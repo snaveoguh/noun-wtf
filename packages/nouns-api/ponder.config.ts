@@ -9,9 +9,16 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Build RPC URL array from PONDER_RPC_URL_1 (comma-separated for multiple endpoints)
+const mainnetRpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+
 const mainnetConfig = createConfig({
   chains: {
-    mainnet: { id: 1, rpc: process.env.PONDER_RPC_URL_1, ws: process.env.PONDER_WS_URL_1 },
+    mainnet: {
+      id: 1,
+      rpc: mainnetRpcUrls.length > 1 ? mainnetRpcUrls : mainnetRpcUrls[0],
+      ws: process.env.PONDER_WS_URL_1,
+    },
   },
   contracts: {
     NounsAuctionHouseV2: {
