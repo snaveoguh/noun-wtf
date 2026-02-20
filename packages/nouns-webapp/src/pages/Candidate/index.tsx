@@ -13,7 +13,6 @@ import { first, isNonNullish } from 'remeda';
 import { toast } from 'sonner';
 import { useAccount, useBlockNumber } from 'wagmi';
 
-import CandidateSponsors from '@/components/CandidateSponsors';
 import ProposalCandidateContent from '@/components/ProposalContent/ProposalCandidateContent';
 import CandidateHeader from '@/components/ProposalHeader/CandidateHeader';
 import VoteSignals from '@/components/VoteSignals/VoteSignals';
@@ -24,7 +23,6 @@ import {
   ProposalState,
   useProposal,
   useProposalCount,
-  useProposalThreshold,
 } from '@/wrappers/nounsDao';
 import {
   useCancelCandidate,
@@ -44,7 +42,7 @@ const CandidatePage = () => {
   const [isProposer, setIsProposer] = useState<boolean>(false);
   const [isCancelPending, setCancelPending] = useState<boolean>(false);
   const [dataFetchPollInterval, setDataFetchPollInterval] = useState<number>(0);
-  const [isSignerWithActiveOrPendingProposal, setIsSignerWithActiveOrPendingProposal] = useState<
+  const [_isSignerWithActiveOrPendingProposal, setIsSignerWithActiveOrPendingProposal] = useState<
     boolean | undefined
   >(undefined);
   const { cancelCandidate, cancelCandidateState } = useCancelCandidate();
@@ -59,7 +57,7 @@ const CandidatePage = () => {
   );
   const [candidate, setCandidate] = useState<typeof candidateData>(undefined);
   const { address: account } = useAccount();
-  const threshold = useProposalThreshold();
+  // threshold removed — was only used by CandidateSponsors
   const userVotes = useUserVotes();
   const latestProposalId = useProposalCount();
   const latestProposal = useProposal(latestProposalId ?? 0);
@@ -266,30 +264,6 @@ const CandidatePage = () => {
             <ProposalCandidateContent proposal={candidate} />
           </Col>
           <Col id="feedback" lg={4} className={classes.sidebar}>
-            {!!currentBlock && !!threshold && !!userVotes && !candidate.isProposal && (
-              <CandidateSponsors
-                candidate={candidate}
-                slug={candidate.slug ?? ''}
-                id={candidate.id}
-                isProposer={isProposer}
-                handleRefetchCandidateData={() => {
-                  candidateRefetch();
-                }}
-                setDataFetchPollInterval={(interval: number | null) =>
-                  interval !== null
-                    ? setDataFetchPollInterval(interval)
-                    : setDataFetchPollInterval(0)
-                }
-                currentBlock={currentBlock - 1n}
-                requiredVotes={threshold + 1}
-                userVotes={userVotes}
-                isSignerWithActiveOrPendingProposal={isSignerWithActiveOrPendingProposal}
-                latestProposal={latestProposal}
-                isUpdateToProposal={isUpdateToProposal}
-                originalProposal={originalProposal}
-                blockNumber={currentBlock}
-              />
-            )}
             <VoteSignals
               proposalId={candidate.id}
               proposer={candidate.proposer}

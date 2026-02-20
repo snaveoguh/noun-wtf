@@ -1,5 +1,7 @@
 import { hardhat, mainnet, sepolia } from 'viem/chains';
 
+import { getSubgraphUrl } from '@/lib/subgraphSettings';
+
 interface ContractParameters {
   executor: {
     GRACE_PERIOD_SECONDS: number;
@@ -38,6 +40,9 @@ export const CHAIN_ID: SupportedChains = import.meta.env.VITE_CHAIN_ID ?? sepoli
 
 export const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY ?? '';
 
+/** noun.wtf client ID for DAO client incentive rewards (bidding, voting, proposing) */
+export const NOUN_WTF_CLIENT_ID = 37;
+
 export const WALLET_CONNECT_V2_PROJECT_ID = import.meta.env.VITE_WALLET_CONNECT_V2_PROJECT_ID ?? '';
 
 const INFURA_PROJECT_ID = import.meta.env.VITE_INFURA_PROJECT_ID;
@@ -62,7 +67,7 @@ const app: Record<SupportedChains, AppConfig> = {
   [mainnet.id]: {
     jsonRpcUri: createNetworkHttpUrl('mainnet'),
     wsRpcUri: createNetworkWsUrl('mainnet'),
-    subgraphApiUri: import.meta.env.VITE_MAINNET_SUBGRAPH ?? '',
+    subgraphApiUri: getSubgraphUrl(),
     enableHistory: import.meta.env.VITE_ENABLE_HISTORY === 'true',
   },
   [hardhat.id]: {

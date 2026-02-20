@@ -1,0 +1,9 @@
+node_modules
+.ponder
+dist
+.git
+*.md
+packages/nouns-webapp
+packages/nouns-docs
+packages/nouns-subgraph
+packages/nouns-bots

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
 
 import SettleManuallyBtn from '@/components/SettleManuallyBtn';
+import { NOUN_WTF_CLIENT_ID } from '@/config';
 import {
   useReadNounsAuctionHouseMinBidIncrementPercentage,
   useWriteNounsAuctionHouseCreateBid,
@@ -122,7 +123,7 @@ const Bid: React.FC<BidProps> = props => {
 
     const value = parseEther(bidInputRef.current.value);
     placeBid({
-      args: [BigInt(auction.nounId)],
+      args: [BigInt(auction.nounId), NOUN_WTF_CLIENT_ID],
       value,
     });
   };

@@ -9,7 +9,7 @@
 }
 
 .textWrapper h1 {
-  font-family: 'Londrina Solid';
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive;
   font-size: 5rem;
 }
 
@@ -22,52 +22,45 @@
   padding-right: 0px;
 }
 
-.embedContainer {
-  padding: 36% 0 0 0;
+/* GIF image containers */
+.gifContainer {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.youtubeEmbedContainer {
-  padding: 32% 0 0 0;
+.gifImage {
+  width: 100%;
+  border-radius: 16px;
+}
+
+.gifContainerFull {
   position: relative;
-}
-
-.embedContainer iframe {
-  position: absolute;
-  top: 20px;
-  left: 0;
-  width: 100%;
-  height: 350px;
-}
-
-.youtubeEmbedContainer iframe {
-  position: absolute;
-  top: 20px;
-  left: 0;
-  height: 320px;
-  width: 100%;
-}
-
-.videoSubtitle {
-  position: absolute;
-  top: 365px;
-}
-
-.youtubeVideoSubtitle {
-  position: absolute;
-  top: 350px;
-}
-
-.videoSubtitle a {
-  display: inline-block;
-  text-decoration: underline;
-  color: #6c757d;
-  padding: 0;
-}
-
-.dlFromAppStoreImg {
   margin-top: 2rem;
-  width: 10rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gifImageFull {
+  width: 100%;
+  border-radius: 16px;
+}
+
+.gifCaption {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.gifCaption a {
+  color: #6c757d;
+  text-decoration: underline;
+}
+
+.gifCaption a:hover {
+  color: #d63c5e;
 }
 
 @media (max-width: 992px) {
@@ -84,39 +77,19 @@
     font-size: 3.75rem;
   }
 
-  .embedContainer {
-    padding: 56.25% 0 0 0 !important;
-    margin-bottom: 60px;
+  .gifContainer {
+    padding: 0 2rem;
+    margin-bottom: 2rem;
   }
 
-  .youtubeEmbedContainer {
-    padding: 56.25% 0 0 0 !important;
-    margin-bottom: 60px;
-  }
-
-  .embedContainer iframe {
-    top: 0;
-    height: 100%;
-  }
-  .youtubeEmbedContainer iframe {
-    top: 0;
-    height: 100%;
-  }
-
-  .videoSubtitle {
-    top: unset;
-    bottom: -40px;
-    padding: 0 2.5rem;
+  .gifContainerFull {
+    padding: 0 2rem;
   }
 }
 
 @media (max-width: 576px) {
-  .videoSubtitle {
-    bottom: -30px;
-  }
-
-  .videoMintedSubtitle {
-    display: none;
+  .textWrapper h1 {
+    font-size: 2.5rem;
   }
 }
 
@@ -126,35 +99,4 @@
 
 .nounsIntroLinks:hover {
   color: #d63c5e;
-}
-
-.nounspotContainer {
-  margin-top: 2rem;
-  margin-bottom: 2rem;
-  position: relative;
-}
-
-.nounspotContainer iframe {
-  width: 100%;
-  height: 500px;
-  border: 0;
-  border-radius: 0px;
-  overflow: hidden;
-}
-
-.nounspotContainer .videoSubtitle {
-  position: absolute;
-  top: 520px;
-}
-
-@media (max-width: 992px) {
-  .nounspotContainer {
-    padding: 0 2rem;
-  }
-
-  .nounspotContainer .videoSubtitle {
-    position: static;
-    margin-top: 1rem;
-    padding: 0;
-  }
 }

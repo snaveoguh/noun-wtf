@@ -1,6 +1,5 @@
 import { ApolloClient, ApolloLink, gql, HttpLink, InMemoryCache } from '@apollo/client';
 
-import { graphql } from '@/subgraphs';
 import { BigNumberish } from '@/utils/types';
 
 export const clientFactory = (uri: string) => {
@@ -67,16 +66,22 @@ export interface Delegates {
   delegates: Delegate[];
 }
 
+// ─── Ponder-compatible GraphQL queries ─────────────────────────────────────────
+// Ponder v0.12 wraps plural results in { items: [...], totalCount }
+// and uses limit/after/before instead of first/skip
+
 export const seedsQuery = (first = 1_000) => ({
   query: gql`
     query GetSeeds($first: Int!) {
-      seeds(first: $first) {
-        id
-        background
-        body
-        accessory
-        head
-        glasses
+      nouns(limit: $first, orderBy: "id", orderDirection: "asc") {
+        items {
+          id
+          background
+          body
+          accessory
+          head
+          glasses
+        }
       }
     }
   `,
@@ -85,7 +90,7 @@ export const seedsQuery = (first = 1_000) => ({
 
 export const proposalQuery = (id: string | number) => ({
   query: gql`
-    query GetProposal($id: ID!) {
+    query GetProposal($id: BigInt!) {
       proposal(id: $id) {
         id
         description
@@ -95,51 +100,60 @@ export const proposalQuery = (id: string | number) => ({
         forVotes
         againstVotes
         abstainVotes
-        createdTransactionHash
-        createdBlock
-        createdTimestamp
+        createdAtTransaction
+        createdAtBlock
+        createdAt
         startBlock
         endBlock
         updatePeriodEndBlock
         objectionPeriodEndBlock
         executionETA
-        targets
-        values
-        signatures
-        calldatas
         onTimelockV1
-        voteSnapshotBlock
-        proposer {
-          id
+        proposer
+        clientId
+        signers(limit: 100) {
+          items {
+            signer
+          }
         }
-        signers {
-          id
+        transactions(limit: 100, orderBy: "index", orderDirection: "asc") {
+          items {
+            target
+            value
+            signature
+            calldata
+          }
         }
       }
     }
   `,
-  variables: { id },
+  variables: { id: String(id) },
 });
 
 export const partialProposalsQuery = (first = 1_000) => ({
   query: gql`
     query GetPartialProposals($first: Int!) {
-      proposals(first: $first, orderBy: createdBlock, orderDirection: asc) {
-        id
-        title
-        status
-        forVotes
-        againstVotes
-        abstainVotes
-        quorumVotes
-        executionETA
-        startBlock
-        endBlock
-        updatePeriodEndBlock
-        objectionPeriodEndBlock
-        onTimelockV1
-        signers {
+      proposals(limit: $first, orderBy: "createdAtBlock", orderDirection: "asc") {
+        items {
           id
+          description
+          status
+          forVotes
+          againstVotes
+          abstainVotes
+          quorumVotes
+          executionETA
+          startBlock
+          endBlock
+          updatePeriodEndBlock
+          objectionPeriodEndBlock
+          onTimelockV1
+          proposer
+          signers(limit: 100) {
+            items {
+              signer
+            }
+          }
         }
       }
     }
@@ -151,277 +165,163 @@ export const activePendingUpdatableProposersQuery = (first = 1_000, currentBlock
   query: gql`
     query GetActivePendingUpdatableProposers($first: Int!, $currentBlock: BigInt!) {
       proposals(
-        first: $first
+        limit: $first
         where: {
-          or: [
-            { status: PENDING, endBlock_gt: $currentBlock }
-            { status: ACTIVE, endBlock_gt: $currentBlock }
+          OR: [
+            { status: "PENDING", endBlock_gt: $currentBlock }
+            { status: "ACTIVE", endBlock_gt: $currentBlock }
           ]
         }
       ) {
-        proposer {
-          id
-        }
-        signers {
-          id
+        items {
+          proposer
+          signers(limit: 100) {
+            items {
+              signer
+            }
+          }
         }
       }
     }
   `,
-  variables: { first, currentBlock },
+  variables: { first, currentBlock: String(currentBlock) },
 });
 
 export const updatableProposalsQuery = (first = 1_000, currentBlock: bigint = 0n) => ({
   query: gql`
     query GetUpdatableProposals($first: Int!, $currentBlock: BigInt!) {
       proposals(
-        first: $first
+        limit: $first
         where: {
-          status: PENDING
+          status: "PENDING"
           endBlock_gt: $currentBlock
           updatePeriodEndBlock_gt: $currentBlock
         }
       ) {
-        id
-      }
-    }
-  `,
-  variables: { first, currentBlock: currentBlock || 0 },
-});
-
-export const candidateProposalsQuery = (first = 1_000) => ({
-  query: gql`
-    query GetCandidateProposals($first: Int!) {
-      proposalCandidates(first: $first) {
-        id
-        slug
-        proposer
-        lastUpdatedTimestamp
-        createdTransactionHash
-        canceled
-        versions {
-          content {
-            title
-          }
-        }
-        latestVersion {
-          content {
-            title
-            description
-            targets
-            values
-            signatures
-            calldatas
-            encodedProposalHash
-            proposalIdToUpdate
-            contentSignatures {
-              id
-              signer {
-                id
-                proposals {
-                  id
-                }
-              }
-              sig
-              expirationTimestamp
-              canceled
-              reason
-            }
-            matchingProposalIds
-          }
-        }
-      }
-    }
-  `,
-  variables: { first },
-});
-
-export const candidateProposalQuery = (id: string) => ({
-  query: gql`
-    query GetCandidateProposal($id: ID!) {
-      proposalCandidate(id: $id) {
-        id
-        slug
-        proposer
-        lastUpdatedTimestamp
-        createdTransactionHash
-        canceled
-        versions {
-          content {
-            title
-          }
-        }
-        latestVersion {
-          content {
-            title
-            description
-            targets
-            values
-            signatures
-            calldatas
-            encodedProposalHash
-            proposalIdToUpdate
-            contentSignatures {
-              id
-              signer {
-                id
-                proposals {
-                  id
-                }
-              }
-              sig
-              expirationTimestamp
-              canceled
-              reason
-            }
-            matchingProposalIds
-          }
-        }
-      }
-    }
-  `,
-  variables: { id },
-});
-
-export const candidateProposalVersionsQuery = (id: string) => ({
-  query: gql`
-    query GetCandidateProposalVersions($id: ID!) {
-      proposalCandidate(id: $id) {
-        id
-        slug
-        proposer
-        lastUpdatedTimestamp
-        canceled
-        createdTransactionHash
-        versions {
-          id
-          createdTimestamp
-          updateMessage
-          content {
-            title
-            description
-            targets
-            values
-            signatures
-            calldatas
-            encodedProposalHash
-          }
-        }
-        latestVersion {
+        items {
           id
         }
       }
     }
   `,
-  variables: { id },
+  variables: { first, currentBlock: String(currentBlock || 0) },
 });
 
-export const proposalVersionsQuery = (id: string | number) => ({
+// Not indexed by Ponder — return empty result shape
+export const candidateProposalsQuery = (_first = 1_000) => ({
   query: gql`
-    query GetProposalVersions($id: ID!) {
-      proposalVersions(where: { proposal_: { id: $id } }) {
-        id
-        createdAt
-        updateMessage
-        title
-        description
-        targets
-        values
-        signatures
-        calldatas
-        proposal {
-          id
-        }
-      }
+    query GetCandidateProposals {
+      __typename
     }
   `,
-  variables: { id },
+  variables: {},
 });
 
-export const auctionQuery = graphql(`
-  query GetAuction($id: ID!) {
-    auction(id: $id) {
-      id
-      amount
-      settled
-      bidder {
-        id
-      }
-      startTime
-      endTime
-      noun {
-        id
-        seed {
+export const candidateProposalQuery = (_id: string) => ({
+  query: gql`
+    query GetCandidateProposal {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const candidateProposalVersionsQuery = (_id: string) => ({
+  query: gql`
+    query GetCandidateProposalVersions {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+// Not indexed by Ponder
+export const proposalVersionsQuery = (_id: string | number) => ({
+  query: gql`
+    query GetProposalVersions {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const auctionQuery = (id: string) => ({
+  query: gql`
+    query GetAuction($id: BigInt!) {
+      auction(nounId: $id) {
+        nounId
+        amount
+        settled
+        winner
+        startTime
+        endTime
+        clientId
+        noun {
           id
           background
           body
           accessory
           head
           glasses
+          owner
         }
-        owner {
-          id
-        }
-      }
-      bids {
-        id
-        blockNumber
-        txIndex
-        amount
-      }
-    }
-  }
-`);
-
-export const bidsByAuctionQuery = (auctionId: string) => ({
-  query: gql`
-    query GetBidsByAuction($auctionId: String!) {
-      bids(where: { auction: $auctionId }) {
-        id
-        amount
-        blockNumber
-        blockTimestamp
-        txIndex
-        bidder {
-          id
-        }
-        noun {
-          id
+        bids(limit: 100, orderBy: "value", orderDirection: "desc") {
+          items {
+            value
+            bidder
+            createdAtBlock
+            createdAtTransaction
+          }
         }
       }
     }
   `,
-  variables: { auctionId },
+  variables: { id: String(id) },
+});
+
+export const bidsByAuctionQuery = (auctionId: string) => ({
+  query: gql`
+    query GetBidsByAuction($auctionId: BigInt!) {
+      bids(where: { nounId: $auctionId }, orderBy: "value", orderDirection: "desc") {
+        items {
+          nounId
+          value
+          bidder
+          clientId
+          createdAt
+          createdAtBlock
+          createdAtTransaction
+        }
+      }
+    }
+  `,
+  variables: { auctionId: String(auctionId) },
 });
 
 export const nounQuery = (id: string) => ({
   query: gql`
-    query GetNoun($id: ID!) {
+    query GetNoun($id: BigInt!) {
       noun(id: $id) {
         id
-        seed {
-          background
-          body
-          accessory
-          head
-          glasses
-        }
-        owner {
-          id
-        }
+        background
+        body
+        accessory
+        head
+        glasses
+        owner
       }
     }
   `,
-  variables: { id },
+  variables: { id: String(id) },
 });
 
 export const nounsIndex = () => ({
   query: gql`
     query GetNounsIndex {
-      nouns {
-        id
-        owner {
+      nouns(limit: 1000, orderBy: "id", orderDirection: "asc") {
+        items {
           id
+          owner
         }
       }
     }
@@ -429,55 +329,31 @@ export const nounsIndex = () => ({
   variables: {},
 });
 
-export const latestAuctionsQuery = graphql(`
-  query GetLatestAuctions($first: Int = 1000, $skip: Int = 0) {
-    auctions(orderBy: startTime, orderDirection: desc, first: $first, skip: $skip) {
-      id
-      amount
-      settled
-      bidder {
-        id
-      }
-      startTime
-      endTime
-      noun {
-        id
-        owner {
-          id
-        }
-      }
-      bids {
-        id
-        amount
-        blockNumber
-        blockTimestamp
-        txHash
-        txIndex
-        bidder {
-          id
-        }
-      }
-    }
-  }
-`);
-
-export const latestBidsQuery = (first = 10) => ({
+export const latestAuctionsQuery = (first = 1000, _skip = 0) => ({
   query: gql`
-    query GetLatestBids($first: Int!) {
-      bids(first: $first, orderBy: blockTimestamp, orderDirection: desc) {
-        id
-        bidder {
-          id
-        }
-        amount
-        blockTimestamp
-        txIndex
-        blockNumber
-        auction {
-          id
+    query GetLatestAuctions($first: Int!) {
+      auctions(orderBy: "startTime", orderDirection: "desc", limit: $first) {
+        items {
+          nounId
+          amount
+          settled
+          winner
           startTime
           endTime
-          settled
+          clientId
+          noun {
+            id
+            owner
+          }
+          bids(limit: 100, orderBy: "value", orderDirection: "desc") {
+            items {
+              value
+              bidder
+              createdAtBlock
+              createdAt
+              createdAtTransaction
+            }
+          }
         }
       }
     }
@@ -485,70 +361,67 @@ export const latestBidsQuery = (first = 10) => ({
   variables: { first },
 });
 
-export const nounVotingHistoryQuery = (nounId: number, first = 1_000) => ({
+export const latestBidsQuery = (first = 10) => ({
   query: gql`
-    query GetNounVotingHistory($nounId: ID!, $first: Int!) {
-      noun(id: $nounId) {
-        id
-        votes(first: $first) {
-          blockNumber
-          proposal {
-            id
-          }
-          support
-          supportDetailed
-          voter {
-            id
+    query GetLatestBids($first: Int!) {
+      bids(limit: $first, orderBy: "createdAt", orderDirection: "desc") {
+        items {
+          nounId
+          bidder
+          value
+          createdAt
+          createdAtBlock
+          createdAtTransaction
+          auction {
+            nounId
+            startTime
+            endTime
+            settled
           }
         }
       }
     }
   `,
-  variables: { nounId, first },
+  variables: { first },
 });
 
-export const nounTransferHistoryQuery = (nounId: number, first = 1_000) => ({
+// Voting history for a specific noun — not directly queryable via Ponder
+export const nounVotingHistoryQuery = (_nounId: number, _first = 1_000) => ({
   query: gql`
-    query GetNounTransferHistory($nounId: String!, $first: Int!) {
-      transferEvents(where: { noun: $nounId }, first: $first) {
-        id
-        previousHolder {
-          id
-        }
-        newHolder {
-          id
-        }
-        blockNumber
-      }
+    query GetNounVotingHistory {
+      __typename
     }
   `,
-  variables: { nounId, first },
+  variables: {},
 });
 
-export const nounDelegationHistoryQuery = (nounId: number, first = 1_000) => ({
+// Transfer/delegation events not indexed by Ponder
+export const nounTransferHistoryQuery = (_nounId: number, _first = 1_000) => ({
   query: gql`
-    query GetNounDelegationHistory($nounId: String!, $first: Int!) {
-      delegationEvents(where: { noun: $nounId }, first: $first) {
-        id
-        previousDelegate {
-          id
-        }
-        newDelegate {
-          id
-        }
-        blockNumber
-      }
+    query GetNounTransferHistory {
+      __typename
     }
   `,
-  variables: { nounId, first },
+  variables: {},
+});
+
+export const nounDelegationHistoryQuery = (_nounId: number, _first = 1_000) => ({
+  query: gql`
+    query GetNounDelegationHistory {
+      __typename
+    }
+  `,
+  variables: {},
 });
 
 export const createTimestampAllProposals = () => ({
   query: gql`
     query GetCreateTimestampAllProposals {
-      proposals(orderBy: createdTimestamp, orderDirection: asc, first: 1000) {
-        id
-        createdTimestamp
+      proposals(orderBy: "createdAt", orderDirection: "asc", limit: 1000) {
+        items {
+          id
+          createdAt
+        }
       }
     }
   `,
@@ -557,39 +430,41 @@ export const createTimestampAllProposals = () => ({
 
 export const proposalVotesQuery = (proposalId: string) => ({
   query: gql`
-    query GetProposalVotes($proposalId: String!) {
-      votes(where: { proposal: $proposalId, votesRaw_gt: 0 }) {
-        supportDetailed
-        voter {
-          id
+    query GetProposalVotes($proposalId: BigInt!) {
+      votes(where: { proposalId: $proposalId, votes_gt: 0 }, limit: 1000) {
+        items {
+          support
+          votes
+          voter
         }
       }
     }
   `,
-  variables: { proposalId },
+  variables: { proposalId: String(proposalId) },
 });
 
-export const delegateNounsAtBlockQuery = (delegates: string[], block: bigint) => ({
+// Block-scoped queries not supported by Ponder — return current state
+export const delegateNounsAtBlockQuery = (delegates: string[], _block: bigint) => ({
   query: gql`
-    query GetDelegateNounsAtBlock($delegates: [ID!]!, $block: Int!) {
-      delegates(where: { id_in: $delegates }, block: { number: $block }) {
-        id
-        nounsRepresented {
+    query GetDelegateNounsAtBlock($delegates: [String!]!) {
+      delegates(where: { id_in: $delegates }, limit: 1000) {
+        items {
           id
+          delegatedVotes
         }
       }
     }
   `,
-  variables: { delegates, block: Number(block) },
+  variables: { delegates },
 });
 
 export const currentlyDelegatedNouns = (delegate: string) => ({
   query: gql`
-    query GetCurrentlyDelegatedNouns($delegate: ID!) {
+    query GetCurrentlyDelegatedNouns($delegate: String!) {
       delegates(where: { id: $delegate }) {
-        id
-        nounsRepresented {
+        items {
           id
+          delegatedVotes
         }
       }
     }
@@ -597,213 +472,133 @@ export const currentlyDelegatedNouns = (delegate: string) => ({
   variables: { delegate },
 });
 
-export const adjustedNounSupplyAtPropSnapshot = (proposalId: string) => ({
+// adjustedTotalSupply not in Ponder — stub
+export const adjustedNounSupplyAtPropSnapshot = (_proposalId: string) => ({
   query: gql`
-    query GetAdjustedNounSupplyAtPropSnapshot($proposalId: ID!) {
-      proposals(where: { id: $proposalId }) {
-        adjustedTotalSupply
-      }
-    }
-  `,
-  variables: { proposalId },
-});
-
-export const propUsingDynamicQuorum = (proposalId: string) => ({
-  query: gql`
-    query GetPropUsingDynamicQuorum($proposalId: ID!) {
-      proposal(id: $proposalId) {
-        quorumCoefficient
-      }
-    }
-  `,
-  variables: { proposalId },
-});
-
-export const proposalFeedbacksQuery = (proposalId: string) => ({
-  query: gql`
-    query GetProposalFeedbacks($proposalId: ID!) {
-      proposalFeedbacks(where: { proposal_: { id: $proposalId } }) {
-        supportDetailed
-        votes
-        reason
-        createdTimestamp
-        voter {
-          id
-        }
-        proposal {
-          id
-        }
-      }
-    }
-  `,
-  variables: { proposalId },
-});
-export const candidateFeedbacksQuery = (candidateId: string) => ({
-  query: gql`
-    query GetCandidateFeedbacks($candidateId: ID!) {
-      candidateFeedbacks(where: { candidate_: { id: $candidateId } }) {
-        supportDetailed
-        votes
-        reason
-        createdTimestamp
-        voter {
-          id
-        }
-        candidate {
-          id
-        }
-      }
-    }
-  `,
-  variables: { candidateId },
-});
-
-export const ownedNounsQuery = (owner: string) => ({
-  query: gql`
-    query GetOwnedNouns($owner: ID!) {
-      nouns(where: { owner_: { id: $owner } }) {
-        id
-      }
-    }
-  `,
-  variables: { owner },
-});
-
-export const accountEscrowedNounsQuery = (owner: string) => ({
-  query: gql`
-    query GetAccountEscrowedNouns($owner: ID!) {
-      escrowedNouns(where: { owner_: { id: $owner } }, first: 1000) {
-        noun {
-          id
-        }
-        fork {
-          id
-        }
-      }
-    }
-  `,
-  variables: { owner },
-});
-
-export const escrowDepositEventsQuery = (forkId: string) => ({
-  query: gql`
-    query GetEscrowDepositEvents($forkId: String!) {
-      escrowDeposits(where: { fork: $forkId, tokenIDs_not: [] }, first: 1000) {
-        id
-        createdAt
-        owner {
-          id
-        }
-        reason
-        tokenIDs
-        proposalIDs
-      }
-    }
-  `,
-  variables: { forkId },
-});
-export const forkJoinsQuery = (forkId: string) => ({
-  query: gql`
-    query GetForkJoins($forkId: String!) {
-      forkJoins(where: { fork: $forkId, tokenIDs_not: [] }, first: 1000) {
-        id
-        createdAt
-        owner {
-          id
-        }
-        reason
-        tokenIDs
-        proposalIDs
-      }
-    }
-  `,
-  variables: { forkId },
-});
-
-export const escrowWithdrawEventsQuery = (forkId: string) => ({
-  query: gql`
-    query GetEscrowWithdrawEvents($forkId: String!) {
-      escrowWithdrawals(where: { fork: $forkId, tokenIDs_not: [] }, first: 1000) {
-        id
-        createdAt
-        owner {
-          id
-        }
-        tokenIDs
-      }
-    }
-  `,
-  variables: { forkId },
-});
-
-export const proposalTitlesQuery = (ids: number[]) => ({
-  query: gql`
-    query GetProposalTitles($ids: [ID!]!) {
-      proposals(where: { id_in: $ids }) {
-        id
-        title
-      }
-    }
-  `,
-  variables: { ids },
-});
-
-export const forkDetailsQuery = (id: string) => ({
-  query: gql`
-    query GetForkDetails($id: ID!) {
-      fork(id: $id) {
-        id
-        forkID
-        executed
-        executedAt
-        forkTreasury
-        forkToken
-        tokensForkingCount
-        tokensInEscrowCount
-        forkingPeriodEndTimestamp
-        escrowedNouns(first: 1000) {
-          noun {
-            id
-          }
-        }
-        joinedNouns(first: 1000) {
-          noun {
-            id
-          }
-        }
-      }
-    }
-  `,
-  variables: { id },
-});
-
-export const forksQuery = () => ({
-  query: gql`
-    query GetForks {
-      forks {
-        id
-        forkID
-        executed
-        executedAt
-        forkTreasury
-        forkToken
-        tokensForkingCount
-        tokensInEscrowCount
-        forkingPeriodEndTimestamp
-      }
+    query GetAdjustedNounSupplyAtPropSnapshot {
+      __typename
     }
   `,
   variables: {},
 });
 
-export const isForkActiveQuery = (currentTimestamp: number) => ({
+// quorumCoefficient not in Ponder — stub
+export const propUsingDynamicQuorum = (_proposalId: string) => ({
   query: gql`
-    query GetIsForkActive($currentTimestamp: BigInt!) {
-      forks(where: { executed: true, forkingPeriodEndTimestamp_gt: $currentTimestamp }) {
-        forkID
-        forkingPeriodEndTimestamp
+    query GetPropUsingDynamicQuorum {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+// Feedbacks not indexed by Ponder — stub
+export const proposalFeedbacksQuery = (_proposalId: string) => ({
+  query: gql`
+    query GetProposalFeedbacks {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const candidateFeedbacksQuery = (_candidateId: string) => ({
+  query: gql`
+    query GetCandidateFeedbacks {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const ownedNounsQuery = (owner: string) => ({
+  query: gql`
+    query GetOwnedNouns($owner: String!) {
+      nouns(where: { owner: $owner }, limit: 1000) {
+        items {
+          id
+        }
       }
     }
   `,
-  variables: { currentTimestamp },
+  variables: { owner: owner.toLowerCase() },
+});
+
+// Fork/escrow not indexed by Ponder — stub
+export const accountEscrowedNounsQuery = (_owner: string) => ({
+  query: gql`
+    query GetAccountEscrowedNouns {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const escrowDepositEventsQuery = (_forkId: string) => ({
+  query: gql`
+    query GetEscrowDepositEvents {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const forkJoinsQuery = (_forkId: string) => ({
+  query: gql`
+    query GetForkJoins {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const escrowWithdrawEventsQuery = (_forkId: string) => ({
+  query: gql`
+    query GetEscrowWithdrawEvents {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const proposalTitlesQuery = (ids: number[]) => ({
+  query: gql`
+    query GetProposalTitles($ids: [BigInt!]!) {
+      proposals(where: { id_in: $ids }, limit: 1000) {
+        items {
+          id
+          description
+        }
+      }
+    }
+  `,
+  variables: { ids: ids.map(String) },
+});
+
+// Fork details not indexed by Ponder — stub
+export const forkDetailsQuery = (_id: string) => ({
+  query: gql`
+    query GetForkDetails {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const forksQuery = () => ({
+  query: gql`
+    query GetForks {
+      __typename
+    }
+  `,
+  variables: {},
+});
+
+export const isForkActiveQuery = (_currentTimestamp: number) => ({
+  query: gql`
+    query GetIsForkActive {
+      __typename
+    }
+  `,
+  variables: {},
 });

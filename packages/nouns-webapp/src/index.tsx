@@ -203,18 +203,40 @@ const PastAuctions: React.FC = () => {
 
   const { data: auctions } = useQuery({
     queryKey: ['latestAuctions'],
-    queryFn: async () =>
-      await Promise.all([
-        execute(latestAuctionsQuery, { first: 1000 }),
-        execute(latestAuctionsQuery, { first: 1000, skip: 1000 }),
-      ]).then(([page1, page2]) => [...page1.auctions, ...page2.auctions]),
+    queryFn: async () => {
+      const { query, variables } = latestAuctionsQuery(1000);
+      const result = await execute<{
+        auctions: {
+          items: Array<{
+            nounId: string;
+            amount: string;
+            settled: boolean;
+            winner: string | null;
+            startTime: string;
+            endTime: string;
+            clientId: number | null;
+            noun: { id: string; owner: string } | null;
+            bids: {
+              items: Array<{
+                value: string;
+                bidder: string;
+                createdAtBlock: string;
+                createdAt: string;
+                createdAtTransaction: string;
+              }>;
+            };
+          }>;
+        };
+      }>(query, variables);
+      return result?.auctions?.items ?? [];
+    },
   });
 
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     if (auctions) {
-      dispatch(addPastAuctions({ auctions }));
+      dispatch(addPastAuctions(auctions));
     }
   }, [auctions, latestAuctionId, dispatch]);
 

@@ -7,6 +7,7 @@ import { Button, FloatingLabel, FormControl, Spinner } from 'react-bootstrap';
 
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import SolidColorBackgroundModal from '@/components/SolidColorBackgroundModal';
+import { NOUN_WTF_CLIENT_ID } from '@/config';
 import { cn } from '@/lib/utils';
 import { useCastRefundableVote, useCastRefundableVoteWithReason, Vote } from '@/wrappers/nounsDao';
 
@@ -210,9 +211,9 @@ const VoteModal = ({
               setIsLoading(true);
               const isReasonEmpty = voteReason.trim() === '';
               if (isReasonEmpty) {
-                castRefundableVote({ args: [BigInt(proposalId), vote] });
+                castRefundableVote({ args: [BigInt(proposalId), vote, NOUN_WTF_CLIENT_ID] });
               } else {
-                castRefundableVoteWithReason({ args: [BigInt(proposalId), vote, voteReason] });
+                castRefundableVoteWithReason({ args: [BigInt(proposalId), vote, voteReason, NOUN_WTF_CLIENT_ID] });
               }
             }}
             className={vote === undefined ? classes.submitBtnDisabled : classes.submitBtn}

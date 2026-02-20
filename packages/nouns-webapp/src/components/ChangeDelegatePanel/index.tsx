@@ -7,7 +7,6 @@ import { isAddress } from 'viem';
 import { useAccount, useEnsAddress } from 'wagmi';
 
 import BrandSpinner from '@/components/BrandSpinner';
-import DelegationCandidateInfo from '@/components/DelegationCandidateInfo';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
 import { buildEtherscanTxLink } from '@/utils/etherscan';
@@ -265,17 +264,7 @@ const ChangeDelegatePanel: React.FC<ChangeDelegatePanelProps> = props => {
             <span className={classes.alreadyDelegatedCopy}>
               <Trans>You&apos;ve already delegated to this address</Trans>
             </span>
-          ) : (
-            <>
-              {isAddress(delegateAddress) && (
-                <DelegationCandidateInfo
-                  address={delegateAddress as `0x${string}`}
-                  votesToAdd={availableVotes}
-                  changeModalState={changeDelegateState}
-                />
-              )}
-            </>
-          )}
+          ) : null}
         </div>
       </Collapse>
 

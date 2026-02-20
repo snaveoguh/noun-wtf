@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm i -g pnpm@10 && pnpm install"]
+
+[phases.build]
+cmds = ["pnpm build --filter=@nouns/api"]
+
+[start]
+cmd = "pnpm --filter @nouns/api -- start --schema $RAILWAY_DEPLOYMENT_ID"

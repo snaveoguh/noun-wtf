@@ -7,7 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        londrina: ['Londrina Solid', 'sans-serif'],
+        londrina: ['Comic Sans MS', 'Comic Sans', 'cursive'],
+        sans: ['Comic Sans MS', 'Comic Sans', 'cursive'],
       },
       screens: {
         xs: '425px',
