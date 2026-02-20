@@ -270,6 +270,7 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
   const waveRef = useRef(1);
   const killsInWaveRef = useRef(0);
   const activeRef = useRef(active);
+  const saberAngleRef = useRef(0); // current effective saber angle (updated in game loop)
 
   // Force Push state
   const forcePushesRef = useRef<ForcePush[]>([]);
@@ -459,8 +460,8 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
       // ── Force Push on "F" ──
       if ((e.key === 'f' || e.key === 'F') && !gameOverRef.current && forceCooldownRef.current <= 0) {
         const m = mouseRef.current;
-        const p = prevMouseRef.current;
-        const forceAngle = Math.atan2(m.y - p.y, m.x - p.x);
+        // Use the current saber direction (stored by game loop), not mouse delta
+        const forceAngle = saberAngleRef.current;
 
         forcePushesRef.current.push({
           x: m.x, y: m.y, angle: forceAngle,
@@ -545,6 +546,7 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
       }
 
       const effectiveAngle = saberAngle + (isSwinging.current ? Math.sin(swingAngle.current) * 1.2 : 0);
+      saberAngleRef.current = effectiveAngle; // expose to keydown handler
 
       // Send position to PartyKit
       if (frame % SEND_INTERVAL === 0 && wsRef.current?.readyState === WebSocket.OPEN) {
@@ -780,18 +782,21 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
         }
 
         // Collision with Siths (local force pushes only)
+        // Force does reduced damage to Siths (20) but massive knockback + stun
+        // Full 50 damage is for PvP only
         if (!fp.isRemote) {
           sithsRef.current.forEach(sith => {
             if (sith.state === 'dead' || fp.hitIds.has(sith.id)) return;
             if (isInCone(fp.x, fp.y, sith.x, sith.y, fp.angle, FORCE_CONE_ANGLE / 2, fp.radius)) {
               fp.hitIds.add(sith.id);
-              sith.hp -= fp.damage; sith.stunTimer = 40;
+              const sithForceDmg = 20; // reduced vs NPCs
+              sith.hp -= sithForceDmg; sith.stunTimer = 40;
               const pa = Math.atan2(sith.y - fp.y, sith.x - fp.x);
               sith.vx = Math.cos(pa) * FORCE_KNOCKBACK;
               sith.vy = Math.sin(pa) * FORCE_KNOCKBACK;
               spawnParticles(sith.x, sith.y, fp.color, 10);
               spawnParticles(sith.x, sith.y, '#ffffff', 5);
-              spawnFloatingText(sith.x, sith.y - 30, `-${fp.damage}`, '#cc88ff');
+              spawnFloatingText(sith.x, sith.y - 30, `-${sithForceDmg}`, '#cc88ff');
               if (sith.hp <= 0) {
                 sith.state = 'dead'; sith.deathTime = now;
                 spawnParticles(sith.x, sith.y, '#ff0000', 20);
