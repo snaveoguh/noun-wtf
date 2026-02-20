@@ -49,7 +49,8 @@ const useOnDisplayAuction = (): Auction | undefined => {
   }
 
   // current auction
-  if (BigInt(onDisplayAuctionNounId) === lastAuctionNounId) {
+  // Compare as numbers — lastAuctionNounId is a string after Redux serialisation
+  if (Number(onDisplayAuctionNounId) === Number(lastAuctionNounId)) {
     return deserializeAuction(currentAuction);
   }
 
@@ -63,7 +64,7 @@ const useOnDisplayAuction = (): Auction | undefined => {
     return deserializeAuction(emptyNounderAuction);
   }
 
-  // past auction
+  // past auction — look up in Ponder data
   const pastAuction = pastAuctions.find(auction => {
     if (!auction.activeAuction) return false;
     const nounId = BigInt(auction.activeAuction.nounId);
@@ -71,7 +72,20 @@ const useOnDisplayAuction = (): Auction | undefined => {
   });
   const reduxSafeAuction = pastAuction?.activeAuction;
 
-  return reduxSafeAuction ? deserializeAuction(reduxSafeAuction) : undefined;
+  if (reduxSafeAuction) {
+    return deserializeAuction(reduxSafeAuction);
+  }
+
+  // Fallback: Ponder hasn't indexed this noun yet — return a stub so the
+  // page still renders (the Noun image loads its seed on-chain independently).
+  return {
+    nounId: BigInt(onDisplayAuctionNounId),
+    startTime: 0n,
+    endTime: 0n,
+    settled: true,
+    amount: 0n,
+    bidder: undefined,
+  };
 };
 
 export const useAuctionBids = (auctionNounId: bigint): Bid[] | undefined => {

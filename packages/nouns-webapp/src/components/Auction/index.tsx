@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 
 import { Col, Container, Row } from 'react-bootstrap';
 import { useNavigate } from 'react-router';
@@ -9,7 +9,7 @@ import NounderNounContent from '@/components/NounderNounContent';
 // eslint-disable-next-line sonarjs/deprecation
 import { StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
-import { setStateBackgroundColor } from '@/state/slices/application';
+import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import { RootState } from '@/store';
 import { nounPath } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
@@ -31,9 +31,13 @@ const Auction: React.FC<AuctionProps> = props => {
   const stateBgColor = useAppSelector((state: RootState) => state.application.stateBackgroundColor);
   const lastNounId = useAppSelector((state: RootState) => state.onDisplayAuction.lastAuctionNounId);
 
-  const loadedNounHandler = (seed: INounSeed) => {
-    dispatch(setStateBackgroundColor(seed.background === 0 ? grey : beige));
-  };
+  const loadedNounHandler = useCallback(
+    (seed: INounSeed) => {
+      dispatch(setStateBackgroundColor(seed.background === 0 ? grey : beige));
+      dispatch(setCurrentNounSeed(seed));
+    },
+    [dispatch],
+  );
 
   const prevAuctionHandler = () => {
     if (currentAuction) {
@@ -88,13 +92,13 @@ const Auction: React.FC<AuctionProps> = props => {
     <div style={{ backgroundColor: stateBgColor }} className={classes.wrapper}>
       <Container fluid="xl">
         <Row>
-          <Col lg={{ span: 6 }} className={classes.auctionActivityCol}>
+          <Col lg={{ span: 5 }} className={classes.auctionActivityCol}>
             {currentAuction &&
               (isNounderNoun(BigInt(currentAuction.nounId))
                 ? nounderNounContent
                 : currentAuctionActivityContent)}
           </Col>
-          <Col lg={{ span: 6 }} className={classes.nounContentCol}>
+          <Col lg={{ span: 7 }} className={classes.nounContentCol}>
             {currentAuction ? nounContent : loadingNoun}
           </Col>
         </Row>

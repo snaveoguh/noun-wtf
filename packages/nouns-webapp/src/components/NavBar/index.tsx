@@ -17,11 +17,14 @@ import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import NavBarTreasury from '@/components/NavBarTreasury';
 import NavDropdown from '@/components/NavDropdown';
 import NavLocaleSwitcher from '@/components/NavLocaleSwitcher';
+import NounPalette from '@/components/NounPalette';
 import ShortAddress from '@/components/ShortAddress';
 import SubgraphSettings from '@/components/SubgraphSettings';
 import config, { CHAIN_ID } from '@/config';
 import { nounsTreasuryAddress } from '@/contracts';
-import { useAppSelector } from '@/hooks';
+import { useAppDispatch, useAppSelector } from '@/hooks';
+import { setTorchMode } from '@/state/slices/application';
+import { INounSeed } from '@/wrappers/nounToken';
 import { usePickByState } from '@/utils/colorResponsiveUIUtils';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
 import { defaultChain } from '@/wagmi';
@@ -37,6 +40,9 @@ const NavBar = () => {
   const isDaoGteV3 = useIsDaoGteV3();
   const stateBgColor = useAppSelector(state => state.application.stateBackgroundColor);
   const isCool = useAppSelector(state => state.application.isCoolBackground);
+  const currentNounSeed = useAppSelector(state => state.application.currentNounSeed) as INounSeed | null;
+  const torchMode = useAppSelector(state => state.application.torchMode);
+  const navDispatch = useAppDispatch();
   const location = useLocation();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
@@ -126,6 +132,14 @@ const NavBar = () => {
                 </Nav.Link>
               ) : null}
             </Nav.Item>
+            {currentNounSeed && (
+              <Nav.Item className="d-none d-xl-flex" style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, whiteSpace: 'nowrap' }}>
+                  today's color pal:
+                </span>
+                <NounPalette seed={currentNounSeed} />
+              </Nav.Item>
+            )}
           </div>
           <Navbar.Toggle
             className={classes.navBarToggle}
@@ -365,6 +379,24 @@ const NavBar = () => {
               </NavDropdown>
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
+            <button
+              onClick={() => navDispatch(setTorchMode(!torchMode))}
+              title={torchMode ? 'Turn on the lights' : 'Turn off the lights'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                padding: '6px 8px',
+                lineHeight: 1,
+                opacity: 0.7,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
+            >
+              {torchMode ? '☀️' : '🌙'}
+            </button>
             <SubgraphSettings />
             <ConnectKitButton.Custom>
               {({ isConnected, show, address }) => {

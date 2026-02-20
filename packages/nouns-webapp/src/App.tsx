@@ -39,6 +39,9 @@ import { setActiveAccount } from '@/state/slices/account';
 
 import DreamWindow from '@/components/DreamWindow';
 import { ProbeButton } from '@/components/ProbeButton';
+import SaberOverlay from '@/components/SaberOverlay';
+import TorchOverlay from '@/components/TorchOverlay';
+import { useAppSelector } from '@/hooks';
 
 import classes from './App.module.css';
 
@@ -51,6 +54,8 @@ const SaberArenaPage = lazy(() => import('@/miniapps/saber/SaberArenaPage'));
 function App() {
   const { address: account, chainId } = useAccount();
   const [dreamOpen, setDreamOpen] = useState(false);
+  const [saberMode, setSaberMode] = useState(false);
+  const torchMode = useAppSelector(state => state.application.torchMode);
 
   const dispatch = useAppDispatch();
   dayjs.extend(relativeTime);
@@ -68,7 +73,7 @@ function App() {
   }, []);
 
   return (
-    <div className={`${classes.wrapper}`}>
+    <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
       {chainId !== undefined && Number(CHAIN_ID) !== chainId && <NetworkAlert />}
       <BrowserRouter>
         <NavBar />
@@ -116,8 +121,11 @@ function App() {
           }}
         />
 
-        {/* Probe-style Dream button — fixed bottom-right */}
-        <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, paddingRight: '0.5rem', paddingBottom: '0.5rem' }}>
+        {/* Fixed bottom-right buttons */}
+        <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, paddingRight: '0.5rem', paddingBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <ProbeButton onClick={() => setSaberMode(s => !s)}>
+            {saberMode ? '⚔ EXIT' : '⚔ SABER'}
+          </ProbeButton>
           <ProbeButton onClick={() => setDreamOpen(true)}>
             Dream
           </ProbeButton>
@@ -125,6 +133,12 @@ function App() {
 
         {/* Dream creation retro window */}
         <DreamWindow open={dreamOpen} onClose={() => setDreamOpen(false)} />
+
+        {/* Saber battle overlay */}
+        <SaberOverlay active={saberMode} onClose={() => setSaberMode(false)} />
+
+        {/* Torch / dungeon mode overlay */}
+        <TorchOverlay active={torchMode} />
       </BrowserRouter>
     </div>
   );

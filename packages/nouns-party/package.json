@@ -1,0 +1,17 @@
+{
+  "name": "@nouns/party",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PartyKit real-time saber multiplayer server for noun.wtf",
+  "scripts": {
+    "dev": "npx partykit dev",
+    "deploy": "npx partykit deploy"
+  },
+  "dependencies": {
+    "partysocket": "^1.0.3"
+  },
+  "devDependencies": {
+    "partykit": "^0.0.115",
+    "typescript": "^5.5.0"
+  }
+}

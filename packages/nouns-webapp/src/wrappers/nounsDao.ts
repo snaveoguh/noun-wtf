@@ -628,7 +628,7 @@ const handlePendingOrActiveState = (
   }
 
   // Check if it's in PENDING state
-  if (blockNumber <= BigInt(proposal.startBlock)) {
+  if (blockNumber <= BigInt(proposal.startBlock ?? 0)) {
     return ProposalState.PENDING;
   }
 
@@ -664,6 +664,7 @@ const isInObjectionPeriod = (
   proposal: GraphQLProposal,
   isDaoGteV3?: boolean,
 ): boolean => {
+  if (!proposal.objectionPeriodEndBlock) return false;
   return Boolean(
     isDaoGteV3 === true &&
       blockNumber > proposal.endBlock &&
@@ -674,15 +675,15 @@ const isInObjectionPeriod = (
 // Check if a proposal is past its end block
 const isPastEndBlock = (blockNumber: number, proposal: GraphQLProposal): boolean => {
   return (
-    blockNumber > BigInt(proposal.endBlock) &&
-    blockNumber > BigInt(proposal.objectionPeriodEndBlock)
+    blockNumber > BigInt(proposal.endBlock ?? 0) &&
+    blockNumber > BigInt(proposal.objectionPeriodEndBlock ?? 0)
   );
 };
 
 // Determine the state for a proposal that is past its end block
 const getPastEndBlockState = (proposal: GraphQLProposal): ProposalState => {
-  const forVotes = BigInt(proposal.forVotes);
-  if (forVotes <= BigInt(proposal.againstVotes) || forVotes < BigInt(proposal.quorumVotes ?? 0)) {
+  const forVotes = BigInt(proposal.forVotes ?? 0);
+  if (forVotes <= BigInt(proposal.againstVotes ?? 0) || forVotes < BigInt(proposal.quorumVotes ?? 0)) {
     return ProposalState.DEFEATED;
   }
 
@@ -748,12 +749,12 @@ const parsePartialSubgraphProposal = (
       isDaoGteV3,
       onTimelockV1,
     ),
-    startBlock: BigInt(proposal.startBlock),
-    endBlock: BigInt(proposal.endBlock),
+    startBlock: BigInt(proposal.startBlock ?? 0),
+    endBlock: BigInt(proposal.endBlock ?? 0),
     updatePeriodEndBlock: BigInt(proposal?.updatePeriodEndBlock ?? 0),
-    forCount: Number(proposal.forVotes),
-    againstCount: Number(proposal.againstVotes),
-    abstainCount: Number(proposal.abstainVotes),
+    forCount: Number(proposal.forVotes ?? 0),
+    againstCount: Number(proposal.againstVotes ?? 0),
+    abstainCount: Number(proposal.abstainVotes ?? 0),
     quorumVotes: Number(proposal?.quorumVotes ?? 0),
     eta: proposal.executionETA != null ? new Date(Number(proposal.executionETA) * 1000) : undefined,
     objectionPeriodEndBlock: BigInt(proposal?.objectionPeriodEndBlock ?? 0),
@@ -805,21 +806,21 @@ const parseSubgraphProposal = (
     ),
     proposalThreshold: BigInt(proposal.proposalThreshold ?? 0),
     quorumVotes: Number(proposal.quorumVotes ?? 0),
-    forCount: Number(proposal.forVotes),
-    againstCount: Number(proposal.againstVotes),
-    abstainCount: Number(proposal.abstainVotes),
-    createdBlock: BigInt(proposal.createdBlock),
-    startBlock: BigInt(proposal.startBlock),
-    endBlock: BigInt(proposal.endBlock),
-    createdTimestamp: BigInt(proposal.createdTimestamp),
+    forCount: Number(proposal.forVotes ?? 0),
+    againstCount: Number(proposal.againstVotes ?? 0),
+    abstainCount: Number(proposal.abstainVotes ?? 0),
+    createdBlock: BigInt(proposal.createdBlock ?? 0),
+    startBlock: BigInt(proposal.startBlock ?? 0),
+    endBlock: BigInt(proposal.endBlock ?? 0),
+    createdTimestamp: BigInt(proposal.createdTimestamp ?? 0),
     eta: proposal.executionETA != null ? new Date(Number(proposal.executionETA) * 1000) : undefined,
     details: details,
     transactionHash: proposal.createdTransactionHash as Hash,
-    objectionPeriodEndBlock: BigInt(proposal.objectionPeriodEndBlock),
+    objectionPeriodEndBlock: BigInt(proposal.objectionPeriodEndBlock ?? 0),
     updatePeriodEndBlock: BigInt(proposal.updatePeriodEndBlock ?? 0),
     signers: map(proposal.signers ?? [], v => ({ id: v.id as Address })),
     onTimelockV1: onTimelockV1,
-    voteSnapshotBlock: BigInt(proposal.voteSnapshotBlock),
+    voteSnapshotBlock: BigInt(proposal.voteSnapshotBlock ?? proposal.startBlock ?? 0),
   };
 };
 
@@ -926,8 +927,8 @@ export const useAllProposalsViaChain = (skip = false): PartialProposalData => {
           id: proposal?.id.toString(),
           title: pipe(description, extractTitle, removeMarkdownStyle) ?? 'Untitled',
           status: proposalStates[i] ?? ProposalState.UNDETERMINED,
-          startBlock: BigInt(proposal?.startBlock?.toString() ?? ''),
-          endBlock: BigInt(proposal?.endBlock?.toString() ?? ''),
+          startBlock: BigInt(proposal?.startBlock?.toString() ?? '0'),
+          endBlock: BigInt(proposal?.endBlock?.toString() ?? '0'),
           objectionPeriodEndBlock: BigInt(proposal?.objectionPeriodEndBlock?.toString() ?? 0),
           forCount: Number(proposal?.forVotes?.toString() ?? '0'),
           againstCount: Number(proposal?.againstVotes?.toString() ?? '0'),
