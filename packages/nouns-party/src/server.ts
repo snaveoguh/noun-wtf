@@ -3,17 +3,16 @@ import type { Party, PartyKitServer, Connection } from "partykit/server";
 /**
  * Saber Arena — PartyKit real-time multiplayer server.
  *
- * Each room = one "arena" (we use "main" as the global room).
- * Players send their cursor position + saber state every frame.
- * Server broadcasts to all other connections.
- *
  * Protocol (JSON):
  *
  * Client → Server:
  *   { type: "update", x, y, angle, swinging, color, name }
+ *   { type: "force", x, y, angle, color }
  *
  * Server → Client:
- *   { type: "sync", players: { [id]: { x, y, angle, swinging, color, name, lastSeen } } }
+ *   { type: "sync", players, count }
+ *   { type: "player", id, ...state }
+ *   { type: "force", id, x, y, angle, color }
  *   { type: "join", id, count }
  *   { type: "leave", id, count }
  */
@@ -28,21 +27,16 @@ interface PlayerState {
   lastSeen: number;
 }
 
-// How often to broadcast the full state to all clients (ms)
-const BROADCAST_INTERVAL = 50; // 20 fps
-// How long before a player is considered disconnected (ms)
 const STALE_TIMEOUT = 5000;
 
 export default {
   onConnect(connection: Connection, room: Party) {
     const count = [...room.getConnections()].length;
 
-    // Notify everyone about the new player
     room.broadcast(
       JSON.stringify({ type: "join", id: connection.id, count }),
     );
 
-    // Send the new player the current state
     const players: Record<string, PlayerState> = {};
     const now = Date.now();
     for (const [id, state] of Object.entries(
@@ -60,7 +54,6 @@ export default {
       const data = JSON.parse(message as string);
 
       if (data.type === "update") {
-        // Store player state on the room object
         const roomAny = room as unknown as { _players?: Record<string, PlayerState> };
         if (!roomAny._players) roomAny._players = {};
 
@@ -74,7 +67,6 @@ export default {
           lastSeen: Date.now(),
         };
 
-        // Broadcast this player's update to everyone else (low latency)
         const update = JSON.stringify({
           type: "player",
           id: connection.id,
@@ -86,6 +78,22 @@ export default {
             conn.send(update);
           }
         }
+      } else if (data.type === "force") {
+        // Broadcast force push event to all other players
+        const forceMsg = JSON.stringify({
+          type: "force",
+          id: connection.id,
+          x: data.x ?? 0,
+          y: data.y ?? 0,
+          angle: data.angle ?? 0,
+          color: data.color ?? "#00aaff",
+        });
+
+        for (const conn of room.getConnections()) {
+          if (conn.id !== connection.id) {
+            conn.send(forceMsg);
+          }
+        }
       }
     } catch {
       // Ignore malformed messages
@@ -93,7 +101,6 @@ export default {
   },
 
   onClose(connection: Connection, room: Party) {
-    // Remove from state
     const roomAny = room as unknown as { _players?: Record<string, PlayerState> };
     if (roomAny._players) {
       delete roomAny._players[connection.id];
