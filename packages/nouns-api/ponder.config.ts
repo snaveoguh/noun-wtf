@@ -1,5 +1,5 @@
 // Infura Developer plan ($50/mo): 4K credits/s, eth_getLogs=255 credits → ~15 effective RPS
-// We add free public RPCs as additional endpoints for Ponder to load-balance across
+// Infura-only — free RPCs (publicnode, llamarpc) can't handle 38+ address Stream factory queries
 import { nounsAuctionHouseAbi } from '@nouns/sdk/auction-house';
 import { nounsTokenAbi } from '@nouns/sdk/token';
 import { nounsGovernorAbi } from '@nouns/sdk/governor';
@@ -12,22 +12,18 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Primary: Infura paid endpoint from env var
-// Secondary: Free public RPCs for load-balancing during backfill
-const infuraRpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
-const publicRpcs = [
-  'https://ethereum-rpc.publicnode.com',
-  'https://eth.llamarpc.com',
-];
-const allRpcUrls = [...infuraRpcUrls, ...publicRpcs];
+// NOTE: Do NOT add free public RPCs — they reject multi-address eth_getLogs
+// (Stream factory creates 38+ addresses which publicnode/llamarpc can't handle)
+const rpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
 
 const mainnetConfig = createConfig({
   chains: {
     mainnet: {
       id: 1,
-      rpc: allRpcUrls,
+      rpc: rpcUrls,
       ws: process.env.PONDER_WS_URL_1,
-      ethGetLogsBlockRange: 2000,
-      maxRpcRequestsPerSecond: 4,
+      ethGetLogsBlockRange: 1000,
+      maxRpcRequestsPerSecond: 2,
     },
   },
   contracts: {

@@ -2,18 +2,29 @@ import { ponder } from 'ponder:registry';
 import { delegate, delegateNoun, noun } from 'ponder:schema';
 
 ponder.on('NounsToken:NounCreated', async ({ event, context }) => {
-  await context.db.insert(noun).values({
-    id: event.args.tokenId,
-    owner: '0x0000000000000000000000000000000000000000', // set by Transfer event
-    head: event.args.seed.head,
-    body: event.args.seed.body,
-    accessory: event.args.seed.accessory,
-    glasses: event.args.seed.glasses,
-    background: event.args.seed.background,
-    createdAt: new Date(Number(event.block.timestamp)),
-    createdAtBlock: event.block.number,
-    createdAtTransaction: event.transaction.hash,
-  });
+  // Transfer fires before NounCreated (mint), so the noun may already exist with zero traits.
+  // Use upsert to overwrite the zero-trait record with the real seed data.
+  await context.db
+    .insert(noun)
+    .values({
+      id: event.args.tokenId,
+      owner: '0x0000000000000000000000000000000000000000', // set by Transfer event
+      head: event.args.seed.head,
+      body: event.args.seed.body,
+      accessory: event.args.seed.accessory,
+      glasses: event.args.seed.glasses,
+      background: event.args.seed.background,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoUpdate({
+      head: event.args.seed.head,
+      body: event.args.seed.body,
+      accessory: event.args.seed.accessory,
+      glasses: event.args.seed.glasses,
+      background: event.args.seed.background,
+    });
 });
 
 ponder.on('NounsToken:Transfer', async ({ event, context }) => {

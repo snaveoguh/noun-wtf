@@ -101,11 +101,18 @@ ponder.on('NounsDAOV4:VoteCast', async ({ event, context }) => {
 });
 
 ponder.on('NounsDAOV4:VoteCastWithClientId', async ({ event, context }) => {
-  await context.db
-    .update(vote, { voter: event.args.voter, proposalId: event.args.proposalId })
-    .set({
-      clientId: event.args.clientId,
-    });
+  // VoteCast may not have been processed yet (event ordering) — guard with find
+  const existing = await context.db.find(vote, {
+    voter: event.args.voter,
+    proposalId: event.args.proposalId,
+  });
+  if (existing) {
+    await context.db
+      .update(vote, { voter: event.args.voter, proposalId: event.args.proposalId })
+      .set({
+        clientId: event.args.clientId,
+      });
+  }
 });
 
 ponder.on('NounsDAOV4:ProposalQueued', async ({ event, context }) => {

@@ -70,6 +70,7 @@
     "lucide-react": "^0.525.0",
     "motion": "^12.16.0",
     "next-themes": "^0.4.6",
+    "partysocket": "^1.1.14",
     "pngjs": "^6.0.0",
     "postcss-normalize": "^13.0.1",
     "react": "^19.1.0",

@@ -48,6 +48,34 @@ import { clientFactory, latestAuctionsQuery } from './wrappers/subgraph';
 
 const queryClient = new QueryClient();
 
+/** Catch React render errors so the whole page doesn't go white */
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'monospace' }}>
+          <h2>Something went wrong</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', color: '#c00' }}>
+            {this.state.error.message}
+          </pre>
+          <button onClick={() => window.location.reload()}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const client = clientFactory(config.app.subgraphApiUri);
 
 const ChainSubscriber: React.FC = () => {
@@ -70,6 +98,7 @@ const ChainSubscriber: React.FC = () => {
       return;
     }
     (async () => {
+      try {
       const latestBlock = await publicClient.getBlock();
       const fromBlock = latestBlock.number > 7200n ? latestBlock.number - 7200n : 0n;
 
@@ -106,6 +135,9 @@ const ChainSubscriber: React.FC = () => {
             }),
           ),
         );
+      }
+      } catch (err) {
+        console.error('[ChainSubscriber] Failed to fetch recent bids:', err);
       }
     })();
   }, [chainId, dispatch, publicClient]);
@@ -258,7 +290,9 @@ createRoot(document.getElementById('root')!).render(
                 <PastAuctions />
                 <LanguageProvider>
                   <CustomConnectkitProvider>
-                    <App />
+                    <ErrorBoundary>
+                      <App />
+                    </ErrorBoundary>
                   </CustomConnectkitProvider>
                 </LanguageProvider>
               </ApolloProvider>
