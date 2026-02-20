@@ -1,3 +1,5 @@
+// Infura Developer plan ($50/mo): 4K credits/s, eth_getLogs=255 credits → ~15 effective RPS
+// We add free public RPCs as additional endpoints for Ponder to load-balance across
 import { nounsAuctionHouseAbi } from '@nouns/sdk/auction-house';
 import { nounsTokenAbi } from '@nouns/sdk/token';
 import { nounsGovernorAbi } from '@nouns/sdk/governor';
@@ -9,15 +11,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Build RPC URL array from PONDER_RPC_URL_1 (comma-separated for multiple endpoints)
-const mainnetRpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+// Primary: Infura paid endpoint from env var
+// Secondary: Free public RPCs for load-balancing during backfill
+const infuraRpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+const publicRpcs = [
+  'https://ethereum-rpc.publicnode.com',
+  'https://eth.llamarpc.com',
+];
+const allRpcUrls = [...infuraRpcUrls, ...publicRpcs];
 
 const mainnetConfig = createConfig({
   chains: {
     mainnet: {
       id: 1,
-      rpc: mainnetRpcUrls.length > 1 ? mainnetRpcUrls : mainnetRpcUrls[0],
+      rpc: allRpcUrls,
       ws: process.env.PONDER_WS_URL_1,
+      ethGetLogsBlockRange: 2000,
+      maxRpcRequestsPerSecond: 4,
     },
   },
   contracts: {

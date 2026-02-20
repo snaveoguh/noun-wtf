@@ -4,26 +4,69 @@
 
 body {
   margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+/* Apply Comic Sans + bold to all elements */
+*, *::before, *::after {
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
+  font-weight: bold !important;
+}
+
+/* Uppercase for headings, labels, buttons, nav — NOT everything */
+h1, h2, h3, h4, h5, h6,
+a, button, label, th,
+nav, nav *,
+.btn, [class*="Button"],
+[class*="header"], [class*="Header"],
+[class*="title"], [class*="Title"],
+[class*="label"], [class*="Label"] {
+  text-transform: uppercase !important;
+}
+
+/* Paragraph/body text: uppercase on desktop, normal case on small mobile */
+p, span, div, li, td, dd, dt {
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  /* On very small screens, relax uppercase on body text to prevent overflow */
+  p, span, li, td, dd, dt,
+  .form-control, input, textarea, select,
+  [class*="description"], [class*="Description"],
+  [class*="content"], [class*="Content"],
+  [class*="copy"], [class*="Copy"],
+  [class*="body"], [class*="Body"] {
+    text-transform: none !important;
+  }
+
+  /* Slightly reduce font size on mobile for bold Comic Sans */
+  body {
+    font-size: 14px;
+  }
+}
+
+/* Form inputs should never be uppercased — breaks address/ENS input */
+input, textarea, select, .form-control {
+  text-transform: none !important;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
 }
 
 .__react_component_tooltip.show {
   opacity: 1 !important;
 }
 
-/* Load custom fonts */
+/* Override Londrina Solid to Comic Sans everywhere */
 @font-face {
   font-family: 'Londrina Solid';
-  src: url(./fonts/Londrina_Solid/LondrinaSolid-Black.ttf);
-  src: url(./fonts/Londrina_Solid/LondrinaSolid-Regular.ttf);
+  src: local('Comic Sans MS'), local('Comic Sans');
 }
 @font-face {
   font-family: 'PT Root UI';

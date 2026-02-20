@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -8,6 +8,9 @@ import { useAccount } from 'wagmi';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/index.css';
 
+// Register all miniapps
+import '@/miniapps';
+
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
 import NetworkAlert from '@/components/NetworkAlert';
@@ -15,31 +18,39 @@ import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
 import { useAppDispatch } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
-import { BrandAssetsPage } from '@/pages/BrandAssets/BrandAssetsPage';
-import { CalendarPage } from '@/pages/CalendarPage';
 import CandidatePage from '@/pages/Candidate';
-import CandidateHistoryPage from '@/pages/CandidateHistoryPage';
 import CreateCandidatePage from '@/pages/CreateCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
-import EditCandidatePage from '@/pages/EditCandidate';
 import EditProposalPage from '@/pages/EditProposal';
-import ForkPage from '@/pages/Fork';
-import ForksPage from '@/pages/Forks';
 import GovernancePage from '@/pages/Governance';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 import NounsPage from '@/pages/NounsPage';
 import Playground from '@/pages/Playground';
 import ProposalHistory from '@/pages/ProposalHistory';
+import DreamCreatePage from '@/pages/DreamCreatePage';
+import DreamsPage from '@/pages/DreamsPage';
+import SettlersPage from '@/pages/SettlersPage';
+import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 import VotePage from '@/pages/Vote';
 import { setActiveAccount } from '@/state/slices/account';
 
+import DreamWindow from '@/components/DreamWindow';
+import { ProbeButton } from '@/components/ProbeButton';
+
 import classes from './App.module.css';
+
+// Lazy-loaded miniapp pages
+const TerminalPage = lazy(() => import('@/miniapps/terminal/TerminalPage'));
+const FeedPage = lazy(() => import('@/miniapps/feed/FeedPage'));
+const HighwayPage = lazy(() => import('@/miniapps/highway/HighwayPage'));
+const SaberArenaPage = lazy(() => import('@/miniapps/saber/SaberArenaPage'));
 
 function App() {
   const { address: account, chainId } = useAccount();
+  const [dreamOpen, setDreamOpen] = useState(false);
 
   const dispatch = useAppDispatch();
   dayjs.extend(relativeTime);
@@ -48,6 +59,13 @@ function App() {
     // Local account array updated
     dispatch(setActiveAccount(account));
   }, [account, dispatch]);
+
+  // Listen for "dream a lil dream" button on auction page
+  useEffect(() => {
+    const handler = () => setDreamOpen(true);
+    window.addEventListener('open-dream-window', handler);
+    return () => window.removeEventListener('open-dream-window', handler);
+  }, []);
 
   return (
     <div className={`${classes.wrapper}`}>
@@ -70,21 +88,20 @@ function App() {
             element={<EditProposalPage match={{ params: { id: ':id' } }} />}
           />
           <Route path="/candidates/:id" element={<CandidatePage />} />
-          <Route
-            path="/candidates/:id/edit"
-            element={<EditCandidatePage match={{ params: { id: ':id' } }} />}
-          />
-          <Route path="/candidates/:id/history" element={<CandidateHistoryPage />} />
-          <Route path="/candidates/:id/history/:versionNumber" element={<CandidateHistoryPage />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/delegate" element={<DelegatePage />} />
           <Route path="/traits" element={<TraitsPage />} />
           <Route path="/explore" element={<Navigate to="/nouns" replace />} />
           <Route path="/nouns" element={<NounsPage />} />
-          <Route path="/fork/:id" element={<ForkPage />} />
-          <Route path="/fork" element={<ForksPage />} />
-          <Route path="/brand" element={<BrandAssetsPage />} />
-          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/studio" element={<StudioPage />} />
+          <Route path="/settlers" element={<SettlersPage />} />
+          <Route path="/dreams" element={<DreamsPage />} />
+          <Route path="/dreams/create" element={<DreamCreatePage />} />
+          {/* Miniapp routes (lazy loaded) */}
+          <Route path="/terminal" element={<Suspense fallback={null}><TerminalPage /></Suspense>} />
+          <Route path="/feed" element={<Suspense fallback={null}><FeedPage /></Suspense>} />
+          <Route path="/highway" element={<Suspense fallback={null}><HighwayPage /></Suspense>} />
+          <Route path="/saber" element={<Suspense fallback={null}><SaberArenaPage /></Suspense>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <Footer />
@@ -98,6 +115,16 @@ function App() {
             },
           }}
         />
+
+        {/* Probe-style Dream button — fixed bottom-right */}
+        <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, paddingRight: '0.5rem', paddingBottom: '0.5rem' }}>
+          <ProbeButton onClick={() => setDreamOpen(true)}>
+            Dream
+          </ProbeButton>
+        </div>
+
+        {/* Dream creation retro window */}
+        <DreamWindow open={dreamOpen} onClose={() => setDreamOpen(false)} />
       </BrowserRouter>
     </div>
   );

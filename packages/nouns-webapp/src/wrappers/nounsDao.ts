@@ -1,13 +1,40 @@
-import type {
-  EscrowDeposit as GraphQLEscrowDeposit,
-  EscrowWithdrawal as GraphQLEscrowWithdrawal,
-  Fork as GraphQLFork,
-  ForkJoin as GraphQLForkJoin,
-  Maybe,
-  Proposal as GraphQLProposal,
-  ProposalVersion as GraphQLProposalVersion,
-} from '@/subgraphs/graphql';
 import type { Address, Hash, Hex } from '@/utils/types';
+
+// Ponder-compatible proposal shape (replaces old GraphQL codegen types)
+type Maybe<T> = T | null;
+
+interface GraphQLProposal {
+  id: string;
+  description: string;
+  status: string;
+  proposalThreshold?: bigint | null;
+  quorumVotes?: bigint | null;
+  forVotes: bigint;
+  againstVotes: bigint;
+  abstainVotes: bigint;
+  createdAtTransaction: string;
+  createdAtBlock: bigint;
+  createdAt: string;
+  startBlock: bigint;
+  endBlock: bigint;
+  updatePeriodEndBlock?: bigint | null;
+  objectionPeriodEndBlock: bigint;
+  executionETA?: bigint | null;
+  onTimelockV1?: boolean | null;
+  proposer: string;
+  clientId?: number | null;
+  title?: string;
+  // Old subgraph nested fields — provided by adapter
+  targets?: string[];
+  values?: string[];
+  signatures?: string[];
+  calldatas?: string[];
+  createdBlock: bigint;
+  createdTimestamp: bigint;
+  createdTransactionHash: string;
+  voteSnapshotBlock: bigint;
+  signers?: { id: string }[];
+}
 
 import { useMemo } from 'react';
 
@@ -20,10 +47,8 @@ import {
   isBigInt,
   isNonNullish,
   isNullish,
-  isTruthy,
   map,
   pipe,
-  sort,
 } from 'remeda';
 import {
   type AbiParameter,
@@ -572,7 +597,7 @@ const getProposalState = (
 ) => {
   // Get the initial status from the proposal
   const status = isNonNullish(proposal.status)
-    ? ProposalState[proposal.status]
+    ? ProposalState[proposal.status as keyof typeof ProposalState]
     : ProposalState.UNDETERMINED;
 
   // Handle specific status cases with dedicated functions
@@ -715,7 +740,7 @@ const parsePartialSubgraphProposal = (
   const onTimelockV1 = proposal.onTimelockV1 !== null;
   return {
     id: proposal.id,
-    title: proposal.title ?? 'Untitled',
+    title: proposal.title ?? (extractTitle(proposal.description) ?? 'Untitled'),
     status: getProposalState(
       Number(blockNumber),
       new Date((timestamp ?? 0) * 1000),
@@ -731,7 +756,7 @@ const parsePartialSubgraphProposal = (
     abstainCount: Number(proposal.abstainVotes),
     quorumVotes: Number(proposal?.quorumVotes ?? 0),
     eta: proposal.executionETA != null ? new Date(Number(proposal.executionETA) * 1000) : undefined,
-    objectionPeriodEndBlock: 0n,
+    objectionPeriodEndBlock: BigInt(proposal?.objectionPeriodEndBlock ?? 0),
   };
 };
 
@@ -770,7 +795,7 @@ const parseSubgraphProposal = (
     id: proposal.id,
     title: pipe(description, extractTitle, removeMarkdownStyle) ?? 'Untitled',
     description: description ?? 'No description.',
-    proposer: proposal.proposer?.id as Address,
+    proposer: (typeof proposal.proposer === 'string' ? proposal.proposer : (proposal.proposer as unknown as { id: string })?.id) as Address,
     status: getProposalState(
       blockNumber,
       new Date((timestamp ?? 0) * 1000),
@@ -800,14 +825,31 @@ const parseSubgraphProposal = (
 
 export const useAllProposalsViaSubgraph = (): PartialProposalData => {
   const { query, variables } = partialProposalsQuery();
-  const { loading, data, error } = useQuery<{ proposals: Maybe<GraphQLProposal[]> }>(query, {
+  const { loading, data, error } = useQuery<{
+    proposals: { items: GraphQLProposal[] };
+  }>(query, {
     variables,
   });
   const isDaoGteV3 = useIsDaoGteV3();
   const { data: blockNumber } = useBlockNumber();
   const timestamp = useBlockTimestamp(blockNumber);
+
+  // Unwrap Ponder items and adapt flat proposer/signers to expected shape
+  const rawProposals = data?.proposals?.items ?? [];
+  const adaptedProposals = rawProposals.map(p => ({
+    ...p,
+    // Adapt flat Ponder fields to match what parsing functions expect
+    createdBlock: p.createdAtBlock,
+    createdTimestamp: BigInt(p.createdAt ?? 0),
+    createdTransactionHash: p.createdAtTransaction ?? '',
+    voteSnapshotBlock: p.startBlock,
+    signers: (p as unknown as { signers?: { items?: { signer: string }[] } }).signers?.items?.map(
+      (s: { signer: string }) => ({ id: s.signer }),
+    ) ?? [],
+  }));
+
   const proposals = pipe(
-    data?.proposals ?? [],
+    adaptedProposals,
     map(proposal => {
       return parsePartialSubgraphProposal(proposal, Number(blockNumber), timestamp, isDaoGteV3);
     }),
@@ -912,62 +954,71 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
   const isDaoGteV3 = useIsDaoGteV3();
 
   const { query, variables } = proposalQuery(id);
-  const { data } = useQuery<{ proposal: Maybe<GraphQLProposal> }>(query, { variables });
-  const proposal = data?.proposal ?? undefined;
+  const { data } = useQuery<{
+    proposal: Maybe<{
+      id: string;
+      description: string;
+      status: string;
+      proposalThreshold: bigint | null;
+      quorumVotes: bigint | null;
+      forVotes: bigint;
+      againstVotes: bigint;
+      abstainVotes: bigint;
+      createdAtTransaction: string;
+      createdAtBlock: bigint;
+      createdAt: string;
+      startBlock: bigint;
+      endBlock: bigint;
+      updatePeriodEndBlock: bigint | null;
+      objectionPeriodEndBlock: bigint;
+      executionETA: bigint | null;
+      onTimelockV1: boolean | null;
+      proposer: string;
+      clientId: number | null;
+      signers: { items: { signer: string }[] };
+      transactions: { items: { target: string; value: string; signature: string; calldata: string }[] };
+    }>;
+  }>(query, { variables });
+
+  // Adapt Ponder flat shape to GraphQLProposal shape
+  const raw = data?.proposal;
+  const proposal: GraphQLProposal | undefined = raw
+    ? {
+        ...raw,
+        createdBlock: raw.createdAtBlock,
+        createdTimestamp: BigInt(raw.createdAt ?? 0),
+        createdTransactionHash: raw.createdAtTransaction ?? '',
+        voteSnapshotBlock: raw.startBlock,
+        signers: raw.signers?.items?.map(s => ({ id: s.signer })) ?? [],
+        targets: raw.transactions?.items?.map(t => t.target) ?? [],
+        values: raw.transactions?.items?.map(t => t.value) ?? [],
+        signatures: raw.transactions?.items?.map(t => t.signature) ?? [],
+        calldatas: raw.transactions?.items?.map(t => t.calldata) ?? [],
+      }
+    : undefined;
 
   return parseSubgraphProposal(proposal, Number(blockNumber), timestamp, toUpdate, isDaoGteV3);
 };
 
 export const useProposalTitles = (ids: number[]): ProposalTitle[] | undefined => {
   const { query, variables } = proposalTitlesQuery(ids);
-  const { data } = useQuery<{ proposals: Maybe<GraphQLProposal[]> }>(query, { variables });
+  const { data } = useQuery<{
+    proposals: { items: Array<{ id: string; description: string }> };
+  }>(query, { variables });
 
   return (
-    data?.proposals?.map(proposal => ({
+    data?.proposals?.items?.map(proposal => ({
       id: proposal.id,
-      title: proposal.title,
+      title: extractTitle(proposal.description) ?? 'Untitled',
     })) ?? undefined
   );
 };
 
 export const useProposalVersions = (id: string | number): ProposalVersion[] | undefined => {
+  // Proposal versions not indexed by Ponder — return empty
   const { query, variables } = proposalVersionsQuery(id);
-  const { data } = useQuery<{
-    proposalVersions: Maybe<GraphQLProposalVersion[]>;
-  }>(query, { variables });
-
-  const sortedProposalVersions = sort(data?.proposalVersions ?? [], (a, b) =>
-    a.createdAt > b.createdAt ? 1 : -1,
-  );
-
-  const sortedNumberedVersions = sortedProposalVersions?.map((proposalVersion, i: number) => {
-    const details: ProposalTransactionDetails = {
-      targets: map(proposalVersion.targets ?? [], t => t as Address),
-      values: map(proposalVersion.values ?? [], v => BigInt(v)),
-      signatures: map(proposalVersion.signatures ?? [], s => s),
-      calldatas: map(proposalVersion.calldatas ?? [], t => t as Hex),
-      encodedProposalHash: '' as Hash,
-    };
-
-    return {
-      id: proposalVersion.id,
-      versionNumber: i + 1,
-      createdAt: BigInt(proposalVersion.createdAt),
-      updateMessage: proposalVersion.updateMessage,
-      description: proposalVersion.description,
-      targets: map(proposalVersion.targets ?? [], t => t as Address),
-      values: map(proposalVersion.values ?? [], v => BigInt(v)),
-      signatures: map(proposalVersion.signatures ?? [], s => s),
-      calldatas: map(proposalVersion.calldatas ?? [], t => t as Hex),
-      title: proposalVersion.title,
-      details: formatProposalTransactionDetails(details),
-      proposal: {
-        id: proposalVersion.proposal.id,
-      },
-    };
-  });
-
-  return sortedNumberedVersions;
+  useQuery(query, { variables, skip: true });
+  return [];
 };
 
 export function useCancelSignature() {
@@ -1308,45 +1359,26 @@ export function useNumTokensInForkEscrow(): number | undefined {
 }
 
 export const useEscrowDepositEvents = (pollInterval: number, forkId: string) => {
+  // Not indexed by Ponder — return empty
   const { query, variables } = escrowDepositEventsQuery(forkId);
-  const { loading, data, error, refetch } = useQuery<{
-    escrowDeposits: Maybe<GraphQLEscrowDeposit[]>;
-  }>(query, {
+  const { loading, error, refetch } = useQuery(query, {
     pollInterval,
     variables,
+    skip: true,
   });
-  const escrowDeposits: EscrowDeposit[] = map(data?.escrowDeposits ?? [], escrowDeposit => {
-    const proposalIDs = escrowDeposit.proposalIDs.map(id => Number(id));
-    return {
-      ...escrowDeposit,
-      eventType: 'EscrowDeposit' as const,
-      owner: { id: escrowDeposit.owner.id as Address },
-      reason: String(escrowDeposit.reason),
-      proposalIDs,
-    };
-  });
-
+  const escrowDeposits: EscrowDeposit[] = [];
   return { loading, error, data: escrowDeposits, refetch };
 };
 
 export const useEscrowWithdrawalEvents = (pollInterval: number, forkId: string) => {
+  // Not indexed by Ponder — return empty
   const { query, variables } = escrowWithdrawEventsQuery(forkId);
-  const { loading, data, error, refetch } = useQuery<{
-    escrowWithdrawals: Maybe<GraphQLEscrowWithdrawal[]>;
-  }>(query, {
+  const { loading, error, refetch } = useQuery(query, {
     pollInterval,
     variables,
+    skip: true,
   });
-
-  const escrowWithdrawals: EscrowWithdrawal[] = map(
-    data?.escrowWithdrawals ?? [],
-    escrowWithdrawal => ({
-      ...escrowWithdrawal,
-      eventType: 'EscrowWithdrawal' as const,
-      owner: { id: escrowWithdrawal.owner.id as Address },
-    }),
-  );
-
+  const escrowWithdrawals: EscrowWithdrawal[] = [];
   return { loading, error, data: escrowWithdrawals, refetch };
 };
 
@@ -1377,42 +1409,15 @@ const eventsWithforkCycleEvents = (events: EscrowEvent[], forkDetails: Fork) => 
 };
 
 export const useForkJoins = (pollInterval: number, forkId: string) => {
+  // Not indexed by Ponder — return empty
   const { query, variables } = forkJoinsQuery(forkId);
-  const { loading, data, error, refetch } = useQuery<{ forkJoins: Maybe<GraphQLForkJoin[]> }>(
-    query,
-    {
-      pollInterval,
-      variables,
-    },
-  );
-  const forkJoins = data?.forkJoins?.map(forkJoin => {
-    const proposalIDs = forkJoin.proposalIDs.map(id => id);
-    return {
-      eventType: 'ForkJoin' as const,
-      id: forkJoin.id,
-      createdAt: forkJoin.createdAt,
-      owner: { id: forkJoin.owner.id as Address },
-      fork: { id: forkId },
-      reason: forkJoin.reason,
-      tokenIDs: forkJoin.tokenIDs,
-      proposalIDs: proposalIDs,
-    };
+  const { loading, error, refetch } = useQuery(query, {
+    pollInterval,
+    variables,
+    skip: true,
   });
-
-  const escrowDeposits: EscrowDeposit[] = map(forkJoins ?? [], forkJoin => {
-    return {
-      ...forkJoin,
-      reason: '',
-      proposalIDs: [],
-    };
-  });
-
-  return {
-    loading,
-    error,
-    data: escrowDeposits,
-    refetch,
-  };
+  const escrowDeposits: EscrowDeposit[] = [];
+  return { loading, error, data: escrowDeposits, refetch };
 };
 
 export const useEscrowEvents = (pollInterval: number, forkId: string) => {
@@ -1462,68 +1467,48 @@ export const useEscrowEvents = (pollInterval: number, forkId: string) => {
 };
 
 export const useForkDetails = (pollInterval: number, id: string) => {
+  // Not indexed by Ponder — return empty fork
   const { query, variables } = forkDetailsQuery(id.toString());
-  const {
-    loading,
-    data: forkData,
-    error,
-    refetch,
-  } = useQuery<{ fork: Maybe<GraphQLFork> }>(query, {
+  const { loading, error, refetch } = useQuery(query, {
     pollInterval,
     variables,
-  }) as { loading: boolean; data: { fork: ForkSubgraphEntity }; error: Error; refetch: () => void };
-  const joined = forkData?.fork?.joinedNouns?.map(item => item.noun.id) ?? [];
-  const escrowed = forkData?.fork?.escrowedNouns?.map(item => item.noun.id) ?? [];
-  const addedNouns = [...escrowed, ...joined];
-  const data = {
-    ...forkData?.fork,
-    addedNouns: addedNouns,
-  } as Fork;
-  return {
-    loading,
-    data,
-    error,
-    refetch,
+    skip: true,
+  });
+  const data: Fork = {
+    id: id,
+    forkID: 0n,
+    executed: null,
+    executedAt: null,
+    forkTreasury: null,
+    forkToken: null,
+    tokensForkingCount: 0,
+    tokensInEscrowCount: 0,
+    forkingPeriodEndTimestamp: null,
+    addedNouns: [],
   };
+  return { loading, data, error, refetch };
 };
 
 export const useForks = (pollInterval: number = 0) => {
+  // Not indexed by Ponder — return empty
   const { query, variables } = forksQuery();
-  const { loading, data, error, refetch } = useQuery<{ forks: Maybe<GraphQLFork[]> }>(query, {
+  const { loading, error, refetch } = useQuery(query, {
     pollInterval,
     variables,
+    skip: true,
   });
-
-  const forks: Fork[] = map(data?.forks ?? [], fork => {
-    const joined = fork?.joinedNouns?.map(item => item.noun.id) ?? [];
-    const escrowed = fork?.escrowedNouns?.map(item => item.noun.id) ?? [];
-    const addedNouns = [...escrowed, ...joined];
-    return {
-      ...fork,
-      addedNouns,
-      executed: fork.executed ?? null,
-      executedAt: fork.executedAt ?? null,
-      forkTreasury: fork.forkTreasury ?? null,
-      forkToken: fork.forkToken ?? null,
-      forkingPeriodEndTimestamp: fork.forkingPeriodEndTimestamp?.toString() ?? null,
-    };
-  });
-
+  const forks: Fork[] = [];
   return { loading, data: forks, error, refetch };
 };
 
 export const useIsForkActive = () => {
+  // Not indexed by Ponder — always return false
   const timestamp = Number((new Date().getTime() / 1000).toFixed(0));
   const { query, variables } = isForkActiveQuery(timestamp);
-  const {
-    loading,
-    data: forksData,
-    error,
-  } = useQuery<{ forks: Maybe<GraphQLFork[]> }>(query, { variables });
-  const data = isTruthy(forksData?.forks?.length);
+  const { loading, error } = useQuery(query, { variables, skip: true });
   return {
     loading,
-    data,
+    data: false,
     error,
   };
 };
@@ -1567,22 +1552,27 @@ export const useActivePendingUpdatableProposers = (blockNumber: bigint = 0n) => 
   const { query, variables } = activePendingUpdatableProposersQuery(1000, blockNumber);
   const {
     loading,
-    data: proposals,
+    data: rawData,
     error,
-  } = useQuery<{ proposals: Maybe<GraphQLProposal[]> }>(query, { variables }) as {
-    loading: boolean;
-    data: { proposals: ProposalProposerAndSigners[] };
-    error: Error;
-  };
+  } = useQuery<{
+    proposals: {
+      items: Array<{
+        proposer: string;
+        signers: { items: Array<{ signer: string }> };
+      }>;
+    };
+  }>(query, { variables });
+
   const data: string[] = [];
-  if (proposals?.proposals.length > 0) {
-    forEach(proposals.proposals, proposal => {
-      data.push(proposal.proposer.id);
-      forEach(proposal.signers, (signer: { id: string }) => {
-        data.push(signer.id);
-        return signer.id;
+  const proposals = rawData?.proposals?.items ?? [];
+  if (proposals.length > 0) {
+    forEach(proposals, proposal => {
+      data.push(proposal.proposer);
+      forEach(proposal.signers?.items ?? [], (signer: { signer: string }) => {
+        data.push(signer.signer);
+        return signer.signer;
       });
-      return proposal.proposer.id;
+      return proposal.proposer;
     });
   }
 
@@ -1601,15 +1591,13 @@ export function useUpdatableProposalIds(blockNumber?: bigint) {
   const { query, variables } = updatableProposalsQuery(1000, blockNumber);
   const {
     loading,
-    data: proposals,
+    data: rawData,
     error,
-  } = useQuery<{ proposals: Maybe<GraphQLProposal[]> }>(query, { variables }) as {
-    loading: boolean;
-    data: { proposals: ProposalProposerAndSigners[] };
-    error: Error;
-  };
+  } = useQuery<{
+    proposals: { items: Array<{ id: string }> };
+  }>(query, { variables });
 
-  const data = proposals?.proposals.map(proposal => +proposal.id);
+  const data = rawData?.proposals?.items?.map(proposal => +proposal.id);
 
   return {
     loading,

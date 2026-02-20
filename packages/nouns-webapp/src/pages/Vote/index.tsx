@@ -1,6 +1,6 @@
 import type { Address } from '@/utils/types';
 
-import { Fragment, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { SearchIcon } from '@heroicons/react/solid';
@@ -19,14 +19,10 @@ import { Link, useParams } from 'react-router';
 import ReactTooltip from 'react-tooltip';
 import { isNonNullish } from 'remeda';
 import { toast } from 'sonner';
-import { zeroAddress } from 'viem';
 import { useAccount, useBlockNumber } from 'wagmi';
 
-import DynamicQuorumInfoModal from '@/components/DynamicQuorumInfoModal';
 import ProposalContent from '@/components/ProposalContent';
 import ProposalHeader from '@/components/ProposalHeader';
-import ShortAddress from '@/components/ShortAddress';
-import StreamWithdrawModal from '@/components/StreamWithdrawModal';
 import VoteCard, { VoteCardVariant } from '@/components/VoteCard';
 import VoteModal from '@/components/VoteModal';
 import VoteSignals from '@/components/VoteSignals/VoteSignals';
@@ -37,9 +33,7 @@ import { SUPPORTED_LOCALE_TO_DAYSJS_LOCALE, SupportedLocale } from '@/i18n/local
 import Section from '@/layout/Section';
 import { cn } from '@/lib/utils';
 import { AVERAGE_BLOCK_TIME_IN_SECS } from '@/utils/constants';
-import { getNounVotes } from '@/utils/getNounsVotes';
 import { isProposalUpdatable } from '@/utils/proposals';
-import { parseStreamCreationCallData } from '@/utils/streamingPaymentUtils/streamingPaymentUtils';
 import {
   PartialProposal,
   ProposalState,
@@ -57,8 +51,6 @@ import { useProposalFeedback } from '@/wrappers/nounsData';
 import { useUserVotes, useUserVotesAsOfBlock } from '@/wrappers/nounToken';
 import {
   delegateNounsAtBlockQuery,
-  Delegates,
-  ProposalVotes,
   proposalVotesQuery,
   propUsingDynamicQuorum,
 } from '@/wrappers/subgraph';
@@ -95,19 +87,11 @@ const getUpdatableCountdownCopy = (
 const VotePage = () => {
   const { id } = useParams<{ id: string }>();
   const [showVoteModal, setShowVoteModal] = useState<boolean>(false);
-  const [showDynamicQuorumInfoModal, setShowDynamicQuorumInfoModal] = useState<boolean>(false);
+  // Dynamic quorum info modal removed (streamlined)
   const [isQueuePending, setQueuePending] = useState<boolean>(false);
   const [isExecutePending, setExecutePending] = useState<boolean>(false);
   const [isCancelPending, setCancelPending] = useState<boolean>(false);
-  const [showStreamWithdrawModal, setShowStreamWithdrawModal] = useState<boolean>(false);
   const [dataFetchPollInterval, setDataFetchPollInterval] = useState<number>(0);
-  const [streamWithdrawInfo, setStreamWithdrawInfo] = useState<{
-    streamAddress: Address;
-    startTime: number;
-    endTime: number;
-    streamAmount: number;
-    tokenAddress: Address;
-  } | null>(null);
   // if objection period is active, then we are in objection period, unless the current block is greater than the end block
   const [isObjectionPeriod, setIsObjectionPeriod] = useState<boolean>(false);
   const [forkPeriodMessage, setForkPeriodMessage] = useState<ReactNode>(<></>);
@@ -404,23 +388,44 @@ const VotePage = () => {
   const {
     loading,
     error,
-    data: voters,
-  } = useQuery<ProposalVotes>(votesQuery, {
+    data: votersRaw,
+  } = useQuery<{
+    votes: { items: Array<{ support: number; votes: number; voter: string }> };
+  }>(votesQuery, {
     skip: !proposal,
     variables: votesVariables,
   });
+
+  // Adapt Ponder response to match old ProposalVotes shape
+  const voters = votersRaw?.votes?.items
+    ? {
+        votes: votersRaw.votes.items.map(v => ({
+          supportDetailed: v.support as 0 | 1 | 2,
+          voter: { id: v.voter },
+          votes: v.votes,
+        })),
+      }
+    : undefined;
 
   const voterIds = voters?.votes?.map(v => v.voter.id);
   const { query: voteSnapshotQuery, variables: voteSnapshotVariables } = delegateNounsAtBlockQuery(
     voterIds ?? [],
     BigInt(proposal?.voteSnapshotBlock ?? 0),
   );
-  const { data: delegateSnapshot } = useQuery<Delegates>(voteSnapshotQuery, {
+  const { data: delegateSnapshotRaw } = useQuery<{
+    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
+  }>(voteSnapshotQuery, {
     skip: (voters?.votes?.length ?? 0) === 0,
     variables: voteSnapshotVariables,
   });
 
-  const { delegates } = delegateSnapshot || {};
+  // Adapt Ponder delegate response
+  const delegates = delegateSnapshotRaw?.delegates?.items?.map(d => ({
+    id: d.id,
+    nounsRepresented: Array.from({ length: Number(d.delegatedVotes) }, (_, i) => ({
+      id: String(i),
+    })),
+  }));
   const delegateToNounIds = delegates?.reduce<Record<string, string[]>>((acc, curr) => {
     acc[curr.id] = curr?.nounsRepresented?.map(nr => nr.id) ?? [];
     return acc;
@@ -487,28 +492,11 @@ const VotePage = () => {
   if (error || dqError) {
     return <Trans>Failed to fetch</Trans>;
   }
-  const againstNouns = getNounVotes(data, 0);
+  // againstNouns removed (was only used by DynamicQuorumInfoModal)
   const isV2Prop = dqInfo.proposal.quorumCoefficient > 0;
 
   return (
     <Section fullWidth={false} className={classes.votePage}>
-      {showDynamicQuorumInfoModal && (
-        <DynamicQuorumInfoModal
-          proposal={proposal}
-          againstVotesAbsolute={againstNouns.length}
-          onDismiss={() => setShowDynamicQuorumInfoModal(false)}
-          currentQuorum={Number(currentQuorum)}
-        />
-      )}
-      <StreamWithdrawModal
-        show={showStreamWithdrawModal}
-        onDismiss={() => setShowStreamWithdrawModal(false)}
-        streamAddress={streamWithdrawInfo?.streamAddress ?? zeroAddress}
-        startTime={streamWithdrawInfo?.startTime}
-        endTime={streamWithdrawInfo?.endTime}
-        streamAmount={streamWithdrawInfo?.streamAmount}
-        tokenAddress={streamWithdrawInfo?.tokenAddress ?? zeroAddress}
-      />
       <VoteModal
         show={showVoteModal}
         onHide={() => setShowVoteModal(false)}
@@ -534,48 +522,6 @@ const VotePage = () => {
         )}
       </Col>
       <Col lg={isUpdateable() ? 12 : 10} className={clsx(classes.proposal, classes.wrapper)}>
-        {proposal.status === ProposalState.EXECUTED &&
-          proposal.details
-            .filter(txn => txn?.functionSig?.includes('createStream') === true)
-            .map(txn => {
-              const parsedCallData = parseStreamCreationCallData(txn.callData);
-              if (parsedCallData.recipient.toLowerCase() !== account?.toLowerCase()) {
-                return <Fragment key={parsedCallData.streamAddress} />;
-              }
-              return (
-                <Row
-                  key={parsedCallData.streamAddress}
-                  className={clsx(classes.section, classes.transitionStateButtonSection)}
-                >
-                  <span className={classes.boldedLabel}>
-                    <Trans>Only visible to you</Trans>
-                  </span>
-                  <Col className="d-grid gap-4">
-                    <Button
-                      onClick={() => {
-                        setStreamWithdrawInfo({
-                          streamAddress: parsedCallData.streamAddress as Address,
-                          startTime: parsedCallData.startTime,
-                          endTime: parsedCallData.endTime,
-                          streamAmount: parsedCallData.streamAmount,
-                          tokenAddress: parsedCallData.tokenAddress as Address,
-                        });
-                        setShowStreamWithdrawModal(true);
-                      }}
-                      variant="primary"
-                      className={classes.transitionStateButton}
-                    >
-                      <Trans>
-                        Withdraw from Stream{' '}
-                        <ShortAddress
-                          address={(parsedCallData.streamAddress as `0x${string}`) ?? '0x'}
-                        />
-                      </Trans>
-                    </Button>
-                  </Col>
-                </Row>
-              );
-            })}
         <Row className={clsx(classes.section, classes.transitionStateButtonSection)}>
           <Col className="d-grid gap-4">
             {userVotes !== undefined && userVotes > 0 && !hasVoted && isObjectionPeriod ? (
@@ -716,7 +662,7 @@ const VotePage = () => {
                   <div
                     data-for="view-dq-info"
                     data-tip="View Dynamic Quorum Info"
-                    onClick={() => setShowDynamicQuorumInfoModal(isV2Prop)}
+                    onClick={() => {/* Dynamic quorum info removed */}}
                     className={clsx(classes.thresholdInfo, isV2Prop ? classes.cursorPointer : '')}
                   >
                     <span>

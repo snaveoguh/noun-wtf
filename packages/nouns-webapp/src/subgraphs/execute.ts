@@ -1,18 +1,28 @@
-import config from "@/config"
-import { TypedDocumentString } from "@/subgraphs/graphql"
+import { DocumentNode, print } from 'graphql'
 
-export async function execute<TResult, TVariables>(
-    query: TypedDocumentString<TResult, TVariables>,
-    ...[variables]: TVariables extends Record<string, never> ? [] : [TVariables]
-) {
-    const response = await fetch(config.app.subgraphApiUri, {
+import { getSubgraphUrl } from '@/lib/subgraphSettings'
+
+/**
+ * Execute a GraphQL query against the Ponder API (or any GraphQL endpoint).
+ * Uses the dynamic subgraph URL from settings (supports custom user endpoints).
+ * Accepts either:
+ *   - A DocumentNode (from gql`...`) with a separate variables object
+ *   - A plain string query with variables
+ */
+export async function execute<TResult = unknown>(
+    query: DocumentNode | string,
+    variables?: Record<string, unknown>,
+): Promise<TResult> {
+    const queryString = typeof query === 'string' ? query : print(query)
+
+    const response = await fetch(getSubgraphUrl(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/graphql-response+json'
         },
         body: JSON.stringify({
-            query,
+            query: queryString,
             variables
         })
     })

@@ -1,4 +1,3 @@
-import type { Delegate, EscrowedNoun, Noun, Seed } from '@/subgraphs/graphql';
 import type { Address } from '@/utils/types';
 
 import { useEffect } from 'react';
@@ -60,18 +59,33 @@ const seedArrayToObject = (seeds: (INounSeed & { id: string })[]) => {
   }, {});
 };
 
-const useNounSeeds = () => {
+// Ponder response shape for seeds (nouns query)
+interface PonderSeedsResponse {
+  nouns: {
+    items: Array<{
+      id: string;
+      background: number;
+      body: number;
+      accessory: number;
+      head: number;
+      glasses: number;
+    }>;
+  };
+}
+
+export const useNounSeeds = () => {
   const cache = localStorage.getItem(seedCacheKey);
-  const cachedSeeds = cache ? (JSON.parse(cache) as Seed[]) : undefined;
+  const cachedSeeds = cache ? JSON.parse(cache) : undefined;
   const { query, variables } = seedsQuery();
-  const { data } = useQuery<{ seeds: Seed[] }>(query, {
+  const { data } = useQuery<PonderSeedsResponse>(query, {
     skip: !!cachedSeeds,
     variables,
   });
 
   useEffect(() => {
-    if (!cachedSeeds && data?.seeds !== undefined) {
-      const transformedSeeds = data.seeds.map(seed => ({
+    const seeds = data?.nouns?.items;
+    if (!cachedSeeds && seeds !== undefined) {
+      const transformedSeeds = seeds.map(seed => ({
         ...seed,
         accessory: Number(seed.accessory),
         background: Number(seed.background),
@@ -198,34 +212,30 @@ export const useNounTokenBalance = (address: Address): number | undefined => {
 
   return tokenBalance !== undefined ? Number(tokenBalance) : undefined;
 };
+
+// Ponder response: nouns(where: { owner }) { items { id } }
 export const useUserOwnedNounIds = (pollInterval: number) => {
   const { address } = useAccount();
   const { query, variables } = ownedNounsQuery(address?.toLowerCase() ?? '');
-  const { loading, data, error, refetch } = useQuery<{ nouns: Noun[] }>(query, {
-    pollInterval,
-    variables,
-  });
-  const userOwnedNouns: number[] = data?.nouns?.map(noun => Number(noun.id)) || [];
-  return { loading, data: userOwnedNouns, error, refetch };
-};
-
-export const useUserEscrowedNounIds = (pollInterval: number, forkId: string) => {
-  const { address } = useAccount();
-  const { query, variables } = accountEscrowedNounsQuery(address?.toLowerCase() ?? '');
   const { loading, data, error, refetch } = useQuery<{
-    escrowedNouns: Array<EscrowedNoun>;
+    nouns: { items: Array<{ id: string }> };
   }>(query, {
     pollInterval,
     variables,
   });
-  // filter escrowed nouns to just this fork
-  const userEscrowedNounIds: number[] =
-    data?.escrowedNouns?.reduce((acc: number[], escrowedNoun: EscrowedNoun) => {
-      if (escrowedNoun.fork.id === forkId) {
-        acc.push(+escrowedNoun.noun.id);
-      }
-      return acc;
-    }, []) || [];
+  const userOwnedNouns: number[] = data?.nouns?.items?.map(noun => Number(noun.id)) || [];
+  return { loading, data: userOwnedNouns, error, refetch };
+};
+
+// Escrowed nouns not indexed by Ponder — return empty
+export const useUserEscrowedNounIds = (pollInterval: number, _forkId: string) => {
+  const { query, variables } = accountEscrowedNounsQuery('');
+  const { loading, error, refetch } = useQuery(query, {
+    pollInterval,
+    variables,
+    skip: true, // always skip — not indexed
+  });
+  const userEscrowedNounIds: number[] = [];
   return { loading, data: userEscrowedNounIds, error, refetch };
 };
 
@@ -269,8 +279,27 @@ export const useIsApprovedForAll = () => {
 
   return (data as boolean) || false;
 };
+
+// Ponder response: delegates(where: { id_in }) { items { id delegatedVotes } }
+// The old subgraph returned `nounsRepresented` (array of nouns) — Ponder only has `delegatedVotes` count.
+// We synthesize `nounsRepresented` as a dummy array of the correct length for vote counting.
 export const useDelegateNounsAtBlockQuery = (signers: string[], block: bigint) => {
   const { query, variables } = delegateNounsAtBlockQuery(signers, block);
-  const { loading, data, error } = useQuery<{ delegates: Delegate[] }>(query, { variables });
+  const { loading, data: rawData, error } = useQuery<{
+    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
+  }>(query, { variables });
+
+  // Adapt Ponder shape to match old subgraph Delegates type
+  const data = rawData?.delegates?.items
+    ? {
+        delegates: rawData.delegates.items.map(d => ({
+          id: d.id,
+          nounsRepresented: Array.from({ length: Number(d.delegatedVotes) }, (_, i) => ({
+            id: String(i),
+          })),
+        })),
+      }
+    : undefined;
+
   return { loading, data, error };
 };

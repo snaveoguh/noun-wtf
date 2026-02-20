@@ -4,7 +4,7 @@ import { useQuery } from '@apollo/client';
 import clsx from 'clsx';
 
 import { CandidateSignature } from '@/wrappers/nounsData';
-import { delegateNounsAtBlockQuery, Delegates } from '@/wrappers/subgraph';
+import { delegateNounsAtBlockQuery } from '@/wrappers/subgraph';
 
 import CandidateSponsorImage from './CandidateSponsorImage';
 import classes from './CandidateSponsors.module.css';
@@ -28,8 +28,16 @@ const CandidateSponsors = ({
     signers?.filter(s => s.signer.activeOrPendingProposal === false && s.signer.id) ?? [];
   const signerIds = activeSigners?.map(s => s.signer.id) ?? [];
   const { query, variables } = delegateNounsAtBlockQuery(signerIds ?? [], currentBlock ?? 0n);
-  const { data: delegateSnapshot } = useQuery<Delegates>(query, { variables });
-  const { delegates } = delegateSnapshot || {};
+  const { data: delegateSnapshotRaw } = useQuery<{
+    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
+  }>(query, { variables });
+  // Adapt Ponder response: synthesize nounsRepresented from delegatedVotes count
+  const delegates = delegateSnapshotRaw?.delegates?.items?.map(d => ({
+    id: d.id,
+    nounsRepresented: Array.from({ length: Number(d.delegatedVotes) }, (_, i) => ({
+      id: String(i),
+    })),
+  }));
   const delegateToNounIds = delegates?.reduce<Record<string, string[]>>((acc, curr) => {
     acc[curr.id] = curr?.nounsRepresented?.map(nr => nr.id) ?? [];
     return acc;

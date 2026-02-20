@@ -17,7 +17,7 @@ import CreateProposalButton from '@/components/CreateProposalButton';
 import ProposalActionModal from '@/components/ProposalActionsModal';
 import ProposalEditor from '@/components/ProposalEditor';
 import ProposalTransactions from '@/components/ProposalTransactions';
-import config from '@/config';
+import config, { NOUN_WTF_CLIENT_ID } from '@/config';
 import { nounsLegacyTreasuryAddress, nounsTokenBuyerAddress } from '@/contracts';
 import Section from '@/layout/Section';
 import { buildEtherscanHoldingsLink } from '@/utils/etherscan';
@@ -187,6 +187,7 @@ const CreateProposalPage = () => {
           proposalTransactions.map(({ signature }) => signature), // Signatures
           proposalTransactions.map(({ calldata }) => calldata), // Calldatas
           `# ${titleValue}\n\n${bodyValue}`, // Description
+          NOUN_WTF_CLIENT_ID,
         ],
       });
     } else {
@@ -197,7 +198,7 @@ const CreateProposalPage = () => {
           proposalTransactions.map(({ signature }) => signature), // Signatures
           proposalTransactions.map(({ calldata }) => calldata), // Calldatas
           `# ${titleValue}\n\n${bodyValue}`, // Description
-          0,
+          NOUN_WTF_CLIENT_ID,
         ],
       });
     }

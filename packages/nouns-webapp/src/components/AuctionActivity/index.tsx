@@ -117,6 +117,50 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
             </AuctionTitleAndNavWrapper>
             <Col lg={12}>
               <AuctionActivityNounTitle isCool={isCool} nounId={BigInt(auction.nounId)} />
+              <div
+                style={{
+                  marginTop: '2px',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+              >
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-dream-window'))}
+                  style={{
+                    background: '#ffef2e',
+                    border: '2px solid #000',
+                    boxShadow: '4px 3px 0 0 #000',
+                    color: '#000',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    padding: '3px 14px',
+                    cursor: 'pointer',
+                    fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                    transition: 'box-shadow 0.1s ease, transform 0.1s ease',
+                  }}
+                  onMouseDown={e => {
+                    const btn = e.currentTarget;
+                    btn.style.boxShadow = 'none';
+                    btn.style.transform = 'translate(4px, 3px)';
+                  }}
+                  onMouseUp={e => {
+                    const btn = e.currentTarget;
+                    btn.style.boxShadow = '4px 3px 0 0 #000';
+                    btn.style.transform = 'translate(0, 0)';
+                  }}
+                  onMouseLeave={e => {
+                    const btn = e.currentTarget;
+                    btn.style.boxShadow = '4px 3px 0 0 #000';
+                    btn.style.transform = 'translate(0, 0)';
+                  }}
+                >
+                  ✨ dream a lil dream
+                </button>
+              </div>
             </Col>
           </Row>
           <Row className={classes.activityRow}>

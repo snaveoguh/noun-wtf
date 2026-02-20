@@ -18,6 +18,7 @@ import NavBarTreasury from '@/components/NavBarTreasury';
 import NavDropdown from '@/components/NavDropdown';
 import NavLocaleSwitcher from '@/components/NavLocaleSwitcher';
 import ShortAddress from '@/components/ShortAddress';
+import SubgraphSettings from '@/components/SubgraphSettings';
 import config, { CHAIN_ID } from '@/config';
 import { nounsTreasuryAddress } from '@/contracts';
 import { useAppSelector } from '@/hooks';
@@ -209,6 +210,42 @@ const NavBar = () => {
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/terminal"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Terminal"
+                  buttonIcon={<span>⌐◨-◨</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/feed"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Feed"
+                  buttonIcon={<span>📡</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/highway"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Highway"
+                  buttonIcon={<span>🛣️</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
             </div>
             <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
               <NavDropdown
@@ -252,9 +289,83 @@ const NavBar = () => {
                 >
                   Playground
                 </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/studio"
+                >
+                  Studio
+                </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/dreams"
+                >
+                  Dreams
+                </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/settlers"
+                >
+                  Settlers
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/terminal"
+                >
+                  Terminal
+                </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/feed"
+                >
+                  Feed
+                </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/highway"
+                >
+                  Highway
+                </Dropdown.Item>
               </NavDropdown>
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
+            <SubgraphSettings />
             <ConnectKitButton.Custom>
               {({ isConnected, show, address }) => {
                 if (!isConnected)

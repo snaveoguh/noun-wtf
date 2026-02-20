@@ -65,7 +65,7 @@
       "@openzeppelin/contracts-upgradeable": "4.4.0",
       "@openzeppelin/hardhat-upgrades": "1.8.2",
       "@openzeppelin/upgrades-core": "1.10.0",
-      "@types/node": "catalog:",
+      "@types/node": "^22.15.3",
       "async": ">=2.6.4",
       "axios": ">=0.30.0",
       "braces": ">=3.0.3",
@@ -91,6 +91,18 @@
       "underscore": ">=1.12.1",
       "ws": ">=7.5.10",
       "yargs-parser": ">=5.0.1"
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "bufferutil",
+      "core-js",
+      "core-js-pure",
+      "keccak",
+      "postinstall-postinstall",
+      "secp256k1",
+      "unrs-resolver",
+      "utf-8-validate",
+      "web3"
+    ]
   }
 }

@@ -6,6 +6,7 @@ ponder.on('NounsAuctionHouseV2:AuctionCreated', async ({ event, context }) => {
     nounId: event.args.nounId,
     startTime: new Date(Number(event.args.startTime)),
     endTime: new Date(Number(event.args.endTime)),
+    settled: false,
     createdAt: new Date(Number(event.block.timestamp)),
     createdAtBlock: event.block.number,
     createdAtTransaction: event.transaction.hash,
@@ -31,6 +32,21 @@ ponder.on('NounsAuctionHouseV2:AuctionBid', async ({ event, context }) => {
 
 ponder.on('NounsAuctionHouseV2:AuctionBidWithClientId', async ({ event, context }) => {
   await context.db.update(bid, { nounId: event.args.nounId, value: event.args.value }).set({
+    clientId: event.args.clientId,
+  });
+});
+
+ponder.on('NounsAuctionHouseV2:AuctionSettled', async ({ event, context }) => {
+  await context.db.update(auction, { nounId: event.args.nounId }).set({
+    settled: true,
+    // settler: event.transaction.from, // TODO: enable after initial sync
+    winner: event.args.winner,
+    amount: event.args.amount,
+  });
+});
+
+ponder.on('NounsAuctionHouseV2:AuctionSettledWithClientId', async ({ event, context }) => {
+  await context.db.update(auction, { nounId: event.args.nounId }).set({
     clientId: event.args.clientId,
   });
 });

@@ -1,4 +1,5 @@
 [build]
+  base = "packages/nouns-webapp"
   command = "pnpm build"
   publish = "packages/nouns-webapp/dist"
 

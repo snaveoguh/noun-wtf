@@ -23,10 +23,18 @@ const NounInfoRowHolder: React.FC<NounInfoRowHolderProps> = props => {
 
   const { isLoading, error, data } = useQuery({
     queryKey: ['auction', nounId],
-    queryFn: () => execute(auctionQuery, { id: nounId.toString() }),
+    queryFn: () => {
+      const { query, variables } = auctionQuery(nounId.toString());
+      return execute<{
+        auction: {
+          nounId: string;
+          winner: string | null;
+        } | null;
+      }>(query, variables);
+    },
   });
 
-  const winner = data && data.auction?.bidder?.id;
+  const winner = data?.auction?.winner;
 
   if (isLoading) {
     return (
