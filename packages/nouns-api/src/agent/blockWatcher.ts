@@ -41,6 +41,8 @@ import {
   NOUNS_TOKEN_ADDRESS,
   NOUNS_TOKEN_ABI,
   BLOCK_POLL_INTERVAL_MS,
+  SAFETY_NET_POLL_INTERVAL_MS,
+  AGENT_RPC_URL,
 } from './constants.js';
 import { reservationStore } from './reservations.js';
 import {
@@ -124,16 +126,10 @@ const PRE_SIGN_TTL = 12_000; // refresh every ~1 block
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 
-function getWsUrl(httpUrl: string): string | null {
-  const infuraMatch = httpUrl.match(/^https:\/\/mainnet\.infura\.io\/v3\/(.+)$/);
-  if (infuraMatch) return `wss://mainnet.infura.io/ws/v3/${infuraMatch[1]}`;
-  if (httpUrl.includes('alchemy.com')) return httpUrl.replace('https://', 'wss://');
-  if (httpUrl.startsWith('https://')) return httpUrl.replace('https://', 'wss://');
-  return null;
-}
-
 function initClients(): boolean {
-  const rpcUrl = process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com';
+  // Agent uses its own RPC (free public node by default) to avoid
+  // competing with Ponder for the Infura rate limit.
+  const rpcUrl = AGENT_RPC_URL;
 
   publicClient = createPublicClient({
     chain: mainnet,
@@ -649,12 +645,9 @@ export function startWatcher(): void {
   state.running = true;
   void poll();
 
-  // Build WebSocket URL list
-  const rpcUrl = process.env.PONDER_RPC_URL_1 || '';
-  const primaryWs = getWsUrl(rpcUrl);
+  // Build WebSocket URL list — use FREE providers only.
+  // Infura WS counts against the rate limit and Ponder needs that budget.
   const wsUrls: Array<{ url: string; label: string }> = [];
-
-  if (primaryWs) wsUrls.push({ url: primaryWs, label: 'primary (Infura)' });
   for (const url of FREE_WS_ENDPOINTS) {
     wsUrls.push({ url, label: `free (${new URL(url).hostname})` });
   }
@@ -678,9 +671,10 @@ export function startWatcher(): void {
     console.log(`[NounIRL] 🚀 Started — HTTP polling every ${BLOCK_POLL_INTERVAL_MS}ms`);
   }
 
-  // Safety net HTTP poll (slower when WS active)
+  // Safety net HTTP poll — much less frequent when WS is active
+  // (just a fallback in case all WS connections drop)
   if (wsConnected > 0 && !pollTimer) {
-    pollTimer = setInterval(poll, 6_000);
+    pollTimer = setInterval(poll, SAFETY_NET_POLL_INTERVAL_MS);
   }
 
   startBackgroundTasks();

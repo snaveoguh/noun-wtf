@@ -69,6 +69,11 @@ export const AUCTION_HOUSE_ABI = [
 
 // ─── Block Watcher Config ──────────────────────────────────────────────────
 export const BLOCK_POLL_INTERVAL_MS = 1_000; // 1s poll — settlement window is 1 block (~12s)
+export const SAFETY_NET_POLL_INTERVAL_MS = 30_000; // 30s backup poll when WS is active
+
+// Agent uses a FREE public RPC for its HTTP calls (auction reads, nonce checks, block polls).
+// This avoids competing with Ponder for the Infura rate limit.
+export const AGENT_RPC_URL = process.env.NOUNIRL_RPC_URL || 'https://ethereum-rpc.publicnode.com';
 
 // NounsToken contract (mainnet) — for Noun-gated access control
 export const NOUNS_TOKEN_ADDRESS = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
