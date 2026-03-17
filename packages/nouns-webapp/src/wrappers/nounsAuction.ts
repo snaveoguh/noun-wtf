@@ -7,4 +7,5 @@ export interface Auction {
   startTime: BigNumberish;
   nounId: BigNumberish;
   settled: boolean;
+  clientId?: number | null;
 }

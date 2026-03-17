@@ -1,69 +1,14 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { Button } from '@/components/ui/button';
-import { INounSeed } from '@/wrappers/nounToken';
+import { type SavedDream, deleteDream, loadDreams } from '@/lib/dreamStorage';
 
-// Demo dreams (will be replaced with API data)
-const DEMO_DREAMS: Dream[] = [
-  {
-    id: '1',
-    title: 'Cosmic Noun',
-    description: 'A noun inspired by the cosmos, with stars in its eyes.',
-    creator: '0x1234...5678',
-    seed: { background: 1, body: 17, accessory: 41, head: 112, glasses: 8 },
-    votes: 42,
-    createdAt: new Date('2024-01-15'),
-    status: 'published',
-  },
-  {
-    id: '2',
-    title: 'Garden Noun',
-    description: 'A peaceful garden-themed noun with flowery accessories.',
-    creator: '0xabcd...ef01',
-    seed: { background: 0, body: 5, accessory: 22, head: 88, glasses: 3 },
-    votes: 28,
-    createdAt: new Date('2024-02-20'),
-    status: 'published',
-  },
-  {
-    id: '3',
-    title: 'Cyber Noun',
-    description: 'A futuristic noun for the digital age.',
-    creator: '0x9876...5432',
-    seed: { background: 1, body: 24, accessory: 55, head: 150, glasses: 12 },
-    votes: 65,
-    createdAt: new Date('2024-03-10'),
-    status: 'published',
-  },
-  {
-    id: '4',
-    title: 'Ocean Noun',
-    description: 'A deep-sea inspired noun, swimming through the blockchain.',
-    creator: '0xfeed...beef',
-    seed: { background: 0, body: 10, accessory: 30, head: 45, glasses: 5 },
-    votes: 19,
-    createdAt: new Date('2024-04-01'),
-    status: 'published',
-  },
-];
-
-interface Dream {
-  id: string;
-  title: string;
-  description: string;
-  creator: string;
-  seed: INounSeed;
-  votes: number;
-  createdAt: Date;
-  status: 'draft' | 'published' | 'proposed';
-}
-
-function DreamCard({ dream }: { dream: Dream }) {
+function DreamCard({ dream, onDelete }: { dream: SavedDream; onDelete: (id: string) => void }) {
   const svgUri = useMemo(() => {
     try {
       const { parts, background } = getNounData(dream.seed);
@@ -75,29 +20,38 @@ function DreamCard({ dream }: { dream: Dream }) {
   }, [dream.seed]);
 
   return (
-    <div className="group overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-2xl border-2 border-black bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {/* Delete button — visible on hover */}
+      <button
+        onClick={() => onDelete(dream.id)}
+        className="absolute right-2 top-2 z-10 hidden rounded-full bg-red-500 p-1.5 text-white transition-colors hover:bg-red-600 group-hover:block"
+        title="Delete dream"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+
+      {/* Lil-sized Noun preview */}
       <div
-        className="p-4"
-        style={{ backgroundColor: `#${ImageData.bgcolors[dream.seed.background]}` }}
+        className="flex items-center justify-center py-4"
+        style={{ backgroundColor: `#${ImageData.bgcolors[dream.seed.background] ?? 'd5d7e1'}` }}
       >
         {svgUri && (
           <img
             src={svgUri}
             alt={dream.title}
-            className="mx-auto h-48 w-48"
+            className="h-24 w-24 transition-transform group-hover:scale-110"
             style={{ imageRendering: 'pixelated' }}
           />
         )}
       </div>
-      <div className="p-4">
-        <h3 className="text-lg font-bold">{dream.title}</h3>
-        <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">{dream.description}</p>
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-muted-foreground text-xs">{dream.creator}</span>
-          <div className="flex items-center gap-1">
-            <span className="text-lg">❤️</span>
-            <span className="text-sm font-bold">{dream.votes}</span>
-          </div>
+
+      <div className="p-3">
+        <h3 className="truncate text-sm font-bold">{dream.title}</h3>
+        {dream.description && (
+          <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{dream.description}</p>
+        )}
+        <div className="text-muted-foreground mt-2 text-xs">
+          {new Date(dream.createdAt).toLocaleDateString()}
         </div>
       </div>
     </div>
@@ -105,25 +59,44 @@ function DreamCard({ dream }: { dream: Dream }) {
 }
 
 const DreamsPage: FC = () => {
-  const [sortBy, setSortBy] = useState<'votes' | 'newest'>('votes');
+  const [dreams, setDreams] = useState<SavedDream[]>([]);
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+
+  // Load from localStorage on mount + listen for updates
+  useEffect(() => {
+    setDreams(loadDreams());
+
+    const handler = () => setDreams(loadDreams());
+    window.addEventListener('storage', handler);
+    window.addEventListener('dreams-updated', handler);
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('dreams-updated', handler);
+    };
+  }, []);
 
   const sortedDreams = useMemo(() => {
-    const sorted = [...DEMO_DREAMS];
-    if (sortBy === 'votes') {
-      sorted.sort((a, b) => b.votes - a.votes);
+    const sorted = [...dreams];
+    if (sortBy === 'oldest') {
+      sorted.sort((a, b) => a.createdAt - b.createdAt);
     } else {
-      sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      sorted.sort((a, b) => b.createdAt - a.createdAt);
     }
     return sorted;
-  }, [sortBy]);
+  }, [sortBy, dreams]);
+
+  const handleDelete = (id: string) => {
+    deleteDream(id);
+    setDreams(loadDreams());
+  };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold">Dreams</h1>
           <p className="text-muted-foreground mt-1">
-            Community-created Noun designs. Vote for your favorites!
+            Your dreamed-up Nouns. Create, collect, admire.
           </p>
         </div>
         <Link to="/dreams/create">
@@ -134,28 +107,46 @@ const DreamsPage: FC = () => {
         </Link>
       </div>
 
-      <div className="mb-4 flex gap-2">
-        <Button
-          variant={sortBy === 'votes' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSortBy('votes')}
-        >
-          Most Voted
-        </Button>
-        <Button
-          variant={sortBy === 'newest' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSortBy('newest')}
-        >
-          Newest
-        </Button>
-      </div>
+      {dreams.length > 0 && (
+        <div className="mb-4 flex gap-2">
+          <Button
+            variant={sortBy === 'newest' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSortBy('newest')}
+          >
+            Newest
+          </Button>
+          <Button
+            variant={sortBy === 'oldest' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSortBy('oldest')}
+          >
+            Oldest
+          </Button>
+        </div>
+      )}
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {sortedDreams.map(dream => (
-          <DreamCard key={dream.id} dream={dream} />
-        ))}
-      </div>
+      {sortedDreams.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <p className="mb-2 text-6xl">💭</p>
+          <p className="mb-2 text-2xl font-bold">No dreams yet</p>
+          <p className="text-muted-foreground mb-6">
+            Create your first Noun dream and it will appear here
+          </p>
+          <Link to="/dreams/create">
+            <Button className="gap-2" size="lg">
+              <Plus className="h-4 w-4" />
+              Create Your First Dream
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {sortedDreams.map(dream => (
+            <DreamCard key={dream.id} dream={dream} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

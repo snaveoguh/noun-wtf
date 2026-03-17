@@ -20,20 +20,34 @@ ponder.on('NounsAuctionHouseV2:AuctionExtended', async ({ event, context }) => {
 });
 
 ponder.on('NounsAuctionHouseV2:AuctionBid', async ({ event, context }) => {
-  await context.db.insert(bid).values({
-    nounId: event.args.nounId,
-    bidder: event.args.sender,
-    value: event.args.value,
-    createdAt: new Date(Number(event.block.timestamp)),
-    createdAtBlock: event.block.number,
-    createdAtTransaction: event.transaction.hash,
-  });
+  // Use onConflictDoUpdate to handle duplicate (nounId, value) pairs
+  // that can occur during reorgs/re-syncs (PK is nounId+value).
+  await context.db
+    .insert(bid)
+    .values({
+      nounId: event.args.nounId,
+      bidder: event.args.sender,
+      value: event.args.value,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoUpdate({
+      bidder: event.args.sender,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    });
 });
 
 ponder.on('NounsAuctionHouseV2:AuctionBidWithClientId', async ({ event, context }) => {
-  await context.db.update(bid, { nounId: event.args.nounId, value: event.args.value }).set({
-    clientId: event.args.clientId,
-  });
+  // Guard: bid record may not exist yet if AuctionBid hasn't been processed
+  const existing = await context.db.find(bid, { nounId: event.args.nounId, value: event.args.value });
+  if (existing) {
+    await context.db.update(bid, { nounId: event.args.nounId, value: event.args.value }).set({
+      clientId: event.args.clientId,
+    });
+  }
 });
 
 ponder.on('NounsAuctionHouseV2:AuctionSettled', async ({ event, context }) => {

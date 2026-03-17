@@ -212,6 +212,7 @@ const Bid: React.FC<BidProps> = props => {
           </>
         )}
         {!auctionEnded ? (
+          // @ts-expect-error TS2590: react-bootstrap Button union type too complex
           <Button
             className={auctionEnded ? classes.bidBtnAuctionEnded : classes.bidBtn}
             onClick={auctionEnded ? settleAuctionHandler : placeBidHandler}

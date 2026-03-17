@@ -1,82 +1,43 @@
 .navArrowsContainer {
   position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.leftArrowCool {
-  -webkit-appearance: none;
-  padding: 0;
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  background-size: contain;
-  background-repeat: no-repeat;
-  font-size: large;
-  border-radius: 50%;
-  color: var(--brand-cool-dark-text);
-  background-color: var(--brand-cool-accent);
-  font-weight: bold;
-}
-
-.rightArrowCool {
-  -webkit-appearance: none;
-  padding: 0;
-  margin-left: 0.3rem;
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  background-size: contain;
-  background-repeat: no-repeat;
-  font-size: large;
-  color: var(--brand-cool-dark-text);
-  background-color: var(--brand-cool-accent);
-  border-radius: 50%;
-  font-weight: bold;
-}
-
-.leftArrowWarm {
-  -webkit-appearance: none;
-  padding: 0;
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  background-size: contain;
-  background-repeat: no-repeat;
-  font-size: large;
-  border-radius: 50%;
-  color: var(--brand-warm-dark-text);
-  background-color: var(--brand-warm-accent);
-  font-weight: bold;
-}
-
+.leftArrowCool,
+.rightArrowCool,
+.leftArrowWarm,
 .rightArrowWarm {
   -webkit-appearance: none;
-  padding: 0;
-  margin-left: 0.3rem;
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  background-size: contain;
-  background-repeat: no-repeat;
-  font-size: large;
-  color: var(--brand-warm-dark-text);
-  background-color: var(--brand-warm-accent);
-  border-radius: 50%;
-  font-weight: bold;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  transition: opacity 0.1s;
 }
 
-/* Disable hover on mobile because it was leading to
-buttons looking disabled when they were not */
+.leftArrowCool,
+.rightArrowCool {
+  color: var(--brand-cool-dark-text);
+}
+
+.leftArrowWarm,
+.rightArrowWarm {
+  color: var(--brand-warm-dark-text);
+}
+
+/* Disable hover on mobile */
 @media (min-width: 992px) {
   .leftArrowWarm:hover,
   .leftArrowCool:hover,
   .rightArrowWarm:hover,
   .rightArrowCool:hover {
-    opacity: 0.9;
-    background-color: var(--brand-gray-hover);
+    opacity: 0.6;
   }
 }
 
@@ -84,7 +45,7 @@ buttons looking disabled when they were not */
 .leftArrowCool:disabled,
 .rightArrowWarm:disabled,
 .rightArrowCool:disabled {
-  opacity: 0.5;
+  opacity: 0.25;
   cursor: not-allowed;
 }
 

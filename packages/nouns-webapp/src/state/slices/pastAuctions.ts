@@ -44,6 +44,7 @@ const reduxSafePastAuctions = (auctions: PonderAuction[]): AuctionState[] => {
         endTime: BigInt(auction.endTime).toString(),
         nounId: BigInt(auction.nounId).toString(),
         settled: auction.settled ?? false,
+        clientId: auction.clientId ?? null,
       },
       bids: (auction.bids?.items ?? []).map(bid => {
         return {

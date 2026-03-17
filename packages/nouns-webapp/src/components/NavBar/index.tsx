@@ -7,7 +7,9 @@ import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
+
+import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { formatEther } from 'viem';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
@@ -44,6 +46,8 @@ const NavBar = () => {
   const torchMode = useAppSelector(state => state.application.torchMode);
   const navDispatch = useAppDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { setMode: setSiteMode } = useSiteTheme();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
       select: data => {
@@ -71,7 +75,7 @@ const NavBar = () => {
     navDropdownClasses.warmInfoSelected,
   );
   const candidatesNavItem = config.featureToggles.candidates ? (
-    <Dropdown.Item className={buttonClasses} href="/vote#candidates">
+    <Dropdown.Item className={buttonClasses} href="/candidates">
       <Trans>Candidates</Trans>
     </Dropdown.Item>
   ) : null;
@@ -95,6 +99,7 @@ const NavBar = () => {
         <Trans>Proposals</Trans>
       </Dropdown.Item>
       {candidatesNavItem}
+      <Dropdown.Item href="/grants">Grants</Dropdown.Item>
     </NavDropdown>
   );
 
@@ -135,7 +140,7 @@ const NavBar = () => {
             {currentNounSeed && (
               <Nav.Item className="d-none d-xl-flex" style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}>
                 <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, whiteSpace: 'nowrap' }}>
-                  today's color pal:
+                  color 2day:
                 </span>
                 <NounPalette seed={currentNounSeed} />
               </Nav.Item>
@@ -160,7 +165,7 @@ const NavBar = () => {
                   {config.featureToggles.candidates && (
                     <Nav.Link
                       as={Link}
-                      to="/vote#candidates"
+                      to="/candidates"
                       className={classes.nounsNavLink}
                       onClick={closeNav}
                     >
@@ -173,6 +178,13 @@ const NavBar = () => {
                   )}
                 </>
               )}
+              <Nav.Link as={Link} to="/grants" className={classes.nounsNavLink} onClick={closeNav}>
+                <NavBarButton
+                  buttonText="Grants"
+                  buttonIcon={<FontAwesomeIcon icon={faFile} />}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
             </div>
             <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
               {isDaoGteV3 ? (
@@ -260,6 +272,18 @@ const NavBar = () => {
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/stats"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Stats"
+                  buttonIcon={<span>📊</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
             </div>
             <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
               <NavDropdown
@@ -339,6 +363,30 @@ const NavBar = () => {
                 >
                   Settlers
                 </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/stats"
+                >
+                  Stats
+                </Dropdown.Item>
+                <Dropdown.Item
+                  className={clsx(
+                    usePickByState(
+                      navDropdownClasses.whiteInfoSelectedBottom,
+                      navDropdownClasses.coolInfoSelected,
+                      navDropdownClasses.warmInfoSelected,
+                    ),
+                  )}
+                  href="/terraforms"
+                >
+                  Terraforms
+                </Dropdown.Item>
                 <Dropdown.Divider />
                 <Dropdown.Item
                   className={clsx(
@@ -396,6 +444,26 @@ const NavBar = () => {
               onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
             >
               {torchMode ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => { setSiteMode('new'); navigate('/'); }}
+              title="Switch to Terminal Feed"
+              style={{
+                background: 'none',
+                border: '1px solid rgba(0,255,65,0.3)',
+                cursor: 'pointer',
+                fontSize: '0.65rem',
+                padding: '3px 8px',
+                lineHeight: 1,
+                color: '#00ff41',
+                borderRadius: '3px',
+                letterSpacing: '0.5px',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,255,65,0.1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+            >
+              NEW
             </button>
             <SubgraphSettings />
             <ConnectKitButton.Custom>

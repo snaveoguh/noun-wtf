@@ -1,6 +1,6 @@
 import { eq } from 'ponder';
 import { ponder } from 'ponder:registry';
-import { proposal, proposalSigner, stream, transaction, vote } from 'ponder:schema';
+import { proposal, proposalSigner, proposalStatusChange, stream, transaction, vote } from 'ponder:schema';
 
 ponder.on('NounsDAOV4:ProposalCreated', async ({ event, context }) => {
   await context.db.insert(proposal).values({
@@ -120,6 +120,13 @@ ponder.on('NounsDAOV4:ProposalQueued', async ({ event, context }) => {
     status: 'QUEUED',
     executionETA: event.args.eta,
   });
+  await context.db.insert(proposalStatusChange).values({
+    proposalId: event.args.id,
+    status: 'QUEUED',
+    createdAt: new Date(Number(event.block.timestamp)),
+    createdAtBlock: event.block.number,
+    createdAtTransaction: event.transaction.hash,
+  }).onConflictDoNothing();
 });
 
 ponder.on('NounsDAOV4:ProposalExecuted', async ({ event, context }) => {
@@ -132,18 +139,40 @@ ponder.on('NounsDAOV4:ProposalExecuted', async ({ event, context }) => {
     .update(stream)
     .set({ proposalId: event.args.id })
     .where(eq(stream.createdAtTransaction, event.transaction.hash));
+
+  await context.db.insert(proposalStatusChange).values({
+    proposalId: event.args.id,
+    status: 'EXECUTED',
+    createdAt: new Date(Number(event.block.timestamp)),
+    createdAtBlock: event.block.number,
+    createdAtTransaction: event.transaction.hash,
+  }).onConflictDoNothing();
 });
 
 ponder.on('NounsDAOV4:ProposalCanceled', async ({ event, context }) => {
   await context.db.update(proposal, { id: event.args.id }).set({
     status: 'CANCELLED',
   });
+  await context.db.insert(proposalStatusChange).values({
+    proposalId: event.args.id,
+    status: 'CANCELLED',
+    createdAt: new Date(Number(event.block.timestamp)),
+    createdAtBlock: event.block.number,
+    createdAtTransaction: event.transaction.hash,
+  }).onConflictDoNothing();
 });
 
 ponder.on('NounsDAOV4:ProposalVetoed', async ({ event, context }) => {
   await context.db.update(proposal, { id: event.args.id }).set({
     status: 'VETOED',
   });
+  await context.db.insert(proposalStatusChange).values({
+    proposalId: event.args.id,
+    status: 'VETOED',
+    createdAt: new Date(Number(event.block.timestamp)),
+    createdAtBlock: event.block.number,
+    createdAtTransaction: event.transaction.hash,
+  }).onConflictDoNothing();
 });
 
 ponder.on('NounsDAOV4:ProposalObjectionPeriodSet', async ({ event, context }) => {

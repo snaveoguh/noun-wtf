@@ -193,7 +193,7 @@ const CreateCandidatePage = () => {
 
       <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
         <div className={classes.wrapper}>
-          <Link to={'/vote#candidates'}>
+          <Link to={'/candidates'}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
           </Link>
           <h3 className={classes.heading}>

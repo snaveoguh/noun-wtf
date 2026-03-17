@@ -1,39 +1,49 @@
-import type { Address } from '@/utils/types';
-
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
-import { SearchIcon } from '@heroicons/react/solid';
 import { i18n } from '@lingui/core';
 import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import clsx from 'clsx';
 import dayjs from 'dayjs';
 import en from 'dayjs/locale/en';
 import advanced from 'dayjs/plugin/advancedFormat';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import { Button, Card, Col, Row, Spinner } from 'react-bootstrap';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  ExternalLink,
+  FileText,
+} from 'lucide-react';
+import { Button, Spinner } from 'react-bootstrap';
+import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
-import ReactTooltip from 'react-tooltip';
-import { isNonNullish } from 'remeda';
+import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 import { toast } from 'sonner';
 import { useAccount, useBlockNumber } from 'wagmi';
 
-import ProposalContent from '@/components/ProposalContent';
-import ProposalHeader from '@/components/ProposalHeader';
-import VoteCard, { VoteCardVariant } from '@/components/VoteCard';
-import VoteModal from '@/components/VoteModal';
-import VoteSignals from '@/components/VoteSignals/VoteSignals';
+import ByLineHoverCard from '@/components/ByLineHoverCard';
+import HoverCard from '@/components/HoverCard';
+import InlineVotePanel from '@/components/InlineVotePanel';
+import ProposalStatus from '@/components/ProposalStatus';
+import ProposalVoteActivity from '@/components/ProposalVoteActivity';
+import type { VoteWithReason } from '@/components/ProposalVoteActivity';
+import ProposalTransactions from '@/components/ProposalContent/ProposalTransactions';
+import ShortAddress from '@/components/ShortAddress';
+import VotingOverview from '@/components/VotingOverview';
 import { useReadNounsGovernorQuorumVotes } from '@/contracts';
 import { useAppSelector } from '@/hooks';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
 import { SUPPORTED_LOCALE_TO_DAYSJS_LOCALE, SupportedLocale } from '@/i18n/locales';
-import Section from '@/layout/Section';
-import { cn } from '@/lib/utils';
 import { AVERAGE_BLOCK_TIME_IN_SECS } from '@/utils/constants';
+import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
 import { isProposalUpdatable } from '@/utils/proposals';
+import { processProposalDescriptionText } from '@/utils/processProposalDescriptionText';
 import {
   PartialProposal,
   ProposalState,
@@ -45,21 +55,21 @@ import {
   useIsForkActive,
   useProposal,
   useProposalVersions,
+  useProposalVote,
   useQueueProposal,
 } from '@/wrappers/nounsDao';
 import { useProposalFeedback } from '@/wrappers/nounsData';
-import { useUserVotes, useUserVotesAsOfBlock } from '@/wrappers/nounToken';
+import { useUserVotesAsOfBlock } from '@/wrappers/nounToken';
 import {
   delegateNounsAtBlockQuery,
   proposalVotesQuery,
   propUsingDynamicQuorum,
 } from '@/wrappers/subgraph';
 
-import classes from './Vote.module.css';
-
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(advanced);
+dayjs.extend(relativeTime);
 
 const getUpdatableCountdownCopy = (
   proposal: PartialProposal,
@@ -70,7 +80,8 @@ const getUpdatableCountdownCopy = (
   const endDate =
     proposal !== undefined && currentBlock !== undefined
       ? dayjs(timestamp).add(
-          AVERAGE_BLOCK_TIME_IN_SECS * Number(proposal.updatePeriodEndBlock - BigInt(currentBlock)),
+          AVERAGE_BLOCK_TIME_IN_SECS *
+            Number(proposal.updatePeriodEndBlock - BigInt(currentBlock)),
           'seconds',
         )
       : undefined;
@@ -84,43 +95,55 @@ const getUpdatableCountdownCopy = (
   );
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Vote Page — nouns.game–inspired redesign
+// ─────────────────────────────────────────────────────────────────────────────
+
 const VotePage = () => {
   const { id } = useParams<{ id: string }>();
-  const [showVoteModal, setShowVoteModal] = useState<boolean>(false);
-  // Dynamic quorum info modal removed (streamlined)
-  const [isQueuePending, setQueuePending] = useState<boolean>(false);
-  const [isExecutePending, setExecutePending] = useState<boolean>(false);
-  const [isCancelPending, setCancelPending] = useState<boolean>(false);
-  const [dataFetchPollInterval, setDataFetchPollInterval] = useState<number>(0);
-  // if objection period is active, then we are in objection period, unless the current block is greater than the end block
-  const [isObjectionPeriod, setIsObjectionPeriod] = useState<boolean>(false);
+  const [isQueuePending, setQueuePending] = useState(false);
+  const [isExecutePending, setExecutePending] = useState(false);
+  const [isCancelPending, setCancelPending] = useState(false);
+  const [dataFetchPollInterval] = useState(0);
+  const [isObjectionPeriod, setIsObjectionPeriod] = useState(false);
   const [forkPeriodMessage, setForkPeriodMessage] = useState<ReactNode>(<></>);
-  const [isExecutable, setIsExecutable] = useState<boolean>(true);
+  const [isExecutable, setIsExecutable] = useState(true);
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [activeTab, setActiveTab] = useState<'vote' | 'description'>('vote');
+  const [revoteTarget, setRevoteTarget] = useState<{
+    voter: string;
+    support: number;
+  } | null>(null);
+
   const proposal = useProposal(Number(id));
   const proposalVersions = useProposalVersions(Number(id));
   const activeLocale = useActiveLocale();
   const { _ } = useLingui();
   const { address: account } = useAccount();
   const { query, variables } = propUsingDynamicQuorum(id ?? '0');
-  const { data: dqInfo, loading: loadingDQInfo, error: dqError } = useQuery(query, { variables });
+  const {
+    data: dqInfo,
+    loading: loadingDQInfo,
+    error: dqError,
+  } = useQuery(query, { variables });
   const { queueProposal, queueProposalState } = useQueueProposal();
   const { executeProposal, executeProposalState } = useExecuteProposal();
   const { cancelProposal, cancelProposalState } = useCancelProposal();
   const isDaoGteV3 = useIsDaoGteV3();
-  const { data: proposalFeedback, refetch: proposalFeedbackRefetch } = useProposalFeedback(
-    Number(id).toString(),
-    dataFetchPollInterval,
-  );
+  useProposalFeedback(Number(id).toString(), dataFetchPollInterval);
   const hasVoted = useHasVotedOnProposal(BigInt(proposal?.id ?? 0n));
+  const proposalVote = useProposalVote(BigInt(proposal?.id ?? 0n));
   const forkActiveState = useIsForkActive();
-  const [isForkActive, setIsForkActive] = useState<boolean>(false);
-  // Get and format date from data
+  const [isForkActive, setIsForkActive] = useState(false);
+
   const timestamp = Date.now();
   const { data: currentBlock } = useBlockNumber();
+
   const startDate =
     proposal !== undefined && currentBlock !== undefined
       ? dayjs(timestamp).add(
-          AVERAGE_BLOCK_TIME_IN_SECS * Number(proposal.startBlock - BigInt(currentBlock)),
+          AVERAGE_BLOCK_TIME_IN_SECS *
+            Number(proposal.startBlock - BigInt(currentBlock)),
           'seconds',
         )
       : undefined;
@@ -132,62 +155,51 @@ const VotePage = () => {
     currentBlock > proposal?.endBlock
       ? proposal?.objectionPeriodEndBlock
       : proposal?.endBlock;
+
   const endDate =
-    proposal !== undefined && currentBlock !== undefined && endBlock !== undefined
+    proposal !== undefined &&
+    currentBlock !== undefined &&
+    endBlock !== undefined
       ? dayjs(timestamp).add(
           AVERAGE_BLOCK_TIME_IN_SECS * Number(endBlock - BigInt(currentBlock)),
           'seconds',
         )
       : undefined;
+
   const now = dayjs();
 
-  // Get total votes and format percentages for UI
-  const totalVotes = proposal
-    ? proposal.forCount + proposal.againstCount + proposal.abstainCount
-    : undefined;
-  const forPercentage =
-    proposal !== undefined && totalVotes !== undefined && totalVotes > 0
-      ? (proposal.forCount * 100) / totalVotes
+  // User vote eligibility — use vote snapshot block (or currentBlock-1 if earlier)
+  const currentOrSnapshotBlock = useMemo(() => {
+    const snapshot = proposal?.voteSnapshotBlock != null
+      ? Number(proposal.voteSnapshotBlock)
       : 0;
-  const againstPercentage =
-    proposal !== undefined && totalVotes !== undefined && totalVotes > 0
-      ? (proposal.againstCount * 100) / totalVotes
-      : 0;
-  const abstainPercentage =
-    proposal !== undefined && totalVotes !== undefined && totalVotes > 0
-      ? (proposal.abstainCount * 100) / totalVotes
-      : 0;
-
-  // Use user votes as of the current or proposal snapshot block
-  const currentOrSnapshotBlock = useMemo(
-    () =>
-      Math.min(
-        Number(proposal?.voteSnapshotBlock) ?? 0,
-        currentBlock !== undefined ? Number(currentBlock - 1n) : 0,
-      ) || undefined,
-    [currentBlock, proposal?.voteSnapshotBlock],
-  );
+    const current = currentBlock !== undefined ? Number(currentBlock - 1n) : 0;
+    if (snapshot <= 0 && current <= 0) return undefined;
+    if (snapshot <= 0) return current;
+    if (current <= 0) return snapshot;
+    return Math.min(snapshot, current);
+  }, [currentBlock, proposal?.voteSnapshotBlock]);
   const userVotes = useUserVotesAsOfBlock(currentOrSnapshotBlock);
 
-  // Get user votes as of current block to use in vote signals
-  const userVotesNow = useUserVotes() ?? 0;
-
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore Type instantiation is excessively deep and possibly infinite.
+  // @ts-ignore
   const { data: currentQuorum } = useReadNounsGovernorQuorumVotes({
-    args: [proposal !== undefined && proposal.id !== undefined ? BigInt(proposal.id) : 0n],
+    args: [
+      proposal !== undefined && proposal.id !== undefined
+        ? BigInt(proposal.id)
+        : 0n,
+    ],
     query: {
       enabled:
-        dqInfo !== undefined && dqInfo.proposal !== undefined
-          ? dqInfo.proposal.quorumCoefficient === '0'
+        dqInfo !== undefined && dqInfo?.proposal !== undefined
+          ? dqInfo.proposal?.quorumCoefficient === '0'
           : true,
     },
   });
 
-  const getVersionTimestamp = (proposalVersions: ProposalVersion[]) => {
-    const versionDetails = proposalVersions[proposalVersions.length - 1];
-    return versionDetails?.createdAt;
-  };
+  const getVersionTimestamp = (pv: ProposalVersion[]) =>
+    pv[pv.length - 1]?.createdAt;
+
   const hasSucceeded = proposal?.status === ProposalState.SUCCEEDED;
   const isInNonFinalState =
     proposal?.status !== undefined &&
@@ -199,140 +211,68 @@ const VotePage = () => {
       ProposalState.QUEUED,
       ProposalState.OBJECTION_PERIOD,
     ].includes(proposal.status);
-  const signers = proposal && proposal?.signers?.map(signer => signer.id.toLowerCase());
+
+  const signers =
+    proposal && proposal?.signers?.map(s => s.id.toLowerCase());
   const isProposalSigner = !!(
     account &&
     proposal &&
     signers &&
     signers.includes(account?.toLowerCase())
   );
-  const hasManyVersions = proposalVersions !== undefined && proposalVersions.length > 1;
-  const isProposer = () => proposal?.proposer?.toLowerCase() === account?.toLowerCase();
+  const hasManyVersions =
+    proposalVersions !== undefined && proposalVersions.length > 1;
+  const isProposer = () =>
+    proposal?.proposer?.toLowerCase() === account?.toLowerCase();
   const isUpdateable = () => {
     if (!isDaoGteV3) return false;
     return !!(
       proposal !== undefined &&
       currentBlock !== undefined &&
-      isProposalUpdatable(proposal.status, proposal.updatePeriodEndBlock, currentBlock)
+      isProposalUpdatable(
+        proposal.status,
+        proposal.updatePeriodEndBlock,
+        currentBlock,
+      )
     );
   };
-
-  const isCancellable = () => {
-    return isInNonFinalState && (isProposalSigner || isProposer());
-  };
-
+  const isCancellable = () =>
+    isInNonFinalState && (isProposalSigner || isProposer());
   const isAwaitingStateChange = () => {
-    if (hasSucceeded) {
-      return true;
-    }
-    if (proposal?.status === ProposalState.QUEUED) {
+    if (hasSucceeded) return true;
+    if (proposal?.status === ProposalState.QUEUED)
       return new Date() >= (proposal?.eta ?? Number.MAX_SAFE_INTEGER);
-    }
     return false;
   };
 
-  const isAwaitingDestructiveStateChange = () => {
-    return isCancellable();
-  };
-
-  const isActionable = () => {
-    if (isUpdateable() && !(isProposer() || isProposalSigner)) {
-      return false;
-    } else if (isAwaitingStateChange()) {
-      return true;
-    } else if (isAwaitingDestructiveStateChange()) {
-      return true;
-    } else return isUpdateable();
-  };
-
-  const startOrEndTimeCopy = () => {
-    if (startDate?.isBefore(now) === true && endDate?.isAfter(now) === true) {
-      return <Trans>Ends</Trans>;
-    }
-    if (endDate?.isBefore(now) === true) {
-      return <Trans>Ended</Trans>;
-    }
-    return <Trans>Starts</Trans>;
-  };
-
-  const startOrEndTimeTime = () => {
-    if (startDate?.isBefore(now) !== true) {
-      return startDate;
-    }
-    return endDate;
-  };
-  const objectionEnd = () => {
-    return proposal !== undefined &&
-      currentBlock !== undefined &&
-      proposal.objectionPeriodEndBlock !== undefined
-      ? dayjs(timestamp).add(
-          AVERAGE_BLOCK_TIME_IN_SECS * Number(proposal.objectionPeriodEndBlock - currentBlock),
-          'seconds',
-        )
-      : undefined;
-  };
-
-  const objectionEndTime = i18n.date(new Date(objectionEnd()?.toISOString() || 0), {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-  const objectionEndDate = i18n.date(new Date(objectionEnd()?.toISOString() || 0), {
-    dateStyle: 'long',
-  });
-  const objectionNoteCopy = (
-    <>
-      Voters will have until {objectionEndTime} on {objectionEndDate} to vote against this proposal.
-    </>
+  // State change actions
+  const moveStateButtonAction = hasSucceeded ? (
+    <Trans>Queue</Trans>
+  ) : (
+    <Trans>Execute</Trans>
   );
-  const moveStateButtonAction = hasSucceeded ? <Trans>Queue</Trans> : <Trans>Execute</Trans>;
   const moveStateAction = (() => {
-    if (hasSucceeded) {
+    if (hasSucceeded)
       return () => {
-        if (proposal?.id) {
+        if (proposal?.id)
           return queueProposal({ args: [BigInt(proposal.id)] });
-        }
       };
-    }
     return () => {
       if (proposal?.id) {
-        if (proposal?.onTimelockV1) {
-          return true;
-        } else {
-          return executeProposal({ args: [BigInt(proposal.id)] });
-        }
+        if (proposal?.onTimelockV1) return true;
+        else return executeProposal({ args: [BigInt(proposal.id)] });
       }
     };
   })();
-
-  const destructiveStateButtonAction = isCancellable() ? 'Cancel' : '';
-  const destructiveStateAction = (() => {
-    if (isCancellable()) {
-      return () => {
-        if (proposal?.id) {
-          return cancelProposal({ args: [BigInt(proposal.id)] });
-        }
-      };
-    }
-  })();
-
-  const handleRefetchData = async () => {
-    await proposalFeedbackRefetch();
-  };
 
   const onTransactionStateChange = useCallback(
     (
       {
         errorMessage,
         status,
-      }: {
-        status: string;
-        errorMessage?: string;
-      },
+      }: { status: string; errorMessage?: string },
       successMessage?: string,
       setPending?: (isPending: boolean) => void,
-      getErrorMessage?: (error?: string) => string | undefined,
-      onFinalState?: () => void,
     ) => {
       switch (status) {
         case 'None':
@@ -344,17 +284,11 @@ const VotePage = () => {
         case 'Success':
           toast.success(successMessage || _(t`Transaction Successful!`));
           setPending?.(false);
-          onFinalState?.();
           break;
         case 'Fail':
+        case 'Exception':
           toast.error(errorMessage || _(t`Please try again.`));
           setPending?.(false);
-          onFinalState?.();
-          break;
-        case 'Exception':
-          toast.error(getErrorMessage?.(errorMessage) || _(t`Please try again.`));
-          setPending?.(false);
-          onFinalState?.();
           break;
       }
     },
@@ -362,89 +296,76 @@ const VotePage = () => {
   );
 
   useEffect(
-    () => onTransactionStateChange(queueProposalState, _(t`Proposal Queued!`), setQueuePending),
+    () =>
+      onTransactionStateChange(
+        queueProposalState,
+        _(t`Proposal Queued!`),
+        setQueuePending,
+      ),
     [queueProposalState, onTransactionStateChange, _],
   );
-
   useEffect(
     () =>
-      onTransactionStateChange(executeProposalState, _(t`Proposal Executed!`), setExecutePending),
+      onTransactionStateChange(
+        executeProposalState,
+        _(t`Proposal Executed!`),
+        setExecutePending,
+      ),
     [executeProposalState, onTransactionStateChange, _],
   );
-
   useEffect(
-    () => onTransactionStateChange(cancelProposalState, _(t`Proposal Canceled!`), setCancelPending),
+    () =>
+      onTransactionStateChange(
+        cancelProposalState,
+        _(t`Proposal Canceled!`),
+        setCancelPending,
+      ),
     [cancelProposalState, onTransactionStateChange, _],
   );
-
   useEffect(() => {
-    if (forkActiveState.data) {
-      setIsForkActive(forkActiveState.data);
-    }
-  }, [forkActiveState.data, setIsForkActive]);
+    if (forkActiveState.data) setIsForkActive(forkActiveState.data);
+  }, [forkActiveState.data]);
 
+  // Votes query
   const activeAccount = useAppSelector(state => state.account.activeAccount);
-  const { query: votesQuery, variables: votesVariables } = proposalVotesQuery(proposal?.id ?? '0');
+  const { query: votesQuery, variables: votesVariables } = proposalVotesQuery(
+    proposal?.id ?? '0',
+  );
   const {
     loading,
     error,
     data: votersRaw,
   } = useQuery<{
-    votes: { items: Array<{ support: number; votes: number; voter: string }> };
-  }>(votesQuery, {
-    skip: !proposal,
-    variables: votesVariables,
-  });
+    votes: {
+      items: Array<{
+        support: number;
+        votes: number;
+        voter: string;
+        reason?: string;
+        clientId?: number;
+        createdAtBlock?: string;
+        createdAtTransaction?: string;
+      }>;
+    };
+  }>(votesQuery, { skip: !proposal, variables: votesVariables });
 
-  // Adapt Ponder response to match old ProposalVotes shape
-  const voters = votersRaw?.votes?.items
-    ? {
-        votes: votersRaw.votes.items.map(v => ({
-          supportDetailed: v.support as 0 | 1 | 2,
-          voter: { id: v.voter },
-          votes: v.votes,
-        })),
-      }
-    : undefined;
-
-  const voterIds = voters?.votes?.map(v => v.voter.id);
-  const { query: voteSnapshotQuery, variables: voteSnapshotVariables } = delegateNounsAtBlockQuery(
+  // Delegate snapshot query (used for vote weight display)
+  const voterIds = votersRaw?.votes?.items?.map(v => v.voter);
+  const {
+    query: voteSnapshotQuery,
+    variables: voteSnapshotVariables,
+  } = delegateNounsAtBlockQuery(
     voterIds ?? [],
     BigInt(proposal?.voteSnapshotBlock ?? 0),
   );
-  const { data: delegateSnapshotRaw } = useQuery<{
-    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
+  useQuery<{
+    delegates: {
+      items: Array<{ id: string; delegatedVotes: number }>;
+    };
   }>(voteSnapshotQuery, {
-    skip: (voters?.votes?.length ?? 0) === 0,
+    skip: (voterIds?.length ?? 0) === 0,
     variables: voteSnapshotVariables,
   });
-
-  // Adapt Ponder delegate response
-  const delegates = delegateSnapshotRaw?.delegates?.items?.map(d => ({
-    id: d.id,
-    nounsRepresented: Array.from({ length: Number(d.delegatedVotes) }, (_, i) => ({
-      id: String(i),
-    })),
-  }));
-  const delegateToNounIds = delegates?.reduce<Record<string, string[]>>((acc, curr) => {
-    acc[curr.id] = curr?.nounsRepresented?.map(nr => nr.id) ?? [];
-    return acc;
-  }, {});
-
-  const data = voters?.votes?.map(v => ({
-    delegate: v.voter.id as Address,
-    supportDetailed: v.supportDetailed,
-    nounsRepresented: delegateToNounIds?.[v.voter.id] ?? [],
-  }));
-
-  const [showToast, setShowToast] = useState(true);
-  useEffect(() => {
-    if (showToast) {
-      setTimeout(() => {
-        setShowToast(false);
-      }, 5000);
-    }
-  }, [showToast]);
 
   const isWalletConnected = activeAccount !== undefined;
   const isActiveForVoting =
@@ -471,313 +392,684 @@ const VotePage = () => {
   useEffect(() => {
     if (proposal?.status === ProposalState.QUEUED && isForkActive) {
       setForkPeriodMessage(
-        <p>
-          <Trans>Proposals cannot be executed during a forking period</Trans>
-        </p>,
+        <p>Proposals cannot be executed during a forking period</p>,
       );
       setIsExecutable(false);
     } else if (proposal?.status === ProposalState.QUEUED && !isForkActive) {
       setIsExecutable(true);
     }
-  }, [proposal?.status, isForkActive, setForkPeriodMessage, setIsExecutable]);
+  }, [proposal?.status, isForkActive]);
 
-  if (!proposal || loading || !data || loadingDQInfo || dqInfo === undefined) {
+  // ── Loading / error states ──────────────────────────────────────────────
+  if (!proposal || loading || loadingDQInfo || dqInfo === undefined) {
     return (
-      <div className={classes.spinner}>
-        <Spinner animation="border" />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '60vh',
+        }}
+      >
+        <Spinner animation="border" style={{ color: '#8c8d92' }} />
+      </div>
+    );
+  }
+  if (error || dqError) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: '#e40536' }}>
+        Failed to fetch proposal data
       </div>
     );
   }
 
-  if (error || dqError) {
-    return <Trans>Failed to fetch</Trans>;
-  }
-  // againstNouns removed (was only used by DynamicQuorumInfoModal)
-  const isV2Prop = dqInfo.proposal.quorumCoefficient > 0;
+  const isV2Prop = (dqInfo?.proposal?.quorumCoefficient ?? 0) > 0;
+  const quorum = isV2Prop
+    ? Number(currentQuorum ?? 0)
+    : proposal.quorumVotes;
+
+  // Build vote activity data
+  const voteActivityData: VoteWithReason[] = (
+    votersRaw?.votes?.items ?? []
+  ).map(v => ({
+    support: v.support,
+    votes: v.votes,
+    voter: v.voter,
+    reason: v.reason,
+    clientId: v.clientId,
+    createdAtBlock: v.createdAtBlock,
+    createdAtTransaction: v.createdAtTransaction,
+  }));
+
+  // Time display helpers
+  const startOrEndTimeCopy = () => {
+    if (startDate?.isBefore(now) && endDate?.isAfter(now)) return 'Ends';
+    if (endDate?.isBefore(now)) return 'Ended';
+    return 'Starts';
+  };
+  const startOrEndTimeTime = () => {
+    if (startDate?.isBefore(now) !== true) return startDate;
+    return endDate;
+  };
+
+  const handleRevote = (voterAddress: string, support: number) => {
+    setRevoteTarget({ voter: voterAddress, support });
+    setActiveTab('vote');
+    // Scroll to inline vote panel
+    document
+      .getElementById('inline-vote-panel')
+      ?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
-    <Section fullWidth={false} className={classes.votePage}>
-      <VoteModal
-        show={showVoteModal}
-        onHide={() => setShowVoteModal(false)}
-        proposalId={proposal?.id}
-        availableVotes={userVotes ?? 0}
-        isObjectionPeriod={isObjectionPeriod}
-      />
-      <Col lg={isUpdateable() ? 12 : 10} className={classes.wrapper}>
-        {proposal !== undefined && (
-          <ProposalHeader
-            proposal={proposal}
-            proposalVersions={proposalVersions}
-            isActiveForVoting={isActiveForVoting}
-            isWalletConnected={isWalletConnected}
-            submitButtonClickHandler={() => setShowVoteModal(true)}
-            versionNumber={
-              hasManyVersions && proposalVersions !== undefined
-                ? BigInt(proposalVersions.length)
-                : undefined
-            }
-            isObjectionPeriod={isObjectionPeriod}
-          />
-        )}
-      </Col>
-      <Col lg={isUpdateable() ? 12 : 10} className={clsx(classes.proposal, classes.wrapper)}>
-        <Row className={clsx(classes.section, classes.transitionStateButtonSection)}>
-          <Col className="d-grid gap-4">
-            {userVotes !== undefined && userVotes > 0 && !hasVoted && isObjectionPeriod ? (
-              <div className={classes.objectionWrapper}>
-                <div className={classes.objection}>
-                  <div className={classes.objectionHeader}>
-                    <p>
-                      <strong className="d-block">
-                        <Trans>Objection only period</Trans>
-                      </strong>
-                      Voting is now limited to against votes. This objection-only period protects
-                      the DAO from last-minute vote swings.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowVoteModal(true)}
-                    className={clsx(
-                      classes.destructiveTransitionStateButton,
-                      classes.button,
-                      classes.voteAgainst,
-                    )}
-                  >
-                    Vote against
-                  </button>
-                </div>
-              </div>
-            ) : null}
+    <div
+      className="vote-detail-wrapper"
+      style={{
+        maxWidth: 960,
+        margin: '0 auto',
+        padding: '0 20px 60px',
+        fontFamily: "'PT Root UI'",
+      }}
+    >
+      {/* ── Back button ──────────────────────────────────────────────── */}
+      <div style={{ paddingTop: 20, marginBottom: 12 }}>
+        <Link
+          to="/vote"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: '#8c8d92',
+            textDecoration: 'none',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            transition: 'color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#14141f')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#8c8d92')}
+        >
+          <ArrowLeft size={16} />
+          Back to proposals
+        </Link>
+      </div>
 
-            {isActionable() && (
-              <div className={classes.proposerOptionsWrapper}>
-                <div className={classes.proposerOptions}>
-                  <p>
-                    <span className={classes.proposerOptionsHeader}>
-                      <Trans>Proposal functions</Trans>
-                    </span>
-                    {isProposer() && isUpdateable() && (
-                      <>
-                        <Trans>This proposal can be edited for </Trans>{' '}
-                        {getUpdatableCountdownCopy(proposal, currentBlock ?? 0n, activeLocale)}{' '}
-                      </>
-                    )}
-                  </p>
+      {/* ── Proposal header ──────────────────────────────────────────── */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.8rem',
+              color: '#8c8d92',
+              fontWeight: 600,
+            }}
+          >
+            Proposal {proposal.id}
+          </span>
+          <ProposalStatus status={proposal.status} />
+          {isObjectionPeriod && (
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                color: '#e40536',
+                padding: '2px 8px',
+                borderRadius: 6,
+                border: '1.5px solid #e40536',
+                background: 'rgba(228, 5, 54, 0.05)',
+              }}
+            >
+              Objection Period
+            </span>
+          )}
+        </div>
 
-                  <div className="d-flex gap-3">
-                    <>
-                      {isAwaitingStateChange() && (
-                        <div className={clsx(classes.awaitingStateChangeButton)}>
-                          <Button
-                            onClick={moveStateAction}
-                            disabled={isQueuePending || isExecutePending || !isExecutable}
-                            variant="dark"
-                            className={clsx(classes.transitionStateButton, classes.button)}
-                          >
-                            {isQueuePending || isExecutePending ? (
-                              <Spinner animation="border" />
-                            ) : (
-                              <>{moveStateButtonAction} Proposal ⌐◧-◧</>
-                            )}
-                          </Button>
-                          {forkPeriodMessage}
-                        </div>
-                      )}
+        <h1
+          style={{
+            fontFamily: "'Londrina Solid'",
+            fontSize: '2rem',
+            fontWeight: 400,
+            margin: '0 0 8px',
+            lineHeight: 1.2,
+          }}
+        >
+          {proposal.title}
+        </h1>
 
-                      {isAwaitingDestructiveStateChange() && (
-                        <Button
-                          onClick={destructiveStateAction}
-                          disabled={isCancelPending}
-                          className={clsx(classes.destructiveTransitionStateButton, classes.button)}
-                        >
-                          {isCancelPending ? (
-                            <Spinner animation="border" />
-                          ) : (
-                            <>{destructiveStateButtonAction} Proposal </>
-                          )}
-                        </Button>
-                      )}
-                    </>
-                    {isProposer() && isUpdateable() && (
-                      <Link
-                        to={`/vote/${id}/edit`}
-                        className={clsx(classes.primaryButton, classes.button)}
-                      >
-                        Edit
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </div>
+        {/* Proposer info */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+            fontSize: '0.8rem',
+            color: '#8c8d92',
+          }}
+        >
+          <span>Proposed by</span>
+          <HoverCard
+            hoverCardContent={(tip: string) => (
+              <ByLineHoverCard proposerAddress={tip} />
             )}
-          </Col>
-        </Row>
-        {!isUpdateable() && (
-          <>
-            <Row>
-              <VoteCard
-                proposal={proposal}
-                percentage={forPercentage}
-                variant={VoteCardVariant.FOR}
-                delegateGroupedVoteData={data}
+            tip={proposal.proposer || ''}
+            id="proposerHoverCard"
+          >
+            <a
+              href={buildEtherscanAddressLink(proposal.proposer || '')}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontWeight: 700,
+                color: '#14141f',
+                textDecoration: 'none',
+              }}
+            >
+              <ShortAddress
+                address={
+                  (proposal.proposer ||
+                    '0x0000000000000000000000000000000000000000') as `0x${string}`
+                }
+                avatar={false}
               />
-              <VoteCard
-                proposal={proposal}
-                percentage={againstPercentage}
-                variant={VoteCardVariant.AGAINST}
-                delegateGroupedVoteData={data}
-              />
-              <VoteCard
-                proposal={proposal}
-                percentage={abstainPercentage}
-                variant={VoteCardVariant.ABSTAIN}
-                delegateGroupedVoteData={data}
-              />
-            </Row>
-          </>
+            </a>
+          </HoverCard>
+
+          {proposal.transactionHash && (
+            <a
+              href={buildEtherscanTxLink(proposal.transactionHash)}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: '#b0b0b8' }}
+            >
+              <ExternalLink size={12} />
+            </a>
+          )}
+
+          {proposal.signers?.length > 0 && (
+            <>
+              <span style={{ color: '#d0d0d4' }}>|</span>
+              <span>Sponsored by</span>
+              {proposal.signers.map((signer: { id: string }) => (
+                <Fragment key={signer.id}>
+                  <HoverCard
+                    hoverCardContent={(tip: string) => (
+                      <ByLineHoverCard proposerAddress={tip} />
+                    )}
+                    tip={signer.id}
+                    id={`signer-${signer.id}`}
+                  >
+                    <a
+                      href={buildEtherscanAddressLink(signer.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontWeight: 700,
+                        color: '#14141f',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ShortAddress
+                        address={signer.id as `0x${string}`}
+                        avatar={false}
+                      />
+                    </a>
+                  </HoverCard>
+                </Fragment>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Version info */}
+        {isDaoGteV3 && (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: '0.75rem',
+              color: '#8c8d92',
+            }}
+          >
+            {hasManyVersions ? (
+              <Link
+                to={`/vote/${proposal.id}/history/`}
+                style={{ color: '#4965d0', textDecoration: 'none' }}
+              >
+                <strong>Version {proposalVersions?.length}</strong>{' '}
+                <span>
+                  updated{' '}
+                  {proposalVersions
+                    ? dayjs
+                        .unix(
+                          Number(getVersionTimestamp(proposalVersions)),
+                        )
+                        .fromNow()
+                    : null}
+                </span>
+              </Link>
+            ) : (
+              <>
+                <strong>Version 1</strong>{' '}
+                <span>
+                  created{' '}
+                  {proposal.createdTimestamp
+                    ? dayjs
+                        .unix(Number(proposal.createdTimestamp))
+                        .fromNow()
+                    : null}
+                </span>
+              </>
+            )}
+          </div>
         )}
 
-        {/* TODO abstract this into a component  */}
-        <Row>
-          <Col xl={4} lg={12}>
-            <Card className={classes.voteInfoCard}>
-              <Card.Body className="p-2">
-                <div className={classes.voteMetadataRow}>
-                  <div className={classes.voteMetadataRowTitle}>
-                    <h1>
-                      <Trans>Threshold</Trans>
-                    </h1>
-                  </div>
-                  {isV2Prop && (
-                    <ReactTooltip
-                      id={'view-dq-info'}
-                      className={classes.delegateHover}
-                      getContent={() => {
-                        return <Trans>View Threshold Info</Trans>;
+        {/* Time info bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 10,
+            fontSize: '0.75rem',
+            color: '#8c8d92',
+          }}
+        >
+          <Clock size={12} />
+          <span>{startOrEndTimeCopy()}</span>
+          {startOrEndTimeTime() && (
+            <span style={{ fontWeight: 600, color: '#14141f' }}>
+              {i18n.date(
+                new Date(startOrEndTimeTime()?.toISOString() || 0),
+                { dateStyle: 'long', timeStyle: 'short' },
+              )}
+            </span>
+          )}
+          <span style={{ color: '#d0d0d4' }}>|</span>
+          <span>Snapshot block</span>
+          <span style={{ fontWeight: 600, color: '#14141f' }}>
+            {String(proposal.voteSnapshotBlock)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Proposer actions (queue / execute / cancel / edit) ───────── */}
+      {(isAwaitingStateChange() || isCancellable() || isUpdateable()) && (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            border: '1px solid #e2e3e8',
+            padding: '14px 20px',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          <div style={{ fontSize: '0.82rem' }}>
+            <span style={{ fontWeight: 700 }}>Proposal functions</span>
+            {isProposer() && isUpdateable() && (
+              <span style={{ color: '#8c8d92', marginLeft: 8 }}>
+                Editable for{' '}
+                {getUpdatableCountdownCopy(
+                  proposal,
+                  currentBlock ?? 0n,
+                  activeLocale,
+                )}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {isAwaitingStateChange() && (
+              <Button
+                onClick={moveStateAction}
+                disabled={
+                  isQueuePending || isExecutePending || !isExecutable
+                }
+                variant="dark"
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  padding: '8px 16px',
+                }}
+              >
+                {isQueuePending || isExecutePending ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <>
+                    {moveStateButtonAction} Proposal ⌐◧-◧
+                  </>
+                )}
+              </Button>
+            )}
+            {isCancellable() && (
+              <Button
+                onClick={() => {
+                  if (proposal?.id)
+                    cancelProposal({ args: [BigInt(proposal.id)] });
+                }}
+                disabled={isCancelPending}
+                variant="outline-danger"
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  padding: '8px 16px',
+                }}
+              >
+                {isCancelPending ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  'Cancel Proposal'
+                )}
+              </Button>
+            )}
+            {isProposer() && isUpdateable() && (
+              <Link
+                to={`/vote/${id}/edit`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#14141f',
+                  color: '#fff',
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  textDecoration: 'none',
+                }}
+              >
+                Edit
+              </Link>
+            )}
+          </div>
+          {forkPeriodMessage}
+        </div>
+      )}
+
+      {/* ── Voting Overview Bar ──────────────────────────────────────── */}
+      <div style={{ marginBottom: 16 }}>
+        <VotingOverview
+          forVotes={proposal.forCount}
+          againstVotes={proposal.againstCount}
+          abstainVotes={proposal.abstainCount}
+          quorum={quorum}
+          isActive={isActiveForVoting}
+        />
+      </div>
+
+      {/* ── Two-column layout: left = content, right = vote panel ─── */}
+      <div
+        className="vote-page-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 340px',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        {/* ── Left column ──────────────────────────────────────────── */}
+        <div>
+          {/* Tabs */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 0,
+              borderBottom: '2px solid #e2e3e8',
+              marginBottom: 20,
+            }}
+          >
+            {(['vote', 'description'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '10px 20px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom:
+                    activeTab === tab
+                      ? '2px solid #14141f'
+                      : '2px solid transparent',
+                  marginBottom: -2,
+                  cursor: 'pointer',
+                  fontFamily: "'PT Root UI'",
+                  fontWeight: activeTab === tab ? 700 : 500,
+                  fontSize: '0.85rem',
+                  color: activeTab === tab ? '#14141f' : '#8c8d92',
+                  transition: 'all 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {tab === 'vote' ? (
+                  <>
+                    Votes & Activity{' '}
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        background: '#f0f0f4',
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        fontWeight: 600,
                       }}
-                    />
-                  )}
-                  <div
-                    data-for="view-dq-info"
-                    data-tip="View Dynamic Quorum Info"
-                    onClick={() => {/* Dynamic quorum info removed */}}
-                    className={clsx(classes.thresholdInfo, isV2Prop ? classes.cursorPointer : '')}
+                    >
+                      {voteActivityData.length}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FileText size={14} />
+                    Description
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'vote' ? (
+            <>
+              {/* Transactions (collapsible) */}
+              {proposal.details && proposal.details.length > 0 && (
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: 12,
+                    border: '1px solid #e2e3e8',
+                    marginBottom: 20,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    onClick={() => setShowTransactions(!showTransactions)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: "'PT Root UI'",
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      color: '#14141f',
+                    }}
                   >
                     <span>
-                      {isV2Prop ? <Trans>Current Threshold</Trans> : <Trans>Threshold</Trans>}
+                      Proposed Transactions ({proposal.details.length})
                     </span>
-                    <h3>
-                      <Trans>
-                        {isV2Prop ? i18n.number(Number(currentQuorum ?? 0)) : proposal.quorumVotes}{' '}
-                        votes
-                      </Trans>
-                      {isV2Prop && <SearchIcon className={cn(classes.dqIcon, 'inline-block')} />}
-                    </h3>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xl={4} lg={12}>
-            <Card className={classes.voteInfoCard}>
-              <Card.Body className="p-2">
-                <div className={classes.voteMetadataRow}>
-                  <div className={classes.voteMetadataRowTitle}>
-                    <h1>{startOrEndTimeCopy()}</h1>
-                  </div>
-                  <div className={classes.voteMetadataTime}>
-                    <span>
-                      {startOrEndTimeTime() &&
-                        i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          timeZoneName: 'short',
-                        })}
-                    </span>
-                    <h3>
-                      {startOrEndTimeTime() &&
-                        i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
-                          dateStyle: 'long',
-                        })}
-                    </h3>
-                  </div>
-                </div>
-                {isNonNullish(currentBlock) &&
-                  proposal?.objectionPeriodEndBlock !== undefined &&
-                  proposal.objectionPeriodEndBlock > 0n && (
-                    <div className={classes.objectionPeriodActive}>
-                      <p>
-                        <strong>
-                          <Trans>Objection period triggered</Trans>
-                        </strong>
-                      </p>
-                      {currentBlock !== undefined &&
-                        proposal?.endBlock !== undefined &&
-                        currentBlock < proposal.endBlock && <p>{objectionNoteCopy}</p>}
+                    {showTransactions ? (
+                      <ChevronUp size={16} />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                  </button>
+                  {showTransactions && (
+                    <div
+                      style={{
+                        padding: '0 16px 16px',
+                        borderTop: '1px solid #e2e3e8',
+                      }}
+                    >
+                      <ProposalTransactions details={proposal.details} />
                     </div>
                   )}
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xl={4} lg={12}>
-            <Card className={classes.voteInfoCard}>
-              <Card.Body className="p-2">
-                <div className={classes.voteMetadataRow}>
-                  <div className={classes.voteMetadataRowTitle}>
-                    <h1>Snapshot</h1>
-                  </div>
-                  <div className={classes.snapshotBlock}>
-                    <span>Taken at block</span>
-                    <h3>{String(proposal?.voteSnapshotBlock)}</h3>
-                  </div>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Col>
-
-      {isUpdateable() ? (
-        <div className={classes.v3ProposalWrapper}>
-          <Row>
-            <Col xl={8} lg={12}>
-              <ProposalContent
-                description={proposal.description}
-                title={proposal.title}
-                details={proposal.details}
-                hasSidebar={true}
-                proposeOnV1={proposal.onTimelockV1}
-              />
-            </Col>
-            <Col xl={4} lg={12} className={classes.sidebar}>
-              {proposalVersions !== undefined && (
-                <VoteSignals
-                  feedback={proposalFeedback}
-                  proposalId={proposal.id}
-                  versionTimestamp={getVersionTimestamp(proposalVersions)}
-                  userVotes={userVotesNow}
-                  setDataFetchPollInterval={setDataFetchPollInterval}
-                  handleRefetch={handleRefetchData}
-                />
               )}
-            </Col>
-          </Row>
+
+              {/* Vote activity feed */}
+              <ProposalVoteActivity
+                votes={voteActivityData}
+                onRevote={
+                  isActiveForVoting && isWalletConnected
+                    ? handleRevote
+                    : undefined
+                }
+              />
+            </>
+          ) : (
+            /* Description tab */
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: 16,
+                border: '1px solid #e2e3e8',
+                padding: '24px',
+                overflowWrap: 'break-word',
+                wordBreak: 'break-word' as const,
+                overflow: 'hidden',
+              }}
+            >
+              {proposal.description && (
+                <ReactMarkdown
+                  remarkPlugins={[remarkBreaks]}
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    img: ({ node, ...props }) => {
+                      // Skip data URL images (base64 embedded) — they're often broken in proposals
+                      if (props.src?.startsWith('data:')) {
+                        return (
+                          <span style={{
+                            display: 'block', padding: '12px 16px', background: '#f4f4f8',
+                            borderRadius: 8, color: '#8c8d92', fontSize: '0.8rem', margin: '8px 0',
+                          }}>
+                            Embedded image ({props.alt || 'image'})
+                          </span>
+                        );
+                      }
+                      return (
+                        <img
+                          {...props}
+                          style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const fallback = document.createElement('div');
+                            fallback.style.cssText = 'padding:12px 16px;background:#f4f4f8;border-radius:8px;color:#8c8d92;font-size:0.8rem;margin:8px 0;';
+                            fallback.textContent = `Image unavailable: ${props.alt || 'image'}`;
+                            target.parentNode?.insertBefore(fallback, target.nextSibling);
+                          }}
+                        />
+                      );
+                    },
+                    // Prevent pre/code blocks from overflowing
+                    pre: ({ node, ...props }) => (
+                      <pre {...props} style={{ overflowX: 'auto', maxWidth: '100%' }} />
+                    ),
+                    table: ({ node, ...props }) => (
+                      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                        <table {...props} />
+                      </div>
+                    ),
+                  }}
+                >
+                  {processProposalDescriptionText(
+                    proposal.description,
+                    proposal.title,
+                  )}
+                </ReactMarkdown>
+              )}
+
+              {proposal.details && proposal.details.length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <h3
+                    style={{
+                      fontFamily: "'Londrina Solid'",
+                      fontSize: '1.3rem',
+                      fontWeight: 400,
+                      marginBottom: 12,
+                    }}
+                  >
+                    Proposed Transactions
+                  </h3>
+                  <ProposalTransactions details={proposal.details} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <Row>
-          <Col xl={10} lg={12} className="m-auto">
-            <ProposalContent
-              description={proposal.description}
-              title={proposal.title}
-              details={proposal.details}
-              proposeOnV1={proposal.onTimelockV1}
-            />
-          </Col>
-        </Row>
-      )}
-    </Section>
+
+        {/* ── Right column (sticky vote panel) ─────────────────────── */}
+        <div
+          id="inline-vote-panel"
+          style={{
+            position: 'sticky',
+            top: 90,
+          }}
+        >
+          <InlineVotePanel
+            proposalId={proposal.id}
+            availableVotes={userVotes ?? 0}
+            hasVoted={hasVoted}
+            proposalVote={proposalVote}
+            isObjectionPeriod={isObjectionPeriod}
+            isActiveForVoting={isActiveForVoting}
+            isWalletConnected={isWalletConnected}
+            prefillReason={
+              revoteTarget
+                ? `Re: ${revoteTarget.voter.slice(0, 6)}...${revoteTarget.voter.slice(-4)}'s vote`
+                : undefined
+            }
+            prefillSupport={revoteTarget?.support}
+          />
+
+          {/* Objection period alert */}
+          {isObjectionPeriod && (
+            <div
+              style={{
+                marginTop: 12,
+                background: 'rgba(228, 5, 54, 0.05)',
+                border: '1px solid rgba(228, 5, 54, 0.2)',
+                borderRadius: 12,
+                padding: '12px 16px',
+                fontSize: '0.75rem',
+                color: '#e40536',
+                lineHeight: 1.4,
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: 4 }}>
+                Objection Only Period
+              </strong>
+              Voting is limited to against votes. This protects the DAO
+              from last-minute vote swings.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

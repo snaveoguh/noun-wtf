@@ -1,5 +1,5 @@
 import { ponder } from 'ponder:registry';
-import { delegate, delegateNoun, noun } from 'ponder:schema';
+import { delegate, delegateNoun, delegationEvent, noun, nounTransfer } from 'ponder:schema';
 
 ponder.on('NounsToken:NounCreated', async ({ event, context }) => {
   // Transfer fires before NounCreated (mint), so the noun may already exist with zero traits.
@@ -29,6 +29,7 @@ ponder.on('NounsToken:NounCreated', async ({ event, context }) => {
 
 ponder.on('NounsToken:Transfer', async ({ event, context }) => {
   const tokenId = event.args.tokenId;
+  const from = event.args.from;
   const to = event.args.to;
 
   // Upsert noun owner — Transfer may fire before NounCreated (mint)
@@ -49,13 +50,43 @@ ponder.on('NounsToken:Transfer', async ({ event, context }) => {
     .onConflictDoUpdate({
       owner: to,
     });
+
+  // Track non-mint transfers in the feed (skip mints from 0x0)
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  if (from.toLowerCase() !== ZERO) {
+    await context.db
+      .insert(nounTransfer)
+      .values({
+        nounId: tokenId,
+        from,
+        to,
+        createdAt: new Date(Number(event.block.timestamp)),
+        createdAtBlock: event.block.number,
+        createdAtTransaction: event.transaction.hash,
+      })
+      .onConflictDoNothing();
+  }
 });
 
 ponder.on('NounsToken:DelegateChanged', async ({ event, context }) => {
   const { delegator, fromDelegate, toDelegate } = event.args;
 
-  // Find all nouns owned by the delegator to figure out which nouns are being re-delegated
-  // For simplicity, we track delegate -> noun mappings via DelegateVotesChanged instead
+  // Track delegation event in the feed
+  // Skip initial self-delegation on mint (fromDelegate = 0x0)
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  if (fromDelegate.toLowerCase() !== ZERO) {
+    await context.db
+      .insert(delegationEvent)
+      .values({
+        delegator,
+        fromDelegate,
+        toDelegate,
+        createdAt: new Date(Number(event.block.timestamp)),
+        createdAtBlock: event.block.number,
+        createdAtTransaction: event.transaction.hash,
+      })
+      .onConflictDoNothing();
+  }
 });
 
 ponder.on('NounsToken:DelegateVotesChanged', async ({ event, context }) => {

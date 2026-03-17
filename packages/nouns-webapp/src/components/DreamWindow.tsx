@@ -5,37 +5,13 @@ import { buildSVG } from '@nouns/sdk';
 import { Dice5, Save, Sparkles, X } from 'lucide-react';
 
 import { ProbeButton } from '@/components/ProbeButton';
+import { type SavedDream, generateDreamId, loadDreams, saveDreamToStorage } from '@/lib/dreamStorage';
 import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 
 interface DreamWindowProps {
   open: boolean;
   onClose: () => void;
-}
-
-// Saved dreams in localStorage
-interface SavedDream {
-  id: string;
-  title: string;
-  description: string;
-  seed: INounSeed;
-  createdAt: number;
-}
-
-const DREAM_STORAGE_KEY = 'noun-wtf-dreams';
-
-function loadDreams(): SavedDream[] {
-  try {
-    return JSON.parse(localStorage.getItem(DREAM_STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveDreamToStorage(dream: SavedDream) {
-  const dreams = loadDreams();
-  dreams.unshift(dream);
-  localStorage.setItem(DREAM_STORAGE_KEY, JSON.stringify(dreams.slice(0, 100)));
 }
 
 const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
@@ -73,7 +49,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
 
   const handleSave = useCallback(() => {
     const dream: SavedDream = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: generateDreamId(),
       title: title.trim() || 'Untitled Dream',
       description: description.trim(),
       seed,

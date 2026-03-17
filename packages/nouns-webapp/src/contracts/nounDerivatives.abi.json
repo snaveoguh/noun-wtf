@@ -1,0 +1,108 @@
+[
+  {
+    "type": "function",
+    "name": "createDerivative",
+    "inputs": [
+      { "name": "nounId", "type": "uint256" },
+      { "name": "tokenURI_", "type": "string" },
+      { "name": "reservePrice", "type": "uint128" }
+    ],
+    "outputs": [{ "name": "tokenId", "type": "uint256" }],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createBid",
+    "inputs": [{ "name": "tokenId", "type": "uint256" }],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "settleAuction",
+    "inputs": [{ "name": "tokenId", "type": "uint256" }],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelAuction",
+    "inputs": [{ "name": "tokenId", "type": "uint256" }],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAuction",
+    "inputs": [{ "name": "tokenId", "type": "uint256" }],
+    "outputs": [
+      { "name": "nounId", "type": "uint256" },
+      { "name": "creator", "type": "address" },
+      { "name": "reservePrice", "type": "uint128" },
+      { "name": "amount", "type": "uint128" },
+      { "name": "bidder", "type": "address" },
+      { "name": "startTime", "type": "uint40" },
+      { "name": "endTime", "type": "uint40" },
+      { "name": "settled", "type": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextTokenId",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "duration",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint40" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "minBidIncrementPercentage",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint8" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "DerivativeCreated",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256", "indexed": true },
+      { "name": "nounId", "type": "uint256", "indexed": true },
+      { "name": "creator", "type": "address", "indexed": false },
+      { "name": "reservePrice", "type": "uint128", "indexed": false },
+      { "name": "tokenURI", "type": "string", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AuctionBid",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256", "indexed": true },
+      { "name": "bidder", "type": "address", "indexed": false },
+      { "name": "amount", "type": "uint256", "indexed": false },
+      { "name": "extended", "type": "bool", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AuctionSettled",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256", "indexed": true },
+      { "name": "winner", "type": "address", "indexed": false },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AuctionCancelled",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256", "indexed": true }
+    ]
+  }
+]

@@ -72,8 +72,14 @@ const ProposalHeader: React.FC<ProposalHeaderProps> = props => {
   const isMobile = isMobileScreen();
   const { data: currentBlock } = useBlockNumber();
   const currentOrSnapshotBlock = useMemo(() => {
+    const snapshot = proposal?.voteSnapshotBlock != null
+      ? Number(proposal.voteSnapshotBlock)
+      : 0;
     const blockNumber = currentBlock ? Number(currentBlock) - 1 : 0;
-    return Math.min(Number(proposal?.voteSnapshotBlock || 0n), blockNumber) || undefined;
+    if (snapshot <= 0 && blockNumber <= 0) return undefined;
+    if (snapshot <= 0) return blockNumber;
+    if (blockNumber <= 0) return snapshot;
+    return Math.min(snapshot, blockNumber);
   }, [currentBlock, proposal?.voteSnapshotBlock]);
   const availableVotes = useUserVotesAsOfBlock(currentOrSnapshotBlock) ?? 0;
   const hasVoted = useHasVotedOnProposal(BigInt(proposal?.id ?? 0n));

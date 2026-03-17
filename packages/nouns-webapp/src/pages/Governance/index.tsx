@@ -62,7 +62,7 @@ const GovernancePage = () => {
   return (
     <>
       <Section fullWidth={false} className={classes.section}>
-        <Col lg={10} className={classes.wrapper}>
+        <Col xs={12} lg={10} className={classes.wrapper}>
           <Row className={classes.headerRow}>
             <span>
               <Trans>Governance</Trans>

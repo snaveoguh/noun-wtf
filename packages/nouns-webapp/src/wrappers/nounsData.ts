@@ -16,9 +16,14 @@ import {
   useWriteNounsGovernorProposeBySigs,
   useWriteNounsGovernorUpdateProposalBySigs,
 } from '@/contracts';
-// Stubbed types — candidates/feedbacks not indexed by Ponder
+import { useCandidatesFromLogs, useCandidateFromLogs } from '@/hooks/useCandidatesFromLogs';
+import {
+  useCandidateFeedbackFromLogs,
+  useProposalFeedbackFromLogs,
+} from '@/hooks/useFeedbackFromLogs';
 
 import {
+  formatProposalTransactionDetails,
   ProposalDetail,
   useActivePendingUpdatableProposers,
   useProposalThreshold,
@@ -142,42 +147,135 @@ export const useAddSignature = () => {
   };
 };
 
+// ── Helper: transform Ponder candidate GraphQL response → ProposalCandidate ──
+function ponderCandidateToProposalCandidate(p: Record<string, unknown>): ProposalCandidate {
+  const description = (p.description as string) ?? '';
+  const firstLine = description.split('\n')[0] ?? '';
+  const title = firstLine.replace(/^#+\s*/, '').trim() || 'Untitled Candidate';
+
+  const targets = JSON.parse((p.targets as string) || '[]') as Address[];
+  const rawValues = JSON.parse((p.values as string) || '[]') as string[];
+  const values = rawValues.map((v: string) => BigInt(v));
+  const sigs = JSON.parse((p.signatures as string) || '[]') as string[];
+  const calldatas = JSON.parse((p.calldatas as string) || '[]') as Hex[];
+
+  const details = formatProposalTransactionDetails({ targets, signatures: sigs, values, calldatas });
+
+  const rawSigs = (p.candidateSignatures as { items?: Record<string, unknown>[] })?.items ?? [];
+  const contentSignatures: CandidateSignature[] = rawSigs.map((s: Record<string, unknown>) => ({
+    reason: (s.reason as string) ?? '',
+    expirationTimestamp: Number(s.expirationTimestamp ?? 0),
+    sig: (s.sig as string) ?? '',
+    canceled: (s.canceled as boolean) ?? false,
+    signer: {
+      id: ((s.signer as string) ?? '').toLowerCase() as Address,
+      proposals: [],
+    },
+  }));
+
+  const proposalIdToUpdate = Number(p.proposalIdToUpdate ?? 0);
+  // Ponder returns timestamp as Unix seconds (number or stringified bigint)
+  const lastUpdatedTimestamp = BigInt(Number(p.lastUpdatedAt) || 0);
+
+  return {
+    id: p.id as string,
+    slug: p.slug as string,
+    proposer: (p.proposer as Address) ?? ('0x0' as Address),
+    lastUpdatedTimestamp,
+    canceled: (p.canceled as boolean) ?? false,
+    versionsCount: (p.versionsCount as number) ?? 1,
+    createdTransactionHash: (p.createdAtTransaction as Hash) ?? ('' as Hash),
+    isProposal: false,
+    requiredVotes: 0,
+    proposalIdToUpdate: proposalIdToUpdate > 0 ? proposalIdToUpdate : undefined,
+    proposerVotes: 0,
+    neededVotes: undefined,
+    voteCount: contentSignatures.length,
+    matchingProposalIds: undefined,
+    version: {
+      content: {
+        title,
+        description,
+        details,
+        targets,
+        values,
+        signatures: sigs,
+        calldatas,
+        contentSignatures,
+        transactionHash: p.createdAtTransaction as Hash,
+      },
+    },
+  };
+}
+
 export const useCandidateProposals = (blockNumber?: bigint) => {
-  // Candidates not indexed by Ponder — return empty
+  // Primary: fetch candidates from Ponder GraphQL (fast, indexed)
   const { query, variables } = candidateProposalsQuery();
-  const { loading, error, refetch } = useQuery(query, { variables, skip: true });
-  // Still need these hooks to avoid conditional hook calls
+  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+    candidates: { items: Record<string, unknown>[] };
+  }>(query, { variables });
+
+  // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
+  const { data: logCandidates, isLoading: logLoading, error: logError, refetch: logRefetch } = useCandidatesFromLogs(!!gqlError);
+
+  // Keep dependent hooks to avoid conditional hook call violations
   useDelegateNounsAtBlockQuery([], blockNumber ?? 0n);
   useProposalThreshold();
   useActivePendingUpdatableProposers(blockNumber);
   useDelegateNounsAtBlockQuery([], blockNumber ?? 0n);
   useUpdatableProposalIds(blockNumber);
 
-  const candidatesData: ProposalCandidate[] = [];
+  // Use GraphQL data if available, otherwise fall back to logs
+  const candidatesData: ProposalCandidate[] = useMemo(() => {
+    const gqlItems = gqlData?.candidates?.items;
+    if (gqlItems && gqlItems.length > 0) {
+      return gqlItems.map(ponderCandidateToProposalCandidate);
+    }
+    // Fallback to log-based data
+    return logCandidates ?? [];
+  }, [gqlData, logCandidates]);
+
+  const loading = gqlError ? logLoading : gqlLoading;
+  const error = gqlError ? (logError ?? undefined) : undefined;
+  const refetch = gqlError ? logRefetch : gqlRefetch;
+
   return { loading, data: candidatesData, error, refetch };
 };
 
 export const useCandidateProposal = (
   id: string,
-  pollInterval: number = 0,
+  _pollInterval: number = 0,
   _toUpdate?: boolean,
   blockNumber?: bigint,
 ) => {
-  // Candidates not indexed by Ponder — return empty
+  // Primary: fetch single candidate from Ponder GraphQL
   const { query, variables } = candidateProposalQuery(id);
-  const { loading, error, refetch } = useQuery(query, {
-    pollInterval,
-    variables,
-    skip: true,
-  });
-  // Still need these hooks to avoid conditional hook calls
+  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+    candidate: Record<string, unknown> | null;
+  }>(query, { variables, skip: !id });
+
+  // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
+  const { data: logCandidate, isLoading: logLoading, error: logError, refetch: logRefetch } = useCandidateFromLogs(id, !!gqlError);
+
+  // Keep dependent hooks to avoid conditional hook call violations
   useActivePendingUpdatableProposers(blockNumber);
   useProposalThreshold();
   useDelegateNounsAtBlockQuery([], BigInt(blockNumber ?? 0n));
   useDelegateNounsAtBlockQuery([], BigInt(blockNumber ?? 0));
   useUpdatableProposalIds(blockNumber);
 
-  return { loading, data: undefined as ProposalCandidate | undefined, error, refetch };
+  const candidateData = useMemo(() => {
+    if (gqlData?.candidate) {
+      return ponderCandidateToProposalCandidate(gqlData.candidate);
+    }
+    return logCandidate ?? undefined;
+  }, [gqlData, logCandidate]);
+
+  const loading = gqlError ? logLoading : gqlLoading;
+  const error = gqlError ? (logError ?? undefined) : undefined;
+  const refetch = gqlError ? logRefetch : gqlRefetch;
+
+  return { loading, data: candidateData, error, refetch };
 };
 
 export const useCandidateProposalVersions = (id: string) => {
@@ -337,27 +435,67 @@ export const useSendFeedback = () => {
 };
 
 export const useProposalFeedback = (id: string, pollInterval: number = 0) => {
-  // Feedbacks not indexed by Ponder — return empty
+  // Primary: fetch from Ponder GraphQL
   const { query, variables } = proposalFeedbacksQuery(id);
-  const { loading, error, refetch } = useQuery(query, {
-    pollInterval,
-    variables,
-    skip: true,
-  });
-  const feedbacks: VoteSignalDetail[] = [];
-  return { loading, data: feedbacks, error, refetch };
+  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+    proposalFeedbacks: { items: Record<string, unknown>[] };
+  }>(query, { variables, skip: !id });
+
+  // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
+  const logResult = useProposalFeedbackFromLogs(id, pollInterval, !!gqlError);
+
+  const feedbackData: VoteSignalDetail[] = useMemo(() => {
+    const gqlItems = gqlData?.proposalFeedbacks?.items;
+    if (gqlItems && gqlItems.length > 0) {
+      return gqlItems.map((f: Record<string, unknown>) => ({
+        supportDetailed: Number(f.support ?? 0),
+        reason: (f.reason as string) ?? '',
+        votes: 0, // Ponder doesn't store voter's vote count
+        createdTimestamp: Math.floor(new Date((f.createdAt as string) ?? 0).getTime() / 1000),
+        voter: { id: ((f.voter as string) ?? '').toLowerCase() as Address },
+      }));
+    }
+    return logResult.data ?? [];
+  }, [gqlData, logResult.data]);
+
+  return {
+    loading: gqlError ? logResult.loading : gqlLoading,
+    data: feedbackData,
+    error: gqlError ? logResult.error : undefined,
+    refetch: gqlError ? logResult.refetch : gqlRefetch,
+  };
 };
 
 export const useCandidateFeedback = (id: string, pollInterval?: number) => {
-  // Feedbacks not indexed by Ponder — return empty
+  // Primary: fetch from Ponder GraphQL
   const { query, variables } = candidateFeedbacksQuery(id);
-  const { loading, error, refetch } = useQuery(query, {
-    pollInterval,
-    variables,
-    skip: true,
-  });
-  const feedbacks: VoteSignalDetail[] = [];
-  return { loading, data: feedbacks, error, refetch };
+  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+    candidateFeedbacks: { items: Record<string, unknown>[] };
+  }>(query, { variables, skip: !id });
+
+  // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
+  const logResult = useCandidateFeedbackFromLogs(id, pollInterval ?? 0, !!gqlError);
+
+  const feedbackData: VoteSignalDetail[] = useMemo(() => {
+    const gqlItems = gqlData?.candidateFeedbacks?.items;
+    if (gqlItems && gqlItems.length > 0) {
+      return gqlItems.map((f: Record<string, unknown>) => ({
+        supportDetailed: Number(f.support ?? 0),
+        reason: (f.reason as string) ?? '',
+        votes: 0,
+        createdTimestamp: Math.floor(new Date((f.createdAt as string) ?? 0).getTime() / 1000),
+        voter: { id: ((f.voter as string) ?? '').toLowerCase() as Address },
+      }));
+    }
+    return logResult.data ?? [];
+  }, [gqlData, logResult.data]);
+
+  return {
+    loading: gqlError ? logResult.loading : gqlLoading,
+    data: feedbackData,
+    error: gqlError ? logResult.error : undefined,
+    refetch: gqlError ? logResult.refetch : gqlRefetch,
+  };
 };
 
 export const useProposeBySigs = () => {

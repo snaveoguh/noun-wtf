@@ -66,6 +66,31 @@ const AuctionNavigation: React.FC<AuctionNavigationProps> = props => {
     };
   }, [handleKeyPress]);
 
+  // 3-pixel arrow: a tiny 5x7 grid scaled up via CSS image-rendering: pixelated
+  const pixelArrowLeft = (
+    <svg width="5" height="7" viewBox="0 0 5 7" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ width: 15, height: 21, imageRendering: 'pixelated' }}>
+      <rect x="2" y="0" width="1" height="1" />
+      <rect x="1" y="1" width="1" height="1" />
+      <rect x="0" y="2" width="1" height="1" />
+      <rect x="0" y="3" width="1" height="1" />
+      <rect x="0" y="4" width="1" height="1" />
+      <rect x="1" y="5" width="1" height="1" />
+      <rect x="2" y="6" width="1" height="1" />
+    </svg>
+  );
+
+  const pixelArrowRight = (
+    <svg width="5" height="7" viewBox="0 0 5 7" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ width: 15, height: 21, imageRendering: 'pixelated' }}>
+      <rect x="2" y="0" width="1" height="1" />
+      <rect x="3" y="1" width="1" height="1" />
+      <rect x="4" y="2" width="1" height="1" />
+      <rect x="4" y="3" width="1" height="1" />
+      <rect x="4" y="4" width="1" height="1" />
+      <rect x="3" y="5" width="1" height="1" />
+      <rect x="2" y="6" width="1" height="1" />
+    </svg>
+  );
+
   return (
     <div className={classes.navArrowsContainer}>
       <button
@@ -73,14 +98,14 @@ const AuctionNavigation: React.FC<AuctionNavigationProps> = props => {
         className={isCool ? classes.leftArrowCool : classes.leftArrowWarm}
         disabled={isFirstAuction}
       >
-        ←
+        {pixelArrowLeft}
       </button>
       <button
         onClick={() => onNextAuctionClick()}
         className={isCool ? classes.rightArrowCool : classes.rightArrowWarm}
         disabled={isLastAuction}
       >
-        →
+        {pixelArrowRight}
       </button>
     </div>
   );

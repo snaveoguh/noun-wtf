@@ -8,4 +8,4 @@ cmds = ["npm i -g pnpm@10 && pnpm install"]
 cmds = ["pnpm build --filter=@nouns/api"]
 
 [start]
-cmd = "pnpm --filter @nouns/api -- start --schema $RAILWAY_DEPLOYMENT_ID"
+cmd = "pnpm --filter @nouns/api -- start --schema nouns-prod"

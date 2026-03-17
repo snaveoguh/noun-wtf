@@ -23,6 +23,14 @@ export const clientFactory = (uri: string) => {
   return new ApolloClient({
     link: ApolloLink.from([scrubBigIntLink, new HttpLink({ uri })]),
     cache: new InMemoryCache(),
+    defaultOptions: {
+      watchQuery: {
+        fetchPolicy: 'cache-and-network',
+      },
+      query: {
+        fetchPolicy: 'network-only',
+      },
+    },
   });
 };
 
@@ -109,6 +117,7 @@ export const proposalQuery = (id: string | number) => ({
         objectionPeriodEndBlock
         executionETA
         onTimelockV1
+        voteSnapshotBlock
         proposer
         clientId
         signers(limit: 100) {
@@ -207,23 +216,85 @@ export const updatableProposalsQuery = (first = 1_000, currentBlock: bigint = 0n
   variables: { first, currentBlock: String(currentBlock || 0) },
 });
 
-// Not indexed by Ponder — return empty result shape
-export const candidateProposalsQuery = (_first = 1_000) => ({
+export const candidateProposalsQuery = (first = 1_000) => ({
   query: gql`
-    query GetCandidateProposals {
-      __typename
+    query GetCandidateProposals($first: Int!) {
+      candidates(
+        limit: $first
+        where: { canceled: false }
+        orderBy: "lastUpdatedAtBlock"
+        orderDirection: "desc"
+      ) {
+        items {
+          id
+          slug
+          proposer
+          canceled
+          versionsCount
+          proposalIdToUpdate
+          encodedProposalHash
+          description
+          targets
+          values
+          signatures
+          calldatas
+          createdAt
+          createdAtBlock
+          createdAtTransaction
+          lastUpdatedAt
+          lastUpdatedAtBlock
+          candidateSignatures(limit: 100) {
+            items {
+              signer
+              sig
+              expirationTimestamp
+              encodedPropHash
+              reason
+              canceled
+            }
+          }
+        }
+      }
     }
   `,
-  variables: {},
+  variables: { first },
 });
 
-export const candidateProposalQuery = (_id: string) => ({
+export const candidateProposalQuery = (id: string) => ({
   query: gql`
-    query GetCandidateProposal {
-      __typename
+    query GetCandidateProposal($id: String!) {
+      candidate(id: $id) {
+        id
+        slug
+        proposer
+        canceled
+        versionsCount
+        proposalIdToUpdate
+        encodedProposalHash
+        description
+        targets
+        values
+        signatures
+        calldatas
+        createdAt
+        createdAtBlock
+        createdAtTransaction
+        lastUpdatedAt
+        lastUpdatedAtBlock
+        candidateSignatures(limit: 100) {
+          items {
+            signer
+            sig
+            expirationTimestamp
+            encodedPropHash
+            reason
+            canceled
+          }
+        }
+      }
     }
   `,
-  variables: {},
+  variables: { id },
 });
 
 export const candidateProposalVersionsQuery = (_id: string) => ({
@@ -436,6 +507,10 @@ export const proposalVotesQuery = (proposalId: string) => ({
           support
           votes
           voter
+          reason
+          clientId
+          createdAtBlock
+          createdAtTransaction
         }
       }
     }
@@ -492,23 +567,50 @@ export const propUsingDynamicQuorum = (_proposalId: string) => ({
   variables: {},
 });
 
-// Feedbacks not indexed by Ponder — stub
-export const proposalFeedbacksQuery = (_proposalId: string) => ({
+export const proposalFeedbacksQuery = (proposalId: string) => ({
   query: gql`
-    query GetProposalFeedbacks {
-      __typename
+    query GetProposalFeedbacks($proposalId: BigInt!) {
+      proposalFeedbacks(
+        where: { proposalId: $proposalId }
+        limit: 1000
+        orderBy: "createdAtBlock"
+        orderDirection: "desc"
+      ) {
+        items {
+          voter
+          proposalId
+          support
+          reason
+          createdAt
+          createdAtBlock
+        }
+      }
     }
   `,
-  variables: {},
+  variables: { proposalId: String(proposalId) },
 });
 
-export const candidateFeedbacksQuery = (_candidateId: string) => ({
+export const candidateFeedbacksQuery = (candidateId: string) => ({
   query: gql`
-    query GetCandidateFeedbacks {
-      __typename
+    query GetCandidateFeedbacks($candidateId: String!) {
+      candidateFeedbacks(
+        where: { candidateId: $candidateId }
+        limit: 1000
+        orderBy: "createdAtBlock"
+        orderDirection: "desc"
+      ) {
+        items {
+          voter
+          candidateId
+          support
+          reason
+          createdAt
+          createdAtBlock
+        }
+      }
     }
   `,
-  variables: {},
+  variables: { candidateId },
 });
 
 export const ownedNounsQuery = (owner: string) => ({

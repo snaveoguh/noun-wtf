@@ -5,6 +5,7 @@ import { buildSVG } from '@nouns/sdk';
 import { useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
+import { generateDreamId, saveDreamToStorage } from '@/lib/dreamStorage';
 import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -41,10 +42,15 @@ const DreamCreatePage: FC = () => {
   }, []);
 
   const handleSubmit = useCallback(() => {
-    // TODO: Connect to API
-    alert('Dream submitted! (API integration coming soon)');
+    saveDreamToStorage({
+      id: generateDreamId(),
+      title: title.trim(),
+      description: description.trim(),
+      seed,
+      createdAt: Date.now(),
+    });
     navigate('/dreams');
-  }, [navigate]);
+  }, [navigate, title, description, seed]);
 
   const traitOptions = useMemo(
     () => ({

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PartySocket from 'partysocket';
+import { useAccount, useEnsName } from 'wagmi';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -48,6 +49,15 @@ interface FloatingText {
   x: number; y: number;
   text: string; color: string;
   life: number;
+}
+
+/** Leaderboard entry from server */
+interface LeaderboardEntry {
+  name: string;
+  seconds: number;
+  score: number;
+  wave: number;
+  timestamp: number;
 }
 
 /** Remote player state received from PartyKit */
@@ -272,6 +282,18 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
   const activeRef = useRef(active);
   const saberAngleRef = useRef(0); // current effective saber angle (updated in game loop)
 
+  // Leaderboard + survival timer
+  const gameStartRef = useRef(Date.now());
+  const survivalSecondsRef = useRef(0);
+  const leaderboardRef = useRef<LeaderboardEntry[]>([]);
+  const scoreSubmittedRef = useRef(false);
+
+  // Player identity from wallet (use ref so it doesn't restart the game loop)
+  const { address } = useAccount();
+  const { data: ensName } = useEnsName({ address });
+  const playerNameRef = useRef('Anon');
+  playerNameRef.current = ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Anon');
+
   // Force Push state
   const forcePushesRef = useRef<ForcePush[]>([]);
   const forceCooldownRef = useRef(0);
@@ -344,6 +366,8 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
             });
           }
           if (data.count) { playerCountRef.current = data.count; setPlayerCount(data.count); }
+        } else if (data.type === 'leaderboard') {
+          leaderboardRef.current = data.entries ?? [];
         } else if (data.type === 'join') {
           playerCountRef.current = data.count; setPlayerCount(data.count);
         } else if (data.type === 'leave') {
@@ -351,6 +375,10 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
           playerCountRef.current = data.count; setPlayerCount(data.count);
         }
       } catch { /* Ignore bad messages */ }
+    });
+
+    ws.addEventListener('open', () => {
+      ws.send(JSON.stringify({ type: 'leaderboard_get' }));
     });
 
     wsRef.current = ws;
@@ -374,6 +402,9 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
       waveRef.current = 1;
       killsInWaveRef.current = 0;
       lastSpawnRef.current = Date.now();
+      gameStartRef.current = Date.now();
+      survivalSecondsRef.current = 0;
+      scoreSubmittedRef.current = false;
       myColorRef.current = SABER_COLORS[Math.floor(Math.random() * SABER_COLORS.length)];
       setTick(t => t + 1);
     }
@@ -448,6 +479,9 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
           waveRef.current = 1;
           killsInWaveRef.current = 0;
           lastSpawnRef.current = Date.now();
+          gameStartRef.current = Date.now();
+          survivalSecondsRef.current = 0;
+          scoreSubmittedRef.current = false;
         }
       }
     };
@@ -495,8 +529,10 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
     const t2 = setTimeout(() => spawnSith(canvas.width, canvas.height), 2500);
     const pixSize = 3;
 
+    let stopped = false;
+
     const tick = () => {
-      if (!activeRef.current) return;
+      if (!activeRef.current || stopped) return;
       frameRef.current++;
       const frame = frameRef.current;
       const mouse = mouseRef.current;
@@ -512,20 +548,92 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
         hitFlashRef.current = Math.max(0, hitFlashRef.current - 0.02);
       }
 
+      // Update survival timer
+      if (!gameOverRef.current) {
+        survivalSecondsRef.current = Math.floor((Date.now() - gameStartRef.current) / 1000);
+      }
+
       if (gameOverRef.current) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        // Submit score once
+        if (!scoreSubmittedRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+          scoreSubmittedRef.current = true;
+          wsRef.current.send(JSON.stringify({
+            type: 'leaderboard_submit',
+            name: playerNameRef.current,
+            seconds: survivalSecondsRef.current,
+            score: scoreRef.current,
+            wave: waveRef.current,
+          }));
+        }
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, w, h);
+
+        // Game over title
         ctx.font = 'bold 48px monospace';
         ctx.fillStyle = '#ff0000';
         ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', w / 2, h / 2 - 40);
-        ctx.font = 'bold 24px monospace';
+        ctx.fillText('GAME OVER', w / 2, 80);
+
+        // Stats
+        ctx.font = 'bold 20px monospace';
         ctx.fillStyle = '#ff6666';
-        ctx.fillText(`SCORE: ${scoreRef.current}`, w / 2, h / 2 + 10);
-        ctx.fillText(`WAVE: ${waveRef.current}`, w / 2, h / 2 + 45);
-        ctx.font = '16px monospace';
+        ctx.fillText(`SURVIVED: ${survivalSecondsRef.current}s  •  SCORE: ${scoreRef.current}  •  WAVE: ${waveRef.current}`, w / 2, 115);
+        ctx.font = 'bold 12px monospace';
         ctx.fillStyle = '#aaa';
-        ctx.fillText('CLICK TO RESTART • ESC TO EXIT', w / 2, h / 2 + 90);
+        ctx.fillText(`PLAYING AS: ${playerNameRef.current}`, w / 2, 138);
+
+        // Leaderboard
+        const lb = leaderboardRef.current;
+        if (lb.length > 0) {
+          const lbX = w / 2;
+          const lbTop = 165;
+          const rowH = 22;
+
+          // Header
+          ctx.font = 'bold 16px monospace';
+          ctx.fillStyle = '#00ccff';
+          ctx.fillText('⚔ LEADERBOARD — SECONDS SURVIVED ⚔', lbX, lbTop);
+
+          // Column headers
+          ctx.font = 'bold 11px monospace';
+          ctx.fillStyle = '#888';
+          ctx.textAlign = 'left';
+          ctx.fillText('#', lbX - 220, lbTop + 22);
+          ctx.fillText('PLAYER', lbX - 200, lbTop + 22);
+          ctx.textAlign = 'right';
+          ctx.fillText('TIME', lbX + 120, lbTop + 22);
+          ctx.fillText('SCORE', lbX + 180, lbTop + 22);
+          ctx.fillText('WAVE', lbX + 220, lbTop + 22);
+
+          // Entries
+          const maxShow = Math.min(lb.length, 15);
+          for (let i = 0; i < maxShow; i++) {
+            const entry = lb[i];
+            const ey = lbTop + 42 + i * rowH;
+            const isMe = entry.name === playerNameRef.current && entry.seconds === survivalSecondsRef.current;
+
+            ctx.font = isMe ? 'bold 12px monospace' : '12px monospace';
+            ctx.fillStyle = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : isMe ? '#00ff88' : '#ccc';
+
+            ctx.textAlign = 'left';
+            ctx.fillText(`${i + 1}.`, lbX - 220, ey);
+            // Truncate long names
+            const displayName = entry.name.length > 20 ? entry.name.slice(0, 17) + '...' : entry.name;
+            ctx.fillText(displayName, lbX - 200, ey);
+            ctx.textAlign = 'right';
+            ctx.fillText(`${entry.seconds}s`, lbX + 120, ey);
+            ctx.fillText(`${entry.score}`, lbX + 180, ey);
+            ctx.fillText(`${entry.wave}`, lbX + 220, ey);
+          }
+        }
+
+        // Restart prompt
+        ctx.font = '14px monospace';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'center';
+        ctx.fillText('CLICK TO RESTART • ESC TO EXIT', w / 2, h - 30);
+
         requestAnimationFrame(tick);
         return;
       }
@@ -552,7 +660,7 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
       if (frame % SEND_INTERVAL === 0 && wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'update', x: mouse.x, y: mouse.y, angle: effectiveAngle,
-          swinging: isSwinging.current, color: myColorRef.current, name: 'Noun',
+          swinging: isSwinging.current, color: myColorRef.current, name: playerNameRef.current,
         }));
       }
 
@@ -900,14 +1008,15 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
         ctx.fillText('FORCE READY [F]', 24, 98);
       }
 
-      // Score + wave + player count
+      // Score + wave + player count + timer
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(w - 180, 60, 164, 40);
+      ctx.fillRect(w - 200, 60, 184, 52);
       ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#00ccff'; ctx.textAlign = 'right';
       ctx.fillText(`SCORE: ${scoreRef.current}`, w - 24, 77);
       ctx.font = 'bold 10px monospace';
-      ctx.fillStyle = '#ff6666'; ctx.fillText(`WAVE ${waveRef.current}`, w - 80, 95);
-      ctx.fillStyle = '#00ff88'; ctx.fillText(`${playerCountRef.current} ONLINE`, w - 24, 95);
+      ctx.fillStyle = '#ff6666'; ctx.fillText(`WAVE ${waveRef.current}`, w - 100, 93);
+      ctx.fillStyle = '#00ff88'; ctx.fillText(`${playerCountRef.current} ONLINE`, w - 24, 93);
+      ctx.fillStyle = '#ffaa00'; ctx.fillText(`${survivalSecondsRef.current}s`, w - 24, 107);
 
       ctx.strokeStyle = `rgba(${hr}, ${hg}, ${hb}, 0.2)`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 5, 0, Math.PI * 2); ctx.stroke();
@@ -918,6 +1027,7 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
     requestAnimationFrame(tick);
 
     return () => {
+      stopped = true;
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);

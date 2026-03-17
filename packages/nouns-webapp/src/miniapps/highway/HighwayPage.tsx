@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Link } from 'react-router';
+import { useAccount } from 'wagmi';
 
 import { execute } from '@/subgraphs/execute';
 
@@ -8,16 +9,11 @@ interface CandidateProposal {
   id: string;
   slug: string;
   proposer: string;
-  createdTimestamp: string;
-  lastUpdatedTimestamp: string;
   canceled: boolean;
   versionsCount: number;
-  version: {
-    content: {
-      title: string;
-      description: string;
-    };
-  };
+  description: string;
+  /** Computed from description — first markdown heading or first line */
+  title: string;
 }
 
 // ASCII art border characters
@@ -37,7 +33,7 @@ const padRight = (text: string, len: number) =>
 /** Render a candidate as an ASCII art block */
 const renderCandidateAscii = (c: CandidateProposal, width = 40): string[] => {
   const innerW = width - 4;
-  const title = truncate(c.version.content.title.toUpperCase(), innerW);
+  const title = truncate(c.title.toUpperCase(), innerW);
   const proposer = truncate(`BY: ${c.proposer.slice(0, 6)}...${c.proposer.slice(-4)}`, innerW);
   const versions = `V${c.versionsCount}`;
   const bar = H_LINE.repeat(width - 2);
@@ -63,21 +59,23 @@ const HighwayPage: React.FC = () => {
   const [candidates, setCandidates] = useState<CandidateProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateProposal | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const speedRef = useRef(1);
+  const { address: account } = useAccount();
 
   // Fetch candidates
   useEffect(() => {
     (async () => {
       try {
         const result = await execute<{
-          proposalCandidates: {
-            items: CandidateProposal[];
+          candidates: {
+            items: Array<Omit<CandidateProposal, 'title'>>;
           };
         }>(`{
-          proposalCandidates(
-            orderBy: "lastUpdatedTimestamp"
+          candidates(
+            orderBy: "lastUpdatedAtBlock"
             orderDirection: "desc"
             limit: 50
             where: { canceled: false }
@@ -86,20 +84,21 @@ const HighwayPage: React.FC = () => {
               id
               slug
               proposer
-              createdTimestamp
-              lastUpdatedTimestamp
               canceled
               versionsCount
-              version {
-                content {
-                  title
-                  description
-                }
-              }
+              description
             }
           }
         }`);
-        setCandidates(result?.proposalCandidates?.items ?? []);
+        const items = (result?.candidates?.items ?? []).map(c => {
+          // Extract title from description (first # heading or first line)
+          const headingMatch = c.description?.match(/^#\s+(.+)/m);
+          const title = headingMatch
+            ? headingMatch[1].trim()
+            : (c.description?.split('\n')[0]?.trim() || 'Untitled');
+          return { ...c, title };
+        });
+        setCandidates(items);
       } catch {
         // No candidates available — that's fine
       } finally {
@@ -192,15 +191,16 @@ const HighwayPage: React.FC = () => {
               {/* Repeat candidates enough times for continuous scroll */}
               {Array.from({ length: 3 }).map((_, rep) =>
                 candidates.map((c, ci) => (
-                  <Link
+                  <button
                     key={`${rep}-${ci}`}
-                    to={`/candidates/${c.id}`}
+                    onClick={(e) => { e.stopPropagation(); setSelectedCandidate(c); }}
                     className="mr-4 inline-block align-top text-green-400 no-underline transition-colors hover:text-green-200"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
                   >
                     <pre className="text-xs leading-tight">
                       {blocks[ci]?.join('\n')}
                     </pre>
-                  </Link>
+                  </button>
                 )),
               )}
             </div>
@@ -223,15 +223,16 @@ const HighwayPage: React.FC = () => {
             >
               {Array.from({ length: 3 }).map((_, rep) =>
                 [...candidates].reverse().map((c, ci) => (
-                  <Link
+                  <button
                     key={`r${rep}-${ci}`}
-                    to={`/candidates/${c.id}`}
+                    onClick={(e) => { e.stopPropagation(); setSelectedCandidate(c); }}
                     className="mr-4 inline-block align-top text-green-600 no-underline transition-colors hover:text-green-300"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
                   >
                     <pre className="text-xs leading-tight">
                       {renderCandidateAscii(c).join('\n')}
                     </pre>
-                  </Link>
+                  </button>
                 )),
               )}
             </div>
@@ -246,9 +247,73 @@ const HighwayPage: React.FC = () => {
         </div>
       )}
 
+      {/* Candidate Detail Panel */}
+      {selectedCandidate && (
+        <div
+          className="border-t border-green-800 px-4 py-3"
+          style={{ background: 'rgba(0,40,0,0.5)' }}
+        >
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-green-300">
+                {selectedCandidate.title.toUpperCase()}
+              </h3>
+              <button
+                onClick={() => setSelectedCandidate(null)}
+                className="text-xs text-green-700 hover:text-green-400"
+              >
+                [CLOSE]
+              </button>
+            </div>
+            <p className="mb-2 text-xs text-green-600" style={{ textTransform: 'none' }}>
+              {selectedCandidate.description.slice(0, 200)}
+              {selectedCandidate.description.length > 200 ? '...' : ''}
+            </p>
+            <div className="flex gap-2">
+              <Link
+                to={`/candidates/${selectedCandidate.id}`}
+                className="rounded border border-green-600 px-3 py-1 text-xs font-bold text-green-400 no-underline hover:bg-green-900"
+              >
+                VIEW FULL
+              </Link>
+              <button
+                onClick={() => {
+                  // Share on Warpcast — promote this candidate
+                  const url = `https://noun.wtf/candidates/${selectedCandidate.id}`;
+                  const text = `Check out this Nouns DAO proposal candidate: "${selectedCandidate.title}" ⌐◨-◨\n\n${url}`;
+                  window.open(
+                    `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`,
+                    '_blank',
+                  );
+                }}
+                className="rounded border border-yellow-600 px-3 py-1 text-xs font-bold text-yellow-400 hover:bg-yellow-900"
+              >
+                📣 PROMOTE
+              </button>
+              <button
+                onClick={() => {
+                  if (!account) {
+                    alert('Connect your wallet first to sponsor a candidate');
+                    return;
+                  }
+                  // Open the candidate page to sponsor
+                  window.open(`https://nouns.wtf/candidates/${selectedCandidate.slug}`, '_blank');
+                }}
+                className="rounded border border-purple-600 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-900"
+              >
+                🤝 SPONSOR
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-green-800">
+              BY: {selectedCandidate.proposer.slice(0, 6)}...{selectedCandidate.proposer.slice(-4)} | V{selectedCandidate.versionsCount}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="border-t border-green-800 px-4 py-2 text-center text-xs text-green-700">
-        SPEED: {speedRef.current.toFixed(1)}x | {candidates.length} CANDIDATES ON THE HIGHWAY
+        SPEED: {speedRef.current.toFixed(1)}x | {candidates.length} CANDIDATES ON THE HIGHWAY | CLICK A BOX TO PROMOTE/SPONSOR
       </div>
     </div>
   );

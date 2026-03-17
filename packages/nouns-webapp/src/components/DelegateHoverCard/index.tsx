@@ -27,7 +27,11 @@ const DelegateHoverCard: React.FC<DelegateHoverCardProps> = props => {
   );
   const { data, loading, error } = useQuery(query, { variables });
 
-  if (loading || !data || data === undefined || data.delegates.length === 0) {
+  // Ponder wraps results in { items: [...] }
+  const delegateItems = data?.delegates?.items ?? data?.delegates ?? [];
+  const delegate = delegateItems[0];
+
+  if (loading || !data || !delegate) {
     return (
       <div className={classes.spinnerWrapper}>
         <div className={classes.spinner}>
@@ -41,18 +45,20 @@ const DelegateHoverCard: React.FC<DelegateHoverCardProps> = props => {
     return <>Error fetching Vote info</>;
   }
 
-  const numVotesForProp = data.delegates[0].nounsRepresented.length;
+  // Ponder doesn't index nounsRepresented — synthesize from delegatedVotes count
+  const numVotesForProp = delegate.nounsRepresented?.length ?? Number(delegate.delegatedVotes ?? 0);
+  const nounIds = delegate.nounsRepresented
+    ? delegate.nounsRepresented.map((noun: { id: string }) => noun.id)
+    : Array.from({ length: numVotesForProp }, (_, i) => String(i));
 
   return (
     <div className={classes.wrapper}>
       <div className={classes.stackedNounWrapper}>
-        <HorizontalStackedNouns
-          nounIds={data.delegates[0].nounsRepresented.map((noun: { id: string }) => noun.id)}
-        />
+        <HorizontalStackedNouns nounIds={nounIds} />
       </div>
 
       <div className={classes.address}>
-        <ShortAddress address={data ? data.delegates[0].id : ''} />
+        <ShortAddress address={delegate.id ?? ''} />
       </div>
 
       <div className={classes.nounInfoWrapper}>

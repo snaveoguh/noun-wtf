@@ -7,6 +7,7 @@ import { useDispatch } from 'react-redux';
 import { Link } from 'react-router';
 
 import LegacyNoun from '@/components/LegacyNoun';
+import { NounHoverCard } from '@/components/NounHoverCard';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 import { INounSeed, useNounSeed } from '@/wrappers/nounToken';
 
@@ -97,18 +98,20 @@ export const StandaloneNounCircular: React.FC<StandaloneCircularNounProps> = (
     return <LegacyNoun imgPath="" alt="Noun" wrapperClassName={nounClasses.circularNounWrapper} />;
 
   return (
-    <Link
-      to={'/noun/' + nounId.toString()}
-      className={classes.clickableNoun}
-      onClick={onClickHandler}
-    >
-      <LegacyNoun
-        imgPath={noun ? noun.image : ''}
-        alt={noun ? noun.description : 'Noun'}
-        wrapperClassName={nounClasses.circularNounWrapper}
-        className={border === true ? nounClasses.circleWithBorder : nounClasses.circular}
-      />
-    </Link>
+    <NounHoverCard nounId={nounId} seed={seed}>
+      <Link
+        to={'/noun/' + nounId.toString()}
+        className={classes.clickableNoun}
+        onClick={onClickHandler}
+      >
+        <LegacyNoun
+          imgPath={noun ? noun.image : ''}
+          alt={noun ? noun.description : 'Noun'}
+          wrapperClassName={nounClasses.circularNounWrapper}
+          className={border === true ? nounClasses.circleWithBorder : nounClasses.circular}
+        />
+      </Link>
+    </NounHoverCard>
   );
 };
 

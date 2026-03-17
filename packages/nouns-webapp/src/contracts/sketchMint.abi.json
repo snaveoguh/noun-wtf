@@ -1,0 +1,42 @@
+[
+  {
+    "type": "function",
+    "name": "mint",
+    "inputs": [{ "name": "sketchId", "type": "uint256" }],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "isAvailable",
+    "inputs": [{ "name": "sketchId", "type": "uint256" }],
+    "outputs": [{ "name": "", "type": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isSoldOut",
+    "inputs": [{ "name": "sketchId", "type": "uint256" }],
+    "outputs": [{ "name": "", "type": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "sketches",
+    "inputs": [{ "name": "", "type": "uint256" }],
+    "outputs": [
+      { "name": "price", "type": "uint256" },
+      { "name": "tokenURI_", "type": "string" },
+      { "name": "listed", "type": "bool" },
+      { "name": "minted", "type": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "defaultPrice",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "stateMutability": "view"
+  }
+]

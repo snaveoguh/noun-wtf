@@ -56,7 +56,7 @@ const NounInfoRowHolder: React.FC<NounInfoRowHolderProps> = props => {
     <span className={cn('text-muted-foreground block', className)}>
       <Trans>Winner</Trans>{' '}
       <a className="text-muted-foreground" href={etherscanURL} target={'_blank'} rel="noreferrer">
-        {winner.toLowerCase() === nounsAuctionHouseAddress[chainId].toLowerCase() ? (
+        {winner?.toLowerCase() === nounsAuctionHouseAddress[chainId]?.toLowerCase() ? (
           <Trans>Nouns Auction House</Trans>
         ) : (
           shortAddressComponent

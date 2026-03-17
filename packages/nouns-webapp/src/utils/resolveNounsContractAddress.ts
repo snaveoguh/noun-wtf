@@ -2,6 +2,7 @@ import { nounsGovernorAddress, nounsAuctionHouseAddress, nounsTreasuryAddress } 
 import { defaultChain } from '@/wagmi';
 
 export const resolveNounContractAddress = (address: string) => {
+  if (!address) return undefined;
   const chainId = defaultChain.id;
   switch (address.toLowerCase()) {
     case nounsGovernorAddress[chainId].toLowerCase():

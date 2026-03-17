@@ -67,6 +67,7 @@ import {
   nounsGovernorAddress,
   useReadNounsGovernorAdjustedTotalSupply,
   useReadNounsGovernorForkThreshold,
+  useReadNounsGovernorState,
   useReadNounsGovernorForkThresholdBps,
   useReadNounsGovernorGetDynamicQuorumParamsAt,
   useReadNounsGovernorGetReceipt,
@@ -348,12 +349,15 @@ const extractEqualTitle = (body: string) => RegExp(equalTitleRegex).exec(body);
 export const extractTitle = (body: string | undefined): string | null => {
   if (!body) return null;
 
-  const hashResult = extractHashTitle(body);
+  // Unescape literal \n sequences (Solidity event descriptions may store them escaped)
+  const normalized = body.replace(/\\n/g, '\n');
+
+  const hashResult = extractHashTitle(normalized);
   if (hashResult && hashResult[1]) {
     return hashResult[1];
   }
 
-  const equalResult = extractEqualTitle(body);
+  const equalResult = extractEqualTitle(normalized);
   return equalResult && equalResult[1] ? equalResult[1] : null;
 };
 
@@ -397,7 +401,8 @@ const replaceInvalidDropboxImageLinks = (descriptionText: string | undefined) =>
 };
 
 export function useDynamicQuorumProps(block: bigint): DynamicQuorumParams | undefined {
-  // @ts-expect-error wagmi hook's return type might be inferred incorrectly or too broadly
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
   const { data } = useReadNounsGovernorGetDynamicQuorumParamsAt({
     args: [block],
   });
@@ -594,6 +599,7 @@ const getProposalState = (
   proposal: GraphQLProposal,
   isDaoGteV3?: boolean,
   onTimelockV1?: boolean,
+  dynamicQuorum?: bigint,
 ) => {
   // Get the initial status from the proposal
   const status = isNonNullish(proposal.status)
@@ -602,7 +608,7 @@ const getProposalState = (
 
   // Handle specific status cases with dedicated functions
   if (status === ProposalState.PENDING || status === ProposalState.ACTIVE) {
-    return handlePendingOrActiveState(blockNumber, proposal, isDaoGteV3);
+    return handlePendingOrActiveState(blockNumber, proposal, isDaoGteV3, dynamicQuorum);
   }
 
   if (status === ProposalState.QUEUED) {
@@ -617,6 +623,7 @@ const handlePendingOrActiveState = (
   blockNumber: number | undefined,
   proposal: GraphQLProposal,
   isDaoGteV3?: boolean,
+  dynamicQuorum?: bigint,
 ): ProposalState => {
   if (blockNumber === undefined) {
     return ProposalState.UNDETERMINED;
@@ -639,7 +646,7 @@ const handlePendingOrActiveState = (
 
   // Check if past end block and determine resulting state
   if (isPastEndBlock(blockNumber, proposal)) {
-    return getPastEndBlockState(proposal);
+    return getPastEndBlockState(proposal, dynamicQuorum);
   }
 
   return ProposalState.ACTIVE;
@@ -681,9 +688,11 @@ const isPastEndBlock = (blockNumber: number, proposal: GraphQLProposal): boolean
 };
 
 // Determine the state for a proposal that is past its end block
-const getPastEndBlockState = (proposal: GraphQLProposal): ProposalState => {
+// dynamicQuorum overrides proposal.quorumVotes when available (accounts for dynamic quorum)
+const getPastEndBlockState = (proposal: GraphQLProposal, dynamicQuorum?: bigint): ProposalState => {
   const forVotes = BigInt(proposal.forVotes ?? 0);
-  if (forVotes <= BigInt(proposal.againstVotes ?? 0) || forVotes < BigInt(proposal.quorumVotes ?? 0)) {
+  const quorum = dynamicQuorum ?? BigInt(proposal.quorumVotes ?? 0);
+  if (forVotes <= BigInt(proposal.againstVotes ?? 0) || forVotes < quorum) {
     return ProposalState.DEFEATED;
   }
 
@@ -767,6 +776,7 @@ const parseSubgraphProposal = (
   timestamp: number | undefined,
   toUpdate?: boolean,
   isDaoGteV3?: boolean,
+  dynamicQuorum?: bigint,
 ): Proposal | undefined => {
   if (isNullish(proposal)) {
     return;
@@ -803,6 +813,7 @@ const parseSubgraphProposal = (
       proposal,
       isDaoGteV3,
       onTimelockV1,
+      dynamicQuorum,
     ),
     proposalThreshold: BigInt(proposal.proposalThreshold ?? 0),
     quorumVotes: Number(proposal.quorumVotes ?? 0),
@@ -825,6 +836,7 @@ const parseSubgraphProposal = (
 };
 
 export const useAllProposalsViaSubgraph = (): PartialProposalData => {
+  const chainId = defaultChain.id;
   const { query, variables } = partialProposalsQuery();
   const { loading, data, error } = useQuery<{
     proposals: { items: GraphQLProposal[] };
@@ -849,10 +861,59 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
     ) ?? [],
   }));
 
+  // Fetch authoritative on-chain state() only for non-terminal proposals.
+  // Terminal proposals (CANCELLED, VETOED, EXECUTED) never change state,
+  // so Ponder's status is authoritative for those. This reduces multicalls
+  // from ~700+ to ~20-30 (only PENDING, ACTIVE, QUEUED proposals).
+  const TERMINAL_STATUSES = new Set(['CANCELLED', 'VETOED', 'EXECUTED']);
+  const nonTerminalProposals = useMemo(
+    () => rawProposals.filter(p => !TERMINAL_STATUSES.has(p.status)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawProposals.length],
+  );
+
+  const onChainStateCalls = useMemo(
+    () =>
+      nonTerminalProposals.map(p => ({
+        abi: nounsGovernorAbi,
+        address: nounsGovernorAddress[chainId],
+        functionName: 'state' as const,
+        args: [BigInt(p.id)],
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nonTerminalProposals.length, chainId],
+  );
+
+  const { data: onChainStates } = useReadContracts({
+    contracts: onChainStateCalls,
+    query: { enabled: onChainStateCalls.length > 0 },
+  });
+
+  // Map on-chain state int → ProposalState enum (non-terminal only)
+  const onChainStateMap = useMemo(() => {
+    const stateMap = new Map<string, ProposalState>();
+    if (!onChainStates) return stateMap;
+    nonTerminalProposals.forEach((p, i) => {
+      const result = onChainStates[i];
+      if (result?.status === 'success' && result.result != null) {
+        stateMap.set(String(p.id), Number(result.result) as ProposalState);
+      }
+    });
+    return stateMap;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onChainStates, nonTerminalProposals.length]);
+
   const proposals = pipe(
     adaptedProposals,
     map(proposal => {
-      return parsePartialSubgraphProposal(proposal, Number(blockNumber), timestamp, isDaoGteV3);
+      const parsed = parsePartialSubgraphProposal(proposal, Number(blockNumber), timestamp, isDaoGteV3);
+      if (!parsed) return undefined;
+      // Override status with on-chain state if available (fixes dynamic quorum)
+      const onChainState = onChainStateMap.get(String(parsed.id));
+      if (onChainState !== undefined) {
+        parsed.status = onChainState;
+      }
+      return parsed;
     }),
     filter((x): x is PartialProposal => x !== undefined),
   );
@@ -974,12 +1035,21 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       objectionPeriodEndBlock: bigint;
       executionETA: bigint | null;
       onTimelockV1: boolean | null;
+      voteSnapshotBlock: bigint | null;
       proposer: string;
       clientId: number | null;
       signers: { items: { signer: string }[] };
       transactions: { items: { target: string; value: string; signature: string; calldata: string }[] };
     }>;
   }>(query, { variables });
+
+  // Read the authoritative on-chain proposal state (handles dynamic quorum correctly)
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  const { data: onChainState } = useReadNounsGovernorState({
+    args: [BigInt(id ?? 0)],
+    query: { enabled: Boolean(id) },
+  });
 
   // Adapt Ponder flat shape to GraphQLProposal shape
   const raw = data?.proposal;
@@ -989,7 +1059,7 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
         createdBlock: raw.createdAtBlock,
         createdTimestamp: BigInt(raw.createdAt ?? 0),
         createdTransactionHash: raw.createdAtTransaction ?? '',
-        voteSnapshotBlock: raw.startBlock,
+        voteSnapshotBlock: raw.voteSnapshotBlock ?? raw.startBlock,
         signers: raw.signers?.items?.map(s => ({ id: s.signer })) ?? [],
         targets: raw.transactions?.items?.map(t => t.target) ?? [],
         values: raw.transactions?.items?.map(t => t.value) ?? [],
@@ -998,7 +1068,15 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       }
     : undefined;
 
-  return parseSubgraphProposal(proposal, Number(blockNumber), timestamp, toUpdate, isDaoGteV3);
+  const parsed = parseSubgraphProposal(proposal, Number(blockNumber), timestamp, toUpdate, isDaoGteV3);
+
+  // Override with authoritative on-chain state if available
+  // On-chain state() correctly accounts for dynamic quorum
+  if (parsed && onChainState != null) {
+    parsed.status = Number(onChainState) as ProposalState;
+  }
+
+  return parsed;
 };
 
 export const useProposalTitles = (ids: number[]): ProposalTitle[] | undefined => {

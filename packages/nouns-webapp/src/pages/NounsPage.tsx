@@ -198,6 +198,7 @@ const NounsPage: React.FC<NounsPageProps> = () => {
                           nounId={nounId != null ? BigInt(nounId) : undefined}
                           loadingNounFallback
                           minFallbackDuration={1000}
+                          hoverCard
                           style={{
                             width: `${ITEM_SIZE}px`,
                             height: `${ITEM_SIZE}px`,

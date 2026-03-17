@@ -11,11 +11,19 @@ import { Alert, Button, Col, Row, Spinner } from 'react-bootstrap';
 import { Link, useParams } from 'react-router';
 import { first, isNonNullish } from 'remeda';
 import { toast } from 'sonner';
-import { useAccount, useBlockNumber } from 'wagmi';
+import {
+  encodePacked,
+  encodeAbiParameters,
+  keccak256,
+  stringToBytes,
+  type Hex,
+} from 'viem';
+import { useAccount, useBlockNumber, useSignTypedData } from 'wagmi';
 
 import ProposalCandidateContent from '@/components/ProposalContent/ProposalCandidateContent';
 import CandidateHeader from '@/components/ProposalHeader/CandidateHeader';
 import VoteSignals from '@/components/VoteSignals/VoteSignals';
+import { nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
 import { useAppSelector } from '@/hooks';
 import Section from '@/layout/Section';
 import { checkHasActiveOrPendingProposalOrCandidate } from '@/utils/proposals';
@@ -23,11 +31,15 @@ import {
   ProposalState,
   useProposal,
   useProposalCount,
+  useProposalThreshold,
+  usePropose,
 } from '@/wrappers/nounsDao';
 import {
+  useAddSignature,
   useCancelCandidate,
   useCandidateFeedback,
   useCandidateProposal,
+  useProposeBySigs,
 } from '@/wrappers/nounsData';
 import { useUserVotes } from '@/wrappers/nounToken';
 
@@ -36,6 +48,183 @@ import classes from './Candidate.module.css';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(advanced);
+
+// ─── Sponsor Modal ────────────────────────────────────────────────────────────
+
+const SponsorModal: React.FC<{
+  onClose: () => void;
+  onSubmit: (expirationTimestamp: number, reason: string) => void;
+  isPending: boolean;
+}> = ({ onClose, onSubmit, isPending }) => {
+  // Default expiration: 7 days from now
+  const defaultDate = dayjs().add(7, 'day').format('YYYY-MM-DD');
+  const [expirationDate, setExpirationDate] = useState(defaultDate);
+  const [reason, setReason] = useState('');
+
+  const handleSubmit = () => {
+    const expiry = Math.floor(new Date(expirationDate).getTime() / 1000);
+    if (expiry <= Math.floor(Date.now() / 1000)) {
+      toast.error('Expiration date must be in the future');
+      return;
+    }
+    onSubmit(expiry, reason);
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.6)',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        style={{
+          background: '#1a1a2e',
+          borderRadius: 16,
+          padding: '28px 32px',
+          maxWidth: 480,
+          width: '90%',
+          color: '#fff',
+        }}
+      >
+        <h3 style={{ fontWeight: 700, fontSize: '1.3rem', marginBottom: 20, color: '#fff' }}>
+          Sponsor candidate
+        </h3>
+
+        <label style={{ display: 'block', marginBottom: 6, color: '#aaa', fontSize: '0.9rem' }}>
+          Signature expiration date
+        </label>
+        <input
+          type="date"
+          value={expirationDate}
+          onChange={e => setExpirationDate(e.target.value)}
+          min={dayjs().add(1, 'day').format('YYYY-MM-DD')}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid #333',
+            background: '#0d0d1a',
+            color: '#fff',
+            fontSize: '1rem',
+            marginBottom: 16,
+          }}
+        />
+
+        <label style={{ display: 'block', marginBottom: 6, color: '#aaa', fontSize: '0.9rem' }}>
+          Optional message
+        </label>
+        <textarea
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="..."
+          rows={4}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid #333',
+            background: '#0d0d1a',
+            color: '#fff',
+            fontSize: '0.95rem',
+            resize: 'vertical',
+            marginBottom: 16,
+          }}
+        />
+
+        <p style={{ color: '#999', fontSize: '0.85rem', lineHeight: 1.5, marginBottom: 20 }}>
+          Note that once the candidate is promoted to a proposal, sponsors will need to wait until
+          the proposal is queued or defeated before they can author or sponsor other proposals.
+        </p>
+
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 10,
+              border: '1px solid #444',
+              background: 'transparent',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+            }}
+          >
+            Close
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isPending}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 10,
+              border: 'none',
+              background: '#3b82f6',
+              color: '#fff',
+              cursor: isPending ? 'not-allowed' : 'pointer',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            {isPending ? 'Signing...' : 'Submit signature'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Helper: compute encodedProp for addSignature ─────────────────────────────
+
+function calcProposalEncodeData({
+  proposer,
+  targets,
+  values,
+  signatures,
+  calldatas,
+  description,
+  proposalIdToUpdate,
+}: {
+  proposer: Hex;
+  targets: Hex[];
+  values: bigint[];
+  signatures: string[];
+  calldatas: Hex[];
+  description: string;
+  proposalIdToUpdate?: number;
+}): Hex {
+  const signatureHashes = signatures.map(sig => keccak256(stringToBytes(sig)));
+  const calldatasHashes = calldatas.map(cd => keccak256(cd));
+
+  const params: [string, unknown][] = [];
+
+  if (proposalIdToUpdate && proposalIdToUpdate > 0) {
+    params.push(['uint256', BigInt(proposalIdToUpdate)]);
+  }
+
+  params.push(
+    ['address', proposer],
+    ['bytes32', keccak256(encodePacked(['address[]'], [targets]))],
+    ['bytes32', keccak256(encodePacked(['uint256[]'], [values]))],
+    ['bytes32', keccak256(encodePacked(['bytes32[]'], [signatureHashes as Hex[]]))],
+    ['bytes32', keccak256(encodePacked(['bytes32[]'], [calldatasHashes as Hex[]]))],
+    ['bytes32', keccak256(stringToBytes(description))],
+  );
+
+  return encodeAbiParameters(
+    params.map(([type]) => ({ type: type as string })),
+    params.map(p => p[1]),
+  );
+}
+
+// ─── Candidate Page ───────────────────────────────────────────────────────────
 
 const CandidatePage = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +235,13 @@ const CandidatePage = () => {
     boolean | undefined
   >(undefined);
   const { cancelCandidate, cancelCandidateState } = useCancelCandidate();
+  const { proposeBySigs, proposeBySigsState } = useProposeBySigs();
+  const { propose, proposeState } = usePropose();
+  const { addSignature, addSignatureState } = useAddSignature();
+  const { signTypedDataAsync } = useSignTypedData();
+  const [isPromotePending, setPromotePending] = useState(false);
+  const [isSponsorPending, setSponsorPending] = useState(false);
+  const [showSponsorModal, setShowSponsorModal] = useState(false);
   const activeAccount = useAppSelector(state => state.account.activeAccount);
   const isWalletConnected = activeAccount !== undefined;
   const { data: currentBlock } = useBlockNumber();
@@ -57,11 +253,11 @@ const CandidatePage = () => {
   );
   const [candidate, setCandidate] = useState<typeof candidateData>(undefined);
   const { address: account } = useAccount();
-  // threshold removed — was only used by CandidateSponsors
+  const proposalThreshold = (useProposalThreshold() ?? 0) + 1;
   const userVotes = useUserVotes();
   const latestProposalId = useProposalCount();
   const latestProposal = useProposal(latestProposalId ?? 0);
-  const feedback = useCandidateFeedback(Number(id).toString(), dataFetchPollInterval);
+  const feedback = useCandidateFeedback(id ?? '', dataFetchPollInterval);
   const [isProposal, setIsProposal] = useState<boolean>(false);
   const [isUpdateToProposal, setIsUpdateToProposal] = useState<boolean>(false);
   const originalProposal = useProposal(candidate?.proposalIdToUpdate ?? 0);
@@ -153,6 +349,42 @@ const CandidatePage = () => {
     [cancelCandidateState, onTransactionStateChange, _],
   );
 
+  // handle promote to proposal (works for both propose and proposeBySigs)
+  useEffect(
+    () =>
+      onTransactionStateChange(
+        proposeBySigsState,
+        _(`Candidate promoted to on-chain proposal!`),
+        setPromotePending,
+      ),
+    [proposeBySigsState, onTransactionStateChange, _],
+  );
+  useEffect(
+    () =>
+      onTransactionStateChange(
+        proposeState,
+        _(`Candidate promoted to on-chain proposal!`),
+        setPromotePending,
+      ),
+    [proposeState, onTransactionStateChange, _],
+  );
+
+  // handle sponsor (addSignature) tx state
+  useEffect(
+    () =>
+      onTransactionStateChange(
+        addSignatureState,
+        _(`Signature submitted! You are now sponsoring this candidate.`),
+        setSponsorPending,
+        undefined,
+        () => {
+          setShowSponsorModal(false);
+          candidateRefetch();
+        },
+      ),
+    [addSignatureState, onTransactionStateChange, _, candidateRefetch],
+  );
+
   const destructiveStateAction = (() => {
     return () => {
       if (candidate?.id) {
@@ -160,6 +392,173 @@ const CandidatePage = () => {
       }
     };
   })();
+
+  // ── Promote handler (proposer-only or has enough sigs) ────────────────────
+
+  const handlePromote = useCallback(() => {
+    if (!candidate) return;
+    const content = candidate.version.content;
+    const description = `# ${content.title}\n${content.description ?? ''}`;
+    const callerHasEnoughVotes = (userVotes ?? 0) >= proposalThreshold;
+
+    if (callerHasEnoughVotes) {
+      return propose({
+        args: [
+          content.targets ?? [],
+          (content.values ?? []).map(v => BigInt(v)),
+          content.signatures ?? [],
+          (content.calldatas ?? []) as `0x${string}`[],
+          description,
+          37,
+        ],
+      });
+    }
+
+    // Need signatures via proposeBySigs
+    const nowSec = Math.floor(Date.now() / 1000);
+    const activeSignatures = (content.contentSignatures ?? [])
+      .filter(s => !s.canceled && s.expirationTimestamp > nowSec)
+      .map(s => ({
+        sig: s.sig as `0x${string}`,
+        signer: s.signer.id as `0x${string}`,
+        expirationTimestamp: BigInt(s.expirationTimestamp),
+      }));
+
+    if (activeSignatures.length === 0) {
+      toast.error('No valid signatures to submit. Signatures may be expired or canceled.');
+      return;
+    }
+
+    return proposeBySigs({
+      args: [
+        activeSignatures,
+        content.targets ?? [],
+        (content.values ?? []).map(v => BigInt(v)),
+        content.signatures ?? [],
+        (content.calldatas ?? []) as `0x${string}`[],
+        description,
+        37,
+      ],
+    });
+  }, [candidate, proposeBySigs, propose, userVotes, proposalThreshold]);
+
+  // ── Sponsor handler (EIP-712 sign + addSignature tx) ──────────────────────
+
+  const handleSponsor = useCallback(
+    async (expirationTimestamp: number, reason: string) => {
+      if (!candidate || !account) return;
+      const content = candidate.version.content;
+      const description = `# ${content.title}\n${content.description ?? ''}`;
+      const proposer = candidate.proposer as Hex;
+      const targets = (content.targets ?? []) as Hex[];
+      const values = (content.values ?? []).map(v => BigInt(v));
+      const sigs = content.signatures ?? [];
+      const calldatas = (content.calldatas ?? []) as Hex[];
+      const proposalIdToUpdate = candidate.proposalIdToUpdate ?? 0;
+
+      const isUpdate = proposalIdToUpdate > 0;
+
+      setSponsorPending(true);
+      try {
+        // Step 1: EIP-712 typed data signature
+        const daoAddress = nounsGovernorAddress[1]; // mainnet
+
+        const typesBase = [
+          { name: 'proposer', type: 'address' },
+          { name: 'targets', type: 'address[]' },
+          { name: 'values', type: 'uint256[]' },
+          { name: 'signatures', type: 'string[]' },
+          { name: 'calldatas', type: 'bytes[]' },
+          { name: 'description', type: 'string' },
+          { name: 'expiry', type: 'uint256' },
+        ];
+
+        const typesUpdate = [
+          { name: 'proposalId', type: 'uint256' },
+          ...typesBase,
+        ];
+
+        const messageBase = {
+          proposer,
+          targets,
+          values,
+          signatures: sigs,
+          calldatas,
+          description,
+          expiry: BigInt(expirationTimestamp),
+        };
+
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: 'Nouns DAO',
+            chainId: 1,
+            verifyingContract: daoAddress,
+          },
+          types: isUpdate
+            ? { UpdateProposal: typesUpdate }
+            : { Proposal: typesBase },
+          primaryType: isUpdate ? 'UpdateProposal' : 'Proposal',
+          message: isUpdate
+            ? { proposalId: BigInt(proposalIdToUpdate), ...messageBase }
+            : messageBase,
+        });
+
+        // Step 2: Compute encodedProp for the addSignature contract call
+        const encodedProp = calcProposalEncodeData({
+          proposer,
+          targets,
+          values,
+          signatures: sigs,
+          calldatas,
+          description,
+          proposalIdToUpdate: isUpdate ? proposalIdToUpdate : undefined,
+        });
+
+        // Step 3: Submit to NounsDAOData contract
+        await addSignature({
+          args: [
+            signature,
+            BigInt(expirationTimestamp),
+            proposer,
+            candidate.slug,
+            BigInt(proposalIdToUpdate),
+            encodedProp,
+            reason,
+          ],
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Sponsor failed';
+        if (!msg.includes('User rejected') && !msg.includes('user rejected')) {
+          toast.error(msg);
+        }
+        setSponsorPending(false);
+      }
+    },
+    [candidate, account, signTypedDataAsync, addSignature],
+  );
+
+  // ── Eligibility flags ─────────────────────────────────────────────────────
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const activeSignatureCount = (candidate?.version?.content?.contentSignatures ?? [])
+    .filter(s => !s.canceled && s.expirationTimestamp > nowSec).length;
+
+  const callerVotes = userVotes ?? 0;
+  const estimatedTotalPower = callerVotes + activeSignatureCount;
+
+  // Promote: visible to proposer (if they have enough power or sigs) OR anyone with enough combined power
+  const canPromote = candidate &&
+    !isProposal &&
+    !candidate.canceled &&
+    isProposer &&
+    estimatedTotalPower >= proposalThreshold;
+
+  // Sponsor: visible to non-proposer Noun holders on active candidates
+  const canSponsor = candidate &&
+    !isProposal &&
+    !candidate.canceled &&
+    !isProposer &&
+    callerVotes > 0;
 
   const primaryProposalId = first(candidate?.matchingProposalIds ?? []);
 
@@ -215,6 +614,8 @@ const CandidatePage = () => {
           />
         )}
       </Col>
+
+      {/* ── Proposer functions (edit/cancel) ─────────────────────────────── */}
       {isProposer && !isProposal && (
         <Row>
           <Col lg={12}>
@@ -229,6 +630,8 @@ const CandidatePage = () => {
                 </Trans>
               </p>
               <div className={classes.buttons}>
+                {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                {/* @ts-ignore — TS2590: react-bootstrap Button union too complex */}
                 <Button
                   onClick={destructiveStateAction}
                   disabled={isCancelPending}
@@ -247,6 +650,69 @@ const CandidatePage = () => {
                 >
                   <Trans>Edit</Trans>
                 </Link>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      )}
+
+      {/* ── Promote to Proposal (proposer only) ─────────────────────────── */}
+      {canPromote && isWalletConnected && (
+        <Row>
+          <Col lg={12}>
+            <div className={classes.editCandidate} style={{ borderColor: '#43b369' }}>
+              <p>
+                <span className={classes.proposerOptionsHeader} style={{ color: '#43b369' }}>
+                  Ready to promote
+                </span>
+                {activeSignatureCount > 0
+                  ? `This candidate has ${activeSignatureCount} sponsor${activeSignatureCount !== 1 ? 's' : ''} (threshold: ${proposalThreshold}). `
+                  : `You have enough voting power to promote this candidate (threshold: ${proposalThreshold}). `}
+                Promote it to an on-chain proposal.
+              </p>
+              <div className={classes.buttons}>
+                <Button
+                  onClick={handlePromote}
+                  disabled={isPromotePending}
+                  variant="success"
+                  className={clsx(classes.primaryButton, classes.button)}
+                  style={{ background: '#43b369', borderColor: '#43b369', color: '#fff' }}
+                >
+                  {isPromotePending ? (
+                    <Spinner animation="border" size="sm" />
+                  ) : (
+                    'Promote to Proposal'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      )}
+
+      {/* ── Sponsor button (non-proposer Noun holders) ───────────────────── */}
+      {canSponsor && isWalletConnected && (
+        <Row>
+          <Col lg={12}>
+            <div className={classes.editCandidate} style={{ borderColor: '#3b82f6' }}>
+              <p>
+                <span className={classes.proposerOptionsHeader} style={{ color: '#3b82f6' }}>
+                  Sponsor this candidate
+                </span>
+                Add your signature to help this candidate reach the{' '}
+                {proposalThreshold} vote threshold needed to become an on-chain proposal.
+                {activeSignatureCount > 0 &&
+                  ` Currently ${activeSignatureCount} sponsor${activeSignatureCount !== 1 ? 's' : ''}.`}
+              </p>
+              <div className={classes.buttons}>
+                <Button
+                  onClick={() => setShowSponsorModal(true)}
+                  variant="primary"
+                  className={clsx(classes.primaryButton, classes.button)}
+                  style={{ background: '#3b82f6', borderColor: '#3b82f6', color: '#fff' }}
+                >
+                  Sponsor
+                </Button>
               </div>
             </div>
           </Col>
@@ -278,6 +744,15 @@ const CandidatePage = () => {
             />
           </Col>
         </Row>
+      )}
+
+      {/* ── Sponsor Modal ────────────────────────────────────────────────── */}
+      {showSponsorModal && (
+        <SponsorModal
+          onClose={() => setShowSponsorModal(false)}
+          onSubmit={handleSponsor}
+          isPending={isSponsorPending}
+        />
       )}
     </Section>
   );
