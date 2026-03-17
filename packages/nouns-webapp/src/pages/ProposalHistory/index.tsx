@@ -19,6 +19,7 @@ import ProposalContent from '@/components/ProposalContent';
 
 import ReactDiffViewer from 'react-diff-viewer';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 import VersionTab from './VersionTab';
 
@@ -65,6 +66,7 @@ const ProposalHistory = () => {
         className={clsx(editorClasses.markdown, editorClasses.diffs)}
         children={str}
         remarkPlugins={[remarkBreaks]}
+        rehypePlugins={[rehypeRaw]}
       />
     );
   };

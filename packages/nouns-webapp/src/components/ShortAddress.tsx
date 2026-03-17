@@ -21,6 +21,11 @@ const ShortAddress: React.FC<ShortAddressProps> = ({ address, avatar = false, si
   const shortAddress = formatShortAddress(address);
   const { data: ensAvatar } = useEnsAvatar({ name: resolvedName });
 
+  // Guard: address may be undefined during loading / when Ponder hasn't indexed
+  if (!address) {
+    return null;
+  }
+
   const displayName = resolvedName && !isBlocklisted ? resolvedName : shortAddress;
 
   if (!avatar) {

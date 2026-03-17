@@ -17,6 +17,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { store } from '@/store';
 import { execute } from '@/subgraphs/execute';
 
+import { SiteThemeProvider } from '@/contexts/SiteThemeContext';
+
 import App from './App';
 import config, { CHAIN_ID } from './config';
 import {
@@ -290,9 +292,11 @@ createRoot(document.getElementById('root')!).render(
                 <PastAuctions />
                 <LanguageProvider>
                   <CustomConnectkitProvider>
-                    <ErrorBoundary>
-                      <App />
-                    </ErrorBoundary>
+                    <SiteThemeProvider>
+                      <ErrorBoundary>
+                        <App />
+                      </ErrorBoundary>
+                    </SiteThemeProvider>
                   </CustomConnectkitProvider>
                 </LanguageProvider>
               </ApolloProvider>

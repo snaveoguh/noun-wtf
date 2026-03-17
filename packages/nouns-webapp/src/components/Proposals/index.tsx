@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { ClockIcon } from '@heroicons/react/solid';
 import { i18n } from '@lingui/core';
@@ -7,7 +7,15 @@ import clsx from 'clsx';
 import dayjs from 'dayjs';
 import en from 'dayjs/locale/en';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Alert, Button, Col, Container, Row, Spinner } from 'react-bootstrap';
+import { Alert, Button as RBButton, Col, Container, Row, Spinner } from 'react-bootstrap';
+
+// Narrow react-bootstrap Button to avoid TS2590 union explosion in large JSX trees
+const Button = RBButton as React.FC<{
+  className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}>;
 import { Link, useLocation, useNavigate } from 'react-router';
 import { filter, find, last } from 'remeda';
 import { useAccount, useBlockNumber } from 'wagmi';
@@ -96,6 +104,55 @@ const getCountdownCopy = (
   );
 };
 
+/** Extracted to its own component to avoid TS2590 union-type explosion in the parent JSX */
+function MobileProposalActions({
+  hasEnoughVotesToPropose,
+  hasNounBalance,
+  nullStateCopy,
+  onNavigate,
+  onDelegate,
+}: {
+  hasEnoughVotesToPropose: boolean;
+  hasNounBalance: boolean;
+  nullStateCopy: React.ReactNode;
+  onNavigate: () => void;
+  onDelegate: () => void;
+}) {
+  const btnClass = hasEnoughVotesToPropose ? classes.generateBtn : classes.generateBtnDisabled;
+  return (
+    <Container>
+      <div className="w-100">
+        <Row>
+          <Col>
+            <div className={classes.nullStateCopy}>{nullStateCopy}</div>
+          </Col>
+        </Row>
+        <Row>
+          <Col>
+            <div className={classes.nounInWalletBtnWrapper}>
+              <div className={classes.submitProposalButtonWrapper}>
+                <Button
+                  className={btnClass}
+                  onClick={hasEnoughVotesToPropose ? onNavigate : undefined}
+                >
+                  <Trans>Submit Proposal</Trans>
+                </Button>
+              </div>
+              {hasNounBalance && (
+                <div className={classes.delegateBtnWrapper}>
+                  <Button className={classes.changeDelegateBtn} onClick={onDelegate}>
+                    <Trans>Delegate</Trans>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Col>
+        </Row>
+      </div>
+    </Container>
+  );
+}
+
 interface ProposalsProps {
   proposals?: PartialProposal[];
   nounsRequired?: number;
@@ -144,7 +201,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
 
   useEffect(() => {
     if (activeTab === 1) {
-      navigate('/vote#candidates');
+      navigate('/candidates');
     } else {
       navigate('/vote');
     }
@@ -166,6 +223,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
       <div className={classes.sectionWrapper}>
         <Section fullWidth={false} className={classes.section}>
           <Col
+            xs={12}
             lg={10}
             className={clsx(
               classes.headerWrapper,
@@ -177,7 +235,13 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                 <button
                   type="button"
                   className={clsx(classes.tab, index === activeTab ? classes.activeTab : '')}
-                  onClick={() => setActiveTab(index)}
+                  onClick={() => {
+                    if (index === 1) {
+                      navigate('/candidates');
+                    } else {
+                      setActiveTab(index);
+                    }
+                  }}
                   key={index}
                 >
                   {tab}
@@ -232,44 +296,18 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
         </Section>
       </div>
 
-      {isMobile && hasNounBalance && (
-        <Container>
-          <div className="w-100">
-            <Row>
-              <Col>
-                <div className={classes.nullStateCopy}>{nullStateCopy()}</div>
-              </Col>
-            </Row>
-            <Row>
-              <Col>
-                <div className={classes.nounInWalletBtnWrapper}>
-                  <div className={classes.submitProposalButtonWrapper}>
-                    <Button
-                      className={classes.generateBtn}
-                      onClick={() => navigate('create-proposal')}
-                    >
-                      <Trans>Submit Proposal</Trans>
-                    </Button>
-                  </div>
-                  {hasNounBalance && (
-                    <div className={classes.delegateBtnWrapper}>
-                      <Button
-                        className={classes.changeDelegateBtn}
-                        onClick={() => setShowDelegateModal(true)}
-                      >
-                        <Trans>Delegate</Trans>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Container>
+      {isMobile && (
+        <MobileProposalActions
+          hasEnoughVotesToPropose={hasEnoughVotesToPropose}
+          hasNounBalance={hasNounBalance}
+          nullStateCopy={nullStateCopy()}
+          onNavigate={() => navigate('create-proposal')}
+          onDelegate={() => setShowDelegateModal(true)}
+        />
       )}
       <Section fullWidth={false} className={classes.section}>
         {activeTab === 0 && (
-          <Col lg={10} className={classes.proposalsList}>
+          <Col xs={12} lg={10} className={classes.proposalsList}>
             {proposals && proposals.length > 0 ? (
               proposals
                 .slice(0)
@@ -344,7 +382,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
           </Col>
         )}
         {activeTab === 1 && (
-          <Col lg={10} className={classes.proposalsList}>
+          <Col xs={12} lg={10} className={classes.proposalsList}>
             <Row>
               <Col lg={9}>
                 {nounsRequired !== undefined && candidates && candidates.length > 0 ? (

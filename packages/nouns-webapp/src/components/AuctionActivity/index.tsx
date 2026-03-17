@@ -69,7 +69,7 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
 
   const renderAuctionWinner = () => {
     if (isLastAuction && auction.bidder) {
-      return <Winner winner={auction.bidder} />;
+      return <Winner winner={auction.bidder} clientId={auction.clientId} />;
     }
     return <Holder nounId={BigInt(auction.nounId)} />;
   };

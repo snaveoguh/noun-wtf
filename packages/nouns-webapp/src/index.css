@@ -4,16 +4,25 @@
 
 body {
   margin: 0;
-  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-transform: uppercase;
   font-weight: bold;
+  font-size: 13px;
 }
+
+/* Global font shrink — Comic Sans bold runs large */
+h1 { font-size: 1.8rem !important; }
+h2 { font-size: 1.4rem !important; }
+h3 { font-size: 1.15rem !important; }
+h4 { font-size: 0.95rem !important; }
+h5 { font-size: 0.85rem !important; }
+h6 { font-size: 0.75rem !important; }
 
 /* Apply Comic Sans + bold to all elements */
 *, *::before, *::after {
-  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
   font-weight: bold !important;
 }
 
@@ -55,8 +64,23 @@ input, textarea, select, .form-control {
   text-transform: none !important;
 }
 
+/* Vote page — stack columns on mobile */
+@media (max-width: 768px) {
+  .vote-page-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .vote-page-grid > #inline-vote-panel {
+    position: static !important;
+    order: -1;
+  }
+  .vote-detail-wrapper {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
+
 code {
-  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
 }
 
 .__react_component_tooltip.show {
@@ -204,6 +228,54 @@ code {
   #root {
     width: 100%;
   }
+}
+
+/* ─── Terminal Mode — Vantablack Void ─────────────────────────────────────── */
+.terminal-mode,
+.terminal-mode *,
+.terminal-mode *::before,
+.terminal-mode *::after {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
+  font-weight: normal !important;
+  text-transform: none !important;
+}
+
+.terminal-mode body {
+  background: #000000 !important;
+  overflow: hidden !important;
+}
+
+/* Near-invisible scrollbar for the void */
+.terminal-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.terminal-scrollbar::-webkit-scrollbar-track {
+  background: #000;
+}
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: #222;
+  border-radius: 2px;
+}
+.terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #333;
+}
+
+/* Firefox scrollbar */
+.terminal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #222 #000;
+}
+
+/* Pulse animation for loading indicator */
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* Terminal event hover */
+.terminal-event:hover {
+  background: #050505 !important;
 }
 
 @layer utilities {

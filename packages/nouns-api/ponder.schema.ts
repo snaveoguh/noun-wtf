@@ -260,3 +260,250 @@ export const streamRelations = relations(stream, ({ one }) => ({
     references: [proposal.id],
   }),
 }));
+
+// ── Delegation Events ────────────────────────────────────────────────────────
+
+export const delegationEvent = onchainTable(
+  'delegation_event',
+  t => ({
+    delegator: t.hex().notNull(),
+    fromDelegate: t.hex().notNull(),
+    toDelegate: t.hex().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.delegator, t.createdAtBlock] }),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── Noun Transfers ───────────────────────────────────────────────────────────
+
+export const nounTransfer = onchainTable(
+  'noun_transfer',
+  t => ({
+    nounId: t.bigint().notNull(),
+    from: t.hex().notNull(),
+    to: t.hex().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.nounId, t.createdAtBlock, t.createdAtTransaction] }),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── Proposal Status Changes ─────────────────────────────────────────────────
+
+export const proposalStatusChange = onchainTable(
+  'proposal_status_change',
+  t => ({
+    proposalId: t.bigint().notNull(),
+    status: proposalStatus().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.proposalId, t.status] }),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── Proposal Candidates ──────────────────────────────────────────────────────
+
+export const candidate = onchainTable(
+  'candidate',
+  t => ({
+    id: t.text().primaryKey(), // `${proposer}-${slug}`
+    slug: t.text().notNull(),
+    proposer: t.hex().notNull(),
+    canceled: t.boolean().notNull().default(false),
+    versionsCount: t.integer().notNull().default(1),
+    proposalIdToUpdate: t.bigint(),
+    encodedProposalHash: t.hex(),
+    description: t.text().notNull(),
+    // Transaction details stored as JSON text for simplicity
+    targets: t.text().notNull().default('[]'),
+    values: t.text().notNull().default('[]'),
+    signatures: t.text().notNull().default('[]'),
+    calldatas: t.text().notNull().default('[]'),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+    lastUpdatedAt: t.timestamp().notNull(),
+    lastUpdatedAtBlock: t.bigint().notNull(),
+  }),
+  t => ({
+    proposerIndex: index().on(t.proposer),
+    canceledIndex: index().on(t.canceled),
+  }),
+);
+
+export const candidateRelations = relations(candidate, ({ many }) => ({
+  candidateSignatures: many(candidateSignature),
+}));
+
+// ── Candidate Signatures ─────────────────────────────────────────────────────
+
+export const candidateSignature = onchainTable(
+  'candidate_signature',
+  t => ({
+    candidateId: t.text().notNull(),
+    signer: t.hex().notNull(),
+    sig: t.hex().notNull(),
+    expirationTimestamp: t.bigint().notNull(),
+    encodedPropHash: t.hex().notNull(),
+    reason: t.text().notNull().default(''),
+    canceled: t.boolean().notNull().default(false),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.candidateId, t.signer, t.sig] }),
+    candidateIdIndex: index().on(t.candidateId),
+  }),
+);
+
+export const candidateSignatureRelations = relations(candidateSignature, ({ one }) => ({
+  candidate: one(candidate, {
+    fields: [candidateSignature.candidateId],
+    references: [candidate.id],
+  }),
+}));
+
+// ── Proposal Feedback ────────────────────────────────────────────────────────
+
+export const proposalFeedback = onchainTable(
+  'proposal_feedback',
+  t => ({
+    voter: t.hex().notNull(),
+    proposalId: t.bigint().notNull(),
+    support: t.integer().notNull(), // 0=against, 1=for, 2=abstain
+    reason: t.text().notNull().default(''),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
+    proposalIdIndex: index().on(t.proposalId),
+  }),
+);
+
+// ── Candidate Feedback ───────────────────────────────────────────────────────
+
+export const candidateFeedback = onchainTable(
+  'candidate_feedback',
+  t => ({
+    voter: t.hex().notNull(),
+    candidateId: t.text().notNull(), // `${proposer}-${slug}`
+    support: t.integer().notNull(), // 0=against, 1=for, 2=abstain
+    reason: t.text().notNull().default(''),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.voter, t.candidateId] }),
+    candidateIdIndex: index().on(t.candidateId),
+  }),
+);
+
+// ── Small Grants ─────────────────────────────────────────────────────────────
+
+const grantStatusValues = ['ACTIVE', 'DEFEATED', 'SUCCEEDED', 'QUEUED', 'EXECUTED', 'CANCELED', 'EXPIRED'] as const;
+export type GrantStatus = (typeof grantStatusValues)[number];
+export const grantStatus = onchainEnum('grantStatus', grantStatusValues);
+
+export const grant = onchainTable(
+  'grant',
+  t => ({
+    id: t.bigint().primaryKey(),
+    proposer: t.hex().notNull(),
+    description: t.text().notNull(),
+    status: grantStatus().notNull().default('ACTIVE'),
+    forVotes: t.integer().notNull().default(0),
+    againstVotes: t.integer().notNull().default(0),
+    abstainVotes: t.integer().notNull().default(0),
+    snapshotBlock: t.bigint().notNull(),
+    startBlock: t.bigint().notNull(),
+    endBlock: t.bigint().notNull(),
+    executionETA: t.bigint(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    statusIndex: index().on(t.status),
+  }),
+);
+
+export const grantRelations = relations(grant, ({ many }) => ({
+  transactions: many(grantTransaction),
+  votes: many(grantVote),
+}));
+
+export const grantTransaction = onchainTable(
+  'grant_transaction',
+  t => ({
+    index: t.integer(),
+    grantId: t.bigint().notNull(),
+    target: t.hex().notNull(),
+    value: t.bigint().notNull(),
+    signature: t.text().notNull(),
+    calldata: t.hex().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.index, t.grantId] }),
+  }),
+);
+
+export const grantTransactionRelations = relations(grantTransaction, ({ one }) => ({
+  grant: one(grant, {
+    fields: [grantTransaction.grantId],
+    references: [grant.id],
+  }),
+}));
+
+export const grantVote = onchainTable(
+  'grant_vote',
+  t => ({
+    voter: t.hex().notNull(),
+    grantId: t.bigint().notNull(),
+    support: t.integer().notNull(),
+    votes: t.integer().notNull(),
+    reason: t.text(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.voter, t.grantId] }),
+    grantIdIndex: index().on(t.grantId),
+  }),
+);
+
+export const grantVoteRelations = relations(grantVote, ({ one }) => ({
+  grant: one(grant, {
+    fields: [grantVote.grantId],
+    references: [grant.id],
+  }),
+}));
+
+export const grantStatusChange = onchainTable(
+  'grant_status_change',
+  t => ({
+    grantId: t.bigint().notNull(),
+    status: grantStatus().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.grantId, t.status] }),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);

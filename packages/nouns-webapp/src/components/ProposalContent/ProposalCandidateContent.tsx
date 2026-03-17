@@ -2,6 +2,7 @@ import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { Col, Row } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 
 import { processProposalDescriptionText } from '@/utils/processProposalDescriptionText';
@@ -30,6 +31,7 @@ const ProposalCandidateContent: React.FC<ProposalCandidateContentProps> = props 
                 proposal.version.content.title,
               )}
               remarkPlugins={[remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
             />
           )}
         </Col>

@@ -6,6 +6,7 @@ import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { Col, Row } from 'react-bootstrap';
 
+import ClientBadge from '@/components/ClientBadge';
 import ShortAddress from '@/components/ShortAddress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppSelector } from '@/hooks';
@@ -17,16 +18,17 @@ import classes from './Winner.module.css';
 interface WinnerProps {
   winner: Address;
   isNounders?: boolean;
+  clientId?: number | null;
 }
 
 const Winner: React.FC<WinnerProps> = props => {
-  const { winner, isNounders } = props;
+  const { winner, isNounders, clientId } = props;
   const activeAccount = useAppSelector(state => state.account.activeAccount);
 
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
   const isWinnerYou =
-    activeAccount !== undefined && activeAccount.toLocaleLowerCase() === winner.toLocaleLowerCase();
+    activeAccount !== undefined && winner !== undefined && activeAccount.toLocaleLowerCase() === winner.toLocaleLowerCase();
 
   const activeLocale = useActiveLocale();
 
@@ -44,7 +46,10 @@ const Winner: React.FC<WinnerProps> = props => {
       </Col>
     </Row>
   ) : (
-    <ShortAddress size={40} address={winner} avatar={true} />
+    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+      <ShortAddress size={40} address={winner} avatar={true} />
+      <ClientBadge clientId={clientId} size={20} />
+    </span>
   );
 
   const nounderNounContent = (

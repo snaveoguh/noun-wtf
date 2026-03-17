@@ -22,6 +22,9 @@
     margin-left: 15%;
     margin-right: 15%;
   }
+  .nounContentCol {
+    order: -1; /* Noun image on TOP on mobile */
+  }
   .auctionActivityCol {
     padding-top: 5%;
     padding-right: 5%;
@@ -29,6 +32,189 @@
     width: 100%;
     background-color: white;
   }
+}
+
+/* ─── Sketch GIF image ───────────────────────────────── */
+
+.sketchImgWrapper {
+  position: relative;
+  padding-top: 100%;
+  width: 100%;
+  height: 0;
+}
+
+.sketchImg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  vertical-align: middle;
+  image-rendering: auto;
+  border-radius: 12px;
+}
+
+/* ─── Toggle pill ────────────────────────────────────── */
+
+.sketchToggle {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 3px;
+  margin-top: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sketchToggle::-webkit-scrollbar {
+  display: none;
+}
+
+.toggleBtn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toggleBtn:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.toggleActive {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.derivativeBtn {
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.addBtn {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.addBtn:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ─── Bid button (on derivative overlay) ─────────────── */
+
+.bidBtn {
+  display: inline-block;
+  padding: 4px 14px;
+  background: #fff;
+  color: #14141f;
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.bidBtn:hover {
+  background: #e0e0e0;
+  color: #000;
+  text-decoration: none;
+}
+
+.editBtn {
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.editBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.editSaveBtn {
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.editSaveBtn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Mint link ──────────────────────────────────────── */
+
+.mintLink {
+  position: absolute;
+  bottom: -28px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mintLink a {
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #8b7355;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.15s;
+}
+
+.mintLink a:hover {
+  color: #14141f;
+  text-decoration: underline;
+}
+
+.mintComingSoon {
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #b0a890;
+  letter-spacing: 0.02em;
+}
+
+.mintArtist {
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: #c0b8a0;
+  font-style: italic;
 }
 
 @media (max-width: 568px) {

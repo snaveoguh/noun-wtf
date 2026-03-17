@@ -4,6 +4,7 @@ import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { Alert, Col, Row } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 import { isAddress } from 'viem';
 
@@ -69,7 +70,7 @@ const ProposalContent: React.FC<ProposalContentProps> = props => {
             <Trans>Description</Trans>
           </h5>
           {description && (
-            <ReactMarkdown className={classes.markdown} remarkPlugins={[remarkBreaks]}>
+            <ReactMarkdown className={classes.markdown} remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
               {processProposalDescriptionText(description, title)}
             </ReactMarkdown>
           )}

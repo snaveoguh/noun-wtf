@@ -8,6 +8,8 @@ import type { Party, PartyKitServer, Connection } from "partykit/server";
  * Client → Server:
  *   { type: "update", x, y, angle, swinging, color, name }
  *   { type: "force", x, y, angle, color }
+ *   { type: "leaderboard_submit", name, seconds, score, wave }
+ *   { type: "leaderboard_get" }
  *
  * Server → Client:
  *   { type: "sync", players, count }
@@ -15,6 +17,7 @@ import type { Party, PartyKitServer, Connection } from "partykit/server";
  *   { type: "force", id, x, y, angle, color }
  *   { type: "join", id, count }
  *   { type: "leave", id, count }
+ *   { type: "leaderboard", entries }
  */
 
 interface PlayerState {
@@ -27,9 +30,28 @@ interface PlayerState {
   lastSeen: number;
 }
 
+interface LeaderboardEntry {
+  name: string;
+  seconds: number;
+  score: number;
+  wave: number;
+  timestamp: number;
+}
+
 const STALE_TIMEOUT = 5000;
+const MAX_LEADERBOARD = 25;
 
 export default {
+  async onStart(room: Party) {
+    // Load leaderboard from durable storage
+    const stored = await room.storage.get<LeaderboardEntry[]>("leaderboard");
+    const roomAny = room as unknown as {
+      _players?: Record<string, PlayerState>;
+      _leaderboard: LeaderboardEntry[];
+    };
+    roomAny._leaderboard = stored ?? [];
+  },
+
   onConnect(connection: Connection, room: Party) {
     const count = [...room.getConnections()].length;
 
@@ -49,12 +71,15 @@ export default {
     connection.send(JSON.stringify({ type: "sync", players, count }));
   },
 
-  onMessage(message: string, connection: Connection, room: Party) {
+  async onMessage(message: string, connection: Connection, room: Party) {
     try {
       const data = JSON.parse(message as string);
+      const roomAny = room as unknown as {
+        _players?: Record<string, PlayerState>;
+        _leaderboard: LeaderboardEntry[];
+      };
 
       if (data.type === "update") {
-        const roomAny = room as unknown as { _players?: Record<string, PlayerState> };
         if (!roomAny._players) roomAny._players = {};
 
         roomAny._players[connection.id] = {
@@ -94,6 +119,42 @@ export default {
             conn.send(forceMsg);
           }
         }
+      } else if (data.type === "leaderboard_submit") {
+        // Add entry to leaderboard
+        const entry: LeaderboardEntry = {
+          name: (data.name ?? "Anon").substring(0, 42), // max length for eth address
+          seconds: Math.max(0, Math.floor(data.seconds ?? 0)),
+          score: Math.max(0, Math.floor(data.score ?? 0)),
+          wave: Math.max(1, Math.floor(data.wave ?? 1)),
+          timestamp: Date.now(),
+        };
+
+        if (!roomAny._leaderboard) roomAny._leaderboard = [];
+        roomAny._leaderboard.push(entry);
+        // Sort by seconds survived descending
+        roomAny._leaderboard.sort((a, b) => b.seconds - a.seconds);
+        // Keep top N
+        roomAny._leaderboard = roomAny._leaderboard.slice(0, MAX_LEADERBOARD);
+        // Persist to durable storage
+        await room.storage.put("leaderboard", roomAny._leaderboard);
+
+        // Send updated leaderboard back to the submitter
+        connection.send(JSON.stringify({
+          type: "leaderboard",
+          entries: roomAny._leaderboard,
+        }));
+
+        // Also broadcast to everyone
+        room.broadcast(JSON.stringify({
+          type: "leaderboard",
+          entries: roomAny._leaderboard,
+        }));
+      } else if (data.type === "leaderboard_get") {
+        if (!roomAny._leaderboard) roomAny._leaderboard = [];
+        connection.send(JSON.stringify({
+          type: "leaderboard",
+          entries: roomAny._leaderboard,
+        }));
       }
     } catch {
       // Ignore malformed messages

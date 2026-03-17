@@ -1,0 +1,418 @@
+/**
+ * HypercastleView — 3D visualization of all 9,910 Terraforms parcels
+ * positioned in the Hypercastle structure using their onchain coordinates.
+ *
+ * Progressively loads token metadata via batched multicall,
+ * renders each parcel as a colored cube at its structureSpace position.
+ * Click a parcel to navigate to its detail view.
+ */
+import { FC, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+
+import { OrbitControls } from '@react-three/drei';
+import { Canvas, ThreeEvent } from '@react-three/fiber';
+import { useNavigate } from 'react-router';
+import * as THREE from 'three';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
+const TOTAL_SUPPLY = 9910;
+const BATCH_SIZE = 20; // tokens per multicall batch (smaller to avoid RPC rate limits)
+const BATCH_DELAY = 500; // ms between batches
+
+// Zone colors for parcels that haven't loaded yet (gradient by level)
+const LEVEL_COLORS = [
+  '#4a1942', '#5c1f5c', '#6e2576', '#802b90', '#9231aa',
+  '#7b3fc4', '#644dde', '#4d5bf8', '#3669ff', '#1f77ff',
+  '#0885ff', '#0093e6', '#00a1cc', '#00afb3', '#00bd99',
+  '#00cb80', '#00d966', '#00e74d', '#00f533', '#00ff1a',
+];
+
+const TERRAFORMS_ABI = [
+  {
+    name: 'tokenSupplementalData',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{
+      name: '',
+      type: 'tuple',
+      components: [
+        { name: 'tokenId', type: 'uint256' },
+        { name: 'level', type: 'uint256' },
+        { name: 'xCoordinate', type: 'uint256' },
+        { name: 'yCoordinate', type: 'uint256' },
+        { name: 'elevation', type: 'int256' },
+        { name: 'structureSpaceX', type: 'uint256' },
+        { name: 'structureSpaceY', type: 'uint256' },
+        { name: 'structureSpaceZ', type: 'uint256' },
+        { name: 'zoneName', type: 'string' },
+        { name: 'zoneColors', type: 'string[10]' },
+        { name: 'characterSet', type: 'string[9]' },
+      ],
+    }],
+  },
+] as const;
+
+const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://mainnet.rpc.buidlguidl.com'),
+});
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface ParcelData {
+  tokenId: number;
+  level: number;
+  x: number;
+  y: number;
+  elevation: number;
+  sx: number; // structureSpaceX
+  sy: number; // structureSpaceY
+  sz: number; // structureSpaceZ
+  zoneName: string;
+  color: string; // primary zone color
+}
+
+// ─── Data fetching with localStorage cache ──────────────────────────────────
+
+const CACHE_KEY = 'terraforms_hypercastle_v1';
+const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function loadCache(): ParcelData[] {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return [];
+    const { data, timestamp } = JSON.parse(raw);
+    if (Date.now() - timestamp > CACHE_EXPIRY) {
+      localStorage.removeItem(CACHE_KEY);
+      return [];
+    }
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+function saveCache(data: ParcelData[]) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data,
+      timestamp: Date.now(),
+    }));
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function useHypercastleData() {
+  const [parcels, setParcels] = useState<ParcelData[]>(() => loadCache());
+  const [loadedCount, setLoadedCount] = useState(() => loadCache().length);
+  const [isLoading, setIsLoading] = useState(false);
+  const cancelRef = useRef(false);
+
+  useEffect(() => {
+    const cached = loadCache();
+    if (cached.length >= TOTAL_SUPPLY) {
+      setParcels(cached);
+      setLoadedCount(cached.length);
+      return;
+    }
+
+    // Start from where cache left off
+    const startFrom = cached.length;
+    const existing = new Map(cached.map(p => [p.tokenId, p]));
+    cancelRef.current = false;
+    setIsLoading(true);
+
+    (async () => {
+      const allParcels = [...cached];
+
+      for (let batchStart = startFrom; batchStart < TOTAL_SUPPLY; batchStart += BATCH_SIZE) {
+        if (cancelRef.current) break;
+
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, TOTAL_SUPPLY);
+        const calls = [];
+
+        for (let i = batchStart; i < batchEnd; i++) {
+          const tokenId = i + 1; // 1-indexed
+          if (existing.has(tokenId)) continue;
+          calls.push({
+            address: TERRAFORMS_ADDRESS,
+            abi: TERRAFORMS_ABI,
+            functionName: 'tokenSupplementalData' as const,
+            args: [BigInt(tokenId)] as const,
+          });
+        }
+
+        if (calls.length === 0) continue;
+
+        // Retry up to 3 times with exponential backoff
+        let success = false;
+        for (let attempt = 0; attempt < 3 && !success; attempt++) {
+          try {
+            if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+            const results = await publicClient.multicall({ contracts: calls });
+
+            for (let i = 0; i < results.length; i++) {
+              const r = results[i];
+              if (r.status !== 'success') continue;
+              const m = r.result as any;
+              const tokenId = Number(m.tokenId);
+              const level = Number(m.level);
+              const colors = [...m.zoneColors].filter((c: string) => c.length > 0);
+
+              allParcels.push({
+                tokenId,
+                level,
+                x: Number(m.xCoordinate),
+                y: Number(m.yCoordinate),
+                elevation: Number(m.elevation),
+                sx: Number(m.structureSpaceX),
+                sy: Number(m.structureSpaceY),
+                sz: Number(m.structureSpaceZ),
+                zoneName: m.zoneName,
+                color: colors[0] || LEVEL_COLORS[Math.min(level - 1, 19)],
+              });
+            }
+
+            setParcels([...allParcels]);
+            setLoadedCount(allParcels.length);
+
+            // Save progress periodically
+            if (allParcels.length % (BATCH_SIZE * 5) === 0 || batchEnd >= TOTAL_SUPPLY) {
+              saveCache(allParcels);
+            }
+            success = true;
+          } catch (err) {
+            console.warn(`Terraforms batch fetch error (attempt ${attempt + 1}/3):`, err);
+          }
+        }
+
+        // Delay between batches to avoid rate limiting
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
+      }
+
+      saveCache(allParcels);
+      setIsLoading(false);
+    })();
+
+    return () => { cancelRef.current = true; };
+  }, []);
+
+  return { parcels, loadedCount, isLoading, total: TOTAL_SUPPLY };
+}
+
+// ─── 3D Scene Components ────────────────────────────────────────────────────
+
+const tempObj = new THREE.Object3D();
+const tempColor = new THREE.Color();
+
+function ParcelInstances({
+  parcels,
+  onClickParcel,
+  hoveredId,
+  setHoveredId,
+}: {
+  parcels: ParcelData[];
+  onClickParcel: (id: number) => void;
+  hoveredId: number | null;
+  setHoveredId: (id: number | null) => void;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const idMapRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || parcels.length === 0) return;
+
+    const ids: number[] = [];
+    for (let i = 0; i < parcels.length; i++) {
+      const p = parcels[i];
+      tempObj.position.set(p.sx, p.sy, p.sz);
+      tempObj.scale.setScalar(hoveredId === p.tokenId ? 1.8 : 0.85);
+      tempObj.updateMatrix();
+      mesh.setMatrixAt(i, tempObj.matrix);
+
+      tempColor.set(p.color);
+      if (hoveredId === p.tokenId) {
+        tempColor.multiplyScalar(1.5);
+      }
+      mesh.setColorAt(i, tempColor);
+      ids.push(p.tokenId);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    idMapRef.current = ids;
+  }, [parcels, hoveredId]);
+
+  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+      setHoveredId(idMapRef.current[e.instanceId]);
+    }
+  }, [setHoveredId]);
+
+  const handlePointerOut = useCallback(() => {
+    setHoveredId(null);
+  }, [setHoveredId]);
+
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+      onClickParcel(idMapRef.current[e.instanceId]);
+    }
+  }, [onClickParcel]);
+
+  if (parcels.length === 0) return null;
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, parcels.length]}
+      onPointerMove={handlePointerMove}
+      onPointerOut={handlePointerOut}
+      onClick={handleClick}
+    >
+      <boxGeometry args={[0.85, 0.85, 0.85]} />
+      <meshStandardMaterial roughness={0.4} metalness={0.1} />
+    </instancedMesh>
+  );
+}
+
+// HoverLabel is rendered as a DOM overlay (see bottom bar in the main component)
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
+const HypercastleView: FC = () => {
+  const navigate = useNavigate();
+  const { parcels, loadedCount, isLoading, total } = useHypercastleData();
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+
+  const onClickParcel = useCallback((tokenId: number) => {
+    navigate(`/terraforms/${tokenId}`);
+  }, [navigate]);
+
+  const pct = Math.round((loadedCount / total) * 100);
+
+  return (
+    <div style={{
+      width: '100%', height: '100vh', background: '#050510',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Loading overlay */}
+      {isLoading && (
+        <div style={{
+          position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 10, background: 'rgba(0,0,0,0.7)', padding: '10px 24px',
+          borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12,
+          border: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            width: 120, height: 4, background: '#1e293b', borderRadius: 2,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${pct}%`, height: '100%', background: '#22c55e',
+              borderRadius: 2, transition: 'width 0.3s',
+            }} />
+          </div>
+          <span style={{
+            color: '#94a3b8', fontSize: '0.7rem', fontFamily: 'monospace',
+          }}>
+            {loadedCount.toLocaleString()} / {total.toLocaleString()} parcels
+          </span>
+        </div>
+      )}
+
+      {/* Title */}
+      <div style={{
+        position: 'absolute', top: 16, left: 20, zIndex: 10,
+        fontFamily: "'Londrina Solid', cursive",
+      }}>
+        <h1 style={{
+          margin: 0, fontSize: '1.4rem', color: '#e2e8f0', fontWeight: 400,
+        }}>
+          <span style={{ color: '#64748b' }}>&#x25A8;</span> Hypercastle
+        </h1>
+        <p style={{ margin: '2px 0 0', fontSize: '0.6rem', color: '#475569', fontFamily: 'monospace' }}>
+          {loadedCount.toLocaleString()} parcels loaded · Click to explore
+        </p>
+      </div>
+
+      {/* Back button */}
+      <div style={{
+        position: 'absolute', top: 16, right: 20, zIndex: 10,
+        display: 'flex', gap: 8,
+      }}>
+        <button
+          onClick={() => {
+            const rand = Math.floor(Math.random() * TOTAL_SUPPLY) + 1;
+            navigate(`/terraforms/${rand}`);
+          }}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: '1px solid #334155',
+            background: '#1e293b', color: '#e2e8f0', fontSize: '0.7rem',
+            cursor: 'pointer', fontFamily: 'monospace',
+          }}
+        >
+          Random Parcel
+        </button>
+      </div>
+
+      {/* Hovered parcel info */}
+      {hoveredId && (
+        <div style={{
+          position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 10, background: 'rgba(0,0,0,0.8)', padding: '8px 20px',
+          borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+          fontSize: '0.75rem', color: '#e2e8f0', fontFamily: 'monospace',
+          pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          {(() => {
+            const p = parcels.find(p => p.tokenId === hoveredId);
+            if (!p) return `#${hoveredId}`;
+            return `#${p.tokenId} · ${p.zoneName} · Level ${p.level} · (${p.x},${p.y}) · Elev ${p.elevation}`;
+          })()}
+        </div>
+      )}
+
+      <Canvas
+        camera={{ position: [60, 40, 60], fov: 55 }}
+        gl={{ antialias: true, alpha: false }}
+        onCreated={({ gl }) => gl.setClearColor('#050510')}
+        style={{ cursor: hoveredId ? 'pointer' : 'grab' }}
+      >
+        <Suspense fallback={null}>
+          <ambientLight intensity={0.5} />
+          <directionalLight position={[50, 80, 30]} intensity={0.8} />
+          <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
+
+          <ParcelInstances
+            parcels={parcels}
+            onClickParcel={onClickParcel}
+            hoveredId={hoveredId}
+            setHoveredId={setHoveredId}
+          />
+
+          <OrbitControls
+            enableDamping
+            dampingFactor={0.06}
+            autoRotate
+            autoRotateSpeed={0.3}
+            minDistance={10}
+            maxDistance={200}
+            enablePan
+            maxPolarAngle={Math.PI * 0.9}
+          />
+
+          {/* Grid reference */}
+          <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+};
+
+export default HypercastleView;

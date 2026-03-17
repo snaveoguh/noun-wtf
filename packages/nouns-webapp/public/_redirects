@@ -1,1 +1,4 @@
+# Return proper 404 for missing static assets (prevents serving index.html as JS)
+/assets/*  /404.html  404
+# SPA fallback for client-side routing
 /*    /index.html   200

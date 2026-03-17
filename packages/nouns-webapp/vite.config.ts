@@ -35,11 +35,12 @@ export default defineConfig({
       //   lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
       //   useFlatConfig: true
       // },
-      overlay: true,
+      overlay: false,
     }),
   ],
   server: {
-    port: 3000,
+    port: 5173,
+    host: '0.0.0.0',
     hmr: {
       overlay: true,
     },

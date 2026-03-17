@@ -19,16 +19,16 @@
 // RESULT: Most blocks process in <1ms (pure math + cache).
 // Settlement path: <500ms (pre-signed tx → Flashbots broadcast).
 
-import type {
-  PublicClient,
-  WalletClient,
+import {
   createPublicClient,
   createWalletClient,
   http,
   webSocket,
   encodeFunctionData,
-  type Hex,
   parseGwei,
+  type PublicClient,
+  type WalletClient,
+  type Hex,
 } from 'viem';
 
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';

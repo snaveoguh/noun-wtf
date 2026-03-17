@@ -5,6 +5,7 @@ import { buildSVG } from '@nouns/sdk';
 import { useQuery } from '@tanstack/react-query';
 
 import loadingNoun from '@/assets/loading-skull-noun.gif';
+import { NounHoverCard } from '@/components/NounHoverCard';
 import { useReadNounsTokenSeeds } from '@/contracts';
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -13,6 +14,8 @@ export interface NounProps extends HTMLAttributes<HTMLImageElement> {
   seed?: INounSeed;
   loadingNounFallback?: boolean;
   minFallbackDuration?: number;
+  /** When true, wraps the Noun image in a rich hover popover */
+  hoverCard?: boolean;
 }
 
 const fallbackTransparentPixel =
@@ -23,6 +26,7 @@ export const Noun: FC<NounProps> = ({
   seed: providedSeed,
   loadingNounFallback,
   minFallbackDuration = 0,
+  hoverCard = false,
   ...props
 }) => {
   const [shouldShowFallback, setShouldShowFallback] = useState(false);
@@ -86,10 +90,20 @@ export const Noun: FC<NounProps> = ({
 
   if (shouldShowFallback) return <img {...props} src={loadingNoun} />;
 
-  return (
+  const imgElement = (
     <img
       {...props}
       src={svg ? `data:image/svg+xml;base64,${btoa(svg)}` : fallbackTransparentPixel}
     />
   );
+
+  if (hoverCard && nounId !== undefined) {
+    return (
+      <NounHoverCard nounId={nounId} seed={seed ?? undefined}>
+        {imgElement}
+      </NounHoverCard>
+    );
+  }
+
+  return imgElement;
 };

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Trans } from '@lingui/react/macro';
 import { FormControl, FormText, InputGroup } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 
 import classes from './ProposalEditor.module.css';
@@ -66,6 +67,7 @@ const ProposalEditor = ({
             className={classes.markdown}
             children={proposalText}
             remarkPlugins={[remarkBreaks]}
+            rehypePlugins={[rehypeRaw]}
           />
         </div>
       )}

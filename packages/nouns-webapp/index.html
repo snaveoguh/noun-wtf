@@ -14,6 +14,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 
+    <!-- Comic Neue — Comic Sans alternative for mobile (Comic Sans MS isn't available on iOS/Android) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet" />
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#e04639" />
     <meta name="msapplication-TileColor" content="#2b5797" />
     <meta name="theme-color" content="#ffffff" />
@@ -28,6 +32,26 @@
       Only files inside the `public` folder can be referenced from the HTML.
     -->
     <title>Nouns DAO</title>
+
+    <script>
+      // Handle stale chunk loading errors (after new deploys, old cached bundles reference non-existent chunks)
+      window.addEventListener('error', function(e) {
+        if (e.message && (e.message.includes('Failed to fetch dynamically imported module') || e.message.includes('Loading chunk') || e.message.includes('Importing a module script failed'))) {
+          if (!sessionStorage.getItem('chunk_reload')) {
+            sessionStorage.setItem('chunk_reload', '1');
+            window.location.reload();
+          }
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message && (e.reason.message.includes('Failed to fetch dynamically imported module') || e.reason.message.includes('Loading chunk') || e.reason.message.includes('Importing a module script failed'))) {
+          if (!sessionStorage.getItem('chunk_reload')) {
+            sessionStorage.setItem('chunk_reload', '1');
+            window.location.reload();
+          }
+        }
+      });
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

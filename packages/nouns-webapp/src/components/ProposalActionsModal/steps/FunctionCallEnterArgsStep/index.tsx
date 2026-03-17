@@ -96,6 +96,7 @@ const FunctionCallEnterArgsStep: React.FC<ProposalActionModalStepProps> = props 
         </div>
       )}
       {inputs.length ? (
+        // @ts-expect-error TS2590: react-bootstrap FormGroup union type too complex
         <FormGroup as={Row}>
           {inputs.map((input, i) => (
             <React.Fragment key={i}>

@@ -13,6 +13,7 @@ const deserializeAuction = (reduxSafeAuction: Auction): Auction => {
     endTime: BigInt(reduxSafeAuction.endTime),
     nounId: BigInt(reduxSafeAuction.nounId),
     settled: false,
+    clientId: reduxSafeAuction.clientId ?? null,
   };
 };
 
@@ -39,19 +40,28 @@ const useOnDisplayAuction = (): Auction | undefined => {
   const currentAuction = useAppSelector(state => state.auction.activeAuction);
   const pastAuctions = useAppSelector(state => state.pastAuctions.pastAuctions);
 
-  if (
-    onDisplayAuctionNounId === undefined ||
-    !lastAuctionNounId ||
-    !currentAuction ||
-    !pastAuctions
-  ) {
+  // Minimum requirements: we need to know WHICH noun to show and the active auction
+  if (onDisplayAuctionNounId === undefined || !lastAuctionNounId || !currentAuction) {
     return undefined;
   }
 
-  // current auction
+  // Current auction — does NOT require pastAuctions to be loaded
   // Compare as numbers — lastAuctionNounId is a string after Redux serialisation
   if (Number(onDisplayAuctionNounId) === Number(lastAuctionNounId)) {
     return deserializeAuction(currentAuction);
+  }
+
+  // Past/nounder auctions need pastAuctions — if not loaded yet, return a
+  // stub so the page still renders (the Noun image fetches its seed on-chain).
+  if (!pastAuctions) {
+    return {
+      nounId: BigInt(onDisplayAuctionNounId),
+      startTime: 0n,
+      endTime: 0n,
+      settled: true,
+      amount: 0n,
+      bidder: undefined,
+    };
   }
 
   // nounder auction

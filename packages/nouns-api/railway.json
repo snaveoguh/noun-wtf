@@ -5,7 +5,7 @@
     "buildCommand": "npx pnpm@10 build --filter=@nouns/api"
   },
   "deploy": {
-    "startCommand": "npx pnpm@10 --filter @nouns/api -- start --schema $RAILWAY_DEPLOYMENT_ID",
+    "startCommand": "npx pnpm@10 --filter @nouns/api -- start --schema nouns-prod",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300
   }

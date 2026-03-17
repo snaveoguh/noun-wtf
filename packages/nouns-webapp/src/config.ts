@@ -45,16 +45,14 @@ export const NOUN_WTF_CLIENT_ID = 37;
 
 export const WALLET_CONNECT_V2_PROJECT_ID = import.meta.env.VITE_WALLET_CONNECT_V2_PROJECT_ID ?? '';
 
-const INFURA_PROJECT_ID = import.meta.env.VITE_INFURA_PROJECT_ID;
-
-export const createNetworkHttpUrl = (network: string): string => {
+export const createNetworkHttpUrl = (_network: string): string => {
   const custom = import.meta.env.VITE_MAINNET_JSONRPC as string;
-  return custom || `https://${network}.infura.io/v3/${INFURA_PROJECT_ID}`;
+  return custom || 'https://ethereum-rpc.publicnode.com';
 };
 
-export const createNetworkWsUrl = (network: string): string => {
+export const createNetworkWsUrl = (_network: string): string => {
   const custom = import.meta.env.VITE_MAINNET_WSRPC as string;
-  return custom || `wss://${network}.infura.io/ws/v3/${INFURA_PROJECT_ID}`;
+  return custom || 'wss://ethereum-rpc.publicnode.com';
 };
 
 const app: Record<SupportedChains, AppConfig> = {

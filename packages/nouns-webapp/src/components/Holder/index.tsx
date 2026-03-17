@@ -36,7 +36,11 @@ const Holder: React.FC<HolderProps> = props => {
     );
   }
 
-  const holder = data && data.noun.owner.id;
+  const holder = data?.noun?.owner?.id;
+
+  if (!holder && !isNounders) {
+    return <></>;
+  }
 
   const nonNounderNounContent = (
     <a

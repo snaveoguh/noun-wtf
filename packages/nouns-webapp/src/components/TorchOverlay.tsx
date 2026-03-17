@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useRef } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * "Dungeon mode" overlay — a full-screen black layer with a circular
@@ -140,7 +140,11 @@ const TorchOverlay: FC<TorchOverlayProps> = ({ active }) => {
     return () => window.removeEventListener('resize', onResize);
   }, [active]);
 
-  if (!active) return null;
+  // Stable mobile check — read once on mount, not on every render
+  const [isMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Disable on mobile — torch overlay doesn't work well on touch devices
+  if (!active || isMobile) return null;
 
   return (
     <canvas

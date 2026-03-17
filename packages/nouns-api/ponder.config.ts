@@ -1,17 +1,19 @@
-// Infura Developer plan ($50/mo): 4K credits/s, eth_getLogs=255 credits → ~15 effective RPS
-// Infura-only — free RPCs (publicnode, llamarpc) can't handle 38+ address Stream factory queries
+// dRPC free tier: 210M CUs/mo, ~100 RPS, flat 20 CU per method (incl. eth_getLogs)
+// Free public RPCs (publicnode, llamarpc) can't handle 38+ address Stream factory queries
 import { nounsAuctionHouseAbi } from '@nouns/sdk/auction-house';
 import { nounsTokenAbi } from '@nouns/sdk/token';
 import { nounsGovernorAbi } from '@nouns/sdk/governor';
+import { nounsDataAbi } from '@nouns/sdk/data';
 import { nounsStreamFactoryAbi } from '@nouns/sdk/stream-factory';
 import { nounsStreamAbi } from '@nouns/sdk/stream';
+import { smallGrantsTreasuryAbi } from './src/abi/SmallGrantsTreasury';
 import { createConfig, factory } from 'ponder';
 import { getAbiItem } from 'viem';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Primary: Infura paid endpoint from env var
+// Primary: dRPC endpoint from env var
 // NOTE: Do NOT add free public RPCs — they reject multi-address eth_getLogs
 // (Stream factory creates 38+ addresses which publicnode/llamarpc can't handle)
 const rpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
@@ -22,8 +24,8 @@ const mainnetConfig = createConfig({
       id: 1,
       rpc: rpcUrls,
       ws: process.env.PONDER_WS_URL_1,
-      ethGetLogsBlockRange: 1000,
-      maxRpcRequestsPerSecond: 2,
+      ethGetLogsBlockRange: 500,
+      maxRpcRequestsPerSecond: 8,
     },
   },
   contracts: {
@@ -45,6 +47,12 @@ const mainnetConfig = createConfig({
       abi: nounsGovernorAbi,
       startBlock: 12985453,
     },
+    NounsDAOData: {
+      chain: 'mainnet',
+      address: '0xf790A5f59678dd733fb3De93493A91f472ca1365',
+      abi: nounsDataAbi,
+      startBlock: 17812145,
+    },
     StreamFactory: {
       chain: 'mainnet',
       address: '0x0fd206FC7A7dBcD5661157eDCb1FFDD0D02A61ff',
@@ -61,6 +69,14 @@ const mainnetConfig = createConfig({
       }),
       abi: nounsStreamAbi,
       startBlock: 16576500,
+    },
+
+    // Small Grants Treasury — noun.wtf exclusive governance
+    SmallGrantsTreasury: {
+      chain: 'mainnet',
+      address: '0xBAc9233725440c595b19d975309CC98cb259253a',
+      abi: smallGrantsTreasuryAbi,
+      startBlock: 24650190,
     },
   },
 });
@@ -91,6 +107,12 @@ const sepoliaConfig = createConfig({
       address: '0x35d2670d7C8931AACdd37C89Ddcb0638c3c44A57',
       abi: nounsGovernorAbi,
       startBlock: 3594849,
+    },
+    NounsDAOData: {
+      chain: 'sepolia',
+      address: '0x9040f720AA8A693f950b9cF94764b4b06079D002',
+      abi: nounsDataAbi,
+      startBlock: 3594900,
     },
     StreamFactory: {
       chain: 'sepolia',

@@ -2,8 +2,11 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
+
+import { useSiteTheme } from '@/contexts/SiteThemeContext';
+import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/index.css';
@@ -24,6 +27,10 @@ import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
 import EditProposalPage from '@/pages/EditProposal';
 import GovernancePage from '@/pages/Governance';
+import GrantsPage from '@/pages/Grants';
+import GrantDetailPage from '@/pages/Grants/GrantDetail';
+import CreateGrantPage from '@/pages/Grants/CreateGrant';
+import UndergroundPage from '@/pages/Underground';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 import NounsPage from '@/pages/NounsPage';
@@ -32,16 +39,26 @@ import ProposalHistory from '@/pages/ProposalHistory';
 import DreamCreatePage from '@/pages/DreamCreatePage';
 import DreamsPage from '@/pages/DreamsPage';
 import SettlersPage from '@/pages/SettlersPage';
+import StatsPage from '@/pages/StatsPage';
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 import VotePage from '@/pages/Vote';
 import { setActiveAccount } from '@/state/slices/account';
 
 import DreamWindow from '@/components/DreamWindow';
-import { ProbeButton } from '@/components/ProbeButton';
+import CandleGate from '@/components/CandleGate';
+import HeliosStatusBar from '@/components/HeliosStatusBar';
+import NocTicker from '@/components/NocTicker';
 import SaberOverlay from '@/components/SaberOverlay';
 import TorchOverlay from '@/components/TorchOverlay';
 import { useAppSelector } from '@/hooks';
+
+import {
+  FeedSkeleton,
+  GenericSkeleton,
+  GovernanceSkeleton,
+  TerminalSkeleton,
+} from '@/components/Skeleton';
 
 import classes from './App.module.css';
 
@@ -50,95 +67,191 @@ const TerminalPage = lazy(() => import('@/miniapps/terminal/TerminalPage'));
 const FeedPage = lazy(() => import('@/miniapps/feed/FeedPage'));
 const HighwayPage = lazy(() => import('@/miniapps/highway/HighwayPage'));
 const SaberArenaPage = lazy(() => import('@/miniapps/saber/SaberArenaPage'));
+const CandidatesListPage = lazy(() => import('@/miniapps/candidates/CandidatesPage'));
+const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage'));
+const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
+const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 
-function App() {
-  const { address: account, chainId } = useAccount();
+/** Inner router — uses useLocation to conditionally show chrome vs terminal */
+function AppRouter() {
+  const { mode } = useSiteTheme();
+  const location = useLocation();
+  const torchMode = useAppSelector(state => state.application.torchMode);
   const [dreamOpen, setDreamOpen] = useState(false);
   const [saberMode, setSaberMode] = useState(false);
-  const torchMode = useAppSelector(state => state.application.torchMode);
 
-  const dispatch = useAppDispatch();
-  dayjs.extend(relativeTime);
+  const isTerminalHome = mode === 'new' && location.pathname === '/';
 
-  useEffect(() => {
-    // Local account array updated
-    dispatch(setActiveAccount(account));
-  }, [account, dispatch]);
-
-  // Listen for "dream a lil dream" button on auction page
   useEffect(() => {
     const handler = () => setDreamOpen(true);
     window.addEventListener('open-dream-window', handler);
     return () => window.removeEventListener('open-dream-window', handler);
   }, []);
 
+  // Terminal mode on root — render only the terminal feed, nothing else
+  if (isTerminalHome) {
+    return <TerminalFeedShell />;
+  }
+
+  // Classic mode or deep link — show full site chrome
+  return (
+    <>
+      <NocTicker />
+      <NavBar />
+      <Routes>
+        <Route path="/" element={<AuctionPage />} />
+        <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
+        <Route path="/noun/:id" element={<AuctionPage />} />
+        <Route path="/nounders" element={<NoundersPage />} />
+        <Route path="/create-proposal" element={<CreateProposalPage />} />
+        <Route path="/create-candidate" element={<CreateCandidatePage />} />
+        <Route path="/vote" element={<GovernancePage />} />
+        <Route path="/vote/:id" element={<VotePage />} />
+        <Route path="/vote/:id/history" element={<ProposalHistory />} />
+        <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
+        <Route
+          path="/vote/:id/edit"
+          element={<EditProposalPage match={{ params: { id: ':id' } }} />}
+        />
+        <Route path="/candidates" element={<Suspense fallback={<GovernanceSkeleton />}><CandidatesListPage /></Suspense>} />
+        <Route path="/candidates/:id" element={<CandidatePage />} />
+        <Route path="/playground" element={<Playground />} />
+        <Route path="/grants" element={<GrantsPage />} />
+        <Route path="/grants/create" element={<CreateGrantPage />} />
+        <Route path="/grants/:id" element={<GrantDetailPage />} />
+        <Route path="/underground" element={<UndergroundPage />} />
+        <Route path="/delegate" element={<DelegatePage />} />
+        <Route path="/traits" element={<TraitsPage />} />
+        <Route path="/explore" element={<Navigate to="/nouns" replace />} />
+        <Route path="/nouns" element={<NounsPage />} />
+        <Route path="/studio" element={<StudioPage />} />
+        <Route path="/settlers" element={<SettlersPage />} />
+        <Route path="/stats" element={<StatsPage />} />
+        <Route path="/dreams" element={<DreamsPage />} />
+        <Route path="/dreams/create" element={<DreamCreatePage />} />
+        {/* Miniapp routes (lazy loaded) */}
+        <Route path="/terminal" element={<Suspense fallback={<TerminalSkeleton />}><TerminalPage /></Suspense>} />
+        <Route path="/crystal-ball" element={<Suspense fallback={<GenericSkeleton />}><CrystalBallPage /></Suspense>} />
+        <Route path="/feed" element={<Suspense fallback={<FeedSkeleton />}><FeedPage /></Suspense>} />
+        <Route path="/highway" element={<Suspense fallback={<GenericSkeleton />}><HighwayPage /></Suspense>} />
+        <Route path="/saber" element={<Suspense fallback={<GenericSkeleton />}><SaberArenaPage /></Suspense>} />
+        <Route path="/terraforms" element={<Suspense fallback={<GenericSkeleton />}><TerraformsPage /></Suspense>} />
+        <Route path="/terraforms/:id" element={<Suspense fallback={<GenericSkeleton />}><TerraformsPage /></Suspense>} />
+        <Route path="/pip3" element={<Suspense fallback={<GenericSkeleton />}><Pip3Page /></Suspense>} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+      <Footer />
+      <HeliosStatusBar />
+      <Toaster
+        expand
+        closeButton
+        toastOptions={{
+          classNames: {
+            closeButton:
+              '[--toast-close-button-start:auto] [--toast-close-button-end:0] [--toast-close-button-transform:translate(35%,-35%)]',
+          },
+        }}
+      />
+
+      {/* Fixed bottom-right liquid glass icon buttons */}
+      <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+        <button
+          onClick={() => setSaberMode(s => !s)}
+          title={saberMode ? 'Exit Saber' : 'Saber'}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            border: '1px solid rgba(255,255,255,0.4)',
+            background: saberMode
+              ? 'rgba(239, 68, 68, 0.25)'
+              : 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.15) inset',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.2rem',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = saberMode
+              ? 'rgba(239, 68, 68, 0.4)'
+              : 'rgba(255, 255, 255, 0.35)';
+            e.currentTarget.style.transform = 'scale(1.08)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = saberMode
+              ? 'rgba(239, 68, 68, 0.25)'
+              : 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {saberMode ? '\u2716' : '\u2694\uFE0F'}
+        </button>
+        <button
+          onClick={() => setDreamOpen(true)}
+          title="Dream"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            border: '1px solid rgba(255,255,255,0.4)',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.15) inset',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.2rem',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+            e.currentTarget.style.transform = 'scale(1.08)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {'\uD83D\uDCA4'}
+        </button>
+      </div>
+
+      {/* Dream creation retro window */}
+      <DreamWindow open={dreamOpen} onClose={() => setDreamOpen(false)} />
+
+      {/* Saber battle overlay */}
+      <SaberOverlay active={saberMode} onClose={() => setSaberMode(false)} />
+
+      {/* Torch / dungeon mode overlay + music */}
+      <TorchOverlay active={torchMode} />
+      <CandleGate />
+    </>
+  );
+}
+
+function App() {
+  const { address: account, chainId } = useAccount();
+  const torchMode = useAppSelector(state => state.application.torchMode);
+
+  const dispatch = useAppDispatch();
+  dayjs.extend(relativeTime);
+
+  useEffect(() => {
+    dispatch(setActiveAccount(account));
+  }, [account, dispatch]);
+
   return (
     <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
       {chainId !== undefined && Number(CHAIN_ID) !== chainId && <NetworkAlert />}
       <BrowserRouter>
-        <NavBar />
-        <Routes>
-          <Route path="/" element={<AuctionPage />} />
-          <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
-          <Route path="/noun/:id" element={<AuctionPage />} />
-          <Route path="/nounders" element={<NoundersPage />} />
-          <Route path="/create-proposal" element={<CreateProposalPage />} />
-          <Route path="/create-candidate" element={<CreateCandidatePage />} />
-          <Route path="/vote" element={<GovernancePage />} />
-          <Route path="/vote/:id" element={<VotePage />} />
-          <Route path="/vote/:id/history" element={<ProposalHistory />} />
-          <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
-          <Route
-            path="/vote/:id/edit"
-            element={<EditProposalPage match={{ params: { id: ':id' } }} />}
-          />
-          <Route path="/candidates/:id" element={<CandidatePage />} />
-          <Route path="/playground" element={<Playground />} />
-          <Route path="/delegate" element={<DelegatePage />} />
-          <Route path="/traits" element={<TraitsPage />} />
-          <Route path="/explore" element={<Navigate to="/nouns" replace />} />
-          <Route path="/nouns" element={<NounsPage />} />
-          <Route path="/studio" element={<StudioPage />} />
-          <Route path="/settlers" element={<SettlersPage />} />
-          <Route path="/dreams" element={<DreamsPage />} />
-          <Route path="/dreams/create" element={<DreamCreatePage />} />
-          {/* Miniapp routes (lazy loaded) */}
-          <Route path="/terminal" element={<Suspense fallback={null}><TerminalPage /></Suspense>} />
-          <Route path="/feed" element={<Suspense fallback={null}><FeedPage /></Suspense>} />
-          <Route path="/highway" element={<Suspense fallback={null}><HighwayPage /></Suspense>} />
-          <Route path="/saber" element={<Suspense fallback={null}><SaberArenaPage /></Suspense>} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-        <Footer />
-        <Toaster
-          expand
-          closeButton
-          toastOptions={{
-            classNames: {
-              closeButton:
-                '[--toast-close-button-start:auto] [--toast-close-button-end:0] [--toast-close-button-transform:translate(35%,-35%)]',
-            },
-          }}
-        />
-
-        {/* Fixed bottom-right buttons */}
-        <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, paddingRight: '0.5rem', paddingBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
-          <ProbeButton onClick={() => setSaberMode(s => !s)}>
-            {saberMode ? '⚔ EXIT' : '⚔ SABER'}
-          </ProbeButton>
-          <ProbeButton onClick={() => setDreamOpen(true)}>
-            Dream
-          </ProbeButton>
-        </div>
-
-        {/* Dream creation retro window */}
-        <DreamWindow open={dreamOpen} onClose={() => setDreamOpen(false)} />
-
-        {/* Saber battle overlay */}
-        <SaberOverlay active={saberMode} onClose={() => setSaberMode(false)} />
-
-        {/* Torch / dungeon mode overlay */}
-        <TorchOverlay active={torchMode} />
+        <AppRouter />
       </BrowserRouter>
     </div>
   );

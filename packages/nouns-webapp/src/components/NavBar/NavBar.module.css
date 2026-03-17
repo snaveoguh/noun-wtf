@@ -10,8 +10,8 @@
 }
 
 .navBarLogo {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
 }
 
 .navBarCustom {
@@ -20,8 +20,8 @@
 
 @media (max-width: 992px) {
   .navBarLogo {
-    width: 75px;
-    height: 75px;
+    width: 55px;
+    height: 55px;
   }
 
   .navBarCustom {
@@ -72,8 +72,8 @@
 .nounsNavDropdownButton > button {
   font-family: 'PT Root UI';
   font-weight: bold;
-  font-size: 0.9rem;
-  padding: 0.3rem 0.3rem !important;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.2rem !important;
   color: black !important;
 }
 
@@ -98,6 +98,8 @@
   flex-flow: row nowrap;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .navBarToggle {
@@ -108,13 +110,13 @@
 }
 
 .nounsNavDropdownButton {
-  height: 40px;
+  height: 36px;
   border-radius: 10px;
-  font-size: 16px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 13px;
   font-family: 'PT Root UI';
   font-weight: bold;
-  padding: 0px 12px 0px 12px;
+  padding: 0px 10px;
   transition: all 0.125s ease-in-out;
   box-shadow: none !important;
   border: 1px solid rgba(0, 0, 0, 0.1);

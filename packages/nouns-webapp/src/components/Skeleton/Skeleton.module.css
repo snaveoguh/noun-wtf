@@ -1,0 +1,278 @@
+/* ─── Lofi skeleton pulse ─────────────────────────────────── */
+
+@keyframes lofiPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.12; }
+}
+
+.bone {
+  background: #d1d5db;
+  border-radius: 6px;
+  animation: lofiPulse 1.8s ease-in-out infinite;
+}
+
+.boneRound {
+  composes: bone;
+  border-radius: 50%;
+}
+
+.boneDark {
+  background: #374151;
+  border-radius: 6px;
+  animation: lofiPulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Page wrappers ──────────────────────────────────────── */
+
+.auctionWrap {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+  max-width: 1140px;
+  margin: 0 auto;
+  min-height: 558px;
+  align-items: flex-end;
+}
+
+.auctionLeft {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.auctionRight {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 2rem;
+}
+
+.feedWrap {
+  max-width: 672px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feedTabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.feedCards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feedCardLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedCardFooter {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.terminalWrap {
+  background: #0a0a0f;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 24px;
+}
+
+.terminalBox {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+}
+
+.terminalInput {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.govWrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.govTreasury {
+  border: 1px solid #e2e3e8;
+  border-radius: 20px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.govTreasuryRow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.govProposals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.govProposalRow {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settlersWrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settlersRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.nounsWrap {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nounsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.dreamsWrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dreamsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dreamsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.dreamCard {
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dreamCardImg {
+  aspect-ratio: 1;
+}
+
+.dreamCardText {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.genericWrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 992px) {
+  .auctionWrap {
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+  }
+  .auctionLeft {
+    width: 70%;
+  }
+  .auctionRight {
+    width: 100%;
+    padding: 0 5%;
+  }
+}
+
+@media (max-width: 568px) {
+  .auctionLeft {
+    width: 80%;
+  }
+  .nounsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  }
+  .dreamsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
