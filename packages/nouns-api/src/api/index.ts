@@ -703,8 +703,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     };
   }
 
-  // ─── Create Candidate ─────────────────────────────────────
-  const candidateMatch = raw.match(/^create\s+candidate:\s*(.+?)\s*-\s*(.+)$/i);
+  // ─── Create Candidate / Proposal ─────────────────────────
+  // "create candidate: title - description", "propose: title - description", "create proposal: title - description"
+  const candidateMatch = raw.match(
+    /^(?:create\s+(?:candidate|proposal)|propose):\s*(.+?)\s*-\s*(.+)$/i,
+  );
   if (candidateMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to create a candidate.' };
     const title = candidateMatch[1].trim();
@@ -712,7 +715,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const action = { type: 'CANDIDATE', title, description };
     return {
       handled: true,
-      response: `Candidate prepared: "${title}". Confirm in your wallet.`,
+      response: `Candidate prepared: "${title}". In Nouns DAO, proposals start as candidates that collect sponsor signatures. Confirm in your wallet.`,
       action,
     };
   }
@@ -1226,8 +1229,18 @@ You are NOT a "text-based AI model" that can only output text. You are embedded 
 CRITICAL — NEVER FABRICATE DATA:
 When you don't know something, say "I don't know" or use your tools to look it up. NEVER guess amounts, percentages, proposal details, or stream values. NEVER pretend to call tools you don't have. NEVER claim to have updated the UI or "self-fixed" something. Your remember_fact and self_learn tools update YOUR KNOWLEDGE, not the website's code or display. Be honest about what you can and cannot do.
 
+CRITICAL — NEVER WRITE FUNCTION CALLS AS TEXT:
+You have REAL tool-calling capabilities through structured function calling. NEVER write out function calls as text like "<function=prepare_vote(...)>" or "calling prepare_proposal(...)". When you want to use a tool, USE the tool calling mechanism — your response will include structured tool_calls that the system executes. If you write function call syntax as text, NOTHING HAPPENS. The tool does not execute. The user sees your text and no action occurs. ALWAYS use the actual tool calling mechanism, NEVER simulate it with text.
+
+CRITICAL — PROPOSALS START AS CANDIDATES:
+There is NO "prepare_proposal" tool. Proposals in Nouns DAO start as CANDIDATES. The flow is:
+1. User creates a CANDIDATE via prepare_candidate (with title, description, optional transactions)
+2. Candidate collects sponsor signatures via prepare_sponsor
+3. When enough signatures, someone PROMOTES the candidate to a real proposal via prepare_promote
+When a user says "create a proposal" or "propose something", use prepare_candidate. This creates a candidate that can be sponsored and promoted. NEVER hallucinate a "prepare_proposal" tool.
+
 CRITICAL — NEVER LIE ABOUT YOUR ARCHITECTURE:
-You are powered by a single LLM (Llama 3.3 70B via Groq) through the Agent Hub. You do NOT use spaCy, NLTK, scikit-learn, Hugging Face, BERT, RoBERTa, LDA, NER pipelines, dependency parsers, or any other NLP framework. If asked about your architecture, say: "I'm an LLM with tool-calling capabilities, persistent memory, and access to noun.wtf's Ponder index. I can prepare onchain governance actions for your wallet to sign."`;
+You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You do NOT use spaCy, NLTK, scikit-learn, Hugging Face, BERT, RoBERTa, LDA, NER pipelines, dependency parsers, or any other NLP framework. If asked about your architecture, say: "I'm an LLM with tool-calling capabilities, persistent memory, and access to noun.wtf's Ponder index. I can prepare onchain governance actions for your wallet to sign."`;
     }
 
     // Build messages array from history
