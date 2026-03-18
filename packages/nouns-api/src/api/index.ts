@@ -3,12 +3,24 @@ const AGENT_HUB_URL = process.env.AGENT_HUB_URL || 'http://localhost:3100';
 const AGENT_HUB_SECRET = process.env.AGENT_HUB_SECRET || '';
 
 interface HubChatRequest {
-  messages: Array<{ role: string; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>; tool_call_id?: string }>;
+  messages: Array<{
+    role: string;
+    content: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: 'function';
+      function: { name: string; arguments: string };
+    }>;
+    tool_call_id?: string;
+  }>;
   system?: string;
   task?: string;
   maxTokens?: number;
   temperature?: number;
-  tools?: Array<{ type: 'function'; function: { name: string; description?: string; parameters?: Record<string, unknown> } }>;
+  tools?: Array<{
+    type: 'function';
+    function: { name: string; description?: string; parameters?: Record<string, unknown> };
+  }>;
   stream?: boolean;
   timeoutMs?: number;
 }
@@ -18,7 +30,11 @@ interface HubChatResponse {
   model: string;
   provider: string;
   usage: { input: number; output: number };
-  toolCalls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
+  toolCalls?: Array<{
+    id: string;
+    type: 'function';
+    function: { name: string; arguments: string };
+  }>;
   finishReason?: string;
   error?: string;
 }
@@ -34,22 +50,29 @@ async function hubChat(request: HubChatRequest): Promise<HubChatResponse> {
     signal: AbortSignal.timeout(request.timeoutMs ?? 60_000),
   });
 
-  const payload = await res.json() as HubChatResponse;
+  const payload = (await res.json()) as HubChatResponse;
   if (!res.ok || payload.error) {
     throw new Error(payload.error || `Hub returned ${res.status}`);
   }
   return payload;
 }
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { graphql } from 'ponder';
-import { db } from 'ponder:api';
-import schema from 'ponder:schema';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Agent NounIRL
+
+import { desc, eq, inArray, lt } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { graphql } from 'ponder';
+import { db } from 'ponder:api';
+import schema from 'ponder:schema';
+import sharp from 'sharp';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+
+import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
 import {
   initAgent,
   reservationStore,
@@ -80,19 +103,7 @@ import {
   searchPeople,
   getPeopleCount,
   buildPeopleContext,
-  lookupPersonForChat,
 } from '../agent/index.js';
-
-import {
-  NOUNS_TOKEN_ADDRESS,
-  NOUNS_TOKEN_ABI,
-  MIN_NOUNS_FOR_DEPLOY,
-} from '../agent/constants.js';
-
-import { desc, eq, inArray, lt } from 'drizzle-orm';
-import sharp from 'sharp';
-import { createPublicClient, http } from 'viem';
-import { mainnet } from 'viem/chains';
 
 // ─── Noun Balance Check (for deploy gating) ────────────────────────────────
 const nounCheckClient = createPublicClient({
@@ -107,8 +118,12 @@ async function getCurrentBlock(): Promise<bigint> {
   return nounCheckClient.getBlockNumber();
 }
 
-function formatBlocksRemaining(currentBlock: bigint, endBlock: string | bigint | null | undefined): { blocksLeft: number; timeLeftHours: number; timeLeftFormatted: string; hasEnded: boolean } {
-  if (!endBlock) return { blocksLeft: 0, timeLeftHours: 0, timeLeftFormatted: 'unknown', hasEnded: true };
+function formatBlocksRemaining(
+  currentBlock: bigint,
+  endBlock: string | bigint | null | undefined,
+): { blocksLeft: number; timeLeftHours: number; timeLeftFormatted: string; hasEnded: boolean } {
+  if (!endBlock)
+    return { blocksLeft: 0, timeLeftHours: 0, timeLeftFormatted: 'unknown', hasEnded: true };
   const end = BigInt(endBlock);
   if (currentBlock >= end) {
     return { blocksLeft: 0, timeLeftHours: 0, timeLeftFormatted: 'ended', hasEnded: true };
@@ -154,11 +169,19 @@ try {
 }
 
 // CORS — allow noun.wtf and localhost
-app.use('*', cors({
-  origin: ['https://noun.wtf', 'https://dev-noun-wtf.netlify.app', 'http://localhost:5173', 'http://localhost:3000'],
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Accept'],
-}));
+app.use(
+  '*',
+  cors({
+    origin: [
+      'https://noun.wtf',
+      'https://dev-noun-wtf.netlify.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ],
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Accept'],
+  }),
+);
 
 // ============================================================
 // GraphQL (Ponder)
@@ -429,16 +452,24 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const blockResult = await checkNow();
       return { handled: true, response: `Block check: ${JSON.stringify(blockResult, null, 2)}` };
     } catch (err) {
-      return { handled: true, response: `Block check failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Block check failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
   // ─── List Traits ───────────────────────────────────────────
-  const traitsMatch = m.match(/^(?:list|show)\s+traits?\s+(background|body|accessory|head|glasses)$/);
+  const traitsMatch = m.match(
+    /^(?:list|show)\s+traits?\s+(background|body|accessory|head|glasses)$/,
+  );
   if (traitsMatch) {
     const category = traitsMatch[1];
     const traits = getAllTraitNames(category);
-    return { handled: true, response: `${category} traits (${traits.length}):\n${traits.join(', ')}` };
+    return {
+      handled: true,
+      response: `${category} traits (${traits.length}):\n${traits.join(', ')}`,
+    };
   }
 
   // ─── My Reservations ──────────────────────────────────────
@@ -448,32 +479,57 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (res.length === 0) return { handled: true, response: 'No active reservations.' };
     return {
       handled: true,
-      response: res.map(r => `[${r.id.slice(0, 8)}] ${r.traits.join(', ')} — ${r.status}`).join('\n'),
+      response: res
+        .map(r => `[${r.id.slice(0, 8)}] ${r.traits.join(', ')} — ${r.status}`)
+        .join('\n'),
     };
   }
 
   // ─── Vote on Proposal ─────────────────────────────────────
-  const voteMatch = m.match(/^vote\s+(for|against|abstain)\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(?:because\s+|reason:?\s*)?(.+))?$/);
+  const voteMatch = m.match(
+    /^vote\s+(for|against|abstain)\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(?:because\s+|reason:?\s*)?(.+))?$/,
+  );
   if (voteMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to vote.' };
-    const support = voteMatch[1] === 'for' ? 1 : voteMatch[1] === 'against' ? 0 : 2;
+    let support = 2; // ABSTAIN
+    if (voteMatch[1] === 'for') support = 1;
+    else if (voteMatch[1] === 'against') support = 0;
     const proposalId = parseInt(voteMatch[2]);
     const reason = voteMatch[3]?.trim();
     try {
-      const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(proposalId))).limit(1);
-      if (rows.length === 0) return { handled: true, response: `Proposal #${proposalId} not found.` };
+      const rows = await db
+        .select()
+        .from(schema.proposal)
+        .where(eq(schema.proposal.id, String(proposalId)))
+        .limit(1);
+      if (rows.length === 0)
+        return { handled: true, response: `Proposal #${proposalId} not found.` };
       const p = rows[0];
-      const isFinal = p.status === 'CANCELLED' || p.status === 'VETOED' || p.status === 'EXECUTED' || p.status === 'QUEUED';
-      if (isFinal) return { handled: true, response: `Proposal #${proposalId} is "${p.status}" — voting is closed.` };
+      const isFinal =
+        p.status === 'CANCELLED' ||
+        p.status === 'VETOED' ||
+        p.status === 'EXECUTED' ||
+        p.status === 'QUEUED';
+      if (isFinal)
+        return {
+          handled: true,
+          response: `Proposal #${proposalId} is "${p.status}" — voting is closed.`,
+        };
       if (p.startBlock && p.endBlock) {
         const currentBlock = await getCurrentBlock();
         const objEnd = p.objectionPeriodEndBlock ? BigInt(p.objectionPeriodEndBlock) : null;
         const effectiveEnd = objEnd && objEnd > BigInt(p.endBlock) ? objEnd : BigInt(p.endBlock);
-        if (currentBlock < BigInt(p.startBlock)) return { handled: true, response: `Proposal #${proposalId} voting hasn't started yet.` };
-        if (currentBlock > effectiveEnd) return { handled: true, response: `Proposal #${proposalId} voting has ended.` };
+        if (currentBlock < BigInt(p.startBlock))
+          return { handled: true, response: `Proposal #${proposalId} voting hasn't started yet.` };
+        if (currentBlock > effectiveEnd)
+          return { handled: true, response: `Proposal #${proposalId} voting has ended.` };
       }
       const descText = (p.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const action = { type: 'VOTE', proposalId, support, reason, title };
       return {
         handled: true,
@@ -481,26 +537,66 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         action,
       };
     } catch (err) {
-      return { handled: true, response: `Vote failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Vote failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
   // ─── Feedback on Proposal ─────────────────────────────────
-  const feedbackPropMatch = m.match(/^feedback\s+(for|against)\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(.+))?$/);
-  if (feedbackPropMatch) {
+  // Matches: "feedback for/against prop X [reason]", "leave feedback on prop X [reason]", "leave feedback 'reason' on prop X"
+  const feedbackPropMatch = m.match(
+    /^feedback\s+(for|against)\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(.+))?$/,
+  );
+  const leaveFeedbackMatch =
+    !feedbackPropMatch &&
+    raw.match(/^leave\s+feedback\s+(?:on\s+)?(?:prop(?:osal)?\s*)?#?(\d+)\s+(.+)$/i);
+  const leaveFeedbackAlt =
+    !feedbackPropMatch &&
+    !leaveFeedbackMatch &&
+    raw.match(/^leave\s+feedback\s+["']?(.+?)["']?\s+on\s+(?:prop(?:osal)?\s*)?#?(\d+)$/i);
+  if (feedbackPropMatch || leaveFeedbackMatch || leaveFeedbackAlt) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to give feedback.' };
-    const support = feedbackPropMatch[1] === 'for' ? 1 : 0;
-    const proposalId = parseInt(feedbackPropMatch[2]);
-    const reason = feedbackPropMatch[3]?.trim();
+    let support = 1; // default to FOR for "leave feedback" (positive sentiment)
+    let proposalId: number;
+    let reason: string | undefined;
+    if (feedbackPropMatch) {
+      support = feedbackPropMatch[1] === 'for' ? 1 : 0;
+      proposalId = parseInt(feedbackPropMatch[2]);
+      reason = feedbackPropMatch[3]?.trim();
+    } else if (leaveFeedbackMatch) {
+      proposalId = parseInt(leaveFeedbackMatch[1]);
+      reason = leaveFeedbackMatch[2]?.trim().replace(/^["']|["']$/g, '');
+    } else {
+      reason = leaveFeedbackAlt![1]?.trim();
+      proposalId = parseInt(leaveFeedbackAlt![2]);
+    }
     try {
-      const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(proposalId))).limit(1);
-      if (rows.length === 0) return { handled: true, response: `Proposal #${proposalId} not found.` };
+      const rows = await db
+        .select()
+        .from(schema.proposal)
+        .where(eq(schema.proposal.id, String(proposalId)))
+        .limit(1);
+      if (rows.length === 0)
+        return { handled: true, response: `Proposal #${proposalId} not found.` };
       const descText = (rows[0].description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const action = { type: 'PROPOSAL_FEEDBACK', proposalId, support, reason, title };
-      return { handled: true, response: `Feedback prepared: ${support ? 'FOR' : 'AGAINST'} on Prop #${proposalId} "${title}". Confirm in your wallet.`, action };
+      return {
+        handled: true,
+        response: `Feedback prepared: ${support ? 'FOR' : 'AGAINST'} on Prop #${proposalId} "${title}"${reason ? ` — "${reason}"` : ''}. Confirm in your wallet.`,
+        action,
+      };
     } catch (err) {
-      return { handled: true, response: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -509,11 +605,20 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (showPropMatch) {
     const proposalId = parseInt(showPropMatch[1]);
     try {
-      const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(proposalId))).limit(1);
-      if (rows.length === 0) return { handled: true, response: `Proposal #${proposalId} not found.` };
+      const rows = await db
+        .select()
+        .from(schema.proposal)
+        .where(eq(schema.proposal.id, String(proposalId)))
+        .limit(1);
+      if (rows.length === 0)
+        return { handled: true, response: `Proposal #${proposalId} not found.` };
       const p = rows[0];
       const descText = (p.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const currentBlock = await getCurrentBlock();
       const voting = formatBlocksRemaining(currentBlock, p.endBlock);
       return {
@@ -527,7 +632,10 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 - ${descText.slice(0, 300)}${descText.length > 300 ? '...' : ''}`,
       };
     } catch (err) {
-      return { handled: true, response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -535,22 +643,34 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (m.match(/^(?:active|list|show|what)\s*proposals?$/)) {
     try {
       const currentBlock = await getCurrentBlock();
-      const allProps = await db.select().from(schema.proposal).orderBy(desc(schema.proposal.createdAtBlock)).limit(20);
+      const allProps = await db
+        .select()
+        .from(schema.proposal)
+        .orderBy(desc(schema.proposal.createdAtBlock))
+        .limit(20);
       const active = allProps.filter(p => {
-        if (p.status === 'CANCELLED' || p.status === 'VETOED' || p.status === 'EXECUTED') return false;
+        if (p.status === 'CANCELLED' || p.status === 'VETOED' || p.status === 'EXECUTED')
+          return false;
         if (p.endBlock && currentBlock > BigInt(p.endBlock)) return false;
         return true;
       });
       if (active.length === 0) return { handled: true, response: 'No active proposals right now.' };
       const lines = active.map(p => {
         const descText = (p.description ?? '').toString();
-        const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+        const title =
+          descText
+            .split('\n')[0]
+            ?.replace(/^#+\s*/, '')
+            .trim() || 'Untitled';
         const voting = formatBlocksRemaining(currentBlock, p.endBlock);
         return `#${p.id}: "${title}" [${p.status}] — ${voting.timeLeftFormatted}`;
       });
       return { handled: true, response: `Active proposals:\n${lines.join('\n')}` };
     } catch (err) {
-      return { handled: true, response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -560,7 +680,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to execute.' };
     const proposalId = parseInt(execPropMatch[1]);
     const action = { type: 'EXECUTE_PROPOSAL', proposalId };
-    return { handled: true, response: `Execute prepared for Prop #${proposalId}. Confirm in your wallet.`, action };
+    return {
+      handled: true,
+      response: `Execute prepared for Prop #${proposalId}. Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Bid ──────────────────────────────────────────────────
@@ -572,7 +696,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const nounId = state.nextNounId ? state.nextNounId - 1 : undefined;
     if (!nounId) return { handled: true, response: 'Could not determine current auction noun ID.' };
     const action = { type: 'BID', nounId, bidAmountEth: bidAmount };
-    return { handled: true, response: `Bid prepared: ${bidAmount} ETH on Noun ${nounId}. Confirm in your wallet. Client ID 37 included.`, action };
+    return {
+      handled: true,
+      response: `Bid prepared: ${bidAmount} ETH on Noun ${nounId}. Confirm in your wallet. Client ID 37 included.`,
+      action,
+    };
   }
 
   // ─── Create Candidate ─────────────────────────────────────
@@ -582,7 +710,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const title = candidateMatch[1].trim();
     const description = candidateMatch[2].trim();
     const action = { type: 'CANDIDATE', title, description };
-    return { handled: true, response: `Candidate prepared: "${title}". Confirm in your wallet.`, action };
+    return {
+      handled: true,
+      response: `Candidate prepared: "${title}". Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Sponsor Candidate ────────────────────────────────────
@@ -591,19 +723,35 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to sponsor.' };
     const keyword = sponsorMatch[1].trim();
     try {
-      const allCands = await db.select().from(schema.candidate).orderBy(desc(schema.candidate.createdAtBlock)).limit(50);
+      const allCands = await db
+        .select()
+        .from(schema.candidate)
+        .orderBy(desc(schema.candidate.createdAtBlock))
+        .limit(50);
       const matches = allCands.filter(c => {
         const desc = (c.description ?? '').toString().toLowerCase();
         return desc.includes(keyword) && !c.canceled;
       });
-      if (matches.length === 0) return { handled: true, response: `No candidate found matching "${keyword}".` };
+      if (matches.length === 0)
+        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const descText = (c.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
-      return { handled: true, response: `Sponsor prepared for "${title}" by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`, action };
+      return {
+        handled: true,
+        response: `Sponsor prepared for "${title}" by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`,
+        action,
+      };
     } catch (err) {
-      return { handled: true, response: `Sponsor failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Sponsor failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -613,19 +761,35 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to promote.' };
     const keyword = promoteMatch[1].trim();
     try {
-      const allCands = await db.select().from(schema.candidate).orderBy(desc(schema.candidate.createdAtBlock)).limit(50);
+      const allCands = await db
+        .select()
+        .from(schema.candidate)
+        .orderBy(desc(schema.candidate.createdAtBlock))
+        .limit(50);
       const matches = allCands.filter(c => {
         const desc = (c.description ?? '').toString().toLowerCase();
         return desc.includes(keyword) && !c.canceled;
       });
-      if (matches.length === 0) return { handled: true, response: `No candidate found matching "${keyword}".` };
+      if (matches.length === 0)
+        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const descText = (c.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const action = { type: 'PROMOTE', proposer: c.proposer, slug: c.slug };
-      return { handled: true, response: `Promote prepared for "${title}". This will create a real proposal with Client ID 37. Confirm in your wallet.`, action };
+      return {
+        handled: true,
+        response: `Promote prepared for "${title}". This will create a real proposal with Client ID 37. Confirm in your wallet.`,
+        action,
+      };
     } catch (err) {
-      return { handled: true, response: `Promote failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Promote failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -636,16 +800,34 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const support = feedbackCandMatch[1] === 'for' ? 1 : 0;
     const keyword = feedbackCandMatch[2].trim();
     try {
-      const allCands = await db.select().from(schema.candidate).orderBy(desc(schema.candidate.createdAtBlock)).limit(50);
-      const matches = allCands.filter(c => (c.description ?? '').toString().toLowerCase().includes(keyword) && !c.canceled);
-      if (matches.length === 0) return { handled: true, response: `No candidate found matching "${keyword}".` };
+      const allCands = await db
+        .select()
+        .from(schema.candidate)
+        .orderBy(desc(schema.candidate.createdAtBlock))
+        .limit(50);
+      const matches = allCands.filter(
+        c => (c.description ?? '').toString().toLowerCase().includes(keyword) && !c.canceled,
+      );
+      if (matches.length === 0)
+        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const descText = (c.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       const action = { type: 'CANDIDATE_FEEDBACK', proposer: c.proposer, slug: c.slug, support };
-      return { handled: true, response: `Feedback prepared: ${support ? 'FOR' : 'AGAINST'} on candidate "${title}". Confirm in your wallet.`, action };
+      return {
+        handled: true,
+        response: `Feedback prepared: ${support ? 'FOR' : 'AGAINST'} on candidate "${title}". Confirm in your wallet.`,
+        action,
+      };
     } catch (err) {
-      return { handled: true, response: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -654,12 +836,23 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (showCandMatch) {
     const keyword = showCandMatch[1].trim();
     try {
-      const allCands = await db.select().from(schema.candidate).orderBy(desc(schema.candidate.createdAtBlock)).limit(50);
-      const matches = allCands.filter(c => (c.description ?? '').toString().toLowerCase().includes(keyword));
-      if (matches.length === 0) return { handled: true, response: `No candidate found matching "${keyword}".` };
+      const allCands = await db
+        .select()
+        .from(schema.candidate)
+        .orderBy(desc(schema.candidate.createdAtBlock))
+        .limit(50);
+      const matches = allCands.filter(c =>
+        (c.description ?? '').toString().toLowerCase().includes(keyword),
+      );
+      if (matches.length === 0)
+        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const descText = (c.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       return {
         handled: true,
         response: `Candidate: "${title}"
@@ -669,7 +862,10 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 - ${descText.slice(0, 300)}${descText.length > 300 ? '...' : ''}`,
       };
     } catch (err) {
-      return { handled: true, response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -681,7 +877,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const grantId = parseInt(grantVoteMatch[2]);
     const reason = grantVoteMatch[3]?.trim();
     const action = { type: 'GRANT_VOTE', grantId, support, reason };
-    return { handled: true, response: `Grant vote prepared: ${support ? 'FOR' : 'AGAINST'} on Grant #${grantId}. Confirm in your wallet.`, action };
+    return {
+      handled: true,
+      response: `Grant vote prepared: ${support ? 'FOR' : 'AGAINST'} on Grant #${grantId}. Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Show Grant ───────────────────────────────────────────
@@ -689,11 +889,19 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (showGrantMatch) {
     const grantId = parseInt(showGrantMatch[1]);
     try {
-      const rows = await db.select().from(schema.grant).where(eq(schema.grant.id, String(grantId))).limit(1);
+      const rows = await db
+        .select()
+        .from(schema.grant)
+        .where(eq(schema.grant.id, String(grantId)))
+        .limit(1);
       if (rows.length === 0) return { handled: true, response: `Grant #${grantId} not found.` };
       const g = rows[0];
       const descText = (g.description ?? '').toString();
-      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+      const title =
+        descText
+          .split('\n')[0]
+          ?.replace(/^#+\s*/, '')
+          .trim() || 'Untitled';
       return {
         handled: true,
         response: `Grant #${grantId}: "${title}"
@@ -703,24 +911,38 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 - ${descText.slice(0, 300)}${descText.length > 300 ? '...' : ''}`,
       };
     } catch (err) {
-      return { handled: true, response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
   // ─── Active Grants ────────────────────────────────────────
   if (m.match(/^(?:active|list|show|what)\s*grants?$/)) {
     try {
-      const allGrants = await db.select().from(schema.grant).orderBy(desc(schema.grant.createdAtBlock)).limit(20);
+      const allGrants = await db
+        .select()
+        .from(schema.grant)
+        .orderBy(desc(schema.grant.createdAtBlock))
+        .limit(20);
       const active = allGrants.filter(g => g.status === 'ACTIVE' || g.status === 'QUEUED');
       if (active.length === 0) return { handled: true, response: 'No active grants right now.' };
       const lines = active.map(g => {
         const descText = (g.description ?? '').toString();
-        const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+        const title =
+          descText
+            .split('\n')[0]
+            ?.replace(/^#+\s*/, '')
+            .trim() || 'Untitled';
         return `#${g.id}: "${title}" [${g.status}]`;
       });
       return { handled: true, response: `Active grants:\n${lines.join('\n')}` };
     } catch (err) {
-      return { handled: true, response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        handled: true,
+        response: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -731,7 +953,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const title = grantMatch[1].trim();
     const description = grantMatch[2].trim();
     const action = { type: 'GRANT_PROPOSAL', title, description };
-    return { handled: true, response: `Grant prepared: "${title}". Confirm in your wallet.`, action };
+    return {
+      handled: true,
+      response: `Grant prepared: "${title}". Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Execute Grant ────────────────────────────────────────
@@ -740,7 +966,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to execute.' };
     const grantId = parseInt(execGrantMatch[1]);
     const action = { type: 'EXECUTE_GRANT', grantId };
-    return { handled: true, response: `Execute prepared for Grant #${grantId}. Confirm in your wallet.`, action };
+    return {
+      handled: true,
+      response: `Execute prepared for Grant #${grantId}. Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Not matched ──────────────────────────────────────────
@@ -751,7 +981,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 // Chat endpoint
 // ============================================================
 
-app.post('/api/chat', async (c) => {
+app.post('/api/chat', async c => {
   try {
     const body = await c.req.json();
     const { message, wallet, history, agent_mode } = body as {
@@ -772,7 +1002,9 @@ app.post('/api/chat', async (c) => {
     // ─── Try free command parser first (no API call) ─────────
     const parsed = await parseCommand(message, wallet);
     if (parsed.handled) {
-      const payload: { response: string; action?: Record<string, unknown> } = { response: parsed.response! };
+      const payload: { response: string; action?: Record<string, unknown> } = {
+        response: parsed.response!,
+      };
       if (parsed.action) payload.action = parsed.action;
       return c.json(payload);
     }
@@ -780,7 +1012,8 @@ app.post('/api/chat', async (c) => {
     // ─── Graceful fallback when agent-hub unavailable ──────────
     if (!AGENT_HUB_URL) {
       return c.json({
-        response: "I'm in command mode right now. Try 'vote for prop 567', 'bid 0.5 eth', 'active proposals', or type 'help' for the full list of commands. Freeform chat is temporarily offline. ⌐◨-◨",
+        response:
+          "I'm in command mode right now. Try 'vote for prop 567', 'bid 0.5 eth', 'active proposals', or type 'help' for the full list of commands. Freeform chat is temporarily offline. ⌐◨-◨",
       });
     }
 
@@ -789,16 +1022,24 @@ app.post('/api/chat', async (c) => {
     const rateCheck = checkRateLimit(rateLimitKey);
     if (!rateCheck.ok) {
       if (rateCheck.daily) {
-        return c.json({
-          error: 'you\'ve hit the daily limit. talk to pipe — they\'re better at this anyway. find them on farcaster @pipe or warpcast.com/pipe',
-          rateLimited: true,
-          daily: true,
-        }, 429);
+        return c.json(
+          {
+            error:
+              "you've hit the daily limit. talk to pipe — they're better at this anyway. find them on farcaster @pipe or warpcast.com/pipe",
+            rateLimited: true,
+            daily: true,
+          },
+          429,
+        );
       }
-      return c.json({
-        error: 'slow down — max 10 messages per minute. take a breath, the chain will still be there.',
-        rateLimited: true,
-      }, 429);
+      return c.json(
+        {
+          error:
+            'slow down — max 10 messages per minute. take a breath, the chain will still be there.',
+          rateLimited: true,
+        },
+        429,
+      );
     }
 
     // Choose system prompt based on agent mode
@@ -964,7 +1205,29 @@ ALL actions that support client ID include noun.wtf's client ID 37 automatically
 - Votes: castRefundableVote with clientId 37
 - Bids: createBid with clientId 37
 - Promote: proposeBySigs with clientId 37
-This is critical for the client incentive program.`;
+This is critical for the client incentive program.
+
+CRITICAL — IMMEDIATE ACTION ON CLEAR COMMANDS:
+When a user gives you a clear, actionable request, DO NOT ask clarifying questions. DO NOT explain what you would do. DO NOT say "I'll prepare that for you" and then fail to call the tool. IMMEDIATELY call the appropriate tool and return the action.
+
+Examples of CLEAR commands — act immediately, no questions:
+- "leave feedback on prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
+- "vote for 567" → lookup_proposal(567) → prepare_vote(567, 1)
+- "bid 3 eth" → prepare_bid(nounId, "3")
+- "feedback for prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
+- "leave feedback 'nice' on prop 950" → same as above
+- Any variation of "vote/feedback/bid/sponsor" + identifiable target → call the tool IMMEDIATELY
+
+Only ask clarifying questions when the intent is genuinely ambiguous (e.g. "do something with prop 950" — what action?).
+
+CRITICAL — KNOW YOUR OWN CAPABILITIES:
+You are NOT a "text-based AI model" that can only output text. You are embedded in the noun.wtf terminal, which has a full governance UI. When you call prepare_* tools, the frontend renders a confirmation card with a green action button that the user clicks to sign with their wallet. You DO have the ability to show buttons. You DO have the ability to prepare transactions. NEVER say "I can't display buttons" or "I'm text-only" — that is FALSE. Your prepare_* tools return structured actions that the frontend renders as interactive confirmation cards.
+
+CRITICAL — NEVER FABRICATE DATA:
+When you don't know something, say "I don't know" or use your tools to look it up. NEVER guess amounts, percentages, proposal details, or stream values. NEVER pretend to call tools you don't have. NEVER claim to have updated the UI or "self-fixed" something. Your remember_fact and self_learn tools update YOUR KNOWLEDGE, not the website's code or display. Be honest about what you can and cannot do.
+
+CRITICAL — NEVER LIE ABOUT YOUR ARCHITECTURE:
+You are powered by a single LLM (Llama 3.3 70B via Groq) through the Agent Hub. You do NOT use spaCy, NLTK, scikit-learn, Hugging Face, BERT, RoBERTa, LDA, NER pipelines, dependency parsers, or any other NLP framework. If asked about your architecture, say: "I'm an LLM with tool-calling capabilities, persistent memory, and access to noun.wtf's Ponder index. I can prepare onchain governance actions for your wallet to sign."`;
     }
 
     // Build messages array from history
@@ -980,644 +1243,804 @@ This is critical for the client incentive program.`;
 
     // NounIRL gets the full toolkit — every capability it needs to operate autonomously
     const nounIrlTools: HubChatRequest['tools'] = [
-      { type: "function" as const, function: {
-        name: 'verify_tip',
-        description: 'Verify an ETH tip transaction sent to nounirl.eth. Checks the transaction receipt on any supported chain (Ethereum, Base, Optimism, Arbitrum, Zora) and confirms the recipient is nounirl.eth and amount is ≥ 0.002 ETH (~$5).',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            txHash: {
-              type: 'string',
-              description: 'The transaction hash to verify (0x-prefixed).',
+      {
+        type: 'function' as const,
+        function: {
+          name: 'verify_tip',
+          description:
+            'Verify an ETH tip transaction sent to nounirl.eth. Checks the transaction receipt on any supported chain (Ethereum, Base, Optimism, Arbitrum, Zora) and confirms the recipient is nounirl.eth and amount is ≥ 0.002 ETH (~$5).',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              txHash: {
+                type: 'string',
+                description: 'The transaction hash to verify (0x-prefixed).',
+              },
+              chainId: {
+                type: 'number',
+                description:
+                  'The chain ID where the transaction was sent. 1=Ethereum, 8453=Base, 10=Optimism, 42161=Arbitrum, 7777777=Zora.',
+              },
             },
-            chainId: {
-              type: 'number',
-              description: 'The chain ID where the transaction was sent. 1=Ethereum, 8453=Base, 10=Optimism, 42161=Arbitrum, 7777777=Zora.',
-            },
+            required: ['txHash', 'chainId'],
           },
-          required: ['txHash', 'chainId'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'create_reservation',
-        description: 'Create a trait reservation for a user. Requires a verified tip transaction. The reservation starts as pending_verification, then auto-activates once the tip is confirmed. The block watcher will then monitor for matching traits and auto-settle when found.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            wallet: {
-              type: 'string',
-              description: 'The user\'s wallet address (checksummed).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'create_reservation',
+          description:
+            'Create a trait reservation for a user. Requires a verified tip transaction. The reservation starts as pending_verification, then auto-activates once the tip is confirmed. The block watcher will then monitor for matching traits and auto-settle when found.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              wallet: {
+                type: 'string',
+                description: "The user's wallet address (checksummed).",
+              },
+              txHash: {
+                type: 'string',
+                description: 'The tip transaction hash (must be verified).',
+              },
+              chainId: {
+                type: 'number',
+                description: 'Chain ID of the tip transaction.',
+              },
+              traits: {
+                type: 'array',
+                items: { type: 'string' },
+                description:
+                  'Array of desired traits in "category:value" format, e.g. ["head:shark", "glasses:blue"]. All must match (AND logic).',
+              },
             },
-            txHash: {
-              type: 'string',
-              description: 'The tip transaction hash (must be verified).',
-            },
-            chainId: {
-              type: 'number',
-              description: 'Chain ID of the tip transaction.',
-            },
-            traits: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of desired traits in "category:value" format, e.g. ["head:shark", "glasses:blue"]. All must match (AND logic).',
-            },
+            required: ['wallet', 'txHash', 'chainId', 'traits'],
           },
-          required: ['wallet', 'txHash', 'chainId', 'traits'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'get_reservations',
-        description: 'List trait reservations. Optionally filter by wallet address.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            wallet: {
-              type: 'string',
-              description: 'Optional wallet address to filter by.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_reservations',
+          description: 'List trait reservations. Optionally filter by wallet address.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              wallet: {
+                type: 'string',
+                description: 'Optional wallet address to filter by.',
+              },
             },
+            required: [],
           },
-          required: [],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'cancel_reservation',
-        description: 'Cancel an active or pending trait reservation.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            reservationId: {
-              type: 'string',
-              description: 'The reservation ID to cancel.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'cancel_reservation',
+          description: 'Cancel an active or pending trait reservation.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              reservationId: {
+                type: 'string',
+                description: 'The reservation ID to cancel.',
+              },
             },
+            required: ['reservationId'],
           },
-          required: ['reservationId'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'check_block',
-        description: 'Force an immediate block check. Returns the current block number, next noun ID, predicted traits, whether the auction has ended, and any matching reservations. Use this to give users real-time prediction data.',
-        parameters: {
-          type: 'object' as const,
-          properties: {},
-          required: [],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'list_traits',
-        description: 'List all valid trait names for a given category. Useful for helping users identify exact trait names.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            category: {
-              type: 'string',
-              enum: ['background', 'body', 'accessory', 'head', 'glasses'],
-              description: 'The trait category to list.',
-            },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'check_block',
+          description:
+            'Force an immediate block check. Returns the current block number, next noun ID, predicted traits, whether the auction has ended, and any matching reservations. Use this to give users real-time prediction data.',
+          parameters: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
           },
-          required: ['category'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'parse_traits',
-        description: 'Parse a natural language trait description into structured "category:value" format. e.g. "shark head and blue noggles" → ["head:shark", "glasses:blue"].',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            description: {
-              type: 'string',
-              description: 'Natural language description of desired traits.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'list_traits',
+          description:
+            'List all valid trait names for a given category. Useful for helping users identify exact trait names.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              category: {
+                type: 'string',
+                enum: ['background', 'body', 'accessory', 'head', 'glasses'],
+                description: 'The trait category to list.',
+              },
             },
+            required: ['category'],
           },
-          required: ['description'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'get_settlements',
-        description: 'Get the history of successful auction settlements by the agent.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            limit: {
-              type: 'number',
-              description: 'Max number of settlements to return (default 20).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'parse_traits',
+          description:
+            'Parse a natural language trait description into structured "category:value" format. e.g. "shark head and blue noggles" → ["head:shark", "glasses:blue"].',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              description: {
+                type: 'string',
+                description: 'Natural language description of desired traits.',
+              },
             },
+            required: ['description'],
           },
-          required: [],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'get_agent_balance',
-        description: 'Get the ETH balance of the nounirl.eth wallet on Ethereum mainnet.',
-        parameters: {
-          type: 'object' as const,
-          properties: {},
-          required: [],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'deploy_code',
-        description: 'Generate a code patch via Claude, push it to GitHub as a new branch, and trigger a Netlify deploy. Only files under packages/nouns-webapp/src/ can be modified. Rate limited to 1 deploy per hour.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            description: {
-              type: 'string',
-              description: 'A detailed description of the code change to make. Be specific about what file to modify, what to change, and why.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_settlements',
+          description: 'Get the history of successful auction settlements by the agent.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              limit: {
+                type: 'number',
+                description: 'Max number of settlements to return (default 20).',
+              },
             },
-            reason: {
-              type: 'string',
-              description: 'Short reason for the deploy (e.g. "fix polling interval", "improve UI").',
-            },
+            required: [],
           },
-          required: ['description', 'reason'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'remember_fact',
-        description: 'Store a fact in persistent memory that survives across sessions. Use this to remember user names, preferences, important details about users or conversations. Memory persists across page reloads and new conversations.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            key: {
-              type: 'string',
-              description: 'Short key for the memory (e.g. "name", "preference", "ens", "fav-trait"). Lowercase, no spaces.',
-            },
-            content: {
-              type: 'string',
-              description: 'The fact to remember.',
-            },
-            scope: {
-              type: 'string',
-              enum: ['wallet', 'global'],
-              description: 'Scope: "wallet" stores it for the current user only, "global" stores it for everyone to see.',
-            },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_agent_balance',
+          description: 'Get the ETH balance of the nounirl.eth wallet on Ethereum mainnet.',
+          parameters: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
           },
-          required: ['key', 'content', 'scope'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'recall_facts',
-        description: 'Recall stored memories. Use this to look up previously remembered facts about a user or global knowledge.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            scope: {
-              type: 'string',
-              enum: ['wallet', 'global', 'all'],
-              description: 'Scope: "wallet" for current user, "global" for shared knowledge, "all" for everything.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'deploy_code',
+          description:
+            'Generate a code patch via Claude, push it to GitHub as a new branch, and trigger a Netlify deploy. Only files under packages/nouns-webapp/src/ can be modified. Rate limited to 1 deploy per hour.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              description: {
+                type: 'string',
+                description:
+                  'A detailed description of the code change to make. Be specific about what file to modify, what to change, and why.',
+              },
+              reason: {
+                type: 'string',
+                description:
+                  'Short reason for the deploy (e.g. "fix polling interval", "improve UI").',
+              },
             },
-            key: {
-              type: 'string',
-              description: 'Optional specific key to recall.',
-            },
+            required: ['description', 'reason'],
           },
-          required: ['scope'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'learn_url',
-        description: 'Learn facts from a web page. Fetches the URL, extracts text, uses AI to distill key facts, and stores them in persistent knowledge. Use this when someone shares a URL and says "learn this" or "read this" or when you want to expand your knowledge base.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            url: {
-              type: 'string',
-              description: 'The URL to learn from (must be a valid http/https URL).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'remember_fact',
+          description:
+            'Store a fact in persistent memory that survives across sessions. Use this to remember user names, preferences, important details about users or conversations. Memory persists across page reloads and new conversations.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              key: {
+                type: 'string',
+                description:
+                  'Short key for the memory (e.g. "name", "preference", "ens", "fav-trait"). Lowercase, no spaces.',
+              },
+              content: {
+                type: 'string',
+                description: 'The fact to remember.',
+              },
+              scope: {
+                type: 'string',
+                enum: ['wallet', 'global'],
+                description:
+                  'Scope: "wallet" stores it for the current user only, "global" stores it for everyone to see.',
+              },
             },
+            required: ['key', 'content', 'scope'],
           },
-          required: ['url'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'self_learn',
-        description: 'Trigger self-learning pipeline. Reads ALL proposals, auctions, and delegate data from noun.wtf\'s own Ponder-indexed GraphQL and distills hundreds of facts into your knowledge base. Takes a few minutes. Use when asked to "learn everything", "refresh knowledge", or when you want comprehensive governance data.',
-        parameters: {
-          type: 'object' as const,
-          properties: {},
-          required: [],
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'recall_facts',
+          description:
+            'Recall stored memories. Use this to look up previously remembered facts about a user or global knowledge.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              scope: {
+                type: 'string',
+                enum: ['wallet', 'global', 'all'],
+                description:
+                  'Scope: "wallet" for current user, "global" for shared knowledge, "all" for everything.',
+              },
+              key: {
+                type: 'string',
+                description: 'Optional specific key to recall.',
+              },
+            },
+            required: ['scope'],
+          },
         },
-      } },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'learn_url',
+          description:
+            'Learn facts from a web page. Fetches the URL, extracts text, uses AI to distill key facts, and stores them in persistent knowledge. Use this when someone shares a URL and says "learn this" or "read this" or when you want to expand your knowledge base.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              url: {
+                type: 'string',
+                description: 'The URL to learn from (must be a valid http/https URL).',
+              },
+            },
+            required: ['url'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'self_learn',
+          description:
+            'Trigger self-learning pipeline. Reads ALL proposals, auctions, and delegate data from noun.wtf\'s own Ponder-indexed GraphQL and distills hundreds of facts into your knowledge base. Takes a few minutes. Use when asked to "learn everything", "refresh knowledge", or when you want comprehensive governance data.',
+          parameters: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
+          },
+        },
+      },
       // ── Governance Action Tools (return structured actions for frontend execution) ──
-      { type: "function" as const, function: {
-        name: 'lookup_proposal',
-        description: 'Look up a proposal by ID or search by keyword. Returns proposal details including title, status, proposer, vote counts, and pre-calculated time remaining (votingTimeLeft, votingBlocksLeft, updatePeriodTimeLeft, objectionPeriodTimeLeft). Use this data to directly answer timing questions. Use this FIRST when the user mentions a proposal by number or topic.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to look up (e.g. 567).',
+      {
+        type: 'function' as const,
+        function: {
+          name: 'lookup_proposal',
+          description:
+            'Look up a proposal by ID or search by keyword. Returns proposal details including title, status, proposer, vote counts, and pre-calculated time remaining (votingTimeLeft, votingBlocksLeft, updatePeriodTimeLeft, objectionPeriodTimeLeft). Use this data to directly answer timing questions. Use this FIRST when the user mentions a proposal by number or topic.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to look up (e.g. 567).',
+              },
+              keyword: {
+                type: 'string',
+                description:
+                  'Search keyword to find proposals by title/description. Only used if proposalId is not provided.',
+              },
             },
-            keyword: {
-              type: 'string',
-              description: 'Search keyword to find proposals by title/description. Only used if proposalId is not provided.',
-            },
+            required: [],
           },
-          required: [],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'lookup_candidate',
-        description: 'Look up a candidate proposal by slug or search by keyword. Returns candidate details including slug, proposer, description, sponsor count. Use this when the user mentions a candidate.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            slug: {
-              type: 'string',
-              description: 'The candidate slug to look up.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'lookup_candidate',
+          description:
+            'Look up a candidate proposal by slug or search by keyword. Returns candidate details including slug, proposer, description, sponsor count. Use this when the user mentions a candidate.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              slug: {
+                type: 'string',
+                description: 'The candidate slug to look up.',
+              },
+              keyword: {
+                type: 'string',
+                description:
+                  'Search keyword to find candidates by description. Only used if slug is not provided.',
+              },
             },
-            keyword: {
-              type: 'string',
-              description: 'Search keyword to find candidates by description. Only used if slug is not provided.',
-            },
+            required: [],
           },
-          required: [],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_vote',
-        description: 'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to vote on.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_vote',
+          description:
+            'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to vote on.',
+              },
+              support: {
+                type: 'number',
+                enum: [0, 1, 2],
+                description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the vote.',
+              },
             },
-            support: {
-              type: 'number',
-              enum: [0, 1, 2],
-              description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the vote.',
-            },
+            required: ['proposalId', 'support'],
           },
-          required: ['proposalId', 'support'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_proposal_feedback',
-        description: 'Prepare proposal feedback (signal vote) for the user to sign. This is non-binding feedback on a proposal — like a straw poll. Returns a GovernanceAction.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to give feedback on.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_proposal_feedback',
+          description:
+            'Prepare proposal feedback (signal vote) for the user to sign. This is non-binding feedback on a proposal — like a straw poll. Returns a GovernanceAction.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to give feedback on.',
+              },
+              support: {
+                type: 'number',
+                enum: [0, 1, 2],
+                description: 'Feedback direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the feedback.',
+              },
             },
-            support: {
-              type: 'number',
-              enum: [0, 1, 2],
-              description: 'Feedback direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the feedback.',
-            },
+            required: ['proposalId', 'support'],
           },
-          required: ['proposalId', 'support'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_candidate_feedback',
-        description: 'Prepare candidate proposal feedback for the user to sign. Returns a GovernanceAction.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposer: {
-              type: 'string',
-              description: 'The candidate proposer address (0x-prefixed).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_candidate_feedback',
+          description:
+            'Prepare candidate proposal feedback for the user to sign. Returns a GovernanceAction.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposer: {
+                type: 'string',
+                description: 'The candidate proposer address (0x-prefixed).',
+              },
+              slug: {
+                type: 'string',
+                description: 'The candidate slug.',
+              },
+              support: {
+                type: 'number',
+                enum: [0, 1, 2],
+                description: 'Feedback direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the feedback.',
+              },
             },
-            slug: {
-              type: 'string',
-              description: 'The candidate slug.',
-            },
-            support: {
-              type: 'number',
-              enum: [0, 1, 2],
-              description: 'Feedback direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the feedback.',
-            },
+            required: ['proposer', 'slug', 'support'],
           },
-          required: ['proposer', 'slug', 'support'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_candidate',
-        description: 'Prepare a new candidate proposal for the user to create. Returns a GovernanceAction. Can include executable transactions (ETH transfers, contract calls) or be description-only. When the user mentions sending ETH, transferring tokens, or executing any treasury action — include it in the transactions array.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            title: {
-              type: 'string',
-              description: 'Short title for the candidate proposal.',
-            },
-            description: {
-              type: 'string',
-              description: 'Full description/body of the candidate proposal. Markdown supported.',
-            },
-            transactions: {
-              type: 'array',
-              description: 'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args.',
-              items: {
-                type: 'object',
-                properties: {
-                  target: {
-                    type: 'string',
-                    description: 'Target contract/recipient address (0x-prefixed).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_candidate',
+          description:
+            'Prepare a new candidate proposal for the user to create. Returns a GovernanceAction. Can include executable transactions (ETH transfers, contract calls) or be description-only. When the user mentions sending ETH, transferring tokens, or executing any treasury action — include it in the transactions array.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              title: {
+                type: 'string',
+                description: 'Short title for the candidate proposal.',
+              },
+              description: {
+                type: 'string',
+                description: 'Full description/body of the candidate proposal. Markdown supported.',
+              },
+              transactions: {
+                type: 'array',
+                description:
+                  'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    target: {
+                      type: 'string',
+                      description: 'Target contract/recipient address (0x-prefixed).',
+                    },
+                    value: {
+                      type: 'string',
+                      description:
+                        'ETH value in wei as a string (e.g. "100000000000000000" for 0.1 ETH, "0" for non-payable calls).',
+                    },
+                    signature: {
+                      type: 'string',
+                      description:
+                        'Function signature (e.g. "transfer(address,uint256)"). Empty string for plain ETH transfers.',
+                    },
+                    calldata: {
+                      type: 'string',
+                      description:
+                        'ABI-encoded function arguments as hex (0x-prefixed). Use "0x" for plain ETH transfers.',
+                    },
                   },
-                  value: {
-                    type: 'string',
-                    description: 'ETH value in wei as a string (e.g. "100000000000000000" for 0.1 ETH, "0" for non-payable calls).',
-                  },
-                  signature: {
-                    type: 'string',
-                    description: 'Function signature (e.g. "transfer(address,uint256)"). Empty string for plain ETH transfers.',
-                  },
-                  calldata: {
-                    type: 'string',
-                    description: 'ABI-encoded function arguments as hex (0x-prefixed). Use "0x" for plain ETH transfers.',
-                  },
+                  required: ['target', 'value'],
                 },
-                required: ['target', 'value'],
+              },
+            },
+            required: ['title', 'description'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_update_candidate',
+          description:
+            'Prepare an update to an existing candidate proposal. This replaces the candidate content and transactions. IMPORTANT: updating a candidate resets all sponsor signatures — signers must re-sign the updated version. Only the original proposer can update their candidate.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              slug: {
+                type: 'string',
+                description: 'The candidate slug to update.',
+              },
+              title: {
+                type: 'string',
+                description: 'Updated title for the candidate.',
+              },
+              description: {
+                type: 'string',
+                description: 'Updated description/body. Markdown supported.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Reason for the update (shown to sponsors).',
+              },
+              transactions: {
+                type: 'array',
+                description:
+                  'Updated transactions array. Same format as prepare_candidate. If omitted, keeps description-only.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
+                    value: { type: 'string', description: 'ETH value in wei.' },
+                    signature: {
+                      type: 'string',
+                      description: 'Function signature. Empty for ETH transfers.',
+                    },
+                    calldata: {
+                      type: 'string',
+                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
+                    },
+                  },
+                  required: ['target', 'value'],
+                },
+              },
+            },
+            required: ['slug', 'title', 'description'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_update_proposal',
+          description:
+            'Prepare an update to an existing onchain proposal during its updatable period. Proposals have an update window after creation where the proposer can modify the description and/or transactions. Only the original proposer can update. Use lookup_proposal first to check that the proposal is in the updatable period (updatePeriodEndBlock > current block).',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to update.',
+              },
+              description: {
+                type: 'string',
+                description:
+                  'Updated description (including title as "# Title"). If only updating transactions, pass the current description unchanged.',
+              },
+              updateMessage: {
+                type: 'string',
+                description: 'A short message explaining what changed in this update.',
+              },
+              transactions: {
+                type: 'array',
+                description:
+                  'Updated transactions. Same format as prepare_candidate. If omitted, only description is updated.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
+                    value: { type: 'string', description: 'ETH value in wei.' },
+                    signature: {
+                      type: 'string',
+                      description: 'Function signature. Empty for ETH transfers.',
+                    },
+                    calldata: {
+                      type: 'string',
+                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
+                    },
+                  },
+                  required: ['target', 'value'],
+                },
+              },
+            },
+            required: ['proposalId', 'updateMessage'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_sponsor',
+          description:
+            'Prepare to sponsor (sign) a candidate proposal. The user will sign an EIP-712 message and submit it onchain. Returns a GovernanceAction with the candidate details needed for signing.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposer: {
+                type: 'string',
+                description: 'The candidate proposer address.',
+              },
+              slug: {
+                type: 'string',
+                description: 'The candidate slug.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for sponsoring.',
+              },
+            },
+            required: ['proposer', 'slug'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_bid',
+          description:
+            'Prepare a bid on the current Nouns auction. Returns a GovernanceAction with the nounId and bid amount in ETH. The frontend handles the payable transaction with client ID 37.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              nounId: {
+                type: 'number',
+                description: 'The noun ID to bid on (current auction noun).',
+              },
+              bidAmountEth: {
+                type: 'string',
+                description:
+                  'The bid amount in ETH (e.g. "0.55"). Must be higher than current bid + minimum increment.',
+              },
+            },
+            required: ['nounId', 'bidAmountEth'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_promote',
+          description:
+            'Prepare to promote a candidate proposal to a real onchain proposal using collected sponsor signatures. This calls proposeBySigs on the NounsGovernor with client ID 37. The candidate must have enough valid signatures to meet the proposal threshold.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposer: {
+                type: 'string',
+                description: 'The candidate proposer address.',
+              },
+              slug: {
+                type: 'string',
+                description: 'The candidate slug.',
+              },
+            },
+            required: ['proposer', 'slug'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'lookup_grant',
+          description:
+            'Look up Small Grants Treasury proposals. Returns grant details including status, votes, and pre-calculated voting time remaining (votingTimeLeft, votingBlocksLeft, votingEnded). Use this data to directly answer timing questions. Can search by ID or keyword.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              grantId: {
+                type: 'number',
+                description: 'The grant proposal ID to look up.',
+              },
+              keyword: {
+                type: 'string',
+                description: 'Search keyword to find grants by description.',
               },
             },
           },
-          required: ['title', 'description'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_update_candidate',
-        description: 'Prepare an update to an existing candidate proposal. This replaces the candidate content and transactions. IMPORTANT: updating a candidate resets all sponsor signatures — signers must re-sign the updated version. Only the original proposer can update their candidate.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            slug: {
-              type: 'string',
-              description: 'The candidate slug to update.',
-            },
-            title: {
-              type: 'string',
-              description: 'Updated title for the candidate.',
-            },
-            description: {
-              type: 'string',
-              description: 'Updated description/body. Markdown supported.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Reason for the update (shown to sponsors).',
-            },
-            transactions: {
-              type: 'array',
-              description: 'Updated transactions array. Same format as prepare_candidate. If omitted, keeps description-only.',
-              items: {
-                type: 'object',
-                properties: {
-                  target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                  value: { type: 'string', description: 'ETH value in wei.' },
-                  signature: { type: 'string', description: 'Function signature. Empty for ETH transfers.' },
-                  calldata: { type: 'string', description: 'ABI-encoded args as hex. "0x" for ETH transfers.' },
-                },
-                required: ['target', 'value'],
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_grant_vote',
+          description:
+            'Prepare a vote on an active Small Grants proposal. Returns a GovernanceAction for the frontend. Requires Nouns voting power.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              grantId: {
+                type: 'number',
+                description: 'The grant proposal ID to vote on.',
+              },
+              support: {
+                type: 'number',
+                description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the vote.',
               },
             },
+            required: ['grantId', 'support'],
           },
-          required: ['slug', 'title', 'description'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_update_proposal',
-        description: 'Prepare an update to an existing onchain proposal during its updatable period. Proposals have an update window after creation where the proposer can modify the description and/or transactions. Only the original proposer can update. Use lookup_proposal first to check that the proposal is in the updatable period (updatePeriodEndBlock > current block).',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to update.',
-            },
-            description: {
-              type: 'string',
-              description: 'Updated description (including title as "# Title"). If only updating transactions, pass the current description unchanged.',
-            },
-            updateMessage: {
-              type: 'string',
-              description: 'A short message explaining what changed in this update.',
-            },
-            transactions: {
-              type: 'array',
-              description: 'Updated transactions. Same format as prepare_candidate. If omitted, only description is updated.',
-              items: {
-                type: 'object',
-                properties: {
-                  target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                  value: { type: 'string', description: 'ETH value in wei.' },
-                  signature: { type: 'string', description: 'Function signature. Empty for ETH transfers.' },
-                  calldata: { type: 'string', description: 'ABI-encoded args as hex. "0x" for ETH transfers.' },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_grant_proposal',
+          description:
+            'Create a new Small Grants proposal. Anyone can propose. Enters 12hr voting immediately, then 12hr timelock. Returns a GovernanceAction. Include transactions for ETH transfers or contract calls.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              title: {
+                type: 'string',
+                description: 'Short title for the grant proposal.',
+              },
+              description: {
+                type: 'string',
+                description: 'Full description of the grant request.',
+              },
+              transactions: {
+                type: 'array',
+                description: 'Optional executable transactions.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    target: { type: 'string', description: 'Target address (e.g. recipient).' },
+                    value: { type: 'string', description: 'ETH value in wei.' },
+                    signature: {
+                      type: 'string',
+                      description: 'Function signature (empty for ETH transfer).',
+                    },
+                    calldata: {
+                      type: 'string',
+                      description: 'Encoded calldata (0x for ETH transfer).',
+                    },
+                  },
+                  required: ['target', 'value'],
                 },
-                required: ['target', 'value'],
               },
             },
-          },
-          required: ['proposalId', 'updateMessage'],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_sponsor',
-        description: 'Prepare to sponsor (sign) a candidate proposal. The user will sign an EIP-712 message and submit it onchain. Returns a GovernanceAction with the candidate details needed for signing.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposer: {
-              type: 'string',
-              description: 'The candidate proposer address.',
-            },
-            slug: {
-              type: 'string',
-              description: 'The candidate slug.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Optional reason for sponsoring.',
-            },
-          },
-          required: ['proposer', 'slug'],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_bid',
-        description: 'Prepare a bid on the current Nouns auction. Returns a GovernanceAction with the nounId and bid amount in ETH. The frontend handles the payable transaction with client ID 37.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            nounId: {
-              type: 'number',
-              description: 'The noun ID to bid on (current auction noun).',
-            },
-            bidAmountEth: {
-              type: 'string',
-              description: 'The bid amount in ETH (e.g. "0.55"). Must be higher than current bid + minimum increment.',
-            },
-          },
-          required: ['nounId', 'bidAmountEth'],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_promote',
-        description: 'Prepare to promote a candidate proposal to a real onchain proposal using collected sponsor signatures. This calls proposeBySigs on the NounsGovernor with client ID 37. The candidate must have enough valid signatures to meet the proposal threshold.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposer: {
-              type: 'string',
-              description: 'The candidate proposer address.',
-            },
-            slug: {
-              type: 'string',
-              description: 'The candidate slug.',
-            },
-          },
-          required: ['proposer', 'slug'],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'lookup_grant',
-        description: 'Look up Small Grants Treasury proposals. Returns grant details including status, votes, and pre-calculated voting time remaining (votingTimeLeft, votingBlocksLeft, votingEnded). Use this data to directly answer timing questions. Can search by ID or keyword.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            grantId: {
-              type: 'number',
-              description: 'The grant proposal ID to look up.',
-            },
-            keyword: {
-              type: 'string',
-              description: 'Search keyword to find grants by description.',
-            },
+            required: ['title', 'description'],
           },
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_grant_vote',
-        description: 'Prepare a vote on an active Small Grants proposal. Returns a GovernanceAction for the frontend. Requires Nouns voting power.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            grantId: {
-              type: 'number',
-              description: 'The grant proposal ID to vote on.',
-            },
-            support: {
-              type: 'number',
-              description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
-            },
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the vote.',
-            },
-          },
-          required: ['grantId', 'support'],
-        },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_grant_proposal',
-        description: 'Create a new Small Grants proposal. Anyone can propose. Enters 12hr voting immediately, then 12hr timelock. Returns a GovernanceAction. Include transactions for ETH transfers or contract calls.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            title: {
-              type: 'string',
-              description: 'Short title for the grant proposal.',
-            },
-            description: {
-              type: 'string',
-              description: 'Full description of the grant request.',
-            },
-            transactions: {
-              type: 'array',
-              description: 'Optional executable transactions.',
-              items: {
-                type: 'object',
-                properties: {
-                  target: { type: 'string', description: 'Target address (e.g. recipient).' },
-                  value: { type: 'string', description: 'ETH value in wei.' },
-                  signature: { type: 'string', description: 'Function signature (empty for ETH transfer).' },
-                  calldata: { type: 'string', description: 'Encoded calldata (0x for ETH transfer).' },
-                },
-                required: ['target', 'value'],
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_queue_proposal',
+          description:
+            'Queue a succeeded Nouns DAO proposal into the timelock. Must be called after a proposal passes voting before it can be executed. Anyone can call this. Returns a GovernanceAction for the frontend.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description:
+                  'The proposal ID to queue. Must be in SUCCEEDED status (passed voting with quorum).',
               },
             },
+            required: ['proposalId'],
           },
-          required: ['title', 'description'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_queue_proposal',
-        description: 'Queue a succeeded Nouns DAO proposal into the timelock. Must be called after a proposal passes voting before it can be executed. Anyone can call this. Returns a GovernanceAction for the frontend.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to queue. Must be in SUCCEEDED status (passed voting with quorum).',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_queue_grant',
+          description:
+            'Queue a succeeded Small Grants proposal into the timelock. Must be called after a grant passes its 12hr vote before it can be executed. Anyone can call this. Returns a GovernanceAction for the frontend.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              grantId: {
+                type: 'number',
+                description: 'The grant proposal ID to queue. Must have passed voting.',
+              },
             },
+            required: ['grantId'],
           },
-          required: ['proposalId'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_queue_grant',
-        description: 'Queue a succeeded Small Grants proposal into the timelock. Must be called after a grant passes its 12hr vote before it can be executed. Anyone can call this. Returns a GovernanceAction for the frontend.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            grantId: {
-              type: 'number',
-              description: 'The grant proposal ID to queue. Must have passed voting.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_execute_proposal',
+          description:
+            'Execute a queued Nouns DAO proposal whose timelock has expired. Anyone can call this. Returns a GovernanceAction for the frontend.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description:
+                  'The proposal ID to execute. Must be in QUEUED status with expired timelock.',
+              },
             },
+            required: ['proposalId'],
           },
-          required: ['grantId'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_execute_proposal',
-        description: 'Execute a queued Nouns DAO proposal whose timelock has expired. Anyone can call this. Returns a GovernanceAction for the frontend.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            proposalId: {
-              type: 'number',
-              description: 'The proposal ID to execute. Must be in QUEUED status with expired timelock.',
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_execute_grant',
+          description:
+            'Execute a queued Small Grants proposal whose timelock has expired. Anyone can call this. Returns a GovernanceAction for the frontend.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              grantId: {
+                type: 'number',
+                description:
+                  'The grant proposal ID to execute. Must be in QUEUED status with expired timelock.',
+              },
             },
+            required: ['grantId'],
           },
-          required: ['proposalId'],
         },
-      } },
-      { type: "function" as const, function: {
-        name: 'prepare_execute_grant',
-        description: 'Execute a queued Small Grants proposal whose timelock has expired. Anyone can call this. Returns a GovernanceAction for the frontend.',
-        parameters: {
-          type: 'object' as const,
-          properties: {
-            grantId: {
-              type: 'number',
-              description: 'The grant proposal ID to execute. Must be in QUEUED status with expired timelock.',
-            },
-          },
-          required: ['grantId'],
-        },
-      } },
+      },
     ];
 
     // Build system prompt — combine static + dynamic context
-    const systemPrompt = dynamicContext
-      ? `${staticPrompt}\n\n${dynamicContext}`
-      : staticPrompt;
+    const systemPrompt = dynamicContext ? `${staticPrompt}\n\n${dynamicContext}` : staticPrompt;
 
     // First API call via agent-hub
     let response = await hubChat({
@@ -1654,10 +2077,18 @@ This is critical for the client incentive program.`;
             }
 
             case 'create_reservation': {
-              const input = args as { wallet: string; txHash: string; chainId: number; traits: string[] };
+              const input = args as {
+                wallet: string;
+                txHash: string;
+                chainId: number;
+                traits: string[];
+              };
               // Check if tx already used
               if (reservationStore.isTxUsed(input.txHash)) {
-                result = { success: false, error: 'This transaction has already been used for a reservation' };
+                result = {
+                  success: false,
+                  error: 'This transaction has already been used for a reservation',
+                };
               } else {
                 // Create reservation
                 const reservation = reservationStore.create({
@@ -1668,27 +2099,34 @@ This is critical for the client incentive program.`;
                   traits: input.traits,
                 });
                 // Verify tip and activate async
-                verifyTip(input.txHash, input.chainId).then(tipResult => {
-                  if (tipResult.valid) {
-                    const r = reservationStore.get(reservation.id);
-                    if (r) {
-                      r.tipAmountEth = tipResult.amountEth || 0;
-                      reservationStore.activate(reservation.id);
-                      console.log(`[NounIRL] ✅ Reservation ${reservation.id} verified & activated — ${tipResult.amountEth} ETH from ${tipResult.chainName}`);
+                verifyTip(input.txHash, input.chainId)
+                  .then(tipResult => {
+                    if (tipResult.valid) {
+                      const r = reservationStore.get(reservation.id);
+                      if (r) {
+                        r.tipAmountEth = tipResult.amountEth || 0;
+                        reservationStore.activate(reservation.id);
+                        console.log(
+                          `[NounIRL] ✅ Reservation ${reservation.id} verified & activated — ${tipResult.amountEth} ETH from ${tipResult.chainName}`,
+                        );
+                      }
+                    } else {
+                      console.log(
+                        `[NounIRL] ❌ Tip verification failed for ${reservation.id}: ${tipResult.error}`,
+                      );
+                      reservationStore.cancel(reservation.id);
                     }
-                  } else {
-                    console.log(`[NounIRL] ❌ Tip verification failed for ${reservation.id}: ${tipResult.error}`);
-                    reservationStore.cancel(reservation.id);
-                  }
-                }).catch(err => {
-                  console.error(`[NounIRL] Tip verification error for ${reservation.id}:`, err);
-                });
+                  })
+                  .catch(err => {
+                    console.error(`[NounIRL] Tip verification error for ${reservation.id}:`, err);
+                  });
                 result = {
                   success: true,
                   reservationId: reservation.id,
                   status: reservation.status,
                   traits: reservation.traits,
-                  message: 'Reservation created. Tip is being verified — it will auto-activate once confirmed onchain.',
+                  message:
+                    'Reservation created. Tip is being verified — it will auto-activate once confirmed onchain.',
                 };
               }
               break;
@@ -1733,7 +2171,9 @@ This is critical for the client incentive program.`;
             }
 
             case 'list_traits': {
-              const input = args as { category: 'background' | 'body' | 'accessory' | 'head' | 'glasses' };
+              const input = args as {
+                category: 'background' | 'body' | 'accessory' | 'head' | 'glasses';
+              };
               const names = getAllTraitNames(input.category);
               result = { category: input.category, count: names.length, traits: names };
               break;
@@ -1766,20 +2206,30 @@ This is critical for the client incentive program.`;
 
               // ── Noun-gated: require 4+ Nouns to deploy ──
               if (!wallet) {
-                result = { success: false, error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Connect your wallet first.` };
+                result = {
+                  success: false,
+                  error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Connect your wallet first.`,
+                };
               } else {
                 const nounBalance = await getNounBalance(wallet);
                 if (nounBalance < MIN_NOUNS_FOR_DEPLOY) {
-                  result = { success: false, error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Your wallet (${wallet.slice(0, 6)}...${wallet.slice(-4)}) holds ${nounBalance} Noun${nounBalance === 1 ? '' : 's'}. Only major Nouners can push code changes.` };
+                  result = {
+                    success: false,
+                    error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Your wallet (${wallet.slice(0, 6)}...${wallet.slice(-4)}) holds ${nounBalance} Noun${nounBalance === 1 ? '' : 's'}. Only major Nouners can push code changes.`,
+                  };
                 } else if (!canDeploy()) {
-                  result = { success: false, error: 'Rate limited — max 1 deploy per hour. Try again later.' };
+                  result = {
+                    success: false,
+                    error: 'Rate limited — max 1 deploy per hour. Try again later.',
+                  };
                 } else {
                   console.log(`[NounIRL] Deploy authorized by ${wallet} (${nounBalance} Nouns)`);
                   const patches = await generatePatch(input.description);
                   const deployResult = await applyAndDeploy(
                     patches,
                     input.description,
-                    input.reason || `autonomous deploy via terminal (authorized by ${wallet.slice(0, 6)}...${wallet.slice(-4)}, ${nounBalance} Nouns)`,
+                    input.reason ||
+                      `autonomous deploy via terminal (authorized by ${wallet.slice(0, 6)}...${wallet.slice(-4)}, ${nounBalance} Nouns)`,
                     'terminal',
                   );
                   result = {
@@ -1798,11 +2248,13 @@ This is critical for the client incentive program.`;
 
             case 'remember_fact': {
               const input = args as { key: string; content: string; scope: 'wallet' | 'global' };
-              const memScope = input.scope === 'wallet' && wallet
-                ? `wallet:${wallet.toLowerCase()}`
-                : 'global';
+              const memScope =
+                input.scope === 'wallet' && wallet ? `wallet:${wallet.toLowerCase()}` : 'global';
               await remember(memScope, input.key, input.content);
-              result = { success: true, message: `Remembered "${input.key}" in ${input.scope} scope.` };
+              result = {
+                success: true,
+                message: `Remembered "${input.key}" in ${input.scope} scope.`,
+              };
               break;
             }
 
@@ -1813,9 +2265,8 @@ This is critical for the client incentive program.`;
                 const walletMem = wallet ? await recall(`wallet:${wallet.toLowerCase()}`) : [];
                 result = { global: all, wallet: walletMem };
               } else {
-                const scope = input.scope === 'wallet' && wallet
-                  ? `wallet:${wallet.toLowerCase()}`
-                  : 'global';
+                const scope =
+                  input.scope === 'wallet' && wallet ? `wallet:${wallet.toLowerCase()}` : 'global';
                 result = { memories: await recall(scope, input.key) };
               }
               break;
@@ -1834,14 +2285,19 @@ This is critical for the client incentive program.`;
 
             case 'self_learn': {
               // Fire and forget — this takes minutes
-              runSelfLearn().then(r => {
-                console.log(`[SelfLearn] Tool-triggered pipeline complete: ${r.totalFacts} facts`);
-              }).catch(err => {
-                console.error('[SelfLearn] Tool-triggered pipeline failed:', err);
-              });
+              runSelfLearn()
+                .then(r => {
+                  console.log(
+                    `[SelfLearn] Tool-triggered pipeline complete: ${r.totalFacts} facts`,
+                  );
+                })
+                .catch(err => {
+                  console.error('[SelfLearn] Tool-triggered pipeline failed:', err);
+                });
               result = {
                 started: true,
-                message: 'Self-learning pipeline started. Processing all proposals, auctions, and delegates from noun.wtf. This takes a few minutes — I\'ll have comprehensive knowledge of all ~950 Nouns DAO proposals when it finishes.',
+                message:
+                  "Self-learning pipeline started. Processing all proposals, auctions, and delegates from noun.wtf. This takes a few minutes — I'll have comprehensive knowledge of all ~950 Nouns DAO proposals when it finishes.",
               };
               break;
             }
@@ -1851,17 +2307,31 @@ This is critical for the client incentive program.`;
               const input = args as { proposalId?: number; keyword?: string };
               try {
                 if (input.proposalId) {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found in index.` };
                   } else {
                     const p = rows[0];
                     const descText = (p.description ?? '').toString();
-                    const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                    const title =
+                      descText
+                        .split('\n')[0]
+                        ?.replace(/^#+\s*/, '')
+                        .trim() || 'Untitled';
                     const currentBlock = await getCurrentBlock();
                     const voting = formatBlocksRemaining(currentBlock, p.endBlock);
-                    const updatePeriod = formatBlocksRemaining(currentBlock, p.updatePeriodEndBlock);
-                    const objectionPeriod = formatBlocksRemaining(currentBlock, p.objectionPeriodEndBlock);
+                    const updatePeriod = formatBlocksRemaining(
+                      currentBlock,
+                      p.updatePeriodEndBlock,
+                    );
+                    const objectionPeriod = formatBlocksRemaining(
+                      currentBlock,
+                      p.objectionPeriodEndBlock,
+                    );
                     result = {
                       proposalId: p.id,
                       title,
@@ -1886,16 +2356,26 @@ This is critical for the client incentive program.`;
                   }
                 } else if (input.keyword) {
                   // Search proposals by description content
-                  const allProps = await db.select().from(schema.proposal).orderBy(desc(schema.proposal.createdAtBlock)).limit(100);
+                  const allProps = await db
+                    .select()
+                    .from(schema.proposal)
+                    .orderBy(desc(schema.proposal.createdAtBlock))
+                    .limit(100);
                   const kw = input.keyword.toLowerCase();
-                  const matches = allProps.filter(p => {
-                    const desc = (p.description ?? '').toString().toLowerCase();
-                    return desc.includes(kw);
-                  }).slice(0, 5);
+                  const matches = allProps
+                    .filter(p => {
+                      const desc = (p.description ?? '').toString().toLowerCase();
+                      return desc.includes(kw);
+                    })
+                    .slice(0, 5);
                   result = {
                     matches: matches.map(p => {
                       const descText = (p.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       return { proposalId: p.id, title, status: p.status, proposer: p.proposer };
                     }),
                     count: matches.length,
@@ -1904,7 +2384,9 @@ This is critical for the client incentive program.`;
                   result = { error: 'Provide either proposalId or keyword.' };
                 }
               } catch (err) {
-                result = { error: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                result = {
+                  error: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                };
               }
               break;
             }
@@ -1913,13 +2395,21 @@ This is critical for the client incentive program.`;
               const input = args as { slug?: string; keyword?: string };
               try {
                 if (input.slug) {
-                  const rows = await db.select().from(schema.candidate).where(eq(schema.candidate.slug, input.slug)).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.candidate)
+                    .where(eq(schema.candidate.slug, input.slug))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
                     const c = rows[0];
                     const descText = (c.description ?? '').toString();
-                    const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                    const title =
+                      descText
+                        .split('\n')[0]
+                        ?.replace(/^#+\s*/, '')
+                        .trim() || 'Untitled';
                     result = {
                       slug: c.slug,
                       proposer: c.proposer,
@@ -1929,16 +2419,26 @@ This is critical for the client incentive program.`;
                     };
                   }
                 } else if (input.keyword) {
-                  const allCands = await db.select().from(schema.candidate).orderBy(desc(schema.candidate.createdAtBlock)).limit(50);
+                  const allCands = await db
+                    .select()
+                    .from(schema.candidate)
+                    .orderBy(desc(schema.candidate.createdAtBlock))
+                    .limit(50);
                   const kw = input.keyword.toLowerCase();
-                  const matches = allCands.filter(c => {
-                    const desc = (c.description ?? '').toString().toLowerCase();
-                    return desc.includes(kw);
-                  }).slice(0, 5);
+                  const matches = allCands
+                    .filter(c => {
+                      const desc = (c.description ?? '').toString().toLowerCase();
+                      return desc.includes(kw);
+                    })
+                    .slice(0, 5);
                   result = {
                     matches: matches.map(c => {
                       const descText = (c.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       return { slug: c.slug, proposer: c.proposer, title, canceled: c.canceled };
                     }),
                     count: matches.length,
@@ -1947,7 +2447,9 @@ This is critical for the client incentive program.`;
                   result = { error: 'Provide either slug or keyword.' };
                 }
               } catch (err) {
-                result = { error: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                result = {
+                  error: `Lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                };
               }
               break;
             }
@@ -1955,10 +2457,17 @@ This is critical for the client incentive program.`;
             case 'prepare_vote': {
               const input = args as { proposalId: number; support: 0 | 1 | 2; reason?: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to vote. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to vote. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
@@ -1966,7 +2475,11 @@ This is critical for the client incentive program.`;
                     // Check votability using block timing instead of DB status,
                     // because the indexer may not have a handler that sets ACTIVE status.
                     // A proposal is votable if: cancelled/vetoed/executed = false, and current block is within voting window.
-                    const isFinalStatus = p.status === 'CANCELLED' || p.status === 'VETOED' || p.status === 'EXECUTED' || p.status === 'QUEUED';
+                    const isFinalStatus =
+                      p.status === 'CANCELLED' ||
+                      p.status === 'VETOED' ||
+                      p.status === 'EXECUTED' ||
+                      p.status === 'QUEUED';
                     let votable = !isFinalStatus;
                     let rejectReason = '';
                     if (isFinalStatus) {
@@ -1976,7 +2489,9 @@ This is critical for the client incentive program.`;
                       const currentBlock = await getCurrentBlock();
                       const start = BigInt(p.startBlock);
                       const end = BigInt(p.endBlock);
-                      const objEnd = p.objectionPeriodEndBlock ? BigInt(p.objectionPeriodEndBlock) : null;
+                      const objEnd = p.objectionPeriodEndBlock
+                        ? BigInt(p.objectionPeriodEndBlock)
+                        : null;
                       const effectiveEnd = objEnd && objEnd > end ? objEnd : end;
                       if (currentBlock < start) {
                         rejectReason = `Proposal #${input.proposalId} voting hasn't started yet (starts at block ${p.startBlock}).`;
@@ -1990,7 +2505,11 @@ This is critical for the client incentive program.`;
                       result = { error: rejectReason };
                     } else {
                       const descText = (p.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       pendingAction = {
                         type: 'VOTE',
                         proposalId: input.proposalId,
@@ -2006,7 +2525,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Vote prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Vote prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2015,15 +2536,26 @@ This is critical for the client incentive program.`;
             case 'prepare_proposal_feedback': {
               const input = args as { proposalId: number; support: 0 | 1 | 2; reason?: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to give feedback. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to give feedback. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
                     const descText = (rows[0].description ?? '').toString();
-                    const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                    const title =
+                      descText
+                        .split('\n')[0]
+                        ?.replace(/^#+\s*/, '')
+                        .trim() || 'Untitled';
                     pendingAction = {
                       type: 'PROPOSAL_FEEDBACK',
                       proposalId: input.proposalId,
@@ -2038,25 +2570,43 @@ This is critical for the client incentive program.`;
                     };
                   }
                 } catch (err) {
-                  result = { error: `Feedback prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Feedback prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
             }
 
             case 'prepare_candidate_feedback': {
-              const input = args as { proposer: string; slug: string; support: 0 | 1 | 2; reason?: string };
+              const input = args as {
+                proposer: string;
+                slug: string;
+                support: 0 | 1 | 2;
+                reason?: string;
+              };
               if (!wallet) {
-                result = { error: 'User must connect their wallet. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.candidate).where(eq(schema.candidate.slug, input.slug)).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.candidate)
+                    .where(eq(schema.candidate.slug, input.slug))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
                     const c = rows[0];
                     const descText = (c.description ?? '').toString();
-                    const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                    const title =
+                      descText
+                        .split('\n')[0]
+                        ?.replace(/^#+\s*/, '')
+                        .trim() || 'Untitled';
                     pendingAction = {
                       type: 'CANDIDATE_FEEDBACK',
                       proposer: c.proposer as string,
@@ -2072,21 +2622,35 @@ This is critical for the client incentive program.`;
                     };
                   }
                 } catch (err) {
-                  result = { error: `Candidate feedback prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Candidate feedback prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
             }
 
             case 'prepare_candidate': {
-              const input = args as { title: string; description: string; transactions?: Array<{ target: string; value: string; signature?: string; calldata?: string }> };
+              const input = args as {
+                title: string;
+                description: string;
+                transactions?: Array<{
+                  target: string;
+                  value: string;
+                  signature?: string;
+                  calldata?: string;
+                }>;
+              };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to create a candidate. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to create a candidate. Tell them to click "connect" in the header.',
+                };
               } else {
                 // Generate a URL-safe slug from the title
                 const slug = input.title
                   .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/[^\da-z]+/g, '-')
                   .replace(/^-|-$/g, '')
                   .slice(0, 80);
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
@@ -2108,9 +2672,10 @@ This is critical for the client incentive program.`;
                   signatures: sigs,
                   calldatas,
                 };
-                const txNote = txs.length > 0
-                  ? ` Includes ${txs.length} executable transaction${txs.length > 1 ? 's' : ''}.`
-                  : ' Description-only (no executable transactions).';
+                const txNote =
+                  txs.length > 0
+                    ? ` Includes ${txs.length} executable transaction${txs.length > 1 ? 's' : ''}.`
+                    : ' Description-only (no executable transactions).';
                 result = {
                   success: true,
                   action: pendingAction,
@@ -2121,12 +2686,30 @@ This is critical for the client incentive program.`;
             }
 
             case 'prepare_update_candidate': {
-              const input = args as { slug: string; title: string; description: string; reason?: string; transactions?: Array<{ target: string; value: string; signature?: string; calldata?: string }> };
+              const input = args as {
+                slug: string;
+                title: string;
+                description: string;
+                reason?: string;
+                transactions?: Array<{
+                  target: string;
+                  value: string;
+                  signature?: string;
+                  calldata?: string;
+                }>;
+              };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to update a candidate. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to update a candidate. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.candidate).where(eq(schema.candidate.slug, input.slug)).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.candidate)
+                    .where(eq(schema.candidate.slug, input.slug))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
@@ -2134,7 +2717,9 @@ This is critical for the client incentive program.`;
                     if (c.canceled) {
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else if ((c.proposer as string).toLowerCase() !== wallet.toLowerCase()) {
-                      result = { error: `Only the original proposer (${(c.proposer as string).slice(0, 6)}...${(c.proposer as string).slice(-4)}) can update this candidate. Connected wallet doesn't match.` };
+                      result = {
+                        error: `Only the original proposer (${(c.proposer as string).slice(0, 6)}...${(c.proposer as string).slice(-4)}) can update this candidate. Connected wallet doesn't match.`,
+                      };
                     } else {
                       const fullDescription = `# ${input.title}\n\n${input.description}`;
                       const txs = input.transactions || [];
@@ -2162,37 +2747,67 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Update candidate prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Update candidate prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
             }
 
             case 'prepare_update_proposal': {
-              const input = args as { proposalId: number; description?: string; updateMessage: string; transactions?: Array<{ target: string; value: string; signature?: string; calldata?: string }> };
+              const input = args as {
+                proposalId: number;
+                description?: string;
+                updateMessage: string;
+                transactions?: Array<{
+                  target: string;
+                  value: string;
+                  signature?: string;
+                  calldata?: string;
+                }>;
+              };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to update a proposal. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to update a proposal. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, String(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
                     const p = rows[0];
                     if ((p.proposer as string).toLowerCase() !== wallet.toLowerCase()) {
-                      result = { error: `Only the original proposer can update this proposal. Connected wallet doesn't match.` };
+                      result = {
+                        error: `Only the original proposer can update this proposal. Connected wallet doesn't match.`,
+                      };
                     } else if (!p.updatePeriodEndBlock) {
-                      result = { error: `Proposal #${input.proposalId} doesn't have an update period set. It may be too old or already past its update window.` };
+                      result = {
+                        error: `Proposal #${input.proposalId} doesn't have an update period set. It may be too old or already past its update window.`,
+                      };
                     } else {
                       const descText = (p.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       const txs = input.transactions || [];
 
                       // Determine update type: description-only, transactions-only, or both
                       const hasNewDesc = !!input.description;
                       const hasNewTxs = txs.length > 0;
 
-                      let updateType: 'UPDATE_PROPOSAL' | 'UPDATE_PROPOSAL_DESCRIPTION' | 'UPDATE_PROPOSAL_TRANSACTIONS';
+                      let updateType:
+                        | 'UPDATE_PROPOSAL'
+                        | 'UPDATE_PROPOSAL_DESCRIPTION'
+                        | 'UPDATE_PROPOSAL_TRANSACTIONS';
                       if (hasNewDesc && hasNewTxs) {
                         updateType = 'UPDATE_PROPOSAL';
                       } else if (hasNewTxs) {
@@ -2221,7 +2836,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Update proposal prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Update proposal prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2230,10 +2847,17 @@ This is critical for the client incentive program.`;
             case 'prepare_sponsor': {
               const input = args as { proposer: string; slug: string; reason?: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to sponsor a candidate. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to sponsor a candidate. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.candidate).where(eq(schema.candidate.slug, input.slug)).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.candidate)
+                    .where(eq(schema.candidate.slug, input.slug))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
@@ -2242,7 +2866,11 @@ This is critical for the client incentive program.`;
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
                       const descText = (c.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       pendingAction = {
                         type: 'SPONSOR',
                         proposer: c.proposer as string,
@@ -2250,13 +2878,15 @@ This is critical for the client incentive program.`;
                         reason: input.reason,
                         title,
                         // Frontend needs these to construct the EIP-712 signature
-                        encodedProp: c.targets ? JSON.stringify({
-                          targets: JSON.parse((c.targets as string) || '[]'),
-                          values: JSON.parse((c.values as string) || '[]'),
-                          signatures: JSON.parse((c.signatures as string) || '[]'),
-                          calldatas: JSON.parse((c.calldatas as string) || '[]'),
-                          description: descText,
-                        }) : '{}',
+                        encodedProp: c.targets
+                          ? JSON.stringify({
+                              targets: JSON.parse((c.targets as string) || '[]'),
+                              values: JSON.parse((c.values as string) || '[]'),
+                              signatures: JSON.parse((c.signatures as string) || '[]'),
+                              calldatas: JSON.parse((c.calldatas as string) || '[]'),
+                              description: descText,
+                            })
+                          : '{}',
                       };
                       result = {
                         success: true,
@@ -2266,7 +2896,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Sponsor prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Sponsor prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2275,17 +2907,26 @@ This is critical for the client incentive program.`;
             case 'prepare_bid': {
               const input = args as { nounId: number; bidAmountEth: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to bid. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to bid. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
                   // Verify the auction exists and is active
-                  const rows = await db.select().from(schema.auction).where(eq(schema.auction.nounId, String(input.nounId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.auction)
+                    .where(eq(schema.auction.nounId, String(input.nounId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Auction for Noun ${input.nounId} not found in index.` };
                   } else {
                     const auction = rows[0];
                     if (auction.settled) {
-                      result = { error: `Auction for Noun ${input.nounId} has already been settled.` };
+                      result = {
+                        error: `Auction for Noun ${input.nounId} has already been settled.`,
+                      };
                     } else {
                       const bidAmount = parseFloat(input.bidAmountEth);
                       if (isNaN(bidAmount) || bidAmount <= 0) {
@@ -2305,7 +2946,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Bid prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Bid prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2314,10 +2957,17 @@ This is critical for the client incentive program.`;
             case 'prepare_promote': {
               const input = args as { proposer: string; slug: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to promote a candidate. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to promote a candidate. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.candidate).where(eq(schema.candidate.slug, input.slug)).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.candidate)
+                    .where(eq(schema.candidate.slug, input.slug))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
@@ -2326,16 +2976,22 @@ This is critical for the client incentive program.`;
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
                       const descText = (c.description ?? '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
 
                       // Fetch signatures for this candidate
-                      const sigs = await db.select().from(schema.candidateSignature)
+                      const sigs = await db
+                        .select()
+                        .from(schema.candidateSignature)
                         .where(eq(schema.candidateSignature.candidateSlug, input.slug))
                         .limit(100);
 
                       const nowSec = Math.floor(Date.now() / 1000);
-                      const validSigs = sigs.filter(s =>
-                        !s.canceled && Number(s.expirationTimestamp) > nowSec
+                      const validSigs = sigs.filter(
+                        s => !s.canceled && Number(s.expirationTimestamp) > nowSec,
                       );
 
                       pendingAction = {
@@ -2365,7 +3021,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Promote prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Promote prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2374,26 +3032,48 @@ This is critical for the client incentive program.`;
             case 'lookup_grant': {
               const input = args as { grantId?: number; keyword?: string };
               try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let rows: any[];
                 if (input.grantId !== undefined) {
-                  rows = await db.select().from(schema.grant).where(eq(schema.grant.id, String(input.grantId))).limit(1);
+                  rows = await db
+                    .select()
+                    .from(schema.grant)
+                    .where(eq(schema.grant.id, String(input.grantId)))
+                    .limit(1);
                 } else {
-                  rows = await db.select().from(schema.grant).orderBy(desc(schema.grant.createdAtBlock)).limit(20);
+                  rows = await db
+                    .select()
+                    .from(schema.grant)
+                    .orderBy(desc(schema.grant.createdAtBlock))
+                    .limit(20);
                   if (input.keyword) {
                     const kw = input.keyword.toLowerCase();
-                    rows = rows.filter((r: any) => (r.description || '').toLowerCase().includes(kw));
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    rows = rows.filter((r: any) =>
+                      (r.description || '').toLowerCase().includes(kw),
+                    );
                   }
                 }
                 if (rows.length === 0) {
-                  result = { found: false, message: input.grantId ? `Grant #${input.grantId} not found.` : 'No grants found.' };
+                  result = {
+                    found: false,
+                    message: input.grantId
+                      ? `Grant #${input.grantId} not found.`
+                      : 'No grants found.',
+                  };
                 } else {
                   const currentBlock = await getCurrentBlock();
                   result = {
                     found: true,
                     currentBlock: currentBlock.toString(),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     grants: rows.map((g: any) => {
                       const descText = (g.description || '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       const voting = formatBlocksRemaining(currentBlock, g.endBlock);
                       return {
                         id: g.id,
@@ -2414,7 +3094,9 @@ This is critical for the client incentive program.`;
                   };
                 }
               } catch (err) {
-                result = { error: `Grant lookup failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                result = {
+                  error: `Grant lookup failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                };
               }
               break;
             }
@@ -2422,19 +3104,32 @@ This is critical for the client incentive program.`;
             case 'prepare_grant_vote': {
               const input = args as { grantId: number; support: 0 | 1 | 2; reason?: string };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to vote on a grant. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to vote on a grant. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.grant).where(eq(schema.grant.id, String(input.grantId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.grant)
+                    .where(eq(schema.grant.id, String(input.grantId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
                     const g = rows[0];
                     if (g.status !== 'ACTIVE') {
-                      result = { error: `Grant #${input.grantId} is "${g.status}" — can only vote on Active grants.` };
+                      result = {
+                        error: `Grant #${input.grantId} is "${g.status}" — can only vote on Active grants.`,
+                      };
                     } else {
                       const descText = (g.description || '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       pendingAction = {
                         type: 'GRANT_VOTE',
                         grantId: input.grantId,
@@ -2450,16 +3145,30 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Grant vote prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Grant vote prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
             }
 
             case 'prepare_grant_proposal': {
-              const input = args as { title: string; description: string; transactions?: Array<{ target: string; value: string; signature?: string; calldata?: string }> };
+              const input = args as {
+                title: string;
+                description: string;
+                transactions?: Array<{
+                  target: string;
+                  value: string;
+                  signature?: string;
+                  calldata?: string;
+                }>;
+              };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to create a grant proposal. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to create a grant proposal. Tell them to click "connect" in the header.',
+                };
               } else {
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
                 const txs = input.transactions || [];
@@ -2477,9 +3186,10 @@ This is critical for the client incentive program.`;
                   signatures: sigs,
                   calldatas,
                 };
-                const txNote = txs.length > 0
-                  ? ` Includes ${txs.length} executable transaction${txs.length > 1 ? 's' : ''}.`
-                  : ' Description-only (no executable transactions).';
+                const txNote =
+                  txs.length > 0
+                    ? ` Includes ${txs.length} executable transaction${txs.length > 1 ? 's' : ''}.`
+                    : ' Description-only (no executable transactions).';
                 result = {
                   success: true,
                   action: pendingAction,
@@ -2492,21 +3202,37 @@ This is critical for the client incentive program.`;
             case 'prepare_queue_proposal': {
               const input = args as { proposalId: number };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to queue a proposal. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to queue a proposal. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, BigInt(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
                     const p = rows[0];
                     const currentBlock = await getCurrentBlock();
-                    const derived = computeDerivedStatus(p as Parameters<typeof computeDerivedStatus>[0], currentBlock);
+                    const derived = computeDerivedStatus(
+                      p as Parameters<typeof computeDerivedStatus>[0],
+                      currentBlock,
+                    );
                     if (derived !== 'SUCCEEDED') {
-                      result = { error: `Proposal #${input.proposalId} is "${derived}" — can only queue SUCCEEDED proposals (passed voting with quorum).` };
+                      result = {
+                        error: `Proposal #${input.proposalId} is "${derived}" — can only queue SUCCEEDED proposals (passed voting with quorum).`,
+                      };
                     } else {
                       const descText = (p.description || '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       pendingAction = {
                         type: 'QUEUE_PROPOSAL',
                         proposalId: input.proposalId,
@@ -2520,7 +3246,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Queue prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Queue prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2529,10 +3257,17 @@ This is critical for the client incentive program.`;
             case 'prepare_queue_grant': {
               const input = args as { grantId: number };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to queue a grant. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to queue a grant. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.grant).where(eq(schema.grant.id, BigInt(input.grantId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.grant)
+                    .where(eq(schema.grant.id, BigInt(input.grantId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
@@ -2548,7 +3283,11 @@ This is critical for the client incentive program.`;
                       result = { error: `Grant #${input.grantId} was cancelled.` };
                     } else {
                       const descText = (g.description || '').toString();
-                      const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                      const title =
+                        descText
+                          .split('\n')[0]
+                          ?.replace(/^#+\s*/, '')
+                          .trim() || 'Untitled';
                       pendingAction = {
                         type: 'QUEUE_GRANT',
                         grantId: input.grantId,
@@ -2562,7 +3301,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Queue prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Queue prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2571,16 +3312,25 @@ This is critical for the client incentive program.`;
             case 'prepare_execute_proposal': {
               const input = args as { proposalId: number };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to execute a proposal. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to execute a proposal. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.proposal).where(eq(schema.proposal.id, BigInt(input.proposalId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.proposal)
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
                     const p = rows[0];
                     if (p.status !== 'QUEUED') {
-                      result = { error: `Proposal #${input.proposalId} is "${p.status}" — can only execute QUEUED proposals.` };
+                      result = {
+                        error: `Proposal #${input.proposalId} is "${p.status}" — can only execute QUEUED proposals.`,
+                      };
                     } else if (!p.executionETA) {
                       result = { error: `Proposal #${input.proposalId} has no execution ETA set.` };
                     } else {
@@ -2588,13 +3338,20 @@ This is critical for the client incentive program.`;
                       const eta = Number(p.executionETA);
                       if (nowSeconds < eta) {
                         const minutesLeft = (eta - nowSeconds) / 60;
-                        const timeStr = minutesLeft > 60
-                          ? `~${(minutesLeft / 60).toFixed(1)} hours`
-                          : `~${Math.ceil(minutesLeft)} minutes`;
-                        result = { error: `Proposal #${input.proposalId} timelock not yet expired (${timeStr} remaining).` };
+                        const timeStr =
+                          minutesLeft > 60
+                            ? `~${(minutesLeft / 60).toFixed(1)} hours`
+                            : `~${Math.ceil(minutesLeft)} minutes`;
+                        result = {
+                          error: `Proposal #${input.proposalId} timelock not yet expired (${timeStr} remaining).`,
+                        };
                       } else {
                         const descText = (p.description || '').toString();
-                        const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                        const title =
+                          descText
+                            .split('\n')[0]
+                            ?.replace(/^#+\s*/, '')
+                            .trim() || 'Untitled';
                         pendingAction = {
                           type: 'EXECUTE_PROPOSAL',
                           proposalId: input.proposalId,
@@ -2609,7 +3366,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Execute prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Execute prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2618,16 +3377,25 @@ This is critical for the client incentive program.`;
             case 'prepare_execute_grant': {
               const input = args as { grantId: number };
               if (!wallet) {
-                result = { error: 'User must connect their wallet to execute a grant. Tell them to click "connect" in the header.' };
+                result = {
+                  error:
+                    'User must connect their wallet to execute a grant. Tell them to click "connect" in the header.',
+                };
               } else {
                 try {
-                  const rows = await db.select().from(schema.grant).where(eq(schema.grant.id, BigInt(input.grantId))).limit(1);
+                  const rows = await db
+                    .select()
+                    .from(schema.grant)
+                    .where(eq(schema.grant.id, BigInt(input.grantId)))
+                    .limit(1);
                   if (rows.length === 0) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
                     const g = rows[0];
                     if (g.status !== 'QUEUED') {
-                      result = { error: `Grant #${input.grantId} is "${g.status}" — can only execute QUEUED grants.` };
+                      result = {
+                        error: `Grant #${input.grantId} is "${g.status}" — can only execute QUEUED grants.`,
+                      };
                     } else if (!g.executionETA) {
                       result = { error: `Grant #${input.grantId} has no execution ETA set.` };
                     } else {
@@ -2635,13 +3403,20 @@ This is critical for the client incentive program.`;
                       const eta = Number(g.executionETA);
                       if (nowSeconds < eta) {
                         const minutesLeft = (eta - nowSeconds) / 60;
-                        const timeStr = minutesLeft > 60
-                          ? `~${(minutesLeft / 60).toFixed(1)} hours`
-                          : `~${Math.ceil(minutesLeft)} minutes`;
-                        result = { error: `Grant #${input.grantId} timelock not yet expired (${timeStr} remaining).` };
+                        const timeStr =
+                          minutesLeft > 60
+                            ? `~${(minutesLeft / 60).toFixed(1)} hours`
+                            : `~${Math.ceil(minutesLeft)} minutes`;
+                        result = {
+                          error: `Grant #${input.grantId} timelock not yet expired (${timeStr} remaining).`,
+                        };
                       } else {
                         const descText = (g.description || '').toString();
-                        const title = descText.split('\n')[0]?.replace(/^#+\s*/, '').trim() || 'Untitled';
+                        const title =
+                          descText
+                            .split('\n')[0]
+                            ?.replace(/^#+\s*/, '')
+                            .trim() || 'Untitled';
                         pendingAction = {
                           type: 'EXECUTE_GRANT',
                           grantId: input.grantId,
@@ -2656,7 +3431,9 @@ This is critical for the client incentive program.`;
                     }
                   }
                 } catch (err) {
-                  result = { error: `Execute prep failed: ${err instanceof Error ? err.message : 'unknown'}` };
+                  result = {
+                    error: `Execute prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
+                  };
                 }
               }
               break;
@@ -2675,7 +3452,9 @@ This is critical for the client incentive program.`;
           toolResults.push({
             role: 'tool',
             tool_call_id: toolUse.id,
-            content: JSON.stringify({ error: err instanceof Error ? err.message : 'Tool execution failed' }),
+            content: JSON.stringify({
+              error: err instanceof Error ? err.message : 'Tool execution failed',
+            }),
           });
         }
       }
@@ -2701,7 +3480,9 @@ This is critical for the client incentive program.`;
     const text = response.text || '';
 
     // Include governance action if one was prepared by a tool
-    const responsePayload: { response: string; action?: Record<string, unknown> } = { response: text };
+    const responsePayload: { response: string; action?: Record<string, unknown> } = {
+      response: text,
+    };
     if (pendingAction) {
       responsePayload.action = pendingAction;
     }
@@ -2722,11 +3503,14 @@ const ALLOWED_CHANNELS = ['nouns', 'noc', 'lil'];
 const feedCaches = new Map<string, { data: any; fetchedAt: number }>();
 const FEED_CACHE_TTL = 60_000; // 60 seconds
 
-app.get('/api/feed/:channel', async (c) => {
+app.get('/api/feed/:channel', async c => {
   const channel = c.req.param('channel');
 
   if (!ALLOWED_CHANNELS.includes(channel)) {
-    return c.json({ error: `Unknown channel: ${channel}. Allowed: ${ALLOWED_CHANNELS.join(', ')}` }, 400);
+    return c.json(
+      { error: `Unknown channel: ${channel}. Allowed: ${ALLOWED_CHANNELS.join(', ')}` },
+      400,
+    );
   }
 
   const neynarKey = process.env.NEYNAR_API_KEY;
@@ -2772,7 +3556,7 @@ const PIP_FID = 191593; // @pip on Farcaster (hugo)
 const SKETCH_CACHE_TTL = 5 * 60_000; // 5 minutes
 let sketchCache: { data: unknown; fetchedAt: number } | null = null;
 
-app.get('/api/sketch/latest', async (c) => {
+app.get('/api/sketch/latest', async c => {
   const neynarKey = process.env.NEYNAR_API_KEY;
   if (!neynarKey) {
     return c.json({ error: 'Sketch API not configured (missing Neynar key)' }, 503);
@@ -2859,41 +3643,163 @@ const TREASURY_ADDRESSES = new Set([
   '0x4f2acdc74f6941390d9b1804fabc3e780388cfe5', // Token Buyer
 ]);
 
-const KNOWN_ENTITIES: Record<string, { name: string; type: string; description: string; url?: string }> = {
+const KNOWN_ENTITIES: Record<
+  string,
+  { name: string; type: string; description: string; url?: string }
+> = {
   // ── Governance ──
-  '0x6f3e6272a167e8accb32072d08e0957f9c79223d': { name: 'Nouns DAO Proxy', type: 'governance', description: 'NounsDAOProxy — governance execution' },
+  '0x6f3e6272a167e8accb32072d08e0957f9c79223d': {
+    name: 'Nouns DAO Proxy',
+    type: 'governance',
+    description: 'NounsDAOProxy — governance execution',
+  },
   // ── Nounders ──
-  '0x2573c60a6d127755aa2dc85e342f7da2378a0cc5': { name: 'Nounders', type: 'nounder', description: 'Nounders multisig — founding team' },
-  '0xfcb177a083c9015adf3cef26fee3e3fc24b993c1': { name: '4156.eth', type: 'nounder', description: 'Nounder — punk4156' },
-  '0x83fce6e68e2f7e58f1d40de12f50ec86e104e94b': { name: 'cryptoseneca.eth', type: 'nounder', description: 'Nounder — cryptoseneca' },
-  '0x1f790c60a21b1d07a041fbc7eb31e36e8457c77a': { name: 'vapeape.eth', type: 'nounder', description: 'Nounder — vapeape' },
-  '0x454cfaa623a629cc0b4017aeb85d54c42e91479d': { name: 'lastpunk9999.eth', type: 'nounder', description: 'Nounder — lastpunk9999' },
-  '0x2c44b726adf1963ca47af88b284c06f30380fc78': { name: 'eboyarts.eth', type: 'nounder', description: 'Nounder — eBoy' },
-  '0xfc7935920789a02b3ee3d7cb768a5f2585f6f383': { name: 'gremplin.eth', type: 'nounder', description: 'Nounder — gremplin' },
-  '0x179a862703a4adfb29681631bd2bae4432e8d5e1': { name: 'devcarrot.eth', type: 'nounder', description: 'Nounder — devcarrot' },
-  '0xc3fdadbae46798cd8762185a09c5b672a7aa36bb': { name: 'solimander.eth', type: 'nounder', description: 'Nounder — solimander' },
+  '0x2573c60a6d127755aa2dc85e342f7da2378a0cc5': {
+    name: 'Nounders',
+    type: 'nounder',
+    description: 'Nounders multisig — founding team',
+  },
+  '0xfcb177a083c9015adf3cef26fee3e3fc24b993c1': {
+    name: '4156.eth',
+    type: 'nounder',
+    description: 'Nounder — punk4156',
+  },
+  '0x83fce6e68e2f7e58f1d40de12f50ec86e104e94b': {
+    name: 'cryptoseneca.eth',
+    type: 'nounder',
+    description: 'Nounder — cryptoseneca',
+  },
+  '0x1f790c60a21b1d07a041fbc7eb31e36e8457c77a': {
+    name: 'vapeape.eth',
+    type: 'nounder',
+    description: 'Nounder — vapeape',
+  },
+  '0x454cfaa623a629cc0b4017aeb85d54c42e91479d': {
+    name: 'lastpunk9999.eth',
+    type: 'nounder',
+    description: 'Nounder — lastpunk9999',
+  },
+  '0x2c44b726adf1963ca47af88b284c06f30380fc78': {
+    name: 'eboyarts.eth',
+    type: 'nounder',
+    description: 'Nounder — eBoy',
+  },
+  '0xfc7935920789a02b3ee3d7cb768a5f2585f6f383': {
+    name: 'gremplin.eth',
+    type: 'nounder',
+    description: 'Nounder — gremplin',
+  },
+  '0x179a862703a4adfb29681631bd2bae4432e8d5e1': {
+    name: 'devcarrot.eth',
+    type: 'nounder',
+    description: 'Nounder — devcarrot',
+  },
+  '0xc3fdadbae46798cd8762185a09c5b672a7aa36bb': {
+    name: 'solimander.eth',
+    type: 'nounder',
+    description: 'Nounder — solimander',
+  },
   // ── Sub-DAOs & Forks ──
-  '0x4b10701bfd7bfedc47d50562b76b436fbb5bdb3b': { name: 'Lil Nouns DAO', type: 'subdao', description: 'Lil Nouns — one Lil Noun every 15 minutes', url: 'https://lilnouns.wtf' },
-  '0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17': { name: 'Gnars DAO', type: 'subdao', description: 'Gnars — action sports DAO', url: 'https://gnars.wtf' },
-  '0xfcb981feaac69b56ff89403ac669b2e1a64fdebb': { name: 'Nouns Fork #0', type: 'subdao', description: 'First Nouns Fork treasury' },
-  '0x7559038535f3d6ed6bac5e54bd6dbe3d4e3fc052': { name: 'Nouns Fork #1', type: 'subdao', description: 'Second Nouns Fork treasury' },
-  '0xd2a838b800b5f7cf4d4769bbf6e3730e1a113e27': { name: 'Purple DAO', type: 'subdao', description: 'Farcaster-aligned Nouns DAO', url: 'https://purple.construction' },
-  '0xe93ff6c15c1a456225e1c642e2fea760f0b0d803': { name: 'Builder DAO', type: 'subdao', description: 'Nouns Builder sub-DAO' },
+  '0x4b10701bfd7bfedc47d50562b76b436fbb5bdb3b': {
+    name: 'Lil Nouns DAO',
+    type: 'subdao',
+    description: 'Lil Nouns — one Lil Noun every 15 minutes',
+    url: 'https://lilnouns.wtf',
+  },
+  '0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17': {
+    name: 'Gnars DAO',
+    type: 'subdao',
+    description: 'Gnars — action sports DAO',
+    url: 'https://gnars.wtf',
+  },
+  '0xfcb981feaac69b56ff89403ac669b2e1a64fdebb': {
+    name: 'Nouns Fork #0',
+    type: 'subdao',
+    description: 'First Nouns Fork treasury',
+  },
+  '0x7559038535f3d6ed6bac5e54bd6dbe3d4e3fc052': {
+    name: 'Nouns Fork #1',
+    type: 'subdao',
+    description: 'Second Nouns Fork treasury',
+  },
+  '0xd2a838b800b5f7cf4d4769bbf6e3730e1a113e27': {
+    name: 'Purple DAO',
+    type: 'subdao',
+    description: 'Farcaster-aligned Nouns DAO',
+    url: 'https://purple.construction',
+  },
+  '0xe93ff6c15c1a456225e1c642e2fea760f0b0d803': {
+    name: 'Builder DAO',
+    type: 'subdao',
+    description: 'Nouns Builder sub-DAO',
+  },
   // ── Infrastructure ──
-  '0xf29ff96aaea6c9a1fba851f74737f3c069d4f1a9': { name: 'Protocol Guild', type: 'infra', description: 'Ethereum core dev funding', url: 'https://protocol-guild.readthedocs.io' },
-  '0x65a3870f48b5237f27f674ec42ea1e017e111d63': { name: 'Prop House', type: 'infra', description: 'Permissionless funding rounds', url: 'https://prop.house' },
-  '0x830bd73e4184cef73443c15111a1df14e495c706': { name: 'Gitcoin', type: 'infra', description: 'Gitcoin — public goods funding', url: 'https://gitcoin.co' },
-  '0x44d97d22b3d37d837ce4b22773aad9d1566055d9': { name: 'Nouns Builder', type: 'infra', description: 'Deploy your own Nouns DAO', url: 'https://nouns.build' },
-  '0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae': { name: 'Ethereum Foundation', type: 'infra', description: 'Ethereum Foundation' },
+  '0xf29ff96aaea6c9a1fba851f74737f3c069d4f1a9': {
+    name: 'Protocol Guild',
+    type: 'infra',
+    description: 'Ethereum core dev funding',
+    url: 'https://protocol-guild.readthedocs.io',
+  },
+  '0x65a3870f48b5237f27f674ec42ea1e017e111d63': {
+    name: 'Prop House',
+    type: 'infra',
+    description: 'Permissionless funding rounds',
+    url: 'https://prop.house',
+  },
+  '0x830bd73e4184cef73443c15111a1df14e495c706': {
+    name: 'Gitcoin',
+    type: 'infra',
+    description: 'Gitcoin — public goods funding',
+    url: 'https://gitcoin.co',
+  },
+  '0x44d97d22b3d37d837ce4b22773aad9d1566055d9': {
+    name: 'Nouns Builder',
+    type: 'infra',
+    description: 'Deploy your own Nouns DAO',
+    url: 'https://nouns.build',
+  },
+  '0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae': {
+    name: 'Ethereum Foundation',
+    type: 'infra',
+    description: 'Ethereum Foundation',
+  },
   // ── Culture ──
-  '0x13ae6e44908e094d4de51d6580b3570ab3c1e360': { name: 'Nouns Movie (Atrium)', type: 'culture', description: 'Nouns: A Movie — feature film' },
-  '0xa3557e3f89063e4bdc1aa4de85fcced4487a4e03': { name: 'Nounish Agency', type: 'culture', description: 'The agency for Nounish brands' },
-  '0x281ec184e704ce57570d4d14cba258cf2a69e7b3': { name: 'Nouns Coffee', type: 'culture', description: 'Nouns-branded coffee experience' },
-  '0x5b2f39f1135485f3f221454a264cd4f023b3e8cb': { name: 'SharkDAO', type: 'culture', description: 'Shark-themed Nouns community' },
-  '0xd5f7818f553e1d1ef0c51e16a13df6691b3b1702': { name: 'Nouns Esports', type: 'culture', description: 'Competitive gaming team' },
+  '0x13ae6e44908e094d4de51d6580b3570ab3c1e360': {
+    name: 'Nouns Movie (Atrium)',
+    type: 'culture',
+    description: 'Nouns: A Movie — feature film',
+  },
+  '0xa3557e3f89063e4bdc1aa4de85fcced4487a4e03': {
+    name: 'Nounish Agency',
+    type: 'culture',
+    description: 'The agency for Nounish brands',
+  },
+  '0x281ec184e704ce57570d4d14cba258cf2a69e7b3': {
+    name: 'Nouns Coffee',
+    type: 'culture',
+    description: 'Nouns-branded coffee experience',
+  },
+  '0x5b2f39f1135485f3f221454a264cd4f023b3e8cb': {
+    name: 'SharkDAO',
+    type: 'culture',
+    description: 'Shark-themed Nouns community',
+  },
+  '0xd5f7818f553e1d1ef0c51e16a13df6691b3b1702': {
+    name: 'Nouns Esports',
+    type: 'culture',
+    description: 'Competitive gaming team',
+  },
   // ── Education ──
-  '0x1a9c8182c09f50c8318d769245bea52c32be35bc': { name: 'Nouns Center', type: 'education', description: 'Community information hub' },
-  '0x40de806b864b502aa5283a8d662e42684f76ce17': { name: 'Glasses for Kids', type: 'education', description: 'Real Noggles — glasses for children' },
+  '0x1a9c8182c09f50c8318d769245bea52c32be35bc': {
+    name: 'Nouns Center',
+    type: 'education',
+    description: 'Community information hub',
+  },
+  '0x40de806b864b502aa5283a8d662e42684f76ce17': {
+    name: 'Glasses for Kids',
+    type: 'education',
+    description: 'Real Noggles — glasses for children',
+  },
 };
 
 // ─── ENS Resolution (background, non-blocking) ─────────────────────────
@@ -2912,7 +3818,8 @@ async function resolveOneEns(rpcUrl: string, addr: string): Promise<string | nul
       }
     }
     encoded += '00';
-    const calldata = '0xec11c823' +
+    const calldata =
+      '0xec11c823' +
       '0000000000000000000000000000000000000000000000000000000000000020' +
       (encoded.length / 2 - 1).toString(16).padStart(64, '0') +
       encoded.slice(2).padEnd(Math.ceil((encoded.length - 2) / 64) * 64, '0');
@@ -2922,12 +3829,13 @@ async function resolveOneEns(rpcUrl: string, addr: string): Promise<string | nul
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          jsonrpc: '2.0', method: 'eth_call',
+          jsonrpc: '2.0',
+          method: 'eth_call',
           params: [{ to: '0xce01f8eee7E0a9588E56A9b3b055b42eAf49D12a', data: calldata }, 'latest'],
           id: 1,
         }),
       });
-      return await res.json() as { result?: string; error?: unknown };
+      return (await res.json()) as { result?: string; error?: unknown };
     };
 
     let json = await doCall(rpcUrl);
@@ -2960,10 +3868,12 @@ async function resolveEnsNames(addresses: string[]): Promise<void> {
   // Process in batches of 20 with 300ms delay between batches
   for (let i = 0; i < toResolve.length; i += 20) {
     const batch = toResolve.slice(i, i + 20);
-    await Promise.all(batch.map(async (addr) => {
-      const name = await resolveOneEns(rpcUrl, addr);
-      ensNameCache.set(addr, name);
-    }));
+    await Promise.all(
+      batch.map(async addr => {
+        const name = await resolveOneEns(rpcUrl, addr);
+        ensNameCache.set(addr, name);
+      }),
+    );
     if (i + 20 < toResolve.length) await new Promise(r => setTimeout(r, 300));
   }
 }
@@ -2980,7 +3890,17 @@ function flowColor(netRatio: number): string {
 // Ponder only stores PENDING/ACTIVE/CANCELLED/VETOED/QUEUED/EXECUTED.
 // We compute DEFEATED/EXPIRED/SUCCEEDED from vote counts + block data.
 function computeDerivedStatus(
-  p: { status: string; forVotes: number; againstVotes: number; quorumVotes: bigint; endBlock: bigint; objectionPeriodEndBlock: bigint | null; executionETA: bigint | null; onTimelockV1: boolean; startBlock: bigint },
+  p: {
+    status: string;
+    forVotes: number;
+    againstVotes: number;
+    quorumVotes: bigint;
+    endBlock: bigint;
+    objectionPeriodEndBlock: bigint | null;
+    executionETA: bigint | null;
+    onTimelockV1: boolean;
+    startBlock: bigint;
+  },
   latestBlock: bigint,
 ): string {
   // Terminal statuses are authoritative
@@ -2998,9 +3918,10 @@ function computeDerivedStatus(
 
   // ACTIVE/PENDING proposals past endBlock may be DEFEATED or SUCCEEDED
   if (p.status === 'ACTIVE' || p.status === 'PENDING') {
-    const effectiveEnd = p.objectionPeriodEndBlock && p.objectionPeriodEndBlock > p.endBlock
-      ? p.objectionPeriodEndBlock
-      : p.endBlock;
+    const effectiveEnd =
+      p.objectionPeriodEndBlock && p.objectionPeriodEndBlock > p.endBlock
+        ? p.objectionPeriodEndBlock
+        : p.endBlock;
 
     if (latestBlock > effectiveEnd) {
       const forVotes = BigInt(p.forVotes);
@@ -3020,26 +3941,31 @@ function computeDerivedStatus(
 // ─── Weighted composite node sizing ──────────────────────────────────────
 // Noun-centric: nodes with more Nouns (held + delegated) are bigger
 function computeNodeSize(
-  totalIn: number, totalOut: number,
-  votesCount: number, totalVotingWeight: number,
-  proposalsCreated: number, connectionCount: number,
-  nounsHeld: number, delegatedVotes: number,
+  totalIn: number,
+  totalOut: number,
+  votesCount: number,
+  totalVotingWeight: number,
+  proposalsCreated: number,
+  connectionCount: number,
+  nounsHeld: number,
+  delegatedVotes: number,
 ): number {
-  const ethScore  = Math.log(1 + totalIn + totalOut);
+  const ethScore = Math.log(1 + totalIn + totalOut);
   const voteScore = Math.log(1 + votesCount) * 0.5 + Math.log(1 + totalVotingWeight) * 0.5;
   const propScore = Math.log(1 + proposalsCreated * 10);
   const connScore = Math.log(1 + connectionCount);
   // Noun ownership is the primary sizing factor
   const nounScore = Math.log(1 + nounsHeld * 5 + delegatedVotes * 3);
 
-  const composite = nounScore * 0.30 + ethScore * 0.25 + voteScore * 0.20 + propScore * 0.15 + connScore * 0.10;
+  const composite =
+    nounScore * 0.3 + ethScore * 0.25 + voteScore * 0.2 + propScore * 0.15 + connScore * 0.1;
   return Math.max(6, Math.min(55, 4 + composite * 3.8));
 }
 
 let treasuryFlowCache: { data: unknown; fetchedAt: number } | null = null;
 const TREASURY_FLOW_CACHE_TTL = 30 * 60_000;
 
-app.get('/api/treasury/flows', async (c) => {
+app.get('/api/treasury/flows', async c => {
   if (treasuryFlowCache && Date.now() - treasuryFlowCache.fetchedAt < TREASURY_FLOW_CACHE_TTL) {
     return c.json(treasuryFlowCache.data);
   }
@@ -3049,11 +3975,31 @@ app.get('/api/treasury/flows', async (c) => {
     const allTransactions = await db.select().from(schema.transaction);
     const settledAuctions = await db.select().from(schema.auction);
     let allBids: unknown[] = [];
-    try { allBids = await db.select().from(schema.bid); } catch { /* bid table may not exist yet */ }
+    try {
+      allBids = await db.select().from(schema.bid);
+    } catch {
+      /* bid table may not exist yet */
+    }
     let allVotes: { voter: string; proposalId: bigint; support: number; votes: number }[] = [];
-    try { allVotes = await db.select().from(schema.vote) as typeof allVotes; } catch { /* vote table may not exist yet */ }
-    let allStreams: { payer: string; recipient: string; tokenAmount: bigint; tokenAddress: string; proposalId: bigint | null; status: string; streamAddress: string }[] = [];
-    try { allStreams = await db.select().from(schema.stream) as typeof allStreams; } catch { /* stream table may not exist yet */ }
+    try {
+      allVotes = (await db.select().from(schema.vote)) as typeof allVotes;
+    } catch {
+      /* vote table may not exist yet */
+    }
+    let allStreams: {
+      payer: string;
+      recipient: string;
+      tokenAmount: bigint;
+      tokenAddress: string;
+      proposalId: bigint | null;
+      status: string;
+      streamAddress: string;
+    }[] = [];
+    try {
+      allStreams = (await db.select().from(schema.stream)) as typeof allStreams;
+    } catch {
+      /* stream table may not exist yet */
+    }
 
     // ── Derived proposal statuses ──────────────────────────────────────
     const latestBlock = allProposals.reduce((max, p) => {
@@ -3063,7 +4009,9 @@ app.get('/api/treasury/flows', async (c) => {
     const latestBlockBi = BigInt(latestBlock || 0);
 
     const derivedStatuses = allProposals.map(p => computeDerivedStatus(p, latestBlockBi));
-    const propsPassed = derivedStatuses.filter(s => s === 'EXECUTED' || s === 'QUEUED' || s === 'SUCCEEDED').length;
+    const propsPassed = derivedStatuses.filter(
+      s => s === 'EXECUTED' || s === 'QUEUED' || s === 'SUCCEEDED',
+    ).length;
     const propsFailed = derivedStatuses.filter(s => s === 'DEFEATED').length;
     const propsCancelled = derivedStatuses.filter(s => s === 'CANCELLED' || s === 'VETOED').length;
     const propsExpired = derivedStatuses.filter(s => s === 'EXPIRED').length;
@@ -3102,7 +4050,10 @@ app.get('/api/treasury/flows', async (c) => {
     }
 
     // ── Aggregate flows per address ────────────────────────────────────
-    const flows = new Map<string, { ethIn: number; ethOut: number; proposals: Set<string>; auctions: number }>();
+    const flows = new Map<
+      string,
+      { ethIn: number; ethOut: number; proposals: Set<string>; auctions: number }
+    >();
     const getFlow = (addr: string) => {
       const k = addr.toLowerCase();
       if (!flows.has(k)) flows.set(k, { ethIn: 0, ethOut: 0, proposals: new Set(), auctions: 0 });
@@ -3129,7 +4080,13 @@ app.get('/api/treasury/flows', async (c) => {
 
     // ── Stream flows ───────────────────────────────────────────────────
     const WETH = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-    const streamLinks: { source: string; target: string; value: number; label: string; direction: string }[] = [];
+    const streamLinks: {
+      source: string;
+      target: string;
+      value: number;
+      label: string;
+      direction: string;
+    }[] = [];
     for (const s of allStreams) {
       const payer = s.payer.toLowerCase();
       const recipient = s.recipient.toLowerCase();
@@ -3149,7 +4106,8 @@ app.get('/api/treasury/flows', async (c) => {
       }
       const propLabel = s.proposalId ? ` (Prop #${s.proposalId})` : '';
       streamLinks.push({
-        source: payer, target: recipient,
+        source: payer,
+        target: recipient,
         value: isEth ? amount : 0.1,
         label: `Stream: ${amount.toFixed(1)} ${isEth ? 'WETH' : 'tokens'}${propLabel}`,
         direction: 'stream',
@@ -3157,7 +4115,10 @@ app.get('/api/treasury/flows', async (c) => {
     }
 
     // ── Proposer → recipient links ─────────────────────────────────────
-    const proposerRecipientAgg = new Map<string, Map<string, { eth: number; proposals: Set<string> }>>();
+    const proposerRecipientAgg = new Map<
+      string,
+      Map<string, { eth: number; proposals: Set<string> }>
+    >();
     for (const prop of allProposals) {
       if (prop.status !== 'EXECUTED' && prop.status !== 'QUEUED') continue;
       const proposer = prop.proposer.toLowerCase();
@@ -3179,22 +4140,51 @@ app.get('/api/treasury/flows', async (c) => {
     }
 
     // ── Noun ownership data ────────────────────────────────────────────
-    interface NounSeedData { background: number; body: number; accessory: number; head: number; glasses: number }
-    let allNouns: { id: bigint; owner: string; background: number; body: number; accessory: number; head: number; glasses: number; createdAt: number }[] = [];
-    try { allNouns = await db.select().from(schema.noun) as typeof allNouns; } catch { /* noun table may not exist yet */ }
+    interface NounSeedData {
+      background: number;
+      body: number;
+      accessory: number;
+      head: number;
+      glasses: number;
+    }
+    let allNouns: {
+      id: bigint;
+      owner: string;
+      background: number;
+      body: number;
+      accessory: number;
+      head: number;
+      glasses: number;
+      createdAt: number;
+    }[] = [];
+    try {
+      allNouns = (await db.select().from(schema.noun)) as typeof allNouns;
+    } catch {
+      /* noun table may not exist yet */
+    }
     const nounsByOwner = new Map<string, { id: string; seed: NounSeedData }[]>();
     for (const n of allNouns) {
       const owner = (n.owner as string).toLowerCase();
       if (!nounsByOwner.has(owner)) nounsByOwner.set(owner, []);
       nounsByOwner.get(owner)!.push({
         id: String(n.id),
-        seed: { background: n.background, body: n.body, accessory: n.accessory, head: n.head, glasses: n.glasses },
+        seed: {
+          background: n.background,
+          body: n.body,
+          accessory: n.accessory,
+          head: n.head,
+          glasses: n.glasses,
+        },
       });
     }
 
     // ── Delegation data ────────────────────────────────────────────────
     let allDelegates: { id: string; delegatedVotes: number }[] = [];
-    try { allDelegates = await db.select().from(schema.delegate) as typeof allDelegates; } catch { /* delegate table may not exist yet */ }
+    try {
+      allDelegates = (await db.select().from(schema.delegate)) as typeof allDelegates;
+    } catch {
+      /* delegate table may not exist yet */
+    }
     const delegatedVotesMap = new Map<string, number>();
     for (const d of allDelegates) {
       delegatedVotesMap.set((d.id as string).toLowerCase(), d.delegatedVotes);
@@ -3202,23 +4192,46 @@ app.get('/api/treasury/flows', async (c) => {
 
     // ── Build graph nodes and links ────────────────────────────────────
     interface GNode {
-      id: string; name: string; type: string; description: string; url?: string;
-      totalIn: number; totalOut: number; netFlow: number; color: string; size: number;
-      proposals: string[]; auctionCount: number;
-      votesCount: number; totalVotingWeight: number;
-      proposalsCreated: number; proposalsCreatedIds: string[];
+      id: string;
+      name: string;
+      type: string;
+      description: string;
+      url?: string;
+      totalIn: number;
+      totalOut: number;
+      netFlow: number;
+      color: string;
+      size: number;
+      proposals: string[];
+      auctionCount: number;
+      votesCount: number;
+      totalVotingWeight: number;
+      proposalsCreated: number;
+      proposalsCreatedIds: string[];
       participationRate: number;
-      flowRole: number; outboundConnections: number; inboundConnections: number;
-      ensName: string | null; ensAvatar: string | null;
-      nounIds: string[]; firstNounSeed: NounSeedData | null;
+      flowRole: number;
+      outboundConnections: number;
+      inboundConnections: number;
+      ensName: string | null;
+      ensAvatar: string | null;
+      nounIds: string[];
+      firstNounSeed: NounSeedData | null;
       delegatedVotes: number;
-      fx?: number; fy?: number;
+      fx?: number;
+      fy?: number;
     }
-    interface GLink { source: string; target: string; value: number; label: string; direction: string }
+    interface GLink {
+      source: string;
+      target: string;
+      value: number;
+      label: string;
+      direction: string;
+    }
 
     const nodes: GNode[] = [];
     const links: GLink[] = [];
-    let totalInflow = 0, totalOutflow = 0;
+    let totalInflow = 0,
+      totalOutflow = 0;
 
     for (const [addr, f] of flows) {
       // Skip treasury addresses — they're merged into the virtual treasury node
@@ -3267,10 +4280,13 @@ app.get('/api/treasury/flows', async (c) => {
         totalVotingWeight: vs?.weight ?? 0,
         proposalsCreated: ps?.length ?? 0,
         proposalsCreatedIds: ps ?? [],
-        participationRate: totalVotableProposals > 0
-          ? Math.round(((vs?.count ?? 0) / totalVotableProposals) * 10000) / 100
-          : 0,
-        flowRole: 0, outboundConnections: 0, inboundConnections: 0,
+        participationRate:
+          totalVotableProposals > 0
+            ? Math.round(((vs?.count ?? 0) / totalVotableProposals) * 10000) / 100
+            : 0,
+        flowRole: 0,
+        outboundConnections: 0,
+        inboundConnections: 0,
         ensName,
         ensAvatar: ensName ? `https://metadata.ens.domains/mainnet/avatar/${ensName}` : null,
         nounIds: ownedNouns.map(n => n.id),
@@ -3279,11 +4295,25 @@ app.get('/api/treasury/flows', async (c) => {
       });
 
       if (f.ethIn > 0) {
-        const pLabels = Array.from(f.proposals).slice(0, 5).map(id => `#${id}`);
-        links.push({ source: 'treasury', target: addr, value: f.ethIn, label: pLabels.join(', ') || 'Funding', direction: 'out' });
+        const pLabels = Array.from(f.proposals)
+          .slice(0, 5)
+          .map(id => `#${id}`);
+        links.push({
+          source: 'treasury',
+          target: addr,
+          value: f.ethIn,
+          label: pLabels.join(', ') || 'Funding',
+          direction: 'out',
+        });
       }
       if (f.ethOut > 0) {
-        links.push({ source: addr, target: 'treasury', value: f.ethOut, label: `${f.auctions} auction${f.auctions !== 1 ? 's' : ''}`, direction: 'in' });
+        links.push({
+          source: addr,
+          target: 'treasury',
+          value: f.ethOut,
+          label: `${f.auctions} auction${f.auctions !== 1 ? 's' : ''}`,
+          direction: 'in',
+        });
       }
     }
 
@@ -3294,8 +4324,13 @@ app.get('/api/treasury/flows', async (c) => {
       for (const [recipient, data] of recipients) {
         if (!nodeIds.has(recipient)) continue;
         links.push({
-          source: proposer, target: recipient, value: data.eth,
-          label: `Proposed: ${Array.from(data.proposals).slice(0, 3).map(id => `#${id}`).join(', ')}`,
+          source: proposer,
+          target: recipient,
+          value: data.eth,
+          label: `Proposed: ${Array.from(data.proposals)
+            .slice(0, 3)
+            .map(id => `#${id}`)
+            .join(', ')}`,
           direction: 'proposed',
         });
       }
@@ -3330,10 +4365,14 @@ app.get('/api/treasury/flows', async (c) => {
       node.inboundConnections = inCount;
       node.flowRole = totalConns > 0 ? (outCount - inCount) / totalConns : 0;
       node.size = computeNodeSize(
-        node.totalIn, node.totalOut,
-        node.votesCount, node.totalVotingWeight,
-        node.proposalsCreated, totalConns,
-        node.nounIds.length, node.delegatedVotes,
+        node.totalIn,
+        node.totalOut,
+        node.votesCount,
+        node.totalVotingWeight,
+        node.proposalsCreated,
+        totalConns,
+        node.nounIds.length,
+        node.delegatedVotes,
       );
     }
 
@@ -3350,22 +4389,33 @@ app.get('/api/treasury/flows', async (c) => {
       size: 60,
       proposals: [],
       auctionCount: 0,
-      votesCount: 0, totalVotingWeight: 0,
-      proposalsCreated: 0, proposalsCreatedIds: [],
+      votesCount: 0,
+      totalVotingWeight: 0,
+      proposalsCreated: 0,
+      proposalsCreatedIds: [],
       participationRate: 0,
-      flowRole: 0, outboundConnections: 0, inboundConnections: 0,
-      ensName: 'nouns.eth', ensAvatar: 'https://metadata.ens.domains/mainnet/avatar/nouns.eth',
-      nounIds: [], firstNounSeed: null, delegatedVotes: 0,
+      flowRole: 0,
+      outboundConnections: 0,
+      inboundConnections: 0,
+      ensName: 'nouns.eth',
+      ensAvatar: 'https://metadata.ens.domains/mainnet/avatar/nouns.eth',
+      nounIds: [],
+      firstNounSeed: null,
+      delegatedVotes: 0,
       fx: 0,
       fy: 0,
     });
 
-    nodes.sort((a, b) => a.id === 'treasury' ? -1 : b.id === 'treasury' ? 1 : (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut));
+    nodes.sort((a, b) => {
+      if (a.id === 'treasury') return -1;
+      if (b.id === 'treasury') return 1;
+      return b.totalIn + b.totalOut - (a.totalIn + a.totalOut);
+    });
 
     // Resolve ENS names for ALL unknown addresses (awaited, batched)
     const unknownAddrs = nodes
       .filter(n => !KNOWN_ENTITIES[n.id] && !ensNameCache.has(n.id) && n.id !== 'treasury')
-      .sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut))
+      .sort((a, b) => b.totalIn + b.totalOut - (a.totalIn + a.totalOut))
       .map(n => n.id);
     if (unknownAddrs.length > 0) {
       await resolveEnsNames(unknownAddrs);
@@ -3382,7 +4432,7 @@ app.get('/api/treasury/flows', async (c) => {
 
     // ── Timeline events for time slider ──────────────────────────────
     interface TimelineEvent {
-      t: number;   // unix timestamp (seconds)
+      t: number; // unix timestamp (seconds)
       type: string; // 'auction' | 'funding' | 'stream' | 'noun_mint'
       from: string;
       to: string;
@@ -3458,7 +4508,9 @@ app.get('/api/treasury/flows', async (c) => {
     timeline.sort((a, b) => a.t - b.t);
 
     const result = {
-      nodes, links, timeline,
+      nodes,
+      links,
+      timeline,
       stats: {
         totalInflow: Math.round(totalInflow),
         totalOutflow: Math.round(totalOutflow),
@@ -3481,7 +4533,10 @@ app.get('/api/treasury/flows', async (c) => {
     return c.json(result);
   } catch (err) {
     console.error('Treasury flows error:', err);
-    return c.json({ error: 'Failed to compute treasury flows', nodes: [], links: [], stats: {} }, 500);
+    return c.json(
+      { error: 'Failed to compute treasury flows', nodes: [], links: [], stats: {} },
+      500,
+    );
   }
 });
 
@@ -3490,7 +4545,7 @@ app.get('/api/treasury/flows', async (c) => {
 // ============================================================
 
 // ── Agent Predict (fast — no auth, no Claude, ~1ms) ─────────────────────
-app.get('/api/agent/predict', (c) => {
+app.get('/api/agent/predict', c => {
   const w = getWatcherState();
   return c.json({
     block: w.lastBlockNumber,
@@ -3505,11 +4560,15 @@ app.get('/api/agent/predict', (c) => {
 });
 
 // ── Agent Status ────────────────────────────────────────────────────────
-app.get('/api/agent/status', async (c) => {
+app.get('/api/agent/status', async c => {
   const watcherState = getWatcherState();
   const stats = reservationStore.stats();
   let balance = 0;
-  try { balance = await getAgentBalance(); } catch { /* ok */ }
+  try {
+    balance = await getAgentBalance();
+  } catch {
+    /* ok */
+  }
 
   return c.json({
     agent: 'NounIRL',
@@ -3532,7 +4591,7 @@ app.get('/api/agent/status', async (c) => {
 });
 
 // ── Create Reservation ──────────────────────────────────────────────────
-app.post('/api/agent/reserve', async (c) => {
+app.post('/api/agent/reserve', async c => {
   try {
     const body = await c.req.json();
     const { wallet, txHash, chainId, traits, settleFor } = body as {
@@ -3544,7 +4603,14 @@ app.post('/api/agent/reserve', async (c) => {
     };
 
     // Validate inputs
-    if (!wallet || !txHash || !chainId || !traits || !Array.isArray(traits) || traits.length === 0) {
+    if (
+      !wallet ||
+      !txHash ||
+      !chainId ||
+      !traits ||
+      !Array.isArray(traits) ||
+      traits.length === 0
+    ) {
       return c.json({ error: 'Missing required fields: wallet, txHash, chainId, traits[]' }, 400);
     }
 
@@ -3564,22 +4630,28 @@ app.post('/api/agent/reserve', async (c) => {
     });
 
     // Verify tip asynchronously (don't block the response)
-    verifyTip(txHash, chainId).then(result => {
-      if (result.valid) {
-        // Update amount and activate
-        const r = reservationStore.get(reservation.id);
-        if (r) {
-          r.tipAmountEth = result.amountEth || 0;
-          reservationStore.activate(reservation.id);
-          console.log(`[NounIRL] ✅ Reservation ${reservation.id} verified and activated — ${result.amountEth} ETH from ${result.chainName}`);
+    verifyTip(txHash, chainId)
+      .then(result => {
+        if (result.valid) {
+          // Update amount and activate
+          const r = reservationStore.get(reservation.id);
+          if (r) {
+            r.tipAmountEth = result.amountEth || 0;
+            reservationStore.activate(reservation.id);
+            console.log(
+              `[NounIRL] ✅ Reservation ${reservation.id} verified and activated — ${result.amountEth} ETH from ${result.chainName}`,
+            );
+          }
+        } else {
+          console.log(
+            `[NounIRL] ❌ Tip verification failed for ${reservation.id}: ${result.error}`,
+          );
+          reservationStore.cancel(reservation.id);
         }
-      } else {
-        console.log(`[NounIRL] ❌ Tip verification failed for ${reservation.id}: ${result.error}`);
-        reservationStore.cancel(reservation.id);
-      }
-    }).catch(err => {
-      console.error(`[NounIRL] Tip verification error for ${reservation.id}:`, err);
-    });
+      })
+      .catch(err => {
+        console.error(`[NounIRL] Tip verification error for ${reservation.id}:`, err);
+      });
 
     return c.json({
       reservation: {
@@ -3596,17 +4668,15 @@ app.post('/api/agent/reserve', async (c) => {
 });
 
 // ── List Reservations ───────────────────────────────────────────────────
-app.get('/api/agent/reservations', (c) => {
+app.get('/api/agent/reservations', c => {
   const wallet = c.req.query('wallet');
-  const reservations = wallet
-    ? reservationStore.getByWallet(wallet)
-    : reservationStore.getAll();
+  const reservations = wallet ? reservationStore.getByWallet(wallet) : reservationStore.getAll();
 
   return c.json({ reservations });
 });
 
 // ── Cancel Reservation ──────────────────────────────────────────────────
-app.post('/api/agent/cancel/:id', (c) => {
+app.post('/api/agent/cancel/:id', c => {
   const id = c.req.param('id');
   const reservation = reservationStore.get(id);
 
@@ -3619,7 +4689,7 @@ app.post('/api/agent/cancel/:id', (c) => {
 });
 
 // ── Manual Check ────────────────────────────────────────────────────────
-app.post('/api/agent/check', async (c) => {
+app.post('/api/agent/check', async c => {
   try {
     const result = await checkNow();
     return c.json(result);
@@ -3630,8 +4700,13 @@ app.post('/api/agent/check', async (c) => {
 });
 
 // ── Trait Info ───────────────────────────────────────────────────────────
-app.get('/api/agent/traits/:category', (c) => {
-  const category = c.req.param('category') as 'background' | 'body' | 'accessory' | 'head' | 'glasses';
+app.get('/api/agent/traits/:category', c => {
+  const category = c.req.param('category') as
+    | 'background'
+    | 'body'
+    | 'accessory'
+    | 'head'
+    | 'glasses';
   const validCategories = ['background', 'body', 'accessory', 'head', 'glasses'];
 
   if (!validCategories.includes(category)) {
@@ -3643,7 +4718,7 @@ app.get('/api/agent/traits/:category', (c) => {
 });
 
 // ── Parse Natural Language Traits ───────────────────────────────────────
-app.post('/api/agent/parse-traits', async (c) => {
+app.post('/api/agent/parse-traits', async c => {
   try {
     const body = await c.req.json();
     const { description } = body as { description: string };
@@ -3651,39 +4726,49 @@ app.post('/api/agent/parse-traits', async (c) => {
 
     const parsed = parseTraitDescription(description);
     return c.json({ description, parsed });
-  } catch (err) {
+  } catch {
     return c.json({ error: 'Failed to parse traits' }, 500);
   }
 });
 
 // ── Settlement History ──────────────────────────────────────────────────
-app.get('/api/agent/settlements', (c) => {
+app.get('/api/agent/settlements', c => {
   const limit = Number(c.req.query('limit') || 20);
   const settlements = reservationStore.getSettlements(limit);
   return c.json({ settlements });
 });
 
 // ── Deploy History ──────────────────────────────────────────────────────
-app.get('/api/agent/deploys', (c) => {
+app.get('/api/agent/deploys', c => {
   const limit = Number(c.req.query('limit') || 20);
   const deploys = getDeployHistory(limit);
   return c.json({ deploys, canDeploy: canDeploy() });
 });
 
 // ── Trigger Deploy (manual, Noun-gated) ─────────────────────────────────
-app.post('/api/agent/deploy', async (c) => {
+app.post('/api/agent/deploy', async c => {
   try {
     const body = await c.req.json();
-    const { description, reason, wallet: deployWallet } = body as { description: string; reason?: string; wallet?: string };
+    const {
+      description,
+      reason,
+      wallet: deployWallet,
+    } = body as { description: string; reason?: string; wallet?: string };
     if (!description) return c.json({ error: 'description is required' }, 400);
 
     // Noun-gated: require connected wallet with 4+ Nouns
     if (!deployWallet) {
-      return c.json({ error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns.` }, 403);
+      return c.json(
+        { error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns.` },
+        403,
+      );
     }
     const nounBalance = await getNounBalance(deployWallet);
     if (nounBalance < MIN_NOUNS_FOR_DEPLOY) {
-      return c.json({ error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Wallet holds ${nounBalance}.` }, 403);
+      return c.json(
+        { error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Wallet holds ${nounBalance}.` },
+        403,
+      );
     }
 
     if (!canDeploy()) {
@@ -3699,7 +4784,8 @@ app.post('/api/agent/deploy', async (c) => {
     const result = await applyAndDeploy(
       patches,
       description,
-      reason || `manual deploy via API (authorized by ${deployWallet.slice(0, 6)}...${deployWallet.slice(-4)}, ${nounBalance} Nouns)`,
+      reason ||
+        `manual deploy via API (authorized by ${deployWallet.slice(0, 6)}...${deployWallet.slice(-4)}, ${nounBalance} Nouns)`,
       'terminal',
     );
 
@@ -3711,7 +4797,7 @@ app.post('/api/agent/deploy', async (c) => {
 });
 
 // ── Knowledge Ingestion ──────────────────────────────────────────────────
-app.post('/api/agent/learn', async (c) => {
+app.post('/api/agent/learn', async c => {
   try {
     const body = await c.req.json();
     const { urls } = body as { urls?: string[] };
@@ -3726,7 +4812,9 @@ app.post('/api/agent/learn', async (c) => {
 
     // Validate all URLs
     for (const url of urls) {
-      try { new URL(url); } catch {
+      try {
+        new URL(url);
+      } catch {
         return c.json({ error: `Invalid URL: ${url}` }, 400);
       }
     }
@@ -3745,32 +4833,38 @@ app.post('/api/agent/learn', async (c) => {
   }
 });
 
-app.get('/api/agent/knowledge', async (c) => {
+app.get('/api/agent/knowledge', async c => {
   try {
     const stats = await getKnowledgeStats();
     return c.json(stats);
-  } catch (err) {
+  } catch {
     return c.json({ totalFacts: 0, sources: [] });
   }
 });
 
 // ─── Self-Learning: Read our own Ponder data ─────────────────────────────────
 
-app.post('/api/agent/self-learn', async (c) => {
+app.post('/api/agent/self-learn', async c => {
   try {
     // This is a long-running operation — run it in background and return immediately
     const startTime = Date.now();
 
     // Kick off the pipeline (non-blocking)
-    runSelfLearn().then(result => {
-      console.log(`[SelfLearn] Pipeline finished in ${((Date.now() - startTime) / 1000).toFixed(0)}s:`, JSON.stringify(result));
-    }).catch(err => {
-      console.error('[SelfLearn] Pipeline failed:', err);
-    });
+    runSelfLearn()
+      .then(result => {
+        console.log(
+          `[SelfLearn] Pipeline finished in ${((Date.now() - startTime) / 1000).toFixed(0)}s:`,
+          JSON.stringify(result),
+        );
+      })
+      .catch(err => {
+        console.error('[SelfLearn] Pipeline failed:', err);
+      });
 
     return c.json({
       success: true,
-      message: 'Self-learning pipeline started. Processing proposals, auctions, and delegates from noun.wtf Ponder index. This takes a few minutes.',
+      message:
+        'Self-learning pipeline started. Processing proposals, auctions, and delegates from noun.wtf Ponder index. This takes a few minutes.',
       startedAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -3781,7 +4875,7 @@ app.post('/api/agent/self-learn', async (c) => {
 
 // ─── People Database ─────────────────────────────────────────────────────────
 
-app.get('/api/agent/people', async (c) => {
+app.get('/api/agent/people', async c => {
   try {
     const limit = parseInt(c.req.query('limit') || '50', 10);
     const offset = parseInt(c.req.query('offset') || '0', 10);
@@ -3796,7 +4890,7 @@ app.get('/api/agent/people', async (c) => {
   }
 });
 
-app.get('/api/agent/people/search', async (c) => {
+app.get('/api/agent/people/search', async c => {
   try {
     const q = c.req.query('q');
     if (!q) return c.json({ error: 'Missing ?q= parameter' }, 400);
@@ -3809,7 +4903,7 @@ app.get('/api/agent/people/search', async (c) => {
   }
 });
 
-app.get('/api/agent/people/stats', async (c) => {
+app.get('/api/agent/people/stats', async c => {
   try {
     const count = await getPeopleCount();
     const status = getBuildStatus();
@@ -3820,7 +4914,7 @@ app.get('/api/agent/people/stats', async (c) => {
   }
 });
 
-app.get('/api/agent/people/:address', async (c) => {
+app.get('/api/agent/people/:address', async c => {
   try {
     const address = c.req.param('address');
     const person = await getPerson(address);
@@ -3832,29 +4926,38 @@ app.get('/api/agent/people/:address', async (c) => {
   }
 });
 
-app.post('/api/agent/people/build', async (c) => {
+app.post('/api/agent/people/build', async c => {
   try {
     const status = getBuildStatus();
     if (status.running) {
-      return c.json({
-        success: false,
-        message: 'Build already in progress',
-        progress: status.progress,
-      }, 409);
+      return c.json(
+        {
+          success: false,
+          message: 'Build already in progress',
+          progress: status.progress,
+        },
+        409,
+      );
     }
 
     const startTime = Date.now();
 
     // Kick off in background (non-blocking)
-    buildPeopleDb().then(result => {
-      console.log(`[PeopleDb] Build finished in ${((Date.now() - startTime) / 1000).toFixed(0)}s:`, JSON.stringify(result));
-    }).catch(err => {
-      console.error('[PeopleDb] Build failed:', err);
-    });
+    buildPeopleDb()
+      .then(result => {
+        console.log(
+          `[PeopleDb] Build finished in ${((Date.now() - startTime) / 1000).toFixed(0)}s:`,
+          JSON.stringify(result),
+        );
+      })
+      .catch(err => {
+        console.error('[PeopleDb] Build failed:', err);
+      });
 
     return c.json({
       success: true,
-      message: 'People database build started. This crawls all proposals, votes, auctions, bids, delegates, and streams, resolves ENS, and generates summaries. May take 10-30 minutes.',
+      message:
+        'People database build started. This crawls all proposals, votes, auctions, bids, delegates, and streams, resolves ENS, and generates summaries. May take 10-30 minutes.',
       startedAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -3888,14 +4991,21 @@ function tsToISO(ts: unknown): string {
 let activityFeedCache: { data: unknown; fetchedAt: number; key: string } | null = null;
 const ACTIVITY_FEED_TTL = 30_000;
 
-app.get('/api/activity', async (c) => {
+app.get('/api/activity', async c => {
   const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
   const beforeParam = c.req.query('before');
   const before = beforeParam ? BigInt(beforeParam) : undefined;
-  const typeFilter = c.req.query('type')?.split(',').map(t => t.trim().toUpperCase()) || [];
+  const typeFilter =
+    c.req
+      .query('type')
+      ?.split(',')
+      .map(t => t.trim().toUpperCase()) || [];
 
   const cacheKey = `${limit}:${before ?? 'latest'}:${typeFilter.join(',')}`;
-  if (activityFeedCache?.key === cacheKey && Date.now() - activityFeedCache.fetchedAt < ACTIVITY_FEED_TTL) {
+  if (
+    activityFeedCache?.key === cacheKey &&
+    Date.now() - activityFeedCache.fetchedAt < ACTIVITY_FEED_TTL
+  ) {
     return c.json(activityFeedCache.data);
   }
 
@@ -3904,34 +5014,78 @@ app.get('/api/activity', async (c) => {
     const perTable = limit + 10;
     const want = (t: string) => !typeFilter.length || typeFilter.includes(t);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function fetchRows(tbl: any, blockCol: any): Promise<any[]> {
       try {
         if (before) {
-          return await db.select().from(tbl).where(lt(blockCol, before)).orderBy(desc(blockCol)).limit(perTable);
+          return await db
+            .select()
+            .from(tbl)
+            .where(lt(blockCol, before))
+            .orderBy(desc(blockCol))
+            .limit(perTable);
         }
         return await db.select().from(tbl).orderBy(desc(blockCol)).limit(perTable);
-      } catch { return []; }
+      } catch {
+        return [];
+      }
     }
 
     const wantDelegation = want('DELEGATION');
     const wantTransfer = want('TRANSFER');
-    const wantPropStatus = want('PROPOSAL_QUEUED') || want('PROPOSAL_EXECUTED') || want('PROPOSAL_CANCELLED') || want('PROPOSAL_VETOED');
-    const wantGrant = want('GRANT_CREATED') || want('GRANT_VOTE') || want('GRANT_QUEUED') || want('GRANT_EXECUTED') || want('GRANT_CANCELED');
+    const wantPropStatus =
+      want('PROPOSAL_QUEUED') ||
+      want('PROPOSAL_EXECUTED') ||
+      want('PROPOSAL_CANCELLED') ||
+      want('PROPOSAL_VETOED');
+    const wantGrant =
+      want('GRANT_CREATED') ||
+      want('GRANT_VOTE') ||
+      want('GRANT_QUEUED') ||
+      want('GRANT_EXECUTED') ||
+      want('GRANT_CANCELED');
 
-    const [bids, votes, proposals, auctions, nouns, candidates, candSigs, propFB, candFB, streams, delegations, transfers, statusChanges, grants, grantVotes, grantStatusChanges] = await Promise.all([
+    const [
+      bids,
+      votes,
+      proposals,
+      auctions,
+      nouns,
+      candidates,
+      candSigs,
+      propFB,
+      candFB,
+      streams,
+      delegations,
+      transfers,
+      statusChanges,
+      grants,
+      grantVotes,
+      grantStatusChanges,
+    ] = await Promise.all([
       want('BID') ? fetchRows(schema.bid, schema.bid.createdAtBlock) : [],
       want('VOTE') ? fetchRows(schema.vote, schema.vote.createdAtBlock) : [],
       want('PROPOSAL_CREATED') ? fetchRows(schema.proposal, schema.proposal.createdAtBlock) : [],
       want('AUCTION_SETTLED') ? fetchRows(schema.auction, schema.auction.createdAtBlock) : [],
       want('NOUN_CREATED') ? fetchRows(schema.noun, schema.noun.createdAtBlock) : [],
       want('CANDIDATE_CREATED') ? fetchRows(schema.candidate, schema.candidate.createdAtBlock) : [],
-      want('CANDIDATE_SPONSORED') ? fetchRows(schema.candidateSignature, schema.candidateSignature.createdAtBlock) : [],
-      want('PROPOSAL_FEEDBACK') ? fetchRows(schema.proposalFeedback, schema.proposalFeedback.createdAtBlock) : [],
-      want('CANDIDATE_FEEDBACK') ? fetchRows(schema.candidateFeedback, schema.candidateFeedback.createdAtBlock) : [],
+      want('CANDIDATE_SPONSORED')
+        ? fetchRows(schema.candidateSignature, schema.candidateSignature.createdAtBlock)
+        : [],
+      want('PROPOSAL_FEEDBACK')
+        ? fetchRows(schema.proposalFeedback, schema.proposalFeedback.createdAtBlock)
+        : [],
+      want('CANDIDATE_FEEDBACK')
+        ? fetchRows(schema.candidateFeedback, schema.candidateFeedback.createdAtBlock)
+        : [],
       want('STREAM_CREATED') ? fetchRows(schema.stream, schema.stream.createdAtBlock) : [],
-      wantDelegation ? fetchRows(schema.delegationEvent, schema.delegationEvent.createdAtBlock) : [],
+      wantDelegation
+        ? fetchRows(schema.delegationEvent, schema.delegationEvent.createdAtBlock)
+        : [],
       wantTransfer ? fetchRows(schema.nounTransfer, schema.nounTransfer.createdAtBlock) : [],
-      wantPropStatus ? fetchRows(schema.proposalStatusChange, schema.proposalStatusChange.createdAtBlock) : [],
+      wantPropStatus
+        ? fetchRows(schema.proposalStatusChange, schema.proposalStatusChange.createdAtBlock)
+        : [],
       wantGrant ? fetchRows(schema.grant, schema.grant.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantVote, schema.grantVote.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantStatusChange, schema.grantStatusChange.createdAtBlock) : [],
@@ -3940,18 +5094,33 @@ app.get('/api/activity', async (c) => {
     // Normalize BIDs
     for (const b of bids) {
       events.push({
-        type: 'BID', blockNumber: Number(b.createdAtBlock), timestamp: tsToISO(b.createdAt),
+        type: 'BID',
+        blockNumber: Number(b.createdAtBlock),
+        timestamp: tsToISO(b.createdAt),
         txHash: b.createdAtTransaction || '',
-        data: { nounId: Number(b.nounId), value: String(b.value), bidder: b.bidder, clientId: b.clientId },
+        data: {
+          nounId: Number(b.nounId),
+          value: String(b.value),
+          bidder: b.bidder,
+          clientId: b.clientId,
+        },
       });
     }
 
     // Normalize VOTEs
     for (const v of votes) {
       events.push({
-        type: 'VOTE', blockNumber: Number(v.createdAtBlock), timestamp: tsToISO(v.createdAt),
+        type: 'VOTE',
+        blockNumber: Number(v.createdAtBlock),
+        timestamp: tsToISO(v.createdAt),
         txHash: v.createdAtTransaction || '',
-        data: { voter: v.voter, proposalId: Number(v.proposalId), support: v.support, votes: v.votes, reason: v.reason || '' },
+        data: {
+          voter: v.voter,
+          proposalId: Number(v.proposalId),
+          support: v.support,
+          votes: v.votes,
+          reason: v.reason || '',
+        },
       });
     }
 
@@ -3960,12 +5129,23 @@ app.get('/api/activity', async (c) => {
       const descText = (p.description || '') as string;
       const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
       // Extract first image URL from markdown or HTML
-      const imgMatch = descText.match(/!\[.*?\]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/);
+      const imgMatch = descText.match(
+        /!\[.*?]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/,
+      );
       const imageUrl = imgMatch?.[1] || imgMatch?.[2] || null;
       events.push({
-        type: 'PROPOSAL_CREATED', blockNumber: Number(p.createdAtBlock), timestamp: tsToISO(p.createdAt),
+        type: 'PROPOSAL_CREATED',
+        blockNumber: Number(p.createdAtBlock),
+        timestamp: tsToISO(p.createdAt),
         txHash: p.createdAtTransaction || '',
-        data: { proposalId: Number(p.id), proposer: p.proposer, title, status: p.status, description: descText.slice(0, 4000), imageUrl },
+        data: {
+          proposalId: Number(p.id),
+          proposer: p.proposer,
+          title,
+          status: p.status,
+          description: descText.slice(0, 4000),
+          imageUrl,
+        },
       });
     }
 
@@ -3973,18 +5153,35 @@ app.get('/api/activity', async (c) => {
     for (const a of auctions) {
       if (!a.settled) continue;
       events.push({
-        type: 'AUCTION_SETTLED', blockNumber: Number(a.createdAtBlock), timestamp: tsToISO(a.createdAt),
+        type: 'AUCTION_SETTLED',
+        blockNumber: Number(a.createdAtBlock),
+        timestamp: tsToISO(a.createdAt),
         txHash: a.createdAtTransaction || '',
-        data: { nounId: Number(a.nounId), winner: a.winner || '', amount: String(a.amount || '0'), clientId: a.clientId },
+        data: {
+          nounId: Number(a.nounId),
+          winner: a.winner || '',
+          amount: String(a.amount || '0'),
+          clientId: a.clientId,
+        },
       });
     }
 
     // Normalize NOUN_CREATED
     for (const n of nouns) {
       events.push({
-        type: 'NOUN_CREATED', blockNumber: Number(n.createdAtBlock), timestamp: tsToISO(n.createdAt),
+        type: 'NOUN_CREATED',
+        blockNumber: Number(n.createdAtBlock),
+        timestamp: tsToISO(n.createdAt),
         txHash: n.createdAtTransaction || '',
-        data: { nounId: Number(n.id), owner: n.owner, head: n.head, body: n.body, accessory: n.accessory, glasses: n.glasses, background: n.background },
+        data: {
+          nounId: Number(n.id),
+          owner: n.owner,
+          head: n.head,
+          body: n.body,
+          accessory: n.accessory,
+          glasses: n.glasses,
+          background: n.background,
+        },
       });
     }
 
@@ -3992,12 +5189,24 @@ app.get('/api/activity', async (c) => {
     for (const cd of candidates) {
       const descText = (cd.description || '') as string;
       const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
-      const imgMatch = descText.match(/!\[.*?\]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/);
+      const imgMatch = descText.match(
+        /!\[.*?]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/,
+      );
       const imageUrl = imgMatch?.[1] || imgMatch?.[2] || null;
       events.push({
-        type: 'CANDIDATE_CREATED', blockNumber: Number(cd.createdAtBlock), timestamp: tsToISO(cd.createdAt),
+        type: 'CANDIDATE_CREATED',
+        blockNumber: Number(cd.createdAtBlock),
+        timestamp: tsToISO(cd.createdAt),
         txHash: cd.createdAtTransaction || '',
-        data: { candidateId: cd.id, slug: cd.slug, proposer: cd.proposer, title, description: descText.slice(0, 4000), imageUrl, canceled: cd.canceled },
+        data: {
+          candidateId: cd.id,
+          slug: cd.slug,
+          proposer: cd.proposer,
+          title,
+          description: descText.slice(0, 4000),
+          imageUrl,
+          canceled: cd.canceled,
+        },
       });
     }
 
@@ -4005,7 +5214,9 @@ app.get('/api/activity', async (c) => {
     for (const cs of candSigs) {
       if (cs.canceled) continue;
       events.push({
-        type: 'CANDIDATE_SPONSORED', blockNumber: Number(cs.createdAtBlock), timestamp: tsToISO(cs.createdAt),
+        type: 'CANDIDATE_SPONSORED',
+        blockNumber: Number(cs.createdAtBlock),
+        timestamp: tsToISO(cs.createdAt),
         txHash: '',
         data: { signer: cs.signer, candidateId: cs.candidateId, reason: cs.reason || '' },
       });
@@ -4014,34 +5225,59 @@ app.get('/api/activity', async (c) => {
     // Normalize PROPOSAL_FEEDBACK
     for (const pf of propFB) {
       events.push({
-        type: 'PROPOSAL_FEEDBACK', blockNumber: Number(pf.createdAtBlock), timestamp: tsToISO(pf.createdAt),
+        type: 'PROPOSAL_FEEDBACK',
+        blockNumber: Number(pf.createdAtBlock),
+        timestamp: tsToISO(pf.createdAt),
         txHash: '',
-        data: { voter: pf.voter, proposalId: Number(pf.proposalId), support: pf.support, reason: pf.reason || '' },
+        data: {
+          voter: pf.voter,
+          proposalId: Number(pf.proposalId),
+          support: pf.support,
+          reason: pf.reason || '',
+        },
       });
     }
 
     // Normalize CANDIDATE_FEEDBACK
     for (const cf of candFB) {
       events.push({
-        type: 'CANDIDATE_FEEDBACK', blockNumber: Number(cf.createdAtBlock), timestamp: tsToISO(cf.createdAt),
+        type: 'CANDIDATE_FEEDBACK',
+        blockNumber: Number(cf.createdAtBlock),
+        timestamp: tsToISO(cf.createdAt),
         txHash: '',
-        data: { voter: cf.voter, candidateId: cf.candidateId, support: cf.support, reason: cf.reason || '' },
+        data: {
+          voter: cf.voter,
+          candidateId: cf.candidateId,
+          support: cf.support,
+          reason: cf.reason || '',
+        },
       });
     }
 
     // Normalize STREAM_CREATED
     for (const s of streams) {
       events.push({
-        type: 'STREAM_CREATED', blockNumber: Number(s.createdAtBlock), timestamp: tsToISO(s.createdAt),
+        type: 'STREAM_CREATED',
+        blockNumber: Number(s.createdAtBlock),
+        timestamp: tsToISO(s.createdAt),
         txHash: s.createdAtTransaction || '',
-        data: { streamAddress: s.streamAddress, recipient: s.recipient, tokenAmount: String(s.tokenAmount), proposalId: s.proposalId ? Number(s.proposalId) : null, status: s.status },
+        data: {
+          streamAddress: s.streamAddress,
+          recipient: s.recipient,
+          tokenAmount: String(s.tokenAmount),
+          tokenAddress: s.tokenAddress || '',
+          proposalId: s.proposalId ? Number(s.proposalId) : null,
+          status: s.status,
+        },
       });
     }
 
     // Normalize DELEGATION
     for (const d of delegations) {
       events.push({
-        type: 'DELEGATION', blockNumber: Number(d.createdAtBlock), timestamp: tsToISO(d.createdAt),
+        type: 'DELEGATION',
+        blockNumber: Number(d.createdAtBlock),
+        timestamp: tsToISO(d.createdAt),
         txHash: d.createdAtTransaction || '',
         data: { delegator: d.delegator, fromDelegate: d.fromDelegate, toDelegate: d.toDelegate },
       });
@@ -4050,7 +5286,9 @@ app.get('/api/activity', async (c) => {
     // Normalize TRANSFER
     for (const t of transfers) {
       events.push({
-        type: 'TRANSFER', blockNumber: Number(t.createdAtBlock), timestamp: tsToISO(t.createdAt),
+        type: 'TRANSFER',
+        blockNumber: Number(t.createdAtBlock),
+        timestamp: tsToISO(t.createdAt),
         txHash: t.createdAtTransaction || '',
         data: { nounId: Number(t.nounId), from: t.from, to: t.to },
       });
@@ -4060,7 +5298,9 @@ app.get('/api/activity', async (c) => {
     for (const sc of statusChanges) {
       const statusType = `PROPOSAL_${sc.status}` as string; // PROPOSAL_QUEUED, PROPOSAL_EXECUTED, etc.
       events.push({
-        type: statusType, blockNumber: Number(sc.createdAtBlock), timestamp: tsToISO(sc.createdAt),
+        type: statusType,
+        blockNumber: Number(sc.createdAtBlock),
+        timestamp: tsToISO(sc.createdAt),
         txHash: sc.createdAtTransaction || '',
         data: { proposalId: Number(sc.proposalId), status: sc.status },
       });
@@ -4069,18 +5309,35 @@ app.get('/api/activity', async (c) => {
     // Normalize GRANT_CREATED
     for (const g of grants) {
       events.push({
-        type: 'GRANT_CREATED', blockNumber: Number(g.createdAtBlock), timestamp: tsToISO(g.createdAt),
+        type: 'GRANT_CREATED',
+        blockNumber: Number(g.createdAtBlock),
+        timestamp: tsToISO(g.createdAt),
         txHash: g.createdAtTransaction || '',
-        data: { grantId: Number(g.id), proposer: g.proposer, description: (g.description || '').slice(0, 4000), status: g.status, forVotes: g.forVotes, againstVotes: g.againstVotes },
+        data: {
+          grantId: Number(g.id),
+          proposer: g.proposer,
+          description: (g.description || '').slice(0, 4000),
+          status: g.status,
+          forVotes: g.forVotes,
+          againstVotes: g.againstVotes,
+        },
       });
     }
 
     // Normalize GRANT_VOTE
     for (const gv of grantVotes) {
       events.push({
-        type: 'GRANT_VOTE', blockNumber: Number(gv.createdAtBlock), timestamp: tsToISO(gv.createdAt),
+        type: 'GRANT_VOTE',
+        blockNumber: Number(gv.createdAtBlock),
+        timestamp: tsToISO(gv.createdAt),
         txHash: gv.createdAtTransaction || '',
-        data: { voter: gv.voter, grantId: Number(gv.grantId), support: gv.support, votes: gv.votes, reason: gv.reason || '' },
+        data: {
+          voter: gv.voter,
+          grantId: Number(gv.grantId),
+          support: gv.support,
+          votes: gv.votes,
+          reason: gv.reason || '',
+        },
       });
     }
 
@@ -4088,7 +5345,9 @@ app.get('/api/activity', async (c) => {
     for (const gs of grantStatusChanges) {
       const grantStatusType = `GRANT_${gs.status}` as string;
       events.push({
-        type: grantStatusType, blockNumber: Number(gs.createdAtBlock), timestamp: tsToISO(gs.createdAt),
+        type: grantStatusType,
+        blockNumber: Number(gs.createdAtBlock),
+        timestamp: tsToISO(gs.createdAt),
         txHash: gs.createdAtTransaction || '',
         data: { grantId: Number(gs.grantId), status: gs.status },
       });
@@ -4117,13 +5376,16 @@ const asciiImageCache = new Map<string, { data: unknown; fetchedAt: number }>();
 const ASCII_CACHE_TTL = 3600_000; // 1 hour
 
 interface AsciiPixel {
-  ch: string;   // ASCII character
-  r: number;    // original red
-  g: number;    // original green
-  b: number;    // original blue
+  ch: string; // ASCII character
+  r: number; // original red
+  g: number; // original green
+  b: number; // original blue
 }
 
-async function imageToAscii(url: string, cols = 80): Promise<{ pixels: AsciiPixel[]; width: number; height: number } | null> {
+async function imageToAscii(
+  url: string,
+  cols = 80,
+): Promise<{ pixels: AsciiPixel[]; width: number; height: number } | null> {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return null;
@@ -4163,7 +5425,7 @@ async function imageToAscii(url: string, cols = 80): Promise<{ pixels: AsciiPixe
   }
 }
 
-app.get('/api/ascii-image', async (c) => {
+app.get('/api/ascii-image', async c => {
   const url = c.req.query('url');
   const cols = Math.min(120, Math.max(20, parseInt(c.req.query('cols') || '80', 10)));
 
@@ -4194,13 +5456,17 @@ app.get('/api/ascii-image', async (c) => {
 
 // ─── OG Image — ASCII art as PNG ──────────────────────────────────────────
 
-app.get('/api/og/proposal/:id', async (c) => {
+app.get('/api/og/proposal/:id', async c => {
   const proposalId = c.req.param('id');
   if (!proposalId) return c.json({ error: 'id required' }, 400);
 
   try {
     // Get proposal from DB
-    const proposals = await db.select().from(schema.proposal).where(eq(schema.proposal.id, BigInt(proposalId))).limit(1);
+    const proposals = await db
+      .select()
+      .from(schema.proposal)
+      .where(eq(schema.proposal.id, BigInt(proposalId)))
+      .limit(1);
     if (proposals.length === 0) return c.json({ error: 'not found' }, 404);
 
     const proposal = proposals[0];
@@ -4208,11 +5474,13 @@ app.get('/api/og/proposal/:id', async (c) => {
     const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 80);
 
     // Extract first image URL
-    const imgMatch = descText.match(/!\[.*?\]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/);
+    const imgMatch = descText.match(
+      /!\[.*?]\((https?:\/\/[^)]+)\)|<img[^>]+src=["'](https?:\/\/[^"']+)["']/,
+    );
     const imgUrl = imgMatch?.[1] || imgMatch?.[2];
 
     // Convert image to ASCII if available
-    let asciiLines: string[] = [];
+    const asciiLines: string[] = [];
     if (imgUrl) {
       const ascii = await imageToAscii(imgUrl, 70);
       if (ascii) {
@@ -4229,7 +5497,7 @@ app.get('/api/og/proposal/:id', async (c) => {
     // Render OG image as SVG → PNG
     const W = 1200;
     const H = 630;
-    const CHAR_W = 8.4;
+    // const CHAR_W = 8.4; // reserved for future OG image layout
     const LINE_H = 12;
     const PAD = 40;
 
@@ -4267,7 +5535,12 @@ app.get('/api/og/proposal/:id', async (c) => {
 });
 
 function escapeXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 // ─── ENS Resolution ─────────────────────────────────────────────────────
@@ -4280,9 +5553,12 @@ const ensClient = createPublicClient({
   transport: http(process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com'),
 });
 
-app.get('/api/ens', async (c) => {
+app.get('/api/ens', async c => {
   const addressesParam = c.req.query('addresses') || '';
-  const addresses = addressesParam.split(',').filter(a => /^0x[a-fA-F0-9]{40}$/.test(a)).slice(0, 50);
+  const addresses = addressesParam
+    .split(',')
+    .filter(a => /^0x[\dA-Fa-f]{40}$/.test(a))
+    .slice(0, 50);
 
   if (addresses.length === 0) return c.json({ names: {} });
 
@@ -4307,17 +5583,19 @@ app.get('/api/ens', async (c) => {
   }
 
   for (const chunk of chunks) {
-    await Promise.all(chunk.map(async (addr) => {
-      const key = addr.toLowerCase();
-      try {
-        const name = await ensClient.getEnsName({ address: addr as `0x${string}` });
-        ensCache.set(key, { name: name || null, resolvedAt: now });
-        names[key] = name || null;
-      } catch {
-        ensCache.set(key, { name: null, resolvedAt: now });
-        names[key] = null;
-      }
-    }));
+    await Promise.all(
+      chunk.map(async addr => {
+        const key = addr.toLowerCase();
+        try {
+          const name = await ensClient.getEnsName({ address: addr as `0x${string}` });
+          ensCache.set(key, { name: name || null, resolvedAt: now });
+          names[key] = name || null;
+        } catch {
+          ensCache.set(key, { name: null, resolvedAt: now });
+          names[key] = null;
+        }
+      }),
+    );
   }
 
   return c.json({ names });
@@ -4325,25 +5603,52 @@ app.get('/api/ens', async (c) => {
 
 // ─── Noun Holders ────────────────────────────────────────────────────────
 
-app.get('/api/noun-holders', async (c) => {
+app.get('/api/noun-holders', async c => {
   const addressesParam = c.req.query('addresses') || '';
-  const addresses = addressesParam.split(',').filter(a => /^0x[a-fA-F0-9]{40}$/.test(a)).slice(0, 50);
+  const addresses = addressesParam
+    .split(',')
+    .filter(a => /^0x[\dA-Fa-f]{40}$/.test(a))
+    .slice(0, 50);
 
   if (addresses.length === 0) return c.json({ holders: {} });
 
   try {
-    const nouns = await db.select().from(schema.noun).where(
-      inArray(schema.noun.owner, addresses.map(a => a.toLowerCase()))
-    );
+    const nouns = await db
+      .select()
+      .from(schema.noun)
+      .where(
+        inArray(
+          schema.noun.owner,
+          addresses.map(a => a.toLowerCase()),
+        ),
+      );
 
-    const holders: Record<string, Array<{ nounId: number; seed: { head: number; body: number; accessory: number; glasses: number; background: number } }>> = {};
+    const holders: Record<
+      string,
+      Array<{
+        nounId: number;
+        seed: {
+          head: number;
+          body: number;
+          accessory: number;
+          glasses: number;
+          background: number;
+        };
+      }>
+    > = {};
 
     for (const n of nouns) {
       const key = (n.owner || '').toLowerCase();
       if (!holders[key]) holders[key] = [];
       holders[key].push({
         nounId: Number(n.id),
-        seed: { head: n.head, body: n.body, accessory: n.accessory, glasses: n.glasses, background: n.background },
+        seed: {
+          head: n.head,
+          body: n.body,
+          accessory: n.accessory,
+          glasses: n.glasses,
+          background: n.background,
+        },
       });
     }
 
@@ -4355,7 +5660,7 @@ app.get('/api/noun-holders', async (c) => {
 });
 
 // Health check
-app.get('/api/health', (c) => {
+app.get('/api/health', c => {
   return c.json({ status: 'ok', timestamp: Date.now() });
 });
 
