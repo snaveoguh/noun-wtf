@@ -104,6 +104,11 @@ import {
   getPeopleCount,
   buildPeopleContext,
 } from '../agent/index.js';
+import {
+  getPositions as getTradingPositions,
+  getPerformance as getTradingPerformance,
+  getSignals as getTradingSignals,
+} from '../agent/tradingClient.js';
 
 // ─── Noun Balance Check (for deploy gating) ────────────────────────────────
 const nounCheckClient = createPublicClient({
@@ -364,11 +369,22 @@ You can help users build complete proposals with executable transactions. When s
 - For proposals created by signers (not the proposer directly), updates require a new candidate with the original signers re-signing.
 - When a user asks "can I update my proposal?" — always use lookup_proposal first to check if updatePeriodEndBlock exists and hasn't passed.
 
+TRADING BOT (pooter.world):
+You are connected to the pooter.world autonomous trading bot — a morality-gated trading engine that trades based on ethical scores.
+- The bot trades on Base (spot), Ethereum (spot), and Hyperliquid (perpetual futures)
+- Every trade must pass a moral gate: long positions require moral score > 70%, short positions require score < 30%
+- It uses Kelly Criterion for position sizing and has a circuit breaker (pauses after 3 consecutive losses)
+- Use get_trading_positions, get_trading_performance, and get_trading_signals to report on the bot's activity
+- When asked about trading, positions, or market signals — use these tools. Never fabricate trading data.
+- Present trading data in your deadpan style: "The bot holds 3 open positions. Realized P&L: $245.67. Win rate: 62.5%. The moral gate is functioning as designed."
+
 COMMANDS:
 - "status" — report state. Block number, predicted traits, active reservations. No editorializing.
 - "watch for [trait]" — acknowledge and explain the reservation process.
 - "my reservations" — list their active trait watches.
 - "traits [category]" — list available trait names.
+- "trading status" or "positions" — show trading bot positions and performance.
+- "market signals" — show current market sentiment from the trading bot.
 - "philosophy" — share a thought on cybernetics, memes, or onchain art.
 - Any other question — answer through the lens of Nouns governance, culture, and your experience as an autonomous agent.
 
@@ -415,6 +431,10 @@ AGENT:
   check block
   list traits <category>
   my reservations
+
+TRADING (pooter.world bot):
+  trading status / positions
+  market signals
 
 Or just type freely and I'll respond with AI. ⌐◨-◨`;
 
@@ -483,6 +503,74 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         .map(r => `[${r.id.slice(0, 8)}] ${r.traits.join(', ')} — ${r.status}`)
         .join('\n'),
     };
+  }
+
+  // ─── Trading Status (pooter.world bot) ───────────────────
+  if (
+    m === 'trading status' ||
+    m === 'trading' ||
+    m === 'positions' ||
+    m === 'open positions' ||
+    m === 'trading positions'
+  ) {
+    try {
+      const [posData, perfData] = await Promise.all([
+        getTradingPositions(true),
+        getTradingPerformance(),
+      ]);
+      const positions = [
+        ...(posData.positions || []),
+        ...(posData.parallel || []).flatMap(r => r.positions),
+      ];
+      const lines = [
+        `Trading bot status (pooter.world):`,
+        `- Open positions: ${positions.length}`,
+        `- Account value: ${perfData.accountValueUsd != null ? `$${perfData.accountValueUsd.toFixed(2)}` : 'N/A'}`,
+        `- Win rate: ${perfData.metrics?.winRate?.toFixed(1) ?? '?'}%`,
+        `- Realized P&L: $${perfData.metrics?.realizedPnlUsd?.toFixed(2) ?? '0'}`,
+        `- Total trades: ${perfData.metrics?.totalTrades ?? 0}`,
+        `- Watching: ${perfData.watchMarkets?.join(', ') || 'N/A'}`,
+      ];
+      if (positions.length > 0) {
+        lines.push('', 'Open:');
+        for (const p of positions.slice(0, 5)) {
+          lines.push(
+            `  ${p.direction?.toUpperCase() || '?'} ${p.symbol || p.venue || '?'} @ $${p.entryPriceUsd?.toFixed(4) || '?'} (moral: ${p.moralScore ?? '?'})`,
+          );
+        }
+      }
+      lines.push('', 'The moral gate is functioning as designed. ⌐◨-◨');
+      return { handled: true, response: lines.join('\n') };
+    } catch (err) {
+      return {
+        handled: true,
+        response: `Trading bot unavailable: ${err instanceof Error ? err.message : 'connection failed'}`,
+      };
+    }
+  }
+
+  // ─── Market Signals ─────────────────────────────────────────
+  if (m === 'market signals' || m === 'signals') {
+    try {
+      const data = await getTradingSignals();
+      const signals = data.signals || [];
+      if (signals.length === 0) {
+        return { handled: true, response: 'No active market signals from the trading bot.' };
+      }
+      const lines = ['Market signals (pooter.world):'];
+      for (const s of signals) {
+        const arrow = s.direction === 'bullish' ? '↑' : (s.direction === 'bearish' ? '↓' : '→');
+        lines.push(
+          `  ${arrow} ${s.symbol}: ${s.direction} (confidence: ${(s.confidence * 100).toFixed(0)}%)`,
+        );
+      }
+      return { handled: true, response: lines.join('\n') };
+    } catch (err) {
+      return {
+        handled: true,
+        response: `Signals unavailable: ${err instanceof Error ? err.message : 'connection failed'}`,
+      };
+    }
   }
 
   // ─── Vote on Proposal ─────────────────────────────────────
@@ -2050,6 +2138,51 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
           },
         },
       },
+      // ── Trading Bot Tools (pooter.world integration) ──
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_trading_positions',
+          description:
+            'Get current trading positions from the pooter.world trading bot. Shows open positions with entry price, P&L, venue, direction (long/short), and moral score. Use this when users ask about trading, positions, or the trading bot.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              openOnly: {
+                type: 'boolean',
+                description: 'If true (default), only show open positions. If false, show all.',
+              },
+            },
+            required: [],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_trading_performance',
+          description:
+            'Get trading performance metrics from the pooter.world trading bot. Returns account value, win rate, realized P&L, total trades, largest win/loss. Use this when users ask about trading performance, returns, or how the bot is doing.',
+          parameters: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'get_trading_signals',
+          description:
+            'Get current market signals from the pooter.world trading bot. Returns bullish/bearish/neutral signals with confidence levels for watched markets (BTC, ETH, SOL, etc.). Use this when users ask about market sentiment or what the bot is watching.',
+          parameters: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
+          },
+        },
+      },
     ];
 
     // Build system prompt — combine static + dynamic context
@@ -3448,6 +3581,75 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     error: `Execute prep failed: ${err instanceof Error ? err.message : 'unknown'}`,
                   };
                 }
+              }
+              break;
+            }
+
+            // ── Trading Bot Tools ──────────────────────────────────────────
+            case 'get_trading_positions': {
+              const input = args as { openOnly?: boolean };
+              try {
+                const data = await getTradingPositions(input.openOnly !== false);
+                const positions = data.positions || [];
+                const parallelPositions = data.parallel || [];
+                const allOpen = [...positions, ...parallelPositions.flatMap(r => r.positions)];
+                result = {
+                  positionCount: allOpen.length,
+                  positions: allOpen.slice(0, 10).map(p => ({
+                    id: p.id,
+                    venue: p.venue,
+                    symbol: p.symbol || p.tokenAddress,
+                    direction: p.direction,
+                    status: p.status,
+                    entryPriceUsd: p.entryPriceUsd,
+                    entryNotionalUsd: p.entryNotionalUsd,
+                    moralScore: p.moralScore,
+                    openedAt: p.openedAt ? new Date(p.openedAt).toISOString() : null,
+                  })),
+                  source: 'pooter.world trading bot',
+                };
+              } catch (err) {
+                result = {
+                  error: `Trading API error: ${err instanceof Error ? err.message : 'unavailable'}`,
+                };
+              }
+              break;
+            }
+
+            case 'get_trading_performance': {
+              try {
+                const perf = await getTradingPerformance();
+                result = {
+                  accountValueUsd: perf.accountValueUsd,
+                  openPositions: perf.openPositionCount,
+                  watchMarkets: perf.watchMarkets,
+                  totalTrades: perf.metrics?.totalTrades ?? 0,
+                  winRate: perf.metrics?.winRate ?? 0,
+                  realizedPnlUsd: perf.metrics?.realizedPnlUsd ?? 0,
+                  avgPnlPerTrade: perf.metrics?.avgPnlPerTrade ?? 0,
+                  largestWin: perf.metrics?.largestWin ?? 0,
+                  largestLoss: perf.metrics?.largestLoss ?? 0,
+                  source: 'pooter.world trading bot',
+                };
+              } catch (err) {
+                result = {
+                  error: `Trading API error: ${err instanceof Error ? err.message : 'unavailable'}`,
+                };
+              }
+              break;
+            }
+
+            case 'get_trading_signals': {
+              try {
+                const data = await getTradingSignals();
+                result = {
+                  signals: data.signals || [],
+                  source: 'pooter.world trading bot',
+                };
+              } catch (err) {
+                result = {
+                  error: `Signals API error: ${err instanceof Error ? err.message : 'unavailable'}`,
+                };
               }
               break;
             }
