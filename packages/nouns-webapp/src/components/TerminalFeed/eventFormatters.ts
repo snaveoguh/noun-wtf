@@ -7,42 +7,42 @@ export interface EventTypeConfig {
 }
 
 export const EVENT_TYPES: Record<string, EventTypeConfig> = {
-  BID:                  { label: 'BID',      color: '#60a5fa', filterKey: 'BID' },
-  VOTE:                 { label: 'VOTE',     color: '#c084fc', filterKey: 'VOTE' },
-  PROPOSAL_CREATED:     { label: 'PROP',     color: '#facc15', filterKey: 'PROPOSAL_CREATED' },
-  AUCTION_SETTLED:      { label: 'SETTLED',  color: '#4ade80', filterKey: 'AUCTION_SETTLED' },
-  NOUN_CREATED:         { label: 'NOUN',     color: '#4ade80', filterKey: 'NOUN_CREATED' },
-  CANDIDATE_CREATED:    { label: 'CAND',     color: '#fb923c', filterKey: 'CANDIDATE_CREATED' },
-  CANDIDATE_SPONSORED:  { label: 'SPONSOR',  color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED' },
-  PROPOSAL_FEEDBACK:    { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK' },
-  CANDIDATE_FEEDBACK:   { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK' },
-  STREAM_CREATED:       { label: 'STREAM',   color: '#2dd4bf', filterKey: 'STREAM_CREATED' },
-  DELEGATION:           { label: 'DELEG',    color: '#e879f9', filterKey: 'DELEGATION' },
-  TRANSFER:             { label: 'XFER',     color: '#f9a8d4', filterKey: 'TRANSFER' },
-  PROPOSAL_QUEUED:      { label: 'QUEUED',   color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED' },
-  PROPOSAL_EXECUTED:    { label: 'EXEC',     color: '#34d399', filterKey: 'PROPOSAL_EXECUTED' },
-  PROPOSAL_CANCELLED:   { label: 'CANCEL',   color: '#f87171', filterKey: 'PROPOSAL_CANCELLED' },
-  PROPOSAL_VETOED:      { label: 'VETOED',   color: '#fb923c', filterKey: 'PROPOSAL_VETOED' },
-  GRANT_CREATED:        { label: 'GRANT',    color: '#22d3ee', filterKey: 'GRANT_CREATED' },
-  GRANT_VOTE:           { label: 'GVOTE',    color: '#67e8f9', filterKey: 'GRANT_VOTE' },
-  GRANT_QUEUED:         { label: 'GQUEUE',   color: '#a5f3fc', filterKey: 'GRANT_QUEUED' },
-  GRANT_EXECUTED:       { label: 'GEXEC',    color: '#06b6d4', filterKey: 'GRANT_EXECUTED' },
-  GRANT_CANCELED:       { label: 'GCANCEL',  color: '#f87171', filterKey: 'GRANT_CANCELED' },
+  BID: { label: 'BID', color: '#60a5fa', filterKey: 'BID' },
+  VOTE: { label: 'VOTE', color: '#c084fc', filterKey: 'VOTE' },
+  PROPOSAL_CREATED: { label: 'PROP', color: '#facc15', filterKey: 'PROPOSAL_CREATED' },
+  AUCTION_SETTLED: { label: 'SETTLED', color: '#4ade80', filterKey: 'AUCTION_SETTLED' },
+  NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED' },
+  CANDIDATE_CREATED: { label: 'CAND', color: '#fb923c', filterKey: 'CANDIDATE_CREATED' },
+  CANDIDATE_SPONSORED: { label: 'SPONSOR', color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED' },
+  PROPOSAL_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK' },
+  CANDIDATE_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK' },
+  STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED' },
+  DELEGATION: { label: 'DELEG', color: '#e879f9', filterKey: 'DELEGATION' },
+  TRANSFER: { label: 'XFER', color: '#f9a8d4', filterKey: 'TRANSFER' },
+  PROPOSAL_QUEUED: { label: 'QUEUED', color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED' },
+  PROPOSAL_EXECUTED: { label: 'EXEC', color: '#34d399', filterKey: 'PROPOSAL_EXECUTED' },
+  PROPOSAL_CANCELLED: { label: 'CANCEL', color: '#f87171', filterKey: 'PROPOSAL_CANCELLED' },
+  PROPOSAL_VETOED: { label: 'VETOED', color: '#fb923c', filterKey: 'PROPOSAL_VETOED' },
+  GRANT_CREATED: { label: 'GRANT', color: '#22d3ee', filterKey: 'GRANT_CREATED' },
+  GRANT_VOTE: { label: 'GVOTE', color: '#67e8f9', filterKey: 'GRANT_VOTE' },
+  GRANT_QUEUED: { label: 'GQUEUE', color: '#a5f3fc', filterKey: 'GRANT_QUEUED' },
+  GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED' },
+  GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED' },
 };
 
 // Filter tabs shown in the UI
 export const FILTER_TABS = [
-  { key: '',                     label: 'ALL' },
-  { key: 'BID',                  label: 'BIDS' },
-  { key: 'VOTE',                 label: 'VOTES' },
-  { key: 'PROPOSAL_CREATED',     label: 'PROPS' },
-  { key: 'AUCTION_SETTLED',      label: 'AUCTIONS' },
-  { key: 'DELEGATION',           label: 'DELEGATIONS' },
-  { key: 'TRANSFER',             label: 'TRANSFERS' },
-  { key: 'CANDIDATE_SPONSORED',  label: 'SPONSORS' },
-  { key: 'STREAM_CREATED',       label: 'STREAMS' },
-  { key: 'GRANT_CREATED',        label: 'GRANTS' },
-  { key: '_CHAT',                label: 'CHAT' },
+  { key: '', label: 'ALL' },
+  { key: 'BID', label: 'BIDS' },
+  { key: 'VOTE', label: 'VOTES' },
+  { key: 'PROPOSAL_CREATED', label: 'PROPS' },
+  { key: 'AUCTION_SETTLED', label: 'AUCTIONS' },
+  { key: 'DELEGATION', label: 'DELEGATIONS' },
+  { key: 'TRANSFER', label: 'TRANSFERS' },
+  { key: 'CANDIDATE_SPONSORED', label: 'SPONSORS' },
+  { key: 'STREAM_CREATED', label: 'STREAMS' },
+  { key: 'GRANT_CREATED', label: 'GRANTS' },
+  { key: '_CHAT', label: 'CHAT' },
 ];
 
 // ─── Address Formatting ────────────────────────────────────────────────────
@@ -73,6 +73,37 @@ function ethFromWei(wei: string): string {
   }
 }
 
+// USDC/stablecoins use 6 decimals, not 18
+function usdcFromWei(wei: string): string {
+  try {
+    const amount = Number(wei) / 1e6;
+    if (amount === 0) return '0';
+    if (amount < 0.01) return '<0.01';
+    return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  } catch {
+    return '?';
+  }
+}
+
+// Known token addresses (lowercase)
+const USDC_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+const STETH_ADDRESS = '0xae7ab96520de3a18e5e111b5eaab095312d7fe84';
+
+function formatStreamAmount(
+  tokenAmount: string,
+  tokenAddress?: string,
+): { amount: string; symbol: string } {
+  const addr = (tokenAddress || '').toLowerCase();
+  if (addr === USDC_ADDRESS) {
+    return { amount: usdcFromWei(tokenAmount), symbol: 'USDC' };
+  }
+  if (addr === STETH_ADDRESS) {
+    return { amount: ethFromWei(tokenAmount), symbol: 'stETH' };
+  }
+  // Default: WETH or unknown → show as ETH
+  return { amount: ethFromWei(tokenAmount), symbol: 'ETH' };
+}
+
 function supportLabel(support: number): string {
   if (support === 0) return 'AGAINST';
   if (support === 1) return 'FOR';
@@ -82,7 +113,11 @@ function supportLabel(support: number): string {
 
 // ─── Event Description Formatter ───────────────────────────────────────────
 
-export function formatEventDescription(type: string, data: Record<string, unknown>, ensLookup?: EnsLookup): string {
+export function formatEventDescription(
+  type: string,
+  data: Record<string, unknown>,
+  ensLookup?: EnsLookup,
+): string {
   const addr = (a: string) => resolveAddr(a, ensLookup);
 
   switch (type) {
@@ -95,8 +130,10 @@ export function formatEventDescription(type: string, data: Record<string, unknow
       return reason ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"` : base;
     }
 
-    case 'PROPOSAL_CREATED':
-      return `New proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${data.title || 'untitled'}`;
+    case 'PROPOSAL_CREATED': {
+      const propTitle = (data.title as string) || 'untitled';
+      return `New proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
+    }
 
     case 'AUCTION_SETTLED':
       return `Noun ${data.nounId} won by ${addr(data.winner as string)} for ${ethFromWei(data.amount as string)} ETH`;
@@ -104,29 +141,43 @@ export function formatEventDescription(type: string, data: Record<string, unknow
     case 'NOUN_CREATED':
       return `Noun ${data.nounId} minted to ${addr(data.owner as string)}`;
 
-    case 'CANDIDATE_CREATED':
-      return `New candidate by ${addr(data.proposer as string)}: ${data.title || data.slug || 'untitled'}`;
+    case 'CANDIDATE_CREATED': {
+      const title = (data.title as string) || (data.slug as string) || 'untitled';
+      return `New candidate by ${addr(data.proposer as string)}: ${title}`;
+    }
 
     case 'CANDIDATE_SPONSORED': {
-      const reason = data.reason as string;
+      const reason = (data.reason as string) || '';
       const base = `${addr(data.signer as string)} sponsored candidate`;
-      return reason ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"` : base;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
+        : base;
     }
 
     case 'PROPOSAL_FEEDBACK': {
-      const reason = data.reason as string;
+      const reason = (data.reason as string) || '';
       const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on Prop ${data.proposalId}`;
-      return reason ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"` : base;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
+        : base;
     }
 
     case 'CANDIDATE_FEEDBACK': {
-      const reason = data.reason as string;
+      const reason = (data.reason as string) || '';
       const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on candidate`;
-      return reason ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"` : base;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
+        : base;
     }
 
-    case 'STREAM_CREATED':
-      return `Stream to ${addr(data.recipient as string)} for ${ethFromWei(data.tokenAmount as string)} ETH${data.proposalId ? ` (Prop ${data.proposalId})` : ''}`;
+    case 'STREAM_CREATED': {
+      const stream = formatStreamAmount(
+        data.tokenAmount as string,
+        data.tokenAddress as string | undefined,
+      );
+      const propSuffix = data.proposalId != null ? ` (Prop ${data.proposalId})` : '';
+      return `Stream to ${addr(data.recipient as string)} for ${stream.amount} ${stream.symbol}${propSuffix}`;
+    }
 
     case 'DELEGATION':
       return `${addr(data.delegator as string)} delegated votes from ${addr(data.fromDelegate as string)} → ${addr(data.toDelegate as string)}`;
@@ -147,7 +198,9 @@ export function formatEventDescription(type: string, data: Record<string, unknow
       return `Prop ${data.proposalId} vetoed`;
 
     case 'GRANT_CREATED': {
-      const title = ((data.description as string) || '').split('\n')[0]?.replace(/^#\s*/, '').slice(0, 80) || 'untitled';
+      const title =
+        ((data.description as string) || '').split('\n')[0]?.replace(/^#\s*/, '').slice(0, 80) ||
+        'untitled';
       return `${addr(data.proposer as string)} created grant #${data.grantId}: ${title}`;
     }
 
@@ -174,7 +227,20 @@ export function formatEventDescription(type: string, data: Record<string, unknow
 /** Extract all address fields from event data */
 export function extractAddresses(data: Record<string, unknown>): string[] {
   const addrs: string[] = [];
-  for (const key of ['bidder', 'voter', 'proposer', 'winner', 'owner', 'signer', 'recipient', 'delegator', 'fromDelegate', 'toDelegate', 'from', 'to']) {
+  for (const key of [
+    'bidder',
+    'voter',
+    'proposer',
+    'winner',
+    'owner',
+    'signer',
+    'recipient',
+    'delegator',
+    'fromDelegate',
+    'toDelegate',
+    'from',
+    'to',
+  ]) {
     const val = data[key] as string | undefined;
     if (val && val.startsWith('0x') && val.length === 42) {
       addrs.push(val);
