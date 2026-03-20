@@ -438,6 +438,112 @@ TRADING (pooter.world bot):
 
 Or just type freely and I'll respond with AI. ⌐◨-◨`;
 
+// ─── Smart Candidate Search ─────────────────────────────────────────────────
+// Searches slug, title (first line of description), and description body.
+// Tokenized: splits query into words, all must appear somewhere.
+// Priority: exact slug > slug contains > title match > description match.
+// Returns up to `limit` results, excluding canceled by default.
+
+type CandidateRow = typeof schema.candidate.$inferSelect;
+
+async function findCandidates(
+  keyword: string,
+  opts: { includeCanceled?: boolean; limit?: number } = {},
+): Promise<CandidateRow[]> {
+  const { includeCanceled = false, limit = 5 } = opts;
+  // Fetch a large pool — candidates are small rows
+  const allCands = await db
+    .select()
+    .from(schema.candidate)
+    .orderBy(desc(schema.candidate.createdAtBlock))
+    .limit(500);
+
+  const kw = keyword.toLowerCase().trim();
+  // Normalize: strip punctuation for fuzzy matching
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\d\sa-z]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const kwNorm = normalize(kw);
+  const kwTokens = kwNorm.split(' ').filter(Boolean);
+
+  type Scored = { row: CandidateRow; score: number; title: string };
+  const results: Scored[] = [];
+
+  for (const c of allCands) {
+    if (!includeCanceled && c.canceled) continue;
+
+    const slug = (c.slug ?? '').toString();
+    const slugNorm = normalize(slug);
+    const descText = (c.description ?? '').toString();
+    const title =
+      descText
+        .split('\n')[0]
+        ?.replace(/^#+\s*/, '')
+        .trim() || '';
+    const titleNorm = normalize(title);
+    const descNorm = normalize(descText);
+
+    let score = 0;
+
+    // Exact slug match (highest priority)
+    if (slugNorm === kwNorm || slug.toLowerCase() === kw) {
+      score = 100;
+    }
+    // Slug contains the full query
+    else if (slugNorm.includes(kwNorm)) {
+      score = 80;
+    }
+    // Title contains the full query
+    else if (titleNorm.includes(kwNorm)) {
+      score = 60;
+    }
+    // Description contains the full query
+    else if (descNorm.includes(kwNorm)) {
+      score = 40;
+    }
+    // Tokenized: all query words appear in slug+title+desc
+    else if (kwTokens.length > 1) {
+      const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
+      const allMatch = kwTokens.every(tok => haystack.includes(tok));
+      if (allMatch) {
+        // Score by how many tokens match in just the title/slug
+        const titleHaystack = `${slugNorm} ${titleNorm}`;
+        const titleHits = kwTokens.filter(tok => titleHaystack.includes(tok)).length;
+        score = 20 + (titleHits / kwTokens.length) * 15;
+      }
+    }
+    // Single token: check if it appears anywhere
+    else if (kwTokens.length === 1) {
+      const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
+      if (haystack.includes(kwTokens[0])) {
+        score = slugNorm.includes(kwTokens[0]) ? 30 : (titleNorm.includes(kwTokens[0]) ? 25 : 15);
+      }
+    }
+
+    if (score > 0) {
+      results.push({ row: c, score, title });
+    }
+  }
+
+  // Sort by score descending, then by most recent
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, limit).map(r => r.row);
+}
+
+// Extract title from candidate description
+function candidateTitle(c: CandidateRow): string {
+  return (
+    (c.description ?? '')
+      .toString()
+      .split('\n')[0]
+      ?.replace(/^#+\s*/, '')
+      .trim() || 'Untitled'
+  );
+}
+
 async function parseCommand(msg: string, wallet: string | undefined): Promise<ParsedCommand> {
   const m = msg.trim().toLowerCase();
   const raw = msg.trim(); // preserve case for descriptions
@@ -814,24 +920,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to sponsor.' };
     const keyword = sponsorMatch[1].trim();
     try {
-      const allCands = await db
-        .select()
-        .from(schema.candidate)
-        .orderBy(desc(schema.candidate.createdAtBlock))
-        .limit(50);
-      const matches = allCands.filter(c => {
-        const desc = (c.description ?? '').toString().toLowerCase();
-        return desc.includes(keyword) && !c.canceled;
-      });
+      const matches = await findCandidates(keyword, { limit: 1 });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
-      const descText = (c.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = candidateTitle(c);
       const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
       return {
         handled: true,
@@ -852,28 +945,41 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     if (!wallet) return { handled: true, response: 'Connect your wallet to promote.' };
     const keyword = promoteMatch[1].trim();
     try {
-      const allCands = await db
-        .select()
-        .from(schema.candidate)
-        .orderBy(desc(schema.candidate.createdAtBlock))
-        .limit(50);
-      const matches = allCands.filter(c => {
-        const desc = (c.description ?? '').toString().toLowerCase();
-        return desc.includes(keyword) && !c.canceled;
-      });
+      const matches = await findCandidates(keyword, { limit: 1 });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
-      const action = { type: 'PROMOTE', proposer: c.proposer, slug: c.slug };
+
+      // Fetch valid sponsor signatures
+      const sigs = await db
+        .select()
+        .from(schema.candidateSignature)
+        .where(eq(schema.candidateSignature.candidateSlug, c.slug))
+        .limit(100);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const validSigs = sigs.filter(s => !s.canceled && Number(s.expirationTimestamp) > nowSec);
+
+      const action = {
+        type: 'PROMOTE',
+        proposer: c.proposer as string,
+        slug: c.slug,
+        title,
+        targets: JSON.parse((c.targets as string) || '[]'),
+        values: JSON.parse((c.values as string) || '[]'),
+        signatures: JSON.parse((c.signatures as string) || '[]'),
+        calldatas: JSON.parse((c.calldatas as string) || '[]'),
+        description: descText,
+        sponsorSignatures: validSigs.map(s => ({
+          sig: s.sig,
+          signer: s.signer,
+          expirationTimestamp: s.expirationTimestamp?.toString(),
+        })),
+      };
       return {
         handled: true,
-        response: `Promote prepared for "${title}". This will create a real proposal with Client ID 37. Confirm in your wallet.`,
+        response: `Promote prepared for "${title}" with ${validSigs.length} valid sponsor signature${validSigs.length !== 1 ? 's' : ''}. This will create a real proposal with Client ID 37. Confirm in your wallet.`,
         action,
       };
     } catch (err) {
@@ -891,23 +997,11 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const support = feedbackCandMatch[1] === 'for' ? 1 : 0;
     const keyword = feedbackCandMatch[2].trim();
     try {
-      const allCands = await db
-        .select()
-        .from(schema.candidate)
-        .orderBy(desc(schema.candidate.createdAtBlock))
-        .limit(50);
-      const matches = allCands.filter(
-        c => (c.description ?? '').toString().toLowerCase().includes(keyword) && !c.canceled,
-      );
+      const matches = await findCandidates(keyword, { limit: 1 });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
-      const descText = (c.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = candidateTitle(c);
       const action = { type: 'CANDIDATE_FEEDBACK', proposer: c.proposer, slug: c.slug, support };
       return {
         handled: true,
@@ -927,23 +1021,12 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (showCandMatch) {
     const keyword = showCandMatch[1].trim();
     try {
-      const allCands = await db
-        .select()
-        .from(schema.candidate)
-        .orderBy(desc(schema.candidate.createdAtBlock))
-        .limit(50);
-      const matches = allCands.filter(c =>
-        (c.description ?? '').toString().toLowerCase().includes(keyword),
-      );
+      const matches = await findCandidates(keyword, { limit: 1, includeCanceled: true });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
       return {
         handled: true,
         response: `Candidate: "${title}"
@@ -2565,28 +2648,17 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     };
                   }
                 } else if (input.keyword) {
-                  const allCands = await db
-                    .select()
-                    .from(schema.candidate)
-                    .orderBy(desc(schema.candidate.createdAtBlock))
-                    .limit(50);
-                  const kw = input.keyword.toLowerCase();
-                  const matches = allCands
-                    .filter(c => {
-                      const desc = (c.description ?? '').toString().toLowerCase();
-                      return desc.includes(kw);
-                    })
-                    .slice(0, 5);
+                  const matches = await findCandidates(input.keyword, {
+                    limit: 5,
+                    includeCanceled: true,
+                  });
                   result = {
-                    matches: matches.map(c => {
-                      const descText = (c.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
-                      return { slug: c.slug, proposer: c.proposer, title, canceled: c.canceled };
-                    }),
+                    matches: matches.map(c => ({
+                      slug: c.slug,
+                      proposer: c.proposer,
+                      title: candidateTitle(c),
+                      canceled: c.canceled,
+                    })),
                     count: matches.length,
                   };
                 } else {
