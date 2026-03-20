@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
@@ -11,23 +11,20 @@ import { Alert, Button, Col, Row, Spinner } from 'react-bootstrap';
 import { Link, useParams } from 'react-router';
 import { first, isNonNullish } from 'remeda';
 import { toast } from 'sonner';
-import {
-  encodePacked,
-  encodeAbiParameters,
-  keccak256,
-  stringToBytes,
-  type Hex,
-} from 'viem';
+import { encodePacked, encodeAbiParameters, keccak256, stringToBytes, type Hex } from 'viem';
 import { useAccount, useBlockNumber, useSignTypedData } from 'wagmi';
 
+import { CandidateVersionSlider } from '@/components/CandidateVersionSlider';
 import ProposalCandidateContent from '@/components/ProposalContent/ProposalCandidateContent';
 import CandidateHeader from '@/components/ProposalHeader/CandidateHeader';
 import VoteSignals from '@/components/VoteSignals/VoteSignals';
 import { nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
 import { useAppSelector } from '@/hooks';
+import { useCandidateVersionsFromLogs } from '@/hooks/useCandidatesFromLogs';
 import Section from '@/layout/Section';
 import { checkHasActiveOrPendingProposalOrCandidate } from '@/utils/proposals';
 import {
+  formatProposalTransactionDetails,
   ProposalState,
   useProposal,
   useProposalCount,
@@ -51,6 +48,7 @@ dayjs.extend(advanced);
 
 // ─── Sponsor Modal ────────────────────────────────────────────────────────────
 
+/* eslint-disable react/prop-types */
 const SponsorModal: React.FC<{
   onClose: () => void;
   onSubmit: (expirationTimestamp: number, reason: string) => void;
@@ -81,7 +79,9 @@ const SponsorModal: React.FC<{
         justifyContent: 'center',
         background: 'rgba(0,0,0,0.6)',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         style={{
@@ -145,6 +145,7 @@ const SponsorModal: React.FC<{
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button
+            type="button"
             onClick={onClose}
             style={{
               padding: '10px 24px',
@@ -159,6 +160,7 @@ const SponsorModal: React.FC<{
             Close
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={isPending}
             style={{
@@ -180,6 +182,7 @@ const SponsorModal: React.FC<{
     </div>
   );
 };
+/* eslint-enable react/prop-types */
 
 // ─── Helper: compute encodedProp for addSignature ─────────────────────────────
 
@@ -205,7 +208,7 @@ function calcProposalEncodeData({
 
   const params: [string, unknown][] = [];
 
-  if (proposalIdToUpdate && proposalIdToUpdate > 0) {
+  if (proposalIdToUpdate != null && proposalIdToUpdate > 0) {
     params.push(['uint256', BigInt(proposalIdToUpdate)]);
   }
 
@@ -231,9 +234,7 @@ const CandidatePage = () => {
   const [isProposer, setIsProposer] = useState<boolean>(false);
   const [isCancelPending, setCancelPending] = useState<boolean>(false);
   const [dataFetchPollInterval, setDataFetchPollInterval] = useState<number>(0);
-  const [_isSignerWithActiveOrPendingProposal, setIsSignerWithActiveOrPendingProposal] = useState<
-    boolean | undefined
-  >(undefined);
+  const [, setIsSignerWithActiveOrPendingProposal] = useState<boolean | undefined>(undefined);
   const { cancelCandidate, cancelCandidateState } = useCancelCandidate();
   const { proposeBySigs, proposeBySigsState } = useProposeBySigs();
   const { propose, proposeState } = usePropose();
@@ -258,6 +259,8 @@ const CandidatePage = () => {
   const latestProposalId = useProposalCount();
   const latestProposal = useProposal(latestProposalId ?? 0);
   const feedback = useCandidateFeedback(id ?? '', dataFetchPollInterval);
+  const { versions, loading: versionsLoading } = useCandidateVersionsFromLogs(id ?? '');
+  const [activeVersionIdx, setActiveVersionIdx] = useState<number>(-1); // -1 = latest
   const [isProposal, setIsProposal] = useState<boolean>(false);
   const [isUpdateToProposal, setIsUpdateToProposal] = useState<boolean>(false);
   const originalProposal = useProposal(candidate?.proposalIdToUpdate ?? 0);
@@ -282,10 +285,10 @@ const CandidatePage = () => {
     if (candidate && account) {
       setIsProposer(candidate.proposer.toLowerCase() === account.toLowerCase());
     }
-    if (candidate?.isProposal) {
+    if (candidate?.isProposal === true) {
       setIsProposal(true);
     }
-    if (candidate?.proposalIdToUpdate && +candidate?.proposalIdToUpdate > 0) {
+    if (candidate?.proposalIdToUpdate != null && +candidate.proposalIdToUpdate > 0) {
       setIsUpdateToProposal(true);
     }
   }, [candidate, account]);
@@ -473,10 +476,7 @@ const CandidatePage = () => {
           { name: 'expiry', type: 'uint256' },
         ];
 
-        const typesUpdate = [
-          { name: 'proposalId', type: 'uint256' },
-          ...typesBase,
-        ];
+        const typesUpdate = [{ name: 'proposalId', type: 'uint256' }, ...typesBase];
 
         const messageBase = {
           proposer,
@@ -494,9 +494,7 @@ const CandidatePage = () => {
             chainId: 1,
             verifyingContract: daoAddress,
           },
-          types: isUpdate
-            ? { UpdateProposal: typesUpdate }
-            : { Proposal: typesBase },
+          types: isUpdate ? { UpdateProposal: typesUpdate } : { Proposal: typesBase },
           primaryType: isUpdate ? 'UpdateProposal' : 'Proposal',
           message: isUpdate
             ? { proposalId: BigInt(proposalIdToUpdate), ...messageBase }
@@ -540,27 +538,62 @@ const CandidatePage = () => {
   // ── Eligibility flags ─────────────────────────────────────────────────────
 
   const nowSec = Math.floor(Date.now() / 1000);
-  const activeSignatureCount = (candidate?.version?.content?.contentSignatures ?? [])
-    .filter(s => !s.canceled && s.expirationTimestamp > nowSec).length;
+  const activeSignatureCount = (candidate?.version?.content?.contentSignatures ?? []).filter(
+    s => !s.canceled && s.expirationTimestamp > nowSec,
+  ).length;
 
   const callerVotes = userVotes ?? 0;
   const estimatedTotalPower = callerVotes + activeSignatureCount;
 
   // Promote: visible to proposer (if they have enough power or sigs) OR anyone with enough combined power
-  const canPromote = candidate &&
+  const canPromote =
+    candidate != null &&
     !isProposal &&
     !candidate.canceled &&
     isProposer &&
     estimatedTotalPower >= proposalThreshold;
 
   // Sponsor: visible to non-proposer Noun holders on active candidates
-  const canSponsor = candidate &&
-    !isProposal &&
-    !candidate.canceled &&
-    !isProposer &&
-    callerVotes > 0;
+  const canSponsor =
+    candidate != null && !isProposal && !candidate.canceled && !isProposer && callerVotes > 0;
 
   const primaryProposalId = first(candidate?.matchingProposalIds ?? []);
+
+  // ── Version slider: build a virtual ProposalCandidate for the selected version ──
+  const hasVersions = versions != null && versions.length > 1;
+  const effectiveVersionIdx =
+    activeVersionIdx < 0 && versions != null ? versions.length - 1 : activeVersionIdx;
+
+  const displayCandidate = useMemo(() => {
+    if (candidate == null) return undefined;
+    if (!hasVersions || effectiveVersionIdx < 0) return candidate;
+    const v = versions![effectiveVersionIdx];
+    if (v == null) return candidate;
+    // If viewing latest version, just use the candidate as-is
+    if (effectiveVersionIdx === versions!.length - 1) return candidate;
+    // Build virtual candidate with version's content
+    const details = formatProposalTransactionDetails({
+      targets: v.targets,
+      signatures: v.signatures,
+      values: v.values,
+      calldatas: v.calldatas,
+    });
+    return {
+      ...candidate,
+      version: {
+        content: {
+          ...candidate.version.content,
+          title: v.title,
+          description: v.description,
+          details,
+          targets: v.targets,
+          values: v.values,
+          signatures: v.signatures,
+          calldatas: v.calldatas,
+        },
+      },
+    };
+  }, [candidate, hasVersions, versions, effectiveVersionIdx]);
 
   return (
     <Section fullWidth={false} className={classes.votePage}>
@@ -585,7 +618,7 @@ const CandidatePage = () => {
             <strong>Note: </strong>
             This proposal candidate has been proposed onchain.
           </Trans>{' '}
-          {primaryProposalId && (
+          {primaryProposalId != null && (
             <Link to={`/vote/${primaryProposalId}`}>View the proposal here</Link>
           )}
         </Alert>
@@ -604,7 +637,7 @@ const CandidatePage = () => {
             title={candidate.version.content.title}
             id={candidate.id}
             proposer={candidate.proposer}
-            versionsCount={candidate.versionsCount}
+            versionsCount={versions ? versions.length : candidate.versionsCount}
             createdTransactionHash={candidate.createdTransactionHash}
             lastUpdatedTimestamp={Number(candidate.lastUpdatedTimestamp)}
             isCandidate={true}
@@ -699,8 +732,8 @@ const CandidatePage = () => {
                 <span className={classes.proposerOptionsHeader} style={{ color: '#3b82f6' }}>
                   Sponsor this candidate
                 </span>
-                Add your signature to help this candidate reach the{' '}
-                {proposalThreshold} vote threshold needed to become an on-chain proposal.
+                Add your signature to help this candidate reach the {proposalThreshold} vote
+                threshold needed to become an on-chain proposal.
                 {activeSignatureCount > 0 &&
                   ` Currently ${activeSignatureCount} sponsor${activeSignatureCount !== 1 ? 's' : ''}.`}
               </p>
@@ -721,13 +754,45 @@ const CandidatePage = () => {
 
       {candidate && (
         <Row>
+          {/* Version timeline slider */}
+          {hasVersions && (
+            <Col lg={12}>
+              <CandidateVersionSlider
+                versions={versions!}
+                activeVersion={effectiveVersionIdx}
+                onChange={setActiveVersionIdx}
+              />
+            </Col>
+          )}
+          {!hasVersions && versionsLoading && candidate.versionsCount > 1 && (
+            <Col lg={12}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.95)',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  marginBottom: 16,
+                  fontSize: '0.8rem',
+                  color: '#6b7280',
+                  fontFamily: "'PT Root UI', sans-serif",
+                }}
+              >
+                <Spinner animation="border" size="sm" /> Loading {candidate.versionsCount} versions
+                from chain...
+              </div>
+            </Col>
+          )}
           <Col lg={12}>
             <a className={classes.jump} href="#feedback">
               Jump to Sponsored Votes and Feedback
             </a>
           </Col>
           <Col lg={8} className={clsx(classes.proposal, classes.wrapper)}>
-            <ProposalCandidateContent proposal={candidate} />
+            <ProposalCandidateContent proposal={displayCandidate} />
           </Col>
           <Col id="feedback" lg={4} className={classes.sidebar}>
             <VoteSignals

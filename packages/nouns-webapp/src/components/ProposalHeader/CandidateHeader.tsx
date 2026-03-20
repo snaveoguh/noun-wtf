@@ -37,7 +37,6 @@ interface CandidateHeaderProps {
 const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
   const {
     title,
-    id,
     proposer,
     versionsCount,
     createdTransactionHash,
@@ -80,12 +79,14 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
     </a>
   );
 
-  const subHead = <>{isUpdateToProposal ? <strong>Update</strong> : ''} Proposal Candidate</>;
+  const subHead = (
+    <>{isUpdateToProposal === true ? <strong>Update</strong> : ''} Proposal Candidate</>
+  );
   const transactionLink = transactionIconLink(createdTransactionHash);
   return (
     <>
       <div className={classes.backButtonWrapper}>
-        <Link to={props.isCandidate ? '/candidates' : '/vote'}>
+        <Link to={props.isCandidate === true ? '/candidates' : '/vote'}>
           <button type="button" className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>
             ←
           </button>
@@ -108,7 +109,7 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
         </div>
         {!isMobile && (
           <div className="d-flex justify-content-end align-items-end">
-            {isActiveForVoting && voteButton}
+            {isActiveForVoting === true && voteButton}
           </div>
         )}
       </div>
@@ -148,28 +149,15 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
         )}
       </div>
 
-      <p className={classes.versionHistory}>
-        {versionsCount > 1 ? (
-          <Link to={`/candidates/${id}/history/`}>
-            <strong>Version {versionsCount}</strong>{' '}
-            <span>
-              {versionsCount === 1 ? 'created' : 'updated'}{' '}
-              {relativeTimestamp(lastUpdatedTimestamp)}
-            </span>
-          </Link>
-        ) : (
-          <>
-            <strong>Version {versionsCount}</strong>{' '}
-            <span>
-              {versionsCount === 1 ? 'created' : 'updated'}{' '}
-              {relativeTimestamp(lastUpdatedTimestamp)}
-            </span>
-          </>
-        )}
+      <p className={classes.versionHistory} style={{ fontSize: 13, opacity: 0.6 }}>
+        Version {versionsCount} · {versionsCount === 1 ? 'created' : 'updated'}{' '}
+        {relativeTimestamp(lastUpdatedTimestamp)}
       </p>
 
       {isMobile && (
-        <div className={classes.mobileSubmitProposalButton}>{isActiveForVoting && voteButton}</div>
+        <div className={classes.mobileSubmitProposalButton}>
+          {isActiveForVoting === true && voteButton}
+        </div>
       )}
     </>
   );

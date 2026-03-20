@@ -12,6 +12,13 @@
  *   ProposalCandidateCanceled → marks canceled
  *   SignatureAdded → attaches sponsor signatures
  */
+import type { Address, Hash, Hex } from '@/utils/types';
+import type {
+  CandidateSignature,
+  ProposalCandidate,
+  ProposalCandidateInfo,
+} from '@/wrappers/nounsData';
+
 import { useMemo, useRef } from 'react';
 
 import { useQuery as useReactQuery } from '@tanstack/react-query';
@@ -19,14 +26,7 @@ import { type Log, decodeEventLog } from 'viem';
 import { useBlockNumber, usePublicClient } from 'wagmi';
 
 import { nounsDataAbi } from '@/contracts';
-import type { Address, Hash, Hex } from '@/utils/types';
 import { formatProposalTransactionDetails } from '@/wrappers/nounsDao';
-
-import type {
-  CandidateSignature,
-  ProposalCandidate,
-  ProposalCandidateInfo,
-} from '@/wrappers/nounsData';
 
 // NounsData contract address on mainnet
 const NOUNS_DATA_ADDRESS = '0xf790A5f59678dd733fb3De93493A91f472ca1365' as Address;
@@ -58,12 +58,25 @@ function estimateTimestamp(blockNumber: bigint): number {
 }
 
 // ---- localStorage cache ----
-const CACHE_KEY = 'candidates-v3'; // bumped version to invalidate old broken caches
+const CACHE_KEY = 'candidates-v4'; // v4: added version history snapshots
 
 interface CachedData {
   lastBlock: string;
   candidateCount: number; // track count to detect empty caches
   candidates: SerializedCandidate[];
+}
+
+interface SerializedVersion {
+  versionNumber: number;
+  blockNumber: string;
+  timestamp: number;
+  description: string;
+  title: string;
+  targets: string[];
+  values: string[];
+  signatures: string[];
+  calldatas: string[];
+  updateMessage: string;
 }
 
 interface SerializedCandidate {
@@ -87,6 +100,7 @@ interface SerializedCandidate {
     expirationTimestamp: number;
     sig: string;
   }>;
+  versions?: SerializedVersion[];
 }
 
 function loadCache(): CachedData | null {
@@ -126,12 +140,13 @@ async function fetchChunkWithRetry(
   address: Address,
   fromBlock: bigint,
   toBlock: bigint,
+  topics?: (`0x${string}` | `0x${string}`[] | null)[],
 ): Promise<{ logs: Log[]; failed: boolean }> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const logs = await client.getLogs({
         address,
-        topics: [CANDIDATE_TOPICS],
+        topics: topics ?? [CANDIDATE_TOPICS],
         fromBlock,
         toBlock,
       });
@@ -163,6 +178,7 @@ async function fetchAllLogs(
   address: Address,
   fromBlock: bigint,
   toBlock: bigint,
+  topics?: (`0x${string}` | `0x${string}`[] | null)[],
 ): Promise<Log[]> {
   // Build chunk ranges
   const chunks: Array<{ from: bigint; to: bigint }> = [];
@@ -173,7 +189,9 @@ async function fetchAllLogs(
 
   if (chunks.length === 0) return [];
 
-  console.log(`[candidates] Fetching ${chunks.length} chunks (${fromBlock} → ${toBlock}), parallelism=${MAX_PARALLEL}`);
+  console.log(
+    `[candidates] Fetching ${chunks.length} chunks (${fromBlock} → ${toBlock}), parallelism=${MAX_PARALLEL}`,
+  );
 
   // Execute chunks in parallel batches with retry
   const allLogs: Log[] = [];
@@ -182,9 +200,7 @@ async function fetchAllLogs(
   for (let i = 0; i < chunks.length; i += MAX_PARALLEL) {
     const batch = chunks.slice(i, i + MAX_PARALLEL);
     const results = await Promise.all(
-      batch.map(chunk =>
-        fetchChunkWithRetry(client, address, chunk.from, chunk.to),
-      ),
+      batch.map(chunk => fetchChunkWithRetry(client, address, chunk.from, chunk.to, topics)),
     );
 
     for (const result of results) {
@@ -197,7 +213,9 @@ async function fetchAllLogs(
 
     // Log progress
     const done = Math.min(i + MAX_PARALLEL, chunks.length);
-    console.log(`[candidates] Progress: ${done}/${chunks.length} chunks (${failedChunks} failed, ${allLogs.length} logs so far)`);
+    console.log(
+      `[candidates] Progress: ${done}/${chunks.length} chunks (${failedChunks} failed, ${allLogs.length} logs so far)`,
+    );
 
     // Delay between batches to avoid rate limiting
     if (i + MAX_PARALLEL < chunks.length) {
@@ -210,12 +228,14 @@ async function fetchAllLogs(
   if (failedChunks > chunks.length / 2) {
     throw new Error(
       `Too many failed chunks: ${failedChunks}/${chunks.length}. RPC may be rate-limiting. ` +
-      `Got ${allLogs.length} logs from successful chunks.`,
+        `Got ${allLogs.length} logs from successful chunks.`,
     );
   }
 
   if (failedChunks > 0) {
-    console.warn(`[candidates] Completed with ${failedChunks}/${chunks.length} failed chunks. Results may be incomplete.`);
+    console.warn(
+      `[candidates] Completed with ${failedChunks}/${chunks.length} failed chunks. Results may be incomplete.`,
+    );
   }
 
   console.log(`[candidates] Fetched ${allLogs.length} total logs`);
@@ -269,11 +289,25 @@ function decodeLogs(logs: Log[]): DecodedEvents {
 
   console.log(
     `[candidates] Decoded events: ${events.created.length} created, ` +
-    `${events.updated.length} updated, ${events.canceled.length} canceled, ` +
-    `${events.signatures.length} signatures`,
+      `${events.updated.length} updated, ${events.canceled.length} canceled, ` +
+      `${events.signatures.length} signatures`,
   );
 
   return events;
+}
+
+// ---- Version snapshot (one per Created/Updated event) ----
+export interface CandidateVersionSnapshot {
+  versionNumber: number;
+  blockNumber: bigint;
+  timestamp: number;
+  description: string;
+  title: string;
+  targets: Address[];
+  values: bigint[];
+  signatures: string[];
+  calldatas: Hex[];
+  updateMessage: string; // empty for v1
 }
 
 // ---- Build candidate state from events ----
@@ -293,10 +327,16 @@ interface CandidateState {
   proposalIdToUpdate: number;
   encodedProposalHash: string;
   contentSignatures: CandidateSignature[];
+  versions: CandidateVersionSnapshot[];
 }
 
 function candidateId(proposer: string, slug: string): string {
   return `${proposer.toLowerCase()}-${slug}`;
+}
+
+function extractTitle(description: string): string {
+  const firstLine = description.split('\n')[0] ?? '';
+  return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
 }
 
 function buildFromEvents(events: DecodedEvents): Map<string, CandidateState> {
@@ -308,6 +348,24 @@ function buildFromEvents(events: DecodedEvents): Map<string, CandidateState> {
     const proposer = ((a.msgSender as string) ?? '').toLowerCase() as Address;
     const slug = (a.slug as string) ?? '';
     const id = candidateId(proposer, slug);
+    const description = (a.description as string) ?? '';
+    const targets = ((a.targets as string[]) ?? []).map(t => t as Address);
+    const values = ((a.values as bigint[]) ?? []).map(v => BigInt(v));
+    const signatures = (a.signatures as string[]) ?? [];
+    const calldatas = ((a.calldatas as string[]) ?? []).map(c => c as Hex);
+
+    const v1: CandidateVersionSnapshot = {
+      versionNumber: 1,
+      blockNumber: e.blockNumber,
+      timestamp: estimateTimestamp(e.blockNumber),
+      description,
+      title: extractTitle(description),
+      targets,
+      values,
+      signatures,
+      calldatas,
+      updateMessage: '',
+    };
 
     map.set(id, {
       id,
@@ -317,14 +375,15 @@ function buildFromEvents(events: DecodedEvents): Map<string, CandidateState> {
       versionsCount: 1,
       createdTxHash: e.txHash,
       lastBlockNumber: e.blockNumber,
-      description: (a.description as string) ?? '',
-      targets: ((a.targets as string[]) ?? []).map(t => t as Address),
-      values: ((a.values as bigint[]) ?? []).map(v => BigInt(v)),
-      signatures: (a.signatures as string[]) ?? [],
-      calldatas: ((a.calldatas as string[]) ?? []).map(c => c as Hex),
+      description,
+      targets,
+      values,
+      signatures,
+      calldatas,
       proposalIdToUpdate: Number(a.proposalIdToUpdate ?? 0),
-      encodedProposalHash: ((a.encodedProposalHash as string) ?? ''),
+      encodedProposalHash: (a.encodedProposalHash as string) ?? '',
       contentSignatures: [],
+      versions: [v1],
     });
   }
 
@@ -338,13 +397,33 @@ function buildFromEvents(events: DecodedEvents): Map<string, CandidateState> {
     if (existing) {
       existing.versionsCount += 1;
       existing.lastBlockNumber = e.blockNumber;
-      existing.description = (a.description as string) ?? existing.description;
-      existing.targets = ((a.targets as string[]) ?? existing.targets).map(t => t as Address);
-      existing.values = ((a.values as bigint[]) ?? existing.values).map(v => BigInt(v));
-      existing.signatures = (a.signatures as string[]) ?? existing.signatures;
-      existing.calldatas = ((a.calldatas as string[]) ?? existing.calldatas).map(c => c as Hex);
-      existing.encodedProposalHash = (a.encodedProposalHash as string) ?? existing.encodedProposalHash;
+      const description = (a.description as string) ?? existing.description;
+      const targets = ((a.targets as string[]) ?? existing.targets).map(t => t as Address);
+      const values = ((a.values as bigint[]) ?? existing.values).map(v => BigInt(v));
+      const signatures = (a.signatures as string[]) ?? existing.signatures;
+      const calldatas = ((a.calldatas as string[]) ?? existing.calldatas).map(c => c as Hex);
+
+      existing.description = description;
+      existing.targets = targets;
+      existing.values = values;
+      existing.signatures = signatures;
+      existing.calldatas = calldatas;
+      existing.encodedProposalHash =
+        (a.encodedProposalHash as string) ?? existing.encodedProposalHash;
       existing.contentSignatures = []; // Clear on update
+
+      existing.versions.push({
+        versionNumber: existing.versionsCount,
+        blockNumber: e.blockNumber,
+        timestamp: estimateTimestamp(e.blockNumber),
+        description,
+        title: extractTitle(description),
+        targets,
+        values,
+        signatures,
+        calldatas,
+        updateMessage: (a.reason as string) ?? '',
+      });
     }
   }
 
@@ -408,6 +487,18 @@ function serializeCandidate(c: CandidateState): SerializedCandidate {
       expirationTimestamp: s.expirationTimestamp,
       sig: s.sig,
     })),
+    versions: c.versions.map(v => ({
+      versionNumber: v.versionNumber,
+      blockNumber: v.blockNumber.toString(),
+      timestamp: v.timestamp,
+      description: v.description,
+      title: v.title,
+      targets: v.targets as string[],
+      values: v.values.map(val => val.toString()),
+      signatures: v.signatures,
+      calldatas: v.calldatas as string[],
+      updateMessage: v.updateMessage,
+    })),
   };
 }
 
@@ -434,11 +525,25 @@ function deserializeCandidate(s: SerializedCandidate): CandidateState {
       canceled: false,
       signer: { id: cs.signer as Address, proposals: [] },
     })),
+    versions: (s.versions ?? []).map(v => ({
+      versionNumber: v.versionNumber,
+      blockNumber: BigInt(v.blockNumber),
+      timestamp: v.timestamp,
+      description: v.description,
+      title: v.title,
+      targets: v.targets as Address[],
+      values: v.values.map(val => BigInt(val)),
+      signatures: v.signatures,
+      calldatas: v.calldatas as Hex[],
+      updateMessage: v.updateMessage,
+    })),
   };
 }
 
-// ---- Transform to ProposalCandidate ----
-function toProposalCandidate(state: CandidateState): ProposalCandidate {
+// ---- Transform to ProposalCandidate (with version history) ----
+function toProposalCandidate(
+  state: CandidateState,
+): ProposalCandidate & { versions: CandidateVersionSnapshot[] } {
   // Extract title from description (# Title on first line)
   const firstLine = state.description.split('\n')[0] ?? '';
   const title = firstLine.replace(/^#+\s*/, '').trim() || 'Untitled Candidate';
@@ -484,6 +589,7 @@ function toProposalCandidate(state: CandidateState): ProposalCandidate {
         transactionHash: state.createdTxHash as Hash,
       },
     },
+    versions: state.versions,
   };
 }
 
@@ -498,7 +604,7 @@ export function useCandidatesFromLogs(enabled = true) {
     // Instead, rely on staleTime + refetchInterval for updates
     queryKey: ['candidatesFromChain'],
     queryFn: async (): Promise<ProposalCandidate[]> => {
-      if (!publicClient || !currentBlock) return [];
+      if (publicClient == null || currentBlock == null) return [];
       if (fetchingRef.current) return []; // Prevent double-fetch
       fetchingRef.current = true;
 
@@ -508,7 +614,7 @@ export function useCandidatesFromLogs(enabled = true) {
         let fromBlock = NOUNS_DATA_DEPLOY_BLOCK;
         let existingCandidates = new Map<string, CandidateState>();
 
-        if (cache) {
+        if (cache != null) {
           const lastBlock = BigInt(cache.lastBlock);
           if (lastBlock >= NOUNS_DATA_DEPLOY_BLOCK) {
             fromBlock = lastBlock + 1n;
@@ -517,20 +623,26 @@ export function useCandidatesFromLogs(enabled = true) {
               const state = deserializeCandidate(sc);
               existingCandidates.set(state.id, state);
             }
-            console.log(`[candidates] Loaded ${existingCandidates.size} candidates from cache (last block: ${lastBlock})`);
+            console.log(
+              `[candidates] Loaded ${existingCandidates.size} candidates from cache (last block: ${lastBlock})`,
+            );
           }
         }
 
         // If we're caught up, return cached directly
         if (fromBlock > currentBlock && existingCandidates.size > 0) {
-          console.log(`[candidates] Cache is current, returning ${existingCandidates.size} cached candidates`);
+          console.log(
+            `[candidates] Cache is current, returning ${existingCandidates.size} cached candidates`,
+          );
           return Array.from(existingCandidates.values())
             .filter(c => !c.canceled)
             .map(toProposalCandidate);
         }
 
         const blocksToFetch = currentBlock - fromBlock;
-        console.log(`[candidates] Fetching from block ${fromBlock} to ${currentBlock} (${blocksToFetch} blocks)`);
+        console.log(
+          `[candidates] Fetching from block ${fromBlock} to ${currentBlock} (${blocksToFetch} blocks)`,
+        );
 
         // Fetch new logs (parallel chunked with retry)
         const newLogs = await fetchAllLogs(
@@ -570,8 +682,12 @@ export function useCandidatesFromLogs(enabled = true) {
         }
 
         const totalCandidates = existingCandidates.size;
-        const activeCandidates = Array.from(existingCandidates.values()).filter(c => !c.canceled).length;
-        console.log(`[candidates] Total: ${totalCandidates}, Active (non-canceled): ${activeCandidates}`);
+        const activeCandidates = Array.from(existingCandidates.values()).filter(
+          c => !c.canceled,
+        ).length;
+        console.log(
+          `[candidates] Total: ${totalCandidates}, Active (non-canceled): ${activeCandidates}`,
+        );
 
         // Save to cache (only if we have candidates)
         saveCache({
@@ -587,7 +703,7 @@ export function useCandidatesFromLogs(enabled = true) {
         fetchingRef.current = false;
       }
     },
-    enabled: enabled && !!publicClient && !!currentBlock,
+    enabled: enabled && publicClient != null && currentBlock != null && currentBlock > 0,
     staleTime: 5 * 60_000, // 5 minutes before considered stale
     gcTime: 30 * 60_000, // Keep in memory for 30 minutes
     refetchInterval: 5 * 60_000, // Refetch every 5 minutes
@@ -606,4 +722,30 @@ export function useCandidateFromLogs(id: string, enabled = true) {
   }, [allCandidates, id]);
 
   return { data: candidate, isLoading, error, refetch };
+}
+
+// ---- Version history for a single candidate ----
+// Piggybacks on the general useCandidatesFromLogs fetch (proven reliable).
+// First load ~10-15s, then cached.
+
+export function useCandidateVersionsFromLogs(candidateId: string): {
+  versions: CandidateVersionSnapshot[] | undefined;
+  loading: boolean;
+} {
+  const { data: allCandidates, isLoading } = useCandidatesFromLogs(!!candidateId);
+
+  const versions = useMemo(() => {
+    if (!allCandidates || !candidateId) return undefined;
+    const candidate = allCandidates.find(
+      c => c.id === candidateId || c.id === candidateId.toLowerCase(),
+    );
+    if (!candidate) return undefined;
+    // versions is added by toProposalCandidate but not in the ProposalCandidate type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const v = (candidate as any).versions as CandidateVersionSnapshot[] | undefined;
+    if (!v || v.length <= 1) return undefined;
+    return v;
+  }, [allCandidates, candidateId]);
+
+  return { versions, loading: isLoading };
 }
