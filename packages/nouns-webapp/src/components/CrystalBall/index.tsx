@@ -53,7 +53,7 @@ const MAX_HEIGHT = 6; // slightly shorter for compact view
 const cbCharCache: THREE.CanvasTexture[] = [];
 
 function getCBCharTexture(index: number): THREE.CanvasTexture {
-  if (cbCharCache[index]) return cbCharCache[index];
+  if (cbCharCache[index] != null) return cbCharCache[index];
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -84,10 +84,10 @@ function decodeRLE(data: string) {
     left: parseInt(hex.substring(8, 10), 16),
   };
   const pairs: [number, number][] =
-    hex.substring(10).match(/.{1,4}/g)?.map(r => [
-      parseInt(r.substring(0, 2), 16),
-      parseInt(r.substring(2, 4), 16),
-    ]) ?? [];
+    hex
+      .substring(10)
+      .match(/.{1,4}/g)
+      ?.map(r => [parseInt(r.substring(0, 2), 16), parseInt(r.substring(2, 4), 16)]) ?? [];
   return { bounds, pairs };
 }
 
@@ -97,9 +97,7 @@ function seedToVoxels(seed: NounSeed): AsciiVoxel[] {
   const { parts, background } = getNounData(seed);
   const palette = ImageData.palette;
 
-  const colorGrid: string[][] = Array.from({ length: 32 }, () =>
-    Array(32).fill(background),
-  );
+  const colorGrid: string[][] = Array.from({ length: 32 }, () => Array(32).fill(background));
 
   for (let p = 0; p < parts.length; p++) {
     const { bounds, pairs } = decodeRLE(parts[p].data);
@@ -169,7 +167,12 @@ function CBCharGroup({ voxels, charIndex }: { voxels: AsciiVoxel[]; charIndex: n
     if (!mesh || voxels.length === 0) return;
     for (let i = 0; i < voxels.length; i++) {
       const v = voxels[i];
-      col.setRGB(v.r / 255, v.g / 255, v.b / 255);
+      const hexStr =
+        '#' +
+        v.r.toString(16).padStart(2, '0') +
+        v.g.toString(16).padStart(2, '0') +
+        v.b.toString(16).padStart(2, '0');
+      col.set(hexStr);
       mesh.setColorAt(i, col);
     }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -178,7 +181,9 @@ function CBCharGroup({ voxels, charIndex }: { voxels: AsciiVoxel[]; charIndex: n
   if (voxels.length === 0) return null;
 
   return (
+    // eslint-disable-next-line react/no-unknown-property
     <instancedMesh ref={meshRef} args={[geometry, undefined, voxels.length]}>
+      {/* eslint-disable react/no-unknown-property */}
       <meshBasicMaterial
         map={texture}
         transparent
@@ -186,6 +191,7 @@ function CBCharGroup({ voxels, charIndex }: { voxels: AsciiVoxel[]; charIndex: n
         side={THREE.DoubleSide}
         depthWrite
       />
+      {/* eslint-enable react/no-unknown-property */}
     </instancedMesh>
   );
 }
@@ -244,21 +250,28 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
   // Poll the fast predict endpoint
   const fetchPrediction = useCallback(async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
+      const apiUrl =
+        (import.meta.env.VITE_API_URL as string | undefined) ??
+        'https://spirited-flexibility-production-3c30.up.railway.app';
       const res = await fetch(`${apiUrl}/api/agent/predict`);
       if (res.ok) {
         const data: PredictResponse = await res.json();
         setPrediction(data);
         onPredict?.(data);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, [onPredict]);
+
+  // Poll every 3s everywhere — realtime block tracking matters
+  const pollInterval = 3_000;
 
   useEffect(() => {
     fetchPrediction();
-    pollRef.current = setInterval(fetchPrediction, 12_000);
+    pollRef.current = setInterval(fetchPrediction, pollInterval);
     return () => clearInterval(pollRef.current);
-  }, [fetchPrediction]);
+  }, [fetchPrediction, pollInterval]);
 
   // Update countdown every second
   useEffect(() => {
@@ -271,7 +284,10 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
     return seedToVoxels(prediction.seed);
   }, [prediction?.seed]);
 
-  const countdown = prediction?.auctionEnd ? formatCountdown(prediction.auctionEnd) : null;
+  const countdown =
+    prediction?.auctionEnd != null && prediction.auctionEnd > 0
+      ? formatCountdown(prediction.auctionEnd)
+      : null;
   const isNounOClock = prediction?.auctionEnded ?? false;
 
   return (
@@ -323,13 +339,17 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
             camera={{ position: [0, 24, 26], fov: 55 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }}
-            onCreated={({ gl }) => { gl.setClearColor(0x000000, 0); }}
+            onCreated={({ gl }) => {
+              gl.setClearColor(0x000000, 0);
+            }}
             frameloop="always"
             dpr={1} // force 1x DPR for speed
           >
             <Suspense fallback={null}>
+              {/* eslint-disable react/no-unknown-property */}
               <ambientLight intensity={0.7} />
               <pointLight position={[0, 12, 0]} intensity={0.3} color="#aaccff" />
+              {/* eslint-enable react/no-unknown-property */}
 
               <CrystalScene voxels={voxels} />
 
@@ -384,7 +404,7 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
               animation: 'pulse 1.5s ease-in-out infinite',
             }}
           >
-            NOUN O'CLOCK
+            NOUN O&apos;CLOCK
           </div>
         )}
       </div>
@@ -405,8 +425,8 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
             <div style={{ fontSize: 10, color: '#666', letterSpacing: '0.05em' }}>
               <span style={{ color: prediction.running ? '#4ade80' : '#ef4444' }}>
                 {prediction.running ? '\u25CF' : '\u25CB'}
-              </span>
-              {' '}NOUN #{prediction.nextNounId}
+              </span>{' '}
+              NOUN #{prediction.nextNounId}
               {prediction.block > 0 && (
                 <span style={{ color: '#444', marginLeft: 6 }}>BLK {prediction.block}</span>
               )}
