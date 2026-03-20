@@ -7,7 +7,24 @@ import { useGovernanceAction } from './useGovernanceAction';
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export interface GovernanceAction {
-  type: 'VOTE' | 'PROPOSAL_FEEDBACK' | 'CANDIDATE_FEEDBACK' | 'CREATE_CANDIDATE' | 'SPONSOR' | 'BID' | 'PROMOTE' | 'UPDATE_CANDIDATE' | 'UPDATE_PROPOSAL' | 'UPDATE_PROPOSAL_DESCRIPTION' | 'UPDATE_PROPOSAL_TRANSACTIONS' | 'GRANT_VOTE' | 'GRANT_PROPOSAL' | 'QUEUE_PROPOSAL' | 'QUEUE_GRANT' | 'EXECUTE_PROPOSAL' | 'EXECUTE_GRANT';
+  type:
+    | 'VOTE'
+    | 'PROPOSAL_FEEDBACK'
+    | 'CANDIDATE_FEEDBACK'
+    | 'CREATE_CANDIDATE'
+    | 'SPONSOR'
+    | 'BID'
+    | 'PROMOTE'
+    | 'UPDATE_CANDIDATE'
+    | 'UPDATE_PROPOSAL'
+    | 'UPDATE_PROPOSAL_DESCRIPTION'
+    | 'UPDATE_PROPOSAL_TRANSACTIONS'
+    | 'GRANT_VOTE'
+    | 'GRANT_PROPOSAL'
+    | 'QUEUE_PROPOSAL'
+    | 'QUEUE_GRANT'
+    | 'EXECUTE_PROPOSAL'
+    | 'EXECUTE_GRANT';
   proposalId?: number;
   support?: 0 | 1 | 2;
   reason?: string;
@@ -90,17 +107,19 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
     }
   }, [action, execute, isPending, status, onSuccess]);
 
-  const actionInfo = ACTION_LABELS[action.type] || { verb: action.type, color: '#ccc' };
+  const actionInfo = ACTION_LABELS[action.type] ?? { verb: action.type, color: '#ccc' };
   const supportInfo = action.support !== undefined ? SUPPORT_LABELS[action.support] : null;
 
   if (!isConnected) {
     return (
       <div style={containerStyle}>
         <div style={{ color: '#ef4444', fontSize: '13px' }}>
-          wallet not connected. click "connect" in the header to proceed.
+          wallet not connected. click &quot;connect&quot; in the header to proceed.
         </div>
         <div style={{ marginTop: '12px' }}>
-          <button onClick={onCancel} style={cancelBtnStyle}>dismiss</button>
+          <button type="button" onClick={onCancel} style={cancelBtnStyle}>
+            dismiss
+          </button>
         </div>
       </div>
     );
@@ -113,9 +132,10 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         <span style={{ color: actionInfo.color, fontSize: '12px', letterSpacing: '0.5px' }}>
           {actionInfo.verb.toUpperCase()}
         </span>
-        {action.title && (
+        {action.title != null && action.title !== '' && (
           <div style={{ color: '#ccc', fontSize: '13px', marginTop: '4px' }}>
-            {action.proposalId ? `prop #${action.proposalId}: ` : ''}{action.title}
+            {action.proposalId != null ? `prop #${action.proposalId}: ` : ''}
+            {action.title}
           </div>
         )}
         {action.slug && !action.title && (
@@ -133,50 +153,60 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
             <span style={{ color: supportInfo.color, fontWeight: 500 }}>{supportInfo.label}</span>
           </div>
         )}
-        {action.reason && (
+        {action.reason != null && action.reason !== '' && (
           <div>
             <span style={{ color: '#666' }}>reason: </span>
-            <span style={{ color: '#aaa' }}>"{action.reason}"</span>
+            <span style={{ color: '#aaa' }}>&quot;{action.reason}&quot;</span>
           </div>
         )}
-        {(action.type === 'CREATE_CANDIDATE' || action.type === 'UPDATE_CANDIDATE') && action.description && (
-          <div style={{ marginTop: '4px' }}>
-            <span style={{ color: '#666' }}>description: </span>
-            <span style={{ color: '#aaa' }}>
-              {action.description.length > 200
-                ? action.description.slice(0, 200) + '...'
-                : action.description}
-            </span>
-          </div>
-        )}
-        {(action.type === 'CREATE_CANDIDATE' || action.type === 'UPDATE_CANDIDATE') && (action.targets?.length ?? 0) > 0 && (
-          <div style={{ marginTop: '4px' }}>
-            <span style={{ color: '#666' }}>transactions: </span>
-            <span style={{ color: '#4ade80' }}>{action.targets?.length} executable</span>
-            {action.targets?.map((t, i) => (
-              <div key={i} style={{ color: '#555', fontSize: '11px', marginLeft: '8px', marginTop: '2px' }}>
-                → {t.slice(0, 6)}...{t.slice(-4)}
-                {action.values?.[i] && action.values[i] !== '0' && (
-                  <span style={{ color: '#fbbf24' }}> ({(Number(BigInt(action.values[i])) / 1e18).toFixed(4)} ETH)</span>
-                )}
-                {action.signatures?.[i] && (
-                  <span style={{ color: '#888' }}> {action.signatures[i]}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {(action.type === 'CREATE_CANDIDATE' || action.type === 'UPDATE_CANDIDATE') &&
+          action.description && (
+            <div style={{ marginTop: '4px' }}>
+              <span style={{ color: '#666' }}>description: </span>
+              <span style={{ color: '#aaa' }}>
+                {action.description.length > 200
+                  ? action.description.slice(0, 200) + '...'
+                  : action.description}
+              </span>
+            </div>
+          )}
+        {(action.type === 'CREATE_CANDIDATE' || action.type === 'UPDATE_CANDIDATE') &&
+          (action.targets?.length ?? 0) > 0 && (
+            <div style={{ marginTop: '4px' }}>
+              <span style={{ color: '#666' }}>transactions: </span>
+              <span style={{ color: '#4ade80' }}>{action.targets?.length} executable</span>
+              {action.targets?.map((t, i) => (
+                <div
+                  key={i}
+                  style={{ color: '#555', fontSize: '11px', marginLeft: '8px', marginTop: '2px' }}
+                >
+                  → {t.slice(0, 6)}...{t.slice(-4)}
+                  {action.values?.[i] && action.values[i] !== '0' && (
+                    <span style={{ color: '#fbbf24' }}>
+                      {' '}
+                      ({(Number(BigInt(action.values[i])) / 1e18).toFixed(4)} ETH)
+                    </span>
+                  )}
+                  {action.signatures?.[i] && (
+                    <span style={{ color: '#888' }}> {action.signatures[i]}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         {action.type === 'UPDATE_CANDIDATE' && (
           <div style={{ color: '#fbbf24', fontSize: '11px', marginTop: '4px' }}>
             warning: updating resets all sponsor signatures
           </div>
         )}
-        {(action.type === 'UPDATE_PROPOSAL' || action.type === 'UPDATE_PROPOSAL_DESCRIPTION' || action.type === 'UPDATE_PROPOSAL_TRANSACTIONS') && (
+        {(action.type === 'UPDATE_PROPOSAL' ||
+          action.type === 'UPDATE_PROPOSAL_DESCRIPTION' ||
+          action.type === 'UPDATE_PROPOSAL_TRANSACTIONS') && (
           <>
             {action.updateMessage && (
               <div>
                 <span style={{ color: '#666' }}>update reason: </span>
-                <span style={{ color: '#aaa' }}>"{action.updateMessage}"</span>
+                <span style={{ color: '#aaa' }}>&quot;{action.updateMessage}&quot;</span>
               </div>
             )}
             {action.updatePeriodEndBlock && (
@@ -196,7 +226,9 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
           <div>
             <span style={{ color: '#666' }}>proposer: </span>
             <span style={{ color: '#aaa' }}>
-              {action.proposer ? `${action.proposer.slice(0, 6)}...${action.proposer.slice(-4)}` : 'unknown'}
+              {action.proposer
+                ? `${action.proposer.slice(0, 6)}...${action.proposer.slice(-4)}`
+                : 'unknown'}
             </span>
           </div>
         )}
@@ -220,12 +252,20 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
             <div>
               <span style={{ color: '#666' }}>proposer: </span>
               <span style={{ color: '#aaa' }}>
-                {action.proposer ? `${action.proposer.slice(0, 6)}...${action.proposer.slice(-4)}` : 'unknown'}
+                {action.proposer
+                  ? `${action.proposer.slice(0, 6)}...${action.proposer.slice(-4)}`
+                  : 'unknown'}
               </span>
             </div>
             <div>
-              <span style={{ color: '#666' }}>signatures: </span>
-              <span style={{ color: '#fb923c' }}>{action.sponsorSignatures?.length ?? 0} valid</span>
+              <span style={{ color: '#666' }}>
+                {(action.sponsorSignatures?.length ?? 0) > 0 ? 'signatures: ' : 'method: '}
+              </span>
+              <span style={{ color: '#fb923c' }}>
+                {(action.sponsorSignatures?.length ?? 0) > 0
+                  ? `${action.sponsorSignatures?.length} valid — proposeBySigs`
+                  : 'direct propose (proposer has voting power)'}
+              </span>
             </div>
             <div style={{ color: '#444', fontSize: '11px', marginTop: '4px' }}>
               client id 37 (noun.wtf) — creates a real onchain proposal
@@ -265,10 +305,16 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
                 <span style={{ color: '#666' }}>transactions: </span>
                 <span style={{ color: '#4ade80' }}>{action.targets?.length} executable</span>
                 {action.targets?.map((t, i) => (
-                  <div key={i} style={{ color: '#555', fontSize: '11px', marginLeft: '8px', marginTop: '2px' }}>
+                  <div
+                    key={i}
+                    style={{ color: '#555', fontSize: '11px', marginLeft: '8px', marginTop: '2px' }}
+                  >
                     → {t.slice(0, 6)}...{t.slice(-4)}
                     {action.values?.[i] && action.values[i] !== '0' && (
-                      <span style={{ color: '#fbbf24' }}> ({(Number(BigInt(action.values[i])) / 1e18).toFixed(4)} ETH)</span>
+                      <span style={{ color: '#fbbf24' }}>
+                        {' '}
+                        ({(Number(BigInt(action.values[i])) / 1e18).toFixed(4)} ETH)
+                      </span>
                     )}
                   </div>
                 ))}
@@ -281,7 +327,8 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         )}
         {action.type === 'QUEUE_PROPOSAL' && (
           <div style={{ color: '#eab308', fontSize: '11px', marginTop: '4px' }}>
-            this will place the proposal in the timelock — after the waiting period it can be executed
+            this will place the proposal in the timelock — after the waiting period it can be
+            executed
           </div>
         )}
         {action.type === 'QUEUE_GRANT' && (
@@ -309,7 +356,9 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
 
       {/* Error */}
       {(status === 'error' || txError) && (
-        <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '8px', wordBreak: 'break-word' }}>
+        <div
+          style={{ color: '#ef4444', fontSize: '11px', marginTop: '8px', wordBreak: 'break-word' }}
+        >
           {txError || 'transaction failed or was rejected'}
         </div>
       )}
@@ -333,6 +382,7 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
       {status !== 'success' && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
           <button
+            type="button"
             onClick={handleConfirm}
             disabled={isPending}
             style={{
@@ -343,11 +393,7 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
           >
             {isPending ? 'signing...' : 'confirm — sign tx'}
           </button>
-          <button
-            onClick={onCancel}
-            disabled={isPending}
-            style={cancelBtnStyle}
-          >
+          <button type="button" onClick={onCancel} disabled={isPending} style={cancelBtnStyle}>
             cancel
           </button>
         </div>
