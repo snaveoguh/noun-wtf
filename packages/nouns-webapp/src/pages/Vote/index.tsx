@@ -19,7 +19,7 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react';
-import { Button, Spinner } from 'react-bootstrap';
+import { Spinner } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
 import rehypeRaw from 'rehype-raw';
@@ -63,7 +63,6 @@ import { useUserVotesAsOfBlock } from '@/wrappers/nounToken';
 import {
   delegateNounsAtBlockQuery,
   proposalVotesQuery,
-  propUsingDynamicQuorum,
 } from '@/wrappers/subgraph';
 
 dayjs.extend(utc);
@@ -120,12 +119,6 @@ const VotePage = () => {
   const activeLocale = useActiveLocale();
   const { _ } = useLingui();
   const { address: account } = useAccount();
-  const { query, variables } = propUsingDynamicQuorum(id ?? '0');
-  const {
-    data: dqInfo,
-    loading: loadingDQInfo,
-    error: dqError,
-  } = useQuery(query, { variables });
   const { queueProposal, queueProposalState } = useQueueProposal();
   const { executeProposal, executeProposalState } = useExecuteProposal();
   const { cancelProposal, cancelProposalState } = useCancelProposal();
@@ -181,6 +174,8 @@ const VotePage = () => {
   }, [currentBlock, proposal?.voteSnapshotBlock]);
   const userVotes = useUserVotesAsOfBlock(currentOrSnapshotBlock);
 
+  // Fetch dynamic quorum directly from the governor contract
+  // This returns the real-time quorum for the proposal (accounts for dynamic quorum)
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   const { data: currentQuorum } = useReadNounsGovernorQuorumVotes({
@@ -190,10 +185,7 @@ const VotePage = () => {
         : 0n,
     ],
     query: {
-      enabled:
-        dqInfo !== undefined && dqInfo?.proposal !== undefined
-          ? dqInfo.proposal?.quorumCoefficient === '0'
-          : true,
+      enabled: proposal !== undefined && proposal.id !== undefined,
     },
   });
 
@@ -401,7 +393,7 @@ const VotePage = () => {
   }, [proposal?.status, isForkActive]);
 
   // ── Loading / error states ──────────────────────────────────────────────
-  if (!proposal || loading || loadingDQInfo || dqInfo === undefined) {
+  if (!proposal || loading) {
     return (
       <div
         style={{
@@ -415,7 +407,7 @@ const VotePage = () => {
       </div>
     );
   }
-  if (error || dqError) {
+  if (error) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: '#e40536' }}>
         Failed to fetch proposal data
@@ -423,9 +415,9 @@ const VotePage = () => {
     );
   }
 
-  const isV2Prop = (dqInfo?.proposal?.quorumCoefficient ?? 0) > 0;
-  const quorum = isV2Prop
-    ? Number(currentQuorum ?? 0)
+  // Use contract's dynamic quorum when available, fall back to static Ponder value
+  const quorum = currentQuorum !== undefined
+    ? Number(currentQuorum)
     : proposal.quorumVotes;
 
   // Build vote activity data
@@ -729,12 +721,11 @@ const VotePage = () => {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {isAwaitingStateChange() && (
-              <Button
+              <button
+                type="button"
                 onClick={moveStateAction}
-                disabled={
-                  isQueuePending || isExecutePending || !isExecutable
-                }
-                variant="dark"
+                disabled={isQueuePending || isExecutePending || !isExecutable}
+                className="btn btn-dark"
                 style={{
                   borderRadius: 8,
                   fontWeight: 700,
@@ -749,16 +740,17 @@ const VotePage = () => {
                     {moveStateButtonAction} Proposal ⌐◧-◧
                   </>
                 )}
-              </Button>
+              </button>
             )}
             {isCancellable() && (
-              <Button
+              <button
+                type="button"
                 onClick={() => {
                   if (proposal?.id)
                     cancelProposal({ args: [BigInt(proposal.id)] });
                 }}
                 disabled={isCancelPending}
-                variant="outline-danger"
+                className="btn btn-outline-danger"
                 style={{
                   borderRadius: 8,
                   fontWeight: 700,
@@ -771,7 +763,7 @@ const VotePage = () => {
                 ) : (
                   'Cancel Proposal'
                 )}
-              </Button>
+              </button>
             )}
             {isProposer() && isUpdateable() && (
               <Link
