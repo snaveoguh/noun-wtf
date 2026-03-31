@@ -371,6 +371,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
         dpr={[1, 2]}
+        flat
         frameloop="always"
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}

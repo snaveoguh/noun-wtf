@@ -192,6 +192,7 @@ const NounVoxel3D: FC<NounVoxel3DProps> = ({ onPredict, pollInterval = 3_000 }) 
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
           }}
           dpr={[1, 2]}
+          flat
           shadows
         >
           <Suspense fallback={null}>
