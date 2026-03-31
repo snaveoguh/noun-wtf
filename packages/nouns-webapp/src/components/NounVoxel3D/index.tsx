@@ -41,9 +41,28 @@ export interface PredictResponse {
 
 type ViewMode = 'color' | 'silhouette';
 
-function VoxelScene({ layers, mode }: { layers: { body: any[]; glasses: any[] }; mode: ViewMode }) {
-  const { bodyGeo, glassesGeo } = useMemo(() => buildNounGeometries(layers), [layers]);
+function VoxelScene({ layers, mode }: { layers: { body: any[]; bling: any[]; glasses: any[] }; mode: ViewMode }) {
+  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => buildNounGeometries(layers), [layers]);
   const isColor = mode === 'color';
+
+  const renderMesh = (geo: THREE.BufferGeometry | null, roughness: number, metalness: number) => {
+    if (!geo) return null;
+    return (
+      <>
+        <mesh geometry={geo} castShadow receiveShadow>
+          {isColor
+            ? <meshStandardMaterial vertexColors roughness={roughness} metalness={metalness} />
+            : <meshStandardMaterial color="#0a0a12" roughness={0.9} />
+          }
+        </mesh>
+        {!isColor && (
+          <mesh geometry={geo}>
+            <meshBasicMaterial color="#1a2a5a" wireframe transparent opacity={0.15} />
+          </mesh>
+        )}
+      </>
+    );
+  };
 
   return (
     <group>
@@ -53,8 +72,8 @@ function VoxelScene({ layers, mode }: { layers: { body: any[]; glasses: any[] };
         position={[15, 25, 30]}
         intensity={1.6}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}
@@ -66,37 +85,9 @@ function VoxelScene({ layers, mode }: { layers: { body: any[]; glasses: any[] };
       <directionalLight position={[-10, -5, -15]} intensity={0.15} />
       <directionalLight position={[-5, 10, -20]} intensity={0.25} />
 
-      {bodyGeo && (
-        <>
-          <mesh geometry={bodyGeo} castShadow receiveShadow>
-            {isColor
-              ? <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
-              : <meshStandardMaterial color="#0a0a12" roughness={0.9} />
-            }
-          </mesh>
-          {!isColor && (
-            <mesh geometry={bodyGeo}>
-              <meshBasicMaterial color="#1a2a5a" wireframe transparent opacity={0.15} />
-            </mesh>
-          )}
-        </>
-      )}
-
-      {glassesGeo && (
-        <>
-          <mesh geometry={glassesGeo} castShadow receiveShadow>
-            {isColor
-              ? <meshStandardMaterial vertexColors roughness={0.5} metalness={0.08} />
-              : <meshStandardMaterial color="#0a0a12" roughness={0.9} />
-            }
-          </mesh>
-          {!isColor && (
-            <mesh geometry={glassesGeo}>
-              <meshBasicMaterial color="#1a2a5a" wireframe transparent opacity={0.15} />
-            </mesh>
-          )}
-        </>
-      )}
+      {renderMesh(bodyGeo, 0.7, 0.0)}
+      {renderMesh(blingGeo, 0.5, 0.05)}
+      {renderMesh(glassesGeo, 0.5, 0.08)}
       {/* eslint-enable react/no-unknown-property */}
 
       <OrbitControls

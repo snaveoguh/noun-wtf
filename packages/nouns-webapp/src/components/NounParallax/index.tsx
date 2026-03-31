@@ -59,7 +59,7 @@ function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
 
-  const { bodyGeo, glassesGeo } = useMemo(() => {
+  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
   }, [seed, layerVisibility]);
@@ -67,9 +67,10 @@ function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
   useEffect(() => {
     return () => {
       bodyGeo?.dispose();
+      blingGeo?.dispose();
       glassesGeo?.dispose();
     };
-  }, [bodyGeo, glassesGeo]);
+  }, [bodyGeo, blingGeo, glassesGeo]);
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -91,8 +92,8 @@ function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
         position={[15, 25, 30]}
         intensity={1.6}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}
@@ -107,6 +108,11 @@ function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
       {bodyGeo && (
         <mesh geometry={bodyGeo} castShadow receiveShadow>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+        </mesh>
+      )}
+      {blingGeo && (
+        <mesh geometry={blingGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} />
         </mesh>
       )}
       {glassesGeo && (
@@ -127,7 +133,7 @@ interface InteractiveSceneProps {
 }
 
 function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
-  const { bodyGeo, glassesGeo } = useMemo(() => {
+  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
   }, [seed, layerVisibility]);
@@ -135,9 +141,10 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   useEffect(() => {
     return () => {
       bodyGeo?.dispose();
+      blingGeo?.dispose();
       glassesGeo?.dispose();
     };
-  }, [bodyGeo, glassesGeo]);
+  }, [bodyGeo, blingGeo, glassesGeo]);
 
   return (
     <>
@@ -163,6 +170,11 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
       {bodyGeo && (
         <mesh geometry={bodyGeo} castShadow receiveShadow>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+        </mesh>
+      )}
+      {blingGeo && (
+        <mesh geometry={blingGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} />
         </mesh>
       )}
       {glassesGeo && (

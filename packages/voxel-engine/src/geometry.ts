@@ -1,16 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import type { VoxelMap, VoxelPixel } from './types';
-import { BODY_DEPTH, GLASSES_DEPTH } from './types';
+import type { VoxelMap, VoxelPixel, NounLayers } from './types';
+import { BODY_DEPTH, BLING_DEPTH, GLASSES_DEPTH } from './types';
 import { parseKey } from './voxelMap';
 
 // ─── Build merged geometry from VoxelPixel array ────────────────────────────
 
-/**
- * Build a single merged BufferGeometry with baked vertex colors from VoxelPixels.
- * Used for the readonly viewer (TiltScene, InteractiveScene).
- */
 export function buildMergedGeometry(
   pixels: VoxelPixel[],
   depth: number,
@@ -41,9 +37,6 @@ export function buildMergedGeometry(
 
 // ─── Build merged geometry from VoxelMap ────────────────────────────────────
 
-/**
- * Build a single merged BufferGeometry from a VoxelMap (used for viewer mode).
- */
 export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry | null {
   if (map.size === 0) return null;
   const boxTemplate = new THREE.BoxGeometry(1, 1, 1);
@@ -69,11 +62,22 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
   return merged;
 }
 
-// ─── Build body + glasses geometries from NounLayers ────────────────────────
+// ─── Build body + bling + glasses geometries from NounLayers ────────────────
 
-export function buildNounGeometries(layers: { body: VoxelPixel[]; glasses: VoxelPixel[] }) {
+/**
+ * Build 3 separate geometries for proper depth rendering:
+ * - body: full BODY_DEPTH, centered at z=0
+ * - bling: BLING_DEPTH, sits on front face of body
+ * - glasses: GLASSES_DEPTH, sits on front face (in front of bling)
+ */
+export function buildNounGeometries(layers: NounLayers) {
+  const bodyZ = 0;
+  const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2; // front face of body
+  const glassesZ = BODY_DEPTH / 2 + BLING_DEPTH + GLASSES_DEPTH / 2; // in front of bling
+
   return {
-    bodyGeo: buildMergedGeometry(layers.body, BODY_DEPTH, 0),
-    glassesGeo: buildMergedGeometry(layers.glasses, GLASSES_DEPTH, BODY_DEPTH / 2 + GLASSES_DEPTH / 2),
+    bodyGeo: buildMergedGeometry(layers.body, BODY_DEPTH, bodyZ),
+    blingGeo: buildMergedGeometry(layers.bling, BLING_DEPTH, blingZ),
+    glassesGeo: buildMergedGeometry(layers.glasses, GLASSES_DEPTH, glassesZ),
   };
 }
