@@ -82,6 +82,7 @@ const Auction: React.FC<AuctionProps> = props => {
   // View mode — default to 2D, with a 3D intro overlay that fades out
   const [viewMode, setViewMode] = useState<string>('real');
   const [showIntro, setShowIntro] = useState(true);
+  const [introOpacity, setIntroOpacity] = useState(1);
 
   // Inline editor state
   const [isEditing, setIsEditing] = useState(false);
@@ -341,11 +342,12 @@ const Auction: React.FC<AuctionProps> = props => {
   // Reset editing state on noun change
   useEffect(() => { setIsEditing(false); setShowHelp(false); }, [currentNounId]);
 
-  // Cinematic intro: 3D spin overlay fades out after 3s
+  // Cinematic intro: 3D spin overlay — start fading at 2.2s, unmount at 3.2s
   useEffect(() => {
     if (!showIntro) return;
-    const timer = setTimeout(() => setShowIntro(false), 3000);
-    return () => clearTimeout(timer);
+    const fadeTimer = setTimeout(() => setIntroOpacity(0), 2200);
+    const removeTimer = setTimeout(() => setShowIntro(false), 3200);
+    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
   }, [showIntro]);
 
   // ─── Activity content ──────────────────────────────────────────────────
@@ -589,8 +591,8 @@ const Auction: React.FC<AuctionProps> = props => {
         {showIntro && currentNounSeed && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 10,
-            opacity: showIntro ? 1 : 0,
-            transition: 'opacity 0.8s ease-out',
+            opacity: introOpacity,
+            transition: 'opacity 1s ease-out',
             pointerEvents: 'none',
           }}>
             <NounParallax seed={currentNounSeed} fullscreen autoSpin />
