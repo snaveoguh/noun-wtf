@@ -99,24 +99,19 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
   return (
     <group ref={groupRef}>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[15, 25, 30]} intensity={1.6} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.2} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.3} />
-
       {bodyGeo && (
         <mesh geometry={bodyGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
       {blingGeo && (
         <mesh geometry={blingGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
       {glassesGeo && (
         <mesh geometry={glassesGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
       {/* eslint-enable react/no-unknown-property */}
@@ -148,24 +143,19 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[15, 25, 30]} intensity={1.6} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.2} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.3} />
-
       {bodyGeo && (
         <mesh geometry={bodyGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
       {blingGeo && (
         <mesh geometry={blingGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
       {glassesGeo && (
         <mesh geometry={glassesGeo}>
-          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
+          <meshBasicMaterial vertexColors />
         </mesh>
       )}
 
