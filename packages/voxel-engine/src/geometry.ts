@@ -72,8 +72,11 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
  */
 export function buildNounGeometries(layers: NounLayers) {
   const bodyZ = 0;
-  const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2; // front face of body
-  const glassesZ = BODY_DEPTH / 2 + BLING_DEPTH + GLASSES_DEPTH / 2; // in front of bling
+  // Bling sits flush on body front face
+  const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2;
+  // Glasses sit just in front of body (flush with bling, or on body if no bling)
+  // Tiny offset (0.01) prevents z-fighting with bling
+  const glassesZ = BODY_DEPTH / 2 + GLASSES_DEPTH / 2 + 0.01;
 
   return {
     bodyGeo: buildMergedGeometry(layers.body, BODY_DEPTH, bodyZ),
