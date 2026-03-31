@@ -91,29 +91,69 @@ export function decodeParts(
   return pixels;
 }
 
+// ─── Accessory classification ───────────────────────────────────────────────
+
+/**
+ * Flat/wrap accessories — all-over prints, gradients, stripes, patterns.
+ * These wrap the full body at full depth (no extrusion).
+ */
+const FLAT_ACCESSORY_PATTERNS = [
+  'body-gradient-', 'checker', 'stripes-', 'stripes_',
+  'grid-', 'matrix', 'woolweave', 'wall', 'wave', 'rain',
+  'tie-dye', 'decay-', 'rainbow-steps', 'taxi-checkers',
+  'lines-45-',
+];
+
+/**
+ * Classify an accessory by its filename.
+ * Returns true if it's a flat/wrap pattern (full depth on body).
+ * Returns false if it's a discrete object/bling (front only, extruded).
+ */
+export function isFlatAccessory(filename: string): boolean {
+  const name = filename.toLowerCase();
+  return FLAT_ACCESSORY_PATTERNS.some(p => name.includes(p));
+}
+
 // ─── Seed → layers (requires @noundry/nouns-assets) ─────────────────────────
 
 /**
- * Decode a noun seed into separated body/glasses layers.
- * `getNounData` and `ImageData` come from @noundry/nouns-assets.
+ * Decode a noun seed into separated layers with smart accessory routing.
+ * Parts: [0]=body, [1]=accessory, [2]=head, [3]=glasses
+ *
+ * Flat accessories (prints, stripes) merge into body at full depth.
+ * Bling accessories (chains, objects, text) render front-only, extruded.
+ * Glasses always front-only, extruded.
  */
 export function seedToLayers(
   seed: { background: number; body: number; accessory: number; head: number; glasses: number },
-  getNounData: (seed: any) => { parts: { data: string }[] },
+  getNounData: (seed: any) => { parts: { data: string; filename: string }[] },
   palette: string[],
   visibility?: LayerVisibility,
 ): NounLayers {
   const { parts } = getNounData(seed);
   const vis = visibility ?? { body: true, accessory: true, head: true, glasses: true };
 
-  // parts[0]=body, parts[1]=accessory, parts[2]=head, parts[3]=glasses
+  // Build body layer: body shape + head + flat accessories
   const bodyParts: { data: string }[] = [];
   if (vis.body) bodyParts.push(parts[0]);
-  if (vis.accessory) bodyParts.push(parts[1]);
   if (vis.head) bodyParts.push(parts[2]);
+
+  // Classify accessory
+  let blingParts: { data: string }[] = [];
+  if (vis.accessory && parts[1]) {
+    const accFilename = parts[1].filename || '';
+    if (isFlatAccessory(accFilename)) {
+      // Flat wrap → merge into body at full depth
+      bodyParts.push(parts[1]);
+    } else {
+      // Bling → separate layer, front-only + extruded
+      blingParts = [parts[1]];
+    }
+  }
 
   return {
     body: bodyParts.length > 0 ? decodeParts(bodyParts, palette) : [],
+    bling: blingParts.length > 0 ? decodeParts(blingParts, palette) : [],
     glasses: vis.glasses ? decodeParts([parts[3]], palette) : [],
   };
 }
@@ -122,11 +162,11 @@ export function seedToLayers(
 
 /**
  * Convert a noun seed directly into a VoxelMap with configurable depth.
- * Body pixels become solid columns of `depth` voxels; glasses protrude.
+ * Body pixels → solid columns. Bling + glasses → front-only, extruded.
  */
 export function seedToVoxelMap(
   seed: { background: number; body: number; accessory: number; head: number; glasses: number },
-  getNounData: (seed: any) => { parts: { data: string }[] },
+  getNounData: (seed: any) => { parts: { data: string; filename: string }[] },
   palette: string[],
   depth: number = DEFAULT_VOXEL_DEPTH,
   visibility?: LayerVisibility,
@@ -134,20 +174,27 @@ export function seedToVoxelMap(
   const layers = seedToLayers(seed, getNounData, palette, visibility);
   const map: VoxelMap = new Map();
 
+  const toHex = (p: VoxelPixel) =>
+    `#${p.r.toString(16).padStart(2, '0')}${p.g.toString(16).padStart(2, '0')}${p.b.toString(16).padStart(2, '0')}`;
+
   // Body pixels → solid columns
   for (const p of layers.body) {
-    const hex = `#${p.r.toString(16).padStart(2, '0')}${p.g.toString(16).padStart(2, '0')}${p.b.toString(16).padStart(2, '0')}`;
+    const hex = toHex(p);
     for (let z = 0; z < depth; z++) {
       map.set(voxelKey(p.x, p.y, z), hex);
     }
   }
 
-  // Glasses pixels → protrude from front face
+  // Bling → front-only, 1px extruded from body front face
+  for (const p of layers.bling) {
+    const hex = toHex(p);
+    map.set(voxelKey(p.x, p.y, depth), hex);
+  }
+
+  // Glasses → front-only, 1px extruded (on top of bling if overlap)
   for (const p of layers.glasses) {
-    const hex = `#${p.r.toString(16).padStart(2, '0')}${p.g.toString(16).padStart(2, '0')}${p.b.toString(16).padStart(2, '0')}`;
-    for (let z = depth; z < depth + 2; z++) {
-      map.set(voxelKey(p.x, p.y, z), hex);
-    }
+    const hex = toHex(p);
+    map.set(voxelKey(p.x, p.y, depth + 1), hex);
   }
 
   return map;

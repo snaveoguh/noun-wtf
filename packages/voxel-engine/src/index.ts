@@ -1,6 +1,6 @@
 // Core types
 export type { VoxelMap, VoxelPixel, NounLayers, LayerVisibility, Tool } from './types';
-export { DEFAULT_VISIBILITY, SATURATION_FACTOR, DEFAULT_VOXEL_DEPTH, BODY_DEPTH, GLASSES_DEPTH } from './types';
+export { DEFAULT_VISIBILITY, SATURATION_FACTOR, DEFAULT_VOXEL_DEPTH, BODY_DEPTH, BLING_DEPTH, GLASSES_DEPTH } from './types';
 
 // VoxelMap operations
 export {
@@ -22,6 +22,7 @@ export {
   decodeParts,
   seedToLayers,
   seedToVoxelMap,
+  isFlatAccessory,
 } from './decoder';
 
 // Geometry builders
