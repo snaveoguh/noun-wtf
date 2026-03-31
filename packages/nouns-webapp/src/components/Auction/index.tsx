@@ -1,11 +1,12 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import { Col, Container, Row } from 'react-bootstrap';
+import { Container } from 'react-bootstrap';
 import { useNavigate } from 'react-router';
 
 import AuctionActivity from '@/components/AuctionActivity';
 import { LoadingNoun } from '@/components/LegacyNoun';
 import NounderNounContent from '@/components/NounderNounContent';
+import PanZoomImage from '@/components/PanZoomImage';
 // eslint-disable-next-line sonarjs/deprecation
 import { StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -19,30 +20,49 @@ import { INounSeed } from '@/wrappers/nounToken';
 
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
+import NounParallax from '@/components/NounParallax';
+import { getNoun } from '@/components/StandaloneNoun';
 import { useCreateDerivative, hasDerivativesContract } from '@/wrappers/nounDerivatives';
+
+import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
+import { type Tool } from '@/components/Studio/PixelCanvas';
+import { historyReducer, createInitialHistory } from '@/lib/pixelHistory';
+import { seedToPixelLayers, mergeLayersToGrid, DEFAULT_VISIBILITY } from '@/lib/nounDecoder';
 
 import classes from './Auction.module.css';
 
-// Lazy-load AsciiNoun (uses Three.js)
+// Lazy-load heavy components
 const AsciiNounCanvas = React.lazy(() => import('@/components/AsciiNoun'));
-// Lazy-load Derivative upload form
+const InlineEditor = React.lazy(() => import('@/components/Auction/InlineEditor'));
+const KeyboardShortcutsHelp = React.lazy(() => import('@/components/Auction/KeyboardShortcutsHelp'));
 const DerivativeUploadForm = React.lazy(() => import('@/components/DerivativeGallery'));
-// ─── Derivative type ────────────────────────────────────────────────────────
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface Derivative {
   id: string;
   name: string;
   image: string;
   nounId?: number;
-  auctionUrl?: string; // external auction link (Manifold, Zora, etc.)
-  tokenId?: number; // onchain ERC721 token ID (set after mint)
-  tokenURI?: string; // IPFS metadata URI
+  auctionUrl?: string;
+  tokenId?: number;
+  tokenURI?: string;
+  createdAt: string;
+}
+
+interface NounLink {
+  id: string;
+  nounId: number;
+  url: string;
+  ogImage?: string;
+  ogTitle?: string;
   createdAt: string;
 }
 
 const DERIVATIVES_API = '/.netlify/functions/derivatives';
+const NOUN_LINKS_API = '/.netlify/functions/noun-links';
 
-// ─── Main Auction ────────────────────────────────────────────────────────────
+// ─── Main Auction ───────────────────────────────────────────────────────────
 
 interface AuctionProps {
   auction?: IAuction;
@@ -59,13 +79,33 @@ const Auction: React.FC<AuctionProps> = props => {
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
 
-  // View mode — dynamic (string)
-  const [viewMode, setViewMode] = useState<string>('real');
+  // View mode
+  const [viewMode, setViewMode] = useState<string>('3d');
 
-  // ASCII 3D resizable height (null = square / auto)
-  const [asciiHeight, setAsciiHeight] = useState<number | null>(null);
-  const asciiWrapRef = useRef<HTMLDivElement>(null);
-  const isDraggingRef = useRef(false);
+  // Inline editor state
+  const [isEditing, setIsEditing] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const editorToolRef = useRef<{ setTool: (t: Tool) => void; undo: () => void; redo: () => void; getActiveTool: () => Tool; getActiveColor: () => string } | null>(null);
+  const panZoomRef = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void } | null>(null);
+
+  // Shared 3D editor state (used when editing in 3D mode)
+  const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
+  const [edit3dTool, setEdit3dTool] = useState<Tool>('pencil');
+  const [edit3dColor, setEdit3dColor] = useState('#000000');
+  const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
+  const voxelMapRef = useRef<import('@nouns/voxel-engine').VoxelMap | null>(null);
+  const [showVoxelSaveModal, setShowVoxelSaveModal] = useState(false);
+  const [voxelSaveName, setVoxelSaveName] = useState('');
+  const [voxelSaveLink, setVoxelSaveLink] = useState('');
+
+  // Load noun pixels when entering edit mode in 3D
+  useEffect(() => {
+    if (isEditing && viewMode === '3d' && currentNounSeed) {
+      const layers = seedToPixelLayers(currentNounSeed);
+      const grid = mergeLayersToGrid(layers, DEFAULT_VISIBILITY);
+      edit3dDispatch({ type: 'LOAD', pixels: grid });
+    }
+  }, [isEditing, viewMode, currentNounSeed]);
 
   // Per-noun derivatives
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
@@ -76,36 +116,63 @@ const Auction: React.FC<AuctionProps> = props => {
   const [listingStep, setListingStep] = useState<'idle' | 'pinning' | 'minting' | 'done'>('idle');
   const { create: createDerivativeOnchain, isPending: mintPending, isSuccess: mintSuccess, receipt: mintReceipt } = useCreateDerivative();
 
+  // Per-noun links
+  const [nounLinks, setNounLinks] = useState<NounLink[]>([]);
+
+  // + menu state
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  // Add link form
+  const [addingLink, setAddingLink] = useState(false);
+  const [linkUrlDraft, setLinkUrlDraft] = useState('');
+  const [linkSubmitting, setLinkSubmitting] = useState(false);
+
+  // ─── Data fetching ──────────────────────────────────────────────────────
+
   const fetchDerivativesForNoun = useCallback(async (nId: number) => {
     try {
       const res = await fetch(`${DERIVATIVES_API}?nounId=${nId}`);
       if (!res.ok) return;
       const data = (await res.json()) as Derivative[];
       setDerivatives(data);
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, []);
 
-  // Fetch derivatives when noun changes
+  const fetchLinksForNoun = useCallback(async (nId: number) => {
+    try {
+      const res = await fetch(`${NOUN_LINKS_API}?nounId=${nId}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as NounLink[];
+      setNounLinks(data);
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     if (currentNounId > 0) {
       fetchDerivativesForNoun(currentNounId);
+      fetchLinksForNoun(currentNounId);
     }
-  }, [currentNounId, fetchDerivativesForNoun]);
+  }, [currentNounId, fetchDerivativesForNoun, fetchLinksForNoun]);
 
   // Reset view mode when noun changes
   useEffect(() => {
-    setViewMode('real');
+    setViewMode('3d');
     setEditingAuctionUrl(false);
+    setAddMenuOpen(false);
+    setAddingLink(false);
   }, [currentNounId]);
 
-  // Find active derivative (if viewing one)
+  // Active items
   const activeDerivative = viewMode.startsWith('deriv-')
     ? derivatives.find(d => `deriv-${d.id}` === viewMode)
     : null;
 
-  // After upload: refetch and switch to the new tab
+  const activeLink = viewMode.startsWith('link-')
+    ? nounLinks.find(l => `link-${l.id}` === viewMode)
+    : null;
+
+  // ─── Derivative handlers ────────────────────────────────────────────────
+
   const handleDerivativeUploaded = useCallback(() => {
     if (currentNounId > 0) {
       fetchDerivativesForNoun(currentNounId).then(() => {
@@ -113,9 +180,7 @@ const Auction: React.FC<AuctionProps> = props => {
           .then(r => r.json())
           .then((data: Derivative[]) => {
             setDerivatives(data);
-            if (data.length > 0) {
-              setViewMode(`deriv-${data[0].id}`);
-            }
+            if (data.length > 0) setViewMode(`deriv-${data[0].id}`);
           })
           .catch(() => {});
       });
@@ -130,7 +195,6 @@ const Auction: React.FC<AuctionProps> = props => {
         body: JSON.stringify({ id: derivId, auctionUrl: url }),
       });
       if (res.ok) {
-        // Update local state
         setDerivatives(prev => prev.map(d =>
           d.id === derivId ? { ...d, auctionUrl: url || undefined } : d
         ));
@@ -139,12 +203,10 @@ const Auction: React.FC<AuctionProps> = props => {
     } catch { /* silent */ }
   }, []);
 
-  // Handle "List for Auction" — pin to IPFS then mint onchain
   const handleListForAuction = useCallback(async (deriv: Derivative) => {
     if (!deriv.nounId) return;
     setListingStep('pinning');
     try {
-      // 1. Pin to IPFS
       const pinRes = await fetch(DERIVATIVES_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -152,8 +214,6 @@ const Auction: React.FC<AuctionProps> = props => {
       });
       if (!pinRes.ok) throw new Error('Pin failed');
       const { tokenURI } = (await pinRes.json()) as { tokenURI: string };
-
-      // 2. Mint onchain
       setListingStep('minting');
       createDerivativeOnchain(deriv.nounId, tokenURI, reservePriceDraft);
     } catch (err) {
@@ -162,17 +222,11 @@ const Auction: React.FC<AuctionProps> = props => {
     }
   }, [createDerivativeOnchain, reservePriceDraft]);
 
-  // After successful mint, link tokenId back to blob record
   useEffect(() => {
     if (mintSuccess && mintReceipt && activeDerivative) {
-      // Parse DerivativeCreated event to get tokenId
-      // Event topic[1] = tokenId (indexed)
-      const createdLog = mintReceipt.logs.find(
-        l => l.topics.length >= 2,
-      );
+      const createdLog = mintReceipt.logs.find(l => l.topics.length >= 2);
       if (createdLog && createdLog.topics[1]) {
         const tokenId = Number(BigInt(createdLog.topics[1]));
-        // PATCH the blob record with tokenId
         fetch(DERIVATIVES_API, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -183,9 +237,7 @@ const Auction: React.FC<AuctionProps> = props => {
           ));
           setListingStep('done');
           setListingForAuction(false);
-        }).catch(() => {
-          setListingStep('done');
-        });
+        }).catch(() => { setListingStep('done'); });
       } else {
         setListingStep('done');
       }
@@ -193,49 +245,31 @@ const Auction: React.FC<AuctionProps> = props => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mintSuccess, mintReceipt]);
 
-  // ASCII resize drag handler
-  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    isDraggingRef.current = true;
+  // ─── Link handlers ──────────────────────────────────────────────────────
 
-    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const wrapper = asciiWrapRef.current;
-    const startHeight = wrapper ? wrapper.getBoundingClientRect().height : 400;
+  const handleAddLink = useCallback(async () => {
+    if (!linkUrlDraft.trim() || currentNounId <= 0) return;
+    setLinkSubmitting(true);
+    try {
+      const res = await fetch(NOUN_LINKS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nounId: currentNounId, url: linkUrlDraft.trim() }),
+      });
+      if (res.ok) {
+        const link = (await res.json()) as NounLink;
+        setNounLinks(prev => [link, ...prev]);
+        setViewMode(`link-${link.id}`);
+        setAddingLink(false);
+        setLinkUrlDraft('');
+      }
+    } catch { /* silent */ }
+    setLinkSubmitting(false);
+  }, [linkUrlDraft, currentNounId]);
 
-    const handleMove = (ev: MouseEvent | TouchEvent) => {
-      if (!isDraggingRef.current) return;
-      const currentY = 'touches' in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY;
-      const delta = currentY - startY;
-      const newHeight = Math.max(200, Math.min(startHeight + delta, window.innerHeight - 100));
-      setAsciiHeight(newHeight);
-    };
+  // ─── Seed / navigation handlers ────────────────────────────────────────
 
-    const handleUp = () => {
-      isDraggingRef.current = false;
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'ns-resize';
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
-    document.addEventListener('touchmove', handleMove, { passive: false });
-    document.addEventListener('touchend', handleUp);
-  }, []);
-
-  // Reset ASCII height when switching away from ascii mode or changing noun
-  useEffect(() => {
-    setAsciiHeight(null);
-  }, [currentNounId]);
-
-  // Ref guard for seed
   const lastSeedKeyRef = useRef('');
-
   const loadedNounHandler = useCallback(
     (seed: INounSeed) => {
       const key = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
@@ -248,407 +282,551 @@ const Auction: React.FC<AuctionProps> = props => {
   );
 
   const prevAuctionHandler = () => {
-    if (currentAuction) {
-      navigate(nounPath(Number(currentAuction.nounId) - 1));
-    }
+    if (currentAuction) navigate(nounPath(Number(currentAuction.nounId) - 1));
   };
   const nextAuctionHandler = () => {
-    if (currentAuction) {
-      navigate(nounPath(Number(currentAuction.nounId) + 1));
-    }
+    if (currentAuction) navigate(nounPath(Number(currentAuction.nounId) + 1));
   };
 
-  const nounContent = currentAuction && (
-    <div className={classes.nounWrapper} style={{ position: 'relative' }}>
-      {/* Real Noun — always render for seed/bg color, but hide when not active */}
-      <div
-        style={{
-          opacity: viewMode === 'real' ? 1 : 0,
-          transition: 'opacity 0.4s ease',
-          position: viewMode === 'real' ? 'relative' : 'absolute',
-          inset: 0,
-          zIndex: 1,
-          pointerEvents: viewMode === 'real' ? 'auto' : 'none',
-        }}
-      >
-        {/* eslint-disable-next-line sonarjs/deprecation */}
-        <StandaloneNounWithSeed
+  // Build 2D SVG image
+  const nounSvg = useMemo(() => {
+    if (!currentNounSeed || !currentAuction) return null;
+    return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
+  }, [currentNounSeed, currentAuction]);
+
+  // ─── Keyboard shortcuts ────────────────────────────────────────────────
+
+  useAuctionKeyboardShortcuts({
+    isEditing,
+    viewMode,
+    onPrevNoun: prevAuctionHandler,
+    onNextNoun: nextAuctionHandler,
+    isFirstAuction: currentAuction?.nounId === 0n,
+    isLastAuction: currentAuction?.nounId === BigInt(lastNounId ?? 0),
+    onSetViewMode: setViewMode,
+    onEnterEdit: () => setIsEditing(true),
+    onExitEdit: () => { setIsEditing(false); setShowHelp(false); },
+    onZoomIn: () => panZoomRef.current?.zoomIn(),
+    onZoomOut: () => panZoomRef.current?.zoomOut(),
+    onResetView: () => panZoomRef.current?.reset(),
+    onToggleFullscreen: () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(() => {});
+    },
+    onSaveScreenshot: () => {
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = `noun-${currentNounId}.png`;
+        a.click();
+      }
+    },
+    onToggleHelp: () => setShowHelp(s => !s),
+    onSetTool: (t: Tool) => {
+      if (viewMode === '3d') setEdit3dTool(t);
+      else editorToolRef.current?.setTool(t);
+    },
+    onUndo: () => {
+      if (viewMode === '3d') edit3dDispatch({ type: 'UNDO' });
+      else editorToolRef.current?.undo();
+    },
+    onRedo: () => {
+      if (viewMode === '3d') edit3dDispatch({ type: 'REDO' });
+      else editorToolRef.current?.redo();
+    },
+  });
+
+  // Reset editing state on noun change
+  useEffect(() => { setIsEditing(false); setShowHelp(false); }, [currentNounId]);
+
+  // ─── Activity content ──────────────────────────────────────────────────
+
+  const activityContent = currentAuction && lastNounId && (
+    isNounderNoun(BigInt(currentAuction.nounId))
+      ? <NounderNounContent
+          mintTimestamp={BigInt(currentAuction.startTime)}
           nounId={BigInt(currentAuction.nounId)}
-          onLoadSeed={loadedNounHandler}
-          shouldLinkToProfile={false}
+          isFirstAuction={currentAuction.nounId === 0n}
+          isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+          onPrevAuctionClick={prevAuctionHandler}
+          onNextAuctionClick={nextAuctionHandler}
         />
+      : <AuctionActivity
+          auction={currentAuction}
+          isFirstAuction={currentAuction.nounId === 0n}
+          isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+          onPrevAuctionClick={prevAuctionHandler}
+          onNextAuctionClick={nextAuctionHandler}
+          displayGraphDepComps={false}
+        />
+  );
+
+  // ─── Hero background per mode ──────────────────────────────────────────
+
+  const renderHeroBackground = () => {
+    if (viewMode === '3d' && currentNounSeed) {
+      return (
+        <NounParallax
+          seed={currentNounSeed}
+          interactive
+          fullscreen
+          editable={isEditing ? {
+            pixels: edit3dHistory.present,
+            activeTool: editorToolRef.current?.getActiveTool() ?? edit3dTool,
+            activeColor: editorToolRef.current?.getActiveColor() ?? edit3dColor,
+            onPixelChange: (x, y, color) => edit3dDispatch({ type: 'SET_PIXEL', x, y, color }),
+            onPixelsFill: (changes) => edit3dDispatch({ type: 'SET_PIXELS', changes }),
+            onColorPick: (color) => { setEdit3dColor(color); editorToolRef.current?.setTool('pencil'); },
+            voxelDepth: edit3dVoxelDepth,
+            onVoxelMapChange: (map) => { voxelMapRef.current = map; },
+          } : undefined}
+        />
+      );
+    }
+
+    if (viewMode === 'ascii' && currentNounSeed) {
+      return (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <Suspense fallback={
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>
+              Loading 3D...
+            </div>
+          }>
+            <AsciiNounCanvas seed={currentNounSeed} />
+          </Suspense>
+        </div>
+      );
+    }
+
+    if (activeDerivative) {
+      return <PanZoomImage src={activeDerivative.image} alt={`${activeDerivative.name} derivative`} />;
+    }
+
+    if (activeLink && activeLink.ogImage) {
+      return <PanZoomImage src={activeLink.ogImage} alt={activeLink.ogTitle || activeLink.url} />;
+    }
+
+    // Default: 2D pixel SVG
+    if (nounSvg) {
+      return <PanZoomImage src={nounSvg} alt={`Noun ${currentAuction?.nounId}`} pixelated />;
+    }
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <LoadingNoun />
+      </div>
+    );
+  };
+
+  // ─── Derivative info badge ─────────────────────────────────────────────
+
+  const derivativeBadge = activeDerivative && (
+    <div className={classes.heroBadge}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>
+          by {activeDerivative.name} · {new Date(activeDerivative.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {activeDerivative.tokenId === undefined && (
+            <>
+              {activeDerivative.auctionUrl && (
+                <a href={activeDerivative.auctionUrl} target="_blank" rel="noopener noreferrer" className={classes.bidBtn}>BID</a>
+              )}
+              {hasDerivativesContract && !listingForAuction && (
+                <button className={classes.bidBtn} onClick={() => setListingForAuction(true)} style={{ background: '#fbbf24', color: '#000' }}>LIST</button>
+              )}
+            </>
+          )}
+          <button className={classes.editBtn} onClick={() => { setEditingAuctionUrl(!editingAuctionUrl); setAuctionUrlDraft(activeDerivative.auctionUrl || ''); }} title="Edit auction link">✎</button>
+        </div>
       </div>
 
-      {/* ASCII 3D Voxel — rendered when ascii mode (resizable) */}
-      {viewMode === 'ascii' && currentNounSeed && (
-        <div
-          ref={asciiWrapRef}
-          style={{
-            position: 'relative',
-            width: '100%',
-            ...(asciiHeight != null
-              ? { height: asciiHeight }
-              : { paddingTop: '100%' }),
-            zIndex: 2,
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', inset: 0 }}>
-            <Suspense
-              fallback={
-                <div style={{
-                  width: '100%', height: '100%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.8rem', color: '#94a3b8',
-                }}>
-                  Loading 3D...
-                </div>
-              }
-            >
-              <AsciiNounCanvas seed={currentNounSeed} />
-            </Suspense>
-          </div>
+      {activeDerivative.tokenId !== undefined && <DerivativeAuction tokenId={activeDerivative.tokenId} />}
 
-          {/* Drag handle to resize */}
-          <div
-            onMouseDown={handleResizeStart}
-            onTouchStart={handleResizeStart}
-            onDoubleClick={() => {
-              // Double-click: toggle between square and tall
-              if (asciiHeight != null) {
-                setAsciiHeight(null);
-              } else {
-                const w = asciiWrapRef.current?.getBoundingClientRect().width ?? 400;
-                setAsciiHeight(Math.min(w * 1.4, window.innerHeight - 100));
-              }
-            }}
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 18,
-              cursor: 'ns-resize',
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(transparent, rgba(0,0,0,0.15))',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(transparent, rgba(0,0,0,0.35))'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(transparent, rgba(0,0,0,0.15))'; }}
-            title="Drag to resize · Double-click to expand"
-          >
-            <div style={{
-              width: 40,
-              height: 4,
-              borderRadius: 2,
-              background: 'rgba(255,255,255,0.5)',
-            }} />
-          </div>
+      {listingForAuction && activeDerivative.tokenId === undefined && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+            {listingStep === 'pinning' ? 'Pinning to IPFS...' : listingStep === 'minting' ? 'Confirm in wallet...' : 'Reserve:'}
+          </span>
+          {listingStep === 'idle' && (
+            <>
+              <input type="number" step="0.001" min="0.001" value={reservePriceDraft} onChange={e => setReservePriceDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleListForAuction(activeDerivative); if (e.key === 'Escape') setListingForAuction(false); }}
+                autoFocus className={classes.inlineInput} style={{ width: 70 }} />
+              <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)' }}>ETH</span>
+              <button className={classes.editSaveBtn} onClick={() => handleListForAuction(activeDerivative)}>✓</button>
+              <button className={classes.editBtn} onClick={() => setListingForAuction(false)} style={{ fontSize: '0.55rem' }}>×</button>
+            </>
+          )}
+          {(listingStep === 'pinning' || listingStep === 'minting') && (
+            <span style={{ fontSize: '0.5rem', color: '#fbbf24', animation: 'pulse 1.5s ease-in-out infinite' }}>
+              {mintPending ? 'Waiting for confirmation...' : ''}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Derivative image — shown when a specific derivative tab is active */}
-      {activeDerivative && (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            zIndex: 2,
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <div className={classes.sketchImgWrapper}>
-            <img
-              src={activeDerivative.image}
-              alt={`${activeDerivative.name} derivative`}
-              className={classes.sketchImg}
-              style={{ objectFit: 'contain' }}
+      {editingAuctionUrl && (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input type="url" placeholder="Paste auction URL…" value={auctionUrlDraft} onChange={e => setAuctionUrlDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim()); if (e.key === 'Escape') setEditingAuctionUrl(false); }}
+            autoFocus className={classes.inlineInput} style={{ flex: 1 }} />
+          <button className={classes.editSaveBtn} onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}>✓</button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── Link info badge ───────────────────────────────────────────────────
+
+  const linkBadge = activeLink && (
+    <div className={classes.heroBadge}>
+      <a href={activeLink.url} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontWeight: 700 }}>{activeLink.ogTitle || new URL(activeLink.url).hostname}</span>
+        <span style={{ fontSize: '0.5rem', opacity: 0.6 }}>↗</span>
+      </a>
+    </div>
+  );
+
+  // ─── + menu (add art or add link) ──────────────────────────────────────
+
+  const isAddMode = viewMode === 'add-derivative' || viewMode === 'add-link';
+
+  // ─── Toggle pill ───────────────────────────────────────────────────────
+
+  const togglePill = (
+    <div className={`${classes.sketchToggle} ${classes.heroToggle}`} onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+      <button className={`${classes.toggleBtn} ${viewMode === 'real' ? classes.toggleActive : ''}`} onClick={() => setViewMode('real')}>Real</button>
+      <button className={`${classes.toggleBtn} ${viewMode === '3d' ? classes.toggleActive : ''}`} onClick={() => setViewMode('3d')}>3D</button>
+      <button className={`${classes.toggleBtn} ${viewMode === 'ascii' ? classes.toggleActive : ''}`} onClick={() => setViewMode('ascii')}>ASCII</button>
+      <button className={`${classes.toggleBtn} ${classes.editToggleBtn}`} onClick={() => setIsEditing(true)} title="Edit Noun (E)">✏</button>
+
+      {derivatives.map(d => (
+        <button key={d.id}
+          className={`${classes.toggleBtn} ${classes.derivativeBtn} ${viewMode === `deriv-${d.id}` ? classes.toggleActive : ''}`}
+          onClick={() => setViewMode(`deriv-${d.id}`)}
+          title={`${d.name} · ${new Date(d.createdAt).toLocaleDateString()}`}
+        >{d.name}</button>
+      ))}
+
+      {nounLinks.map(l => (
+        <button key={l.id}
+          className={`${classes.toggleBtn} ${classes.linkBtn} ${viewMode === `link-${l.id}` ? classes.toggleActive : ''}`}
+          onClick={() => setViewMode(`link-${l.id}`)}
+          title={l.ogTitle || l.url}
+        >{l.ogTitle ? l.ogTitle.substring(0, 12) : new URL(l.url).hostname}</button>
+      ))}
+
+      {/* + menu */}
+      <div style={{ position: 'relative', display: 'inline-flex' }}>
+        <button
+          className={`${classes.toggleBtn} ${classes.addBtn} ${isAddMode ? classes.toggleActive : ''}`}
+          onClick={() => setAddMenuOpen(o => !o)}
+          title="Add content"
+        >+</button>
+        {addMenuOpen && (
+          <div className={classes.addMenu}>
+            <button className={classes.addMenuItem} onClick={() => { setViewMode('add-derivative'); setAddMenuOpen(false); }}>Add Art</button>
+            <button className={classes.addMenuItem} onClick={() => { setAddingLink(true); setAddMenuOpen(false); }}>Add Link</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ─── Draggable activity panel ────────────────────────────────────────
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelDragging = useRef(false);
+  const panelOffset = useRef({ x: 0, y: 0 });
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Reset panel position when noun changes
+  useEffect(() => { setPanelPos(null); }, [currentNounId]);
+
+  const onPanelPointerDown = useCallback((e: React.PointerEvent) => {
+    // Only drag from the panel header area (first 40px)
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (e.clientY - rect.top > 44) return; // only drag from top bar
+    panelDragging.current = true;
+    panelOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPanelPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!panelDragging.current) return;
+    setPanelPos({
+      x: e.clientX - panelOffset.current.x,
+      y: e.clientY - panelOffset.current.y,
+    });
+  }, []);
+
+  const onPanelPointerUp = useCallback(() => {
+    panelDragging.current = false;
+  }, []);
+
+  // ─── Render ────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ backgroundColor: stateBgColor }}>
+      <div className={classes.heroWrapper}>
+        {/* Background artwork — mode-appropriate */}
+        <div className={classes.hero3dBg}>
+          {renderHeroBackground()}
+        </div>
+
+        {/* Hidden: fires onLoadSeed for bg color + seed */}
+        {currentAuction && (
+          <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+            {/* eslint-disable-next-line sonarjs/deprecation */}
+            <StandaloneNounWithSeed
+              nounId={BigInt(currentAuction.nounId)}
+              onLoadSeed={loadedNounHandler}
+              shouldLinkToProfile={false}
             />
           </div>
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: '6px 10px',
-            background: 'linear-gradient(transparent, rgba(0,0,0,0.4))',
-            fontFamily: "'PT Root UI', sans-serif",
-            fontSize: '0.6rem',
-            fontWeight: 600,
-            color: 'rgba(255,255,255,0.8)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>
-                by {activeDerivative.name} · {new Date(activeDerivative.createdAt).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric',
-                })}
+        )}
+
+        {/* Prompt bar */}
+        <div className={classes.heroPromptBar} onPointerDown={e => e.stopPropagation()}>
+          <Container fluid="xl">
+            <HomePrompt />
+          </Container>
+        </div>
+
+        {/* Draggable frosted glass activity panel — hidden while editing */}
+        {!isEditing && (
+          <div
+            ref={panelRef}
+            className={classes.glassPanel}
+            style={panelPos ? { left: panelPos.x, top: panelPos.y } : undefined}
+            onPointerDown={e => { e.stopPropagation(); onPanelPointerDown(e); }}
+            onPointerMove={onPanelPointerMove}
+            onPointerUp={onPanelPointerUp}
+            onPointerCancel={onPanelPointerUp}
+          >
+            <div className={classes.glassPanelDragBar}>
+              <div className={classes.glassPanelGrip} />
+            </div>
+            {currentAuction ? activityContent : <LoadingNoun />}
+          </div>
+        )}
+
+        {/* Derivative / Link info badge — bottom-left */}
+        {derivativeBadge}
+        {linkBadge}
+
+        {/* Upload form overlay */}
+        {viewMode === 'add-derivative' && (
+          <div className={classes.heroFormOverlay}>
+            <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>Loading...</div>}>
+              <DerivativeUploadForm nounId={currentNounId} onUploaded={handleDerivativeUploaded} />
+            </Suspense>
+          </div>
+        )}
+
+        {/* Add link form overlay */}
+        {addingLink && (
+          <div className={classes.heroFormOverlay}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontFamily: "'PT Root UI', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: 'rgba(0,0,0,0.7)' }}>
+                Add a link for Noun {currentNounId}
               </span>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {/* Minted derivative: show onchain auction */}
-                {activeDerivative.tokenId !== undefined ? null : (
-                  <>
-                    {/* External auction link (legacy) */}
-                    {activeDerivative.auctionUrl && (
-                      <a
-                        href={activeDerivative.auctionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={classes.bidBtn}
-                      >
-                        BID
-                      </a>
-                    )}
-                    {/* List for Auction button (only if contract is deployed and not yet minted) */}
-                    {hasDerivativesContract && !listingForAuction && (
-                      <button
-                        className={classes.bidBtn}
-                        onClick={() => setListingForAuction(true)}
-                        style={{ background: '#fbbf24', color: '#000' }}
-                      >
-                        LIST
-                      </button>
-                    )}
-                  </>
-                )}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={linkUrlDraft}
+                  onChange={e => setLinkUrlDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddLink(); if (e.key === 'Escape') setAddingLink(false); }}
+                  autoFocus
+                  className={classes.inlineInput}
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.05)', color: '#14141f', border: '1px solid rgba(0,0,0,0.15)' }}
+                />
                 <button
-                  className={classes.editBtn}
-                  onClick={() => {
-                    setEditingAuctionUrl(!editingAuctionUrl);
-                    setAuctionUrlDraft(activeDerivative.auctionUrl || '');
+                  onClick={handleAddLink}
+                  disabled={linkSubmitting || !linkUrlDraft.trim()}
+                  style={{
+                    border: 'none', borderRadius: 6, padding: '6px 14px',
+                    background: '#14141f', color: '#fff', cursor: 'pointer',
+                    fontSize: '0.65rem', fontWeight: 700, fontFamily: "'PT Root UI', sans-serif",
+                    opacity: linkSubmitting ? 0.5 : 1,
                   }}
-                  title="Edit auction link"
                 >
-                  ✎
+                  {linkSubmitting ? '...' : 'Add'}
+                </button>
+                <button
+                  onClick={() => setAddingLink(false)}
+                  style={{
+                    border: 'none', borderRadius: 6, padding: '6px 10px',
+                    background: 'rgba(0,0,0,0.1)', color: '#14141f', cursor: 'pointer',
+                    fontSize: '0.65rem', fontFamily: "'PT Root UI', sans-serif",
+                  }}
+                >
+                  Cancel
                 </button>
               </div>
             </div>
-
-            {/* Onchain auction panel (for minted derivatives) */}
-            {activeDerivative.tokenId !== undefined && (
-              <DerivativeAuction tokenId={activeDerivative.tokenId} />
-            )}
-
-            {/* List for Auction flow */}
-            {listingForAuction && activeDerivative.tokenId === undefined && (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
-                  {listingStep === 'pinning' ? 'Pinning to IPFS...' :
-                   listingStep === 'minting' ? 'Confirm in wallet...' :
-                   'Reserve:'}
-                </span>
-                {listingStep === 'idle' && (
-                  <>
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0.001"
-                      value={reservePriceDraft}
-                      onChange={e => setReservePriceDraft(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleListForAuction(activeDerivative);
-                        if (e.key === 'Escape') setListingForAuction(false);
-                      }}
-                      autoFocus
-                      style={{
-                        width: 70,
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        borderRadius: 4,
-                        padding: '3px 6px',
-                        fontSize: '0.6rem',
-                        fontFamily: "'PT Root UI', sans-serif",
-                        background: 'rgba(0,0,0,0.4)',
-                        color: '#fff',
-                        outline: 'none',
-                      }}
-                    />
-                    <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)' }}>ETH</span>
-                    <button
-                      className={classes.editSaveBtn}
-                      onClick={() => handleListForAuction(activeDerivative)}
-                    >
-                      ✓
-                    </button>
-                    <button
-                      className={classes.editBtn}
-                      onClick={() => setListingForAuction(false)}
-                      style={{ fontSize: '0.55rem' }}
-                    >
-                      ×
-                    </button>
-                  </>
-                )}
-                {(listingStep === 'pinning' || listingStep === 'minting') && (
-                  <span style={{
-                    fontSize: '0.5rem', color: '#fbbf24',
-                    animation: 'pulse 1.5s ease-in-out infinite',
-                  }}>
-                    {mintPending ? 'Waiting for confirmation...' : ''}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Legacy: edit external auction URL */}
-            {editingAuctionUrl && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <input
-                  type="url"
-                  placeholder="Paste auction URL…"
-                  value={auctionUrlDraft}
-                  onChange={e => setAuctionUrlDraft(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim());
-                    if (e.key === 'Escape') setEditingAuctionUrl(false);
-                  }}
-                  autoFocus
-                  style={{
-                    flex: 1,
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    borderRadius: 4,
-                    padding: '3px 6px',
-                    fontSize: '0.6rem',
-                    fontFamily: "'PT Root UI', sans-serif",
-                    background: 'rgba(0,0,0,0.4)',
-                    color: '#fff',
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  className={classes.editSaveBtn}
-                  onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}
-                >
-                  ✓
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Upload form — shown when [+] tab is active */}
-      {viewMode === 'add-derivative' && (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            zIndex: 2,
-            borderRadius: 12,
-            padding: 16,
-            background: 'rgba(255,255,255,0.5)',
-            backdropFilter: 'blur(6px)',
-            minHeight: 300,
-          }}
-        >
-          <Suspense
-            fallback={
-              <div style={{
-                width: '100%', padding: 20,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.8rem', color: '#94a3b8',
-              }}>
-                Loading...
-              </div>
-            }
-          >
-            <DerivativeUploadForm nounId={currentNounId} onUploaded={handleDerivativeUploaded} />
+        {/* Toggle pill — hidden while editing */}
+        {!isEditing && togglePill}
+
+        {/* Inline pixel editor — only in 2D mode (3D uses NounParallax EditableScene) */}
+        {isEditing && viewMode !== '3d' && currentNounSeed && (
+          <Suspense fallback={null}>
+            <InlineEditor
+              seed={currentNounSeed}
+              nounSvg={nounSvg}
+              onExit={() => setIsEditing(false)}
+              toolRef={editorToolRef}
+              onSave={(pixels, thumbnail) => {
+                // Save to localStorage as a derivative trait
+                const saved = JSON.parse(localStorage.getItem('noun-wtf-studio-traits') || '[]');
+                saved.unshift({
+                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  name: `Noun ${currentNounId} edit`,
+                  pixels,
+                  traitType: 'head',
+                  createdAt: Date.now(),
+                  thumbnail,
+                });
+                localStorage.setItem('noun-wtf-studio-traits', JSON.stringify(saved.slice(0, 50)));
+                setIsEditing(false);
+              }}
+            />
           </Suspense>
-        </div>
-      )}
+        )}
 
-      {/* Toggle pill — below the artwork */}
-      <div className={classes.sketchToggle}>
-        <button
-          className={`${classes.toggleBtn} ${viewMode === 'real' ? classes.toggleActive : ''}`}
-          onClick={() => setViewMode('real')}
-        >
-          Real
-        </button>
-        <button
-          className={`${classes.toggleBtn} ${viewMode === 'ascii' ? classes.toggleActive : ''}`}
-          onClick={() => setViewMode('ascii')}
-        >
-          ASCII 3D
-        </button>
+        {/* 3D edit mode: full tool panels (3D canvas handles voxels via EditableScene) */}
+        {isEditing && viewMode === '3d' && currentNounSeed && (
+          <Suspense fallback={null}>
+            <InlineEditor
+              seed={currentNounSeed}
+              nounSvg={null}
+              panelsOnly
+              externalPixels={edit3dHistory.present}
+              externalDispatch={edit3dDispatch}
+              externalPast={edit3dHistory.past}
+              externalFuture={edit3dHistory.future}
+              voxelDepth={edit3dVoxelDepth}
+              onVoxelDepthChange={setEdit3dVoxelDepth}
+              onExit={() => setIsEditing(false)}
+              toolRef={editorToolRef}
+              onSave={() => {
+                setVoxelSaveName(`Noun ${currentNounId} voxel`);
+                setVoxelSaveLink('');
+                setShowVoxelSaveModal(true);
+              }}
+            />
+          </Suspense>
+        )}
 
-        {/* Per-noun derivative tabs */}
-        {derivatives.map(d => (
-          <button
-            key={d.id}
-            className={`${classes.toggleBtn} ${classes.derivativeBtn} ${viewMode === `deriv-${d.id}` ? classes.toggleActive : ''}`}
-            onClick={() => setViewMode(`deriv-${d.id}`)}
-            title={`${d.name} · ${new Date(d.createdAt).toLocaleDateString()}`}
-          >
-            {d.name}
-          </button>
-        ))}
+        {/* Keyboard shortcuts help */}
+        {showHelp && (
+          <Suspense fallback={null}>
+            <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />
+          </Suspense>
+        )}
 
-        {/* [+] add derivative */}
-        <button
-          className={`${classes.toggleBtn} ${classes.addBtn} ${viewMode === 'add-derivative' ? classes.toggleActive : ''}`}
-          onClick={() => setViewMode('add-derivative')}
-          title="Add your derivative"
-        >
-          +
-        </button>
+        {/* Voxel save modal */}
+        {showVoxelSaveModal && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }} onClick={() => setShowVoxelSaveModal(false)}>
+            <div style={{
+              background: '#1a1a2e', borderRadius: 12, padding: 24, width: 340,
+              border: '1px solid rgba(255,255,255,0.1)',
+            }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 16px', color: '#fff', fontSize: 16 }}>Save Voxel Creation</h3>
+              <input
+                type="text"
+                placeholder="Name (required)"
+                value={voxelSaveName}
+                onChange={e => setVoxelSaveName(e.target.value)}
+                maxLength={30}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.2)', background: '#0d0d1a', color: '#fff',
+                  fontSize: 14, marginBottom: 8, boxSizing: 'border-box',
+                }}
+                autoFocus
+              />
+              <input
+                type="url"
+                placeholder="Link (optional)"
+                value={voxelSaveLink}
+                onChange={e => setVoxelSaveLink(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.2)', background: '#0d0d1a', color: '#fff',
+                  fontSize: 14, marginBottom: 16, boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowVoxelSaveModal(false)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent', color: '#999', cursor: 'pointer', fontSize: 13,
+                  }}
+                >Cancel</button>
+                <button
+                  type="button"
+                  disabled={!voxelSaveName.trim()}
+                  onClick={async () => {
+                    if (!voxelSaveName.trim() || !currentNounId) return;
+                    try {
+                      // Capture canvas screenshot
+                      const canvas = document.querySelector('canvas');
+                      const image = canvas?.toDataURL('image/jpeg', 0.8) ?? '';
+
+                      // Serialize voxel data
+                      const voxelData = voxelMapRef.current
+                        ? Object.fromEntries(voxelMapRef.current)
+                        : {};
+
+                      // Save as derivative
+                      const res = await fetch('/.netlify/functions/derivatives', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: voxelSaveName.trim(),
+                          image,
+                          nounId: currentNounId,
+                          auctionUrl: voxelSaveLink.trim() || undefined,
+                          voxelData: JSON.stringify(voxelData),
+                        }),
+                      });
+
+                      if (res.ok) {
+                        const newDeriv = await res.json();
+                        setDerivatives(prev => [...prev, newDeriv]);
+                        setShowVoxelSaveModal(false);
+                        setIsEditing(false);
+                      }
+                    } catch (err) {
+                      console.error('Failed to save voxel derivative:', err);
+                    }
+                  }}
+                  style={{
+                    padding: '8px 16px', borderRadius: 6, border: 'none',
+                    background: voxelSaveName.trim() ? '#4ade80' : '#333',
+                    color: voxelSaveName.trim() ? '#000' : '#666',
+                    cursor: voxelSaveName.trim() ? 'pointer' : 'not-allowed',
+                    fontWeight: 700, fontSize: 13,
+                  }}
+                >Save</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-    </div>
-  );
-
-  const loadingNoun = (
-    <div className={classes.nounWrapper}>
-      <LoadingNoun />
-    </div>
-  );
-
-  const currentAuctionActivityContent = currentAuction && lastNounId && (
-    <AuctionActivity
-      auction={currentAuction}
-      isFirstAuction={currentAuction.nounId === 0n}
-      isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
-      onPrevAuctionClick={prevAuctionHandler}
-      onNextAuctionClick={nextAuctionHandler}
-      displayGraphDepComps={true}
-    />
-  );
-  const nounderNounContent = currentAuction && lastNounId && (
-    <NounderNounContent
-      mintTimestamp={BigInt(currentAuction.startTime)}
-      nounId={BigInt(currentAuction.nounId)}
-      isFirstAuction={currentAuction.nounId === 0n}
-      isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
-      onPrevAuctionClick={prevAuctionHandler}
-      onNextAuctionClick={nextAuctionHandler}
-    />
-  );
-
-  return (
-    <div style={{ backgroundColor: stateBgColor }} className={classes.wrapper}>
-      <Container fluid="xl">
-        {/* Inline AI prompt */}
-        <div style={{ paddingTop: '1rem', paddingBottom: '0.5rem' }}>
-          <HomePrompt />
-        </div>
-        <Row>
-          <Col lg={{ span: 5 }} className={classes.auctionActivityCol}>
-            {currentAuction &&
-              (isNounderNoun(BigInt(currentAuction.nounId))
-                ? nounderNounContent
-                : currentAuctionActivityContent)}
-          </Col>
-          <Col lg={{ span: 7 }} className={classes.nounContentCol}>
-            {currentAuction ? nounContent : loadingNoun}
-          </Col>
-        </Row>
-      </Container>
     </div>
   );
 };
