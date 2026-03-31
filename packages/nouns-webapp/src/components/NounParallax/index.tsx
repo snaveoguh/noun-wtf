@@ -99,36 +99,23 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
   return (
     <group ref={groupRef}>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.35} />
-      <directionalLight
-        position={[15, 25, 30]}
-        intensity={1.8}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-        shadow-camera-near={1}
-        shadow-camera-far={80}
-        shadow-bias={-0.005}
-      />
-      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[15, 25, 30]} intensity={1.6} />
+      <directionalLight position={[-10, -5, -15]} intensity={0.2} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.3} />
 
       {bodyGeo && (
-        <mesh geometry={bodyGeo} castShadow receiveShadow>
+        <mesh geometry={bodyGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {blingGeo && (
-        <mesh geometry={blingGeo} castShadow receiveShadow>
+        <mesh geometry={blingGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {glassesGeo && (
-        <mesh geometry={glassesGeo} castShadow receiveShadow>
+        <mesh geometry={glassesGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
@@ -161,36 +148,23 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.35} />
-      <directionalLight
-        position={[15, 25, 30]}
-        intensity={1.8}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-        shadow-camera-near={1}
-        shadow-camera-far={80}
-        shadow-bias={-0.005}
-      />
-      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[15, 25, 30]} intensity={1.6} />
+      <directionalLight position={[-10, -5, -15]} intensity={0.2} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.3} />
 
       {bodyGeo && (
-        <mesh geometry={bodyGeo} castShadow receiveShadow>
+        <mesh geometry={bodyGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {blingGeo && (
-        <mesh geometry={blingGeo} castShadow receiveShadow>
+        <mesh geometry={blingGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {glassesGeo && (
-        <mesh geometry={glassesGeo} castShadow receiveShadow>
+        <mesh geometry={glassesGeo}>
           <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
@@ -391,7 +365,6 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
         }}
-        shadows
         dpr={[1, 2]}
         flat
         frameloop="always"
