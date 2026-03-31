@@ -12,6 +12,7 @@ interface PixelCanvasProps {
   activeColor: string;
   activeTool: Tool;
   zoom?: number;
+  transparentBg?: boolean; // skip checkerboard — renders on transparent canvas
 }
 
 export const PixelCanvas: FC<PixelCanvasProps> = ({
@@ -24,6 +25,7 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
   activeColor,
   activeTool,
   zoom = 16,
+  transparentBg = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -41,12 +43,14 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
     // Clear
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw checkerboard background (transparency indicator)
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const isLight = (x + y) % 2 === 0;
-        ctx.fillStyle = isLight ? '#f0f0f0' : '#d0d0d0';
-        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+    // Draw checkerboard background (transparency indicator) — skip if transparent
+    if (!transparentBg) {
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const isLight = (x + y) % 2 === 0;
+          ctx.fillStyle = isLight ? '#f0f0f0' : '#d0d0d0';
+          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+        }
       }
     }
 
@@ -76,7 +80,7 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
       ctx.lineTo(canvasWidth, y * pixelSize);
       ctx.stroke();
     }
-  }, [pixels, width, height, pixelSize, canvasWidth, canvasHeight]);
+  }, [pixels, width, height, pixelSize, canvasWidth, canvasHeight, transparentBg]);
 
   useEffect(() => {
     draw();

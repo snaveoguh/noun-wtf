@@ -5,8 +5,13 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
-import { useSiteTheme } from '@/contexts/SiteThemeContext';
+import CandleGate from '@/components/CandleGate';
+import DreamWindow from '@/components/DreamWindow';
+import { Footer } from '@/components/Footer';
+import HeliosStatusBar from '@/components/HeliosStatusBar';
+import NavBar from '@/components/NavBar';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
+import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/index.css';
@@ -14,45 +19,38 @@ import '@/index.css';
 // Register all miniapps
 import '@/miniapps';
 
-import { Footer } from '@/components/Footer';
-import NavBar from '@/components/NavBar';
 import NetworkAlert from '@/components/NetworkAlert';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
-import { useAppDispatch } from '@/hooks';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
+import DreamCreatePage from '@/pages/DreamCreatePage';
+import DreamsPage from '@/pages/DreamsPage';
 import EditProposalPage from '@/pages/EditProposal';
 import GovernancePage from '@/pages/Governance';
 import GrantsPage from '@/pages/Grants';
-import GrantDetailPage from '@/pages/Grants/GrantDetail';
 import CreateGrantPage from '@/pages/Grants/CreateGrant';
-import UndergroundPage from '@/pages/Underground';
+import GrantDetailPage from '@/pages/Grants/GrantDetail';
+import HackathonPage from '@/pages/Hackathon';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 import NounsPage from '@/pages/NounsPage';
 import Playground from '@/pages/Playground';
+import UndergroundPage from '@/pages/Underground';
 import ProposalHistory from '@/pages/ProposalHistory';
-import DreamCreatePage from '@/pages/DreamCreatePage';
-import DreamsPage from '@/pages/DreamsPage';
 import SettlersPage from '@/pages/SettlersPage';
 import StatsPage from '@/pages/StatsPage';
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 import VotePage from '@/pages/Vote';
 import { setActiveAccount } from '@/state/slices/account';
-
-import DreamWindow from '@/components/DreamWindow';
-import CandleGate from '@/components/CandleGate';
-import HeliosStatusBar from '@/components/HeliosStatusBar';
 import NocTicker from '@/components/NocTicker';
 import SaberOverlay from '@/components/SaberOverlay';
 import TorchOverlay from '@/components/TorchOverlay';
-import { useAppSelector } from '@/hooks';
-
 import {
   FeedSkeleton,
   GenericSkeleton,
@@ -113,12 +111,20 @@ function AppRouter() {
           path="/vote/:id/edit"
           element={<EditProposalPage match={{ params: { id: ':id' } }} />}
         />
-        <Route path="/candidates" element={<Suspense fallback={<GovernanceSkeleton />}><CandidatesListPage /></Suspense>} />
+        <Route
+          path="/candidates"
+          element={
+            <Suspense fallback={<GovernanceSkeleton />}>
+              <CandidatesListPage />
+            </Suspense>
+          }
+        />
         <Route path="/candidates/:id" element={<CandidatePage />} />
         <Route path="/playground" element={<Playground />} />
         <Route path="/grants" element={<GrantsPage />} />
         <Route path="/grants/create" element={<CreateGrantPage />} />
         <Route path="/grants/:id" element={<GrantDetailPage />} />
+        <Route path="/hackathons" element={<HackathonPage />} />
         <Route path="/underground" element={<UndergroundPage />} />
         <Route path="/delegate" element={<DelegatePage />} />
         <Route path="/traits" element={<TraitsPage />} />
@@ -130,14 +136,70 @@ function AppRouter() {
         <Route path="/dreams" element={<DreamsPage />} />
         <Route path="/dreams/create" element={<DreamCreatePage />} />
         {/* Miniapp routes (lazy loaded) */}
-        <Route path="/terminal" element={<Suspense fallback={<TerminalSkeleton />}><TerminalPage /></Suspense>} />
-        <Route path="/crystal-ball" element={<Suspense fallback={<GenericSkeleton />}><CrystalBallPage /></Suspense>} />
-        <Route path="/feed" element={<Suspense fallback={<FeedSkeleton />}><FeedPage /></Suspense>} />
-        <Route path="/highway" element={<Suspense fallback={<GenericSkeleton />}><HighwayPage /></Suspense>} />
-        <Route path="/saber" element={<Suspense fallback={<GenericSkeleton />}><SaberArenaPage /></Suspense>} />
-        <Route path="/terraforms" element={<Suspense fallback={<GenericSkeleton />}><TerraformsPage /></Suspense>} />
-        <Route path="/terraforms/:id" element={<Suspense fallback={<GenericSkeleton />}><TerraformsPage /></Suspense>} />
-        <Route path="/pip3" element={<Suspense fallback={<GenericSkeleton />}><Pip3Page /></Suspense>} />
+        <Route
+          path="/terminal"
+          element={
+            <Suspense fallback={<TerminalSkeleton />}>
+              <TerminalPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/crystal-ball"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <CrystalBallPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/feed"
+          element={
+            <Suspense fallback={<FeedSkeleton />}>
+              <FeedPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/highway"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <HighwayPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/saber"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <SaberArenaPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/terraforms"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <TerraformsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/terraforms/:id"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <TerraformsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/pip3"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <Pip3Page />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
@@ -154,7 +216,18 @@ function AppRouter() {
       />
 
       {/* Fixed bottom-right liquid glass icon buttons */}
-      <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 900, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '1rem',
+          right: '1rem',
+          zIndex: 900,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          alignItems: 'center',
+        }}
+      >
         <button
           onClick={() => setSaberMode(s => !s)}
           title={saberMode ? 'Exit Saber' : 'Saber'}
@@ -163,9 +236,7 @@ function AppRouter() {
             height: 44,
             borderRadius: 14,
             border: '1px solid rgba(255,255,255,0.4)',
-            background: saberMode
-              ? 'rgba(239, 68, 68, 0.25)'
-              : 'rgba(255, 255, 255, 0.2)',
+            background: saberMode ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.15) inset',

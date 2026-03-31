@@ -11,10 +11,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
-import { OrbitControls } from '@react-three/drei';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import * as THREE from 'three';
-
 import {
   buildNounGeometries,
   seedToLayers,
@@ -22,7 +18,9 @@ import {
   type VoxelMap,
   type Tool,
 } from '@nouns/voxel-engine';
-
+import { OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -101,24 +99,37 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
   return (
     <group ref={groupRef}>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[15, 25, 30]} intensity={0.7} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.1} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.15} />
+      <ambientLight intensity={0.35} />
+      <directionalLight
+        position={[15, 25, 30]}
+        intensity={1.8}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
+        shadow-camera-near={1}
+        shadow-camera-far={80}
+        shadow-bias={-0.005}
+      />
+      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
 
       {bodyGeo && (
-        <mesh geometry={bodyGeo}>
-          <meshStandardMaterial vertexColors roughness={0.8} metalness={0.0} />
+        <mesh geometry={bodyGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {blingGeo && (
-        <mesh geometry={blingGeo}>
-          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.0} />
+        <mesh geometry={blingGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {glassesGeo && (
-        <mesh geometry={glassesGeo}>
-          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.0} />
+        <mesh geometry={glassesGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {/* eslint-enable react/no-unknown-property */}
@@ -150,24 +161,37 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[15, 25, 30]} intensity={0.7} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.1} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.15} />
+      <ambientLight intensity={0.35} />
+      <directionalLight
+        position={[15, 25, 30]}
+        intensity={1.8}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
+        shadow-camera-near={1}
+        shadow-camera-far={80}
+        shadow-bias={-0.005}
+      />
+      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
 
       {bodyGeo && (
-        <mesh geometry={bodyGeo}>
-          <meshStandardMaterial vertexColors roughness={0.8} metalness={0.0} />
+        <mesh geometry={bodyGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {blingGeo && (
-        <mesh geometry={blingGeo}>
-          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.0} />
+        <mesh geometry={blingGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
       {glassesGeo && (
-        <mesh geometry={glassesGeo}>
-          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.0} />
+        <mesh geometry={glassesGeo} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.7} metalness={0.0} />
         </mesh>
       )}
 
@@ -191,7 +215,7 @@ function ResponsiveCamera({ fullscreen }: { fullscreen?: boolean }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const aspect = size.width / size.height;
-    if (fullscreen) {
+    if (fullscreen === true) {
       const base = aspect > 1 ? 34 : 34 / aspect;
       (camera as THREE.PerspectiveCamera).position.set(0, 0, base);
     } else {
@@ -231,7 +255,14 @@ interface NounParallaxProps {
 // Lazy-load EditableScene from voxel engine
 const EditableSceneComponent = React.lazy(() => import('./VoxelEditableScene'));
 
-const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, fullscreen = false, editable, layerVisibility, autoSpin = false }) => {
+const NounParallax: React.FC<NounParallaxProps> = ({
+  seed,
+  interactive = false,
+  fullscreen = false,
+  editable,
+  layerVisibility,
+  autoSpin = false,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tiltRef = useRef<Tilt>({ x: 0, y: 0 });
   const hasGyro = useRef(false);
@@ -241,7 +272,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
   useEffect(() => {
     if (interactive) return;
     const container = containerRef.current;
-    if (!container) return;
+    if (container == null) return;
 
     const onMouseMove = (e: MouseEvent) => {
       if (hasGyro.current) return;
@@ -270,12 +301,12 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
   useEffect(() => {
     if (interactive) return;
     const container = containerRef.current;
-    if (!container) return;
+    if (container == null) return;
 
     const onTouchMove = (e: TouchEvent) => {
       if (hasGyro.current) return;
       const touch = e.touches[0];
-      if (!touch) return;
+      if (touch == null) return;
       const rect = container.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
@@ -352,12 +383,15 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
     >
       <Canvas
         className={classes.canvas}
-        style={fullscreen ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : undefined}
+        style={
+          fullscreen ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : undefined
+        }
         camera={{ fov: 50, near: 1, far: 200 }}
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
         }}
+        shadows
         dpr={[1, 2]}
         flat
         frameloop="always"
@@ -379,7 +413,12 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
           ) : interactive ? (
             <InteractiveScene seed={seed} layerVisibility={layerVisibility} />
           ) : (
-            <TiltScene seed={seed} tiltRef={tiltRef} layerVisibility={layerVisibility} autoSpin={autoSpin} />
+            <TiltScene
+              seed={seed}
+              tiltRef={tiltRef}
+              layerVisibility={layerVisibility}
+              autoSpin={autoSpin}
+            />
           )}
         </Suspense>
       </Canvas>
