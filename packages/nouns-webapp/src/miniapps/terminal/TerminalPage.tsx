@@ -66,7 +66,7 @@ interface SpeechRecognitionLike extends EventTarget {
 }
 
 const getSpeechRecognition = (): (new () => SpeechRecognitionLike) | null => {
-  const w = window as Record<string, unknown>;
+  const w = window as unknown as Record<string, unknown>;
   return (
     (w.SpeechRecognition as (new () => SpeechRecognitionLike) | undefined) ??
     (w.webkitSpeechRecognition as (new () => SpeechRecognitionLike) | undefined) ??
