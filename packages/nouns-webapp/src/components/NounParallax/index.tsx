@@ -97,25 +97,31 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
   });
 
   return (
-    <group ref={groupRef}>
+    <>
       {/* eslint-disable react/no-unknown-property */}
-      {bodyGeo && (
-        <mesh geometry={bodyGeo}>
-          <meshBasicMaterial vertexColors />
-        </mesh>
-      )}
-      {blingGeo && (
-        <mesh geometry={blingGeo}>
-          <meshBasicMaterial vertexColors />
-        </mesh>
-      )}
-      {glassesGeo && (
-        <mesh geometry={glassesGeo}>
-          <meshBasicMaterial vertexColors />
-        </mesh>
-      )}
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[15, 25, 30]} intensity={0.7} />
+      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
+      <group ref={groupRef}>
+        {bodyGeo && (
+          <mesh geometry={bodyGeo}>
+            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          </mesh>
+        )}
+        {blingGeo && (
+          <mesh geometry={blingGeo}>
+            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          </mesh>
+        )}
+        {glassesGeo && (
+          <mesh geometry={glassesGeo}>
+            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          </mesh>
+        )}
+      </group>
       {/* eslint-enable react/no-unknown-property */}
-    </group>
+    </>
   );
 }
 
@@ -143,19 +149,23 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[15, 25, 30]} intensity={0.7} />
+      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
       {bodyGeo && (
         <mesh geometry={bodyGeo}>
-          <meshBasicMaterial vertexColors />
+          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
         </mesh>
       )}
       {blingGeo && (
         <mesh geometry={blingGeo}>
-          <meshBasicMaterial vertexColors />
+          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
         </mesh>
       )}
       {glassesGeo && (
         <mesh geometry={glassesGeo}>
-          <meshBasicMaterial vertexColors />
+          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
         </mesh>
       )}
 
