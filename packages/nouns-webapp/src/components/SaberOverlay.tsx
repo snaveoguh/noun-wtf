@@ -346,6 +346,8 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
             });
           }
         } else if (data.type === 'force') {
+          // Ignore our own force push echoed back from the server
+          if (data.id === ws.id) return;
           forcePushesRef.current.push({
             x: data.x, y: data.y, angle: data.angle,
             radius: 20, maxRadius: FORCE_MAX_RADIUS,
@@ -491,8 +493,9 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
 
-      // ── Force Push on "F" ──
-      if ((e.key === 'f' || e.key === 'F') && !gameOverRef.current && forceCooldownRef.current <= 0) {
+      // ── Force Push on "Q" ──
+      if ((e.key === 'q' || e.key === 'Q') && !gameOverRef.current && forceCooldownRef.current <= 0) {
+        e.preventDefault();
         const m = mouseRef.current;
         // Use the current saber direction (stored by game loop), not mouse delta
         const forceAngle = saberAngleRef.current;
@@ -1000,12 +1003,12 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
         ctx.fillStyle = 'rgba(180, 140, 255, 0.7)';
         ctx.fillRect(18, 90, 200 * (1 - cdPct), 10);
         ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#cc88ff';
-        ctx.fillText('FORCE [F]', 24, 98);
+        ctx.fillText('FORCE [Q]', 24, 98);
       } else {
         ctx.fillStyle = 'rgba(180, 140, 255, 0.9)';
         ctx.fillRect(18, 90, 200, 10);
         ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#fff';
-        ctx.fillText('FORCE READY [F]', 24, 98);
+        ctx.fillText('FORCE READY [Q]', 24, 98);
       }
 
       // Score + wave + player count + timer
@@ -1048,7 +1051,7 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
         width: '100vw',
         height: '100vh',
         zIndex: 9999,
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
         cursor: 'none',
       }}
     />
