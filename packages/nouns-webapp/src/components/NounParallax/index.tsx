@@ -53,11 +53,13 @@ interface TiltSceneProps {
   seed: INounSeed;
   tiltRef: React.MutableRefObject<Tilt>;
   layerVisibility?: LayerVisibility;
+  autoSpin?: boolean;
 }
 
-function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
+function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
+  const spinTime = useRef(0);
 
   const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
@@ -72,8 +74,20 @@ function TiltScene({ seed, tiltRef, layerVisibility }: TiltSceneProps) {
     };
   }, [bodyGeo, blingGeo, glassesGeo]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!groupRef.current) return;
+
+    if (autoSpin) {
+      // Cinematic spin: ease-in-out rotation over ~2.5s
+      spinTime.current += delta;
+      const t = Math.min(spinTime.current / 2.5, 1);
+      // Ease-in-out cubic
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      groupRef.current.rotation.y = eased * Math.PI * 2; // full 360°
+      groupRef.current.rotation.x = Math.sin(eased * Math.PI) * -8 * DEG; // subtle nod
+      return;
+    }
+
     const smoothing = 0.07;
     currentTilt.current.x = lerp(currentTilt.current.x, tiltRef.current.x, smoothing);
     currentTilt.current.y = lerp(currentTilt.current.y, tiltRef.current.y, smoothing);
@@ -209,13 +223,15 @@ interface NounParallaxProps {
   fullscreen?: boolean;
   editable?: EditableConfig;
   layerVisibility?: LayerVisibility;
+  /** Auto-spin for cinematic intro (one full rotation over ~2s) */
+  autoSpin?: boolean;
 }
 
 // Lazy-load EditableScene (heavy — raycasting + individual meshes)
 // Lazy-load EditableScene from voxel engine
 const EditableSceneComponent = React.lazy(() => import('./VoxelEditableScene'));
 
-const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, fullscreen = false, editable, layerVisibility }) => {
+const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, fullscreen = false, editable, layerVisibility, autoSpin = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tiltRef = useRef<Tilt>({ x: 0, y: 0 });
   const hasGyro = useRef(false);
@@ -363,7 +379,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({ seed, interactive = false, 
           ) : interactive ? (
             <InteractiveScene seed={seed} layerVisibility={layerVisibility} />
           ) : (
-            <TiltScene seed={seed} tiltRef={tiltRef} layerVisibility={layerVisibility} />
+            <TiltScene seed={seed} tiltRef={tiltRef} layerVisibility={layerVisibility} autoSpin={autoSpin} />
           )}
         </Suspense>
       </Canvas>

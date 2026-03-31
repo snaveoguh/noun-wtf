@@ -19,21 +19,19 @@ import CurrentBid from '@/components/CurrentBid';
 import Holder from '@/components/Holder';
 import NounInfoCard from '@/components/NounInfoCard';
 import Winner from '@/components/Winner';
-import { nounsAuctionHouseAddress } from '@/contracts';
 import { useAppSelector } from '@/hooks';
 import { RootState } from '@/store';
-import { buildEtherscanAddressLink } from '@/utils/etherscan';
-import { defaultChain } from '@/wagmi';
 import { Auction } from '@/wrappers/nounsAuction';
 
 import classes from './AuctionActivity.module.css';
 import bidHistoryClasses from './BidHistory.module.css';
 
-const openEtherscanBidHistory = () => {
-  const chainId = defaultChain.id;
-  const url = buildEtherscanAddressLink(nounsAuctionHouseAddress[chainId]);
-  window.open(url);
-};
+// Etherscan link kept as fallback if needed
+// const openEtherscanBidHistory = () => {
+//   const chainId = defaultChain.id;
+//   const url = buildEtherscanAddressLink(nounsAuctionHouseAddress[chainId]);
+//   window.open(url);
+// };
 
 interface AuctionActivityProps {
   auction: Auction;
@@ -173,12 +171,9 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
             {/* If no bids, show nothing. If bids avail:graph is stable? Show bid history modal,
             else show etherscan contract link */}
             {isLastAuction &&
-              auction.amount !== 0n &&
-              (displayGraphDepComps ? (
+              auction.amount !== 0n && (
                 <BidHistoryBtn onClick={showBidModalHandler} />
-              ) : (
-                <BidHistoryBtn onClick={openEtherscanBidHistory} />
-              ))}
+              )}
           </Col>
         </Row>
       </AuctionActivityWrapper>

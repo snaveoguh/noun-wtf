@@ -79,8 +79,9 @@ const Auction: React.FC<AuctionProps> = props => {
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
 
-  // View mode
-  const [viewMode, setViewMode] = useState<string>('3d');
+  // View mode — default to 2D, with a 3D intro overlay that fades out
+  const [viewMode, setViewMode] = useState<string>('real');
+  const [showIntro, setShowIntro] = useState(true);
 
   // Inline editor state
   const [isEditing, setIsEditing] = useState(false);
@@ -340,6 +341,13 @@ const Auction: React.FC<AuctionProps> = props => {
   // Reset editing state on noun change
   useEffect(() => { setIsEditing(false); setShowHelp(false); }, [currentNounId]);
 
+  // Cinematic intro: 3D spin overlay fades out after 3s
+  useEffect(() => {
+    if (!showIntro) return;
+    const timer = setTimeout(() => setShowIntro(false), 3000);
+    return () => clearTimeout(timer);
+  }, [showIntro]);
+
   // ─── Activity content ──────────────────────────────────────────────────
 
   const activityContent = currentAuction && lastNounId && (
@@ -576,6 +584,54 @@ const Auction: React.FC<AuctionProps> = props => {
         <div className={classes.hero3dBg}>
           {renderHeroBackground()}
         </div>
+
+        {/* Cinematic 3D intro overlay — spins then fades out */}
+        {showIntro && currentNounSeed && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 10,
+            opacity: showIntro ? 1 : 0,
+            transition: 'opacity 0.8s ease-out',
+            pointerEvents: 'none',
+          }}>
+            <NounParallax seed={currentNounSeed} fullscreen autoSpin />
+          </div>
+        )}
+
+        {/* Prev/Next noun arrows */}
+        {currentAuction && lastNounId && !isEditing && (
+          <>
+            {BigInt(currentAuction.nounId) > 0n && (
+              <button
+                type="button"
+                onClick={prevAuctionHandler}
+                style={{
+                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                  zIndex: 20, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+                  width: 44, height: 44, cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#333',
+                  transition: 'background 0.15s',
+                }}
+                title="Previous Noun"
+              >&#8249;</button>
+            )}
+            {BigInt(currentAuction.nounId) < BigInt(lastNounId) && (
+              <button
+                type="button"
+                onClick={nextAuctionHandler}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  zIndex: 20, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+                  width: 44, height: 44, cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#333',
+                  transition: 'background 0.15s',
+                }}
+                title="Next Noun"
+              >&#8250;</button>
+            )}
+          </>
+        )}
 
         {/* Hidden: fires onLoadSeed for bg color + seed */}
         {currentAuction && (
