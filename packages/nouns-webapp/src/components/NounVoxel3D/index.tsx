@@ -45,13 +45,13 @@ function VoxelScene({ layers, mode }: { layers: { body: any[]; bling: any[]; gla
   const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => buildNounGeometries(layers), [layers]);
   const isColor = mode === 'color';
 
-  const renderMesh = (geo: THREE.BufferGeometry | null, roughness: number, metalness: number) => {
+  const renderMesh = (geo: THREE.BufferGeometry | null, roughness: number) => {
     if (!geo) return null;
     return (
       <>
-        <mesh geometry={geo} castShadow receiveShadow>
+        <mesh geometry={geo}>
           {isColor
-            ? <meshStandardMaterial vertexColors roughness={roughness} metalness={metalness} />
+            ? <meshStandardMaterial vertexColors roughness={roughness} metalness={0.0} />
             : <meshStandardMaterial color="#0a0a12" roughness={0.9} />
           }
         </mesh>
@@ -67,27 +67,14 @@ function VoxelScene({ layers, mode }: { layers: { body: any[]; bling: any[]; gla
   return (
     <group>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[15, 25, 30]}
-        intensity={1.6}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-        shadow-camera-near={1}
-        shadow-camera-far={80}
-        shadow-bias={-0.005}
-      />
-      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[15, 25, 30]} intensity={0.7} />
+      <directionalLight position={[-10, -5, -15]} intensity={0.1} />
+      <directionalLight position={[-5, 10, -20]} intensity={0.15} />
 
-      {renderMesh(bodyGeo, 0.7, 0.0)}
-      {renderMesh(blingGeo, 0.5, 0.05)}
-      {renderMesh(glassesGeo, 0.5, 0.08)}
+      {renderMesh(bodyGeo, 0.8)}
+      {renderMesh(blingGeo, 0.6)}
+      {renderMesh(glassesGeo, 0.6)}
       {/* eslint-enable react/no-unknown-property */}
 
       <OrbitControls
@@ -188,12 +175,9 @@ const NounVoxel3D: FC<NounVoxel3DProps> = ({ onPredict, pollInterval = 3_000 }) 
           gl={{ antialias: true, alpha: true }}
           onCreated={({ gl }) => {
             gl.setClearColor(0x000000, 0);
-            gl.shadowMap.enabled = true;
-            gl.shadowMap.type = THREE.PCFSoftShadowMap;
           }}
           dpr={[1, 2]}
           flat
-          shadows
         >
           <Suspense fallback={null}>
             <VoxelScene layers={layers!} mode={mode} />
