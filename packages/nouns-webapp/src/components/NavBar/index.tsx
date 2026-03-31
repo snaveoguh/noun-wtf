@@ -8,8 +8,6 @@ import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router';
-
-import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { formatEther } from 'viem';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
@@ -23,14 +21,15 @@ import NounPalette from '@/components/NounPalette';
 import ShortAddress from '@/components/ShortAddress';
 import SubgraphSettings from '@/components/SubgraphSettings';
 import config, { CHAIN_ID } from '@/config';
+import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { nounsTreasuryAddress } from '@/contracts';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { setTorchMode } from '@/state/slices/application';
-import { INounSeed } from '@/wrappers/nounToken';
 import { usePickByState } from '@/utils/colorResponsiveUIUtils';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
 import { defaultChain } from '@/wagmi';
 import { useIsDaoGteV3 } from '@/wrappers/nounsDao';
+import { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './NavBar.module.css';
 import navDropdownClasses from './NavBarDropdown.module.css';
@@ -40,9 +39,10 @@ import responsiveUiUtilsClasses from '@/utils/ResponsiveUIUtils.module.css';
 const NavBar = () => {
   const chainId = defaultChain.id;
   const isDaoGteV3 = useIsDaoGteV3();
-  const stateBgColor = useAppSelector(state => state.application.stateBackgroundColor);
   const isCool = useAppSelector(state => state.application.isCoolBackground);
-  const currentNounSeed = useAppSelector(state => state.application.currentNounSeed) as INounSeed | null;
+  const currentNounSeed = useAppSelector(
+    state => state.application.currentNounSeed,
+  ) as INounSeed | null;
   const torchMode = useAppSelector(state => state.application.torchMode);
   const navDispatch = useAppDispatch();
   const location = useLocation();
@@ -107,7 +107,7 @@ const NavBar = () => {
     <>
       <Navbar
         expand="xl"
-        style={{ backgroundColor: `${useStateBg ? stateBgColor : 'white'}` }}
+        style={{ backgroundColor: 'transparent' }}
         className={classes.navBarCustom}
         expanded={isNavExpanded}
       >
@@ -138,8 +138,20 @@ const NavBar = () => {
               ) : null}
             </Nav.Item>
             {currentNounSeed && (
-              <Nav.Item className="d-none d-xl-flex" style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, whiteSpace: 'nowrap' }}>
+              <Nav.Item
+                className="d-none d-xl-flex"
+                style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    opacity: 0.5,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   color 2day:
                 </span>
                 <NounPalette seed={currentNounSeed} />
@@ -248,36 +260,21 @@ const NavBar = () => {
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/feed"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
+              <Nav.Link as={Link} to="/feed" className={classes.nounsNavLink} onClick={closeNav}>
                 <NavBarButton
                   buttonText="Feed"
                   buttonIcon={<span>📡</span>}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/highway"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
+              <Nav.Link as={Link} to="/highway" className={classes.nounsNavLink} onClick={closeNav}>
                 <NavBarButton
                   buttonText="Highway"
                   buttonIcon={<span>🛣️</span>}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/stats"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
+              <Nav.Link as={Link} to="/stats" className={classes.nounsNavLink} onClick={closeNav}>
                 <NavBarButton
                   buttonText="Stats"
                   buttonIcon={<span>📊</span>}
@@ -440,13 +437,20 @@ const NavBar = () => {
                 opacity: 0.7,
                 transition: 'opacity 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.opacity = '1';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.opacity = '0.7';
+              }}
             >
               {torchMode ? '☀️' : '🌙'}
             </button>
             <button
-              onClick={() => { setSiteMode('new'); navigate('/'); }}
+              onClick={() => {
+                setSiteMode('new');
+                navigate('/');
+              }}
               title="Switch to Terminal Feed"
               style={{
                 background: 'none',
@@ -460,8 +464,12 @@ const NavBar = () => {
                 letterSpacing: '0.5px',
                 transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,255,65,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(0,255,65,0.1)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'none';
+              }}
             >
               NEW
             </button>

@@ -1,0 +1,404 @@
+/* ─── Hackathon Page — Computer World ────────────────────────── */
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  color: #e2e8f0;
+  font-family: 'PT Root UI', monospace, sans-serif;
+}
+
+/* ─── Hero ──────────────────────────────────────────────────── */
+
+.hero {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding: 3rem 1.5rem;
+  border: 1px solid #1e293b;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(34, 211, 238, 0.015) 2px,
+      rgba(34, 211, 238, 0.015) 4px
+    ),
+    #0a0a0a;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+}
+
+.heroTitle {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.heroSub {
+  font-size: 1.3rem;
+  color: #22d3ee;
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
+.heroDesc {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  max-width: 600px;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
+}
+
+.heroCta {
+  display: inline-block;
+  padding: 0.7rem 1.5rem;
+  border: 1px solid #22d3ee;
+  color: #22d3ee;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  margin: 0 0.5rem;
+}
+.heroCta:hover {
+  background: rgba(34, 211, 238, 0.12);
+  color: #22d3ee;
+}
+
+.heroCtaFilled {
+  composes: heroCta;
+  background: #22d3ee;
+  color: #000;
+}
+.heroCtaFilled:hover {
+  background: #06b6d4;
+  color: #000;
+}
+
+.heroAscii {
+  margin-top: 1.5rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: #334155;
+  line-height: 1.2;
+  white-space: pre;
+  user-select: none;
+}
+
+/* ─── Section ───────────────────────────────────────────────── */
+
+.section {
+  margin-bottom: 3rem;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+/* ─── Cartridge Grid ────────────────────────────────────────── */
+
+.cartridgeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.cartridge {
+  border: 1px solid #1e293b;
+  background: #0a0a0a;
+  padding: 0;
+  text-decoration: none;
+  color: #e2e8f0;
+  transition: all 0.25s;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.cartridge:hover {
+  border-color: #22d3ee;
+  color: #e2e8f0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(34, 211, 238, 0.08);
+}
+
+.cartridgeHeader {
+  padding: 0.75rem 1rem 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cartridgeTag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid currentColor;
+}
+
+.tagLive {
+  color: #4ade80;
+}
+
+.tagWip {
+  color: #fbbf24;
+}
+
+.tagPhysical {
+  color: #f472b6;
+}
+
+.tagGuide {
+  color: #a78bfa;
+}
+
+.tagMainnet {
+  color: #22d3ee;
+}
+
+.cartridgeVersion {
+  font-size: 0.65rem;
+  color: #475569;
+  font-family: monospace;
+}
+
+.cartridgeScreen {
+  margin: 0 1rem;
+  padding: 1.25rem 1rem;
+  background: #111318;
+  border: 1px solid #1e293b;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.cartridgeArt {
+  font-family: 'Courier New', monospace;
+  font-size: 0.6rem;
+  color: #334155;
+  line-height: 1.15;
+  white-space: pre;
+  text-align: center;
+}
+
+.cartridgeImg {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.cartridgePlaceholder {
+  color: #334155;
+  font-size: 0.8rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.cartridgeBody {
+  padding: 0.75rem 1rem 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cartridgeName {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: #fff;
+}
+
+.cartridgeDesc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  flex: 1;
+  margin: 0 0 0.75rem;
+}
+
+.cartridgeFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #475569;
+  padding-top: 0.5rem;
+  border-top: 1px solid #1e293b;
+}
+
+.cartridgeStack {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stackChip {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  background: rgba(34, 211, 238, 0.08);
+  color: #22d3ee;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  font-family: monospace;
+}
+
+/* ─── Build Ideas ───────────────────────────────────────────── */
+
+.ideaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.ideaCard {
+  padding: 0.75rem 1rem;
+  border: 1px solid #1e293b;
+  background: #0a0a0a;
+  transition: border-color 0.2s;
+}
+.ideaCard:hover {
+  border-color: #334155;
+}
+
+.ideaCat {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.ideaText {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.ideaSub {
+  font-size: 0.7rem;
+  color: #475569;
+  margin-top: 0.25rem;
+}
+
+/* ─── Photo Gallery (placeholder grid) ──────────────────────── */
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.photoSlot {
+  aspect-ratio: 4 / 3;
+  border: 1px dashed #1e293b;
+  background: #0a0a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #334155;
+  font-size: 0.75rem;
+  font-style: italic;
+  overflow: hidden;
+  position: relative;
+}
+
+.photoSlot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoLabel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  font-size: 0.65rem;
+  color: #94a3b8;
+  font-style: normal;
+}
+
+/* ─── Links Table ───────────────────────────────────────────── */
+
+.linksGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.linkRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #1e293b;
+  background: #0a0a0a;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+  text-decoration: none;
+  color: #e2e8f0;
+}
+.linkRow:hover {
+  border-color: #22d3ee;
+  color: #e2e8f0;
+}
+
+.linkName {
+  font-weight: 600;
+}
+
+.linkUrl {
+  color: #22d3ee;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* ─── Responsive ────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .heroTitle {
+    font-size: 1.8rem;
+  }
+  .heroSub {
+    font-size: 1rem;
+  }
+  .cartridgeGrid {
+    grid-template-columns: 1fr;
+  }
+  .ideaGrid {
+    grid-template-columns: 1fr;
+  }
+  .hero {
+    padding: 2rem 1rem;
+  }
+  .heroCta {
+    display: block;
+    margin: 0.4rem 0;
+  }
+}

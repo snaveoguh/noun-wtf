@@ -1,60 +1,110 @@
-.nounWrapper {
-  align-self: flex-end;
-  width: 100%;
-}
+/* ─── Full-page hero layout ──────────────────────── */
 
-.nounContentCol {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.auctionActivityCol {
-  padding-right: 5rem;
-  padding-bottom: 0rem;
-  min-height: 558px;
-  align-self: flex-end !important;
-}
-
-@media (max-width: 992px) {
-  .nounWrapper {
-    width: 70%;
-    margin-left: 15%;
-    margin-right: 15%;
-  }
-  .nounContentCol {
-    order: -1; /* Noun image on TOP on mobile */
-  }
-  .auctionActivityCol {
-    padding-top: 5%;
-    padding-right: 5%;
-    padding-left: 5%;
-    width: 100%;
-    background-color: white;
-  }
-}
-
-/* ─── Sketch GIF image ───────────────────────────────── */
-
-.sketchImgWrapper {
+.heroWrapper {
   position: relative;
-  padding-top: 100%;
   width: 100%;
-  height: 0;
+  min-height: 100vh;
 }
 
-.sketchImg {
+.hero3dBg {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: auto;
-  vertical-align: middle;
-  image-rendering: auto;
-  border-radius: 12px;
+  inset: 0;
+  z-index: 0;
 }
 
-/* ─── Toggle pill ────────────────────────────────────── */
+/* ─── Prompt bar ─────────────────────────────────── */
+
+.heroPromptBar {
+  position: relative;
+  z-index: 2;
+  padding: 1rem 0 0.5rem;
+  pointer-events: auto;
+}
+
+/* ─── Frosted glass draggable panel ──────────────── */
+
+.glassPanel {
+  position: fixed;
+  z-index: 50;
+  left: 24px;
+  bottom: 60px;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.04) inset;
+  padding: 0 16px 12px;
+  pointer-events: auto;
+  touch-action: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.glassPanel:hover {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.04) inset;
+}
+
+.glassPanelDragBar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+  cursor: grab;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  border-radius: 20px 20px 0 0;
+}
+
+.glassPanelDragBar:active {
+  cursor: grabbing;
+}
+
+.glassPanelGrip {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .glassPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 52px;
+    width: auto;
+    max-width: none;
+    border-radius: 16px;
+    padding: 0 16px 16px;
+  }
+}
+
+/* ─── Toggle pill ────────────────────────────────── */
+
+.heroToggle {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 50;
+  pointer-events: auto;
+  isolation: isolate;
+}
 
 .sketchToggle {
   display: inline-flex;
@@ -64,8 +114,7 @@
   -webkit-backdrop-filter: blur(8px);
   border-radius: 8px;
   padding: 3px;
-  margin-top: 8px;
-  max-width: 100%;
+  max-width: 90vw;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -95,6 +144,11 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.editToggleBtn {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
 .toggleActive {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
@@ -103,6 +157,11 @@
 .derivativeBtn {
   font-style: italic;
   white-space: nowrap;
+}
+
+.linkBtn {
+  white-space: nowrap;
+  font-size: 0.6rem;
 }
 
 .addBtn {
@@ -116,7 +175,101 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* ─── Bid button (on derivative overlay) ─────────────── */
+/* ─── + dropdown menu ────────────────────────────── */
+
+.addMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+  z-index: 20;
+}
+
+.addMenuItem {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.addMenuItem:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* ─── Info badge (derivative / link) ─────────────── */
+
+.heroBadge {
+  position: fixed;
+  bottom: 52px;
+  left: 16px;
+  z-index: 5;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.35));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+  pointer-events: auto;
+}
+
+/* ─── Form overlay (upload / add link) ───────────── */
+
+.heroFormOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 320px;
+  max-width: 480px;
+  width: 90vw;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Inline input (reusable) ────────────────────── */
+
+.inlineInput {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.6rem;
+  font-family: 'PT Root UI', sans-serif;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  outline: none;
+}
+
+/* ─── Buttons ────────────────────────────────────── */
 
 .bidBtn {
   display: inline-block;
@@ -132,6 +285,7 @@
   border-radius: 6px;
   transition: all 0.15s ease;
   cursor: pointer;
+  border: none;
 }
 
 .bidBtn:hover {
@@ -173,68 +327,22 @@
   background: rgba(255, 255, 255, 0.4);
 }
 
-/* ─── Mint link ──────────────────────────────────────── */
-
-.mintLink {
-  position: absolute;
-  bottom: -28px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mintLink a {
-  font-family: 'PT Root UI', sans-serif;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #8b7355;
-  text-decoration: none;
-  letter-spacing: 0.02em;
-  transition: color 0.15s;
-}
-
-.mintLink a:hover {
-  color: #14141f;
-  text-decoration: underline;
-}
-
-.mintComingSoon {
-  font-family: 'PT Root UI', sans-serif;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #b0a890;
-  letter-spacing: 0.02em;
-}
-
-.mintArtist {
-  font-family: 'PT Root UI', sans-serif;
-  font-size: 0.6rem;
-  font-weight: 500;
-  color: #c0b8a0;
-  font-style: italic;
-}
-
 @media (max-width: 568px) {
-  .auctionActivityCol {
+  .heroActivityCol {
     width: 100%;
-    margin-left: unset;
-    margin-right: unset;
-    padding-top: 2rem;
-    padding-right: unset;
-    padding-left: 0;
+    padding: 1rem !important;
   }
 
-  .nounWrapper {
-    width: 80%;
-    margin-left: 10%;
-    margin-right: 10%;
-    margin-top: 2rem;
+  .heroBadge {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    bottom: 52px;
   }
 
-  .nounContentCol {
-    padding: 0rem;
+  .heroFormOverlay {
+    min-width: auto;
+    width: 94vw;
+    padding: 16px;
   }
 }

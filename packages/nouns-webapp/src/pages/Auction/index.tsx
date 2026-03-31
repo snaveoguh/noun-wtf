@@ -4,14 +4,15 @@ import { useNavigate, useParams } from 'react-router';
 import { isNumber } from 'remeda';
 
 import Auction from '@/components/Auction';
-import { Bone } from '@/components/Skeleton';
 import CurrentPropsBanner from '@/components/CurrentPropsBanner';
 import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
+import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
 import NounsWorldBanner from '@/components/NounsWorldBanner';
 import PropdatesBanner from '@/components/PropdatesBanner';
+import { Bone } from '@/components/Skeleton';
 
 // Lazy-load TreasuryFlow (Three.js ~600KB — keep out of initial bundle)
 const TreasuryFlowSection = React.lazy(() => import('@/components/TreasuryFlow'));
@@ -33,7 +34,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!lastAuctionNounId) return;
+    if (lastAuctionNounId == null) return;
     if (auctionId === undefined) {
       if (onDisplayAuctionNounId === Number(lastAuctionNounId)) return;
       dispatch(setOnDisplayAuctionNounId(Number(lastAuctionNounId)));
@@ -64,6 +65,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
       <PropdatesBanner />
       <CurrentPropsBanner />
       <DreamsBanner />
+      <NoundryBanner />
       <NounsWorldBanner />
       <NounsIntroSection />
       <Suspense fallback={<Bone w="100%" h={200} style={{ borderRadius: 0 }} />}>

@@ -50,6 +50,48 @@ interface AgentStatus {
   reservations: { active: number; total: number };
 }
 
+// Speech Recognition (vendor-prefixed in some browsers)
+interface SpeechRecognitionEvent {
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+}
+interface SpeechRecognitionLike extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+const getSpeechRecognition = (): (new () => SpeechRecognitionLike) | null => {
+  const w = window as Record<string, unknown>;
+  return (
+    (w.SpeechRecognition as (new () => SpeechRecognitionLike) | undefined) ??
+    (w.webkitSpeechRecognition as (new () => SpeechRecognitionLike) | undefined) ??
+    null
+  );
+};
+
+const speakText = (text: string) => {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.85;
+  utterance.pitch = 0.4;
+
+  // Try to find a deep male English voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred =
+    voices.find(v => /daniel|male|baritone|james/i.test(v.name) && v.lang.startsWith('en')) ??
+    voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ??
+    voices.find(v => v.lang.startsWith('en'));
+  if (preferred) utterance.voice = preferred;
+
+  window.speechSynthesis.speak(utterance);
+};
+
 const TerminalPage: React.FC = () => {
   const { address } = useAccount();
   const [agentMode, setAgentMode] = useState(false);
@@ -59,8 +101,19 @@ const TerminalPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speakBack, setSpeakBack] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Preload voices (some browsers load them async)
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -76,7 +129,9 @@ const TerminalPage: React.FC = () => {
 
     const fetchStatus = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
+        const apiUrl =
+          (import.meta.env.VITE_API_URL as string | undefined) ??
+          'https://spirited-flexibility-production-3c30.up.railway.app';
         const res = await fetch(`${apiUrl}/api/agent/status`);
         if (res.ok) {
           const data = await res.json();
@@ -88,7 +143,9 @@ const TerminalPage: React.FC = () => {
             reservations: data.reservations,
           });
         }
-      } catch { /* silent fail */ }
+      } catch {
+        /* silent fail */
+      }
     };
 
     fetchStatus();
@@ -100,13 +157,55 @@ const TerminalPage: React.FC = () => {
   const toggleAgentMode = useCallback(() => {
     const newMode = !agentMode;
     setAgentMode(newMode);
-    setMessages([{
-      role: 'system',
-      content: newMode ? AGENT_GREETING : TERMINAL_GREETING,
-      timestamp: Date.now(),
-    }]);
+    setMessages([
+      {
+        role: 'system',
+        content: newMode ? AGENT_GREETING : TERMINAL_GREETING,
+        timestamp: Date.now(),
+      },
+    ]);
     setAgentStatus(null);
   }, [agentMode]);
+
+  // Toggle speech recognition
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'ERROR: Speech recognition not supported in this browser. Try Chrome.',
+          timestamp: Date.now(),
+        },
+      ]);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      setIsListening(false);
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -118,7 +217,9 @@ const TerminalPage: React.FC = () => {
       setIsLoading(true);
 
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
+        const apiUrl =
+          (import.meta.env.VITE_API_URL as string | undefined) ??
+          'https://spirited-flexibility-production-3c30.up.railway.app';
         const res = await fetch(`${apiUrl}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -135,11 +236,16 @@ const TerminalPage: React.FC = () => {
           throw new Error(errText || `HTTP ${res.status}`);
         }
 
-        const data = await res.json();
+        const data = (await res.json()) as { response?: string };
         setMessages(prev => [
           ...prev,
-          { role: 'assistant', content: data.response, timestamp: Date.now() },
+          { role: 'assistant', content: data.response ?? '', timestamp: Date.now() },
         ]);
+
+        // Speak the response if speak-back is enabled
+        if (speakBack && typeof data.response === 'string' && data.response.length > 0) {
+          speakText(data.response);
+        }
       } catch (err) {
         setMessages(prev => [
           ...prev,
@@ -153,7 +259,7 @@ const TerminalPage: React.FC = () => {
         setIsLoading(false);
       }
     },
-    [address, isLoading, messages, agentMode],
+    [address, isLoading, messages, agentMode, speakBack],
   );
 
   // Colors based on mode
@@ -171,7 +277,10 @@ const TerminalPage: React.FC = () => {
         {/* Left: header + status + messages */}
         <div className="min-w-0 flex-1">
           {/* Header */}
-          <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: accentDim }}>
+          <div
+            className="flex items-center justify-between border-b pb-2"
+            style={{ borderColor: accentDim }}
+          >
             <div className="flex items-center gap-3">
               <span className="text-sm" style={{ color: accentColor }}>
                 {agentMode ? 'AGENT NOUNIRL' : 'NOUN.WTF TERMINAL'}
@@ -209,7 +318,8 @@ const TerminalPage: React.FC = () => {
               }}
             >
               <span>
-                {agentStatus.running ? '\uD83D\uDFE2' : '\uD83D\uDD34'} {agentStatus.running ? 'ACTIVE' : 'OFFLINE'}
+                {agentStatus.running ? '\uD83D\uDFE2' : '\uD83D\uDD34'}{' '}
+                {agentStatus.running ? 'ACTIVE' : 'OFFLINE'}
               </span>
               <span>BLOCK {agentStatus.lastBlock}</span>
               <span>NEXT: #{agentStatus.nextNounId}</span>
@@ -225,24 +335,47 @@ const TerminalPage: React.FC = () => {
 
         {/* Right: Crystal Ball — hidden on small screens */}
         <div className="hidden shrink-0 lg:block">
-          <Suspense fallback={
-            <div style={{ width: 160, height: 212, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: '"Courier New", monospace', fontSize: 10, color: '#333', letterSpacing: '0.1em' }}>
-                SCRYING...
-              </span>
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div
+                style={{
+                  width: 160,
+                  height: 212,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: 10,
+                    color: '#333',
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  SCRYING...
+                </span>
+              </div>
+            }
+          >
             <CrystalBall size={160} />
           </Suspense>
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-4" style={{ maxHeight: 'calc(100vh - 240px)' }}>
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto pb-4"
+        style={{ maxHeight: 'calc(100vh - 240px)' }}
+      >
         {messages.map((msg, i) => (
           <div key={i} className="mb-3">
             {msg.role === 'system' ? (
-              <pre className="whitespace-pre-wrap text-xs sm:text-sm" style={{ color: accentDim }}>{msg.content}</pre>
+              <pre className="whitespace-pre-wrap text-xs sm:text-sm" style={{ color: accentDim }}>
+                {msg.content}
+              </pre>
             ) : msg.role === 'user' ? (
               <div>
                 <span style={{ color: accentBright }}>&gt; </span>
@@ -250,21 +383,24 @@ const TerminalPage: React.FC = () => {
               </div>
             ) : (
               <div className="ml-2 border-l-2 pl-3" style={{ borderColor: accentDim }}>
-                <pre className="whitespace-pre-wrap text-sm" style={{ color: textLight }}>{msg.content}</pre>
+                <pre className="whitespace-pre-wrap text-sm" style={{ color: textLight }}>
+                  {msg.content}
+                </pre>
               </div>
             )}
           </div>
         ))}
         {isLoading && (
           <div className="ml-2 animate-pulse" style={{ color: accentColor }}>
-            {agentMode ? 'SCANNING' : 'PROCESSING'}<span className="animate-ping">...</span>
+            {agentMode ? 'SCANNING' : 'PROCESSING'}
+            <span className="animate-ping">...</span>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="flex items-center border-t pt-3" style={{ borderColor: accentDim }}>
-        <span className="mr-2" style={{ color: accentBright }}>&gt;</span>
+      <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: accentDim }}>
+        <span style={{ color: accentBright }}>&gt;</span>
         <input
           ref={inputRef}
           value={input}
@@ -272,7 +408,13 @@ const TerminalPage: React.FC = () => {
           onKeyDown={e => {
             if (e.key === 'Enter' && address) sendMessage(input);
           }}
-          placeholder={address ? (agentMode ? 'COMMAND AGENT NOUNIRL...' : 'ASK ABOUT NOUNS...') : 'CONNECT WALLET TO CHAT...'}
+          placeholder={
+            address
+              ? agentMode
+                ? 'COMMAND AGENT NOUNIRL...'
+                : 'ASK ABOUT NOUNS...'
+              : 'CONNECT WALLET TO CHAT...'
+          }
           className="flex-1 border-none bg-transparent text-sm outline-none"
           style={{
             color: textColor,
@@ -281,10 +423,57 @@ const TerminalPage: React.FC = () => {
           }}
           disabled={isLoading || !address}
         />
+
+        {/* Mic button */}
+        <button
+          onClick={toggleListening}
+          disabled={!address || isLoading}
+          className="rounded border px-2 py-1 text-xs transition-colors disabled:opacity-30"
+          style={{
+            borderColor: isListening ? '#ef4444' : accentDim,
+            color: isListening ? '#ef4444' : accentColor,
+            background: isListening ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+          }}
+          title={isListening ? 'Stop listening' : 'Speak a message'}
+          onMouseEnter={e => {
+            if (!isListening) e.currentTarget.style.background = accentMuted;
+          }}
+          onMouseLeave={e => {
+            if (!isListening) e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          {isListening ? 'REC' : 'MIC'}
+        </button>
+
+        {/* Speak-back toggle */}
+        <button
+          onClick={() => {
+            if (speakBack) window.speechSynthesis?.cancel();
+            setSpeakBack(!speakBack);
+          }}
+          className="rounded border px-2 py-1 text-xs transition-colors"
+          style={{
+            borderColor: speakBack ? accentColor : accentDim,
+            color: speakBack ? accentBright : accentDim,
+            background: speakBack ? `${accentMuted}` : 'transparent',
+          }}
+          title={
+            speakBack ? 'Disable voice responses' : 'Enable voice responses (Morgan Freeman mode)'
+          }
+          onMouseEnter={e => {
+            if (!speakBack) e.currentTarget.style.background = accentMuted;
+          }}
+          onMouseLeave={e => {
+            if (!speakBack) e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          {speakBack ? 'VOX ON' : 'VOX'}
+        </button>
+
         <button
           onClick={() => sendMessage(input)}
           disabled={isLoading || !input.trim() || !address}
-          className="ml-2 rounded border px-3 py-1 text-xs transition-colors disabled:opacity-30"
+          className="rounded border px-3 py-1 text-xs transition-colors disabled:opacity-30"
           style={{
             borderColor: accentDim,
             color: accentColor,

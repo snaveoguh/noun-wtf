@@ -1,0 +1,518 @@
+# ⌐◨-◨ NOUNS TERMINAL — Raspberry Pi Deployment Guide
+
+## Overview
+
+The Nouns Terminal is a GameBoy-inspired Nouns DAO governance client designed for a Raspberry Pi 3B+ with a 3-inch JJN Electron touchscreen + stylus. It provides:
+
+- **Pixel Studio** — 32×32 pixel art editor using the Nouns on-chain color palette
+- **Governance** — Browse proposals, vote FOR/AGAINST/ABSTAIN, view vote bars
+- **Live Auction** — See current Noun auction, place bids
+- **Candidates** — Browse proposal candidates, submit your pixel art as a candidate
+- **Gallery** — View/manage your saved pixel artworks
+- **Wallet** — Connect via WalletConnect or injected provider
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────┐
+│          NOUNS TERMINAL (React)         │
+│  ┌──────┐ ┌────────┐ ┌──────────────┐  │
+│  │Studio│ │Governance│ │  Auction     │  │
+│  │32×32 │ │Proposals │ │  Live Feed   │  │
+│  │Editor│ │Voting    │ │  Bid UI      │  │
+│  └──────┘ └────────┘ └──────────────┘  │
+│  ┌──────────────────────────────────┐   │
+│  │   ethers.js / viem / wagmi       │   │
+│  │   Contract Interactions Layer    │   │
+│  └──────────────────────────────────┘   │
+│  ┌──────────────────────────────────┐   │
+│  │   Nouns Subgraph (The Graph)     │   │
+│  │   + Direct RPC for writes        │   │
+│  └──────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+         │                    │
+    Ethereum RPC         Nouns Subgraph
+    (Infura/Alchemy)     (The Graph)
+```
+
+---
+
+## Hardware Setup
+
+### Required Components
+- Raspberry Pi 3B+ (or 4)
+- JJN Electron 3-inch touchscreen (480×320 or similar)
+- Stylus (for precise pixel art)
+- MicroSD card (16GB+)
+- Power supply (5V 2.5A)
+
+### Touchscreen Driver Setup
+```bash
+# SSH into your Pi or use a keyboard
+sudo apt update && sudo apt upgrade -y
+
+# Install touchscreen drivers (JJN Electron)
+# Check your specific model — common driver:
+git clone https://github.com/goodtft/LCD-show.git
+cd LCD-show
+chmod +x LCD35-show  # or LCD3-show depending on model
+sudo ./LCD35-show    # This will reboot
+
+# After reboot, calibrate touchscreen
+sudo apt install xinput-calibrator
+DISPLAY=:0 xinput_calibrator
+```
+
+---
+
+## Software Setup
+
+### 1. Install Node.js
+```bash
+# Install Node.js 18+ on Pi
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -
+sudo apt install -y nodejs
+
+# Verify
+node --version  # Should be 18+
+npm --version
+```
+
+### 2. Create the Project
+```bash
+mkdir ~/nouns-terminal && cd ~/nouns-terminal
+
+# Initialize with Vite + React
+npm create vite@latest . -- --template react
+npm install
+
+# Install Web3 dependencies
+npm install ethers@6 @walletconnect/ethereum-provider
+npm install @tanstack/react-query
+```
+
+### 3. Deploy the Terminal Code
+
+Copy the `nouns-terminal.jsx` file as your main App component:
+
+```bash
+# Replace src/App.jsx with the terminal
+cp nouns-terminal.jsx src/App.jsx
+```
+
+### 4. Add Web3 Integration
+
+Create `src/lib/contracts.js`:
+
+```javascript
+import { ethers } from 'ethers';
+
+// Contract ABIs (key functions only)
+const NOUNS_DAO_ABI = [
+  "function propose(address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, string description) returns (uint256)",
+  "function castVote(uint256 proposalId, uint8 support)",
+  "function castVoteWithReason(uint256 proposalId, uint8 support, string reason)",
+  "function queue(uint256 proposalId)",
+  "function execute(uint256 proposalId)",
+  "function state(uint256 proposalId) view returns (uint8)",
+  "function proposals(uint256 proposalId) view returns (tuple)",
+  "function proposalCount() view returns (uint256)",
+];
+
+const NOUNS_DATA_ABI = [
+  "function createProposalCandidate(address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, string description, string slug, uint256 proposalIdToUpdate) payable",
+  "function updateProposalCandidate(address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, string description, string slug, uint256 proposalIdToUpdate, string reason)",
+  "function cancelProposalCandidate(string slug)",
+  "function addSignature(bytes sig, uint256 expirationTimestamp, address proposer, string slug, uint256 proposalIdToUpdate, bytes encodedProp, string reason)",
+];
+
+const NOUNS_AUCTION_ABI = [
+  "function createBid(uint256 nounId) payable",
+  "function settleCurrentAndCreateNewAuction()",
+  "function auction() view returns (uint256 nounId, uint256 amount, uint256 startTime, uint256 endTime, address bidder, bool settled)",
+];
+
+const NOUNS_TOKEN_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function getCurrentVotes(address account) view returns (uint96)",
+  "function delegate(address delegatee)",
+  "function delegates(address delegator) view returns (address)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+];
+
+const CONTRACTS = {
+  NOUNS_TOKEN: "0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03",
+  NOUNS_DAO: "0x6f3E6272A167e8AcCb32072d08E0957F9c79223d",
+  NOUNS_AUCTION: "0x830BD73E4184ceF73443C15111a1DF14e7bdAED",
+  NOUNS_DATA: "0xf790A5f59678dd733fb3De93493A91f472ca1365",
+};
+
+export function getContracts(signer) {
+  return {
+    dao: new ethers.Contract(CONTRACTS.NOUNS_DAO, NOUNS_DAO_ABI, signer),
+    auction: new ethers.Contract(CONTRACTS.NOUNS_AUCTION, NOUNS_AUCTION_ABI, signer),
+    token: new ethers.Contract(CONTRACTS.NOUNS_TOKEN, NOUNS_TOKEN_ABI, signer),
+    data: new ethers.Contract(CONTRACTS.NOUNS_DATA, NOUNS_DATA_ABI, signer),
+  };
+}
+
+// Cast a vote on a proposal
+export async function castVote(signer, proposalId, support, reason = "") {
+  const { dao } = getContracts(signer);
+  if (reason) {
+    return dao.castVoteWithReason(proposalId, support, reason);
+  }
+  return dao.castVote(proposalId, support);
+}
+
+// Place a bid on the current auction
+export async function placeBid(signer, nounId, amountEth) {
+  const { auction } = getContracts(signer);
+  return auction.createBid(nounId, {
+    value: ethers.parseEther(amountEth),
+  });
+}
+
+// Create a proposal candidate
+export async function createCandidate(signer, { targets, values, signatures, calldatas, description, slug }) {
+  const { data } = getContracts(signer);
+  return data.createProposalCandidate(
+    targets, values, signatures, calldatas,
+    description, slug, 0
+  );
+}
+
+// Fetch proposals from the Nouns subgraph
+export async function fetchProposals() {
+  const query = `{
+    proposals(first: 20, orderBy: createdBlock, orderDirection: desc) {
+      id
+      proposer { id }
+      description
+      status
+      forVotes
+      againstVotes
+      abstainVotes
+      quorumVotes
+      createdBlock
+      startBlock
+      endBlock
+      executionETA
+    }
+  }`;
+
+  const res = await fetch(
+    'https://api.thegraph.com/subgraphs/name/nounsdao/nouns-subgraph',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    }
+  );
+  const json = await res.json();
+  return json.data?.proposals || [];
+}
+
+// Fetch current auction
+export async function fetchAuction(provider) {
+  const { auction } = getContracts(provider);
+  const data = await auction.auction();
+  return {
+    nounId: Number(data.nounId),
+    currentBid: ethers.formatEther(data.amount),
+    startTime: Number(data.startTime),
+    endTime: Number(data.endTime),
+    bidder: data.bidder,
+    settled: data.settled,
+  };
+}
+
+// Fetch candidates from Nouns Data events
+export async function fetchCandidates() {
+  const query = `{
+    proposalCandidates(first: 20, orderBy: createdBlock, orderDirection: desc) {
+      id
+      slug
+      proposer
+      createdBlock
+      lastUpdatedBlock
+      canceled
+      latestVersion {
+        content {
+          title
+          description
+          targets
+          values
+          signatures
+          calldatas
+        }
+      }
+    }
+  }`;
+
+  const res = await fetch(
+    'https://api.thegraph.com/subgraphs/name/nounsdao/nouns-subgraph',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    }
+  );
+  const json = await res.json();
+  return json.data?.proposalCandidates || [];
+}
+```
+
+### 5. Pixel Art to On-Chain Encoding
+
+Create `src/lib/pixel-encoder.js` for encoding pixel art to Nouns-compatible RLE format:
+
+```javascript
+// Encode 32x32 pixel art into Nouns-compatible RLE format
+export function encodePixelArt(pixels, palette) {
+  // Map pixel colors to palette indices
+  const indexed = pixels.map(color => {
+    if (!color) return 0; // transparent
+    const idx = palette.indexOf(color);
+    return idx >= 0 ? idx : 0;
+  });
+
+  // RLE encode rows
+  const runs = [];
+  for (let y = 0; y < 32; y++) {
+    let x = 0;
+    while (x < 32) {
+      const colorIdx = indexed[y * 32 + x];
+      let runLength = 1;
+      while (x + runLength < 32 && indexed[y * 32 + x + runLength] === colorIdx) {
+        runLength++;
+      }
+      runs.push({ length: runLength, colorIndex: colorIdx });
+      x += runLength;
+    }
+  }
+
+  // Pack into bytes (Nouns format: length byte, then color index byte)
+  const bytes = [];
+  // Header: bounds (top, right, bottom, left)
+  bytes.push(0, 31, 31, 0); // full 32x32
+
+  for (const run of runs) {
+    bytes.push(run.length, run.colorIndex);
+  }
+
+  return '0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Export pixel art as SVG (for preview/sharing)
+export function pixelsToSVG(pixels, size = 320) {
+  const cellSize = size / 32;
+  let rects = '';
+
+  pixels.forEach((color, i) => {
+    if (!color) return;
+    const x = (i % 32) * cellSize;
+    const y = Math.floor(i / 32) * cellSize;
+    rects += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${color}"/>`;
+  });
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+// Export pixel art as PNG data URL
+export function pixelsToPNG(pixels, scale = 10) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32 * scale;
+  canvas.height = 32 * scale;
+  const ctx = canvas.getContext('2d');
+
+  pixels.forEach((color, i) => {
+    if (!color) return;
+    const x = (i % 32) * scale;
+    const y = Math.floor(i / 32) * scale;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, scale, scale);
+  });
+
+  return canvas.toDataURL('image/png');
+}
+```
+
+### 6. Build & Deploy to Pi
+
+```bash
+# Build the production bundle
+npm run build
+
+# The built files will be in dist/
+# Serve with a lightweight server
+npm install -g serve
+serve -s dist -l 3000
+```
+
+### 7. Kiosk Mode Setup
+
+Create `/home/pi/start-terminal.sh`:
+```bash
+#!/bin/bash
+# Start Nouns Terminal in kiosk mode
+
+# Wait for X server
+sleep 5
+
+# Disable screensaver and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide mouse cursor after 3 seconds
+unclutter -idle 3 &
+
+# Start Chromium in kiosk mode
+chromium-browser \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-translate \
+  --no-first-run \
+  --fast \
+  --fast-start \
+  --disable-features=TranslateUI \
+  --overscroll-history-navigation=0 \
+  --disable-pinch \
+  --touch-events=enabled \
+  --enable-features=OverlayScrollbar \
+  http://localhost:3000
+```
+
+```bash
+chmod +x /home/pi/start-terminal.sh
+```
+
+### 8. Auto-start on Boot
+
+Add to `/etc/xdg/lxsession/LXDE-pi/autostart`:
+```
+@/home/pi/start-terminal.sh
+```
+
+Or create a systemd service:
+```bash
+sudo nano /etc/systemd/system/nouns-terminal.service
+```
+
+```ini
+[Unit]
+Description=Nouns Terminal
+After=graphical.target
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+ExecStart=/home/pi/start-terminal.sh
+Restart=on-failure
+
+[Install]
+WantedBy=graphical.target
+```
+
+```bash
+sudo systemctl enable nouns-terminal.service
+```
+
+---
+
+## Contract Functionality Parity with nouns.camp
+
+### Governance (NounsDAOLogicV3)
+| Feature | Status | Contract Function |
+|---------|--------|-------------------|
+| View proposals | ✅ | Subgraph query |
+| Vote FOR/AGAINST/ABSTAIN | ✅ | `castVote()` / `castVoteWithReason()` |
+| View vote tallies | ✅ | Subgraph query |
+| Proposal state tracking | ✅ | `state()` |
+| Create proposal | ✅ | `propose()` |
+| Queue proposal | ✅ | `queue()` |
+| Execute proposal | ✅ | `execute()` |
+| Proposal feedback | ✅ | `sendFeedback()` |
+
+### Candidates (NounsDAOData)
+| Feature | Status | Contract Function |
+|---------|--------|-------------------|
+| Browse candidates | ✅ | Subgraph query |
+| Create candidate | ✅ | `createProposalCandidate()` |
+| Update candidate | ✅ | `updateProposalCandidate()` |
+| Cancel candidate | ✅ | `cancelProposalCandidate()` |
+| Sign candidate | ✅ | `addSignature()` |
+| Candidate feedback | ✅ | `sendCandidateFeedback()` |
+
+### Auction (NounsAuctionHouse)
+| Feature | Status | Contract Function |
+|---------|--------|-------------------|
+| View current auction | ✅ | `auction()` |
+| Place bid | ✅ | `createBid()` |
+| Settle auction | ✅ | `settleCurrentAndCreateNewAuction()` |
+| Bid history | ✅ | Subgraph/events |
+
+### Token (NounsToken)
+| Feature | Status | Contract Function |
+|---------|--------|-------------------|
+| Balance check | ✅ | `balanceOf()` |
+| Vote power | ✅ | `getCurrentVotes()` |
+| Delegate | ✅ | `delegate()` |
+| View Noun art | ✅ | `tokenURI()` / descriptor |
+
+### Pixel Studio (probe.wtf/dreams parity)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| 32×32 pixel canvas | ✅ | Touch + stylus optimized |
+| Nouns color palette | ✅ | Full on-chain palette |
+| Pen/Eraser/Fill/Picker | ✅ | All tools |
+| Save locally | ✅ | Gallery system |
+| Export as SVG | ✅ | Nouns-compatible |
+| Export as PNG | ✅ | For sharing |
+| RLE encode for on-chain | ✅ | Nouns format |
+| Submit as candidate art | ✅ | Via NounsDAOData |
+
+---
+
+## Touchscreen Optimizations
+
+The UI is specifically designed for a 480×320 3-inch display:
+
+- **7px pixel grid cells** — precisely tuned for stylus accuracy on 3" screen
+- **Large touch targets** — all buttons min 28px height
+- **Bottom navigation** — thumb-reachable nav bar
+- **Collapsible palette** — toggle color picker to maximize canvas space
+- **CRT/scanline effects** — authentic retro feel without hurting usability
+- **Press Start 2P + Silkscreen fonts** — pixel-perfect at small sizes
+
+---
+
+## Environment Variables
+
+Create `.env` in project root:
+```
+VITE_RPC_URL=https://mainnet.infura.io/v3/YOUR_KEY
+VITE_SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/nounsdao/nouns-subgraph
+VITE_WALLETCONNECT_PROJECT_ID=YOUR_WC_PROJECT_ID
+VITE_CHAIN_ID=1
+```
+
+---
+
+## Next Steps / Roadmap
+
+1. **WalletConnect integration** — QR code scan from mobile wallet
+2. **Real-time auction websocket** — live bid updates
+3. **Offline mode** — cache proposals, queue votes for when online
+4. **Physical buttons** — map GPIO buttons to D-pad navigation
+5. **Hardware wallet support** — Ledger/Trezor via USB
+6. **Multi-chain** — Support Base for Nouns Builder DAOs
+7. **Audio feedback** — GameBoy-style beeps and chimes (piezo buzzer via GPIO)
+
+---
+
+*Built with ⌐◨-◨ energy. CC0. One Noun, every day, forever.*
