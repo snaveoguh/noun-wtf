@@ -64,7 +64,6 @@ import classes from './App.module.css';
 const TerminalPage = lazy(() => import('@/miniapps/terminal/TerminalPage'));
 const FeedPage = lazy(() => import('@/miniapps/feed/FeedPage'));
 const HighwayPage = lazy(() => import('@/miniapps/highway/HighwayPage'));
-const SaberArenaPage = lazy(() => import('@/miniapps/saber/SaberArenaPage'));
 const CandidatesListPage = lazy(() => import('@/miniapps/candidates/CandidatesPage'));
 const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage'));
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
@@ -165,14 +164,6 @@ function AppRouter() {
           element={
             <Suspense fallback={<GenericSkeleton />}>
               <HighwayPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/saber"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <SaberArenaPage />
             </Suspense>
           }
         />
