@@ -798,7 +798,7 @@ const CandidatePage = () => {
             <VoteSignals
               proposalId={candidate.id}
               proposer={candidate.proposer}
-              versionTimestamp={BigInt(candidate?.lastUpdatedTimestamp)}
+              versionTimestamp={BigInt(candidate?.lastUpdatedTimestamp ?? 0)}
               feedback={feedback.data}
               userVotes={userVotes}
               isCandidate={true}
