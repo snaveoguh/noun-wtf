@@ -1,9 +1,16 @@
+import type { VoxelMap, VoxelPixel, NounLayers } from './types';
+
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import type { VoxelMap, VoxelPixel, NounLayers } from './types';
 import { BODY_DEPTH, BLING_DEPTH, GLASSES_DEPTH } from './types';
 import { parseKey } from './voxelMap';
+
+// Convert sRGB 0-1 channel to linear RGB for Three.js vertex colors.
+// Three.js renderer outputs sRGB, so vertex colors must be in linear space.
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
 
 // ─── Build merged geometry from VoxelPixel array ────────────────────────────
 
@@ -20,7 +27,9 @@ export function buildMergedGeometry(
     box.translate(p.x - 15.5, p.y - 15.5, zOffset);
     const count = box.attributes.position.count;
     const colors = new Float32Array(count * 3);
-    const r = p.r / 255, g = p.g / 255, b = p.b / 255;
+    const r = srgbToLinear(p.r / 255);
+    const g = srgbToLinear(p.g / 255);
+    const b = srgbToLinear(p.b / 255);
     for (let i = 0; i < count; i++) {
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
@@ -48,6 +57,7 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
     const count = box.attributes.position.count;
     const colors = new Float32Array(count * 3);
     const c = new THREE.Color(color);
+    // THREE.Color(hex) already converts sRGB→linear internally
     for (let i = 0; i < count; i++) {
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
