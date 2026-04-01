@@ -364,8 +364,6 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
-          // Force linear output so sRGB vertex colors aren't gamma-corrected twice
-          gl.outputColorSpace = THREE.LinearSRGBColorSpace;
         }}
         dpr={[1, 2]}
         flat
