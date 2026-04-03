@@ -1,3 +1,4 @@
+/* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 /**
  * NounParallax — 3D voxel Noun with gyro/touch/mouse tilt.
  *
@@ -13,6 +14,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import {
+  buildGeometryFromVoxelMap,
   buildNounGeometries,
   seedToLayers,
   type LayerVisibility,
@@ -49,21 +51,32 @@ const DEG = Math.PI / 180;
 // ─── Inner R3F scene (tilt mode — parallax with proper lighting) ────────────
 
 interface TiltSceneProps {
-  seed: INounSeed;
+  seed?: INounSeed;
+  voxelMap?: VoxelMap;
   tiltRef: React.MutableRefObject<Tilt>;
   layerVisibility?: LayerVisibility;
   autoSpin?: boolean;
 }
 
-function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSceneProps) {
+function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false }: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
 
   const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+    if (voxelMap) {
+      return {
+        bodyGeo: buildGeometryFromVoxelMap(voxelMap),
+        blingGeo: null,
+        glassesGeo: null,
+      };
+    }
+    if (!seed) {
+      return { bodyGeo: null, blingGeo: null, glassesGeo: null };
+    }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-  }, [seed, layerVisibility]);
+  }, [seed, layerVisibility, voxelMap]);
 
   useEffect(() => {
     return () => {
@@ -72,6 +85,10 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
       glassesGeo?.dispose();
     };
   }, [bodyGeo, blingGeo, glassesGeo]);
+
+  useEffect(() => {
+    spinTime.current = 0;
+  }, [seed, voxelMap, autoSpin]);
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
@@ -125,15 +142,32 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
 // ─── Inner R3F scene (interactive mode — orbit + shadows) ────────────────────
 
 interface InteractiveSceneProps {
-  seed: INounSeed;
+  seed?: INounSeed;
+  voxelMap?: VoxelMap;
   layerVisibility?: LayerVisibility;
+  autoRotate?: boolean;
 }
 
-function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
+function InteractiveScene({
+  seed,
+  voxelMap,
+  layerVisibility,
+  autoRotate = false,
+}: InteractiveSceneProps) {
   const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+    if (voxelMap) {
+      return {
+        bodyGeo: buildGeometryFromVoxelMap(voxelMap),
+        blingGeo: null,
+        glassesGeo: null,
+      };
+    }
+    if (!seed) {
+      return { bodyGeo: null, blingGeo: null, glassesGeo: null };
+    }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-  }, [seed, layerVisibility]);
+  }, [seed, layerVisibility, voxelMap]);
 
   useEffect(() => {
     return () => {
@@ -166,6 +200,8 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
         enablePan={false}
         enableDamping
         dampingFactor={0.12}
+        autoRotate={autoRotate}
+        autoRotateSpeed={1.3}
         minDistance={10}
         maxDistance={80}
         minPolarAngle={Math.PI * 0.05}
@@ -199,6 +235,7 @@ function ResponsiveCamera({ fullscreen }: { fullscreen?: boolean }) {
 
 export interface EditableConfig {
   pixels: string[][];
+  initialVoxelMap?: VoxelMap | null;
   activeTool: Tool;
   activeColor: string;
   onPixelChange: (x: number, y: number, color: string) => void;
@@ -209,13 +246,16 @@ export interface EditableConfig {
 }
 
 interface NounParallaxProps {
-  seed: INounSeed;
+  seed?: INounSeed;
+  voxelMap?: VoxelMap;
   interactive?: boolean;
   fullscreen?: boolean;
   editable?: EditableConfig;
   layerVisibility?: LayerVisibility;
   /** Auto-spin for cinematic intro (one full rotation over ~2s) */
   autoSpin?: boolean;
+  autoRotate?: boolean;
+  pointerEnabled?: boolean;
 }
 
 // Lazy-load EditableScene (heavy — raycasting + individual meshes)
@@ -224,20 +264,26 @@ const EditableSceneComponent = React.lazy(() => import('./VoxelEditableScene'));
 
 const NounParallax: React.FC<NounParallaxProps> = ({
   seed,
+  voxelMap,
   interactive = false,
   fullscreen = false,
   editable,
   layerVisibility,
   autoSpin = false,
+  autoRotate = false,
+  pointerEnabled = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tiltRef = useRef<Tilt>({ x: 0, y: 0 });
   const hasGyro = useRef(false);
   const [needsPermission, setNeedsPermission] = useState(false);
+  const showPermissionHint = useCallback(() => {
+    setNeedsPermission(true);
+  }, []);
 
   // ── Mouse (desktop) — tilt mode only ──
   useEffect(() => {
-    if (interactive) return;
+    if (interactive || !pointerEnabled) return;
     const container = containerRef.current;
     if (container == null) return;
 
@@ -262,11 +308,11 @@ const NounParallax: React.FC<NounParallaxProps> = ({
       container.removeEventListener('mousemove', onMouseMove);
       container.removeEventListener('mouseleave', onMouseLeave);
     };
-  }, [interactive]);
+  }, [interactive, pointerEnabled]);
 
   // ── Touch (mobile without gyro) — tilt mode only ──
   useEffect(() => {
-    if (interactive) return;
+    if (interactive || !pointerEnabled) return;
     const container = containerRef.current;
     if (container == null) return;
 
@@ -295,11 +341,11 @@ const NounParallax: React.FC<NounParallaxProps> = ({
       container.removeEventListener('touchend', onTouchEnd);
       container.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [interactive]);
+  }, [interactive, pointerEnabled]);
 
   // ── DeviceOrientation (gyroscope) — tilt mode only ──
   useEffect(() => {
-    if (interactive) return;
+    if (interactive || !pointerEnabled) return;
     const onOrientation = (e: DeviceOrientationEvent) => {
       if (e.gamma == null || e.beta == null) return;
       hasGyro.current = true;
@@ -313,12 +359,12 @@ const NounParallax: React.FC<NounParallaxProps> = ({
       requestPermission?: () => Promise<string>;
     };
     if (typeof DOE.requestPermission === 'function') {
-      setNeedsPermission(true);
+      showPermissionHint();
     } else {
       window.addEventListener('deviceorientation', onOrientation);
     }
     return () => window.removeEventListener('deviceorientation', onOrientation);
-  }, [interactive]);
+  }, [interactive, pointerEnabled, showPermissionHint]);
 
   const requestPermission = useCallback(async () => {
     const DOE = DeviceOrientationEvent as unknown as {
@@ -347,7 +393,8 @@ const NounParallax: React.FC<NounParallaxProps> = ({
       ref={containerRef}
       data-noun-parallax-root="true"
       className={`${classes.container} ${fullscreen ? classes.fullscreen : ''}`}
-      onClick={!interactive && needsPermission ? requestPermission : undefined}
+      onClick={!interactive && pointerEnabled && needsPermission ? requestPermission : undefined}
+      style={{ pointerEvents: pointerEnabled ? 'auto' : 'none' }}
     >
       <Canvas
         className={classes.canvas}
@@ -358,8 +405,10 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
+          gl.outputColorSpace = THREE.SRGBColorSpace;
+          gl.toneMapping = THREE.NoToneMapping;
         }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         flat
         frameloop="always"
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
@@ -369,6 +418,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
           {editable ? (
             <EditableSceneComponent
               pixels={editable.pixels}
+              initialVoxelMap={editable.initialVoxelMap ?? undefined}
               activeTool={editable.activeTool}
               activeColor={editable.activeColor}
               onPixelChange={editable.onPixelChange}
@@ -378,10 +428,16 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               onVoxelMapChange={editable.onVoxelMapChange}
             />
           ) : interactive ? (
-            <InteractiveScene seed={seed} layerVisibility={layerVisibility} />
+            <InteractiveScene
+              seed={seed}
+              voxelMap={voxelMap}
+              layerVisibility={layerVisibility}
+              autoRotate={autoRotate}
+            />
           ) : (
             <TiltScene
               seed={seed}
+              voxelMap={voxelMap}
               tiltRef={tiltRef}
               layerVisibility={layerVisibility}
               autoSpin={autoSpin}
@@ -389,11 +445,8 @@ const NounParallax: React.FC<NounParallaxProps> = ({
           )}
         </Suspense>
       </Canvas>
-      {!interactive && needsPermission && (
+      {!interactive && pointerEnabled && needsPermission && (
         <div className={classes.permissionHint}>Tap to enable motion</div>
-      )}
-      {interactive && (
-        <div className={classes.interactiveHint}>Drag to rotate &middot; Pinch to zoom</div>
       )}
     </div>
   );

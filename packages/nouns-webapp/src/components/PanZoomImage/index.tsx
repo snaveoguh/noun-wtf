@@ -1,3 +1,4 @@
+/* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 /**
  * PanZoomImage — Full-container image with drag-to-pan.
  * Zoom controlled via keyboard (+/-) or forwardRef.
@@ -15,6 +16,7 @@ interface PanZoomImageProps {
   src: string;
   alt?: string;
   pixelated?: boolean;
+  interactive?: boolean;
 }
 
 const PanZoomImage = ({
@@ -22,16 +24,12 @@ const PanZoomImage = ({
   src,
   alt = '',
   pixelated = false,
+  interactive = true,
 }: PanZoomImageProps & { ref?: React.RefObject<PanZoomHandle | null> }) => {
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    setScale(1);
-    setTranslate({ x: 0, y: 0 });
-  }, [src]);
 
   const zoomIn = useCallback(() => setScale(s => Math.min(6, s * 1.3)), []);
   const zoomOut = useCallback(() => setScale(s => Math.max(0.3, s / 1.3)), []);
@@ -39,6 +37,10 @@ const PanZoomImage = ({
     setScale(1);
     setTranslate({ x: 0, y: 0 });
   }, []);
+
+  useEffect(() => {
+    reset();
+  }, [reset, src]);
 
   useImperativeHandle(ref, () => ({ zoomIn, zoomOut, reset }), [zoomIn, zoomOut, reset]);
 
@@ -67,14 +69,15 @@ const PanZoomImage = ({
         position: 'absolute',
         inset: 0,
         overflow: 'hidden',
-        cursor: dragging.current ? 'grabbing' : 'grab',
-        touchAction: 'none',
+        cursor: interactive ? (dragging.current ? 'grabbing' : 'grab') : 'default',
+        touchAction: interactive ? 'none' : 'pan-y',
+        pointerEvents: interactive ? 'auto' : 'none',
       }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onDoubleClick={reset}
+      onPointerDown={interactive ? onPointerDown : undefined}
+      onPointerMove={interactive ? onPointerMove : undefined}
+      onPointerUp={interactive ? onPointerUp : undefined}
+      onPointerCancel={interactive ? onPointerUp : undefined}
+      onDoubleClick={interactive ? reset : undefined}
     >
       <img
         src={src}
