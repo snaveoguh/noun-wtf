@@ -2,7 +2,8 @@
  * InlineEditor — Seamless Noun pixel editor.
  *
  * Pre-loads the current Noun's actual pixels from its seed.
- * In 2D mode: transparent PixelCanvas overlaid on the Noun SVG (same position/size).
+ * In 2D mode: PixelCanvas sits over the hero artwork but keeps its own editor
+ * background so erased pixels don't reveal the original noun underneath.
  * Layer visibility toggles let you hide/show body parts.
  * Tools, palette, and actions in floating glass panels.
  */
@@ -196,7 +197,6 @@ const InlineEditor: FC<InlineEditorProps> = ({
             activeColor={activeColor}
             activeTool={activeTool}
             zoom={zoom}
-            transparentBg
           />
         </div>
       )}

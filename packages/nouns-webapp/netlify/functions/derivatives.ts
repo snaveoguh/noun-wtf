@@ -6,6 +6,7 @@ interface Derivative {
   image: string; // base64 data URL (JPEG for static, original for GIFs)
   nounId?: number; // which noun this derivative is for
   auctionUrl?: string; // external auction link (Manifold, Zora, etc.)
+  voxelData?: string; // serialized voxel map for 3D derivatives
   tokenId?: number; // onchain ERC721 token ID (set after mint)
   tokenURI?: string; // IPFS metadata URI (set after pin)
   createdAt: string;
@@ -103,11 +104,12 @@ export default async (req: Request) => {
   if (req.method === 'POST') {
     try {
       const body = await req.json();
-      const { name, image, nounId, auctionUrl } = body as {
+      const { name, image, nounId, auctionUrl, voxelData } = body as {
         name?: string;
         image?: string;
         nounId?: number;
         auctionUrl?: string;
+        voxelData?: string;
       };
 
       // Validate
@@ -153,6 +155,12 @@ export default async (req: Request) => {
           });
         }
       }
+      if (voxelData !== undefined && typeof voxelData !== 'string') {
+        return new Response(JSON.stringify({ error: 'voxelData must be a string when provided' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
 
       // Read existing
       let derivatives: Derivative[] = [];
@@ -171,6 +179,7 @@ export default async (req: Request) => {
         image,
         nounId,
         ...(trimmedAuctionUrl && { auctionUrl: trimmedAuctionUrl }),
+        ...(voxelData && { voxelData }),
         createdAt: new Date().toISOString(),
       };
 
@@ -181,7 +190,7 @@ export default async (req: Request) => {
       await store.set(META_KEY, JSON.stringify(derivatives));
 
       return new Response(
-        JSON.stringify({ success: true, id: newDerivative.id }),
+        JSON.stringify(newDerivative),
         {
           status: 201,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
