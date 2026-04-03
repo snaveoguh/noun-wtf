@@ -1,3 +1,5 @@
+/* eslint-disable import/order, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+import type { Tool, VoxelMap } from '@nouns/voxel-engine';
 import React, {
   Suspense,
   useCallback,
@@ -8,7 +10,6 @@ import React, {
   useState,
 } from 'react';
 
-import { Container } from 'react-bootstrap';
 import { useNavigate } from 'react-router';
 
 import AuctionActivity from '@/components/AuctionActivity';
@@ -19,31 +20,27 @@ import NounderNounContent from '@/components/NounderNounContent';
 import NounParallax from '@/components/NounParallax';
 import PanZoomImage from '@/components/PanZoomImage';
 import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
-import { type Tool } from '@/components/Studio/PixelCanvas';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
 import { seedToPixelLayers, mergeLayersToGrid, DEFAULT_VISIBILITY } from '@/lib/nounDecoder';
-import { historyReducer, createInitialHistory } from '@/lib/pixelHistory';
+import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
-import { RootState } from '@/store';
+import type { RootState } from '@/store';
 import { nounPath } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
 import { isNounderNoun } from '@/utils/nounderNoun';
-import { useCreateDerivative, hasDerivativesContract } from '@/wrappers/nounDerivatives';
-import { Auction as IAuction } from '@/wrappers/nounsAuction';
-import { INounSeed } from '@/wrappers/nounToken';
+import { hasDerivativesContract, useCreateDerivative } from '@/wrappers/nounDerivatives';
+import type { Auction as IAuction } from '@/wrappers/nounsAuction';
+import type { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './Auction.module.css';
 
-// Lazy-load heavy components
 const AsciiNounCanvas = React.lazy(() => import('@/components/AsciiNoun'));
 const InlineEditor = React.lazy(() => import('@/components/Auction/InlineEditor'));
 const KeyboardShortcutsHelp = React.lazy(
   () => import('@/components/Auction/KeyboardShortcutsHelp'),
 );
 const DerivativeUploadForm = React.lazy(() => import('@/components/DerivativeGallery'));
-
-// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface Derivative {
   id: string;
@@ -61,23 +58,93 @@ interface NounLink {
   id: string;
   nounId: number;
   url: string;
+  name?: string;
   ogImage?: string;
   ogTitle?: string;
   createdAt: string;
 }
 
+interface PixelDraft {
+  image: string;
+  pixels: string[][];
+  updatedAt: string;
+}
+
+interface VoxelDraft extends PixelDraft {
+  voxelData: string;
+}
+
+interface NounDayDrafts {
+  nounId: number;
+  pixel?: PixelDraft;
+  voxel?: VoxelDraft;
+}
+
+type HeroViewMode =
+  | 'real'
+  | '3d'
+  | 'ascii'
+  | 'edit-2d'
+  | 'edit-3d'
+  | `deriv-${string}`
+  | `link-${string}`;
+
+type InteractionMode = 'scroll' | 'grab' | 'twist';
+type EditMode = '2d' | '3d' | null;
+type ComposerMode = 'art' | 'link';
+
 const DERIVATIVES_API = '/.netlify/functions/derivatives';
 const NOUN_LINKS_API = '/.netlify/functions/noun-links';
+const LIVE_DRAFTS_API = '/.netlify/functions/noun-day-drafts';
 
-// ─── Main Auction ───────────────────────────────────────────────────────────
+function buildPixelImage(pixels: string[][]) {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < 32; x++) {
+      const color = pixels[y]?.[x];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+function serializeVoxelMap(map: VoxelMap | null) {
+  if (!map) return '';
+  return JSON.stringify(Object.fromEntries(map));
+}
+
+function parseVoxelMap(voxelData?: string) {
+  if (!voxelData) return null;
+  try {
+    const parsed = JSON.parse(voxelData) as Record<string, string>;
+    return new Map(Object.entries(parsed)) as VoxelMap;
+  } catch {
+    return null;
+  }
+}
+
+function formatUpdateLabel(updatedAt?: string) {
+  if (!updatedAt) return 'Waiting for the first live save';
+  return `Live on site · ${new Date(updatedAt).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
+}
 
 interface AuctionProps {
   auction?: IAuction;
 }
 
-const Auction: React.FC<AuctionProps> = props => {
-  const { auction: currentAuction } = props;
-
+const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const stateBgColor = useAppSelector((state: RootState) => state.application.stateBackgroundColor);
@@ -85,17 +152,19 @@ const Auction: React.FC<AuctionProps> = props => {
   const currentNounSeed = useAppSelector((state: RootState) => state.application.currentNounSeed);
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
-
-  // View mode — default to 2D, with a 3D intro overlay that fades out
-  const [viewMode, setViewMode] = useState<string>('real');
-  const [showIntro, setShowIntro] = useState(true);
-  const [introOpacity, setIntroOpacity] = useState(1);
-
-  // Inline editor state
-  const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
+  const [editMode, setEditMode] = useState<EditMode>(null);
+  const [playIntroSpin, setPlayIntroSpin] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<ComposerMode>('art');
+  const [liveDrafts, setLiveDrafts] = useState<NounDayDrafts | null>(null);
+  const [liveSaveMode, setLiveSaveMode] = useState<EditMode>(null);
+  const [voxelMapVersion, setVoxelMapVersion] = useState(0);
+
   const editorToolRef = useRef<{
-    setTool: (t: Tool) => void;
+    setTool: (tool: Tool) => void;
     undo: () => void;
     redo: () => void;
     getActiveTool: () => Tool;
@@ -104,31 +173,17 @@ const Auction: React.FC<AuctionProps> = props => {
   const panZoomRef = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void } | null>(
     null,
   );
+  const voxelMapRef = useRef<VoxelMap | null>(null);
+  const live2dSignatureRef = useRef('');
+  const live3dSignatureRef = useRef('');
 
-  // Shared 3D editor state (used when editing in 3D mode)
+  const [edit2dHistory, edit2dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit3dTool, setEdit3dTool] = useState<Tool>('pencil');
   const [edit3dColor, setEdit3dColor] = useState('#000000');
   const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
-  const voxelMapRef = useRef<import('@nouns/voxel-engine').VoxelMap | null>(null);
-  const [showDerivativeSaveModal, setShowDerivativeSaveModal] = useState(false);
-  const [derivativeSaveMode, setDerivativeSaveMode] = useState<'pixel' | 'voxel'>('pixel');
-  const [derivativeSaveName, setDerivativeSaveName] = useState('');
-  const [derivativeSaveLink, setDerivativeSaveLink] = useState('');
-  const [derivativeSaveImage, setDerivativeSaveImage] = useState('');
-  const [derivativeSavePending, setDerivativeSavePending] = useState(false);
-  const [derivativeSaveError, setDerivativeSaveError] = useState('');
+  const [edit3dStartVoxelMap, setEdit3dStartVoxelMap] = useState<VoxelMap | null>(null);
 
-  // Load noun pixels when entering edit mode in 3D
-  useEffect(() => {
-    if (isEditing && viewMode === '3d' && currentNounSeed) {
-      const layers = seedToPixelLayers(currentNounSeed);
-      const grid = mergeLayersToGrid(layers, DEFAULT_VISIBILITY);
-      edit3dDispatch({ type: 'LOAD', pixels: grid });
-    }
-  }, [isEditing, viewMode, currentNounSeed]);
-
-  // Per-noun derivatives
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
   const [editingAuctionUrl, setEditingAuctionUrl] = useState(false);
   const [auctionUrlDraft, setAuctionUrlDraft] = useState('');
@@ -142,252 +197,315 @@ const Auction: React.FC<AuctionProps> = props => {
     receipt: mintReceipt,
   } = useCreateDerivative();
 
-  // Per-noun links
   const [nounLinks, setNounLinks] = useState<NounLink[]>([]);
-
-  // + menu state
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-
-  // Add link form
-  const [addingLink, setAddingLink] = useState(false);
+  const [linkNameDraft, setLinkNameDraft] = useState('');
   const [linkUrlDraft, setLinkUrlDraft] = useState('');
   const [linkSubmitting, setLinkSubmitting] = useState(false);
 
-  // ─── Data fetching ──────────────────────────────────────────────────────
+  const isEditing = editMode !== null;
+  const baseGrid = useMemo(() => {
+    if (!currentNounSeed) return createEmptyGrid();
+    return mergeLayersToGrid(seedToPixelLayers(currentNounSeed), DEFAULT_VISIBILITY);
+  }, [currentNounSeed]);
 
-  const fetchDerivativesForNoun = useCallback(async (nId: number) => {
-    try {
-      const res = await fetch(`${DERIVATIVES_API}?nounId=${nId}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as Derivative[];
-      setDerivatives(data);
-    } catch {
-      /* silent */
-    }
-  }, []);
-
-  const fetchLinksForNoun = useCallback(async (nId: number) => {
-    try {
-      const res = await fetch(`${NOUN_LINKS_API}?nounId=${nId}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as NounLink[];
-      setNounLinks(data);
-    } catch {
-      /* silent */
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentAuction) {
-      fetchDerivativesForNoun(currentNounId);
-      fetchLinksForNoun(currentNounId);
-    }
-  }, [currentAuction, currentNounId, fetchDerivativesForNoun, fetchLinksForNoun]);
-
-  // Reset view mode when noun changes
-  useEffect(() => {
-    setViewMode('3d');
-    setEditingAuctionUrl(false);
-    setAddMenuOpen(false);
-    setAddingLink(false);
-  }, [currentNounId]);
-
-  // Active items
   const activeDerivative = viewMode.startsWith('deriv-')
-    ? derivatives.find(d => `deriv-${d.id}` === viewMode)
+    ? derivatives.find(derivative => `deriv-${derivative.id}` === viewMode)
     : null;
-
   const activeLink = viewMode.startsWith('link-')
-    ? nounLinks.find(l => `link-${l.id}` === viewMode)
+    ? nounLinks.find(link => `link-${link.id}` === viewMode)
     : null;
+  const liveVoxelMap = useMemo(() => parseVoxelMap(liveDrafts?.voxel?.voxelData), [liveDrafts]);
 
-  // ─── Derivative handlers ────────────────────────────────────────────────
-
-  const handleDerivativeUploaded = useCallback(() => {
-    if (currentAuction) {
-      fetchDerivativesForNoun(currentNounId).then(() => {
-        fetch(`${DERIVATIVES_API}?nounId=${currentNounId}`)
-          .then(r => r.json())
-          .then((data: Derivative[]) => {
-            setDerivatives(data);
-            if (data.length > 0) setViewMode(`deriv-${data[0].id}`);
-          })
-          .catch(() => {});
-      });
+  const fetchDerivativesForNoun = useCallback(async (nounId: number) => {
+    try {
+      const res = await fetch(`${DERIVATIVES_API}?nounId=${nounId}`);
+      if (!res.ok) return;
+      setDerivatives((await res.json()) as Derivative[]);
+    } catch {
+      setDerivatives([]);
     }
-  }, [currentAuction, currentNounId, fetchDerivativesForNoun]);
-
-  const resetDerivativeSaveModal = useCallback(() => {
-    setShowDerivativeSaveModal(false);
-    setDerivativeSaveMode('pixel');
-    setDerivativeSaveName('');
-    setDerivativeSaveLink('');
-    setDerivativeSaveImage('');
-    setDerivativeSavePending(false);
-    setDerivativeSaveError('');
   }, []);
 
-  const openDerivativeSaveModal = useCallback(
-    (mode: 'pixel' | 'voxel', image: string, defaultName: string) => {
-      setDerivativeSaveMode(mode);
-      setDerivativeSaveImage(image);
-      setDerivativeSaveName(defaultName);
-      setDerivativeSaveLink('');
-      setDerivativeSavePending(false);
-      setDerivativeSaveError('');
-      setShowDerivativeSaveModal(true);
-    },
-    [],
-  );
-
-  const handleSaveDerivative = useCallback(async () => {
-    if (!derivativeSaveName.trim() || !currentAuction) return;
-    if (!derivativeSaveImage) {
-      setDerivativeSaveError('Could not capture the current creation. Please try again.');
-      return;
-    }
-
-    setDerivativeSavePending(true);
-    setDerivativeSaveError('');
-
+  const fetchLinksForNoun = useCallback(async (nounId: number) => {
     try {
-      const voxelData =
-        derivativeSaveMode === 'voxel' && voxelMapRef.current
-          ? JSON.stringify(Object.fromEntries(voxelMapRef.current))
-          : undefined;
-
-      const res = await fetch(DERIVATIVES_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: derivativeSaveName.trim(),
-          image: derivativeSaveImage,
-          nounId: currentNounId,
-          auctionUrl: derivativeSaveLink.trim() || undefined,
-          ...(voxelData && { voxelData }),
-        }),
-      });
-
-      const data = (await res.json()) as Derivative | { error?: string };
-      if (!res.ok || !('id' in data)) {
-        setDerivativeSaveError(
-          'error' in data && data.error ? data.error : 'Failed to save derivative',
-        );
-        setDerivativeSavePending(false);
-        return;
-      }
-
-      setDerivatives(prev => [data, ...prev.filter(d => d.id !== data.id)]);
-      setViewMode(`deriv-${data.id}`);
-      setIsEditing(false);
-      resetDerivativeSaveModal();
-    } catch (err) {
-      setDerivativeSaveError(
-        err instanceof Error && err.message ? err.message : 'Failed to save derivative',
-      );
-      setDerivativeSavePending(false);
+      const res = await fetch(`${NOUN_LINKS_API}?nounId=${nounId}`);
+      if (!res.ok) return;
+      setNounLinks((await res.json()) as NounLink[]);
+    } catch {
+      setNounLinks([]);
     }
+  }, []);
+
+  const fetchLiveDraftsForNoun = useCallback(async (nounId: number) => {
+    try {
+      const res = await fetch(`${LIVE_DRAFTS_API}?nounId=${nounId}`);
+      if (!res.ok) return;
+      setLiveDrafts((await res.json()) as NounDayDrafts | null);
+    } catch {
+      setLiveDrafts(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentAuction) return;
+    fetchDerivativesForNoun(currentNounId);
+    fetchLinksForNoun(currentNounId);
+    fetchLiveDraftsForNoun(currentNounId);
   }, [
+    currentAuction,
     currentNounId,
-    derivativeSaveImage,
-    derivativeSaveLink,
-    derivativeSaveMode,
-    derivativeSaveName,
-    resetDerivativeSaveModal,
+    fetchDerivativesForNoun,
+    fetchLinksForNoun,
+    fetchLiveDraftsForNoun,
   ]);
 
-  const handleSaveAuctionUrl = useCallback(async (derivId: string, url: string) => {
+  useEffect(() => {
+    if (!currentAuction || isEditing) return;
+    const interval = window.setInterval(() => {
+      fetchLiveDraftsForNoun(currentNounId);
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [currentAuction, currentNounId, fetchLiveDraftsForNoun, isEditing]);
+
+  const resetHeroState = useCallback(() => {
+    setViewMode('3d');
+    setInteractionMode('scroll');
+    setEditMode(null);
+    setShowHelp(false);
+    setComposerOpen(false);
+    setComposerMode('art');
+    setListingForAuction(false);
+    setEditingAuctionUrl(false);
+    setEdit3dStartVoxelMap(null);
+    setLinkNameDraft('');
+    setLinkUrlDraft('');
+    setPlayIntroSpin(true);
+  }, []);
+
+  useEffect(() => {
+    resetHeroState();
+    const timer = window.setTimeout(() => setPlayIntroSpin(false), 2600);
+    return () => window.clearTimeout(timer);
+  }, [currentNounId, resetHeroState]);
+
+  const resetLive2dSignature = useCallback(
+    (pixels: string[][]) => {
+      live2dSignatureRef.current = JSON.stringify(pixels);
+      edit2dDispatch({ type: 'LOAD', pixels });
+    },
+    [edit2dDispatch],
+  );
+
+  const resetLive3dSignature = useCallback(
+    (pixels: string[][], voxelData?: string) => {
+      live3dSignatureRef.current = JSON.stringify({
+        pixels,
+        voxelData: voxelData ?? '',
+      });
+      edit3dDispatch({ type: 'LOAD', pixels });
+    },
+    [edit3dDispatch],
+  );
+
+  const startEditing = useCallback(
+    (mode: Exclude<EditMode, null>) => {
+      if (mode === '2d') {
+        const pixels = liveDrafts?.pixel?.pixels ?? baseGrid;
+        resetLive2dSignature(pixels);
+        setViewMode('edit-2d');
+      } else {
+        const pixels = liveDrafts?.voxel?.pixels ?? liveDrafts?.pixel?.pixels ?? baseGrid;
+        resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
+        setEdit3dStartVoxelMap(liveVoxelMap);
+        setViewMode('edit-3d');
+        setInteractionMode('grab');
+      }
+      setEditMode(mode);
+    },
+    [baseGrid, liveDrafts, liveVoxelMap, resetLive2dSignature, resetLive3dSignature],
+  );
+
+  const stopEditing = useCallback(() => {
+    setEditMode(null);
+    setEdit3dStartVoxelMap(null);
+    setInteractionMode('scroll');
+  }, []);
+
+  const persistLiveDraft = useCallback(
+    async (mode: Exclude<EditMode, null>, pixels: string[][], voxelData?: string) => {
+      const image = buildPixelImage(pixels);
+      if (!image || !currentAuction) return;
+
+      setLiveSaveMode(mode);
+      try {
+        const res = await fetch(LIVE_DRAFTS_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nounId: currentNounId,
+            mode,
+            pixels,
+            image,
+            ...(mode === '3d' ? { voxelData } : {}),
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as NounDayDrafts;
+        setLiveDrafts(data);
+        if (mode === '2d') {
+          live2dSignatureRef.current = JSON.stringify(pixels);
+        } else {
+          live3dSignatureRef.current = JSON.stringify({
+            pixels,
+            voxelData: voxelData ?? '',
+          });
+        }
+      } finally {
+        setLiveSaveMode(null);
+      }
+    },
+    [currentAuction, currentNounId],
+  );
+
+  useEffect(() => {
+    if (editMode !== '2d') return;
+    const signature = JSON.stringify(edit2dHistory.present);
+    if (signature === live2dSignatureRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      persistLiveDraft('2d', edit2dHistory.present);
+    }, 850);
+    return () => window.clearTimeout(timer);
+  }, [edit2dHistory.present, editMode, persistLiveDraft]);
+
+  useEffect(() => {
+    if (editMode !== '3d') return;
+    const voxelData = serializeVoxelMap(voxelMapRef.current);
+    const signature = JSON.stringify({
+      pixels: edit3dHistory.present,
+      voxelData,
+    });
+    if (!voxelData || signature === live3dSignatureRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      persistLiveDraft('3d', edit3dHistory.present, voxelData);
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [edit3dHistory.present, editMode, persistLiveDraft, voxelMapVersion]);
+
+  const handleDerivativeUploaded = useCallback(() => {
+    if (!currentAuction) return;
+    fetchDerivativesForNoun(currentNounId).then(() => {
+      fetch(`${DERIVATIVES_API}?nounId=${currentNounId}`)
+        .then(res => res.json())
+        .then((data: Derivative[]) => {
+          setComposerOpen(false);
+          setDerivatives(data);
+          if (data.length > 0) setViewMode(`deriv-${data[0].id}`);
+        })
+        .catch(() => undefined);
+    });
+  }, [currentAuction, currentNounId, fetchDerivativesForNoun]);
+
+  const handleSaveAuctionUrl = useCallback(async (derivativeId: string, url: string) => {
     try {
       const res = await fetch(DERIVATIVES_API, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: derivId, auctionUrl: url }),
+        body: JSON.stringify({ id: derivativeId, auctionUrl: url }),
       });
-      if (res.ok) {
-        setDerivatives(prev =>
-          prev.map(d => (d.id === derivId ? { ...d, auctionUrl: url || undefined } : d)),
-        );
-        setEditingAuctionUrl(false);
-      }
+      if (!res.ok) return;
+      setDerivatives(prev =>
+        prev.map(derivative =>
+          derivative.id === derivativeId
+            ? { ...derivative, auctionUrl: url || undefined }
+            : derivative,
+        ),
+      );
+      setEditingAuctionUrl(false);
     } catch {
-      /* silent */
+      return;
     }
   }, []);
 
   const handleListForAuction = useCallback(
-    async (deriv: Derivative) => {
-      if (deriv.nounId === undefined) return;
+    async (derivative: Derivative) => {
+      if (derivative.nounId === undefined) return;
       setListingStep('pinning');
       try {
         const pinRes = await fetch(DERIVATIVES_API, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: deriv.id }),
+          body: JSON.stringify({ id: derivative.id }),
         });
         if (!pinRes.ok) throw new Error('Pin failed');
         const { tokenURI } = (await pinRes.json()) as { tokenURI: string };
         setListingStep('minting');
-        createDerivativeOnchain(deriv.nounId, tokenURI, reservePriceDraft);
-      } catch (err) {
-        console.error('[ListForAuction]', err);
+        createDerivativeOnchain(derivative.nounId, tokenURI, reservePriceDraft);
+      } catch {
         setListingStep('idle');
       }
     },
     [createDerivativeOnchain, reservePriceDraft],
   );
 
-  useEffect(() => {
-    if (mintSuccess && mintReceipt && activeDerivative) {
-      const createdLog = mintReceipt.logs.find(l => l.topics.length >= 2);
-      if (createdLog && createdLog.topics[1]) {
-        const tokenId = Number(BigInt(createdLog.topics[1]));
-        fetch(DERIVATIVES_API, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: activeDerivative.id, tokenId }),
-        })
-          .then(() => {
-            setDerivatives(prev =>
-              prev.map(d => (d.id === activeDerivative.id ? { ...d, tokenId } : d)),
-            );
-            setListingStep('done');
-            setListingForAuction(false);
-          })
-          .catch(() => {
-            setListingStep('done');
-          });
-      } else {
-        setListingStep('done');
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintSuccess, mintReceipt]);
+  const markListingDone = useCallback(() => {
+    setListingStep('done');
+  }, []);
 
-  // ─── Link handlers ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mintSuccess || !mintReceipt || !activeDerivative) return;
+    const createdLog = mintReceipt.logs.find(log => log.topics.length >= 2);
+    if (!(createdLog && createdLog.topics[1])) {
+      markListingDone();
+      return;
+    }
+
+    const tokenId = Number(BigInt(createdLog.topics[1]));
+    fetch(DERIVATIVES_API, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activeDerivative.id, tokenId }),
+    })
+      .then(() => {
+        setDerivatives(prev =>
+          prev.map(derivative =>
+            derivative.id === activeDerivative.id ? { ...derivative, tokenId } : derivative,
+          ),
+        );
+        markListingDone();
+        setListingForAuction(false);
+      })
+      .catch(() => {
+        markListingDone();
+      });
+  }, [activeDerivative, markListingDone, mintReceipt, mintSuccess]);
 
   const handleAddLink = useCallback(async () => {
-    if (!linkUrlDraft.trim() || !currentAuction) return;
+    if (!linkUrlDraft.trim() || !linkNameDraft.trim() || !currentAuction) return;
     setLinkSubmitting(true);
     try {
       const res = await fetch(NOUN_LINKS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nounId: currentNounId, url: linkUrlDraft.trim() }),
+        body: JSON.stringify({
+          nounId: currentNounId,
+          name: linkNameDraft.trim(),
+          url: linkUrlDraft.trim(),
+        }),
       });
-      if (res.ok) {
-        const link = (await res.json()) as NounLink;
-        setNounLinks(prev => [link, ...prev]);
-        setViewMode(`link-${link.id}`);
-        setAddingLink(false);
-        setLinkUrlDraft('');
-      }
-    } catch {
-      /* silent */
+      if (!res.ok) return;
+      const link = (await res.json()) as NounLink;
+      setNounLinks(prev => [link, ...prev]);
+      setComposerOpen(false);
+      setComposerMode('art');
+      setLinkNameDraft('');
+      setLinkUrlDraft('');
+      setViewMode(`link-${link.id}`);
+    } finally {
+      setLinkSubmitting(false);
     }
-    setLinkSubmitting(false);
-  }, [currentAuction, currentNounId, linkUrlDraft]);
-
-  // ─── Seed / navigation handlers ────────────────────────────────────────
+  }, [currentAuction, currentNounId, linkNameDraft, linkUrlDraft]);
 
   const lastSeedKeyRef = useRef('');
   const loadedNounHandler = useCallback(
@@ -401,20 +519,20 @@ const Auction: React.FC<AuctionProps> = props => {
     [dispatch],
   );
 
-  const prevAuctionHandler = () => {
-    if (currentAuction) navigate(nounPath(Number(currentAuction.nounId) - 1));
-  };
-  const nextAuctionHandler = () => {
-    if (currentAuction) navigate(nounPath(Number(currentAuction.nounId) + 1));
-  };
+  const prevAuctionHandler = useCallback(() => {
+    if (!currentAuction) return;
+    navigate(nounPath(Number(currentAuction.nounId) - 1));
+  }, [currentAuction, navigate]);
 
-  // Build 2D SVG image
+  const nextAuctionHandler = useCallback(() => {
+    if (!currentAuction) return;
+    navigate(nounPath(Number(currentAuction.nounId) + 1));
+  }, [currentAuction, navigate]);
+
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentNounSeed, currentAuction]);
-
-  // ─── Keyboard shortcuts ────────────────────────────────────────────────
+  }, [currentAuction, currentNounSeed]);
 
   useAuctionKeyboardShortcuts({
     isEditing,
@@ -423,64 +541,64 @@ const Auction: React.FC<AuctionProps> = props => {
     onNextNoun: nextAuctionHandler,
     isFirstAuction: currentAuction?.nounId === 0n,
     isLastAuction: currentAuction?.nounId === BigInt(lastNounId ?? 0),
-    onSetViewMode: setViewMode,
-    onEnterEdit: () => setIsEditing(true),
+    onSetViewMode: mode => setViewMode(mode as HeroViewMode),
+    onEnterEdit: () => {
+      const mode = viewMode === 'real' || viewMode === 'edit-2d' ? '2d' : '3d';
+      startEditing(mode);
+    },
     onExitEdit: () => {
-      setIsEditing(false);
+      stopEditing();
       setShowHelp(false);
     },
     onZoomIn: () => panZoomRef.current?.zoomIn(),
     onZoomOut: () => panZoomRef.current?.zoomOut(),
-    onResetView: () => panZoomRef.current?.reset(),
-    onToggleFullscreen: () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen().catch(() => {});
+    onResetView: () => {
+      panZoomRef.current?.reset();
+      setInteractionMode('scroll');
     },
-    onSaveScreenshot: () => {
-      const canvas = document.querySelector('canvas');
-      if (canvas) {
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
-        a.download = `noun-${currentNounId}.png`;
-        a.click();
+    onToggleFullscreen: () => {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        document.documentElement.requestFullscreen().catch(() => undefined);
       }
     },
-    onToggleHelp: () => setShowHelp(s => !s),
-    onSetTool: (t: Tool) => {
-      if (viewMode === '3d') setEdit3dTool(t);
-      else editorToolRef.current?.setTool(t);
+    onSaveScreenshot: () => {
+      const canvas = document.querySelector(
+        '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
+      ) as HTMLCanvasElement | null;
+      if (canvas) {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `noun-${currentNounId}.png`;
+        link.click();
+        return;
+      }
+
+      const imageSource =
+        activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
+      if (!imageSource) return;
+      const link = document.createElement('a');
+      link.href = imageSource;
+      link.download = `noun-${currentNounId}.png`;
+      link.click();
+    },
+    onToggleHelp: () => setShowHelp(value => !value),
+    onSetTool: tool => {
+      if (editMode === '3d') setEdit3dTool(tool);
+      else editorToolRef.current?.setTool(tool);
     },
     onUndo: () => {
-      if (viewMode === '3d') edit3dDispatch({ type: 'UNDO' });
-      else editorToolRef.current?.undo();
+      if (editMode === '3d') edit3dDispatch({ type: 'UNDO' });
+      else edit2dDispatch({ type: 'UNDO' });
     },
     onRedo: () => {
-      if (viewMode === '3d') edit3dDispatch({ type: 'REDO' });
-      else editorToolRef.current?.redo();
+      if (editMode === '3d') edit3dDispatch({ type: 'REDO' });
+      else edit2dDispatch({ type: 'REDO' });
     },
   });
 
-  // Reset editing state on noun change
-  useEffect(() => {
-    setIsEditing(false);
-    setShowHelp(false);
-  }, [currentNounId]);
-
-  // Cinematic intro: 3D spin overlay — start fading at 2.2s, unmount at 3.2s
-  useEffect(() => {
-    if (!showIntro) return;
-    const fadeTimer = setTimeout(() => setIntroOpacity(0), 2200);
-    const removeTimer = setTimeout(() => setShowIntro(false), 3200);
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(removeTimer);
-    };
-  }, [showIntro]);
-
-  // ─── Activity content ──────────────────────────────────────────────────
-
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
-
   const activityContent = hasAuctionBounds ? (
     isNounderNoun(BigInt(currentAuction.nounId)) ? (
       <NounderNounContent
@@ -503,19 +621,28 @@ const Auction: React.FC<AuctionProps> = props => {
     )
   ) : null;
 
-  // ─── Hero background per mode ──────────────────────────────────────────
+  const renderHeroArtwork = () => {
+    const imageInteractive = interactionMode !== 'scroll';
+    const parallaxInteractive =
+      interactionMode === 'grab' || interactionMode === 'twist' || editMode === '3d';
+    const showSpin = playIntroSpin && !isEditing && (viewMode === '3d' || viewMode === 'edit-3d');
+    const displayVoxelMap = viewMode === 'edit-3d' || editMode === '3d' ? liveVoxelMap : null;
 
-  const renderHeroBackground = () => {
-    if (viewMode === '3d' && currentNounSeed) {
+    if ((viewMode === '3d' || viewMode === 'edit-3d') && (currentNounSeed || displayVoxelMap)) {
       return (
         <NounParallax
-          seed={currentNounSeed}
-          interactive
+          seed={displayVoxelMap ? undefined : (currentNounSeed ?? undefined)}
+          voxelMap={displayVoxelMap ?? undefined}
+          interactive={parallaxInteractive}
+          autoRotate={interactionMode === 'twist' && !showSpin}
+          autoSpin={showSpin}
           fullscreen
+          pointerEnabled={parallaxInteractive}
           editable={
-            isEditing
+            editMode === '3d'
               ? {
                   pixels: edit3dHistory.present,
+                  initialVoxelMap: edit3dStartVoxelMap,
                   activeTool: editorToolRef.current?.getActiveTool() ?? edit3dTool,
                   activeColor: editorToolRef.current?.getActiveColor() ?? edit3dColor,
                   onPixelChange: (x, y, color) =>
@@ -528,6 +655,7 @@ const Auction: React.FC<AuctionProps> = props => {
                   voxelDepth: edit3dVoxelDepth,
                   onVoxelMapChange: map => {
                     voxelMapRef.current = map;
+                    setVoxelMapVersion(version => version + 1);
                   },
                 }
               : undefined
@@ -538,24 +666,11 @@ const Auction: React.FC<AuctionProps> = props => {
 
     if (viewMode === 'ascii' && currentNounSeed) {
       return (
-        <div style={{ position: 'absolute', inset: 0 }}>
-          <Suspense
-            fallback={
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.8rem',
-                  color: '#94a3b8',
-                }}
-              >
-                Loading 3D...
-              </div>
-            }
-          >
+        <div
+          className={classes.heroAscii}
+          style={{ pointerEvents: imageInteractive ? 'auto' : 'none' }}
+        >
+          <Suspense fallback={<div className={classes.heroLoading}>Loading ASCII...</div>}>
             <AsciiNounCanvas seed={currentNounSeed} />
           </Suspense>
         </div>
@@ -564,711 +679,576 @@ const Auction: React.FC<AuctionProps> = props => {
 
     if (activeDerivative) {
       return (
-        <PanZoomImage src={activeDerivative.image} alt={`${activeDerivative.name} derivative`} />
+        <PanZoomImage
+          ref={panZoomRef}
+          src={activeDerivative.image}
+          alt={`${activeDerivative.name} derivative`}
+          interactive={imageInteractive}
+        />
       );
     }
 
-    if (activeLink && activeLink.ogImage) {
-      return <PanZoomImage src={activeLink.ogImage} alt={activeLink.ogTitle || activeLink.url} />;
+    if (activeLink?.ogImage) {
+      return (
+        <PanZoomImage
+          ref={panZoomRef}
+          src={activeLink.ogImage}
+          alt={activeLink.ogTitle || activeLink.url}
+          interactive={imageInteractive}
+        />
+      );
     }
 
-    // Default: 2D pixel SVG
+    if (viewMode === 'edit-2d' && liveDrafts?.pixel?.image) {
+      return (
+        <PanZoomImage
+          ref={panZoomRef}
+          src={liveDrafts.pixel.image}
+          alt={`Live 2D edit for Noun ${currentNounId}`}
+          pixelated
+          interactive={imageInteractive}
+        />
+      );
+    }
+
     if (nounSvg) {
-      return <PanZoomImage src={nounSvg} alt={`Noun ${currentAuction?.nounId}`} pixelated />;
+      return (
+        <PanZoomImage
+          ref={panZoomRef}
+          src={nounSvg}
+          alt={`Noun ${currentAuction?.nounId}`}
+          pixelated
+          interactive={imageInteractive}
+        />
+      );
     }
 
     return (
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <div className={classes.heroLoading}>
         <LoadingNoun />
       </div>
     );
   };
 
-  // ─── Derivative info badge ─────────────────────────────────────────────
+  const renderInfoCard = () => {
+    if (activeDerivative) {
+      return (
+        <div className={classes.metaCard}>
+          <div className={classes.metaHeader}>
+            <div>
+              <p className={classes.metaEyebrow}>Derivative</p>
+              <h3 className={classes.metaTitle}>{activeDerivative.name}</h3>
+              <p className={classes.metaBody}>
+                Added {new Date(activeDerivative.createdAt).toLocaleDateString('en-US')}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={classes.metaIconBtn}
+              onClick={() => {
+                setEditingAuctionUrl(!editingAuctionUrl);
+                setAuctionUrlDraft(activeDerivative.auctionUrl || '');
+              }}
+              title="Edit auction link"
+            >
+              ✎
+            </button>
+          </div>
 
-  const derivativeBadge = activeDerivative && (
-    <div className={classes.heroBadge}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>
-          by {activeDerivative.name} ·{' '}
-          {new Date(activeDerivative.createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-          })}
-        </span>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {activeDerivative.tokenId !== undefined && (
+            <DerivativeAuction tokenId={activeDerivative.tokenId} />
+          )}
+
           {activeDerivative.tokenId === undefined && (
-            <>
+            <div className={classes.metaActions}>
               {activeDerivative.auctionUrl && (
                 <a
                   href={activeDerivative.auctionUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={classes.bidBtn}
+                  className={classes.metaPrimaryBtn}
                 >
-                  BID
+                  Open Auction
                 </a>
               )}
               {hasDerivativesContract && !listingForAuction && (
                 <button
-                  className={classes.bidBtn}
+                  type="button"
+                  className={classes.metaAccentBtn}
                   onClick={() => setListingForAuction(true)}
-                  style={{ background: '#fbbf24', color: '#000' }}
                 >
-                  LIST
+                  Start Derivative Auction
                 </button>
               )}
-            </>
+            </div>
           )}
-          <button
-            className={classes.editBtn}
-            onClick={() => {
-              setEditingAuctionUrl(!editingAuctionUrl);
-              setAuctionUrlDraft(activeDerivative.auctionUrl || '');
-            }}
-            title="Edit auction link"
-          >
-            ✎
-          </button>
-        </div>
-      </div>
 
-      {activeDerivative.tokenId !== undefined && (
-        <DerivativeAuction tokenId={activeDerivative.tokenId} />
-      )}
+          {listingForAuction && activeDerivative.tokenId === undefined && (
+            <div className={classes.inlineActionRow}>
+              <span className={classes.inlineLabel}>
+                {listingStep === 'pinning'
+                  ? 'Pinning to IPFS...'
+                  : listingStep === 'minting'
+                    ? 'Confirm in wallet...'
+                    : 'Reserve'}
+              </span>
+              {listingStep === 'idle' ? (
+                <>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    value={reservePriceDraft}
+                    onChange={e => setReservePriceDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleListForAuction(activeDerivative);
+                      if (e.key === 'Escape') setListingForAuction(false);
+                    }}
+                    className={classes.inlineInput}
+                  />
+                  <button
+                    type="button"
+                    className={classes.metaPrimaryBtn}
+                    onClick={() => handleListForAuction(activeDerivative)}
+                  >
+                    Go
+                  </button>
+                  <button
+                    type="button"
+                    className={classes.metaGhostBtn}
+                    onClick={() => setListingForAuction(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <span className={classes.metaBody}>
+                  {mintPending ? 'Waiting for confirmation...' : 'Almost there...'}
+                </span>
+              )}
+            </div>
+          )}
 
-      {listingForAuction && activeDerivative.tokenId === undefined && (
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span
-            style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}
-          >
-            {listingStep === 'pinning'
-              ? 'Pinning to IPFS...'
-              : listingStep === 'minting'
-                ? 'Confirm in wallet...'
-                : 'Reserve:'}
-          </span>
-          {listingStep === 'idle' && (
-            <>
+          {editingAuctionUrl && (
+            <div className={classes.inlineActionRow}>
               <input
-                type="number"
-                step="0.001"
-                min="0.001"
-                value={reservePriceDraft}
-                onChange={e => setReservePriceDraft(e.target.value)}
+                type="url"
+                placeholder="Paste auction URL..."
+                value={auctionUrlDraft}
+                onChange={e => setAuctionUrlDraft(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') handleListForAuction(activeDerivative);
-                  if (e.key === 'Escape') setListingForAuction(false);
+                  if (e.key === 'Enter') {
+                    handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim());
+                  }
+                  if (e.key === 'Escape') setEditingAuctionUrl(false);
                 }}
-                autoFocus
                 className={classes.inlineInput}
-                style={{ width: 70 }}
               />
-              <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)' }}>ETH</span>
               <button
-                className={classes.editSaveBtn}
-                onClick={() => handleListForAuction(activeDerivative)}
+                type="button"
+                className={classes.metaPrimaryBtn}
+                onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}
               >
-                ✓
+                Save
               </button>
-              <button
-                className={classes.editBtn}
-                onClick={() => setListingForAuction(false)}
-                style={{ fontSize: '0.55rem' }}
-              >
-                ×
-              </button>
-            </>
-          )}
-          {(listingStep === 'pinning' || listingStep === 'minting') && (
-            <span
-              style={{
-                fontSize: '0.5rem',
-                color: '#fbbf24',
-                animation: 'pulse 1.5s ease-in-out infinite',
-              }}
-            >
-              {mintPending ? 'Waiting for confirmation...' : ''}
-            </span>
+            </div>
           )}
         </div>
-      )}
+      );
+    }
 
-      {editingAuctionUrl && (
-        <div style={{ display: 'flex', gap: 4 }}>
-          <input
-            type="url"
-            placeholder="Paste auction URL…"
-            value={auctionUrlDraft}
-            onChange={e => setAuctionUrlDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter')
-                handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim());
-              if (e.key === 'Escape') setEditingAuctionUrl(false);
-            }}
-            autoFocus
-            className={classes.inlineInput}
-            style={{ flex: 1 }}
-          />
-          <button
-            className={classes.editSaveBtn}
-            onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}
-          >
-            ✓
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  // ─── Link info badge ───────────────────────────────────────────────────
-
-  const linkBadge = activeLink && (
-    <div className={classes.heroBadge}>
-      <a
-        href={activeLink.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          color: '#fff',
-          textDecoration: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <span style={{ fontWeight: 700 }}>
-          {activeLink.ogTitle || new URL(activeLink.url).hostname}
-        </span>
-        <span style={{ fontSize: '0.5rem', opacity: 0.6 }}>↗</span>
-      </a>
-    </div>
-  );
-
-  // ─── + menu (add art or add link) ──────────────────────────────────────
-
-  const isAddMode = viewMode === 'add-derivative' || viewMode === 'add-link';
-
-  // ─── Toggle pill ───────────────────────────────────────────────────────
-
-  const togglePill = (
-    <div
-      className={`${classes.sketchToggle} ${classes.heroToggle}`}
-      onPointerDown={e => e.stopPropagation()}
-      onPointerUp={e => e.stopPropagation()}
-      onMouseDown={e => e.stopPropagation()}
-      onMouseUp={e => e.stopPropagation()}
-      onClick={e => e.stopPropagation()}
-    >
-      <button
-        className={`${classes.toggleBtn} ${viewMode === 'real' ? classes.toggleActive : ''}`}
-        onClick={() => setViewMode('real')}
-      >
-        Real
-      </button>
-      <button
-        className={`${classes.toggleBtn} ${viewMode === '3d' ? classes.toggleActive : ''}`}
-        onClick={() => setViewMode('3d')}
-      >
-        3D
-      </button>
-      <button
-        className={`${classes.toggleBtn} ${viewMode === 'ascii' ? classes.toggleActive : ''}`}
-        onClick={() => setViewMode('ascii')}
-      >
-        ASCII
-      </button>
-      <button
-        className={`${classes.toggleBtn} ${classes.editToggleBtn}`}
-        onClick={() => setIsEditing(true)}
-        title="Edit Noun (E)"
-      >
-        ✏
-      </button>
-
-      {derivatives.map(d => (
-        <button
-          key={d.id}
-          className={`${classes.toggleBtn} ${classes.derivativeBtn} ${viewMode === `deriv-${d.id}` ? classes.toggleActive : ''}`}
-          onClick={() => setViewMode(`deriv-${d.id}`)}
-          title={`${d.name} · ${new Date(d.createdAt).toLocaleDateString()}`}
-        >
-          {d.name}
-        </button>
-      ))}
-
-      {nounLinks.map(l => (
-        <button
-          key={l.id}
-          className={`${classes.toggleBtn} ${classes.linkBtn} ${viewMode === `link-${l.id}` ? classes.toggleActive : ''}`}
-          onClick={() => setViewMode(`link-${l.id}`)}
-          title={l.ogTitle || l.url}
-        >
-          {l.ogTitle ? l.ogTitle.substring(0, 12) : new URL(l.url).hostname}
-        </button>
-      ))}
-
-      {/* + menu */}
-      <div style={{ position: 'relative', display: 'inline-flex' }}>
-        <button
-          className={`${classes.toggleBtn} ${classes.addBtn} ${isAddMode ? classes.toggleActive : ''}`}
-          onClick={() => setAddMenuOpen(o => !o)}
-          title="Add content"
-        >
-          + Add
-        </button>
-        {addMenuOpen && (
-          <div className={classes.addMenu}>
-            <button
-              className={classes.addMenuItem}
-              onClick={() => {
-                setViewMode('add-derivative');
-                setAddMenuOpen(false);
-              }}
+    if (activeLink) {
+      return (
+        <div className={classes.metaCard}>
+          <p className={classes.metaEyebrow}>Linked Work</p>
+          <h3 className={classes.metaTitle}>
+            {activeLink.name || activeLink.ogTitle || 'Open link'}
+          </h3>
+          <p className={classes.metaBody}>{activeLink.url}</p>
+          <div className={classes.metaActions}>
+            <a
+              href={activeLink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={classes.metaPrimaryBtn}
             >
-              Add Art
-            </button>
-            <button
-              className={classes.addMenuItem}
-              onClick={() => {
-                setAddingLink(true);
-                setAddMenuOpen(false);
-              }}
-            >
-              Add Link
-            </button>
+              Visit Link
+            </a>
           </div>
-        )}
+        </div>
+      );
+    }
+
+    if (viewMode === 'edit-2d' || editMode === '2d') {
+      return (
+        <div className={classes.metaCard}>
+          <p className={classes.metaEyebrow}>Live 2D Edit</p>
+          <h3 className={classes.metaTitle}>Community pixel remix</h3>
+          <p className={classes.metaBody}>{formatUpdateLabel(liveDrafts?.pixel?.updatedAt)}</p>
+          <div className={classes.metaActions}>
+            {!isEditing && (
+              <button
+                type="button"
+                className={classes.metaPrimaryBtn}
+                onClick={() => startEditing('2d')}
+              >
+                Jump In
+              </button>
+            )}
+            {liveSaveMode === '2d' && <span className={classes.metaSaving}>Autosaving...</span>}
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === 'edit-3d' || editMode === '3d') {
+      return (
+        <div className={classes.metaCard}>
+          <p className={classes.metaEyebrow}>Live 3D Edit</p>
+          <h3 className={classes.metaTitle}>Shared voxel build</h3>
+          <p className={classes.metaBody}>{formatUpdateLabel(liveDrafts?.voxel?.updatedAt)}</p>
+          <div className={classes.metaActions}>
+            {!isEditing && (
+              <button
+                type="button"
+                className={classes.metaPrimaryBtn}
+                onClick={() => startEditing('3d')}
+              >
+                Sculpt It
+              </button>
+            )}
+            {liveSaveMode === '3d' && <span className={classes.metaSaving}>Autosaving...</span>}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={classes.metaCard}>
+        <p className={classes.metaEyebrow}>Above The Fold</p>
+        <h3 className={classes.metaTitle}>Noun #{currentNounId}</h3>
+        <p className={classes.metaBody}>
+          Scroll first, then grab, twist, or edit when you want to take over the stage.
+        </p>
       </div>
-    </div>
-  );
+    );
+  };
 
-  // ─── Draggable activity panel ────────────────────────────────────────
-
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelDragging = useRef(false);
-  const panelOffset = useRef({ x: 0, y: 0 });
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
-
-  // Reset panel position when noun changes
-  useEffect(() => {
-    setPanelPos(null);
-  }, [currentNounId]);
-
-  const onPanelPointerDown = useCallback((e: React.PointerEvent) => {
-    // Only drag from the panel header area (first 40px)
-    const rect = panelRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    if (e.clientY - rect.top > 44) return; // only drag from top bar
-    panelDragging.current = true;
-    panelOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
-
-  const onPanelPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!panelDragging.current) return;
-    setPanelPos({
-      x: e.clientX - panelOffset.current.x,
-      y: e.clientY - panelOffset.current.y,
-    });
-  }, []);
-
-  const onPanelPointerUp = useCallback(() => {
-    panelDragging.current = false;
-  }, []);
-
-  // ─── Render ────────────────────────────────────────────────────────────
+  const statusLabel = isEditing
+    ? editMode === '3d'
+      ? 'Live 3D editing'
+      : 'Live 2D editing'
+    : interactionMode === 'grab'
+      ? 'Grab mode'
+      : interactionMode === 'twist'
+        ? 'Twist mode'
+        : 'Scroll mode';
 
   return (
     <div style={{ backgroundColor: stateBgColor }}>
       <div className={classes.heroWrapper}>
-        {/* Background artwork — mode-appropriate */}
-        <div className={classes.hero3dBg} data-hero-artwork-root="true">
-          {renderHeroBackground()}
-        </div>
-
-        {/* Cinematic 3D intro overlay — spins then fades out */}
-        {showIntro && currentNounSeed && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 10,
-              opacity: introOpacity,
-              transition: 'opacity 1s ease-out',
-              pointerEvents: 'none',
-            }}
-          >
-            <NounParallax seed={currentNounSeed} fullscreen autoSpin />
-          </div>
-        )}
-
-        {/* Prev/Next noun arrows */}
-        {hasAuctionBounds && !isEditing && (
-          <>
-            {BigInt(currentAuction.nounId) > 0n && (
-              <button
-                type="button"
-                onClick={prevAuctionHandler}
-                style={{
-                  position: 'absolute',
-                  left: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  zIndex: 20,
-                  background: 'rgba(255,255,255,0.15)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '50%',
-                  width: 44,
-                  height: 44,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 20,
-                  color: '#333',
-                  transition: 'background 0.15s',
-                }}
-                title="Previous Noun"
-              >
-                &#8249;
-              </button>
-            )}
-            {BigInt(currentAuction.nounId) < BigInt(lastNounId) && (
-              <button
-                type="button"
-                onClick={nextAuctionHandler}
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  zIndex: 20,
-                  background: 'rgba(255,255,255,0.15)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '50%',
-                  width: 44,
-                  height: 44,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 20,
-                  color: '#333',
-                  transition: 'background 0.15s',
-                }}
-                title="Next Noun"
-              >
-                &#8250;
-              </button>
-            )}
-          </>
-        )}
-
-        {/* Hidden: fires onLoadSeed for bg color + seed */}
-        {currentAuction && (
-          <div
-            style={{
-              position: 'absolute',
-              width: 0,
-              height: 0,
-              overflow: 'hidden',
-              pointerEvents: 'none',
-            }}
-          >
-            <StandaloneNounWithSeed
-              nounId={BigInt(currentAuction.nounId)}
-              onLoadSeed={loadedNounHandler}
-              shouldLinkToProfile={false}
-            />
-          </div>
-        )}
-
-        {/* Prompt bar */}
-        <div className={classes.heroPromptBar} onPointerDown={e => e.stopPropagation()}>
-          <Container fluid="xl">
-            <HomePrompt />
-          </Container>
-        </div>
-
-        {/* Draggable frosted glass activity panel — hidden while editing */}
-        {!isEditing && (
-          <div
-            ref={panelRef}
-            className={classes.glassPanel}
-            style={panelPos ? { left: panelPos.x, top: panelPos.y } : undefined}
-            onPointerDown={e => {
-              e.stopPropagation();
-              onPanelPointerDown(e);
-            }}
-            onPointerMove={onPanelPointerMove}
-            onPointerUp={onPanelPointerUp}
-            onPointerCancel={onPanelPointerUp}
-          >
-            <div className={classes.glassPanelDragBar}>
-              <div className={classes.glassPanelGrip} />
+        <div className={classes.heroShell}>
+          {currentAuction && (
+            <div className={classes.hiddenSeedLoader}>
+              <StandaloneNounWithSeed
+                nounId={BigInt(currentAuction.nounId)}
+                onLoadSeed={loadedNounHandler}
+                shouldLinkToProfile={false}
+              />
             </div>
-            {currentAuction ? activityContent : <LoadingNoun />}
+          )}
+
+          <div className={classes.heroPromptBar}>
+            <HomePrompt />
           </div>
-        )}
 
-        {/* Derivative / Link info badge — bottom-left */}
-        {derivativeBadge}
-        {linkBadge}
-
-        {/* Upload form overlay */}
-        {viewMode === 'add-derivative' && (
-          <div className={classes.heroFormOverlay}>
-            <Suspense
-              fallback={
-                <div
-                  style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}
-                >
-                  Loading...
-                </div>
-              }
-            >
-              <DerivativeUploadForm nounId={currentNounId} onUploaded={handleDerivativeUploaded} />
-            </Suspense>
-          </div>
-        )}
-
-        {/* Add link form overlay */}
-        {addingLink && (
-          <div className={classes.heroFormOverlay}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span
-                style={{
-                  fontFamily: "'PT Root UI', sans-serif",
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  color: 'rgba(0,0,0,0.7)',
+          <div
+            className={classes.heroTabs}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
+            {[
+              ['real', 'Real'],
+              ['3d', '3D'],
+              ['ascii', 'ASCII'],
+              ['edit-2d', '2D Edit'],
+              ['edit-3d', '3D Edit'],
+            ].map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
+                onClick={() => {
+                  if (isEditing) stopEditing();
+                  setViewMode(value as HeroViewMode);
+                  if (value === 'edit-3d' && interactionMode === 'scroll') {
+                    setInteractionMode('grab');
+                  }
                 }}
               >
-                Add a link for Noun {currentNounId}
-              </span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={linkUrlDraft}
-                  onChange={e => setLinkUrlDraft(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleAddLink();
-                    if (e.key === 'Escape') setAddingLink(false);
-                  }}
-                  autoFocus
-                  className={classes.inlineInput}
-                  style={{
-                    flex: 1,
-                    background: 'rgba(0,0,0,0.05)',
-                    color: '#14141f',
-                    border: '1px solid rgba(0,0,0,0.15)',
-                  }}
-                />
+                {label}
+              </button>
+            ))}
+
+            {derivatives.map(derivative => (
+              <button
+                type="button"
+                key={derivative.id}
+                className={`${classes.tabBtn} ${classes.derivativeTab} ${viewMode === `deriv-${derivative.id}` ? classes.tabActive : ''}`}
+                onClick={() => {
+                  if (isEditing) stopEditing();
+                  setViewMode(`deriv-${derivative.id}`);
+                }}
+                title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
+              >
+                {derivative.name}
+              </button>
+            ))}
+
+            {nounLinks.map(link => (
+              <button
+                type="button"
+                key={link.id}
+                className={`${classes.tabBtn} ${classes.linkTab} ${viewMode === `link-${link.id}` ? classes.tabActive : ''}`}
+                onClick={() => {
+                  if (isEditing) stopEditing();
+                  setViewMode(`link-${link.id}`);
+                }}
+                title={link.ogTitle || link.url}
+              >
+                {link.name || link.ogTitle?.slice(0, 14) || new URL(link.url).hostname}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              className={`${classes.tabBtn} ${classes.addTab}`}
+              onClick={() => {
+                if (isEditing) stopEditing();
+                setComposerOpen(true);
+                setComposerMode('art');
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          <div className={classes.heroMain}>
+            <section className={classes.heroStage}>
+              <div className={classes.heroArtFrame} data-hero-artwork-root="true">
+                {renderHeroArtwork()}
+              </div>
+
+              {!isEditing && (
+                <div className={classes.heroControlRail}>
+                  <button
+                    type="button"
+                    className={`${classes.railBtn} ${interactionMode === 'scroll' ? classes.railBtnActive : ''}`}
+                    onClick={() => {
+                      setInteractionMode('scroll');
+                      setPlayIntroSpin(false);
+                    }}
+                    title="Default scroll mode"
+                  >
+                    <span className={classes.railIcon}>✋</span>
+                    <span className={classes.railLabel}>Scroll</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${classes.railBtn} ${interactionMode === 'grab' ? classes.railBtnActive : ''}`}
+                    onClick={() => setInteractionMode('grab')}
+                    title="Grab and inspect"
+                  >
+                    <span className={classes.railIcon}>🖐</span>
+                    <span className={classes.railLabel}>Grab</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${classes.railBtn} ${interactionMode === 'twist' ? classes.railBtnActive : ''}`}
+                    onClick={() => setInteractionMode('twist')}
+                    title="Let it spin"
+                  >
+                    <span className={classes.railIcon}>🌀</span>
+                    <span className={classes.railLabel}>Twist</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={classes.railBtn}
+                    onClick={() =>
+                      startEditing(viewMode === 'real' || viewMode === 'edit-2d' ? '2d' : '3d')
+                    }
+                    title="Live edit"
+                  >
+                    <span className={classes.railIcon}>✎</span>
+                    <span className={classes.railLabel}>Edit</span>
+                  </button>
+                </div>
+              )}
+
+              <div className={classes.stageStatus}>{statusLabel}</div>
+
+              {!isEditing && (
+                <>
+                  {hasAuctionBounds && BigInt(currentAuction.nounId) > 0n && (
+                    <button
+                      type="button"
+                      onClick={prevAuctionHandler}
+                      className={`${classes.navArrow} ${classes.navArrowLeft}`}
+                      title="Previous Noun"
+                    >
+                      &#8249;
+                    </button>
+                  )}
+                  {hasAuctionBounds && BigInt(currentAuction.nounId) < BigInt(lastNounId) && (
+                    <button
+                      type="button"
+                      onClick={nextAuctionHandler}
+                      className={`${classes.navArrow} ${classes.navArrowRight}`}
+                      title="Next Noun"
+                    >
+                      &#8250;
+                    </button>
+                  )}
+                </>
+              )}
+
+              {!isEditing && viewMode === 'edit-2d' && !liveDrafts?.pixel?.image && (
+                <div className={classes.emptyDraftNotice}>
+                  No live 2D edit yet. Hit edit and your version becomes the tab everyone sees.
+                </div>
+              )}
+
+              {!isEditing && viewMode === 'edit-3d' && !liveDrafts?.voxel?.voxelData && (
+                <div className={classes.emptyDraftNotice}>
+                  No live 3D edit yet. Spin in, sculpt it, and the page updates for everyone.
+                </div>
+              )}
+
+              {editMode === '2d' && currentNounSeed && (
+                <Suspense fallback={null}>
+                  <InlineEditor
+                    seed={currentNounSeed}
+                    nounSvg={nounSvg}
+                    onExit={stopEditing}
+                    toolRef={editorToolRef}
+                    externalPixels={edit2dHistory.present}
+                    externalDispatch={edit2dDispatch}
+                    externalPast={edit2dHistory.past}
+                    externalFuture={edit2dHistory.future}
+                  />
+                </Suspense>
+              )}
+
+              {editMode === '3d' && currentNounSeed && (
+                <Suspense fallback={null}>
+                  <InlineEditor
+                    seed={currentNounSeed}
+                    nounSvg={null}
+                    panelsOnly
+                    externalPixels={edit3dHistory.present}
+                    externalDispatch={edit3dDispatch}
+                    externalPast={edit3dHistory.past}
+                    externalFuture={edit3dHistory.future}
+                    voxelDepth={edit3dVoxelDepth}
+                    onVoxelDepthChange={setEdit3dVoxelDepth}
+                    onExit={stopEditing}
+                    toolRef={editorToolRef}
+                  />
+                </Suspense>
+              )}
+            </section>
+
+            <aside className={classes.heroSidebar}>
+              {renderInfoCard()}
+              <div className={classes.auctionCard}>
+                {currentAuction ? activityContent : <LoadingNoun />}
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        {composerOpen && (
+          <div className={classes.composerOverlay} onClick={() => setComposerOpen(false)}>
+            <div className={classes.composerCard} onClick={e => e.stopPropagation()}>
+              <div className={classes.composerTabs}>
                 <button
-                  onClick={handleAddLink}
-                  disabled={linkSubmitting || !linkUrlDraft.trim()}
-                  style={{
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '6px 14px',
-                    background: '#14141f',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    fontFamily: "'PT Root UI', sans-serif",
-                    opacity: linkSubmitting ? 0.5 : 1,
-                  }}
+                  type="button"
+                  className={`${classes.composerTabBtn} ${composerMode === 'art' ? classes.composerTabActive : ''}`}
+                  onClick={() => setComposerMode('art')}
                 >
-                  {linkSubmitting ? '...' : 'Add'}
+                  Add Art
                 </button>
                 <button
-                  onClick={() => setAddingLink(false)}
-                  style={{
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '6px 10px',
-                    background: 'rgba(0,0,0,0.1)',
-                    color: '#14141f',
-                    cursor: 'pointer',
-                    fontSize: '0.65rem',
-                    fontFamily: "'PT Root UI', sans-serif",
-                  }}
+                  type="button"
+                  className={`${classes.composerTabBtn} ${composerMode === 'link' ? classes.composerTabActive : ''}`}
+                  onClick={() => setComposerMode('link')}
                 >
-                  Cancel
+                  Add Link
                 </button>
               </div>
+
+              {composerMode === 'art' ? (
+                <Suspense fallback={<div className={classes.heroLoading}>Loading form...</div>}>
+                  <DerivativeUploadForm
+                    nounId={currentNounId}
+                    onUploaded={handleDerivativeUploaded}
+                  />
+                </Suspense>
+              ) : (
+                <div className={classes.linkComposer}>
+                  <div>
+                    <p className={classes.metaEyebrow}>Add Link</p>
+                    <h3 className={classes.metaTitle}>Claim a pill on today&apos;s noun</h3>
+                    <p className={classes.metaBody}>
+                      Add your name and a link, then the tab shows up for everyone on this day.
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Your name"
+                    value={linkNameDraft}
+                    onChange={e => setLinkNameDraft(e.target.value)}
+                    className={classes.composerInput}
+                    maxLength={40}
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={linkUrlDraft}
+                    onChange={e => setLinkUrlDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddLink();
+                      if (e.key === 'Escape') setComposerOpen(false);
+                    }}
+                    className={classes.composerInput}
+                  />
+                  <div className={classes.composerActions}>
+                    <button
+                      type="button"
+                      className={classes.metaGhostBtn}
+                      onClick={() => setComposerOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={classes.metaPrimaryBtn}
+                      onClick={handleAddLink}
+                      disabled={linkSubmitting || !linkNameDraft.trim() || !linkUrlDraft.trim()}
+                    >
+                      {linkSubmitting ? 'Adding...' : 'Add Link'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Toggle pill — hidden while editing */}
-        {!isEditing && togglePill}
-
-        {/* Inline pixel editor — only in 2D mode (3D uses NounParallax EditableScene) */}
-        {isEditing && viewMode !== '3d' && currentNounSeed && (
-          <Suspense fallback={null}>
-            <InlineEditor
-              seed={currentNounSeed}
-              nounSvg={nounSvg}
-              onExit={() => setIsEditing(false)}
-              toolRef={editorToolRef}
-              onSave={(_, thumbnail) => {
-                openDerivativeSaveModal('pixel', thumbnail, `Noun ${currentNounId} edit`);
-              }}
-            />
-          </Suspense>
-        )}
-
-        {/* 3D edit mode: full tool panels (3D canvas handles voxels via EditableScene) */}
-        {isEditing && viewMode === '3d' && currentNounSeed && (
-          <Suspense fallback={null}>
-            <InlineEditor
-              seed={currentNounSeed}
-              nounSvg={null}
-              panelsOnly
-              externalPixels={edit3dHistory.present}
-              externalDispatch={edit3dDispatch}
-              externalPast={edit3dHistory.past}
-              externalFuture={edit3dHistory.future}
-              voxelDepth={edit3dVoxelDepth}
-              onVoxelDepthChange={setEdit3dVoxelDepth}
-              onExit={() => setIsEditing(false)}
-              toolRef={editorToolRef}
-              onSave={() => {
-                const canvas = document.querySelector(
-                  '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
-                ) as HTMLCanvasElement | null;
-                const image = canvas?.toDataURL('image/jpeg', 0.88) ?? '';
-                openDerivativeSaveModal('voxel', image, `Noun ${currentNounId} voxel`);
-              }}
-            />
-          </Suspense>
-        )}
-
-        {/* Keyboard shortcuts help */}
         {showHelp && (
           <Suspense fallback={null}>
             <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />
           </Suspense>
-        )}
-
-        {/* Derivative save modal */}
-        {showDerivativeSaveModal && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9999,
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onClick={resetDerivativeSaveModal}
-          >
-            <div
-              style={{
-                background: '#1a1a2e',
-                borderRadius: 12,
-                padding: 24,
-                width: 340,
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <h3 style={{ margin: '0 0 16px', color: '#fff', fontSize: 16 }}>
-                Save {derivativeSaveMode === 'voxel' ? '3D' : '2D'} Derivative
-              </h3>
-              <input
-                type="text"
-                placeholder="Artist / title (required)"
-                value={derivativeSaveName}
-                onChange={e => setDerivativeSaveName(e.target.value)}
-                maxLength={30}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  background: '#0d0d1a',
-                  color: '#fff',
-                  fontSize: 14,
-                  marginBottom: 8,
-                  boxSizing: 'border-box',
-                }}
-                autoFocus
-              />
-              <input
-                type="url"
-                placeholder="Link (optional — site, social, auction)"
-                value={derivativeSaveLink}
-                onChange={e => setDerivativeSaveLink(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  background: '#0d0d1a',
-                  color: '#fff',
-                  fontSize: 14,
-                  marginBottom: 16,
-                  boxSizing: 'border-box',
-                }}
-              />
-              {derivativeSaveError && (
-                <div style={{ color: '#fca5a5', fontSize: 12, marginBottom: 12 }}>
-                  {derivativeSaveError}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={resetDerivativeSaveModal}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 6,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'transparent',
-                    color: '#999',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={derivativeSavePending || !derivativeSaveName.trim()}
-                  onClick={handleSaveDerivative}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: derivativeSaveName.trim() ? '#4ade80' : '#333',
-                    color: derivativeSaveName.trim() ? '#000' : '#666',
-                    cursor: derivativeSaveName.trim() ? 'pointer' : 'not-allowed',
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  {derivativeSavePending ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

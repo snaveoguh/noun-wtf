@@ -4,6 +4,7 @@ interface NounLink {
   id: string;
   nounId: number;
   url: string;
+  name?: string;
   ogImage?: string;
   ogTitle?: string;
   createdAt: string;
@@ -32,13 +33,15 @@ async function scrapeOG(url: string): Promise<{ ogImage?: string; ogTitle?: stri
     const html = await res.text();
 
     // Extract og:image
-    const imageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const imageMatch =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
 
     // Extract og:title (fallback to <title>)
-    const titleMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
-      || html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const titleMatch =
+      html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i) ||
+      html.match(/<title[^>]*>([^<]+)<\/title>/i);
 
     return {
       ogImage: imageMatch?.[1] || undefined,
@@ -77,14 +80,23 @@ export default async function handler(req: Request) {
 
   // ── POST: add a link ────────────────────────────────────────────────
   if (req.method === 'POST') {
-    const body = await req.json() as { nounId?: number; url?: string };
+    const body = (await req.json()) as { nounId?: number; url?: string; name?: string };
     if (!body.nounId || !body.url) {
-      return new Response(JSON.stringify({ error: 'nounId and url required' }), { status: 400, headers });
+      return new Response(JSON.stringify({ error: 'nounId and url required' }), {
+        status: 400,
+        headers,
+      });
     }
 
     // Validate URL
-    try { new URL(body.url); } catch {
+    try {
+      new URL(body.url);
+    } catch {
       return new Response(JSON.stringify({ error: 'Invalid URL' }), { status: 400, headers });
+    }
+    const trimmedName = body.name?.trim();
+    if (trimmedName && trimmedName.length > 60) {
+      return new Response(JSON.stringify({ error: 'Name too long' }), { status: 400, headers });
     }
 
     // Scrape OG metadata
@@ -94,6 +106,7 @@ export default async function handler(req: Request) {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       nounId: body.nounId,
       url: body.url,
+      ...(trimmedName ? { name: trimmedName } : {}),
       ogImage: og.ogImage,
       ogTitle: og.ogTitle,
       createdAt: new Date().toISOString(),
@@ -110,7 +123,8 @@ export default async function handler(req: Request) {
   // ── DELETE: remove a link ───────────────────────────────────────────
   if (req.method === 'DELETE') {
     const id = url.searchParams.get('id');
-    if (!id) return new Response(JSON.stringify({ error: 'id required' }), { status: 400, headers });
+    if (!id)
+      return new Response(JSON.stringify({ error: 'id required' }), { status: 400, headers });
 
     const raw = await store.get(META_KEY);
     if (!raw) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers });

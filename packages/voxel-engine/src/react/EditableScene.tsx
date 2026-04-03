@@ -10,7 +10,7 @@ import type { Tool, VoxelMap, LayerVisibility } from '../types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { OrbitControls } from '@react-three/drei';
-import { ThreeEvent, useThree } from '@react-three/fiber';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { DEFAULT_VOXEL_DEPTH } from '../types';
@@ -19,6 +19,20 @@ import { floodFill3D, getAdjacentPos, parseKey, pixelsToSolidBlock, voxelKey } f
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
+
+type MeshMouseEvent = {
+  clientX: number;
+  clientY: number;
+  face?: THREE.Face | null;
+  object: THREE.Object3D;
+  stopPropagation: () => void;
+};
+
+type MeshPointerEvent = {
+  face?: THREE.Face | null;
+  object: THREE.Object3D;
+  stopPropagation: () => void;
+};
 
 // ─── Orbit controls (right-click to rotate) ─────────────────────────────────
 
@@ -53,8 +67,8 @@ function Voxel({
   position: [number, number, number];
   color: string;
   isHovered: boolean;
-  onClick: (e: ThreeEvent<MouseEvent>) => void;
-  onPointerOver: (e: ThreeEvent<PointerEvent>) => void;
+  onClick: (e: MeshMouseEvent) => void;
+  onPointerOver: (e: MeshPointerEvent) => void;
 }) {
   const col = useMemo(() => new THREE.Color(color), [color]);
   const highlightCol = useMemo(() => {
@@ -87,6 +101,8 @@ function GhostVoxel({ position, color }: { position: [number, number, number]; c
 export interface EditableSceneProps {
   /** 32x32 pixel grid — converted to solid block on init */
   pixels: string[][];
+  /** Optional existing voxel sculpture to resume editing from */
+  initialVoxelMap?: VoxelMap;
   activeTool: Tool;
   activeColor: string;
   onPixelChange: (x: number, y: number, color: string) => void;
@@ -103,6 +119,7 @@ export interface EditableSceneProps {
 
 export default function EditableScene({
   pixels,
+  initialVoxelMap,
   activeTool,
   activeColor,
   onPixelChange,
@@ -112,13 +129,21 @@ export default function EditableScene({
   onVoxelMapChange,
 }: EditableSceneProps) {
   // Initialize as solid block with depth
-  const [voxels, setVoxels] = useState<VoxelMap>(() => pixelsToSolidBlock(pixels, voxelDepth));
+  const [voxels, setVoxels] = useState<VoxelMap>(() =>
+    initialVoxelMap ? new Map(initialVoxelMap) : pixelsToSolidBlock(pixels, voxelDepth),
+  );
 
-  // Re-init when pixels change externally (undo/redo, layer toggle)
+  // Re-init when resuming an existing sculpture
   useEffect(() => {
-    const map = pixelsToSolidBlock(pixels, voxelDepth);
-    setVoxels(map);
-  }, [pixels, voxelDepth]);
+    if (!initialVoxelMap) return;
+    setVoxels(new Map(initialVoxelMap));
+  }, [initialVoxelMap]);
+
+  // Re-init from the flat pixel grid when there is no saved voxel map
+  useEffect(() => {
+    if (initialVoxelMap) return;
+    setVoxels(pixelsToSolidBlock(pixels, voxelDepth));
+  }, [initialVoxelMap, pixels, voxelDepth]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -158,7 +183,7 @@ export default function EditableScene({
 
   // ── Handle voxel click ──
   const handleVoxelClick = useCallback(
-    (key: string, e: ThreeEvent<MouseEvent>) => {
+    (key: string, e: MeshMouseEvent) => {
       e.stopPropagation();
       if (isDrag(e)) return;
 
@@ -233,7 +258,7 @@ export default function EditableScene({
 
   // ── Handle voxel hover ──
   const handleVoxelHover = useCallback(
-    (key: string, e: ThreeEvent<PointerEvent>) => {
+    (key: string, e: MeshPointerEvent) => {
       e.stopPropagation();
       setHoveredKey(key);
       if (activeTool === 'pencil' && activeColor) {
