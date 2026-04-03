@@ -1,40 +1,46 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 
 import { Container } from 'react-bootstrap';
 import { useNavigate } from 'react-router';
 
 import AuctionActivity from '@/components/AuctionActivity';
+import DerivativeAuction from '@/components/DerivativeAuction';
+import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
 import NounderNounContent from '@/components/NounderNounContent';
+import NounParallax from '@/components/NounParallax';
 import PanZoomImage from '@/components/PanZoomImage';
-// eslint-disable-next-line sonarjs/deprecation
-import { StandaloneNounWithSeed } from '@/components/StandaloneNoun';
+import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
+import { type Tool } from '@/components/Studio/PixelCanvas';
 import { useAppDispatch, useAppSelector } from '@/hooks';
+import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
+import { seedToPixelLayers, mergeLayersToGrid, DEFAULT_VISIBILITY } from '@/lib/nounDecoder';
+import { historyReducer, createInitialHistory } from '@/lib/pixelHistory';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import { RootState } from '@/store';
 import { nounPath } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
 import { isNounderNoun } from '@/utils/nounderNoun';
+import { useCreateDerivative, hasDerivativesContract } from '@/wrappers/nounDerivatives';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
 import { INounSeed } from '@/wrappers/nounToken';
-
-import DerivativeAuction from '@/components/DerivativeAuction';
-import HomePrompt from '@/components/HomePrompt';
-import NounParallax from '@/components/NounParallax';
-import { getNoun } from '@/components/StandaloneNoun';
-import { useCreateDerivative, hasDerivativesContract } from '@/wrappers/nounDerivatives';
-
-import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
-import { type Tool } from '@/components/Studio/PixelCanvas';
-import { historyReducer, createInitialHistory } from '@/lib/pixelHistory';
-import { seedToPixelLayers, mergeLayersToGrid, DEFAULT_VISIBILITY } from '@/lib/nounDecoder';
 
 import classes from './Auction.module.css';
 
 // Lazy-load heavy components
 const AsciiNounCanvas = React.lazy(() => import('@/components/AsciiNoun'));
 const InlineEditor = React.lazy(() => import('@/components/Auction/InlineEditor'));
-const KeyboardShortcutsHelp = React.lazy(() => import('@/components/Auction/KeyboardShortcutsHelp'));
+const KeyboardShortcutsHelp = React.lazy(
+  () => import('@/components/Auction/KeyboardShortcutsHelp'),
+);
 const DerivativeUploadForm = React.lazy(() => import('@/components/DerivativeGallery'));
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -45,6 +51,7 @@ interface Derivative {
   image: string;
   nounId?: number;
   auctionUrl?: string;
+  voxelData?: string;
   tokenId?: number;
   tokenURI?: string;
   createdAt: string;
@@ -87,8 +94,16 @@ const Auction: React.FC<AuctionProps> = props => {
   // Inline editor state
   const [isEditing, setIsEditing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const editorToolRef = useRef<{ setTool: (t: Tool) => void; undo: () => void; redo: () => void; getActiveTool: () => Tool; getActiveColor: () => string } | null>(null);
-  const panZoomRef = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void } | null>(null);
+  const editorToolRef = useRef<{
+    setTool: (t: Tool) => void;
+    undo: () => void;
+    redo: () => void;
+    getActiveTool: () => Tool;
+    getActiveColor: () => string;
+  } | null>(null);
+  const panZoomRef = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void } | null>(
+    null,
+  );
 
   // Shared 3D editor state (used when editing in 3D mode)
   const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
@@ -96,9 +111,13 @@ const Auction: React.FC<AuctionProps> = props => {
   const [edit3dColor, setEdit3dColor] = useState('#000000');
   const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
   const voxelMapRef = useRef<import('@nouns/voxel-engine').VoxelMap | null>(null);
-  const [showVoxelSaveModal, setShowVoxelSaveModal] = useState(false);
-  const [voxelSaveName, setVoxelSaveName] = useState('');
-  const [voxelSaveLink, setVoxelSaveLink] = useState('');
+  const [showDerivativeSaveModal, setShowDerivativeSaveModal] = useState(false);
+  const [derivativeSaveMode, setDerivativeSaveMode] = useState<'pixel' | 'voxel'>('pixel');
+  const [derivativeSaveName, setDerivativeSaveName] = useState('');
+  const [derivativeSaveLink, setDerivativeSaveLink] = useState('');
+  const [derivativeSaveImage, setDerivativeSaveImage] = useState('');
+  const [derivativeSavePending, setDerivativeSavePending] = useState(false);
+  const [derivativeSaveError, setDerivativeSaveError] = useState('');
 
   // Load noun pixels when entering edit mode in 3D
   useEffect(() => {
@@ -116,7 +135,12 @@ const Auction: React.FC<AuctionProps> = props => {
   const [listingForAuction, setListingForAuction] = useState(false);
   const [reservePriceDraft, setReservePriceDraft] = useState('0.01');
   const [listingStep, setListingStep] = useState<'idle' | 'pinning' | 'minting' | 'done'>('idle');
-  const { create: createDerivativeOnchain, isPending: mintPending, isSuccess: mintSuccess, receipt: mintReceipt } = useCreateDerivative();
+  const {
+    create: createDerivativeOnchain,
+    isPending: mintPending,
+    isSuccess: mintSuccess,
+    receipt: mintReceipt,
+  } = useCreateDerivative();
 
   // Per-noun links
   const [nounLinks, setNounLinks] = useState<NounLink[]>([]);
@@ -137,7 +161,9 @@ const Auction: React.FC<AuctionProps> = props => {
       if (!res.ok) return;
       const data = (await res.json()) as Derivative[];
       setDerivatives(data);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, []);
 
   const fetchLinksForNoun = useCallback(async (nId: number) => {
@@ -146,15 +172,17 @@ const Auction: React.FC<AuctionProps> = props => {
       if (!res.ok) return;
       const data = (await res.json()) as NounLink[];
       setNounLinks(data);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, []);
 
   useEffect(() => {
-    if (currentNounId > 0) {
+    if (currentAuction) {
       fetchDerivativesForNoun(currentNounId);
       fetchLinksForNoun(currentNounId);
     }
-  }, [currentNounId, fetchDerivativesForNoun, fetchLinksForNoun]);
+  }, [currentAuction, currentNounId, fetchDerivativesForNoun, fetchLinksForNoun]);
 
   // Reset view mode when noun changes
   useEffect(() => {
@@ -176,7 +204,7 @@ const Auction: React.FC<AuctionProps> = props => {
   // ─── Derivative handlers ────────────────────────────────────────────────
 
   const handleDerivativeUploaded = useCallback(() => {
-    if (currentNounId > 0) {
+    if (currentAuction) {
       fetchDerivativesForNoun(currentNounId).then(() => {
         fetch(`${DERIVATIVES_API}?nounId=${currentNounId}`)
           .then(r => r.json())
@@ -187,7 +215,86 @@ const Auction: React.FC<AuctionProps> = props => {
           .catch(() => {});
       });
     }
-  }, [currentNounId, fetchDerivativesForNoun]);
+  }, [currentAuction, currentNounId, fetchDerivativesForNoun]);
+
+  const resetDerivativeSaveModal = useCallback(() => {
+    setShowDerivativeSaveModal(false);
+    setDerivativeSaveMode('pixel');
+    setDerivativeSaveName('');
+    setDerivativeSaveLink('');
+    setDerivativeSaveImage('');
+    setDerivativeSavePending(false);
+    setDerivativeSaveError('');
+  }, []);
+
+  const openDerivativeSaveModal = useCallback(
+    (mode: 'pixel' | 'voxel', image: string, defaultName: string) => {
+      setDerivativeSaveMode(mode);
+      setDerivativeSaveImage(image);
+      setDerivativeSaveName(defaultName);
+      setDerivativeSaveLink('');
+      setDerivativeSavePending(false);
+      setDerivativeSaveError('');
+      setShowDerivativeSaveModal(true);
+    },
+    [],
+  );
+
+  const handleSaveDerivative = useCallback(async () => {
+    if (!derivativeSaveName.trim() || !currentAuction) return;
+    if (!derivativeSaveImage) {
+      setDerivativeSaveError('Could not capture the current creation. Please try again.');
+      return;
+    }
+
+    setDerivativeSavePending(true);
+    setDerivativeSaveError('');
+
+    try {
+      const voxelData =
+        derivativeSaveMode === 'voxel' && voxelMapRef.current
+          ? JSON.stringify(Object.fromEntries(voxelMapRef.current))
+          : undefined;
+
+      const res = await fetch(DERIVATIVES_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: derivativeSaveName.trim(),
+          image: derivativeSaveImage,
+          nounId: currentNounId,
+          auctionUrl: derivativeSaveLink.trim() || undefined,
+          ...(voxelData && { voxelData }),
+        }),
+      });
+
+      const data = (await res.json()) as Derivative | { error?: string };
+      if (!res.ok || !('id' in data)) {
+        setDerivativeSaveError(
+          'error' in data && data.error ? data.error : 'Failed to save derivative',
+        );
+        setDerivativeSavePending(false);
+        return;
+      }
+
+      setDerivatives(prev => [data, ...prev.filter(d => d.id !== data.id)]);
+      setViewMode(`deriv-${data.id}`);
+      setIsEditing(false);
+      resetDerivativeSaveModal();
+    } catch (err) {
+      setDerivativeSaveError(
+        err instanceof Error && err.message ? err.message : 'Failed to save derivative',
+      );
+      setDerivativeSavePending(false);
+    }
+  }, [
+    currentNounId,
+    derivativeSaveImage,
+    derivativeSaveLink,
+    derivativeSaveMode,
+    derivativeSaveName,
+    resetDerivativeSaveModal,
+  ]);
 
   const handleSaveAuctionUrl = useCallback(async (derivId: string, url: string) => {
     try {
@@ -197,32 +304,37 @@ const Auction: React.FC<AuctionProps> = props => {
         body: JSON.stringify({ id: derivId, auctionUrl: url }),
       });
       if (res.ok) {
-        setDerivatives(prev => prev.map(d =>
-          d.id === derivId ? { ...d, auctionUrl: url || undefined } : d
-        ));
+        setDerivatives(prev =>
+          prev.map(d => (d.id === derivId ? { ...d, auctionUrl: url || undefined } : d)),
+        );
         setEditingAuctionUrl(false);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, []);
 
-  const handleListForAuction = useCallback(async (deriv: Derivative) => {
-    if (!deriv.nounId) return;
-    setListingStep('pinning');
-    try {
-      const pinRes = await fetch(DERIVATIVES_API, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deriv.id }),
-      });
-      if (!pinRes.ok) throw new Error('Pin failed');
-      const { tokenURI } = (await pinRes.json()) as { tokenURI: string };
-      setListingStep('minting');
-      createDerivativeOnchain(deriv.nounId, tokenURI, reservePriceDraft);
-    } catch (err) {
-      console.error('[ListForAuction]', err);
-      setListingStep('idle');
-    }
-  }, [createDerivativeOnchain, reservePriceDraft]);
+  const handleListForAuction = useCallback(
+    async (deriv: Derivative) => {
+      if (deriv.nounId === undefined) return;
+      setListingStep('pinning');
+      try {
+        const pinRes = await fetch(DERIVATIVES_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: deriv.id }),
+        });
+        if (!pinRes.ok) throw new Error('Pin failed');
+        const { tokenURI } = (await pinRes.json()) as { tokenURI: string };
+        setListingStep('minting');
+        createDerivativeOnchain(deriv.nounId, tokenURI, reservePriceDraft);
+      } catch (err) {
+        console.error('[ListForAuction]', err);
+        setListingStep('idle');
+      }
+    },
+    [createDerivativeOnchain, reservePriceDraft],
+  );
 
   useEffect(() => {
     if (mintSuccess && mintReceipt && activeDerivative) {
@@ -233,24 +345,28 @@ const Auction: React.FC<AuctionProps> = props => {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: activeDerivative.id, tokenId }),
-        }).then(() => {
-          setDerivatives(prev => prev.map(d =>
-            d.id === activeDerivative.id ? { ...d, tokenId } : d,
-          ));
-          setListingStep('done');
-          setListingForAuction(false);
-        }).catch(() => { setListingStep('done'); });
+        })
+          .then(() => {
+            setDerivatives(prev =>
+              prev.map(d => (d.id === activeDerivative.id ? { ...d, tokenId } : d)),
+            );
+            setListingStep('done');
+            setListingForAuction(false);
+          })
+          .catch(() => {
+            setListingStep('done');
+          });
       } else {
         setListingStep('done');
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mintSuccess, mintReceipt]);
 
   // ─── Link handlers ──────────────────────────────────────────────────────
 
   const handleAddLink = useCallback(async () => {
-    if (!linkUrlDraft.trim() || currentNounId <= 0) return;
+    if (!linkUrlDraft.trim() || !currentAuction) return;
     setLinkSubmitting(true);
     try {
       const res = await fetch(NOUN_LINKS_API, {
@@ -265,9 +381,11 @@ const Auction: React.FC<AuctionProps> = props => {
         setAddingLink(false);
         setLinkUrlDraft('');
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
     setLinkSubmitting(false);
-  }, [linkUrlDraft, currentNounId]);
+  }, [currentAuction, currentNounId, linkUrlDraft]);
 
   // ─── Seed / navigation handlers ────────────────────────────────────────
 
@@ -307,7 +425,10 @@ const Auction: React.FC<AuctionProps> = props => {
     isLastAuction: currentAuction?.nounId === BigInt(lastNounId ?? 0),
     onSetViewMode: setViewMode,
     onEnterEdit: () => setIsEditing(true),
-    onExitEdit: () => { setIsEditing(false); setShowHelp(false); },
+    onExitEdit: () => {
+      setIsEditing(false);
+      setShowHelp(false);
+    },
     onZoomIn: () => panZoomRef.current?.zoomIn(),
     onZoomOut: () => panZoomRef.current?.zoomOut(),
     onResetView: () => panZoomRef.current?.reset(),
@@ -340,37 +461,47 @@ const Auction: React.FC<AuctionProps> = props => {
   });
 
   // Reset editing state on noun change
-  useEffect(() => { setIsEditing(false); setShowHelp(false); }, [currentNounId]);
+  useEffect(() => {
+    setIsEditing(false);
+    setShowHelp(false);
+  }, [currentNounId]);
 
   // Cinematic intro: 3D spin overlay — start fading at 2.2s, unmount at 3.2s
   useEffect(() => {
     if (!showIntro) return;
     const fadeTimer = setTimeout(() => setIntroOpacity(0), 2200);
     const removeTimer = setTimeout(() => setShowIntro(false), 3200);
-    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
+    };
   }, [showIntro]);
 
   // ─── Activity content ──────────────────────────────────────────────────
 
-  const activityContent = currentAuction && lastNounId && (
-    isNounderNoun(BigInt(currentAuction.nounId))
-      ? <NounderNounContent
-          mintTimestamp={BigInt(currentAuction.startTime)}
-          nounId={BigInt(currentAuction.nounId)}
-          isFirstAuction={currentAuction.nounId === 0n}
-          isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
-          onPrevAuctionClick={prevAuctionHandler}
-          onNextAuctionClick={nextAuctionHandler}
-        />
-      : <AuctionActivity
-          auction={currentAuction}
-          isFirstAuction={currentAuction.nounId === 0n}
-          isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
-          onPrevAuctionClick={prevAuctionHandler}
-          onNextAuctionClick={nextAuctionHandler}
-          displayGraphDepComps={false}
-        />
-  );
+  const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
+
+  const activityContent = hasAuctionBounds ? (
+    isNounderNoun(BigInt(currentAuction.nounId)) ? (
+      <NounderNounContent
+        mintTimestamp={BigInt(currentAuction.startTime)}
+        nounId={BigInt(currentAuction.nounId)}
+        isFirstAuction={currentAuction.nounId === 0n}
+        isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        onPrevAuctionClick={prevAuctionHandler}
+        onNextAuctionClick={nextAuctionHandler}
+      />
+    ) : (
+      <AuctionActivity
+        auction={currentAuction}
+        isFirstAuction={currentAuction.nounId === 0n}
+        isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        onPrevAuctionClick={prevAuctionHandler}
+        onNextAuctionClick={nextAuctionHandler}
+        displayGraphDepComps={false}
+      />
+    )
+  ) : null;
 
   // ─── Hero background per mode ──────────────────────────────────────────
 
@@ -381,16 +512,26 @@ const Auction: React.FC<AuctionProps> = props => {
           seed={currentNounSeed}
           interactive
           fullscreen
-          editable={isEditing ? {
-            pixels: edit3dHistory.present,
-            activeTool: editorToolRef.current?.getActiveTool() ?? edit3dTool,
-            activeColor: editorToolRef.current?.getActiveColor() ?? edit3dColor,
-            onPixelChange: (x, y, color) => edit3dDispatch({ type: 'SET_PIXEL', x, y, color }),
-            onPixelsFill: (changes) => edit3dDispatch({ type: 'SET_PIXELS', changes }),
-            onColorPick: (color) => { setEdit3dColor(color); editorToolRef.current?.setTool('pencil'); },
-            voxelDepth: edit3dVoxelDepth,
-            onVoxelMapChange: (map) => { voxelMapRef.current = map; },
-          } : undefined}
+          editable={
+            isEditing
+              ? {
+                  pixels: edit3dHistory.present,
+                  activeTool: editorToolRef.current?.getActiveTool() ?? edit3dTool,
+                  activeColor: editorToolRef.current?.getActiveColor() ?? edit3dColor,
+                  onPixelChange: (x, y, color) =>
+                    edit3dDispatch({ type: 'SET_PIXEL', x, y, color }),
+                  onPixelsFill: changes => edit3dDispatch({ type: 'SET_PIXELS', changes }),
+                  onColorPick: color => {
+                    setEdit3dColor(color);
+                    editorToolRef.current?.setTool('pencil');
+                  },
+                  voxelDepth: edit3dVoxelDepth,
+                  onVoxelMapChange: map => {
+                    voxelMapRef.current = map;
+                  },
+                }
+              : undefined
+          }
         />
       );
     }
@@ -398,11 +539,23 @@ const Auction: React.FC<AuctionProps> = props => {
     if (viewMode === 'ascii' && currentNounSeed) {
       return (
         <div style={{ position: 'absolute', inset: 0 }}>
-          <Suspense fallback={
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>
-              Loading 3D...
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.8rem',
+                  color: '#94a3b8',
+                }}
+              >
+                Loading 3D...
+              </div>
+            }
+          >
             <AsciiNounCanvas seed={currentNounSeed} />
           </Suspense>
         </div>
@@ -410,7 +563,9 @@ const Auction: React.FC<AuctionProps> = props => {
     }
 
     if (activeDerivative) {
-      return <PanZoomImage src={activeDerivative.image} alt={`${activeDerivative.name} derivative`} />;
+      return (
+        <PanZoomImage src={activeDerivative.image} alt={`${activeDerivative.name} derivative`} />
+      );
     }
 
     if (activeLink && activeLink.ogImage) {
@@ -423,7 +578,15 @@ const Auction: React.FC<AuctionProps> = props => {
     }
 
     return (
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <LoadingNoun />
       </div>
     );
@@ -435,42 +598,104 @@ const Auction: React.FC<AuctionProps> = props => {
     <div className={classes.heroBadge}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>
-          by {activeDerivative.name} · {new Date(activeDerivative.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          by {activeDerivative.name} ·{' '}
+          {new Date(activeDerivative.createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
         </span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {activeDerivative.tokenId === undefined && (
             <>
               {activeDerivative.auctionUrl && (
-                <a href={activeDerivative.auctionUrl} target="_blank" rel="noopener noreferrer" className={classes.bidBtn}>BID</a>
+                <a
+                  href={activeDerivative.auctionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={classes.bidBtn}
+                >
+                  BID
+                </a>
               )}
               {hasDerivativesContract && !listingForAuction && (
-                <button className={classes.bidBtn} onClick={() => setListingForAuction(true)} style={{ background: '#fbbf24', color: '#000' }}>LIST</button>
+                <button
+                  className={classes.bidBtn}
+                  onClick={() => setListingForAuction(true)}
+                  style={{ background: '#fbbf24', color: '#000' }}
+                >
+                  LIST
+                </button>
               )}
             </>
           )}
-          <button className={classes.editBtn} onClick={() => { setEditingAuctionUrl(!editingAuctionUrl); setAuctionUrlDraft(activeDerivative.auctionUrl || ''); }} title="Edit auction link">✎</button>
+          <button
+            className={classes.editBtn}
+            onClick={() => {
+              setEditingAuctionUrl(!editingAuctionUrl);
+              setAuctionUrlDraft(activeDerivative.auctionUrl || '');
+            }}
+            title="Edit auction link"
+          >
+            ✎
+          </button>
         </div>
       </div>
 
-      {activeDerivative.tokenId !== undefined && <DerivativeAuction tokenId={activeDerivative.tokenId} />}
+      {activeDerivative.tokenId !== undefined && (
+        <DerivativeAuction tokenId={activeDerivative.tokenId} />
+      )}
 
       {listingForAuction && activeDerivative.tokenId === undefined && (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
-            {listingStep === 'pinning' ? 'Pinning to IPFS...' : listingStep === 'minting' ? 'Confirm in wallet...' : 'Reserve:'}
+          <span
+            style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}
+          >
+            {listingStep === 'pinning'
+              ? 'Pinning to IPFS...'
+              : listingStep === 'minting'
+                ? 'Confirm in wallet...'
+                : 'Reserve:'}
           </span>
           {listingStep === 'idle' && (
             <>
-              <input type="number" step="0.001" min="0.001" value={reservePriceDraft} onChange={e => setReservePriceDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleListForAuction(activeDerivative); if (e.key === 'Escape') setListingForAuction(false); }}
-                autoFocus className={classes.inlineInput} style={{ width: 70 }} />
+              <input
+                type="number"
+                step="0.001"
+                min="0.001"
+                value={reservePriceDraft}
+                onChange={e => setReservePriceDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleListForAuction(activeDerivative);
+                  if (e.key === 'Escape') setListingForAuction(false);
+                }}
+                autoFocus
+                className={classes.inlineInput}
+                style={{ width: 70 }}
+              />
               <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)' }}>ETH</span>
-              <button className={classes.editSaveBtn} onClick={() => handleListForAuction(activeDerivative)}>✓</button>
-              <button className={classes.editBtn} onClick={() => setListingForAuction(false)} style={{ fontSize: '0.55rem' }}>×</button>
+              <button
+                className={classes.editSaveBtn}
+                onClick={() => handleListForAuction(activeDerivative)}
+              >
+                ✓
+              </button>
+              <button
+                className={classes.editBtn}
+                onClick={() => setListingForAuction(false)}
+                style={{ fontSize: '0.55rem' }}
+              >
+                ×
+              </button>
             </>
           )}
           {(listingStep === 'pinning' || listingStep === 'minting') && (
-            <span style={{ fontSize: '0.5rem', color: '#fbbf24', animation: 'pulse 1.5s ease-in-out infinite' }}>
+            <span
+              style={{
+                fontSize: '0.5rem',
+                color: '#fbbf24',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }}
+            >
               {mintPending ? 'Waiting for confirmation...' : ''}
             </span>
           )}
@@ -479,10 +704,26 @@ const Auction: React.FC<AuctionProps> = props => {
 
       {editingAuctionUrl && (
         <div style={{ display: 'flex', gap: 4 }}>
-          <input type="url" placeholder="Paste auction URL…" value={auctionUrlDraft} onChange={e => setAuctionUrlDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim()); if (e.key === 'Escape') setEditingAuctionUrl(false); }}
-            autoFocus className={classes.inlineInput} style={{ flex: 1 }} />
-          <button className={classes.editSaveBtn} onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}>✓</button>
+          <input
+            type="url"
+            placeholder="Paste auction URL…"
+            value={auctionUrlDraft}
+            onChange={e => setAuctionUrlDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter')
+                handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim());
+              if (e.key === 'Escape') setEditingAuctionUrl(false);
+            }}
+            autoFocus
+            className={classes.inlineInput}
+            style={{ flex: 1 }}
+          />
+          <button
+            className={classes.editSaveBtn}
+            onClick={() => handleSaveAuctionUrl(activeDerivative.id, auctionUrlDraft.trim())}
+          >
+            ✓
+          </button>
         </div>
       )}
     </div>
@@ -492,8 +733,21 @@ const Auction: React.FC<AuctionProps> = props => {
 
   const linkBadge = activeLink && (
     <div className={classes.heroBadge}>
-      <a href={activeLink.url} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontWeight: 700 }}>{activeLink.ogTitle || new URL(activeLink.url).hostname}</span>
+      <a
+        href={activeLink.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: '#fff',
+          textDecoration: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <span style={{ fontWeight: 700 }}>
+          {activeLink.ogTitle || new URL(activeLink.url).hostname}
+        </span>
         <span style={{ fontSize: '0.5rem', opacity: 0.6 }}>↗</span>
       </a>
     </div>
@@ -506,26 +760,60 @@ const Auction: React.FC<AuctionProps> = props => {
   // ─── Toggle pill ───────────────────────────────────────────────────────
 
   const togglePill = (
-    <div className={`${classes.sketchToggle} ${classes.heroToggle}`} onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-      <button className={`${classes.toggleBtn} ${viewMode === 'real' ? classes.toggleActive : ''}`} onClick={() => setViewMode('real')}>Real</button>
-      <button className={`${classes.toggleBtn} ${viewMode === '3d' ? classes.toggleActive : ''}`} onClick={() => setViewMode('3d')}>3D</button>
-      <button className={`${classes.toggleBtn} ${viewMode === 'ascii' ? classes.toggleActive : ''}`} onClick={() => setViewMode('ascii')}>ASCII</button>
-      <button className={`${classes.toggleBtn} ${classes.editToggleBtn}`} onClick={() => setIsEditing(true)} title="Edit Noun (E)">✏</button>
+    <div
+      className={`${classes.sketchToggle} ${classes.heroToggle}`}
+      onPointerDown={e => e.stopPropagation()}
+      onPointerUp={e => e.stopPropagation()}
+      onMouseDown={e => e.stopPropagation()}
+      onMouseUp={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
+    >
+      <button
+        className={`${classes.toggleBtn} ${viewMode === 'real' ? classes.toggleActive : ''}`}
+        onClick={() => setViewMode('real')}
+      >
+        Real
+      </button>
+      <button
+        className={`${classes.toggleBtn} ${viewMode === '3d' ? classes.toggleActive : ''}`}
+        onClick={() => setViewMode('3d')}
+      >
+        3D
+      </button>
+      <button
+        className={`${classes.toggleBtn} ${viewMode === 'ascii' ? classes.toggleActive : ''}`}
+        onClick={() => setViewMode('ascii')}
+      >
+        ASCII
+      </button>
+      <button
+        className={`${classes.toggleBtn} ${classes.editToggleBtn}`}
+        onClick={() => setIsEditing(true)}
+        title="Edit Noun (E)"
+      >
+        ✏
+      </button>
 
       {derivatives.map(d => (
-        <button key={d.id}
+        <button
+          key={d.id}
           className={`${classes.toggleBtn} ${classes.derivativeBtn} ${viewMode === `deriv-${d.id}` ? classes.toggleActive : ''}`}
           onClick={() => setViewMode(`deriv-${d.id}`)}
           title={`${d.name} · ${new Date(d.createdAt).toLocaleDateString()}`}
-        >{d.name}</button>
+        >
+          {d.name}
+        </button>
       ))}
 
       {nounLinks.map(l => (
-        <button key={l.id}
+        <button
+          key={l.id}
           className={`${classes.toggleBtn} ${classes.linkBtn} ${viewMode === `link-${l.id}` ? classes.toggleActive : ''}`}
           onClick={() => setViewMode(`link-${l.id}`)}
           title={l.ogTitle || l.url}
-        >{l.ogTitle ? l.ogTitle.substring(0, 12) : new URL(l.url).hostname}</button>
+        >
+          {l.ogTitle ? l.ogTitle.substring(0, 12) : new URL(l.url).hostname}
+        </button>
       ))}
 
       {/* + menu */}
@@ -534,11 +822,29 @@ const Auction: React.FC<AuctionProps> = props => {
           className={`${classes.toggleBtn} ${classes.addBtn} ${isAddMode ? classes.toggleActive : ''}`}
           onClick={() => setAddMenuOpen(o => !o)}
           title="Add content"
-        >+</button>
+        >
+          + Add
+        </button>
         {addMenuOpen && (
           <div className={classes.addMenu}>
-            <button className={classes.addMenuItem} onClick={() => { setViewMode('add-derivative'); setAddMenuOpen(false); }}>Add Art</button>
-            <button className={classes.addMenuItem} onClick={() => { setAddingLink(true); setAddMenuOpen(false); }}>Add Link</button>
+            <button
+              className={classes.addMenuItem}
+              onClick={() => {
+                setViewMode('add-derivative');
+                setAddMenuOpen(false);
+              }}
+            >
+              Add Art
+            </button>
+            <button
+              className={classes.addMenuItem}
+              onClick={() => {
+                setAddingLink(true);
+                setAddMenuOpen(false);
+              }}
+            >
+              Add Link
+            </button>
           </div>
         )}
       </div>
@@ -553,7 +859,9 @@ const Auction: React.FC<AuctionProps> = props => {
   const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
 
   // Reset panel position when noun changes
-  useEffect(() => { setPanelPos(null); }, [currentNounId]);
+  useEffect(() => {
+    setPanelPos(null);
+  }, [currentNounId]);
 
   const onPanelPointerDown = useCallback((e: React.PointerEvent) => {
     // Only drag from the panel header area (first 40px)
@@ -583,62 +891,101 @@ const Auction: React.FC<AuctionProps> = props => {
     <div style={{ backgroundColor: stateBgColor }}>
       <div className={classes.heroWrapper}>
         {/* Background artwork — mode-appropriate */}
-        <div className={classes.hero3dBg}>
+        <div className={classes.hero3dBg} data-hero-artwork-root="true">
           {renderHeroBackground()}
         </div>
 
         {/* Cinematic 3D intro overlay — spins then fades out */}
         {showIntro && currentNounSeed && (
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 10,
-            opacity: introOpacity,
-            transition: 'opacity 1s ease-out',
-            pointerEvents: 'none',
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 10,
+              opacity: introOpacity,
+              transition: 'opacity 1s ease-out',
+              pointerEvents: 'none',
+            }}
+          >
             <NounParallax seed={currentNounSeed} fullscreen autoSpin />
           </div>
         )}
 
         {/* Prev/Next noun arrows */}
-        {currentAuction && lastNounId && !isEditing && (
+        {hasAuctionBounds && !isEditing && (
           <>
             {BigInt(currentAuction.nounId) > 0n && (
               <button
                 type="button"
                 onClick={prevAuctionHandler}
                 style={{
-                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                  zIndex: 20, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
-                  width: 44, height: 44, cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#333',
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 20,
+                  background: 'rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '50%',
+                  width: 44,
+                  height: 44,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  color: '#333',
                   transition: 'background 0.15s',
                 }}
                 title="Previous Noun"
-              >&#8249;</button>
+              >
+                &#8249;
+              </button>
             )}
             {BigInt(currentAuction.nounId) < BigInt(lastNounId) && (
               <button
                 type="button"
                 onClick={nextAuctionHandler}
                 style={{
-                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                  zIndex: 20, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
-                  width: 44, height: 44, cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#333',
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 20,
+                  background: 'rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '50%',
+                  width: 44,
+                  height: 44,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  color: '#333',
                   transition: 'background 0.15s',
                 }}
                 title="Next Noun"
-              >&#8250;</button>
+              >
+                &#8250;
+              </button>
             )}
           </>
         )}
 
         {/* Hidden: fires onLoadSeed for bg color + seed */}
         {currentAuction && (
-          <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-            {/* eslint-disable-next-line sonarjs/deprecation */}
+          <div
+            style={{
+              position: 'absolute',
+              width: 0,
+              height: 0,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+            }}
+          >
             <StandaloneNounWithSeed
               nounId={BigInt(currentAuction.nounId)}
               onLoadSeed={loadedNounHandler}
@@ -660,7 +1007,10 @@ const Auction: React.FC<AuctionProps> = props => {
             ref={panelRef}
             className={classes.glassPanel}
             style={panelPos ? { left: panelPos.x, top: panelPos.y } : undefined}
-            onPointerDown={e => { e.stopPropagation(); onPanelPointerDown(e); }}
+            onPointerDown={e => {
+              e.stopPropagation();
+              onPanelPointerDown(e);
+            }}
             onPointerMove={onPanelPointerMove}
             onPointerUp={onPanelPointerUp}
             onPointerCancel={onPanelPointerUp}
@@ -679,7 +1029,15 @@ const Auction: React.FC<AuctionProps> = props => {
         {/* Upload form overlay */}
         {viewMode === 'add-derivative' && (
           <div className={classes.heroFormOverlay}>
-            <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>Loading...</div>}>
+            <Suspense
+              fallback={
+                <div
+                  style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}
+                >
+                  Loading...
+                </div>
+              }
+            >
               <DerivativeUploadForm nounId={currentNounId} onUploaded={handleDerivativeUploaded} />
             </Suspense>
           </div>
@@ -689,7 +1047,14 @@ const Auction: React.FC<AuctionProps> = props => {
         {addingLink && (
           <div className={classes.heroFormOverlay}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontFamily: "'PT Root UI', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: 'rgba(0,0,0,0.7)' }}>
+              <span
+                style={{
+                  fontFamily: "'PT Root UI', sans-serif",
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: 'rgba(0,0,0,0.7)',
+                }}
+              >
                 Add a link for Noun {currentNounId}
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -698,18 +1063,32 @@ const Auction: React.FC<AuctionProps> = props => {
                   placeholder="https://..."
                   value={linkUrlDraft}
                   onChange={e => setLinkUrlDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddLink(); if (e.key === 'Escape') setAddingLink(false); }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddLink();
+                    if (e.key === 'Escape') setAddingLink(false);
+                  }}
                   autoFocus
                   className={classes.inlineInput}
-                  style={{ flex: 1, background: 'rgba(0,0,0,0.05)', color: '#14141f', border: '1px solid rgba(0,0,0,0.15)' }}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(0,0,0,0.05)',
+                    color: '#14141f',
+                    border: '1px solid rgba(0,0,0,0.15)',
+                  }}
                 />
                 <button
                   onClick={handleAddLink}
                   disabled={linkSubmitting || !linkUrlDraft.trim()}
                   style={{
-                    border: 'none', borderRadius: 6, padding: '6px 14px',
-                    background: '#14141f', color: '#fff', cursor: 'pointer',
-                    fontSize: '0.65rem', fontWeight: 700, fontFamily: "'PT Root UI', sans-serif",
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '6px 14px',
+                    background: '#14141f',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    fontFamily: "'PT Root UI', sans-serif",
                     opacity: linkSubmitting ? 0.5 : 1,
                   }}
                 >
@@ -718,9 +1097,14 @@ const Auction: React.FC<AuctionProps> = props => {
                 <button
                   onClick={() => setAddingLink(false)}
                   style={{
-                    border: 'none', borderRadius: 6, padding: '6px 10px',
-                    background: 'rgba(0,0,0,0.1)', color: '#14141f', cursor: 'pointer',
-                    fontSize: '0.65rem', fontFamily: "'PT Root UI', sans-serif",
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    background: 'rgba(0,0,0,0.1)',
+                    color: '#14141f',
+                    cursor: 'pointer',
+                    fontSize: '0.65rem',
+                    fontFamily: "'PT Root UI', sans-serif",
                   }}
                 >
                   Cancel
@@ -741,19 +1125,8 @@ const Auction: React.FC<AuctionProps> = props => {
               nounSvg={nounSvg}
               onExit={() => setIsEditing(false)}
               toolRef={editorToolRef}
-              onSave={(pixels, thumbnail) => {
-                // Save to localStorage as a derivative trait
-                const saved = JSON.parse(localStorage.getItem('noun-wtf-studio-traits') || '[]');
-                saved.unshift({
-                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  name: `Noun ${currentNounId} edit`,
-                  pixels,
-                  traitType: 'head',
-                  createdAt: Date.now(),
-                  thumbnail,
-                });
-                localStorage.setItem('noun-wtf-studio-traits', JSON.stringify(saved.slice(0, 50)));
-                setIsEditing(false);
+              onSave={(_, thumbnail) => {
+                openDerivativeSaveModal('pixel', thumbnail, `Noun ${currentNounId} edit`);
               }}
             />
           </Suspense>
@@ -775,9 +1148,11 @@ const Auction: React.FC<AuctionProps> = props => {
               onExit={() => setIsEditing(false)}
               toolRef={editorToolRef}
               onSave={() => {
-                setVoxelSaveName(`Noun ${currentNounId} voxel`);
-                setVoxelSaveLink('');
-                setShowVoxelSaveModal(true);
+                const canvas = document.querySelector(
+                  '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
+                ) as HTMLCanvasElement | null;
+                const image = canvas?.toDataURL('image/jpeg', 0.88) ?? '';
+                openDerivativeSaveModal('voxel', image, `Noun ${currentNounId} voxel`);
               }}
             />
           </Suspense>
@@ -790,96 +1165,107 @@ const Auction: React.FC<AuctionProps> = props => {
           </Suspense>
         )}
 
-        {/* Voxel save modal */}
-        {showVoxelSaveModal && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }} onClick={() => setShowVoxelSaveModal(false)}>
-            <div style={{
-              background: '#1a1a2e', borderRadius: 12, padding: 24, width: 340,
-              border: '1px solid rgba(255,255,255,0.1)',
-            }} onClick={e => e.stopPropagation()}>
-              <h3 style={{ margin: '0 0 16px', color: '#fff', fontSize: 16 }}>Save Voxel Creation</h3>
+        {/* Derivative save modal */}
+        {showDerivativeSaveModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={resetDerivativeSaveModal}
+          >
+            <div
+              style={{
+                background: '#1a1a2e',
+                borderRadius: 12,
+                padding: 24,
+                width: 340,
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 style={{ margin: '0 0 16px', color: '#fff', fontSize: 16 }}>
+                Save {derivativeSaveMode === 'voxel' ? '3D' : '2D'} Derivative
+              </h3>
               <input
                 type="text"
-                placeholder="Name (required)"
-                value={voxelSaveName}
-                onChange={e => setVoxelSaveName(e.target.value)}
+                placeholder="Artist / title (required)"
+                value={derivativeSaveName}
+                onChange={e => setDerivativeSaveName(e.target.value)}
                 maxLength={30}
                 style={{
-                  width: '100%', padding: '8px 12px', borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.2)', background: '#0d0d1a', color: '#fff',
-                  fontSize: 14, marginBottom: 8, boxSizing: 'border-box',
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: '#0d0d1a',
+                  color: '#fff',
+                  fontSize: 14,
+                  marginBottom: 8,
+                  boxSizing: 'border-box',
                 }}
                 autoFocus
               />
               <input
                 type="url"
-                placeholder="Link (optional)"
-                value={voxelSaveLink}
-                onChange={e => setVoxelSaveLink(e.target.value)}
+                placeholder="Link (optional — site, social, auction)"
+                value={derivativeSaveLink}
+                onChange={e => setDerivativeSaveLink(e.target.value)}
                 style={{
-                  width: '100%', padding: '8px 12px', borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.2)', background: '#0d0d1a', color: '#fff',
-                  fontSize: 14, marginBottom: 16, boxSizing: 'border-box',
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: '#0d0d1a',
+                  color: '#fff',
+                  fontSize: 14,
+                  marginBottom: 16,
+                  boxSizing: 'border-box',
                 }}
               />
+              {derivativeSaveError && (
+                <div style={{ color: '#fca5a5', fontSize: 12, marginBottom: 12 }}>
+                  {derivativeSaveError}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  onClick={() => setShowVoxelSaveModal(false)}
+                  onClick={resetDerivativeSaveModal}
                   style={{
-                    padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'transparent', color: '#999', cursor: 'pointer', fontSize: 13,
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent',
+                    color: '#999',
+                    cursor: 'pointer',
+                    fontSize: 13,
                   }}
-                >Cancel</button>
+                >
+                  Cancel
+                </button>
                 <button
                   type="button"
-                  disabled={!voxelSaveName.trim()}
-                  onClick={async () => {
-                    if (!voxelSaveName.trim() || !currentNounId) return;
-                    try {
-                      // Capture canvas screenshot
-                      const canvas = document.querySelector('canvas');
-                      const image = canvas?.toDataURL('image/jpeg', 0.8) ?? '';
-
-                      // Serialize voxel data
-                      const voxelData = voxelMapRef.current
-                        ? Object.fromEntries(voxelMapRef.current)
-                        : {};
-
-                      // Save as derivative
-                      const res = await fetch('/.netlify/functions/derivatives', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          name: voxelSaveName.trim(),
-                          image,
-                          nounId: currentNounId,
-                          auctionUrl: voxelSaveLink.trim() || undefined,
-                          voxelData: JSON.stringify(voxelData),
-                        }),
-                      });
-
-                      if (res.ok) {
-                        const newDeriv = await res.json();
-                        setDerivatives(prev => [...prev, newDeriv]);
-                        setShowVoxelSaveModal(false);
-                        setIsEditing(false);
-                      }
-                    } catch (err) {
-                      console.error('Failed to save voxel derivative:', err);
-                    }
-                  }}
+                  disabled={derivativeSavePending || !derivativeSaveName.trim()}
+                  onClick={handleSaveDerivative}
                   style={{
-                    padding: '8px 16px', borderRadius: 6, border: 'none',
-                    background: voxelSaveName.trim() ? '#4ade80' : '#333',
-                    color: voxelSaveName.trim() ? '#000' : '#666',
-                    cursor: voxelSaveName.trim() ? 'pointer' : 'not-allowed',
-                    fontWeight: 700, fontSize: 13,
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: derivativeSaveName.trim() ? '#4ade80' : '#333',
+                    color: derivativeSaveName.trim() ? '#000' : '#666',
+                    cursor: derivativeSaveName.trim() ? 'pointer' : 'not-allowed',
+                    fontWeight: 700,
+                    fontSize: 13,
                   }}
-                >Save</button>
+                >
+                  {derivativeSavePending ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </div>
           </div>

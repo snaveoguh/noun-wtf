@@ -62,8 +62,8 @@ async function uploadDerivative(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, image, nounId, ...(auctionUrl && { auctionUrl }) }),
     });
-    const data = await res.json();
-    if (!res.ok) return { success: false, error: data.error || 'Upload failed' };
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) return { success: false, error: data.error ?? 'Upload failed' };
     return { success: true };
   } catch {
     return { success: false, error: 'Network error — please try again' };
@@ -112,7 +112,7 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
       e.preventDefault();
       setDragActive(false);
       const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      if (file !== undefined) handleFile(file);
     },
     [handleFile],
   );
@@ -130,11 +130,16 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
     setSuccess('');
     setUploading(true);
 
-    const result = await uploadDerivative(name.trim(), imageData, nounId, auctionUrl.trim() || undefined);
+    const result = await uploadDerivative(
+      name.trim(),
+      imageData,
+      nounId,
+      auctionUrl.trim() || undefined,
+    );
     setUploading(false);
 
     if (result.success) {
-      setSuccess('Added.');
+      setSuccess('Added to this noun.');
       setName('');
       setAuctionUrl('');
       setPreview('');
@@ -144,25 +149,29 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
     } else {
       setError(result.error || 'Upload failed');
     }
-  }, [name, imageData, nounId, onUploaded]);
+  }, [auctionUrl, imageData, name, nounId, onUploaded]);
 
   return (
-    <div style={{
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10,
-      padding: '4px 0',
-    }}>
-      <p style={{
-        fontSize: '0.8rem',
-        fontWeight: 800,
-        color: '#222',
-        margin: 0,
-        letterSpacing: '0.02em',
-        fontFamily: "'PT Root UI', sans-serif",
-      }}>
-        Add Derivative for Noun {nounId}
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '4px 0',
+      }}
+    >
+      <p
+        style={{
+          fontSize: '0.8rem',
+          fontWeight: 800,
+          color: '#222',
+          margin: 0,
+          letterSpacing: '0.02em',
+          fontFamily: "'PT Root UI', sans-serif",
+        }}
+      >
+        Add artwork for Noun {nounId}
       </p>
 
       {/* Drop zone */}
@@ -187,7 +196,10 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
           fontFamily: "'PT Root UI', sans-serif",
         }}
         onClick={() => fileInputRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); setDragActive(true); }}
+        onDragOver={e => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
       >
@@ -222,15 +234,15 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
         style={{ display: 'none' }}
         onChange={e => {
           const file = e.target.files?.[0];
-          if (file) handleFile(file);
+          if (file !== undefined) handleFile(file);
         }}
       />
 
-      {/* Name + Auction URL + Submit */}
+      {/* Artist / title + link + submit */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Tab name (e.g. pip, sketch, remix)"
+          placeholder="Artist / title"
           value={name}
           onChange={e => setName(e.target.value)}
           style={{
@@ -246,11 +258,13 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
             background: 'rgba(255,255,255,0.6)',
           }}
           maxLength={30}
-          onKeyDown={e => { if (e.key === 'Enter' && !uploading) handleSubmit(); }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !uploading) handleSubmit();
+          }}
         />
         <input
           type="url"
-          placeholder="Auction URL (optional — Manifold, Zora, etc.)"
+          placeholder="Link (optional — site, social, auction)"
           value={auctionUrl}
           onChange={e => setAuctionUrl(e.target.value)}
           style={{
@@ -265,37 +279,46 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
             fontFamily: "'PT Root UI', sans-serif",
             background: 'rgba(255,255,255,0.6)',
           }}
-          onKeyDown={e => { if (e.key === 'Enter' && !uploading) handleSubmit(); }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !uploading) handleSubmit();
+          }}
         />
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={uploading || !name.trim() || !imageData}
           style={{
-            background: (uploading || !name.trim() || !imageData) ? '#ccc' : '#d97706',
+            background: uploading || !name.trim() || !imageData ? '#ccc' : '#d97706',
             color: '#fff',
             border: 'none',
             borderRadius: 8,
             padding: '8px 20px',
             fontWeight: 700,
             fontSize: '0.72rem',
-            cursor: (uploading || !name.trim() || !imageData) ? 'not-allowed' : 'pointer',
+            cursor: uploading || !name.trim() || !imageData ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
             fontFamily: "'PT Root UI', sans-serif",
             whiteSpace: 'nowrap',
           }}
           onMouseEnter={e => {
-            if (!uploading && name.trim() && imageData) e.currentTarget.style.background = '#b45309';
+            if (!uploading && name.trim() && imageData)
+              e.currentTarget.style.background = '#b45309';
           }}
           onMouseLeave={e => {
-            if (!uploading && name.trim() && imageData) e.currentTarget.style.background = '#d97706';
+            if (!uploading && name.trim() && imageData)
+              e.currentTarget.style.background = '#d97706';
           }}
         >
-          {uploading ? 'Uploading...' : 'Add'}
+          {uploading ? 'Uploading...' : 'Add Art'}
         </button>
       </div>
 
-      {error && <span style={{ color: '#dc2626', fontSize: '0.65rem', fontWeight: 600 }}>{error}</span>}
-      {success && <span style={{ color: '#16a34a', fontSize: '0.65rem', fontWeight: 600 }}>{success}</span>}
+      {error && (
+        <span style={{ color: '#dc2626', fontSize: '0.65rem', fontWeight: 600 }}>{error}</span>
+      )}
+      {success && (
+        <span style={{ color: '#16a34a', fontSize: '0.65rem', fontWeight: 600 }}>{success}</span>
+      )}
     </div>
   );
 };

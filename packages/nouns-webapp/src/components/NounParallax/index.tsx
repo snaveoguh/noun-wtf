@@ -6,7 +6,8 @@
  *   - Tilt mode (default): subtle gyro/touch/mouse parallax
  *   - Interactive mode (interactive prop): full orbit/zoom/drag via OrbitControls
  *   - Editable mode (editable prop): 3D voxel editor with sculpting
- * All modes use meshStandardMaterial with proper lighting and shadows.
+ * Display mode uses unlit materials so the rendered noun matches the source
+ * palette exactly instead of darkening under scene lighting.
  */
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -99,24 +100,20 @@ function TiltScene({ seed, tiltRef, layerVisibility, autoSpin = false }: TiltSce
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[15, 25, 30]} intensity={0.7} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
       <group ref={groupRef}>
         {bodyGeo && (
           <mesh geometry={bodyGeo}>
-            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+            <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
         {blingGeo && (
           <mesh geometry={blingGeo}>
-            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+            <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
         {glassesGeo && (
           <mesh geometry={glassesGeo}>
-            <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+            <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
       </group>
@@ -149,23 +146,19 @@ function InteractiveScene({ seed, layerVisibility }: InteractiveSceneProps) {
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[15, 25, 30]} intensity={0.7} />
-      <directionalLight position={[-10, -5, -15]} intensity={0.15} />
-      <directionalLight position={[-5, 10, -20]} intensity={0.25} />
       {bodyGeo && (
         <mesh geometry={bodyGeo}>
-          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
       {blingGeo && (
         <mesh geometry={blingGeo}>
-          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
       {glassesGeo && (
         <mesh geometry={glassesGeo}>
-          <meshStandardMaterial vertexColors roughness={0.85} metalness={0} />
+          <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
 
@@ -352,6 +345,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
   return (
     <div
       ref={containerRef}
+      data-noun-parallax-root="true"
       className={`${classes.container} ${fullscreen ? classes.fullscreen : ''}`}
       onClick={!interactive && needsPermission ? requestPermission : undefined}
     >
