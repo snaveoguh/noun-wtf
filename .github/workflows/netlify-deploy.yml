@@ -46,15 +46,17 @@ jobs:
 
       - name: Build with Netlify context
         env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
-        run: npx netlify build --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}" --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
+        run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         shell: bash
         run: |
           if [ "${{ steps.site.outputs.prod }}" = "true" ]; then
             npx netlify deploy \
-              --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}" \
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --prod \
@@ -65,7 +67,6 @@ jobs:
               --message "GitHub Actions ${GITHUB_SHA}"
           else
             npx netlify deploy \
-              --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}" \
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --context "${{ steps.site.outputs.context }}" \
