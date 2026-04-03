@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Deployment Rules
+
+`noun.wtf` uses `snaveoguh/noun-wtf` as the canonical source repo.
+
+- Production branch: `main`
+- Dev branch: `staging`
+- Production site: `noun.wtf`
+- Dev site: `https://dev-noun-wtf.netlify.app/`
+
+Netlify's site metadata is legacy/manual-ish, so treat GitHub as the source of truth and deploy through the branch flow:
+
+1. Push to `staging` to update dev
+2. Review on `dev-noun-wtf.netlify.app`
+3. Push or merge to `main` to update production
+
+GitHub Actions handles publishing to the existing Netlify sites. Do not create duplicate Netlify sites.
+
+Remote notes:
+- `nounwtf` = your fork (`snaveoguh/noun-wtf`)
+- `origin` = upstream Nouns DAO monorepo
+
+Safety:
+- Do not run `npm`, `pnpm`, `npx`, or `netlify` inside random downloaded repos. These tools can execute project scripts and config, so untrusted repos can run code on the machine.
+- Prefer `main` and `staging` for deployment work. Treat `master` as legacy.
+
 ## Project Architecture
 
 This is a monorepo for Nouns DAO, a generative avatar art collective run by crypto misfits. The project uses:
