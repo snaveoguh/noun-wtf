@@ -1,5 +1,14 @@
 # nouns-monorepo
 
+## Deploy flow for `noun.wtf`
+
+This fork deploys to the existing Netlify sites through GitHub Actions:
+
+- `main` -> `noun.wtf`
+- `staging` -> `https://dev-noun-wtf.netlify.app/`
+
+The existing Netlify sites are legacy/manual-ish, so the repo branch flow is the canonical deployment source of truth.
+
 Nouns DAO is a generative avatar art collective run by a group of crypto misfits.
 
 ## Packages
