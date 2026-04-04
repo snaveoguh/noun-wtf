@@ -271,6 +271,7 @@ export interface EditableConfig {
   onPixelsFill: (changes: [number, number, string][]) => void;
   onColorPick: (color: string) => void;
   voxelDepth?: number;
+  interactionMode?: 'sculpt' | 'orbit';
   onVoxelMapChange?: (map: VoxelMap) => void;
 }
 
@@ -456,6 +457,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               onPixelsFill={editable.onPixelsFill}
               onColorPick={editable.onColorPick}
               voxelDepth={editable.voxelDepth}
+              interactionMode={editable.interactionMode}
               onVoxelMapChange={editable.onVoxelMapChange}
             />
           ) : interactive ? (

@@ -7,7 +7,16 @@
  * Layer visibility toggles let you hide/show body parts.
  * Tools, palette, and actions in floating glass panels.
  */
-import { FC, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import {
+  FC,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 
 import { PixelCanvas, type Tool } from '@/components/Studio/PixelCanvas';
 import {
@@ -47,7 +56,11 @@ interface InlineEditorProps {
   externalDispatch?: React.Dispatch<import('@/lib/pixelHistory').HistoryAction>;
   externalPast?: string[][][];
   externalFuture?: string[][][];
+  interactionMode?: 'sculpt' | 'orbit';
+  onInteractionModeChange?: (mode: 'sculpt' | 'orbit') => void;
 }
+
+type PanelKey = 'tools' | 'palette' | 'actions';
 
 const LAYER_NAMES: { key: keyof LayerVisibility; label: string; emoji: string }[] = [
   { key: 'body', label: 'Body', emoji: '👤' },
@@ -67,6 +80,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
   externalDispatch,
   externalPast,
   externalFuture,
+  interactionMode = 'sculpt',
+  onInteractionModeChange,
   voxelDepth = 1,
   onVoxelDepthChange,
 }) => {
@@ -113,6 +128,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
     return '#000000';
   });
   const [paletteExpanded, setPaletteExpanded] = useState(false);
+  const [panelOffsets, setPanelOffsets] = useState<Record<PanelKey, { x: number; y: number }>>({
+    tools: { x: 0, y: 0 },
+    palette: { x: 0, y: 0 },
+    actions: { x: 0, y: 0 },
+  });
+  const dragRef = useRef<{
+    key: PanelKey;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
 
   const palette = getSortedPalette();
   const displayPalette = paletteExpanded ? palette : palette.slice(0, 64);
@@ -174,6 +201,56 @@ const InlineEditor: FC<InlineEditorProps> = ({
 
   const hasChanges = pastLen > 0;
 
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      setPanelOffsets(prev => ({
+        ...prev,
+        [drag.key]: {
+          x: drag.originX + (event.clientX - drag.startX),
+          y: drag.originY + (event.clientY - drag.startY),
+        },
+      }));
+    };
+
+    const onPointerUp = () => {
+      dragRef.current = null;
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, []);
+
+  const startDraggingPanel = useCallback(
+    (key: PanelKey) => (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dragRef.current = {
+        key,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: panelOffsets[key].x,
+        originY: panelOffsets[key].y,
+      };
+    },
+    [panelOffsets],
+  );
+
+  const getPanelStyle = useCallback(
+    (key: PanelKey) => ({
+      transform: `translate3d(${panelOffsets[key].x}px, ${panelOffsets[key].y}px, 0)`,
+    }),
+    [panelOffsets],
+  );
+
   // Compute zoom to fill viewport nicely
   const zoom = useMemo(() => {
     if (typeof window === 'undefined') return 14;
@@ -202,11 +279,16 @@ const InlineEditor: FC<InlineEditorProps> = ({
       )}
 
       {/* ── Tools + Layers panel (top-left) ──────────────────── */}
-      <div className={`${classes.glassFloat} ${classes.toolsPanel}`}>
+      <div className={`${classes.glassFloat} ${classes.toolsPanel}`} style={getPanelStyle('tools')}>
+        <div className={classes.panelHandle} onPointerDown={startDraggingPanel('tools')}>
+          <span className={classes.panelHandleDots}>:::</span>
+          <span className={classes.panelHandleLabel}>Tools</span>
+        </div>
         <div className={classes.toolRow}>
           {(['pencil', 'eraser', 'fill', 'eyedropper'] as Tool[]).map(tool => (
             <button
               key={tool}
+              type="button"
               className={`${classes.toolBtn} ${activeTool === tool ? classes.toolActive : ''}`}
               onClick={() => setActiveTool(tool)}
               title={tool[0].toUpperCase() + tool.slice(1)}
@@ -219,6 +301,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
           ))}
           <div className={classes.toolDivider} />
           <button
+            type="button"
             className={classes.toolBtn}
             onClick={undo}
             disabled={pastLen === 0}
@@ -227,6 +310,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
             ↩
           </button>
           <button
+            type="button"
             className={classes.toolBtn}
             onClick={redo}
             disabled={futureLen === 0}
@@ -236,6 +320,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
           </button>
           <div className={classes.toolDivider} />
           <button
+            type="button"
             className={classes.toolBtn}
             onClick={() => dispatch({ type: 'CLEAR' })}
             title="Clear all"
@@ -249,6 +334,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
           {LAYER_NAMES.map(({ key, label, emoji }) => (
             <button
               key={key}
+              type="button"
               className={`${classes.layerBtn} ${visibility[key] ? classes.layerOn : classes.layerOff}`}
               onClick={() => toggleLayer(key)}
               title={`Toggle ${label}`}
@@ -275,10 +361,36 @@ const InlineEditor: FC<InlineEditorProps> = ({
             <span className={classes.depthValue}>{voxelDepth}</span>
           </div>
         )}
+
+        {panelsOnly && onInteractionModeChange && (
+          <div className={classes.editorModeRow}>
+            <button
+              type="button"
+              className={`${classes.modeBtn} ${interactionMode === 'sculpt' ? classes.modeBtnActive : ''}`}
+              onClick={() => onInteractionModeChange('sculpt')}
+            >
+              Sculpt
+            </button>
+            <button
+              type="button"
+              className={`${classes.modeBtn} ${interactionMode === 'orbit' ? classes.modeBtnActive : ''}`}
+              onClick={() => onInteractionModeChange('orbit')}
+            >
+              Twist
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Color palette (left) ─────────────────────────────── */}
-      <div className={`${classes.glassFloat} ${classes.palettePanel}`}>
+      <div
+        className={`${classes.glassFloat} ${classes.palettePanel}`}
+        style={getPanelStyle('palette')}
+      >
+        <div className={classes.panelHandle} onPointerDown={startDraggingPanel('palette')}>
+          <span className={classes.panelHandleDots}>:::</span>
+          <span className={classes.panelHandleLabel}>Palette</span>
+        </div>
         <div className={classes.currentColor}>
           <div
             className={classes.colorSwatch}
@@ -291,6 +403,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
         </div>
         <div className={classes.paletteGrid}>
           <button
+            type="button"
             className={`${classes.paletteSwatch} ${activeColor === '' ? classes.paletteActive : ''}`}
             onClick={() => setActiveColor('')}
             title="Transparent"
@@ -298,9 +411,10 @@ const InlineEditor: FC<InlineEditorProps> = ({
               background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 6px 6px',
             }}
           />
-          {displayPalette.map((color, i) => (
+          {displayPalette.map(color => (
             <button
-              key={`${color}-${i}`}
+              key={color}
+              type="button"
               className={`${classes.paletteSwatch} ${activeColor === color ? classes.paletteActive : ''}`}
               onClick={() => setActiveColor(color)}
               style={{ background: color }}
@@ -309,20 +423,35 @@ const InlineEditor: FC<InlineEditorProps> = ({
           ))}
         </div>
         {palette.length > 64 && (
-          <button className={classes.showMoreBtn} onClick={() => setPaletteExpanded(e => !e)}>
+          <button
+            type="button"
+            className={classes.showMoreBtn}
+            onClick={() => setPaletteExpanded(e => !e)}
+          >
             {paletteExpanded ? 'Less' : `All ${palette.length}`}
           </button>
         )}
       </div>
 
       {/* ── Actions (top-right) ──────────────────────────────── */}
-      <div className={`${classes.glassFloat} ${classes.actionsPanel}`}>
+      <div
+        className={`${classes.glassFloat} ${classes.actionsPanel}`}
+        style={getPanelStyle('actions')}
+      >
+        <div className={classes.panelHandle} onPointerDown={startDraggingPanel('actions')}>
+          <span className={classes.panelHandleDots}>:::</span>
+          <span className={classes.panelHandleLabel}>Actions</span>
+        </div>
         {hasChanges && onSave && (
-          <button className={classes.actionBtn} onClick={handleSave}>
+          <button type="button" className={classes.actionBtn} onClick={handleSave}>
             Save
           </button>
         )}
-        <button className={`${classes.actionBtn} ${classes.exitBtn}`} onClick={onExit}>
+        <button
+          type="button"
+          className={`${classes.actionBtn} ${classes.exitBtn}`}
+          onClick={onExit}
+        >
           {hasChanges ? 'Discard' : 'Exit'}
         </button>
       </div>
@@ -330,7 +459,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
       {/* Hint bar */}
       <div className={classes.hint}>
         <kbd>Esc</kbd> exit · <kbd>B</kbd> pencil · <kbd>E</kbd> eraser · <kbd>G</kbd> fill ·{' '}
-        <kbd>I</kbd> picker · <kbd>Ctrl+Z</kbd> undo · Toggle layers to hide parts
+        <kbd>I</kbd> picker · <kbd>Ctrl+Z</kbd> undo · Drag the panel grips to move them
       </div>
     </div>
   );

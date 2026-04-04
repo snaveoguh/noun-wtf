@@ -36,7 +36,7 @@ type MeshPointerEvent = {
 
 // ─── Orbit controls (right-click to rotate) ─────────────────────────────────
 
-function EditOrbitControls() {
+function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'orbit' }) {
   return (
     <OrbitControls
       enablePan={false}
@@ -47,9 +47,15 @@ function EditOrbitControls() {
       minPolarAngle={Math.PI * 0.05}
       maxPolarAngle={Math.PI * 0.95}
       mouseButtons={{
-        LEFT: undefined as unknown as THREE.MOUSE,
+        LEFT:
+          interactionMode === 'orbit' ? THREE.MOUSE.ROTATE : (undefined as unknown as THREE.MOUSE),
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.ROTATE,
+      }}
+      touches={{
+        ONE:
+          interactionMode === 'orbit' ? THREE.TOUCH.ROTATE : (undefined as unknown as THREE.TOUCH),
+        TWO: THREE.TOUCH.DOLLY_PAN,
       }}
     />
   );
@@ -67,8 +73,8 @@ function Voxel({
   position: [number, number, number];
   color: string;
   isHovered: boolean;
-  onClick: (e: MeshMouseEvent) => void;
-  onPointerOver: (e: MeshPointerEvent) => void;
+  onClick?: (e: MeshMouseEvent) => void;
+  onPointerOver?: (e: MeshPointerEvent) => void;
 }) {
   const col = useMemo(() => new THREE.Color(color), [color]);
   const highlightCol = useMemo(() => {
@@ -110,6 +116,7 @@ export interface EditableSceneProps {
   onColorPick: (color: string) => void;
   /** How deep the initial solid block is (default 3) */
   voxelDepth?: number;
+  interactionMode?: 'sculpt' | 'orbit';
   layerVisibility?: LayerVisibility;
   /** Called when voxel map changes — parent can capture for save */
   onVoxelMapChange?: (map: VoxelMap) => void;
@@ -126,6 +133,7 @@ export default function EditableScene({
   onPixelsFill,
   onColorPick,
   voxelDepth = DEFAULT_VOXEL_DEPTH,
+  interactionMode = 'sculpt',
   onVoxelMapChange,
 }: EditableSceneProps) {
   // Initialize as solid block with depth
@@ -149,6 +157,13 @@ export default function EditableScene({
   useEffect(() => {
     onVoxelMapChange?.(voxels);
   }, [voxels, onVoxelMapChange]);
+
+  useEffect(() => {
+    if (interactionMode === 'orbit') {
+      setHoveredKey(null);
+      setGhostPos(null);
+    }
+  }, [interactionMode]);
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [ghostPos, setGhostPos] = useState<[number, number, number] | null>(null);
@@ -184,6 +199,7 @@ export default function EditableScene({
   // ── Handle voxel click ──
   const handleVoxelClick = useCallback(
     (key: string, e: MeshMouseEvent) => {
+      if (interactionMode === 'orbit') return;
       e.stopPropagation();
       if (isDrag(e)) return;
 
@@ -253,12 +269,22 @@ export default function EditableScene({
         }
       }
     },
-    [activeTool, activeColor, voxels, isDrag, onPixelChange, onPixelsFill, onColorPick],
+    [
+      activeTool,
+      activeColor,
+      interactionMode,
+      voxels,
+      isDrag,
+      onPixelChange,
+      onPixelsFill,
+      onColorPick,
+    ],
   );
 
   // ── Handle voxel hover ──
   const handleVoxelHover = useCallback(
     (key: string, e: MeshPointerEvent) => {
+      if (interactionMode === 'orbit') return;
       e.stopPropagation();
       setHoveredKey(key);
       if (activeTool === 'pencil' && activeColor) {
@@ -277,7 +303,7 @@ export default function EditableScene({
         setGhostPos(null);
       }
     },
-    [activeTool, activeColor],
+    [activeTool, activeColor, interactionMode],
   );
 
   const voxelEntries = useMemo(() => Array.from(voxels.entries()), [voxels]);
@@ -295,8 +321,8 @@ export default function EditableScene({
             position={[x - 15.5, y - 15.5, z]}
             color={color}
             isHovered={hoveredKey === key}
-            onClick={e => handleVoxelClick(key, e)}
-            onPointerOver={e => handleVoxelHover(key, e)}
+            onClick={interactionMode === 'sculpt' ? e => handleVoxelClick(key, e) : undefined}
+            onPointerOver={interactionMode === 'sculpt' ? e => handleVoxelHover(key, e) : undefined}
           />
         );
       })}
@@ -308,7 +334,7 @@ export default function EditableScene({
         />
       )}
 
-      <EditOrbitControls />
+      <EditOrbitControls interactionMode={interactionMode} />
 
       <mesh
         visible={false}
