@@ -2,6 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 
 import { useAccount } from 'wagmi';
 
+import { normalizeTerminalErrorMessage } from '@/components/TerminalFeed/errorMessages';
+
 const CrystalBall = lazy(() => import('@/components/CrystalBall'));
 
 const TERMINAL_GREETING = `╔══════════════════════════════════════════╗
@@ -247,11 +249,14 @@ const TerminalPage: React.FC = () => {
           speakText(data.response);
         }
       } catch (err) {
+        const friendlyError = normalizeTerminalErrorMessage(
+          err instanceof Error ? err.message : 'Connection failed',
+        );
         setMessages(prev => [
           ...prev,
           {
             role: 'assistant',
-            content: `ERROR: ${err instanceof Error ? err.message : 'Connection failed'}. The Terminal backend may not be deployed yet.`,
+            content: friendlyError,
             timestamp: Date.now(),
           },
         ]);

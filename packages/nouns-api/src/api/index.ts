@@ -56,6 +56,15 @@ async function hubChat(request: HubChatRequest): Promise<HubChatResponse> {
   }
   return payload;
 }
+
+const NOUNIRL_PIPE_UNLOCK_MESSAGE =
+  'if you are here it is likely you know where to find my pipe, talk to him to get this unlocked';
+
+function isUpstreamAiFailure(errMsg: string) {
+  return /all providers failed|rate limit reached|credit limit exceeded|credit limit|429\b|402\b/i.test(
+    errMsg,
+  );
+}
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -519,7 +528,13 @@ async function findCandidates(
     else if (kwTokens.length === 1) {
       const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
       if (haystack.includes(kwTokens[0])) {
-        score = slugNorm.includes(kwTokens[0]) ? 30 : (titleNorm.includes(kwTokens[0]) ? 25 : 15);
+        if (slugNorm.includes(kwTokens[0])) {
+          score = 30;
+        } else if (titleNorm.includes(kwTokens[0])) {
+          score = 25;
+        } else {
+          score = 15;
+        }
       }
     }
 
@@ -665,7 +680,12 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       }
       const lines = ['Market signals (pooter.world):'];
       for (const s of signals) {
-        const arrow = s.direction === 'bullish' ? '↑' : (s.direction === 'bearish' ? '↓' : '→');
+        let arrow = '→';
+        if (s.direction === 'bullish') {
+          arrow = '↑';
+        } else if (s.direction === 'bearish') {
+          arrow = '↓';
+        }
         lines.push(
           `  ${arrow} ${s.symbol}: ${s.direction} (confidence: ${(s.confidence * 100).toFixed(0)}%)`,
         );
@@ -1156,6 +1176,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 // ============================================================
 
 app.post('/api/chat', async c => {
+  let agentMode: string | undefined;
   try {
     const body = await c.req.json();
     const { message, wallet, history, agent_mode } = body as {
@@ -1164,6 +1185,7 @@ app.post('/api/chat', async c => {
       history?: Array<{ role: string; content: string }>;
       agent_mode?: string;
     };
+    agentMode = agent_mode;
 
     if (!message || typeof message !== 'string') {
       return c.json({ error: 'Message is required' }, 400);
@@ -3777,7 +3799,11 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('Terminal chat error:', errMsg);
-    return c.json({ error: `AI request failed: ${errMsg}` }, 500);
+    const friendlyError =
+      agentMode === 'nounirl' && isUpstreamAiFailure(errMsg)
+        ? NOUNIRL_PIPE_UNLOCK_MESSAGE
+        : `AI request failed: ${errMsg}`;
+    return c.json({ error: friendlyError }, 500);
   }
 });
 
