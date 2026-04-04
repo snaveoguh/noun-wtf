@@ -19,6 +19,16 @@
   },
   {
     "type": "function",
+    "name": "createBidWithReason",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256" },
+      { "name": "reason", "type": "string" }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "settleAuction",
     "inputs": [{ "name": "tokenId", "type": "uint256" }],
     "outputs": [],
@@ -49,6 +59,13 @@
   },
   {
     "type": "function",
+    "name": "bidReasons",
+    "inputs": [{ "name": "", "type": "uint256" }],
+    "outputs": [{ "name": "", "type": "string" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "nextTokenId",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256" }],
@@ -66,6 +83,13 @@
     "name": "minBidIncrementPercentage",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint8" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_BID_REASON_LENGTH",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint16" }],
     "stateMutability": "view"
   },
   {
@@ -87,6 +111,17 @@
       { "name": "bidder", "type": "address", "indexed": false },
       { "name": "amount", "type": "uint256", "indexed": false },
       { "name": "extended", "type": "bool", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AuctionBidWithReason",
+    "inputs": [
+      { "name": "tokenId", "type": "uint256", "indexed": true },
+      { "name": "bidder", "type": "address", "indexed": false },
+      { "name": "amount", "type": "uint256", "indexed": false },
+      { "name": "extended", "type": "bool", "indexed": false },
+      { "name": "reason", "type": "string", "indexed": false }
     ]
   },
   {
