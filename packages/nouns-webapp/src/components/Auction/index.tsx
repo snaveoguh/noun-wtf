@@ -22,7 +22,12 @@ import PanZoomImage from '@/components/PanZoomImage';
 import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
-import { seedToPixelLayers, mergeLayersToGrid, DEFAULT_VISIBILITY } from '@/lib/nounDecoder';
+import {
+  buildVisibilityMask,
+  seedToPixelLayers,
+  mergeLayersToGrid,
+  DEFAULT_VISIBILITY,
+} from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
@@ -180,6 +185,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const [edit2dHistory, edit2dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
+  const [edit2dVisibility, setEdit2dVisibility] = useState({ ...DEFAULT_VISIBILITY });
+  const [edit3dVisibility, setEdit3dVisibility] = useState({ ...DEFAULT_VISIBILITY });
   const [edit3dTool, setEdit3dTool] = useState<Tool>('pencil');
   const [edit3dColor, setEdit3dColor] = useState('#000000');
   const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
@@ -206,10 +213,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [linkSubmitting, setLinkSubmitting] = useState(false);
 
   const isEditing = editMode !== null;
+  const nounLayers = useMemo(
+    () => (currentNounSeed ? seedToPixelLayers(currentNounSeed) : null),
+    [currentNounSeed],
+  );
   const baseGrid = useMemo(() => {
-    if (!currentNounSeed) return createEmptyGrid();
-    return mergeLayersToGrid(seedToPixelLayers(currentNounSeed), DEFAULT_VISIBILITY);
-  }, [currentNounSeed]);
+    if (!nounLayers) return createEmptyGrid();
+    return mergeLayersToGrid(nounLayers, DEFAULT_VISIBILITY);
+  }, [nounLayers]);
 
   const activeDerivative = viewMode.startsWith('deriv-')
     ? derivatives.find(derivative => `deriv-${derivative.id}` === viewMode)
@@ -219,6 +230,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     : null;
   const liveVoxelMap = useMemo(() => parseVoxelMap(liveDrafts?.voxel?.voxelData), [liveDrafts]);
   const is3dView = viewMode === '3d' || viewMode === 'edit-3d' || editMode === '3d';
+  const edit3dVisibilityMask = useMemo(
+    () => (nounLayers ? buildVisibilityMask(nounLayers, edit3dVisibility) : undefined),
+    [edit3dVisibility, nounLayers],
+  );
 
   const fetchDerivativesForNoun = useCallback(async (nounId: number) => {
     try {
@@ -282,6 +297,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setEditingAuctionUrl(false);
     setEdit3dStartVoxelMap(null);
     setEdit3dInteractionMode('sculpt');
+    voxelMapRef.current = null;
+    setEdit2dVisibility({ ...DEFAULT_VISIBILITY });
+    setEdit3dVisibility({ ...DEFAULT_VISIBILITY });
     setLinkNameDraft('');
     setLinkUrlDraft('');
     setPlayIntroSpin(true);
@@ -328,6 +346,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         const pixels = liveDrafts?.voxel?.pixels ?? liveDrafts?.pixel?.pixels ?? baseGrid;
         resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
         setEdit3dStartVoxelMap(liveVoxelMap);
+        voxelMapRef.current = liveVoxelMap;
         setEdit3dInteractionMode('sculpt');
         setViewMode('edit-3d');
         setInteractionMode('grab');
@@ -337,14 +356,13 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [baseGrid, liveDrafts, liveVoxelMap, resetLive2dSignature, resetLive3dSignature],
   );
 
-  const stopEditing = useCallback(() => {
-    setEditMode(null);
-    setEdit3dStartVoxelMap(null);
-    setInteractionMode('scroll');
-  }, []);
-
   const persistLiveDraft = useCallback(
-    async (mode: Exclude<EditMode, null>, pixels: string[][], voxelData?: string) => {
+    async (
+      mode: Exclude<EditMode, null>,
+      pixels: string[][],
+      voxelData?: string,
+      options?: { keepalive?: boolean },
+    ) => {
       const image = buildPixelImage(pixels);
       if (!image || !currentAuction) return;
 
@@ -352,6 +370,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       try {
         const res = await fetch(LIVE_DRAFTS_API, {
           method: 'PUT',
+          keepalive: options?.keepalive,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nounId: currentNounId,
@@ -379,6 +398,31 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [currentAuction, currentNounId],
   );
 
+  const stopEditing = useCallback(() => {
+    if (editMode === '2d') {
+      const signature = JSON.stringify(edit2dHistory.present);
+      if (signature !== live2dSignatureRef.current) {
+        void persistLiveDraft('2d', edit2dHistory.present);
+      }
+    }
+
+    if (editMode === '3d') {
+      const voxelData = serializeVoxelMap(voxelMapRef.current);
+      const signature = JSON.stringify({
+        pixels: edit3dHistory.present,
+        voxelData,
+      });
+      if (voxelData && signature !== live3dSignatureRef.current) {
+        void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+      }
+    }
+
+    setEditMode(null);
+    setEdit3dStartVoxelMap(null);
+    voxelMapRef.current = null;
+    setInteractionMode('scroll');
+  }, [edit2dHistory.present, edit3dHistory.present, editMode, persistLiveDraft]);
+
   useEffect(() => {
     if (editMode !== '2d') return;
     const signature = JSON.stringify(edit2dHistory.present);
@@ -404,6 +448,31 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     }, 900);
     return () => window.clearTimeout(timer);
   }, [edit3dHistory.present, editMode, persistLiveDraft, voxelMapVersion]);
+
+  useEffect(() => {
+    const flushOnPageHide = () => {
+      if (editMode === '2d') {
+        const signature = JSON.stringify(edit2dHistory.present);
+        if (signature !== live2dSignatureRef.current) {
+          void persistLiveDraft('2d', edit2dHistory.present, undefined, { keepalive: true });
+        }
+      }
+
+      if (editMode === '3d') {
+        const voxelData = serializeVoxelMap(voxelMapRef.current);
+        const signature = JSON.stringify({
+          pixels: edit3dHistory.present,
+          voxelData,
+        });
+        if (voxelData && signature !== live3dSignatureRef.current) {
+          void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+        }
+      }
+    };
+
+    window.addEventListener('pagehide', flushOnPageHide);
+    return () => window.removeEventListener('pagehide', flushOnPageHide);
+  }, [edit2dHistory.present, edit3dHistory.present, editMode, persistLiveDraft]);
 
   const handleDerivativeUploaded = useCallback(() => {
     if (!currentAuction) return;
@@ -667,6 +736,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   },
                   voxelDepth: edit3dVoxelDepth,
                   interactionMode: edit3dInteractionMode,
+                  visibilityMask: edit3dVisibilityMask,
                   onVoxelMapChange: map => {
                     voxelMapRef.current = map;
                     setVoxelMapVersion(version => version + 1);
@@ -1158,6 +1228,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     externalDispatch={edit2dDispatch}
                     externalPast={edit2dHistory.past}
                     externalFuture={edit2dHistory.future}
+                    visibility={edit2dVisibility}
+                    onVisibilityChange={setEdit2dVisibility}
                   />
                 </Suspense>
               )}
@@ -1175,6 +1247,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     voxelDepth={edit3dVoxelDepth}
                     onVoxelDepthChange={setEdit3dVoxelDepth}
                     onExit={stopEditing}
+                    visibility={edit3dVisibility}
+                    onVisibilityChange={setEdit3dVisibility}
                     interactionMode={edit3dInteractionMode}
                     onInteractionModeChange={setEdit3dInteractionMode}
                     toolRef={editorToolRef}

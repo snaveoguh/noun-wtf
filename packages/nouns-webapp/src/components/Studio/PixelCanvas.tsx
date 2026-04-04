@@ -1,4 +1,11 @@
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  FC,
+  PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 export type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 
@@ -29,6 +36,7 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const activePointerIdRef = useRef<number | null>(null);
 
   const pixelSize = zoom;
   const canvasWidth = width * pixelSize;
@@ -86,7 +94,7 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
     draw();
   }, [draw]);
 
-  const getPixelCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getPixelCoords = (e: { clientX: number; clientY: number }) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
@@ -149,38 +157,50 @@ export const PixelCanvas: FC<PixelCanvasProps> = ({
     [activeTool, activeColor, onPixelChange, floodFill, onColorPick, pixels],
   );
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const coords = getPixelCoords(e);
     if (!coords) return;
+    activePointerIdRef.current = e.pointerId;
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDrawing(true);
     handleAction(coords.x, coords.y);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+  const handlePointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || activePointerIdRef.current !== e.pointerId) return;
     if (activeTool === 'fill' || activeTool === 'eyedropper') return;
     const coords = getPixelCoords(e);
     if (!coords) return;
     handleAction(coords.x, coords.y);
   };
 
-  const handleMouseUp = () => setIsDrawing(false);
-  const handleMouseLeave = () => setIsDrawing(false);
+  const stopDrawing = (e?: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (e && activePointerIdRef.current !== e.pointerId) return;
+    if (e && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    activePointerIdRef.current = null;
+    setIsDrawing(false);
+  };
 
   return (
     <canvas
       ref={canvasRef}
       width={canvasWidth}
       height={canvasHeight}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopDrawing}
+      onPointerCancel={stopDrawing}
+      onPointerLeave={stopDrawing}
+      onContextMenu={e => e.preventDefault()}
       className="cursor-crosshair rounded-lg border-2 border-gray-300 shadow-inner"
       style={{
         width: canvasWidth,
         height: canvasHeight,
         imageRendering: 'pixelated',
+        touchAction: 'none',
       }}
     />
   );

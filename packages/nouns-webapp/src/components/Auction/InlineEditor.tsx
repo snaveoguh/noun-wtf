@@ -20,8 +20,10 @@ import {
 
 import { PixelCanvas, type Tool } from '@/components/Studio/PixelCanvas';
 import {
-  seedToPixelLayers,
+  applyVisibilityMask,
+  buildVisibilityMask,
   mergeLayersToGrid,
+  seedToPixelLayers,
   DEFAULT_VISIBILITY,
   type NounPixelLayers,
   type LayerVisibility,
@@ -56,6 +58,8 @@ interface InlineEditorProps {
   externalDispatch?: React.Dispatch<import('@/lib/pixelHistory').HistoryAction>;
   externalPast?: string[][][];
   externalFuture?: string[][][];
+  visibility?: LayerVisibility;
+  onVisibilityChange?: (visibility: LayerVisibility) => void;
   interactionMode?: 'sculpt' | 'orbit';
   onInteractionModeChange?: (mode: 'sculpt' | 'orbit') => void;
 }
@@ -80,6 +84,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
   externalDispatch,
   externalPast,
   externalFuture,
+  visibility: controlledVisibility,
+  onVisibilityChange,
   interactionMode = 'sculpt',
   onInteractionModeChange,
   voxelDepth = 1,
@@ -90,12 +96,15 @@ const InlineEditor: FC<InlineEditorProps> = ({
   const nounLayers: NounPixelLayers = useMemo(() => seedToPixelLayers(seed), [seed]);
 
   // Layer visibility
-  const [visibility, setVisibility] = useState<LayerVisibility>({ ...DEFAULT_VISIBILITY });
+  const [localVisibility, setLocalVisibility] = useState<LayerVisibility>({
+    ...DEFAULT_VISIBILITY,
+  });
+  const visibility = controlledVisibility ?? localVisibility;
 
   // Merge visible layers into initial grid
   const initialGrid = useMemo(
-    () => mergeLayersToGrid(nounLayers, visibility),
-    [nounLayers, visibility],
+    () => mergeLayersToGrid(nounLayers, DEFAULT_VISIBILITY),
+    [nounLayers],
   );
 
   // History (undo/redo) — internal state (used in 2D mode)
@@ -105,17 +114,19 @@ const InlineEditor: FC<InlineEditorProps> = ({
     future: [],
   });
 
-  // When visibility changes, reload merged grid (2D mode only)
-  useEffect(() => {
-    if (!panelsOnly)
-      internalDispatch({ type: 'LOAD', pixels: mergeLayersToGrid(nounLayers, visibility) });
-  }, [visibility, nounLayers, panelsOnly]);
-
   // Use external or internal state
   const pixels = externalPixels ?? internalHistory.present;
   const dispatch = externalDispatch ?? internalDispatch;
   const pastLen = externalPast?.length ?? internalHistory.past.length;
   const futureLen = externalFuture?.length ?? internalHistory.future.length;
+  const visibilityMask = useMemo(
+    () => buildVisibilityMask(nounLayers, visibility),
+    [nounLayers, visibility],
+  );
+  const visiblePixels = useMemo(
+    () => applyVisibilityMask(pixels, visibilityMask),
+    [pixels, visibilityMask],
+  );
 
   const [activeTool, setActiveTool] = useState<Tool>('pencil');
   const [activeColor, setActiveColor] = useState(() => {
@@ -177,9 +188,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
     setActiveTool('pencil');
   }, []);
 
-  const toggleLayer = useCallback((layer: keyof LayerVisibility) => {
-    setVisibility(v => ({ ...v, [layer]: !v[layer] }));
-  }, []);
+  const toggleLayer = useCallback(
+    (layer: keyof LayerVisibility) => {
+      const next = { ...visibility, [layer]: !visibility[layer] };
+      if (controlledVisibility) {
+        onVisibilityChange?.(next);
+        return;
+      }
+      setLocalVisibility(next);
+      onVisibilityChange?.(next);
+    },
+    [controlledVisibility, onVisibilityChange, visibility],
+  );
 
   const handleSave = useCallback(() => {
     if (!onSave) return;
@@ -267,7 +287,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
       {!panelsOnly && (
         <div className={classes.canvasWrap}>
           <PixelCanvas
-            pixels={pixels}
+            pixels={visiblePixels}
             onPixelChange={handlePixelChange}
             onPixelsFill={handlePixelsFill}
             onColorPick={handleColorPick}

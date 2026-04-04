@@ -5,7 +5,7 @@
  * eraser, fill, and eyedropper tools. Initializes from 2D pixel grid as
  * a solid block with configurable depth (for sculpting/chiseling).
  */
-import type { Tool, VoxelMap, LayerVisibility } from '../types';
+import type { Tool, VoxelMap } from '../types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -117,7 +117,7 @@ export interface EditableSceneProps {
   /** How deep the initial solid block is (default 3) */
   voxelDepth?: number;
   interactionMode?: 'sculpt' | 'orbit';
-  layerVisibility?: LayerVisibility;
+  visibilityMask?: boolean[][];
   /** Called when voxel map changes — parent can capture for save */
   onVoxelMapChange?: (map: VoxelMap) => void;
 }
@@ -134,6 +134,7 @@ export default function EditableScene({
   onColorPick,
   voxelDepth = DEFAULT_VOXEL_DEPTH,
   interactionMode = 'sculpt',
+  visibilityMask,
   onVoxelMapChange,
 }: EditableSceneProps) {
   // Initialize as solid block with depth
@@ -306,7 +307,13 @@ export default function EditableScene({
     [activeTool, activeColor, interactionMode],
   );
 
-  const voxelEntries = useMemo(() => Array.from(voxels.entries()), [voxels]);
+  const voxelEntries = useMemo(() => {
+    return Array.from(voxels.entries()).filter(([key]) => {
+      if (!visibilityMask) return true;
+      const [x, y] = parseKey(key);
+      return Boolean(visibilityMask[31 - y]?.[x]);
+    });
+  }, [visibilityMask, voxels]);
 
   return (
     <>
