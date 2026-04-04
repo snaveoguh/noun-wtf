@@ -272,6 +272,7 @@ export interface EditableConfig {
   onColorPick: (color: string) => void;
   voxelDepth?: number;
   interactionMode?: 'sculpt' | 'orbit';
+  visibilityMask?: boolean[][];
   onVoxelMapChange?: (map: VoxelMap) => void;
 }
 
@@ -458,6 +459,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               onColorPick={editable.onColorPick}
               voxelDepth={editable.voxelDepth}
               interactionMode={editable.interactionMode}
+              visibilityMask={editable.visibilityMask}
               onVoxelMapChange={editable.onVoxelMapChange}
             />
           ) : interactive ? (

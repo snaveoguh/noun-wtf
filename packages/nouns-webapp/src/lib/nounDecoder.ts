@@ -21,6 +21,8 @@ export interface LayerVisibility {
   glasses: boolean;
 }
 
+export type VisibilityMask = boolean[][];
+
 // ─── RLE decoder ─────────────────────────────────────────────────────────────
 
 function decodeRLE(data: string) {
@@ -92,6 +94,17 @@ export function mergeLayersToGrid(
     }
   }
   return grid;
+}
+
+export function buildVisibilityMask(
+  layers: NounPixelLayers,
+  visibility: LayerVisibility,
+): VisibilityMask {
+  return mergeLayersToGrid(layers, visibility).map(row => row.map(color => Boolean(color)));
+}
+
+export function applyVisibilityMask(pixels: string[][], mask: VisibilityMask): string[][] {
+  return pixels.map((row, y) => row.map((color, x) => (mask[y]?.[x] ? color : '')));
 }
 
 export const DEFAULT_VISIBILITY: LayerVisibility = {
