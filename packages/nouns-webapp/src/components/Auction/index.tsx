@@ -92,6 +92,7 @@ type HeroViewMode =
 type InteractionMode = 'scroll' | 'grab' | 'twist';
 type EditMode = '2d' | '3d' | null;
 type ComposerMode = 'art' | 'link';
+type Edit3DInteractionMode = 'sculpt' | 'orbit';
 
 const DERIVATIVES_API = '/.netlify/functions/derivatives';
 const NOUN_LINKS_API = '/.netlify/functions/noun-links';
@@ -183,6 +184,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [edit3dColor, setEdit3dColor] = useState('#000000');
   const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
   const [edit3dStartVoxelMap, setEdit3dStartVoxelMap] = useState<VoxelMap | null>(null);
+  const [edit3dInteractionMode, setEdit3dInteractionMode] =
+    useState<Edit3DInteractionMode>('sculpt');
 
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
   const [editingAuctionUrl, setEditingAuctionUrl] = useState(false);
@@ -278,6 +281,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setListingForAuction(false);
     setEditingAuctionUrl(false);
     setEdit3dStartVoxelMap(null);
+    setEdit3dInteractionMode('sculpt');
     setLinkNameDraft('');
     setLinkUrlDraft('');
     setPlayIntroSpin(true);
@@ -324,6 +328,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         const pixels = liveDrafts?.voxel?.pixels ?? liveDrafts?.pixel?.pixels ?? baseGrid;
         resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
         setEdit3dStartVoxelMap(liveVoxelMap);
+        setEdit3dInteractionMode('sculpt');
         setViewMode('edit-3d');
         setInteractionMode('grab');
       }
@@ -661,6 +666,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     editorToolRef.current?.setTool('pencil');
                   },
                   voxelDepth: edit3dVoxelDepth,
+                  interactionMode: edit3dInteractionMode,
                   onVoxelMapChange: map => {
                     voxelMapRef.current = map;
                     setVoxelMapVersion(version => version + 1);
@@ -1169,6 +1175,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     voxelDepth={edit3dVoxelDepth}
                     onVoxelDepthChange={setEdit3dVoxelDepth}
                     onExit={stopEditing}
+                    interactionMode={edit3dInteractionMode}
+                    onInteractionModeChange={setEdit3dInteractionMode}
                     toolRef={editorToolRef}
                   />
                 </Suspense>

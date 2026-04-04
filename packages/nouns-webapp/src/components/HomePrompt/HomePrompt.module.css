@@ -10,6 +10,33 @@
   gap: 0;
 }
 
+.wrapperClosed {
+  align-items: center;
+}
+
+.triggerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  background: rgba(255, 255, 255, 0.78);
+  color: #1f1a17;
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(82, 54, 25, 0.08);
+}
+
+.triggerIcon {
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.65;
+}
+
 /* ─── Input bar ─────────────────────────────────── */
 
 .inputBar {
@@ -169,6 +196,11 @@
 @media (max-width: 768px) {
   .wrapper {
     padding: 0 0.5rem;
+  }
+
+  .triggerBtn {
+    width: 100%;
+    justify-content: center;
   }
 
   .conversation {
