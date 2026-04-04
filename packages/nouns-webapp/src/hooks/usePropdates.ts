@@ -117,7 +117,7 @@ function decodePostUpdateLogs(logs: Log[]): PropdateEntry[] {
       const isCompleted = BigInt(topics[2]!) !== 0n;
 
       const data = log.data;
-      if (data == null || data === '' || data === '0x') continue;
+      if (data == null || data === '0x') continue;
 
       const [update] = decodeAbiParameters(parseAbiParameters('string'), data as `0x${string}`);
 
