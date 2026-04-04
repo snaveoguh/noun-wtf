@@ -215,6 +215,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     ? nounLinks.find(link => `link-${link.id}` === viewMode)
     : null;
   const liveVoxelMap = useMemo(() => parseVoxelMap(liveDrafts?.voxel?.voxelData), [liveDrafts]);
+  const is3dView = viewMode === '3d' || viewMode === 'edit-3d' || editMode === '3d';
 
   const fetchDerivativesForNoun = useCallback(async (nounId: number) => {
     try {
@@ -287,6 +288,12 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     const timer = window.setTimeout(() => setPlayIntroSpin(false), 2600);
     return () => window.clearTimeout(timer);
   }, [currentNounId, resetHeroState]);
+
+  useEffect(() => {
+    if (!is3dView && interactionMode === 'twist') {
+      setInteractionMode('scroll');
+    }
+  }, [interactionMode, is3dView]);
 
   const resetLive2dSignature = useCallback(
     (pixels: string[][]) => {
@@ -634,6 +641,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           seed={displayVoxelMap ? undefined : (currentNounSeed ?? undefined)}
           voxelMap={displayVoxelMap ?? undefined}
           interactive={parallaxInteractive}
+          interactionMode={interactionMode === 'grab' ? 'grab' : 'twist'}
           autoRotate={interactionMode === 'twist' && !showSpin}
           autoSpin={showSpin}
           fullscreen
@@ -928,7 +936,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         <p className={classes.metaEyebrow}>Above The Fold</p>
         <h3 className={classes.metaTitle}>Noun #{currentNounId}</h3>
         <p className={classes.metaBody}>
-          Scroll first, then grab, twist, or edit when you want to take over the stage.
+          {is3dView
+            ? 'Scroll first, then grab, twist, or edit when you want to take over the stage.'
+            : 'Scroll first, then grab or edit when you want to take over the stage.'}
         </p>
       </div>
     );
@@ -979,11 +989,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 key={value}
                 className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
                 onClick={() => {
+                  if (value === 'edit-2d') {
+                    startEditing('2d');
+                    return;
+                  }
+                  if (value === 'edit-3d') {
+                    startEditing('3d');
+                    return;
+                  }
                   if (isEditing) stopEditing();
                   setViewMode(value as HeroViewMode);
-                  if (value === 'edit-3d' && interactionMode === 'scroll') {
-                    setInteractionMode('grab');
-                  }
                 }}
               >
                 {label}
@@ -1062,15 +1077,17 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     <span className={classes.railIcon}>🖐</span>
                     <span className={classes.railLabel}>Grab</span>
                   </button>
-                  <button
-                    type="button"
-                    className={`${classes.railBtn} ${interactionMode === 'twist' ? classes.railBtnActive : ''}`}
-                    onClick={() => setInteractionMode('twist')}
-                    title="Let it spin"
-                  >
-                    <span className={classes.railIcon}>🌀</span>
-                    <span className={classes.railLabel}>Twist</span>
-                  </button>
+                  {is3dView && (
+                    <button
+                      type="button"
+                      className={`${classes.railBtn} ${interactionMode === 'twist' ? classes.railBtnActive : ''}`}
+                      onClick={() => setInteractionMode('twist')}
+                      title="Rotate the 3D noun"
+                    >
+                      <span className={classes.railIcon}>🌀</span>
+                      <span className={classes.railLabel}>Twist</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={classes.railBtn}

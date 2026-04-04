@@ -10,11 +10,10 @@
 import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { buildNounGeometries, seedToLayers, type NounLayers } from '@nouns/voxel-engine';
 import { OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
-
-import { buildNounGeometries, seedToLayers } from '@nouns/voxel-engine';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -41,25 +40,31 @@ export interface PredictResponse {
 
 type ViewMode = 'color' | 'silhouette';
 
-function VoxelScene({ layers, mode }: { layers: { body: any[]; bling: any[]; glasses: any[] }; mode: ViewMode }) {
-  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => buildNounGeometries(layers), [layers]);
+function VoxelScene({ layers, mode }: { layers: NounLayers; mode: ViewMode }) {
+  const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(
+    () => buildNounGeometries(layers),
+    [layers],
+  );
   const isColor = mode === 'color';
 
   const renderMesh = (geo: THREE.BufferGeometry | null, roughness: number) => {
     if (!geo) return null;
     return (
       <>
+        {/* eslint-disable react/no-unknown-property */}
         <mesh geometry={geo}>
-          {isColor
-            ? <meshStandardMaterial vertexColors roughness={roughness} metalness={0.0} />
-            : <meshStandardMaterial color="#0a0a12" roughness={0.9} />
-          }
+          {isColor ? (
+            <meshStandardMaterial vertexColors roughness={roughness} metalness={0.0} />
+          ) : (
+            <meshStandardMaterial color="#0a0a12" roughness={0.9} />
+          )}
         </mesh>
         {!isColor && (
           <mesh geometry={geo}>
             <meshBasicMaterial color="#1a2a5a" wireframe transparent opacity={0.15} />
           </mesh>
         )}
+        {/* eslint-enable react/no-unknown-property */}
       </>
     );
   };
@@ -74,6 +79,7 @@ function VoxelScene({ layers, mode }: { layers: { body: any[]; bling: any[]; gla
 
       {renderMesh(bodyGeo, 0.8)}
       {renderMesh(blingGeo, 0.6)}
+      {renderMesh(headGeo, 0.72)}
       {renderMesh(glassesGeo, 0.6)}
       {/* eslint-enable react/no-unknown-property */}
 

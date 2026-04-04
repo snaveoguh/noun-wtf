@@ -10,10 +10,12 @@ export interface VoxelPixel {
 }
 
 export interface NounLayers {
-  /** Body shape + head + flat accessories (prints, stripes, gradients) — full depth */
+  /** Body shape + flat accessories (prints, stripes, gradients) — full depth */
   body: VoxelPixel[];
   /** Bling accessories (chains, necklaces, objects, text) — front only, 1px extruded */
   bling: VoxelPixel[];
+  /** Head silhouette — full depth, slightly in front of accessory */
+  head: VoxelPixel[];
   /** Glasses/noggles — front only, 1px extruded */
   glasses: VoxelPixel[];
 }
@@ -38,4 +40,5 @@ export const SATURATION_FACTOR = 1.0; // true to source colors, no boost
 export const DEFAULT_VOXEL_DEPTH = 3;
 export const BODY_DEPTH = 2.5;
 export const BLING_DEPTH = 1.0;
+export const HEAD_DEPTH = 2.5;
 export const GLASSES_DEPTH = 1.0;

@@ -63,16 +63,17 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
 
-  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+  const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
     if (voxelMap) {
       return {
         bodyGeo: buildGeometryFromVoxelMap(voxelMap),
         blingGeo: null,
+        headGeo: null,
         glassesGeo: null,
       };
     }
     if (!seed) {
-      return { bodyGeo: null, blingGeo: null, glassesGeo: null };
+      return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
@@ -82,9 +83,10 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
     return () => {
       bodyGeo?.dispose();
       blingGeo?.dispose();
+      headGeo?.dispose();
       glassesGeo?.dispose();
     };
-  }, [bodyGeo, blingGeo, glassesGeo]);
+  }, [bodyGeo, blingGeo, glassesGeo, headGeo]);
 
   useEffect(() => {
     spinTime.current = 0;
@@ -128,6 +130,11 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
+        {headGeo && (
+          <mesh geometry={headGeo}>
+            <meshBasicMaterial vertexColors toneMapped={false} />
+          </mesh>
+        )}
         {glassesGeo && (
           <mesh geometry={glassesGeo}>
             <meshBasicMaterial vertexColors toneMapped={false} />
@@ -146,6 +153,7 @@ interface InteractiveSceneProps {
   voxelMap?: VoxelMap;
   layerVisibility?: LayerVisibility;
   autoRotate?: boolean;
+  interactionMode?: 'grab' | 'twist';
 }
 
 function InteractiveScene({
@@ -153,17 +161,19 @@ function InteractiveScene({
   voxelMap,
   layerVisibility,
   autoRotate = false,
+  interactionMode = 'twist',
 }: InteractiveSceneProps) {
-  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+  const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
     if (voxelMap) {
       return {
         bodyGeo: buildGeometryFromVoxelMap(voxelMap),
         blingGeo: null,
+        headGeo: null,
         glassesGeo: null,
       };
     }
     if (!seed) {
-      return { bodyGeo: null, blingGeo: null, glassesGeo: null };
+      return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
@@ -173,9 +183,10 @@ function InteractiveScene({
     return () => {
       bodyGeo?.dispose();
       blingGeo?.dispose();
+      headGeo?.dispose();
       glassesGeo?.dispose();
     };
-  }, [bodyGeo, blingGeo, glassesGeo]);
+  }, [bodyGeo, blingGeo, glassesGeo, headGeo]);
 
   return (
     <>
@@ -190,6 +201,11 @@ function InteractiveScene({
           <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
+      {headGeo && (
+        <mesh geometry={headGeo}>
+          <meshBasicMaterial vertexColors toneMapped={false} />
+        </mesh>
+      )}
       {glassesGeo && (
         <mesh geometry={glassesGeo}>
           <meshBasicMaterial vertexColors toneMapped={false} />
@@ -197,15 +213,28 @@ function InteractiveScene({
       )}
 
       <OrbitControls
-        enablePan={false}
+        enablePan={interactionMode === 'grab'}
+        enableRotate={interactionMode === 'twist'}
+        enableZoom
         enableDamping
         dampingFactor={0.12}
         autoRotate={autoRotate}
         autoRotateSpeed={1.3}
+        screenSpacePanning
+        panSpeed={0.9}
         minDistance={10}
         maxDistance={80}
         minPolarAngle={Math.PI * 0.05}
         maxPolarAngle={Math.PI * 0.95}
+        mouseButtons={{
+          LEFT: interactionMode === 'grab' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: interactionMode === 'grab' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+        }}
+        touches={{
+          ONE: interactionMode === 'grab' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE,
+          TWO: interactionMode === 'grab' ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE,
+        }}
       />
       {/* eslint-enable react/no-unknown-property */}
     </>
@@ -249,6 +278,7 @@ interface NounParallaxProps {
   seed?: INounSeed;
   voxelMap?: VoxelMap;
   interactive?: boolean;
+  interactionMode?: 'grab' | 'twist';
   fullscreen?: boolean;
   editable?: EditableConfig;
   layerVisibility?: LayerVisibility;
@@ -266,6 +296,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
   seed,
   voxelMap,
   interactive = false,
+  interactionMode = 'twist',
   fullscreen = false,
   editable,
   layerVisibility,
@@ -433,6 +464,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               voxelMap={voxelMap}
               layerVisibility={layerVisibility}
               autoRotate={autoRotate}
+              interactionMode={interactionMode}
             />
           ) : (
             <TiltScene

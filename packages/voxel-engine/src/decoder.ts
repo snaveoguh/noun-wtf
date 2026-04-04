@@ -1,21 +1,38 @@
-import { SATURATION_FACTOR, type LayerVisibility, type NounLayers, type VoxelPixel, type VoxelMap, DEFAULT_VOXEL_DEPTH } from './types';
+import {
+  SATURATION_FACTOR,
+  type LayerVisibility,
+  type NounLayers,
+  type VoxelPixel,
+  type VoxelMap,
+  DEFAULT_VOXEL_DEPTH,
+} from './types';
 import { voxelKey } from './voxelMap';
 
 // ─── Color utilities ────────────────────────────────────────────────────────
 
 export function saturate(r: number, g: number, b: number, factor: number) {
   if (factor === 1.0) return { r, g, b }; // no-op: true colors
-  const rf = r / 255, gf = g / 255, bf = b / 255;
-  const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf);
+  const rf = r / 255,
+    gf = g / 255,
+    bf = b / 255;
+  const max = Math.max(rf, gf, bf),
+    min = Math.min(rf, gf, bf);
   const l = (max + min) / 2;
-  let h = 0, s = 0;
+  let h = 0,
+    s = 0;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case rf: h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6; break;
-      case gf: h = ((bf - rf) / d + 2) / 6; break;
-      case bf: h = ((rf - gf) / d + 4) / 6; break;
+      case rf:
+        h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6;
+        break;
+      case gf:
+        h = ((bf - rf) / d + 2) / 6;
+        break;
+      case bf:
+        h = ((rf - gf) / d + 4) / 6;
+        break;
     }
   }
   s = Math.min(1, s * factor);
@@ -51,7 +68,9 @@ export function decodeRLE(data: string) {
     left: parseInt(hex.substring(8, 10), 16),
   };
   const pairs: [number, number][] =
-    hex.substring(10).match(/.{1,4}/g)
+    hex
+      .substring(10)
+      .match(/.{1,4}/g)
       ?.map(r => [parseInt(r.substring(0, 2), 16), parseInt(r.substring(2, 4), 16)]) ?? [];
   return { bounds, pairs };
 }
@@ -66,12 +85,16 @@ export function decodeParts(
   const colorGrid: (string | null)[][] = Array.from({ length: 32 }, () => Array(32).fill(null));
   for (const part of parts) {
     const { bounds, pairs } = decodeRLE(part.data);
-    let x = bounds.left, y = bounds.top;
+    let x = bounds.left,
+      y = bounds.top;
     for (const [runLength, colorIndex] of pairs) {
       for (let i = 0; i < runLength; i++) {
         if (colorIndex !== 0 && y < 32 && x < 32) colorGrid[y][x] = palette[colorIndex];
         x++;
-        if (x >= bounds.right) { x = bounds.left; y++; }
+        if (x >= bounds.right) {
+          x = bounds.left;
+          y++;
+        }
       }
     }
   }
@@ -98,9 +121,20 @@ export function decodeParts(
  * These wrap the full body at full depth (no extrusion).
  */
 const FLAT_ACCESSORY_PATTERNS = [
-  'body-gradient-', 'checker', 'stripes-', 'stripes_',
-  'grid-', 'matrix', 'woolweave', 'wall', 'wave', 'rain',
-  'tie-dye', 'decay-', 'rainbow-steps', 'taxi-checkers',
+  'body-gradient-',
+  'checker',
+  'stripes-',
+  'stripes_',
+  'grid-',
+  'matrix',
+  'woolweave',
+  'wall',
+  'wave',
+  'rain',
+  'tie-dye',
+  'decay-',
+  'rainbow-steps',
+  'taxi-checkers',
   'lines-45-',
 ];
 
@@ -121,22 +155,28 @@ export function isFlatAccessory(filename: string): boolean {
  * Parts: [0]=body, [1]=accessory, [2]=head, [3]=glasses
  *
  * Flat accessories (prints, stripes) merge into body at full depth.
- * Bling accessories (chains, objects, text) render front-only, extruded.
+ * Bling accessories (chains, objects, text) render in front of the body,
+ * while the head remains above them and glasses stay top-most.
  * Glasses always front-only, extruded.
  */
 export function seedToLayers(
   seed: { background: number; body: number; accessory: number; head: number; glasses: number },
-  getNounData: (seed: any) => { parts: { data: string; filename: string }[] },
+  getNounData: (seed: {
+    background: number;
+    body: number;
+    accessory: number;
+    head: number;
+    glasses: number;
+  }) => { parts: { data: string; filename: string }[] },
   palette: string[],
   visibility?: LayerVisibility,
 ): NounLayers {
   const { parts } = getNounData(seed);
   const vis = visibility ?? { body: true, accessory: true, head: true, glasses: true };
 
-  // Build body layer: body shape + head + flat accessories
+  // Build body layer: body shape + flat accessories
   const bodyParts: { data: string }[] = [];
   if (vis.body) bodyParts.push(parts[0]);
-  if (vis.head) bodyParts.push(parts[2]);
 
   // Classify accessory
   let blingParts: { data: string }[] = [];
@@ -154,6 +194,7 @@ export function seedToLayers(
   return {
     body: bodyParts.length > 0 ? decodeParts(bodyParts, palette) : [],
     bling: blingParts.length > 0 ? decodeParts(blingParts, palette) : [],
+    head: vis.head ? decodeParts([parts[2]], palette) : [],
     glasses: vis.glasses ? decodeParts([parts[3]], palette) : [],
   };
 }
@@ -166,7 +207,13 @@ export function seedToLayers(
  */
 export function seedToVoxelMap(
   seed: { background: number; body: number; accessory: number; head: number; glasses: number },
-  getNounData: (seed: any) => { parts: { data: string; filename: string }[] },
+  getNounData: (seed: {
+    background: number;
+    body: number;
+    accessory: number;
+    head: number;
+    glasses: number;
+  }) => { parts: { data: string; filename: string }[] },
   palette: string[],
   depth: number = DEFAULT_VOXEL_DEPTH,
   visibility?: LayerVisibility,
@@ -191,10 +238,16 @@ export function seedToVoxelMap(
     map.set(voxelKey(p.x, p.y, depth), hex);
   }
 
-  // Glasses → front-only, 1px extruded (on top of bling if overlap)
-  for (const p of layers.glasses) {
+  // Head sits above the accessory so facial features are never hidden by bling.
+  for (const p of layers.head) {
     const hex = toHex(p);
     map.set(voxelKey(p.x, p.y, depth + 1), hex);
+  }
+
+  // Glasses → front-only, 1px extruded (on top of head if overlap)
+  for (const p of layers.glasses) {
+    const hex = toHex(p);
+    map.set(voxelKey(p.x, p.y, depth + 2), hex);
   }
 
   return map;
