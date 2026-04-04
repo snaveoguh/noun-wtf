@@ -1,5 +1,5 @@
 /* eslint-disable import/order, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
-import type { Tool, VoxelMap } from '@nouns/voxel-engine';
+import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine';
 import React, {
   Suspense,
   useCallback,
@@ -23,10 +23,10 @@ import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
 import {
-  buildVisibilityMask,
-  seedToPixelLayers,
-  mergeLayersToGrid,
   DEFAULT_VISIBILITY,
+  mergeLayersToGrid,
+  resolveEditableVisibility,
+  seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
@@ -180,6 +180,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     null,
   );
   const voxelMapRef = useRef<VoxelMap | null>(null);
+  const edit3dViewStateRef = useRef<EditableSceneViewState | null>(null);
   const live2dSignatureRef = useRef('');
   const live3dSignatureRef = useRef('');
 
@@ -230,9 +231,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     : null;
   const liveVoxelMap = useMemo(() => parseVoxelMap(liveDrafts?.voxel?.voxelData), [liveDrafts]);
   const is3dView = viewMode === '3d' || viewMode === 'edit-3d' || editMode === '3d';
+  const edit3dVisiblePixels = useMemo(
+    () =>
+      nounLayers
+        ? resolveEditableVisibility(edit3dHistory.present, nounLayers, edit3dVisibility)
+        : edit3dHistory.present,
+    [edit3dHistory.present, edit3dVisibility, nounLayers],
+  );
   const edit3dVisibilityMask = useMemo(
-    () => (nounLayers ? buildVisibilityMask(nounLayers, edit3dVisibility) : undefined),
-    [edit3dVisibility, nounLayers],
+    () => edit3dVisiblePixels.map(row => row.map(color => Boolean(color))),
+    [edit3dVisiblePixels],
   );
 
   const fetchDerivativesForNoun = useCallback(async (nounId: number) => {
@@ -298,6 +306,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setEdit3dStartVoxelMap(null);
     setEdit3dInteractionMode('sculpt');
     voxelMapRef.current = null;
+    edit3dViewStateRef.current = null;
     setEdit2dVisibility({ ...DEFAULT_VISIBILITY });
     setEdit3dVisibility({ ...DEFAULT_VISIBILITY });
     setLinkNameDraft('');
@@ -347,6 +356,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
         setEdit3dStartVoxelMap(liveVoxelMap);
         voxelMapRef.current = liveVoxelMap;
+        edit3dViewStateRef.current = null;
         setEdit3dInteractionMode('sculpt');
         setViewMode('edit-3d');
         setInteractionMode('grab');
@@ -420,6 +430,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setEditMode(null);
     setEdit3dStartVoxelMap(null);
     voxelMapRef.current = null;
+    edit3dViewStateRef.current = null;
     setInteractionMode('scroll');
   }, [edit2dHistory.present, edit3dHistory.present, editMode, persistLiveDraft]);
 
@@ -737,6 +748,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   voxelDepth: edit3dVoxelDepth,
                   interactionMode: edit3dInteractionMode,
                   visibilityMask: edit3dVisibilityMask,
+                  displayPixels: edit3dVisiblePixels,
+                  viewStateRef: edit3dViewStateRef,
                   onVoxelMapChange: map => {
                     voxelMapRef.current = map;
                     setVoxelMapVersion(version => version + 1);

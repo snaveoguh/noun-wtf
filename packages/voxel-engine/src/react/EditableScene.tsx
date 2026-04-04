@@ -5,7 +5,7 @@
  * eraser, fill, and eyedropper tools. Initializes from 2D pixel grid as
  * a solid block with configurable depth (for sculpting/chiseling).
  */
-import type { Tool, VoxelMap } from '../types';
+import type { EditableSceneViewState, Tool, VoxelMap } from '../types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -14,7 +14,14 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { DEFAULT_VOXEL_DEPTH } from '../types';
-import { floodFill3D, getAdjacentPos, parseKey, pixelsToSolidBlock, voxelKey } from '../voxelMap';
+import {
+  flattenTo2D,
+  floodFill3D,
+  getAdjacentPos,
+  parseKey,
+  pixelsToSolidBlock,
+  voxelKey,
+} from '../voxelMap';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -34,27 +41,148 @@ type MeshPointerEvent = {
   stopPropagation: () => void;
 };
 
-function getBrushPositions(
+type BrushAxis = 'x' | 'y' | 'z';
+
+type FaceNormal = {
+  axis: BrushAxis;
+  direction: -1 | 1;
+  vector: [number, number, number];
+};
+
+function getBrushOffsets(size: number) {
+  const start = -Math.floor((size - 1) / 2);
+  return Array.from({ length: size }, (_, index) => start + index);
+}
+
+function clampBrushPositions(positions: [number, number, number][]): [number, number, number][] {
+  const seen = new Set<string>();
+  return positions.filter(([x, y, z]) => {
+    if (x < 0 || x >= 32 || y < 0 || y >= 32 || z < 0) return false;
+    const key = voxelKey(x, y, z);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getDominantFaceNormal(faceNormal: { x: number; y: number; z: number } | null): FaceNormal {
+  if (!faceNormal) {
+    return { axis: 'z', direction: 1, vector: [0, 0, 1] };
+  }
+
+  const ax = Math.abs(faceNormal.x);
+  const ay = Math.abs(faceNormal.y);
+  const az = Math.abs(faceNormal.z);
+
+  if (ax >= ay && ax >= az) {
+    const direction = faceNormal.x >= 0 ? 1 : -1;
+    return { axis: 'x', direction, vector: [direction, 0, 0] };
+  }
+
+  if (ay >= ax && ay >= az) {
+    const direction = faceNormal.y >= 0 ? 1 : -1;
+    return { axis: 'y', direction, vector: [0, direction, 0] };
+  }
+
+  const direction = faceNormal.z >= 0 ? 1 : -1;
+  return { axis: 'z', direction, vector: [0, 0, direction] };
+}
+
+function getSurfaceBrushPositions(
   [cx, cy, cz]: [number, number, number],
   size: number,
+  axis: BrushAxis,
 ): [number, number, number][] {
-  const radius = Math.max(0, Math.floor(size / 2));
+  const offsets = getBrushOffsets(Math.max(1, size));
   const positions: [number, number, number][] = [];
 
-  for (let x = cx - radius; x <= cx + radius; x++) {
-    for (let y = cy - radius; y <= cy + radius; y++) {
-      for (let z = cz - radius; z <= cz + radius; z++) {
-        positions.push([x, y, z]);
+  if (axis === 'x') {
+    for (const yOffset of offsets) {
+      for (const zOffset of offsets) {
+        positions.push([cx, cy + yOffset, cz + zOffset]);
       }
+    }
+    return clampBrushPositions(positions);
+  }
+
+  if (axis === 'y') {
+    for (const xOffset of offsets) {
+      for (const zOffset of offsets) {
+        positions.push([cx + xOffset, cy, cz + zOffset]);
+      }
+    }
+    return clampBrushPositions(positions);
+  }
+
+  for (const xOffset of offsets) {
+    for (const yOffset of offsets) {
+      positions.push([cx + xOffset, cy + yOffset, cz]);
     }
   }
 
-  return positions;
+  return clampBrushPositions(positions);
+}
+
+function getWorldFaceNormal(
+  normal: THREE.Face['normal'] | null | undefined,
+  object: THREE.Object3D,
+): { x: number; y: number; z: number } | null {
+  if (!normal) return null;
+  const worldNormal = normal.clone();
+  worldNormal.transformDirection(object.matrixWorld);
+  return { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z };
 }
 
 // ─── Orbit controls (grab/twist) ────────────────────────────────────────────
 
-function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'grab' | 'twist' }) {
+function EditOrbitControls({
+  interactionMode,
+  viewStateRef,
+}: {
+  interactionMode: 'sculpt' | 'grab' | 'twist';
+  viewStateRef: { current: EditableSceneViewState | null };
+}) {
+  const controlsRef = useRef<{
+    target: THREE.Vector3;
+    update: () => void;
+  } | null>(null);
+  const { camera } = useThree();
+  const setControlsRef = useCallback(
+    (
+      controls: {
+        target: THREE.Vector3;
+        update: () => void;
+      } | null,
+    ) => {
+      controlsRef.current = controls;
+    },
+    [],
+  );
+
+  const syncViewState = useCallback(() => {
+    const controls = controlsRef.current;
+    const perspectiveCamera = camera as THREE.PerspectiveCamera;
+    if (!controls) return;
+
+    viewStateRef.current = {
+      cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
+      target: [controls.target.x, controls.target.y, controls.target.z],
+      zoom: perspectiveCamera.zoom,
+    };
+  }, [camera, viewStateRef]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const savedView = viewStateRef.current;
+    if (!controls || !savedView) return;
+
+    camera.position.set(...savedView.cameraPosition);
+    controls.target.set(...savedView.target);
+    (camera as THREE.PerspectiveCamera).zoom = savedView.zoom;
+    camera.updateProjectionMatrix();
+    controls.update();
+  }, [camera, interactionMode, viewStateRef]);
+
   const leftMouseButton = (() => {
     if (interactionMode === 'grab') return THREE.MOUSE.PAN;
     if (interactionMode === 'twist') return THREE.MOUSE.ROTATE;
@@ -78,6 +206,7 @@ function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'g
 
   return (
     <OrbitControls
+      ref={setControlsRef}
       enablePan={interactionMode === 'grab'}
       enableRotate={interactionMode === 'twist'}
       enableDamping
@@ -95,6 +224,7 @@ function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'g
         ONE: singleTouchMode,
         TWO: doubleTouchMode,
       }}
+      onChange={syncViewState}
     />
   );
 }
@@ -161,6 +291,8 @@ export interface EditableSceneProps {
   voxelDepth?: number;
   interactionMode?: 'sculpt' | 'grab' | 'twist';
   visibilityMask?: boolean[][];
+  displayPixels?: string[][];
+  viewStateRef?: { current: EditableSceneViewState | null };
   /** Called when voxel map changes — parent can capture for save */
   onVoxelMapChange?: (map: VoxelMap) => void;
 }
@@ -172,15 +304,18 @@ export default function EditableScene({
   initialVoxelMap,
   activeTool,
   activeColor,
-  onPixelChange,
   onPixelsFill,
   onColorPick,
   voxelDepth = DEFAULT_VOXEL_DEPTH,
   interactionMode = 'sculpt',
   visibilityMask,
+  displayPixels,
+  viewStateRef,
   onVoxelMapChange,
 }: EditableSceneProps) {
   const brushSize = Math.max(1, Math.round(voxelDepth));
+  const localViewStateRef = useRef<EditableSceneViewState | null>(null);
+  const orbitViewStateRef = viewStateRef ?? localViewStateRef;
 
   // Initialize as solid block with depth
   const [voxels, setVoxels] = useState<VoxelMap>(() =>
@@ -207,14 +342,42 @@ export default function EditableScene({
   useEffect(() => {
     if (interactionMode !== 'sculpt') {
       setHoveredKey(null);
-      setGhostPos(null);
+      setGhostPositions([]);
     }
   }, [interactionMode]);
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [ghostPos, setGhostPos] = useState<[number, number, number] | null>(null);
+  const [ghostPositions, setGhostPositions] = useState<[number, number, number][]>([]);
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   const { gl } = useThree();
+
+  const getDisplayColor = useCallback(
+    (key: string) => {
+      const [x, y] = parseKey(key);
+      return displayPixels?.[31 - y]?.[x] ?? voxels.get(key) ?? '';
+    },
+    [displayPixels, voxels],
+  );
+
+  const syncPixelsFromVoxelMap = useCallback(
+    (nextMap: VoxelMap) => {
+      const nextGrid = flattenTo2D(nextMap);
+      const changes: [number, number, string][] = [];
+
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          if ((pixels[y]?.[x] ?? '') !== (nextGrid[y]?.[x] ?? '')) {
+            changes.push([x, y, nextGrid[y]?.[x] ?? '']);
+          }
+        }
+      }
+
+      if (changes.length > 0) {
+        onPixelsFill(changes);
+      }
+    },
+    [onPixelsFill, pixels],
+  );
 
   // Track pointer for drag detection
   useEffect(() => {
@@ -224,7 +387,7 @@ export default function EditableScene({
     };
     const onLeave = () => {
       setHoveredKey(null);
-      setGhostPos(null);
+      setGhostPositions([]);
     };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointerleave', onLeave);
@@ -250,73 +413,49 @@ export default function EditableScene({
       if (isDrag(e)) return;
 
       const pos = parseKey(key);
+      const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
 
       switch (activeTool) {
         case 'pencil': {
-          const normal = e.face?.normal;
-          const worldNormal = normal ? normal.clone() : null;
-          if (worldNormal && e.object) {
-            worldNormal.transformDirection(e.object.matrixWorld);
-          }
           const adjacent = getAdjacentPos(
-            worldNormal ? { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z } : null,
+            { x: faceNormal.vector[0], y: faceNormal.vector[1], z: faceNormal.vector[2] },
             pos,
           );
-          const brushPositions = getBrushPositions(adjacent, brushSize);
-          setVoxels(prev => {
-            const next = new Map(prev);
-            for (const position of brushPositions) {
-              next.set(voxelKey(...position), activeColor);
-            }
-            return next;
-          });
-          for (const [ax, ay3d] of brushPositions) {
-            const gridY = 31 - ay3d;
-            if (ax >= 0 && ax < 32 && gridY >= 0 && gridY < 32) {
-              onPixelChange(ax, gridY, activeColor);
-            }
+          const brushPositions = getSurfaceBrushPositions(adjacent, brushSize, faceNormal.axis);
+          if (brushPositions.length === 0) break;
+
+          const next = new Map(voxels);
+          for (const position of brushPositions) {
+            next.set(voxelKey(...position), activeColor);
           }
+          setVoxels(next);
+          syncPixelsFromVoxelMap(next);
           break;
         }
         case 'eraser': {
-          const brushPositions = getBrushPositions(pos, brushSize);
-          setVoxels(prev => {
-            const next = new Map(prev);
-            for (const position of brushPositions) {
-              next.delete(voxelKey(...position));
-            }
-            return next;
-          });
-          for (const [ex, ey3d] of brushPositions) {
-            const gridY = 31 - ey3d;
-            if (ex >= 0 && ex < 32 && gridY >= 0 && gridY < 32) {
-              onPixelChange(ex, gridY, '');
-            }
+          const brushPositions = getSurfaceBrushPositions(pos, brushSize, faceNormal.axis);
+          if (brushPositions.length === 0) break;
+
+          const next = new Map(voxels);
+          for (const position of brushPositions) {
+            next.delete(voxelKey(...position));
           }
+          setVoxels(next);
+          syncPixelsFromVoxelMap(next);
           break;
         }
         case 'fill': {
           const changes = floodFill3D(voxels, key, activeColor);
           if (changes.size > 0) {
-            setVoxels(prev => {
-              const next = new Map(prev);
-              for (const [k, v] of changes) next.set(k, v);
-              return next;
-            });
-            const grid2dChanges: [number, number, string][] = [];
-            for (const [k, v] of changes) {
-              const [fx, fy3d] = parseKey(k);
-              const gy = 31 - fy3d;
-              if (fx >= 0 && fx < 32 && gy >= 0 && gy < 32) {
-                grid2dChanges.push([fx, gy, v]);
-              }
-            }
-            if (grid2dChanges.length > 0) onPixelsFill(grid2dChanges);
+            const next = new Map(voxels);
+            for (const [k, v] of changes) next.set(k, v);
+            setVoxels(next);
+            syncPixelsFromVoxelMap(next);
           }
           break;
         }
         case 'eyedropper': {
-          const color = voxels.get(key);
+          const color = getDisplayColor(key);
           if (color) onColorPick(color);
           break;
         }
@@ -326,12 +465,12 @@ export default function EditableScene({
       activeTool,
       activeColor,
       brushSize,
+      getDisplayColor,
       interactionMode,
       voxels,
       isDrag,
-      onPixelChange,
-      onPixelsFill,
       onColorPick,
+      syncPixelsFromVoxelMap,
     ],
   );
 
@@ -343,21 +482,17 @@ export default function EditableScene({
       setHoveredKey(key);
       if (activeTool === 'pencil' && activeColor) {
         const pos = parseKey(key);
-        const normal = e.face?.normal;
-        const worldNormal = normal ? normal.clone() : null;
-        if (worldNormal && e.object) {
-          worldNormal.transformDirection(e.object.matrixWorld);
-        }
+        const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
         const adjacent = getAdjacentPos(
-          worldNormal ? { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z } : null,
+          { x: faceNormal.vector[0], y: faceNormal.vector[1], z: faceNormal.vector[2] },
           pos,
         );
-        setGhostPos(adjacent);
+        setGhostPositions(getSurfaceBrushPositions(adjacent, brushSize, faceNormal.axis));
       } else {
-        setGhostPos(null);
+        setGhostPositions([]);
       }
     },
-    [activeTool, activeColor, interactionMode],
+    [activeTool, activeColor, brushSize, interactionMode],
   );
 
   const voxelEntries = useMemo(() => {
@@ -373,8 +508,10 @@ export default function EditableScene({
       {}
       {/* No lights needed — meshBasicMaterial renders true hex colors */}
 
-      {voxelEntries.map(([key, color]) => {
+      {voxelEntries.map(([key]) => {
         const [x, y, z] = parseKey(key);
+        const color = getDisplayColor(key);
+        if (!color) return null;
         return (
           <Voxel
             key={key}
@@ -387,21 +524,24 @@ export default function EditableScene({
         );
       })}
 
-      {ghostPos && activeTool === 'pencil' && activeColor && (
-        <GhostVoxel
-          position={[ghostPos[0] - 15.5, ghostPos[1] - 15.5, ghostPos[2]]}
-          color={activeColor}
-        />
-      )}
+      {activeTool === 'pencil' &&
+        activeColor &&
+        ghostPositions.map(position => (
+          <GhostVoxel
+            key={`ghost-${voxelKey(...position)}`}
+            position={[position[0] - 15.5, position[1] - 15.5, position[2]]}
+            color={activeColor}
+          />
+        ))}
 
-      <EditOrbitControls interactionMode={interactionMode} />
+      <EditOrbitControls interactionMode={interactionMode} viewStateRef={orbitViewStateRef} />
 
       <mesh
         visible={false}
         position={[0, 0, -10]}
         onPointerOver={() => {
           setHoveredKey(null);
-          setGhostPos(null);
+          setGhostPositions([]);
         }}
       >
         <planeGeometry args={[200, 200]} />
