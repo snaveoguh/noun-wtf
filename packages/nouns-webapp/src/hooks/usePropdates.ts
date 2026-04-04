@@ -1,5 +1,7 @@
 import type { Address } from '@/utils/types';
 
+import { useMemo } from 'react';
+
 import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { type Log, decodeAbiParameters, parseAbiParameters } from 'viem';
 import { useBlockNumber, usePublicClient } from 'wagmi';
@@ -66,14 +68,7 @@ async function fetchAllLogs(
   address: Address,
   fromBlock: bigint,
   toBlock: bigint,
-  propId?: number,
 ): Promise<Log[]> {
-  const topics: (string | null)[] = [POST_UPDATE_TOPIC];
-  if (propId !== undefined) {
-    // Filter by propId in topic[1] (indexed uint256)
-    topics.push('0x' + propId.toString(16).padStart(64, '0'));
-  }
-
   const chunks: Array<{ from: bigint; to: bigint }> = [];
   for (let start = fromBlock; start <= toBlock; start += BLOCK_CHUNK) {
     const end = start + BLOCK_CHUNK - 1n > toBlock ? toBlock : start + BLOCK_CHUNK - 1n;
@@ -88,7 +83,7 @@ async function fetchAllLogs(
       batch.map(chunk =>
         client.getLogs({
           address,
-          topics,
+          topics: [POST_UPDATE_TOPIC],
           fromBlock: chunk.from,
           toBlock: chunk.to,
         }),
@@ -158,8 +153,9 @@ export function usePropdates(options: UsePropdatesOptions = {}) {
   const publicClient = usePublicClient();
   const { data: currentBlock } = useBlockNumber();
 
-  return useReactQuery({
-    queryKey: ['propdatesFromChain', currentBlock?.toString(), propId],
+  // Single shared query for all propdates — filter client-side
+  const query = useReactQuery({
+    queryKey: ['propdatesFromChain', currentBlock?.toString()],
     queryFn: async (): Promise<PropdateEntry[]> => {
       if (publicClient == null || currentBlock == null) return [];
 
@@ -168,31 +164,44 @@ export function usePropdates(options: UsePropdatesOptions = {}) {
         PROPDATES_ADDRESS,
         DEPLOY_BLOCK,
         currentBlock,
-        propId,
       );
 
       const entries = decodePostUpdateLogs(rawLogs);
-
-      // Sort newest first
       entries.sort((a, b) => Number(b.blockNumber - a.blockNumber));
-
-      if (dedupeByProp) {
-        const seen = new Set<number>();
-        const unique: PropdateEntry[] = [];
-        for (const e of entries) {
-          if (!seen.has(e.propId)) {
-            seen.add(e.propId);
-            unique.push(e);
-          }
-        }
-        return unique.slice(0, limit);
-      }
-
-      return entries.slice(0, limit);
+      return entries;
     },
     enabled: publicClient != null && currentBlock != null,
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
     retry: 2,
   });
+
+  // Client-side filtering by propId + dedup + limit
+  const filtered = useMemo(() => {
+    if (query.data == null) return [];
+
+    let entries = query.data;
+
+    // Filter to specific proposal
+    if (propId !== undefined) {
+      entries = entries.filter(e => e.propId === propId);
+    }
+
+    // Deduplicate to latest update per proposal (for banner)
+    if (dedupeByProp) {
+      const seen = new Set<number>();
+      const unique: PropdateEntry[] = [];
+      for (const e of entries) {
+        if (!seen.has(e.propId)) {
+          seen.add(e.propId);
+          unique.push(e);
+        }
+      }
+      entries = unique;
+    }
+
+    return entries.slice(0, limit);
+  }, [query.data, propId, dedupeByProp, limit]);
+
+  return { ...query, data: filtered };
 }

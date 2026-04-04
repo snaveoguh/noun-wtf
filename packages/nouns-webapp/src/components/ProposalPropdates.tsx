@@ -139,7 +139,8 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
     limit: 50,
   });
 
-  if (isLoading || !propdates || propdates.length === 0) return null;
+  // Nothing to show and done loading
+  if (!isLoading && (propdates == null || propdates.length === 0)) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -164,19 +165,21 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
           }}
         >
           Propdates
-          <span
-            style={{
-              fontSize: '0.65rem',
-              fontFamily: "'PT Root UI'",
-              fontWeight: 600,
-              background: '#f0f0f4',
-              padding: '1px 6px',
-              borderRadius: 4,
-              color: '#8c8d92',
-            }}
-          >
-            {propdates.length}
-          </span>
+          {propdates != null && propdates.length > 0 && (
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontFamily: "'PT Root UI'",
+                fontWeight: 600,
+                background: '#f0f0f4',
+                padding: '1px 6px',
+                borderRadius: 4,
+                color: '#8c8d92',
+              }}
+            >
+              {propdates.length}
+            </span>
+          )}
         </div>
         <a
           href={`https://propdates.nouns.wtf/prop/${proposalId}`}
@@ -197,12 +200,32 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
         </a>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            border: '1px solid #e2e3e8',
+            padding: '20px 16px',
+            textAlign: 'center',
+            color: '#8c8d92',
+            fontSize: '0.75rem',
+            fontFamily: "'PT Root UI'",
+          }}
+        >
+          Loading proposal updates...
+        </div>
+      )}
+
       {/* Stacked propdates */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {propdates.map((entry, i) => (
-          <PropdateCard key={`${entry.blockNumber}-${i}`} entry={entry} />
-        ))}
-      </div>
+      {propdates != null && propdates.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {propdates.map((entry, i) => (
+            <PropdateCard key={`${entry.blockNumber}-${i}`} entry={entry} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
