@@ -16,9 +16,9 @@
 
 .navBarCustom {
   padding:
-    0.65rem
+    max(0.95rem, env(safe-area-inset-top))
     var(--page-edge-padding-right)
-    0.35rem
+    0.45rem
     var(--page-edge-padding-left);
   background: transparent;
 }
@@ -43,9 +43,9 @@
   .navBarCustom {
     margin-bottom: -1px;
     padding:
-      0.4rem
+      max(0.7rem, env(safe-area-inset-top))
       var(--page-edge-padding-right)
-      0
+      0.15rem
       var(--page-edge-padding-left);
   }
 
