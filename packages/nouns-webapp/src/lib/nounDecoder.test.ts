@@ -87,4 +87,34 @@ describe('nounDecoder visibility helpers', () => {
 
     expect(visible[8][8]).toBe('#body');
   });
+
+  it('drops edited top-layer color when that layer gets hidden', () => {
+    const body = createGrid();
+    const accessory = createGrid();
+    const head = createGrid();
+    const glasses = createGrid();
+
+    body[6][6] = '#body';
+    accessory[6][6] = '#accessory';
+
+    const layers: NounPixelLayers = {
+      accessory,
+      background: '#ffffff',
+      body,
+      glasses,
+      head,
+    };
+
+    const pixels = createGrid();
+    pixels[6][6] = '#custom-accessory-edit';
+
+    const visible = resolveEditableVisibility(pixels, layers, {
+      body: true,
+      accessory: false,
+      head: true,
+      glasses: true,
+    });
+
+    expect(visible[6][6]).toBe('#body');
+  });
 });

@@ -29,6 +29,12 @@ export interface LayerVisibility {
 
 export type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 
+export interface EditableSceneViewState {
+  cameraPosition: [number, number, number];
+  target: [number, number, number];
+  zoom: number;
+}
+
 export const DEFAULT_VISIBILITY: LayerVisibility = {
   body: true,
   accessory: true,

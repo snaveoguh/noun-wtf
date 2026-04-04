@@ -120,11 +120,17 @@ export function resolveEditableVisibility(
       if (!color) return '';
 
       const originalTopColor = baseAll[y]?.[x] ?? '';
-      if (color !== originalTopColor) {
-        return color;
+      const nextVisibleBaseColor = baseVisible[y]?.[x] ?? '';
+
+      if (color === originalTopColor) {
+        return nextVisibleBaseColor;
       }
 
-      return baseVisible[y]?.[x] ?? '';
+      if (nextVisibleBaseColor !== originalTopColor) {
+        return nextVisibleBaseColor;
+      }
+
+      return color;
     }),
   );
 }

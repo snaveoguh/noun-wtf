@@ -17,9 +17,10 @@ import {
   buildGeometryFromVoxelMap,
   buildNounGeometries,
   seedToLayers,
+  type EditableSceneViewState,
   type LayerVisibility,
-  type VoxelMap,
   type Tool,
+  type VoxelMap,
 } from '@nouns/voxel-engine';
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -273,6 +274,8 @@ export interface EditableConfig {
   voxelDepth?: number;
   interactionMode?: 'sculpt' | 'grab' | 'twist';
   visibilityMask?: boolean[][];
+  displayPixels?: string[][];
+  viewStateRef?: { current: EditableSceneViewState | null };
   onVoxelMapChange?: (map: VoxelMap) => void;
 }
 
@@ -460,6 +463,8 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               voxelDepth={editable.voxelDepth}
               interactionMode={editable.interactionMode}
               visibilityMask={editable.visibilityMask}
+              displayPixels={editable.displayPixels}
+              viewStateRef={editable.viewStateRef}
               onVoxelMapChange={editable.onVoxelMapChange}
             />
           ) : interactive ? (
