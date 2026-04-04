@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title NounDerivatives
@@ -25,6 +25,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *    → burns the token
  */
 contract NounDerivatives is ERC721, ReentrancyGuard {
+    uint16 public constant MAX_BID_REASON_LENGTH = 280;
 
     struct Auction {
         uint256 nounId;          // which Noun this is a derivative of
@@ -44,6 +45,7 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
     uint40 public timeBuffer = 5 minutes;
 
     mapping(uint256 => Auction) public auctions;
+    mapping(uint256 => string) public bidReasons;
 
     // ── Events ──────────────────────────────────────────────────────────
 
@@ -60,6 +62,14 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
         address bidder,
         uint256 amount,
         bool extended
+    );
+
+    event AuctionBidWithReason(
+        uint256 indexed tokenId,
+        address bidder,
+        uint256 amount,
+        bool extended,
+        string reason
     );
 
     event AuctionSettled(
@@ -116,9 +126,24 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
      * First bid activates the auction timer.
      */
     function createBid(uint256 tokenId) external payable nonReentrant {
+        _createBid(tokenId, "");
+    }
+
+    /**
+     * @notice Place a bid on a derivative auction with an onchain reason.
+     * First bid activates the auction timer.
+     * @param tokenId The derivative token being bid on
+     * @param reason Short message stored onchain for the current highest bid
+     */
+    function createBidWithReason(uint256 tokenId, string calldata reason) external payable nonReentrant {
+        _createBid(tokenId, reason);
+    }
+
+    function _createBid(uint256 tokenId, string memory reason) internal {
         Auction storage a = auctions[tokenId];
         require(a.creator != address(0), "Auction does not exist");
         require(!a.settled, "Auction already settled");
+        require(bytes(reason).length <= MAX_BID_REASON_LENGTH, "Reason too long");
 
         // First bid — activate the auction
         if (a.startTime == 0) {
@@ -137,6 +162,7 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
 
         a.amount = uint128(msg.value);
         a.bidder = payable(msg.sender);
+        bidReasons[tokenId] = reason;
 
         if (lastBidder != address(0)) {
             _safeTransferETH(lastBidder, lastAmount);
@@ -150,6 +176,7 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
         }
 
         emit AuctionBid(tokenId, msg.sender, msg.value, extended);
+        emit AuctionBidWithReason(tokenId, msg.sender, msg.value, extended, reason);
     }
 
     // ── Settle ──────────────────────────────────────────────────────────
@@ -197,7 +224,7 @@ contract NounDerivatives is ERC721, ReentrancyGuard {
     // ── ERC721 overrides ────────────────────────────────────────────────
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        _requireOwned(tokenId);
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
         return auctions[tokenId].tokenURI_;
     }
 

@@ -6,8 +6,12 @@ import { Address } from '@/utils/types';
 
 const abi = nounDerivativesABI;
 
-const NOUN_DERIVATIVES_ADDRESS = (import.meta.env.VITE_NOUN_DERIVATIVES_ADDRESS || '') as Address;
-export const hasDerivativesContract = Boolean(NOUN_DERIVATIVES_ADDRESS);
+const rawDerivativesAddress = String(import.meta.env.VITE_NOUN_DERIVATIVES_ADDRESS ?? '');
+const NOUN_DERIVATIVES_ADDRESS = rawDerivativesAddress as Address;
+const DERIVATIVE_BID_REASON_ENABLED =
+  String(import.meta.env.VITE_DERIVATIVE_BID_REASON_ENABLED ?? '').toLowerCase() === 'true';
+export const hasDerivativesContract = rawDerivativesAddress.length > 0;
+export const hasDerivativeBidReason = hasDerivativesContract && DERIVATIVE_BID_REASON_ENABLED;
 
 // ── Read auction state ──────────────────────────────────────────────────
 
@@ -20,6 +24,8 @@ export interface DerivativeAuction {
   startTime: number;
   endTime: number;
   settled: boolean;
+  bidReason: string;
+  supportsBidReason: boolean;
 }
 
 export const useDerivativeAuction = (tokenId: number | undefined) => {
@@ -31,10 +37,37 @@ export const useDerivativeAuction = (tokenId: number | undefined) => {
     query: { enabled: hasDerivativesContract && tokenId !== undefined },
   });
 
-  if (!data) return { auction: undefined, isLoading, refetch };
+  const {
+    data: bidReasonData,
+    isSuccess: bidReasonSupported,
+    refetch: refetchBidReason,
+  } = useReadContract({
+    abi,
+    address: NOUN_DERIVATIVES_ADDRESS,
+    functionName: 'bidReasons',
+    args: tokenId !== undefined ? [BigInt(tokenId)] : undefined,
+    query: {
+      enabled: hasDerivativeBidReason && tokenId !== undefined,
+      retry: false,
+    },
+  });
 
-  const [nounId, creator, reservePrice, amount, bidder, startTime, endTime, settled] =
-    data as [bigint, Address, bigint, bigint, Address, number, number, boolean];
+  const refetchAuction = async () => {
+    await Promise.all([refetch(), refetchBidReason()]);
+  };
+
+  if (data === undefined) return { auction: undefined, isLoading, refetch: refetchAuction };
+
+  const [nounId, creator, reservePrice, amount, bidder, startTime, endTime, settled] = data as [
+    bigint,
+    Address,
+    bigint,
+    bigint,
+    Address,
+    number,
+    number,
+    boolean,
+  ];
 
   const auction: DerivativeAuction = {
     nounId,
@@ -45,9 +78,11 @@ export const useDerivativeAuction = (tokenId: number | undefined) => {
     startTime: Number(startTime),
     endTime: Number(endTime),
     settled,
+    bidReason: (bidReasonData as string | undefined) ?? '',
+    supportsBidReason: hasDerivativeBidReason && bidReasonSupported,
   };
 
-  return { auction, isLoading, refetch };
+  return { auction, isLoading, refetch: refetchAuction };
 };
 
 // ── Create derivative (mint + list) ─────────────────────────────────────
@@ -75,13 +110,24 @@ export const useCreateDerivative = () => {
 export const useCreateDerivativeBid = () => {
   const { writeContract, isPending, isSuccess, isError, error, data: txHash } = useWriteContract();
 
-  const bid = (tokenId: number, amountEth: string) => {
+  const bid = (
+    tokenId: number,
+    amountEth: string,
+    options?: { reason?: string; supportsBidReason?: boolean },
+  ) => {
     if (!hasDerivativesContract) return;
+    const trimmedReason = options?.reason?.trim() ?? '';
     writeContract({
       abi,
       address: NOUN_DERIVATIVES_ADDRESS,
-      functionName: 'createBid',
-      args: [BigInt(tokenId)],
+      functionName:
+        trimmedReason.length > 0 && options?.supportsBidReason === true
+          ? 'createBidWithReason'
+          : 'createBid',
+      args:
+        trimmedReason.length > 0 && options?.supportsBidReason === true
+          ? [BigInt(tokenId), trimmedReason]
+          : [BigInt(tokenId)],
       value: parseEther(amountEth),
     });
   };

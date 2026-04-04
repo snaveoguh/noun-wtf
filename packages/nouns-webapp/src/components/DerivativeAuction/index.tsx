@@ -29,8 +29,9 @@ const fmt = (wei: bigint): string => {
   return n < 0.001 ? n.toFixed(6) : n.toFixed(4);
 };
 
-const truncAddr = (addr: string) =>
-  `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+const MAX_BID_REASON_LENGTH = 280;
+
+const truncAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 const useCountdown = (endTime: number) => {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -52,12 +53,18 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
   const { auction, isLoading, refetch } = useDerivativeAuction(tokenId);
   const { isConnected } = useAccount();
   const { bid, isPending: bidPending, isSuccess: bidSuccess } = useCreateDerivativeBid();
-  const { settle, isPending: settlePending, isSuccess: settleSuccess } = useSettleDerivativeAuction();
+  const {
+    settle,
+    isPending: settlePending,
+    isSuccess: settleSuccess,
+  } = useSettleDerivativeAuction();
 
   const [bidInput, setBidInput] = useState('');
+  const [bidReasonInput, setBidReasonInput] = useState('');
 
-  const isActive = auction && auction.startTime > 0 && !auction.settled;
-  const isEnded = auction && auction.startTime > 0 && !auction.settled;
+  const isWalletConnected = isConnected === true;
+  const isActive = auction !== undefined && auction.startTime > 0 && !auction.settled;
+  const isEnded = auction !== undefined && auction.startTime > 0 && !auction.settled;
   const { remaining, label: countdown } = useCountdown(auction?.endTime ?? 0);
 
   // Refetch auction after successful bid or settle
@@ -68,6 +75,15 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
     }
   }, [bidSuccess, settleSuccess, refetch]);
 
+  useEffect(() => {
+    if (!bidSuccess) return;
+    const t = setTimeout(() => {
+      setBidInput('');
+      setBidReasonInput('');
+    }, 0);
+    return () => clearTimeout(t);
+  }, [bidSuccess]);
+
   const minBid = useMemo(() => {
     if (!auction) return '0';
     if (auction.startTime === 0) return fmt(auction.reservePrice);
@@ -76,8 +92,11 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
 
   const handleBid = useCallback(() => {
     if (!bidInput.trim()) return;
-    bid(tokenId, bidInput.trim());
-  }, [tokenId, bidInput, bid]);
+    bid(tokenId, bidInput.trim(), {
+      reason: bidReasonInput,
+      supportsBidReason: auction?.supportsBidReason,
+    });
+  }, [tokenId, bid, bidInput, bidReasonInput, auction?.supportsBidReason]);
 
   const handleSettle = useCallback(() => {
     settle(tokenId);
@@ -94,10 +113,25 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
   // ── Settled ───────────────────────────────────────────────────────────
   if (auction.settled) {
     return (
-      <div style={{ ...s, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontWeight: 700, color: '#22c55e' }}>SOLD</span>
-        <span>{fmt(auction.amount)} ETH</span>
-        <span style={{ color: 'rgba(255,255,255,0.5)' }}>→ {truncAddr(auction.bidder)}</span>
+      <div style={{ ...s, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontWeight: 700, color: '#22c55e' }}>SOLD</span>
+          <span>{fmt(auction.amount)} ETH</span>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>→ {truncAddr(auction.bidder)}</span>
+        </div>
+        {auction.supportsBidReason && auction.bidReason.trim().length > 0 && (
+          <div
+            style={{
+              padding: '6px 8px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.82)',
+              lineHeight: 1.45,
+            }}
+          >
+            “{auction.bidReason}”
+          </div>
+        )}
       </div>
     );
   }
@@ -107,14 +141,21 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
     return (
       <div style={{ ...s, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontWeight: 700 }}>ENDED · {fmt(auction.amount)} ETH</span>
-        {isConnected && (
+        {isWalletConnected && (
           <button
+            type="button"
             onClick={handleSettle}
             disabled={settlePending}
             style={{
-              border: 'none', borderRadius: 4, padding: '3px 10px',
-              background: '#22c55e', color: '#000', cursor: 'pointer',
-              fontSize: '0.6rem', fontWeight: 700, fontFamily: "'PT Root UI', sans-serif",
+              border: 'none',
+              borderRadius: 4,
+              padding: '3px 10px',
+              background: '#22c55e',
+              color: '#000',
+              cursor: 'pointer',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              fontFamily: "'PT Root UI', sans-serif",
               opacity: settlePending ? 0.5 : 1,
             }}
           >
@@ -138,8 +179,21 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           </span>
           <span style={{ color: '#fbbf24', fontWeight: 600 }}>{countdown}</span>
         </div>
-        {isConnected && (
-          <div style={{ display: 'flex', gap: 4 }}>
+        {auction.supportsBidReason && auction.bidReason.trim().length > 0 && (
+          <div
+            style={{
+              padding: '6px 8px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.82)',
+              lineHeight: 1.45,
+            }}
+          >
+            “{auction.bidReason}”
+          </div>
+        )}
+        {isWalletConnected && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <input
               type="number"
               step="0.001"
@@ -147,26 +201,67 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
               placeholder={`≥ ${minBid} ETH`}
               value={bidInput}
               onChange={e => setBidInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleBid(); }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleBid();
+              }}
               style={{
-                flex: 1, border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: 4, padding: '3px 6px', fontSize: '0.6rem',
+                flex: 1,
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 4,
+                padding: '3px 6px',
+                fontSize: '0.6rem',
                 fontFamily: "'PT Root UI', sans-serif",
-                background: 'rgba(0,0,0,0.4)', color: '#fff', outline: 'none',
+                background: 'rgba(0,0,0,0.4)',
+                color: '#fff',
+                outline: 'none',
               }}
             />
-            <button
-              onClick={handleBid}
-              disabled={bidPending || !bidInput.trim()}
-              style={{
-                border: 'none', borderRadius: 4, padding: '3px 10px',
-                background: '#fff', color: '#14141f', cursor: 'pointer',
-                fontSize: '0.6rem', fontWeight: 700, fontFamily: "'PT Root UI', sans-serif",
-                opacity: bidPending ? 0.5 : 1,
-              }}
-            >
-              {bidPending ? '...' : 'BID'}
-            </button>
+            {auction.supportsBidReason && (
+              <textarea
+                value={bidReasonInput}
+                onChange={e => setBidReasonInput(e.target.value.slice(0, MAX_BID_REASON_LENGTH))}
+                placeholder="BWR - ONLY AT NOUN.WTF"
+                rows={2}
+                style={{
+                  resize: 'vertical',
+                  minHeight: 46,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 8,
+                  padding: '6px 8px',
+                  fontSize: '0.6rem',
+                  fontFamily: "'PT Root UI', sans-serif",
+                  background: 'rgba(0,0,0,0.28)',
+                  color: '#fff',
+                  outline: 'none',
+                }}
+              />
+            )}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={handleBid}
+                disabled={bidPending || !bidInput.trim()}
+                style={{
+                  border: 'none',
+                  borderRadius: 4,
+                  padding: '3px 10px',
+                  background: '#fff',
+                  color: '#14141f',
+                  cursor: 'pointer',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  fontFamily: "'PT Root UI', sans-serif",
+                  opacity: bidPending ? 0.5 : 1,
+                }}
+              >
+                {bidPending ? '...' : 'BID'}
+              </button>
+              {auction.supportsBidReason && (
+                <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.5rem' }}>
+                  {bidReasonInput.length}/{MAX_BID_REASON_LENGTH}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -184,8 +279,8 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           24h auction starts on first bid
         </span>
       </div>
-      {isConnected && (
-        <div style={{ display: 'flex', gap: 4 }}>
+      {isWalletConnected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <input
             type="number"
             step="0.001"
@@ -193,26 +288,67 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
             placeholder={`≥ ${minBid} ETH`}
             value={bidInput}
             onChange={e => setBidInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleBid(); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleBid();
+            }}
             style={{
-              flex: 1, border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 4, padding: '3px 6px', fontSize: '0.6rem',
+              flex: 1,
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 4,
+              padding: '3px 6px',
+              fontSize: '0.6rem',
               fontFamily: "'PT Root UI', sans-serif",
-              background: 'rgba(0,0,0,0.4)', color: '#fff', outline: 'none',
+              background: 'rgba(0,0,0,0.4)',
+              color: '#fff',
+              outline: 'none',
             }}
           />
-          <button
-            onClick={handleBid}
-            disabled={bidPending || !bidInput.trim()}
-            style={{
-              border: 'none', borderRadius: 4, padding: '3px 10px',
-              background: '#fff', color: '#14141f', cursor: 'pointer',
-              fontSize: '0.6rem', fontWeight: 700, fontFamily: "'PT Root UI', sans-serif",
-              opacity: bidPending ? 0.5 : 1,
-            }}
-          >
-            {bidPending ? '...' : 'BID'}
-          </button>
+          {auction.supportsBidReason && (
+            <textarea
+              value={bidReasonInput}
+              onChange={e => setBidReasonInput(e.target.value.slice(0, MAX_BID_REASON_LENGTH))}
+              placeholder="BWR - ONLY AT NOUN.WTF"
+              rows={2}
+              style={{
+                resize: 'vertical',
+                minHeight: 46,
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 8,
+                padding: '6px 8px',
+                fontSize: '0.6rem',
+                fontFamily: "'PT Root UI', sans-serif",
+                background: 'rgba(0,0,0,0.28)',
+                color: '#fff',
+                outline: 'none',
+              }}
+            />
+          )}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleBid}
+              disabled={bidPending || !bidInput.trim()}
+              style={{
+                border: 'none',
+                borderRadius: 4,
+                padding: '3px 10px',
+                background: '#fff',
+                color: '#14141f',
+                cursor: 'pointer',
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                fontFamily: "'PT Root UI', sans-serif",
+                opacity: bidPending ? 0.5 : 1,
+              }}
+            >
+              {bidPending ? '...' : 'BID'}
+            </button>
+            {auction.supportsBidReason && (
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.5rem' }}>
+                {bidReasonInput.length}/{MAX_BID_REASON_LENGTH}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
