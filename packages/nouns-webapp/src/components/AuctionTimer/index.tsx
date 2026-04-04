@@ -31,11 +31,11 @@ const AuctionTimer: React.FC<AuctionTimerProps> = ({ auction, auctionEnded }) =>
 
   // timer logic
   useEffect(() => {
-    const timeLeft = (auction && Number(auction.endTime)) - dayjs().unix();
+    const timeLeft = Number(auction.endTime) - dayjs().unix();
 
-    setAuctionTimer(auction && timeLeft);
+    setAuctionTimer(timeLeft);
 
-    if (auction && timeLeft <= 0) {
+    if (timeLeft <= 0) {
       setAuctionTimer(0);
     } else {
       const timer = setTimeout(() => {
@@ -63,14 +63,12 @@ const AuctionTimer: React.FC<AuctionTimerProps> = ({ auction, auctionEnded }) =>
   const flooredSeconds = Math.floor(timerDuration.seconds());
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
-  if (!auction) return null;
-
   return (
     <Row
       className={clsx(classes.wrapper, classes.section)}
       onClick={() => setTimerToggle(!timerToggle)}
     >
-      <Col xs={timerToggle ? 4 : 6} lg={12} className={classes.leftCol}>
+      <Col xs={12} lg={12} className={classes.leftCol}>
         <h4
           style={{
             color: isCool ? 'var(--brand-cool-light-text)' : 'var(--brand-warm-light-text)',
@@ -90,7 +88,7 @@ const AuctionTimer: React.FC<AuctionTimerProps> = ({ auction, auctionEnded }) =>
           )}
         </h4>
       </Col>
-      <Col xs="auto" lg={12}>
+      <Col xs={12} lg={12}>
         {timerToggle ? (
           <h2
             className={clsx(classes.timerWrapper, classes.timeLeft)}

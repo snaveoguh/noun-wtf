@@ -107,6 +107,28 @@ export function applyVisibilityMask(pixels: string[][], mask: VisibilityMask): s
   return pixels.map((row, y) => row.map((color, x) => (mask[y]?.[x] ? color : '')));
 }
 
+export function resolveEditableVisibility(
+  pixels: string[][],
+  layers: NounPixelLayers,
+  visibility: LayerVisibility,
+): string[][] {
+  const baseAll = mergeLayersToGrid(layers, DEFAULT_VISIBILITY);
+  const baseVisible = mergeLayersToGrid(layers, visibility);
+
+  return pixels.map((row, y) =>
+    row.map((color, x) => {
+      if (!color) return '';
+
+      const originalTopColor = baseAll[y]?.[x] ?? '';
+      if (color !== originalTopColor) {
+        return color;
+      }
+
+      return baseVisible[y]?.[x] ?? '';
+    }),
+  );
+}
+
 export const DEFAULT_VISIBILITY: LayerVisibility = {
   body: true,
   accessory: true,

@@ -20,9 +20,8 @@ import {
 
 import { PixelCanvas, type Tool } from '@/components/Studio/PixelCanvas';
 import {
-  applyVisibilityMask,
-  buildVisibilityMask,
   mergeLayersToGrid,
+  resolveEditableVisibility,
   seedToPixelLayers,
   DEFAULT_VISIBILITY,
   type NounPixelLayers,
@@ -60,8 +59,8 @@ interface InlineEditorProps {
   externalFuture?: string[][][];
   visibility?: LayerVisibility;
   onVisibilityChange?: (visibility: LayerVisibility) => void;
-  interactionMode?: 'sculpt' | 'orbit';
-  onInteractionModeChange?: (mode: 'sculpt' | 'orbit') => void;
+  interactionMode?: 'sculpt' | 'grab' | 'twist';
+  onInteractionModeChange?: (mode: 'sculpt' | 'grab' | 'twist') => void;
 }
 
 type PanelKey = 'tools' | 'palette' | 'actions';
@@ -119,13 +118,9 @@ const InlineEditor: FC<InlineEditorProps> = ({
   const dispatch = externalDispatch ?? internalDispatch;
   const pastLen = externalPast?.length ?? internalHistory.past.length;
   const futureLen = externalFuture?.length ?? internalHistory.future.length;
-  const visibilityMask = useMemo(
-    () => buildVisibilityMask(nounLayers, visibility),
-    [nounLayers, visibility],
-  );
   const visiblePixels = useMemo(
-    () => applyVisibilityMask(pixels, visibilityMask),
-    [pixels, visibilityMask],
+    () => resolveEditableVisibility(pixels, nounLayers, visibility),
+    [nounLayers, pixels, visibility],
   );
 
   const [activeTool, setActiveTool] = useState<Tool>('pencil');
@@ -368,12 +363,12 @@ const InlineEditor: FC<InlineEditorProps> = ({
         {/* Voxel depth slider (3D mode only) */}
         {panelsOnly && onVoxelDepthChange && (
           <div className={classes.depthSlider}>
-            <span className={classes.depthLabel}>Depth</span>
+            <span className={classes.depthLabel}>Brush</span>
             <input
               type="range"
-              min="0.5"
-              max="5"
-              step="0.5"
+              min="1"
+              max="4"
+              step="1"
               value={voxelDepth}
               onChange={e => onVoxelDepthChange(parseFloat(e.target.value))}
               className={classes.depthRange}
@@ -389,12 +384,19 @@ const InlineEditor: FC<InlineEditorProps> = ({
               className={`${classes.modeBtn} ${interactionMode === 'sculpt' ? classes.modeBtnActive : ''}`}
               onClick={() => onInteractionModeChange('sculpt')}
             >
-              Sculpt
+              Build
             </button>
             <button
               type="button"
-              className={`${classes.modeBtn} ${interactionMode === 'orbit' ? classes.modeBtnActive : ''}`}
-              onClick={() => onInteractionModeChange('orbit')}
+              className={`${classes.modeBtn} ${interactionMode === 'grab' ? classes.modeBtnActive : ''}`}
+              onClick={() => onInteractionModeChange('grab')}
+            >
+              Grab
+            </button>
+            <button
+              type="button"
+              className={`${classes.modeBtn} ${interactionMode === 'twist' ? classes.modeBtnActive : ''}`}
+              onClick={() => onInteractionModeChange('twist')}
             >
               Twist
             </button>

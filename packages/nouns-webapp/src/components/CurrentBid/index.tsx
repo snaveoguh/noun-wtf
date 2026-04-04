@@ -32,7 +32,7 @@ const CurrentBid: React.FC<CurrentBidProps> = props => {
 
   return (
     <Row className={clsx(classes.wrapper, classes.container, classes.section)}>
-      <Col xs={5} lg={12} className={classes.leftCol}>
+      <Col xs={12} lg={12} className={classes.leftCol}>
         <h4
           style={{
             color: isCool ? 'var(--brand-cool-light-text)' : 'var(--brand-warm-light-text)',
@@ -41,7 +41,7 @@ const CurrentBid: React.FC<CurrentBidProps> = props => {
           {titleContent}
         </h4>
       </Col>
-      <Col xs="auto" lg={12}>
+      <Col xs={12} lg={12}>
         <h2
           className={classes.currentBid}
           style={{ color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)' }}

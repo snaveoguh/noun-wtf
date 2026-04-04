@@ -19,16 +19,20 @@
 }
 
 .wrapper {
-  padding-left: 2.5rem;
+  padding-left: 0;
   padding-right: 0rem;
   cursor: pointer;
   margin-top: 0.3rem;
-  width: max-content;
+  width: 100%;
+  min-width: 0;
 }
 
 .timerWrapper {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.35rem;
   margin-top: 1px;
+  min-width: 0;
 }
 
 .timerSection span {
@@ -38,7 +42,7 @@
 }
 
 .timerSection {
-  margin-right: 0.5rem;
+  margin-right: 0.15rem;
 }
 
 .timerSectionFinal {
@@ -96,6 +100,6 @@
   }
 
   .timeLeft {
-    padding-right: 0.5rem;
+    padding-right: 0;
   }
 }

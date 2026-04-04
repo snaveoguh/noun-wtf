@@ -182,7 +182,7 @@ const Bid: React.FC<BidProps> = props => {
 
   return (
     <>
-      <InputGroup>
+      <InputGroup className={classes.bidGroup}>
         {!auctionEnded && (
           <>
             <span className={classes.customPlaceholderBidAmt}>

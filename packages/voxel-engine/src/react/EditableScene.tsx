@@ -34,12 +34,52 @@ type MeshPointerEvent = {
   stopPropagation: () => void;
 };
 
-// ─── Orbit controls (right-click to rotate) ─────────────────────────────────
+function getBrushPositions(
+  [cx, cy, cz]: [number, number, number],
+  size: number,
+): [number, number, number][] {
+  const radius = Math.max(0, Math.floor(size / 2));
+  const positions: [number, number, number][] = [];
 
-function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'orbit' }) {
+  for (let x = cx - radius; x <= cx + radius; x++) {
+    for (let y = cy - radius; y <= cy + radius; y++) {
+      for (let z = cz - radius; z <= cz + radius; z++) {
+        positions.push([x, y, z]);
+      }
+    }
+  }
+
+  return positions;
+}
+
+// ─── Orbit controls (grab/twist) ────────────────────────────────────────────
+
+function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'grab' | 'twist' }) {
+  const leftMouseButton = (() => {
+    if (interactionMode === 'grab') return THREE.MOUSE.PAN;
+    if (interactionMode === 'twist') return THREE.MOUSE.ROTATE;
+    return undefined as unknown as THREE.MOUSE;
+  })();
+
+  const rightMouseButton = (() => {
+    if (interactionMode === 'grab') return THREE.MOUSE.PAN;
+    if (interactionMode === 'twist') return THREE.MOUSE.ROTATE;
+    return undefined as unknown as THREE.MOUSE;
+  })();
+
+  const singleTouchMode = (() => {
+    if (interactionMode === 'grab') return THREE.TOUCH.PAN;
+    if (interactionMode === 'twist') return THREE.TOUCH.ROTATE;
+    return undefined as unknown as THREE.TOUCH;
+  })();
+
+  const doubleTouchMode =
+    interactionMode === 'twist' ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;
+
   return (
     <OrbitControls
-      enablePan={false}
+      enablePan={interactionMode === 'grab'}
+      enableRotate={interactionMode === 'twist'}
       enableDamping
       dampingFactor={0.12}
       minDistance={10}
@@ -47,15 +87,13 @@ function EditOrbitControls({ interactionMode }: { interactionMode: 'sculpt' | 'o
       minPolarAngle={Math.PI * 0.05}
       maxPolarAngle={Math.PI * 0.95}
       mouseButtons={{
-        LEFT:
-          interactionMode === 'orbit' ? THREE.MOUSE.ROTATE : (undefined as unknown as THREE.MOUSE),
+        LEFT: leftMouseButton,
         MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.ROTATE,
+        RIGHT: rightMouseButton,
       }}
       touches={{
-        ONE:
-          interactionMode === 'orbit' ? THREE.TOUCH.ROTATE : (undefined as unknown as THREE.TOUCH),
-        TWO: THREE.TOUCH.DOLLY_PAN,
+        ONE: singleTouchMode,
+        TWO: doubleTouchMode,
       }}
     />
   );
@@ -67,13 +105,13 @@ function Voxel({
   position,
   color,
   isHovered,
-  onClick,
+  onPointerDown,
   onPointerOver,
 }: {
   position: [number, number, number];
   color: string;
   isHovered: boolean;
-  onClick?: (e: MeshMouseEvent) => void;
+  onPointerDown?: (e: MeshMouseEvent) => void;
   onPointerOver?: (e: MeshPointerEvent) => void;
 }) {
   const col = useMemo(() => new THREE.Color(color), [color]);
@@ -83,7 +121,12 @@ function Voxel({
     return c;
   }, [color]);
   return (
-    <mesh position={position} geometry={BOX} onClick={onClick} onPointerOver={onPointerOver}>
+    <mesh
+      position={position}
+      geometry={BOX}
+      onPointerDown={onPointerDown}
+      onPointerOver={onPointerOver}
+    >
       {}
       <meshBasicMaterial color={isHovered ? highlightCol : col} />
     </mesh>
@@ -114,9 +157,9 @@ export interface EditableSceneProps {
   onPixelChange: (x: number, y: number, color: string) => void;
   onPixelsFill: (changes: [number, number, string][]) => void;
   onColorPick: (color: string) => void;
-  /** How deep the initial solid block is (default 3) */
+  /** Brush size for 3D build/erase actions */
   voxelDepth?: number;
-  interactionMode?: 'sculpt' | 'orbit';
+  interactionMode?: 'sculpt' | 'grab' | 'twist';
   visibilityMask?: boolean[][];
   /** Called when voxel map changes — parent can capture for save */
   onVoxelMapChange?: (map: VoxelMap) => void;
@@ -137,9 +180,11 @@ export default function EditableScene({
   visibilityMask,
   onVoxelMapChange,
 }: EditableSceneProps) {
+  const brushSize = Math.max(1, Math.round(voxelDepth));
+
   // Initialize as solid block with depth
   const [voxels, setVoxels] = useState<VoxelMap>(() =>
-    initialVoxelMap ? new Map(initialVoxelMap) : pixelsToSolidBlock(pixels, voxelDepth),
+    initialVoxelMap ? new Map(initialVoxelMap) : pixelsToSolidBlock(pixels, DEFAULT_VOXEL_DEPTH),
   );
 
   // Re-init when resuming an existing sculpture
@@ -151,8 +196,8 @@ export default function EditableScene({
   // Re-init from the flat pixel grid when there is no saved voxel map
   useEffect(() => {
     if (initialVoxelMap) return;
-    setVoxels(pixelsToSolidBlock(pixels, voxelDepth));
-  }, [initialVoxelMap, pixels, voxelDepth]);
+    setVoxels(pixelsToSolidBlock(pixels, DEFAULT_VOXEL_DEPTH));
+  }, [initialVoxelMap, pixels]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -160,7 +205,7 @@ export default function EditableScene({
   }, [voxels, onVoxelMapChange]);
 
   useEffect(() => {
-    if (interactionMode === 'orbit') {
+    if (interactionMode !== 'sculpt') {
       setHoveredKey(null);
       setGhostPos(null);
     }
@@ -200,7 +245,7 @@ export default function EditableScene({
   // ── Handle voxel click ──
   const handleVoxelClick = useCallback(
     (key: string, e: MeshMouseEvent) => {
-      if (interactionMode === 'orbit') return;
+      if (interactionMode !== 'sculpt') return;
       e.stopPropagation();
       if (isDrag(e)) return;
 
@@ -217,29 +262,36 @@ export default function EditableScene({
             worldNormal ? { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z } : null,
             pos,
           );
-          const adjKey = voxelKey(...adjacent);
+          const brushPositions = getBrushPositions(adjacent, brushSize);
           setVoxels(prev => {
             const next = new Map(prev);
-            next.set(adjKey, activeColor);
+            for (const position of brushPositions) {
+              next.set(voxelKey(...position), activeColor);
+            }
             return next;
           });
-          const [ax, ay3d] = adjacent;
-          const gridY = 31 - ay3d;
-          if (ax >= 0 && ax < 32 && gridY >= 0 && gridY < 32) {
-            onPixelChange(ax, gridY, activeColor);
+          for (const [ax, ay3d] of brushPositions) {
+            const gridY = 31 - ay3d;
+            if (ax >= 0 && ax < 32 && gridY >= 0 && gridY < 32) {
+              onPixelChange(ax, gridY, activeColor);
+            }
           }
           break;
         }
         case 'eraser': {
+          const brushPositions = getBrushPositions(pos, brushSize);
           setVoxels(prev => {
             const next = new Map(prev);
-            next.delete(key);
+            for (const position of brushPositions) {
+              next.delete(voxelKey(...position));
+            }
             return next;
           });
-          const [ex, ey3d] = pos;
-          const gridY = 31 - ey3d;
-          if (ex >= 0 && ex < 32 && gridY >= 0 && gridY < 32) {
-            onPixelChange(ex, gridY, '');
+          for (const [ex, ey3d] of brushPositions) {
+            const gridY = 31 - ey3d;
+            if (ex >= 0 && ex < 32 && gridY >= 0 && gridY < 32) {
+              onPixelChange(ex, gridY, '');
+            }
           }
           break;
         }
@@ -273,6 +325,7 @@ export default function EditableScene({
     [
       activeTool,
       activeColor,
+      brushSize,
       interactionMode,
       voxels,
       isDrag,
@@ -285,7 +338,7 @@ export default function EditableScene({
   // ── Handle voxel hover ──
   const handleVoxelHover = useCallback(
     (key: string, e: MeshPointerEvent) => {
-      if (interactionMode === 'orbit') return;
+      if (interactionMode !== 'sculpt') return;
       e.stopPropagation();
       setHoveredKey(key);
       if (activeTool === 'pencil' && activeColor) {
@@ -328,7 +381,7 @@ export default function EditableScene({
             position={[x - 15.5, y - 15.5, z]}
             color={color}
             isHovered={hoveredKey === key}
-            onClick={interactionMode === 'sculpt' ? e => handleVoxelClick(key, e) : undefined}
+            onPointerDown={interactionMode === 'sculpt' ? e => handleVoxelClick(key, e) : undefined}
             onPointerOver={interactionMode === 'sculpt' ? e => handleVoxelHover(key, e) : undefined}
           />
         );

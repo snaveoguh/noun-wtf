@@ -271,7 +271,7 @@ export interface EditableConfig {
   onPixelsFill: (changes: [number, number, string][]) => void;
   onColorPick: (color: string) => void;
   voxelDepth?: number;
-  interactionMode?: 'sculpt' | 'orbit';
+  interactionMode?: 'sculpt' | 'grab' | 'twist';
   visibilityMask?: boolean[][];
   onVoxelMapChange?: (map: VoxelMap) => void;
 }

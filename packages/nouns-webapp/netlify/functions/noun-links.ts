@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 interface NounLink {
   id: string;
@@ -10,8 +10,23 @@ interface NounLink {
   createdAt: string;
 }
 
+interface HandlerEvent {
+  body: string | null;
+  blobs?: string;
+  headers?: Record<string, string>;
+  httpMethod: string;
+  rawUrl?: string;
+}
+
+interface HandlerResponse {
+  body: string;
+  headers: Record<string, string>;
+  statusCode: number;
+}
+
 const STORE_NAME = 'noun-links';
 const META_KEY = 'all-links';
+const FALLBACK_URL = 'https://noun.wtf/.netlify/functions/noun-links';
 
 const headers = {
   'Content-Type': 'application/json',
@@ -54,7 +69,7 @@ async function scrapeOG(url: string): Promise<{ ogImage?: string; ogTitle?: stri
 
 // ── Handler ─────────────────────────────────────────────────────────────
 
-export default async function handler(req: Request) {
+async function handleRequest(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers });
   }
@@ -140,4 +155,28 @@ export default async function handler(req: Request) {
   }
 
   return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers });
+}
+
+export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
+  const method = event.httpMethod || 'GET';
+  connectLambda({
+    blobs: event.blobs ?? '',
+    headers: event.headers ?? {},
+  });
+  const request = new Request(event.rawUrl ?? FALLBACK_URL, {
+    method,
+    ...(method === 'GET' || method === 'HEAD' || method === 'OPTIONS'
+      ? {}
+      : {
+          body: event.body ?? undefined,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+  });
+
+  const response = await handleRequest(request);
+  return {
+    body: await response.text(),
+    headers: Object.fromEntries(response.headers.entries()),
+    statusCode: response.status,
+  };
 }

@@ -1,3 +1,16 @@
+.bidGroup {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0.6rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.bidGroup > * {
+  min-width: 0;
+}
+
 .bidWrapper {
   margin: 0;
   display: flex;
@@ -9,7 +22,7 @@
 .bidBtn {
   font-family: 'PT Root UI';
   border-radius: 12px !important;
-  margin-left: 0.6rem !important;
+  margin-left: 0 !important;
   margin-top: 3px;
   width: auto;
   padding: 10px 16px;
@@ -21,6 +34,7 @@
   letter-spacing: normal;
   font-size: 19px;
   transition: all 0.2s ease-in-out;
+  white-space: nowrap;
 }
 
 .bidBtn:disabled {
@@ -50,7 +64,8 @@
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
-  width: auto;
+  width: 100%;
+  min-width: 0;
   height: 54px;
   color: black;
   border-radius: 12px !important;
@@ -82,12 +97,16 @@
   opacity: 0.3;
   top: 15%;
   left: 3%;
+  max-width: calc(100% - 1.5rem);
   color: var(--brand-cool-light-text);
   font-family: 'PT Root UI';
   font-weight: bold;
   font-size: 25px;
   z-index: 1;
   pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .activityRow .form-floating {
@@ -158,6 +177,22 @@
 
   .voteForNextNounBtnWrapper {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .bidGroup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bidBtn {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .customPlaceholderBidAmt {
+    top: 20%;
+    font-size: 20px;
   }
 }
 

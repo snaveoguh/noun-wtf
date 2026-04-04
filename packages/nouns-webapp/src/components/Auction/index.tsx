@@ -97,7 +97,7 @@ type HeroViewMode =
 type InteractionMode = 'scroll' | 'grab' | 'twist';
 type EditMode = '2d' | '3d' | null;
 type ComposerMode = 'art' | 'link';
-type Edit3DInteractionMode = 'sculpt' | 'orbit';
+type Edit3DInteractionMode = 'sculpt' | 'grab' | 'twist';
 
 const DERIVATIVES_API = '/.netlify/functions/derivatives';
 const NOUN_LINKS_API = '/.netlify/functions/noun-links';
@@ -1044,84 +1044,86 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             </div>
           )}
 
-          <div className={classes.heroPromptBar}>
-            <HomePrompt />
-          </div>
-
-          <div
-            className={classes.heroTabs}
-            onPointerDown={e => e.stopPropagation()}
-            onClick={e => e.stopPropagation()}
-          >
-            {[
-              ['real', 'Real'],
-              ['3d', '3D'],
-              ['ascii', 'ASCII'],
-              ['edit-2d', '2D Edit'],
-              ['edit-3d', '3D Edit'],
-            ].map(([value, label]) => (
-              <button
-                type="button"
-                key={value}
-                className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
-                onClick={() => {
-                  if (value === 'edit-2d') {
-                    startEditing('2d');
-                    return;
-                  }
-                  if (value === 'edit-3d') {
-                    startEditing('3d');
-                    return;
-                  }
-                  if (isEditing) stopEditing();
-                  setViewMode(value as HeroViewMode);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-
-            {derivatives.map(derivative => (
-              <button
-                type="button"
-                key={derivative.id}
-                className={`${classes.tabBtn} ${classes.derivativeTab} ${viewMode === `deriv-${derivative.id}` ? classes.tabActive : ''}`}
-                onClick={() => {
-                  if (isEditing) stopEditing();
-                  setViewMode(`deriv-${derivative.id}`);
-                }}
-                title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
-              >
-                {derivative.name}
-              </button>
-            ))}
-
-            {nounLinks.map(link => (
-              <button
-                type="button"
-                key={link.id}
-                className={`${classes.tabBtn} ${classes.linkTab} ${viewMode === `link-${link.id}` ? classes.tabActive : ''}`}
-                onClick={() => {
-                  if (isEditing) stopEditing();
-                  setViewMode(`link-${link.id}`);
-                }}
-                title={link.ogTitle || link.url}
-              >
-                {link.name || link.ogTitle?.slice(0, 14) || new URL(link.url).hostname}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className={`${classes.tabBtn} ${classes.addTab}`}
-              onClick={() => {
-                if (isEditing) stopEditing();
-                setComposerOpen(true);
-                setComposerMode('art');
-              }}
+          <div className={classes.heroTopRow}>
+            <div
+              className={classes.heroTabs}
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
             >
-              +
-            </button>
+              {[
+                ['real', 'Real'],
+                ['3d', '3D'],
+                ['ascii', 'ASCII'],
+                ['edit-2d', '2D Edit'],
+                ['edit-3d', '3D Edit'],
+              ].map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
+                  onClick={() => {
+                    if (value === 'edit-2d') {
+                      startEditing('2d');
+                      return;
+                    }
+                    if (value === 'edit-3d') {
+                      startEditing('3d');
+                      return;
+                    }
+                    if (isEditing) stopEditing();
+                    setViewMode(value as HeroViewMode);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+
+              {derivatives.map(derivative => (
+                <button
+                  type="button"
+                  key={derivative.id}
+                  className={`${classes.tabBtn} ${classes.derivativeTab} ${viewMode === `deriv-${derivative.id}` ? classes.tabActive : ''}`}
+                  onClick={() => {
+                    if (isEditing) stopEditing();
+                    setViewMode(`deriv-${derivative.id}`);
+                  }}
+                  title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
+                >
+                  {derivative.name}
+                </button>
+              ))}
+
+              {nounLinks.map(link => (
+                <button
+                  type="button"
+                  key={link.id}
+                  className={`${classes.tabBtn} ${classes.linkTab} ${viewMode === `link-${link.id}` ? classes.tabActive : ''}`}
+                  onClick={() => {
+                    if (isEditing) stopEditing();
+                    setViewMode(`link-${link.id}`);
+                  }}
+                  title={link.ogTitle || link.url}
+                >
+                  {link.name || link.ogTitle?.slice(0, 14) || new URL(link.url).hostname}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className={`${classes.tabBtn} ${classes.addTab}`}
+                onClick={() => {
+                  if (isEditing) stopEditing();
+                  setComposerOpen(true);
+                  setComposerMode('art');
+                }}
+              >
+                +
+              </button>
+            </div>
+
+            <div className={classes.heroPromptBar}>
+              <HomePrompt />
+            </div>
           </div>
 
           <div className={classes.heroMain}>
