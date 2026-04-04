@@ -44,6 +44,11 @@ jobs:
             echo "prod=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build workspace dependencies
+        run: |
+          pnpm --filter @nouns/sdk build
+          pnpm --filter @nouns/assets build
+
       - name: Build with Netlify context
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
