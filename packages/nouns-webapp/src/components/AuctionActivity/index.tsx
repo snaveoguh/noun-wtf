@@ -118,13 +118,13 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
             </Col>
           </Row>
           <Row className={classes.activityRow}>
-            <Col lg={4} className={classes.currentBidCol}>
+            <Col xs={12} sm={6} lg={4} className={classes.currentBidCol}>
               <CurrentBid
                 currentBid={BigInt(auction.amount?.toString() ?? '0')}
                 auctionEnded={auctionEnded}
               />
             </Col>
-            <Col lg={6} className={classes.auctionTimerCol}>
+            <Col xs={12} sm={6} lg={6} className={classes.auctionTimerCol}>
               {auctionEnded ? (
                 renderAuctionWinner()
               ) : (
@@ -170,10 +170,9 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
             )}
             {/* If no bids, show nothing. If bids avail:graph is stable? Show bid history modal,
             else show etherscan contract link */}
-            {isLastAuction &&
-              auction.amount !== 0n && (
-                <BidHistoryBtn onClick={showBidModalHandler} />
-              )}
+            {isLastAuction && auction.amount !== 0n && (
+              <BidHistoryBtn onClick={showBidModalHandler} />
+            )}
           </Col>
         </Row>
       </AuctionActivityWrapper>

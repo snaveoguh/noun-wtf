@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyVisibilityMask, buildVisibilityMask, type NounPixelLayers } from '@/lib/nounDecoder';
+import {
+  applyVisibilityMask,
+  buildVisibilityMask,
+  resolveEditableVisibility,
+  type NounPixelLayers,
+} from '@/lib/nounDecoder';
 
 function createGrid(fill = ''): string[][] {
   return Array.from({ length: 32 }, () => Array(32).fill(fill));
@@ -50,5 +55,36 @@ describe('nounDecoder visibility helpers', () => {
         5: expect.objectContaining({ 5: '' }),
       }),
     );
+  });
+
+  it('falls back to the next visible base layer when hiding an untouched top layer', () => {
+    const body = createGrid();
+    const accessory = createGrid();
+    const head = createGrid();
+    const glasses = createGrid();
+
+    body[8][8] = '#body';
+    accessory[8][8] = '#accessory';
+    glasses[8][8] = '#glasses';
+
+    const layers: NounPixelLayers = {
+      accessory,
+      background: '#ffffff',
+      body,
+      glasses,
+      head,
+    };
+
+    const pixels = createGrid();
+    pixels[8][8] = '#glasses';
+
+    const visible = resolveEditableVisibility(pixels, layers, {
+      body: true,
+      accessory: false,
+      head: true,
+      glasses: false,
+    });
+
+    expect(visible[8][8]).toBe('#body');
   });
 });

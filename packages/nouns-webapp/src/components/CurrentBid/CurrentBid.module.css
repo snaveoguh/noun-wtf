@@ -19,6 +19,8 @@
 }
 
 .wrapper {
+  width: 100%;
+  min-width: 0;
   padding-left: 0rem;
   padding-right: 0rem;
 }
@@ -39,7 +41,8 @@
   }
 
   .currentBid {
-    margin-right: 0.5rem;
+    margin-right: 0;
+    overflow-wrap: anywhere;
   }
 
   .wrapper {

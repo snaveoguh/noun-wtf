@@ -3,14 +3,16 @@
 .wrapper {
   width: 100%;
   max-width: 620px;
-  margin: 0 auto;
-  padding: 0 1rem;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
 .wrapperClosed {
+  width: auto;
+  max-width: none;
   align-items: center;
 }
 
@@ -195,11 +197,11 @@
 
 @media (max-width: 768px) {
   .wrapper {
-    padding: 0 0.5rem;
+    max-width: 100%;
   }
 
   .triggerBtn {
-    width: 100%;
+    width: auto;
     justify-content: center;
   }
 

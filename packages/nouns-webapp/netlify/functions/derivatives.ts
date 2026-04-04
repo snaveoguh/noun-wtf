@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 interface Derivative {
   id: string;
@@ -10,6 +10,20 @@ interface Derivative {
   tokenId?: number; // onchain ERC721 token ID (set after mint)
   tokenURI?: string; // IPFS metadata URI (set after pin)
   createdAt: string;
+}
+
+interface HandlerEvent {
+  body: string | null;
+  blobs?: string;
+  headers?: Record<string, string>;
+  httpMethod: string;
+  rawUrl?: string;
+}
+
+interface HandlerResponse {
+  body: string;
+  headers: Record<string, string>;
+  statusCode: number;
 }
 
 // ── IPFS pinning via Pinata ─────────────────────────────────────────────
@@ -58,6 +72,7 @@ async function pinToIPFS(
 
 const STORE_NAME = 'noun-derivatives';
 const META_KEY = 'all-derivatives';
+const FALLBACK_URL = 'https://noun.wtf/.netlify/functions/derivatives';
 
 // CORS headers for the Vite dev server and production
 const corsHeaders = {
@@ -66,7 +81,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-export default async (req: Request) => {
+async function handleRequest(req: Request) {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -353,4 +368,28 @@ export default async (req: Request) => {
   }
 
   return new Response('Method not allowed', { status: 405, headers: corsHeaders });
-};
+}
+
+export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
+  const method = event.httpMethod || 'GET';
+  connectLambda({
+    blobs: event.blobs ?? '',
+    headers: event.headers ?? {},
+  });
+  const request = new Request(event.rawUrl ?? FALLBACK_URL, {
+    method,
+    ...(method === 'GET' || method === 'HEAD' || method === 'OPTIONS'
+      ? {}
+      : {
+          body: event.body ?? undefined,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+  });
+
+  const response = await handleRequest(request);
+  return {
+    body: await response.text(),
+    headers: Object.fromEntries(response.headers.entries()),
+    statusCode: response.status,
+  };
+}

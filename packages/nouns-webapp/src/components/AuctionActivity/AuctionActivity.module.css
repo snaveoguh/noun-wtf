@@ -2,14 +2,21 @@
   padding: 1rem 1rem;
   color: var(--brand-black);
   align-self: flex-start !important;
+  width: 100%;
+  min-width: 0;
 }
 
 .informationRow {
   margin-bottom: 0.5rem;
+  min-width: 0;
 }
 
 .activityRow {
   margin-bottom: 0rem;
+  --bs-gutter-x: 0;
+  margin-left: 0;
+  margin-right: 0;
+  min-width: 0;
 }
 
 h1 {
@@ -51,12 +58,14 @@ h4 {
 
 .currentBidCol {
   border-right: 1px solid #79809c49;
-  margin-left: 6px;
-  margin-top: 6px;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 1rem;
 }
 
 .auctionTimerCol {
-  padding-left: 0rem;
+  min-width: 0;
+  padding-left: 1rem;
 }
 
 .section h4 {
@@ -81,18 +90,28 @@ h4 {
   }
 
   .auctionTimerCol {
-    margin-left: 6px;
-    margin-top: 6px;
     padding-left: 0rem;
   }
 
   .currentBidCol {
     border-right: 0px;
     padding-left: 0rem;
+    padding-right: 0rem;
   }
 
   .nextNounLink {
     padding-left: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .currentBidCol {
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid #79809c49;
+  }
+
+  .auctionTimerCol {
+    padding-top: 0.8rem;
   }
 }
 

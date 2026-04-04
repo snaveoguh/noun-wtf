@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 type DraftMode = '2d' | '3d';
 
@@ -18,15 +18,47 @@ interface NounDayDrafts {
   voxel?: VoxelDraft;
 }
 
+interface HandlerEvent {
+  body: string | null;
+  blobs?: string;
+  headers?: Record<string, string>;
+  httpMethod: string;
+  queryStringParameters?: Record<string, string | undefined> | null;
+  rawUrl?: string;
+}
+
+interface HandlerResponse {
+  body: string;
+  headers: Record<string, string>;
+  statusCode: number;
+}
+
 const STORE_NAME = 'noun-day-drafts';
 const META_KEY = 'all-drafts';
+const FALLBACK_URL = 'https://noun.wtf/.netlify/functions/noun-day-drafts';
 
 const headers = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+  'Access-Control-Allow-Origin': '*',
+  'Content-Type': 'application/json',
 };
+
+function json(body: unknown, statusCode = 200): HandlerResponse {
+  return {
+    body: JSON.stringify(body),
+    headers,
+    statusCode,
+  };
+}
+
+function parseBody<T>(event: HandlerEvent): T {
+  return JSON.parse(event.body ?? '{}') as T;
+}
+
+function getRequestUrl(event: HandlerEvent): URL {
+  return new URL(event.rawUrl ?? FALLBACK_URL);
+}
 
 async function readDrafts(store: ReturnType<typeof getStore>) {
   const raw = await store.get(META_KEY);
@@ -34,87 +66,93 @@ async function readDrafts(store: ReturnType<typeof getStore>) {
   return JSON.parse(raw) as Record<string, NounDayDrafts>;
 }
 
-export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers });
+export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      body: '',
+      headers,
+      statusCode: 204,
+    };
   }
+
+  connectLambda({
+    blobs: event.blobs ?? '',
+    headers: event.headers ?? {},
+  });
 
   const store = getStore(STORE_NAME);
 
-  if (req.method === 'GET') {
-    const url = new URL(req.url);
-    const nounId = Number(url.searchParams.get('nounId'));
-    if (!Number.isFinite(nounId)) {
-      return new Response(JSON.stringify({ error: 'nounId required' }), { status: 400, headers });
-    }
+  if (event.httpMethod === 'GET') {
+    try {
+      const url = getRequestUrl(event);
+      const nounId = Number(url.searchParams.get('nounId'));
+      if (!Number.isFinite(nounId)) {
+        return json({ error: 'nounId required' }, 400);
+      }
 
-    const drafts = await readDrafts(store);
-    return new Response(JSON.stringify(drafts[String(nounId)] ?? null), { headers });
+      const drafts = await readDrafts(store);
+      return json(drafts[String(nounId)] ?? null);
+    } catch {
+      return json(null);
+    }
   }
 
-  if (req.method === 'PUT') {
-    const body = (await req.json()) as {
-      nounId?: number;
-      mode?: DraftMode;
-      image?: string;
-      pixels?: string[][];
-      voxelData?: string;
-    };
+  if (event.httpMethod === 'PUT') {
+    try {
+      const body = parseBody<{
+        image?: string;
+        mode?: DraftMode;
+        nounId?: number;
+        pixels?: string[][];
+        voxelData?: string;
+      }>(event);
 
-    if (!Number.isFinite(body.nounId)) {
-      return new Response(JSON.stringify({ error: 'nounId required' }), { status: 400, headers });
-    }
-    if (body.mode !== '2d' && body.mode !== '3d') {
-      return new Response(JSON.stringify({ error: 'mode must be 2d or 3d' }), {
-        status: 400,
-        headers,
-      });
-    }
-    if (!body.image || !body.image.startsWith('data:image/')) {
-      return new Response(JSON.stringify({ error: 'image data URL required' }), {
-        status: 400,
-        headers,
-      });
-    }
-    if (!Array.isArray(body.pixels) || body.pixels.length !== 32) {
-      return new Response(JSON.stringify({ error: '32x32 pixels grid required' }), {
-        status: 400,
-        headers,
-      });
-    }
-    if (body.mode === '3d' && (!body.voxelData || typeof body.voxelData !== 'string')) {
-      return new Response(JSON.stringify({ error: 'voxelData required for 3d drafts' }), {
-        status: 400,
-        headers,
-      });
-    }
+      if (!Number.isFinite(body.nounId)) {
+        return json({ error: 'nounId required' }, 400);
+      }
+      if (body.mode !== '2d' && body.mode !== '3d') {
+        return json({ error: 'mode must be 2d or 3d' }, 400);
+      }
+      if (!body.image || !body.image.startsWith('data:image/')) {
+        return json({ error: 'image data URL required' }, 400);
+      }
+      if (!Array.isArray(body.pixels) || body.pixels.length !== 32) {
+        return json({ error: '32x32 pixels grid required' }, 400);
+      }
+      if (body.mode === '3d' && (!body.voxelData || typeof body.voxelData !== 'string')) {
+        return json({ error: 'voxelData required for 3d drafts' }, 400);
+      }
 
-    const drafts = await readDrafts(store);
-    const nounId = Number(body.nounId);
-    const key = String(nounId);
-    const existing = drafts[key] ?? { nounId };
-    const updatedAt = new Date().toISOString();
+      const drafts = await readDrafts(store);
+      const nounId = Number(body.nounId);
+      const key = String(nounId);
+      const existing = drafts[key] ?? { nounId };
+      const updatedAt = new Date().toISOString();
 
-    if (body.mode === '2d') {
-      existing.pixel = {
-        image: body.image,
-        pixels: body.pixels,
-        updatedAt,
-      };
-    } else {
-      existing.voxel = {
-        image: body.image,
-        pixels: body.pixels,
-        voxelData: body.voxelData!,
-        updatedAt,
-      };
+      if (body.mode === '2d') {
+        existing.pixel = {
+          image: body.image,
+          pixels: body.pixels,
+          updatedAt,
+        };
+      } else {
+        existing.voxel = {
+          image: body.image,
+          pixels: body.pixels,
+          updatedAt,
+          voxelData: body.voxelData,
+        };
+      }
+
+      drafts[key] = existing;
+      await store.set(META_KEY, JSON.stringify(drafts));
+
+      return json(existing);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save draft';
+      return json({ error: message }, 500);
     }
-
-    drafts[key] = existing;
-    await store.set(META_KEY, JSON.stringify(drafts));
-
-    return new Response(JSON.stringify(existing), { headers });
   }
 
-  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers });
+  return json({ error: 'Method not allowed' }, 405);
 }
