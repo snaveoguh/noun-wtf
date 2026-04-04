@@ -1,3 +1,5 @@
+import type { VoteWithReason } from '@/components/ProposalVoteActivity';
+
 import { Fragment, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
@@ -11,14 +13,7 @@ import advanced from 'dayjs/plugin/advancedFormat';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import {
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  ExternalLink,
-  FileText,
-} from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Clock, ExternalLink, FileText } from 'lucide-react';
 import { Spinner } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
@@ -30,10 +25,10 @@ import { useAccount, useBlockNumber } from 'wagmi';
 import ByLineHoverCard from '@/components/ByLineHoverCard';
 import HoverCard from '@/components/HoverCard';
 import InlineVotePanel from '@/components/InlineVotePanel';
+import ProposalTransactions from '@/components/ProposalContent/ProposalTransactions';
+import ProposalPropdates from '@/components/ProposalPropdates';
 import ProposalStatus from '@/components/ProposalStatus';
 import ProposalVoteActivity from '@/components/ProposalVoteActivity';
-import type { VoteWithReason } from '@/components/ProposalVoteActivity';
-import ProposalTransactions from '@/components/ProposalContent/ProposalTransactions';
 import ShortAddress from '@/components/ShortAddress';
 import VotingOverview from '@/components/VotingOverview';
 import { useReadNounsGovernorQuorumVotes } from '@/contracts';
@@ -42,8 +37,8 @@ import { useActiveLocale } from '@/hooks/useActivateLocale';
 import { SUPPORTED_LOCALE_TO_DAYSJS_LOCALE, SupportedLocale } from '@/i18n/locales';
 import { AVERAGE_BLOCK_TIME_IN_SECS } from '@/utils/constants';
 import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
-import { isProposalUpdatable } from '@/utils/proposals';
 import { processProposalDescriptionText } from '@/utils/processProposalDescriptionText';
+import { isProposalUpdatable } from '@/utils/proposals';
 import {
   PartialProposal,
   ProposalState,
@@ -60,10 +55,7 @@ import {
 } from '@/wrappers/nounsDao';
 import { useProposalFeedback } from '@/wrappers/nounsData';
 import { useUserVotesAsOfBlock } from '@/wrappers/nounToken';
-import {
-  delegateNounsAtBlockQuery,
-  proposalVotesQuery,
-} from '@/wrappers/subgraph';
+import { delegateNounsAtBlockQuery, proposalVotesQuery } from '@/wrappers/subgraph';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -79,8 +71,7 @@ const getUpdatableCountdownCopy = (
   const endDate =
     proposal !== undefined && currentBlock !== undefined
       ? dayjs(timestamp).add(
-          AVERAGE_BLOCK_TIME_IN_SECS *
-            Number(proposal.updatePeriodEndBlock - BigInt(currentBlock)),
+          AVERAGE_BLOCK_TIME_IN_SECS * Number(proposal.updatePeriodEndBlock - BigInt(currentBlock)),
           'seconds',
         )
       : undefined;
@@ -135,8 +126,7 @@ const VotePage = () => {
   const startDate =
     proposal !== undefined && currentBlock !== undefined
       ? dayjs(timestamp).add(
-          AVERAGE_BLOCK_TIME_IN_SECS *
-            Number(proposal.startBlock - BigInt(currentBlock)),
+          AVERAGE_BLOCK_TIME_IN_SECS * Number(proposal.startBlock - BigInt(currentBlock)),
           'seconds',
         )
       : undefined;
@@ -150,9 +140,7 @@ const VotePage = () => {
       : proposal?.endBlock;
 
   const endDate =
-    proposal !== undefined &&
-    currentBlock !== undefined &&
-    endBlock !== undefined
+    proposal !== undefined && currentBlock !== undefined && endBlock !== undefined
       ? dayjs(timestamp).add(
           AVERAGE_BLOCK_TIME_IN_SECS * Number(endBlock - BigInt(currentBlock)),
           'seconds',
@@ -163,9 +151,7 @@ const VotePage = () => {
 
   // User vote eligibility — use vote snapshot block (or currentBlock-1 if earlier)
   const currentOrSnapshotBlock = useMemo(() => {
-    const snapshot = proposal?.voteSnapshotBlock != null
-      ? Number(proposal.voteSnapshotBlock)
-      : 0;
+    const snapshot = proposal?.voteSnapshotBlock != null ? Number(proposal.voteSnapshotBlock) : 0;
     const current = currentBlock !== undefined ? Number(currentBlock - 1n) : 0;
     if (snapshot <= 0 && current <= 0) return undefined;
     if (snapshot <= 0) return current;
@@ -179,18 +165,13 @@ const VotePage = () => {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   const { data: currentQuorum } = useReadNounsGovernorQuorumVotes({
-    args: [
-      proposal !== undefined && proposal.id !== undefined
-        ? BigInt(proposal.id)
-        : 0n,
-    ],
+    args: [proposal !== undefined && proposal.id !== undefined ? BigInt(proposal.id) : 0n],
     query: {
       enabled: proposal !== undefined && proposal.id !== undefined,
     },
   });
 
-  const getVersionTimestamp = (pv: ProposalVersion[]) =>
-    pv[pv.length - 1]?.createdAt;
+  const getVersionTimestamp = (pv: ProposalVersion[]) => pv[pv.length - 1]?.createdAt;
 
   const hasSucceeded = proposal?.status === ProposalState.SUCCEEDED;
   const isInNonFinalState =
@@ -204,32 +185,24 @@ const VotePage = () => {
       ProposalState.OBJECTION_PERIOD,
     ].includes(proposal.status);
 
-  const signers =
-    proposal && proposal?.signers?.map(s => s.id.toLowerCase());
+  const signers = proposal && proposal?.signers?.map(s => s.id.toLowerCase());
   const isProposalSigner = !!(
     account &&
     proposal &&
     signers &&
     signers.includes(account?.toLowerCase())
   );
-  const hasManyVersions =
-    proposalVersions !== undefined && proposalVersions.length > 1;
-  const isProposer = () =>
-    proposal?.proposer?.toLowerCase() === account?.toLowerCase();
+  const hasManyVersions = proposalVersions !== undefined && proposalVersions.length > 1;
+  const isProposer = () => proposal?.proposer?.toLowerCase() === account?.toLowerCase();
   const isUpdateable = () => {
     if (!isDaoGteV3) return false;
     return !!(
       proposal !== undefined &&
       currentBlock !== undefined &&
-      isProposalUpdatable(
-        proposal.status,
-        proposal.updatePeriodEndBlock,
-        currentBlock,
-      )
+      isProposalUpdatable(proposal.status, proposal.updatePeriodEndBlock, currentBlock)
     );
   };
-  const isCancellable = () =>
-    isInNonFinalState && (isProposalSigner || isProposer());
+  const isCancellable = () => isInNonFinalState && (isProposalSigner || isProposer());
   const isAwaitingStateChange = () => {
     if (hasSucceeded) return true;
     if (proposal?.status === ProposalState.QUEUED)
@@ -238,16 +211,11 @@ const VotePage = () => {
   };
 
   // State change actions
-  const moveStateButtonAction = hasSucceeded ? (
-    <Trans>Queue</Trans>
-  ) : (
-    <Trans>Execute</Trans>
-  );
+  const moveStateButtonAction = hasSucceeded ? <Trans>Queue</Trans> : <Trans>Execute</Trans>;
   const moveStateAction = (() => {
     if (hasSucceeded)
       return () => {
-        if (proposal?.id)
-          return queueProposal({ args: [BigInt(proposal.id)] });
+        if (proposal?.id) return queueProposal({ args: [BigInt(proposal.id)] });
       };
     return () => {
       if (proposal?.id) {
@@ -259,10 +227,7 @@ const VotePage = () => {
 
   const onTransactionStateChange = useCallback(
     (
-      {
-        errorMessage,
-        status,
-      }: { status: string; errorMessage?: string },
+      { errorMessage, status }: { status: string; errorMessage?: string },
       successMessage?: string,
       setPending?: (isPending: boolean) => void,
     ) => {
@@ -288,30 +253,16 @@ const VotePage = () => {
   );
 
   useEffect(
-    () =>
-      onTransactionStateChange(
-        queueProposalState,
-        _(t`Proposal Queued!`),
-        setQueuePending,
-      ),
+    () => onTransactionStateChange(queueProposalState, _(t`Proposal Queued!`), setQueuePending),
     [queueProposalState, onTransactionStateChange, _],
   );
   useEffect(
     () =>
-      onTransactionStateChange(
-        executeProposalState,
-        _(t`Proposal Executed!`),
-        setExecutePending,
-      ),
+      onTransactionStateChange(executeProposalState, _(t`Proposal Executed!`), setExecutePending),
     [executeProposalState, onTransactionStateChange, _],
   );
   useEffect(
-    () =>
-      onTransactionStateChange(
-        cancelProposalState,
-        _(t`Proposal Canceled!`),
-        setCancelPending,
-      ),
+    () => onTransactionStateChange(cancelProposalState, _(t`Proposal Canceled!`), setCancelPending),
     [cancelProposalState, onTransactionStateChange, _],
   );
   useEffect(() => {
@@ -320,9 +271,7 @@ const VotePage = () => {
 
   // Votes query
   const activeAccount = useAppSelector(state => state.account.activeAccount);
-  const { query: votesQuery, variables: votesVariables } = proposalVotesQuery(
-    proposal?.id ?? '0',
-  );
+  const { query: votesQuery, variables: votesVariables } = proposalVotesQuery(proposal?.id ?? '0');
   const {
     loading,
     error,
@@ -343,10 +292,7 @@ const VotePage = () => {
 
   // Delegate snapshot query (used for vote weight display)
   const voterIds = votersRaw?.votes?.items?.map(v => v.voter);
-  const {
-    query: voteSnapshotQuery,
-    variables: voteSnapshotVariables,
-  } = delegateNounsAtBlockQuery(
+  const { query: voteSnapshotQuery, variables: voteSnapshotVariables } = delegateNounsAtBlockQuery(
     voterIds ?? [],
     BigInt(proposal?.voteSnapshotBlock ?? 0),
   );
@@ -383,9 +329,7 @@ const VotePage = () => {
 
   useEffect(() => {
     if (proposal?.status === ProposalState.QUEUED && isForkActive) {
-      setForkPeriodMessage(
-        <p>Proposals cannot be executed during a forking period</p>,
-      );
+      setForkPeriodMessage(<p>Proposals cannot be executed during a forking period</p>);
       setIsExecutable(false);
     } else if (proposal?.status === ProposalState.QUEUED && !isForkActive) {
       setIsExecutable(true);
@@ -416,14 +360,10 @@ const VotePage = () => {
   }
 
   // Use contract's dynamic quorum when available, fall back to static Ponder value
-  const quorum = currentQuorum !== undefined
-    ? Number(currentQuorum)
-    : proposal.quorumVotes;
+  const quorum = currentQuorum !== undefined ? Number(currentQuorum) : proposal.quorumVotes;
 
   // Build vote activity data
-  const voteActivityData: VoteWithReason[] = (
-    votersRaw?.votes?.items ?? []
-  ).map(v => ({
+  const voteActivityData: VoteWithReason[] = (votersRaw?.votes?.items ?? []).map(v => ({
     support: v.support,
     votes: v.votes,
     voter: v.voter,
@@ -435,12 +375,12 @@ const VotePage = () => {
 
   // Time display helpers
   const startOrEndTimeCopy = () => {
-    if (startDate?.isBefore(now) && endDate?.isAfter(now)) return 'Ends';
-    if (endDate?.isBefore(now)) return 'Ended';
+    if (startDate?.isBefore(now) === true && endDate?.isAfter(now) === true) return 'Ends';
+    if (endDate?.isBefore(now) === true) return 'Ended';
     return 'Starts';
   };
   const startOrEndTimeTime = () => {
-    if (startDate?.isBefore(now) !== true) return startDate;
+    if (startDate == null || !startDate.isBefore(now)) return startDate;
     return endDate;
   };
 
@@ -448,9 +388,7 @@ const VotePage = () => {
     setRevoteTarget({ voter: voterAddress, support });
     setActiveTab('vote');
     // Scroll to inline vote panel
-    document
-      .getElementById('inline-vote-panel')
-      ?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('inline-vote-panel')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -547,9 +485,7 @@ const VotePage = () => {
         >
           <span>Proposed by</span>
           <HoverCard
-            hoverCardContent={(tip: string) => (
-              <ByLineHoverCard proposerAddress={tip} />
-            )}
+            hoverCardContent={(tip: string) => <ByLineHoverCard proposerAddress={tip} />}
             tip={proposal.proposer || ''}
             id="proposerHoverCard"
           >
@@ -591,9 +527,7 @@ const VotePage = () => {
               {proposal.signers.map((signer: { id: string }) => (
                 <Fragment key={signer.id}>
                   <HoverCard
-                    hoverCardContent={(tip: string) => (
-                      <ByLineHoverCard proposerAddress={tip} />
-                    )}
+                    hoverCardContent={(tip: string) => <ByLineHoverCard proposerAddress={tip} />}
                     tip={signer.id}
                     id={`signer-${signer.id}`}
                   >
@@ -607,10 +541,7 @@ const VotePage = () => {
                         textDecoration: 'none',
                       }}
                     >
-                      <ShortAddress
-                        address={signer.id as `0x${string}`}
-                        avatar={false}
-                      />
+                      <ShortAddress address={signer.id as `0x${string}`} avatar={false} />
                     </a>
                   </HoverCard>
                 </Fragment>
@@ -636,12 +567,8 @@ const VotePage = () => {
                 <strong>Version {proposalVersions?.length}</strong>{' '}
                 <span>
                   updated{' '}
-                  {proposalVersions
-                    ? dayjs
-                        .unix(
-                          Number(getVersionTimestamp(proposalVersions)),
-                        )
-                        .fromNow()
+                  {proposalVersions != null
+                    ? dayjs.unix(Number(getVersionTimestamp(proposalVersions))).fromNow()
                     : null}
                 </span>
               </Link>
@@ -651,9 +578,7 @@ const VotePage = () => {
                 <span>
                   created{' '}
                   {proposal.createdTimestamp
-                    ? dayjs
-                        .unix(Number(proposal.createdTimestamp))
-                        .fromNow()
+                    ? dayjs.unix(Number(proposal.createdTimestamp)).fromNow()
                     : null}
                 </span>
               </>
@@ -676,10 +601,10 @@ const VotePage = () => {
           <span>{startOrEndTimeCopy()}</span>
           {startOrEndTimeTime() && (
             <span style={{ fontWeight: 600, color: '#14141f' }}>
-              {i18n.date(
-                new Date(startOrEndTimeTime()?.toISOString() || 0),
-                { dateStyle: 'long', timeStyle: 'short' },
-              )}
+              {i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
+                dateStyle: 'long',
+                timeStyle: 'short',
+              })}
             </span>
           )}
           <span style={{ color: '#d0d0d4' }}>|</span>
@@ -710,12 +635,7 @@ const VotePage = () => {
             <span style={{ fontWeight: 700 }}>Proposal functions</span>
             {isProposer() && isUpdateable() && (
               <span style={{ color: '#8c8d92', marginLeft: 8 }}>
-                Editable for{' '}
-                {getUpdatableCountdownCopy(
-                  proposal,
-                  currentBlock ?? 0n,
-                  activeLocale,
-                )}
+                Editable for {getUpdatableCountdownCopy(proposal, currentBlock ?? 0n, activeLocale)}
               </span>
             )}
           </div>
@@ -736,9 +656,7 @@ const VotePage = () => {
                 {isQueuePending || isExecutePending ? (
                   <Spinner animation="border" size="sm" />
                 ) : (
-                  <>
-                    {moveStateButtonAction} Proposal ⌐◧-◧
-                  </>
+                  <>{moveStateButtonAction} Proposal ⌐◧-◧</>
                 )}
               </button>
             )}
@@ -746,8 +664,7 @@ const VotePage = () => {
               <button
                 type="button"
                 onClick={() => {
-                  if (proposal?.id)
-                    cancelProposal({ args: [BigInt(proposal.id)] });
+                  if (proposal?.id) cancelProposal({ args: [BigInt(proposal.id)] });
                 }}
                 disabled={isCancelPending}
                 className="btn btn-outline-danger"
@@ -758,11 +675,7 @@ const VotePage = () => {
                   padding: '8px 16px',
                 }}
               >
-                {isCancelPending ? (
-                  <Spinner animation="border" size="sm" />
-                ) : (
-                  'Cancel Proposal'
-                )}
+                {isCancelPending ? <Spinner animation="border" size="sm" /> : 'Cancel Proposal'}
               </button>
             )}
             {isProposer() && isUpdateable() && (
@@ -828,10 +741,7 @@ const VotePage = () => {
                   padding: '10px 20px',
                   background: 'none',
                   border: 'none',
-                  borderBottom:
-                    activeTab === tab
-                      ? '2px solid #14141f'
-                      : '2px solid transparent',
+                  borderBottom: activeTab === tab ? '2px solid #14141f' : '2px solid transparent',
                   marginBottom: -2,
                   cursor: 'pointer',
                   fontFamily: "'PT Root UI'",
@@ -872,7 +782,7 @@ const VotePage = () => {
           {activeTab === 'vote' ? (
             <>
               {/* Transactions (collapsible) */}
-              {proposal.details && proposal.details.length > 0 && (
+              {proposal.details != null && proposal.details.length > 0 && (
                 <div
                   style={{
                     background: '#fff',
@@ -899,14 +809,8 @@ const VotePage = () => {
                       color: '#14141f',
                     }}
                   >
-                    <span>
-                      Proposed Transactions ({proposal.details.length})
-                    </span>
-                    {showTransactions ? (
-                      <ChevronUp size={16} />
-                    ) : (
-                      <ChevronDown size={16} />
-                    )}
+                    <span>Proposed Transactions ({proposal.details.length})</span>
+                    {showTransactions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   {showTransactions && (
                     <div
@@ -924,11 +828,7 @@ const VotePage = () => {
               {/* Vote activity feed */}
               <ProposalVoteActivity
                 votes={voteActivityData}
-                onRevote={
-                  isActiveForVoting && isWalletConnected
-                    ? handleRevote
-                    : undefined
-                }
+                onRevote={isActiveForVoting && isWalletConnected ? handleRevote : undefined}
               />
             </>
           ) : (
@@ -944,58 +844,65 @@ const VotePage = () => {
                 overflow: 'hidden',
               }}
             >
-              {proposal.description && (
+              {proposal.description != null && proposal.description !== '' && (
                 <ReactMarkdown
                   remarkPlugins={[remarkBreaks]}
                   rehypePlugins={[rehypeRaw]}
                   components={{
-                    img: ({ node, ...props }) => {
+                    img: ({ src, alt, ...props }) => {
                       // Skip data URL images (base64 embedded) — they're often broken in proposals
-                      if (props.src?.startsWith('data:')) {
+                      if (src != null && src.startsWith('data:')) {
                         return (
-                          <span style={{
-                            display: 'block', padding: '12px 16px', background: '#f4f4f8',
-                            borderRadius: 8, color: '#8c8d92', fontSize: '0.8rem', margin: '8px 0',
-                          }}>
-                            Embedded image ({props.alt || 'image'})
+                          <span
+                            style={{
+                              display: 'block',
+                              padding: '12px 16px',
+                              background: '#f4f4f8',
+                              borderRadius: 8,
+                              color: '#8c8d92',
+                              fontSize: '0.8rem',
+                              margin: '8px 0',
+                            }}
+                          >
+                            Embedded image ({alt ?? 'image'})
                           </span>
                         );
                       }
                       return (
                         <img
                           {...props}
+                          src={src}
+                          alt={alt}
                           style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
                           loading="lazy"
-                          onError={(e) => {
+                          onError={e => {
                             const target = e.currentTarget;
                             target.style.display = 'none';
                             const fallback = document.createElement('div');
-                            fallback.style.cssText = 'padding:12px 16px;background:#f4f4f8;border-radius:8px;color:#8c8d92;font-size:0.8rem;margin:8px 0;';
-                            fallback.textContent = `Image unavailable: ${props.alt || 'image'}`;
+                            fallback.style.cssText =
+                              'padding:12px 16px;background:#f4f4f8;border-radius:8px;color:#8c8d92;font-size:0.8rem;margin:8px 0;';
+                            fallback.textContent = `Image unavailable: ${alt ?? 'image'}`;
                             target.parentNode?.insertBefore(fallback, target.nextSibling);
                           }}
                         />
                       );
                     },
                     // Prevent pre/code blocks from overflowing
-                    pre: ({ node, ...props }) => (
+                    pre: ({ ...props }) => (
                       <pre {...props} style={{ overflowX: 'auto', maxWidth: '100%' }} />
                     ),
-                    table: ({ node, ...props }) => (
+                    table: ({ ...props }) => (
                       <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <table {...props} />
                       </div>
                     ),
                   }}
                 >
-                  {processProposalDescriptionText(
-                    proposal.description,
-                    proposal.title,
-                  )}
+                  {processProposalDescriptionText(proposal.description, proposal.title)}
                 </ReactMarkdown>
               )}
 
-              {proposal.details && proposal.details.length > 0 && (
+              {proposal.details != null && proposal.details.length > 0 && (
                 <div style={{ marginTop: 24 }}>
                   <h3
                     style={{
@@ -1052,13 +959,14 @@ const VotePage = () => {
                 lineHeight: 1.4,
               }}
             >
-              <strong style={{ display: 'block', marginBottom: 4 }}>
-                Objection Only Period
-              </strong>
-              Voting is limited to against votes. This protects the DAO
-              from last-minute vote swings.
+              <strong style={{ display: 'block', marginBottom: 4 }}>Objection Only Period</strong>
+              Voting is limited to against votes. This protects the DAO from last-minute vote
+              swings.
             </div>
           )}
+
+          {/* Propdates for this proposal */}
+          <ProposalPropdates proposalId={Number(proposal.id)} />
         </div>
       </div>
     </div>

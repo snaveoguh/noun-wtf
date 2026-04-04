@@ -1,192 +1,10 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
-import { type Log, decodeAbiParameters, parseAbiParameters } from 'viem';
-import { useBlockNumber, usePublicClient } from 'wagmi';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
-import type { Address } from '@/utils/types';
-
-// ─── Contract Config ──────────────────────────────────────────────────────────
-
-const PROPDATES_ADDRESS = '0xa5Bf9A9b8f60CFD98b1cCB592f2F9F37Bb0033a4' as Address;
-const DEPLOY_BLOCK = 19_399_894n;
-const BLOCK_CHUNK = 50_000n;
-const MAX_PARALLEL = 8;
-
-// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update)
-// keccak256("PostUpdate(uint256,bool,string)")
-const POST_UPDATE_TOPIC =
-  '0xad584acc60e02bf07eea7e31719bb25c1bfa1c95a28a2cf1b530f88aaa2d72b4';
-
-// Timestamp estimation
-const ANCHOR_BLOCK = 19_399_894n;
-const ANCHOR_TIMESTAMP = 1709942400; // ~Mar 9 2024
-const AVG_BLOCK_TIME = 12;
-
-function estimateTimestamp(blockNumber: bigint): number {
-  return ANCHOR_TIMESTAMP + Number(blockNumber - ANCHOR_BLOCK) * AVG_BLOCK_TIME;
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PropdateEntry {
-  propId: number;
-  isCompleted: boolean;
-  update: string;
-  blockNumber: bigint;
-  timestamp: number;
-  imageUrl: string | null; // first image/gif found in markdown
-  title: string; // extracted or fallback
-}
-
-// ─── Markdown image extraction ────────────────────────────────────────────────
-
-const MD_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/;
-const HTML_IMG_RE = /<img[^>]+src=["']([^"']+)["']/i;
-
-function extractImageUrl(text: string): string | null {
-  const mdMatch = text.match(MD_IMAGE_RE);
-  if (mdMatch) return mdMatch[1];
-  const htmlMatch = text.match(HTML_IMG_RE);
-  if (htmlMatch) return htmlMatch[1];
-  return null;
-}
-
-function extractTitle(text: string): string {
-  // Try to get first line as title (markdown heading or plain text)
-  const firstLine = text.split('\n').find(l => l.trim().length > 0) ?? '';
-  const cleaned = firstLine.replace(/^#+\s*/, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
-  // Truncate if too long
-  if (cleaned.length > 80) return cleaned.slice(0, 77) + '...';
-  return cleaned || 'Update';
-}
-
-// ─── Parallel chunked log fetcher ─────────────────────────────────────────────
-
-async function fetchAllLogs(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
-  address: Address,
-  fromBlock: bigint,
-  toBlock: bigint,
-): Promise<Log[]> {
-  const chunks: Array<{ from: bigint; to: bigint }> = [];
-  for (let start = fromBlock; start <= toBlock; start += BLOCK_CHUNK) {
-    const end = start + BLOCK_CHUNK - 1n > toBlock ? toBlock : start + BLOCK_CHUNK - 1n;
-    chunks.push({ from: start, to: end });
-  }
-  if (chunks.length === 0) return [];
-
-  const allLogs: Log[] = [];
-  for (let i = 0; i < chunks.length; i += MAX_PARALLEL) {
-    const batch = chunks.slice(i, i + MAX_PARALLEL);
-    const results = await Promise.allSettled(
-      batch.map(chunk =>
-        client.getLogs({
-          address,
-          topics: [POST_UPDATE_TOPIC],
-          fromBlock: chunk.from,
-          toBlock: chunk.to,
-        }),
-      ),
-    );
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allLogs.push(...(result.value as Log[]));
-      }
-    }
-  }
-  return allLogs;
-}
-
-// ─── Decode PostUpdate logs ───────────────────────────────────────────────────
-
-function decodePostUpdateLogs(logs: Log[]): PropdateEntry[] {
-  const entries: PropdateEntry[] = [];
-
-  for (const log of logs) {
-    try {
-      // topic[0] = event sig, topic[1] = propId (uint256), topic[2] = isCompleted (bool)
-      const topics = log.topics;
-      if (!topics || topics.length < 3) continue;
-
-      const propId = Number(BigInt(topics[1]!));
-      const isCompleted = BigInt(topics[2]!) !== 0n;
-
-      // data = abi.encode(string update) → offset + length + string bytes
-      const data = log.data;
-      if (!data || data === '0x') continue;
-
-      const [update] = decodeAbiParameters(
-        parseAbiParameters('string'),
-        data as `0x${string}`,
-      );
-
-      const blockNumber = log.blockNumber ?? 0n;
-      const imageUrl = extractImageUrl(update);
-      const title = extractTitle(update);
-
-      entries.push({
-        propId,
-        isCompleted,
-        update,
-        blockNumber,
-        timestamp: estimateTimestamp(blockNumber),
-        imageUrl,
-        title,
-      });
-    } catch {
-      // Skip undecodable logs
-    }
-  }
-
-  return entries;
-}
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-function usePropdates() {
-  const publicClient = usePublicClient();
-  const { data: currentBlock } = useBlockNumber();
-
-  return useReactQuery({
-    queryKey: ['propdatesFromChain', currentBlock?.toString()],
-    queryFn: async (): Promise<PropdateEntry[]> => {
-      if (!publicClient || !currentBlock) return [];
-
-      const rawLogs = await fetchAllLogs(
-        publicClient,
-        PROPDATES_ADDRESS,
-        DEPLOY_BLOCK,
-        currentBlock,
-      );
-
-      const entries = decodePostUpdateLogs(rawLogs);
-
-      // Sort newest first, dedupe by propId (keep most recent update per prop)
-      entries.sort((a, b) => Number(b.blockNumber - a.blockNumber));
-
-      // Keep most recent update per proposal
-      const seen = new Set<number>();
-      const unique: PropdateEntry[] = [];
-      for (const e of entries) {
-        if (!seen.has(e.propId)) {
-          seen.add(e.propId);
-          unique.push(e);
-        }
-      }
-
-      return unique.slice(0, 40); // Cap at 40 for the banner
-    },
-    enabled: !!publicClient && !!currentBlock,
-    staleTime: 5 * 60_000,
-    gcTime: 15 * 60_000,
-    retry: 2,
-  });
-}
+import { type PropdateEntry, usePropdates } from '@/hooks/usePropdates';
 
 // ─── Propdate Modal ───────────────────────────────────────────────────────────
 
@@ -225,8 +43,8 @@ const PropdateModal: FC<{
 
   // Simple markdown → text (strip images, links, headings)
   const cleanText = entry.update
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // remove images
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → text
+    .replace(/!\[[^\]]*]\([^)]*\)/g, '') // remove images
+    .replace(/\[([^\]]*)]\([^)]*\)/g, '$1') // links → text
     .replace(/^#+\s*/gm, '') // headings
     .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
     .replace(/\*([^*]+)\*/g, '$1') // italic
@@ -255,9 +73,7 @@ const PropdateModal: FC<{
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: visible
-          ? 'translate(-50%, -50%) scale(1)'
-          : 'translate(-50%, -50%) scale(0.92)',
+        transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
         zIndex: 100,
         maxWidth: 640,
         width: '90vw',
@@ -266,8 +82,7 @@ const PropdateModal: FC<{
         background: 'rgba(255, 255, 255, 0.88)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        boxShadow:
-          '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
         overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.25s ease, transform 0.25s ease',
@@ -346,9 +161,7 @@ const PropdateModal: FC<{
             gap: 6,
             padding: '4px 10px',
             borderRadius: 6,
-            background: entry.isCompleted
-              ? 'rgba(34, 197, 94, 0.12)'
-              : 'rgba(59, 130, 246, 0.12)',
+            background: entry.isCompleted ? 'rgba(34, 197, 94, 0.12)' : 'rgba(59, 130, 246, 0.12)',
             fontSize: '0.7rem',
             fontWeight: 700,
             color: entry.isCompleted ? '#16a34a' : '#2563eb',
@@ -437,8 +250,7 @@ const PropdateModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span style={{ color: '#d4a843' }}>⌐◨-◨</span>{' '}
-          <span>propdates</span>
+          <span style={{ color: '#d4a843' }}>⌐◨-◨</span> <span>propdates</span>
         </div>
       </div>
     </div>
@@ -459,8 +271,7 @@ const PropdateModal: FC<{
 // ─── Banner ───────────────────────────────────────────────────────────────────
 
 // Placeholder for cards while loading
-const PLACEHOLDER_GRADIENT =
-  'linear-gradient(135deg, #e8f4e8 0%, #d4e8d4 50%, #c0dcc0 100%)';
+const PLACEHOLDER_GRADIENT = 'linear-gradient(135deg, #e8f4e8 0%, #d4e8d4 50%, #c0dcc0 100%)';
 
 /**
  * PropdatesBanner — auto-scrolling horizontal banner of recent Nouns proposal updates
@@ -562,8 +373,12 @@ const PropdatesBanner: FC = () => {
           ref={scrollRef}
           onPointerDown={onPointerDown}
           onClickCapture={onClickCapture}
-          onMouseEnter={() => { pausedRef.current = true; }}
-          onMouseLeave={() => { pausedRef.current = false; }}
+          onMouseEnter={() => {
+            pausedRef.current = true;
+          }}
+          onMouseLeave={() => {
+            pausedRef.current = false;
+          }}
           style={{
             display: 'flex',
             gap: '10px',
@@ -640,8 +455,7 @@ const PropdatesBanner: FC = () => {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  background:
-                    'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                  background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
                   padding: '28px 10px 8px',
                 }}
               >
@@ -686,9 +500,7 @@ const PropdatesBanner: FC = () => {
       </div>
 
       {/* Liquid Glass Modal */}
-      {selectedEntry && (
-        <PropdateModal entry={selectedEntry} onClose={handleClose} />
-      )}
+      {selectedEntry && <PropdateModal entry={selectedEntry} onClose={handleClose} />}
     </>
   );
 };
