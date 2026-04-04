@@ -472,8 +472,14 @@
   }
 
   .heroStage {
-    min-height: 29rem;
+    min-height: 31rem;
     border-radius: 1.5rem;
+  }
+
+  .heroArtFrame,
+  .heroAscii,
+  .heroLoading {
+    top: 4.7rem;
   }
 
   .heroControlRail {

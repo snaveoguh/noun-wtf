@@ -3,7 +3,7 @@ import type { VoxelMap, VoxelPixel, NounLayers } from './types';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import { BODY_DEPTH, BLING_DEPTH, GLASSES_DEPTH } from './types';
+import { BODY_DEPTH, BLING_DEPTH, GLASSES_DEPTH, HEAD_DEPTH } from './types';
 import { parseKey } from './voxelMap';
 
 // Convert sRGB 0-1 channel to linear RGB for Three.js vertex colors.
@@ -78,19 +78,22 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
  * Build 3 separate geometries for proper depth rendering:
  * - body: full BODY_DEPTH, centered at z=0
  * - bling: BLING_DEPTH, sits on front face of body
- * - glasses: GLASSES_DEPTH, sits on front face (in front of bling)
+ * - head: full HEAD_DEPTH, pushed in front of accessory
+ * - glasses: GLASSES_DEPTH, always top-most
  */
 export function buildNounGeometries(layers: NounLayers) {
   const bodyZ = 0;
   // Bling sits flush on body front face
   const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2;
-  // Glasses sit just in front of body (flush with bling, or on body if no bling)
-  // Tiny offset (0.01) prevents z-fighting with bling
-  const glassesZ = BODY_DEPTH / 2 + GLASSES_DEPTH / 2 + 0.01;
+  // Head protrudes in front of accessory so it always reads above bling.
+  const headZ = BODY_DEPTH / 2 - BLING_DEPTH / 2 + 0.03;
+  // Glasses sit just in front of the head. Tiny offset prevents z-fighting.
+  const glassesZ = headZ + HEAD_DEPTH / 2 + GLASSES_DEPTH / 2 + 0.02;
 
   return {
     bodyGeo: buildMergedGeometry(layers.body, BODY_DEPTH, bodyZ),
     blingGeo: buildMergedGeometry(layers.bling, BLING_DEPTH, blingZ),
+    headGeo: buildMergedGeometry(layers.head, HEAD_DEPTH, headZ),
     glassesGeo: buildMergedGeometry(layers.glasses, GLASSES_DEPTH, glassesZ),
   };
 }
