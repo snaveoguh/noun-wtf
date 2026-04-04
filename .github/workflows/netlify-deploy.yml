@@ -61,8 +61,8 @@ jobs:
               --site "${{ steps.site.outputs.site_id }}" \
               --prod \
               --context production \
-              --dir packages/nouns-webapp/dist \
-              --functions packages/nouns-webapp/netlify/functions \
+              --dir dist \
+              --functions netlify/functions \
               --no-build \
               --message "GitHub Actions ${GITHUB_SHA}"
           else
@@ -70,8 +70,8 @@ jobs:
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --context "${{ steps.site.outputs.context }}" \
-              --dir packages/nouns-webapp/dist \
-              --functions packages/nouns-webapp/netlify/functions \
+              --dir dist \
+              --functions netlify/functions \
               --no-build \
               --message "GitHub Actions ${GITHUB_SHA}"
           fi
