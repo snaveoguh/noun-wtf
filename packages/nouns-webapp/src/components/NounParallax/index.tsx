@@ -244,20 +244,45 @@ function InteractiveScene({
 
 // ─── Responsive camera ──────────────────────────────────────────────────────
 
-function ResponsiveCamera({ fullscreen }: { fullscreen?: boolean }) {
+function ResponsiveCamera({
+  fullscreen,
+  viewStateRef,
+}: {
+  fullscreen?: boolean;
+  viewStateRef?: { current: EditableSceneViewState | null };
+}) {
   const { camera, size } = useThree();
   useEffect(() => {
+    const perspectiveCamera = camera as THREE.PerspectiveCamera;
+    const savedView = viewStateRef?.current;
+
+    if (savedView) {
+      camera.position.set(...savedView.cameraPosition);
+      perspectiveCamera.zoom = savedView.zoom;
+      camera.lookAt(...savedView.target);
+      camera.updateProjectionMatrix();
+      return;
+    }
+
     const aspect = size.width / size.height;
     if (fullscreen === true) {
       const base = aspect > 1 ? 34 : 34 / aspect;
-      (camera as THREE.PerspectiveCamera).position.set(0, 0, base);
+      perspectiveCamera.position.set(0, 0, base);
     } else {
       const dist = aspect > 1 ? 38 : 38 / aspect;
-      (camera as THREE.PerspectiveCamera).position.set(0, 2, dist);
+      perspectiveCamera.position.set(0, 2, dist);
     }
     camera.lookAt(0, 0, 0);
-    camera.updateProjectionMatrix();
-  }, [camera, size, fullscreen]);
+    perspectiveCamera.updateProjectionMatrix();
+
+    if (viewStateRef) {
+      viewStateRef.current = {
+        cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
+        target: [0, 0, 0],
+        zoom: perspectiveCamera.zoom,
+      };
+    }
+  }, [camera, fullscreen, size.height, size.width, viewStateRef]);
   return null;
 }
 
@@ -450,7 +475,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
       >
         <Suspense fallback={null}>
-          <ResponsiveCamera fullscreen={fullscreen} />
+          <ResponsiveCamera fullscreen={fullscreen} viewStateRef={editable?.viewStateRef} />
           {editable ? (
             <EditableSceneComponent
               pixels={editable.pixels}
