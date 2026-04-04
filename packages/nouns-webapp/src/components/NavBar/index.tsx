@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { faFile, faPenToSquare, faPlay, faUsers } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -43,6 +43,7 @@ const NavBar = () => {
   const currentNounSeed = useAppSelector(
     state => state.application.currentNounSeed,
   ) as INounSeed | null;
+  const stateBgColor = useAppSelector(state => state.application.stateBackgroundColor);
   const torchMode = useAppSelector(state => state.application.torchMode);
   const navDispatch = useAppDispatch();
   const location = useLocation();
@@ -50,10 +51,7 @@ const NavBar = () => {
   const { setMode: setSiteMode } = useSiteTheme();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
-      select: data => {
-        console.log(data);
-        return data.total;
-      },
+      select: data => data.total,
     },
   }).data;
   const daoEtherscanLink = buildEtherscanAddressLink(nounsTreasuryAddress[chainId]);
@@ -103,6 +101,22 @@ const NavBar = () => {
     </NavDropdown>
   );
 
+  useEffect(() => {
+    const previousBodyBackground = document.body.style.backgroundColor;
+
+    if (useStateBg) {
+      document.body.style.backgroundColor = stateBgColor;
+    }
+
+    if (!useStateBg) {
+      document.body.style.backgroundColor = '';
+    }
+
+    return () => {
+      document.body.style.backgroundColor = previousBodyBackground;
+    };
+  }, [stateBgColor, useStateBg]);
+
   return (
     <>
       <Navbar
@@ -111,7 +125,7 @@ const NavBar = () => {
         className={classes.navBarCustom}
         expanded={isNavExpanded}
       >
-        <Container style={{ maxWidth: 'unset' }}>
+        <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
             <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
               <NogglesLogo className={classes.navBarLogo} aria-label="Nouns DAO noggles" />
@@ -425,6 +439,7 @@ const NavBar = () => {
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
             <button
+              type="button"
               onClick={() => navDispatch(setTorchMode(!torchMode))}
               title={torchMode ? 'Turn on the lights' : 'Turn off the lights'}
               style={{
@@ -447,6 +462,7 @@ const NavBar = () => {
               {torchMode ? '☀️' : '🌙'}
             </button>
             <button
+              type="button"
               onClick={() => {
                 setSiteMode('new');
                 navigate('/');

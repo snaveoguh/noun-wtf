@@ -3,9 +3,9 @@
   width: 100%;
   padding:
     1rem
-    max(1rem, env(safe-area-inset-right))
+    var(--page-edge-padding-right)
     2rem
-    max(1rem, env(safe-area-inset-left));
+    var(--page-edge-padding-left);
 }
 
 .heroShell {
