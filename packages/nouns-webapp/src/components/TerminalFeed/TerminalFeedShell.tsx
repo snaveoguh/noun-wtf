@@ -1,3 +1,5 @@
+import type { ChatMessage } from './TerminalPrompt';
+
 import { useCallback, useEffect, useState } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
@@ -6,9 +8,9 @@ import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import ActivityFeed from './ActivityFeed';
 import ChatHistory from './ChatHistory';
+import { normalizeTerminalErrorMessage } from './errorMessages';
 import { FILTER_TABS } from './eventFormatters';
 import TerminalPrompt from './TerminalPrompt';
-import type { ChatMessage } from './TerminalPrompt';
 import { useActivityFeed } from './useActivityFeed';
 
 export default function TerminalFeedShell() {
@@ -16,7 +18,9 @@ export default function TerminalFeedShell() {
   const [activeFilter, setActiveFilter] = useState('');
   const isChatTab = activeFilter === '_CHAT';
   // Only pass filter to activity feed when not in chat mode
-  const { events, loading, hasMore, error, loadMore } = useActivityFeed(isChatTab ? '' : activeFilter);
+  const { events, loading, hasMore, error, loadMore } = useActivityFeed(
+    isChatTab ? '' : activeFilter,
+  );
 
   // Chat history (persisted across tab switches)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -26,7 +30,11 @@ export default function TerminalFeedShell() {
   }, []);
 
   const handleChatError = useCallback((userMsg: ChatMessage, errorMsg: string) => {
-    const errAssistant: ChatMessage = { role: 'assistant', content: `error: ${errorMsg}`, timestamp: Date.now() };
+    const errAssistant: ChatMessage = {
+      role: 'assistant',
+      content: normalizeTerminalErrorMessage(errorMsg),
+      timestamp: Date.now(),
+    };
     setChatHistory(prev => [...prev, userMsg, errAssistant]);
   }, []);
 
@@ -74,9 +82,7 @@ export default function TerminalFeedShell() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#00ff41', fontSize: '14px', letterSpacing: '1px' }}>
-            NOUN.WTF
-          </span>
+          <span style={{ color: '#00ff41', fontSize: '14px', letterSpacing: '1px' }}>NOUN.WTF</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -105,7 +111,10 @@ export default function TerminalFeedShell() {
           {/* Theme toggle */}
           {!isEmbedded && (
             <button
-              onClick={() => { setMode('classic'); window.location.replace('/'); }}
+              onClick={() => {
+                setMode('classic');
+                window.location.replace('/');
+              }}
               style={{
                 background: 'transparent',
                 border: '1px solid #222',
@@ -115,8 +124,12 @@ export default function TerminalFeedShell() {
                 padding: '4px 8px',
                 borderRadius: '2px',
               }}
-              onMouseEnter={e => { (e.target as HTMLElement).style.color = '#666'; }}
-              onMouseLeave={e => { (e.target as HTMLElement).style.color = '#444'; }}
+              onMouseEnter={e => {
+                (e.target as HTMLElement).style.color = '#666';
+              }}
+              onMouseLeave={e => {
+                (e.target as HTMLElement).style.color = '#444';
+              }}
             >
               classic
             </button>
@@ -150,8 +163,12 @@ export default function TerminalFeedShell() {
                 background: isActive ? '#111' : 'transparent',
                 border: 'none',
                 color: isActive
-                  ? (isChatButton ? '#00ff41' : '#00ff41')
-                  : (isChatButton && chatHistory.length > 0 ? '#00ff41' : '#444'),
+                  ? isChatButton
+                    ? '#00ff41'
+                    : '#00ff41'
+                  : isChatButton && chatHistory.length > 0
+                    ? '#00ff41'
+                    : '#444',
                 cursor: 'pointer',
                 fontSize: '11px',
                 padding: '4px 10px',

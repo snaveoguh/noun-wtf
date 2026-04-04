@@ -1,9 +1,11 @@
+import type { GovernanceAction } from './GovernanceActionConfirm';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAccount } from 'wagmi';
 
+import { normalizeTerminalErrorMessage } from './errorMessages';
 import GovernanceActionConfirm from './GovernanceActionConfirm';
-import type { GovernanceAction } from './GovernanceActionConfirm';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -17,8 +19,11 @@ interface Props {
   onError: (userMsg: ChatMessage, errorMsg: string) => void;
 }
 
-const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
+const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
+const API_BASE =
+  typeof apiBaseEnv === 'string' && apiBaseEnv.length > 0
+    ? apiBaseEnv
+    : 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
   const { address } = useAccount();
@@ -36,7 +41,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
 
   // Scroll response panel
   useEffect(() => {
-    if (response) {
+    if (response !== null) {
       responseRef.current?.scrollTo({ top: 0 });
     }
   }, [response]);
@@ -44,7 +49,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (response || pendingAction)) {
+      if (e.key === 'Escape' && (response !== null || pendingAction !== null)) {
         setResponse(null);
         setPendingAction(null);
         inputRef.current?.focus();
@@ -60,68 +65,82 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
     inputRef.current?.focus();
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return;
 
-    setInput('');
-    setIsLoading(true);
-    setResponse(null);
-    setPendingAction(null);
+      setInput('');
+      setIsLoading(true);
+      setResponse(null);
+      setPendingAction(null);
 
-    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
-    // Build API history from last 10 messages
-    const apiHistory = [...history, userMsg].slice(-10).map(m => ({ role: m.role, content: m.content }));
+      const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
+      // Build API history from last 10 messages
+      const apiHistory = [...history, userMsg]
+        .slice(-10)
+        .map(m => ({ role: m.role, content: m.content }));
 
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          wallet: address ?? null,
-          history: apiHistory,
-          agent_mode: 'nounirl',
-        }),
-      });
+      try {
+        const res = await fetch(`${API_BASE}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            wallet: address ?? null,
+            history: apiHistory,
+            agent_mode: 'nounirl',
+          }),
+        });
 
-      if (!res.ok) {
-        let errText: string;
-        try {
-          const errData = await res.json();
-          errText = errData.error || `HTTP ${res.status}`;
-        } catch {
-          errText = await res.text() || `HTTP ${res.status}`;
+        if (!res.ok) {
+          let errText: string;
+          try {
+            const errData = (await res.json()) as { error?: string };
+            errText = errData.error ?? `HTTP ${res.status}`;
+          } catch {
+            errText = (await res.text()) || `HTTP ${res.status}`;
+          }
+          throw new Error(errText);
         }
-        throw new Error(errText);
+
+        const data = (await res.json()) as { action?: GovernanceAction; response?: string };
+        const responseText = data.response ?? '';
+        const assistantMsg: ChatMessage = {
+          role: 'assistant',
+          content: responseText,
+          timestamp: Date.now(),
+        };
+        onNewMessages(userMsg, assistantMsg);
+        setResponse(responseText);
+
+        // Check for governance action
+        if (data.action !== undefined && data.action.type !== undefined) {
+          setPendingAction(data.action as GovernanceAction);
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'connection failed';
+        const friendlyError = normalizeTerminalErrorMessage(errMsg);
+        onError(userMsg, errMsg);
+        setResponse(friendlyError);
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [address, isLoading, history, onNewMessages, onError],
+  );
 
-      const data = await res.json();
-      const assistantMsg: ChatMessage = { role: 'assistant', content: data.response, timestamp: Date.now() };
-      onNewMessages(userMsg, assistantMsg);
-      setResponse(data.response);
-
-      // Check for governance action
-      if (data.action && data.action.type) {
-        setPendingAction(data.action as GovernanceAction);
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'connection failed';
-      onError(userMsg, errMsg);
-      setResponse(`error: ${errMsg}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [address, isLoading, history, onNewMessages, onError]);
-
-  const handleActionSuccess = useCallback((txHash: string) => {
-    // Add success message to chat
-    const successContent = `tx submitted: ${txHash.slice(0, 10)}... — check etherscan.io/tx/${txHash}`;
-    onNewMessages(
-      { role: 'user', content: '[governance action confirmed]', timestamp: Date.now() },
-      { role: 'assistant', content: successContent, timestamp: Date.now() },
-    );
-    // Keep the overlay open to show the tx link
-  }, [onNewMessages]);
+  const handleActionSuccess = useCallback(
+    (txHash: string) => {
+      // Add success message to chat
+      const successContent = `tx submitted: ${txHash.slice(0, 10)}... — check etherscan.io/tx/${txHash}`;
+      onNewMessages(
+        { role: 'user', content: '[governance action confirmed]', timestamp: Date.now() },
+        { role: 'assistant', content: successContent, timestamp: Date.now() },
+      );
+      // Keep the overlay open to show the tx link
+    },
+    [onNewMessages],
+  );
 
   const handleActionCancel = useCallback(() => {
     setPendingAction(null);
@@ -131,7 +150,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
     );
   }, [onNewMessages]);
 
-  const showOverlay = response || pendingAction;
+  const showOverlay = response !== null || pendingAction !== null;
 
   return (
     <>
@@ -162,6 +181,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           >
             <span style={{ color: '#00ff41', fontSize: '11px' }}>agent nounirl</span>
             <button
+              type="button"
               onClick={dismiss}
               style={{
                 background: 'none',
@@ -190,10 +210,10 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             className="terminal-scrollbar"
           >
             {/* Agent text response */}
-            {response && <div>{response}</div>}
+            {response !== null && <div>{response}</div>}
 
             {/* Governance action confirmation */}
-            {pendingAction && (
+            {pendingAction !== null && (
               <GovernanceActionConfirm
                 action={pendingAction}
                 onSuccess={handleActionSuccess}
@@ -237,7 +257,14 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           }}
         />
         {isLoading && (
-          <span style={{ color: '#00ff41', fontSize: '12px', opacity: 0.6, animation: 'pulse 1.5s infinite' }}>
+          <span
+            style={{
+              color: '#00ff41',
+              fontSize: '12px',
+              opacity: 0.6,
+              animation: 'pulse 1.5s infinite',
+            }}
+          >
             ...
           </span>
         )}
