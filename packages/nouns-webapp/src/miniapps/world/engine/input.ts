@@ -70,28 +70,22 @@ export function attachInputListeners(
   };
 }
 
-/** WASD movement vector, rotated by camera angle so W = forward from camera */
-export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
-  // Raw input: W=forward(-Z), S=back(+Z), A=left(-X), D=right(+X)
-  let rawX = 0, rawZ = 0;
-  if (keys.has('w')) rawZ -= 1;
-  if (keys.has('s')) rawZ += 1;
-  if (keys.has('a')) rawX -= 1;
-  if (keys.has('d')) rawX += 1;
-  if (rawX === 0 && rawZ === 0) return { dx: 0, dy: 0 };
-  // Normalize diagonals
-  if (rawX !== 0 && rawZ !== 0) {
+/** WASD movement — W=forward, S=back, A=left, D=right from camera's POV */
+export function getMovementVector(keys: Set<string>, _cameraAngle = 0): { dx: number; dy: number } {
+  // Simple world-relative: W=up(-Y), S=down(+Y), A=left(-X), D=right(+X)
+  // Camera always follows behind, so world-relative IS camera-relative
+  // because camera snaps to behind the player instantly
+  let dx = 0, dy = 0;
+  if (keys.has('w')) dy -= 1;
+  if (keys.has('s')) dy += 1;
+  if (keys.has('a')) dx -= 1;
+  if (keys.has('d')) dx += 1;
+  if (dx !== 0 && dy !== 0) {
     const inv = 1 / Math.SQRT2;
-    rawX *= inv;
-    rawZ *= inv;
+    dx *= inv;
+    dy *= inv;
   }
-  // Rotate by camera angle so movement is camera-relative
-  const cos = Math.cos(cameraAngle);
-  const sin = Math.sin(cameraAngle);
-  return {
-    dx: rawX * cos - rawZ * sin,
-    dy: rawX * sin + rawZ * cos,
-  };
+  return { dx, dy };
 }
 
 /** Update camera orbit from arrow keys (call each frame) */
