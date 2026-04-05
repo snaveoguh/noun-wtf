@@ -24,7 +24,7 @@ import {
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
 import { Tile } from './engine/types';
 import { seedToKey, randomSeed } from './engine/sprites';
-import { isInDeepWater, dist, angleBetween } from './engine/physics';
+import { isInDeepWater } from './engine/physics';
 import {
   createPlayer,
   createCombatState,
@@ -66,12 +66,11 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
 import {
   createNPCs,
-  tickNPC,
-  damageNPC,
   type NPC,
 } from './engine/npcs';
-import { MOVE_DEFS, resolveDamage } from './engine/moves';
-import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
+// NPC combat imports — disabled until NPCs re-enabled
+// import { MOVE_DEFS, resolveDamage } from './engine/moves';
+// import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
 import { Character3D, type CharacterState } from './engine/Character3D';
 import type { INounSeed } from '@/wrappers/nounToken';
 
@@ -377,20 +376,44 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
-function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRef: React.RefObject<InputState> }) {
+function CameraController({ target, inputRef, playerCharState }: {
+  target: THREE.Vector3;
+  inputRef: React.RefObject<InputState>;
+  playerCharState: React.RefObject<CharacterState>;
+}) {
   const { camera } = useThree();
+  const camAngle = useRef(0); // current camera orbit angle (follows player direction)
 
   useFrame((_, delta) => {
     const input = inputRef.current;
-    if (!input) return;
+    const pcs = playerCharState.current;
+    if (!input || !pcs) return;
 
-    // Update orbit from arrow keys
+    // Arrow keys add orbit offset
     updateCameraOrbit(input, delta);
 
-    const horizAngle = input.cameraOrbitX;
-    const vertAngle = 0.25 + input.cameraOrbitY; // low angle — almost ground level
+    // Camera angle follows player direction (always behind)
+    // Player faces: up=PI, down=0, left=1.5PI, right=0.5PI
+    // Camera behind: up=0, down=PI, left=0.5PI, right=1.5PI
+    const behindAngle =
+      pcs.direction === 'up' ? 0 :
+      pcs.direction === 'down' ? Math.PI :
+      pcs.direction === 'left' ? Math.PI * 0.5 :
+      Math.PI * 1.5;
 
-    const camDist = 3.5; // close behind
+    // Smooth follow
+    let diff = behindAngle - camAngle.current;
+    if (diff > Math.PI) diff -= Math.PI * 2;
+    if (diff < -Math.PI) diff += Math.PI * 2;
+    camAngle.current += diff * 0.05;
+
+    const horizAngle = camAngle.current + input.cameraOrbitX;
+    const vertAngle = 0.25 + input.cameraOrbitY;
+
+    // Write camera angle to input so movement can be camera-relative
+    input.cameraAngle = horizAngle;
+
+    const camDist = 3.5;
     const desired = new THREE.Vector3(
       target.x + Math.sin(horizAngle) * Math.cos(vertAngle) * camDist,
       target.y + Math.sin(vertAngle) * camDist + 1.0,
@@ -399,7 +422,6 @@ function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRe
 
     camera.position.lerp(desired, 0.1);
 
-    // Look at player's mid-body
     const lookTarget = target.clone().add(new THREE.Vector3(0, 0.8, 0));
     camera.lookAt(lookTarget);
   });
@@ -733,58 +755,13 @@ export default function WorldPage() {
             }
           }
 
-          // Hit NPCs with same attack
-          if (intendedMove && intendedMove !== 'block') {
-            const moveDef = MOVE_DEFS[intendedMove];
-            if (moveDef && moveDef.damage !== 0) {
-              for (const npc of npcsRef.current) {
-                if (npc.state === 'dead' || npc.respawnTimer > 0) continue;
-                const d = dist(player.x, player.y, npc.x, npc.y);
-                if (d < moveDef.range * 1.5) {
-                  const damage = resolveDamage(moveDef, 1);
-                  const knockAngle = angleBetween(player.x, player.y, npc.x, npc.y);
-                  const knockX = Math.cos(knockAngle) * moveDef.knockback;
-                  const knockY = Math.sin(knockAngle) * moveDef.knockback;
-                  const killed = damageNPC(npc, damage, knockX, knockY, moveDef.stunDuration);
-                  spawnHitSparks(combat.particles, (player.x + npc.x) / 2, (player.y + npc.y) / 2, 8);
-                  spawnDamageText(combat.floatingTexts, npc.x, npc.y, damage, false);
-                  combat.shake = createScreenShake(2 + damage / 10, 6);
-                  if (killed) {
-                    spawnDeathExplosion(combat.particles, npc.x, npc.y);
-                    combat.shake = createScreenShake(6, 12);
-                    combat.slowMo = createSlowMo(0.3, 6);
-                    combat.killFeed.push({
-                      killer: `You`,
-                      victim: npc.def.name,
-                      move: intendedMove,
-                      timestamp: Date.now(),
-                    });
-                  }
-                }
-              }
-            }
-          }
+          // NPC hit detection disabled — NPCs not rendered
+          // TODO: re-enable with separate GLB instances
         }
       }
 
-      // ── Tick NPCs ──
-      const npcs = npcsRef.current;
-      for (const npc of npcs) {
-        const result = tickNPC(npc, player.x, player.y, player.hp);
-        if (result.didAttack && player.state !== 'dead' && player.state !== 'respawning' && player.iFrames <= 0) {
-          player.hp = Math.max(0, player.hp - result.damage);
-          player.hitFlash = 1;
-          spawnHitSparks(combat.particles, player.x, player.y, 6);
-          spawnDamageText(combat.floatingTexts, player.x, player.y, result.damage, false);
-          combat.shake = createScreenShake(3, 6);
-          if (player.hp <= 0) {
-            player.state = 'dead';
-            player.deathTimer = 60;
-            spawnDeathExplosion(combat.particles, player.x, player.y);
-            combat.shake = createScreenShake(8, 15);
-          }
-        }
-      }
+      // NPCs disabled — rendering removed, so disable AI too
+      // TODO: re-enable when NPC characters use separate GLB instances
 
       // Tick player
       tickPlayer(player, input, combat);
@@ -885,7 +862,7 @@ export default function WorldPage() {
         <PlayerCharacter3D />
         {/* NPCCharacters3D disabled — shared GLB scene conflict. TODO: load separate GLB per NPC */}
 
-        <CameraController target={playerTargetRef.current} inputRef={inputRef} />
+        <CameraController target={playerTargetRef.current} inputRef={inputRef} playerCharState={playerCharState} />
         <GameLogic />
       </Canvas>
 
