@@ -159,6 +159,54 @@ export interface WorldWagerBroadcast {
   winner?: string;
 }
 
+// ── Drop Party Messages ───────────────────────────────────────────────
+
+export interface WorldDropPartyBroadcast {
+  type: 'world:dropParty';
+  items: {
+    dropId: number;
+    worldX: number;
+    worldY: number;
+    itemType: 'eth' | 'erc20' | 'erc721';
+    tokenAddress: string;
+    amountOrId: string;
+  }[];
+}
+
+export interface WorldDropClaimedBroadcast {
+  type: 'world:dropClaimed';
+  dropId: number;
+  claimedBy: string;
+}
+
+// ── VOIP Messages ─────────────────────────────────────────────────────
+
+export interface WorldVoipOffer {
+  type: 'world:voip:offer';
+  from: string;
+  sdp: string;
+}
+
+export interface WorldVoipAnswer {
+  type: 'world:voip:answer';
+  from: string;
+  to: string;
+  sdp: string;
+}
+
+export interface WorldVoipIce {
+  type: 'world:voip:ice';
+  from: string;
+  candidate: string;
+}
+
+export interface WorldSettleCrowdMeter {
+  type: 'world:settleMeter';
+  activeSpeakers: number;
+  threshold: number;
+  triggered: boolean;
+}
+
 export type ServerMessage =
   | WorldSyncMessage
   | WorldPlayerMessage
@@ -168,4 +216,7 @@ export type ServerMessage =
   | WorldHitBroadcast
   | WorldDeathBroadcast
   | WorldForcePushBroadcast
-  | WorldWagerBroadcast;
+  | WorldWagerBroadcast
+  | WorldDropPartyBroadcast
+  | WorldDropClaimedBroadcast
+  | WorldSettleCrowdMeter;

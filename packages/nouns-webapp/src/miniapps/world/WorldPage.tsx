@@ -71,7 +71,10 @@ import {
 // import { MOVE_DEFS, resolveDamage } from './engine/moves';
 // import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
 import { Character3D, type CharacterState } from './engine/Character3D';
-import { TreasureChest3D } from './engine/TreasureChest3D';
+import { TreasureChest3D, DroppedItem3D } from './engine/TreasureChest3D';
+import { DepositModal } from './wager/DepositModal';
+import { useClaimDrop } from './wager/treasureChest';
+import { getActiveDrops, getNearbyDrop, markClaimed, type DroppedItem } from './engine/drops';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -529,7 +532,7 @@ function HUD({
         color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: 10,
         textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center',
       }}>
-        WASD move &middot; Arrows pan camera &middot; ESC exit
+        WASD move &middot; E interact/pickup &middot; ESC exit
       </div>
 
       {/* Ocean death overlay */}
@@ -656,17 +659,51 @@ export default function WorldPage() {
     return cleanup;
   }, []);
 
-  // ESC handler
+  // Deposit modal + drop items state
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [droppedItems, setDroppedItems] = useState<DroppedItem[]>([]);
+  const claimDrop = useClaimDrop();
+
+  // Chest position (southwest of spawn)
+  const chestWorldX = (SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE;
+  const chestWorldZ = (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE;
+
+  // ESC + E key handler
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        disconnectMultiplayer(mpRef.current);
-        navigate('/');
+        if (depositOpen) {
+          setDepositOpen(false);
+        } else {
+          disconnectMultiplayer(mpRef.current);
+          navigate('/');
+        }
+      }
+      if (e.key === 'e' || e.key === 'E') {
+        const p = playerRef.current;
+        if (!p) return;
+        const px = p.x * WORLD_SCALE;
+        const pz = p.y * WORLD_SCALE;
+
+        // Check distance to chest
+        const chestDist = Math.sqrt((px - chestWorldX) ** 2 + (pz - chestWorldZ) ** 2);
+        if (chestDist < 3) {
+          setDepositOpen(true);
+          return;
+        }
+
+        // Check for nearby drop item
+        const nearbyDrop = getNearbyDrop(p.x, p.y);
+        if (nearbyDrop) {
+          claimDrop.claim(BigInt(nearbyDrop.dropId));
+          markClaimed(nearbyDrop.dropId, 'you');
+          setDroppedItems([...getActiveDrops()]);
+        }
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate]);
+  }, [navigate, depositOpen, claimDrop, chestWorldX, chestWorldZ]);
 
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
@@ -886,13 +923,23 @@ export default function WorldPage() {
         <Rocks />
         <CrystalBallMountain nounSeed={seed} />
 
-        {/* Treasure Chest — southwest of spawn */}
+        {/* Treasure Chest */}
         <TreasureChest3D
-          position={[(SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE, getTerrainHeight((SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE, (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE) + 0.1, (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE]}
+          position={[chestWorldX, getTerrainHeight(chestWorldX, chestWorldZ) + 0.1, chestWorldZ]}
           pendingCount={0}
-          onInteract={() => {}}
+          onInteract={() => setDepositOpen(true)}
           playerDistance={99}
         />
+
+        {/* Dropped items from last drop party */}
+        {droppedItems.filter(d => !d.claimed).map(item => (
+          <DroppedItem3D
+            key={item.dropId}
+            position={[item.worldX * WORLD_SCALE, getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1, item.worldY * WORLD_SCALE]}
+            itemType={item.itemType}
+            claimed={item.claimed}
+          />
+        ))}
 
         <PlayerCharacter3D />
         <RemotePlayers />
@@ -902,6 +949,7 @@ export default function WorldPage() {
       </Canvas>
 
       <HUDLive hudRef={hudRef} />
+      <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
     </div>
   );
 }
