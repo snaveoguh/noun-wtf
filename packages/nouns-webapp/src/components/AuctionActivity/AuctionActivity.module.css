@@ -1,137 +1,55 @@
+/* ── Auction Widget ─────────────────────────────── */
+/* Consistent 1rem outer padding, 0.75rem vertical rhythm */
+
 .wrapper {
-  padding: 1rem 1rem;
+  padding: 1rem 1.1rem;
   color: var(--brand-black);
   align-self: flex-start !important;
   width: 100%;
   min-width: 0;
 }
 
-.informationRow {
+/* Row 1: Title left + Current Bid badge right */
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
   margin-bottom: 0.5rem;
   min-width: 0;
 }
 
-.activityRow {
-  margin-bottom: 0rem;
-  --bs-gutter-x: 0;
-  margin-left: 0;
-  margin-right: 0;
+.headerLeft {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-h1 {
-  font-size: 3rem;
-}
-
-h2 {
-  font-size: 2.5rem;
-}
-
-h4 {
-  font-size: 1rem;
-  font-weight: 400;
-}
-
-.modalHeader {
-  border-bottom: none;
-  justify-content: flex-start;
-  align-items: center;
-}
-
-.modalTitleWrapper {
-  color: var(--brand-black);
-}
-
-.modalTitleWrapper h1 {
-  font-size: xx-large;
-  margin-left: 2rem;
-}
-
-.modalHeader button {
+.bidBadge {
+  flex: 0 0 auto;
   align-self: flex-start;
-}
-
-.modalHeaderNounImgWrapper {
-  width: 150px;
-  height: 150px;
-}
-
-.currentBidCol {
-  border-right: 1px solid #79809c49;
   min-width: 0;
-  padding-left: 0;
-  padding-right: 1rem;
+  background: rgba(120, 120, 140, 0.55);
+  border-radius: 14px;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  margin-top: 0.1rem;
 }
 
-.auctionTimerCol {
+/* Row 2: Timer single line */
+.timerRow {
+  margin-bottom: 0.65rem;
   min-width: 0;
-  padding-left: 1rem;
 }
 
-.section h4 {
-  font-family: 'PT Root UI';
-  font-size: 17px;
-  line-height: 25px;
+/* Row 4: Bottom actions */
+.bottomRow {
+  min-width: 0;
 }
 
-.section h2 {
-  font-family: 'PT Root UI';
-  font-weight: bold;
-  font-size: 32px;
-}
-
-@media (max-width: 992px) {
-  h1 {
-    padding-top: 12px;
-  }
-
-  .wrapper {
-    padding: 1rem;
-  }
-
-  .auctionTimerCol {
-    padding-left: 0rem;
-  }
-
-  .currentBidCol {
-    border-right: 0px;
-    padding-left: 0rem;
-    padding-right: 0rem;
-  }
-
-  .nextNounLink {
-    padding-left: 14px;
-  }
-}
-
-@media (max-width: 640px) {
-  .currentBidCol {
-    padding-bottom: 0.8rem;
-    border-bottom: 1px solid #79809c49;
-  }
-
-  .auctionTimerCol {
-    padding-top: 0.8rem;
-  }
-}
-
-@media (max-width: 400px) {
-  .nextNounLink {
-    font-size: 14px;
-  }
-}
-
-/* Fix Firefox navigation arrow alignment issues */
-@-moz-document url-prefix() {
-  .colAlignCenter {
-    display: flex;
-    align-items: center;
-  }
-}
-
+/* Next noun link (auction ended) */
 .nextNounLink {
-  margin-top: 0rem;
-  margin-bottom: 1rem;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
   transition: 0.2s ease-in-out;
 }
 
@@ -154,4 +72,29 @@ h4 {
   text-decoration: none;
   color: black;
   opacity: 1;
+}
+
+/* Legacy modal styles (kept for BidHistoryModal) */
+.modalHeader {
+  border-bottom: none;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.modalTitleWrapper {
+  color: var(--brand-black);
+}
+
+.modalTitleWrapper h1 {
+  font-size: xx-large;
+  margin-left: 2rem;
+}
+
+.modalHeader button {
+  align-self: flex-start;
+}
+
+.modalHeaderNounImgWrapper {
+  width: 150px;
+  height: 150px;
 }
