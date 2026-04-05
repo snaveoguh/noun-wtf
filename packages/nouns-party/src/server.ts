@@ -1,24 +1,21 @@
 import type { Party, PartyKitServer, Connection } from "partykit/server";
 
 /**
- * Saber Arena — PartyKit real-time multiplayer server.
+ * noun.wtf — PartyKit real-time multiplayer server.
  *
- * Protocol (JSON):
+ * Handles two game modes via message type prefix:
  *
- * Client → Server:
- *   { type: "update", x, y, angle, swinging, color, name }
- *   { type: "force", x, y, angle, color }
- *   { type: "leaderboard_submit", name, seconds, score, wave }
- *   { type: "leaderboard_get" }
+ * 1. Saber Arena (default, no prefix):
+ *    Client → Server: update, force, leaderboard_submit, leaderboard_get
+ *    Server → Client: sync, player, force, join, leave, leaderboard
  *
- * Server → Client:
- *   { type: "sync", players, count }
- *   { type: "player", id, ...state }
- *   { type: "force", id, x, y, angle, color }
- *   { type: "join", id, count }
- *   { type: "leave", id, count }
- *   { type: "leaderboard", entries }
+ * 2. Nouns World (world: prefix):
+ *    Client → Server: world:move, world:attack, world:hit, world:force, world:wager
+ *    Server → Client: world:sync, world:player, world:join, world:leave,
+ *                      world:attack, world:hit, world:death, world:force, world:wager
  */
+
+// ── Saber types ───────────────────────────────────────────────────────
 
 interface PlayerState {
   x: number;
@@ -38,51 +35,208 @@ interface LeaderboardEntry {
   timestamp: number;
 }
 
+// ── World types ───────────────────────────────────────────────────────
+
+interface WorldPlayerState {
+  x: number;
+  y: number;
+  direction: string;
+  state: string;
+  hp: number;
+  nounId: number;
+  seedKey: string;
+  scaleX: number;
+  attackType: string | null;
+  attackTimer: number;
+  airborneY: number;
+  flipRotation: number;
+  lastSeen: number;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────
+
 const STALE_TIMEOUT = 5000;
 const MAX_LEADERBOARD = 25;
 
+// ── Room state shape ──────────────────────────────────────────────────
+
+interface RoomState {
+  _players?: Record<string, PlayerState>;
+  _worldPlayers?: Record<string, WorldPlayerState>;
+  _leaderboard: LeaderboardEntry[];
+}
+
+function getRoomState(room: Party): RoomState {
+  return room as unknown as RoomState;
+}
+
+// ── Broadcast helpers ─────────────────────────────────────────────────
+
+function broadcastExcept(room: Party, senderId: string, msg: string) {
+  for (const conn of room.getConnections()) {
+    if (conn.id !== senderId) {
+      conn.send(msg);
+    }
+  }
+}
+
+// ── Server ────────────────────────────────────────────────────────────
+
 export default {
   async onStart(room: Party) {
-    // Load leaderboard from durable storage
     const stored = await room.storage.get<LeaderboardEntry[]>("leaderboard");
-    const roomAny = room as unknown as {
-      _players?: Record<string, PlayerState>;
-      _leaderboard: LeaderboardEntry[];
-    };
-    roomAny._leaderboard = stored ?? [];
+    const rs = getRoomState(room);
+    rs._leaderboard = stored ?? [];
   },
 
   onConnect(connection: Connection, room: Party) {
     const count = [...room.getConnections()].length;
+    const rs = getRoomState(room);
 
+    // Broadcast join to everyone
     room.broadcast(
       JSON.stringify({ type: "join", id: connection.id, count }),
     );
+    // Also broadcast as world:join for world clients
+    room.broadcast(
+      JSON.stringify({ type: "world:join", id: connection.id, count }),
+    );
 
+    // Send saber sync
     const players: Record<string, PlayerState> = {};
     const now = Date.now();
-    for (const [id, state] of Object.entries(
-      (room as unknown as { _players?: Record<string, PlayerState> })._players ?? {},
-    )) {
+    for (const [id, state] of Object.entries(rs._players ?? {})) {
       if (now - state.lastSeen < STALE_TIMEOUT) {
         players[id] = state;
       }
     }
     connection.send(JSON.stringify({ type: "sync", players, count }));
+
+    // Send world sync
+    const worldPlayers: Record<string, Omit<WorldPlayerState, "lastSeen">> = {};
+    for (const [id, state] of Object.entries(rs._worldPlayers ?? {})) {
+      if (now - state.lastSeen < STALE_TIMEOUT) {
+        const { lastSeen, ...rest } = state;
+        worldPlayers[id] = rest;
+      }
+    }
+    connection.send(
+      JSON.stringify({ type: "world:sync", players: worldPlayers, count }),
+    );
   },
 
   async onMessage(message: string, connection: Connection, room: Party) {
     try {
       const data = JSON.parse(message as string);
-      const roomAny = room as unknown as {
-        _players?: Record<string, PlayerState>;
-        _leaderboard: LeaderboardEntry[];
-      };
+      const rs = getRoomState(room);
+
+      // ── World messages (world: prefix) ──────────────────────────────
+
+      if (typeof data.type === "string" && data.type.startsWith("world:")) {
+        if (!rs._worldPlayers) rs._worldPlayers = {};
+
+        if (data.type === "world:move") {
+          rs._worldPlayers[connection.id] = {
+            x: data.x ?? 0,
+            y: data.y ?? 0,
+            direction: data.direction ?? "down",
+            state: data.state ?? "idle",
+            hp: data.hp ?? 100,
+            nounId: data.nounId ?? 0,
+            seedKey: data.seedKey ?? "0-0-0-0-0",
+            scaleX: data.scaleX ?? 1,
+            attackType: data.attackType ?? null,
+            attackTimer: data.attackTimer ?? 0,
+            airborneY: data.airborneY ?? 0,
+            flipRotation: data.flipRotation ?? 0,
+            lastSeen: Date.now(),
+          };
+
+          const { lastSeen, ...rest } = rs._worldPlayers[connection.id];
+          broadcastExcept(
+            room,
+            connection.id,
+            JSON.stringify({
+              type: "world:player",
+              id: connection.id,
+              ...rest,
+            }),
+          );
+        } else if (data.type === "world:attack") {
+          broadcastExcept(
+            room,
+            connection.id,
+            JSON.stringify({
+              type: "world:attack",
+              id: connection.id,
+              moveType: data.moveType,
+              x: data.x ?? 0,
+              y: data.y ?? 0,
+              angle: data.angle ?? 0,
+            }),
+          );
+        } else if (data.type === "world:hit") {
+          // Broadcast hit to all (including target who needs to take damage)
+          room.broadcast(
+            JSON.stringify({
+              type: "world:hit",
+              attackerId: connection.id,
+              targetId: data.targetId,
+              damage: data.damage ?? 0,
+              knockX: data.knockX ?? 0,
+              knockY: data.knockY ?? 0,
+              move: data.move ?? "punch",
+              combo: data.combo ?? 0,
+            }),
+          );
+
+          // Check for death — update world player state
+          const target = rs._worldPlayers?.[data.targetId];
+          if (target) {
+            target.hp = Math.max(0, target.hp - (data.damage ?? 0));
+            if (target.hp <= 0) {
+              room.broadcast(
+                JSON.stringify({
+                  type: "world:death",
+                  id: data.targetId,
+                  killerId: connection.id,
+                }),
+              );
+            }
+          }
+        } else if (data.type === "world:force") {
+          broadcastExcept(
+            room,
+            connection.id,
+            JSON.stringify({
+              type: "world:force",
+              id: connection.id,
+              x: data.x ?? 0,
+              y: data.y ?? 0,
+              angle: data.angle ?? 0,
+              color: data.color ?? "#4488ff",
+            }),
+          );
+        } else if (data.type === "world:wager") {
+          // Broadcast wager events to all
+          room.broadcast(
+            JSON.stringify({
+              type: "world:wager",
+              ...data,
+              from: connection.id,
+            }),
+          );
+        }
+
+        return; // Don't process as saber message
+      }
+
+      // ── Saber messages (no prefix) ──────────────────────────────────
 
       if (data.type === "update") {
-        if (!roomAny._players) roomAny._players = {};
+        if (!rs._players) rs._players = {};
 
-        roomAny._players[connection.id] = {
+        rs._players[connection.id] = {
           x: data.x ?? 0,
           y: data.y ?? 0,
           angle: data.angle ?? 0,
@@ -92,69 +246,54 @@ export default {
           lastSeen: Date.now(),
         };
 
-        const update = JSON.stringify({
-          type: "player",
-          id: connection.id,
-          ...roomAny._players[connection.id],
-        });
-
-        for (const conn of room.getConnections()) {
-          if (conn.id !== connection.id) {
-            conn.send(update);
-          }
-        }
+        broadcastExcept(
+          room,
+          connection.id,
+          JSON.stringify({
+            type: "player",
+            id: connection.id,
+            ...rs._players[connection.id],
+          }),
+        );
       } else if (data.type === "force") {
-        // Broadcast force push event to all other players
-        const forceMsg = JSON.stringify({
-          type: "force",
-          id: connection.id,
-          x: data.x ?? 0,
-          y: data.y ?? 0,
-          angle: data.angle ?? 0,
-          color: data.color ?? "#00aaff",
-        });
-
-        for (const conn of room.getConnections()) {
-          if (conn.id !== connection.id) {
-            conn.send(forceMsg);
-          }
-        }
+        broadcastExcept(
+          room,
+          connection.id,
+          JSON.stringify({
+            type: "force",
+            id: connection.id,
+            x: data.x ?? 0,
+            y: data.y ?? 0,
+            angle: data.angle ?? 0,
+            color: data.color ?? "#00aaff",
+          }),
+        );
       } else if (data.type === "leaderboard_submit") {
-        // Add entry to leaderboard
         const entry: LeaderboardEntry = {
-          name: (data.name ?? "Anon").substring(0, 42), // max length for eth address
+          name: (data.name ?? "Anon").substring(0, 42),
           seconds: Math.max(0, Math.floor(data.seconds ?? 0)),
           score: Math.max(0, Math.floor(data.score ?? 0)),
           wave: Math.max(1, Math.floor(data.wave ?? 1)),
           timestamp: Date.now(),
         };
 
-        if (!roomAny._leaderboard) roomAny._leaderboard = [];
-        roomAny._leaderboard.push(entry);
-        // Sort by seconds survived descending
-        roomAny._leaderboard.sort((a, b) => b.seconds - a.seconds);
-        // Keep top N
-        roomAny._leaderboard = roomAny._leaderboard.slice(0, MAX_LEADERBOARD);
-        // Persist to durable storage
-        await room.storage.put("leaderboard", roomAny._leaderboard);
+        if (!rs._leaderboard) rs._leaderboard = [];
+        rs._leaderboard.push(entry);
+        rs._leaderboard.sort((a, b) => b.seconds - a.seconds);
+        rs._leaderboard = rs._leaderboard.slice(0, MAX_LEADERBOARD);
+        await room.storage.put("leaderboard", rs._leaderboard);
 
-        // Send updated leaderboard back to the submitter
-        connection.send(JSON.stringify({
-          type: "leaderboard",
-          entries: roomAny._leaderboard,
-        }));
-
-        // Also broadcast to everyone
-        room.broadcast(JSON.stringify({
-          type: "leaderboard",
-          entries: roomAny._leaderboard,
-        }));
+        connection.send(
+          JSON.stringify({ type: "leaderboard", entries: rs._leaderboard }),
+        );
+        room.broadcast(
+          JSON.stringify({ type: "leaderboard", entries: rs._leaderboard }),
+        );
       } else if (data.type === "leaderboard_get") {
-        if (!roomAny._leaderboard) roomAny._leaderboard = [];
-        connection.send(JSON.stringify({
-          type: "leaderboard",
-          entries: roomAny._leaderboard,
-        }));
+        if (!rs._leaderboard) rs._leaderboard = [];
+        connection.send(
+          JSON.stringify({ type: "leaderboard", entries: rs._leaderboard }),
+        );
       }
     } catch {
       // Ignore malformed messages
@@ -162,14 +301,24 @@ export default {
   },
 
   onClose(connection: Connection, room: Party) {
-    const roomAny = room as unknown as { _players?: Record<string, PlayerState> };
-    if (roomAny._players) {
-      delete roomAny._players[connection.id];
+    const rs = getRoomState(room);
+
+    // Clean up saber player
+    if (rs._players) {
+      delete rs._players[connection.id];
+    }
+
+    // Clean up world player
+    if (rs._worldPlayers) {
+      delete rs._worldPlayers[connection.id];
     }
 
     const count = [...room.getConnections()].length;
     room.broadcast(
       JSON.stringify({ type: "leave", id: connection.id, count }),
+    );
+    room.broadcast(
+      JSON.stringify({ type: "world:leave", id: connection.id, count }),
     );
   },
 } satisfies PartyKitServer;

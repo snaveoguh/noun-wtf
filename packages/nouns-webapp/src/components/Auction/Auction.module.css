@@ -575,3 +575,24 @@
     padding: 0.9rem;
   }
 }
+
+/* ── Sprite world transition ─────────────────────────── */
+
+.spriteTransition {
+  animation: spriteEnter 0.8s ease-in-out forwards;
+}
+
+@keyframes spriteEnter {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1) rotate(360deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0) rotate(720deg);
+    opacity: 0;
+  }
+}

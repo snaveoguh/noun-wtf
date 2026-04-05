@@ -116,10 +116,14 @@ code {
 
 /*---break---*/
 
+/* Edge padding must live outside @layer so CSS modules can resolve the vars */
+:root {
+  --page-edge-padding-left: max(1rem, env(safe-area-inset-left));
+  --page-edge-padding-right: max(1rem, env(safe-area-inset-right));
+}
+
 @layer base {
   :root {
-    --page-edge-padding-left: max(1rem, env(safe-area-inset-left));
-    --page-edge-padding-right: max(1rem, env(safe-area-inset-right));
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;

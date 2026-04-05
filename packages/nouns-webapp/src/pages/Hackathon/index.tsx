@@ -1,115 +1,141 @@
+import { formatEther } from 'viem';
+import { useBalance } from 'wagmi';
+
+import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
+
 import classes from './Hackathon.module.css';
 
-const EXAMPLE_PROJECTS = [
+const TREASURY_ADDRESS = SMALL_GRANTS_TREASURY_ADDRESS;
+
+const CONTRACTS = [
   {
-    name: 'Nouns Terminal',
-    desc: 'GameBoy-inspired touchscreen governance client for Raspberry Pi. Pixel art studio, proposal voting, live auction bidding, candidate submissions. 480x320 display with stylus.',
-    tag: 'PHYSICAL',
-    tagClass: 'tagPhysical',
-    version: 'v0.1',
-    stack: ['React', 'ethers.js', 'RPi 3B+', 'Chromium Kiosk'],
-    link: '/hackathon/NOUNS-TERMINAL-GUIDE.pdf',
-    art: `┌──────────────┐
-│  ⌐◨-◨  NOUN  │
-│  TERMINAL    │
-│  ┌────────┐  │
-│  │ 32x32  │  │
-│  │ STUDIO │  │
-│  └────────┘  │
-│  [A][B][SEL] │
-└──────────────┘`,
+    name: 'SmallGrantsTreasury',
+    address: '0xBAc9233725440c595b19d975309CC98cb259253a',
+    chain: 'Ethereum',
+    desc: 'The target. 12hr vote, 12hr lock, no quorum. 1 Noun vote passes a prop. propose(), castVote(), queue(), execute().',
+    caption: 'Build a physical device that submits proposals or casts votes. A one-button grant machine.',
+    tag: 'TARGET',
+    tagClass: 'tagTarget',
+    etherscan: 'https://etherscan.io/address/0xBAc9233725440c595b19d975309CC98cb259253a',
   },
   {
-    name: 'IRL Crystal Ball',
-    desc: "Raspberry Pi Zero W inside a crystal ball housing. Predicts the next Noun's traits using the NounsSeeder algorithm. OLED display shows trait predictions updating each block.",
-    tag: 'PHYSICAL',
-    tagClass: 'tagPhysical',
-    version: 'v0.1',
-    stack: ['RPi Zero W', '0.96" OLED', 'Python', 'keccak256'],
-    link: '/crystal-ball',
-    art: `      .-""-.
-    /        \\
-   |  ⌐◨-◨   |
-   | head:    |
-   | shark    |
-    \\  next  /
-     '-.  .-'
-      |__|`,
+    name: 'NounsToken',
+    address: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
+    chain: 'Ethereum',
+    desc: 'ERC-721 governance token. 1 Noun = 1 vote. balanceOf(), delegates(), votesToDelegate(). Used by the treasury for voting power.',
+    caption: 'Build a delegation kiosk. Show who holds power and let people delegate from a physical terminal.',
+    tag: 'CORE',
+    tagClass: 'tagCore',
+    etherscan: 'https://etherscan.io/address/0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
   },
   {
-    name: 'Touchscreen Playground',
-    desc: 'Full Nouns playground + proposal maker optimized for 3" touchscreen. Draw pixel art, submit as proposal candidates, vote on proposals — all from a handheld device.',
-    tag: 'PHYSICAL',
-    tagClass: 'tagPhysical',
-    version: 'v0.1',
-    stack: ['Vite', 'React', 'wagmi', 'Touch Events'],
-    link: '/playground',
-    art: `┌────────────────┐
-│ ■ □ ■ □ ■ □ ■ │
-│ □ ■ □ ■ □ ■ □ │
-│ ■ ⌐◨-◨ ■ □ ■ │
-│ □ ■ □ ■ □ ■ □ │
-│ [PEN][FILL][OK]│
-└────────────────┘`,
+    name: 'NounsDAOV4',
+    address: '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d',
+    chain: 'Ethereum',
+    desc: 'Main DAO governor. proposals(), state(), castVote(). The big treasury ($52M+).',
+    caption: 'Build a proposal ticker or governance dashboard that runs on an e-ink display or Raspberry Pi.',
+    tag: 'CORE',
+    tagClass: 'tagCore',
+    etherscan: 'https://etherscan.io/address/0x6f3E6272A167e8AcCb32072d08E0957F9c79223d',
   },
   {
-    name: 'Terminal Chat',
-    desc: 'AI chat interface backed by Claude with full governance tool access. Vote, create proposals, place bids, delegate — all through natural language. 10 governance actions.',
-    tag: 'LIVE',
-    tagClass: 'tagLive',
-    version: 'v1.0',
-    stack: ['Claude AI', 'SSE', 'wagmi', 'Nouns Contracts'],
-    href: 'https://noun.wtf/terminal',
-    link: '/terminal',
+    name: 'NounsAuctionHouseV2',
+    address: '0x830BD73E4184ceF73443C15111a1DF14e495C706',
+    chain: 'Ethereum',
+    desc: 'Daily auctions. One Noun per day. settleCurrentAndCreateNewAuction(), createBid(). The heartbeat of Nouns.',
+    caption: 'Build an auction alert device — a bell, buzzer, or light that goes off when bids land or auctions end.',
+    tag: 'CORE',
+    tagClass: 'tagCore',
+    etherscan: 'https://etherscan.io/address/0x830BD73E4184ceF73443C15111a1DF14e495C706',
+  },
+  {
+    name: 'MoralityPredictionMarket',
+    address: '0x2ea7502C4db5B8cfB329d8a9866EB6705b036608',
+    chain: 'Ethereum',
+    desc: 'Bet on whether Nouns proposals pass or fail. Parimutuel pools. stake(), claim(), resolve(). Auto-creates markets on first bet.',
+    caption: 'Build a physical voting booth where people predict proposal outcomes with real ETH at stake.',
+    tag: 'MARKET',
+    tagClass: 'tagMarket',
+    etherscan: 'https://etherscan.io/address/0x2ea7502C4db5B8cfB329d8a9866EB6705b036608',
+  },
+  {
+    name: 'PooterEditions',
+    address: '0x06d7c7d70c685d58686FF6E0b0DB388209fCCC6e',
+    chain: 'Base',
+    desc: 'Daily newspaper NFTs (ERC-721). One edition per day since March 2026. mint(), mintFor(). On Base L2.',
+    caption: 'Build a dot matrix printer that prints the daily Pooter edition as a physical newspaper every morning.',
+    tag: 'NFT',
+    tagClass: 'tagNft',
+    etherscan: 'https://basescan.org/address/0x06d7c7d70c685d58686FF6E0b0DB388209fCCC6e',
+  },
+];
+
+const APIS = [
+  {
+    name: 'GraphQL API (Ponder)',
+    url: 'https://spirited-flexibility-production-3c30.up.railway.app/graphql',
+    desc: 'Nouns indexer. Auctions, proposals, grants, delegates, transfers. Full GraphQL.',
+  },
+  {
+    name: 'Governance Feed',
+    url: 'https://pooter.world/api/v1/governance/live',
+    desc: 'Live proposals from Nouns + Lil Nouns. Status, votes, social signals. JSON REST.',
+  },
+  {
+    name: 'Agent Hub (Free LLM)',
+    url: 'https://heartfelt-flow-production-d872.up.railway.app',
+    desc: 'Free LLM via Groq (Qwen3-32B / Llama 3.3 70B). POST /v1/generate or /v1/chat. No API key needed.',
+  },
+  {
+    name: 'Newsroom / Editorial',
+    url: 'https://pooter.world/api/feed',
+    desc: 'Aggregated RSS + AI editorial feed. Market impact extraction, bias analysis, daily editions.',
+  },
+  {
+    name: 'Prediction Market Ops',
+    url: 'https://pooter.world/api/predictions/ops',
+    desc: 'Operator snapshot: markets needing resolution, live markets, resolved markets.',
+  },
+];
+
+const TOOLS = [
+  {
+    name: 'Terminal',
+    path: '/terminal',
+    desc: 'AI chat with governance tool access. Vote, propose, bid, delegate — all through natural language.',
     art: `$ noun-terminal v1.0
 > vote for prop 948
 preparing your vote...
 support: FOR
-reason: "good vibes"
 [SIGN TX]`,
   },
   {
-    name: 'Nouns Classic Fork',
-    desc: 'noun.wtf itself — fork it, add your own features. Add content to the daily Noun, run concurrent auctions alongside the daily for your own art. Client ID 37.',
-    tag: 'LIVE',
-    tagClass: 'tagLive',
-    version: 'v2.0',
-    stack: ['Vite', 'React', 'Ponder', 'wagmi v2'],
-    href: 'https://noun.wtf',
-    art: `noun.wtf
-├─ /studio    create art
-├─ /terminal  AI chat
-├─ /grants    micro-gov
-├─ /feed      farcaster
-├─ /settlers  agent
-└─ /hackathons you are here`,
+    name: 'Crystal Ball',
+    path: '/crystal-ball',
+    desc: "Predict the next Noun's traits using the NounsSeeder algorithm. keccak256 pseudorandomness.",
+    art: `    .-""-.
+  /  ⌐◨-◨  \\
+ | head:    |
+ | shark    |
+  \\  next  /
+   '-..-'`,
   },
   {
-    name: 'Noun Grants',
-    desc: 'Unaudited SmallGrantsTreasury contract — 24hr governance with no quorum. 12hr vote + 12hr timelock. A proposal passes with 1 FOR if nobody votes AGAINST. Micro-governance for the people.',
-    tag: 'LIVE',
-    tagClass: 'tagLive',
-    version: 'v0.1 UNAUDITED',
-    stack: ['Solidity', 'Governor', 'Ponder', 'React'],
-    href: 'https://noun.wtf/grants',
-    link: '/grants',
-    art: `SmallGrantsTreasury.sol
-propose() → ACTIVE
-  12hr vote → SUCCEEDED
-  12hr lock → QUEUED
-  execute() → DONE
+    name: 'Grants',
+    path: '/grants',
+    desc: 'Propose and vote on SmallGrantsTreasury proposals. The front door to Hack the Treasury.',
+    art: `propose() → ACTIVE
+ 12hr vote → SUCCEEDED
+ 12hr lock → QUEUED
+ execute() → DONE
 quorum: none (!)`,
   },
   {
     name: 'Predictions',
-    desc: 'Prediction markets that resolve to onchain results of Nouns proposals. Live on mainnet. Bet on whether proposals will pass or fail, resolved by the actual vote outcome.',
-    tag: 'MAINNET',
-    tagClass: 'tagMainnet',
-    version: 'v0.1',
-    stack: ['Solidity', 'Base', 'Next.js', 'viem'],
-    href: 'https://dev.pooter.world/predictions',
-    art: `PREDICTIONS
-┌──────────────────┐
+    path: 'https://pooter.world/predictions',
+    external: true,
+    desc: 'Bet on whether Nouns proposals will pass or fail. Resolved by onchain governor state.',
+    art: `┌──────────────────┐
 │ Prop #948        │
 │ Pass?  ■■■■░░ 67%│
 │ Fail?  ■■░░░░ 33%│
@@ -117,267 +143,238 @@ quorum: none (!)`,
 └──────────────────┘`,
   },
   {
-    name: 'Hackathon Guide (PDF)',
-    desc: 'Everything you need to build on the noun.wtf stack: contracts, APIs, GraphQL schema, agent endpoints, local dev setup, environment variables, build ideas. 18 pages.',
-    tag: 'GUIDE',
-    tagClass: 'tagGuide',
-    version: '2026.03',
-    stack: ['PDF', '18 pages', 'CC0'],
-    link: '/hackathon/noun-wtf-hackathon-guide.pdf',
-    art: `noun.wtf Hackathon Guide
-━━━━━━━━━━━━━━━━━━━━
-1.  What Is This
-2.  The Nouns Ecosystem
-3.  Architecture
-4.  Contracts On Chain
-5.  GraphQL API
-...
-13. Build Ideas`,
+    name: 'Studio',
+    path: '/studio',
+    desc: 'Draw pixel art using Nouns traits. Save, propose, remix. Full trait library.',
+    art: `┌────────────────┐
+│ ■ □ ■ □ ■ □ ■ │
+│ □ ⌐◨-◨ □ ■ □ │
+│ ■ □ ■ □ ■ □ ■ │
+│ [PEN][FILL][OK]│
+└────────────────┘`,
   },
 ];
 
-const BUILD_IDEAS = [
+const PHYSICAL_IDEAS = [
   {
-    cat: 'Data',
-    color: '#22d3ee',
-    text: 'Voter influence graph',
-    sub: 'Map who influences what with delegates + votes data',
+    text: 'Raspberry Pi governance terminal',
+    sub: 'Touchscreen for voting, bidding, proposing. Kiosk mode. Could run noun.wtf or a custom UI.',
   },
   {
-    cat: 'Data',
-    color: '#22d3ee',
-    text: 'Proposal outcome predictor',
-    sub: 'Use historical vote patterns to predict results',
+    text: 'OLED trait predictor',
+    sub: 'RPi Zero W + 0.96" OLED. Shows predicted traits for the next Noun, updating each block.',
   },
   {
-    cat: 'Data',
-    color: '#22d3ee',
-    text: 'Treasury flow visualization',
-    sub: 'Streams + proposal execution → where money goes',
+    text: 'Dot matrix Noun printer',
+    sub: '80-column continuous feed. Print proposals, auction results, governance events as they happen.',
   },
   {
-    cat: 'Governance',
-    color: '#4ade80',
-    text: 'Delegation marketplace',
-    sub: 'Help Noun holders find aligned delegates',
+    text: 'Hardware delegation device',
+    sub: 'Cold storage signer that auto-delegates to specified addresses. Physical governance key.',
   },
   {
-    cat: 'Governance',
-    color: '#4ade80',
-    text: 'Proposal diff viewer',
-    sub: 'Track ProposalUpdated events, show what changed',
+    text: 'Auction notification bell',
+    sub: 'Physical bell/buzzer that rings when an auction is about to end or when you get outbid.',
   },
   {
-    cat: 'Governance',
-    color: '#4ade80',
-    text: 'Grant proposal templates',
-    sub: 'Pre-built SmallGrantsTreasury proposals',
-  },
-  {
-    cat: 'Agent',
-    color: '#a78bfa',
-    text: 'Custom settlement strategies',
-    sub: 'Fork the trait predictor for different strategies',
-  },
-  {
-    cat: 'Agent',
-    color: '#a78bfa',
-    text: 'Cross-DAO agent',
-    sub: 'Extend nounirl to Lil Nouns, Purple DAO, ENS...',
-  },
-  {
-    cat: 'Agent',
-    color: '#a78bfa',
-    text: 'Farcaster bot',
-    sub: 'Post settlement predictions + governance activity',
-  },
-  {
-    cat: 'Frontend',
-    color: '#fbbf24',
-    text: 'Mobile-first governance',
-    sub: 'Native-feeling mobile app for Nouns voting',
-  },
-  {
-    cat: 'Frontend',
-    color: '#fbbf24',
-    text: 'Noun trait explorer',
-    sub: '3D viewer for all trait combos with rarity scores',
-  },
-  {
-    cat: 'Onchain',
-    color: '#f472b6',
-    text: 'Extend SmallGrantsTreasury',
-    sub: 'Recurring grants, milestone payouts, quadratic voting',
-  },
-  {
-    cat: 'Onchain',
-    color: '#f472b6',
-    text: 'Noun fractionalization',
-    sub: 'Split Noun voting power across multiple wallets',
-  },
-  {
-    cat: 'Physical',
-    color: '#fb923c',
-    text: 'Bridge URL to IRL via good UX',
-    sub: 'Raspberry Pi builds, cold storage delegate devices',
-  },
-  {
-    cat: 'Physical',
-    color: '#fb923c',
-    text: 'Dot Matrix Noun Printer',
-    sub: '80-col continuous feed Noun news printer',
+    text: 'Treasury balance display',
+    sub: 'E-ink or LED display showing live treasury balance. Wall-mountable. Reads from chain.',
   },
 ];
 
-const LINKS = [
-  { name: 'noun.wtf', url: 'https://noun.wtf', desc: 'Live site' },
-  {
-    name: 'GraphQL API',
-    url: 'https://spirited-flexibility-production-3c30.up.railway.app/graphql',
-    desc: 'Ponder API',
-  },
-  {
-    name: 'SmallGrantsTreasury',
-    url: 'https://etherscan.io/address/0xBAc9233725440c595b19d975309CC98cb259253a',
-    desc: 'Etherscan',
-  },
-  {
-    name: 'NounsToken',
-    url: 'https://etherscan.io/address/0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
-    desc: 'Etherscan',
-  },
-  {
-    name: 'NounsDAOV4',
-    url: 'https://etherscan.io/address/0x6f3E6272A167e8AcCb32072d08E0957F9c79223d',
-    desc: 'Etherscan',
-  },
-  { name: 'Nouns Center', url: 'https://nouns.center', desc: 'Ecosystem docs' },
-  { name: 'pooter.world', url: 'https://dev.pooter.world', desc: 'Predictions + more' },
-];
+function shortAddr(addr: string) {
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
 
 export default function HackathonPage() {
+  const { data: balance } = useBalance({ address: TREASURY_ADDRESS });
+
   return (
     <div className={classes.container}>
       {/* ─── Hero ─────────────────────────────────── */}
       <div className={classes.hero}>
-        <h1 className={classes.heroTitle}>World Compooter</h1>
-        <p className={classes.heroSub}>A Nounish Hackathon 2026</p>
-        <p className={classes.heroDesc}>
-          Open source projects to copy-paste, fork, remix, and build on. Start small — if it works,
-          scale it. If not, sunset it. Everything runs on Ethereum mainnet. Client ID 37.
+        <h1 className={classes.heroTitle}>Hack the Treasury</h1>
+        <p className={classes.heroSub}>
+          {balance ? `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH` : '0.42 ETH'}{' '}
+          permissionless grants
         </p>
-        <a
-          href="/hackathon/noun-wtf-hackathon-guide.pdf"
-          target="_blank"
-          rel="noopener"
-          className={classes.heroCtaFilled}
-        >
-          Download Hackathon Guide (PDF)
-        </a>
-        <a
-          href="https://github.com/user/noun-wtf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={classes.heroCta}
-        >
-          View Source on GitHub
-        </a>
+        <p className={classes.heroDesc}>
+          0.42 ETH sitting in a SmallGrantsTreasury contract on Ethereum mainnet.
+          No quorum. 1 Noun vote passes a proposal. 12hr vote + 12hr lock = funds in 24hrs.
+          Build something physical that interacts with a Nouns contract — or find a vulnerability
+          and hack the treasury. Permissionless. The ETH is for someone's taking.
+        </p>
+
+        <div className={classes.treasuryBadge}>
+          <a
+            href={`https://etherscan.io/address/${TREASURY_ADDRESS}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={classes.treasuryAddr}
+          >
+            {shortAddr(TREASURY_ADDRESS)}
+          </a>
+          <span className={classes.treasuryBal}>
+            {balance ? `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH` : '...'}
+          </span>
+        </div>
+
+        <div className={classes.heroCtas}>
+          <a href="/grants" className={classes.heroCtaFilled}>
+            Submit a Proposal
+          </a>
+          <a
+            href={`https://etherscan.io/address/${TREASURY_ADDRESS}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={classes.heroCta}
+          >
+            View on Etherscan
+          </a>
+        </div>
+
         <div className={classes.heroAscii}>{`
-  pooter.world                         ⌐◨-◨
+  SmallGrantsTreasury.sol          ⌐◨-◨
   ┌─────────────────────────┐
-  │ $ noun-terminal v0.1    │    NounsDAO v4
-  │ > settle --trait shark  │    proposals: 948
-  │ watching block 21847293 │    treasury: $52M
+  │ propose()  → 12hr vote  │    no quorum
+  │ queue()    → 12hr lock  │    1 noun = 1 vote
+  │ execute()  → get paid   │    permissionless
   └─────────────────────────┘
         `}</div>
       </div>
 
-      {/* ─── Example Projects ─────────────────────── */}
+      {/* ─── Rules ────────────────────────────────── */}
       <div className={classes.section}>
-        <h2 className={classes.sectionTitle}>Example Projects</h2>
+        <h2 className={classes.sectionTitle}>How It Works</h2>
+        <div className={classes.rulesGrid}>
+          <div className={classes.ruleCard}>
+            <div className={classes.ruleNum}>1</div>
+            <div className={classes.ruleText}>
+              <strong>Build something physical</strong> that interacts with at least one Nouns
+              smart contract. A Pi terminal, a printer, a display, a button — anything IRL that
+              talks to the chain.
+            </div>
+          </div>
+          <div className={classes.ruleCard}>
+            <div className={classes.ruleNum}>2</div>
+            <div className={classes.ruleText}>
+              <strong>OR hack the treasury.</strong> Find a vulnerability in the SmallGrantsTreasury
+              contract and drain it. Permissionless security audit with a bounty.
+            </div>
+          </div>
+          <div className={classes.ruleCard}>
+            <div className={classes.ruleNum}>3</div>
+            <div className={classes.ruleText}>
+              <strong>Submit a proposal</strong> to the treasury at{' '}
+              <a href="/grants">noun.wtf/grants</a>. Describe what you built, link proof.
+              Anyone can propose — no Noun ownership required to submit.
+            </div>
+          </div>
+          <div className={classes.ruleCard}>
+            <div className={classes.ruleNum}>4</div>
+            <div className={classes.ruleText}>
+              <strong>1 vote passes.</strong> Nouns holders vote (1 Noun = 1 vote). No quorum
+              means a single FOR vote with no opposition passes the prop. 12hr vote window,
+              12hr timelock, funds in 24hrs.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Contracts ────────────────────────────── */}
+      <div className={classes.section}>
+        <h2 className={classes.sectionTitle}>Contracts</h2>
+        <p className={classes.sectionDesc}>
+          Deployed and verified. No source code needed — just addresses and ABIs on Etherscan.
+        </p>
+        <div className={classes.contractGrid}>
+          {CONTRACTS.map(c => (
+            <a
+              key={c.name}
+              href={c.etherscan}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={classes.contractCard}
+            >
+              <div className={classes.contractHeader}>
+                <span className={`${classes.contractTag} ${classes[c.tagClass]}`}>{c.tag}</span>
+                <h3 className={classes.contractName}>{c.name}</h3>
+                <code className={classes.contractAddr}>{shortAddr(c.address)}</code>
+                <span className={classes.contractChain}>{c.chain}</span>
+              </div>
+              <p className={classes.contractDesc}>{c.desc}</p>
+              <p className={classes.contractCaption}>{c.caption}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── APIs ─────────────────────────────────── */}
+      <div className={classes.section}>
+        <h2 className={classes.sectionTitle}>APIs & Endpoints</h2>
+        <p className={classes.sectionDesc}>
+          Live URLs. Hit them. All return JSON. No API keys required.
+        </p>
+        <div className={classes.linksGrid}>
+          {APIS.map(a => (
+            <a
+              key={a.name}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={classes.linkRow}
+            >
+              <div>
+                <span className={classes.linkName}>{a.name}</span>
+                <span className={classes.linkDesc}>{a.desc}</span>
+              </div>
+              <span className={classes.linkUrl}>{new URL(a.url).hostname}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Tools ────────────────────────────────── */}
+      <div className={classes.section}>
+        <h2 className={classes.sectionTitle}>Tools</h2>
+        <p className={classes.sectionDesc}>
+          Live on noun.wtf and pooter.world. Use them as-is or build on top.
+        </p>
         <div className={classes.cartridgeGrid}>
-          {EXAMPLE_PROJECTS.map(p => {
-            const Wrapper = p.href ? 'a' : p.link ? 'a' : 'div';
-            const wrapperProps = p.href
-              ? { href: p.href, target: '_blank', rel: 'noopener noreferrer' }
-              : p.link
-                ? { href: p.link }
-                : {};
+          {TOOLS.map(t => {
+            const isExternal = 'external' in t && t.external;
             return (
-              <Wrapper key={p.name} className={classes.cartridge} {...wrapperProps}>
-                <div className={classes.cartridgeHeader}>
-                  <span className={`${classes.cartridgeTag} ${classes[p.tagClass]}`}>{p.tag}</span>
-                  <span className={classes.cartridgeVersion}>{p.version}</span>
-                </div>
+              <a
+                key={t.name}
+                href={t.path}
+                {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                className={classes.cartridge}
+              >
                 <div className={classes.cartridgeScreen}>
-                  <pre className={classes.cartridgeArt}>{p.art}</pre>
+                  <pre className={classes.cartridgeArt}>{t.art}</pre>
                 </div>
                 <div className={classes.cartridgeBody}>
-                  <h3 className={classes.cartridgeName}>{p.name}</h3>
-                  <p className={classes.cartridgeDesc}>{p.desc}</p>
-                  <div className={classes.cartridgeFooter}>
-                    <div className={classes.cartridgeStack}>
-                      {p.stack.map(s => (
-                        <span key={s} className={classes.stackChip}>
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <h3 className={classes.cartridgeName}>{t.name}</h3>
+                  <p className={classes.cartridgeDesc}>{t.desc}</p>
                 </div>
-              </Wrapper>
+              </a>
             );
           })}
         </div>
       </div>
 
-      {/* ─── Physical Builds Gallery ──────────────── */}
+      {/* ─── Physical Build Ideas ─────────────────── */}
       <div className={classes.section}>
-        <h2 className={classes.sectionTitle}>Physical Builds</h2>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          Raspberry Pi terminals, crystal balls, silver Nouns, Duckhead prototypes and more. IRL
-          compooter builds bridging URL to IRL.
-        </p>
-        <div className={classes.photoGrid}>
-          <div className={classes.photoSlot}>
-            <span>Noun Terminal — RPi 3B+</span>
-            <span className={classes.photoLabel}>NT-FRAME MK.I housing assembly</span>
-          </div>
-          <div className={classes.photoSlot}>
-            <span>Crystal Ball — RPi Zero W</span>
-            <span className={classes.photoLabel}>0.96&quot; OLED trait predictor</span>
-          </div>
-          <div className={classes.photoSlot}>
-            <span>Dot Matrix Printer</span>
-            <span className={classes.photoLabel}>80col Noun news feed printer</span>
-          </div>
-          <div className={classes.photoSlot}>
-            <span>Silver Nouns</span>
-            <span className={classes.photoLabel}>Capybara, Mushroom, Wiz</span>
-          </div>
-          <div className={classes.photoSlot}>
-            <span>Duckhead Prototypes</span>
-            <span className={classes.photoLabel}>100+ prototypes and counting</span>
-          </div>
-          <div className={classes.photoSlot}>
-            <span>More coming soon...</span>
-            <span className={classes.photoLabel}>Upload your builds</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Build Ideas ──────────────────────────── */}
-      <div className={classes.section}>
-        <h2 className={classes.sectionTitle}>Build Ideas</h2>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          Concrete things you could build on this stack in a hackathon. The GraphQL API, REST
-          endpoints, and agent are all live and ready to use.
+        <h2 className={classes.sectionTitle}>Physical Build Ideas</h2>
+        <p className={classes.sectionDesc}>
+          The only requirement is that it's physical and it talks to a Nouns contract.
+          Here are some starting points.
         </p>
         <div className={classes.ideaGrid}>
-          {BUILD_IDEAS.map((idea, i) => (
+          {PHYSICAL_IDEAS.map((idea, i) => (
             <div key={i} className={classes.ideaCard}>
-              <div className={classes.ideaCat} style={{ color: idea.color }}>
-                {idea.cat}
+              <div className={classes.ideaCat} style={{ color: '#fb923c' }}>
+                Physical
               </div>
               <div className={classes.ideaText}>{idea.text}</div>
               <div className={classes.ideaSub}>{idea.sub}</div>
@@ -389,73 +386,39 @@ export default function HackathonPage() {
       {/* ─── Quick Start ──────────────────────────── */}
       <div className={classes.section}>
         <h2 className={classes.sectionTitle}>Quick Start</h2>
-        <div
-          style={{
-            background: '#0a0a0a',
-            border: '1px solid #1e293b',
-            padding: '1.25rem',
-            fontFamily: 'monospace',
-            fontSize: '0.8rem',
-            color: '#94a3b8',
-            lineHeight: 1.8,
-          }}
-        >
-          <div>
-            <span style={{ color: '#64748b' }}># Clone & install</span>
-          </div>
-          <div>
-            <span style={{ color: '#22d3ee' }}>$</span> git clone
-            https://github.com/user/noun-wtf.git
-          </div>
-          <div>
-            <span style={{ color: '#22d3ee' }}>$</span> cd noun-wtf && pnpm install
-          </div>
+        <div className={classes.codeBlock}>
+          <div><span className={classes.comment}># The treasury contract is live on Ethereum mainnet</span></div>
+          <div><span className={classes.comment}># Read it, poke it, propose to it</span></div>
           <div style={{ marginTop: '0.5rem' }}>
-            <span style={{ color: '#64748b' }}># Run frontend (uses production Ponder API)</span>
-          </div>
-          <div>
-            <span style={{ color: '#22d3ee' }}>$</span> cd packages/nouns-webapp
-          </div>
-          <div>
-            <span style={{ color: '#22d3ee' }}>$</span> CI=true pnpm dev
-          </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <span style={{ color: '#64748b' }}># Open http://localhost:5173</span>
+            <span className={classes.prompt}>$</span> cast call 0xBAc9233725440c595b19d975309CC98cb259253a "proposalCount()(uint256)" --rpc-url https://ethereum-rpc.publicnode.com
           </div>
           <div style={{ marginTop: '1rem' }}>
-            <span style={{ color: '#64748b' }}># Environment variables needed:</span>
+            <span className={classes.comment}># Or use the noun.wtf stack</span>
           </div>
-          <div>VITE_CHAIN_ID=1</div>
-          <div>VITE_MAINNET_JSONRPC=https://ethereum-rpc.publicnode.com</div>
+          <div><span className={classes.prompt}>$</span> git clone https://github.com/snaveoguh/noun-wtf.git</div>
+          <div><span className={classes.prompt}>$</span> cd noun-wtf && pnpm install</div>
+          <div><span className={classes.prompt}>$</span> cd packages/nouns-webapp && CI=true pnpm dev</div>
+          <div style={{ marginTop: '0.5rem' }}>
+            <span className={classes.comment}># GraphQL API (no setup needed)</span>
+          </div>
           <div>
-            VITE_MAINNET_SUBGRAPH=https://spirited-flexibility-production-3c30.up.railway.app
+            <span className={classes.prompt}>$</span> curl -s 'https://spirited-flexibility-production-3c30.up.railway.app/graphql' -H 'Content-Type: application/json' -d '&#123;"query":"&#123; nouns(limit:1) &#123; items &#123; id &#125; &#125; &#125;"&#125;'
           </div>
-        </div>
-      </div>
-
-      {/* ─── Links ────────────────────────────────── */}
-      <div className={classes.section}>
-        <h2 className={classes.sectionTitle}>Links</h2>
-        <div className={classes.linksGrid}>
-          {LINKS.map(l => (
-            <a
-              key={l.name}
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={classes.linkRow}
-            >
-              <span className={classes.linkName}>{l.name}</span>
-              <span className={classes.linkUrl}>{l.desc}</span>
-            </a>
-          ))}
+          <div style={{ marginTop: '0.5rem' }}>
+            <span className={classes.comment}># Free LLM (no API key)</span>
+          </div>
+          <div>
+            <span className={classes.prompt}>$</span> curl -X POST https://heartfelt-flow-production-d872.up.railway.app/v1/generate -H 'Content-Type: application/json' -d '&#123;"task":"editorial","prompt":"What should I build?"&#125;'
+          </div>
         </div>
       </div>
 
       {/* ─── Footer ───────────────────────────────── */}
-      <div style={{ textAlign: 'center', padding: '2rem 0', color: '#334155', fontSize: '0.8rem' }}>
-        <div style={{ marginBottom: '0.5rem' }}>CC0. No rights reserved. Fork everything.</div>
-        <div>pooter.world — noun.wtf — Client ID 37</div>
+      <div className={classes.footer}>
+        <div>CC0. No rights reserved. Fork everything.</div>
+        <div style={{ marginTop: '0.25rem' }}>
+          <a href="https://noun.wtf">noun.wtf</a> · <a href="https://pooter.world">pooter.world</a> · Client ID 37
+        </div>
       </div>
     </div>
   );
