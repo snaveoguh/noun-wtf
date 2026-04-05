@@ -422,6 +422,16 @@ function Lighting() {
 
 // ── HUD Overlay (HTML on top of canvas) ───────────────────────────────
 
+// HUDLive — reads from ref, updates itself independently, never causes parent re-render
+function HUDLive({ hudRef }: { hudRef: React.RefObject<any> }) {
+  const [s, setS] = useState(() => ({ ...hudRef.current }));
+  useEffect(() => {
+    const id = setInterval(() => setS({ ...hudRef.current }), 250);
+    return () => clearInterval(id);
+  }, [hudRef]);
+  return <HUD {...s} />;
+}
+
 function HUD({
   hp,
   maxHp,
@@ -598,8 +608,8 @@ export default function WorldPage() {
   const frameRef = useRef(0);
   const playerTargetRef = useRef(new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE));
 
-  // HUD state (React state for UI re-renders)
-  const [hudState, setHudState] = useState({
+  // HUD state — ref only, HUD component reads via DOM manipulation (no React re-renders)
+  const hudRef = useRef({
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,
     playerCount: 0,
@@ -772,21 +782,17 @@ export default function WorldPage() {
       // Clear input
       clearFrameFlags(input);
 
-      // Update HUD (throttled to every 6 frames)
-      if (frame % 6 === 0) {
-        setHudState({
-          hp: player.hp,
-          maxHp: player.maxHp,
-          playerCount: mp.playerCount,
-          comboHits: player.comboHits,
-          controlsVisible: frame < 300,
-          oceanPhase: ocean.phase,
-          oceanAlpha: getOceanOverlayAlpha(ocean),
-          majaAlpha: getGranMajaTextAlpha(ocean),
-          respawnTimer: player.respawnTimer,
-          isDead: player.state === 'dead' || player.state === 'respawning',
-        });
-      }
+      // Update HUD via ref (no React re-renders)
+      hudRef.current.hp = player.hp;
+      hudRef.current.maxHp = player.maxHp;
+      hudRef.current.playerCount = mp.playerCount;
+      hudRef.current.comboHits = player.comboHits;
+      hudRef.current.controlsVisible = frame < 300;
+      hudRef.current.oceanPhase = ocean.phase;
+      hudRef.current.oceanAlpha = getOceanOverlayAlpha(ocean);
+      hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
+      hudRef.current.respawnTimer = player.respawnTimer;
+      hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
     });
 
     return null;
@@ -886,7 +892,7 @@ export default function WorldPage() {
         <GameLogic />
       </Canvas>
 
-      <HUD {...hudState} />
+      <HUDLive hudRef={hudRef} />
     </div>
   );
 }

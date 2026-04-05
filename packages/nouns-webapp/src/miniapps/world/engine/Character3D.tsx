@@ -91,19 +91,21 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
   const prevAnimRef = useRef('');
   const oneShotPlaying = useRef(false);
 
-  const nounHead = useMemo(() => {
+  const nounHeadRef = useRef((() => {
     try {
       const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
       return buildNounGeometries(layers);
     } catch {
       return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
     }
-  }, [seed]);
+  })());
 
-  const bodyColor = useMemo(() => getNounBodyColor(seed), [seed]);
+  const bodyColorRef = useRef(getNounBodyColor(seed));
 
-  // Load fresh GLB instance — each character gets its own scene+skeleton
+  // Load fresh GLB instance — runs ONCE per mount
   useEffect(() => {
+    const nounHead = nounHeadRef.current;
+    const bodyColor = bodyColorRef.current;
     let cancelled = false;
     let model: THREE.Group | null = null;
 
@@ -139,7 +141,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           if (child.name === 'head' && (child as any).isBone) {
             const headGroup = new THREE.Group();
             headGroup.scale.set(VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE);
-            headGroup.position.set(0, 0.45, 0);
+            headGroup.position.set(0, 1.2, 0);
             const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
             if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
             if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
@@ -164,14 +166,11 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
     return () => {
       cancelled = true;
-      if (model && groupRef.current) {
-        groupRef.current.remove(model);
-      }
-      mixerRef.current?.stopAllAction();
-      mixerRef.current = null;
-      actionsRef.current = {};
+      // Don't remove model — prevents flash on strict mode re-mount
+      // Model will be replaced if seed changes (effect re-runs)
     };
-  }, [seed, bodyColor, nounHead]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Per-frame update
   useFrame((_, delta) => {
@@ -233,7 +232,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       mixer.update(delta);
     }
 
-    g.visible = true;
+    // visibility managed by model load — no toggling
   });
 
   return (
