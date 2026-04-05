@@ -280,5 +280,32 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
         IERC20(token).safeTransfer(owner(), balance);
     }
 
+    function emergencyWithdrawERC721(address token, uint256 tokenId) external onlyOwner {
+        IERC721(token).safeTransferFrom(address(this), owner(), tokenId);
+    }
+
+    /**
+     * @notice Cancel an undropped deposit and return to depositor
+     * @param depositId The deposit to cancel
+     */
+    function cancelDeposit(uint256 depositId) external nonReentrant {
+        require(depositId < deposits.length, "Invalid deposit");
+        Deposit storage dep = deposits[depositId];
+        require(dep.depositor == msg.sender, "Not your deposit");
+        require(!dep.dropped, "Already dropped");
+
+        // Mark as dropped to prevent future dropping
+        dep.dropped = true;
+
+        if (dep.token == address(0)) {
+            (bool ok, ) = payable(msg.sender).call{value: dep.amountOrId}("");
+            require(ok, "ETH return failed");
+        } else if (dep.itemType == ItemType.ERC20) {
+            IERC20(dep.token).safeTransfer(msg.sender, dep.amountOrId);
+        } else {
+            IERC721(dep.token).safeTransferFrom(address(this), msg.sender, dep.amountOrId);
+        }
+    }
+
     receive() external payable {}
 }
