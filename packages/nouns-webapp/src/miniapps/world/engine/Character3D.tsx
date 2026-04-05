@@ -1,9 +1,10 @@
 // ── 3D Rigged Character with Voxel Noun Head ────────────────────────
+// Each instance loads its own GLB copy for independent skeletons.
 
 import { useEffect, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import {
   buildNounGeometries,
@@ -15,8 +16,9 @@ import type { INounSeed } from '@/wrappers/nounToken';
 import type { Direction, MoveType, PlayerState } from './types';
 
 const MODEL_PATH = '/models/character.glb';
-const VOXEL_HEAD_SCALE = 0.14; // Doubled because body is halved
+const VOXEL_HEAD_SCALE = 0.28;
 const HEAD_VIS: LayerVisibility = { body: false, accessory: false, head: true, glasses: true };
+const BODY_SCALE = 0.14;
 
 const ANIM_MAP: Record<string, string> = {
   idle: 'Idle',
@@ -62,7 +64,20 @@ function getNounBodyColor(seed: INounSeed): string {
   return '#888888';
 }
 
-useGLTF.preload(MODEL_PATH);
+// Cache the raw ArrayBuffer so we don't re-fetch for each instance
+let glbBuffer: ArrayBuffer | null = null;
+let glbFetching: Promise<ArrayBuffer> | null = null;
+
+function fetchGLB(): Promise<ArrayBuffer> {
+  if (glbBuffer) return Promise.resolve(glbBuffer);
+  if (!glbFetching) {
+    glbFetching = fetch(MODEL_PATH).then(r => r.arrayBuffer()).then(buf => {
+      glbBuffer = buf;
+      return buf;
+    });
+  }
+  return glbFetching;
+}
 
 interface Character3DProps {
   seed: INounSeed;
@@ -71,11 +86,10 @@ interface Character3DProps {
 
 export function Character3D({ seed, stateRef }: Character3DProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const actionsRef = useRef<Record<string, THREE.AnimationAction>>({});
   const prevAnimRef = useRef('');
-  const oneShotPlaying = useRef(false); // true while a one-shot animation is playing
-
-  const { scene, animations } = useGLTF(MODEL_PATH);
-  const { actions, mixer } = useAnimations(animations, groupRef);
+  const oneShotPlaying = useRef(false);
 
   const nounHead = useMemo(() => {
     try {
@@ -88,83 +102,103 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
   const bodyColor = useMemo(() => getNounBodyColor(seed), [seed]);
 
-  // Setup scene — runs once via scene.__setup flag
+  // Load fresh GLB instance — each character gets its own scene+skeleton
   useEffect(() => {
-    if ((scene.userData as any).__setup) return;
-    (scene.userData as any).__setup = true;
+    let cancelled = false;
+    let model: THREE.Group | null = null;
 
-    // Hide head, cape, weapons; set solid colors
-    scene.traverse((child: THREE.Object3D) => {
-      if (child.name === 'Rogue_Head' || child.name === 'Rogue_Cape') child.visible = false;
-      if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
-          child.name.includes('Throwable') || child.name.includes('handslot') ||
-          child.name.includes('1H_') || child.name.includes('2H_') ||
-          child.name === 'Rogue_ArmLeft') {
-        child.visible = false;
-      }
-      if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
-        const mesh = child as THREE.SkinnedMesh;
-        const color = child.name.includes('Leg') ? '#443322' : bodyColor;
-        mesh.material = new THREE.MeshBasicMaterial({ color });
-        mesh.frustumCulled = false;
-      }
+    fetchGLB().then(buffer => {
+      if (cancelled || !groupRef.current) return;
+
+      const loader = new GLTFLoader();
+      loader.parse(buffer.slice(0), '', (gltf) => {
+        if (cancelled || !groupRef.current) return;
+
+        model = gltf.scene;
+        model.scale.set(BODY_SCALE, BODY_SCALE, BODY_SCALE);
+
+        // Setup: hide head/cape/weapons, tint body
+        model.traverse((child: THREE.Object3D) => {
+          if (child.name === 'Rogue_Head' || child.name === 'Rogue_Cape') child.visible = false;
+          if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
+              child.name.includes('Throwable') || child.name.includes('handslot') ||
+              child.name.includes('1H_') || child.name.includes('2H_') ||
+              child.name === 'Rogue_ArmLeft') {
+            child.visible = false;
+          }
+          if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
+            const mesh = child as THREE.SkinnedMesh;
+            const color = child.name.includes('Leg') ? '#443322' : bodyColor;
+            mesh.material = new THREE.MeshBasicMaterial({ color });
+            mesh.frustumCulled = false;
+          }
+        });
+
+        // Attach voxel head to head bone
+        model.traverse((child: THREE.Object3D) => {
+          if (child.name === 'head' && (child as any).isBone) {
+            const headGroup = new THREE.Group();
+            headGroup.scale.set(VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE);
+            headGroup.position.set(0, 0.45, 0);
+            const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+            if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
+            if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
+            child.add(headGroup);
+          }
+        });
+
+        // Animation mixer
+        const mixer = new THREE.AnimationMixer(model);
+        const actions: Record<string, THREE.AnimationAction> = {};
+        for (const clip of gltf.animations) {
+          actions[clip.name] = mixer.clipAction(clip);
+        }
+        if (actions['Idle']) actions['Idle'].play();
+
+        groupRef.current!.add(model);
+        mixerRef.current = mixer;
+        actionsRef.current = actions;
+        prevAnimRef.current = 'Idle';
+      });
     });
 
-    // Attach voxel head to head bone (only if not already attached)
-    scene.traverse((child: THREE.Object3D) => {
-      if (child.name === 'head' && (child as any).isBone) {
-        // Remove any previously attached voxel heads
-        const existing = child.children.filter(c => c.name === '__nounHead');
-        existing.forEach(c => child.remove(c));
-
-        const headGroup = new THREE.Group();
-        headGroup.name = '__nounHead';
-        headGroup.scale.set(VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE);
-        headGroup.position.set(0, 0.45, 0);
-        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-        if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
-        if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
-        child.add(headGroup);
+    return () => {
+      cancelled = true;
+      if (model && groupRef.current) {
+        groupRef.current.remove(model);
       }
-    });
+      mixerRef.current?.stopAllAction();
+      mixerRef.current = null;
+      actionsRef.current = {};
+    };
+  }, [seed, bodyColor, nounHead]);
 
-    // Start idle
-    if (actions['Idle']) actions['Idle']!.play();
-  }, [scene, actions, bodyColor, nounHead]);
-
-  // Per-frame update from stateRef
+  // Per-frame update
   useFrame((_, delta) => {
     const g = groupRef.current;
     const s = stateRef.current;
+    const mixer = mixerRef.current;
+    const actions = actionsRef.current;
     if (!g || !s) return;
 
+    // Position
     g.position.set(s.x, s.y + 0.05, s.z);
 
-    // Model faces +Z at rotation 0. Camera at +Z. So rotation PI = facing away.
-    // Set initial facing away
-    if (prevAnimRef.current === '') {
-      g.rotation.y = Math.PI;
-      prevAnimRef.current = 'Idle';
-    }
-
-    // Rotation — direct set, no lerp (eliminates all spazzing)
-    if (s.state === 'walking' || s.state === 'dashing' || s.state === 'attacking') {
-      const target =
-        s.direction === 'up' ? Math.PI :
-        s.direction === 'down' ? 0 :
-        s.direction === 'left' ? Math.PI * 1.5 :
-        Math.PI * 0.5;
-      g.rotation.y = target;
-    }
+    // Always face current direction
+    const targetRot =
+      s.direction === 'up' ? Math.PI :
+      s.direction === 'down' ? 0 :
+      s.direction === 'left' ? Math.PI * 1.5 :
+      Math.PI * 0.5;
+    g.rotation.y = targetRot;
 
     // Animation crossfade
-    if (Object.keys(actions).length > 0) {
+    if (mixer && Object.keys(actions).length > 0) {
       let animKey = s.state as string;
       if (s.state === 'attacking' && s.attackType) animKey = `attacking_${s.attackType}`;
       const clipName = ANIM_MAP[animKey] ?? 'Idle';
       const isOneShot = ['attacking', 'dead', 'backflip', 'stunned'].includes(s.state);
 
-      // Don't re-trigger if a one-shot is already playing
       if (clipName !== prevAnimRef.current && actions[clipName] && !oneShotPlaying.current) {
         const prev = actions[prevAnimRef.current];
         const next = actions[clipName]!;
@@ -175,11 +209,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           next.setLoop(THREE.LoopOnce, 1);
           next.clampWhenFinished = true;
           oneShotPlaying.current = true;
-          // Auto-return to idle when done
           const onFinished = () => {
             mixer.removeEventListener('finished', onFinished);
             oneShotPlaying.current = false;
-            prevAnimRef.current = '__done'; // force re-eval next frame
+            prevAnimRef.current = '__done';
           };
           mixer.addEventListener('finished', onFinished);
         } else {
@@ -188,7 +221,6 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         prevAnimRef.current = clipName;
       }
 
-      // If one-shot finished and state went back to idle/walking, transition
       if (!oneShotPlaying.current && !isOneShot && prevAnimRef.current === '__done') {
         const next = actions[clipName];
         if (next) {
@@ -206,10 +238,9 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
   return (
     <group ref={groupRef}>
-      <primitive object={scene} scale={0.28} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <circleGeometry args={[0.35, 12]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.2} />
+        <circleGeometry args={[0.25, 12]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.15} />
       </mesh>
     </group>
   );

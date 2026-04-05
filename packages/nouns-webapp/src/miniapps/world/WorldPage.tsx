@@ -18,7 +18,6 @@ import {
   attachInputListeners,
   resolveIntendedMove,
   clearFrameFlags,
-  updateCameraOrbit,
   type InputState,
 } from './engine/input';
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
@@ -376,54 +375,14 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
-function CameraController({ target, inputRef, playerCharState }: {
-  target: THREE.Vector3;
-  inputRef: React.RefObject<InputState>;
-  playerCharState: React.RefObject<CharacterState>;
-}) {
+function CameraController({ target }: { target: THREE.Vector3 }) {
   const { camera } = useThree();
-  const camAngle = useRef(0); // current camera orbit angle (follows player direction)
 
-  useFrame((_, delta) => {
-    const input = inputRef.current;
-    const pcs = playerCharState.current;
-    if (!input || !pcs) return;
-
-    // Arrow keys add orbit offset
-    updateCameraOrbit(input, delta);
-
-    // Camera angle follows player direction (always behind)
-    // Player faces: up=PI, down=0, left=1.5PI, right=0.5PI
-    // Camera behind: up=0, down=PI, left=0.5PI, right=1.5PI
-    const behindAngle =
-      pcs.direction === 'up' ? 0 :
-      pcs.direction === 'down' ? Math.PI :
-      pcs.direction === 'left' ? Math.PI * 0.5 :
-      Math.PI * 1.5;
-
-    // Smooth follow
-    let diff = behindAngle - camAngle.current;
-    if (diff > Math.PI) diff -= Math.PI * 2;
-    if (diff < -Math.PI) diff += Math.PI * 2;
-    camAngle.current += diff * 0.05;
-
-    const horizAngle = camAngle.current + input.cameraOrbitX;
-    const vertAngle = 0.25 + input.cameraOrbitY;
-
-    // Write camera angle to input so movement can be camera-relative
-    input.cameraAngle = horizAngle;
-
-    const camDist = 3.5;
-    const desired = new THREE.Vector3(
-      target.x + Math.sin(horizAngle) * Math.cos(vertAngle) * camDist,
-      target.y + Math.sin(vertAngle) * camDist + 1.0,
-      target.z + Math.cos(horizAngle) * Math.cos(vertAngle) * camDist,
-    );
-
+  useFrame(() => {
+    // Dead simple: camera always behind (+Z), slightly above, looking at player
+    const desired = new THREE.Vector3(target.x, target.y + 1.5, target.z + 3.5);
     camera.position.lerp(desired, 0.1);
-
-    const lookTarget = target.clone().add(new THREE.Vector3(0, 0.8, 0));
-    camera.lookAt(lookTarget);
+    camera.lookAt(target.x, target.y + 0.5, target.z);
   });
 
   return null;
@@ -840,6 +799,67 @@ export default function WorldPage() {
     return <Character3D seed={seed} stateRef={playerCharState} />;
   }
 
+  // Remote players — each gets own Character3D with own GLB
+  function RemotePlayers() {
+    const remoteCharStates = useRef<Map<string, { seed: INounSeed; state: CharacterState }>>(new Map());
+
+    useFrame(() => {
+      const mp = mpRef.current;
+      // Update or create state for each remote player
+      for (const [id, rp] of mp.remotePlayers) {
+        let entry = remoteCharStates.current.get(id);
+        if (!entry) {
+          let rpSeed: INounSeed;
+          try {
+            const parts = rp.seedKey.split('-').map(Number);
+            rpSeed = { background: parts[0], body: parts[1], accessory: parts[2], head: parts[3], glasses: parts[4] };
+          } catch {
+            rpSeed = randomSeed();
+          }
+          entry = {
+            seed: rpSeed,
+            state: { x: 0, z: 0, y: 0, direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: 100, maxHp: 100 },
+          };
+          remoteCharStates.current.set(id, entry);
+        }
+        const wx = rp.x * WORLD_SCALE;
+        const wz = rp.y * WORLD_SCALE;
+        entry.state.x = wx;
+        entry.state.z = wz;
+        entry.state.y = getTerrainHeight(wx, wz);
+        entry.state.direction = rp.direction;
+        entry.state.state = rp.state === 'walking' ? 'walking' : rp.state === 'attacking' ? 'attacking' : 'idle';
+        entry.state.hitFlash = rp.hitFlash;
+        entry.state.hp = rp.hp;
+      }
+      // Remove disconnected players
+      for (const id of remoteCharStates.current.keys()) {
+        if (!mp.remotePlayers.has(id)) {
+          remoteCharStates.current.delete(id);
+        }
+      }
+    });
+
+    // Render — stable list from ref, only re-render when player count changes
+    const [playerIds, setPlayerIds] = useState<string[]>([]);
+    useFrame(() => {
+      const ids = Array.from(remoteCharStates.current.keys());
+      if (ids.length !== playerIds.length || ids.some((id, i) => id !== playerIds[i])) {
+        setPlayerIds(ids);
+      }
+    });
+
+    return (
+      <>
+        {playerIds.map(id => {
+          const entry = remoteCharStates.current.get(id);
+          if (!entry) return null;
+          return <Character3D key={id} seed={entry.seed} stateRef={{ current: entry.state }} />;
+        })}
+      </>
+    );
+  }
+
   return (
     <div ref={canvasContainerRef} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#1a4f8a', cursor: 'crosshair', overflow: 'hidden' }}>
       <Canvas
@@ -860,9 +880,9 @@ export default function WorldPage() {
         <CrystalBallMountain nounSeed={seed} />
 
         <PlayerCharacter3D />
-        {/* NPCCharacters3D disabled — shared GLB scene conflict. TODO: load separate GLB per NPC */}
+        <RemotePlayers />
 
-        <CameraController target={playerTargetRef.current} inputRef={inputRef} playerCharState={playerCharState} />
+        <CameraController target={playerTargetRef.current} />
         <GameLogic />
       </Canvas>
 
