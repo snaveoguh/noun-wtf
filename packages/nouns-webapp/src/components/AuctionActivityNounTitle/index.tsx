@@ -1,7 +1,5 @@
 import React from 'react';
 
-import { Trans } from '@lingui/react/macro';
-
 interface AuctionActivityNounTitleProps {
   nounId: bigint;
   isCool?: boolean;
@@ -9,14 +7,21 @@ interface AuctionActivityNounTitleProps {
 
 const AuctionActivityNounTitle: React.FC<AuctionActivityNounTitleProps> = props => {
   const { nounId, isCool } = props;
+  const color = isCool === true ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)';
   return (
-    <div className="inline-block">
+    <div className="inline-block leading-[0.85]">
       <h1
-        className="mb-2.5 font-['Londrina_Solid'] text-[68px] md:text-[56px] lg:text-[68px]"
-        style={{ color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)' }}
+        className="mb-0 font-['Londrina_Solid'] text-[36px] md:text-[32px] lg:text-[36px]"
+        style={{ color, lineHeight: 0.85, margin: 0 }}
       >
-        <Trans>Noun {nounId.toString()}</Trans>
+        Noun
       </h1>
+      <span
+        className="block font-['Londrina_Solid'] text-[46px] md:text-[40px] lg:text-[46px]"
+        style={{ color, lineHeight: 0.85 }}
+      >
+        {nounId.toString()}
+      </span>
     </div>
   );
 };
