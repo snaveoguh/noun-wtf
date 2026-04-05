@@ -75,6 +75,22 @@ import { TreasureChest3D, DroppedItem3D } from './engine/TreasureChest3D';
 import { DepositModal } from './wager/DepositModal';
 import { useClaimDrop } from './wager/treasureChest';
 import { getActiveDrops, getNearbyDrop, markClaimed, type DroppedItem } from './engine/drops';
+import { getAuctionState } from './engine/settlement';
+import {
+  createVoipState,
+  initVoip,
+  checkVoiceActivity,
+  updateCrowdSettle,
+  toggleMute,
+  callPeer,
+  handleOffer,
+  handleAnswer,
+  handleIceCandidate,
+  destroyVoip,
+  updateListenerPosition,
+  updateSpatialPosition,
+  type VoipState,
+} from './engine/voip';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -447,6 +463,13 @@ function HUD({
   majaAlpha,
   respawnTimer,
   isDead,
+  micEnabled = false,
+  isMuted = false,
+  isSpeaking = false,
+  activeSpeakers = 0,
+  crowdMeter = 0,
+  settlementWindow = false,
+  settleTriggered = false,
 }: {
   hp: number;
   maxHp: number;
@@ -458,6 +481,13 @@ function HUD({
   majaAlpha: number;
   respawnTimer: number;
   isDead: boolean;
+  micEnabled?: boolean;
+  isMuted?: boolean;
+  isSpeaking?: boolean;
+  activeSpeakers?: number;
+  crowdMeter?: number;
+  settlementWindow?: boolean;
+  settleTriggered?: boolean;
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
@@ -532,7 +562,7 @@ function HUD({
         color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: 10,
         textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center',
       }}>
-        WASD move &middot; E interact/pickup &middot; ESC exit
+        WASD move &middot; E interact &middot; M mic &middot; ESC exit
       </div>
 
       {/* Ocean death overlay */}
@@ -581,6 +611,71 @@ function HUD({
           </div>
         </div>
       )}
+
+      {/* ── VOIP UI ─────────────────────────────────────────── */}
+
+      {/* Mic indicator (top left) */}
+      <div style={{
+        position: 'absolute', top: 16, left: 16,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: !micEnabled ? 'rgba(100,100,100,0.5)'
+            : isMuted ? 'rgba(255,50,50,0.6)'
+            : isSpeaking ? 'rgba(50,255,50,0.7)'
+            : 'rgba(50,150,50,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, border: '2px solid rgba(255,255,255,0.3)',
+          transition: 'background 0.2s',
+        }}>
+          {!micEnabled ? '🔇' : isMuted ? '🔴' : '🎤'}
+        </div>
+        <span style={{
+          color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 10,
+        }}>
+          {!micEnabled ? 'M to enable mic' : isMuted ? 'MUTED' : isSpeaking ? 'SPEAKING' : 'MIC ON'}
+        </span>
+      </div>
+
+      {/* Settlement window banner */}
+      {settlementWindow && (
+        <div style={{
+          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
+          background: settleTriggered ? 'rgba(50,255,50,0.3)' : 'rgba(255,50,50,0.3)',
+          border: `2px solid ${settleTriggered ? '#4f4' : '#f44'}`,
+          borderRadius: 8, padding: '8px 24px',
+          fontFamily: 'monospace', fontWeight: 'bold', fontSize: 14,
+          color: '#fff', textAlign: 'center',
+          textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+        }}>
+          {settleTriggered ? '⌐◧-◧ SETTLED! DROP PARTY!' : '⌐◧-◧ SETTLEMENT WINDOW — SHOUT TO SETTLE!'}
+        </div>
+      )}
+
+      {/* Crowd settle meter */}
+      {settlementWindow && micEnabled && !settleTriggered && (
+        <div style={{
+          position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)',
+          width: 200, textAlign: 'center',
+        }}>
+          <div style={{
+            height: 8, background: 'rgba(0,0,0,0.5)', borderRadius: 4, overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${crowdMeter * 100}%`, height: '100%',
+              background: `linear-gradient(90deg, #ff4444, #ffaa00, #44ff44)`,
+              transition: 'width 0.1s',
+              borderRadius: 4,
+            }} />
+          </div>
+          <div style={{
+            color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 10, marginTop: 4,
+          }}>
+            {activeSpeakers} / 3 speakers
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -610,6 +705,8 @@ export default function WorldPage() {
     }))
   );
   const frameRef = useRef(0);
+  const voipRef = useRef<VoipState>(createVoipState());
+  const [micEnabled, setMicEnabled] = useState(false);
   const playerTargetRef = useRef(new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE));
 
   // HUD state — ref only, HUD component reads via DOM manipulation (no React re-renders)
@@ -624,6 +721,14 @@ export default function WorldPage() {
     majaAlpha: 0,
     respawnTimer: 0,
     isDead: false,
+    // VOIP
+    micEnabled: false,
+    isMuted: false,
+    isSpeaking: false,
+    activeSpeakers: 0,
+    crowdMeter: 0,
+    settlementWindow: false,
+    settleTriggered: false,
   });
 
   const seed = useMemo(() => currentNounSeed || randomSeed(), [currentNounSeed]);
@@ -639,7 +744,28 @@ export default function WorldPage() {
     connectMultiplayer(mp);
     setupMessageHandler(mp, { current: player }, combatRef);
 
+    // VOIP signaling message handler
+    if (mp.ws) {
+      mp.ws.addEventListener('message', (evt: MessageEvent) => {
+        try {
+          const data = JSON.parse(evt.data);
+          const voip = voipRef.current;
+          if (data.type === 'world:voip:offer' && mp.ws) {
+            handleOffer(voip, data.from, data.sdp, mp.ws, mp.myId);
+          } else if (data.type === 'world:voip:answer') {
+            handleAnswer(voip, data.from, data.sdp);
+          } else if (data.type === 'world:voip:ice') {
+            handleIceCandidate(voip, data.from, data.candidate);
+          } else if (data.type === 'world:voip:speaking') {
+            if (data.speaking) voip.activeSpeakers.add(data.id);
+            else voip.activeSpeakers.delete(data.id);
+          }
+        } catch {}
+      });
+    }
+
     return () => {
+      destroyVoip(voipRef.current);
       disconnectMultiplayer(mp);
     };
   }, [seedKey]);
@@ -668,16 +794,39 @@ export default function WorldPage() {
   const chestWorldX = (SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE;
   const chestWorldZ = (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE;
 
-  // ESC + E key handler
+  // Mic toggle handler
+  const handleMicToggle = async () => {
+    const voip = voipRef.current;
+    if (!micEnabled) {
+      const ok = await initVoip(voip);
+      if (ok) {
+        setMicEnabled(true);
+        // Connect to all existing peers
+        const mp = mpRef.current;
+        for (const [id] of mp.remotePlayers) {
+          if (mp.ws) callPeer(voip, id, mp.ws, mp.myId);
+        }
+      }
+    } else {
+      toggleMute(voip);
+    }
+  };
+
+  // ESC + E + M key handler
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (depositOpen) {
           setDepositOpen(false);
         } else {
+          destroyVoip(voipRef.current);
           disconnectMultiplayer(mpRef.current);
           navigate('/');
         }
+      }
+      // M = toggle mic
+      if (e.key === 'm' || e.key === 'M') {
+        handleMicToggle();
       }
       if (e.key === 'e' || e.key === 'E') {
         const p = playerRef.current;
@@ -767,8 +916,41 @@ export default function WorldPage() {
         }
       }
 
-      // NPCs disabled — rendering removed, so disable AI too
-      // TODO: re-enable when NPC characters use separate GLB instances
+      // ── Settlement window check (every ~15 seconds) ──
+      if (frame % 900 === 0) {
+        getAuctionState().then(auction => {
+          voipRef.current.settlementWindow = auction.isSettlementWindow;
+        });
+      }
+
+      // ── VOIP tick ──
+      const voip = voipRef.current;
+      if (voip.localStream && frame % 6 === 0) {
+        const wasSpeaking = voip.isSpeaking;
+        checkVoiceActivity(voip);
+        // Broadcast speaking state change
+        if (voip.isSpeaking !== wasSpeaking && mp.ws && mp.ws.readyState === WebSocket.OPEN) {
+          mp.ws.send(JSON.stringify({
+            type: 'world:voip:speaking',
+            speaking: voip.isSpeaking,
+          }));
+        }
+        // Update crowd settle
+        const shouldSettle = updateCrowdSettle(voip);
+        if (shouldSettle) {
+          // TODO: trigger nounirl.eth settlement via agent hub API
+          console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
+        }
+        // Update spatial audio listener position
+        updateListenerPosition(voip, player.x * WORLD_SCALE, 0, player.y * WORLD_SCALE,
+          Math.sin(player.direction === 'up' ? Math.PI : player.direction === 'down' ? 0 : player.direction === 'left' ? Math.PI * 1.5 : Math.PI * 0.5),
+          Math.cos(player.direction === 'up' ? Math.PI : player.direction === 'down' ? 0 : player.direction === 'left' ? Math.PI * 1.5 : Math.PI * 0.5),
+        );
+        // Update spatial positions for remote players
+        for (const [id, rp] of mp.remotePlayers) {
+          updateSpatialPosition(voip, id, rp.x * WORLD_SCALE, 0, rp.y * WORLD_SCALE);
+        }
+      }
 
       // Tick player
       tickPlayer(player, input, combat);
@@ -831,6 +1013,14 @@ export default function WorldPage() {
       hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
       hudRef.current.respawnTimer = player.respawnTimer;
       hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
+      // VOIP HUD
+      hudRef.current.micEnabled = !!voipRef.current.localStream;
+      hudRef.current.isMuted = voipRef.current.isMuted;
+      hudRef.current.isSpeaking = voipRef.current.isSpeaking;
+      hudRef.current.activeSpeakers = voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
+      hudRef.current.crowdMeter = voipRef.current.crowdMeter;
+      hudRef.current.settlementWindow = voipRef.current.settlementWindow;
+      hudRef.current.settleTriggered = voipRef.current.settleTriggered;
     });
 
     return null;
