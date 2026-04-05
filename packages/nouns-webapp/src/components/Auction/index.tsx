@@ -91,6 +91,7 @@ type HeroViewMode =
   | 'ascii'
   | 'edit-2d'
   | 'edit-3d'
+  | 'sprite'
   | `deriv-${string}`
   | `link-${string}`;
 
@@ -1067,6 +1068,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 ['real', 'Real'],
                 ['3d', '3D'],
                 ['ascii', 'ASCII'],
+                ['sprite', 'Sprite'],
                 ['edit-2d', '2D Edit'],
                 ['edit-3d', '3D Edit'],
               ].map(([value, label]) => (
@@ -1075,6 +1077,12 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   key={value}
                   className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
                   onClick={() => {
+                    if (value === 'sprite') {
+                      // Spin transition then enter world
+                      setViewMode('sprite');
+                      setTimeout(() => navigate('/world'), 800);
+                      return;
+                    }
                     if (value === 'edit-2d') {
                       startEditing('2d');
                       return;
@@ -1141,7 +1149,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
           <div className={classes.heroMain}>
             <section className={classes.heroStage}>
-              <div className={classes.heroArtFrame} data-hero-artwork-root="true">
+              <div className={`${classes.heroArtFrame} ${viewMode === 'sprite' ? classes.spriteTransition : ''}`} data-hero-artwork-root="true">
                 {renderHeroArtwork()}
               </div>
 
@@ -1156,7 +1164,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     }}
                     title="Default scroll mode"
                   >
-                    <span className={classes.railIcon}>✋</span>
+                    <span className={classes.railIcon}>📱</span>
                     <span className={classes.railLabel}>Scroll</span>
                   </button>
                   <button

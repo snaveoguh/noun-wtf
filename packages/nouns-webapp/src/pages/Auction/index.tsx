@@ -67,11 +67,13 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
       <DreamsBanner />
       <NoundryBanner />
       <NounsWorldBanner />
-      <NounsIntroSection />
-      <Suspense fallback={<Bone w="100%" h={200} style={{ borderRadius: 0 }} />}>
-        <TreasuryFlowSection />
-      </Suspense>
-      <Documentation backgroundColor="#ffffff" />
+      <div style={{ background: '#fff' }}>
+        <NounsIntroSection />
+        <Suspense fallback={<Bone w="100%" h={200} style={{ borderRadius: 0 }} />}>
+          <TreasuryFlowSection />
+        </Suspense>
+        <Documentation backgroundColor="#ffffff" />
+      </div>
     </>
   );
 };

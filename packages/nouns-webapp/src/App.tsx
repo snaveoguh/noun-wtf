@@ -68,6 +68,7 @@ const CandidatesListPage = lazy(() => import('@/miniapps/candidates/CandidatesPa
 const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage'));
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
+const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 
 /** Inner router — uses useLocation to conditionally show chrome vs terminal */
 function AppRouter() {
@@ -88,6 +89,15 @@ function AppRouter() {
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
     return <TerminalFeedShell />;
+  }
+
+  // World — full-screen canvas, no chrome
+  if (location.pathname === '/world') {
+    return (
+      <Suspense fallback={<div style={{ background: '#1a4f8a', width: '100vw', height: '100vh' }} />}>
+        <WorldPage />
+      </Suspense>
+    );
   }
 
   // Classic mode or deep link — show full site chrome

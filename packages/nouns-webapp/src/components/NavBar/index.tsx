@@ -11,7 +11,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
-import NogglesLogo from '@/assets/noggles.svg?react';
+import LolLogo from '@/components/LolLogo';
 import testnetNoun from '@/assets/testnet-noun.png';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import NavBarTreasury from '@/components/NavBarTreasury';
@@ -98,6 +98,7 @@ const NavBar = () => {
       </Dropdown.Item>
       {candidatesNavItem}
       <Dropdown.Item href="/grants">Grants</Dropdown.Item>
+      <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
     </NavDropdown>
   );
 
@@ -128,7 +129,7 @@ const NavBar = () => {
         <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
             <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
-              <NogglesLogo className={classes.navBarLogo} aria-label="Nouns DAO noggles" />
+              <LolLogo className={classes.navBarLogo} />
             </Navbar.Brand>
             {Number(CHAIN_ID) !== 1 && (
               <Nav.Item>
@@ -208,6 +209,13 @@ const NavBar = () => {
                 <NavBarButton
                   buttonText="Grants"
                   buttonIcon={<FontAwesomeIcon icon={faFile} />}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link as={Link} to="/hackathons" className={classes.nounsNavLink} onClick={closeNav}>
+                <NavBarButton
+                  buttonText="Hack"
+                  buttonIcon={<FontAwesomeIcon icon={faPlay} />}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>

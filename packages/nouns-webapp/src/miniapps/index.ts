@@ -10,6 +10,7 @@ import { registerMiniapp } from './registry';
 import { saberMiniapp } from './saber';
 import { terraformsMiniapp } from './terraforms';
 import { terminalMiniapp } from './terminal';
+import { worldMiniapp } from './world';
 
 // Register all built-in miniapps
 registerMiniapp(terminalMiniapp);
@@ -19,6 +20,7 @@ registerMiniapp(highwayMiniapp);
 registerMiniapp(saberMiniapp);
 registerMiniapp(candidatesMiniapp);
 registerMiniapp(terraformsMiniapp);
+registerMiniapp(worldMiniapp);
 
 // Re-export for convenience
 export { getMiniappNavItems, getMiniappRoutes, getMiniapps } from './registry';
