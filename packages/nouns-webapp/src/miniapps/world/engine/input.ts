@@ -16,6 +16,7 @@ export interface InputState {
   // Camera orbit from arrow keys
   cameraOrbitX: number; // horizontal orbit offset (radians)
   cameraOrbitY: number; // vertical orbit offset (radians)
+  cameraAngle: number; // current camera horizontal angle (written by CameraController)
   // Per-frame flags
   justPressed: Set<string>;
   shiftHeld: boolean;
@@ -26,6 +27,7 @@ export function createInputState(): InputState {
     keys: new Set(),
     cameraOrbitX: 0,
     cameraOrbitY: 0,
+    cameraAngle: 0,
     justPressed: new Set(),
     shiftHeld: false,
   };
@@ -68,19 +70,28 @@ export function attachInputListeners(
   };
 }
 
-/** WASD movement vector (arrows NOT included — arrows are for camera) */
-export function getMovementVector(keys: Set<string>): { dx: number; dy: number } {
-  let dx = 0, dy = 0;
-  if (keys.has('w')) dy -= 1;
-  if (keys.has('s')) dy += 1;
-  if (keys.has('a')) dx -= 1;
-  if (keys.has('d')) dx += 1;
-  if (dx !== 0 && dy !== 0) {
+/** WASD movement vector, rotated by camera angle so W = forward from camera */
+export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
+  // Raw input: W=forward(-Z), S=back(+Z), A=left(-X), D=right(+X)
+  let rawX = 0, rawZ = 0;
+  if (keys.has('w')) rawZ -= 1;
+  if (keys.has('s')) rawZ += 1;
+  if (keys.has('a')) rawX -= 1;
+  if (keys.has('d')) rawX += 1;
+  if (rawX === 0 && rawZ === 0) return { dx: 0, dy: 0 };
+  // Normalize diagonals
+  if (rawX !== 0 && rawZ !== 0) {
     const inv = 1 / Math.SQRT2;
-    dx *= inv;
-    dy *= inv;
+    rawX *= inv;
+    rawZ *= inv;
   }
-  return { dx, dy };
+  // Rotate by camera angle so movement is camera-relative
+  const cos = Math.cos(cameraAngle);
+  const sin = Math.sin(cameraAngle);
+  return {
+    dx: rawX * cos - rawZ * sin,
+    dy: rawX * sin + rawZ * cos,
+  };
 }
 
 /** Update camera orbit from arrow keys (call each frame) */

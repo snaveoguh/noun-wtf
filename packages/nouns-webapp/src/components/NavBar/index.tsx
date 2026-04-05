@@ -99,6 +99,7 @@ const NavBar = () => {
       {candidatesNavItem}
       <Dropdown.Item href="/grants">Grants</Dropdown.Item>
       <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
+      <Dropdown.Item href="/world">World</Dropdown.Item>
     </NavDropdown>
   );
 
@@ -215,6 +216,13 @@ const NavBar = () => {
               <Nav.Link as={Link} to="/hackathons" className={classes.nounsNavLink} onClick={closeNav}>
                 <NavBarButton
                   buttonText="Hack"
+                  buttonIcon={<FontAwesomeIcon icon={faPlay} />}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link as={Link} to="/world" className={classes.nounsNavLink} onClick={closeNav}>
+                <NavBarButton
+                  buttonText="World"
                   buttonIcon={<FontAwesomeIcon icon={faPlay} />}
                   buttonStyle={nonWalletButtonStyle}
                 />

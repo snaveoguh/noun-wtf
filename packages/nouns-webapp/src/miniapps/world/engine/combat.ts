@@ -488,7 +488,7 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
   }
 
   // ── Normal movement ──
-  const { dx, dy } = getMovementVector(input.keys);
+  const { dx, dy } = getMovementVector(input.keys, input.cameraAngle);
 
   if (dx !== 0 || dy !== 0) {
     player.state = 'walking';
