@@ -226,6 +226,68 @@ export default {
               from: connection.id,
             }),
           );
+
+        // ── VOIP signaling ──────────────────────────────────────────
+
+        } else if (data.type === "world:voip:offer") {
+          // Forward offer to specific peer
+          for (const conn of room.getConnections()) {
+            if (conn.id === data.to) {
+              conn.send(JSON.stringify({
+                type: "world:voip:offer",
+                from: connection.id,
+                sdp: data.sdp,
+              }));
+              break;
+            }
+          }
+        } else if (data.type === "world:voip:answer") {
+          // Forward answer to specific peer
+          for (const conn of room.getConnections()) {
+            if (conn.id === data.to) {
+              conn.send(JSON.stringify({
+                type: "world:voip:answer",
+                from: connection.id,
+                sdp: data.sdp,
+              }));
+              break;
+            }
+          }
+        } else if (data.type === "world:voip:ice") {
+          // Forward ICE candidate to specific peer
+          for (const conn of room.getConnections()) {
+            if (conn.id === data.to) {
+              conn.send(JSON.stringify({
+                type: "world:voip:ice",
+                from: connection.id,
+                candidate: data.candidate,
+              }));
+              break;
+            }
+          }
+
+        // ── Drop party ──────────────────────────────────────────────
+
+        } else if (data.type === "world:dropParty") {
+          // Broadcast drop party to all players
+          room.broadcast(JSON.stringify(data));
+        } else if (data.type === "world:dropClaimed") {
+          // Broadcast claim to all
+          room.broadcast(JSON.stringify({
+            type: "world:dropClaimed",
+            dropId: data.dropId,
+            claimedBy: connection.id,
+          }));
+
+        // ── Settlement crowd meter ──────────────────────────────────
+
+        } else if (data.type === "world:voip:speaking") {
+          // Broadcast speaking state to all for crowd meter
+          room.broadcast(JSON.stringify({
+            type: "world:voip:speaking",
+            id: connection.id,
+            speaking: data.speaking ?? false,
+          }));
         }
 
         return; // Don't process as saber message
