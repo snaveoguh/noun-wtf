@@ -71,6 +71,7 @@ import {
 // import { MOVE_DEFS, resolveDamage } from './engine/moves';
 // import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
 import { Character3D, type CharacterState } from './engine/Character3D';
+import { TreasureChest3D } from './engine/TreasureChest3D';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -884,6 +885,14 @@ export default function WorldPage() {
         <Trees />
         <Rocks />
         <CrystalBallMountain nounSeed={seed} />
+
+        {/* Treasure Chest — southwest of spawn */}
+        <TreasureChest3D
+          position={[(SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE, getTerrainHeight((SPAWN_X - 4 * TILE_SIZE) * WORLD_SCALE, (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE) + 0.1, (SPAWN_Y + 4 * TILE_SIZE) * WORLD_SCALE]}
+          pendingCount={0}
+          onInteract={() => {}}
+          playerDistance={99}
+        />
 
         <PlayerCharacter3D />
         <RemotePlayers />
