@@ -1,7 +1,7 @@
 // ── 3D Rigged Character with Voxel Noun Head ────────────────────────
 // Each instance loads its own GLB copy for independent skeletons.
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
