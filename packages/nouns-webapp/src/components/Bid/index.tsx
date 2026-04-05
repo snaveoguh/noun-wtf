@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { Trans, useLingui } from '@lingui/react/macro';
-import { Button, Col, FormControl, InputGroup, Spinner } from 'react-bootstrap';
+import { Button, Col, FormControl, Spinner } from 'react-bootstrap';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
 
@@ -27,8 +27,6 @@ const computeMinimumNextBid = (
   if (minBidIncPercentage === undefined) {
     return 0n;
   }
-  // Calculate minBidIncPercentage/100 + 1 with bigint
-  // Since bigint division truncates, we multiply first then divide to maintain precision
   return (currentBid * (minBidIncPercentage + 100n)) / 100n;
 };
 
@@ -38,7 +36,6 @@ const minBidEth = (minBid: bigint): string => {
   }
 
   const eth = formatEther(minBid);
-  // We need to round up to 2 decimal places
   const ethNum = parseFloat(eth);
   return (Math.ceil(ethNum * 100) / 100).toFixed(2);
 };
@@ -53,11 +50,12 @@ const currentBid = (bidInputRef: React.RefObject<HTMLInputElement | null>) => {
 interface BidProps {
   auction: Auction;
   auctionEnded: boolean;
+  bottomLeft?: React.ReactNode;
 }
 
 const Bid: React.FC<BidProps> = props => {
   const activeAccount = useAppSelector(state => state.account.activeAccount);
-  const { auction, auctionEnded } = props;
+  const { auction, auctionEnded, bottomLeft } = props;
   const activeLocale = useActiveLocale();
 
   const account = useAppSelector(state => state.account.activeAccount);
@@ -142,16 +140,14 @@ const Bid: React.FC<BidProps> = props => {
   useEffect(() => {
     if (!account) return;
 
-    // tx state is mining
     const isMiningUserTx = isPlacingBid;
-    // allows user to rebid against themselves so long as it is different tx
     const isCorrectTx = currentBid(bidInputRef) === BigInt(auction.amount?.toString() ?? '0');
     if (isMiningUserTx && auction.bidder === account && isCorrectTx) {
       toast.success(t`Bid was placed successfully!`);
       clearBidInput();
     }
   }, [auction, account, t, isPlacingBid]);
-  // settle auction transaction state hook
+
   useEffect(() => {
     if (auctionEnded && didSettleAuction) {
       toast.success(t`Settled auction successfully!`);
@@ -174,19 +170,19 @@ const Bid: React.FC<BidProps> = props => {
   const isDisabled = isPlacingBid || isSettlingAuction || !activeAccount;
 
   const crytalBallBtnOnClickHandler = () => {
-    // Open Crystal Ball in a new tab
     window.open('https://www.nouns.game/crystal-ball', '_blank', 'noopener,noreferrer')?.focus();
   };
 
   const isWalletConnected = activeAccount !== undefined;
 
   return (
-    <>
-      <InputGroup className={classes.bidGroup}>
-        {!auctionEnded && (
-          <>
+    <div className={classes.bidGroup}>
+      {!auctionEnded ? (
+        <>
+          {/* Full-width bid input */}
+          <div className={classes.bidInputWrapper}>
             <span className={classes.customPlaceholderBidAmt}>
-              {!auctionEnded && !bidInput ? (
+              {!bidInput ? (
                 <>
                   Ξ {minBidEth(minBid)}{' '}
                   <span
@@ -209,34 +205,32 @@ const Bid: React.FC<BidProps> = props => {
               ref={bidInputRef}
               value={bidInput}
             />
-          </>
-        )}
-        {!auctionEnded ? (
-          // @ts-expect-error TS2590: react-bootstrap Button union type too complex
-          <Button
-            className={auctionEnded ? classes.bidBtnAuctionEnded : classes.bidBtn}
-            onClick={auctionEnded ? settleAuctionHandler : placeBidHandler}
-            disabled={isDisabled}
-          >
-            {isPlacingBid ? <Spinner animation="border" /> : <Trans>Bid</Trans>}
-          </Button>
-        ) : (
-          <>
-            <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
-              <Button className={classes.bidBtnAuctionEnded} onClick={crytalBallBtnOnClickHandler}>
-                <Trans>Pick the next Noun</Trans> ⌐◧-◧
-              </Button>
+          </div>
+
+          {/* Bottom row: VIEW ALL BIDS left, BID button right */}
+          <div className={classes.bidActionRow}>
+            {bottomLeft}
+            {/* @ts-expect-error TS2590: react-bootstrap Button union type too complex */}
+            <Button className={classes.bidBtn} onClick={placeBidHandler} disabled={isDisabled}>
+              {isPlacingBid ? <Spinner animation="border" size="sm" /> : <Trans>Bid</Trans>}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
+            <Button className={classes.bidBtnAuctionEnded} onClick={crytalBallBtnOnClickHandler}>
+              <Trans>Pick the next Noun</Trans> ⌐◧-◧
+            </Button>
+          </Col>
+          {isWalletConnected && (
+            <Col lg={12}>
+              <SettleManuallyBtn settleAuctionHandler={settleAuctionHandler} auction={auction} />
             </Col>
-            {/* Only show the force settles button if the wallet connected */}
-            {isWalletConnected && (
-              <Col lg={12}>
-                <SettleManuallyBtn settleAuctionHandler={settleAuctionHandler} auction={auction} />
-              </Col>
-            )}
-          </>
-        )}
-      </InputGroup>
-    </>
+          )}
+        </>
+      )}
+    </div>
   );
 };
 export default Bid;

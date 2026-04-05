@@ -3,14 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Trans } from '@lingui/react/macro';
-import { Col, Row } from 'react-bootstrap';
 
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
 import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
 import AuctionActivityWrapper from '@/components/AuctionActivityWrapper';
-import AuctionNavigation from '@/components/AuctionNavigation';
 import AuctionTimer from '@/components/AuctionTimer';
-import AuctionTitleAndNavWrapper from '@/components/AuctionTitleAndNavWrapper';
 import Bid from '@/components/Bid';
 import BidHistory from '@/components/BidHistory';
 import BidHistoryBtn from '@/components/BidHistoryBtn';
@@ -26,13 +23,6 @@ import { Auction } from '@/wrappers/nounsAuction';
 import classes from './AuctionActivity.module.css';
 import bidHistoryClasses from './BidHistory.module.css';
 
-// Etherscan link kept as fallback if needed
-// const openEtherscanBidHistory = () => {
-//   const chainId = defaultChain.id;
-//   const url = buildEtherscanAddressLink(nounsAuctionHouseAddress[chainId]);
-//   window.open(url);
-// };
-
 interface AuctionActivityProps {
   auction: Auction;
   isFirstAuction: boolean;
@@ -43,14 +33,7 @@ interface AuctionActivityProps {
 }
 
 const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityProps) => {
-  const {
-    auction,
-    isFirstAuction,
-    isLastAuction,
-    onPrevAuctionClick,
-    onNextAuctionClick,
-    displayGraphDepComps,
-  } = props;
+  const { auction, isLastAuction, displayGraphDepComps } = props;
 
   const isCool = useAppSelector((state: RootState) => state.application.isCoolBackground);
 
@@ -72,7 +55,7 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
     return <Holder nounId={BigInt(auction.nounId)} />;
   };
 
-  // timer logic - check auction status every 30 seconds, until five minutes remain, then check status every second
+  // timer logic
   useEffect(() => {
     const timeLeft = Number(auction.endTime) - Math.floor(Date.now() / 1000);
 
@@ -100,81 +83,61 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
       )}
 
       <AuctionActivityWrapper>
-        <div className={classes.informationRow}>
-          <Row className={classes.activityRow}>
-            <AuctionTitleAndNavWrapper>
-              {displayGraphDepComps && (
-                <AuctionNavigation
-                  isFirstAuction={isFirstAuction}
-                  isLastAuction={isLastAuction}
-                  onNextAuctionClick={onNextAuctionClick}
-                  onPrevAuctionClick={onPrevAuctionClick}
-                />
-              )}
-              <AuctionActivityDateHeadline startTime={BigInt(auction.startTime)} />
-            </AuctionTitleAndNavWrapper>
-            <Col lg={12}>
-              <AuctionActivityNounTitle isCool={isCool} nounId={BigInt(auction.nounId)} />
-            </Col>
-          </Row>
-          <Row className={classes.activityRow}>
-            <Col xs={12} sm={6} lg={4} className={classes.currentBidCol}>
-              <CurrentBid
-                currentBid={BigInt(auction.amount?.toString() ?? '0')}
-                auctionEnded={auctionEnded}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={6} className={classes.auctionTimerCol}>
-              {auctionEnded ? (
-                renderAuctionWinner()
-              ) : (
-                <AuctionTimer auction={auction} auctionEnded={auctionEnded} />
-              )}
-            </Col>
-          </Row>
+        {/* Row 1: Title + Current Bid badge */}
+        <div className={classes.headerRow}>
+          <div className={classes.headerLeft}>
+            <AuctionActivityDateHeadline startTime={BigInt(auction.startTime)} />
+            <AuctionActivityNounTitle isCool={isCool} nounId={BigInt(auction.nounId)} />
+          </div>
+          <div className={classes.bidBadge}>
+            <CurrentBid
+              currentBid={BigInt(auction.amount?.toString() ?? '0')}
+              auctionEnded={auctionEnded}
+            />
+          </div>
         </div>
+
+        {/* Row 2: Timer (single line) */}
+        <div className={classes.timerRow}>
+          {auctionEnded ? (
+            renderAuctionWinner()
+          ) : (
+            <AuctionTimer auction={auction} auctionEnded={auctionEnded} />
+          )}
+        </div>
+
         {auctionEnded && (
-          <Row className={classes.activityRow}>
-            <Col lg={12} className={classes.nextNounLink}>
-              <FontAwesomeIcon icon={faInfoCircle} />
-              <a href={'https://www.nouns.game/crystal-ball'} target={'_blank'} rel="noreferrer">
-                <Trans>Help mint the next Noun</Trans>
-              </a>
-            </Col>
-          </Row>
+          <div className={classes.nextNounLink}>
+            <FontAwesomeIcon icon={faInfoCircle} />
+            <a href={'https://www.nouns.game/crystal-ball'} target={'_blank'} rel="noreferrer">
+              <Trans>Help mint the next Noun</Trans>
+            </a>
+          </div>
         )}
+
+        {/* Row 3: Bid input + bottom action row */}
         {isLastAuction && (
-          <>
-            <Row className={classes.activityRow}>
-              <Col lg={12}>
-                <Bid auction={auction} auctionEnded={auctionEnded} />
-              </Col>
-            </Row>
-          </>
+          <Bid
+            auction={auction}
+            auctionEnded={auctionEnded}
+            bottomLeft={
+              auction.amount !== 0n ? <BidHistoryBtn onClick={showBidModalHandler} /> : undefined
+            }
+          />
         )}
-        <Row className={classes.activityRow}>
-          <Col lg={12}>
-            {!isLastAuction ? (
-              <NounInfoCard
-                nounId={BigInt(auction.nounId)}
-                bidHistoryOnClickHandler={showBidModalHandler}
-              />
-            ) : (
-              displayGraphDepComps && (
-                <BidHistory
-                  auctionId={auction.nounId.toString()}
-                  max={3}
-                  classes={bidHistoryClasses}
-                />
-              )
-            )}
-            {/* If no bids, show nothing. If bids avail:graph is stable? Show bid history modal,
-            else show etherscan contract link */}
-            {isLastAuction && auction.amount !== 0n && (
-              <BidHistoryBtn onClick={showBidModalHandler} />
-            )}
-          </Col>
-        </Row>
+
+        {/* Non-latest auction: info card / bid history */}
+        {!isLastAuction && (
+          <div className={classes.bottomRow}>
+            <NounInfoCard
+              nounId={BigInt(auction.nounId)}
+              bidHistoryOnClickHandler={showBidModalHandler}
+            />
+          </div>
+        )}
+        {isLastAuction && displayGraphDepComps && (
+          <BidHistory auctionId={auction.nounId.toString()} max={3} classes={bidHistoryClasses} />
+        )}
       </AuctionActivityWrapper>
     </>
   );

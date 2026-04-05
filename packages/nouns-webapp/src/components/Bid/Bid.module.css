@@ -1,107 +1,56 @@
+/* Full-width bid input + bottom action row */
 .bidGroup {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: stretch;
-  gap: 0.6rem;
+  display: flex !important;
+  flex-direction: column;
+  gap: 0.65rem;
   width: 100%;
   min-width: 0;
+  margin-bottom: 0;
 }
 
 .bidGroup > * {
   min-width: 0;
 }
 
-.bidWrapper {
-  margin: 0;
-  display: flex;
-  flex-flow: row nowrap;
-  align-items: center;
-  justify-content: center;
-}
-
-.bidBtn {
-  font-family: 'PT Root UI';
-  border-radius: 12px !important;
-  margin-left: 0 !important;
-  margin-top: 3px;
-  width: auto;
-  padding: 10px 16px;
-  height: 3rem;
-  color: white;
-  border: transparent;
-  background-color: var(--brand-black);
-  font-weight: bold;
-  letter-spacing: normal;
-  font-size: 19px;
-  transition: all 0.2s ease-in-out;
-  white-space: nowrap;
-}
-
-.bidBtn:disabled {
-  cursor: not-allowed;
-}
-
-.bidBtn:hover,
-.bidBtn:active,
-.bidBtn:focus .bidBtn:disabled {
-  outline: none !important;
-  box-shadow: none !important;
-  background-color: #2125298a;
-}
-
-.bidBtn:disabled {
-  background-color: gray !important;
-}
-
-.minBidCopy {
-  padding-top: 0;
-  font-size: small;
-  margin-left: 0.25rem;
-  margin-bottom: 0.3rem;
+.bidInputWrapper {
+  position: relative;
+  width: 100%;
 }
 
 .bidInput {
   box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
   width: 100%;
   min-width: 0;
   height: 54px;
   color: black;
   border-radius: 12px !important;
-  box-shadow: inset 0px 0px 0px 1px #fff;
   background-color: white;
   outline: none !important;
   box-shadow: none !important;
   font-family: 'PT Root UI';
   font-weight: bold;
-  font-size: 25px;
-  transition: all 0.2s ease-in-out;
-  border: none;
+  font-size: 22px;
+  border: 1.5px solid #c0c3cc;
+  padding-left: 2rem;
+  transition: border-color 0.2s ease-in-out;
 }
 
 .bidInput:focus {
-  box-shadow: inset 0px 0px 0px 1px var(--brand-cool-dark-text) !important;
-}
-
-.customPlaceholder {
-  color: var(--brand-cool-light-text);
-  font-family: 'PT Root UI';
-  font-weight: bold;
-  z-index: 3;
-  user-select: none;
+  border-color: var(--brand-cool-dark-text);
+  box-shadow: none !important;
 }
 
 .customPlaceholderBidAmt {
   position: absolute;
-  opacity: 0.3;
-  top: 15%;
-  left: 3%;
-  max-width: calc(100% - 1.5rem);
+  opacity: 0.35;
+  top: 50%;
+  left: 2rem;
+  transform: translateY(-50%);
+  max-width: calc(100% - 3rem);
   color: var(--brand-cool-light-text);
   font-family: 'PT Root UI';
   font-weight: bold;
-  font-size: 25px;
+  font-size: 22px;
   z-index: 1;
   pointer-events: none;
   white-space: nowrap;
@@ -109,10 +58,56 @@
   text-overflow: ellipsis;
 }
 
-.activityRow .form-floating {
-  display: flex !important;
-  flex-flow: row nowrap !important;
-  justify-content: space-between !important;
+/* Bottom action row: VIEW ALL BIDS left, BID button right */
+.bidActionRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+/* When bottomLeft is present, spread items apart */
+.bidActionRow > *:first-child:not(:last-child) ~ * {
+  margin-left: auto;
+}
+
+/* If there are two children, space-between */
+.bidActionRow:has(> :nth-child(2)) {
+  justify-content: space-between;
+}
+
+.bidBtn {
+  font-family: 'PT Root UI';
+  border-radius: 999px !important;
+  width: auto;
+  padding: 10px 32px;
+  height: 3rem;
+  color: white !important;
+  border: transparent;
+  background-color: #43b369 !important;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  font-size: 20px;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+}
+
+.bidBtn:hover {
+  background-color: #38a05c !important;
+}
+
+.bidBtn:active,
+.bidBtn:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: #2f8a4f !important;
+}
+
+.bidBtn:disabled {
+  cursor: not-allowed;
+  background-color: #8cc9a0 !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .bidBtnAuctionEnded {
@@ -141,59 +136,19 @@
   display: none;
 }
 
-.bidInput:focus {
-  outline: none;
-}
-
 /* REMOVE UP/DOWN ARROWS FROM INPUT */
-/* Chrome, Safari, Edge, Opera */
 .bidInput::-webkit-outer-spin-button,
 .bidInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Firefox */
 .bidInput[type='number'] {
   -moz-appearance: textfield;
 }
 
-@media (max-width: 992px) {
-  .bidInput {
-    border: none;
-    border: 1px solid #8c8d9275;
-  }
-
-  .customPlaceholder {
-    left: 40%;
-  }
-  .customPlaceholderBidAmt {
-    left: 3.5%;
-    top: 16%;
-  }
-  .emergencySettleWrapper {
-    text-align: center;
-  }
-
-  .voteForNextNounBtnWrapper {
-    width: 100%;
-  }
-}
-
-@media (max-width: 640px) {
-  .bidGroup {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .bidBtn {
-    width: 100%;
-    margin-top: 0;
-  }
-
-  .customPlaceholderBidAmt {
-    top: 20%;
-    font-size: 20px;
-  }
+.voteForNextNounBtnWrapper {
+  width: 100%;
 }
 
 .emergencySettleButton {
@@ -205,4 +160,23 @@
   display: inline;
   margin: 0;
   padding: 0;
+}
+
+@media (max-width: 640px) {
+  .bidInput {
+    height: 48px;
+    font-size: 18px;
+    padding-left: 1.5rem;
+  }
+
+  .customPlaceholderBidAmt {
+    font-size: 18px;
+    left: 1.5rem;
+  }
+
+  .bidBtn {
+    padding: 8px 22px;
+    font-size: 15px;
+    height: 2.5rem;
+  }
 }
