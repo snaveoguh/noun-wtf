@@ -392,7 +392,7 @@ export function toggleMute(state: VoipState) {
 
 export function destroyVoip(state: VoipState) {
   // Close all peer connections
-  for (const [id, pc] of state.peers) {
+  for (const [, pc] of state.peers) {
     pc.close();
   }
   state.peers.clear();
