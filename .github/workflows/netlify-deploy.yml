@@ -66,7 +66,6 @@ jobs:
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --prod \
-              --context production \
               --dir dist \
               --functions netlify/functions \
               --no-build \
@@ -75,7 +74,6 @@ jobs:
             npx netlify deploy \
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
-              --context "${{ steps.site.outputs.context }}" \
               --dir dist \
               --functions netlify/functions \
               --no-build \
