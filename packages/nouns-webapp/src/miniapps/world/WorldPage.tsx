@@ -12,7 +12,15 @@ import * as THREE from 'three';
 import { useAppSelector } from '@/hooks';
 import { GameHUD } from './engine/GameHUD';
 
-import { SEND_INTERVAL, TILE_SIZE, MAP_SIZE, PLAYER_MAX_HP, DIRECTION_ROTATION, DIRECTION_FACING_ANGLE } from './engine/types';
+import {
+  SEND_INTERVAL,
+  TILE_SIZE,
+  MAP_SIZE,
+  PLAYER_MAX_HP,
+  DIRECTION_ROTATION,
+  DIRECTION_FACING_ANGLE,
+  Tile,
+} from './engine/types';
 import type { Player, Direction, PlayerState } from './engine/types';
 import {
   createInputState,
@@ -22,15 +30,9 @@ import {
   type InputState,
 } from './engine/input';
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
-import { Tile } from './engine/types';
 import { seedToKey, randomSeed } from './engine/sprites';
 import { isInDeepWater } from './engine/physics';
-import {
-  createPlayer,
-  createCombatState,
-  executeMove,
-  tickPlayer,
-} from './engine/combat';
+import { createPlayer, createCombatState, executeMove, tickPlayer } from './engine/combat';
 import {
   updateParticles,
   updateFloatingTexts,
@@ -64,10 +66,7 @@ import {
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 // Spritesheet compositor available for future use
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
-import {
-  createNPCs,
-  type NPC,
-} from './engine/npcs';
+import { createNPCs, type NPC } from './engine/npcs';
 // NPC combat imports — disabled until NPCs re-enabled
 // import { MOVE_DEFS, resolveDamage } from './engine/moves';
 // import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
@@ -78,13 +77,27 @@ import { useClaimDrop } from './wager/treasureChest';
 import { getActiveDrops, getNearbyDrop, markClaimed, type DroppedItem } from './engine/drops';
 import { getAuctionState } from './engine/settlement';
 import {
-  playPunchSound, playKickSound, playHeadbuttSound, playGunshot,
-  playShotgunSound, playDeathSound, playPickupSound,
-  playComboSound, playJumpSound, playBlockSound,
+  playPunchSound,
+  playKickSound,
+  playHeadbuttSound,
+  playGunshot,
+  playShotgunSound,
+  playDeathSound,
+  playPickupSound,
+  playComboSound,
+  playJumpSound,
 } from './engine/sounds';
 import {
-  createWeaponState, checkWeaponPickup, fireWeapon, tickReload, tickMuzzleFlash,
-  spawnWeaponPickup, getActivePickups, clearPickups, type WeaponState, type WeaponPickup,
+  createWeaponState,
+  checkWeaponPickup,
+  fireWeapon,
+  tickReload,
+  tickMuzzleFlash,
+  spawnWeaponPickup,
+  getActivePickups,
+  clearPickups,
+  type WeaponState,
+  type WeaponPickup,
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
 import { BirdFlocks, CloudLayer, AnimatedOcean, Dolphins } from './engine/Atmosphere';
@@ -120,17 +133,28 @@ const TERRAIN_SIZE = MAP_SIZE * TILE_SIZE * WORLD_SCALE;
 
 function tileColor(tile: Tile): [number, number, number] {
   switch (tile) {
-    case Tile.DeepWater: return [26, 79, 138];
-    case Tile.Water: return [59, 125, 216];
-    case Tile.Sand: return [232, 213, 163];
-    case Tile.Grass: return [90, 143, 60];
-    case Tile.Tree: return [45, 107, 30];
-    case Tile.Flower: return [100, 153, 70];
-    case Tile.Path: return [196, 165, 110];
-    case Tile.Rock: return [136, 136, 136];
-    case Tile.Spawn: return [106, 168, 79];
-    case Tile.Arena: return [139, 105, 20];
-    default: return [26, 79, 138];
+    case Tile.DeepWater:
+      return [26, 79, 138];
+    case Tile.Water:
+      return [59, 125, 216];
+    case Tile.Sand:
+      return [232, 213, 163];
+    case Tile.Grass:
+      return [90, 143, 60];
+    case Tile.Tree:
+      return [45, 107, 30];
+    case Tile.Flower:
+      return [100, 153, 70];
+    case Tile.Path:
+      return [196, 165, 110];
+    case Tile.Rock:
+      return [136, 136, 136];
+    case Tile.Spawn:
+      return [106, 168, 79];
+    case Tile.Arena:
+      return [139, 105, 20];
+    default:
+      return [26, 79, 138];
   }
 }
 
@@ -168,7 +192,8 @@ function generateHeightmap(): Float32Array {
   const heights = new Float32Array((MAP_SIZE + 1) * (MAP_SIZE + 1));
   for (let y = 0; y <= MAP_SIZE; y++) {
     for (let x = 0; x <= MAP_SIZE; x++) {
-      const tile = ISLAND_MAP[Math.min(y, MAP_SIZE - 1)]?.[Math.min(x, MAP_SIZE - 1)] ?? Tile.DeepWater;
+      const tile =
+        ISLAND_MAP[Math.min(y, MAP_SIZE - 1)]?.[Math.min(x, MAP_SIZE - 1)] ?? Tile.DeepWater;
       let h = 0;
       if (tile === Tile.DeepWater) h = -2;
       else if (tile === Tile.Water) h = -1;
@@ -214,12 +239,7 @@ function Terrain() {
   const heightmap = useMemo(() => generateHeightmap(), []);
 
   const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(
-      TERRAIN_SIZE,
-      TERRAIN_SIZE,
-      MAP_SIZE,
-      MAP_SIZE,
-    );
+    const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, MAP_SIZE, MAP_SIZE);
     // Apply heightmap
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -231,7 +251,11 @@ function Terrain() {
   }, [heightmap]);
 
   return (
-    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[TERRAIN_SIZE / 2, 0, TERRAIN_SIZE / 2]}>
+    <mesh
+      geometry={geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[TERRAIN_SIZE / 2, 0, TERRAIN_SIZE / 2]}
+    >
       <meshStandardMaterial map={texture} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -318,7 +342,17 @@ const CRYSTAL_BALL_Z = 2 * TILE_SIZE * WORLD_SCALE;
 const MOUNTAIN_HEIGHT = 6;
 const BALL_RADIUS = 1.5;
 
-function SmokeParticles({ count, radius, height, baseY }: { count: number; radius: number; height: number; baseY: number }) {
+function SmokeParticles({
+  count,
+  radius,
+  height,
+  baseY,
+}: {
+  count: number;
+  radius: number;
+  height: number;
+  baseY: number;
+}) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const particles = useMemo(() => {
@@ -357,7 +391,15 @@ function SmokeParticles({ count, radius, height, baseY }: { count: number; radiu
   );
 }
 
-function LavaCracks({ baseRadius, height, segments }: { baseRadius: number; height: number; segments: number }) {
+function LavaCracks({
+  baseRadius,
+  height,
+  segments,
+}: {
+  baseRadius: number;
+  height: number;
+  segments: number;
+}) {
   const lineObjects = useMemo(() => {
     const objs: THREE.Line[] = [];
     for (let i = 0; i < segments; i++) {
@@ -491,19 +533,51 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
       </mesh>
 
       {/* Pulsing ominous light */}
-      <pointLight ref={pulseRef} position={[0, eyeY, 0]} color="#ff3300" intensity={3} distance={15} />
+      <pointLight
+        ref={pulseRef}
+        position={[0, eyeY, 0]}
+        color="#ff3300"
+        intensity={3}
+        distance={15}
+      />
       {/* Secondary ambient glow — red/orange uplighting */}
-      <pointLight position={[0, MOUNTAIN_HEIGHT * 0.3, 0]} color="#ff2200" intensity={1.5} distance={8} />
+      <pointLight
+        position={[0, MOUNTAIN_HEIGHT * 0.3, 0]}
+        color="#ff2200"
+        intensity={1.5}
+        distance={8}
+      />
 
       {/* Swirling smoke particles */}
-      <SmokeParticles count={60} radius={1.8} height={MOUNTAIN_HEIGHT * 1.2} baseY={MOUNTAIN_HEIGHT * 0.3} />
+      <SmokeParticles
+        count={60}
+        radius={1.8}
+        height={MOUNTAIN_HEIGHT * 1.2}
+        baseY={MOUNTAIN_HEIGHT * 0.3}
+      />
 
       {/* Rotating voxel Noun — MASSIVE in the sky, visible from everywhere */}
       <group ref={ballGroupRef} position={[0, eyeY, 0]} scale={[1, 1, 1]}>
-        {bodyGeo && <mesh geometry={bodyGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
-        {blingGeo && <mesh geometry={blingGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
-        {headGeo && <mesh geometry={headGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
-        {glassesGeo && <mesh geometry={glassesGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
+        {bodyGeo && (
+          <mesh geometry={bodyGeo}>
+            <meshBasicMaterial vertexColors toneMapped={false} />
+          </mesh>
+        )}
+        {blingGeo && (
+          <mesh geometry={blingGeo}>
+            <meshBasicMaterial vertexColors toneMapped={false} />
+          </mesh>
+        )}
+        {headGeo && (
+          <mesh geometry={headGeo}>
+            <meshBasicMaterial vertexColors toneMapped={false} />
+          </mesh>
+        )}
+        {glassesGeo && (
+          <mesh geometry={glassesGeo}>
+            <meshBasicMaterial vertexColors toneMapped={false} />
+          </mesh>
+        )}
       </group>
     </group>
   );
@@ -523,7 +597,11 @@ export function _Water() {
   });
 
   return (
-    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[TERRAIN_SIZE / 2, -0.15, TERRAIN_SIZE / 2]}>
+    <mesh
+      ref={meshRef}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[TERRAIN_SIZE / 2, -0.15, TERRAIN_SIZE / 2]}
+    >
       <planeGeometry args={[TERRAIN_SIZE * 1.5, TERRAIN_SIZE * 1.5]} />
       <meshStandardMaterial color="#3377cc" transparent opacity={0.8} side={THREE.DoubleSide} />
     </mesh>
@@ -534,15 +612,31 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
-function CameraController({ target, inputRef, playerCharState }: {
+// Map 2D direction → angle the camera should sit BEHIND the character
+const BEHIND_ANGLE: Record<string, number> = {
+  up: Math.PI, // char faces -Z → cam at +Z
+  down: 0, // char faces +Z → cam at +Z behind = 0 (same side)
+  left: Math.PI * 0.5, // char faces -X → cam at +X
+  right: -Math.PI * 0.5, // char faces +X → cam at -X
+  'up-left': Math.PI * 0.75,
+  'up-right': -Math.PI * 0.75,
+  'down-left': Math.PI * 0.25,
+  'down-right': -Math.PI * 0.25,
+};
+
+function CameraController({
+  target,
+  inputRef,
+  playerCharState,
+}: {
   target: THREE.Vector3;
   inputRef: React.RefObject<InputState>;
   playerCharState: React.RefObject<CharacterState>;
 }) {
   const { camera } = useThree();
-  const angleX = useRef(0);
-  const angleY = useRef(0.12); // starts low — right behind head
-  const dist = useRef(1.5); // starts close as fuck
+  const angleX = useRef(Math.PI); // start behind (facing up = -Z)
+  const angleY = useRef(0.12);
+  const dist = useRef(1.5);
 
   useFrame((_, delta) => {
     const input = inputRef.current;
@@ -553,18 +647,26 @@ function CameraController({ target, inputRef, playerCharState }: {
       if (input.keys.has('arrowleft')) angleX.current -= 1.5 * delta;
       if (input.keys.has('arrowright')) angleX.current += 1.5 * delta;
       if (input.keys.has('arrowup')) angleY.current = Math.min(angleY.current + 0.8 * delta, 1.2);
-      if (input.keys.has('arrowdown')) angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
+      if (input.keys.has('arrowdown'))
+        angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
     }
 
-    // Walking → zoom out, rise up, AND reset angleX to behind (0)
+    // Walking → zoom out, rise up, AND swing camera behind character's facing direction
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
     const wantDist = moving ? 3.5 : 1.5;
     const wantY = moving ? 0.3 : 0.12;
     dist.current += (wantDist - dist.current) * 0.04;
     angleY.current += (wantY - angleY.current) * 0.03;
-    // When walking, smoothly return camera to behind (angleX → 0)
-    if (moving) {
-      angleX.current *= 0.92; // ease back to 0
+
+    if (moving && pcs) {
+      // Get the angle the camera should be at (behind the character)
+      const behindAngle = BEHIND_ANGLE[pcs.direction] ?? Math.PI;
+      // Shortest-path angle lerp to avoid spinning the wrong way around
+      let diff = behindAngle - angleX.current;
+      // Normalize to [-PI, PI]
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      angleX.current += diff * 0.06; // smooth follow
     }
 
     const d = dist.current;
@@ -632,8 +734,8 @@ export function _HUD_OLD({
   maxHp,
   playerCount,
   comboHits,
-  controlsVisible: _controlsVisible,
-  oceanPhase: _oceanPhase,
+  controlsVisible: _controlsVisible, // eslint-disable-line @typescript-eslint/no-unused-vars
+  oceanPhase: _oceanPhase, // eslint-disable-line @typescript-eslint/no-unused-vars
   oceanAlpha,
   majaAlpha,
   respawnTimer,
@@ -673,49 +775,94 @@ export function _HUD_OLD({
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
       {/* HP bar */}
-      <div style={{
-        position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)',
-        width: 200, height: 14, background: 'rgba(0,0,0,0.5)', borderRadius: 4,
-      }}>
-        <div style={{
-          width: `${(hp / maxHp) * 100}%`, height: '100%', borderRadius: 4,
-          background: hp / maxHp > 0.5 ? '#4a4' : hp / maxHp > 0.25 ? '#ca4' : '#c44',
-          transition: 'width 0.1s',
-        }} />
-        <span style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: '#fff', fontSize: 10, fontFamily: 'monospace',
-        }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 30,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 200,
+          height: 14,
+          background: 'rgba(0,0,0,0.5)',
+          borderRadius: 4,
+        }}
+      >
+        <div
+          style={{
+            width: `${(hp / maxHp) * 100}%`,
+            height: '100%',
+            borderRadius: 4,
+            background: hp / maxHp > 0.5 ? '#4a4' : hp / maxHp > 0.25 ? '#ca4' : '#c44',
+            transition: 'width 0.1s',
+          }}
+        />
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: 10,
+            fontFamily: 'monospace',
+          }}
+        >
           {hp} / {maxHp}
         </span>
       </div>
 
       {/* Player count */}
-      <div style={{
-        position: 'absolute', top: 16, right: 16, color: '#fff', fontFamily: 'monospace',
-        fontSize: 12, textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          color: '#fff',
+          fontFamily: 'monospace',
+          fontSize: 12,
+          textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+        }}
+      >
         {playerCount} online
       </div>
 
       {/* Combo */}
       {comboHits >= 2 && (
-        <div style={{
-          position: 'absolute', right: 20, top: '40%', color: '#ffdd00',
-          fontFamily: 'monospace', fontWeight: 'bold', textAlign: 'right',
-          fontSize: 20 + Math.min(comboHits, 10) * 3,
-          textShadow: '0 2px 6px rgba(0,0,0,0.8)',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            right: 20,
+            top: '40%',
+            color: '#ffdd00',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            textAlign: 'right',
+            fontSize: 20 + Math.min(comboHits, 10) * 3,
+            textShadow: '0 2px 6px rgba(0,0,0,0.8)',
+          }}
+        >
           {comboHits}x<br />
           <span style={{ fontSize: 14, color: '#ffaa00' }}>COMBO</span>
         </div>
       )}
 
       {/* Controls — always visible */}
-      <div style={{
-        position: 'absolute', bottom: 55, left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', gap: 4, fontFamily: 'monospace', fontSize: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 600,
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 55,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 4,
+          fontFamily: 'monospace',
+          fontSize: 10,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          maxWidth: 600,
+        }}
+      >
         {[
           { key: 'J', label: 'Punch', color: '#ff8844' },
           { key: 'K', label: 'Kick', color: '#ff4444' },
@@ -727,10 +874,17 @@ export function _HUD_OLD({
           { key: 'Spc+Dir', label: 'Dash', color: '#88ff44' },
           { key: 'Shift', label: 'Block', color: '#8888ff' },
         ].map(({ key, label, color }) => (
-          <div key={key} style={{
-            background: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: '2px 5px',
-            border: `1px solid ${color}40`, textAlign: 'center', minWidth: 44,
-          }}>
+          <div
+            key={key}
+            style={{
+              background: 'rgba(0,0,0,0.6)',
+              borderRadius: 4,
+              padding: '2px 5px',
+              border: `1px solid ${color}40`,
+              textAlign: 'center',
+              minWidth: 44,
+            }}
+          >
             <div style={{ color, fontWeight: 'bold', fontSize: 11 }}>{key}</div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8 }}>{label}</div>
           </div>
@@ -738,34 +892,57 @@ export function _HUD_OLD({
       </div>
 
       {/* Movement hint */}
-      <div style={{
-        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-        color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: 10,
-        textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center',
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: 'rgba(255,255,255,0.4)',
+          fontFamily: 'monospace',
+          fontSize: 10,
+          textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+          textAlign: 'center',
+        }}
+      >
         WASD move &middot; F fire &middot; E interact &middot; M mic &middot; ESC exit
       </div>
 
       {/* Ocean death overlay */}
       {oceanAlpha > 0 && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `rgba(0,0,0,${oceanAlpha})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexDirection: 'column',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `rgba(0,0,0,${oceanAlpha})`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+          }}
+        >
           {majaAlpha > 0 && (
             <>
-              <div style={{
-                color: '#fff', fontSize: 64, fontFamily: 'serif', fontWeight: 'bold',
-                opacity: majaAlpha,
-              }}>
+              <div
+                style={{
+                  color: '#fff',
+                  fontSize: 64,
+                  fontFamily: 'serif',
+                  fontWeight: 'bold',
+                  opacity: majaAlpha,
+                }}
+              >
                 Gran Maja
               </div>
-              <div style={{
-                color: 'rgba(255,255,255,0.7)', fontSize: 24, fontFamily: 'serif',
-                opacity: majaAlpha, marginTop: 8,
-              }}>
+              <div
+                style={{
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: 24,
+                  fontFamily: 'serif',
+                  opacity: majaAlpha,
+                  marginTop: 8,
+                }}
+              >
                 swallowed you whole
               </div>
             </>
@@ -775,19 +952,34 @@ export function _HUD_OLD({
 
       {/* Respawn */}
       {isDead && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', flexDirection: 'column',
-        }}>
-          <div style={{
-            color: '#fff', fontSize: 48, fontFamily: 'monospace', fontWeight: 'bold',
-            textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-          }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              color: '#fff',
+              fontSize: 48,
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+            }}
+          >
             {Math.ceil(respawnTimer / 60)}
           </div>
-          <div style={{
-            color: 'rgba(255,255,255,0.7)', fontSize: 18, fontFamily: 'monospace',
-          }}>
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: 18,
+              fontFamily: 'monospace',
+            }}
+          >
             RESPAWNING
           </div>
         </div>
@@ -795,12 +987,20 @@ export function _HUD_OLD({
 
       {/* Weapon ammo (bottom right) */}
       {(weaponEquipped as any) && (
-        <div style={{
-          position: 'absolute', bottom: 35, right: 16,
-          background: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: '6px 12px',
-          fontFamily: 'monospace', color: '#fff', fontSize: 13,
-          border: '1px solid rgba(255,255,255,0.2)',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 35,
+            right: 16,
+            background: 'rgba(0,0,0,0.6)',
+            borderRadius: 8,
+            padding: '6px 12px',
+            fontFamily: 'monospace',
+            color: '#fff',
+            fontSize: 13,
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+        >
           <span style={{ color: '#ff8844', fontWeight: 'bold' }}>
             {String(weaponEquipped).toUpperCase()}
           </span>
@@ -814,84 +1014,153 @@ export function _HUD_OLD({
 
       {/* Speech bubble above player */}
       {transcript && (
-        <div style={{
-          position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,255,255,0.9)', color: '#111', borderRadius: 12,
-          padding: '6px 14px', fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold',
-          maxWidth: 280, textAlign: 'center', wordBreak: 'break-word',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '25%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(255,255,255,0.9)',
+            color: '#111',
+            borderRadius: 12,
+            padding: '6px 14px',
+            fontFamily: 'monospace',
+            fontSize: 13,
+            fontWeight: 'bold',
+            maxWidth: 280,
+            textAlign: 'center',
+            wordBreak: 'break-word',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
           {transcript}
           {/* Speech bubble tail */}
-          <div style={{
-            position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
-            width: 0, height: 0,
-            borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
-            borderTop: '8px solid rgba(255,255,255,0.9)',
-          }} />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: -8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderTop: '8px solid rgba(255,255,255,0.9)',
+            }}
+          />
         </div>
       )}
 
       {/* ── VOIP UI ─────────────────────────────────────────── */}
 
       {/* Mic indicator (top left) */}
-      <div style={{
-        position: 'absolute', top: 16, left: 16,
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: !micEnabled ? 'rgba(100,100,100,0.5)'
-            : isMuted ? 'rgba(255,50,50,0.6)'
-            : isSpeaking ? 'rgba(50,255,50,0.7)'
-            : 'rgba(50,150,50,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, border: '2px solid rgba(255,255,255,0.3)',
-          transition: 'background 0.2s',
-        }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: !micEnabled
+              ? 'rgba(100,100,100,0.5)'
+              : isMuted
+                ? 'rgba(255,50,50,0.6)'
+                : isSpeaking
+                  ? 'rgba(50,255,50,0.7)'
+                  : 'rgba(50,150,50,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+            border: '2px solid rgba(255,255,255,0.3)',
+            transition: 'background 0.2s',
+          }}
+        >
           {!micEnabled ? '🔇' : isMuted ? '🔴' : '🎤'}
         </div>
-        <span style={{
-          color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 10,
-        }}>
+        <span
+          style={{
+            color: 'rgba(255,255,255,0.6)',
+            fontFamily: 'monospace',
+            fontSize: 10,
+          }}
+        >
           {!micEnabled ? 'M to enable mic' : isMuted ? 'MUTED' : isSpeaking ? 'SPEAKING' : 'MIC ON'}
         </span>
       </div>
 
       {/* Settlement window banner */}
       {settlementWindow && (
-        <div style={{
-          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
-          background: settleTriggered ? 'rgba(50,255,50,0.3)' : 'rgba(255,50,50,0.3)',
-          border: `2px solid ${settleTriggered ? '#4f4' : '#f44'}`,
-          borderRadius: 8, padding: '8px 24px',
-          fontFamily: 'monospace', fontWeight: 'bold', fontSize: 14,
-          color: '#fff', textAlign: 'center',
-          textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-        }}>
-          {settleTriggered ? '⌐◧-◧ SETTLED! DROP PARTY!' : '⌐◧-◧ SETTLEMENT WINDOW — SHOUT TO SETTLE!'}
+        <div
+          style={{
+            position: 'absolute',
+            top: 50,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: settleTriggered ? 'rgba(50,255,50,0.3)' : 'rgba(255,50,50,0.3)',
+            border: `2px solid ${settleTriggered ? '#4f4' : '#f44'}`,
+            borderRadius: 8,
+            padding: '8px 24px',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            fontSize: 14,
+            color: '#fff',
+            textAlign: 'center',
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+          }}
+        >
+          {settleTriggered
+            ? '⌐◧-◧ SETTLED! DROP PARTY!'
+            : '⌐◧-◧ SETTLEMENT WINDOW — SHOUT TO SETTLE!'}
         </div>
       )}
 
       {/* Crowd settle meter */}
       {settlementWindow && micEnabled && !settleTriggered && (
-        <div style={{
-          position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)',
-          width: 200, textAlign: 'center',
-        }}>
-          <div style={{
-            height: 8, background: 'rgba(0,0,0,0.5)', borderRadius: 4, overflow: 'hidden',
-          }}>
-            <div style={{
-              width: `${crowdMeter * 100}%`, height: '100%',
-              background: `linear-gradient(90deg, #ff4444, #ffaa00, #44ff44)`,
-              transition: 'width 0.1s',
+        <div
+          style={{
+            position: 'absolute',
+            top: 90,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 200,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              height: 8,
+              background: 'rgba(0,0,0,0.5)',
               borderRadius: 4,
-            }} />
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${crowdMeter * 100}%`,
+                height: '100%',
+                background: `linear-gradient(90deg, #ff4444, #ffaa00, #44ff44)`,
+                transition: 'width 0.1s',
+                borderRadius: 4,
+              }}
+            />
           </div>
-          <div style={{
-            color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 10, marginTop: 4,
-          }}>
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontFamily: 'monospace',
+              fontSize: 10,
+              marginTop: 4,
+            }}
+          >
             {activeSpeakers} / 3 speakers
           </div>
         </div>
@@ -906,12 +1175,34 @@ export default function WorldPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentNounSeed = useAppSelector(state => (state as any).onDisplayAuction?.seed);
-  const lastAuctionNounId = useAppSelector(state => (state as any).onDisplayAuction?.lastAuctionNounId);
+  const lastAuctionNounId = useAppSelector(
+    state => (state as any).onDisplayAuction?.lastAuctionNounId,
+  );
 
   // Fetch the auction Noun's seed for the crystal ball
   const auctionNounSeed = useNounSeed(BigInt(lastAuctionNounId ?? 0));
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // Play intro music on first load
+  useEffect(() => {
+    const audio = new Audio('/sounds/noun-world-intro.mp3');
+    audio.volume = 0.6;
+    audio.play().catch(() => {
+      // Browser blocks autoplay — play on first click
+      const playOnClick = () => {
+        audio.play().catch(() => {});
+        document.removeEventListener('click', playOnClick);
+        document.removeEventListener('keydown', playOnClick);
+      };
+      document.addEventListener('click', playOnClick);
+      document.addEventListener('keydown', playOnClick);
+    });
+    return () => {
+      audio.pause();
+      audio.src = '';
+    };
+  }, []);
 
   // Game state refs (mutable, no re-renders)
   const playerRef = useRef<Player | null>(null);
@@ -921,21 +1212,41 @@ export default function WorldPage() {
   const mpRef = useRef(createMultiplayerState());
   const npcsRef = useRef<NPC[]>(createNPCs());
   const playerCharState = useRef<CharacterState>({
-    x: SPAWN_X * WORLD_SCALE, z: SPAWN_Y * WORLD_SCALE, y: 0,
-    direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, weaponEquipped: null, muzzleFlash: 0,
+    x: SPAWN_X * WORLD_SCALE,
+    z: SPAWN_Y * WORLD_SCALE,
+    y: 0,
+    direction: 'up',
+    state: 'idle',
+    attackType: null,
+    hitFlash: 0,
+    hp: PLAYER_MAX_HP,
+    maxHp: PLAYER_MAX_HP,
+    weaponEquipped: null,
+    muzzleFlash: 0,
   });
   const npcCharStates = useRef<CharacterState[]>(
     npcsRef.current.map(npc => ({
-      x: npc.x * WORLD_SCALE, z: npc.y * WORLD_SCALE, y: 0,
-      direction: 'down' as Direction, state: 'idle' as PlayerState, attackType: null, hitFlash: 0, hp: npc.hp, maxHp: npc.maxHp, weaponEquipped: null, muzzleFlash: 0,
-    }))
+      x: npc.x * WORLD_SCALE,
+      z: npc.y * WORLD_SCALE,
+      y: 0,
+      direction: 'down' as Direction,
+      state: 'idle' as PlayerState,
+      attackType: null,
+      hitFlash: 0,
+      hp: npc.hp,
+      maxHp: npc.maxHp,
+      weaponEquipped: null,
+      muzzleFlash: 0,
+    })),
   );
   const frameRef = useRef(0);
   const voipRef = useRef<VoipState>(createVoipState());
   const weaponRef = useRef<WeaponState>(createWeaponState());
   const [weaponPickups, setWeaponPickups] = useState<WeaponPickup[]>([]);
   const [micEnabled, setMicEnabled] = useState(false);
-  const playerTargetRef = useRef(new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE));
+  const playerTargetRef = useRef(
+    new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE),
+  );
 
   // HUD state — ref only, HUD component reads via DOM manipulation (no React re-renders)
   const hudRef = useRef({
@@ -958,7 +1269,7 @@ export default function WorldPage() {
     settlementWindow: false,
     settleTriggered: false,
     transcript: '',
-    weaponEquipped: null as (string | null),
+    weaponEquipped: null as string | null,
     weaponAmmo: 0,
   });
 
@@ -968,7 +1279,13 @@ export default function WorldPage() {
     if (seedParam) {
       const parts = seedParam.split('-').map(Number);
       if (parts.length === 5 && parts.every(n => !isNaN(n))) {
-        return { background: parts[0], body: parts[1], accessory: parts[2], head: parts[3], glasses: parts[4] };
+        return {
+          background: parts[0],
+          body: parts[1],
+          accessory: parts[2],
+          head: parts[3],
+          glasses: parts[4],
+        };
       }
     }
     return currentNounSeed || randomSeed();
@@ -986,7 +1303,12 @@ export default function WorldPage() {
     spawnWeaponPickup('shotgun', SPAWN_X - 100, SPAWN_Y + 40);
     spawnWeaponPickup('uzi', SPAWN_X + 50, SPAWN_Y + 90);
     setWeaponPickups([...getActivePickups()]);
-    console.log('[Weapons] Spawned pickups at:', getActivePickups().map(p => `${p.type}(${p.worldX},${p.worldY})`).join(', '));
+    console.log(
+      '[Weapons] Spawned pickups at:',
+      getActivePickups()
+        .map(p => `${p.type}(${p.worldX},${p.worldY})`)
+        .join(', '),
+    );
 
     // Multiplayer
     const mp = mpRef.current;
@@ -1139,11 +1461,16 @@ export default function WorldPage() {
       if (frame % 120 === 0) {
         const pickups = getActivePickups();
         if (pickups.length > 0) {
-          const nearest = pickups.reduce((best, p) => {
-            const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
-            return d < best.d ? { d, p } : best;
-          }, { d: Infinity, p: pickups[0] });
-          console.log(`[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`);
+          const nearest = pickups.reduce(
+            (best, p) => {
+              const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
+              return d < best.d ? { d, p } : best;
+            },
+            { d: Infinity, p: pickups[0] },
+          );
+          console.log(
+            `[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`,
+          );
         }
       }
       const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
@@ -1179,7 +1506,7 @@ export default function WorldPage() {
           else if (intendedMove === 'kick') playKickSound();
           else if (intendedMove === 'headbutt') playHeadbuttSound();
           else if (intendedMove === 'backflip') playJumpSound();
-          else if (intendedMove === 'block') playBlockSound();
+          // block is silent — no annoying clang on shift
 
           // Use player facing direction for attack direction
           const facingAngle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
@@ -1187,7 +1514,14 @@ export default function WorldPage() {
           const mouseWorldX = player.x + Math.cos(angle) * 50;
           const mouseWorldY = player.y + Math.sin(angle) * 50;
 
-          const hits = executeMove(player, intendedMove, mouseWorldX, mouseWorldY, mp.remotePlayers, combat);
+          const hits = executeMove(
+            player,
+            intendedMove,
+            mouseWorldX,
+            mouseWorldY,
+            mp.remotePlayers,
+            combat,
+          );
 
           if (intendedMove !== 'block') {
             sendAttack(mp, intendedMove, player.x, player.y, angle);
@@ -1229,18 +1563,22 @@ export default function WorldPage() {
         // Broadcast speaking state + transcript
         if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
           if (voip.isSpeaking !== wasSpeaking) {
-            mp.ws.send(JSON.stringify({
-              type: 'world:voip:speaking',
-              speaking: voip.isSpeaking,
-            }));
+            mp.ws.send(
+              JSON.stringify({
+                type: 'world:voip:speaking',
+                speaking: voip.isSpeaking,
+              }),
+            );
           }
           // Broadcast transcript to other players
           const transcript = getCurrentTranscript();
           if (transcript) {
-            mp.ws.send(JSON.stringify({
-              type: 'world:voip:transcript',
-              text: transcript,
-            }));
+            mp.ws.send(
+              JSON.stringify({
+                type: 'world:voip:transcript',
+                text: transcript,
+              }),
+            );
           }
         }
         // Update crowd settle
@@ -1251,7 +1589,11 @@ export default function WorldPage() {
         }
         // Update spatial audio listener position
         const rot = DIRECTION_ROTATION[player.direction] ?? 0;
-        updateListenerPosition(voip, player.x * WORLD_SCALE, 0, player.y * WORLD_SCALE,
+        updateListenerPosition(
+          voip,
+          player.x * WORLD_SCALE,
+          0,
+          player.y * WORLD_SCALE,
           Math.sin(rot),
           Math.cos(rot),
         );
@@ -1270,7 +1612,9 @@ export default function WorldPage() {
       const terrainY = getTerrainHeight(wx, wz);
       playerTargetRef.current.set(wx, terrainY, wz);
       const pcs = playerCharState.current;
-      pcs.x = wx; pcs.z = wz; pcs.y = terrainY;
+      pcs.x = wx;
+      pcs.z = wz;
+      pcs.y = terrainY;
       pcs.direction = player.direction;
       pcs.state = player.state;
       pcs.attackType = player.attackType;
@@ -1286,7 +1630,20 @@ export default function WorldPage() {
         ncs.z = npc.y * WORLD_SCALE;
         ncs.y = getTerrainHeight(ncs.x, ncs.z);
         ncs.direction = npc.direction;
-        ncs.state = npc.state === 'chase' ? 'walking' : npc.state === 'attack' ? 'attacking' : npc.state === 'dead' ? 'dead' : npc.state === 'stunned' ? 'stunned' : npc.state === 'patrol' ? (npc.patrolWaitTimer > 0 ? 'idle' : 'walking') : 'idle';
+        ncs.state =
+          npc.state === 'chase'
+            ? 'walking'
+            : npc.state === 'attack'
+              ? 'attacking'
+              : npc.state === 'dead'
+                ? 'dead'
+                : npc.state === 'stunned'
+                  ? 'stunned'
+                  : npc.state === 'patrol'
+                    ? npc.patrolWaitTimer > 0
+                      ? 'idle'
+                      : 'walking'
+                    : 'idle';
         ncs.hitFlash = npc.hitFlash;
         ncs.hp = npc.hp;
       }
@@ -1326,7 +1683,8 @@ export default function WorldPage() {
       hudRef.current.micEnabled = !!voipRef.current.localStream;
       hudRef.current.isMuted = voipRef.current.isMuted;
       hudRef.current.isSpeaking = voipRef.current.isSpeaking;
-      hudRef.current.activeSpeakers = voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
+      hudRef.current.activeSpeakers =
+        voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
       hudRef.current.crowdMeter = voipRef.current.crowdMeter;
       hudRef.current.settlementWindow = voipRef.current.settlementWindow;
       hudRef.current.settleTriggered = voipRef.current.settleTriggered;
@@ -1351,7 +1709,9 @@ export default function WorldPage() {
 
   // Remote players — each gets own Character3D with own GLB
   function RemotePlayers() {
-    const remoteCharStates = useRef<Map<string, { seed: INounSeed; state: CharacterState }>>(new Map());
+    const remoteCharStates = useRef<Map<string, { seed: INounSeed; state: CharacterState }>>(
+      new Map(),
+    );
 
     useFrame(() => {
       const mp = mpRef.current;
@@ -1362,13 +1722,31 @@ export default function WorldPage() {
           let rpSeed: INounSeed;
           try {
             const parts = rp.seedKey.split('-').map(Number);
-            rpSeed = { background: parts[0], body: parts[1], accessory: parts[2], head: parts[3], glasses: parts[4] };
+            rpSeed = {
+              background: parts[0],
+              body: parts[1],
+              accessory: parts[2],
+              head: parts[3],
+              glasses: parts[4],
+            };
           } catch {
             rpSeed = randomSeed();
           }
           entry = {
             seed: rpSeed,
-            state: { x: 0, z: 0, y: 0, direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: 100, maxHp: 100, weaponEquipped: null, muzzleFlash: 0 },
+            state: {
+              x: 0,
+              z: 0,
+              y: 0,
+              direction: 'up',
+              state: 'idle',
+              attackType: null,
+              hitFlash: 0,
+              hp: 100,
+              maxHp: 100,
+              weaponEquipped: null,
+              muzzleFlash: 0,
+            },
           };
           remoteCharStates.current.set(id, entry);
         }
@@ -1378,7 +1756,8 @@ export default function WorldPage() {
         entry.state.z = wz;
         entry.state.y = getTerrainHeight(wx, wz);
         entry.state.direction = rp.direction;
-        entry.state.state = rp.state === 'walking' ? 'walking' : rp.state === 'attacking' ? 'attacking' : 'idle';
+        entry.state.state =
+          rp.state === 'walking' ? 'walking' : rp.state === 'attacking' ? 'attacking' : 'idle';
         entry.state.hitFlash = rp.hitFlash;
         entry.state.hp = rp.hp;
       }
@@ -1411,7 +1790,19 @@ export default function WorldPage() {
   }
 
   return (
-    <div ref={canvasContainerRef} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#1a4f8a', cursor: 'crosshair', overflow: 'hidden' }}>
+    <div
+      ref={canvasContainerRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: '#1a4f8a',
+        cursor: 'crosshair',
+        overflow: 'hidden',
+      }}
+    >
       <Canvas
         shadows
         camera={{ position: [SPAWN_X * WORLD_SCALE, 2, SPAWN_Y * WORLD_SCALE + 3.5], fov: 50 }}
@@ -1435,9 +1826,22 @@ export default function WorldPage() {
         <Dolphins />
 
         {/* World objects */}
-        <Billboard position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]} text="probe.wtf" url="https://probe.wtf" />
-        <Billboard position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]} text="YOUR AD HERE ⌐◧-◧" rotation={0.5} />
-        <Billboard position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]} text="pooter.world" url="https://pooter.world" rotation={-0.3} />
+        <Billboard
+          position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]}
+          text="probe.wtf"
+          url="https://probe.wtf"
+        />
+        <Billboard
+          position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]}
+          text="YOUR AD HERE ⌐◧-◧"
+          rotation={0.5}
+        />
+        <Billboard
+          position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]}
+          text="pooter.world"
+          url="https://pooter.world"
+          rotation={-0.3}
+        />
         <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
         <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
 
@@ -1453,29 +1857,45 @@ export default function WorldPage() {
         />
 
         {/* Dropped items from last drop party */}
-        {droppedItems.filter(d => !d.claimed).map(item => (
-          <DroppedItem3D
-            key={item.dropId}
-            position={[item.worldX * WORLD_SCALE, getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1, item.worldY * WORLD_SCALE]}
-            itemType={item.itemType}
-            claimed={item.claimed}
-          />
-        ))}
+        {droppedItems
+          .filter(d => !d.claimed)
+          .map(item => (
+            <DroppedItem3D
+              key={item.dropId}
+              position={[
+                item.worldX * WORLD_SCALE,
+                getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1,
+                item.worldY * WORLD_SCALE,
+              ]}
+              itemType={item.itemType}
+              claimed={item.claimed}
+            />
+          ))}
 
         {/* Weapon pickups on the ground */}
-        {weaponPickups.filter(p => !p.picked).map(pickup => (
-          <WeaponPickup3D
-            key={pickup.id}
-            position={[pickup.worldX * WORLD_SCALE, getTerrainHeight(pickup.worldX * WORLD_SCALE, pickup.worldY * WORLD_SCALE) + 0.2, pickup.worldY * WORLD_SCALE]}
-            type={pickup.type}
-            picked={pickup.picked}
-          />
-        ))}
+        {weaponPickups
+          .filter(p => !p.picked)
+          .map(pickup => (
+            <WeaponPickup3D
+              key={pickup.id}
+              position={[
+                pickup.worldX * WORLD_SCALE,
+                getTerrainHeight(pickup.worldX * WORLD_SCALE, pickup.worldY * WORLD_SCALE) + 0.2,
+                pickup.worldY * WORLD_SCALE,
+              ]}
+              type={pickup.type}
+              picked={pickup.picked}
+            />
+          ))}
 
         <PlayerCharacter3D />
         <RemotePlayers />
 
-        <CameraController target={playerTargetRef.current} inputRef={inputRef} playerCharState={playerCharState} />
+        <CameraController
+          target={playerTargetRef.current}
+          inputRef={inputRef}
+          playerCharState={playerCharState}
+        />
         <GameLogic />
       </Canvas>
 
