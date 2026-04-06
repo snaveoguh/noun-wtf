@@ -145,11 +145,13 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
               child.name.includes('Throwable') ||
               child.name.includes('1H_') || child.name.includes('2H_') ||
-              child.name.includes('Left') || child.name.includes('left') ||
-              child.name.includes('.l') ||
+              child.name === 'Rogue_ArmLeft' ||
+              child.name === 'hand.l' || child.name === 'handslot.l' ||
+              child.name === 'wrist.l' || child.name === 'lowerarm.l' ||
+              child.name === 'upperarm.l' ||
               child.name === 'hand.r' ||
               child.name === 'Knife_Offhand') {
-            // Hide all weapon slots + left arm parts (broad match on Left/.l)
+            // Hide weapons + left arm (exact names only — don't match legs!)
             child.visible = false;
           }
           // Store chest/spine bone for safety vest attachment

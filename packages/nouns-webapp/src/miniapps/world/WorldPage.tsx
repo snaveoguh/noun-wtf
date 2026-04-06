@@ -1047,15 +1047,18 @@ export default function WorldPage() {
   const handleMicToggle = async () => {
     const voip = voipRef.current;
     if (!micEnabled) {
+      console.log('[VOIP] Requesting mic access...');
       const ok = await initVoip(voip);
+      console.log('[VOIP] Mic access:', ok ? 'granted' : 'denied');
       if (ok) {
         setMicEnabled(true);
         startSpeechToText(voip);
-        // Connect to all existing peers
         const mp = mpRef.current;
         for (const [id] of mp.remotePlayers) {
           if (mp.ws) callPeer(voip, id, mp.ws, mp.myId);
         }
+      } else {
+        alert('Mic access denied. Please allow microphone in browser settings.');
       }
     } else {
       toggleMute(voip);
