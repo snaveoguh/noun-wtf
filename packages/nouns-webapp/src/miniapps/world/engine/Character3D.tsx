@@ -142,12 +142,15 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         model.traverse((child: THREE.Object3D) => {
           if (child.name === 'Rogue_Head' || child.name === 'Rogue_Cape') child.visible = false;
           if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
-              child.name.includes('Throwable') || child.name.includes('handslot') ||
+              child.name.includes('Throwable') ||
               child.name.includes('1H_') || child.name.includes('2H_') ||
               child.name === 'Rogue_ArmLeft' ||
               child.name === 'hand.l' || child.name === 'wrist.l' ||
               child.name === 'lowerarm.l' || child.name === 'upperarm.l' ||
-              child.name === 'handslot.l') {
+              child.name === 'handslot.l' ||
+              child.name === 'hand.r' ||
+              child.name === 'Knife_Offhand') {
+            // Hide all weapon slots + left arm parts
             child.visible = false;
           }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
