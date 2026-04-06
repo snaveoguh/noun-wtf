@@ -13,9 +13,9 @@ import * as THREE from 'three';
 
 // ── Dimensions ──────────────────────────────────────────────────────
 
-const BUILDING_W = 3;
-const BUILDING_H = 8;
-const BUILDING_D = 2;
+const BUILDING_W = 4;
+const BUILDING_H = 14; // taller than the ramp (12) so stairs reach top
+const BUILDING_D = 3;
 
 // Position: right next to the mega ramp's east wall
 // MegaRamp is at RAMP_X=80, RAMP_Z=51.2, width=8
@@ -179,7 +179,7 @@ function FireEscapes() {
 function ExternalStairs() {
   const metalMat = <meshStandardMaterial color="#2a2a2a" metalness={0.8} roughness={0.3} />;
   const flights: Array<{ landingY: number; dir: number }> = [];
-  const flightCount = 6;
+  const flightCount = 10; // enough flights to reach the top of the building
   const flightHeight = BUILDING_H / flightCount;
 
   for (let i = 0; i < flightCount; i++) {
@@ -460,13 +460,13 @@ export function NYCApartmentBlock() {
       {/* Main building body */}
       <mesh>
         <boxGeometry args={[BUILDING_W, BUILDING_H, BUILDING_D]} />
-        <meshStandardMaterial color="#8B3A3A" roughness={0.92} metalness={0.02} />
+        <meshBasicMaterial color="#9B4A4A" />
       </mesh>
 
       {/* Darker depth layer — slightly smaller, offset for shadow depth */}
       <mesh position={[0, 0, 0.02]}>
         <boxGeometry args={[BUILDING_W - 0.04, BUILDING_H - 0.04, BUILDING_D - 0.04]} />
-        <meshStandardMaterial color="#6B2A2A" roughness={0.95} />
+        <meshBasicMaterial color="#7B3A3A" />
       </mesh>
 
       {/* Brick details on each face */}
