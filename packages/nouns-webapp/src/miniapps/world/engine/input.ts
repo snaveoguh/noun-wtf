@@ -88,10 +88,10 @@ export function attachInputListeners(canvas: HTMLCanvasElement, state: InputStat
 export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
   let fx = 0,
     fy = 0;
-  if (keys.has('w')) fy -= 1;
-  if (keys.has('s')) fy += 1;
-  if (keys.has('a')) fx -= 1;
-  if (keys.has('d')) fx += 1;
+  if (keys.has('w') || keys.has('arrowup')) fy -= 1;
+  if (keys.has('s') || keys.has('arrowdown')) fy += 1;
+  if (keys.has('a') || keys.has('arrowleft')) fx -= 1;
+  if (keys.has('d') || keys.has('arrowright')) fx += 1;
   if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
   if (fx !== 0 && fy !== 0) {
     const inv = 1 / Math.SQRT2;

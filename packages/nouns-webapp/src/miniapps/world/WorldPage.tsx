@@ -58,12 +58,9 @@ import {
   tickRemotePlayers,
   disconnectMultiplayer,
 } from './multiplayer/client';
-import {
-  buildNounGeometries,
-  seedToLayers,
-  type LayerVisibility as VoxelLayerVis,
-} from '@nouns/voxel-engine';
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { seedToAsciiVoxels, CharacterGroup } from '@/components/AsciiNoun';
+import type { AsciiVoxel } from '@/components/AsciiNoun';
+import { Html } from '@react-three/drei';
 // Spritesheet compositor available for future use
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
 import { createNPCs, type NPC } from './engine/npcs';
@@ -101,6 +98,15 @@ import {
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
 import { BirdFlocks, CloudLayer, AnimatedOcean, Dolphins } from './engine/Atmosphere';
+import { GraffitiUI } from './engine/GraffitiUI';
+import {
+  createPaintState,
+  spawnPaintCan,
+  checkPaintPickup,
+  getActivePaintCans,
+  type PaintCanState,
+  type PaintCan,
+} from './engine/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
 import { MegaRamp3D } from './engine/MegaRamp3D';
 import {
@@ -333,6 +339,182 @@ function Rocks() {
   );
 }
 
+// ── Graffiti wall positions (3D world coords) ───────────────────────────
+
+const GRAFFITI_WALLS = [
+  {
+    id: 'wall-north',
+    worldX: 50 * WORLD_SCALE,
+    worldZ: 30 * WORLD_SCALE,
+    rotation: 0,
+    label: 'YOUR TAG HERE',
+  },
+  {
+    id: 'wall-east',
+    worldX: 62 * WORLD_SCALE,
+    worldZ: 48 * WORLD_SCALE,
+    rotation: Math.PI / 2,
+    label: 'DEPOSIT TO NOUNIRL.ETH',
+  },
+  {
+    id: 'wall-south',
+    worldX: 46 * WORLD_SCALE,
+    worldZ: 60 * WORLD_SCALE,
+    rotation: Math.PI,
+    label: 'YOUR TAG HERE',
+  },
+  {
+    id: 'wall-west',
+    worldX: 28 * WORLD_SCALE,
+    worldZ: 44 * WORLD_SCALE,
+    rotation: -Math.PI / 2,
+    label: 'DEPOSIT TO NOUNIRL.ETH',
+  },
+  {
+    id: 'wall-northeast',
+    worldX: 58 * WORLD_SCALE,
+    worldZ: 34 * WORLD_SCALE,
+    rotation: Math.PI / 4,
+    label: 'YOUR TAG HERE',
+  },
+  {
+    id: 'wall-southwest',
+    worldX: 34 * WORLD_SCALE,
+    worldZ: 56 * WORLD_SCALE,
+    rotation: -Math.PI / 3,
+    label: 'DEPOSIT TO NOUNIRL.ETH',
+  },
+  {
+    id: 'wall-arena-l',
+    worldX: 42 * WORLD_SCALE,
+    worldZ: 40 * WORLD_SCALE,
+    rotation: 0.2,
+    label: 'YOUR TAG HERE',
+  },
+  {
+    id: 'wall-arena-r',
+    worldX: 54 * WORLD_SCALE,
+    worldZ: 52 * WORLD_SCALE,
+    rotation: -0.4,
+    label: 'DEPOSIT TO NOUNIRL.ETH',
+  },
+] as const;
+
+const WALL_NEAR_DISTANCE = 4;
+
+function GraffitiWalls() {
+  return (
+    <group>
+      {GRAFFITI_WALLS.map(wall => {
+        const y = getTerrainHeight(wall.worldX, wall.worldZ);
+        return (
+          <group
+            key={wall.id}
+            position={[wall.worldX, y + 1.8, wall.worldZ]}
+            rotation={[0, wall.rotation, 0]}
+          >
+            {/* Concrete wall slab */}
+            <mesh>
+              <planeGeometry args={[3.5, 3]} />
+              <meshStandardMaterial
+                color="#d4cfc4"
+                roughness={0.95}
+                metalness={0.02}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+            {/* Border frame behind */}
+            <mesh position={[0, 0, -0.02]}>
+              <planeGeometry args={[3.7, 3.2]} />
+              <meshStandardMaterial
+                color="#9a9488"
+                roughness={1}
+                metalness={0}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+            {/* Floating label text */}
+            <Html position={[0, 2, 0]} center distanceFactor={12} style={{ pointerEvents: 'none' }}>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#ff4444',
+                  textShadow: '0 0 6px rgba(255,68,68,0.6)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '2px',
+                  textAlign: 'center',
+                  userSelect: 'none',
+                }}
+              >
+                {wall.label}
+              </div>
+            </Html>
+            {/* Press G prompt */}
+            <Html
+              position={[0, -1.8, 0.1]}
+              center
+              distanceFactor={6}
+              style={{ pointerEvents: 'none' }}
+            >
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  color: '#aaa',
+                  textShadow: '0 0 4px rgba(0,0,0,0.8)',
+                  whiteSpace: 'nowrap',
+                  userSelect: 'none',
+                  opacity: 0.7,
+                }}
+              >
+                [G] SPRAY PAINT
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// ── Paint can pickup spawn positions ────────────────────────────────────
+
+const PAINT_CAN_SPAWNS: [number, number][] = [
+  [SPAWN_X + 60, SPAWN_Y - 40],
+  [SPAWN_X - 70, SPAWN_Y + 30],
+  [SPAWN_X + 30, SPAWN_Y + 70],
+  [SPAWN_X - 50, SPAWN_Y - 50],
+  [SPAWN_X + 90, SPAWN_Y + 10],
+  [SPAWN_X - 20, SPAWN_Y - 80],
+  [SPAWN_X + 10, SPAWN_Y + 100],
+  [SPAWN_X - 90, SPAWN_Y + 60],
+  [SPAWN_X + 70, SPAWN_Y - 70],
+  [SPAWN_X - 40, SPAWN_Y + 90],
+];
+
+function PaintCanPickup3D({
+  position,
+  color,
+}: {
+  position: [number, number, number];
+  color: string;
+}) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = clock.elapsedTime * 2.5;
+    ref.current.position.y = position[1] + Math.sin(clock.elapsedTime * 3) * 0.1;
+  });
+  return (
+    <mesh ref={ref} position={position}>
+      <boxGeometry args={[0.25, 0.35, 0.25]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+    </mesh>
+  );
+}
+
 // ── Crystal Ball Mountain ─────────────────────────────────────────────
 // A rocky peak in the deep ocean with a giant glass sphere containing
 // a slowly rotating voxel Noun.
@@ -430,27 +612,36 @@ function LavaCracks({
 }
 
 function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
-  const ballGroupRef = useRef<THREE.Group>(null);
+  const asciiGroupRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const pulseRef = useRef<THREE.PointLight>(null);
 
-  // Build the voxel Noun inside the ball
-  const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
+  // Build the ASCII voxels from the noun seed
+  const asciiVoxels = useMemo(() => {
     try {
-      const layers = seedToLayers(nounSeed, getNounData, ImageData.palette, DEFAULT_VIS);
-      return buildNounGeometries(layers);
+      return seedToAsciiVoxels(nounSeed);
     } catch {
-      return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
+      return [] as AsciiVoxel[];
     }
   }, [nounSeed]);
+
+  // Group voxels by character type for CharacterGroup rendering
+  const charGroups = useMemo(() => {
+    const groups = new Map<number, AsciiVoxel[]>();
+    for (const v of asciiVoxels) {
+      if (!groups.has(v.charIndex)) groups.set(v.charIndex, []);
+      groups.get(v.charIndex)!.push(v);
+    }
+    return Array.from(groups.entries());
+  }, [asciiVoxels]);
 
   const eyeY = MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5;
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (ballGroupRef.current) {
-      ballGroupRef.current.rotation.y = t * 0.4;
-      ballGroupRef.current.position.y = eyeY + Math.sin(t * 0.8) * 0.1;
+    if (asciiGroupRef.current) {
+      asciiGroupRef.current.rotation.y = t * 0.4;
+      asciiGroupRef.current.position.y = eyeY + 15 + Math.sin(t * 0.8) * 0.3;
     }
     if (ringRef.current) {
       ringRef.current.rotation.x = Math.PI / 2 + Math.sin(t * 0.6) * 0.05;
@@ -556,29 +747,185 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
         baseY={MOUNTAIN_HEIGHT * 0.3}
       />
 
-      {/* Rotating voxel Noun — MASSIVE in the sky, visible from everywhere */}
-      <group ref={ballGroupRef} position={[0, eyeY + 8, 0]} scale={[20, 20, 20]}>
-        {bodyGeo && (
-          <mesh geometry={bodyGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
-        )}
-        {blingGeo && (
-          <mesh geometry={blingGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
-        )}
-        {headGeo && (
-          <mesh geometry={headGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
-        )}
-        {glassesGeo && (
-          <mesh geometry={glassesGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
-        )}
+      {/* Floating ASCII Noun — MASSIVE in the sky above the Eye */}
+      <group ref={asciiGroupRef} position={[0, eyeY + 15, 0]} scale={[3, 3, 3]}>
+        {charGroups.map(([charIndex, group]) => (
+          <CharacterGroup key={charIndex} charIndex={charIndex} voxels={group} splitAmount={0} />
+        ))}
       </group>
+    </group>
+  );
+}
+
+// ── Venetian Boats — old weathered boats bobbing at the shoreline ─────
+
+const BOAT_POSITIONS: [number, number, number, number][] = [
+  [20 * TILE_SIZE * WORLD_SCALE, 8 * TILE_SIZE * WORLD_SCALE, 0.3, 0],
+  [60 * TILE_SIZE * WORLD_SCALE, 15 * TILE_SIZE * WORLD_SCALE, -0.8, 1.2],
+  [70 * TILE_SIZE * WORLD_SCALE, 50 * TILE_SIZE * WORLD_SCALE, 2.1, 2.5],
+  [15 * TILE_SIZE * WORLD_SCALE, 55 * TILE_SIZE * WORLD_SCALE, 1.4, 3.8],
+  [40 * TILE_SIZE * WORLD_SCALE, 68 * TILE_SIZE * WORLD_SCALE, -1.5, 5.1],
+];
+
+function VenetianBoat({
+  position,
+  rotationY = 0,
+  phase = 0,
+}: {
+  position: [number, number, number];
+  rotationY?: number;
+  phase?: number;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.elapsedTime + phase;
+    groupRef.current.position.y = position[1] + Math.sin(t * 0.7) * 0.06;
+    groupRef.current.rotation.z = Math.sin(t * 0.5) * 0.04;
+    groupRef.current.rotation.x = Math.sin(t * 0.3 + 1) * 0.02;
+  });
+
+  return (
+    <group ref={groupRef} position={position} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[0.3, 0.15, 1.2]} />
+        <meshStandardMaterial color="#6b3a1f" roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 0.02, 0.55]} scale={[0.6, 0.8, 0.4]}>
+        <boxGeometry args={[0.3, 0.12, 0.4]} />
+        <meshStandardMaterial color="#5a3018" roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 0.02, -0.55]} scale={[0.7, 0.8, 0.3]}>
+        <boxGeometry args={[0.3, 0.12, 0.4]} />
+        <meshStandardMaterial color="#5a3018" roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 0.08, 0]}>
+        <boxGeometry args={[0.32, 0.02, 1.1]} />
+        <meshStandardMaterial color="#4a2a12" roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.55, 0.1]}>
+        <cylinderGeometry args={[0.015, 0.02, 1.0, 6]} />
+        <meshStandardMaterial color="#4a2a12" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.05, 0.6, 0.1]} rotation={[0, 0.15, 0.08]}>
+        <planeGeometry args={[0.35, 0.55]} />
+        <meshStandardMaterial
+          color="#e8dcc8"
+          roughness={0.85}
+          side={THREE.DoubleSide}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+      <mesh position={[-0.02, 0.38, 0.1]} rotation={[0, -0.1, -0.05]}>
+        <planeGeometry args={[0.2, 0.25]} />
+        <meshStandardMaterial
+          color="#d4c9b0"
+          roughness={0.9}
+          side={THREE.DoubleSide}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function VenetianBoats() {
+  return (
+    <group>
+      {BOAT_POSITIONS.map(([x, z, rot, phase], i) => (
+        <VenetianBoat key={i} position={[x, -0.05, z]} rotationY={rot} phase={phase} />
+      ))}
+    </group>
+  );
+}
+
+// ── Gas Station — run-down abandoned structure ───────────────────────
+
+function GasStation({
+  position,
+  rotationY = 0,
+}: {
+  position: [number, number, number];
+  rotationY?: number;
+}) {
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, 0.3, 0]}>
+        <boxGeometry args={[1.0, 0.6, 0.8]} />
+        <meshStandardMaterial color="#b8b0a0" roughness={0.95} />
+      </mesh>
+      <mesh position={[0.25, 0.35, 0.401]}>
+        <boxGeometry args={[0.3, 0.2, 0.01]} />
+        <meshStandardMaterial color="#7a4422" roughness={1} />
+      </mesh>
+      <mesh position={[-0.2, 0.2, 0.401]}>
+        <boxGeometry args={[0.2, 0.15, 0.01]} />
+        <meshStandardMaterial color="#6b3a1a" roughness={1} />
+      </mesh>
+      <mesh position={[0.1, 0.45, -0.401]}>
+        <boxGeometry args={[0.35, 0.1, 0.01]} />
+        <meshStandardMaterial color="#7a4422" roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.72, 0.7]} rotation={[0.03, 0, -0.04]}>
+        <boxGeometry args={[1.4, 0.04, 1.0]} />
+        <meshStandardMaterial color="#8a8278" roughness={0.9} />
+      </mesh>
+      <mesh position={[-0.55, 0.4, 1.0]} rotation={[0, 0, 0.06]}>
+        <cylinderGeometry args={[0.025, 0.03, 0.7, 6]} />
+        <meshStandardMaterial color="#777" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.55, 0.38, 1.0]}>
+        <cylinderGeometry args={[0.025, 0.03, 0.7, 6]} />
+        <meshStandardMaterial color="#777" roughness={0.9} />
+      </mesh>
+      <group position={[-0.2, 0, 0.9]}>
+        <mesh position={[0, 0.2, 0]}>
+          <boxGeometry args={[0.12, 0.35, 0.1]} />
+          <meshStandardMaterial color="#cc3333" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.08, 0.35, 0]}>
+          <cylinderGeometry args={[0.008, 0.008, 0.15, 4]} />
+          <meshStandardMaterial color="#222" roughness={0.7} />
+        </mesh>
+      </group>
+      <group position={[0.2, 0, 0.9]}>
+        <mesh position={[0, 0.18, 0]}>
+          <boxGeometry args={[0.12, 0.32, 0.1]} />
+          <meshStandardMaterial color="#bb4444" roughness={0.85} />
+        </mesh>
+        <mesh position={[-0.07, 0.32, 0]}>
+          <cylinderGeometry args={[0.008, 0.008, 0.12, 4]} />
+          <meshStandardMaterial color="#222" roughness={0.7} />
+        </mesh>
+      </group>
+      <group position={[0, 0.95, 0.7]} rotation={[0, 0, 0.12]}>
+        <mesh>
+          <boxGeometry args={[0.5, 0.18, 0.02]} />
+          <meshStandardMaterial color="#d4c455" roughness={0.85} />
+        </mesh>
+        <Html position={[0, 0, 0.015]} transform occlude style={{ pointerEvents: 'none' }}>
+          <div
+            style={{
+              fontFamily: '"Courier New", monospace',
+              fontSize: '14px',
+              fontWeight: 900,
+              color: '#2a2a2a',
+              letterSpacing: '0.15em',
+              textShadow: '1px 1px 0 rgba(0,0,0,0.2)',
+              userSelect: 'none',
+            }}
+          >
+            GAS
+          </div>
+        </Html>
+      </group>
+      <mesh position={[0, 0.6, 0.7]}>
+        <cylinderGeometry args={[0.015, 0.02, 0.6, 5]} />
+        <meshStandardMaterial color="#666" roughness={0.9} />
+      </mesh>
     </group>
   );
 }
@@ -607,8 +954,6 @@ export function _Water() {
     </mesh>
   );
 }
-
-const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, glasses: true };
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
@@ -640,18 +985,9 @@ function CameraController({
   const angleY = useRef(0.12);
   const dist = useRef(1.5);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const input = inputRef.current;
     const pcs = playerCharState.current;
-
-    // Arrows pan freely
-    if (input) {
-      if (input.keys.has('arrowleft')) angleX.current += 1.5 * delta;
-      if (input.keys.has('arrowright')) angleX.current -= 1.5 * delta;
-      if (input.keys.has('arrowup')) angleY.current = Math.min(angleY.current + 0.8 * delta, 1.2);
-      if (input.keys.has('arrowdown'))
-        angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
-    }
 
     // Walking → zoom out, rise up, AND swing camera behind character
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
@@ -1252,6 +1588,12 @@ export default function WorldPage() {
     new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE),
   );
 
+  // ── Graffiti state ──
+  const paintRef = useRef<PaintCanState>(createPaintState());
+  const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
+  const [graffitiOpen, setGraffitiOpen] = useState(false);
+  const [graffitiWallId, setGraffitiWallId] = useState<string | null>(null);
+
   // HUD state — ref only, HUD component reads via DOM manipulation (no React re-renders)
   const hudRef = useRef({
     hp: PLAYER_MAX_HP,
@@ -1313,6 +1655,12 @@ export default function WorldPage() {
         .map(p => `${p.type}(${p.worldX},${p.worldY})`)
         .join(', '),
     );
+
+    // Spawn paint cans around the island
+    for (const [px, py] of PAINT_CAN_SPAWNS) {
+      spawnPaintCan(px, py);
+    }
+    setPaintCans([...getActivePaintCans()]);
 
     // Multiplayer
     const mp = mpRef.current;
@@ -1397,7 +1745,10 @@ export default function WorldPage() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (depositOpen) {
+        if (graffitiOpen) {
+          setGraffitiOpen(false);
+          setGraffitiWallId(null);
+        } else if (depositOpen) {
           setDepositOpen(false);
         } else {
           destroyVoip(voipRef.current);
@@ -1408,6 +1759,35 @@ export default function WorldPage() {
       // M = toggle mic
       if (e.key === 'm' || e.key === 'M') {
         handleMicToggle();
+      }
+      // G = open graffiti spray UI when near a wall and have paint
+      if ((e.key === 'g' || e.key === 'G') && !graffitiOpen) {
+        const p = playerRef.current;
+        if (!p) return;
+        const px = p.x * WORLD_SCALE;
+        const pz = p.y * WORLD_SCALE;
+        if (!paintRef.current.hasPaint) {
+          console.log('[Graffiti] No paint can — pick one up first!');
+          return;
+        }
+        // Find nearest wall
+        let nearestWall: (typeof GRAFFITI_WALLS)[number] | null = null;
+        let nearestDist = Infinity;
+        for (const wall of GRAFFITI_WALLS) {
+          const dist = Math.sqrt((px - wall.worldX) ** 2 + (pz - wall.worldZ) ** 2);
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestWall = wall;
+          }
+        }
+        if (nearestWall && nearestDist < WALL_NEAR_DISTANCE) {
+          setGraffitiWallId(nearestWall.id);
+          setGraffitiOpen(true);
+          console.log(`[Graffiti] Opening spray UI for ${nearestWall.id}`);
+        } else {
+          console.log('[Graffiti] No wall nearby — get closer to a wall!');
+        }
+        return;
       }
       if (e.key === 'e' || e.key === 'E') {
         const p = playerRef.current;
@@ -1433,7 +1813,7 @@ export default function WorldPage() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate, depositOpen, claimDrop, chestWorldX, chestWorldZ]);
+  }, [navigate, depositOpen, graffitiOpen, claimDrop, chestWorldX, chestWorldZ]);
 
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
@@ -1484,6 +1864,14 @@ export default function WorldPage() {
       }
       tickReload(weapon);
       tickMuzzleFlash(weapon);
+
+      // ── Paint can pickup check (auto on walk-over) ──
+      const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
+      if (paintPickedUp) {
+        playPickupSound();
+        setPaintCans([...getActivePaintCans()]);
+        console.log(`[Graffiti] Picked up ${paintPickedUp.color} paint can!`);
+      }
 
       // Footsteps disabled — too noisy
 
@@ -1823,6 +2211,11 @@ export default function WorldPage() {
         <Trees />
         <Rocks />
         <CrystalBallMountain nounSeed={auctionNounSeed ?? seed} />
+        <VenetianBoats />
+        <GasStation
+          position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
+          rotationY={-0.4}
+        />
 
         {/* Atmosphere */}
         <BirdFlocks />
@@ -1848,6 +2241,24 @@ export default function WorldPage() {
         />
         <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
         <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
+
+        {/* Graffiti walls */}
+        <GraffitiWalls />
+
+        {/* Paint can pickups */}
+        {paintCans
+          .filter(c => !c.picked)
+          .map(can => (
+            <PaintCanPickup3D
+              key={can.id}
+              position={[
+                can.worldX * WORLD_SCALE,
+                getTerrainHeight(can.worldX * WORLD_SCALE, can.worldY * WORLD_SCALE) + 0.3,
+                can.worldY * WORLD_SCALE,
+              ]}
+              color={can.color}
+            />
+          ))}
 
         {/* Mega Ramp */}
         <MegaRamp3D />
@@ -1905,6 +2316,40 @@ export default function WorldPage() {
 
       <HUDLive hudRef={hudRef} />
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+
+      {/* Graffiti spray paint overlay */}
+      {graffitiOpen && graffitiWallId && (
+        <GraffitiUI
+          billboardId={graffitiWallId}
+          playerId={mpRef.current.myId}
+          ws={mpRef.current.ws as WebSocket | null}
+          onClose={() => {
+            setGraffitiOpen(false);
+            setGraffitiWallId(null);
+          }}
+        />
+      )}
+
+      {/* Paint can HUD indicator */}
+      {paintRef.current.hasPaint && !graffitiOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: paintRef.current.color,
+            textShadow: '0 0 8px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+            zIndex: 20,
+            letterSpacing: '1px',
+          }}
+        >
+          SPRAY CAN EQUIPPED — FIND A WALL AND PRESS [G]
+        </div>
+      )}
     </div>
   );
 }

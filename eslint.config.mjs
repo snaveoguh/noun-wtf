@@ -255,7 +255,10 @@ export default defineConfig([
   // World miniapp — game code with R3F, Three.js, real-time loops.
   // Many standard React/TS rules produce false positives or are impractical here.
   {
-    files: ['**/packages/nouns-webapp/src/miniapps/world/**/*.{ts,tsx}'],
+    files: [
+      '**/packages/nouns-webapp/src/miniapps/world/**/*.{ts,tsx}',
+      '**/packages/nouns-webapp/src/components/AsciiNoun/**/*.{ts,tsx}',
+    ],
     rules: {
       'react/no-unknown-property': 'off',
       'import/order': 'off',
