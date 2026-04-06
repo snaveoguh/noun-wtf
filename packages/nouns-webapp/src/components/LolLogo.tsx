@@ -4,7 +4,7 @@ import { FC, memo } from 'react';
  * Pixel art "LOL" logo — Nouns red, pure CSS animation (no React re-renders).
  */
 const LolLogo: FC<{ className?: string }> = memo(({ className }) => {
-  const color = '#d5584d'; // Nouns red
+  const color = '#111111'; // Black
 
   const pixels = [
     // L (cols 0-1)

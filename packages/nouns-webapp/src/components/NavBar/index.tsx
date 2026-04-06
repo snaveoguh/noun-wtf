@@ -122,7 +122,7 @@ const NavBar = () => {
   return (
     <>
       <Navbar
-        expand="xl"
+        expand="md"
         style={{ backgroundColor: 'transparent' }}
         className={classes.navBarCustom}
         expanded={isNavExpanded}
@@ -179,7 +179,7 @@ const NavBar = () => {
             aria-controls="basic-navbar-nav"
             onClick={() => setIsNavExpanded(!isNavExpanded)}
           />
-          <Navbar.Collapse className="justify-content-end z-10">
+          <Navbar.Collapse className="justify-content-end z-10" style={{ visibility: 'visible' }}>
             <div className={clsx(responsiveUiUtilsClasses.mobileOnly)}>
               <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink} onClick={closeNav}>
                 <NavBarButton
@@ -213,20 +213,7 @@ const NavBar = () => {
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              <Nav.Link as={Link} to="/hackathons" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="Hack"
-                  buttonIcon={<FontAwesomeIcon icon={faPlay} />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link as={Link} to="/world" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="World"
-                  buttonIcon={<FontAwesomeIcon icon={faPlay} />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
+              {/* Hack + World in dropdown only, not mobile nav */}
             </div>
             <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
               {isDaoGteV3 ? (
