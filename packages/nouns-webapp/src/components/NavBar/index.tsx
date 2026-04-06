@@ -353,91 +353,10 @@ const NavBar = () => {
                 >
                   Studio
                 </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/dreams"
-                >
-                  Dreams
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/settlers"
-                >
-                  Settlers
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/stats"
-                >
-                  Stats
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/terraforms"
-                >
-                  Terraforms
-                </Dropdown.Item>
                 <Dropdown.Divider />
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/terminal"
-                >
-                  Terminal
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/feed"
-                >
-                  Feed
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/highway"
-                >
-                  Highway
-                </Dropdown.Item>
+                <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
+                <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
+                <Dropdown.Item href="/feed">Feed</Dropdown.Item>
               </NavDropdown>
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
