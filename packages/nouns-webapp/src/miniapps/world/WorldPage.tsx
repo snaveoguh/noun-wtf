@@ -11,7 +11,7 @@ import * as THREE from 'three';
 
 import { useAppSelector } from '@/hooks';
 
-import { SEND_INTERVAL, TILE_SIZE, MAP_SIZE, PLAYER_MAX_HP } from './engine/types';
+import { SEND_INTERVAL, TILE_SIZE, MAP_SIZE, PLAYER_MAX_HP, DIRECTION_ROTATION, DIRECTION_FACING_ANGLE } from './engine/types';
 import type { Player, Direction, PlayerState } from './engine/types';
 import {
   createInputState,
@@ -942,7 +942,7 @@ export default function WorldPage() {
         const intendedMove = resolveIntendedMove(input);
         if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
           // Use player facing direction for attack direction
-          const facingAngle = player.direction === 'up' ? -Math.PI / 2 : player.direction === 'down' ? Math.PI / 2 : player.direction === 'left' ? Math.PI : 0;
+          const facingAngle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
           const angle = facingAngle;
           const mouseWorldX = player.x + Math.cos(angle) * 50;
           const mouseWorldY = player.y + Math.sin(angle) * 50;
@@ -1010,9 +1010,10 @@ export default function WorldPage() {
           console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
         }
         // Update spatial audio listener position
+        const rot = DIRECTION_ROTATION[player.direction] ?? 0;
         updateListenerPosition(voip, player.x * WORLD_SCALE, 0, player.y * WORLD_SCALE,
-          Math.sin(player.direction === 'up' ? Math.PI : player.direction === 'down' ? 0 : player.direction === 'left' ? Math.PI * 1.5 : Math.PI * 0.5),
-          Math.cos(player.direction === 'up' ? Math.PI : player.direction === 'down' ? 0 : player.direction === 'left' ? Math.PI * 1.5 : Math.PI * 0.5),
+          Math.sin(rot),
+          Math.cos(rot),
         );
         // Update spatial positions for remote players
         for (const [id, rp] of mp.remotePlayers) {

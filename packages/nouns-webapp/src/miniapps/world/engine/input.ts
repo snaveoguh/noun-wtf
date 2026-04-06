@@ -4,12 +4,13 @@
 // Arrow keys = camera pan
 // J = punch, K = kick, H = headbutt, U = uppercut
 // Q = force push, R = spin attack
+// F = fire weapon (when gun equipped)
 // Space = backflip (+ direction = dash)
 // Shift = block/parry
 // E = interact
 // ESC = exit
 
-import type { MoveType } from './types';
+import type { Direction, MoveType } from './types';
 
 export interface InputState {
   keys: Set<string>;
@@ -120,18 +121,24 @@ export function updateCameraOrbit(state: InputState, delta: number) {
   }
 }
 
-/** Determine facing direction from movement delta */
-export function directionFromDelta(dx: number, dy: number): 'up' | 'down' | 'left' | 'right' {
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0 ? 'right' : 'left';
+/** Determine facing direction from movement delta (8-way) */
+export function directionFromDelta(dx: number, dy: number): Direction {
+  if (dx === 0 && dy === 0) return 'down'; // fallback
+  // Both axes active -> diagonal
+  if (dx !== 0 && dy !== 0) {
+    if (dy < 0) return dx < 0 ? 'up-left' : 'up-right';
+    return dx < 0 ? 'down-left' : 'down-right';
   }
-  return dy >= 0 ? 'down' : 'up';
+  // Single axis -> cardinal
+  if (dx !== 0) return dx > 0 ? 'right' : 'left';
+  return dy > 0 ? 'down' : 'up';
 }
 
 /** Resolve combat move from keyboard (no mouse) */
 export function resolveIntendedMove(input: InputState): MoveType | null {
   const jp = input.justPressed;
 
+  if (jp.has('f')) return 'gunshot';
   if (jp.has('h')) return 'headbutt';
   if (jp.has('q')) return 'forcePush';
   if (jp.has('r')) return 'spinAttack';

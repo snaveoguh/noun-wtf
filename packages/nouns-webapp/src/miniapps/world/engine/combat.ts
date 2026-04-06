@@ -23,6 +23,9 @@ import {
   BACKFLIP_DURATION,
   DASH_DURATION,
   DASH_SPEED,
+  WOUNDED_DURATION,
+  KNOCKED_DURATION,
+  GUNSHOT_RESPAWN_TIME,
 } from './types';
 import { MOVE_DEFS, resolveDamage } from './moves';
 import { registerHit, tickCombo } from './combo';
@@ -82,6 +85,9 @@ export function createPlayer(
     comboHits: 0,
     comboTimer: 0,
     lastMoves: [],
+    knockedTimer: 0,
+    woundedTimer: 0,
+    consecutiveGunshots: 0,
     flipRotation: 0,
     scaleX: 1,
     hitFlash: 0,
@@ -149,8 +155,12 @@ export function executeMove(
   const def = MOVE_DEFS[move];
   if (!def) return [];
 
-  // Can't act while stunned or dead
-  if (player.state === 'stunned' || player.state === 'dead' || player.state === 'respawning') {
+  // Can't act while stunned, dead, knocked down, or wounded
+  if (
+    player.state === 'stunned' || player.state === 'dead' ||
+    player.state === 'respawning' || player.state === 'knocked' ||
+    player.state === 'wounded'
+  ) {
     return [];
   }
 
@@ -320,7 +330,7 @@ export function applyDamageToPlayer(
       spawnHitSparks(combat.particles, player.x, player.y, 15);
       spawnSpecialText(combat.floatingTexts, player.x, player.y, 'PARRY!');
       combat.shake = createScreenShake(4, 8);
-      return false; // no damage, caller should get reflected hit
+      return false;
     }
     // Normal block
     actualDamage = Math.round(damage * BLOCK_REDUCTION);
@@ -329,17 +339,90 @@ export function applyDamageToPlayer(
 
   player.hp = Math.max(0, player.hp - actualDamage);
   player.hitFlash = 1;
+
+  // ── Knockback is now subtle — just a slight push ──
   player.vx += knockX;
   player.vy += knockY;
 
-  // Stun
   const def = MOVE_DEFS[attackMove];
-  if (def && player.state !== 'blocking') {
-    player.stunTimer = def.stunDuration;
-    player.state = 'stunned';
+
+  // ── Headshot = instant kill ──
+  if (attackMove === 'headshot') {
+    player.hp = 0;
+    player.state = 'dead';
+    player.attackType = 'headshot'; // signals Death_B animation
+    player.deathTimer = 60;
+    player.consecutiveGunshots = 0;
+    spawnDeathExplosion(combat.particles, player.x, player.y);
+    spawnSpecialText(combat.floatingTexts, player.x, player.y - 20, 'HEADSHOT');
+    combat.shake = createScreenShake(10, 18);
+    combat.slowMo = createSlowMo(0.2, 10);
+    return true;
   }
 
-  // Launch if uppercut
+  // ── Gunshot = collapse to one knee ──
+  if (attackMove === 'gunshot') {
+    player.consecutiveGunshots++;
+
+    if (player.consecutiveGunshots >= 2) {
+      // Two gunshots = death
+      player.hp = 0;
+      player.state = 'dead';
+      player.attackType = null; // uses Death_A
+      player.deathTimer = GUNSHOT_RESPAWN_TIME;
+      player.consecutiveGunshots = 0;
+      spawnDeathExplosion(combat.particles, player.x, player.y);
+      spawnSpecialText(combat.floatingTexts, player.x, player.y - 20, 'EXECUTED');
+      combat.shake = createScreenShake(8, 15);
+      combat.slowMo = createSlowMo(0.3, 8);
+      return true;
+    }
+
+    // First gunshot: collapse to one knee (wounded state)
+    player.state = 'wounded';
+    player.woundedTimer = WOUNDED_DURATION;
+    player.stunTimer = 0; // wounded overrides stun
+    spawnHitSparks(combat.particles, player.x, player.y, 10);
+    spawnDamageText(combat.floatingTexts, player.x, player.y, actualDamage, false);
+    combat.shake = createScreenShake(4, 8);
+    return false;
+  }
+
+  // ── Melee hits: reset gunshot counter (only consecutive gunshots count) ──
+  player.consecutiveGunshots = 0;
+
+  // ── 3-hit combo knockdown ──
+  // comboHits is tracked on the ATTACKER, but we check the victim's
+  // recent received hits. Use stunTimer accumulation as a proxy:
+  // if the player is already stunned and gets hit again, count toward knockdown.
+  if (player.state === 'stunned' || player.state === 'knocked') {
+    // Already reeling — this hit stacks
+  }
+
+  // Check if this is a combo-worthy situation (attacker's combo is in HitResult)
+  // The combo count is passed via the damage multiplier from the attacker side.
+  // For the victim, track consecutive hits received while stunned.
+  if (def && player.state !== 'blocking') {
+    player.stunTimer += def.stunDuration;
+
+    // If accumulated stun exceeds threshold, it's a combo knockdown
+    if (player.stunTimer >= 20 && player.state === 'stunned') {
+      // 3-hit combo knockdown — play Death_A at 0.5x, auto-stand after 2 seconds
+      player.state = 'knocked';
+      player.knockedTimer = KNOCKED_DURATION;
+      player.stunTimer = 0;
+      player.vx *= 0.3; // slow to a crawl
+      player.vy *= 0.3;
+      spawnSpecialText(combat.floatingTexts, player.x, player.y - 20, 'KNOCKDOWN');
+      spawnGroundSlamWave(combat.particles, player.x, player.y + 16);
+      combat.shake = createScreenShake(6, 12);
+      combat.slowMo = createSlowMo(0.4, 6);
+    } else if (player.state !== 'knocked') {
+      player.state = 'stunned';
+    }
+  }
+
+  // Launch if uppercut (still works but with reduced knockback)
   if (def && def.launchVy < 0 && player.airborneY >= GROUND_Y) {
     player.airborneVy = def.launchVy;
     player.airborneY = -1;
@@ -356,7 +439,7 @@ export function applyDamageToPlayer(
     spawnDeathExplosion(combat.particles, player.x, player.y);
     combat.shake = createScreenShake(8, 15);
     combat.slowMo = createSlowMo(0.3, 8);
-    return true; // player died
+    return true;
   }
 
   return false;
@@ -397,6 +480,42 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
       player.iFrames = 60; // spawn protection
       player.airborneY = GROUND_Y;
       player.airborneVy = 0;
+      player.knockedTimer = 0;
+      player.woundedTimer = 0;
+      player.consecutiveGunshots = 0;
+      player.attackType = null;
+    }
+    return;
+  }
+
+  // ── Knocked down (3-hit combo) — on the ground, auto-stand after delay ──
+  if (player.state === 'knocked') {
+    player.knockedTimer--;
+    applyFriction(player, 0.95);
+    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
+    player.x = pos.x;
+    player.y = pos.y;
+    if (player.knockedTimer <= 0) {
+      // Auto-stand — back to idle with brief i-frames
+      player.state = 'idle';
+      player.knockedTimer = 0;
+      player.stunTimer = 0;
+      player.iFrames = 30; // half-second get-up protection
+    }
+    return;
+  }
+
+  // ── Wounded (gunshot knee collapse) — held pose, then recover ──
+  if (player.state === 'wounded') {
+    player.woundedTimer--;
+    applyFriction(player, 0.95);
+    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
+    player.x = pos.x;
+    player.y = pos.y;
+    if (player.woundedTimer <= 0) {
+      player.state = 'idle';
+      player.woundedTimer = 0;
+      player.iFrames = 20; // brief recovery protection
     }
     return;
   }
@@ -518,8 +637,9 @@ export function applyHitToRemote(
 ) {
   remote.hp = Math.max(0, remote.hp - damage);
   remote.hitFlash = 1;
-  remote.targetX += knockX * 2;
-  remote.targetY += knockY * 2;
+  // Subtle knockback — no flying across the map
+  remote.targetX += knockX;
+  remote.targetY += knockY;
 
   spawnHitSparks(combat.particles, remote.x, remote.y, 8);
   spawnDamageText(combat.floatingTexts, remote.x, remote.y, damage, false);
@@ -527,6 +647,22 @@ export function applyHitToRemote(
   const def = MOVE_DEFS[move];
   if (def && def.launchVy < 0) {
     remote.airborneY = -20;
+  }
+
+  // Gunshot: show wounded state on remote
+  if (move === 'gunshot' && remote.hp > 0) {
+    remote.state = 'wounded';
+  }
+
+  // Headshot: instant kill on remote
+  if (move === 'headshot') {
+    remote.hp = 0;
+    remote.state = 'dead';
+    spawnDeathExplosion(combat.particles, remote.x, remote.y);
+    spawnSpecialText(combat.floatingTexts, remote.x, remote.y - 20, 'HEADSHOT');
+    combat.shake = createScreenShake(10, 18);
+    combat.slowMo = createSlowMo(0.2, 10);
+    return;
   }
 
   if (remote.hp <= 0) {
