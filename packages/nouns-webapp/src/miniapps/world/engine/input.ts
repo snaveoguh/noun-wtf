@@ -83,21 +83,28 @@ export function attachInputListeners(canvas: HTMLCanvasElement, state: InputStat
   };
 }
 
-/** WASD movement — world-relative. W=north, S=south, A=west, D=east.
- *  Camera follows behind separately — no feedback loop. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function getMovementVector(keys: Set<string>, _cameraAngle = 0): { dx: number; dy: number } {
-  let dx = 0,
-    dy = 0;
-  if (keys.has('w')) dy -= 1;
-  if (keys.has('s')) dy += 1;
-  if (keys.has('a')) dx -= 1;
-  if (keys.has('d')) dx += 1;
-  if (dx !== 0 && dy !== 0) {
+/** WASD movement — camera-relative. W=forward (into screen), A/D=strafe.
+ *  Camera angle rotates the raw input so W always means "forward from camera." */
+export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
+  let fx = 0,
+    fy = 0;
+  if (keys.has('w')) fy -= 1;
+  if (keys.has('s')) fy += 1;
+  if (keys.has('a')) fx -= 1;
+  if (keys.has('d')) fx += 1;
+  if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
+  if (fx !== 0 && fy !== 0) {
     const inv = 1 / Math.SQRT2;
-    dx *= inv;
-    dy *= inv;
+    fx *= inv;
+    fy *= inv;
   }
+  // Rotate raw input by camera orbit angle
+  // cam at angle a sits at (sin(a), cos(a)), looks toward origin
+  // "forward" (W, fy<0) = toward player from cam = (-sin(a), -cos(a)) in 2D
+  const cos = Math.cos(cameraAngle);
+  const sin = Math.sin(cameraAngle);
+  const dx = fy * sin + fx * cos;
+  const dy = fy * cos - fx * sin;
   return { dx, dy };
 }
 
