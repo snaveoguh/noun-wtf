@@ -646,8 +646,8 @@ function CameraController({
 
     // Arrows pan freely
     if (input) {
-      if (input.keys.has('arrowleft')) angleX.current -= 1.5 * delta;
-      if (input.keys.has('arrowright')) angleX.current += 1.5 * delta;
+      if (input.keys.has('arrowleft')) angleX.current += 1.5 * delta;
+      if (input.keys.has('arrowright')) angleX.current -= 1.5 * delta;
       if (input.keys.has('arrowup')) angleY.current = Math.min(angleY.current + 0.8 * delta, 1.2);
       if (input.keys.has('arrowdown'))
         angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
@@ -668,7 +668,7 @@ function CameraController({
       // Normalize to [-PI, PI]
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      angleX.current += diff * 0.06; // smooth follow
+      angleX.current += diff * 0.15; // tight follow behind character
     }
 
     const d = dist.current;
