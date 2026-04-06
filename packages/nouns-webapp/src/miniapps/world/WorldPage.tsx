@@ -616,14 +616,14 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 // Camera orbit: angle 0 = +Z side, PI = -Z side
 // "up" = walking toward -Z, so camera BEHIND = at +Z = angle 0
 const BEHIND_ANGLE: Record<string, number> = {
-  up: Math.PI,
-  down: 0,
+  up: 0,
+  down: Math.PI,
   left: Math.PI * 0.5,
   right: -Math.PI * 0.5,
-  'up-left': Math.PI * 0.75,
-  'up-right': -Math.PI * 0.75,
-  'down-left': Math.PI * 0.25,
-  'down-right': -Math.PI * 0.25,
+  'up-left': Math.PI * 0.25,
+  'up-right': -Math.PI * 0.25,
+  'down-left': Math.PI * 0.75,
+  'down-right': -Math.PI * 0.75,
 };
 
 function CameraController({
