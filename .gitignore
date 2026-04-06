@@ -17,3 +17,5 @@ dist
 .turbo
 .cache
 i18n.cache
+packages/nouns-contracts/broadcast/
+packages/nouns-contracts/foundry-cache/
