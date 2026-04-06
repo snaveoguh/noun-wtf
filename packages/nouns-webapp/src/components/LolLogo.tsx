@@ -1,61 +1,11 @@
-import { FC, useEffect, useRef, useState } from 'react';
-
-// Red → yellow gradient, 30 steps for ~30 second full cycle
-const PALETTE = Array.from({ length: 30 }, (_, i) => {
-  const t = i / 29; // 0 to 1
-  const r = 213;
-  const g = Math.round(60 + t * 179); // 60 → 239
-  const b = Math.round(94 - t * 56);  // 94 → 38
-  return `rgb(${r},${g},${b})`;
-});
+import { FC, memo } from 'react';
 
 /**
- * Pixel art "LOL" logo — classic Nouns accessory proportions.
- * L = 2w x 3h, O = 2w x 3h, 1px gap between letters.
- * Colors drift very slowly through the Nouns palette.
- * On hover: reverses direction and slows further.
+ * Pixel art "LOL" logo — Nouns red, pure CSS animation (no React re-renders).
  */
-const LolLogo: FC<{ className?: string }> = ({ className }) => {
-  const [colorIndex, setColorIndex] = useState(0);
-  const [hovered, setHovered] = useState(false);
-  const directionRef = useRef(1);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+const LolLogo: FC<{ className?: string }> = memo(({ className }) => {
+  const color = '#d5584d'; // Nouns red
 
-  useEffect(() => {
-    const tick = () => {
-      setColorIndex(prev => {
-        const next = prev + directionRef.current;
-        if (next >= PALETTE.length) {
-          directionRef.current = -1;
-          return PALETTE.length - 2;
-        }
-        if (next < 0) {
-          directionRef.current = 1;
-          return 1;
-        }
-        return next;
-      });
-    };
-
-    // ~1s per step = ~30s full cycle, even slower on hover
-    const speed = hovered ? 3000 : 1000;
-    intervalRef.current = setInterval(tick, speed);
-    return () => clearInterval(intervalRef.current);
-  }, [hovered]);
-
-  const handleMouseEnter = () => {
-    directionRef.current = -directionRef.current;
-    setHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    setHovered(false);
-  };
-
-  const color = PALETTE[colorIndex] || PALETTE[0];
-
-  // L = 2w x 3h, O = 2w x 3h, 1px gap between each letter
-  // L: cols 0-1, O: cols 3-4, L: cols 6-7 → 8 wide, 3 tall
   const pixels = [
     // L (cols 0-1)
     [0,0], [0,1], [0,2], [1,2],
@@ -73,8 +23,6 @@ const LolLogo: FC<{ className?: string }> = ({ className }) => {
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className={className}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       style={{ cursor: 'pointer' }}
       aria-label="LOL"
     >
@@ -86,11 +34,12 @@ const LolLogo: FC<{ className?: string }> = ({ className }) => {
           width={pixelSize}
           height={pixelSize}
           fill={color}
-          style={{ transition: 'fill 1.5s ease' }}
         />
       ))}
     </svg>
   );
-};
+});
+
+LolLogo.displayName = 'LolLogo';
 
 export default LolLogo;
