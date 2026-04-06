@@ -1522,6 +1522,28 @@ export default function WorldPage() {
   // Fetch the auction Noun's seed for the crystal ball
   const auctionNounSeed = useNounSeed(BigInt(lastAuctionNounId ?? 0));
 
+  // Poll /api/agent/predict for the NEXT noun that would be settled right now
+  const [predictedSeed, setPredictedSeed] = useState<INounSeed | null>(null);
+  useEffect(() => {
+    const apiUrl =
+      (import.meta.env.VITE_API_URL as string | undefined) ??
+      'https://spirited-flexibility-production-3c30.up.railway.app';
+    const fetchPrediction = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/agent/predict`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.seed) setPredictedSeed(data.seed);
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchPrediction();
+    const interval = setInterval(fetchPrediction, 12_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   // Play intro music on first load
@@ -2210,7 +2232,7 @@ export default function WorldPage() {
         <Terrain />
         <Trees />
         <Rocks />
-        <CrystalBallMountain nounSeed={auctionNounSeed ?? seed} />
+        <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
         <VenetianBoats />
         <GasStation
           position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
