@@ -29,6 +29,7 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
+import { traitName } from '@/lib/traitName';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
 import { nounPath } from '@/utils/history';
@@ -1021,15 +1022,29 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       );
     }
 
+    // Generate a haiku from the Noun's traits
+    const traitHaiku = (() => {
+      if (!currentNounSeed) return { l1: 'Pixels come alive', l2: 'One noun born every day', l3: 'Forever onchain' };
+      const headName = traitName('head', currentNounSeed.head).replace('head-', '').replace(/-/g, ' ');
+      const bodyName = traitName('body', currentNounSeed.body).replace('body-', '').replace(/-/g, ' ');
+      const accName = traitName('accessory', currentNounSeed.accessory).replace('accessory-', '').replace(/-/g, ' ');
+      // Simple deterministic haiku from trait words
+      const haikus = [
+        { l1: `A ${headName}`, l2: `Dressed in ${bodyName} warmth`, l3: `${accName} dreams` },
+        { l1: `${headName} watches`, l2: `Through noggles, ${bodyName}`, l3: `${accName} in hand` },
+        { l1: `Born from the chain`, l2: `${headName}, ${bodyName}`, l3: `${accName} forever` },
+      ];
+      return haikus[currentNounId % haikus.length];
+    })();
+
     return (
       <div className={classes.metaCard}>
-        <p className={classes.metaEyebrow}>Above The Fold</p>
-        <h3 className={classes.metaTitle}>Noun #{currentNounId}</h3>
-        <p className={classes.metaBody}>
-          {is3dView
-            ? 'Scroll first, then grab, twist, or edit when you want to take over the stage.'
-            : 'Scroll first, then grab or edit when you want to take over the stage.'}
-        </p>
+        <p className={classes.metaEyebrow}>Noun #{currentNounId}</p>
+        <div style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: '1.05rem', lineHeight: 1.8, color: '#555', padding: '8px 0' }}>
+          <div>{traitHaiku.l1}</div>
+          <div>{traitHaiku.l2}</div>
+          <div>{traitHaiku.l3}</div>
+        </div>
       </div>
     );
   };
