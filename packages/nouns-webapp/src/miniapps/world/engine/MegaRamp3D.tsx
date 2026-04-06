@@ -42,8 +42,8 @@ const RAMP_X = 50 * TILE_SIZE * WORLD_SCALE; // 80
 const RAMP_Z = 32 * TILE_SIZE * WORLD_SCALE; // 51.2
 const RAMP_Y = 0;
 
-// Portal
-const PORTAL_RADIUS = 1.8;
+// Portal — big enough you can't miss it
+const PORTAL_RADIUS = 4.5;
 
 // Hoverboard
 const HOVER_COLOR = '#00ffcc';
@@ -80,13 +80,13 @@ function createMegaRampGeometry(): THREE.BufferGeometry {
 
       // Steep drop profile: almost vertical at top, smooth curve at bottom
       const curveT = 1 - Math.pow(1 - t, 1.8);
-      const y = RAMP_HEIGHT * Math.sin(curveT * Math.PI / 2);
+      const y = RAMP_HEIGHT * Math.sin((curveT * Math.PI) / 2);
 
       // Surface normal
       const dt = 0.001;
       const t2 = Math.min(1, t + dt);
       const curveT2 = 1 - Math.pow(1 - t2, 1.8);
-      const y2 = RAMP_HEIGHT * Math.sin(curveT2 * Math.PI / 2);
+      const y2 = RAMP_HEIGHT * Math.sin((curveT2 * Math.PI) / 2);
       const dydz = (y2 - y) / (dt * RAMP_LENGTH);
       const nLen = Math.sqrt(1 + dydz * dydz);
 
@@ -115,7 +115,7 @@ function createMegaRampGeometry(): THREE.BufferGeometry {
       const t = i / CURVE_SEGMENTS;
       const z = -RAMP_LENGTH / 2 + t * RAMP_LENGTH;
       const curveT = 1 - Math.pow(1 - t, 1.8);
-      const y = RAMP_HEIGHT * Math.sin(curveT * Math.PI / 2) - thickness;
+      const y = RAMP_HEIGHT * Math.sin((curveT * Math.PI) / 2) - thickness;
 
       positions.push(xPos, y, z);
       normals.push(0, -1, 0);
@@ -160,7 +160,7 @@ function LaunchKicker() {
       </mesh>
       {/* Side supports */}
       {[-1, 1].map(side => (
-        <mesh key={side} position={[side * RAMP_WIDTH / 2, KICKER_HEIGHT / 4, 0]}>
+        <mesh key={side} position={[(side * RAMP_WIDTH) / 2, KICKER_HEIGHT / 4, 0]}>
           <boxGeometry args={[0.3, KICKER_HEIGHT / 2, KICKER_LENGTH]} />
           <meshStandardMaterial color="#555555" roughness={0.7} />
         </mesh>
@@ -291,10 +291,7 @@ function MegaStairs() {
       {steps.map((step, i) => (
         <mesh key={i} position={[0, step.y, step.z]}>
           <boxGeometry args={[stepWidth, stepHeight, stepDepth]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? '#707070' : '#7a7a7a'}
-            roughness={0.8}
-          />
+          <meshStandardMaterial color={i % 2 === 0 ? '#707070' : '#7a7a7a'} roughness={0.8} />
         </mesh>
       ))}
       {/* Railing */}
@@ -404,11 +401,21 @@ function TeleportPortal({ position }: { position: [number, number, number] }) {
 function GraffitiPatches({ wallHeight, wallLength }: { wallHeight: number; wallLength: number }) {
   const patches = useMemo(() => {
     const colors = [
-      '#e74c3c', '#f39c12', '#2ecc71', '#3498db', '#9b59b6',
-      '#e91e63', '#ff5722', '#00bcd4', '#ffeb3b', '#4caf50',
-      '#ff6f00', '#7c4dff',
+      '#e74c3c',
+      '#f39c12',
+      '#2ecc71',
+      '#3498db',
+      '#9b59b6',
+      '#e91e63',
+      '#ff5722',
+      '#00bcd4',
+      '#ffeb3b',
+      '#4caf50',
+      '#ff6f00',
+      '#7c4dff',
     ];
-    const arr: Array<{ x: number; y: number; w: number; h: number; color: string; rot: number }> = [];
+    const arr: Array<{ x: number; y: number; w: number; h: number; color: string; rot: number }> =
+      [];
     for (let i = 0; i < 18; i++) {
       const seed = Math.sin(i * 127.1 + 311.7) * 43758.5453;
       const frac = seed - Math.floor(seed);
@@ -448,7 +455,11 @@ interface HoverboardPickup3DProps {
   playerDistance?: number;
 }
 
-export function HoverboardPickup3D({ position, onPickup, playerDistance }: HoverboardPickup3DProps) {
+export function HoverboardPickup3D({
+  position,
+  onPickup,
+  playerDistance,
+}: HoverboardPickup3DProps) {
   const groupRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.PointLight>(null);
 
@@ -622,11 +633,7 @@ export function HoverboardAttachment({ speed, crouching, surfaceTilt }: Hoverboa
         {[-0.12, 0.12].map(x => (
           <mesh key={`thruster-${x}`} position={[x, -0.06, 0]}>
             <sphereGeometry args={[0.025, 8, 8]} />
-            <meshBasicMaterial
-              color="#ffffff"
-              transparent
-              opacity={0.8}
-            />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.8} />
           </mesh>
         ))}
 
@@ -663,7 +670,7 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
   useFrame(() => {
     if (!playerPosition || !onPortalEnter) return;
     const portalWorldX = RAMP_X;
-    const portalWorldZ = RAMP_Z - RAMP_LENGTH / 2 - 1;
+    const portalWorldZ = RAMP_Z - RAMP_LENGTH / 2 - 6;
     const dx = playerPosition[0] - portalWorldX;
     const dz = playerPosition[2] - portalWorldZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
@@ -722,14 +729,20 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
       </mesh>
       {/* Safety railing — sides */}
       {[-1, 1].map(side => (
-        <mesh key={`rail-side-${side}`} position={[side * (RAMP_WIDTH / 2 + 1.3), RAMP_HEIGHT + 0.7, RAMP_LENGTH / 2 + 2]}>
+        <mesh
+          key={`rail-side-${side}`}
+          position={[side * (RAMP_WIDTH / 2 + 1.3), RAMP_HEIGHT + 0.7, RAMP_LENGTH / 2 + 2]}
+        >
           <boxGeometry args={[0.1, 1.0, 4]} />
           <meshStandardMaterial color="#444444" metalness={0.6} roughness={0.3} />
         </mesh>
       ))}
       {/* Railing posts */}
       {[-1, 0, 1].map(i => (
-        <mesh key={`top-post-${i}`} position={[i * (RAMP_WIDTH / 3), RAMP_HEIGHT + 0.5, RAMP_LENGTH / 2 + 3.8]}>
+        <mesh
+          key={`top-post-${i}`}
+          position={[i * (RAMP_WIDTH / 3), RAMP_HEIGHT + 0.5, RAMP_LENGTH / 2 + 3.8]}
+        >
           <cylinderGeometry args={[0.05, 0.05, 1.0, 6]} />
           <meshStandardMaterial color="#555555" metalness={0.5} roughness={0.4} />
         </mesh>
@@ -746,8 +759,8 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
           const z1 = -RAMP_LENGTH / 2 + t1 * RAMP_LENGTH;
           const curveT0 = 1 - Math.pow(1 - t0, 1.8);
           const curveT1 = 1 - Math.pow(1 - t1, 1.8);
-          const y0 = RAMP_HEIGHT * Math.sin(curveT0 * Math.PI / 2) + 0.18;
-          const y1 = RAMP_HEIGHT * Math.sin(curveT1 * Math.PI / 2) + 0.18;
+          const y0 = RAMP_HEIGHT * Math.sin((curveT0 * Math.PI) / 2) + 0.18;
+          const y1 = RAMP_HEIGHT * Math.sin((curveT1 * Math.PI) / 2) + 0.18;
           const midZ = (z0 + z1) / 2;
           const midY = (y0 + y1) / 2;
           const angle = Math.atan2(y1 - y0, z1 - z0);
@@ -755,7 +768,7 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
         }
         return railSegs.map((seg, i) => (
           <mesh key={`rail-${i}`} position={seg.pos} rotation={[seg.rot, 0, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, RAMP_LENGTH / segCount * 1.05, 8]} />
+            <cylinderGeometry args={[0.05, 0.05, (RAMP_LENGTH / segCount) * 1.05, 8]} />
             <meshStandardMaterial color="#bbbbbb" metalness={0.85} roughness={0.12} />
           </mesh>
         ));
@@ -765,26 +778,38 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
       {(() => {
         const midT = 0.5;
         const curveT = 1 - Math.pow(1 - midT, 1.8);
-        const midY = RAMP_HEIGHT * Math.sin(curveT * Math.PI / 2) + 0.8;
+        const midY = RAMP_HEIGHT * Math.sin((curveT * Math.PI) / 2) + 0.8;
         return <GiantNoggles position={[0, midY, 0]} />;
       })()}
 
       {/* ── 50+ Stairs on the right side ── */}
       <MegaStairs />
 
-      {/* ── Teleport portal at the bottom ── */}
-      <TeleportPortal position={[0, PORTAL_RADIUS + 0.4, -RAMP_LENGTH / 2 - 1]} />
+      {/* ── Teleport portal at the launch edge — impossible to miss ── */}
+      <TeleportPortal position={[0, PORTAL_RADIUS + 0.2, -RAMP_LENGTH / 2 - 6]} />
 
       {/* ── Ground shadow ── */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <planeGeometry args={[RAMP_WIDTH + 6, RAMP_LENGTH + KICKER_LENGTH + GAP_LENGTH + LANDING_LENGTH + 8]} />
+        <planeGeometry
+          args={[RAMP_WIDTH + 6, RAMP_LENGTH + KICKER_LENGTH + GAP_LENGTH + LANDING_LENGTH + 8]}
+        />
         <meshBasicMaterial color="#000000" transparent opacity={0.12} />
       </mesh>
 
       {/* ── Lighting ── */}
       <pointLight position={[0, RAMP_HEIGHT + 3, 0]} color="#ffffff" intensity={3} distance={30} />
-      <pointLight position={[0, 2, -RAMP_LENGTH / 2]} color="#88ccff" intensity={1.5} distance={12} />
-      <pointLight position={[0, RAMP_HEIGHT + 1, RAMP_LENGTH / 2 + 2]} color="#ffcc88" intensity={1} distance={8} />
+      <pointLight
+        position={[0, 2, -RAMP_LENGTH / 2]}
+        color="#88ccff"
+        intensity={1.5}
+        distance={12}
+      />
+      <pointLight
+        position={[0, RAMP_HEIGHT + 1, RAMP_LENGTH / 2 + 2]}
+        color="#ffcc88"
+        intensity={1}
+        distance={8}
+      />
     </group>
   );
 }

@@ -1,4 +1,41 @@
-import { Proposal, ProposalState } from '@/wrappers/nounsDao';
+import { DynamicQuorumParams, Proposal, ProposalState } from '@/wrappers/nounsDao';
+
+/**
+ * Computes the dynamic quorum for a proposal based on against votes.
+ *
+ * The Nouns DAO contract adjusts the quorum threshold upward as more
+ * "against" votes are cast, capped between minQuorumVotesBPS and
+ * maxQuorumVotesBPS.
+ *
+ * Formula (from NounsDAODynamicQuorum.sol):
+ *   againstVotesBPS = (againstVotes * 1e4) / totalSupply
+ *   adjustedQuorumBPS = minQuorumVotesBPS +
+ *     ((maxQuorumVotesBPS - minQuorumVotesBPS) * againstVotesBPS * quorumCoefficient) / 1e6
+ *   adjustedQuorumBPS = clamp(adjustedQuorumBPS, minQuorumVotesBPS, maxQuorumVotesBPS)
+ *   dynamicQuorum = (adjustedQuorumBPS * totalSupply) / 1e4
+ */
+export const computeDynamicQuorum = (
+  params: DynamicQuorumParams,
+  againstVotes: number,
+  totalSupply: number,
+): number => {
+  if (totalSupply === 0) return 0;
+
+  const againstVotesBPS = (againstVotes * 1e4) / totalSupply;
+
+  const scaledDiff =
+    (params.maxQuorumVotesBPS - params.minQuorumVotesBPS) *
+    againstVotesBPS *
+    params.quorumCoefficient;
+
+  let adjustedQuorumBPS = params.minQuorumVotesBPS + scaledDiff / 1e6;
+
+  // Clamp to [minQuorumVotesBPS, maxQuorumVotesBPS]
+  adjustedQuorumBPS = Math.min(adjustedQuorumBPS, params.maxQuorumVotesBPS);
+  adjustedQuorumBPS = Math.max(adjustedQuorumBPS, params.minQuorumVotesBPS);
+
+  return Math.ceil((adjustedQuorumBPS * totalSupply) / 1e4);
+};
 
 export const isProposalUpdatable = (
   proposalState: ProposalState,
@@ -16,7 +53,7 @@ export const checkEnoughVotes = (
   proposalThreshold: number | undefined,
 ) => {
   return !!(
-    availableVotes &&
+    availableVotes != null &&
     proposalThreshold !== undefined &&
     availableVotes > proposalThreshold
   );

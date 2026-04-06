@@ -12,6 +12,7 @@ import {
   drawOnGraffiti,
   canvasToBase64,
   saveTag,
+  saveGraffitiTag,
   type GraffitiTag,
 } from './graffiti';
 
@@ -57,7 +58,7 @@ export function GraffitiUI({ billboardId, playerId, ws, onClose }: GraffitiUIPro
     };
     window.addEventListener('keydown', blockKeys, true);
     return () => window.removeEventListener('keydown', blockKeys, true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Render the 32x32 canvas scaled up to the display canvas
   const renderToDisplay = useCallback(() => {
@@ -102,25 +103,34 @@ export function GraffitiUI({ billboardId, playerId, ws, onClose }: GraffitiUIPro
   }, []);
 
   // Draw at pixel position
-  const drawAt = useCallback((x: number, y: number) => {
-    if (!canvasRef.current) return;
-    drawOnGraffiti(canvasRef.current, x, y, selectedColor, brushSize);
-    renderToDisplay();
-  }, [selectedColor, brushSize, renderToDisplay]);
+  const drawAt = useCallback(
+    (x: number, y: number) => {
+      if (!canvasRef.current) return;
+      drawOnGraffiti(canvasRef.current, x, y, selectedColor, brushSize);
+      renderToDisplay();
+    },
+    [selectedColor, brushSize, renderToDisplay],
+  );
 
-  const handlePointerDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    drawingRef.current = true;
-    const coords = getPixelCoords(e);
-    if (coords) drawAt(coords.x, coords.y);
-  }, [getPixelCoords, drawAt]);
+  const handlePointerDown = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      drawingRef.current = true;
+      const coords = getPixelCoords(e);
+      if (coords) drawAt(coords.x, coords.y);
+    },
+    [getPixelCoords, drawAt],
+  );
 
-  const handlePointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!drawingRef.current) return;
-    e.preventDefault();
-    const coords = getPixelCoords(e);
-    if (coords) drawAt(coords.x, coords.y);
-  }, [getPixelCoords, drawAt]);
+  const handlePointerMove = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      if (!drawingRef.current) return;
+      e.preventDefault();
+      const coords = getPixelCoords(e);
+      if (coords) drawAt(coords.x, coords.y);
+    },
+    [getPixelCoords, drawAt],
+  );
 
   const handlePointerUp = useCallback(() => {
     drawingRef.current = false;
@@ -139,12 +149,16 @@ export function GraffitiUI({ billboardId, playerId, ws, onClose }: GraffitiUIPro
       color: selectedColor,
     };
     saveTag(tag);
-    // Broadcast via PartyKit
+    // Broadcast via PartyKit (legacy format)
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'world:graffiti',
-        tag,
-      }));
+      ws.send(
+        JSON.stringify({
+          type: 'world:graffiti',
+          tag,
+        }),
+      );
+      // Also persist via graffiti storage protocol
+      saveGraffitiTag(ws, billboardId, pixels, playerId);
     }
     onClose(tag);
   }, [billboardId, playerId, selectedColor, ws, onClose]);
