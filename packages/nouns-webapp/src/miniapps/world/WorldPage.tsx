@@ -90,6 +90,9 @@ import {
   updateListenerPosition,
   updateSpatialPosition,
   type VoipState,
+  startSpeechToText,
+  stopSpeechToText,
+  getCurrentTranscript,
 } from './engine/voip';
 import type { INounSeed } from '@/wrappers/nounToken';
 
@@ -395,12 +398,30 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
-function CameraController({ target }: { target: THREE.Vector3 }) {
+function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRef: React.RefObject<InputState> }) {
   const { camera } = useThree();
+  const orbitX = useRef(0); // horizontal orbit (left/right arrows)
+  const orbitY = useRef(0.3); // vertical orbit (up/down arrows) — starts slightly above
 
-  useFrame(() => {
-    // Dead simple: camera always behind (+Z), slightly above, looking at player
-    const desired = new THREE.Vector3(target.x, target.y + 1.5, target.z + 3.5);
+  useFrame((_, delta) => {
+    const input = inputRef.current;
+
+    // Arrow keys pan camera — stays where you put it
+    if (input) {
+      const panSpeed = 1.5;
+      if (input.keys.has('arrowleft')) orbitX.current -= panSpeed * delta;
+      if (input.keys.has('arrowright')) orbitX.current += panSpeed * delta;
+      if (input.keys.has('arrowup')) orbitY.current = Math.min(orbitY.current + panSpeed * delta * 0.5, 1.2);
+      if (input.keys.has('arrowdown')) orbitY.current = Math.max(orbitY.current - panSpeed * delta * 0.5, 0.05);
+    }
+
+    const camDist = 3.5;
+    const desired = new THREE.Vector3(
+      target.x + Math.sin(orbitX.current) * Math.cos(orbitY.current) * camDist,
+      target.y + Math.sin(orbitY.current) * camDist + 0.5,
+      target.z + Math.cos(orbitX.current) * Math.cos(orbitY.current) * camDist,
+    );
+
     camera.position.lerp(desired, 0.1);
     camera.lookAt(target.x, target.y + 0.5, target.z);
   });
@@ -470,6 +491,7 @@ function HUD({
   crowdMeter = 0,
   settlementWindow = false,
   settleTriggered = false,
+  transcript = '',
 }: {
   hp: number;
   maxHp: number;
@@ -488,6 +510,7 @@ function HUD({
   crowdMeter?: number;
   settlementWindow?: boolean;
   settleTriggered?: boolean;
+  transcript?: string;
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
@@ -612,6 +635,26 @@ function HUD({
         </div>
       )}
 
+      {/* Speech bubble above player */}
+      {transcript && (
+        <div style={{
+          position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(255,255,255,0.9)', color: '#111', borderRadius: 12,
+          padding: '6px 14px', fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold',
+          maxWidth: 280, textAlign: 'center', wordBreak: 'break-word',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        }}>
+          {transcript}
+          {/* Speech bubble tail */}
+          <div style={{
+            position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
+            borderTop: '8px solid rgba(255,255,255,0.9)',
+          }} />
+        </div>
+      )}
+
       {/* ── VOIP UI ─────────────────────────────────────────── */}
 
       {/* Mic indicator (top left) */}
@@ -730,6 +773,7 @@ export default function WorldPage() {
     crowdMeter: 0,
     settlementWindow: false,
     settleTriggered: false,
+    transcript: '',
   });
 
   // Seed priority: URL param > Redux auction state > random
@@ -812,6 +856,7 @@ export default function WorldPage() {
       const ok = await initVoip(voip);
       if (ok) {
         setMicEnabled(true);
+        startSpeechToText(voip);
         // Connect to all existing peers
         const mp = mpRef.current;
         for (const [id] of mp.remotePlayers) {
@@ -820,6 +865,8 @@ export default function WorldPage() {
       }
     } else {
       toggleMute(voip);
+      if (voip.isMuted) stopSpeechToText();
+      else startSpeechToText(voip);
     }
   };
 
@@ -939,12 +986,22 @@ export default function WorldPage() {
       if (voip.localStream && frame % 6 === 0) {
         const wasSpeaking = voip.isSpeaking;
         checkVoiceActivity(voip);
-        // Broadcast speaking state change
-        if (voip.isSpeaking !== wasSpeaking && mp.ws && mp.ws.readyState === WebSocket.OPEN) {
-          mp.ws.send(JSON.stringify({
-            type: 'world:voip:speaking',
-            speaking: voip.isSpeaking,
-          }));
+        // Broadcast speaking state + transcript
+        if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
+          if (voip.isSpeaking !== wasSpeaking) {
+            mp.ws.send(JSON.stringify({
+              type: 'world:voip:speaking',
+              speaking: voip.isSpeaking,
+            }));
+          }
+          // Broadcast transcript to other players
+          const transcript = getCurrentTranscript();
+          if (transcript) {
+            mp.ws.send(JSON.stringify({
+              type: 'world:voip:transcript',
+              text: transcript,
+            }));
+          }
         }
         // Update crowd settle
         const shouldSettle = updateCrowdSettle(voip);
@@ -1032,6 +1089,7 @@ export default function WorldPage() {
       hudRef.current.crowdMeter = voipRef.current.crowdMeter;
       hudRef.current.settlementWindow = voipRef.current.settlementWindow;
       hudRef.current.settleTriggered = voipRef.current.settleTriggered;
+      hudRef.current.transcript = getCurrentTranscript();
     });
 
     return null;
@@ -1145,7 +1203,7 @@ export default function WorldPage() {
         <PlayerCharacter3D />
         <RemotePlayers />
 
-        <CameraController target={playerTargetRef.current} />
+        <CameraController target={playerTargetRef.current} inputRef={inputRef} />
         <GameLogic />
       </Canvas>
 
