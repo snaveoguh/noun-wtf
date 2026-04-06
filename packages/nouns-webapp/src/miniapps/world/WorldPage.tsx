@@ -10,6 +10,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { useAppSelector } from '@/hooks';
+import { GameHUD } from './engine/GameHUD';
 
 import { SEND_INTERVAL, TILE_SIZE, MAP_SIZE, PLAYER_MAX_HP, DIRECTION_ROTATION, DIRECTION_FACING_ANGLE } from './engine/types';
 import type { Player, Direction, PlayerState } from './engine/types';
@@ -86,6 +87,9 @@ import {
   spawnWeaponPickup, getActivePickups, type WeaponState, type WeaponPickup,
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
+import { BirdFlocks, CloudLayer, AnimatedOcean, Dolphins } from './engine/Atmosphere';
+import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
+import { MegaRamp3D } from './engine/MegaRamp3D';
 import {
   createVoipState,
   initVoip,
@@ -314,8 +318,79 @@ const CRYSTAL_BALL_Z = 2 * TILE_SIZE * WORLD_SCALE;
 const MOUNTAIN_HEIGHT = 6;
 const BALL_RADIUS = 1.5;
 
+function SmokeParticles({ count, radius, height, baseY }: { count: number; radius: number; height: number; baseY: number }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const particles = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      angle: (i / count) * Math.PI * 2 + Math.random() * 0.5,
+      speed: 0.2 + Math.random() * 0.3,
+      radiusOffset: (Math.random() - 0.5) * 0.8,
+      yOffset: Math.random() * height,
+      size: 0.08 + Math.random() * 0.12,
+      spiralSpeed: 0.3 + Math.random() * 0.4,
+    }));
+  }, [count, height]);
+
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.elapsedTime;
+    particles.forEach((p, i) => {
+      const y = (p.yOffset + t * p.speed) % height;
+      const r = radius + p.radiusOffset + y * 0.15; // widens as it rises
+      const angle = p.angle + t * p.spiralSpeed;
+      dummy.position.set(Math.cos(angle) * r, baseY + y, Math.sin(angle) * r);
+      const fade = 1 - y / height;
+      const s = p.size * (0.5 + fade * 0.5);
+      dummy.scale.set(s, s, s);
+      dummy.updateMatrix();
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+    });
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
+      <sphereGeometry args={[1, 6, 6]} />
+      <meshBasicMaterial color="#666" transparent opacity={0.35} depthWrite={false} />
+    </instancedMesh>
+  );
+}
+
+function LavaCracks({ baseRadius, height, segments }: { baseRadius: number; height: number; segments: number }) {
+  const lineObjects = useMemo(() => {
+    const objs: THREE.Line[] = [];
+    for (let i = 0; i < segments; i++) {
+      const angle = (i / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const pts: THREE.Vector3[] = [];
+      const steps = 4 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < steps; j++) {
+        const t = j / (steps - 1);
+        const y = t * height * 0.85;
+        const r = baseRadius * (1 - t * 0.7) + (Math.random() - 0.5) * 0.2;
+        const a = angle + (Math.random() - 0.5) * 0.4;
+        pts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: '#ff4400' });
+      objs.push(new THREE.Line(geo, mat));
+    }
+    return objs;
+  }, [baseRadius, height, segments]);
+
+  return (
+    <group>
+      {lineObjects.map((obj, i) => (
+        <primitive key={i} object={obj} />
+      ))}
+    </group>
+  );
+}
+
 function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
   const ballGroupRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const pulseRef = useRef<THREE.PointLight>(null);
 
   // Build the voxel Noun inside the ball
   const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
@@ -327,54 +402,104 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
     }
   }, [nounSeed]);
 
+  const eyeY = MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5;
+
   useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
     if (ballGroupRef.current) {
-      ballGroupRef.current.rotation.y = clock.elapsedTime * 0.3;
-      // Gentle float
-      ballGroupRef.current.position.y = MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5 + Math.sin(clock.elapsedTime * 0.5) * 0.15;
+      ballGroupRef.current.rotation.y = t * 0.4;
+      ballGroupRef.current.position.y = eyeY + Math.sin(t * 0.8) * 0.1;
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.x = Math.PI / 2 + Math.sin(t * 0.6) * 0.05;
+      ringRef.current.rotation.z = t * 0.2;
+    }
+    if (pulseRef.current) {
+      pulseRef.current.intensity = 3 + Math.sin(t * 2) * 1.5 + Math.sin(t * 3.7) * 0.5;
     }
   });
 
   return (
     <group position={[CRYSTAL_BALL_X, 0, CRYSTAL_BALL_Z]}>
-      {/* Rocky mountain base — stack of cones */}
+      {/* Dark volcanic base — wide foundation */}
       <mesh position={[0, 0, 0]}>
-        <coneGeometry args={[3, MOUNTAIN_HEIGHT * 0.6, 8]} />
-        <meshStandardMaterial color="#555" roughness={1} />
+        <coneGeometry args={[4, MOUNTAIN_HEIGHT * 0.5, 10]} />
+        <meshStandardMaterial color="#222" roughness={1} />
       </mesh>
-      <mesh position={[0, MOUNTAIN_HEIGHT * 0.3, 0]}>
-        <coneGeometry args={[2, MOUNTAIN_HEIGHT * 0.5, 7]} />
-        <meshStandardMaterial color="#666" roughness={0.9} />
+      {/* Mid volcano */}
+      <mesh position={[0, MOUNTAIN_HEIGHT * 0.25, 0]}>
+        <coneGeometry args={[2.8, MOUNTAIN_HEIGHT * 0.5, 9]} />
+        <meshStandardMaterial color="#333" roughness={0.95} />
       </mesh>
-      <mesh position={[0, MOUNTAIN_HEIGHT * 0.55, 0]}>
-        <coneGeometry args={[1.2, MOUNTAIN_HEIGHT * 0.4, 6]} />
-        <meshStandardMaterial color="#777" roughness={0.8} />
+      {/* Upper peak — jagged */}
+      <mesh position={[0, MOUNTAIN_HEIGHT * 0.5, 0]}>
+        <coneGeometry args={[1.8, MOUNTAIN_HEIGHT * 0.45, 7]} />
+        <meshStandardMaterial color="#444" roughness={0.9} />
       </mesh>
-      {/* Peak */}
-      <mesh position={[0, MOUNTAIN_HEIGHT * 0.8, 0]}>
-        <coneGeometry args={[0.6, MOUNTAIN_HEIGHT * 0.3, 5]} />
-        <meshStandardMaterial color="#888" roughness={0.7} />
+      {/* Narrow spire */}
+      <mesh position={[0, MOUNTAIN_HEIGHT * 0.72, 0]}>
+        <coneGeometry args={[0.9, MOUNTAIN_HEIGHT * 0.35, 6]} />
+        <meshStandardMaterial color="#333" roughness={0.85} />
+      </mesh>
+      {/* Twin prongs flanking the eye */}
+      <mesh position={[-0.6, MOUNTAIN_HEIGHT * 0.9, 0]} rotation={[0, 0, 0.15]}>
+        <coneGeometry args={[0.3, MOUNTAIN_HEIGHT * 0.25, 5]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.6, MOUNTAIN_HEIGHT * 0.9, 0]} rotation={[0, 0, -0.15]}>
+        <coneGeometry args={[0.3, MOUNTAIN_HEIGHT * 0.25, 5]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.9} />
       </mesh>
 
-      {/* Glass sphere */}
-      <mesh position={[0, MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5, 0]}>
-        <sphereGeometry args={[BALL_RADIUS, 32, 24]} />
-        <meshPhysicalMaterial
-          color="#aaddff"
-          transparent
-          opacity={0.25}
-          roughness={0}
-          metalness={0.1}
-          transmission={0.8}
-          thickness={0.5}
+      {/* Lava cracks running up the mountain */}
+      <LavaCracks baseRadius={2.5} height={MOUNTAIN_HEIGHT * 0.8} segments={12} />
+
+      {/* Lava glow from the base */}
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.5, 4, 16]} />
+        <meshBasicMaterial color="#ff3300" transparent opacity={0.15} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* The Eye — fiery ring (torus) */}
+      <mesh ref={ringRef} position={[0, eyeY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[BALL_RADIUS, 0.2, 16, 48]} />
+        <meshStandardMaterial
+          color="#ff4400"
+          emissive="#ff2200"
+          emissiveIntensity={2.5}
+          roughness={0.3}
+          metalness={0.6}
+          toneMapped={false}
         />
       </mesh>
+      {/* Inner fire ring — slightly smaller, brighter */}
+      <mesh position={[0, eyeY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[BALL_RADIUS * 0.75, 0.1, 12, 36]} />
+        <meshStandardMaterial
+          color="#ff6600"
+          emissive="#ff4400"
+          emissiveIntensity={3}
+          roughness={0.2}
+          metalness={0.4}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Outer halo — faint wide ring */}
+      <mesh position={[0, eyeY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[BALL_RADIUS * 1.3, 0.05, 8, 48]} />
+        <meshBasicMaterial color="#ff6600" transparent opacity={0.3} toneMapped={false} />
+      </mesh>
 
-      {/* Inner glow */}
-      <pointLight position={[0, MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5, 0]} color="#6699ff" intensity={2} distance={8} />
+      {/* Pulsing ominous light */}
+      <pointLight ref={pulseRef} position={[0, eyeY, 0]} color="#ff3300" intensity={3} distance={15} />
+      {/* Secondary ambient glow — red/orange uplighting */}
+      <pointLight position={[0, MOUNTAIN_HEIGHT * 0.3, 0]} color="#ff2200" intensity={1.5} distance={8} />
 
-      {/* Rotating voxel Noun inside the sphere */}
-      <group ref={ballGroupRef} position={[0, MOUNTAIN_HEIGHT + BALL_RADIUS + 0.5, 0]} scale={[0.05, 0.05, 0.05]}>
+      {/* Swirling smoke particles */}
+      <SmokeParticles count={60} radius={1.8} height={MOUNTAIN_HEIGHT * 1.2} baseY={MOUNTAIN_HEIGHT * 0.3} />
+
+      {/* Rotating voxel Noun inside the fiery ring */}
+      <group ref={ballGroupRef} position={[0, eyeY, 0]} scale={[0.05, 0.05, 0.05]}>
         {bodyGeo && <mesh geometry={bodyGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
         {blingGeo && <mesh geometry={blingGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
         {headGeo && <mesh geometry={headGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
@@ -386,7 +511,7 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
 
 // ── Water plane (animated) ────────────────────────────────────────────
 
-function Water() {
+function _Water() {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
@@ -483,10 +608,11 @@ function HUDLive({ hudRef }: { hudRef: React.RefObject<any> }) {
     const id = setInterval(() => setS({ ...hudRef.current }), 250);
     return () => clearInterval(id);
   }, [hudRef]);
-  return <HUD {...s} />;
+  return <GameHUD {...s} />;
 }
 
-function HUD({
+// Old HUD replaced by GameHUD — keeping for reference
+function _HUD_OLD({
   hp,
   maxHp,
   playerCount,
@@ -1262,11 +1388,26 @@ export default function WorldPage() {
         <fog attach="fog" args={['#87ceeb', 30, 80]} />
 
         <Lighting />
-        <Water />
+        <AnimatedOcean />
         <Terrain />
         <Trees />
         <Rocks />
         <CrystalBallMountain nounSeed={seed} />
+
+        {/* Atmosphere */}
+        <BirdFlocks />
+        <CloudLayer />
+        <Dolphins />
+
+        {/* World objects */}
+        <Billboard position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]} text="probe.wtf" url="https://probe.wtf" />
+        <Billboard position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]} text="YOUR AD HERE ⌐◧-◧" rotation={0.5} />
+        <Billboard position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]} text="pooter.world" url="https://pooter.world" rotation={-0.3} />
+        <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
+        <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
+
+        {/* Mega Ramp */}
+        <MegaRamp3D />
 
         {/* Treasure Chest */}
         <TreasureChest3D

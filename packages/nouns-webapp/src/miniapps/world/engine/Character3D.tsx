@@ -139,19 +139,22 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         model.scale.set(BODY_SCALE, BODY_SCALE, BODY_SCALE);
 
         // Setup: hide head/cape/weapons, tint body
+        let chestBone: THREE.Object3D | null = null;
         model.traverse((child: THREE.Object3D) => {
           if (child.name === 'Rogue_Head' || child.name === 'Rogue_Cape') child.visible = false;
           if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
               child.name.includes('Throwable') ||
               child.name.includes('1H_') || child.name.includes('2H_') ||
-              child.name === 'Rogue_ArmLeft' ||
-              child.name === 'hand.l' || child.name === 'wrist.l' ||
-              child.name === 'lowerarm.l' || child.name === 'upperarm.l' ||
-              child.name === 'handslot.l' ||
+              child.name.includes('Left') || child.name.includes('left') ||
+              child.name.includes('.l') ||
               child.name === 'hand.r' ||
               child.name === 'Knife_Offhand') {
-            // Hide all weapon slots + left arm parts
+            // Hide all weapon slots + left arm parts (broad match on Left/.l)
             child.visible = false;
+          }
+          // Store chest/spine bone for safety vest attachment
+          if ((child.name === 'chest' || child.name === 'spine_01' || child.name === 'spine') && (child as any).isBone) {
+            chestBone = child;
           }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
             const mesh = child as THREE.SkinnedMesh;
@@ -160,6 +163,78 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             mesh.frustumCulled = false;
           }
         });
+
+        // ── Safety Vest ──
+        if (chestBone) {
+          const vestGroup = new THREE.Group();
+          vestGroup.name = '__safetyVest';
+
+          const vestColor = '#CCFF00';
+          const vestMat = new THREE.MeshBasicMaterial({ color: vestColor });
+          const stripMat = new THREE.MeshStandardMaterial({
+            color: '#dddddd',
+            metalness: 0.9,
+            roughness: 0.2,
+            emissive: new THREE.Color('#666666'),
+          });
+
+          // Front panel — slightly curved via thin box
+          const frontPanel = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 2.2, 0.15),
+            vestMat,
+          );
+          frontPanel.position.set(0, 0.2, 0.55);
+          vestGroup.add(frontPanel);
+
+          // Back panel
+          const backPanel = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 2.2, 0.15),
+            vestMat,
+          );
+          backPanel.position.set(0, 0.2, -0.55);
+          vestGroup.add(backPanel);
+
+          // Shoulder straps connecting front to back
+          const strapMat = vestMat.clone();
+          const leftStrap = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.15, 1.0),
+            strapMat,
+          );
+          leftStrap.position.set(-0.55, 1.2, 0);
+          vestGroup.add(leftStrap);
+
+          const rightStrap = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.15, 1.0),
+            strapMat,
+          );
+          rightStrap.position.set(0.55, 1.2, 0);
+          vestGroup.add(rightStrap);
+
+          // Reflective strips — chest level (front + back)
+          const stripGeo = new THREE.BoxGeometry(1.5, 0.2, 0.17);
+          const frontStripChest = new THREE.Mesh(stripGeo, stripMat);
+          frontStripChest.position.set(0, 0.7, 0.56);
+          vestGroup.add(frontStripChest);
+
+          const backStripChest = new THREE.Mesh(stripGeo, stripMat.clone());
+          backStripChest.position.set(0, 0.7, -0.56);
+          vestGroup.add(backStripChest);
+
+          // Reflective strips — waist level (front + back)
+          const frontStripWaist = new THREE.Mesh(stripGeo.clone(), stripMat.clone());
+          frontStripWaist.position.set(0, -0.4, 0.56);
+          vestGroup.add(frontStripWaist);
+
+          const backStripWaist = new THREE.Mesh(stripGeo.clone(), stripMat.clone());
+          backStripWaist.position.set(0, -0.4, -0.56);
+          vestGroup.add(backStripWaist);
+
+          // Scale vest to fit body at BODY_SCALE
+          // Scale vest tiny to fit small body + cut front open
+          vestGroup.scale.set(0.15, 0.15, 0.15);
+          frontPanel.scale.x = 0.7; // narrower front = open vest look
+          (chestBone as THREE.Object3D).add(vestGroup);
+        }
 
         // Attach voxel head to head bone
         model.traverse((child: THREE.Object3D) => {
