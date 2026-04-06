@@ -99,11 +99,15 @@ export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: num
   }
   if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
 
-  // Rotate by camera angle so W always means "away from camera"
+  // Rotate by camera angle so W always means "toward where camera looks"
+  // Camera orbits at (sin(a)*d, h, cos(a)*d) in 3D, looking at player
+  // 2D game: player.x → 3D x, player.y → 3D z
+  // Forward (W, fy=-1) should move in camera-look direction: (-sin(a), -cos(a)) in 2D
+  // Right (D, fx=+1) should move perpendicular: (cos(a), -sin(a)) in 2D
   const cos = Math.cos(cameraAngle);
   const sin = Math.sin(cameraAngle);
-  const dx = fx * cos - fy * sin;
-  const dy = fx * sin + fy * cos;
+  const dx = fy * sin + fx * cos; // fy=-1 → -sin(a), fx=+1 → cos(a)
+  const dy = fy * cos - fx * sin; // fy=-1 → -cos(a), fx=+1 → -sin(a)
   return { dx, dy };
 }
 
