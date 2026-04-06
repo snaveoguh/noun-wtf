@@ -86,28 +86,19 @@ export function attachInputListeners(
   };
 }
 
-/** WASD movement — rotated by camera angle so W always = forward from camera POV */
-export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
-  // Raw input
-  let rawX = 0, rawZ = 0;
-  if (keys.has('w')) rawZ -= 1; // forward
-  if (keys.has('s')) rawZ += 1; // back
-  if (keys.has('a')) rawX -= 1; // left
-  if (keys.has('d')) rawX += 1; // right
-  if (rawX === 0 && rawZ === 0) return { dx: 0, dy: 0 };
-  // Normalize diagonals
-  if (rawX !== 0 && rawZ !== 0) {
+/** WASD movement — simple world-relative. W=up, S=down, A=left, D=right */
+export function getMovementVector(keys: Set<string>, _cameraAngle = 0): { dx: number; dy: number } {
+  let dx = 0, dy = 0;
+  if (keys.has('w')) dy -= 1;
+  if (keys.has('s')) dy += 1;
+  if (keys.has('a')) dx -= 1;
+  if (keys.has('d')) dx += 1;
+  if (dx !== 0 && dy !== 0) {
     const inv = 1 / Math.SQRT2;
-    rawX *= inv;
-    rawZ *= inv;
+    dx *= inv;
+    dy *= inv;
   }
-  // Rotate by camera angle so W = into screen from camera's POV
-  const cos = Math.cos(cameraAngle);
-  const sin = Math.sin(cameraAngle);
-  return {
-    dx: rawX * cos - rawZ * sin,
-    dy: rawX * sin + rawZ * cos,
-  };
+  return { dx, dy };
 }
 
 /** Update camera orbit from arrow keys (call each frame) */
