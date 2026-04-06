@@ -131,7 +131,6 @@ export function directionFromDelta(dx: number, dy: number): 'up' | 'down' | 'lef
 /** Resolve combat move from keyboard (no mouse) */
 export function resolveIntendedMove(input: InputState): MoveType | null {
   const jp = input.justPressed;
-  const keys = input.keys;
 
   if (jp.has('h')) return 'headbutt';
   if (jp.has('q')) return 'forcePush';

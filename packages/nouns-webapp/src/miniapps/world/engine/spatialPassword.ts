@@ -18,7 +18,7 @@
 //
 // Uses keccak256 for hashing (same as Ethereum).
 
-import { keccak256, toBytes, toHex, type Hex } from 'viem';
+import { keccak256, toBytes, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 // ── Types ────────────────────────────────────────────────────────────
