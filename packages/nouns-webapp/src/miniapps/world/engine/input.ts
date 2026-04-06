@@ -40,10 +40,7 @@ export function createInputState(): InputState {
 }
 
 /** Attach listeners, return cleanup function */
-export function attachInputListeners(
-  canvas: HTMLCanvasElement,
-  state: InputState,
-): () => void {
+export function attachInputListeners(canvas: HTMLCanvasElement, state: InputState): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
     if (!state.keys.has(k)) {
@@ -86,18 +83,27 @@ export function attachInputListeners(
   };
 }
 
-/** WASD movement — simple world-relative. W=up, S=down, A=left, D=right */
-export function getMovementVector(keys: Set<string>, _cameraAngle = 0): { dx: number; dy: number } {
-  let dx = 0, dy = 0;
-  if (keys.has('w')) dy -= 1;
-  if (keys.has('s')) dy += 1;
-  if (keys.has('a')) dx -= 1;
-  if (keys.has('d')) dx += 1;
-  if (dx !== 0 && dy !== 0) {
+/** WASD movement — camera-relative. W=forward (away from camera), A/D=strafe, S=back */
+export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
+  // Raw input: W=forward, S=back, A=left, D=right (relative to camera)
+  let fx = 0,
+    fy = 0;
+  if (keys.has('w')) fy -= 1; // forward
+  if (keys.has('s')) fy += 1; // back
+  if (keys.has('a')) fx -= 1; // strafe left
+  if (keys.has('d')) fx += 1; // strafe right
+  if (fx !== 0 && fy !== 0) {
     const inv = 1 / Math.SQRT2;
-    dx *= inv;
-    dy *= inv;
+    fx *= inv;
+    fy *= inv;
   }
+  if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
+
+  // Rotate by camera angle so W always means "away from camera"
+  const cos = Math.cos(cameraAngle);
+  const sin = Math.sin(cameraAngle);
+  const dx = fx * cos - fy * sin;
+  const dy = fx * sin + fy * cos;
   return { dx, dy };
 }
 
@@ -106,8 +112,10 @@ export function updateCameraOrbit(state: InputState, delta: number) {
   const speed = 2.0; // radians per second
   if (state.keys.has('arrowleft')) state.cameraOrbitX -= speed * delta;
   if (state.keys.has('arrowright')) state.cameraOrbitX += speed * delta;
-  if (state.keys.has('arrowup')) state.cameraOrbitY = Math.min(state.cameraOrbitY + speed * delta * 0.5, 1.2);
-  if (state.keys.has('arrowdown')) state.cameraOrbitY = Math.max(state.cameraOrbitY - speed * delta * 0.5, -0.3);
+  if (state.keys.has('arrowup'))
+    state.cameraOrbitY = Math.min(state.cameraOrbitY + speed * delta * 0.5, 1.2);
+  if (state.keys.has('arrowdown'))
+    state.cameraOrbitY = Math.max(state.cameraOrbitY - speed * delta * 0.5, -0.3);
 
   // Gentle spring back to default orbit when arrows released
   if (!state.keys.has('arrowleft') && !state.keys.has('arrowright')) {
