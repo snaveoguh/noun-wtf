@@ -613,15 +613,17 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
 // Map 2D direction → angle the camera should sit BEHIND the character
+// Camera orbit: angle 0 = +Z side, PI = -Z side
+// "up" = walking toward -Z, so camera BEHIND = at +Z = angle 0
 const BEHIND_ANGLE: Record<string, number> = {
-  up: Math.PI, // char faces -Z → cam at +Z
-  down: 0, // char faces +Z → cam at +Z behind = 0 (same side)
-  left: Math.PI * 0.5, // char faces -X → cam at +X
-  right: -Math.PI * 0.5, // char faces +X → cam at -X
-  'up-left': Math.PI * 0.75,
-  'up-right': -Math.PI * 0.75,
-  'down-left': Math.PI * 0.25,
-  'down-right': -Math.PI * 0.25,
+  up: 0,
+  down: Math.PI,
+  left: -Math.PI * 0.5,
+  right: Math.PI * 0.5,
+  'up-left': -Math.PI * 0.25,
+  'up-right': Math.PI * 0.25,
+  'down-left': -Math.PI * 0.75,
+  'down-right': Math.PI * 0.75,
 };
 
 function CameraController({
@@ -634,7 +636,7 @@ function CameraController({
   playerCharState: React.RefObject<CharacterState>;
 }) {
   const { camera } = useThree();
-  const angleX = useRef(Math.PI); // start behind (facing up = -Z)
+  const angleX = useRef(0); // start behind (facing up = -Z, cam at +Z = angle 0)
   const angleY = useRef(0.12);
   const dist = useRef(1.5);
 
