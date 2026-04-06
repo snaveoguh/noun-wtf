@@ -40,16 +40,7 @@ import { useMemo } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
-import {
-  filter,
-  flatMap,
-  forEach,
-  isBigInt,
-  isNonNullish,
-  isNullish,
-  map,
-  pipe,
-} from 'remeda';
+import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
   type AbiParameter,
   decodeAbiParameters,
@@ -750,7 +741,7 @@ const parsePartialSubgraphProposal = (
   const onTimelockV1 = proposal.onTimelockV1 !== null;
   return {
     id: proposal.id,
-    title: proposal.title ?? (extractTitle(proposal.description) ?? 'Untitled'),
+    title: proposal.title ?? extractTitle(proposal.description) ?? 'Untitled',
     status: getProposalState(
       Number(blockNumber),
       new Date((timestamp ?? 0) * 1000),
@@ -806,7 +797,9 @@ const parseSubgraphProposal = (
     id: proposal.id,
     title: pipe(description, extractTitle, removeMarkdownStyle) ?? 'Untitled',
     description: description ?? 'No description.',
-    proposer: (typeof proposal.proposer === 'string' ? proposal.proposer : (proposal.proposer as unknown as { id: string })?.id) as Address,
+    proposer: (typeof proposal.proposer === 'string'
+      ? proposal.proposer
+      : (proposal.proposer as unknown as { id: string })?.id) as Address,
     status: getProposalState(
       blockNumber,
       new Date((timestamp ?? 0) * 1000),
@@ -856,9 +849,10 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
     createdTimestamp: BigInt(p.createdAt ?? 0),
     createdTransactionHash: p.createdAtTransaction ?? '',
     voteSnapshotBlock: p.startBlock,
-    signers: (p as unknown as { signers?: { items?: { signer: string }[] } }).signers?.items?.map(
-      (s: { signer: string }) => ({ id: s.signer }),
-    ) ?? [],
+    signers:
+      (p as unknown as { signers?: { items?: { signer: string }[] } }).signers?.items?.map(
+        (s: { signer: string }) => ({ id: s.signer }),
+      ) ?? [],
   }));
 
   // Fetch authoritative on-chain state() only for non-terminal proposals.
@@ -884,9 +878,27 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
     [nonTerminalProposals.length, chainId],
   );
 
+  // Batch-call quorumVotes(proposalId) for non-terminal proposals to get dynamic quorum
+  const onChainQuorumCalls = useMemo(
+    () =>
+      nonTerminalProposals.map(p => ({
+        abi: nounsGovernorAbi,
+        address: nounsGovernorAddress[chainId],
+        functionName: 'quorumVotes' as const,
+        args: [BigInt(p.id)],
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nonTerminalProposals.length, chainId],
+  );
+
   const { data: onChainStates } = useReadContracts({
     contracts: onChainStateCalls,
     query: { enabled: onChainStateCalls.length > 0 },
+  });
+
+  const { data: onChainQuorums } = useReadContracts({
+    contracts: onChainQuorumCalls,
+    query: { enabled: onChainQuorumCalls.length > 0 },
   });
 
   // Map on-chain state int → ProposalState enum (non-terminal only)
@@ -903,15 +915,39 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChainStates, nonTerminalProposals.length]);
 
+  // Map on-chain dynamic quorum for non-terminal proposals
+  const onChainQuorumMap = useMemo(() => {
+    const quorumMap = new Map<string, number>();
+    if (!onChainQuorums) return quorumMap;
+    nonTerminalProposals.forEach((p, i) => {
+      const result = onChainQuorums[i];
+      if (result?.status === 'success' && result.result != null) {
+        quorumMap.set(String(p.id), Number(result.result));
+      }
+    });
+    return quorumMap;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onChainQuorums, nonTerminalProposals.length]);
+
   const proposals = pipe(
     adaptedProposals,
     map(proposal => {
-      const parsed = parsePartialSubgraphProposal(proposal, Number(blockNumber), timestamp, isDaoGteV3);
+      const parsed = parsePartialSubgraphProposal(
+        proposal,
+        Number(blockNumber),
+        timestamp,
+        isDaoGteV3,
+      );
       if (!parsed) return undefined;
       // Override status with on-chain state if available (fixes dynamic quorum)
       const onChainState = onChainStateMap.get(String(parsed.id));
       if (onChainState !== undefined) {
         parsed.status = onChainState;
+      }
+      // Override quorumVotes with on-chain dynamic quorum if available
+      const onChainQuorum = onChainQuorumMap.get(String(parsed.id));
+      if (onChainQuorum !== undefined) {
+        parsed.quorumVotes = onChainQuorum;
       }
       return parsed;
     }),
@@ -952,6 +988,18 @@ export const useAllProposalsViaChain = (skip = false): PartialProposalData => {
     [govProposalIndexes],
   );
 
+  // Batch-call quorumVotes(proposalId) to get dynamic quorum for each proposal
+  const quorumCalls = useMemo(
+    () =>
+      govProposalIndexes.map(idx => ({
+        abi: nounsGovernorAbi,
+        address: nounsGovernorAddress[chainId],
+        functionName: 'quorumVotes' as const,
+        args: [idx],
+      })),
+    [govProposalIndexes],
+  );
+
   const { data: proposalResults, isLoading: loadingProposals } = useReadContracts<
     { result?: ProposalCallResult }[]
   >({
@@ -971,6 +1019,15 @@ export const useAllProposalsViaChain = (skip = false): PartialProposalData => {
     stateResults ?? [],
     flatMap(item => (isNullish(item.result) ? [] : [item.result])),
   ) as number[];
+
+  const { data: quorumResults } = useReadContracts<{ result?: bigint }[]>({
+    contracts: quorumCalls,
+    query: { enabled: !skip && quorumCalls.length > 0 },
+  });
+  const dynamicQuorums = pipe(
+    quorumResults ?? [],
+    map(item => (item.result != null ? Number(item.result) : undefined)),
+  );
 
   const formattedLogs = useFormattedProposalCreatedLogs(skip);
 
@@ -994,14 +1051,14 @@ export const useAllProposalsViaChain = (skip = false): PartialProposalData => {
           forCount: Number(proposal?.forVotes?.toString() ?? '0'),
           againstCount: Number(proposal?.againstVotes?.toString() ?? '0'),
           abstainCount: Number(proposal?.abstainVotes?.toString() ?? '0'),
-          quorumVotes: Number(proposal?.quorumVotes?.toString() ?? '0'),
+          quorumVotes: dynamicQuorums[i] ?? Number(proposal?.quorumVotes?.toString() ?? '0'),
           eta: proposal?.eta ? new Date(Number(proposal?.eta) * 1000) : undefined,
           updatePeriodEndBlock: BigInt(proposal?.updatePeriodEndBlock?.toString() ?? 0),
         };
       }),
       loading: loadingProposals || loadingStates,
     };
-  }, [formattedLogs, proposalStates, proposals]);
+  }, [formattedLogs, proposalStates, proposals, dynamicQuorums]);
 };
 
 export const useAllProposals = (): PartialProposalData => {
@@ -1039,7 +1096,9 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       proposer: string;
       clientId: number | null;
       signers: { items: { signer: string }[] };
-      transactions: { items: { target: string; value: string; signature: string; calldata: string }[] };
+      transactions: {
+        items: { target: string; value: string; signature: string; calldata: string }[];
+      };
     }>;
   }>(query, { variables });
 
@@ -1048,6 +1107,19 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
   // @ts-ignore
   const { data: onChainState } = useReadNounsGovernorState({
     args: [BigInt(id ?? 0)],
+    query: { enabled: Boolean(id) },
+  });
+
+  // Read the dynamic quorum from the contract (accounts for against votes)
+  const { data: onChainQuorum } = useReadContracts({
+    contracts: [
+      {
+        abi: nounsGovernorAbi,
+        address: nounsGovernorAddress[defaultChain.id],
+        functionName: 'quorumVotes' as const,
+        args: [BigInt(id ?? 0)],
+      },
+    ],
     query: { enabled: Boolean(id) },
   });
 
@@ -1068,12 +1140,23 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       }
     : undefined;
 
-  const parsed = parseSubgraphProposal(proposal, Number(blockNumber), timestamp, toUpdate, isDaoGteV3);
+  const parsed = parseSubgraphProposal(
+    proposal,
+    Number(blockNumber),
+    timestamp,
+    toUpdate,
+    isDaoGteV3,
+  );
 
   // Override with authoritative on-chain state if available
   // On-chain state() correctly accounts for dynamic quorum
   if (parsed && onChainState != null) {
     parsed.status = Number(onChainState) as ProposalState;
+  }
+
+  // Override quorumVotes with on-chain dynamic quorum if available
+  if (parsed && onChainQuorum?.[0]?.status === 'success' && onChainQuorum[0].result != null) {
+    parsed.quorumVotes = Number(onChainQuorum[0].result);
   }
 
   return parsed;

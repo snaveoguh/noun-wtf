@@ -22,9 +22,18 @@ export interface PaintCanState {
 // ── Paint can colors ─────────────────────────────────────────────────
 
 export const PAINT_COLORS = [
-  '#ff0000', '#00ff00', '#0000ff', '#ffff00',
-  '#ff00ff', '#00ffff', '#ff8800', '#8800ff',
-  '#ff0088', '#00ff88', '#ffffff', '#000000',
+  '#ff0000',
+  '#00ff00',
+  '#0000ff',
+  '#ffff00',
+  '#ff00ff',
+  '#00ffff',
+  '#ff8800',
+  '#8800ff',
+  '#ff0088',
+  '#00ff88',
+  '#ffffff',
+  '#000000',
 ];
 
 // ── Paint can pickups ────────────────────────────────────────────────
@@ -147,10 +156,104 @@ export function getAllTags(): GraffitiTag[] {
   return Array.from(_tags.values());
 }
 
+// ── PartyKit graffiti persistence messages ───────────────────────────
+
+export interface GraffitiSaveMessage {
+  type: 'graffiti:save';
+  wallId: string;
+  imageData: string; // base64 PNG
+  playerId: string;
+}
+
+export interface GraffitiLoadMessage {
+  type: 'graffiti:load';
+  wallId: string;
+}
+
+export interface GraffitiTagData {
+  imageData: string;
+  playerId: string;
+  timestamp: number;
+}
+
+export interface GraffitiTagsMessage {
+  type: 'graffiti:tags';
+  wallId: string;
+  tags: GraffitiTagData[];
+}
+
+/** Minimal WebSocket interface so PartySocket is also accepted */
+interface WsSendable {
+  readyState: number;
+  send(data: string): void;
+}
+
+/**
+ * Send a graffiti tag to the PartyKit server for permanent storage.
+ * The server stores the base64 PNG keyed by wallId.
+ */
+export function saveGraffitiTag(
+  ws: WsSendable,
+  wallId: string,
+  imageData: string,
+  playerId: string,
+): void {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  const msg: GraffitiSaveMessage = {
+    type: 'graffiti:save',
+    wallId,
+    imageData,
+    playerId,
+  };
+  ws.send(JSON.stringify(msg));
+}
+
+/**
+ * Request all stored graffiti tags for a given wall from the PartyKit server.
+ * The server responds with a `graffiti:tags` message.
+ */
+export function loadGraffitiTags(ws: WsSendable, wallId: string): void {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  const msg: GraffitiLoadMessage = {
+    type: 'graffiti:load',
+    wallId,
+  };
+  ws.send(JSON.stringify(msg));
+}
+
+/**
+ * Parse an incoming PartyKit message and return graffiti tags data if applicable.
+ */
+export function parseGraffitiMessage(
+  data: string,
+): GraffitiTagsMessage | GraffitiSaveMessage | null {
+  try {
+    const msg = JSON.parse(data);
+    if (msg.type === 'graffiti:tags' || msg.type === 'graffiti:save') {
+      return msg;
+    }
+  } catch {
+    // Not a graffiti message
+  }
+  return null;
+}
+
 // ── Billboard positions (center of island) ───────────────────────────
 
 export const CENTER_BILLBOARDS = [
-  { id: 'center-1', worldX: 512, worldY: 500, text: 'DEPOSIT TO\nNOUNIRL.ETH\nYOUR AD HERE', rotation: 0 },
+  {
+    id: 'center-1',
+    worldX: 512,
+    worldY: 500,
+    text: 'DEPOSIT TO\nNOUNIRL.ETH\nYOUR AD HERE',
+    rotation: 0,
+  },
   { id: 'center-2', worldX: 520, worldY: 512, text: 'TAG THIS\n⌐◧-◧', rotation: Math.PI / 3 },
-  { id: 'center-3', worldX: 504, worldY: 520, text: 'NOUNS WORLD\nWAS HERE', rotation: -Math.PI / 4 },
+  {
+    id: 'center-3',
+    worldX: 504,
+    worldY: 520,
+    text: 'NOUNS WORLD\nWAS HERE',
+    rotation: -Math.PI / 4,
+  },
 ];

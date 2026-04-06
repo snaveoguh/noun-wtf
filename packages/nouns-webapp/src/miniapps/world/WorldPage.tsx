@@ -105,11 +105,16 @@ import {
   spawnPaintCan,
   checkPaintPickup,
   getActivePaintCans,
+  loadGraffitiTags,
+  parseGraffitiMessage,
+  saveTag,
   type PaintCanState,
   type PaintCan,
+  type GraffitiTagData,
 } from './engine/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
 import { MegaRamp3D, HoverboardPickup3D, MEGA_RAMP_BOUNDS } from './engine/MegaRamp3D';
+import { NYCApartmentBlock, APARTMENT_GRAFFITI_WALL } from './engine/NYCApartmentBlock';
 import {
   createSkatingState,
   mountBoard,
@@ -416,11 +421,65 @@ const GRAFFITI_WALLS = [
     rotation: -0.4,
     label: 'DEPOSIT TO NOUNIRL.ETH',
   },
+  APARTMENT_GRAFFITI_WALL,
 ] as const;
 
 const WALL_NEAR_DISTANCE = 4;
 
-function GraffitiWalls() {
+/** Single graffiti wall mesh that can display a saved tag texture */
+function GraffitiWallMesh({ savedTags }: { savedTags: GraffitiTagData[] }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const textureRef = useRef<THREE.CanvasTexture | null>(null);
+
+  // Apply the most recent saved tag as a texture overlay
+  useEffect(() => {
+    if (savedTags.length === 0 || !meshRef.current) return;
+    const latest = savedTags[savedTags.length - 1];
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d')!;
+      // Base wall color
+      ctx.fillStyle = '#d4cfc4';
+      ctx.fillRect(0, 0, 512, 512);
+      // Draw the graffiti tag scaled up (pixelated)
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, 512, 512);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      if (textureRef.current) textureRef.current.dispose();
+      textureRef.current = tex;
+      if (meshRef.current) {
+        (meshRef.current.material as THREE.MeshStandardMaterial).map = tex;
+        (meshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      }
+    };
+    img.src = latest.imageData;
+
+    return () => {
+      if (textureRef.current) {
+        textureRef.current.dispose();
+        textureRef.current = null;
+      }
+    };
+  }, [savedTags]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[3.5, 3]} />
+      <meshStandardMaterial
+        color="#d4cfc4"
+        roughness={0.95}
+        metalness={0.02}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function GraffitiWalls({ tagsMap }: { tagsMap: Record<string, GraffitiTagData[]> }) {
   return (
     <group>
       {GRAFFITI_WALLS.map(wall => {
@@ -431,16 +490,8 @@ function GraffitiWalls() {
             position={[wall.worldX, y + 1.8, wall.worldZ]}
             rotation={[0, wall.rotation, 0]}
           >
-            {/* Concrete wall slab */}
-            <mesh>
-              <planeGeometry args={[3.5, 3]} />
-              <meshStandardMaterial
-                color="#d4cfc4"
-                roughness={0.95}
-                metalness={0.02}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
+            {/* Concrete wall slab — with optional graffiti texture */}
+            <GraffitiWallMesh savedTags={tagsMap[wall.id] || []} />
             {/* Border frame behind */}
             <mesh position={[0, 0, -0.02]}>
               <planeGeometry args={[3.7, 3.2]} />
@@ -519,17 +570,40 @@ function PaintCanPickup3D({
   position: [number, number, number];
   color: string;
 }) {
-  const ref = useRef<THREE.Mesh>(null);
+  const ref = useRef<THREE.Group>(null);
+  // Derive a darker shade for the nozzle cap
+  const darkerColor = useMemo(() => {
+    const c = new THREE.Color(color);
+    c.multiplyScalar(0.55);
+    return '#' + c.getHexString();
+  }, [color]);
+
   useFrame(({ clock }) => {
     if (!ref.current) return;
     ref.current.rotation.y = clock.elapsedTime * 2.5;
     ref.current.position.y = position[1] + Math.sin(clock.elapsedTime * 3) * 0.1;
   });
+
   return (
-    <mesh ref={ref} position={position}>
-      <boxGeometry args={[0.25, 0.35, 0.25]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
-    </mesh>
+    <group ref={ref} position={position}>
+      {/* Can body — cylinder */}
+      <mesh>
+        <cylinderGeometry args={[0.08, 0.08, 0.3, 12]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+      </mesh>
+      {/* Nozzle cap — smaller cylinder on top */}
+      <mesh position={[0, 0.18, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.06, 10]} />
+        <meshStandardMaterial color={darkerColor} emissive={darkerColor} emissiveIntensity={0.15} />
+      </mesh>
+      {/* Spray tip — tiny white sphere on very top */}
+      <mesh position={[0, 0.23, 0]}>
+        <sphereGeometry args={[0.02, 8, 8]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+      </mesh>
+      {/* Emissive glow light */}
+      <pointLight color={color} intensity={0.6} distance={1.5} position={[0, 0, 0]} />
+    </group>
   );
 }
 
@@ -1533,6 +1607,54 @@ export function _HUD_OLD({
 
 const NOUNIRL_ADDRESS = '0x65C5C840797b85e23eB33C39b8A956e2cE498103' as const;
 const HOVERBOARD_PRICE_ETH = '0.01';
+
+// ── Billboard Ad System ──────────────────────────────────────────────
+
+interface BillboardAd {
+  imageUrl: string;
+  expiresAt: number; // Unix timestamp in ms
+  tier: string;
+  paidBy: string;
+}
+
+const BILLBOARD_AD_TIERS = [
+  { label: '1 HOUR', price: '0.01', durationMs: 60 * 60 * 1000 },
+  { label: '1 DAY', price: '0.05', durationMs: 24 * 60 * 60 * 1000 },
+  { label: '1 WEEK', price: '0.1', durationMs: 7 * 24 * 60 * 60 * 1000 },
+] as const;
+
+// Billboard positions that can display ads (matches the Billboard components in the scene)
+const AD_BILLBOARDS = [
+  { id: 'ad-board-1', worldX: 45, worldZ: 38, rotation: 0 },
+  { id: 'ad-board-2', worldX: 55, worldZ: 42, rotation: 0.5 },
+  { id: 'ad-board-3', worldX: 35, worldZ: 55, rotation: -0.3 },
+] as const;
+
+const AD_BOARD_NEAR_DISTANCE = 4;
+const BILLBOARD_AD_STORAGE_KEY = 'nouns-world-billboard-ads';
+
+function loadBillboardAds(): Record<string, BillboardAd> {
+  try {
+    const raw = localStorage.getItem(BILLBOARD_AD_STORAGE_KEY);
+    if (!raw) return {};
+    const ads = JSON.parse(raw) as Record<string, BillboardAd>;
+    const now = Date.now();
+    const active: Record<string, BillboardAd> = {};
+    for (const [id, ad] of Object.entries(ads)) {
+      if (ad.expiresAt > now) active[id] = ad;
+    }
+    return active;
+  } catch {
+    return {};
+  }
+}
+
+function saveBillboardAd(boardId: string, ad: BillboardAd) {
+  const ads = loadBillboardAds();
+  ads[boardId] = ad;
+  localStorage.setItem(BILLBOARD_AD_STORAGE_KEY, JSON.stringify(ads));
+}
+
 // Hoverboard pickup position (near the mega ramp)
 const HOVERBOARD_PICKUP_X = MEGA_RAMP_BOUNDS.x - 3;
 const HOVERBOARD_PICKUP_Z = MEGA_RAMP_BOUNDS.z - 8;
@@ -1656,6 +1778,217 @@ function HoverboardPurchaseModal({
         {txConfirmed && (
           <div style={{ color: '#00ffcc', fontSize: 13, marginTop: 8 }}>
             HOVERBOARD ACQUIRED! Press S to mount.
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 8,
+            background: 'none',
+            border: '1px solid #444',
+            borderRadius: 6,
+            padding: '6px 16px',
+            color: '#888',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            cursor: 'pointer',
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Billboard Ad Purchase Modal ──────────────────────────────────────
+
+function BillboardAdModal({
+  open,
+  boardId,
+  onClose,
+  onPurchased,
+}: {
+  open: boolean;
+  boardId: string;
+  onClose: () => void;
+  onPurchased: (boardId: string, ad: BillboardAd) => void;
+}) {
+  const { sendTransaction, data: txHash, isPending } = useSendTransaction();
+  const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+  const { address: wallet } = useAccount();
+  const [imageUrl, setImageUrl] = useState('');
+  const [selectedTier, setSelectedTier] = useState(0);
+
+  useEffect(() => {
+    if (txConfirmed && imageUrl) {
+      const tier = BILLBOARD_AD_TIERS[selectedTier];
+      const ad: BillboardAd = {
+        imageUrl,
+        expiresAt: Date.now() + tier.durationMs,
+        tier: tier.label,
+        paidBy: wallet ?? 'unknown',
+      };
+      saveBillboardAd(boardId, ad);
+      onPurchased(boardId, ad);
+    }
+  }, [txConfirmed]);
+
+  if (!open) return null;
+
+  const handleBuy = () => {
+    if (!imageUrl.trim()) {
+      alert('Please enter an image URL for your ad.');
+      return;
+    }
+    const tier = BILLBOARD_AD_TIERS[selectedTier];
+    sendTransaction({
+      to: NOUNIRL_ADDRESS,
+      value: parseEther(tier.price),
+    });
+  };
+
+  const modalStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0,0,0,0.8)',
+    pointerEvents: 'auto',
+  };
+
+  const boxStyle: React.CSSProperties = {
+    background: 'linear-gradient(135deg, #1a0a28 0%, #2a1a4a 100%)',
+    borderRadius: 16,
+    padding: 32,
+    width: 440,
+    maxWidth: '90vw',
+    color: '#fff',
+    fontFamily: 'monospace',
+    border: '1px solid rgba(255,170,0,0.4)',
+    boxShadow: '0 0 40px rgba(255,170,0,0.15)',
+    textAlign: 'center' as const,
+  };
+
+  return (
+    <div style={modalStyle} onClick={onClose}>
+      <div style={boxStyle} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: '#ffaa00', marginBottom: 8 }}>
+          BILLBOARD
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8, letterSpacing: 2 }}>
+          ADVERTISE HERE
+        </div>
+        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>
+          Payment goes to nounirl.eth (small grants treasury)
+        </div>
+
+        {/* Tier selector */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+          {BILLBOARD_AD_TIERS.map((tier, i) => (
+            <button
+              key={tier.label}
+              onClick={() => setSelectedTier(i)}
+              style={{
+                flex: 1,
+                padding: '10px 8px',
+                borderRadius: 8,
+                border: selectedTier === i ? '2px solid #ffaa00' : '1px solid #555',
+                background: selectedTier === i ? 'rgba(255,170,0,0.15)' : 'rgba(255,255,255,0.05)',
+                color: selectedTier === i ? '#ffaa00' : '#aaa',
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <div>{tier.label}</div>
+              <div style={{ fontSize: 14, marginTop: 4 }}>{tier.price} ETH</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Image URL input */}
+        <div style={{ marginBottom: 16, textAlign: 'left' }}>
+          <label style={{ fontSize: 11, color: '#888', letterSpacing: 1 }}>AD IMAGE URL</label>
+          <input
+            type="text"
+            value={imageUrl}
+            onChange={e => setImageUrl(e.target.value)}
+            placeholder="https://example.com/your-ad.png"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              marginTop: 4,
+              borderRadius: 6,
+              border: '1px solid #555',
+              background: 'rgba(0,0,0,0.4)',
+              color: '#fff',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Preview */}
+        {imageUrl && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>PREVIEW</div>
+            <img
+              src={imageUrl}
+              alt="Ad preview"
+              style={{
+                maxWidth: '100%',
+                maxHeight: 120,
+                borderRadius: 4,
+                border: '1px solid #444',
+              }}
+              onError={e => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          onClick={handleBuy}
+          disabled={isPending || !imageUrl.trim()}
+          style={{
+            width: '100%',
+            padding: '14px 24px',
+            borderRadius: 10,
+            border: 'none',
+            cursor: isPending ? 'wait' : 'pointer',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            fontSize: 16,
+            letterSpacing: 2,
+            background: isPending
+              ? 'rgba(255,170,0,0.3)'
+              : !imageUrl.trim()
+                ? '#333'
+                : 'linear-gradient(90deg, #ffaa00 0%, #ff8800 100%)',
+            color: isPending || !imageUrl.trim() ? '#666' : '#1a0a28',
+            marginBottom: 12,
+            transition: 'all 0.2s',
+          }}
+        >
+          {isPending
+            ? 'CONFIRMING...'
+            : txHash
+              ? 'WAITING...'
+              : `PAY ${BILLBOARD_AD_TIERS[selectedTier].price} ETH`}
+        </button>
+
+        {txConfirmed && (
+          <div style={{ color: '#ffaa00', fontSize: 13, marginTop: 8 }}>
+            AD PURCHASED! Your ad is now live.
           </div>
         )}
 
@@ -1847,6 +2180,13 @@ export default function WorldPage() {
   const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
   const [graffitiOpen, setGraffitiOpen] = useState(false);
   const [graffitiWallId, setGraffitiWallId] = useState<string | null>(null);
+  // Saved graffiti tags loaded from PartyKit — keyed by wallId
+  const graffitiTagsRef = useRef<Record<string, GraffitiTagData[]>>({});
+
+  // ── Billboard ad state ──
+  const [billboardAdOpen, setBillboardAdOpen] = useState(false);
+  const [billboardAdBoardId, setBillboardAdBoardId] = useState<string>('');
+  const [billboardAds, setBillboardAds] = useState<Record<string, BillboardAd>>(loadBillboardAds);
 
   // HUD state — ref only, HUD component reads via DOM manipulation (no React re-renders)
   const hudRef = useRef({
@@ -1932,7 +2272,7 @@ export default function WorldPage() {
     connectMultiplayer(mp);
     setupMessageHandler(mp, { current: player }, combatRef);
 
-    // VOIP signaling message handler
+    // VOIP signaling + graffiti message handler
     if (mp.ws) {
       mp.ws.addEventListener('message', (evt: MessageEvent) => {
         try {
@@ -1948,8 +2288,46 @@ export default function WorldPage() {
             if (data.speaking) voip.activeSpeakers.add(data.id);
             else voip.activeSpeakers.delete(data.id);
           }
+          // Handle graffiti persistence messages
+          const graffitiMsg = parseGraffitiMessage(evt.data);
+          if (graffitiMsg) {
+            if (graffitiMsg.type === 'graffiti:tags') {
+              graffitiTagsRef.current[graffitiMsg.wallId] = graffitiMsg.tags;
+            } else if (graffitiMsg.type === 'graffiti:save') {
+              // Another player saved a tag — add it to our local store
+              const existing = graffitiTagsRef.current[graffitiMsg.wallId] || [];
+              existing.push({
+                imageData: graffitiMsg.imageData,
+                playerId: graffitiMsg.playerId,
+                timestamp: Date.now(),
+              });
+              graffitiTagsRef.current[graffitiMsg.wallId] = existing;
+              // Also save to in-memory tag store
+              saveTag({
+                id: `${graffitiMsg.wallId}-${Date.now()}`,
+                billboardId: graffitiMsg.wallId,
+                pixels: graffitiMsg.imageData,
+                author: graffitiMsg.playerId,
+                timestamp: Date.now(),
+                color: '#ffffff',
+              });
+            }
+          }
         } catch {}
       });
+
+      // Request existing graffiti for all walls once connected
+      mp.ws.addEventListener('open', () => {
+        for (const wall of GRAFFITI_WALLS) {
+          loadGraffitiTags(mp.ws!, wall.id);
+        }
+      });
+      // If already open, request immediately
+      if (mp.ws.readyState === WebSocket.OPEN) {
+        for (const wall of GRAFFITI_WALLS) {
+          loadGraffitiTags(mp.ws, wall.id);
+        }
+      }
     }
 
     return () => {
@@ -2013,6 +2391,8 @@ export default function WorldPage() {
         if (graffitiOpen) {
           setGraffitiOpen(false);
           setGraffitiWallId(null);
+        } else if (billboardAdOpen) {
+          setBillboardAdOpen(false);
         } else if (depositOpen) {
           setDepositOpen(false);
         } else {
@@ -2102,6 +2482,18 @@ export default function WorldPage() {
           return;
         }
 
+        // Check for nearby billboard ad boards
+        for (const board of AD_BILLBOARDS) {
+          const bx = board.worldX * WORLD_SCALE;
+          const bz = board.worldZ * WORLD_SCALE;
+          const adDist = Math.sqrt((px - bx) ** 2 + (pz - bz) ** 2);
+          if (adDist < AD_BOARD_NEAR_DISTANCE) {
+            setBillboardAdBoardId(board.id);
+            setBillboardAdOpen(true);
+            return;
+          }
+        }
+
         // Check for nearby drop item
         const nearbyDrop = getNearbyDrop(p.x, p.y);
         if (nearbyDrop) {
@@ -2113,7 +2505,16 @@ export default function WorldPage() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate, depositOpen, graffitiOpen, claimDrop, chestWorldX, chestWorldZ, hasHoverboard]);
+  }, [
+    navigate,
+    depositOpen,
+    graffitiOpen,
+    billboardAdOpen,
+    claimDrop,
+    chestWorldX,
+    chestWorldZ,
+    hasHoverboard,
+  ]);
 
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
@@ -2635,25 +3036,63 @@ export default function WorldPage() {
         {/* World objects */}
         <Billboard
           position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]}
-          text="probe.wtf"
-          url="https://probe.wtf"
+          text={
+            billboardAds['ad-board-1']?.imageUrl
+              ? `AD: ${billboardAds['ad-board-1'].paidBy.slice(0, 8)}...`
+              : 'probe.wtf'
+          }
+          url={billboardAds['ad-board-1']?.imageUrl || 'https://probe.wtf'}
         />
         <Billboard
           position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]}
-          text="YOUR AD HERE ⌐◧-◧"
+          text={
+            billboardAds['ad-board-2']?.imageUrl
+              ? `AD: ${billboardAds['ad-board-2'].paidBy.slice(0, 8)}...`
+              : 'YOUR AD HERE ⌐◧-◧'
+          }
+          url={billboardAds['ad-board-2']?.imageUrl}
           rotation={0.5}
         />
         <Billboard
           position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]}
-          text="pooter.world"
-          url="https://pooter.world"
+          text={
+            billboardAds['ad-board-3']?.imageUrl
+              ? `AD: ${billboardAds['ad-board-3'].paidBy.slice(0, 8)}...`
+              : 'pooter.world'
+          }
+          url={billboardAds['ad-board-3']?.imageUrl || 'https://pooter.world'}
           rotation={-0.3}
         />
+        {/* [E] ADVERTISE prompts near ad billboards */}
+        {AD_BILLBOARDS.map(board => (
+          <Html
+            key={`ad-prompt-${board.id}`}
+            position={[board.worldX * WORLD_SCALE, 0.3, board.worldZ * WORLD_SCALE]}
+            center
+            distanceFactor={6}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '10px',
+                color: '#ffaa00',
+                textShadow: '0 0 4px rgba(0,0,0,0.8)',
+                whiteSpace: 'nowrap',
+                userSelect: 'none',
+                opacity: 0.8,
+              }}
+            >
+              [E] ADVERTISE
+            </div>
+          </Html>
+        ))}
+
         <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
         <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
 
         {/* Graffiti walls */}
-        <GraffitiWalls />
+        <GraffitiWalls tagsMap={graffitiTagsRef.current} />
 
         {/* Paint can pickups */}
         {paintCans
@@ -2672,6 +3111,9 @@ export default function WorldPage() {
 
         {/* Mega Ramp */}
         <MegaRamp3D />
+
+        {/* NYC Apartment Block (adjacent to mega ramp) */}
+        <NYCApartmentBlock />
 
         {/* Hoverboard Pickup (near mega ramp) */}
         {!hasHoverboard && (
@@ -2786,7 +3228,7 @@ export default function WorldPage() {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            paddingTop: '15vh',
+            paddingTop: '25vh',
             opacity: introOpacity,
             transition: 'none',
           }}
@@ -2816,7 +3258,7 @@ export default function WorldPage() {
               lineHeight: 1,
             }}
           >
-            NOUNS
+            NOUN
             <br />
             WORLD
           </div>
@@ -2869,6 +3311,17 @@ export default function WorldPage() {
           mountBoard(skateRef.current);
         }}
         isFree={isOwnerWallet}
+      />
+
+      {/* Billboard ad purchase modal */}
+      <BillboardAdModal
+        open={billboardAdOpen}
+        boardId={billboardAdBoardId}
+        onClose={() => setBillboardAdOpen(false)}
+        onPurchased={(boardId, ad) => {
+          setBillboardAds(prev => ({ ...prev, [boardId]: ad }));
+          setBillboardAdOpen(false);
+        }}
       />
 
       {/* Skating HUD overlay — trick score, combo, balance meter */}
