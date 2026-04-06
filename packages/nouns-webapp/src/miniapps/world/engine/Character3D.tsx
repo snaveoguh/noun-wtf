@@ -62,6 +62,8 @@ export interface CharacterState {
   hitFlash: number;
   hp: number;
   maxHp: number;
+  weaponEquipped: string | null;
+  muzzleFlash: number;
 }
 
 function getNounBodyColor(seed: INounSeed): string {
@@ -105,6 +107,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
   const prevAnimRef = useRef('');
   const oneShotPlaying = useRef(false);
   const voxelHeadRef = useRef<THREE.Group | null>(null);
+  const gunGroupRef = useRef<THREE.Group | null>(null);
+  const handBoneRef = useRef<THREE.Object3D | null>(null);
 
   const nounHeadRef = useRef((() => {
     try {
@@ -162,6 +166,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
             child.add(headGroup);
             voxelHeadRef.current = headGroup;
+          }
+          // Store hand bone for gun attachment
+          if (child.name === 'handslot.r') {
+            handBoneRef.current = child;
           }
         });
 
@@ -308,6 +316,57 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           }
         }
       });
+    }
+
+    // ── Gun in hand ──
+    const handBone = handBoneRef.current;
+    if (handBone) {
+      const wep = s.weaponEquipped;
+      if (wep && !gunGroupRef.current) {
+        // Create tiny gun mesh and attach to hand
+        const gun = new THREE.Group();
+        const gunScale = 0.08; // very small to not drag on floor
+        const mat = new THREE.MeshBasicMaterial({ color: wep === 'shotgun' ? '#8B4513' : wep === 'uzi' ? '#333' : '#555' });
+        // Barrel
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 6), mat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = 1;
+        gun.add(barrel);
+        // Body
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), mat);
+        gun.add(body);
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.2), new THREE.MeshBasicMaterial({ color: '#222' }));
+        grip.position.set(0, -0.4, -0.05);
+        gun.add(grip);
+        // Muzzle flash light (starts off)
+        const flash = new THREE.PointLight('#ff8800', 0, 3);
+        flash.name = '__gunFlash';
+        flash.position.set(0, 0, 2.2);
+        gun.add(flash);
+
+        gun.scale.set(gunScale, gunScale, gunScale);
+        gun.position.set(0, 0, 0.3);
+        gun.rotation.set(0, 0, -Math.PI / 4);
+        handBone.add(gun);
+        gunGroupRef.current = gun;
+      } else if (!wep && gunGroupRef.current) {
+        // Remove gun
+        handBone.remove(gunGroupRef.current);
+        gunGroupRef.current = null;
+      }
+
+      // Muzzle flash
+      if (gunGroupRef.current) {
+        const flash = gunGroupRef.current.getObjectByName('__gunFlash') as THREE.PointLight;
+        if (flash) {
+          if (s.muzzleFlash > 0) {
+            flash.intensity = 5 + Math.random() * 3;
+          } else {
+            flash.intensity = 0;
+          }
+        }
+      }
     }
   });
 

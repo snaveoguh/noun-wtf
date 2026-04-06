@@ -78,7 +78,7 @@ import { getActiveDrops, getNearbyDrop, markClaimed, type DroppedItem } from './
 import { getAuctionState } from './engine/settlement';
 import {
   playPunchSound, playKickSound, playHeadbuttSound, playGunshot,
-  playShotgunSound, playFootstep, playDeathSound, playPickupSound,
+  playShotgunSound, playDeathSound, playPickupSound,
   playComboSound, playJumpSound, playBlockSound,
 } from './engine/sounds';
 import {
@@ -434,6 +434,9 @@ function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRe
 
     camera.position.lerp(desired, 0.1);
     camera.lookAt(target.x, target.y + 0.5, target.z);
+
+    // Write camera angle to input state so WASD movement is camera-relative
+    if (input) input.cameraAngle = orbitX.current;
   });
 
   return null;
@@ -773,12 +776,12 @@ export default function WorldPage() {
   const npcsRef = useRef<NPC[]>(createNPCs());
   const playerCharState = useRef<CharacterState>({
     x: SPAWN_X * WORLD_SCALE, z: SPAWN_Y * WORLD_SCALE, y: 0,
-    direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
+    direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, weaponEquipped: null, muzzleFlash: 0,
   });
   const npcCharStates = useRef<CharacterState[]>(
     npcsRef.current.map(npc => ({
       x: npc.x * WORLD_SCALE, z: npc.y * WORLD_SCALE, y: 0,
-      direction: 'down' as Direction, state: 'idle' as PlayerState, attackType: null, hitFlash: 0, hp: npc.hp, maxHp: npc.maxHp,
+      direction: 'down' as Direction, state: 'idle' as PlayerState, attackType: null, hitFlash: 0, hp: npc.hp, maxHp: npc.maxHp, weaponEquipped: null, muzzleFlash: 0,
     }))
   );
   const frameRef = useRef(0);
@@ -990,10 +993,7 @@ export default function WorldPage() {
       tickReload(weapon);
       tickMuzzleFlash(weapon);
 
-      // ── Footstep sound (every 20 frames while walking) ──
-      if ((player.state === 'walking' || player.state === 'dashing') && frame % 20 === 0) {
-        playFootstep();
-      }
+      // Footsteps disabled — too noisy
 
       // Combat input
       if (ocean.phase === 'normal') {
@@ -1173,6 +1173,9 @@ export default function WorldPage() {
       // Weapon HUD
       hudRef.current.weaponEquipped = weaponRef.current.equipped;
       hudRef.current.weaponAmmo = weaponRef.current.ammo;
+      // Write weapon state to character for gun rendering
+      pcs.weaponEquipped = weaponRef.current.equipped;
+      pcs.muzzleFlash = weaponRef.current.muzzleFlash;
     });
 
     return null;
@@ -1204,7 +1207,7 @@ export default function WorldPage() {
           }
           entry = {
             seed: rpSeed,
-            state: { x: 0, z: 0, y: 0, direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: 100, maxHp: 100 },
+            state: { x: 0, z: 0, y: 0, direction: 'up', state: 'idle', attackType: null, hitFlash: 0, hp: 100, maxHp: 100, weaponEquipped: null, muzzleFlash: 0 },
           };
           remoteCharStates.current.set(id, entry);
         }
