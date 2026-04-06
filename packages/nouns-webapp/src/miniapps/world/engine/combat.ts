@@ -190,10 +190,7 @@ export function executeMove(
     player.airborneVy = def.launchVy;
     player.airborneY = -1; // start airborne
     player.flipRotation = 0;
-    // Move backward
-    player.vx += -player.scaleX * 4;
-    player.vy -= 2;
-    spawnDustTrail(combat.particles, player.x, player.y + SPRITE_SIZE / 2, 8);
+    // Jump in place — no horizontal push
     return [];
   }
 
