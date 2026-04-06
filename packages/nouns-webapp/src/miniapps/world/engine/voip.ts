@@ -417,4 +417,69 @@ export function destroyVoip(state: VoipState) {
   state.settleTriggered = false;
 }
 
+// ── Speech-to-Text (floating words above head) ──────────────────────
+
+let _recognition: any = null;
+let _currentTranscript = '';
+let _transcriptExpiry = 0;
+
+/**
+ * Start speech recognition. Transcribed words appear above the player.
+ */
+export function startSpeechToText(state: VoipState) {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) return; // not supported
+
+  if (_recognition) _recognition.stop();
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (event: any) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        _currentTranscript = transcript.trim();
+        _transcriptExpiry = Date.now() + 4000; // show for 4 seconds
+      } else {
+        interim = transcript;
+      }
+    }
+    if (interim) {
+      _currentTranscript = interim.trim();
+      _transcriptExpiry = Date.now() + 2000; // interim fades faster
+    }
+  };
+
+  recognition.onerror = () => {};
+  recognition.onend = () => {
+    // Auto-restart if still speaking
+    if (state.localStream && !state.isMuted) {
+      try { recognition.start(); } catch {}
+    }
+  };
+
+  try {
+    recognition.start();
+    _recognition = recognition;
+  } catch {}
+}
+
+export function stopSpeechToText() {
+  if (_recognition) {
+    _recognition.stop();
+    _recognition = null;
+  }
+  _currentTranscript = '';
+}
+
+/** Get current transcript text (empty if expired) */
+export function getCurrentTranscript(): string {
+  if (Date.now() > _transcriptExpiry) return '';
+  return _currentTranscript;
+}
+
 export { SETTLE_SPEAKER_THRESHOLD };

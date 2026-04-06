@@ -90,6 +90,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
   const actionsRef = useRef<Record<string, THREE.AnimationAction>>({});
   const prevAnimRef = useRef('');
   const oneShotPlaying = useRef(false);
+  const voxelHeadRef = useRef<THREE.Group | null>(null);
 
   const nounHeadRef = useRef((() => {
     try {
@@ -141,11 +142,12 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           if (child.name === 'head' && (child as any).isBone) {
             const headGroup = new THREE.Group();
             headGroup.scale.set(VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE);
-            headGroup.position.set(0, 1.2, 0);
+            headGroup.position.set(0, 0.65, 0);
             const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
             if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
             if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
             child.add(headGroup);
+            voxelHeadRef.current = headGroup;
           }
         });
 
@@ -232,7 +234,62 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       mixer.update(delta);
     }
 
-    // visibility managed by model load — no toggling
+    // Voxel head subtle idle animation
+    const head = voxelHeadRef.current;
+    if (head) {
+      const t = Date.now() * 0.001;
+      // Gentle nod left/right
+      head.rotation.z = Math.sin(t * 0.4) * 0.03;
+      // Very subtle forward/back nod
+      head.rotation.x = Math.sin(t * 0.6) * 0.015;
+
+      // Noggle blink — squash Y scale briefly every ~8-12 seconds
+      const blinkCycle = t % 10; // 10 second cycle
+      if (blinkCycle > 9.7 && blinkCycle < 9.85) {
+        // Blink! Squash the glasses
+        head.children.forEach((child, i) => {
+          if (i > 0) { // glasses are second child
+            child.scale.y = 0.3; // squash
+          }
+        });
+      } else if (blinkCycle > 9.85 && blinkCycle < 9.9) {
+        // Open back up
+        head.children.forEach((child, i) => {
+          if (i > 0) child.scale.y = 1;
+        });
+      }
+
+      // Swap pupil colors (black<->white) every ~20 seconds to look different direction
+      const lookCycle = Math.floor(t / 20) % 2;
+      head.children.forEach((child, i) => {
+        if (i > 0 && (child as THREE.Mesh).geometry) {
+          const geo = (child as THREE.Mesh).geometry;
+          const colors = geo.attributes.color;
+          if (colors && !((geo as any).__origColors)) {
+            // Store original colors on first frame
+            (geo as any).__origColors = new Float32Array(colors.array);
+          }
+          if (colors && (geo as any).__origColors) {
+            const orig = (geo as any).__origColors as Float32Array;
+            const arr = colors.array as Float32Array;
+            for (let ci = 0; ci < arr.length; ci += 3) {
+              const r = orig[ci], g = orig[ci + 1], b = orig[ci + 2];
+              // Detect near-black (pupil) and near-white (eye white)
+              const isBlack = r < 0.05 && g < 0.05 && b < 0.05;
+              const isWhite = r > 0.9 && g > 0.9 && b > 0.9;
+              if (lookCycle === 1) {
+                if (isBlack) { arr[ci] = 1; arr[ci + 1] = 1; arr[ci + 2] = 1; }
+                else if (isWhite) { arr[ci] = 0; arr[ci + 1] = 0; arr[ci + 2] = 0; }
+                else { arr[ci] = orig[ci]; arr[ci + 1] = orig[ci + 1]; arr[ci + 2] = orig[ci + 2]; }
+              } else {
+                arr[ci] = orig[ci]; arr[ci + 1] = orig[ci + 1]; arr[ci + 2] = orig[ci + 2];
+              }
+            }
+            colors.needsUpdate = true;
+          }
+        }
+      });
+    }
   });
 
   return (
