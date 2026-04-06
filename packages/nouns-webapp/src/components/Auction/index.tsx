@@ -1078,9 +1078,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
                   onClick={() => {
                     if (value === 'sprite') {
-                      // Spin transition then enter world
+                      // Spin transition then enter world as this Noun
                       setViewMode('sprite');
-                      setTimeout(() => navigate('/world'), 800);
+                      const s = currentNounSeed;
+                      const seedParam = s ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}` : '';
+                      setTimeout(() => navigate(`/world${seedParam}`), 800);
                       return;
                     }
                     if (value === 'edit-2d') {

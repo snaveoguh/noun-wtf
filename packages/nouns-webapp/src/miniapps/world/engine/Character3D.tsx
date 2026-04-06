@@ -16,7 +16,7 @@ import type { INounSeed } from '@/wrappers/nounToken';
 import type { Direction, MoveType, PlayerState } from './types';
 
 const MODEL_PATH = '/models/character.glb';
-const VOXEL_HEAD_SCALE = 0.28;
+const VOXEL_HEAD_SCALE = 0.14; // 50% smaller head
 const HEAD_VIS: LayerVisibility = { body: false, accessory: false, head: true, glasses: true };
 const BODY_SCALE = 0.14;
 

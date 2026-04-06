@@ -14,12 +14,15 @@ import type { MoveType } from './types';
 export interface InputState {
   keys: Set<string>;
   // Camera orbit from arrow keys
-  cameraOrbitX: number; // horizontal orbit offset (radians)
-  cameraOrbitY: number; // vertical orbit offset (radians)
-  cameraAngle: number; // current camera horizontal angle (written by CameraController)
+  cameraOrbitX: number;
+  cameraOrbitY: number;
+  cameraAngle: number;
   // Per-frame flags
   justPressed: Set<string>;
   shiftHeld: boolean;
+  // Space tap tracking for jump/double-jump/backflip
+  spaceTaps: number;
+  lastSpaceTime: number;
 }
 
 export function createInputState(): InputState {
@@ -30,6 +33,8 @@ export function createInputState(): InputState {
     cameraAngle: 0,
     justPressed: new Set(),
     shiftHeld: false,
+    spaceTaps: 0,
+    lastSpaceTime: 0,
   };
 }
 
@@ -43,6 +48,16 @@ export function attachInputListeners(
     if (!state.keys.has(k)) {
       state.keys.add(k);
       state.justPressed.add(k);
+      // Track space taps for jump/double-jump/backflip
+      if (k === ' ') {
+        const now = Date.now();
+        if (now - state.lastSpaceTime < 400) {
+          state.spaceTaps++;
+        } else {
+          state.spaceTaps = 1;
+        }
+        state.lastSpaceTime = now;
+      }
     }
     if (k === 'shift') state.shiftHeld = true;
     // Prevent scrolling
@@ -126,9 +141,8 @@ export function resolveIntendedMove(input: InputState): MoveType | null {
   if (input.shiftHeld) return 'block';
 
   if (jp.has(' ')) {
-    if (keys.has('s')) return 'backflip';
-    if (keys.has('a') || keys.has('d') || keys.has('w')) return 'dash';
-    return 'backflip'; // space alone = backflip
+    // Space = jump (backflip move uses Jump_Full_Long animation)
+    return 'backflip';
   }
 
   if (jp.has('j')) return 'punch';

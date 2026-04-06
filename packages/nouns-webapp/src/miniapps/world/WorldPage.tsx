@@ -5,7 +5,7 @@
 // and the full combat + multiplayer system from the engine.
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -684,6 +684,7 @@ function HUD({
 
 export default function WorldPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const currentNounSeed = useAppSelector(state => (state as any).onDisplayAuction?.seed);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
@@ -731,7 +732,17 @@ export default function WorldPage() {
     settleTriggered: false,
   });
 
-  const seed = useMemo(() => currentNounSeed || randomSeed(), [currentNounSeed]);
+  // Seed priority: URL param > Redux auction state > random
+  const seed = useMemo(() => {
+    const seedParam = searchParams.get('seed');
+    if (seedParam) {
+      const parts = seedParam.split('-').map(Number);
+      if (parts.length === 5 && parts.every(n => !isNaN(n))) {
+        return { background: parts[0], body: parts[1], accessory: parts[2], head: parts[3], glasses: parts[4] };
+      }
+    }
+    return currentNounSeed || randomSeed();
+  }, [searchParams, currentNounSeed]);
   const seedKey = useMemo(() => seedToKey(seed), [seed]);
 
   // Initialize player + multiplayer
