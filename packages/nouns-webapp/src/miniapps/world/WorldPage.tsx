@@ -498,8 +498,8 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
       {/* Swirling smoke particles */}
       <SmokeParticles count={60} radius={1.8} height={MOUNTAIN_HEIGHT * 1.2} baseY={MOUNTAIN_HEIGHT * 0.3} />
 
-      {/* Rotating voxel Noun inside the fiery ring */}
-      <group ref={ballGroupRef} position={[0, eyeY, 0]} scale={[0.05, 0.05, 0.05]}>
+      {/* Rotating voxel Noun — MASSIVE in the sky, visible from everywhere */}
+      <group ref={ballGroupRef} position={[0, eyeY, 0]} scale={[1, 1, 1]}>
         {bodyGeo && <mesh geometry={bodyGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
         {blingGeo && <mesh geometry={blingGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
         {headGeo && <mesh geometry={headGeo}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
@@ -556,12 +556,16 @@ function CameraController({ target, inputRef, playerCharState }: {
       if (input.keys.has('arrowdown')) angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
     }
 
-    // Walking → zoom out + rise up. Idle → zoom in tight + drop low
+    // Walking → zoom out, rise up, AND reset angleX to behind (0)
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
     const wantDist = moving ? 3.5 : 1.5;
     const wantY = moving ? 0.3 : 0.12;
     dist.current += (wantDist - dist.current) * 0.04;
     angleY.current += (wantY - angleY.current) * 0.03;
+    // When walking, smoothly return camera to behind (angleX → 0)
+    if (moving) {
+      angleX.current *= 0.92; // ease back to 0
+    }
 
     const d = dist.current;
     const desired = new THREE.Vector3(
