@@ -534,21 +534,40 @@ const DEFAULT_VIS: VoxelLayerVis = { body: true, accessory: true, head: true, gl
 
 // ── Third-Person Camera — arrow keys orbit, always behind player ──────
 
-function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRef: React.RefObject<InputState> }) {
+function CameraController({ target, inputRef, playerCharState }: {
+  target: THREE.Vector3;
+  inputRef: React.RefObject<InputState>;
+  playerCharState: React.RefObject<CharacterState>;
+}) {
   const { camera } = useThree();
-  const orbitX = useRef(0); // horizontal orbit (left/right arrows)
-  const orbitY = useRef(0.3); // vertical orbit (up/down arrows) — starts slightly above
+  const orbitX = useRef(0);
+  const orbitY = useRef(0.3);
 
   useFrame((_, delta) => {
     const input = inputRef.current;
+    const pcs = playerCharState.current;
 
-    // Arrow keys pan camera — stays where you put it
+    // Arrow keys pan camera when idle
     if (input) {
       const panSpeed = 1.5;
       if (input.keys.has('arrowleft')) orbitX.current -= panSpeed * delta;
       if (input.keys.has('arrowright')) orbitX.current += panSpeed * delta;
       if (input.keys.has('arrowup')) orbitY.current = Math.min(orbitY.current + panSpeed * delta * 0.5, 1.2);
       if (input.keys.has('arrowdown')) orbitY.current = Math.max(orbitY.current - panSpeed * delta * 0.5, 0.05);
+    }
+
+    // When walking — instant snap camera behind player
+    if (pcs && (pcs.state === 'walking' || pcs.state === 'dashing')) {
+      const behindAngle =
+        pcs.direction === 'up' ? 0 :
+        pcs.direction === 'down' ? Math.PI :
+        pcs.direction === 'left' ? Math.PI * 0.5 :
+        pcs.direction === 'right' ? Math.PI * 1.5 :
+        pcs.direction === 'up-left' ? Math.PI * 0.25 :
+        pcs.direction === 'up-right' ? Math.PI * 1.75 :
+        pcs.direction === 'down-left' ? Math.PI * 0.75 :
+        Math.PI * 1.25;
+      orbitX.current = behindAngle;
     }
 
     const camDist = 3.5;
@@ -558,7 +577,6 @@ function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRe
       target.z + Math.cos(orbitX.current) * Math.cos(orbitY.current) * camDist,
     );
 
-    // Snap camera (no lerp lag — instant follow like good 3rd person games)
     camera.position.copy(desired);
     camera.lookAt(target.x, target.y + 0.5, target.z);
   });
@@ -1440,7 +1458,7 @@ export default function WorldPage() {
         <PlayerCharacter3D />
         <RemotePlayers />
 
-        <CameraController target={playerTargetRef.current} inputRef={inputRef} />
+        <CameraController target={playerTargetRef.current} inputRef={inputRef} playerCharState={playerCharState} />
         <GameLogic />
       </Canvas>
 
