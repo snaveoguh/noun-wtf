@@ -64,6 +64,11 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
 
+  // Compare seed by value (not reference) so geometry rebuilds on navigation
+  const seedKey = seed
+    ? `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`
+    : '';
+
   const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
     if (voxelMap) {
       return {
@@ -78,7 +83,8 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-  }, [seed, layerVisibility, voxelMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey, layerVisibility, voxelMap]);
 
   useEffect(() => {
     return () => {
@@ -91,7 +97,8 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
 
   useEffect(() => {
     spinTime.current = 0;
-  }, [seed, voxelMap, autoSpin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey, voxelMap, autoSpin]);
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
@@ -164,6 +171,11 @@ function InteractiveScene({
   autoRotate = false,
   interactionMode = 'twist',
 }: InteractiveSceneProps) {
+  // Compare seed by value (not reference) so geometry rebuilds on navigation
+  const seedKey = seed
+    ? `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`
+    : '';
+
   const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
     if (voxelMap) {
       return {
@@ -178,7 +190,8 @@ function InteractiveScene({
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-  }, [seed, layerVisibility, voxelMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey, layerVisibility, voxelMap]);
 
   useEffect(() => {
     return () => {
