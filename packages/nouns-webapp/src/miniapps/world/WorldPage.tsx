@@ -653,22 +653,21 @@ function CameraController({
         angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
     }
 
-    // Walking → zoom out, rise up, AND swing camera behind character's facing direction
+    // Walking → zoom out, rise up, AND swing camera behind character
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
     const wantDist = moving ? 3.5 : 1.5;
     const wantY = moving ? 0.3 : 0.12;
     dist.current += (wantDist - dist.current) * 0.04;
     angleY.current += (wantY - angleY.current) * 0.03;
 
+    // When walking, smoothly swing camera behind the character's facing direction
+    // Safe because WASD is world-relative — no feedback loop
     if (moving && pcs) {
-      // Get the angle the camera should be at (behind the character)
-      const behindAngle = BEHIND_ANGLE[pcs.direction] ?? Math.PI;
-      // Shortest-path angle lerp to avoid spinning the wrong way around
+      const behindAngle = BEHIND_ANGLE[pcs.direction] ?? 0;
       let diff = behindAngle - angleX.current;
-      // Normalize to [-PI, PI]
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      angleX.current += diff * 0.15; // tight follow behind character
+      angleX.current += diff * 0.08;
     }
 
     const d = dist.current;
@@ -680,9 +679,6 @@ function CameraController({
 
     camera.position.lerp(desired, 0.08);
     camera.lookAt(target.x, target.y + 0.4, target.z);
-
-    // Write camera angle back to input so WASD is camera-relative
-    if (input) input.cameraAngle = angleX.current;
   });
 
   return null;

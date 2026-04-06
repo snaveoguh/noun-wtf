@@ -83,31 +83,21 @@ export function attachInputListeners(canvas: HTMLCanvasElement, state: InputStat
   };
 }
 
-/** WASD movement — camera-relative. W=forward (away from camera), A/D=strafe, S=back */
-export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
-  // Raw input: W=forward, S=back, A=left, D=right (relative to camera)
-  let fx = 0,
-    fy = 0;
-  if (keys.has('w')) fy -= 1; // forward
-  if (keys.has('s')) fy += 1; // back
-  if (keys.has('a')) fx -= 1; // strafe left
-  if (keys.has('d')) fx += 1; // strafe right
-  if (fx !== 0 && fy !== 0) {
+/** WASD movement — world-relative. W=north, S=south, A=west, D=east.
+ *  Camera follows behind separately — no feedback loop. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getMovementVector(keys: Set<string>, _cameraAngle = 0): { dx: number; dy: number } {
+  let dx = 0,
+    dy = 0;
+  if (keys.has('w')) dy -= 1;
+  if (keys.has('s')) dy += 1;
+  if (keys.has('a')) dx -= 1;
+  if (keys.has('d')) dx += 1;
+  if (dx !== 0 && dy !== 0) {
     const inv = 1 / Math.SQRT2;
-    fx *= inv;
-    fy *= inv;
+    dx *= inv;
+    dy *= inv;
   }
-  if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
-
-  // Rotate by camera angle so W always means "toward where camera looks"
-  // Camera orbits at (sin(a)*d, h, cos(a)*d) in 3D, looking at player
-  // 2D game: player.x → 3D x, player.y → 3D z
-  // Forward (W, fy=-1) should move in camera-look direction: (-sin(a), -cos(a)) in 2D
-  // Right (D, fx=+1) should move perpendicular: (cos(a), -sin(a)) in 2D
-  const cos = Math.cos(cameraAngle);
-  const sin = Math.sin(cameraAngle);
-  const dx = fy * sin + fx * cos; // fy=-1 → -sin(a), fx=+1 → cos(a)
-  const dy = fy * cos - fx * sin; // fy=-1 → -cos(a), fx=+1 → -sin(a)
   return { dx, dy };
 }
 
