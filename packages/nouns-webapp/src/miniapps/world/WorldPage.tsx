@@ -1007,11 +1007,13 @@ function CameraController({
     const input = inputRef.current;
     const pcs = playerCharState.current;
 
-    // Walking → zoom out, rise up, AND swing camera behind character
+    // Z key → zoom WAY out (bird's eye to see the ASCII noun in the sky)
+    const zoomOut = input?.keys.has('z');
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
-    const wantDist = moving ? 3.5 : 1.5;
-    const wantY = moving ? 0.3 : 0.12;
-    dist.current += (wantDist - dist.current) * 0.04;
+    const wantDist = zoomOut ? 40 : moving ? 3.5 : 1.5;
+    const wantY = zoomOut ? 1.2 : moving ? 0.3 : 0.12;
+    const zoomSpeed = zoomOut ? 0.08 : 0.04; // faster zoom out/in for Z key
+    dist.current += (wantDist - dist.current) * zoomSpeed;
     angleY.current += (wantY - angleY.current) * 0.03;
 
     // When walking, smoothly swing camera behind the character's facing direction
