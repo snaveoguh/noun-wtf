@@ -29,10 +29,10 @@ interface NounSeed {
   glasses: number;
 }
 
-interface AsciiVoxel {
+export interface AsciiVoxel {
   x: number;
-  z: number;       // row (depth axis)
-  y: number;       // base height (brightness-derived)
+  z: number; // row (depth axis)
+  y: number; // base height (brightness-derived)
   r: number;
   g: number;
   b: number;
@@ -51,11 +51,11 @@ const PART_COLORS = ['#8b8b8b', '#e06c75', '#e5c07b', '#61afef', '#c678dd'];
 
 // Split offsets — how far apart each gene group floats in split mode
 const SPLIT_OFFSETS = [
-  -12,  // background (bottom)
-   -4,  // body
-    4,  // accessory
-   12,  // head
-   20,  // glasses (top)
+  -12, // background (bottom)
+  -4, // body
+  4, // accessory
+  12, // head
+  20, // glasses (top)
 ];
 
 // ─── Character Textures (canvas-rendered, cached) ───────────────────────────
@@ -96,25 +96,24 @@ function decodeRLE(data: string) {
     left: parseInt(hex.substring(8, 10), 16),
   };
   const pairs: [number, number][] =
-    hex.substring(10).match(/.{1,4}/g)?.map(r => [
-      parseInt(r.substring(0, 2), 16),
-      parseInt(r.substring(2, 4), 16),
-    ]) ?? [];
+    hex
+      .substring(10)
+      .match(/.{1,4}/g)
+      ?.map(r => [parseInt(r.substring(0, 2), 16), parseInt(r.substring(2, 4), 16)]) ?? [];
   return { bounds, pairs };
 }
 
 // ─── Seed → ASCII Voxels (with part tracking) ──────────────────────────────
 
-function seedToAsciiVoxels(seed: NounSeed): AsciiVoxel[] {
+export function seedToAsciiVoxels(seed: NounSeed): AsciiVoxel[] {
   const { parts, background } = getNounData(seed);
   const palette = ImageData.palette;
 
   // Build 32x32 grids — color + which part painted it
-  const colorGrid: string[][] = Array.from({ length: 32 }, () =>
-    Array(32).fill(background),
-  );
-  const partGrid: number[][] = Array.from({ length: 32 }, () =>
-    Array(32).fill(0), // 0 = background
+  const colorGrid: string[][] = Array.from({ length: 32 }, () => Array(32).fill(background));
+  const partGrid: number[][] = Array.from(
+    { length: 32 },
+    () => Array(32).fill(0), // 0 = background
   );
 
   for (let p = 0; p < parts.length; p++) {
@@ -157,7 +156,9 @@ function seedToAsciiVoxels(seed: NounSeed): AsciiVoxel[] {
         x: col,
         z: 31 - row,
         y: height,
-        r, g, b,
+        r,
+        g,
+        b,
         charIndex,
         partIndex: partGrid[row][col],
       });
@@ -168,7 +169,7 @@ function seedToAsciiVoxels(seed: NounSeed): AsciiVoxel[] {
 
 // ─── Animated Character Group ──────────────────────────────────────────────
 
-function CharacterGroup({
+export function CharacterGroup({
   voxels,
   charIndex,
   splitAmount,
@@ -279,9 +280,7 @@ function PartLabel({
         }}
       >
         {PART_NAMES[partIndex]}
-        <span style={{ opacity: 0.5, marginLeft: 4, fontSize: '0.5rem' }}>
-          {count}px
-        </span>
+        <span style={{ opacity: 0.5, marginLeft: 4, fontSize: '0.5rem' }}>{count}px</span>
       </div>
     </Html>
   );
@@ -289,13 +288,7 @@ function PartLabel({
 
 // ─── ASCII Scene ─────────────────────────────────────────────────────────────
 
-function AsciiScene({
-  voxels,
-  splitAmount,
-}: {
-  voxels: AsciiVoxel[];
-  splitAmount: number;
-}) {
+function AsciiScene({ voxels, splitAmount }: { voxels: AsciiVoxel[]; splitAmount: number }) {
   const groupRef = useRef<THREE.Group>(null);
 
   // Group voxels by character type
@@ -327,12 +320,7 @@ function AsciiScene({
       ))}
       {/* Part labels when split */}
       {PART_NAMES.map((_, i) => (
-        <PartLabel
-          key={i}
-          partIndex={i}
-          splitAmount={splitAmount}
-          count={partCounts[i]}
-        />
+        <PartLabel key={i} partIndex={i} splitAmount={splitAmount} count={partCounts[i]} />
       ))}
     </group>
   );
@@ -380,7 +368,9 @@ const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed }) => {
         camera={{ position: [0, 28, 30], fov: 50 }}
         style={{ width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: true }}
-        onCreated={({ gl }) => { gl.setClearColor(0x000000, 0); }}
+        onCreated={({ gl }) => {
+          gl.setClearColor(0x000000, 0);
+        }}
       >
         <Suspense fallback={null}>
           <ambientLight intensity={0.8} />

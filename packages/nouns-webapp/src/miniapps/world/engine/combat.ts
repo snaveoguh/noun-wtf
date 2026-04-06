@@ -577,17 +577,20 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
   }
 
   // ��─ Attacking ──
-  if (player.attackTimer > 0 && player.state === 'attacking') {
-    applyFriction(player, 0.92);
-    applyGravity(player);
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
+  if (player.state === 'attacking') {
     if (player.attackTimer <= 0) {
+      // Attack finished — return to idle
       player.state = player.airborneY < GROUND_Y ? 'airborne' : 'idle';
       player.attackType = null;
+      // Fall through to normal movement
+    } else {
+      applyFriction(player, 0.92);
+      applyGravity(player);
+      const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
+      player.x = pos.x;
+      player.y = pos.y;
+      return;
     }
-    return;
   }
 
   // ── Airborne ���─

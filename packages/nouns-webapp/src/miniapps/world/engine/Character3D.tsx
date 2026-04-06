@@ -155,7 +155,6 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             child.name === 'lowerarm.l' ||
             child.name === 'upperarm.l' ||
             child.name === 'shoulder.l' ||
-            child.name === 'hand.r' ||
             child.name === 'Knife_Offhand' ||
             child.name.toLowerCase().includes('armleft') ||
             child.name.toLowerCase().includes('arm_left') ||
