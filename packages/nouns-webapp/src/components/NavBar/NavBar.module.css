@@ -31,13 +31,15 @@
   position: relative;
 }
 
-/* Center LOL logo absolutely */
+/* LOL logo — left side, half size */
 .navBarBrand {
-  position: absolute !important;
-  left: 50%;
-  transform: translateX(-50%);
   z-index: 2;
-  padding: 0.5rem 0;
+  padding: 0.3rem 0;
+}
+
+.navBarLogo {
+  width: 30px;
+  height: 30px;
 }
 
 .navBarCustom :global(.navbar-collapse) {
