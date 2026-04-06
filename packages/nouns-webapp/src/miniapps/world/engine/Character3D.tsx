@@ -144,7 +144,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
               child.name.includes('Throwable') || child.name.includes('handslot') ||
               child.name.includes('1H_') || child.name.includes('2H_') ||
-              child.name === 'Rogue_ArmLeft') {
+              child.name === 'Rogue_ArmLeft' ||
+              child.name === 'hand.l' || child.name === 'wrist.l' ||
+              child.name === 'lowerarm.l' || child.name === 'upperarm.l' ||
+              child.name === 'handslot.l') {
             child.visible = false;
           }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {

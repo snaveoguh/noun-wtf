@@ -428,7 +428,12 @@ let _transcriptExpiry = 0;
  */
 export function startSpeechToText(state: VoipState) {
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-  if (!SpeechRecognition) return; // not supported
+  if (!SpeechRecognition) {
+    console.warn('[VOIP] SpeechRecognition not supported in this browser');
+    _currentTranscript = 'Speech not supported in this browser';
+    _transcriptExpiry = Date.now() + 5000;
+    return;
+  }
 
   if (_recognition) _recognition.stop();
 
@@ -454,7 +459,9 @@ export function startSpeechToText(state: VoipState) {
     }
   };
 
-  recognition.onerror = () => {};
+  recognition.onerror = (e: any) => {
+    console.warn('[VOIP] Speech recognition error:', e.error);
+  };
   recognition.onend = () => {
     // Auto-restart if still speaking
     if (state.localStream && !state.isMuted) {
@@ -465,7 +472,12 @@ export function startSpeechToText(state: VoipState) {
   try {
     recognition.start();
     _recognition = recognition;
-  } catch {}
+    console.log('[VOIP] Speech recognition started');
+    _currentTranscript = '🎤 Listening...';
+    _transcriptExpiry = Date.now() + 2000;
+  } catch (e) {
+    console.warn('[VOIP] Failed to start speech recognition:', e);
+  }
 }
 
 export function stopSpeechToText() {

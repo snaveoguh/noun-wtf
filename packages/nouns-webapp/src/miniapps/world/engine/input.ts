@@ -101,12 +101,12 @@ export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: num
     rawX *= inv;
     rawZ *= inv;
   }
-  // Rotate by camera angle
+  // Rotate by camera angle so W = into screen from camera's POV
   const cos = Math.cos(cameraAngle);
   const sin = Math.sin(cameraAngle);
   return {
-    dx: rawX * cos + rawZ * sin,
-    dy: -rawX * sin + rawZ * cos,
+    dx: rawX * cos - rawZ * sin,
+    dy: rawX * sin + rawZ * cos,
   };
 }
 
