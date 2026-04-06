@@ -122,7 +122,7 @@ interface NounVoxel3DProps {
 
 const NounVoxel3D: FC<NounVoxel3DProps> = ({ onPredict, pollInterval = 3_000 }) => {
   const [prediction, setPrediction] = useState<PredictResponse | null>(null);
-  const [mode, setMode] = useState<ViewMode>('color');
+  const [mode, setMode] = useState<ViewMode>('silhouette');
   const [, setTick] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const countdownRef = useRef<ReturnType<typeof setInterval>>(undefined);
