@@ -53,6 +53,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify
