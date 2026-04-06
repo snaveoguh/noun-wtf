@@ -31,7 +31,33 @@ export const WALKABLE = new Set<Tile>([
 
 // ── Direction / State ─────────────────────────────────────────────────
 
-export type Direction = 'up' | 'down' | 'left' | 'right';
+export type Direction =
+  | 'up' | 'down' | 'left' | 'right'
+  | 'up-left' | 'up-right' | 'down-left' | 'down-right';
+
+/** Map facing direction to Y-axis rotation (radians). */
+export const DIRECTION_ROTATION: Record<Direction, number> = {
+  up: Math.PI,
+  down: 0,
+  left: Math.PI * 1.5,
+  right: Math.PI * 0.5,
+  'up-left': Math.PI * 1.25,
+  'up-right': Math.PI * 0.75,
+  'down-left': Math.PI * 1.75,
+  'down-right': Math.PI * 0.25,
+};
+
+/** Map facing direction to a 2D unit-ish angle (used for attack aiming, spatial audio). */
+export const DIRECTION_FACING_ANGLE: Record<Direction, number> = {
+  up: -Math.PI / 2,
+  down: Math.PI / 2,
+  left: Math.PI,
+  right: 0,
+  'up-left': -Math.PI * 0.75,
+  'up-right': -Math.PI * 0.25,
+  'down-left': Math.PI * 0.75,
+  'down-right': Math.PI * 0.25,
+};
 
 export type PlayerState =
   | 'idle'
@@ -43,7 +69,9 @@ export type PlayerState =
   | 'dead'
   | 'respawning'
   | 'backflip'
-  | 'dashing';
+  | 'dashing'
+  | 'knocked'    // combo knockdown — on the ground, auto-stand after delay
+  | 'wounded';   // gunshot knee collapse — held pose
 
 export type MoveType =
   | 'punch'
@@ -58,7 +86,9 @@ export type MoveType =
   | 'headbutt'
   | 'roundhouse'
   | 'meteor'
-  | 'cyclone';
+  | 'cyclone'
+  | 'gunshot'    // ranged — collapses target to one knee
+  | 'headshot';  // instant kill variant
 
 // ── Player ────────────────────────────────────────────────────────────
 
@@ -90,6 +120,11 @@ export interface Player {
   comboHits: number;
   comboTimer: number; // frames until combo resets
   lastMoves: MoveType[]; // last 5 moves for special combos
+
+  // Hit reaction
+  knockedTimer: number;   // frames remaining in knocked-down state
+  woundedTimer: number;   // frames remaining in wounded (knee) state
+  consecutiveGunshots: number; // gunshot hit counter for 2-shot kill
 
   // Visuals
   flipRotation: number; // backflip rotation angle
@@ -208,7 +243,7 @@ export const KICK_RANGE = 38;
 export const KICK_DAMAGE_MIN = 15;
 export const KICK_DAMAGE_MAX = 20;
 export const KICK_DURATION = 18;
-export const KICK_KNOCKBACK = 6;
+export const KICK_KNOCKBACK = 2;
 export const UPPERCUT_RANGE = 30;
 export const UPPERCUT_DAMAGE = 25;
 export const UPPERCUT_DURATION = 20;
@@ -227,7 +262,7 @@ export const SPIN_ATTACK_DAMAGE = 20;
 export const SPIN_ATTACK_DURATION = 24;
 export const FORCE_PUSH_RANGE = 200;
 export const FORCE_PUSH_DAMAGE = 15;
-export const FORCE_PUSH_KNOCKBACK = 14;
+export const FORCE_PUSH_KNOCKBACK = 3;
 export const FORCE_PUSH_COOLDOWN = 90;
 export const FORCE_PUSH_LIFE = 30;
 export const FORCE_CONE_ANGLE = Math.PI / 3;
@@ -237,6 +272,15 @@ export const PARRY_REFLECT_MULT = 1.5;
 export const COMBO_WINDOW = 120; // 2 seconds at 60fps
 export const COMBO_3_MULT = 1.5;
 export const COMBO_5_MULT = 2.0;
+
+// Gunshot constants
+export const GUNSHOT_RANGE = 120;
+export const GUNSHOT_DAMAGE = 35;
+export const GUNSHOT_DURATION = 15;
+export const HEADSHOT_DAMAGE = 100; // instant kill
+export const WOUNDED_DURATION = 60; // 1 second at 60fps — knee collapse hold
+export const KNOCKED_DURATION = 120; // 2 seconds at 60fps — ground knockdown
+export const GUNSHOT_RESPAWN_TIME = 180; // 3 seconds at 60fps
 
 // Special combo sequences
 export const ROUNDHOUSE_SEQ: MoveType[] = ['punch', 'punch', 'kick'];

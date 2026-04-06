@@ -13,6 +13,7 @@ import {
 } from '@nouns/voxel-engine';
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import type { INounSeed } from '@/wrappers/nounToken';
+import { DIRECTION_ROTATION } from './types';
 import type { Direction, MoveType, PlayerState } from './types';
 
 const MODEL_PATH = '/models/character.glb';
@@ -30,12 +31,25 @@ const ANIM_MAP: Record<string, string> = {
   attacking_uppercut: 'Unarmed_Melee_Attack_Punch_A',
   attacking_spinAttack: '1H_Melee_Attack_Slice_Diagonal',
   attacking_forcePush: 'Spellcast_Shoot',
+  attacking_gunshot: '1H_Ranged_Shoot',
+  attacking_headshot: '1H_Ranged_Shoot',
+  aiming: '1H_Ranged_Aiming',
+  reloading: '1H_Ranged_Reload',
   blocking: 'Block',
   backflip: 'Jump_Full_Long',
-  stunned: 'Hit_A',
-  dead: 'Death_A',
+  stunned: 'Hit_A',                         // punch/kick recoil — head sway, slight stumble
+  wounded: 'Hit_B',                         // gunshot — collapse to one knee, hold pose
+  knocked: 'Death_A',                       // 3-hit combo knockdown — played at 0.5x speed
+  dead: 'Death_A',                          // full death fall
+  dead_headshot: 'Death_B',                 // headshot instant kill — alternate death anim
   respawning: 'Idle',
   airborne: 'Jump_Full_Short',
+};
+
+// Animations that play at custom speeds
+const ANIM_SPEED: Partial<Record<string, number>> = {
+  knocked: 0.5,    // slow-motion fall for combo knockdown
+  wounded: 0.6,    // slightly slowed knee collapse
 };
 
 export interface CharacterState {
@@ -185,26 +199,30 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     // Position
     g.position.set(s.x, s.y + 0.05, s.z);
 
-    // Always face current direction
-    const targetRot =
-      s.direction === 'up' ? Math.PI :
-      s.direction === 'down' ? 0 :
-      s.direction === 'left' ? Math.PI * 1.5 :
-      Math.PI * 0.5;
-    g.rotation.y = targetRot;
+    // Always face current direction (8-way)
+    g.rotation.y = DIRECTION_ROTATION[s.direction] ?? 0;
 
     // Animation crossfade
     if (mixer && Object.keys(actions).length > 0) {
       let animKey = s.state as string;
       if (s.state === 'attacking' && s.attackType) animKey = `attacking_${s.attackType}`;
+      // Headshot death uses alternate death animation
+      if (s.state === 'dead' && s.attackType === 'headshot') animKey = 'dead_headshot';
       const clipName = ANIM_MAP[animKey] ?? 'Idle';
-      const isOneShot = ['attacking', 'dead', 'backflip', 'stunned'].includes(s.state);
+      const isOneShot = [
+        'attacking', 'dead', 'backflip', 'stunned',
+        'knocked', 'wounded',
+      ].includes(s.state);
 
       if (clipName !== prevAnimRef.current && actions[clipName] && !oneShotPlaying.current) {
         const prev = actions[prevAnimRef.current];
         const next = actions[clipName]!;
         if (prev) prev.fadeOut(0.15);
         next.reset().fadeIn(0.15).play();
+
+        // Apply custom animation speed (e.g. 0.5x for knocked)
+        const customSpeed = ANIM_SPEED[animKey];
+        next.timeScale = customSpeed ?? 1;
 
         if (isOneShot) {
           next.setLoop(THREE.LoopOnce, 1);
@@ -226,6 +244,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         const next = actions[clipName];
         if (next) {
           next.reset().fadeIn(0.15).play();
+          next.timeScale = 1;
           next.setLoop(THREE.LoopRepeat, Infinity);
           prevAnimRef.current = clipName;
         }

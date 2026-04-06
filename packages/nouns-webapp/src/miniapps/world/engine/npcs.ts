@@ -273,7 +273,15 @@ export function damageNPC(npc: NPC, damage: number, knockX: number, knockY: numb
 function getDirectionToward(fromX: number, fromY: number, toX: number, toY: number): Direction {
   const dx = toX - fromX;
   const dy = toY - fromY;
-  if (Math.abs(dx) >= Math.abs(dy)) {
+  const adx = Math.abs(dx);
+  const ady = Math.abs(dy);
+  // If both axes have meaningful movement, return diagonal
+  if (adx > 0.001 && ady > 0.001 && adx / ady < 2 && ady / adx < 2) {
+    if (dy < 0) return dx < 0 ? 'up-left' : 'up-right';
+    return dx < 0 ? 'down-left' : 'down-right';
+  }
+  // Otherwise cardinal
+  if (adx >= ady) {
     return dx >= 0 ? 'right' : 'left';
   }
   return dy >= 0 ? 'down' : 'up';

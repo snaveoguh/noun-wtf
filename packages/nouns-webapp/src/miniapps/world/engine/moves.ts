@@ -34,6 +34,10 @@ import {
   ROUNDHOUSE_DAMAGE,
   METEOR_DAMAGE,
   CYCLONE_DAMAGE,
+  GUNSHOT_RANGE,
+  GUNSHOT_DAMAGE,
+  GUNSHOT_DURATION,
+  HEADSHOT_DAMAGE,
 } from './types';
 import { randInt } from './physics';
 
@@ -57,7 +61,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: () => randInt(PUNCH_DAMAGE_MIN, PUNCH_DAMAGE_MAX),
     range: PUNCH_RANGE,
     duration: PUNCH_DURATION,
-    knockback: 3,
+    knockback: 1,           // was 3 — subtle stumble only
     stunDuration: 6,
     iFrames: 0,
     launchVy: 0,
@@ -70,7 +74,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: () => randInt(KICK_DAMAGE_MIN, KICK_DAMAGE_MAX),
     range: KICK_RANGE,
     duration: KICK_DURATION,
-    knockback: KICK_KNOCKBACK,
+    knockback: KICK_KNOCKBACK, // now 2 (was 6)
     stunDuration: 10,
     iFrames: 0,
     launchVy: 0,
@@ -83,7 +87,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: UPPERCUT_DAMAGE,
     range: UPPERCUT_RANGE,
     duration: UPPERCUT_DURATION,
-    knockback: 4,
+    knockback: 1.5,         // was 4 — slight lift only
     stunDuration: 15,
     iFrames: 0,
     launchVy: UPPERCUT_LAUNCH_VY,
@@ -96,13 +100,13 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: GROUND_SLAM_DAMAGE,
     range: GROUND_SLAM_RADIUS,
     duration: 24,
-    knockback: 10,
+    knockback: 2,           // was 10 — heavy impact, minimal push
     stunDuration: GROUND_SLAM_STUN,
     iFrames: 0,
     launchVy: 0,
     isAoE: true,
     cooldown: 0,
-    canAerial: true, // must be airborne to use
+    canAerial: true,
   },
   backflip: {
     type: 'backflip',
@@ -122,7 +126,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: DASH_DAMAGE,
     range: 24,
     duration: DASH_DURATION,
-    knockback: 4,
+    knockback: 1,           // was 4
     stunDuration: 4,
     iFrames: DASH_IFRAMES,
     launchVy: 0,
@@ -135,7 +139,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: SPIN_ATTACK_DAMAGE,
     range: SPIN_ATTACK_RANGE,
     duration: SPIN_ATTACK_DURATION,
-    knockback: 8,
+    knockback: 2,           // was 8
     stunDuration: 12,
     iFrames: 0,
     launchVy: 0,
@@ -148,7 +152,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: FORCE_PUSH_DAMAGE,
     range: FORCE_PUSH_RANGE,
     duration: FORCE_PUSH_LIFE,
-    knockback: FORCE_PUSH_KNOCKBACK,
+    knockback: FORCE_PUSH_KNOCKBACK, // now 3 (was 14)
     stunDuration: 20,
     iFrames: 0,
     launchVy: 0,
@@ -161,7 +165,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: 30,
     range: 24,
     duration: 18,
-    knockback: 10,
+    knockback: 2,           // was 10 — heavy impact, stays close
     stunDuration: 25,
     iFrames: 4,
     launchVy: 0,
@@ -173,7 +177,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     type: 'block',
     damage: 0,
     range: 0,
-    duration: 999, // held as long as shift is down
+    duration: 999,
     knockback: 0,
     stunDuration: 0,
     iFrames: 0,
@@ -188,7 +192,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: ROUNDHOUSE_DAMAGE,
     range: 44,
     duration: 20,
-    knockback: 12,
+    knockback: 3,           // was 12
     stunDuration: 20,
     iFrames: 4,
     launchVy: 0,
@@ -201,7 +205,7 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: METEOR_DAMAGE,
     range: 56,
     duration: 30,
-    knockback: 16,
+    knockback: 3,           // was 16
     stunDuration: 30,
     iFrames: 8,
     launchVy: 0,
@@ -214,12 +218,39 @@ export const MOVE_DEFS: Record<MoveType, MoveDefinition> = {
     damage: CYCLONE_DAMAGE,
     range: 52,
     duration: 28,
-    knockback: 14,
+    knockback: 3,           // was 14
     stunDuration: 24,
     iFrames: 12,
     launchVy: -6,
     isAoE: true,
     cooldown: 0,
+    canAerial: false,
+  },
+  // ── Ranged / Gun moves ──
+  gunshot: {
+    type: 'gunshot',
+    damage: GUNSHOT_DAMAGE,
+    range: GUNSHOT_RANGE,
+    duration: GUNSHOT_DURATION,
+    knockback: 0.5,         // barely moves — collapse in place
+    stunDuration: 0,        // wounded state handles this instead
+    iFrames: 0,
+    launchVy: 0,
+    isAoE: false,
+    cooldown: 30,           // half-second between shots
+    canAerial: false,
+  },
+  headshot: {
+    type: 'headshot',
+    damage: HEADSHOT_DAMAGE,
+    range: GUNSHOT_RANGE,
+    duration: GUNSHOT_DURATION,
+    knockback: 0,           // drops in place
+    stunDuration: 0,
+    iFrames: 0,
+    launchVy: 0,
+    isAoE: false,
+    cooldown: 30,
     canAerial: false,
   },
 };
