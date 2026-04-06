@@ -54,6 +54,11 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
           NODE_OPTIONS: --max-old-space-size=4096
+          VITE_CHAIN_ID: "1"
+          VITE_MAINNET_JSONRPC: "https://ethereum-rpc.publicnode.com"
+          VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
+          VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}
+          VITE_ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
         run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify
