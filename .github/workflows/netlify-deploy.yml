@@ -74,6 +74,7 @@ jobs:
             npx netlify deploy \
               --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
+              --prod \
               --dir dist \
               --functions netlify/functions \
               --no-build \
