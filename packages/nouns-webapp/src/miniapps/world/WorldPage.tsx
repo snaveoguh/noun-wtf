@@ -1001,12 +1001,12 @@ export default function WorldPage() {
 
         // If F pressed and gun equipped, override to gunshot
         if (intendedMove === 'gunshot' && weapon.equipped) {
-          const fired = fireWeapon(weapon);
-          if (fired) {
+          const result = fireWeapon(weapon);
+          if (result.fired) {
             if (weapon.equipped === 'shotgun') playShotgunSound();
             else playGunshot();
           } else {
-            intendedMove = null; // can't fire (cooldown/no ammo)
+            intendedMove = null; // can't fire (cooldown/no ammo/reloading)
           }
         } else if (intendedMove === 'gunshot' && !weapon.equipped) {
           intendedMove = null; // no gun
