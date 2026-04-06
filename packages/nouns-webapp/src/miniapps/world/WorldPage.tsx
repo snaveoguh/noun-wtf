@@ -27,6 +27,7 @@ import {
   attachInputListeners,
   resolveIntendedMove,
   clearFrameFlags,
+  pollGamepad,
   type InputState,
 } from './engine/input';
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
@@ -108,7 +109,24 @@ import {
   type PaintCan,
 } from './engine/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
-import { MegaRamp3D } from './engine/MegaRamp3D';
+import { MegaRamp3D, HoverboardPickup3D, MEGA_RAMP_BOUNDS } from './engine/MegaRamp3D';
+import {
+  createSkatingState,
+  mountBoard,
+  dismountBoard,
+  ollie,
+  airTrick,
+  spin180,
+  kickflip,
+  startGrind,
+  setCrouching,
+  balanceCorrect,
+  tickSkating,
+  testRampCollision,
+  type SkatingState,
+} from './engine/skating';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
 import {
   createVoipState,
   initVoip,
@@ -1509,6 +1527,157 @@ export function _HUD_OLD({
   );
 }
 
+// ── Hoverboard Constants ─────────────────────────────────────────────
+
+const NOUNIRL_ADDRESS = '0x65C5C840797b85e23eB33C39b8A956e2cE498103' as const;
+const HOVERBOARD_PRICE_ETH = '0.01';
+// Hoverboard pickup position (near the mega ramp)
+const HOVERBOARD_PICKUP_X = MEGA_RAMP_BOUNDS.x - 3;
+const HOVERBOARD_PICKUP_Z = MEGA_RAMP_BOUNDS.z - 8;
+
+// ── Hoverboard Purchase Modal ───────────────────────────────────────
+
+function HoverboardPurchaseModal({
+  open,
+  onClose,
+  onPurchased,
+  isFree,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPurchased: () => void;
+  isFree: boolean;
+}) {
+  const { sendTransaction, data: txHash, isPending } = useSendTransaction();
+  const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  useEffect(() => {
+    if (txConfirmed) {
+      onPurchased();
+    }
+  }, [txConfirmed, onPurchased]);
+
+  useEffect(() => {
+    if (isFree && open) {
+      // Auto-grant for connected wallet owner
+      onPurchased();
+    }
+  }, [isFree, open, onPurchased]);
+
+  if (!open) return null;
+
+  const handleBuy = () => {
+    sendTransaction({
+      to: NOUNIRL_ADDRESS,
+      value: parseEther(HOVERBOARD_PRICE_ETH),
+    });
+  };
+
+  const modalStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0,0,0,0.75)',
+    pointerEvents: 'auto',
+  };
+
+  const boxStyle: React.CSSProperties = {
+    background: 'linear-gradient(135deg, #0a1628 0%, #1a2a4a 100%)',
+    borderRadius: 16,
+    padding: 32,
+    width: 400,
+    maxWidth: '90vw',
+    color: '#fff',
+    fontFamily: 'monospace',
+    border: '1px solid rgba(0,255,204,0.4)',
+    boxShadow: '0 0 40px rgba(0,255,204,0.15)',
+    textAlign: 'center' as const,
+  };
+
+  return (
+    <div style={modalStyle} onClick={onClose}>
+      <div style={boxStyle} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: '#00ffcc', marginBottom: 8 }}>
+          PRE-ORDER
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 8, letterSpacing: 2 }}>
+          HOVERBOARD
+        </div>
+        <div style={{ fontSize: 13, color: '#aaa', marginBottom: 20 }}>
+          Deposit {HOVERBOARD_PRICE_ETH} ETH to nounirl.eth
+        </div>
+
+        {isFree ? (
+          <div
+            style={{
+              padding: '12px 24px',
+              borderRadius: 10,
+              background: 'rgba(0,255,204,0.15)',
+              border: '1px solid rgba(0,255,204,0.3)',
+              color: '#00ffcc',
+              fontSize: 14,
+              fontWeight: 'bold',
+              marginBottom: 12,
+            }}
+          >
+            FREE FOR YOU
+          </div>
+        ) : (
+          <button
+            onClick={handleBuy}
+            disabled={isPending}
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              borderRadius: 10,
+              border: 'none',
+              cursor: isPending ? 'wait' : 'pointer',
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              fontSize: 16,
+              letterSpacing: 2,
+              background: isPending
+                ? 'rgba(0,255,204,0.3)'
+                : 'linear-gradient(90deg, #00ffcc 0%, #00ddaa 100%)',
+              color: '#0a1628',
+              marginBottom: 12,
+              transition: 'all 0.2s',
+            }}
+          >
+            {isPending ? 'CONFIRMING...' : txHash ? 'WAITING...' : 'BUY'}
+          </button>
+        )}
+
+        {txConfirmed && (
+          <div style={{ color: '#00ffcc', fontSize: 13, marginTop: 8 }}>
+            HOVERBOARD ACQUIRED! Press S to mount.
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 8,
+            background: 'none',
+            border: '1px solid #444',
+            borderRadius: 6,
+            padding: '6px 16px',
+            color: '#888',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            cursor: 'pointer',
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main WorldPage Component ──────────────────────────────────────────
 
 export default function WorldPage() {
@@ -1545,6 +1714,59 @@ export default function WorldPage() {
   }, []);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // ── FEATURE 1: "NOUNS WORLD" cloud text intro ──
+  const [introPhase, setIntroPhase] = useState<'fadein' | 'hold' | 'fadeout' | 'done'>('fadein');
+  const [introOpacity, setIntroOpacity] = useState(0);
+
+  useEffect(() => {
+    if (introPhase === 'done') return;
+    let raf: number;
+    const start = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      if (introPhase === 'fadein') {
+        const t = Math.min(elapsed / 1, 1);
+        setIntroOpacity(t);
+        if (t >= 1) {
+          setIntroPhase('hold');
+          return;
+        }
+      }
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [introPhase === 'fadein']);
+
+  useEffect(() => {
+    if (introPhase !== 'hold') return;
+    const timer = setTimeout(() => setIntroPhase('fadeout'), 3000);
+    return () => clearTimeout(timer);
+  }, [introPhase]);
+
+  useEffect(() => {
+    if (introPhase !== 'fadeout') return;
+    let raf: number;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      const t = Math.max(1 - elapsed / 1, 0);
+      setIntroOpacity(t);
+      if (t <= 0) {
+        setIntroPhase('done');
+        return;
+      }
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [introPhase === 'fadeout']);
+
+  // ── FEATURE 3: Wanted level (mic volume → stars) ──
+  const [wantedLevel, setWantedLevel] = useState(0);
+  const wantedRef = useRef(0); // smooth float 0-5, decays each frame
 
   // Play intro music on first load
   useEffect(() => {
@@ -1610,6 +1832,14 @@ export default function WorldPage() {
     new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE),
   );
 
+  // ── Skating / Hoverboard state ──
+  const skateRef = useRef<SkatingState>(createSkatingState());
+  const [hasHoverboard, setHasHoverboard] = useState(false);
+  const [hoverboardModalOpen, setHoverboardModalOpen] = useState(false);
+  const { address: connectedWallet } = useAccount();
+  // Owner wallet gets hoverboard free
+  const isOwnerWallet = connectedWallet?.toLowerCase() === NOUNIRL_ADDRESS.toLowerCase();
+
   // ── Graffiti state ──
   const paintRef = useRef<PaintCanState>(createPaintState());
   const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
@@ -1639,6 +1869,17 @@ export default function WorldPage() {
     transcript: '',
     weaponEquipped: null as string | null,
     weaponAmmo: 0,
+    wantedLevel: 0,
+    // Skating
+    isSkating: false,
+    skateSpeed: 0,
+    trickScore: 0,
+    currentTrick: null as string | null,
+    comboMultiplier: 0,
+    comboScore: 0,
+    balanceMeter: 0,
+    grindActive: false,
+    manualActive: false,
   });
 
   // Seed priority: URL param > Redux auction state > random
@@ -1811,11 +2052,46 @@ export default function WorldPage() {
         }
         return;
       }
+      // S = toggle skate mode on/off when near hoverboard pickup
+      if (e.key === 's' || e.key === 'S') {
+        const p = playerRef.current;
+        if (!p) return;
+        const sk = skateRef.current;
+        if (sk.isSkating) {
+          dismountBoard(sk);
+          return;
+        }
+        if (hasHoverboard) {
+          // Already own hoverboard — mount anywhere
+          mountBoard(sk);
+          return;
+        }
+        // Check if near hoverboard pickup
+        const px = p.x * WORLD_SCALE;
+        const pz = p.y * WORLD_SCALE;
+        const boardDist = Math.sqrt(
+          (px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2,
+        );
+        if (boardDist < 3) {
+          mountBoard(sk);
+          setHasHoverboard(true);
+          return;
+        }
+      }
       if (e.key === 'e' || e.key === 'E') {
         const p = playerRef.current;
         if (!p) return;
         const px = p.x * WORLD_SCALE;
         const pz = p.y * WORLD_SCALE;
+
+        // Check distance to hoverboard pickup — open purchase modal
+        const boardDist = Math.sqrt(
+          (px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2,
+        );
+        if (boardDist < 3 && !hasHoverboard) {
+          setHoverboardModalOpen(true);
+          return;
+        }
 
         // Check distance to chest
         const chestDist = Math.sqrt((px - chestWorldX) ** 2 + (pz - chestWorldZ) ** 2);
@@ -1835,7 +2111,7 @@ export default function WorldPage() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate, depositOpen, graffitiOpen, claimDrop, chestWorldX, chestWorldZ]);
+  }, [navigate, depositOpen, graffitiOpen, claimDrop, chestWorldX, chestWorldZ, hasHoverboard]);
 
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
@@ -1847,6 +2123,9 @@ export default function WorldPage() {
       const ocean = oceanRef.current;
       const mp = mpRef.current;
       if (!player) return;
+
+      // ── FEATURE 2: Poll gamepad each frame ──
+      pollGamepad(input);
 
       frameRef.current++;
       const frame = frameRef.current;
@@ -2020,11 +2299,77 @@ export default function WorldPage() {
       // Tick player
       tickPlayer(player, input, combat);
 
+      // ── Skating physics tick ──
+      const sk = skateRef.current;
+      if (sk.isSkating) {
+        const skWx = player.x * WORLD_SCALE;
+        const skWz = player.y * WORLD_SCALE;
+        const skTerrainY = getTerrainHeight(skWx, skWz);
+
+        // Test ramp collision
+        const rampData = testRampCollision(skWx, skWz, skTerrainY, MEGA_RAMP_BOUNDS);
+
+        // Movement direction from input
+        const hasW = input.keys.has('w');
+        const hasA = input.keys.has('a');
+        const hasS = input.keys.has('s');
+        const hasD = input.keys.has('d');
+        let sdx = 0,
+          sdz = 0;
+        if (hasW) sdz -= 1;
+        if (hasS) sdz += 1;
+        if (hasA) sdx -= 1;
+        if (hasD) sdx += 1;
+        const sLen = Math.sqrt(sdx * sdx + sdz * sdz);
+        if (sLen > 0) {
+          sdx /= sLen;
+          sdz /= sLen;
+        }
+
+        // Shift held = crouching/pump
+        setCrouching(sk, input.shiftHeld);
+
+        // Space = ollie (ground) or air trick (airborne)
+        if (input.justPressed.has(' ')) {
+          if (sk.airborne) {
+            // Determine direction for air trick
+            const dir = hasA ? 'left' : hasD ? 'right' : hasW ? 'up' : hasS ? 'down' : null;
+            airTrick(sk, dir);
+          } else {
+            ollie(sk, rampData);
+          }
+        }
+
+        // J = spin, K = kickflip (legacy keys still work)
+        if (input.justPressed.has('j') && sk.airborne) spin180(sk);
+        if (input.justPressed.has('k') && sk.airborne) kickflip(sk);
+
+        // G = manual grind start
+        if (input.justPressed.has('g')) startGrind(sk, rampData);
+
+        // Balance correction: left/right during grind or manual
+        if (sk.grindActive || sk.manualActive) {
+          if (input.keys.has('a') || input.keys.has('arrowleft')) balanceCorrect(sk, -1);
+          if (input.keys.has('d') || input.keys.has('arrowright')) balanceCorrect(sk, 1);
+        }
+
+        const delta = 1 / 60; // approximate frame delta
+        const skMove = tickSkating(sk, [sdx, sdz], delta, skTerrainY, rampData);
+
+        // Apply skating movement to player position (convert back from world scale)
+        player.x += skMove.dx / WORLD_SCALE;
+        player.y += skMove.dz / WORLD_SCALE;
+      }
+
       // Update camera target + character state ref
       const wx = player.x * WORLD_SCALE;
       const wz = player.y * WORLD_SCALE;
       const terrainY = getTerrainHeight(wx, wz);
-      playerTargetRef.current.set(wx, terrainY, wz);
+      playerTargetRef.current.set(
+        wx,
+        terrainY + (sk.isSkating ? sk.hoverHeight + sk.airborneY : 0),
+        wz,
+      );
       const pcs = playerCharState.current;
       pcs.x = wx;
       pcs.z = wz;
@@ -2079,6 +2424,36 @@ export default function WorldPage() {
       const now = Date.now();
       combat.killFeed = combat.killFeed.filter(k => now - k.timestamp < 10000);
 
+      // ── FEATURE 3: Wanted level from mic volume ──
+      const voipForWanted = voipRef.current;
+      if (voipForWanted.analyser && voipForWanted.localStream && !voipForWanted.isMuted) {
+        const wantedData = new Uint8Array(voipForWanted.analyser.frequencyBinCount);
+        voipForWanted.analyser.getByteFrequencyData(wantedData);
+        let wantedSum = 0;
+        for (let i = 0; i < wantedData.length; i++) wantedSum += wantedData[i];
+        const vol = wantedSum / wantedData.length / 255; // normalize to 0-1
+        let targetStars = 0;
+        if (vol > 0.9) targetStars = 5;
+        else if (vol > 0.7) targetStars = 4;
+        else if (vol > 0.5) targetStars = 3;
+        else if (vol > 0.3) targetStars = 2;
+        else if (vol > 0.1) targetStars = 1;
+        // Instant ramp up, slow decay
+        if (targetStars > wantedRef.current) {
+          wantedRef.current = targetStars;
+        } else {
+          wantedRef.current = Math.max(0, wantedRef.current - 0.02);
+        }
+      } else {
+        // Decay when mic off
+        wantedRef.current = Math.max(0, wantedRef.current - 0.02);
+      }
+      // Update React state every ~15 frames to avoid excessive re-renders
+      if (frame % 15 === 0) {
+        const rounded = Math.ceil(wantedRef.current);
+        setWantedLevel(prev => (prev !== rounded ? rounded : prev));
+      }
+
       // Clear input
       clearFrameFlags(input);
 
@@ -2106,6 +2481,17 @@ export default function WorldPage() {
       // Weapon HUD
       hudRef.current.weaponEquipped = weaponRef.current.equipped;
       hudRef.current.weaponAmmo = weaponRef.current.ammo;
+      hudRef.current.wantedLevel = Math.ceil(wantedRef.current);
+      // Skating HUD
+      hudRef.current.isSkating = sk.isSkating;
+      hudRef.current.skateSpeed = sk.speed;
+      hudRef.current.trickScore = sk.trickScore;
+      hudRef.current.currentTrick = sk.currentTrick;
+      hudRef.current.comboMultiplier = sk.comboMultiplier;
+      hudRef.current.comboScore = sk.comboScore;
+      hudRef.current.balanceMeter = sk.balanceMeter;
+      hudRef.current.grindActive = sk.grindActive;
+      hudRef.current.manualActive = sk.manualActive;
       // Write weapon state to character for gun rendering
       pcs.weaponEquipped = weaponRef.current.equipped;
       pcs.muzzleFlash = weaponRef.current.muzzleFlash;
@@ -2285,6 +2671,52 @@ export default function WorldPage() {
         {/* Mega Ramp */}
         <MegaRamp3D />
 
+        {/* Hoverboard Pickup (near mega ramp) */}
+        {!hasHoverboard && (
+          <HoverboardPickup3D
+            position={[
+              HOVERBOARD_PICKUP_X,
+              getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 0.3,
+              HOVERBOARD_PICKUP_Z,
+            ]}
+            playerDistance={(() => {
+              const p = playerRef.current;
+              if (!p) return 99;
+              const px = p.x * WORLD_SCALE;
+              const pz = p.y * WORLD_SCALE;
+              return Math.sqrt((px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2);
+            })()}
+          />
+        )}
+
+        {/* Price label floating above hoverboard pickup */}
+        {!hasHoverboard && (
+          <Html
+            position={[
+              HOVERBOARD_PICKUP_X,
+              getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 1.8,
+              HOVERBOARD_PICKUP_Z,
+            ]}
+            center
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            <div
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#00ffcc',
+                textShadow: '0 0 8px rgba(0,255,204,0.6), 0 2px 4px rgba(0,0,0,0.8)',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+              }}
+            >
+              0.01 ETH
+              <div style={{ fontSize: '10px', color: '#aaa', marginTop: 2 }}>[E] to interact</div>
+            </div>
+          </Html>
+        )}
+
         {/* Treasure Chest */}
         <TreasureChest3D
           position={[chestWorldX, getTerrainHeight(chestWorldX, chestWorldZ) + 0.1, chestWorldZ]}
@@ -2337,7 +2769,243 @@ export default function WorldPage() {
       </Canvas>
 
       <HUDLive hudRef={hudRef} />
+
+      {/* FEATURE 1: "NOUNS WORLD" cloud text intro */}
+      {introPhase !== 'done' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            pointerEvents: 'none',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '15vh',
+            opacity: introOpacity,
+            transition: 'none',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Georgia', 'Times New Roman', serif",
+              fontWeight: 'bold',
+              fontSize: '120px',
+              color: '#fff',
+              textShadow: [
+                '0 0 20px rgba(255,255,255,0.9)',
+                '4px 4px 8px rgba(220,220,220,0.8)',
+                '-4px -4px 8px rgba(220,220,220,0.8)',
+                '4px -4px 8px rgba(240,240,240,0.7)',
+                '-4px 4px 8px rgba(240,240,240,0.7)',
+                '0 6px 15px rgba(200,200,200,0.6)',
+                '0 -6px 15px rgba(200,200,200,0.6)',
+                '6px 0 15px rgba(200,200,200,0.6)',
+                '-6px 0 15px rgba(200,200,200,0.6)',
+                '0 0 40px rgba(255,255,255,0.5)',
+                '0 0 80px rgba(255,255,255,0.3)',
+              ].join(', '),
+              letterSpacing: '12px',
+              userSelect: 'none',
+              textAlign: 'center',
+              lineHeight: 1,
+            }}
+          >
+            NOUNS
+            <br />
+            WORLD
+          </div>
+        </div>
+      )}
+
+      {/* FEATURE 3: Wanted level stars */}
+      {wantedLevel > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 38,
+            right: 16,
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#ffdd00',
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+            zIndex: 15,
+            letterSpacing: '2px',
+          }}
+        >
+          {'★'.repeat(wantedLevel)}
+          {'☆'.repeat(5 - wantedLevel)}
+          {wantedLevel >= 3 && (
+            <span
+              style={{
+                display: 'block',
+                fontSize: '10px',
+                color: '#ff4444',
+                letterSpacing: '1px',
+                marginTop: '2px',
+              }}
+            >
+              WANTED
+            </span>
+          )}
+        </div>
+      )}
+
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+
+      {/* Hoverboard purchase modal */}
+      <HoverboardPurchaseModal
+        open={hoverboardModalOpen}
+        onClose={() => setHoverboardModalOpen(false)}
+        onPurchased={() => {
+          setHasHoverboard(true);
+          setHoverboardModalOpen(false);
+          mountBoard(skateRef.current);
+        }}
+        isFree={isOwnerWallet}
+      />
+
+      {/* Skating HUD overlay — trick score, combo, balance meter */}
+      {skateRef.current.isSkating && (
+        <>
+          {/* Trick score (top-left) */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 80,
+              left: 16,
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              color: '#00ffcc',
+              textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              zIndex: 15,
+            }}
+          >
+            <div style={{ fontSize: 11, color: '#888', letterSpacing: 1 }}>TRICK SCORE</div>
+            <div style={{ fontSize: 22, fontWeight: 'bold' }}>
+              {skateRef.current.trickScore.toLocaleString()}
+            </div>
+          </div>
+
+          {/* Current trick / combo display (center-top) */}
+          {skateRef.current.currentTrick && (
+            <div
+              style={{
+                position: 'fixed',
+                top: '18%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontFamily: 'monospace',
+                fontSize: skateRef.current.comboMultiplier >= 3 ? '28px' : '20px',
+                fontWeight: 'bold',
+                color:
+                  skateRef.current.comboMultiplier >= 5
+                    ? '#ff4444'
+                    : skateRef.current.comboMultiplier >= 3
+                      ? '#ffaa00'
+                      : '#00ffcc',
+                textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                pointerEvents: 'none',
+                zIndex: 15,
+                textAlign: 'center',
+                letterSpacing: 2,
+                transition: 'font-size 0.15s',
+              }}
+            >
+              {skateRef.current.currentTrick}
+              {skateRef.current.comboMultiplier > 1 && skateRef.current.comboScore > 0 && (
+                <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>
+                  {skateRef.current.comboScore} x {skateRef.current.comboMultiplier}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Balance meter (during grind/manual) */}
+          {(skateRef.current.grindActive || skateRef.current.manualActive) && (
+            <div
+              style={{
+                position: 'fixed',
+                bottom: 120,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 200,
+                height: 12,
+                background: 'rgba(0,0,0,0.6)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 6,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                zIndex: 15,
+              }}
+            >
+              {/* Balance indicator */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 1,
+                  left: `${50 + skateRef.current.balanceMeter * 48}%`,
+                  width: 4,
+                  height: 10,
+                  background: Math.abs(skateRef.current.balanceMeter) > 0.7 ? '#ff4444' : '#00ffcc',
+                  borderRadius: 2,
+                  transition: 'left 0.05s',
+                }}
+              />
+              {/* Center mark */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '50%',
+                  width: 1,
+                  height: 12,
+                  background: 'rgba(255,255,255,0.4)',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Speed indicator */}
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 100,
+              left: 16,
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#888',
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              zIndex: 15,
+            }}
+          >
+            SPEED {(skateRef.current.speed * 10).toFixed(0)} MPH
+          </div>
+
+          {/* "S to dismount" hint */}
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 60,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#666',
+              pointerEvents: 'none',
+              zIndex: 15,
+            }}
+          >
+            [S] dismount {'  '} [SPACE] ollie {'  '} [SHIFT] pump
+          </div>
+        </>
+      )}
 
       {/* Graffiti spray paint overlay */}
       {graffitiOpen && graffitiWallId && (
