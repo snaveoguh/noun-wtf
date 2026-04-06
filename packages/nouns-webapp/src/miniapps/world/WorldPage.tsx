@@ -511,7 +511,8 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
 
 // ── Water plane (animated) ────────────────────────────────────────────
 
-function _Water() {
+// @ts-ignore
+export function _Water() {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
@@ -612,7 +613,8 @@ function HUDLive({ hudRef }: { hudRef: React.RefObject<any> }) {
 }
 
 // Old HUD replaced by GameHUD — keeping for reference
-function _HUD_OLD({
+// @ts-ignore
+export function _HUD_OLD({
   hp,
   maxHp,
   playerCount,
