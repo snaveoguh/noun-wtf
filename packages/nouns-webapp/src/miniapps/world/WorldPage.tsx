@@ -680,6 +680,9 @@ function CameraController({
 
     camera.position.lerp(desired, 0.08);
     camera.lookAt(target.x, target.y + 0.4, target.z);
+
+    // Write camera angle back to input so WASD is camera-relative
+    if (input) input.cameraAngle = angleX.current;
   });
 
   return null;
