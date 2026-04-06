@@ -4,10 +4,16 @@
 //
 // Controls:
 //   S near hoverboard pickup = mount/dismount
-//   Space while hovering     = ollie (upward impulse, amplified at ramp lip)
+//   Space while on ground    = ollie (upward impulse, amplified at ramp lip)
+//   Space while airborne     = 180 spin (+100 per 180)
+//   Space + Left (airborne)  = kickflip (+200)
+//   Space + Right (airborne) = heelflip (+200)
+//   Space + Up (airborne)    = hardflip (+300)
+//   Space + Down (airborne)  = pop shove-it (+150)
 //   J while airborne         = 180 spin (+100 per 180)
 //   K while airborne         = kickflip (+200)
-//   G near rail              = grind (auto-snap)
+//   Near rail (0.5 units)    = auto-snap grind (balance meter active)
+//   G near rail              = manual grind start
 //   Up-Up / Down-Down        = manual / nose manual (links combos on ground)
 //   Shift (hold)             = crouch/pump — release on curve for speed boost
 //   Left/Right while grind/manual = balance correction
@@ -63,6 +69,7 @@ export interface RampData {
   atLip: boolean; // at top edge of ramp
   onRail: boolean; // on grind rail geometry
   surfaceHeight: number; // ground Y at this point on the ramp
+  railDistance: number; // distance to nearest rail center (for auto-snap)
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -95,11 +102,17 @@ const HOVER_OSCILLATION = 0.04; // gentle bob
 const OLLIE_SCORE = 25;
 const SPIN_180_SCORE = 100;
 const KICKFLIP_SCORE = 200;
+const HEELFLIP_SCORE = 200;
+const HARDFLIP_SCORE = 300;
+const POP_SHOVE_SCORE = 150;
 const GRIND_SCORE_PER_SEC = 50;
 const MANUAL_SCORE_PER_SEC = 30;
 const RAMP_LIP_BONUS = 75;
 
 const TRICK_DISPLAY_FRAMES = 90; // 1.5s at 60fps
+
+// Grind auto-snap
+const GRIND_SNAP_DISTANCE = 0.5; // world units — auto-snap to rail within this range
 
 // Balance
 const BALANCE_OSCILLATION_SPEED = 2.5; // radians/sec
@@ -231,7 +244,15 @@ function bail(state: SkatingState): void {
 
 // ── Trick Actions ────────────────────────────────────────────────────
 
-/** Ollie: Space while hovering. Bonus at ramp lip. */
+/**
+ * Ollie / directional trick: Space while hovering. Bonus at ramp lip.
+ * If airborne + direction held, triggers a specific trick:
+ *   Space alone       = Ollie (ground) or nothing (air, use dirTrick)
+ *   Space + Left      = Kickflip   (+200)
+ *   Space + Right     = Heelflip   (+200)
+ *   Space + Up        = Hardflip   (+300)
+ *   Space + Down      = Pop Shove-it (+150)
+ */
 export function ollie(state: SkatingState, rampData: RampData): void {
   if (!state.isSkating || state.airborne || state.ollieCooldown > 0 || state.bailed) return;
 
@@ -256,6 +277,36 @@ export function ollie(state: SkatingState, rampData: RampData): void {
   addToCombo(state, name, score);
 }
 
+/**
+ * Directional trick while airborne.
+ * Called with the direction held when Space is pressed in air.
+ */
+export function airTrick(
+  state: SkatingState,
+  direction: 'left' | 'right' | 'up' | 'down' | null,
+): void {
+  if (!state.isSkating || !state.airborne || state.bailed) return;
+
+  switch (direction) {
+    case 'left':
+      addToCombo(state, 'Kickflip', KICKFLIP_SCORE);
+      break;
+    case 'right':
+      addToCombo(state, 'Heelflip', HEELFLIP_SCORE);
+      break;
+    case 'up':
+      addToCombo(state, 'Hardflip', HARDFLIP_SCORE);
+      break;
+    case 'down':
+      addToCombo(state, 'Pop Shove-it', POP_SHOVE_SCORE);
+      break;
+    default:
+      // Space alone in air = spin180
+      spin180(state);
+      break;
+  }
+}
+
 /** 180 Spin: J while airborne. +100 per 180. */
 export function spin180(state: SkatingState): void {
   if (!state.isSkating || !state.airborne || state.bailed) return;
@@ -271,7 +322,7 @@ export function kickflip(state: SkatingState): void {
   addToCombo(state, 'Kickflip', KICKFLIP_SCORE);
 }
 
-/** Start grind: G near a rail. Auto-snaps. */
+/** Start grind: G near a rail OR auto-snap when within GRIND_SNAP_DISTANCE. */
 export function startGrind(state: SkatingState, rampData: RampData): void {
   if (!state.isSkating || state.bailed) return;
   if (!rampData.onRail) return;
@@ -286,6 +337,19 @@ export function startGrind(state: SkatingState, rampData: RampData): void {
   state.balanceDifficulty = 0.15;
   state.balanceOscillation = 0;
   addToCombo(state, 'Grind', 50);
+}
+
+/**
+ * Auto-snap grind: called each frame. If player is within GRIND_SNAP_DISTANCE
+ * of a rail and moving fast enough, auto-start a grind.
+ */
+export function tryAutoGrind(state: SkatingState, rampData: RampData, railDist: number): void {
+  if (!state.isSkating || state.bailed || state.grindActive) return;
+  if (railDist > GRIND_SNAP_DISTANCE) return;
+  if (state.speed < 0.5) return; // need some momentum to grind
+  if (!rampData.onRail) return;
+
+  startGrind(state, rampData);
 }
 
 /** Manual: up-up or down-down on ground. Links combos. */
@@ -445,6 +509,11 @@ export function tickSkating(
     }
   }
 
+  // ── Auto-snap grind: when near a rail, auto-start grinding
+  if (!state.grindActive && !state.airborne && rampData.onRamp) {
+    tryAutoGrind(state, rampData, rampData.railDistance);
+  }
+
   // ── Manual scoring
   if (state.manualActive && !state.airborne) {
     const pts = Math.floor(MANUAL_SCORE_PER_SEC * delta);
@@ -593,6 +662,7 @@ export function testRampCollision(
     atLip: false,
     onRail: false,
     surfaceHeight: 0,
+    railDistance: Infinity,
   };
 
   // Transform to ramp-local coords
@@ -635,7 +705,12 @@ export function testRampCollision(
   const atLip = t > 0.92;
 
   // Grind rail detection: center strip
-  const onRail = Math.abs(localX) < halfWid * 0.08 && t > 0.05 && t < 0.92;
+  const railCenterDist = Math.abs(localX); // distance to rail center line
+  const railThreshold = halfWid * 0.08;
+  const onRail = railCenterDist < railThreshold && t > 0.05 && t < 0.92;
+
+  // Rail distance in world units (for auto-snap)
+  const railDist = t > 0.05 && t < 0.92 ? Math.max(0, railCenterDist - railThreshold) : Infinity;
 
   // Slope direction in world space (downhill)
   const slopeDirLocal: [number, number] = [0, -1];
@@ -651,6 +726,7 @@ export function testRampCollision(
     atLip,
     onRail,
     surfaceHeight: surfaceY,
+    railDistance: railDist,
   };
 }
 

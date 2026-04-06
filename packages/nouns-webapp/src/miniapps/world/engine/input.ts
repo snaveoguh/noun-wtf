@@ -163,6 +163,111 @@ export function resolveIntendedMove(input: InputState): MoveType | null {
   return null;
 }
 
+/** Poll gamepad and map to input state each frame */
+export function pollGamepad(input: InputState) {
+  const gamepads = navigator.getGamepads?.();
+  if (!gamepads) return;
+  const gp = gamepads[0];
+  if (!gp) return;
+
+  const DEADZONE = 0.2;
+
+  // ── Left stick → WASD movement ──
+  const lx = gp.axes[0] ?? 0;
+  const ly = gp.axes[1] ?? 0;
+  if (ly < -DEADZONE) input.keys.add('w');
+  else input.keys.delete('w');
+  if (ly > DEADZONE) input.keys.add('s');
+  else input.keys.delete('s');
+  if (lx < -DEADZONE) input.keys.add('a');
+  else input.keys.delete('a');
+  if (lx > DEADZONE) input.keys.add('d');
+  else input.keys.delete('d');
+
+  // ── Right stick X → camera orbit ──
+  const rx = gp.axes[2] ?? 0;
+  if (Math.abs(rx) > DEADZONE) {
+    input.cameraAngle += rx * 0.05;
+  }
+
+  // ── Face buttons ──
+  // X (index 0) → jump (space)
+  if (gp.buttons[0]?.pressed) {
+    if (!input.keys.has(' ')) {
+      input.keys.add(' ');
+      input.justPressed.add(' ');
+      const now = Date.now();
+      if (now - input.lastSpaceTime < 400) input.spaceTaps++;
+      else input.spaceTaps = 1;
+      input.lastSpaceTime = now;
+    }
+  } else {
+    input.keys.delete(' ');
+  }
+
+  // Circle (index 1) → headbutt (h)
+  if (gp.buttons[1]?.pressed) {
+    if (!input.keys.has('h')) {
+      input.keys.add('h');
+      input.justPressed.add('h');
+    }
+  } else {
+    input.keys.delete('h');
+  }
+
+  // Square (index 2) → punch (j)
+  if (gp.buttons[2]?.pressed) {
+    if (!input.keys.has('j')) {
+      input.keys.add('j');
+      input.justPressed.add('j');
+    }
+  } else {
+    input.keys.delete('j');
+  }
+
+  // Triangle (index 3) → kick (k)
+  if (gp.buttons[3]?.pressed) {
+    if (!input.keys.has('k')) {
+      input.keys.add('k');
+      input.justPressed.add('k');
+    }
+  } else {
+    input.keys.delete('k');
+  }
+
+  // L1 (index 4) → block (shift)
+  if (gp.buttons[4]?.pressed) {
+    input.shiftHeld = true;
+    input.keys.add('shift');
+  } else {
+    // Only release if keyboard shift isn't physically held
+    // (gamepad releases shift when button released)
+    if (input.keys.has('shift') && !gp.buttons[4]?.pressed) {
+      // Let keyboard handler manage its own shift state
+    }
+  }
+
+  // R1 (index 5) → fire/gun (f)
+  if (gp.buttons[5]?.pressed) {
+    if (!input.keys.has('f')) {
+      input.keys.add('f');
+      input.justPressed.add('f');
+    }
+  } else {
+    input.keys.delete('f');
+  }
+
+  // D-pad up (index 12) → interact (e)
+  if (gp.buttons[12]?.pressed) {
+    if (!input.keys.has('e')) {
+      input.keys.add('e');
+      input.justPressed.add('e');
+    }
+  } else {
+    input.keys.delete('e');
+  }
+}
+
 /** Clear per-frame flags */
 export function clearFrameFlags(input: InputState) {
   input.justPressed.clear();
