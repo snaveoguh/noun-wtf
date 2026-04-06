@@ -1,15 +1,7 @@
 // ── Physics: knockback, gravity, juggle, collision ───────────────────
 
 import type { Player } from './types';
-import {
-  Tile,
-  WALKABLE,
-  TILE_SIZE,
-  MAP_SIZE,
-  GRAVITY,
-  GROUND_Y,
-  SPRITE_SIZE,
-} from './types';
+import { Tile, WALKABLE, TILE_SIZE, MAP_SIZE, GRAVITY, GROUND_Y, SPRITE_SIZE } from './types';
 
 /** Simple lerp */
 export function lerp(a: number, b: number, t: number): number {
@@ -58,11 +50,7 @@ export function isInCone(
 }
 
 /** Get tile at world coordinate */
-export function getTileAt(
-  worldX: number,
-  worldY: number,
-  map: Tile[][],
-): Tile {
+export function getTileAt(worldX: number, worldY: number, map: Tile[][]): Tile {
   const tx = Math.floor(worldX / TILE_SIZE);
   const ty = Math.floor(worldY / TILE_SIZE);
   if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return Tile.DeepWater;
@@ -111,6 +99,7 @@ export function applyGravity(player: Player) {
     if (player.airborneY >= GROUND_Y) {
       player.airborneY = GROUND_Y;
       player.airborneVy = 0;
+      player.jumpCount = 0; // reset jump counter on landing
       if (player.state === 'airborne') {
         player.state = 'idle';
       }
@@ -119,12 +108,7 @@ export function applyGravity(player: Player) {
 }
 
 /** Apply knockback force to a player */
-export function applyKnockback(
-  player: Player,
-  fromX: number,
-  fromY: number,
-  force: number,
-) {
+export function applyKnockback(player: Player, fromX: number, fromY: number, force: number) {
   const angle = angleBetween(fromX, fromY, player.x, player.y);
   player.vx += Math.cos(angle) * force;
   player.vy += Math.sin(angle) * force;
