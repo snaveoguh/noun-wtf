@@ -77,6 +77,16 @@ import { useClaimDrop } from './wager/treasureChest';
 import { getActiveDrops, getNearbyDrop, markClaimed, type DroppedItem } from './engine/drops';
 import { getAuctionState } from './engine/settlement';
 import {
+  playPunchSound, playKickSound, playHeadbuttSound, playGunshot,
+  playShotgunSound, playFootstep, playDeathSound, playPickupSound,
+  playComboSound, playJumpSound, playBlockSound,
+} from './engine/sounds';
+import {
+  createWeaponState, checkWeaponPickup, fireWeapon, tickReload, tickMuzzleFlash,
+  spawnWeaponPickup, getActivePickups, type WeaponState, type WeaponPickup,
+} from './engine/weapons';
+import { WeaponPickup3D } from './engine/WeaponPickup3D';
+import {
   createVoipState,
   initVoip,
   checkVoiceActivity,
@@ -492,6 +502,8 @@ function HUD({
   settlementWindow = false,
   settleTriggered = false,
   transcript = '',
+  weaponEquipped = null,
+  weaponAmmo = 0,
 }: {
   hp: number;
   maxHp: number;
@@ -511,6 +523,8 @@ function HUD({
   settlementWindow?: boolean;
   settleTriggered?: boolean;
   transcript?: string;
+  weaponEquipped?: string | null;
+  weaponAmmo?: number;
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
@@ -585,7 +599,7 @@ function HUD({
         color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: 10,
         textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center',
       }}>
-        WASD move &middot; E interact &middot; M mic &middot; ESC exit
+        WASD move &middot; F fire &middot; E interact &middot; M mic &middot; ESC exit
       </div>
 
       {/* Ocean death overlay */}
@@ -632,6 +646,25 @@ function HUD({
           }}>
             RESPAWNING
           </div>
+        </div>
+      )}
+
+      {/* Weapon ammo (bottom right) */}
+      {(weaponEquipped as any) && (
+        <div style={{
+          position: 'absolute', bottom: 35, right: 16,
+          background: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: '6px 12px',
+          fontFamily: 'monospace', color: '#fff', fontSize: 13,
+          border: '1px solid rgba(255,255,255,0.2)',
+        }}>
+          <span style={{ color: '#ff8844', fontWeight: 'bold' }}>
+            {String(weaponEquipped).toUpperCase()}
+          </span>
+          <span style={{ color: '#888', margin: '0 6px' }}>|</span>
+          <span style={{ color: (weaponAmmo as number) > 0 ? '#4ecdc4' : '#ff4444' }}>
+            {weaponAmmo} ammo
+          </span>
+          <span style={{ color: '#666', fontSize: 10, marginLeft: 8 }}>F shoot</span>
         </div>
       )}
 
@@ -750,6 +783,8 @@ export default function WorldPage() {
   );
   const frameRef = useRef(0);
   const voipRef = useRef<VoipState>(createVoipState());
+  const weaponRef = useRef<WeaponState>(createWeaponState());
+  const [weaponPickups, setWeaponPickups] = useState<WeaponPickup[]>([]);
   const [micEnabled, setMicEnabled] = useState(false);
   const playerTargetRef = useRef(new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE));
 
@@ -774,6 +809,8 @@ export default function WorldPage() {
     settlementWindow: false,
     settleTriggered: false,
     transcript: '',
+    weaponEquipped: null as (string | null),
+    weaponAmmo: 0,
   });
 
   // Seed priority: URL param > Redux auction state > random
@@ -793,6 +830,12 @@ export default function WorldPage() {
   useEffect(() => {
     const player = createPlayer(SPAWN_X, SPAWN_Y, 0, seedKey);
     playerRef.current = player;
+
+    // Spawn weapon pickups around the island
+    spawnWeaponPickup('pistol', SPAWN_X + 80, SPAWN_Y - 60);
+    spawnWeaponPickup('shotgun', SPAWN_X - 100, SPAWN_Y + 40);
+    spawnWeaponPickup('uzi', SPAWN_X + 50, SPAWN_Y + 90);
+    setWeaponPickups([...getActivePickups()]);
 
     // Multiplayer
     const mp = mpRef.current;
@@ -937,10 +980,46 @@ export default function WorldPage() {
         player.hp = player.maxHp;
       }
 
+      // ── Weapon pickup check (GTA style — auto on walk-over) ──
+      const weapon = weaponRef.current;
+      const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
+      if (pickedUp) {
+        playPickupSound();
+        setWeaponPickups([...getActivePickups()]);
+      }
+      tickReload(weapon);
+      tickMuzzleFlash(weapon);
+
+      // ── Footstep sound (every 20 frames while walking) ──
+      if ((player.state === 'walking' || player.state === 'dashing') && frame % 20 === 0) {
+        playFootstep();
+      }
+
       // Combat input
       if (ocean.phase === 'normal') {
-        const intendedMove = resolveIntendedMove(input);
+        let intendedMove = resolveIntendedMove(input);
+
+        // If F pressed and gun equipped, override to gunshot
+        if (intendedMove === 'gunshot' && weapon.equipped) {
+          const fired = fireWeapon(weapon);
+          if (fired) {
+            if (weapon.equipped === 'shotgun') playShotgunSound();
+            else playGunshot();
+          } else {
+            intendedMove = null; // can't fire (cooldown/no ammo)
+          }
+        } else if (intendedMove === 'gunshot' && !weapon.equipped) {
+          intendedMove = null; // no gun
+        }
+
         if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
+          // Play attack sound
+          if (intendedMove === 'punch') playPunchSound();
+          else if (intendedMove === 'kick') playKickSound();
+          else if (intendedMove === 'headbutt') playHeadbuttSound();
+          else if (intendedMove === 'backflip') playJumpSound();
+          else if (intendedMove === 'block') playBlockSound();
+
           // Use player facing direction for attack direction
           const facingAngle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
           const angle = facingAngle;
@@ -956,10 +1035,13 @@ export default function WorldPage() {
             sendForcePush(mp, player.x, player.y, angle, '#4488ff');
           }
 
+          // Sound on hit
           for (const hit of hits) {
+            if (hit.combo >= 3) playComboSound();
             sendHit(mp, hit.targetId, hit.damage, hit.knockX, hit.knockY, hit.move, hit.combo);
             const target = mp.remotePlayers.get(hit.targetId);
             if (target && target.hp <= 0) {
+              playDeathSound();
               combat.killFeed.push({
                 killer: `Noun #${player.nounId}`,
                 victim: `Noun #${target.nounId}`,
@@ -968,9 +1050,6 @@ export default function WorldPage() {
               });
             }
           }
-
-          // NPC hit detection disabled — NPCs not rendered
-          // TODO: re-enable with separate GLB instances
         }
       }
 
@@ -1091,6 +1170,9 @@ export default function WorldPage() {
       hudRef.current.settlementWindow = voipRef.current.settlementWindow;
       hudRef.current.settleTriggered = voipRef.current.settleTriggered;
       hudRef.current.transcript = getCurrentTranscript();
+      // Weapon HUD
+      hudRef.current.weaponEquipped = weaponRef.current.equipped;
+      hudRef.current.weaponAmmo = weaponRef.current.ammo;
     });
 
     return null;
@@ -1198,6 +1280,16 @@ export default function WorldPage() {
             position={[item.worldX * WORLD_SCALE, getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1, item.worldY * WORLD_SCALE]}
             itemType={item.itemType}
             claimed={item.claimed}
+          />
+        ))}
+
+        {/* Weapon pickups on the ground */}
+        {weaponPickups.filter(p => !p.picked).map(pickup => (
+          <WeaponPickup3D
+            key={pickup.id}
+            position={[pickup.worldX * WORLD_SCALE, getTerrainHeight(pickup.worldX * WORLD_SCALE, pickup.worldY * WORLD_SCALE) + 0.2, pickup.worldY * WORLD_SCALE]}
+            type={pickup.type}
+            picked={pickup.picked}
           />
         ))}
 
