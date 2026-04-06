@@ -1,21 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
- * @title TreasureChest
+ * @title TreasureChest (UUPS Upgradeable)
  * @notice Accepts ERC20 and ERC721 deposits from anyone. At settlement time,
  *         the operator scatters deposits as claimable drops on the Nouns World
  *         island. First player to reach the drop location and sign a claim tx
  *         receives the item.
  */
-contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
+contract TreasureChest is
+    Initializable,
+    ERC721Holder,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable
+{
     using SafeERC20 for IERC20;
 
     // ── Types ────────────────────────────────────────────────────────────
@@ -25,18 +33,18 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
     struct Deposit {
         address depositor;
         address token;
-        uint256 amountOrId; // amount for ERC20, tokenId for ERC721
+        uint256 amountOrId;
         ItemType itemType;
         uint64 timestamp;
-        bool dropped; // true once scattered in a drop party
+        bool dropped;
     }
 
     struct Drop {
         uint256 depositIndex;
-        address claimer; // address(0) = unclaimed
+        address claimer;
         uint64 droppedAt;
         uint64 claimedAt;
-        int16 worldX; // island grid position
+        int16 worldX;
         int16 worldY;
     }
 
@@ -44,11 +52,7 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
 
     Deposit[] public deposits;
     Drop[] public drops;
-
-    /// Operator allowed to trigger drops (nounirl.eth agent)
     address public operator;
-
-    /// Drop expiry — unclaimed items return to chest after this duration
     uint64 public constant DROP_EXPIRY = 24 hours;
 
     // ── Events ───────────────────────────────────────────────────────────
@@ -59,11 +63,21 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
     event Expired(uint256 indexed dropId);
     event OperatorUpdated(address indexed newOperator);
 
-    // ── Constructor ──────────────────────────────────────────────────────
+    // ── Initializer (replaces constructor for proxy) ─────────────────────
 
-    constructor(address _operator) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function initialize(address _operator) public initializer {
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
         operator = _operator;
     }
+
+    // ── UUPS ─────────────────────────────────────────────────────────────
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ── Modifiers ────────────────────────────────────────────────────────
 
@@ -74,11 +88,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
 
     // ── Deposit Functions ────────────────────────────────────────────────
 
-    /**
-     * @notice Deposit ERC20 tokens into the treasure chest
-     * @param token ERC20 token address
-     * @param amount Amount to deposit (must have prior approval)
-     */
     function depositERC20(address token, uint256 amount) external nonReentrant {
         require(amount > 0, "Zero amount");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -92,15 +101,9 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
             timestamp: uint64(block.timestamp),
             dropped: false
         }));
-
         emit Deposited(depositId, msg.sender, token, amount, ItemType.ERC20);
     }
 
-    /**
-     * @notice Deposit an ERC721 NFT into the treasure chest
-     * @param token ERC721 contract address
-     * @param tokenId Token ID to deposit (must have prior approval)
-     */
     function depositERC721(address token, uint256 tokenId) external nonReentrant {
         IERC721(token).safeTransferFrom(msg.sender, address(this), tokenId);
 
@@ -113,35 +116,26 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
             timestamp: uint64(block.timestamp),
             dropped: false
         }));
-
         emit Deposited(depositId, msg.sender, token, tokenId, ItemType.ERC721);
     }
 
-    /**
-     * @notice Deposit ETH directly into the treasure chest
-     */
     function depositETH() external payable nonReentrant {
         require(msg.value > 0, "Zero ETH");
 
         uint256 depositId = deposits.length;
         deposits.push(Deposit({
             depositor: msg.sender,
-            token: address(0), // ETH
+            token: address(0),
             amountOrId: msg.value,
-            itemType: ItemType.ERC20, // treat ETH as ERC20-like
+            itemType: ItemType.ERC20,
             timestamp: uint64(block.timestamp),
             dropped: false
         }));
-
         emit Deposited(depositId, msg.sender, address(0), msg.value, ItemType.ERC20);
     }
 
     // ── Drop Functions (operator only) ───────────────────────────────────
 
-    /**
-     * @notice Scatter pending deposits as claimable drops on the island
-     * @param positions Array of (worldX, worldY) pairs for each deposit
-     */
     function drop(int16[] calldata positions) external onlyOperator nonReentrant {
         require(positions.length % 2 == 0, "Positions must be pairs");
 
@@ -161,7 +155,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
                     worldX: positions[dropped * 2],
                     worldY: positions[dropped * 2 + 1]
                 }));
-
                 emit Dropped(dropId, i, positions[dropped * 2], positions[dropped * 2 + 1]);
                 dropped++;
             }
@@ -170,10 +163,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
 
     // ── Claim Functions ──────────────────────────────────────────────────
 
-    /**
-     * @notice Claim a dropped item. First to claim gets it.
-     * @param dropId The drop to claim
-     */
     function claim(uint256 dropId) external nonReentrant {
         require(dropId < drops.length, "Invalid drop");
         Drop storage d = drops[dropId];
@@ -186,7 +175,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
         Deposit storage dep = deposits[d.depositIndex];
 
         if (dep.token == address(0)) {
-            // ETH
             (bool ok, ) = payable(msg.sender).call{value: dep.amountOrId}("");
             require(ok, "ETH transfer failed");
         } else if (dep.itemType == ItemType.ERC20) {
@@ -194,16 +182,29 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
         } else {
             IERC721(dep.token).safeTransferFrom(address(this), msg.sender, dep.amountOrId);
         }
-
         emit Claimed(dropId, msg.sender);
     }
 
-    // ── Expiry / Return ──────────────────────────────────────────────────
+    // ── Cancel / Return ──────────────────────────────────────────────────
 
-    /**
-     * @notice Return expired unclaimed drops to the original depositor
-     * @param dropIds Array of expired drop IDs to return
-     */
+    function cancelDeposit(uint256 depositId) external nonReentrant {
+        require(depositId < deposits.length, "Invalid deposit");
+        Deposit storage dep = deposits[depositId];
+        require(dep.depositor == msg.sender, "Not your deposit");
+        require(!dep.dropped, "Already dropped");
+
+        dep.dropped = true;
+
+        if (dep.token == address(0)) {
+            (bool ok, ) = payable(msg.sender).call{value: dep.amountOrId}("");
+            require(ok, "ETH return failed");
+        } else if (dep.itemType == ItemType.ERC20) {
+            IERC20(dep.token).safeTransfer(msg.sender, dep.amountOrId);
+        } else {
+            IERC721(dep.token).safeTransferFrom(address(this), msg.sender, dep.amountOrId);
+        }
+    }
+
     function returnExpired(uint256[] calldata dropIds) external nonReentrant {
         for (uint256 i = 0; i < dropIds.length; i++) {
             uint256 dropId = dropIds[i];
@@ -212,7 +213,7 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
             require(d.claimer == address(0), "Already claimed");
             require(block.timestamp > d.droppedAt + DROP_EXPIRY, "Not expired");
 
-            d.claimer = address(0xdead); // mark as returned
+            d.claimer = address(0xdead);
             Deposit storage dep = deposits[d.depositIndex];
 
             if (dep.token == address(0)) {
@@ -223,20 +224,14 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
             } else {
                 IERC721(dep.token).safeTransferFrom(address(this), dep.depositor, dep.amountOrId);
             }
-
             emit Expired(dropId);
         }
     }
 
     // ── View Functions ───────────────────────────────────────────────────
 
-    function getDepositCount() external view returns (uint256) {
-        return deposits.length;
-    }
-
-    function getDropCount() external view returns (uint256) {
-        return drops.length;
-    }
+    function getDepositCount() external view returns (uint256) { return deposits.length; }
+    function getDropCount() external view returns (uint256) { return drops.length; }
 
     function getPendingDeposits() external view returns (uint256 count) {
         for (uint256 i = 0; i < deposits.length; i++) {
@@ -247,17 +242,12 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
     function getActiveDrops() external view returns (uint256[] memory) {
         uint256 count = 0;
         for (uint256 i = 0; i < drops.length; i++) {
-            if (drops[i].claimer == address(0) && block.timestamp <= drops[i].droppedAt + DROP_EXPIRY) {
-                count++;
-            }
+            if (drops[i].claimer == address(0) && block.timestamp <= drops[i].droppedAt + DROP_EXPIRY) count++;
         }
-
         uint256[] memory active = new uint256[](count);
         uint256 j = 0;
         for (uint256 i = 0; i < drops.length; i++) {
-            if (drops[i].claimer == address(0) && block.timestamp <= drops[i].droppedAt + DROP_EXPIRY) {
-                active[j++] = i;
-            }
+            if (drops[i].claimer == address(0) && block.timestamp <= drops[i].droppedAt + DROP_EXPIRY) active[j++] = i;
         }
         return active;
     }
@@ -269,7 +259,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
         emit OperatorUpdated(_operator);
     }
 
-    /// @notice Emergency withdrawal by owner
     function emergencyWithdrawETH() external onlyOwner {
         (bool ok, ) = payable(owner()).call{value: address(this).balance}("");
         require(ok, "ETH transfer failed");
@@ -282,29 +271,6 @@ contract TreasureChest is ERC721Holder, Ownable, ReentrancyGuard {
 
     function emergencyWithdrawERC721(address token, uint256 tokenId) external onlyOwner {
         IERC721(token).safeTransferFrom(address(this), owner(), tokenId);
-    }
-
-    /**
-     * @notice Cancel an undropped deposit and return to depositor
-     * @param depositId The deposit to cancel
-     */
-    function cancelDeposit(uint256 depositId) external nonReentrant {
-        require(depositId < deposits.length, "Invalid deposit");
-        Deposit storage dep = deposits[depositId];
-        require(dep.depositor == msg.sender, "Not your deposit");
-        require(!dep.dropped, "Already dropped");
-
-        // Mark as dropped to prevent future dropping
-        dep.dropped = true;
-
-        if (dep.token == address(0)) {
-            (bool ok, ) = payable(msg.sender).call{value: dep.amountOrId}("");
-            require(ok, "ETH return failed");
-        } else if (dep.itemType == ItemType.ERC20) {
-            IERC20(dep.token).safeTransfer(msg.sender, dep.amountOrId);
-        } else {
-            IERC721(dep.token).safeTransferFrom(address(this), msg.sender, dep.amountOrId);
-        }
     }
 
     receive() external payable {}
