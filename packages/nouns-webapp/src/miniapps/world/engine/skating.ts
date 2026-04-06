@@ -85,7 +85,7 @@ const GROUND_Y = 0;
 // Pump mechanic
 const PUMP_BOOST_MIN = 1.05; // minimum multiplier on release
 const PUMP_BOOST_MAX = 1.35; // max multiplier when releasing on curve
-const PUMP_CHARGE_RATE = 0.02; // charge per frame while crouching
+// const PUMP_CHARGE_RATE = 0.02; // charge per frame while crouching (TODO: wire up)
 
 // Hover
 const HOVER_BASE = 0.3; // base hover height
@@ -434,7 +434,7 @@ export function tickSkating(
       const pts = Math.floor(GRIND_SCORE_PER_SEC * delta);
       if (pts > 0) {
         state.comboScore += pts;
-        state.currentTrick = `Grind ${(state.grindTimer).toFixed(1)}s x${state.comboMultiplier}`;
+        state.currentTrick = `Grind ${state.grindTimer.toFixed(1)}s x${state.comboMultiplier}`;
         state.trickTimer = TRICK_DISPLAY_FRAMES;
       }
       // Grind friction
@@ -607,7 +607,11 @@ export function testRampCollision(
   const halfLen = ramp.length / 2;
   const halfWid = ramp.width / 2;
   const margin = 1.0;
-  if (Math.abs(localX) > halfWid + margin || localZ < -halfLen - margin || localZ > halfLen + margin) {
+  if (
+    Math.abs(localX) > halfWid + margin ||
+    localZ < -halfLen - margin ||
+    localZ > halfLen + margin
+  ) {
     return noContact;
   }
 
@@ -615,7 +619,7 @@ export function testRampCollision(
   const t = Math.max(0, Math.min(1, (localZ + halfLen) / ramp.length));
 
   // Quarter-pipe curve: height = H * sin(t * PI/2)
-  const surfaceY = ramp.height * Math.sin(t * Math.PI / 2);
+  const surfaceY = ramp.height * Math.sin((t * Math.PI) / 2);
 
   // Check if player is above ramp surface (within tolerance)
   const tolerance = 1.5;
@@ -624,7 +628,7 @@ export function testRampCollision(
   }
 
   // Slope angle and normal
-  const slopeAngle = t * Math.PI / 2;
+  const slopeAngle = (t * Math.PI) / 2;
   const normalY = Math.cos(slopeAngle); // steepness: 1 at bottom, 0 at vert
 
   // At lip = top 8% of ramp
@@ -635,8 +639,10 @@ export function testRampCollision(
 
   // Slope direction in world space (downhill)
   const slopeDirLocal: [number, number] = [0, -1];
-  const worldSlopeX = slopeDirLocal[0] * Math.cos(ramp.rotation) - slopeDirLocal[1] * Math.sin(ramp.rotation);
-  const worldSlopeZ = slopeDirLocal[0] * Math.sin(ramp.rotation) + slopeDirLocal[1] * Math.cos(ramp.rotation);
+  const worldSlopeX =
+    slopeDirLocal[0] * Math.cos(ramp.rotation) - slopeDirLocal[1] * Math.sin(ramp.rotation);
+  const worldSlopeZ =
+    slopeDirLocal[0] * Math.sin(ramp.rotation) + slopeDirLocal[1] * Math.cos(ramp.rotation);
 
   return {
     onRamp: true,
@@ -654,7 +660,7 @@ export function testRampCollision(
  */
 export function getRampHeight(t: number, peakHeight: number): number {
   const clamped = Math.max(0, Math.min(1, t));
-  return peakHeight * Math.sin(clamped * Math.PI / 2);
+  return peakHeight * Math.sin((clamped * Math.PI) / 2);
 }
 
 /**

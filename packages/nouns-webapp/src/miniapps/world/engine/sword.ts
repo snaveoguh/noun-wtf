@@ -5,12 +5,9 @@
 // Combo chain: light-light-heavy = "Executioner" (50 dmg AoE).
 // Sword range: 2 world units (close combat).
 
-import type { Player, RemotePlayer, MoveType, Direction } from './types';
+import type { Player, RemotePlayer } from './types';
 import type { CombatState } from './combat';
-import {
-  COMBO_WINDOW,
-  PARRY_WINDOW,
-} from './types';
+import { COMBO_WINDOW } from './types';
 import {
   spawnHitSparks,
   spawnDamageText,
@@ -25,11 +22,7 @@ import { directionFromDelta } from './input';
 
 // ── Sword Move Types ────────────────────────────────────────────────
 
-export type SwordMoveType =
-  | 'lightAttack'
-  | 'heavyAttack'
-  | 'stab'
-  | 'swordBlock';
+export type SwordMoveType = 'lightAttack' | 'heavyAttack' | 'stab' | 'swordBlock';
 
 // ── Animation mapping — uses existing Character3D clip names ────────
 
@@ -45,14 +38,14 @@ export const SWORD_ANIM_MAP: Record<SwordMoveType, string> = {
 export interface SwordMoveDef {
   type: SwordMoveType;
   damage: number;
-  range: number;          // world units
-  duration: number;       // frames
+  range: number; // world units
+  duration: number; // frames
   knockback: number;
-  stunDuration: number;   // frames target is stunned
+  stunDuration: number; // frames target is stunned
   iFrames: number;
   isAoE: boolean;
-  cooldown: number;       // frames between swings
-  animation: string;      // GLB clip name
+  cooldown: number; // frames between swings
+  animation: string; // GLB clip name
 }
 
 export const SWORD_RANGE = 2; // close combat — 2 world units
@@ -62,24 +55,24 @@ export const SWORD_MOVE_DEFS: Record<SwordMoveType, SwordMoveDef> = {
     type: 'lightAttack',
     damage: 15,
     range: SWORD_RANGE,
-    duration: 10,           // quick slash
+    duration: 10, // quick slash
     knockback: 1,
     stunDuration: 5,
     iFrames: 0,
     isAoE: false,
-    cooldown: 12,           // fast recovery
+    cooldown: 12, // fast recovery
     animation: '1H_Melee_Attack_Chop',
   },
   heavyAttack: {
     type: 'heavyAttack',
     damage: 30,
     range: SWORD_RANGE,
-    duration: 22,           // slow but powerful
+    duration: 22, // slow but powerful
     knockback: 2.5,
     stunDuration: 14,
     iFrames: 0,
     isAoE: false,
-    cooldown: 28,           // long recovery
+    cooldown: 28, // long recovery
     animation: '1H_Melee_Attack_Slice_Diagonal',
   },
   stab: {
@@ -89,7 +82,7 @@ export const SWORD_MOVE_DEFS: Record<SwordMoveType, SwordMoveDef> = {
     duration: 16,
     knockback: 1.5,
     stunDuration: 10,
-    iFrames: 2,             // brief i-frames on lunge
+    iFrames: 2, // brief i-frames on lunge
     isAoE: false,
     cooldown: 20,
     animation: '1H_Melee_Attack_Stab',
@@ -98,7 +91,7 @@ export const SWORD_MOVE_DEFS: Record<SwordMoveType, SwordMoveDef> = {
     type: 'swordBlock',
     damage: 0,
     range: 0,
-    duration: 999,          // held while shift is down
+    duration: 999, // held while shift is down
     knockback: 0,
     stunDuration: 0,
     iFrames: 0,
@@ -110,28 +103,28 @@ export const SWORD_MOVE_DEFS: Record<SwordMoveType, SwordMoveDef> = {
 
 // ── Sword Block / Parry Constants ───────────────────────────────────
 
-export const SWORD_BLOCK_REDUCTION = 0.8;    // 80% damage reduction when blocking
-export const SWORD_PARRY_WINDOW = 8;         // first 8 frames = parry window
+export const SWORD_BLOCK_REDUCTION = 0.8; // 80% damage reduction when blocking
+export const SWORD_PARRY_WINDOW = 8; // first 8 frames = parry window
 export const SWORD_PARRY_REFLECT_MULT = 1.0; // reflect 100% of damage back
 
 // ── Executioner Combo ───────────────────────────────────────────────
 
 export const EXECUTIONER_SEQ: SwordMoveType[] = ['lightAttack', 'lightAttack', 'heavyAttack'];
 export const EXECUTIONER_DAMAGE = 50;
-export const EXECUTIONER_RANGE = 3;  // AoE radius for finisher
+export const EXECUTIONER_RANGE = 3; // AoE radius for finisher
 
 // ── Sword State ─────────────────────────────────────────────────────
 
 export interface SwordState {
   hasSword: boolean;
   swinging: boolean;
-  swingTimer: number;       // frames remaining in current swing
-  comboCount: number;       // hits landed in current combo chain
+  swingTimer: number; // frames remaining in current swing
+  comboCount: number; // hits landed in current combo chain
   blockActive: boolean;
-  parryWindow: number;      // frames remaining in parry window (counts down from SWORD_PARRY_WINDOW)
-  cooldownTimer: number;    // frames until next swing allowed
+  parryWindow: number; // frames remaining in parry window (counts down from SWORD_PARRY_WINDOW)
+  cooldownTimer: number; // frames until next swing allowed
   lastMoves: SwordMoveType[]; // last 3 moves for combo detection
-  comboTimer: number;       // frames until combo chain resets
+  comboTimer: number; // frames until combo chain resets
   currentMove: SwordMoveType | null;
 }
 
@@ -258,9 +251,10 @@ function matchesSwordSequence(moves: SwordMoveType[], seq: SwordMoveType[]): boo
 }
 
 /** Register a sword hit. Returns combo multiplier and whether Executioner triggered. */
-export function registerSwordHit(
-  swordState: SwordState,
-): { multiplier: number; isExecutioner: boolean } {
+export function registerSwordHit(swordState: SwordState): {
+  multiplier: number;
+  isExecutioner: boolean;
+} {
   // Reset if combo window expired
   if (swordState.comboTimer <= 0) {
     swordState.comboCount = 0;
@@ -325,8 +319,10 @@ export function executeSwordMove(
 
   // Can't act while in bad state
   if (
-    player.state === 'stunned' || player.state === 'dead' ||
-    player.state === 'respawning' || player.state === 'knocked' ||
+    player.state === 'stunned' ||
+    player.state === 'dead' ||
+    player.state === 'respawning' ||
+    player.state === 'knocked' ||
     player.state === 'wounded'
   ) {
     return [];
@@ -395,19 +391,13 @@ export function executeSwordMove(
 
       let damage: number;
       let knockback: number;
-      let range: number;
-      let isAoE = false;
-
       if (isExecutioner) {
         // Executioner finisher — 50 dmg AoE
         damage = EXECUTIONER_DAMAGE;
         knockback = 3;
-        range = EXECUTIONER_RANGE * 16;
-        isAoE = true;
       } else {
         damage = Math.round(def.damage * multiplier);
         knockback = def.knockback;
-        range = def.range * 16;
       }
 
       const knockAngle = angleBetween(player.x, player.y, remote.x, remote.y);

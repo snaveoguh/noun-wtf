@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 
 import type { RemotePlayer, Player } from './types';
 import { PLAYER_MAX_HP } from './types';
@@ -18,8 +18,8 @@ import { dist } from './physics';
 
 // ── Constants ───────────────────────────────────────────────────────
 
-export const CHALLENGE_RANGE = 48;            // pixels — must be close to challenge
-export const FIGHT_ARENA_RADIUS = 80;         // pixels — invisible wall during fight
+export const CHALLENGE_RANGE = 48; // pixels — must be close to challenge
+export const FIGHT_ARENA_RADIUS = 80; // pixels — invisible wall during fight
 export const COUNTDOWN_SECONDS = 3;
 export const MIN_STAKE_ETH = '0.001';
 export const MAX_STAKE_ETH = '1';
@@ -29,31 +29,31 @@ export const STAKE_PRESETS = ['0.001', '0.005', '0.01', '0.05', '0.1', '0.5', '1
 // ── Fight Phase ─────────────────────────────────────────────────────
 
 export type FightPhase =
-  | 'idle'            // no fight active
-  | 'challenging'     // sent challenge, waiting for response
-  | 'challenged'      // received challenge, showing Y/N prompt
-  | 'staking'         // both accepted, depositing ETH
-  | 'countdown'       // 3-2-1 countdown
-  | 'fighting'        // combat active
-  | 'victory'         // local player won
-  | 'defeat'          // local player lost
-  | 'draw';           // both died somehow (timeout)
+  | 'idle' // no fight active
+  | 'challenging' // sent challenge, waiting for response
+  | 'challenged' // received challenge, showing Y/N prompt
+  | 'staking' // both accepted, depositing ETH
+  | 'countdown' // 3-2-1 countdown
+  | 'fighting' // combat active
+  | 'victory' // local player won
+  | 'defeat' // local player lost
+  | 'draw'; // both died somehow (timeout)
 
 // ── Fight State ─────────────────────────────────────────────────────
 
 export interface StakedFightState {
   phase: FightPhase;
-  opponentId: string | null;       // PartyKit player id
+  opponentId: string | null; // PartyKit player id
   opponentNounId: number | null;
-  stakeAmount: string;             // ETH as string
+  stakeAmount: string; // ETH as string
   myDeposited: boolean;
   opponentDeposited: boolean;
-  countdownTimer: number;          // seconds remaining
-  fightTimer: number;              // seconds elapsed in fight
+  countdownTimer: number; // seconds remaining
+  fightTimer: number; // seconds elapsed in fight
   myHp: number;
   opponentHp: number;
   arenaCenter: { x: number; y: number } | null;
-  ethWon: string;                  // ETH won (for victory screen)
+  ethWon: string; // ETH won (for victory screen)
   myTxHash: `0x${string}` | undefined;
 }
 
@@ -151,17 +151,21 @@ export function findChallengeTarget(
   player: Player,
   remotePlayers: Map<string, RemotePlayer>,
 ): { id: string; remote: RemotePlayer } | null {
-  let nearest: { id: string; remote: RemotePlayer; d: number } | null = null;
+  let nearestId = '';
+  let nearestRemote: RemotePlayer | null = null;
+  let nearestDist = Infinity;
 
   remotePlayers.forEach((remote, id) => {
     if (remote.state === 'dead' || remote.state === 'respawning') return;
     const d = dist(player.x, player.y, remote.x, remote.y);
-    if (d < CHALLENGE_RANGE && (!nearest || d < nearest.d)) {
-      nearest = { id, remote, d };
+    if (d < CHALLENGE_RANGE && d < nearestDist) {
+      nearestId = id;
+      nearestRemote = remote;
+      nearestDist = d;
     }
   });
 
-  return nearest ? { id: nearest.id, remote: nearest.remote } : null;
+  return nearestRemote ? { id: nearestId, remote: nearestRemote } : null;
 }
 
 // ── Arena Boundary Enforcement ──────────────────────────────────────
@@ -286,10 +290,7 @@ export function handleFightMessage(
 
 // ── Tick fight timer (call each frame) ──────────────────────────────
 
-export function tickFight(
-  state: StakedFightState,
-  deltaSeconds: number,
-): StakedFightState {
+export function tickFight(state: StakedFightState, deltaSeconds: number): StakedFightState {
   if (state.phase !== 'fighting' && state.phase !== 'countdown') return state;
 
   const next = { ...state };
@@ -358,7 +359,12 @@ interface ChallengePromptProps {
   onDecline: () => void;
 }
 
-function ChallengePrompt({ opponentNounId, stakeAmount, onAccept, onDecline }: ChallengePromptProps) {
+function ChallengePrompt({
+  opponentNounId,
+  stakeAmount,
+  onAccept,
+  onDecline,
+}: ChallengePromptProps) {
   return (
     <div
       style={{
@@ -369,15 +375,11 @@ function ChallengePrompt({ opponentNounId, stakeAmount, onAccept, onDecline }: C
         minWidth: 340,
       }}
     >
-      <div style={{ fontSize: 16, marginBottom: 16, color: ACCENT }}>
-        FIGHT?
-      </div>
+      <div style={{ fontSize: 16, marginBottom: 16, color: ACCENT }}>FIGHT?</div>
       <div style={{ marginBottom: 8, opacity: 0.7 }}>
         Noun #{opponentNounId ?? '???'} challenges you
       </div>
-      <div style={{ marginBottom: 20, fontSize: 14, color: GOLD }}>
-        Stake: {stakeAmount} ETH
-      </div>
+      <div style={{ marginBottom: 20, fontSize: 14, color: GOLD }}>Stake: {stakeAmount} ETH</div>
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
         <button
           onClick={onAccept}
@@ -431,17 +433,19 @@ function StakeSelector({
         minWidth: 380,
       }}
     >
-      <div style={{ fontSize: 14, marginBottom: 8, color: ACCENT }}>
-        CHALLENGE
-      </div>
-      <div style={{ marginBottom: 16, opacity: 0.7 }}>
-        vs Noun #{targetNounId ?? '???'}
-      </div>
+      <div style={{ fontSize: 14, marginBottom: 8, color: ACCENT }}>CHALLENGE</div>
+      <div style={{ marginBottom: 16, opacity: 0.7 }}>vs Noun #{targetNounId ?? '???'}</div>
 
-      <div style={{ marginBottom: 12, fontSize: 10, opacity: 0.6 }}>
-        SELECT STAKE
-      </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 16 }}>
+      <div style={{ marginBottom: 12, fontSize: 10, opacity: 0.6 }}>SELECT STAKE</div>
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          marginBottom: 16,
+        }}
+      >
         {STAKE_PRESETS.map(preset => (
           <button
             key={preset}
@@ -458,9 +462,7 @@ function StakeSelector({
           </button>
         ))}
       </div>
-      <div style={{ marginBottom: 20, fontSize: 16, color: GOLD }}>
-        {stakeAmount} ETH
-      </div>
+      <div style={{ marginBottom: 20, fontSize: 16, color: GOLD }}>{stakeAmount} ETH</div>
 
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
         <button
@@ -521,16 +523,29 @@ function VSScreen({
       }}
     >
       {/* Noun heads side by side */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, marginBottom: 20 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 32,
+          marginBottom: 20,
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 80, height: 80,
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28,
-            border: myDeposited ? `2px solid ${GOLD}` : '2px solid rgba(255,255,255,0.1)',
-          }}>
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              border: myDeposited ? `2px solid ${GOLD}` : '2px solid rgba(255,255,255,0.1)',
+            }}
+          >
             #{myNounId}
           </div>
           <div style={{ marginTop: 6, fontSize: 9, opacity: 0.6 }}>
@@ -538,24 +553,31 @@ function VSScreen({
           </div>
         </div>
 
-        <div style={{
-          fontSize: 24,
-          color: ACCENT,
-          fontWeight: 'bold',
-          textShadow: `0 0 20px ${ACCENT}`,
-        }}>
+        <div
+          style={{
+            fontSize: 24,
+            color: ACCENT,
+            fontWeight: 'bold',
+            textShadow: `0 0 20px ${ACCENT}`,
+          }}
+        >
           VS
         </div>
 
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 80, height: 80,
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28,
-            border: opponentDeposited ? `2px solid ${GOLD}` : '2px solid rgba(255,255,255,0.1)',
-          }}>
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              border: opponentDeposited ? `2px solid ${GOLD}` : '2px solid rgba(255,255,255,0.1)',
+            }}
+          >
             #{opponentNounId ?? '?'}
           </div>
           <div style={{ marginTop: 6, fontSize: 9, opacity: 0.6 }}>
@@ -565,24 +587,22 @@ function VSScreen({
       </div>
 
       {/* Stake amount */}
-      <div style={{ fontSize: 14, color: GOLD, marginBottom: 12 }}>
-        {stakeAmount} ETH each
-      </div>
+      <div style={{ fontSize: 14, color: GOLD, marginBottom: 12 }}>{stakeAmount} ETH each</div>
 
       {/* Phase-specific text */}
       {phase === 'staking' && (
-        <div style={{ fontSize: 10, opacity: 0.5 }}>
-          Waiting for deposits...
-        </div>
+        <div style={{ fontSize: 10, opacity: 0.5 }}>Waiting for deposits...</div>
       )}
       {phase === 'countdown' && (
-        <div style={{
-          fontSize: 48,
-          color: ACCENT,
-          fontWeight: 'bold',
-          textShadow: `0 0 30px ${ACCENT}`,
-          animation: 'pulse 1s infinite',
-        }}>
+        <div
+          style={{
+            fontSize: 48,
+            color: ACCENT,
+            fontWeight: 'bold',
+            textShadow: `0 0 30px ${ACCENT}`,
+            animation: 'pulse 1s infinite',
+          }}
+        >
           {Math.ceil(countdownTimer)}
         </div>
       )}
@@ -601,14 +621,22 @@ interface FightHUDProps {
   stakeAmount: string;
 }
 
-function FightHUD({ myHp, opponentHp, myNounId, opponentNounId, fightTimer, stakeAmount }: FightHUDProps) {
+function FightHUD({
+  myHp,
+  opponentHp,
+  myNounId,
+  opponentNounId,
+  fightTimer,
+  stakeAmount,
+}: FightHUDProps) {
   const myPct = Math.max(0, myHp / PLAYER_MAX_HP);
   const opPct = Math.max(0, opponentHp / PLAYER_MAX_HP);
   const mins = Math.floor(fightTimer / 60);
   const secs = Math.floor(fightTimer % 60);
   const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
-  const hpBarStyle = (pct: number, align: 'left' | 'right'): React.CSSProperties => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const hpBarStyle = (_pct: number, _align: 'left' | 'right'): React.CSSProperties => ({
     width: 200,
     height: 18,
     background: 'rgba(255,255,255,0.1)',
@@ -626,20 +654,22 @@ function FightHUD({ myHp, opponentHp, myNounId, opponentNounId, fightTimer, stak
   });
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: 16,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-      pointerEvents: 'none',
-      zIndex: 9999,
-      fontFamily: FONT,
-      fontSize: 10,
-      color: '#fff',
-    }}>
+    <div
+      style={{
+        position: 'absolute',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        pointerEvents: 'none',
+        zIndex: 9999,
+        fontFamily: FONT,
+        fontSize: 10,
+        color: '#fff',
+      }}
+    >
       {/* My HP */}
       <div style={{ textAlign: 'right' }}>
         <div style={{ marginBottom: 4, opacity: 0.7 }}>#{myNounId}</div>
@@ -688,12 +718,14 @@ function ResultScreen({ isVictory, ethWon, onClose }: ResultScreenProps) {
         borderColor: isVictory ? GOLD : ACCENT,
       }}
     >
-      <div style={{
-        fontSize: 28,
-        color: isVictory ? GOLD : ACCENT,
-        marginBottom: 16,
-        textShadow: `0 0 30px ${isVictory ? GOLD : ACCENT}`,
-      }}>
+      <div
+        style={{
+          fontSize: 28,
+          color: isVictory ? GOLD : ACCENT,
+          marginBottom: 16,
+          textShadow: `0 0 30px ${isVictory ? GOLD : ACCENT}`,
+        }}
+      >
         {isVictory ? 'VICTORY' : 'DEFEAT'}
       </div>
 
@@ -705,9 +737,7 @@ function ResultScreen({ isVictory, ethWon, onClose }: ResultScreenProps) {
       )}
 
       {!isVictory && (
-        <div style={{ marginBottom: 20, fontSize: 10, opacity: 0.6 }}>
-          Better luck next time
-        </div>
+        <div style={{ marginBottom: 20, fontSize: 10, opacity: 0.6 }}>Better luck next time</div>
       )}
 
       <button
@@ -756,11 +786,7 @@ export function StakedFightUI({
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Send transaction hook for depositing stake ──
-  const {
-    sendTransaction,
-    data: txHash,
-    isPending: isSending,
-  } = useSendTransaction();
+  const { sendTransaction, data: txHash, isPending: isSending } = useSendTransaction();
 
   const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -915,20 +941,22 @@ export function StakedFightUI({
     <>
       {/* "Press C to challenge" hint when near a player */}
       {fightState.phase === 'idle' && challengeTarget && !showStakeSelector && (
-        <div style={{
-          position: 'absolute',
-          bottom: 140,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontFamily: FONT,
-          fontSize: 10,
-          color: 'rgba(255,255,255,0.6)',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '6px 14px',
-          borderRadius: 4,
-          pointerEvents: 'none',
-          zIndex: 9998,
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 140,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontFamily: FONT,
+            fontSize: 10,
+            color: 'rgba(255,255,255,0.6)',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '6px 14px',
+            borderRadius: 4,
+            pointerEvents: 'none',
+            zIndex: 9998,
+          }}
+        >
           Press [C] to challenge Noun #{challengeTarget.nounId}
         </div>
       )}
@@ -946,13 +974,15 @@ export function StakedFightUI({
 
       {/* Waiting for response */}
       {fightState.phase === 'challenging' && (
-        <div style={{
-          ...panelStyle,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          minWidth: 300,
-        }}>
+        <div
+          style={{
+            ...panelStyle,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            minWidth: 300,
+          }}
+        >
           <div style={{ marginBottom: 12, color: ACCENT }}>CHALLENGE SENT</div>
           <div style={{ opacity: 0.6, marginBottom: 16 }}>
             Waiting for Noun #{fightState.opponentNounId ?? '?'}...
@@ -995,14 +1025,16 @@ export function StakedFightUI({
 
       {/* Deposit button during staking if not yet deposited */}
       {fightState.phase === 'staking' && !fightState.myDeposited && (
-        <div style={{
-          position: 'absolute',
-          bottom: '20%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10000,
-          pointerEvents: 'auto',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '20%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            pointerEvents: 'auto',
+          }}
+        >
           <button
             onClick={depositStake}
             disabled={isSending}
