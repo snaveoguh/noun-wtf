@@ -155,7 +155,7 @@ const NavBar = () => {
             </Nav.Item>
             {currentNounSeed && (
               <Nav.Item
-                className="d-none d-xl-flex"
+                className="d-none d-md-flex"
                 style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}
               >
                 <span
