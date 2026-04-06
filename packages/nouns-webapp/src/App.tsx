@@ -2,13 +2,14 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
 import HeliosStatusBar from '@/components/HeliosStatusBar';
+import LolLogo from '@/components/LolLogo';
 import NavBar from '@/components/NavBar';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
@@ -69,6 +70,176 @@ const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage')
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
+
+/** Floating mega menu — + button top-left, centered LOL, mode toggles top-right */
+function MiniNav() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { mode, setMode } = useSiteTheme();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const torchMode = useAppSelector(state => state.application.torchMode);
+
+  const go = (path: string) => { setMenuOpen(false); navigate(path); };
+  const ext = (url: string) => { setMenuOpen(false); window.open(url, '_blank'); };
+
+  return (
+    <>
+      {/* Floating + button — top left */}
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        style={{
+          position: 'fixed', top: 12, left: 12, zIndex: 10000,
+          width: 36, height: 36, borderRadius: 10,
+          border: 'none',
+          background: menuOpen
+            ? '#111'
+            : 'linear-gradient(135deg, #d5584d, #e8a54d, #d5584d)',
+          color: menuOpen ? '#fff' : '#fff',
+          fontSize: 22, fontWeight: 900, lineHeight: 1,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: menuOpen ? '0 2px 20px rgba(0,0,0,0.3)' : '0 2px 8px rgba(213,88,77,0.3)',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        {menuOpen ? '×' : '+'}
+      </button>
+
+      {/* Mode toggles — top right */}
+      <div style={{
+        position: 'fixed', top: 12, right: 12, zIndex: 10000,
+        display: 'flex', gap: 6, alignItems: 'center',
+      }}>
+        <button onClick={() => setMode(mode === 'new' ? 'classic' : 'new')} style={{
+          padding: '6px 12px', borderRadius: 8, border: 'none',
+          background: 'rgba(0,0,0,0.06)', cursor: 'pointer',
+          fontSize: 11, fontFamily: 'monospace', fontWeight: 600,
+          color: '#555', backdropFilter: 'blur(8px)',
+          transition: 'all 0.15s',
+        }}>
+          {mode === 'new' ? 'classic' : 'new'}
+        </button>
+        <button onClick={() => dispatch({ type: 'application/setTorchMode', payload: !torchMode })} style={{
+          width: 32, height: 32, borderRadius: 8, border: 'none',
+          background: 'rgba(0,0,0,0.06)', cursor: 'pointer',
+          fontSize: 16, backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {torchMode ? '☀️' : '🌙'}
+        </button>
+        <ConnectKitButton.Custom>
+          {({ isConnected, show, address }) => (
+            <button onClick={show} style={{
+              padding: '6px 12px', borderRadius: 8, border: 'none',
+              background: isConnected ? 'rgba(0,0,0,0.06)' : 'linear-gradient(135deg, #d5584d, #e8a54d)',
+              color: isConnected ? '#333' : '#fff',
+              cursor: 'pointer', fontSize: 11, fontFamily: 'monospace', fontWeight: 600,
+              backdropFilter: 'blur(8px)',
+            }}>
+              {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}` : 'connect'}
+            </button>
+          )}
+        </ConnectKitButton.Custom>
+      </div>
+
+      {/* Mega menu — dark, full screen, sexy */}
+      {menuOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(8,8,12,0.95)', backdropFilter: 'blur(30px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setMenuOpen(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 48, maxWidth: 900, width: '100%', padding: '0 32px',
+            }}
+          >
+            {[
+              {
+                title: 'GOVERN',
+                items: [
+                  { label: 'Proposals', action: () => go('/vote') },
+                  { label: 'Candidates', action: () => go('/candidates') },
+                  { label: 'Grants', action: () => go('/grants') },
+                  { label: 'Submit Proposal', action: () => go('/create-proposal') },
+                ],
+              },
+              {
+                title: 'EXPLORE',
+                items: [
+                  { label: '⌐◧-◧ World', action: () => go('/world') },
+                  { label: 'Crystal Ball', action: () => go('/crystal-ball') },
+                  { label: 'Hack the Treasury', action: () => go('/hackathons') },
+                  { label: 'Terminal', action: () => go('/terminal') },
+                  { label: 'Gallery', action: () => go('/nouns') },
+                  { label: 'Studio', action: () => go('/studio') },
+                ],
+              },
+              {
+                title: 'ECOSYSTEM',
+                items: [
+                  { label: 'Probe', action: () => ext('https://probe.wtf'), external: true },
+                  { label: 'Dreams', action: () => ext('https://probe.wtf/dreams/create'), external: true },
+                  { label: 'Pooter', action: () => ext('https://pooter.world'), external: true },
+                  { label: 'Lils', action: () => ext('https://lils.wtf'), external: true },
+                  { label: 'Nouns.wtf', action: () => ext('https://nouns.wtf'), external: true },
+                ],
+              },
+              {
+                title: 'MORE',
+                items: [
+                  { label: 'Stats', action: () => go('/stats') },
+                  { label: 'Settlers', action: () => go('/settlers') },
+                  { label: 'Feed', action: () => go('/feed') },
+                  { label: 'Highway', action: () => go('/highway') },
+                  { label: 'Nounders', action: () => go('/nounders') },
+                ],
+              },
+            ].map(section => (
+              <div key={section.title}>
+                <div style={{
+                  fontSize: 10, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.3)',
+                  marginBottom: 16, fontFamily: 'monospace', fontWeight: 700,
+                }}>
+                  {section.title}
+                </div>
+                {section.items.map(item => (
+                  <div
+                    key={item.label}
+                    onClick={item.action}
+                    style={{
+                      padding: '10px 0', color: 'rgba(255,255,255,0.75)',
+                      fontSize: 16, fontFamily: 'monospace', cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      transition: 'color 0.15s, padding-left 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.color = '#fff';
+                      e.currentTarget.style.paddingLeft = '8px';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
+                      e.currentTarget.style.paddingLeft = '0px';
+                    }}
+                  >
+                    {item.label}
+                    {(item as any).external && <span style={{ opacity: 0.4, marginLeft: 6 }}>↗</span>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 /** Inner router — uses useLocation to conditionally show chrome vs terminal */
 function AppRouter() {

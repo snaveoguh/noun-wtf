@@ -17,9 +17,9 @@ interface ApplicationState {
   torchMode: boolean;
 }
 
-// Default to torch mode ON unless user has previously turned it off
+// Default to torch mode OFF — users can enable via navbar candle icon
 const savedTorch = typeof window !== 'undefined' ? localStorage.getItem('noun-wtf-torch') : null;
-const torchDefault = savedTorch === null ? true : savedTorch === '1';
+const torchDefault = savedTorch === '1';
 
 const initialState: ApplicationState = {
   stateBackgroundColor: grey,
