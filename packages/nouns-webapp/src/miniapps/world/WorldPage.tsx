@@ -557,7 +557,7 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
       />
 
       {/* Rotating voxel Noun — MASSIVE in the sky, visible from everywhere */}
-      <group ref={ballGroupRef} position={[0, eyeY, 0]} scale={[1, 1, 1]}>
+      <group ref={ballGroupRef} position={[0, eyeY + 8, 0]} scale={[20, 20, 20]}>
         {bodyGeo && (
           <mesh geometry={bodyGeo}>
             <meshBasicMaterial vertexColors toneMapped={false} />

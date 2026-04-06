@@ -32,8 +32,14 @@ export const WALKABLE = new Set<Tile>([
 // ── Direction / State ─────────────────────────────────────────────────
 
 export type Direction =
-  | 'up' | 'down' | 'left' | 'right'
-  | 'up-left' | 'up-right' | 'down-left' | 'down-right';
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+  | 'up-left'
+  | 'up-right'
+  | 'down-left'
+  | 'down-right';
 
 /** Map facing direction to Y-axis rotation (radians). */
 export const DIRECTION_ROTATION: Record<Direction, number> = {
@@ -70,8 +76,8 @@ export type PlayerState =
   | 'respawning'
   | 'backflip'
   | 'dashing'
-  | 'knocked'    // combo knockdown — on the ground, auto-stand after delay
-  | 'wounded';   // gunshot knee collapse — held pose
+  | 'knocked' // combo knockdown — on the ground, auto-stand after delay
+  | 'wounded'; // gunshot knee collapse — held pose
 
 export type MoveType =
   | 'punch'
@@ -87,8 +93,8 @@ export type MoveType =
   | 'roundhouse'
   | 'meteor'
   | 'cyclone'
-  | 'gunshot'    // ranged — collapses target to one knee
-  | 'headshot';  // instant kill variant
+  | 'gunshot' // ranged — collapses target to one knee
+  | 'headshot'; // instant kill variant
 
 // ── Player ────────────────────────────────────────────────────────────
 
@@ -111,6 +117,7 @@ export interface Player {
   iFrames: number; // invincibility frames remaining
   airborneVy: number; // vertical velocity for juggle/jump
   airborneY: number; // visual Y offset (negative = up)
+  jumpCount: number; // 0=ground, 1=jumped, 2=double, 3=triple, 4=backflip
   blockTimer: number;
   dashVx: number;
   dashVy: number;
@@ -122,8 +129,8 @@ export interface Player {
   lastMoves: MoveType[]; // last 5 moves for special combos
 
   // Hit reaction
-  knockedTimer: number;   // frames remaining in knocked-down state
-  woundedTimer: number;   // frames remaining in wounded (knee) state
+  knockedTimer: number; // frames remaining in knocked-down state
+  woundedTimer: number; // frames remaining in wounded (knee) state
   consecutiveGunshots: number; // gunshot hit counter for 2-shot kill
 
   // Visuals

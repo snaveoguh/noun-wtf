@@ -6,11 +6,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import {
-  buildNounGeometries,
-  seedToLayers,
-  type LayerVisibility,
-} from '@nouns/voxel-engine';
+import { buildNounGeometries, seedToLayers, type LayerVisibility } from '@nouns/voxel-engine';
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import type { INounSeed } from '@/wrappers/nounToken';
 import { DIRECTION_ROTATION } from './types';
@@ -37,19 +33,19 @@ const ANIM_MAP: Record<string, string> = {
   reloading: '1H_Ranged_Reload',
   blocking: 'Block',
   backflip: 'Jump_Full_Long',
-  stunned: 'Hit_A',                         // punch/kick recoil — head sway, slight stumble
-  wounded: 'Hit_B',                         // gunshot — collapse to one knee, hold pose
-  knocked: 'Death_A',                       // 3-hit combo knockdown — played at 0.5x speed
-  dead: 'Death_A',                          // full death fall
-  dead_headshot: 'Death_B',                 // headshot instant kill — alternate death anim
+  stunned: 'Hit_A', // punch/kick recoil — head sway, slight stumble
+  wounded: 'Hit_B', // gunshot — collapse to one knee, hold pose
+  knocked: 'Death_A', // 3-hit combo knockdown — played at 0.5x speed
+  dead: 'Death_A', // full death fall
+  dead_headshot: 'Death_B', // headshot instant kill — alternate death anim
   respawning: 'Idle',
   airborne: 'Jump_Full_Short',
 };
 
 // Animations that play at custom speeds
 const ANIM_SPEED: Partial<Record<string, number>> = {
-  knocked: 0.5,    // slow-motion fall for combo knockdown
-  wounded: 0.6,    // slightly slowed knee collapse
+  knocked: 0.5, // slow-motion fall for combo knockdown
+  wounded: 0.6, // slightly slowed knee collapse
 };
 
 export interface CharacterState {
@@ -87,10 +83,12 @@ let glbFetching: Promise<ArrayBuffer> | null = null;
 function fetchGLB(): Promise<ArrayBuffer> {
   if (glbBuffer) return Promise.resolve(glbBuffer);
   if (!glbFetching) {
-    glbFetching = fetch(MODEL_PATH).then(r => r.arrayBuffer()).then(buf => {
-      glbBuffer = buf;
-      return buf;
-    });
+    glbFetching = fetch(MODEL_PATH)
+      .then(r => r.arrayBuffer())
+      .then(buf => {
+        glbBuffer = buf;
+        return buf;
+      });
   }
   return glbFetching;
 }
@@ -110,14 +108,16 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
   const gunGroupRef = useRef<THREE.Group | null>(null);
   const handBoneRef = useRef<THREE.Object3D | null>(null);
 
-  const nounHeadRef = useRef((() => {
-    try {
-      const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
-      return buildNounGeometries(layers);
-    } catch {
-      return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
-    }
-  })());
+  const nounHeadRef = useRef(
+    (() => {
+      try {
+        const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
+        return buildNounGeometries(layers);
+      } catch {
+        return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
+      }
+    })(),
+  );
 
   const bodyColorRef = useRef(getNounBodyColor(seed));
 
@@ -132,7 +132,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       if (cancelled || !groupRef.current) return;
 
       const loader = new GLTFLoader();
-      loader.parse(buffer.slice(0), '', (gltf) => {
+      loader.parse(buffer.slice(0), '', gltf => {
         if (cancelled || !groupRef.current) return;
 
         model = gltf.scene;
@@ -142,20 +142,33 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         let chestBone: THREE.Object3D | null = null;
         model.traverse((child: THREE.Object3D) => {
           if (child.name === 'Rogue_Head' || child.name === 'Rogue_Cape') child.visible = false;
-          if (child.name.includes('Knife') || child.name.includes('Crossbow') ||
-              child.name.includes('Throwable') ||
-              child.name.includes('1H_') || child.name.includes('2H_') ||
-              child.name === 'Rogue_ArmLeft' ||
-              child.name === 'hand.l' || child.name === 'handslot.l' ||
-              child.name === 'wrist.l' || child.name === 'lowerarm.l' ||
-              child.name === 'upperarm.l' ||
-              child.name === 'hand.r' ||
-              child.name === 'Knife_Offhand') {
+          if (
+            child.name.includes('Knife') ||
+            child.name.includes('Crossbow') ||
+            child.name.includes('Throwable') ||
+            child.name.includes('1H_') ||
+            child.name.includes('2H_') ||
+            child.name === 'Rogue_ArmLeft' ||
+            child.name === 'hand.l' ||
+            child.name === 'handslot.l' ||
+            child.name === 'wrist.l' ||
+            child.name === 'lowerarm.l' ||
+            child.name === 'upperarm.l' ||
+            child.name === 'shoulder.l' ||
+            child.name === 'hand.r' ||
+            child.name === 'Knife_Offhand' ||
+            child.name.toLowerCase().includes('armleft') ||
+            child.name.toLowerCase().includes('arm_left') ||
+            child.name.toLowerCase().includes('arm_l')
+          ) {
             // Hide weapons + left arm (exact names only — don't match legs!)
             child.visible = false;
           }
           // Store chest/spine bone for safety vest attachment
-          if ((child.name === 'chest' || child.name === 'spine_01' || child.name === 'spine') && (child as any).isBone) {
+          if (
+            (child.name === 'chest' || child.name === 'spine_01' || child.name === 'spine') &&
+            (child as any).isBone
+          ) {
             chestBone = child;
           }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
@@ -181,34 +194,22 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           });
 
           // Front panel — slightly curved via thin box
-          const frontPanel = new THREE.Mesh(
-            new THREE.BoxGeometry(1.6, 2.2, 0.15),
-            vestMat,
-          );
+          const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 0.15), vestMat);
           frontPanel.position.set(0, 0.2, 0.55);
           vestGroup.add(frontPanel);
 
           // Back panel
-          const backPanel = new THREE.Mesh(
-            new THREE.BoxGeometry(1.6, 2.2, 0.15),
-            vestMat,
-          );
+          const backPanel = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 0.15), vestMat);
           backPanel.position.set(0, 0.2, -0.55);
           vestGroup.add(backPanel);
 
           // Shoulder straps connecting front to back
           const strapMat = vestMat.clone();
-          const leftStrap = new THREE.Mesh(
-            new THREE.BoxGeometry(0.35, 0.15, 1.0),
-            strapMat,
-          );
+          const leftStrap = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.15, 1.0), strapMat);
           leftStrap.position.set(-0.55, 1.2, 0);
           vestGroup.add(leftStrap);
 
-          const rightStrap = new THREE.Mesh(
-            new THREE.BoxGeometry(0.35, 0.15, 1.0),
-            strapMat,
-          );
+          const rightStrap = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.15, 1.0), strapMat);
           rightStrap.position.set(0.55, 1.2, 0);
           vestGroup.add(rightStrap);
 
@@ -246,7 +247,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             headGroup.position.set(0, 0.65, 0);
             const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
             if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
-            if (nounHead.glassesGeo) headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
+            if (nounHead.glassesGeo)
+              headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
             child.add(headGroup);
             voxelHeadRef.current = headGroup;
           }
@@ -276,7 +278,6 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       // Don't remove model — prevents flash on strict mode re-mount
       // Model will be replaced if seed changes (effect re-runs)
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Per-frame update
@@ -300,10 +301,9 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       // Headshot death uses alternate death animation
       if (s.state === 'dead' && s.attackType === 'headshot') animKey = 'dead_headshot';
       const clipName = ANIM_MAP[animKey] ?? 'Idle';
-      const isOneShot = [
-        'attacking', 'dead', 'backflip', 'stunned',
-        'knocked', 'wounded',
-      ].includes(s.state);
+      const isOneShot = ['attacking', 'dead', 'backflip', 'stunned', 'knocked', 'wounded'].includes(
+        s.state,
+      );
 
       if (clipName !== prevAnimRef.current && actions[clipName] && !oneShotPlaying.current) {
         const prev = actions[prevAnimRef.current];
@@ -358,7 +358,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       if (blinkCycle > 9.7 && blinkCycle < 9.85) {
         // Blink! Squash the glasses
         head.children.forEach((child, i) => {
-          if (i > 0) { // glasses are second child
+          if (i > 0) {
+            // glasses are second child
             child.scale.y = 0.3; // squash
           }
         });
@@ -375,7 +376,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         if (i > 0 && (child as THREE.Mesh).geometry) {
           const geo = (child as THREE.Mesh).geometry;
           const colors = geo.attributes.color;
-          if (colors && !((geo as any).__origColors)) {
+          if (colors && !(geo as any).__origColors) {
             // Store original colors on first frame
             (geo as any).__origColors = new Float32Array(colors.array);
           }
@@ -383,16 +384,30 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             const orig = (geo as any).__origColors as Float32Array;
             const arr = colors.array as Float32Array;
             for (let ci = 0; ci < arr.length; ci += 3) {
-              const r = orig[ci], g = orig[ci + 1], b = orig[ci + 2];
+              const r = orig[ci],
+                g = orig[ci + 1],
+                b = orig[ci + 2];
               // Detect near-black (pupil) and near-white (eye white)
               const isBlack = r < 0.05 && g < 0.05 && b < 0.05;
               const isWhite = r > 0.9 && g > 0.9 && b > 0.9;
               if (lookCycle === 1) {
-                if (isBlack) { arr[ci] = 1; arr[ci + 1] = 1; arr[ci + 2] = 1; }
-                else if (isWhite) { arr[ci] = 0; arr[ci + 1] = 0; arr[ci + 2] = 0; }
-                else { arr[ci] = orig[ci]; arr[ci + 1] = orig[ci + 1]; arr[ci + 2] = orig[ci + 2]; }
+                if (isBlack) {
+                  arr[ci] = 1;
+                  arr[ci + 1] = 1;
+                  arr[ci + 2] = 1;
+                } else if (isWhite) {
+                  arr[ci] = 0;
+                  arr[ci + 1] = 0;
+                  arr[ci + 2] = 0;
+                } else {
+                  arr[ci] = orig[ci];
+                  arr[ci + 1] = orig[ci + 1];
+                  arr[ci + 2] = orig[ci + 2];
+                }
               } else {
-                arr[ci] = orig[ci]; arr[ci + 1] = orig[ci + 1]; arr[ci + 2] = orig[ci + 2];
+                arr[ci] = orig[ci];
+                arr[ci + 1] = orig[ci + 1];
+                arr[ci + 2] = orig[ci + 2];
               }
             }
             colors.needsUpdate = true;
@@ -409,7 +424,9 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         // Create tiny gun mesh and attach to hand
         const gun = new THREE.Group();
         const gunScale = 0.08; // very small to not drag on floor
-        const mat = new THREE.MeshBasicMaterial({ color: wep === 'shotgun' ? '#8B4513' : wep === 'uzi' ? '#333' : '#555' });
+        const mat = new THREE.MeshBasicMaterial({
+          color: wep === 'shotgun' ? '#8B4513' : wep === 'uzi' ? '#333' : '#555',
+        });
         // Barrel
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 6), mat);
         barrel.rotation.x = Math.PI / 2;
@@ -419,7 +436,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), mat);
         gun.add(body);
         // Grip
-        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.2), new THREE.MeshBasicMaterial({ color: '#222' }));
+        const grip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 0.5, 0.2),
+          new THREE.MeshBasicMaterial({ color: '#222' }),
+        );
         grip.position.set(0, -0.4, -0.05);
         gun.add(grip);
         // Muzzle flash light (starts off)

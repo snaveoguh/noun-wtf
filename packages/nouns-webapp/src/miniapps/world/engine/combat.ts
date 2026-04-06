@@ -26,15 +26,12 @@ import {
   WOUNDED_DURATION,
   KNOCKED_DURATION,
   GUNSHOT_RESPAWN_TIME,
+  PLAYER_SPEED,
+  SPRITE_SIZE,
 } from './types';
 import { MOVE_DEFS, resolveDamage } from './moves';
 import { registerHit, tickCombo } from './combo';
-import {
-  dist,
-  angleBetween,
-  applyGravity,
-  applyFriction,
-} from './physics';
+import { dist, angleBetween, applyGravity, applyFriction, moveWithCollision } from './physics';
 import {
   spawnHitSparks,
   spawnDustTrail,
@@ -50,17 +47,10 @@ import {
 } from './particles';
 import { getMovementVector, directionFromDelta, type InputState } from './input';
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './tilemap';
-import { moveWithCollision } from './physics';
-import { PLAYER_SPEED, SPRITE_SIZE } from './types';
 
 // ── Player factory ────────────────────────────────────���───────────────
 
-export function createPlayer(
-  x: number,
-  y: number,
-  nounId: number,
-  seedKey: string,
-): Player {
+export function createPlayer(x: number, y: number, nounId: number, seedKey: string): Player {
   return {
     x,
     y,
@@ -78,6 +68,7 @@ export function createPlayer(
     iFrames: 0,
     airborneVy: 0,
     airborneY: GROUND_Y,
+    jumpCount: 0,
     blockTimer: 0,
     dashVx: 0,
     dashVy: 0,
@@ -157,8 +148,10 @@ export function executeMove(
 
   // Can't act while stunned, dead, knocked down, or wounded
   if (
-    player.state === 'stunned' || player.state === 'dead' ||
-    player.state === 'respawning' || player.state === 'knocked' ||
+    player.state === 'stunned' ||
+    player.state === 'dead' ||
+    player.state === 'respawning' ||
+    player.state === 'knocked' ||
     player.state === 'wounded'
   ) {
     return [];
@@ -186,11 +179,22 @@ export function executeMove(
   // ── Move-specific behavior ──
 
   if (move === 'backflip') {
-    player.state = 'backflip';
-    player.airborneVy = def.launchVy;
-    player.airborneY = -1; // start airborne
-    player.flipRotation = 0;
-    // Jump in place — no horizontal push
+    // Progressive jump: jump → double → triple → backflip
+    player.jumpCount++;
+    if (player.jumpCount <= 3) {
+      // Regular jumps (each successive one slightly higher)
+      const jumpPower = -6 - player.jumpCount * 1.5; // -7.5, -9, -10.5
+      player.state = 'airborne';
+      player.airborneVy = jumpPower;
+      if (player.airborneY >= GROUND_Y) player.airborneY = -0.5; // start airborne
+    } else {
+      // 4th press = backflip
+      player.state = 'backflip';
+      player.airborneVy = -12; // big launch
+      if (player.airborneY >= GROUND_Y) player.airborneY = -0.5;
+      player.flipRotation = 0;
+      player.jumpCount = 0; // reset after backflip
+    }
     return [];
   }
 
@@ -206,9 +210,7 @@ export function executeMove(
   if (move === 'forcePush') {
     combat.cooldowns.forcePush = def.cooldown;
     const pushAngle = angleBetween(player.x, player.y, mouseWorldX, mouseWorldY);
-    combat.forcePushes.push(
-      createForcePush(player.x, player.y, pushAngle, '#4488ff'),
-    );
+    combat.forcePushes.push(createForcePush(player.x, player.y, pushAngle, '#4488ff'));
     player.state = 'attacking';
   }
 
@@ -251,7 +253,9 @@ export function executeMove(
     } else {
       // Directional: check if target is in front of player and in range
       const targetAngle = angleBetween(player.x, player.y, remote.x, remote.y);
-      const angleDelta = Math.abs(angleBetween(player.x, player.y, mouseWorldX, mouseWorldY) - targetAngle);
+      const angleDelta = Math.abs(
+        angleBetween(player.x, player.y, mouseWorldX, mouseWorldY) - targetAngle,
+      );
       hit = d < def.range && angleDelta < Math.PI / 2;
     }
 
@@ -546,13 +550,7 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
   // ── Dashing ──
   if (player.state === 'dashing') {
     player.dashTimer--;
-    const pos = moveWithCollision(
-      player.x,
-      player.y,
-      player.dashVx,
-      player.dashVy,
-      ISLAND_MAP,
-    );
+    const pos = moveWithCollision(player.x, player.y, player.dashVx, player.dashVy, ISLAND_MAP);
     player.x = pos.x;
     player.y = pos.y;
     if (player.dashTimer <= 0) {
