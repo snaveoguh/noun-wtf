@@ -558,11 +558,9 @@ function CameraController({ target, inputRef }: { target: THREE.Vector3; inputRe
       target.z + Math.cos(orbitX.current) * Math.cos(orbitY.current) * camDist,
     );
 
-    camera.position.lerp(desired, 0.1);
+    // Snap camera (no lerp lag — instant follow like good 3rd person games)
+    camera.position.copy(desired);
     camera.lookAt(target.x, target.y + 0.5, target.z);
-
-    // Write camera angle to input state so WASD movement is camera-relative
-    if (input) input.cameraAngle = orbitX.current;
   });
 
   return null;
