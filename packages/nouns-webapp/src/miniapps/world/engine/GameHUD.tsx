@@ -709,6 +709,31 @@ export function GameHUD({
           </div>
         </div>
       )}
+      {/* PIP3 watermark — PS3 logo style, bottom right */}
+      <div style={{
+        position: 'absolute', bottom: 8, right: 12,
+        fontFamily: '"Courier New", monospace',
+        pointerEvents: 'none', userSelect: 'none',
+      }}>
+        <span style={{
+          fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px',
+          color: 'rgba(255,255,255,0.12)',
+          textShadow: '0 0 8px rgba(255,255,255,0.05)',
+          fontStyle: 'italic',
+        }}>
+          P
+          <span style={{ fontSize: 13, verticalAlign: 'super', marginLeft: -1 }}>I</span>
+          P
+          <span style={{
+            fontSize: 22, fontWeight: 900, marginLeft: 1,
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.06))',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
+            3
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
