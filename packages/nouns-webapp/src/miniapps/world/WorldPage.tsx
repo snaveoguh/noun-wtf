@@ -84,7 +84,7 @@ import {
 } from './engine/sounds';
 import {
   createWeaponState, checkWeaponPickup, fireWeapon, tickReload, tickMuzzleFlash,
-  spawnWeaponPickup, getActivePickups, type WeaponState, type WeaponPickup,
+  spawnWeaponPickup, getActivePickups, clearPickups, type WeaponState, type WeaponPickup,
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
 import { BirdFlocks, CloudLayer, AnimatedOcean, Dolphins } from './engine/Atmosphere';
@@ -108,7 +108,7 @@ import {
   stopSpeechToText,
   getCurrentTranscript,
 } from './engine/voip';
-import type { INounSeed } from '@/wrappers/nounToken';
+import { useNounSeed, type INounSeed } from '@/wrappers/nounToken';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -540,45 +540,38 @@ function CameraController({ target, inputRef, playerCharState }: {
   playerCharState: React.RefObject<CharacterState>;
 }) {
   const { camera } = useThree();
-  const orbitX = useRef(0);
-  const orbitY = useRef(0.3);
+  const angleX = useRef(0);
+  const angleY = useRef(0.12); // starts low — right behind head
+  const dist = useRef(1.5); // starts close as fuck
 
   useFrame((_, delta) => {
     const input = inputRef.current;
     const pcs = playerCharState.current;
 
-    // Arrow keys pan camera when idle
+    // Arrows pan freely
     if (input) {
-      const panSpeed = 1.5;
-      if (input.keys.has('arrowleft')) orbitX.current -= panSpeed * delta;
-      if (input.keys.has('arrowright')) orbitX.current += panSpeed * delta;
-      if (input.keys.has('arrowup')) orbitY.current = Math.min(orbitY.current + panSpeed * delta * 0.5, 1.2);
-      if (input.keys.has('arrowdown')) orbitY.current = Math.max(orbitY.current - panSpeed * delta * 0.5, 0.05);
+      if (input.keys.has('arrowleft')) angleX.current -= 1.5 * delta;
+      if (input.keys.has('arrowright')) angleX.current += 1.5 * delta;
+      if (input.keys.has('arrowup')) angleY.current = Math.min(angleY.current + 0.8 * delta, 1.2);
+      if (input.keys.has('arrowdown')) angleY.current = Math.max(angleY.current - 0.8 * delta, 0.05);
     }
 
-    // When walking — instant snap camera behind player
-    if (pcs && (pcs.state === 'walking' || pcs.state === 'dashing')) {
-      const behindAngle =
-        pcs.direction === 'up' ? 0 :
-        pcs.direction === 'down' ? Math.PI :
-        pcs.direction === 'left' ? Math.PI * 0.5 :
-        pcs.direction === 'right' ? Math.PI * 1.5 :
-        pcs.direction === 'up-left' ? Math.PI * 0.25 :
-        pcs.direction === 'up-right' ? Math.PI * 1.75 :
-        pcs.direction === 'down-left' ? Math.PI * 0.75 :
-        Math.PI * 1.25;
-      orbitX.current = behindAngle;
-    }
+    // Walking → zoom out + rise up. Idle → zoom in tight + drop low
+    const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
+    const wantDist = moving ? 3.5 : 1.5;
+    const wantY = moving ? 0.3 : 0.12;
+    dist.current += (wantDist - dist.current) * 0.04;
+    angleY.current += (wantY - angleY.current) * 0.03;
 
-    const camDist = 3.5;
+    const d = dist.current;
     const desired = new THREE.Vector3(
-      target.x + Math.sin(orbitX.current) * Math.cos(orbitY.current) * camDist,
-      target.y + Math.sin(orbitY.current) * camDist + 0.5,
-      target.z + Math.cos(orbitX.current) * Math.cos(orbitY.current) * camDist,
+      target.x + Math.sin(angleX.current) * Math.cos(angleY.current) * d,
+      target.y + Math.sin(angleY.current) * d + 0.3,
+      target.z + Math.cos(angleX.current) * Math.cos(angleY.current) * d,
     );
 
-    camera.position.copy(desired);
-    camera.lookAt(target.x, target.y + 0.5, target.z);
+    camera.position.lerp(desired, 0.08);
+    camera.lookAt(target.x, target.y + 0.4, target.z);
   });
 
   return null;
@@ -909,6 +902,11 @@ export default function WorldPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentNounSeed = useAppSelector(state => (state as any).onDisplayAuction?.seed);
+  const lastAuctionNounId = useAppSelector(state => (state as any).onDisplayAuction?.lastAuctionNounId);
+
+  // Fetch the auction Noun's seed for the crystal ball
+  const auctionNounSeed = useNounSeed(BigInt(lastAuctionNounId ?? 0));
+
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   // Game state refs (mutable, no re-renders)
@@ -978,11 +976,13 @@ export default function WorldPage() {
     const player = createPlayer(SPAWN_X, SPAWN_Y, 0, seedKey);
     playerRef.current = player;
 
-    // Spawn weapon pickups around the island
+    // Spawn weapon pickups around the island (clear first to avoid duplicates on re-mount)
+    clearPickups();
     spawnWeaponPickup('pistol', SPAWN_X + 80, SPAWN_Y - 60);
     spawnWeaponPickup('shotgun', SPAWN_X - 100, SPAWN_Y + 40);
     spawnWeaponPickup('uzi', SPAWN_X + 50, SPAWN_Y + 90);
     setWeaponPickups([...getActivePickups()]);
+    console.log('[Weapons] Spawned pickups at:', getActivePickups().map(p => `${p.type}(${p.worldX},${p.worldY})`).join(', '));
 
     // Multiplayer
     const mp = mpRef.current;
@@ -1129,6 +1129,16 @@ export default function WorldPage() {
 
       // ── Weapon pickup check (GTA style — auto on walk-over) ──
       const weapon = weaponRef.current;
+      if (frame % 120 === 0) {
+        const pickups = getActivePickups();
+        if (pickups.length > 0) {
+          const nearest = pickups.reduce((best, p) => {
+            const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
+            return d < best.d ? { d, p } : best;
+          }, { d: Infinity, p: pickups[0] });
+          console.log(`[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`);
+        }
+      }
       const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
       if (pickedUp) {
         playPickupSound();
@@ -1410,7 +1420,7 @@ export default function WorldPage() {
         <Terrain />
         <Trees />
         <Rocks />
-        <CrystalBallMountain nounSeed={seed} />
+        <CrystalBallMountain nounSeed={auctionNounSeed ?? seed} />
 
         {/* Atmosphere */}
         <BirdFlocks />

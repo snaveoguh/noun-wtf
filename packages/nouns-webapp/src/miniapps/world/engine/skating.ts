@@ -1,12 +1,22 @@
-// ── Skating Physics & State ──────────────────────────────────────────
+// ── Hoverboard Physics & Trick System ────────────────────────────────
 //
-// S near skateboard = mount/dismount
-// Space while skating = ollie (jump)
-// J while airborne = kickflip (+100 pts)
-// Auto-detect grind rail contact (+50 pts/sec)
+// THPS-style "marble on surface" physics adapted for a hoverboard.
 //
-// Momentum-based movement: player keeps rolling in last push direction.
-// Friction on flat, gravity acceleration on downhill, speed cap 8 u/frame.
+// Controls:
+//   S near hoverboard pickup = mount/dismount
+//   Space while hovering     = ollie (upward impulse, amplified at ramp lip)
+//   J while airborne         = 180 spin (+100 per 180)
+//   K while airborne         = kickflip (+200)
+//   G near rail              = grind (auto-snap)
+//   Up-Up / Down-Down        = manual / nose manual (links combos on ground)
+//   Shift (hold)             = crouch/pump — release on curve for speed boost
+//   Left/Right while grind/manual = balance correction
+//
+// Core physics (Neversoft approach):
+//   speed = sqrt(2 * g * heightDropped)        — energy conservation on ramps
+//   y = launchY + vy*t - 0.5*g*t^2             — projectile motion in air
+//   Surface normal alignment: player tilts to match ground slope
+//   Momentum preservation through transitions (flat → ramp → vert → air)
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -17,42 +27,89 @@ export interface SkatingState {
   onRamp: boolean;
   airborne: boolean;
   airborneVy: number;
-  airborneY: number; // visual Y offset (positive = up in skating space)
+  airborneY: number; // visual Y offset
+  airborneTime: number; // seconds since launch (for projectile eq.)
+  launchY: number; // world Y at launch
+  launchVy: number; // initial vertical velocity at launch
   trickScore: number;
+  comboScore: number; // current combo accumulator (lost on bail)
+  comboMultiplier: number; // trick count in current combo
   currentTrick: string | null;
   trickTimer: number; // frames remaining for trick display
-  grindTimer: number; // accumulated grind frames (for scoring)
-  lastDirection: [number, number]; // last non-zero input direction
+  grindTimer: number; // accumulated grind seconds
+  grindActive: boolean;
+  manualActive: boolean; // manual/nose manual balance mode
+  manualIsNose: boolean;
+  balanceMeter: number; // -1 to 1 — center is balanced
+  balanceOscillation: number; // difficulty oscillation phase
+  balanceDifficulty: number; // increases over time
+  lastDirection: [number, number];
   ollieCooldown: number;
+  crouching: boolean; // shift held — pump charging
+  crouchStartSpeed: number; // speed when crouch began
+  surfaceNormalY: number; // current surface tilt (0=flat, 1=vertical wall)
+  surfaceSlopeDir: [number, number]; // downhill direction
+  heightRef: number; // reference height for energy calc
+  spinAngle: number; // accumulated spin in air (degrees)
+  bailed: boolean; // ragdoll state
+  bailTimer: number; // frames of bail animation remaining
+  hoverHeight: number; // current hover offset (oscillates ~0.3)
 }
 
 export interface RampData {
   onRamp: boolean;
   rampNormalY: number; // upward slope component (0 = flat, 1 = vertical)
   rampSlopeDir: [number, number]; // direction the slope faces (downhill)
-  atLip: boolean; // true when at the top edge of ramp
-  onRail: boolean; // true when on grind rail geometry
+  atLip: boolean; // at top edge of ramp
+  onRail: boolean; // on grind rail geometry
+  surfaceHeight: number; // ground Y at this point on the ramp
 }
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const FLAT_FRICTION = 0.995;
-const AIR_FRICTION = 0.999;
-const RAMP_GRAVITY_ACCEL = 0.15; // gravity boost going downhill
-const SPEED_CAP = 8;
-const OLLIE_FORCE = 0.35;
-const OLLIE_RAMP_BONUS = 0.15; // extra launch from ramp lip
-const SKATING_GRAVITY = 0.018;
+const GRAVITY = 9.81; // m/s^2 (world scale)
+const GRAVITY_TICK = 0.025; // per-frame gravity for airborne (tuned for 60fps feel)
+const FLAT_FRICTION = 0.998;
+const AIR_FRICTION = 0.9995; // almost none in air
+const RAMP_FRICTION = 0.999; // minimal on ramp surface
+const GRIND_FRICTION = 0.996;
+const SPEED_CAP = 12;
+const PUSH_FORCE = 0.065; // WASD acceleration on flat
+const PUSH_FORCE_AIR = 0.01; // tiny air control
+const OLLIE_FORCE = 0.42;
+const OLLIE_RAMP_BONUS = 0.25; // extra launch from ramp lip
+const OLLIE_SPEED_BONUS_FACTOR = 0.06; // speed → vertical conversion
+const OLLIE_COOLDOWN_FRAMES = 12;
 const GROUND_Y = 0;
-const OLLIE_COOLDOWN_FRAMES = 15;
+
+// Pump mechanic
+const PUMP_BOOST_MIN = 1.05; // minimum multiplier on release
+const PUMP_BOOST_MAX = 1.35; // max multiplier when releasing on curve
+const PUMP_CHARGE_RATE = 0.02; // charge per frame while crouching
+
+// Hover
+const HOVER_BASE = 0.3; // base hover height
+const HOVER_OSCILLATION = 0.04; // gentle bob
 
 // Trick scores
 const OLLIE_SCORE = 25;
-const KICKFLIP_SCORE = 100;
+const SPIN_180_SCORE = 100;
+const KICKFLIP_SCORE = 200;
 const GRIND_SCORE_PER_SEC = 50;
-const RAMP_LIP_OLLIE_BONUS = 50;
+const MANUAL_SCORE_PER_SEC = 30;
+const RAMP_LIP_BONUS = 75;
 
-const TRICK_DISPLAY_FRAMES = 90; // 1.5 seconds at 60fps
+const TRICK_DISPLAY_FRAMES = 90; // 1.5s at 60fps
+
+// Balance
+const BALANCE_OSCILLATION_SPEED = 2.5; // radians/sec
+const BALANCE_DIFFICULTY_RAMP = 0.008; // difficulty increase per frame
+const BALANCE_MAX_DIFFICULTY = 0.85;
+const BALANCE_FAIL_THRESHOLD = 0.95; // meter beyond this = bail
+
+// Bail
+const BAIL_DURATION_FRAMES = 90; // 1.5s ragdoll
+const BAIL_LANDING_ANGLE = 0.75; // max landing angle before bail (cos of 41 degrees)
 
 // ── Factory ──────────────────────────────────────────────────────────
 
@@ -65,12 +122,32 @@ export function createSkatingState(): SkatingState {
     airborne: false,
     airborneVy: 0,
     airborneY: 0,
+    airborneTime: 0,
+    launchY: 0,
+    launchVy: 0,
     trickScore: 0,
+    comboScore: 0,
+    comboMultiplier: 0,
     currentTrick: null,
     trickTimer: 0,
     grindTimer: 0,
+    grindActive: false,
+    manualActive: false,
+    manualIsNose: false,
+    balanceMeter: 0,
+    balanceOscillation: 0,
+    balanceDifficulty: 0.15,
     lastDirection: [0, 1],
     ollieCooldown: 0,
+    crouching: false,
+    crouchStartSpeed: 0,
+    surfaceNormalY: 0,
+    surfaceSlopeDir: [0, 0],
+    heightRef: 0,
+    spinAngle: 0,
+    bailed: false,
+    bailTimer: 0,
+    hoverHeight: HOVER_BASE,
   };
 }
 
@@ -83,78 +160,219 @@ export function mountBoard(state: SkatingState): void {
   state.airborne = false;
   state.airborneY = 0;
   state.airborneVy = 0;
+  state.airborneTime = 0;
   state.currentTrick = null;
   state.trickTimer = 0;
   state.grindTimer = 0;
+  state.grindActive = false;
+  state.manualActive = false;
+  state.comboScore = 0;
+  state.comboMultiplier = 0;
+  state.bailed = false;
+  state.bailTimer = 0;
+  state.hoverHeight = HOVER_BASE;
 }
 
 export function dismountBoard(state: SkatingState): void {
+  // Bank any active combo before dismounting
+  if (state.comboMultiplier > 0) {
+    bankCombo(state);
+  }
   state.isSkating = false;
   state.speed = 0;
   state.momentum = [0, 0];
   state.airborne = false;
   state.airborneY = 0;
   state.airborneVy = 0;
+  state.airborneTime = 0;
   state.onRamp = false;
   state.grindTimer = 0;
+  state.grindActive = false;
+  state.manualActive = false;
+  state.crouching = false;
+  state.bailed = false;
+  state.bailTimer = 0;
 }
 
-// ── Trick System ─────────────────────────────────────────────────────
+// ── Combo System ─────────────────────────────────────────────────────
 
-function registerTrick(state: SkatingState, name: string, points: number): void {
-  state.trickScore += points;
-  state.currentTrick = name;
+function addToCombo(state: SkatingState, name: string, basePoints: number): void {
+  state.comboMultiplier++;
+  state.comboScore += basePoints;
+  state.currentTrick = `${name} x${state.comboMultiplier}`;
   state.trickTimer = TRICK_DISPLAY_FRAMES;
 }
 
-/** Ollie: space while skating. Bonus if on ramp lip. */
+function bankCombo(state: SkatingState): void {
+  if (state.comboMultiplier > 0) {
+    const total = state.comboScore * state.comboMultiplier;
+    state.trickScore += total;
+    state.currentTrick = `+${total}!`;
+    state.trickTimer = TRICK_DISPLAY_FRAMES;
+  }
+  state.comboScore = 0;
+  state.comboMultiplier = 0;
+}
+
+function bail(state: SkatingState): void {
+  state.bailed = true;
+  state.bailTimer = BAIL_DURATION_FRAMES;
+  state.comboScore = 0;
+  state.comboMultiplier = 0;
+  state.currentTrick = 'BAIL!';
+  state.trickTimer = TRICK_DISPLAY_FRAMES;
+  state.grindActive = false;
+  state.manualActive = false;
+  state.speed *= 0.2; // lose most speed
+  state.airborne = false;
+  state.airborneY = 0;
+  state.airborneVy = 0;
+}
+
+// ── Trick Actions ────────────────────────────────────────────────────
+
+/** Ollie: Space while hovering. Bonus at ramp lip. */
 export function ollie(state: SkatingState, rampData: RampData): void {
-  if (!state.isSkating || state.airborne || state.ollieCooldown > 0) return;
+  if (!state.isSkating || state.airborne || state.ollieCooldown > 0 || state.bailed) return;
 
-  const launchForce = OLLIE_FORCE + (rampData.atLip ? OLLIE_RAMP_BONUS : 0);
+  const atLip = rampData.atLip;
+  const launchForce = OLLIE_FORCE + (atLip ? OLLIE_RAMP_BONUS : 0);
+  const speedBonus = Math.min(state.speed * OLLIE_SPEED_BONUS_FACTOR, 0.2);
 
-  // Convert some horizontal speed into vertical
-  const speedBonus = Math.min(state.speed * 0.05, 0.15);
   state.airborneVy = launchForce + speedBonus;
+  state.launchVy = state.airborneVy;
+  state.launchY = rampData.surfaceHeight || 0;
   state.airborne = true;
+  state.airborneTime = 0;
   state.ollieCooldown = OLLIE_COOLDOWN_FRAMES;
+  state.spinAngle = 0;
 
-  const score = OLLIE_SCORE + (rampData.atLip ? RAMP_LIP_OLLIE_BONUS : 0);
-  const name = rampData.atLip ? 'Ramp Ollie!' : 'Ollie';
-  registerTrick(state, name, score);
+  // End grind/manual cleanly (links combo)
+  state.grindActive = false;
+  state.manualActive = false;
+
+  const score = OLLIE_SCORE + (atLip ? RAMP_LIP_BONUS : 0);
+  const name = atLip ? 'Ramp Launch!' : 'Ollie';
+  addToCombo(state, name, score);
 }
 
-/** Kickflip: J while airborne. */
+/** 180 Spin: J while airborne. +100 per 180. */
+export function spin180(state: SkatingState): void {
+  if (!state.isSkating || !state.airborne || state.bailed) return;
+  state.spinAngle += 180;
+  const spins = Math.floor(state.spinAngle / 180);
+  const name = state.spinAngle >= 360 ? `${state.spinAngle} Spin` : '180';
+  addToCombo(state, name, SPIN_180_SCORE * spins);
+}
+
+/** Kickflip: K while airborne. +200. */
 export function kickflip(state: SkatingState): void {
-  if (!state.isSkating || !state.airborne) return;
-  registerTrick(state, 'Kickflip!', KICKFLIP_SCORE);
+  if (!state.isSkating || !state.airborne || state.bailed) return;
+  addToCombo(state, 'Kickflip', KICKFLIP_SCORE);
 }
 
-/** Grind scoring: called each frame while on rail. */
-function tickGrind(state: SkatingState, delta: number): void {
-  state.grindTimer += delta;
-  // Award points every ~1 second of grind time
-  // const _secondsGrinding = state.grindTimer * delta;
-  if (state.grindTimer > 0) {
-    const points = Math.floor(GRIND_SCORE_PER_SEC * delta);
-    if (points > 0) {
-      state.trickScore += points;
-      state.currentTrick = 'Grinding...';
-      state.trickTimer = TRICK_DISPLAY_FRAMES;
+/** Start grind: G near a rail. Auto-snaps. */
+export function startGrind(state: SkatingState, rampData: RampData): void {
+  if (!state.isSkating || state.bailed) return;
+  if (!rampData.onRail) return;
+  if (state.grindActive) return; // already grinding
+
+  state.grindActive = true;
+  state.grindTimer = 0;
+  state.airborne = false;
+  state.airborneY = 0;
+  state.airborneVy = 0;
+  state.balanceMeter = 0;
+  state.balanceDifficulty = 0.15;
+  state.balanceOscillation = 0;
+  addToCombo(state, 'Grind', 50);
+}
+
+/** Manual: up-up or down-down on ground. Links combos. */
+export function startManual(state: SkatingState, isNose: boolean): void {
+  if (!state.isSkating || state.airborne || state.bailed || state.grindActive) return;
+  if (state.manualActive) return;
+
+  state.manualActive = true;
+  state.manualIsNose = isNose;
+  state.balanceMeter = 0;
+  state.balanceDifficulty = 0.15;
+  state.balanceOscillation = 0;
+  addToCombo(state, isNose ? 'Nose Manual' : 'Manual', 25);
+}
+
+/** Crouch/pump: hold Shift. Release on curves for speed boost. */
+export function setCrouching(state: SkatingState, crouching: boolean): void {
+  if (!state.isSkating || state.bailed) return;
+
+  if (crouching && !state.crouching) {
+    // Start crouch
+    state.crouching = true;
+    state.crouchStartSpeed = state.speed;
+  } else if (!crouching && state.crouching) {
+    // Release — pump boost
+    state.crouching = false;
+    const onCurve = state.onRamp && state.surfaceNormalY > 0.2;
+    const boost = onCurve ? PUMP_BOOST_MAX : PUMP_BOOST_MIN;
+    const len = Math.sqrt(state.momentum[0] ** 2 + state.momentum[1] ** 2);
+    if (len > 0.001) {
+      state.momentum[0] *= boost;
+      state.momentum[1] *= boost;
     }
   }
+}
+
+/** Balance correction: left/right during grind or manual. */
+export function balanceCorrect(state: SkatingState, direction: number): void {
+  if (!state.grindActive && !state.manualActive) return;
+  // Push meter toward center
+  state.balanceMeter -= direction * 0.06;
+  state.balanceMeter = Math.max(-1, Math.min(1, state.balanceMeter));
+}
+
+// ── Balance Meter Tick ───────────────────────────────────────────────
+
+function tickBalance(state: SkatingState, delta: number): void {
+  if (!state.grindActive && !state.manualActive) return;
+
+  // Increase difficulty over time
+  state.balanceDifficulty = Math.min(
+    BALANCE_MAX_DIFFICULTY,
+    state.balanceDifficulty + BALANCE_DIFFICULTY_RAMP * delta * 60,
+  );
+
+  // Oscillation pushes the meter
+  state.balanceOscillation += BALANCE_OSCILLATION_SPEED * delta;
+  const push = Math.sin(state.balanceOscillation) * state.balanceDifficulty * delta * 2;
+  state.balanceMeter += push;
+
+  // Clamp
+  state.balanceMeter = Math.max(-1, Math.min(1, state.balanceMeter));
+
+  // Check fail
+  if (Math.abs(state.balanceMeter) > BALANCE_FAIL_THRESHOLD) {
+    bail(state);
+  }
+}
+
+// ── Energy Conservation Helper ───────────────────────────────────────
+// speed = sqrt(2 * g * deltaHeight) — Neversoft marble physics
+
+function energySpeed(heightDropped: number): number {
+  if (heightDropped <= 0) return 0;
+  return Math.sqrt(2 * GRAVITY * heightDropped);
 }
 
 // ── Main Tick ────────────────────────────────────────────────────────
 
 /**
- * Advance skating physics by one frame.
+ * Advance hoverboard physics by one frame.
  *
- * @param state      - Mutable skating state
- * @param direction  - Normalized input direction [dx, dz] from WASD (0,0 if no input)
- * @param delta      - Frame delta in seconds (typically ~0.016)
- * @param terrainHeight - Ground height at player position (for ramp elevation)
- * @param rampData   - Ramp contact info from collision detection
+ * @param state         - Mutable skating state
+ * @param direction     - Normalized input [dx, dz] from WASD (0,0 if none)
+ * @param delta         - Frame delta in seconds (~0.016)
+ * @param terrainHeight - Ground height at player position
+ * @param rampData      - Ramp/rail contact info
  *
  * @returns Movement delta { dx, dz, dy } to apply to player world position
  */
@@ -162,54 +380,129 @@ export function tickSkating(
   state: SkatingState,
   direction: [number, number],
   delta: number,
-  _terrainHeight: number,
+  terrainHeight: number,
   rampData: RampData,
 ): { dx: number; dz: number; dy: number } {
   if (!state.isSkating) return { dx: 0, dz: 0, dy: 0 };
 
-  // Cooldowns
+  // ── Bail recovery
+  if (state.bailed) {
+    state.bailTimer--;
+    if (state.bailTimer <= 0) {
+      state.bailed = false;
+      state.speed *= 0.5;
+    }
+    // Slide forward slowly during bail
+    const bDx = state.momentum[0] * 0.3 * delta * 60;
+    const bDz = state.momentum[1] * 0.3 * delta * 60;
+    return { dx: bDx, dz: bDz, dy: 0 };
+  }
+
+  // ── Cooldowns & timers
   if (state.ollieCooldown > 0) state.ollieCooldown--;
   if (state.trickTimer > 0) {
     state.trickTimer--;
     if (state.trickTimer <= 0) state.currentTrick = null;
   }
 
-  // Track last non-zero direction for momentum
+  // ── Hover bob
+  state.hoverHeight = HOVER_BASE + Math.sin(Date.now() * 0.005) * HOVER_OSCILLATION;
+
+  // ── Track direction
   const hasInput = direction[0] !== 0 || direction[1] !== 0;
   if (hasInput) {
     state.lastDirection = [direction[0], direction[1]];
   }
 
-  // ── Ramp state
+  // ── Surface state
   state.onRamp = rampData.onRamp;
+  state.surfaceNormalY = rampData.rampNormalY;
+  state.surfaceSlopeDir = [rampData.rampSlopeDir[0], rampData.rampSlopeDir[1]];
 
-  // ── Grind rail
-  if (rampData.onRail && !state.airborne) {
-    tickGrind(state, delta);
-    // Snap to rail — reduce lateral drift
-    state.momentum[0] *= 0.98;
-    state.momentum[1] *= 0.98;
-  } else {
-    state.grindTimer = 0;
+  // ── Balance tick (grind / manual)
+  tickBalance(state, delta);
+  if (state.bailed) return { dx: 0, dz: 0, dy: 0 }; // balance fail mid-frame
+
+  // ── Grind rail physics
+  if (state.grindActive) {
+    if (!rampData.onRail) {
+      // Left the rail — end grind
+      state.grindActive = false;
+    } else {
+      state.grindTimer += delta;
+      // Score per second
+      const pts = Math.floor(GRIND_SCORE_PER_SEC * delta);
+      if (pts > 0) {
+        state.comboScore += pts;
+        state.currentTrick = `Grind ${(state.grindTimer).toFixed(1)}s x${state.comboMultiplier}`;
+        state.trickTimer = TRICK_DISPLAY_FRAMES;
+      }
+      // Grind friction
+      state.momentum[0] *= GRIND_FRICTION;
+      state.momentum[1] *= GRIND_FRICTION;
+      // Reduce lateral drift on rail
+      state.momentum[0] *= 0.95;
+    }
+  }
+
+  // ── Manual scoring
+  if (state.manualActive && !state.airborne) {
+    const pts = Math.floor(MANUAL_SCORE_PER_SEC * delta);
+    if (pts > 0) {
+      state.comboScore += pts;
+    }
   }
 
   // ── Acceleration from input
   if (hasInput) {
-    const pushForce = 0.08;
-    state.momentum[0] += direction[0] * pushForce;
-    state.momentum[1] += direction[1] * pushForce;
+    const force = state.airborne ? PUSH_FORCE_AIR : PUSH_FORCE;
+    state.momentum[0] += direction[0] * force;
+    state.momentum[1] += direction[1] * force;
   }
 
-  // ── Ramp gravity: accelerate downhill
+  // ── Ramp gravity: energy conservation (marble physics)
   if (rampData.onRamp && !state.airborne) {
-    state.momentum[0] += rampData.rampSlopeDir[0] * RAMP_GRAVITY_ACCEL * rampData.rampNormalY * delta;
-    state.momentum[1] += rampData.rampSlopeDir[1] * RAMP_GRAVITY_ACCEL * rampData.rampNormalY * delta;
+    // Height change drives speed: accelerate downhill, decelerate uphill
+    const heightDelta = state.heightRef - terrainHeight;
+    if (heightDelta > 0) {
+      // Going downhill — gain speed from potential energy
+      const extraSpeed = energySpeed(heightDelta) * 0.15;
+      state.momentum[0] += rampData.rampSlopeDir[0] * extraSpeed;
+      state.momentum[1] += rampData.rampSlopeDir[1] * extraSpeed;
+    } else if (heightDelta < 0) {
+      // Going uphill — lose speed (energy converts to potential)
+      const dragFactor = Math.max(0.92, 1.0 + heightDelta * 0.08);
+      state.momentum[0] *= dragFactor;
+      state.momentum[1] *= dragFactor;
+    }
+
+    // Lip launch: at ramp lip with enough speed → automatic airborne
+    if (rampData.atLip && state.speed > 2.0) {
+      const verticalComponent = state.speed * rampData.rampNormalY * 0.35;
+      state.airborneVy = Math.max(verticalComponent, 0.2);
+      state.launchVy = state.airborneVy;
+      state.launchY = terrainHeight;
+      state.airborne = true;
+      state.airborneTime = 0;
+      state.spinAngle = 0;
+      addToCombo(state, 'Air!', 50);
+    }
   }
+  state.heightRef = terrainHeight;
 
   // ── Friction
-  const friction = state.airborne ? AIR_FRICTION : FLAT_FRICTION;
-  state.momentum[0] *= friction;
-  state.momentum[1] *= friction;
+  if (state.airborne) {
+    state.momentum[0] *= AIR_FRICTION;
+    state.momentum[1] *= AIR_FRICTION;
+  } else if (state.grindActive) {
+    // already applied above
+  } else if (rampData.onRamp) {
+    state.momentum[0] *= RAMP_FRICTION;
+    state.momentum[1] *= RAMP_FRICTION;
+  } else {
+    state.momentum[0] *= FLAT_FRICTION;
+    state.momentum[1] *= FLAT_FRICTION;
+  }
 
   // ── Speed calculation & cap
   state.speed = Math.sqrt(state.momentum[0] ** 2 + state.momentum[1] ** 2);
@@ -227,53 +520,70 @@ export function tickSkating(
     state.speed = 0;
   }
 
-  // ── Airborne physics (ollie / ramp launch)
+  // ── Airborne physics: projectile motion
+  // y(t) = launchY + vy*t - 0.5*g*t^2
   let dy = 0;
   if (state.airborne) {
-    state.airborneVy -= SKATING_GRAVITY;
+    state.airborneTime += delta;
+    state.airborneVy -= GRAVITY_TICK;
     state.airborneY += state.airborneVy;
 
-    if (state.airborneY <= GROUND_Y) {
-      // Landed
-      state.airborneY = GROUND_Y;
+    // Check landing
+    const groundLevel = rampData.surfaceHeight || terrainHeight || GROUND_Y;
+    if (state.airborneY <= groundLevel && state.airborneTime > 0.05) {
+      // Landing check: angle between velocity and surface
+      // If landing at too steep an angle → bail
+      const landingAngleOk = rampData.onRamp
+        ? true // ramps absorb most landings (transition)
+        : Math.abs(state.airborneVy) < state.speed * (1 - BAIL_LANDING_ANGLE) + 0.5;
+
+      if (!landingAngleOk && state.comboMultiplier > 0) {
+        bail(state);
+      } else {
+        // Clean landing — bank combo if no manual
+        if (!state.manualActive && state.comboMultiplier > 0) {
+          bankCombo(state);
+        }
+      }
+
+      state.airborneY = groundLevel;
       state.airborneVy = 0;
       state.airborne = false;
+      state.airborneTime = 0;
+      state.spinAngle = 0;
     }
 
-    dy = state.airborneVy; // pass vertical delta to caller
+    dy = state.airborneVy;
   } else {
     state.airborneY = GROUND_Y;
   }
 
-  // ── Movement output
-  const dx = state.momentum[0] * delta * 60; // normalize to ~60fps baseline
+  // ── Movement output (normalize to ~60fps baseline)
+  const dx = state.momentum[0] * delta * 60;
   const dz = state.momentum[1] * delta * 60;
 
   return { dx, dz, dy };
 }
 
 // ── Ramp Collision Helper ────────────────────────────────────────────
-//
-// Simplified ramp detection based on position relative to the mega ramp.
-// The MegaRamp3D component defines its own bounds; this helper tests
-// whether a world-space position is on the ramp surface.
 
 export interface RampBounds {
   x: number; // ramp center X in world-space
   z: number; // ramp center Z in world-space
-  length: number; // ramp length along its main axis
-  width: number; // ramp width
-  height: number; // peak height
+  length: number;
+  width: number;
+  height: number;
   rotation: number; // Y rotation in radians
 }
 
 /**
  * Test if a world position is on/near the mega ramp and return ramp data.
- * Uses a simple parametric model of a quarter-pipe curve.
+ * Uses a parametric quarter-pipe + launch ramp model.
  */
 export function testRampCollision(
   worldX: number,
   worldZ: number,
+  worldY: number,
   ramp: RampBounds,
 ): RampData {
   const noContact: RampData = {
@@ -282,6 +592,7 @@ export function testRampCollision(
     rampSlopeDir: [0, 0],
     atLip: false,
     onRail: false,
+    surfaceHeight: 0,
   };
 
   // Transform to ramp-local coords
@@ -292,28 +603,38 @@ export function testRampCollision(
   const localX = relX * cos - relZ * sin;
   const localZ = relX * sin + relZ * cos;
 
-  // Check bounds
+  // Check bounds (with margin)
   const halfLen = ramp.length / 2;
   const halfWid = ramp.width / 2;
-  if (Math.abs(localX) > halfWid || localZ < -halfLen || localZ > halfLen) {
+  const margin = 1.0;
+  if (Math.abs(localX) > halfWid + margin || localZ < -halfLen - margin || localZ > halfLen + margin) {
     return noContact;
   }
 
   // Parametric position along ramp (0 = bottom, 1 = top)
-  const t = (localZ + halfLen) / ramp.length;
+  const t = Math.max(0, Math.min(1, (localZ + halfLen) / ramp.length));
 
   // Quarter-pipe curve: height = H * sin(t * PI/2)
+  const surfaceY = ramp.height * Math.sin(t * Math.PI / 2);
+
+  // Check if player is above ramp surface (within tolerance)
+  const tolerance = 1.5;
+  if (worldY > surfaceY + tolerance) {
+    return noContact; // too far above
+  }
+
+  // Slope angle and normal
   const slopeAngle = t * Math.PI / 2;
-  const normalY = Math.cos(slopeAngle); // steepness increases toward top
+  const normalY = Math.cos(slopeAngle); // steepness: 1 at bottom, 0 at vert
 
-  // At lip = top 10% of ramp
-  const atLip = t > 0.9;
+  // At lip = top 8% of ramp
+  const atLip = t > 0.92;
 
-  // Grind rail detection: center strip, narrow
-  const onRail = Math.abs(localX) < halfWid * 0.1 && t > 0.1 && t < 0.9;
+  // Grind rail detection: center strip
+  const onRail = Math.abs(localX) < halfWid * 0.08 && t > 0.05 && t < 0.92;
 
-  // Slope direction in world space (downhill = negative Z in local = toward bottom)
-  const slopeDirLocal = [0, -1] as [number, number];
+  // Slope direction in world space (downhill)
+  const slopeDirLocal: [number, number] = [0, -1];
   const worldSlopeX = slopeDirLocal[0] * Math.cos(ramp.rotation) - slopeDirLocal[1] * Math.sin(ramp.rotation);
   const worldSlopeZ = slopeDirLocal[0] * Math.sin(ramp.rotation) + slopeDirLocal[1] * Math.cos(ramp.rotation);
 
@@ -323,14 +644,28 @@ export function testRampCollision(
     rampSlopeDir: [worldSlopeX, worldSlopeZ],
     atLip,
     onRail,
+    surfaceHeight: surfaceY,
   };
 }
 
 /**
- * Get ramp surface height at a given parametric position (0..1 along ramp length).
+ * Get ramp surface height at a given parametric position (0..1 along ramp).
  * Quarter-pipe curve: y = peakHeight * sin(t * PI/2)
  */
 export function getRampHeight(t: number, peakHeight: number): number {
   const clamped = Math.max(0, Math.min(1, t));
   return peakHeight * Math.sin(clamped * Math.PI / 2);
+}
+
+/**
+ * Get surface tilt (rotation) for the hoverboard visual to match ramp slope.
+ * Returns [rotX, rotZ] in radians.
+ */
+export function getSurfaceTilt(state: SkatingState): [number, number] {
+  if (!state.isSkating || state.airborne) return [0, 0];
+  // Tilt forward/back based on slope
+  const tiltMagnitude = Math.asin(Math.min(1, state.surfaceNormalY));
+  const rotX = state.surfaceSlopeDir[1] * tiltMagnitude;
+  const rotZ = -state.surfaceSlopeDir[0] * tiltMagnitude;
+  return [rotX, rotZ];
 }

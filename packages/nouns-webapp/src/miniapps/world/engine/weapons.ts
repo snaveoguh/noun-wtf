@@ -100,7 +100,7 @@ export function clearPickups() {
 
 // ── Pickup Radius ────────────────────────────────────────────────────
 
-const PICKUP_RADIUS = 28; // auto-pickup when player walks within this distance
+const PICKUP_RADIUS = 50; // auto-pickup when player walks within this distance (game coords)
 
 /** Check if player is near any weapon pickup — GTA style auto-pickup */
 export function checkWeaponPickup(
@@ -112,9 +112,11 @@ export function checkWeaponPickup(
     if (pickup.picked) continue;
     const dx = playerX - pickup.worldX;
     const dy = playerY - pickup.worldY;
-    if (Math.sqrt(dx * dx + dy * dy) < PICKUP_RADIUS) {
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < PICKUP_RADIUS) {
       pickup.picked = true;
       equipWeapon(weaponState, pickup.type);
+      console.log(`[Weapons] Picked up ${pickup.type}! Player(${playerX.toFixed(0)},${playerY.toFixed(0)}) Pickup(${pickup.worldX},${pickup.worldY}) dist=${dist.toFixed(1)}`);
       return pickup;
     }
   }
