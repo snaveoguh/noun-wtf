@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import LolLogo from '@/components/LolLogo';
 
 import { useAppSelector } from '@/hooks';
 import { GameHUD } from './engine/GameHUD';
@@ -3386,36 +3387,18 @@ export default function WorldPage() {
 
       <HUDLive hudRef={hudRef} />
 
-      {/* Fries logo + f·r·i·e·d — top left */}
+      {/* Fries logo — same pixel art as homepage navbar */}
       <div
         style={{
           position: 'fixed',
           top: 14,
           left: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          pointerEvents: 'none',
           zIndex: 20,
+          transform: 'scale(1.5)',
+          transformOrigin: 'top left',
         }}
       >
-        <img
-          src="/sprites/accessory/accessory-fries.png"
-          alt=""
-          style={{ width: 28, height: 28, imageRendering: 'pixelated' }}
-        />
-        <span
-          style={{
-            fontFamily: 'monospace',
-            fontSize: 13,
-            fontWeight: 'bold',
-            color: '#fff',
-            letterSpacing: 4,
-            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-          }}
-        >
-          f · r · i · e · d
-        </span>
+        <LolLogo />
       </div>
 
       {/* FEATURE 1: "NOUNS WORLD" cloud text intro */}
