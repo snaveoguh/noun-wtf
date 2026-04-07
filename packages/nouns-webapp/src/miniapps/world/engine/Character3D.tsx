@@ -361,6 +361,13 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           if (child.name === 'handslot.r') {
             handBoneRef.current = child;
             console.log('[Character3D] Found handslot.r bone for item attachment');
+            // DEBUG: bright red sphere at hand bone so we can SEE where it is
+            const debugSphere = new THREE.Mesh(
+              new THREE.SphereGeometry(0.3, 8, 8),
+              new THREE.MeshBasicMaterial({ color: '#ff0000' }),
+            );
+            debugSphere.name = '__handDebug';
+            child.add(debugSphere);
           }
         });
 
@@ -585,7 +592,6 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         if (wantedItem) {
           const item = new THREE.Group();
           item.name = wantedItem;
-          const sc = 0.08;
 
           if (wantedItem.startsWith('gun:')) {
             // Gun mesh
@@ -655,9 +661,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             item.add(grip);
           }
 
-          item.scale.set(sc, sc, sc);
-          item.position.set(0, 0, 0.3);
-          item.rotation.set(0, 0, -Math.PI / 4);
+          // Scale relative to hand bone — bigger than you'd think because model is 0.14 scale
+          item.scale.set(0.5, 0.5, 0.5);
+          item.position.set(0, 0.5, 0);
+          item.rotation.set(0, 0, 0);
           handBone.add(item);
           gunGroupRef.current = item;
         }
