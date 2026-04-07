@@ -418,8 +418,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     // Animation crossfade
     if (mixer && Object.keys(actions).length > 0) {
       let animKey = s.state as string;
-      // On hoverboard — always idle stance (board does the moving)
-      if (s.isSkating) animKey = 'idle';
+      // On hoverboard or airborne — idle stance (rotation handles the visual)
+      if (s.isSkating || s.state === 'airborne') animKey = 'idle';
       else if (s.state === 'attacking' && s.attackType) animKey = `attacking_${s.attackType}`;
       // Headshot death uses alternate death animation
       if (s.state === 'dead' && s.attackType === 'headshot') animKey = 'dead_headshot';

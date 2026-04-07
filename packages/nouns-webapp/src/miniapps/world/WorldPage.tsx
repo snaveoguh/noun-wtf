@@ -1295,14 +1295,7 @@ function Lighting() {
   return (
     <>
       <ambientLight ref={ambientRef} intensity={0.6} />
-      <directionalLight
-        ref={dirLightRef}
-        position={[20, 30, 10]}
-        intensity={0.8}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
+      <directionalLight ref={dirLightRef} position={[20, 30, 10]} intensity={0.8} />
       <hemisphereLight args={['#87ceeb', '#5a8f3c', 0.3]} />
     </>
   );
@@ -3244,7 +3237,6 @@ export default function WorldPage() {
       }}
     >
       <Canvas
-        shadows
         camera={{ position: [SPAWN_X * WORLD_SCALE, 2, SPAWN_Y * WORLD_SCALE + 3.5], fov: 50 }}
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: false }}
