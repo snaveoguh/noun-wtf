@@ -249,10 +249,12 @@ function DisintegrationScene({ oldVoxels, newVoxels, onComplete }: Disintegratio
     groupRef.current.rotation.y = spinEased * Math.PI * 2;
     groupRef.current.rotation.x = Math.sin(spinEased * Math.PI) * -8 * DEG;
 
-    // Scatter curve: peaks around t=0.4, returns to 0 at t=1
-    const scatterT = Math.sin(t * Math.PI) * (t < 0.5 ? 1 : 0.7);
-    // Morph curve: smoothly interpolates from old to new positions
-    const morphT = t < 0.3 ? 0 : Math.min((t - 0.3) / 0.5, 1);
+    // Scatter + morph complete by t=0.65 so the last third of the spin shows the finished noun
+    // Scatter curve: peaks around t=0.3, fully settled by t=0.65
+    const scatterNorm = t < 0.65 ? t / 0.65 : 1;
+    const scatterT = t < 0.65 ? Math.sin(scatterNorm * Math.PI) : 0;
+    // Morph curve: starts at t=0.15, fully morphed by t=0.65
+    const morphT = t < 0.15 ? 0 : t >= 0.65 ? 1 : (t - 0.15) / 0.5;
     const morphEased = morphT * morphT * (3 - 2 * morphT); // smoothstep
 
     const mesh = meshRef.current;
@@ -288,12 +290,11 @@ function DisintegrationScene({ oldVoxels, newVoxels, onComplete }: Disintegratio
       quat.setFromAxisAngle(axis, scatterT * animData.rotSpeeds[i] * Math.PI);
       dummy.quaternion.copy(quat);
 
-      // Scale down voxels that are disappearing (extras from old set)
+      // Scale transitions complete by t=0.65 to match scatter/morph
       if (i >= newVoxels.length) {
-        dummy.scale.setScalar(Math.max(0, 1 - t * 1.5));
+        dummy.scale.setScalar(Math.max(0, 1 - t * 2));
       } else if (i >= oldVoxels.length) {
-        // Materialize new voxels
-        dummy.scale.setScalar(Math.min(1, t * 2));
+        dummy.scale.setScalar(Math.min(1, t * 2.5));
       } else {
         dummy.scale.setScalar(1);
       }
