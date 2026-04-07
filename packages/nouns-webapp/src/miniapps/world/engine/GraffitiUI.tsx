@@ -1,347 +1,229 @@
-// ── GraffitiUI — Pixel spray-paint overlay for billboards ─────────────
+// ── GraffitiUI — In-scene spray paint on walls ──────────────────────
 //
-// Press G near a billboard to open a 32x32 pixel canvas (scaled to
-// 512x512 on screen). Draw with mouse/touch, pick colors, change
-// brush size. Save broadcasts the tag via PartyKit, cancel exits.
-// The saved drawing is applied as a CanvasTexture on the billboard.
+// When G is pressed near a wall:
+//   1. Camera zooms into the wall face
+//   2. A crosshair cursor appears
+//   3. Mouse/touch drag = spray paint in your can's color
+//   4. Freehand drawing directly on the wall's texture
+//   5. ESC or G again = done, saves to PartyKit
+//
+// The wall texture is a shared CanvasTexture that persists.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  PAINT_COLORS,
-  createGraffitiCanvas,
-  drawOnGraffiti,
-  canvasToBase64,
-  saveTag,
-  saveGraffitiTag,
-  type GraffitiTag,
-} from './graffiti';
+import { useCallback, useEffect, useRef } from 'react';
+import { canvasToBase64, saveGraffitiTag } from './graffiti';
 
-// ── Types ────────────────────────────────────────────────────────────
-
-interface GraffitiUIProps {
-  billboardId: string;
+interface SprayUIProps {
+  /** Which wall we're spraying */
+  wallId: string;
+  /** Player ID for tag attribution */
   playerId: string;
-  /** PartyKit WebSocket for broadcasting the tag */
+  /** Paint color from the can we picked up */
+  paintColor: string;
+  /** PartyKit WebSocket */
   ws: WebSocket | null;
-  /** Called when the overlay closes (save or cancel) */
-  onClose: (tag: GraffitiTag | null) => void;
+  /** Called when done spraying */
+  onClose: () => void;
+  /** Ref to the wall's canvas texture (256x256) */
+  wallCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  /** Callback to mark texture as needing update */
+  onTextureUpdate: () => void;
 }
 
-// ── Constants ────────────────────────────────────────────────────────
+const SPRAY_RADIUS = 6; // pixels on the 256x256 canvas
+const SPRAY_DENSITY = 0.4; // how many dots per frame of spray
 
-const CANVAS_SIZE = 32;
-const DISPLAY_SIZE = 512;
-const SCALE = DISPLAY_SIZE / CANVAS_SIZE;
-const BRUSH_SIZES = [1, 2, 3];
-
-// ── Component ────────────────────────────────────────────────────────
-
-export function GraffitiUI({ billboardId, playerId, ws, onClose }: GraffitiUIProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const displayRef = useRef<HTMLCanvasElement | null>(null);
+export function GraffitiUI({
+  wallId,
+  playerId,
+  paintColor,
+  ws,
+  onClose,
+  wallCanvasRef,
+  onTextureUpdate,
+}: SprayUIProps) {
   const drawingRef = useRef(false);
-  const [selectedColor, setSelectedColor] = useState(PAINT_COLORS[0]);
-  const [brushSize, setBrushSize] = useState(1);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Create the 32x32 drawing canvas on mount
-  useEffect(() => {
-    canvasRef.current = createGraffitiCanvas();
-    renderToDisplay();
-    // Block game input while overlay is open
-    const blockKeys = (e: KeyboardEvent) => {
-      // Allow Escape to cancel
-      if (e.key === 'Escape') {
-        onClose(null);
-        return;
+  // Spray paint at a position on the wall canvas
+  const sprayAt = useCallback(
+    (canvasX: number, canvasY: number) => {
+      const canvas = wallCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Spray effect — scatter dots in a radius
+      for (let i = 0; i < 12; i++) {
+        if (Math.random() > SPRAY_DENSITY) continue;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * SPRAY_RADIUS;
+        const px = Math.round(canvasX + Math.cos(angle) * dist);
+        const py = Math.round(canvasY + Math.sin(angle) * dist);
+        if (px < 0 || px >= 256 || py < 0 || py >= 256) continue;
+
+        const size = 1 + Math.floor(Math.random() * 3);
+        ctx.globalAlpha = 0.3 + Math.random() * 0.5;
+        ctx.fillStyle = paintColor;
+        ctx.fillRect(px, py, size, size);
       }
-      e.stopPropagation();
-    };
-    window.addEventListener('keydown', blockKeys, true);
-    return () => window.removeEventListener('keydown', blockKeys, true);
-  }, []);
-
-  // Render the 32x32 canvas scaled up to the display canvas
-  const renderToDisplay = useCallback(() => {
-    const src = canvasRef.current;
-    const dst = displayRef.current;
-    if (!src || !dst) return;
-    const ctx = dst.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-    // Checkerboard background for transparency
-    for (let y = 0; y < CANVAS_SIZE; y++) {
-      for (let x = 0; x < CANVAS_SIZE; x++) {
-        ctx.fillStyle = (x + y) % 2 === 0 ? '#333' : '#444';
-        ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
-      }
-    }
-    ctx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= CANVAS_SIZE; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * SCALE, 0);
-      ctx.lineTo(i * SCALE, DISPLAY_SIZE);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i * SCALE);
-      ctx.lineTo(DISPLAY_SIZE, i * SCALE);
-      ctx.stroke();
-    }
-  }, []);
-
-  // Convert mouse/touch position to pixel coords
-  const getPixelCoords = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    const rect = displayRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = Math.floor((clientX - rect.left) / SCALE);
-    const y = Math.floor((clientY - rect.top) / SCALE);
-    if (x < 0 || x >= CANVAS_SIZE || y < 0 || y >= CANVAS_SIZE) return null;
-    return { x, y };
-  }, []);
-
-  // Draw at pixel position
-  const drawAt = useCallback(
-    (x: number, y: number) => {
-      if (!canvasRef.current) return;
-      drawOnGraffiti(canvasRef.current, x, y, selectedColor, brushSize);
-      renderToDisplay();
+      ctx.globalAlpha = 1;
+      onTextureUpdate();
     },
-    [selectedColor, brushSize, renderToDisplay],
+    [paintColor, wallCanvasRef, onTextureUpdate],
   );
 
+  // Mouse/touch handlers on the overlay
   const handlePointerDown = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
+    (e: React.PointerEvent) => {
       drawingRef.current = true;
-      const coords = getPixelCoords(e);
-      if (coords) drawAt(coords.x, coords.y);
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 256;
+      const y = ((e.clientY - rect.top) / rect.height) * 256;
+      lastPosRef.current = { x, y };
+      sprayAt(x, y);
     },
-    [getPixelCoords, drawAt],
+    [sprayAt],
   );
 
   const handlePointerMove = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    (e: React.PointerEvent) => {
       if (!drawingRef.current) return;
-      e.preventDefault();
-      const coords = getPixelCoords(e);
-      if (coords) drawAt(coords.x, coords.y);
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 256;
+      const y = ((e.clientY - rect.top) / rect.height) * 256;
+
+      // Interpolate between last and current for smooth lines
+      const last = lastPosRef.current;
+      if (last) {
+        const dx = x - last.x;
+        const dy = y - last.y;
+        const steps = Math.max(1, Math.floor(Math.sqrt(dx * dx + dy * dy) / 3));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          sprayAt(last.x + dx * t, last.y + dy * t);
+        }
+      } else {
+        sprayAt(x, y);
+      }
+      lastPosRef.current = { x, y };
     },
-    [getPixelCoords, drawAt],
+    [sprayAt],
   );
 
   const handlePointerUp = useCallback(() => {
     drawingRef.current = false;
+    lastPosRef.current = null;
   }, []);
 
-  // Save the tag
+  // Save and close
   const handleSave = useCallback(() => {
-    if (!canvasRef.current) return;
-    const pixels = canvasToBase64(canvasRef.current);
-    const tag: GraffitiTag = {
-      id: `${billboardId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      billboardId,
-      pixels,
-      author: playerId,
-      timestamp: Date.now(),
-      color: selectedColor,
-    };
-    saveTag(tag);
-    // Broadcast via PartyKit (legacy format)
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: 'world:graffiti',
-          tag,
-        }),
-      );
-      // Also persist via graffiti storage protocol
-      saveGraffitiTag(ws, billboardId, pixels, playerId);
+    const canvas = wallCanvasRef.current;
+    if (canvas && ws) {
+      const base64 = canvasToBase64(canvas);
+      saveGraffitiTag(ws, wallId, base64, playerId);
     }
-    onClose(tag);
-  }, [billboardId, playerId, selectedColor, ws, onClose]);
+    onClose();
+  }, [wallCanvasRef, ws, wallId, playerId, onClose]);
 
-  // Clear canvas
-  const handleClear = useCallback(() => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d')!;
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    renderToDisplay();
-  }, [renderToDisplay]);
-
-  // Cycle brush size
-  const cycleBrush = useCallback(() => {
-    setBrushSize(prev => {
-      const idx = BRUSH_SIZES.indexOf(prev);
-      return BRUSH_SIZES[(idx + 1) % BRUSH_SIZES.length];
-    });
-  }, []);
+  // ESC or G to finish
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [handleSave]);
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.container}>
-        {/* Title */}
-        <div style={styles.title}>SPRAY PAINT - {billboardId.toUpperCase()}</div>
-
-        {/* Canvas */}
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 40,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.3)',
+        cursor: 'crosshair',
+      }}
+    >
+      {/* The spray surface — maps to the wall texture */}
+      <div
+        style={{
+          width: '70vmin',
+          height: '70vmin',
+          maxWidth: 600,
+          maxHeight: 600,
+          border: `3px solid ${paintColor}`,
+          borderRadius: 4,
+          position: 'relative',
+          boxShadow: `0 0 30px ${paintColor}40`,
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        {/* Render the wall canvas as background */}
         <canvas
-          ref={displayRef}
-          width={DISPLAY_SIZE}
-          height={DISPLAY_SIZE}
-          style={styles.canvas}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={handlePointerUp}
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
+          ref={el => {
+            // Mirror the wall canvas into this display
+            if (el && wallCanvasRef.current) {
+              el.width = 256;
+              el.height = 256;
+              const ctx = el.getContext('2d');
+              if (ctx) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(wallCanvasRef.current, 0, 0);
+              }
+            }
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            imageRendering: 'pixelated',
+            pointerEvents: 'none',
+          }}
         />
+      </div>
 
-        {/* Color picker */}
-        <div style={styles.colorRow}>
-          {PAINT_COLORS.map(color => (
-            <button
-              key={color}
-              onClick={() => setSelectedColor(color)}
-              style={{
-                ...styles.colorSwatch,
-                backgroundColor: color,
-                border: color === selectedColor ? '3px solid #fff' : '2px solid #666',
-                transform: color === selectedColor ? 'scale(1.2)' : 'scale(1)',
-              }}
-            />
-          ))}
+      {/* HUD */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 30,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontFamily: 'monospace',
+          fontSize: 14,
+          color: '#fff',
+          textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 16,
+              height: 16,
+              background: paintColor,
+              borderRadius: 3,
+              verticalAlign: 'middle',
+              marginRight: 8,
+              border: '1px solid rgba(255,255,255,0.3)',
+            }}
+          />
+          SPRAY PAINTING
         </div>
-
-        {/* Controls row */}
-        <div style={styles.controlRow}>
-          <button onClick={cycleBrush} style={styles.btn}>
-            BRUSH: {brushSize}px
-          </button>
-          <button onClick={handleClear} style={styles.btn}>
-            CLEAR
-          </button>
-          <button onClick={handleSave} style={styles.saveBtn}>
-            SAVE
-          </button>
-          <button onClick={() => onClose(null)} style={styles.cancelBtn}>
-            CANCEL
-          </button>
+        <div style={{ fontSize: 11, color: '#aaa' }}>
+          DRAG TO SPRAY &middot; [ESC] or [G] TO FINISH
         </div>
-
-        <div style={styles.hint}>ESC to cancel | Draw with mouse/touch</div>
       </div>
     </div>
   );
 }
-
-// ── Styles ───────────────────────────────────────────────────────────
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100vw',
-    height: '100vh',
-    background: 'rgba(0, 0, 0, 0.85)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-    cursor: 'crosshair',
-  },
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '20px',
-    background: '#1a1a1a',
-    border: '2px solid #555',
-    borderRadius: '8px',
-    maxWidth: '560px',
-    width: '95vw',
-  },
-  title: {
-    fontFamily: 'monospace',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#ff4444',
-    letterSpacing: '2px',
-    textTransform: 'uppercase',
-  },
-  canvas: {
-    border: '2px solid #666',
-    imageRendering: 'pixelated',
-    width: '100%',
-    maxWidth: `${DISPLAY_SIZE}px`,
-    aspectRatio: '1',
-    touchAction: 'none',
-    cursor: 'crosshair',
-  },
-  colorRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
-    justifyContent: 'center',
-    padding: '4px 0',
-  },
-  colorSwatch: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'transform 0.1s, border 0.1s',
-    padding: 0,
-    outline: 'none',
-  },
-  controlRow: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  btn: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    padding: '8px 16px',
-    background: '#333',
-    color: '#ccc',
-    border: '1px solid #666',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  saveBtn: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    padding: '8px 20px',
-    background: '#228B22',
-    color: '#fff',
-    border: '1px solid #3a3',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  cancelBtn: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    padding: '8px 16px',
-    background: '#8B2222',
-    color: '#fff',
-    border: '1px solid #a33',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  hint: {
-    fontFamily: 'monospace',
-    fontSize: '11px',
-    color: '#666',
-    textAlign: 'center',
-  },
-};

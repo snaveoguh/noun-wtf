@@ -2326,17 +2326,18 @@ export default function WorldPage() {
           // Handle graffiti persistence messages
           const graffitiMsg = parseGraffitiMessage(evt.data);
           if (graffitiMsg) {
-            if (graffitiMsg.type === 'graffiti:tags') {
-              graffitiTagsRef.current[graffitiMsg.wallId] = graffitiMsg.tags;
-            } else if (graffitiMsg.type === 'graffiti:save') {
+            if (graffitiMsg.type === 'world:graffiti:tags') {
+              graffitiTagsRef.current[(graffitiMsg as any).wallId] = (graffitiMsg as any).tags;
+            } else if (graffitiMsg.type === 'world:graffiti:save') {
               // Another player saved a tag — add it to our local store
-              const existing = graffitiTagsRef.current[graffitiMsg.wallId] || [];
+              const msg = graffitiMsg as any;
+              const existing = graffitiTagsRef.current[msg.wallId] || [];
               existing.push({
-                imageData: graffitiMsg.imageData,
-                playerId: graffitiMsg.playerId,
+                imageData: msg.imageData,
+                playerId: msg.playerId,
                 timestamp: Date.now(),
               });
-              graffitiTagsRef.current[graffitiMsg.wallId] = existing;
+              graffitiTagsRef.current[msg.wallId] = existing;
               // Also save to in-memory tag store
               saveTag({
                 id: `${graffitiMsg.wallId}-${Date.now()}`,
@@ -3583,12 +3584,34 @@ export default function WorldPage() {
       {/* Graffiti spray paint overlay */}
       {graffitiOpen && graffitiWallId && (
         <GraffitiUI
-          billboardId={graffitiWallId}
+          wallId={graffitiWallId}
           playerId={mpRef.current.myId}
+          paintColor={paintRef.current.color || '#ff0000'}
           ws={mpRef.current.ws as WebSocket | null}
           onClose={() => {
             setGraffitiOpen(false);
             setGraffitiWallId(null);
+          }}
+          wallCanvasRef={{
+            current: (() => {
+              // Get or create a 256x256 canvas for this wall
+              const key = `__graffitiCanvas_${graffitiWallId}`;
+              let c = (window as any)[key] as HTMLCanvasElement | undefined;
+              if (!c) {
+                c = document.createElement('canvas');
+                c.width = 256;
+                c.height = 256;
+                const ctx = c.getContext('2d')!;
+                ctx.fillStyle = '#d4cfc4'; // wall base color
+                ctx.fillRect(0, 0, 256, 256);
+                (window as any)[key] = c;
+              }
+              return c;
+            })(),
+          }}
+          onTextureUpdate={() => {
+            // Force re-render to update wall texture
+            setGraffitiWallId(prev => prev);
           }}
         />
       )}
