@@ -2280,7 +2280,7 @@ export default function WorldPage() {
   // Play intro music on first load
   useEffect(() => {
     const audio = new Audio('/sounds/noun-world-intro.mp3');
-    audio.volume = 0.6;
+    audio.volume = 0.12;
     audio.play().catch(() => {
       // Browser blocks autoplay — play on first click
       const playOnClick = () => {

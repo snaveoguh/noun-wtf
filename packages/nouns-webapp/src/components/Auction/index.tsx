@@ -368,6 +368,17 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [baseGrid, liveDrafts, liveVoxelMap, resetLive2dSignature, resetLive3dSignature],
   );
 
+  // Listen for Noundry trait clicks — open 2D editor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { category: string; index: number } | undefined;
+      if (!detail) return;
+      startEditing('2d');
+    };
+    window.addEventListener('noundry-trait-edit', handler);
+    return () => window.removeEventListener('noundry-trait-edit', handler);
+  }, [startEditing]);
+
   const persistLiveDraft = useCallback(
     async (
       mode: Exclude<EditMode, null>,
@@ -1093,7 +1104,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
                   onClick={() => {
                     if (value === 'sprite') {
-                      // Spin transition then enter world as this Noun
+                      // Batman transition sound + spin then enter world
+                      new Audio('/sounds/batman-transition.mp3').play().catch(() => {});
                       setViewMode('sprite');
                       const s = currentNounSeed;
                       const seedParam = s ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}` : '';
