@@ -126,13 +126,33 @@ function ShadowCircle({ stateRef }: { stateRef: React.RefObject<CharacterState> 
   );
 }
 
-/** Hoverboard mesh — visibility toggled imperatively via useFrame (instant on/off) */
+/** Hoverboard mesh — leans into turns, tilts with speed */
 function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState> }) {
   const groupRef = useRef<THREE.Group>(null);
+  const prevVxRef = useRef(0);
   useFrame(() => {
     const g = groupRef.current;
-    if (!g) return;
-    g.visible = stateRef.current?.isSkating ?? false;
+    const s = stateRef.current;
+    if (!g || !s) return;
+    g.visible = s.isSkating;
+    if (!s.isSkating) return;
+
+    // Board tilts into turns based on lateral velocity change
+    const vx = s.vx || 0;
+    const vy = s.vy || 0;
+    const speed = Math.sqrt(vx * vx + vy * vy);
+
+    // Lean into turns — roll based on lateral velocity
+    const targetLean = -vx * 0.15; // lean opposite to X velocity
+    g.rotation.z += (targetLean - g.rotation.z) * 0.15; // smooth lerp
+
+    // Nose tilt based on acceleration/speed
+    const accel = vx - prevVxRef.current;
+    g.rotation.x = accel * 0.3 + Math.sin(Date.now() * 0.003) * 0.02; // slight bob
+    prevVxRef.current = vx;
+
+    // Hover bob — gentle up/down based on speed
+    g.position.y = 0.01 + Math.sin(Date.now() * 0.005) * (0.005 + speed * 0.003);
   });
   return (
     <group ref={groupRef} position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]} visible={false}>
@@ -410,6 +430,13 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         g.rotation.x = Math.sin(t * 3.7) * 0.15;
         g.rotation.z = Math.cos(t * 4.3) * 0.12;
       }
+    } else if (s.isSkating) {
+      // SKATING — lean body into turns, slight forward crouch
+      const vx = s.vx || 0;
+      const vy = s.vy || 0;
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      g.rotation.x = 0.1 + speed * 0.02; // slight forward crouch, more at speed
+      g.rotation.z = -vx * 0.1; // lean into turns
     } else {
       g.rotation.x = 0;
       g.rotation.z = 0;
