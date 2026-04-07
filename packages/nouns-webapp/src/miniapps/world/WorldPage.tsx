@@ -248,6 +248,22 @@ const HEIGHT_SCALE = WORLD_SCALE * 8;
 
 /** Get terrain height in Three.js Y at a given world X/Z position */
 function getTerrainHeight(worldX: number, worldZ: number): number {
+  // Check if on the mega ramp — if so, return ramp surface height
+  const rb = MEGA_RAMP_BOUNDS;
+  const relX = worldX - rb.x;
+  const relZ = worldZ - rb.z;
+  if (
+    Math.abs(relX) < rb.width / 2 + 0.5 &&
+    relZ > -rb.length / 2 - 1 &&
+    relZ < rb.length / 2 + 1
+  ) {
+    // On the ramp — compute curved surface height
+    // curveT: 0 at back (high end), 1 at front (low end)
+    const curveT = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
+    const rampY = rb.height * Math.sin(((1 - curveT) * Math.PI) / 2);
+    return Math.max(rampY, 0.35); // don't go below ground
+  }
+
   // Convert Three.js world coords back to tile coords
   const tx = Math.floor(worldX / (TILE_SIZE * WORLD_SCALE));
   const tz = Math.floor(worldZ / (TILE_SIZE * WORLD_SCALE));
