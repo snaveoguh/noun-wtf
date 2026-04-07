@@ -248,20 +248,26 @@ const HEIGHT_SCALE = WORLD_SCALE * 8;
 
 /** Get terrain height in Three.js Y at a given world X/Z position */
 function getTerrainHeight(worldX: number, worldZ: number): number {
-  // Check if on the mega ramp — if so, return ramp surface height
+  // Check if on the mega ramp or its surrounding structures
   const rb = MEGA_RAMP_BOUNDS;
   const relX = worldX - rb.x;
   const relZ = worldZ - rb.z;
-  if (
-    Math.abs(relX) < rb.width / 2 + 0.5 &&
-    relZ > -rb.length / 2 - 1 &&
-    relZ < rb.length / 2 + 1
-  ) {
-    // On the ramp — compute curved surface height
-    // curveT: 0 at back (high end), 1 at front (low end)
-    const curveT = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
-    const rampY = rb.height * Math.sin(((1 - curveT) * Math.PI) / 2);
-    return Math.max(rampY, 0.35); // don't go below ground
+  // Wide bounds to catch ramp + side walls + stairs + top platform
+  if (Math.abs(relX) < rb.width / 2 + 6 && relZ > -rb.length / 2 - 8 && relZ < rb.length / 2 + 6) {
+    // Top platform (back of ramp, high end) — flat at RAMP_HEIGHT
+    if (relZ > rb.length / 2 - 2) {
+      return rb.height;
+    }
+    // On the curved ramp surface itself (within ramp width)
+    if (Math.abs(relX) < rb.width / 2 + 0.5) {
+      const curveT = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
+      const rampY = rb.height * Math.sin(((1 - curveT) * Math.PI) / 2);
+      return Math.max(rampY, 0.35);
+    }
+    // Side area (stairs, apartment building side) — ramp up linearly with Z
+    const stairT = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
+    const stairY = stairT * rb.height;
+    return Math.max(stairY, 0.35);
   }
 
   // Convert Three.js world coords back to tile coords
@@ -3437,7 +3443,7 @@ export default function WorldPage() {
         >
           <div
             style={{
-              fontFamily: "'Georgia', 'Times New Roman', serif",
+              fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
               fontWeight: 'bold',
               fontSize: '120px',
               color: '#fff',
@@ -3460,7 +3466,7 @@ export default function WorldPage() {
               lineHeight: 1,
             }}
           >
-            NOUN
+            FRIED
             <br />
             WORLD
           </div>
