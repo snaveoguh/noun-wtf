@@ -375,15 +375,14 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       const t = Date.now() * 0.015;
 
       if (isFalling) {
-        // SKYDIVING — stomach down, arms out, lean into movement direction
-        g.rotation.x = Math.PI / 2.5; // tilt forward ~72 degrees (face down)
-        // Lean based on movement input (vx/vy from air control)
-        const leanX = (s.vx || 0) * 0.08; // lean into horizontal movement
-        const leanZ = (s.vy || 0) * 0.08;
-        g.rotation.z = -leanX + Math.sin(t * 2) * 0.03; // slight wobble
-        g.rotation.x += leanZ * 0.5; // forward/back lean
-        // Subtle body sway from wind
-        g.rotation.y = baseRotY + Math.sin(t * 1.5) * 0.05;
+        // SKYDIVING — flat on stomach, face looking at ground
+        g.rotation.x = Math.PI / 2; // 90 degrees — completely face down
+        // Gentle lean based on movement (very subtle since air control is gentle)
+        const leanX = (s.vx || 0) * 2; // amplify the tiny air control for visible lean
+        const leanZ = (s.vy || 0) * 2;
+        g.rotation.z = -leanX + Math.sin(t * 1.5) * 0.02; // lean left/right
+        g.rotation.x += leanZ * 0.3; // lean forward/back slightly
+        g.rotation.y = baseRotY + Math.sin(t * 1.2) * 0.03; // wind sway
       } else if (isRising) {
         // RISING — slight backward tilt, arms flailing
         g.rotation.x = -0.15 + Math.sin(t * 3.7) * 0.1;

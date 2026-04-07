@@ -601,7 +601,7 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
     // Air control — WASD steers while airborne (skydiving navigation)
     const { dx: adx, dy: ady } = getMovementVector(input.keys, input.cameraAngle);
     if (adx !== 0 || ady !== 0) {
-      const airControl = 0.8;
+      const airControl = 0.04; // gentle lean, not a jetpack
       player.vx += adx * airControl;
       player.vy += ady * airControl;
       player.direction = directionFromDelta(adx, ady);
