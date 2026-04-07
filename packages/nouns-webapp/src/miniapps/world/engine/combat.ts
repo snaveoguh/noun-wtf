@@ -182,15 +182,15 @@ export function executeMove(
     // Progressive jump: jump → double → triple → backflip
     player.jumpCount++;
     if (player.jumpCount <= 3) {
-      // Regular jumps (each successive one slightly higher)
-      const jumpPower = -6 - player.jumpCount * 1.5; // -7.5, -9, -10.5
+      // Spider-Man style — high launch, floaty hang time
+      const jumpPower = -4 - player.jumpCount * 1.2; // -5.2, -6.4, -7.6
       player.state = 'airborne';
       player.airborneVy = jumpPower;
-      if (player.airborneY >= GROUND_Y) player.airborneY = -0.5; // start airborne
+      if (player.airborneY >= GROUND_Y) player.airborneY = -0.5;
     } else {
-      // 4th press = backflip
+      // 4th press = backflip — massive launch
       player.state = 'backflip';
-      player.airborneVy = -12; // big launch
+      player.airborneVy = -8;
       if (player.airborneY >= GROUND_Y) player.airborneY = -0.5;
       player.flipRotation = 0;
       player.jumpCount = 0; // reset after backflip
