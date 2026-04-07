@@ -123,6 +123,39 @@ function ShadowCircle({ stateRef }: { stateRef: React.RefObject<CharacterState> 
   );
 }
 
+/** Hoverboard mesh — visibility toggled imperatively via useFrame (instant on/off) */
+function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState> }) {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    g.visible = stateRef.current?.isSkating ?? false;
+  });
+  return (
+    <group ref={groupRef} position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]} visible={false}>
+      <mesh>
+        <boxGeometry args={[1.2, 0.04, 0.3]} />
+        <meshStandardMaterial
+          color="#00ffcc"
+          emissive="#00ffcc"
+          emissiveIntensity={2}
+          metalness={0.8}
+          roughness={0.2}
+        />
+      </mesh>
+      <pointLight position={[0, -0.06, 0]} color="#00ffcc" intensity={0.8} distance={0.5} />
+      <mesh position={[0.55, 0.03, 0]}>
+        <boxGeometry args={[0.1, 0.02, 0.24]} />
+        <meshBasicMaterial color="#ff00ff" />
+      </mesh>
+      <mesh position={[-0.55, 0.03, 0]}>
+        <boxGeometry args={[0.1, 0.02, 0.24]} />
+        <meshBasicMaterial color="#ff00ff" />
+      </mesh>
+    </group>
+  );
+}
+
 interface Character3DProps {
   seed: INounSeed;
   stateRef: React.RefObject<CharacterState>;
@@ -200,11 +233,12 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           ) {
             chestBone = child;
           }
+          // Disable frustum culling on EVERYTHING to prevent disappearing on turn
+          child.frustumCulled = false;
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
             const mesh = child as THREE.SkinnedMesh;
             const color = child.name.includes('Leg') ? '#443322' : bodyColor;
             mesh.material = new THREE.MeshBasicMaterial({ color });
-            mesh.frustumCulled = false;
           }
         });
 
@@ -518,34 +552,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     <group ref={groupRef}>
       {/* Shadow circle — stays on ground, shrinks when airborne */}
       <ShadowCircle stateRef={stateRef} />
-      {/* Hoverboard — small neon board under feet, side-on (long axis = X) */}
-      {stateRef.current?.isSkating && (
-        <group position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]}>
-          {/* Board deck — long on X axis so it's side-on to character */}
-          <mesh>
-            <boxGeometry args={[1.2, 0.04, 0.3]} />
-            <meshStandardMaterial
-              color="#00ffcc"
-              emissive="#00ffcc"
-              emissiveIntensity={2}
-              metalness={0.8}
-              roughness={0.2}
-            />
-          </mesh>
-          {/* Thruster glow */}
-          <pointLight position={[0, -0.06, 0]} color="#00ffcc" intensity={0.8} distance={0.5} />
-          {/* Nose accent */}
-          <mesh position={[0.55, 0.03, 0]}>
-            <boxGeometry args={[0.1, 0.02, 0.24]} />
-            <meshBasicMaterial color="#ff00ff" />
-          </mesh>
-          {/* Tail accent */}
-          <mesh position={[-0.55, 0.03, 0]}>
-            <boxGeometry args={[0.1, 0.02, 0.24]} />
-            <meshBasicMaterial color="#ff00ff" />
-          </mesh>
-        </group>
-      )}
+      {/* Hoverboard — always mounted, visibility toggled by useFrame */}
+      <HoverboardMesh stateRef={stateRef} />
     </group>
   );
 }
