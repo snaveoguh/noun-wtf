@@ -2901,12 +2901,7 @@ export default function WorldPage() {
       // Tick player — always run, but board overrides movement after
       tickPlayer(player, input, combat);
 
-      // ── Hoverboard: just boost speed, tickPlayer handles the rest ──
-      if (sk.isSkating) {
-        // Just boost the velocity — tickPlayer already handled movement
-        player.vx *= 1.8;
-        player.vy *= 1.8;
-      }
+      // Hoverboard — no extra velocity boost needed, sprint key (R) handles speed
 
       // Update camera target + character state ref
       const wx = player.x * WORLD_SCALE;
@@ -3533,10 +3528,27 @@ export default function WorldPage() {
         }}
       />
 
-      {/* Skating HUD overlay — trick score, combo, balance meter */}
+      {/* Hoverboard hint */}
       {skateRef.current.isSkating && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 60,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: '#666',
+            pointerEvents: 'none',
+            zIndex: 15,
+          }}
+        >
+          [V] DISMOUNT · [R] BOOST
+        </div>
+      )}
+      {false && (
         <>
-          {/* Trick score (top-left) */}
+          {/* Dead skating HUD — kept for reference */}
           <div
             style={{
               position: 'fixed',
