@@ -246,12 +246,16 @@ const NoundryBanner: FC = () => {
     const el = scrollRef.current;
     if (!el) return;
     const speed = 1.2;
-    let pos = 0;
+    let pos = el.scrollLeft;
+    let wasPaused = false;
     const tick = () => {
-      if (!pausedRef.current) {
+      if (pausedRef.current) {
+        wasPaused = true;
+      } else {
+        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
         pos += speed;
         const half = el.scrollWidth / 2;
-        if (half > 0 && pos >= half) pos = 0;
+        if (half > 0 && pos >= half) pos -= half;
         el.scrollLeft = pos;
       }
       animRef.current = requestAnimationFrame(tick);
@@ -338,7 +342,15 @@ const NoundryBanner: FC = () => {
           {displayCards.map((card, i) => (
             <div
               key={`${card.id}-${i}`}
-              onClick={() => setSelectedCard(card)}
+              onClick={() => {
+                // Dispatch event to open 2D editor with this trait
+                window.dispatchEvent(
+                  new CustomEvent('noundry-trait-edit', {
+                    detail: { category: card.category, index: parseInt(card.id.split('-')[1], 10) },
+                  }),
+                );
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               role="button"
               tabIndex={0}
               onKeyDown={e => {

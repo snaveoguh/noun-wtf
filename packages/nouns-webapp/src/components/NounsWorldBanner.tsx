@@ -342,13 +342,17 @@ const NounsWorldBanner: FC = () => {
     if (!el) return;
 
     const speed = 1.0;
-    let pos = 0;
+    let pos = el.scrollLeft;
+    let wasPaused = false;
 
     const tick = () => {
-      if (!pausedRef.current) {
+      if (pausedRef.current) {
+        wasPaused = true;
+      } else {
+        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
-        if (pos >= halfWidth) pos = 0;
+        if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;
         el.scrollLeft = pos;
       }
       animRef.current = requestAnimationFrame(tick);

@@ -83,7 +83,7 @@ const APIS = [
   },
   {
     name: 'Agent Hub (Free LLM)',
-    url: 'https://heartfelt-flow-production-d872.up.railway.app',
+    url: 'https://heartfelt-flow-production-d872.up.railway.app/health',
     desc: 'Free LLM (Claude via Anthropic, Groq, Together fallback). POST /v1/generate with {"user":"your prompt","task":"chat"}. No API key needed.',
   },
   {

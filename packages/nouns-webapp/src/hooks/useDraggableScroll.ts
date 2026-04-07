@@ -40,7 +40,7 @@ export function useDraggableScroll(
       const onPointerMove = (ev: PointerEvent) => {
         if (!isDragging.current) return;
         const dx = ev.clientX - startX.current;
-        if (Math.abs(dx) > 3) hasMoved.current = true;
+        if (Math.abs(dx) > 8) hasMoved.current = true;
         el.scrollLeft = scrollStart.current - dx;
       };
 
