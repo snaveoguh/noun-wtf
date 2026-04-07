@@ -1,9 +1,6 @@
-// ── GraffitiUI — In-scene freehand spray paint ──────────────────────
-//
-// Press G near a wall → fullscreen crosshair overlay, drag to spray.
-// Draws directly onto a 256x256 canvas. On close, saves to PartyKit.
+// ── GraffitiUI — Freehand spray paint on walls ──────────────────────
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { saveGraffitiTag } from './graffiti';
 
 interface SprayUIProps {
@@ -19,17 +16,15 @@ const SPRAY_RADIUS = 8;
 
 export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayUIProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawingRef = useRef(false);
+  const [drawing, setDrawing] = useState(false);
 
-  // Initialize canvas with wall base color
+  // Init canvas
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
+    const ctx = c.getContext('2d')!;
     ctx.fillStyle = '#c8c0b4';
     ctx.fillRect(0, 0, SIZE, SIZE);
-    // Add some grit/texture
     for (let i = 0; i < 300; i++) {
       ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`;
       ctx.fillRect(
@@ -41,76 +36,51 @@ export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayU
     }
   }, []);
 
-  const sprayAt = useCallback(
-    (x: number, y: number) => {
+  const spray = useCallback(
+    (cx: number, cy: number) => {
       const ctx = canvasRef.current?.getContext('2d');
       if (!ctx) return;
-      for (let i = 0; i < 15; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * SPRAY_RADIUS;
-        const px = x + Math.cos(angle) * dist;
-        const py = y + Math.sin(angle) * dist;
+      for (let i = 0; i < 18; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * SPRAY_RADIUS;
+        const px = cx + Math.cos(a) * d;
+        const py = cy + Math.sin(a) * d;
         if (px < 0 || px >= SIZE || py < 0 || py >= SIZE) continue;
-        const sz = 1 + Math.floor(Math.random() * 3);
-        ctx.globalAlpha = 0.3 + Math.random() * 0.5;
+        ctx.globalAlpha = 0.25 + Math.random() * 0.55;
         ctx.fillStyle = paintColor;
-        ctx.fillRect(px, py, sz, sz);
+        ctx.fillRect(px, py, 1 + Math.floor(Math.random() * 3), 1 + Math.floor(Math.random() * 3));
       }
       ctx.globalAlpha = 1;
     },
     [paintColor],
   );
 
-  const getPos = (e: React.PointerEvent): [number, number] => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return [0, 0];
+  const toCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
     return [
       ((e.clientX - rect.left) / rect.width) * SIZE,
       ((e.clientY - rect.top) / rect.height) * SIZE,
-    ];
+    ] as const;
   };
-
-  const onDown = useCallback(
-    (e: React.PointerEvent) => {
-      drawingRef.current = true;
-      const [x, y] = getPos(e);
-      sprayAt(x, y);
-    },
-    [sprayAt],
-  );
-
-  const onMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!drawingRef.current) return;
-      const [x, y] = getPos(e);
-      sprayAt(x, y);
-    },
-    [sprayAt],
-  );
-
-  const onUp = useCallback(() => {
-    drawingRef.current = false;
-  }, []);
 
   const handleClose = useCallback(() => {
     const c = canvasRef.current;
     if (c && ws) {
-      const base64 = c.toDataURL('image/png');
-      saveGraffitiTag(ws, wallId, base64, playerId);
+      saveGraffitiTag(ws, wallId, c.toDataURL('image/png'), playerId);
     }
     onClose();
   }, [ws, wallId, playerId, onClose]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key.toLowerCase() === 'g') {
         e.preventDefault();
         e.stopPropagation();
         handleClose();
       }
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', fn, true);
+    return () => window.removeEventListener('keydown', fn, true);
   }, [handleClose]);
 
   return (
@@ -118,13 +88,15 @@ export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayU
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 40,
+        zIndex: 100,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        background: 'rgba(0,0,0,0.4)',
-        cursor: 'crosshair',
+        background: 'rgba(0,0,0,0.5)',
+      }}
+      onClick={e => {
+        if (e.target === e.currentTarget) handleClose();
       }}
     >
       <canvas
@@ -132,20 +104,49 @@ export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayU
         width={SIZE}
         height={SIZE}
         style={{
-          width: '70vmin',
-          height: '70vmin',
-          maxWidth: 600,
-          maxHeight: 600,
+          width: 'min(70vmin, 500px)',
+          height: 'min(70vmin, 500px)',
           border: `3px solid ${paintColor}`,
           borderRadius: 4,
-          boxShadow: `0 0 30px ${paintColor}40`,
+          boxShadow: `0 0 40px ${paintColor}60`,
           imageRendering: 'pixelated',
+          cursor: 'crosshair',
           touchAction: 'none',
         }}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerLeave={onUp}
+        onMouseDown={e => {
+          setDrawing(true);
+          const [x, y] = toCanvasCoords(e);
+          spray(x, y);
+        }}
+        onMouseMove={e => {
+          if (drawing) {
+            const [x, y] = toCanvasCoords(e);
+            spray(x, y);
+          }
+        }}
+        onMouseUp={() => setDrawing(false)}
+        onMouseLeave={() => setDrawing(false)}
+        onTouchStart={e => {
+          e.preventDefault();
+          setDrawing(true);
+          const touch = e.touches[0];
+          const rect = e.currentTarget.getBoundingClientRect();
+          spray(
+            ((touch.clientX - rect.left) / rect.width) * SIZE,
+            ((touch.clientY - rect.top) / rect.height) * SIZE,
+          );
+        }}
+        onTouchMove={e => {
+          e.preventDefault();
+          if (!drawing) return;
+          const touch = e.touches[0];
+          const rect = e.currentTarget.getBoundingClientRect();
+          spray(
+            ((touch.clientX - rect.left) / rect.width) * SIZE,
+            ((touch.clientY - rect.top) / rect.height) * SIZE,
+          );
+        }}
+        onTouchEnd={() => setDrawing(false)}
       />
       <div
         style={{
@@ -169,7 +170,7 @@ export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayU
             border: '1px solid rgba(255,255,255,0.3)',
           }}
         />
-        DRAG TO SPRAY &middot; [ESC] or [G] TO FINISH
+        DRAG TO SPRAY · [ESC] or [G] TO FINISH
       </div>
     </div>
   );
