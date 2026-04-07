@@ -2808,10 +2808,12 @@ export default function WorldPage() {
       frameRef.current++;
       const frame = frameRef.current;
 
-      // Ocean death — hoverboard floats on water
+      // Ocean death — only if actually at water level (not on ramp/buildings above water tiles)
       const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
       const sk = skateRef.current;
-      tickOceanDeath(ocean, inWater && !sk.isSkating);
+      const terrainAtPlayer = getTerrainHeight(player.x * WORLD_SCALE, player.y * WORLD_SCALE);
+      const actuallySubmerged = inWater && terrainAtPlayer < 0.3;
+      tickOceanDeath(ocean, actuallySubmerged && !sk.isSkating);
       if (ocean.phase === 'respawning' && ocean.timer === 59) {
         player.x = SPAWN_X;
         player.y = SPAWN_Y;
