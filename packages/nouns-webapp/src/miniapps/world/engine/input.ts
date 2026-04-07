@@ -147,7 +147,7 @@ export function resolveIntendedMove(input: InputState): MoveType | null {
   if (jp.has('f')) return 'gunshot';
   if (jp.has('h')) return 'headbutt';
   if (jp.has('q')) return 'forcePush';
-  if (jp.has('r')) return 'spinAttack';
+  // R is now sprint (held) — no longer spin attack
   if (jp.has('u')) return 'uppercut';
 
   if (input.shiftHeld) return 'block';

@@ -616,11 +616,13 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
   const { dx, dy } = getMovementVector(input.keys, input.cameraAngle);
 
   if (dx !== 0 || dy !== 0) {
-    player.state = 'walking';
+    const sprinting = input.keys.has('r');
+    player.state = sprinting ? 'dashing' : 'walking';
     player.direction = directionFromDelta(dx, dy);
     if (dx !== 0) player.scaleX = dx > 0 ? 1 : -1;
-    player.vx = dx * PLAYER_SPEED;
-    player.vy = dy * PLAYER_SPEED;
+    const speed = sprinting ? PLAYER_SPEED * 2.2 : PLAYER_SPEED;
+    player.vx = dx * speed;
+    player.vy = dy * speed;
   } else {
     if (player.state === 'walking') player.state = 'idle';
     applyFriction(player);
