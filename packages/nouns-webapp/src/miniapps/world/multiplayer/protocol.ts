@@ -20,6 +20,8 @@ export interface WorldMoveMessage {
   flipRotation: number;
   isSkating?: boolean;
   trickName?: string;
+  weaponEquipped?: string | null;
+  paintColor?: string | null;
 }
 
 export interface WorldAttackMessage {
@@ -81,6 +83,8 @@ export interface WorldPlayerState {
   flipRotation: number;
   isSkating?: boolean;
   trickName?: string;
+  weaponEquipped?: string | null;
+  paintColor?: string | null;
 }
 
 export interface WorldSyncMessage {
@@ -106,6 +110,8 @@ export interface WorldPlayerMessage {
   flipRotation: number;
   isSkating?: boolean;
   trickName?: string;
+  weaponEquipped?: string | null;
+  paintColor?: string | null;
 }
 
 export interface WorldJoinMessage {

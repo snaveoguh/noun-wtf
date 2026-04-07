@@ -3164,6 +3164,8 @@ export default function WorldPage() {
         : 0;
       player.isSkating = skateRef.current.isSkating;
       player.trickName = skateRef.current.currentTrick || null;
+      (player as any).weaponEquipped = weaponRef.current.equipped;
+      (player as any).paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
       pcs.airborneVy = player.airborneVy;
       pcs.vx = player.vx;
       pcs.vy = player.vy;
@@ -3244,6 +3246,8 @@ export default function WorldPage() {
         entry.state.hitFlash = rp.hitFlash;
         entry.state.hp = rp.hp;
         entry.state.isSkating = rp.isSkating ?? false;
+        entry.state.weaponEquipped = (rp as any).weaponEquipped ?? null;
+        entry.state.paintColor = (rp as any).paintColor ?? null;
       }
       // Remove disconnected players
       for (const id of remoteCharStates.current.keys()) {

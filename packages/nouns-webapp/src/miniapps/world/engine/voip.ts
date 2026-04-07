@@ -83,6 +83,18 @@ export function initVoipListenOnly(state: VoipState): boolean {
     if (!state.audioContext) {
       state.audioContext = new AudioContext();
     }
+    // Browsers suspend AudioContext until user gesture — resume on first interaction
+    if (state.audioContext.state === 'suspended') {
+      const resume = () => {
+        state.audioContext?.resume();
+        document.removeEventListener('click', resume);
+        document.removeEventListener('keydown', resume);
+        document.removeEventListener('touchstart', resume);
+      };
+      document.addEventListener('click', resume);
+      document.addEventListener('keydown', resume);
+      document.addEventListener('touchstart', resume);
+    }
     return true;
   } catch (err) {
     console.warn('[VOIP] Failed to create audio context:', err);
