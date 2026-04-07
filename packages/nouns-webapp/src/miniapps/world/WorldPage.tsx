@@ -119,21 +119,7 @@ import {
   APARTMENT_GRAFFITI_WALL,
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
-import {
-  createSkatingState,
-  mountBoard,
-  dismountBoard,
-  ollie,
-  airTrick,
-  spin180,
-  kickflip,
-  startGrind,
-  setCrouching,
-  balanceCorrect,
-  tickSkating,
-  testRampCollision,
-  type SkatingState,
-} from './engine/skating';
+import { createSkatingState, mountBoard, dismountBoard, type SkatingState } from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import {
@@ -2912,78 +2898,14 @@ export default function WorldPage() {
         }
       }
 
-      // Tick player — skip combat movement when skating (skating handles its own physics)
-      if (!sk.isSkating) {
-        tickPlayer(player, input, combat);
-      }
+      // Tick player — always run, but board overrides movement after
+      tickPlayer(player, input, combat);
 
-      // ── Skating physics tick ──
+      // ── Hoverboard: just boost speed, tickPlayer handles the rest ──
       if (sk.isSkating) {
-        const skWx = player.x * WORLD_SCALE;
-        const skWz = player.y * WORLD_SCALE;
-        const skTerrainY = getTerrainHeight(skWx, skWz);
-
-        // Test ramp collision
-        const rampData = testRampCollision(skWx, skWz, skTerrainY, MEGA_RAMP_BOUNDS);
-
-        // Movement direction from input
-        const hasW = input.keys.has('w');
-        const hasA = input.keys.has('a');
-        const hasS = input.keys.has('s');
-        const hasD = input.keys.has('d');
-        let sdx = 0,
-          sdz = 0;
-        if (hasW) sdz -= 1;
-        if (hasS) sdz += 1;
-        if (hasA) sdx -= 1;
-        if (hasD) sdx += 1;
-        const sLen = Math.sqrt(sdx * sdx + sdz * sdz);
-        if (sLen > 0) {
-          sdx /= sLen;
-          sdz /= sLen;
-        }
-
-        // Shift held = crouching/pump
-        setCrouching(sk, input.shiftHeld);
-
-        // Space = ollie (ground) or air trick (airborne)
-        if (input.justPressed.has(' ')) {
-          if (sk.airborne) {
-            // Determine direction for air trick
-            const dir = hasA ? 'left' : hasD ? 'right' : hasW ? 'up' : hasS ? 'down' : null;
-            airTrick(sk, dir);
-          } else {
-            ollie(sk, rampData);
-          }
-        }
-
-        // J = spin, K = kickflip (legacy keys still work)
-        if (input.justPressed.has('j') && sk.airborne) spin180(sk);
-        if (input.justPressed.has('k') && sk.airborne) kickflip(sk);
-
-        // G = manual grind start
-        if (input.justPressed.has('g')) startGrind(sk, rampData);
-
-        // Balance correction: left/right during grind or manual
-        if (sk.grindActive || sk.manualActive) {
-          if (input.keys.has('a') || input.keys.has('arrowleft')) balanceCorrect(sk, -1);
-          if (input.keys.has('d') || input.keys.has('arrowright')) balanceCorrect(sk, 1);
-        }
-
-        const delta = 1 / 60; // approximate frame delta
-        const skMove = tickSkating(sk, [sdx, sdz], delta, skTerrainY, rampData);
-
-        // Apply skating movement to player position
-        player.x += skMove.dx * 0.5;
-        player.y += skMove.dz * 0.5;
-
-        // Update direction so character/camera follow
-        if (sdx !== 0 || sdz !== 0) {
-          player.direction = directionFromDelta(sdx, sdz);
-          player.state = 'walking';
-        }
-        player.vx = skMove.dx * 5;
-        player.vy = skMove.dz * 5;
+        // Just boost the velocity — tickPlayer already handled movement
+        player.vx *= 1.8;
+        player.vy *= 1.8;
       }
 
       // Update camera target + character state ref
