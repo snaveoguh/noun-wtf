@@ -94,8 +94,8 @@ export function moveWithCollision(
 /** Apply gravity to airborne player */
 export function applyGravity(player: Player) {
   if (player.airborneY < GROUND_Y) {
-    // Spider-Man hang time: reduce gravity near the peak (when vy is close to 0)
-    const hangFactor = Math.abs(player.airborneVy) < 1.5 ? 0.4 : 1.0;
+    // Spider-Man hang time: heavy slow-mo near the peak
+    const hangFactor = Math.abs(player.airborneVy) < 2.0 ? 0.2 : 0.7;
     player.airborneVy += GRAVITY * hangFactor;
     player.airborneY += player.airborneVy;
     if (player.airborneY >= GROUND_Y) {
