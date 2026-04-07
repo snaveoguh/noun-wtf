@@ -18,7 +18,11 @@ const NounsIntroSection = () => {
           <Trans>One Noun, Every Day, Forever.</Trans>
         </h1>
       </div>
-      <Section fullWidth={false} className={classes.videoSection} style={{ position: 'relative', zIndex: 1 }}>
+      <Section
+        fullWidth={false}
+        className={classes.videoSection}
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <Col lg={6}>
           <div className={classes.textWrapper}>
             <p>
@@ -32,11 +36,7 @@ const NounsIntroSection = () => {
           </div>
         </Col>
         <Col lg={6} className={classes.gifContainer}>
-          <img
-            src="https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:3046/g:ce/f:webp/aHR0cHM6Ly9tYWdpYy5kZWNlbnRyYWxpemVkLWNvbnRlbnQuY29tL2lwZnMvYmFmeWJlaWVjN3A0a3RrbXl6cm1kZGR4cGhhZTQyNzdyZ3o3amJ6ZDUzZzRnaGM0cmtsZHR5d3RscWk"
-            alt="Artwork"
-            className={classes.gifImage}
-          />
+          <img src="/untitled2026.gif" alt="Nouns 2026 artwork" className={classes.gifImage} />
         </Col>
       </Section>
 
@@ -45,7 +45,11 @@ const NounsIntroSection = () => {
           <Trans>Build With Nouns. Get Funded.</Trans>
         </h1>
       </div>
-      <Section fullWidth={false} className={classes.videoSection} style={{ position: 'relative', zIndex: 1 }}>
+      <Section
+        fullWidth={false}
+        className={classes.videoSection}
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <Col lg={6} className={`${classes.gifContainer} order-lg-1 order-2`}>
           <img
             src="https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:3046/g:ce/f:webp/aHR0cHM6Ly9tYWdpYy5kZWNlbnRyYWxpemVkLWNvbnRlbnQuY29tL2lwZnMvYmFmeWJlaWhwc2s0amNuazR1NWtnYnpqNHZudDZ0b3pnZnRmd3d3dHo3c29ja3R1bHJ3aDZiYW5ibnE"
@@ -67,7 +71,11 @@ const NounsIntroSection = () => {
           </div>
         </Col>
       </Section>
-      <Section fullWidth={false} className={classes.videoSection} style={{ position: 'relative', zIndex: 1 }}>
+      <Section
+        fullWidth={false}
+        className={classes.videoSection}
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <Col lg={12}>
           <div className={classes.textWrapper}>
             <h1 className={classes.globalHeader}>
