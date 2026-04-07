@@ -137,19 +137,19 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
     g.visible = s.isSkating;
     if (!s.isSkating) return;
 
-    // Board tilts into turns based on lateral velocity change
+    // Board tilts into turns
     const vx = s.vx || 0;
     const vy = s.vy || 0;
     const speed = Math.sqrt(vx * vx + vy * vy);
 
-    // Lean into turns — roll based on lateral velocity
-    const targetLean = -vx * 0.15; // lean opposite to X velocity
-    g.rotation.z += (targetLean - g.rotation.z) * 0.15; // smooth lerp
+    // Lean into turns — roll based on lateral velocity (X)
+    const targetLean = -vx * 0.15;
+    g.rotation.z += (targetLean - g.rotation.z) * 0.15;
 
-    // Nose tilt based on acceleration/speed
-    const accel = vx - prevVxRef.current;
-    g.rotation.x = accel * 0.3 + Math.sin(Date.now() * 0.003) * 0.02; // slight bob
-    prevVxRef.current = vx;
+    // Nose tilt based on forward acceleration
+    const accel = vy - prevVxRef.current;
+    g.rotation.x = -accel * 0.3 + Math.sin(Date.now() * 0.003) * 0.02;
+    prevVxRef.current = vy;
 
     // Hover bob — gentle up/down based on speed
     g.position.y = 0.01 + Math.sin(Date.now() * 0.005) * (0.005 + speed * 0.003);
@@ -157,7 +157,7 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
   return (
     <group ref={groupRef} position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]} visible={false}>
       <mesh>
-        <boxGeometry args={[1.2, 0.04, 0.3]} />
+        <boxGeometry args={[0.3, 0.04, 1.2]} />
         <meshStandardMaterial
           color="#00ffcc"
           emissive="#00ffcc"
@@ -167,12 +167,14 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
         />
       </mesh>
       <pointLight position={[0, -0.06, 0]} color="#00ffcc" intensity={0.8} distance={0.5} />
-      <mesh position={[0.55, 0.03, 0]}>
-        <boxGeometry args={[0.1, 0.02, 0.24]} />
+      {/* Nose accent (front) */}
+      <mesh position={[0, 0.03, 0.55]}>
+        <boxGeometry args={[0.24, 0.02, 0.1]} />
         <meshBasicMaterial color="#ff00ff" />
       </mesh>
-      <mesh position={[-0.55, 0.03, 0]}>
-        <boxGeometry args={[0.1, 0.02, 0.24]} />
+      {/* Tail accent (back) */}
+      <mesh position={[0, 0.03, -0.55]}>
+        <boxGeometry args={[0.24, 0.02, 0.1]} />
         <meshBasicMaterial color="#ff00ff" />
       </mesh>
     </group>

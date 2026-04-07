@@ -2983,7 +2983,9 @@ export default function WorldPage() {
       // Update camera target + character state ref
       const wx = player.x * WORLD_SCALE;
       const wz = player.y * WORLD_SCALE;
-      const terrainY = getTerrainHeight(wx, wz);
+      let terrainY = getTerrainHeight(wx, wz);
+      // Hoverboard hovers OVER water, not under
+      if (sk.isSkating && terrainY < 0.1) terrainY = 0.1;
       // Jump height offset — airborneY is negative when up
       const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
       const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
