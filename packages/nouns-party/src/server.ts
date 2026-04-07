@@ -336,6 +336,33 @@ export default {
               speaking: data.speaking ?? false,
             }),
           );
+        } else if (data.type === 'world:kd:save') {
+          // Persist K/D ratio keyed by wallet address
+          const wallet = (data.wallet ?? '').toLowerCase();
+          if (wallet) {
+            const existing = (await room.storage.get<{ kills: number; deaths: number }>(`kd:${wallet}`)) ?? { kills: 0, deaths: 0 };
+            existing.kills += data.addKills ?? 0;
+            existing.deaths += data.addDeaths ?? 0;
+            await room.storage.put(`kd:${wallet}`, existing);
+            // Send updated stats back
+            connection.send(JSON.stringify({
+              type: 'world:kd:stats',
+              wallet,
+              kills: existing.kills,
+              deaths: existing.deaths,
+            }));
+          }
+        } else if (data.type === 'world:kd:load') {
+          const wallet = (data.wallet ?? '').toLowerCase();
+          if (wallet) {
+            const stats = (await room.storage.get<{ kills: number; deaths: number }>(`kd:${wallet}`)) ?? { kills: 0, deaths: 0 };
+            connection.send(JSON.stringify({
+              type: 'world:kd:stats',
+              wallet,
+              kills: stats.kills,
+              deaths: stats.deaths,
+            }));
+          }
         } else if (data.type === 'world:voip:transcript') {
           // Broadcast speech-to-text transcript to all players
           room.broadcast(

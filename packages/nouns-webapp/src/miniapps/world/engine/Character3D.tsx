@@ -175,6 +175,22 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
         g.rotation.x = 0;
         g.rotation.y = t * Math.PI;
         g.rotation.z = 0;
+      } else if (trick.includes('Grab') || trick === 'Method Air') {
+        // Board grabs — board tilts toward grab direction
+        const tiltPhase = Math.sin(t * Math.PI); // smooth in/out
+        if (trick === 'Indy Grab') {
+          g.rotation.z = tiltPhase * 0.4; // tilt right (indy = right hand, right rail)
+        } else if (trick === 'Melon Grab') {
+          g.rotation.z = -tiltPhase * 0.4; // tilt left (melon = left hand, left rail)
+        } else if (trick === 'Nose Grab') {
+          g.rotation.x = -tiltPhase * 0.3; // nose dips down
+        } else if (trick === 'Tail Grab') {
+          g.rotation.x = tiltPhase * 0.3; // tail dips down
+        } else if (trick === 'Method Air') {
+          // Board tweaked behind with body lean
+          g.rotation.x = tiltPhase * 0.5;
+          g.rotation.z = tiltPhase * 0.3;
+        }
       } else {
         // Generic trick — small flip
         g.rotation.x = t * Math.PI * 2;

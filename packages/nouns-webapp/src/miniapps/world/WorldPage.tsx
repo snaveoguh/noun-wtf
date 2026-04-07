@@ -121,13 +121,15 @@ import {
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
 import CaribbeanOffice, { OFFICE_WHITEBOARD_WALL } from './engine/CaribbeanOffice';
-import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, type SkatingState } from './engine/skating';
+import MobileControls, { isTouchDevice } from './engine/MobileControls';
+import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, boardGrab, type SkatingState } from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import {
   createVoipState,
   initVoipListenOnly,
   initVoip,
+  getVoipDebugInfo,
   checkVoiceActivity,
   updateCrowdSettle,
   toggleMute,
@@ -464,6 +466,14 @@ const GRAFFITI_WALLS = [
   },
   // Office whiteboard
   OFFICE_WHITEBOARD_WALL,
+  // Spawn billboard
+  {
+    id: 'wall-spawn-billboard',
+    worldX: SPAWN_X * 0.1 + 1,
+    worldZ: SPAWN_Y * 0.1 + 1.5,
+    rotation: 0,
+    label: '🕹️',
+  },
 ] as const;
 
 const WALL_NEAR_DISTANCE = 4;
@@ -473,32 +483,45 @@ function GraffitiWallMesh({ savedTags }: { savedTags: GraffitiTagData[] }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
-  // Apply the most recent saved tag as a texture overlay
+  // Composite ALL saved tags as layered texture (multiple artists on one wall)
   useEffect(() => {
     if (savedTags.length === 0 || !meshRef.current) return;
-    const latest = savedTags[savedTags.length - 1];
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d')!;
-      // Base wall color
-      ctx.fillStyle = '#d4cfc4';
-      ctx.fillRect(0, 0, 512, 512);
-      // Draw the graffiti tag scaled up (pixelated)
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0, 512, 512);
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.needsUpdate = true;
-      if (textureRef.current) textureRef.current.dispose();
-      textureRef.current = tex;
-      if (meshRef.current) {
-        (meshRef.current.material as THREE.MeshStandardMaterial).map = tex;
-        (meshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
-      }
-    };
-    img.src = latest.imageData;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+    // Base wall color
+    ctx.fillStyle = '#d4cfc4';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Load and draw ALL tags in order (oldest first, newest on top)
+    let loaded = 0;
+    const images: HTMLImageElement[] = [];
+    for (const tag of savedTags) {
+      const img = new Image();
+      img.onload = () => {
+        loaded++;
+        if (loaded === savedTags.length) {
+          // All loaded — composite in order
+          ctx.imageSmoothingEnabled = false;
+          for (const loadedImg of images) {
+            ctx.drawImage(loadedImg, 0, 0, 512, 512);
+          }
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.needsUpdate = true;
+          if (textureRef.current) textureRef.current.dispose();
+          textureRef.current = tex;
+          if (meshRef.current) {
+            (meshRef.current.material as THREE.MeshStandardMaterial).map = tex;
+            (meshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
+          }
+        }
+      };
+      img.onerror = () => { loaded++; }; // skip broken images
+      img.src = tag.imageData;
+      images.push(img);
+    }
 
     return () => {
       if (textureRef.current) {
@@ -2388,6 +2411,14 @@ export default function WorldPage() {
   // Owner wallet gets hoverboard free
   const isOwnerWallet = connectedWallet?.toLowerCase() === PIPE_ADDRESS.toLowerCase();
 
+  // ── Debug overlay ──
+  const [showVoipDebug, setShowVoipDebug] = useState(false);
+  const [voipDebugLines, setVoipDebugLines] = useState<string[]>([]);
+
+  // ── K/D ratio (persisted via PartyKit storage, keyed by wallet) ──
+  const [kdStats, setKdStats] = useState({ kills: 0, deaths: 0 });
+  const kdLoadedRef = useRef(false);
+
   // ── Graffiti state ──
   const paintRef = useRef<PaintCanState>(createPaintState());
   const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
@@ -2511,6 +2542,8 @@ export default function WorldPage() {
           } else if (data.type === 'world:voip:speaking') {
             if (data.speaking) voip.activeSpeakers.add(data.id);
             else voip.activeSpeakers.delete(data.id);
+          } else if (data.type === 'world:kd:stats') {
+            setKdStats({ kills: data.kills ?? 0, deaths: data.deaths ?? 0 });
           } else if (data.type === 'world:voip:transcript') {
             // Store remote player transcript for rendering above their head
             remoteTranscriptsRef.current.set(data.id, {
@@ -2551,6 +2584,11 @@ export default function WorldPage() {
       mp.ws.addEventListener('open', () => {
         for (const wall of GRAFFITI_WALLS) {
           loadGraffitiTags(mp.ws!, wall.id);
+        }
+        // Load K/D stats for connected wallet
+        if (connectedWallet && !kdLoadedRef.current) {
+          mp.ws!.send(JSON.stringify({ type: 'world:kd:load', wallet: connectedWallet }));
+          kdLoadedRef.current = true;
         }
       });
       // If already open, request immediately
@@ -2723,6 +2761,21 @@ export default function WorldPage() {
         }
         if (e.key === 'j' || e.key === 'J') { spin180(skateRef.current); return; }
         if (e.key === 'k' || e.key === 'K') { kickflip(skateRef.current); return; }
+        // Board grabs: hold direction + L while airborne
+        if ((e.key === 'l' || e.key === 'L') && skateRef.current.airborne) {
+          const inp = inputRef.current;
+          if (inp?.keys.has('a')) boardGrab(skateRef.current, 'melon');
+          else if (inp?.keys.has('d')) boardGrab(skateRef.current, 'indy');
+          else if (inp?.keys.has('w')) boardGrab(skateRef.current, 'nose');
+          else if (inp?.keys.has('s')) boardGrab(skateRef.current, 'tail');
+          else boardGrab(skateRef.current, 'method');
+          return;
+        }
+      }
+      // ── VOIP debug overlay (backtick key) ──
+      if (e.key === '`') {
+        setShowVoipDebug(prev => !prev);
+        return;
       }
       // ── Camera zoom levels (1-5) ──
       if (e.key >= '1' && e.key <= '5') {
@@ -2948,6 +3001,10 @@ export default function WorldPage() {
                 move: hit.move,
                 timestamp: Date.now(),
               });
+              // Persist kill to K/D stats
+              if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
+                mp.ws.send(JSON.stringify({ type: 'world:kd:save', wallet: connectedWallet, addKills: 1, addDeaths: 0 }));
+              }
             }
           }
         }
@@ -3130,6 +3187,14 @@ export default function WorldPage() {
       hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
       hudRef.current.respawnTimer = player.respawnTimer;
       hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
+      // Update VOIP debug info every 30 frames (~0.5s)
+      if (showVoipDebug && frame % 30 === 0) {
+        setVoipDebugLines(getVoipDebugInfo(voipRef.current));
+      }
+      // Track death for K/D (only on transition to dead, not every frame)
+      if (player.state === 'dead' && player.deathTimer === 59 && connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
+        mp.ws.send(JSON.stringify({ type: 'world:kd:save', wallet: connectedWallet, addKills: 0, addDeaths: 1 }));
+      }
       // VOIP HUD
       hudRef.current.micEnabled = !!voipRef.current.localStream;
       hudRef.current.isMuted = voipRef.current.isMuted;
@@ -3271,7 +3336,38 @@ export default function WorldPage() {
         {playerIds.map(id => {
           const entry = remoteCharStates.current.get(id);
           if (!entry) return null;
-          return <Character3D key={id} seed={entry.seed} stateRef={{ current: entry.state }} />;
+          const transcript = remoteTranscriptsRef.current.get(id);
+          const showBubble = transcript && Date.now() < transcript.expires;
+          return (
+            <group key={id}>
+              <Character3D seed={entry.seed} stateRef={{ current: entry.state }} />
+              {showBubble && (
+                <Html
+                  position={[entry.state.x, entry.state.y + 0.6, entry.state.z]}
+                  center
+                  distanceFactor={5}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <div style={{
+                    background: 'rgba(255,255,255,0.92)',
+                    color: '#111',
+                    borderRadius: 10,
+                    padding: '4px 12px',
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                    maxWidth: 200,
+                    textAlign: 'center',
+                    wordBreak: 'break-word',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {transcript.text}
+                  </div>
+                </Html>
+              )}
+            </group>
+          );
         })}
       </>
     );
@@ -3685,6 +3781,28 @@ export default function WorldPage() {
             </div>
           </div>
 
+          {/* K/D Ratio (below trick score) */}
+          {connectedWallet && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 60,
+                right: 16,
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                color: '#aaa',
+                textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+                pointerEvents: 'none',
+                zIndex: 15,
+              }}
+            >
+              <span style={{ color: '#4caf50' }}>{kdStats.kills}</span>
+              <span style={{ color: '#666' }}> / </span>
+              <span style={{ color: '#f44336' }}>{kdStats.deaths}</span>
+              <span style={{ color: '#555', marginLeft: 4, fontSize: 10 }}>K/D</span>
+            </div>
+          )}
+
           {/* Current trick / combo display (center-top) */}
           {skateRef.current.currentTrick && (
             <div
@@ -3862,7 +3980,22 @@ export default function WorldPage() {
               <div>
                 <span style={{ color: '#8888ff' }}>←/→</span> — Balance (grind)
               </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 4 }}>
+                <span style={{ color: '#ff88ff' }}>L</span> — Method Air
+              </div>
               <div>
+                <span style={{ color: '#ff88ff' }}>L+←</span> — Melon Grab
+              </div>
+              <div>
+                <span style={{ color: '#ff88ff' }}>L+→</span> — Indy Grab
+              </div>
+              <div>
+                <span style={{ color: '#ff88ff' }}>L+↑</span> — Nose Grab
+              </div>
+              <div>
+                <span style={{ color: '#ff88ff' }}>L+↓</span> — Tail Grab
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 4 }}>
                 <span style={{ color: '#888' }}>V</span> — Dismount
               </div>
             </div>
@@ -3917,6 +4050,57 @@ export default function WorldPage() {
         >
           SPRAY CAN EQUIPPED — FIND A WALL AND PRESS [G]
         </div>
+      )}
+
+      {/* VOIP Debug Overlay (press ` to toggle) */}
+      {showVoipDebug && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 80,
+            left: 16,
+            background: 'rgba(0,0,0,0.85)',
+            color: '#0f0',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            padding: '8px 12px',
+            borderRadius: 8,
+            zIndex: 30,
+            maxWidth: 400,
+            whiteSpace: 'pre',
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ color: '#ff0', marginBottom: 4 }}>VOIP DEBUG (press ` to hide)</div>
+          {voipDebugLines.map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Mobile virtual controls */}
+      {isTouchDevice() && (
+        <MobileControls
+          inputRef={inputRef}
+          onJump={() => {
+            const p = playerRef.current;
+            if (p && p.jumpCount < 3) {
+              p.airborneVy = -0.15;
+              p.jumpCount++;
+              p.state = 'airborne';
+            }
+          }}
+          onAttack={() => {
+            const input = inputRef.current;
+            if (input) input.keys.add('f');
+            setTimeout(() => { inputRef.current?.keys.delete('f'); }, 100);
+          }}
+          onInteract={() => {
+            const input = inputRef.current;
+            if (input) input.keys.add('e');
+            setTimeout(() => { inputRef.current?.keys.delete('e'); }, 100);
+          }}
+        />
       )}
     </div>
   );

@@ -30,6 +30,24 @@ export interface VoipState {
   settleTriggered: boolean;
 }
 
+/** Get debug info for all peer connections */
+export function getVoipDebugInfo(state: VoipState): string[] {
+  const lines: string[] = [];
+  lines.push(`mic: ${state.localStream ? 'ON' : 'OFF'} | muted: ${state.isMuted} | speaking: ${state.isSpeaking}`);
+  lines.push(`audioCtx: ${state.audioContext?.state ?? 'none'} | peers: ${state.peers.size} | remoteStreams: ${state.remoteStreams.size}`);
+  for (const [id, pc] of state.peers) {
+    const senders = pc.getSenders();
+    const receivers = pc.getReceivers();
+    const audioSender = senders.find(s => s.track?.kind === 'audio');
+    const audioReceiver = receivers.find(r => r.track?.kind === 'audio');
+    lines.push(
+      `  ${id.slice(0, 8)}: conn=${pc.connectionState} ice=${pc.iceConnectionState} ` +
+      `send=${audioSender?.track?.enabled ? 'YES' : 'no'} recv=${audioReceiver?.track?.enabled ? 'YES' : 'no'}`
+    );
+  }
+  return lines;
+}
+
 export function createVoipState(): VoipState {
   return {
     localStream: null,
@@ -232,22 +250,32 @@ export function createPeerConnection(
   return pc;
 }
 
-/** Reconnect all peers after mic enable — tear down and recreate with local tracks */
+/** Add local tracks to existing connections after late mic enable */
 export async function addTracksToExistingPeers(
   state: VoipState,
   ws: PartySocket,
   myId: string,
 ) {
   if (!state.localStream) return;
+  const audioTrack = state.localStream.getAudioTracks()[0];
+  if (!audioTrack) return;
 
-  // Get list of current peers, then reconnect each
-  const peerIds = Array.from(state.peers.keys());
-  for (const peerId of peerIds) {
-    // Close old connection
-    removePeer(state, peerId);
-    // Create fresh connection with local tracks included
-    const pc = createPeerConnection(state, peerId, ws, myId);
+  for (const [peerId, pc] of state.peers) {
+    // Try replacing existing sender's track first
+    const audioSender = pc.getSenders().find(s => s.track?.kind === 'audio' || !s.track);
+    if (audioSender) {
+      try {
+        await audioSender.replaceTrack(audioTrack);
+        console.log(`[VOIP] Replaced track for ${peerId}`);
+        continue;
+      } catch {
+        // Fall through to addTrack
+      }
+    }
+
+    // Add track + renegotiate
     try {
+      pc.addTrack(audioTrack, state.localStream);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       ws.send(JSON.stringify({
@@ -256,9 +284,9 @@ export async function addTracksToExistingPeers(
         to: peerId,
         sdp: JSON.stringify(offer),
       }));
-      console.log(`[VOIP] Reconnected to ${peerId} with local mic tracks`);
+      console.log(`[VOIP] Added track + renegotiated with ${peerId}`);
     } catch (err) {
-      console.warn(`[VOIP] Failed to reconnect to ${peerId}:`, err);
+      console.warn(`[VOIP] Failed to add tracks to ${peerId}:`, err);
     }
   }
 }
@@ -270,8 +298,14 @@ export async function callPeer(
   ws: PartySocket,
   myId: string,
 ) {
-  // Close any existing connection first (clean reconnect)
+  // If already connected and working, just add tracks if needed
   const existing = state.peers.get(peerId);
+  if (existing && existing.connectionState === 'connected') {
+    console.log(`[VOIP] Already connected to ${peerId}, adding tracks if needed`);
+    await addTracksToExistingPeers(state, ws, myId);
+    return;
+  }
+  // Close failed/closed connections
   if (existing) {
     existing.close();
     state.peers.delete(peerId);

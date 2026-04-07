@@ -322,6 +322,29 @@ export function kickflip(state: SkatingState): void {
   addToCombo(state, 'Kickflip', KICKFLIP_SCORE);
 }
 
+/** Board grab: hold direction in air for style points */
+export function boardGrab(
+  state: SkatingState,
+  grabType: 'indy' | 'melon' | 'nose' | 'tail' | 'method',
+): void {
+  if (!state.isSkating || !state.airborne || state.bailed) return;
+  const names: Record<string, string> = {
+    indy: 'Indy Grab',
+    melon: 'Melon Grab',
+    nose: 'Nose Grab',
+    tail: 'Tail Grab',
+    method: 'Method Air',
+  };
+  const scores: Record<string, number> = {
+    indy: 150,
+    melon: 150,
+    nose: 200,
+    tail: 175,
+    method: 250,
+  };
+  addToCombo(state, names[grabType], scores[grabType]);
+}
+
 /** Start grind: G near a rail OR auto-snap when within GRIND_SNAP_DISTANCE. */
 export function startGrind(state: SkatingState, rampData: RampData): void {
   if (!state.isSkating || state.bailed) return;
