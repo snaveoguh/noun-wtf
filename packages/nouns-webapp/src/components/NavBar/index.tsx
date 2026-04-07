@@ -98,8 +98,6 @@ const NavBar = () => {
       </Dropdown.Item>
       {candidatesNavItem}
       <Dropdown.Item href="/grants">Grants</Dropdown.Item>
-      <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
-      <Dropdown.Item href="/world">World</Dropdown.Item>
     </NavDropdown>
   );
 
@@ -213,7 +211,25 @@ const NavBar = () => {
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              {/* Hack + World in dropdown only, not mobile nav */}
+              <Nav.Link
+                as={Link}
+                to="/hackathons"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Hack"
+                  buttonIcon={<span>⚡</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link as={Link} to="/world" className={classes.nounsNavLink} onClick={closeNav}>
+                <NavBarButton
+                  buttonText="World"
+                  buttonIcon={<span>🌍</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
             </div>
             <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
               {isDaoGteV3 ? (
@@ -274,6 +290,18 @@ const NavBar = () => {
                 <NavBarButton
                   buttonText="Terminal"
                   buttonIcon={<span>⌐◨-◨</span>}
+                  buttonStyle={nonWalletButtonStyle}
+                />
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/crystal-ball"
+                className={classes.nounsNavLink}
+                onClick={closeNav}
+              >
+                <NavBarButton
+                  buttonText="Crystal Ball"
+                  buttonIcon={<span>🔮</span>}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
@@ -345,6 +373,9 @@ const NavBar = () => {
                 <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
                 <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
                 <Dropdown.Item href="/feed">Feed</Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
+                <Dropdown.Item href="/world">World</Dropdown.Item>
               </NavDropdown>
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
