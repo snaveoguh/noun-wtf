@@ -400,10 +400,32 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             voxelHeadRef.current = headGroup;
           }
           // Store hand bone for gun attachment
-          if (child.name === 'handslot.r') {
+          // Find hand bone for item attachment — try multiple names
+          if (
+            !handBoneRef.current &&
+            (child as any).isBone &&
+            (child.name === 'handslot.r' ||
+              child.name === 'hand.r' ||
+              child.name === 'hand_r' ||
+              child.name === 'Hand_R' ||
+              child.name === 'RightHand' ||
+              child.name === 'mixamorig:RightHand' ||
+              child.name.toLowerCase().includes('hand') && child.name.toLowerCase().includes('r'))
+          ) {
             handBoneRef.current = child;
+            console.log(`[Character3D] Found hand bone: ${child.name}`);
           }
         });
+
+        // Fallback: if no hand bone found, create a dummy attach point on the model
+        if (!handBoneRef.current) {
+          const dummyHand = new THREE.Group();
+          dummyHand.name = '__fallbackHand';
+          dummyHand.position.set(1.5, 3.5, 1); // right side, chest height, in front
+          model.add(dummyHand);
+          handBoneRef.current = dummyHand;
+          console.log('[Character3D] No hand bone found, using fallback attach point');
+        }
 
         // Animation mixer
         const mixer = new THREE.AnimationMixer(model);
@@ -437,7 +459,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
     // Position — hover bob when on board (character + board move together)
     const hoverBob = s.isSkating ? 0.15 + Math.sin(Date.now() * 0.005) * 0.02 : 0;
-    g.position.set(s.x, s.y + 0.05 + hoverBob, s.z);
+    g.position.set(s.x, s.y + 0.14 + hoverBob, s.z);
 
     // Face direction — on board: character 90° side-on, board points forward
     const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
