@@ -80,12 +80,12 @@ const FLAT_FRICTION = 0.998;
 const AIR_FRICTION = 0.9995; // almost none in air
 const RAMP_FRICTION = 0.999; // minimal on ramp surface
 const GRIND_FRICTION = 0.996;
-const SPEED_CAP = 12;
-const PUSH_FORCE = 0.065; // WASD acceleration on flat
-const PUSH_FORCE_AIR = 0.01; // tiny air control
-const OLLIE_FORCE = 0.42;
-const OLLIE_RAMP_BONUS = 0.25; // extra launch from ramp lip
-const OLLIE_SPEED_BONUS_FACTOR = 0.06; // speed → vertical conversion
+const SPEED_CAP = 4; // much lower — controllable cruising speed
+const PUSH_FORCE = 0.035; // gentle WASD acceleration
+const PUSH_FORCE_AIR = 0.005; // tiny air nudge
+const OLLIE_FORCE = 0.2; // gentle hop
+const OLLIE_RAMP_BONUS = 0.1; // small extra from ramp lip
+const OLLIE_SPEED_BONUS_FACTOR = 0.03; // speed → vertical conversion
 const OLLIE_COOLDOWN_FRAMES = 12;
 const GROUND_Y = 0;
 
@@ -535,7 +535,7 @@ export function tickSkating(
     const heightDelta = state.heightRef - terrainHeight;
     if (heightDelta > 0) {
       // Going downhill — gain speed from potential energy
-      const extraSpeed = energySpeed(heightDelta) * 0.15;
+      const extraSpeed = energySpeed(heightDelta) * 0.05; // gentle downhill boost
       state.momentum[0] += rampData.rampSlopeDir[0] * extraSpeed;
       state.momentum[1] += rampData.rampSlopeDir[1] * extraSpeed;
     } else if (heightDelta < 0) {
