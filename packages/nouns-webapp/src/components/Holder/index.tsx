@@ -24,21 +24,16 @@ const Holder: React.FC<HolderProps> = props => {
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
   const { query, variables } = nounQuery(nounId.toString());
-  const { loading, error, data } = useQuery(query, { variables });
+  const { loading, error, data } = useQuery(query, { variables, errorPolicy: 'ignore' });
 
-  if (loading) {
+  if (loading === true || error != null) {
     return <></>;
-  } else if (error) {
-    return (
-      <div>
-        <Trans>Failed to fetch Noun info</Trans>
-      </div>
-    );
   }
 
-  const holder = data?.noun?.owner?.id;
+  const ownerRaw = data?.noun?.owner;
+  const holder = typeof ownerRaw === 'string' ? ownerRaw : ownerRaw?.id;
 
-  if (!holder && !isNounders) {
+  if (holder == null && isNounders !== true) {
     return <></>;
   }
 
@@ -82,7 +77,7 @@ const Holder: React.FC<HolderProps> = props => {
               color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)',
             }}
           >
-            {isNounders ? nounderNounContent : nonNounderNounContent}
+            {isNounders === true ? nounderNounContent : nonNounderNounContent}
           </h2>
         </Col>
       </Row>
