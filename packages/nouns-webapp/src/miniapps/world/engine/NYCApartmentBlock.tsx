@@ -503,6 +503,78 @@ export function NYCApartmentBlock() {
   );
 }
 
+// ── Burj Khalifa Skyscraper — so tall it disappears into the clouds ──
+
+const TOWER_HEIGHT = 120; // absurdly tall
+const TOWER_X = APARTMENT_X + 8;
+const TOWER_Z = APARTMENT_Z - 5;
+
+export function BurjKhalifa() {
+  return (
+    <group position={[TOWER_X, 0, TOWER_Z]}>
+      {/* Base — wide foundation */}
+      <mesh position={[0, 2, 0]}>
+        <boxGeometry args={[4, 4, 4]} />
+        <meshBasicMaterial color="#c0c8d0" />
+      </mesh>
+      {/* Lower section — wide */}
+      <mesh position={[0, 15, 0]}>
+        <boxGeometry args={[3, 22, 3]} />
+        <meshBasicMaterial color="#b8c4d0" />
+      </mesh>
+      {/* Mid section — tapers */}
+      <mesh position={[0, 35, 0]}>
+        <boxGeometry args={[2.2, 18, 2.2]} />
+        <meshBasicMaterial color="#aab8c8" />
+      </mesh>
+      {/* Upper section — narrower */}
+      <mesh position={[0, 52, 0]}>
+        <boxGeometry args={[1.6, 16, 1.6]} />
+        <meshBasicMaterial color="#9cb0c0" />
+      </mesh>
+      {/* Spire section */}
+      <mesh position={[0, 68, 0]}>
+        <boxGeometry args={[1.0, 16, 1.0]} />
+        <meshBasicMaterial color="#90a8b8" />
+      </mesh>
+      {/* Needle spire */}
+      <mesh position={[0, 85, 0]}>
+        <coneGeometry args={[0.4, 30, 8]} />
+        <meshBasicMaterial color="#88a0b0" />
+      </mesh>
+      {/* Antenna tip */}
+      <mesh position={[0, TOWER_HEIGHT, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 20, 6]} />
+        <meshBasicMaterial color="#708090" />
+      </mesh>
+      {/* Window strips — horizontal lines across the tower */}
+      {Array.from({ length: 25 }).map((_, i) => (
+        <mesh key={i} position={[0, 5 + i * 3, 1.55]} scale={[1, 1, 1]}>
+          <boxGeometry args={[2.8 - i * 0.08, 0.15, 0.02]} />
+          <meshBasicMaterial color="#4a6070" />
+        </mesh>
+      ))}
+      {/* Red blinking light at very top */}
+      <pointLight
+        position={[0, TOWER_HEIGHT + 10, 0]}
+        color="#ff0000"
+        intensity={2}
+        distance={20}
+      />
+      {/* Cloud fog around upper half — semi-transparent white boxes */}
+      {Array.from({ length: 8 }).map((_, i) => (
+        <mesh
+          key={`fog-${i}`}
+          position={[Math.sin(i * 1.3) * 3, 60 + i * 6, Math.cos(i * 1.7) * 3]}
+        >
+          <sphereGeometry args={[2 + Math.random() * 2, 8, 8]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.15} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 // ── Graffiti wall position (the face facing the ramp) ───────────────
 // The left face of the building (-X side) faces the ramp wall
 
