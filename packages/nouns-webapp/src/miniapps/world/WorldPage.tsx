@@ -2767,9 +2767,11 @@ export default function WorldPage() {
         const delta = 1 / 60; // approximate frame delta
         const skMove = tickSkating(sk, [sdx, sdz], delta, skTerrainY, rampData);
 
-        // Apply skating movement to player position (convert back from world scale)
-        player.x += skMove.dx / WORLD_SCALE;
-        player.y += skMove.dz / WORLD_SCALE;
+        // Apply skating movement to player position
+        // skMove is in world-scale units, player pos is in pixel units
+        // Scale down heavily — skating physics outputs are way too fast otherwise
+        player.x += skMove.dx * 0.5;
+        player.y += skMove.dz * 0.5;
       }
 
       // Update camera target + character state ref
