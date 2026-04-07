@@ -212,13 +212,12 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             child.name.includes('1H_') ||
             child.name.includes('2H_') ||
             child.name === 'Rogue_ArmLeft' ||
-            child.name === 'hand.l' ||
-            child.name === 'handslot.l' ||
-            child.name === 'wrist.l' ||
-            child.name === 'lowerarm.l' ||
-            child.name === 'upperarm.l' ||
-            child.name === 'shoulder.l' ||
             child.name === 'Knife_Offhand' ||
+            // Hide ALL left-side bones/meshes EXCEPT legs
+            (child.name.endsWith('.l') &&
+              !child.name.toLowerCase().includes('leg') &&
+              !child.name.toLowerCase().includes('foot') &&
+              !child.name.toLowerCase().includes('toe')) ||
             child.name.toLowerCase().includes('armleft') ||
             child.name.toLowerCase().includes('arm_left') ||
             child.name.toLowerCase().includes('arm_l')
