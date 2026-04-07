@@ -471,11 +471,11 @@ const GRAFFITI_WALLS = [
   },
   // Office whiteboard
   OFFICE_WHITEBOARD_WALL,
-  // Spawn billboard
+  // Joystick billboard (near water, southeast)
   {
     id: 'wall-spawn-billboard',
-    worldX: SPAWN_X * 0.1 + 1,
-    worldZ: SPAWN_Y * 0.1 + 1.5,
+    worldX: 25 * TILE_SIZE * WORLD_SCALE, // near southeast coast
+    worldZ: 45 * TILE_SIZE * WORLD_SCALE,
     rotation: 0,
     label: '🕹️',
   },

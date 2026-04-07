@@ -617,7 +617,9 @@ export function tickSkating(
   let dy = 0;
   if (state.airborne) {
     state.airborneTime += delta;
-    state.airborneVy -= GRAVITY_TICK;
+    // Slow-mo near peak: reduce gravity when vertical velocity is near zero (peak of arc)
+    const peakFactor = Math.abs(state.airborneVy) < 0.08 ? 0.4 : 1.0; // 40% gravity at peak
+    state.airborneVy -= GRAVITY_TICK * peakFactor;
     state.airborneY += state.airborneVy;
 
     // Check landing
