@@ -94,6 +94,35 @@ function fetchGLB(): Promise<ArrayBuffer> {
   return glbFetching;
 }
 
+/** Shadow that stays on the ground and shrinks/fades when character jumps */
+function ShadowCircle({ stateRef }: { stateRef: React.RefObject<CharacterState> }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    const s = stateRef.current;
+    const m = meshRef.current;
+    if (!s || !m) return;
+    // How high above terrain? s.y includes terrain + jump offset
+    // We approximate: if state is airborne/backflip, character is jumping
+    const isJumping = s.state === 'airborne' || s.state === 'backflip';
+    // Shadow should be at ground level (offset DOWN from character position)
+    // Since the group is at s.y, we offset the shadow back to terrain
+    const jumpHeight = isJumping ? 2 : 0; // approximate
+    m.position.y = -jumpHeight + 0.02; // push shadow down to ground
+    // Scale shadow smaller when higher
+    const scale = isJumping ? 0.12 : 0.25;
+    m.scale.set(scale, scale, 1);
+    // Fade when high
+    const mat = m.material as THREE.MeshBasicMaterial;
+    mat.opacity = isJumping ? 0.06 : 0.15;
+  });
+  return (
+    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+      <circleGeometry args={[1, 12]} />
+      <meshBasicMaterial color="#000" transparent opacity={0.15} />
+    </mesh>
+  );
+}
+
 interface Character3DProps {
   seed: INounSeed;
   stateRef: React.RefObject<CharacterState>;
@@ -487,11 +516,8 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
   return (
     <group ref={groupRef}>
-      {/* Shadow circle */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <circleGeometry args={[0.25, 12]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.15} />
-      </mesh>
+      {/* Shadow circle — stays on ground, shrinks when airborne */}
+      <ShadowCircle stateRef={stateRef} />
       {/* Hoverboard — small neon board under feet, side-on (long axis = X) */}
       {stateRef.current?.isSkating && (
         <group position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]}>

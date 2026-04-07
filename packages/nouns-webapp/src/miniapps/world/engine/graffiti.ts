@@ -159,14 +159,14 @@ export function getAllTags(): GraffitiTag[] {
 // ── PartyKit graffiti persistence messages ───────────────────────────
 
 export interface GraffitiSaveMessage {
-  type: 'graffiti:save';
+  type: 'world:graffiti:save';
   wallId: string;
   imageData: string; // base64 PNG
   playerId: string;
 }
 
 export interface GraffitiLoadMessage {
-  type: 'graffiti:load';
+  type: 'world:graffiti:load';
   wallId: string;
 }
 
@@ -177,7 +177,7 @@ export interface GraffitiTagData {
 }
 
 export interface GraffitiTagsMessage {
-  type: 'graffiti:tags';
+  type: 'world:graffiti:tags';
   wallId: string;
   tags: GraffitiTagData[];
 }
@@ -200,7 +200,7 @@ export function saveGraffitiTag(
 ): void {
   if (ws.readyState !== WebSocket.OPEN) return;
   const msg: GraffitiSaveMessage = {
-    type: 'graffiti:save',
+    type: 'world:graffiti:save',
     wallId,
     imageData,
     playerId,
@@ -215,7 +215,7 @@ export function saveGraffitiTag(
 export function loadGraffitiTags(ws: WsSendable, wallId: string): void {
   if (ws.readyState !== WebSocket.OPEN) return;
   const msg: GraffitiLoadMessage = {
-    type: 'graffiti:load',
+    type: 'world:graffiti:load',
     wallId,
   };
   ws.send(JSON.stringify(msg));
@@ -229,7 +229,7 @@ export function parseGraffitiMessage(
 ): GraffitiTagsMessage | GraffitiSaveMessage | null {
   try {
     const msg = JSON.parse(data);
-    if (msg.type === 'graffiti:tags' || msg.type === 'graffiti:save') {
+    if (msg.type === 'world:graffiti:tags' || msg.type === 'world:graffiti:save') {
       return msg;
     }
   } catch {
