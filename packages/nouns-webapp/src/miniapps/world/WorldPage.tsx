@@ -1409,7 +1409,7 @@ export function _HUD_OLD({
       <div
         style={{
           position: 'absolute',
-          top: 85,
+          top: 14,
           left: 16,
           display: 'flex',
           alignItems: 'center',
@@ -1437,19 +1437,22 @@ export function _HUD_OLD({
         </span>
       </div>
 
-      {/* Player count */}
+      {/* Player count + mic — under the minimap on the right */}
       <div
         style={{
           position: 'absolute',
-          top: 16,
+          top: 200,
           right: 16,
-          color: '#fff',
+          color: '#aaa',
           fontFamily: 'monospace',
-          fontSize: 12,
+          fontSize: 10,
           textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+          textAlign: 'right',
+          lineHeight: 1.6,
         }}
       >
-        {playerCount} online
+        <div>● {playerCount} ONLINE</div>
+        <div>● M MIC</div>
       </div>
 
       {/* Combo */}
