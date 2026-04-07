@@ -2960,10 +2960,12 @@ export default function WorldPage() {
               maxHp: 100,
               weaponEquipped: null,
               muzzleFlash: 0,
+              isSkating: false,
             },
           };
           remoteCharStates.current.set(id, entry);
         }
+        if (!entry) continue;
         const wx = rp.x * WORLD_SCALE;
         const wz = rp.y * WORLD_SCALE;
         entry.state.x = wx;
