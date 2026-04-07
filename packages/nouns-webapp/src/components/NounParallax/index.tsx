@@ -1,4 +1,3 @@
-/* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 /**
  * NounParallax — 3D voxel Noun with gyro/touch/mouse tilt.
  *
@@ -17,8 +16,13 @@ import {
   buildGeometryFromVoxelMap,
   buildNounGeometries,
   seedToLayers,
+  BODY_DEPTH,
+  BLING_DEPTH,
+  HEAD_DEPTH,
+  GLASSES_DEPTH,
   type EditableSceneViewState,
   type LayerVisibility,
+  type NounLayers,
   type Tool,
   type VoxelMap,
 } from '@nouns/voxel-engine';
@@ -49,6 +53,282 @@ function lerp(a: number, b: number, t: number) {
 }
 const DEG = Math.PI / 180;
 
+// ─── Voxel data helpers for disintegration ─────────────────────────────────
+
+interface FlatVoxel {
+  x: number;
+  y: number;
+  z: number;
+  r: number;
+  g: number;
+  b: number;
+}
+
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/** Flatten NounLayers into a single array of positioned voxels with proper z-offsets */
+function layersToFlatVoxels(layers: NounLayers): FlatVoxel[] {
+  const bodyZ = 0;
+  const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2;
+  const headZ = BODY_DEPTH / 2 - BLING_DEPTH / 2 + 0.03;
+  const glassesZ = headZ + HEAD_DEPTH / 2 + GLASSES_DEPTH / 2 + 0.02;
+
+  const result: FlatVoxel[] = [];
+  for (const p of layers.body)
+    result.push({ x: p.x - 15.5, y: p.y - 15.5, z: bodyZ, r: p.r, g: p.g, b: p.b });
+  for (const p of layers.bling)
+    result.push({ x: p.x - 15.5, y: p.y - 15.5, z: blingZ, r: p.r, g: p.g, b: p.b });
+  for (const p of layers.head)
+    result.push({ x: p.x - 15.5, y: p.y - 15.5, z: headZ, r: p.r, g: p.g, b: p.b });
+  for (const p of layers.glasses)
+    result.push({ x: p.x - 15.5, y: p.y - 15.5, z: glassesZ, r: p.r, g: p.g, b: p.b });
+  return result;
+}
+
+function seedToFlatVoxels(seed: INounSeed, layerVisibility?: LayerVisibility): FlatVoxel[] {
+  const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
+  return layersToFlatVoxels(layers);
+}
+
+// ─── Disintegration transition scene ────────────────────────────────────────
+
+const TRANSITION_DURATION = 2.2;
+const SCATTER_RADIUS = 25;
+
+interface DisintegrationProps {
+  oldVoxels: FlatVoxel[];
+  newVoxels: FlatVoxel[];
+  onComplete: () => void;
+}
+
+function DisintegrationScene({ oldVoxels, newVoxels, onComplete }: DisintegrationProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const timeRef = useRef(0);
+  const doneRef = useRef(false);
+
+  const count = Math.max(oldVoxels.length, newVoxels.length);
+
+  // Pre-compute per-voxel animation data
+  const animData = useMemo(() => {
+    const startPositions = new Float32Array(count * 3);
+    const endPositions = new Float32Array(count * 3);
+    const startColors = new Float32Array(count * 3);
+    const endColors = new Float32Array(count * 3);
+    const scatterDirs = new Float32Array(count * 3);
+    const scatterSpeeds = new Float32Array(count);
+    const rotAxes = new Float32Array(count * 3);
+    const rotSpeeds = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const ov = oldVoxels[i % oldVoxels.length];
+      const nv = newVoxels[i % newVoxels.length];
+
+      if (i < oldVoxels.length) {
+        startPositions[i * 3] = ov.x;
+        startPositions[i * 3 + 1] = ov.y;
+        startPositions[i * 3 + 2] = ov.z;
+        startColors[i * 3] = srgbToLinear(ov.r / 255);
+        startColors[i * 3 + 1] = srgbToLinear(ov.g / 255);
+        startColors[i * 3 + 2] = srgbToLinear(ov.b / 255);
+      } else {
+        // Extra voxels for new noun - start from scattered position
+        const angle = Math.random() * Math.PI * 2;
+        const elev = (Math.random() - 0.5) * Math.PI;
+        startPositions[i * 3] = Math.cos(angle) * Math.cos(elev) * SCATTER_RADIUS;
+        startPositions[i * 3 + 1] = Math.sin(elev) * SCATTER_RADIUS;
+        startPositions[i * 3 + 2] = Math.sin(angle) * Math.cos(elev) * SCATTER_RADIUS;
+        startColors[i * 3] = srgbToLinear(nv.r / 255);
+        startColors[i * 3 + 1] = srgbToLinear(nv.g / 255);
+        startColors[i * 3 + 2] = srgbToLinear(nv.b / 255);
+      }
+
+      if (i < newVoxels.length) {
+        endPositions[i * 3] = nv.x;
+        endPositions[i * 3 + 1] = nv.y;
+        endPositions[i * 3 + 2] = nv.z;
+        endColors[i * 3] = srgbToLinear(nv.r / 255);
+        endColors[i * 3 + 1] = srgbToLinear(nv.g / 255);
+        endColors[i * 3 + 2] = srgbToLinear(nv.b / 255);
+      } else {
+        // Extra voxels from old noun - scatter outward to disappear
+        const angle = Math.random() * Math.PI * 2;
+        const elev = (Math.random() - 0.5) * Math.PI;
+        endPositions[i * 3] = Math.cos(angle) * Math.cos(elev) * SCATTER_RADIUS;
+        endPositions[i * 3 + 1] = Math.sin(elev) * SCATTER_RADIUS;
+        endPositions[i * 3 + 2] = Math.sin(angle) * Math.cos(elev) * SCATTER_RADIUS;
+        endColors[i * 3] = startColors[i * 3];
+        endColors[i * 3 + 1] = startColors[i * 3 + 1];
+        endColors[i * 3 + 2] = startColors[i * 3 + 2];
+      }
+
+      // Random scatter direction (normalized) and speed
+      const sx = Math.random() - 0.5;
+      const sy = Math.random() - 0.5;
+      const sz = Math.random() - 0.5;
+      const sLen = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1;
+      scatterDirs[i * 3] = sx / sLen;
+      scatterDirs[i * 3 + 1] = sy / sLen;
+      scatterDirs[i * 3 + 2] = sz / sLen;
+      scatterSpeeds[i] = 0.6 + Math.random() * 0.8;
+
+      // Random per-voxel tumble rotation
+      const ax = Math.random() - 0.5;
+      const ay = Math.random() - 0.5;
+      const az = Math.random() - 0.5;
+      const aLen = Math.sqrt(ax * ax + ay * ay + az * az) || 1;
+      rotAxes[i * 3] = ax / aLen;
+      rotAxes[i * 3 + 1] = ay / aLen;
+      rotAxes[i * 3 + 2] = az / aLen;
+      rotSpeeds[i] = (2 + Math.random() * 6) * (Math.random() < 0.5 ? 1 : -1);
+    }
+
+    return {
+      startPositions,
+      endPositions,
+      startColors,
+      endColors,
+      scatterDirs,
+      scatterSpeeds,
+      rotAxes,
+      rotSpeeds,
+    };
+  }, [oldVoxels, newVoxels, count]);
+
+  // Build geometry with instanced color attribute
+  const { geometry, colorAttr } = useMemo(() => {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const colorArray = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i++) {
+      colorArray[i] = animData.startColors[i];
+    }
+    const attr = new THREE.InstancedBufferAttribute(colorArray, 3);
+    geo.setAttribute('color', attr);
+    return { geometry: geo, colorAttr: attr };
+  }, [count, animData]);
+
+  useEffect(() => {
+    return () => geometry.dispose();
+  }, [geometry]);
+
+  // Set initial instance matrices
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < count; i++) {
+      dummy.position.set(
+        animData.startPositions[i * 3],
+        animData.startPositions[i * 3 + 1],
+        animData.startPositions[i * 3 + 2],
+      );
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [count, animData]);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current || !groupRef.current) return;
+
+    timeRef.current += delta;
+    const t = Math.min(timeRef.current / TRANSITION_DURATION, 1);
+
+    if (t >= 1 && !doneRef.current) {
+      doneRef.current = true;
+      onComplete();
+      return;
+    }
+
+    // Overall group spin (full 360)
+    const spinEased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    groupRef.current.rotation.y = spinEased * Math.PI * 2;
+    groupRef.current.rotation.x = Math.sin(spinEased * Math.PI) * -8 * DEG;
+
+    // Scatter curve: peaks around t=0.4, returns to 0 at t=1
+    const scatterT = Math.sin(t * Math.PI) * (t < 0.5 ? 1 : 0.7);
+    // Morph curve: smoothly interpolates from old to new positions
+    const morphT = t < 0.3 ? 0 : Math.min((t - 0.3) / 0.5, 1);
+    const morphEased = morphT * morphT * (3 - 2 * morphT); // smoothstep
+
+    const mesh = meshRef.current;
+    const dummy = new THREE.Object3D();
+    const axis = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const colors = colorAttr.array as Float32Array;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+
+      // Lerp between start and end positions
+      const baseX =
+        animData.startPositions[i3] +
+        (animData.endPositions[i3] - animData.startPositions[i3]) * morphEased;
+      const baseY =
+        animData.startPositions[i3 + 1] +
+        (animData.endPositions[i3 + 1] - animData.startPositions[i3 + 1]) * morphEased;
+      const baseZ =
+        animData.startPositions[i3 + 2] +
+        (animData.endPositions[i3 + 2] - animData.startPositions[i3 + 2]) * morphEased;
+
+      // Add scatter offset
+      const scatter = scatterT * SCATTER_RADIUS * animData.scatterSpeeds[i];
+      dummy.position.set(
+        baseX + animData.scatterDirs[i3] * scatter,
+        baseY + animData.scatterDirs[i3 + 1] * scatter,
+        baseZ + animData.scatterDirs[i3 + 2] * scatter,
+      );
+
+      // Per-voxel tumble rotation
+      axis.set(animData.rotAxes[i3], animData.rotAxes[i3 + 1], animData.rotAxes[i3 + 2]);
+      quat.setFromAxisAngle(axis, scatterT * animData.rotSpeeds[i] * Math.PI);
+      dummy.quaternion.copy(quat);
+
+      // Scale down voxels that are disappearing (extras from old set)
+      if (i >= newVoxels.length) {
+        dummy.scale.setScalar(Math.max(0, 1 - t * 1.5));
+      } else if (i >= oldVoxels.length) {
+        // Materialize new voxels
+        dummy.scale.setScalar(Math.min(1, t * 2));
+      } else {
+        dummy.scale.setScalar(1);
+      }
+
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+
+      // Lerp colors
+      colors[i3] =
+        animData.startColors[i3] + (animData.endColors[i3] - animData.startColors[i3]) * morphEased;
+      colors[i3 + 1] =
+        animData.startColors[i3 + 1] +
+        (animData.endColors[i3 + 1] - animData.startColors[i3 + 1]) * morphEased;
+      colors[i3 + 2] =
+        animData.startColors[i3 + 2] +
+        (animData.endColors[i3 + 2] - animData.startColors[i3 + 2]) * morphEased;
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+  });
+
+  return (
+    <>
+      {}
+      <group ref={groupRef}>
+        <instancedMesh ref={meshRef} args={[geometry, undefined, count]} frustumCulled={false}>
+          <meshBasicMaterial vertexColors toneMapped={false} />
+        </instancedMesh>
+      </group>
+      {}
+    </>
+  );
+}
+
 // ─── Inner R3F scene (tilt mode — parallax with proper lighting) ────────────
 
 interface TiltSceneProps {
@@ -63,11 +343,44 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
+  const prevSeedRef = useRef<string>('');
+  const prevVoxelsRef = useRef<FlatVoxel[] | null>(null);
+  const [transition, setTransition] = useState<{
+    oldVoxels: FlatVoxel[];
+    newVoxels: FlatVoxel[];
+  } | null>(null);
 
   // Compare seed by value (not reference) so geometry rebuilds on navigation
   const seedKey = seed
     ? `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`
     : '';
+
+  // Compute flat voxels for current seed (used by disintegration)
+  const currentVoxels = useMemo(() => {
+    if (voxelMap || !seed) return null;
+    return seedToFlatVoxels(seed, layerVisibility);
+  }, [seedKey, layerVisibility, voxelMap]);
+
+  // Detect seed change and trigger disintegration
+  useEffect(() => {
+    if (!seedKey || !currentVoxels) {
+      prevSeedRef.current = seedKey;
+      prevVoxelsRef.current = currentVoxels;
+      return;
+    }
+    if (prevSeedRef.current && prevSeedRef.current !== seedKey && prevVoxelsRef.current) {
+      setTransition({
+        oldVoxels: prevVoxelsRef.current,
+        newVoxels: currentVoxels,
+      });
+    }
+    prevSeedRef.current = seedKey;
+    prevVoxelsRef.current = currentVoxels;
+  }, [seedKey, currentVoxels]);
+
+  const handleTransitionComplete = useCallback(() => {
+    setTransition(null);
+  }, []);
 
   const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(() => {
     if (voxelMap) {
@@ -83,7 +396,6 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey, layerVisibility, voxelMap]);
 
   useEffect(() => {
@@ -100,7 +412,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
   }, [seedKey, voxelMap, autoSpin]);
 
   useFrame((_, delta) => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || transition) return;
 
     if (autoSpin) {
       // Cinematic spin: ease-in-out rotation over ~2.5s
@@ -123,9 +435,20 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
     groupRef.current.rotation.z = x * -ROT_Z_DEG * DEG;
   });
 
+  // During transition, render DisintegrationScene instead of static meshes
+  if (transition) {
+    return (
+      <DisintegrationScene
+        oldVoxels={transition.oldVoxels}
+        newVoxels={transition.newVoxels}
+        onComplete={handleTransitionComplete}
+      />
+    );
+  }
+
   return (
     <>
-      {/* eslint-disable react/no-unknown-property */}
+      {}
       <group ref={groupRef}>
         {bodyGeo && (
           <mesh geometry={bodyGeo}>
@@ -148,7 +471,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
           </mesh>
         )}
       </group>
-      {/* eslint-enable react/no-unknown-property */}
+      {}
     </>
   );
 }
@@ -189,7 +512,6 @@ function InteractiveScene({
     }
     const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
     return buildNounGeometries(layers);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey, layerVisibility, voxelMap]);
 
   useEffect(() => {
@@ -203,7 +525,7 @@ function InteractiveScene({
 
   return (
     <>
-      {/* eslint-disable react/no-unknown-property */}
+      {}
       {bodyGeo && (
         <mesh geometry={bodyGeo}>
           <meshBasicMaterial vertexColors toneMapped={false} />
@@ -249,7 +571,7 @@ function InteractiveScene({
           TWO: interactionMode === 'grab' ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE,
         }}
       />
-      {/* eslint-enable react/no-unknown-property */}
+      {}
     </>
   );
 }

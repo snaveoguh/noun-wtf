@@ -13,6 +13,7 @@ export {
   DEFAULT_VOXEL_DEPTH,
   BODY_DEPTH,
   BLING_DEPTH,
+  HEAD_DEPTH,
   GLASSES_DEPTH,
 } from './types';
 
