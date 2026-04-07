@@ -2539,9 +2539,10 @@ export default function WorldPage() {
       frameRef.current++;
       const frame = frameRef.current;
 
-      // Ocean death
+      // Ocean death — hoverboard floats on water
       const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
-      tickOceanDeath(ocean, inWater);
+      const sk = skateRef.current;
+      tickOceanDeath(ocean, inWater && !sk.isSkating);
       if (ocean.phase === 'respawning' && ocean.timer === 59) {
         player.x = SPAWN_X;
         player.y = SPAWN_Y;
