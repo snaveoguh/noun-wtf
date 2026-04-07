@@ -61,6 +61,8 @@ export interface CharacterState {
   weaponEquipped: string | null;
   muzzleFlash: number;
   isSkating: boolean;
+  trickName: string | null; // current trick animation (kickflip, heelflip, etc)
+  trickTimer: number; // 0-1 progress through trick animation
   airborneVy: number; // vertical velocity — negative=rising, positive=falling
   vx: number; // horizontal velocity for lean direction
   vy: number;
@@ -128,7 +130,7 @@ function ShadowCircle({ stateRef }: { stateRef: React.RefObject<CharacterState> 
   );
 }
 
-/** Hoverboard mesh — leans into turns, tilts with speed */
+/** Hoverboard mesh — animates trick rotations (kickflip, heelflip, etc) */
 function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState> }) {
   const groupRef = useRef<THREE.Group>(null);
   useFrame(() => {
@@ -138,13 +140,53 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
     g.visible = s.isSkating;
     if (!s.isSkating) return;
 
-    // Board sits under character — no independent rotation
-    g.rotation.y = 0;
-    g.rotation.z = 0;
-    g.rotation.x = Math.sin(Date.now() * 0.003) * 0.01;
+    const t = s.trickTimer ?? 0; // 0-1 progress through trick
 
-    // Board stays at feet level — bob is on the parent character group
+    // Base position
     g.position.y = 0.01;
+
+    if (s.trickName && t > 0) {
+      // Trick-specific board rotations
+      const trick = s.trickName;
+      if (trick === 'Kickflip' || trick === 'Double Kickflip') {
+        // Roll 360° (or 720° for double) on the length axis
+        const flips = trick === 'Double Kickflip' ? 2 : 1;
+        g.rotation.x = t * Math.PI * 2 * flips;
+        g.rotation.y = 0;
+        g.rotation.z = 0;
+      } else if (trick === 'Heelflip') {
+        // Roll -360° (opposite direction from kickflip)
+        g.rotation.x = -t * Math.PI * 2;
+        g.rotation.y = 0;
+        g.rotation.z = 0;
+      } else if (trick === '180' || trick === '360') {
+        // Spin on vertical axis
+        const spins = trick === '360' ? 2 : 1;
+        g.rotation.x = 0;
+        g.rotation.y = t * Math.PI * spins;
+        g.rotation.z = 0;
+      } else if (trick === 'Hardflip') {
+        // Kickflip + 180 spin combo
+        g.rotation.x = t * Math.PI * 2;
+        g.rotation.y = t * Math.PI;
+        g.rotation.z = 0;
+      } else if (trick === 'Pop Shove-it') {
+        // Board spins 180 under feet (y-axis rotation only)
+        g.rotation.x = 0;
+        g.rotation.y = t * Math.PI;
+        g.rotation.z = 0;
+      } else {
+        // Generic trick — small flip
+        g.rotation.x = t * Math.PI * 2;
+        g.rotation.y = 0;
+        g.rotation.z = 0;
+      }
+    } else {
+      // Idle bob
+      g.rotation.x = Math.sin(Date.now() * 0.003) * 0.01;
+      g.rotation.y = 0;
+      g.rotation.z = 0;
+    }
   });
   return (
     <group ref={groupRef} position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]} visible={false}>

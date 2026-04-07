@@ -139,6 +139,10 @@ export interface Player {
   hitFlash: number; // 0-1 red flash
   deathTimer: number;
   respawnTimer: number;
+
+  // Skating
+  isSkating: boolean;
+  trickName: string | null;
 }
 
 export interface RemotePlayer {
@@ -160,6 +164,8 @@ export interface RemotePlayer {
   scaleX: number;
   hitFlash: number;
   lastSeen: number;
+  isSkating: boolean;
+  trickName: string | null;
 }
 
 // ── Particles / Effects ───────────────────────────────────────────────
