@@ -2707,7 +2707,6 @@ export default function WorldPage() {
       }
 
       // Tick player — skip combat movement when skating (skating handles its own physics)
-      const sk = skateRef.current;
       if (!sk.isSkating) {
         tickPlayer(player, input, combat);
       }
