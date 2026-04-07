@@ -426,6 +426,28 @@ const GRAFFITI_WALLS = [
     label: 'DEPOSIT TO NOUNIRL.ETH',
   },
   APARTMENT_GRAFFITI_WALL,
+  // Walls near spawn — positioned to NOT block gravestones
+  {
+    id: 'wall-spawn-2',
+    worldX: SPAWN_X * 0.1 + 6,
+    worldZ: SPAWN_Y * 0.1 + 2,
+    rotation: -0.3,
+    label: 'TAG ME',
+  },
+  {
+    id: 'wall-spawn-3',
+    worldX: SPAWN_X * 0.1 - 5,
+    worldZ: SPAWN_Y * 0.1 + 5,
+    rotation: Math.PI / 2 + 0.1,
+    label: 'WRITE SOMETHING',
+  },
+  {
+    id: 'wall-spawn-4',
+    worldX: SPAWN_X * 0.1 + 3,
+    worldZ: SPAWN_Y * 0.1 - 6,
+    rotation: -Math.PI / 4,
+    label: 'NOUNS WUZ HERE',
+  },
 ] as const;
 
 const WALL_NEAR_DISTANCE = 4;
