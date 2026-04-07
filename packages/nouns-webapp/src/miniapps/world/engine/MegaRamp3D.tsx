@@ -703,13 +703,37 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
       {/* ── Landing ramp (far side of gap) ── */}
       <LandingRamp />
 
-      {/* ── Side walls (tall, with graffiti) ── */}
+      {/* ── Side walls (red broken brick, double-sided, with graffiti) ── */}
       {[-1, 1].map(side => (
         <group key={side} position={[side * (RAMP_WIDTH / 2 + 0.2), RAMP_HEIGHT / 2, 0]}>
+          {/* Main wall body */}
           <mesh>
             <boxGeometry args={[0.4, RAMP_HEIGHT + 1, RAMP_LENGTH + 2]} />
-            <meshStandardMaterial color="#5a5a5a" roughness={0.85} />
+            <meshStandardMaterial
+              color="#8B3A3A"
+              roughness={0.95}
+              side={THREE.DoubleSide}
+            />
           </mesh>
+          {/* Brick detail bumps (procedural broken brick look) */}
+          {Array.from({ length: 60 }, (_, i) => {
+            const seed = i * 7919 + side * 3571;
+            const bx = ((seed * 13) % 100) / 100 * 0.3 - 0.15;
+            const by = ((seed * 17) % 100) / 100 * (RAMP_HEIGHT + 0.5) - (RAMP_HEIGHT + 0.5) / 2;
+            const bz = ((seed * 23) % 100) / 100 * (RAMP_LENGTH + 1) - (RAMP_LENGTH + 1) / 2;
+            const brickW = 0.18 + ((seed * 31) % 100) / 100 * 0.08;
+            const brickH = 0.06 + ((seed * 37) % 100) / 100 * 0.04;
+            const colors = ['#6B2A2A', '#7A3232', '#8B3A3A', '#5A2020', '#9B4A4A'];
+            const col = colors[i % colors.length];
+            const missing = (seed * 41) % 100 < 15; // 15% gaps for broken look
+            if (missing) return null;
+            return (
+              <mesh key={i} position={[bx + side * 0.02, by, bz]}>
+                <boxGeometry args={[0.05, brickH, brickW]} />
+                <meshStandardMaterial color={col} roughness={0.95} />
+              </mesh>
+            );
+          })}
           {/* Graffiti on inner face */}
           <group position={[-side * 0.22, 0, 0]} rotation={[0, side > 0 ? Math.PI : 0, 0]}>
             <GraffitiPatches wallHeight={RAMP_HEIGHT} wallLength={RAMP_LENGTH} />

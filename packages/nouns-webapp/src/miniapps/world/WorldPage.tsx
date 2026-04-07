@@ -246,9 +246,11 @@ function getTerrainHeight(worldX: number, worldZ: number): number {
       return rb.height;
     }
     // On the curved ramp surface itself (within ramp width)
+    // Must match createMegaRampGeometry: curveT = 1 - pow(1-t, 1.8), y = H * sin(curveT * PI/2)
     if (Math.abs(relX) < rb.width / 2 + 0.5) {
-      const curveT = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
-      const rampY = rb.height * Math.sin(((1 - curveT) * Math.PI) / 2);
+      const t = Math.max(0, Math.min(1, (relZ + rb.length / 2) / rb.length));
+      const curveT = 1 - Math.pow(1 - t, 1.8);
+      const rampY = rb.height * Math.sin((curveT * Math.PI) / 2);
       return Math.max(rampY, 0.35);
     }
     // Side area (stairs, apartment building side) — ramp up linearly with Z
@@ -390,7 +392,7 @@ const GRAFFITI_WALLS = [
     worldX: 62 * WORLD_SCALE,
     worldZ: 48 * WORLD_SCALE,
     rotation: Math.PI / 2,
-    label: 'DEPOSIT TO NOUNIRL.ETH',
+    label: 'SEND TO SEWERPIPE.ETH',
   },
   {
     id: 'wall-south',
@@ -404,7 +406,7 @@ const GRAFFITI_WALLS = [
     worldX: 28 * WORLD_SCALE,
     worldZ: 44 * WORLD_SCALE,
     rotation: -Math.PI / 2,
-    label: 'DEPOSIT TO NOUNIRL.ETH',
+    label: 'SEND TO SEWERPIPE.ETH',
   },
   {
     id: 'wall-northeast',
@@ -418,7 +420,7 @@ const GRAFFITI_WALLS = [
     worldX: 34 * WORLD_SCALE,
     worldZ: 56 * WORLD_SCALE,
     rotation: -Math.PI / 3,
-    label: 'DEPOSIT TO NOUNIRL.ETH',
+    label: 'SEND TO SEWERPIPE.ETH',
   },
   {
     id: 'wall-arena-l',
@@ -432,7 +434,7 @@ const GRAFFITI_WALLS = [
     worldX: 54 * WORLD_SCALE,
     worldZ: 52 * WORLD_SCALE,
     rotation: -0.4,
-    label: 'DEPOSIT TO NOUNIRL.ETH',
+    label: 'SEND TO SEWERPIPE.ETH',
   },
   APARTMENT_GRAFFITI_WALL,
   // Walls near spawn — positioned to NOT block gravestones
@@ -1779,7 +1781,7 @@ export function _HUD_OLD({
 
 // ── Hoverboard Constants ─────────────────────────────────────────────
 
-const NOUNIRL_ADDRESS = '0x65C5C840797b85e23eB33C39b8A956e2cE498103' as const;
+const PIPE_ADDRESS = '0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed' as const; // sewerpipe.eth
 const HOVERBOARD_PRICE_ETH = '0.01';
 
 // ── Billboard Ad System ──────────────────────────────────────────────
@@ -1866,7 +1868,7 @@ function HoverboardPurchaseModal({
 
   const handleBuy = () => {
     sendTransaction({
-      to: NOUNIRL_ADDRESS,
+      to: PIPE_ADDRESS,
       value: parseEther(HOVERBOARD_PRICE_ETH),
     });
   };
@@ -1905,7 +1907,7 @@ function HoverboardPurchaseModal({
           HOVERBOARD
         </div>
         <div style={{ fontSize: 13, color: '#aaa', marginBottom: 20 }}>
-          Deposit {HOVERBOARD_PRICE_ETH} ETH to nounirl.eth
+          Deposit {HOVERBOARD_PRICE_ETH} ETH to sewerpipe.eth
         </div>
 
         {isFree ? (
@@ -2018,7 +2020,7 @@ function BillboardAdModal({
     }
     const tier = BILLBOARD_AD_TIERS[selectedTier];
     sendTransaction({
-      to: NOUNIRL_ADDRESS,
+      to: PIPE_ADDRESS,
       value: parseEther(tier.price),
     });
   };
@@ -2057,7 +2059,7 @@ function BillboardAdModal({
           ADVERTISE HERE
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>
-          Payment goes to nounirl.eth (small grants treasury)
+          Payment goes to sewerpipe.eth (small grants treasury)
         </div>
 
         {/* Tier selector */}
@@ -2359,7 +2361,7 @@ export default function WorldPage() {
   const [hoverboardModalOpen, setHoverboardModalOpen] = useState(false);
   const { address: connectedWallet } = useAccount();
   // Owner wallet gets hoverboard free
-  const isOwnerWallet = connectedWallet?.toLowerCase() === NOUNIRL_ADDRESS.toLowerCase();
+  const isOwnerWallet = connectedWallet?.toLowerCase() === PIPE_ADDRESS.toLowerCase();
 
   // ── Graffiti state ──
   const paintRef = useRef<PaintCanState>(createPaintState());
@@ -2876,7 +2878,7 @@ export default function WorldPage() {
         // Update crowd settle
         const shouldSettle = updateCrowdSettle(voip);
         if (shouldSettle) {
-          // TODO: trigger nounirl.eth settlement via agent hub API
+          // TODO: trigger sewerpipe.eth settlement via agent hub API
           console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
         }
         // Update spatial audio listener position
