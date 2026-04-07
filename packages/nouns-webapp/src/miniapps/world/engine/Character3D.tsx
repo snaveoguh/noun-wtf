@@ -137,8 +137,6 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
     if (!s.isSkating) return;
 
     const vx = s.vx || 0;
-    const vy = s.vy || 0;
-    const speed = Math.sqrt(vx * vx + vy * vy);
 
     // Board sits under character — no Y rotation (inherits from parent group)
     g.rotation.y = 0;
@@ -149,8 +147,8 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
     // Gentle hover bob
     g.rotation.x = Math.sin(Date.now() * 0.003) * 0.015;
 
-    // Hover bob
-    g.position.y = 0.01 + Math.sin(Date.now() * 0.005) * (0.005 + speed * 0.003);
+    // Board stays at feet level — bob is on the parent character group
+    g.position.y = 0.01;
   });
   return (
     <group ref={groupRef} position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]} visible={false}>
@@ -399,8 +397,9 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     const actions = actionsRef.current;
     if (!g || !s) return;
 
-    // Position
-    g.position.set(s.x, s.y + 0.05, s.z);
+    // Position — hover bob when on board (character + board move together)
+    const hoverBob = s.isSkating ? 0.15 + Math.sin(Date.now() * 0.005) * 0.02 : 0;
+    g.position.set(s.x, s.y + 0.05 + hoverBob, s.z);
 
     // Face direction — on board: character 90° side-on, board points forward
     const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
