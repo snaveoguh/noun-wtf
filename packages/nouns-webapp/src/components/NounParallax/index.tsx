@@ -97,7 +97,6 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
 
   useEffect(() => {
     spinTime.current = 0;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey, voxelMap, autoSpin]);
 
   useFrame((_, delta) => {
