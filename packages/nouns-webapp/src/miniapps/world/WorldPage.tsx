@@ -114,7 +114,11 @@ import {
 } from './engine/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
 import { MegaRamp3D, HoverboardPickup3D, MEGA_RAMP_BOUNDS } from './engine/MegaRamp3D';
-import { NYCApartmentBlock, APARTMENT_GRAFFITI_WALL } from './engine/NYCApartmentBlock';
+import {
+  NYCApartmentBlock,
+  APARTMENT_GRAFFITI_WALL,
+  BurjKhalifa,
+} from './engine/NYCApartmentBlock';
 import {
   createSkatingState,
   mountBoard,
@@ -3114,6 +3118,9 @@ export default function WorldPage() {
 
         {/* NYC Apartment Block (adjacent to mega ramp) */}
         <NYCApartmentBlock />
+
+        {/* Burj Khalifa — so tall it disappears into the clouds */}
+        <BurjKhalifa />
 
         {/* Hoverboard Pickup (near mega ramp) */}
         {!hasHoverboard && (
