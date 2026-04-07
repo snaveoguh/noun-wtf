@@ -237,6 +237,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           }
           // Disable frustum culling on EVERYTHING to prevent disappearing on turn
           child.frustumCulled = false;
+          // Debug: log all visible meshes to find the lump
+          if ((child as THREE.Mesh).isMesh && child.visible) {
+            console.log('[Character3D] visible mesh:', child.name, child.type);
+          }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
             const mesh = child as THREE.SkinnedMesh;
             const color = child.name.includes('Leg') ? '#443322' : bodyColor;
@@ -411,8 +415,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       if (clipName !== prevAnimRef.current && actions[clipName] && !oneShotPlaying.current) {
         const prev = actions[prevAnimRef.current];
         const next = actions[clipName]!;
-        if (prev) prev.fadeOut(0.15);
-        next.reset().fadeIn(0.15).play();
+        if (prev) {
+          prev.crossFadeTo(next, 0.1, true);
+        }
+        next.reset().fadeIn(0.05).play();
 
         // Apply custom animation speed (e.g. 0.5x for knocked)
         const customSpeed = ANIM_SPEED[animKey];
