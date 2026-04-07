@@ -1390,6 +1390,38 @@ export function _HUD_OLD({
         </span>
       </div>
 
+      {/* Fries logo + f·r·i·e·d */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          left: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          pointerEvents: 'none',
+          zIndex: 10,
+        }}
+      >
+        <img
+          src="/sprites/accessory/accessory-fries.png"
+          alt=""
+          style={{ width: 28, height: 28, imageRendering: 'pixelated' }}
+        />
+        <span
+          style={{
+            fontFamily: 'monospace',
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: '#fff',
+            letterSpacing: 4,
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+          }}
+        >
+          f · r · i · e · d
+        </span>
+      </div>
+
       {/* Player count */}
       <div
         style={{
