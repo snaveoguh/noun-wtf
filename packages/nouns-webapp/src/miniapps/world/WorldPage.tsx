@@ -2755,18 +2755,7 @@ export default function WorldPage() {
       tickReload(weapon);
       tickMuzzleFlash(weapon);
 
-      // ── Hoverboard auto-pickup (walk over = free) ──
-      if (!hasHoverboard) {
-        const px = player.x * WORLD_SCALE;
-        const pz = player.y * WORLD_SCALE;
-        const boardDist = Math.sqrt(
-          (px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2,
-        );
-        if (boardDist < 2) {
-          setHasHoverboard(true);
-          mountBoard(skateRef.current);
-        }
-      }
+      // Hoverboard disabled for now — TODO: fix board physics before re-enabling
 
       // ── Paint can pickup check (auto on walk-over) ──
       const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
