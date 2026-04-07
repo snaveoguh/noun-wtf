@@ -957,6 +957,94 @@ function VenetianBoat({
   );
 }
 
+// ── Gravestones near spawn ───────────────────────────────────────────
+
+const GRAVESTONES = [
+  {
+    x: SPAWN_X * 0.1 - 2.5,
+    z: SPAWN_Y * 0.1 - 3.5,
+    rot: 0.08,
+    name: 'playnouns.wtf',
+    years: '2024 - ?',
+  },
+  {
+    x: SPAWN_X * 0.1 - 1.2,
+    z: SPAWN_Y * 0.1 - 3.8,
+    rot: -0.12,
+    name: 'Nounish Punk',
+    years: '2023 - ?',
+  },
+  { x: SPAWN_X * 0.1 + 0.2, z: SPAWN_Y * 0.1 - 3.3, rot: 0.05, name: 'Pipe', years: '1992 - ?' },
+] as const;
+
+function Gravestone({
+  x,
+  z,
+  rot,
+  name,
+  years,
+}: {
+  x: number;
+  z: number;
+  rot: number;
+  name: string;
+  years: string;
+}) {
+  return (
+    <group position={[x, 0.35, z]} rotation={[0, rot, 0]}>
+      {/* Headstone */}
+      <mesh position={[0, 0.3, 0]}>
+        <boxGeometry args={[0.5, 0.6, 0.08]} />
+        <meshStandardMaterial color="#777777" roughness={0.95} />
+      </mesh>
+      {/* Rounded top */}
+      <mesh position={[0, 0.62, 0]}>
+        <cylinderGeometry args={[0.25, 0.25, 0.08, 12, 1, false, 0, Math.PI]} />
+        <meshStandardMaterial color="#777777" roughness={0.95} />
+      </mesh>
+      {/* Base */}
+      <mesh position={[0, -0.02, 0]}>
+        <boxGeometry args={[0.6, 0.06, 0.15]} />
+        <meshStandardMaterial color="#666666" roughness={0.9} />
+      </mesh>
+      {/* Dirt mound */}
+      <mesh position={[0, -0.03, 0.25]} rotation={[-0.3, 0, 0]}>
+        <boxGeometry args={[0.5, 0.04, 0.4]} />
+        <meshBasicMaterial color="#5a4a3a" />
+      </mesh>
+      {/* Text — RIP + name + years */}
+      <Html position={[0, 0.45, 0.05]} center>
+        <div
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: '7px',
+            color: '#333',
+            textAlign: 'center',
+            lineHeight: 1.3,
+            userSelect: 'none',
+            pointerEvents: 'none',
+            textShadow: '0 0 2px rgba(255,255,255,0.3)',
+          }}
+        >
+          <div style={{ fontSize: '8px', fontWeight: 'bold', letterSpacing: 1 }}>RIP</div>
+          <div style={{ fontSize: '6px', marginTop: 2 }}>{name}</div>
+          <div style={{ fontSize: '5px', color: '#555', marginTop: 1 }}>{years}</div>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function Gravestones() {
+  return (
+    <>
+      {GRAVESTONES.map((g, i) => (
+        <Gravestone key={i} {...g} />
+      ))}
+    </>
+  );
+}
+
 function VenetianBoats() {
   return (
     <group>
@@ -3068,6 +3156,7 @@ export default function WorldPage() {
         <Trees />
         <Rocks />
         <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
+        <Gravestones />
         <VenetianBoats />
         <GasStation
           position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
