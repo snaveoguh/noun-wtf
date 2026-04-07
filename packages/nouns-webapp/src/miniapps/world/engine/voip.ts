@@ -206,6 +206,41 @@ export function createPeerConnection(
   return pc;
 }
 
+/** Add local audio tracks to all existing peer connections (after late mic enable) */
+export async function addTracksToExistingPeers(
+  state: VoipState,
+  ws: PartySocket,
+  myId: string,
+) {
+  if (!state.localStream) return;
+  const tracks = state.localStream.getTracks();
+
+  for (const [peerId, pc] of state.peers) {
+    // Check if tracks already added
+    const senders = pc.getSenders();
+    const hasAudio = senders.some(s => s.track?.kind === 'audio');
+    if (hasAudio) continue;
+
+    // Add tracks and renegotiate
+    for (const track of tracks) {
+      pc.addTrack(track, state.localStream);
+    }
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({
+        type: 'world:voip:offer',
+        from: myId,
+        to: peerId,
+        sdp: JSON.stringify(offer),
+      }));
+      console.log(`[VOIP] Renegotiated with ${peerId} after adding local tracks`);
+    } catch (err) {
+      console.warn(`[VOIP] Failed to renegotiate with ${peerId}:`, err);
+    }
+  }
+}
+
 /** Initiate a call to a peer (create offer) */
 export async function callPeer(
   state: VoipState,
@@ -213,6 +248,13 @@ export async function callPeer(
   ws: PartySocket,
   myId: string,
 ) {
+  // Skip if we already have an active connection to this peer
+  const existing = state.peers.get(peerId);
+  if (existing && existing.connectionState !== 'failed' && existing.connectionState !== 'closed') {
+    console.log(`[VOIP] Already connected to ${peerId}, skipping callPeer`);
+    return;
+  }
+
   const pc = createPeerConnection(state, peerId, ws, myId);
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -225,7 +267,7 @@ export async function callPeer(
   }));
 }
 
-/** Handle incoming offer (create answer) */
+/** Handle incoming offer (create answer, or renegotiate existing) */
 export async function handleOffer(
   state: VoipState,
   peerId: string,
@@ -233,7 +275,12 @@ export async function handleOffer(
   ws: PartySocket,
   myId: string,
 ) {
-  const pc = createPeerConnection(state, peerId, ws, myId);
+  // Reuse existing connection if it exists (renegotiation)
+  let pc = state.peers.get(peerId);
+  if (!pc || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+    pc = createPeerConnection(state, peerId, ws, myId);
+  }
+
   await pc.setRemoteDescription(JSON.parse(sdp));
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
@@ -244,6 +291,7 @@ export async function handleOffer(
     to: peerId,
     sdp: JSON.stringify(answer),
   }));
+  console.log(`[VOIP] Answered offer from ${peerId}`);
 }
 
 /** Handle incoming answer */

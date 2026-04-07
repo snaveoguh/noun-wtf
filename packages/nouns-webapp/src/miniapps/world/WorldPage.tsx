@@ -120,6 +120,7 @@ import {
   APARTMENT_GRAFFITI_WALL,
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
+import CaribbeanOffice, { OFFICE_WHITEBOARD_WALL } from './engine/CaribbeanOffice';
 import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, type SkatingState } from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
@@ -130,6 +131,7 @@ import {
   updateCrowdSettle,
   toggleMute,
   callPeer,
+  addTracksToExistingPeers,
   handleOffer,
   handleAnswer,
   handleIceCandidate,
@@ -459,6 +461,8 @@ const GRAFFITI_WALLS = [
     rotation: -Math.PI / 4,
     label: 'NOUNS WUZ HERE',
   },
+  // Office whiteboard
+  OFFICE_WHITEBOARD_WALL,
 ] as const;
 
 const WALL_NEAR_DISTANCE = 4;
@@ -2367,6 +2371,7 @@ export default function WorldPage() {
   );
   const frameRef = useRef(0);
   const voipRef = useRef<VoipState>(createVoipState());
+  const remoteTranscriptsRef = useRef<Map<string, { text: string; expires: number }>>(new Map());
   const weaponRef = useRef<WeaponState>(createWeaponState());
   const [weaponPickups, setWeaponPickups] = useState<WeaponPickup[]>([]);
   const [micEnabled, setMicEnabled] = useState(false);
@@ -2502,6 +2507,12 @@ export default function WorldPage() {
           } else if (data.type === 'world:voip:speaking') {
             if (data.speaking) voip.activeSpeakers.add(data.id);
             else voip.activeSpeakers.delete(data.id);
+          } else if (data.type === 'world:voip:transcript') {
+            // Store remote player transcript for rendering above their head
+            remoteTranscriptsRef.current.set(data.id, {
+              text: data.text,
+              expires: Date.now() + 4000,
+            });
           }
           // Handle graffiti persistence messages
           const graffitiMsg = parseGraffitiMessage(evt.data);
@@ -2587,8 +2598,13 @@ export default function WorldPage() {
         setMicEnabled(true);
         startSpeechToText(voip);
         const mp = mpRef.current;
-        for (const [id] of mp.remotePlayers) {
-          if (mp.ws) callPeer(voip, id, mp.ws, mp.myId);
+        if (mp.ws) {
+          // Add tracks to any existing connections (peer joined before we had mic)
+          addTracksToExistingPeers(voip, mp.ws, mp.myId);
+          // Call any peers we don't have connections to yet
+          for (const [id] of mp.remotePlayers) {
+            callPeer(voip, id, mp.ws, mp.myId);
+          }
         }
       } else {
         alert('Mic access denied. Please allow microphone in browser settings.');
@@ -2990,13 +3006,18 @@ export default function WorldPage() {
       const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
       const totalYOffset = jumpOffset + skateOffset;
 
-      // Camera follows the jump height
-      playerTargetRef.current.set(wx, terrainY + totalYOffset, wz);
+      // Smooth Y interpolation — prevents jolty terrain transitions
+      const targetY = terrainY + totalYOffset;
+      const prevY = playerTargetRef.current.y;
+      const smoothY = prevY + (targetY - prevY) * 0.15; // lerp factor
+
+      // Camera follows the smoothed height
+      playerTargetRef.current.set(wx, smoothY, wz);
 
       const pcs = playerCharState.current;
       pcs.x = wx;
       pcs.z = wz;
-      pcs.y = terrainY + totalYOffset;
+      pcs.y = smoothY;
       pcs.direction = player.direction;
       pcs.state = player.state;
       pcs.attackType = player.attackType;
@@ -3361,6 +3382,9 @@ export default function WorldPage() {
 
         {/* Burj Khalifa — so tall it disappears into the clouds */}
         <BurjKhalifa />
+
+        {/* Caribbean Office (southeast coast) */}
+        <CaribbeanOffice />
 
         {/* Hoverboard Pickup (near mega ramp) */}
         {!hasHoverboard && (
