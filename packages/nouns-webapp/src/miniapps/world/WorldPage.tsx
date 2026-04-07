@@ -2778,17 +2778,18 @@ export default function WorldPage() {
       const wx = player.x * WORLD_SCALE;
       const wz = player.y * WORLD_SCALE;
       const terrainY = getTerrainHeight(wx, wz);
-      playerTargetRef.current.set(
-        wx,
-        terrainY + (sk.isSkating ? sk.hoverHeight + sk.airborneY : 0),
-        wz,
-      );
+      // Jump height offset — airborneY is negative when up
+      const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
+      const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
+      const totalYOffset = jumpOffset + skateOffset;
+
+      // Camera follows the jump height
+      playerTargetRef.current.set(wx, terrainY + totalYOffset, wz);
+
       const pcs = playerCharState.current;
       pcs.x = wx;
       pcs.z = wz;
-      // airborneY is negative when jumping (up = negative in 2D), convert to positive 3D Y offset
-      const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
-      pcs.y = terrainY + jumpOffset;
+      pcs.y = terrainY + totalYOffset;
       pcs.direction = player.direction;
       pcs.state = player.state;
       pcs.attackType = player.attackType;
