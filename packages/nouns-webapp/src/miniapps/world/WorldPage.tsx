@@ -3592,27 +3592,6 @@ export default function WorldPage() {
             setGraffitiOpen(false);
             setGraffitiWallId(null);
           }}
-          wallCanvasRef={{
-            current: (() => {
-              // Get or create a 256x256 canvas for this wall
-              const key = `__graffitiCanvas_${graffitiWallId}`;
-              let c = (window as any)[key] as HTMLCanvasElement | undefined;
-              if (!c) {
-                c = document.createElement('canvas');
-                c.width = 256;
-                c.height = 256;
-                const ctx = c.getContext('2d')!;
-                ctx.fillStyle = '#d4cfc4'; // wall base color
-                ctx.fillRect(0, 0, 256, 256);
-                (window as any)[key] = c;
-              }
-              return c;
-            })(),
-          }}
-          onTextureUpdate={() => {
-            // Force re-render to update wall texture
-            setGraffitiWallId(prev => prev);
-          }}
         />
       )}
 
