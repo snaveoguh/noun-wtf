@@ -2334,6 +2334,9 @@ export default function WorldPage() {
     weaponEquipped: null,
     muzzleFlash: 0,
     isSkating: false,
+    airborneVy: 0,
+    vx: 0,
+    vy: 0,
   });
   const npcCharStates = useRef<CharacterState[]>(
     npcsRef.current.map(npc => ({
@@ -2349,6 +2352,9 @@ export default function WorldPage() {
       weaponEquipped: null,
       muzzleFlash: 0,
       isSkating: false,
+      airborneVy: 0,
+      vx: 0,
+      vy: 0,
     })),
   );
   const frameRef = useRef(0);
@@ -2407,6 +2413,9 @@ export default function WorldPage() {
     wantedLevel: 0,
     // Skating
     isSkating: false,
+    airborneVy: 0,
+    vx: 0,
+    vy: 0,
     skateSpeed: 0,
     trickScore: 0,
     currentTrick: null as string | null,
@@ -3100,6 +3109,9 @@ export default function WorldPage() {
       pcs.weaponEquipped = weaponRef.current.equipped;
       pcs.muzzleFlash = weaponRef.current.muzzleFlash;
       pcs.isSkating = skateRef.current.isSkating;
+      pcs.airborneVy = player.airborneVy;
+      pcs.vx = player.vx;
+      pcs.vy = player.vy;
     });
 
     return null;
@@ -3152,6 +3164,9 @@ export default function WorldPage() {
               weaponEquipped: null,
               muzzleFlash: 0,
               isSkating: false,
+              airborneVy: 0,
+              vx: 0,
+              vy: 0,
             },
           };
           remoteCharStates.current.set(id, entry);
