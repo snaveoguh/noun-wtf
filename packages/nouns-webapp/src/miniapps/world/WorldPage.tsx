@@ -1659,9 +1659,9 @@ function saveBillboardAd(boardId: string, ad: BillboardAd) {
   localStorage.setItem(BILLBOARD_AD_STORAGE_KEY, JSON.stringify(ads));
 }
 
-// Hoverboard pickup position (near the mega ramp)
-const HOVERBOARD_PICKUP_X = MEGA_RAMP_BOUNDS.x - 3;
-const HOVERBOARD_PICKUP_Z = MEGA_RAMP_BOUNDS.z - 8;
+// Hoverboard pickup position — right next to spawn so you see it immediately
+const HOVERBOARD_PICKUP_X = SPAWN_X * 0.1 + 2; // 2 units right of spawn
+const HOVERBOARD_PICKUP_Z = SPAWN_Y * 0.1 + 1; // 1 unit south of spawn
 
 // ── Hoverboard Purchase Modal ───────────────────────────────────────
 
