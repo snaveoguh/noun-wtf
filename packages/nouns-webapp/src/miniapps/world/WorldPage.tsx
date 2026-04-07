@@ -2776,6 +2776,19 @@ export default function WorldPage() {
       tickReload(weapon);
       tickMuzzleFlash(weapon);
 
+      // ── Hoverboard auto-pickup (walk over = free) ──
+      if (!hasHoverboard) {
+        const px = player.x * WORLD_SCALE;
+        const pz = player.y * WORLD_SCALE;
+        const boardDist = Math.sqrt(
+          (px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2,
+        );
+        if (boardDist < 2) {
+          setHasHoverboard(true);
+          mountBoard(skateRef.current);
+        }
+      }
+
       // ── Paint can pickup check (auto on walk-over) ──
       const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
       if (paintPickedUp) {
@@ -3455,6 +3468,38 @@ export default function WorldPage() {
       />
 
       <HUDLive hudRef={hudRef} />
+
+      {/* Fries logo + f·r·i·e·d — top left */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 14,
+          left: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          pointerEvents: 'none',
+          zIndex: 20,
+        }}
+      >
+        <img
+          src="/sprites/accessory/accessory-fries.png"
+          alt=""
+          style={{ width: 28, height: 28, imageRendering: 'pixelated' }}
+        />
+        <span
+          style={{
+            fontFamily: 'monospace',
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: '#fff',
+            letterSpacing: 4,
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+          }}
+        >
+          f · r · i · e · d
+        </span>
+      </div>
 
       {/* FEATURE 1: "NOUNS WORLD" cloud text intro */}
       {introPhase !== 'done' && (
