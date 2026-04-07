@@ -1195,6 +1195,11 @@ app.post('/api/chat', async c => {
       return c.json({ error: 'Message too long (max 2000 chars)' }, 400);
     }
 
+    // Require wallet connection — no anonymous chat (prevents spam, enables per-wallet rate limiting)
+    if (!wallet || typeof wallet !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+      return c.json({ error: 'Connect your wallet to use chat. ⌐◨-◨', requiresWallet: true }, 401);
+    }
+
     // ─── Try free command parser first (no API call) ─────────
     const parsed = await parseCommand(message, wallet);
     if (parsed.handled) {
@@ -2293,12 +2298,12 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
     // Build system prompt — combine static + dynamic context
     const systemPrompt = dynamicContext ? `${staticPrompt}\n\n${dynamicContext}` : staticPrompt;
 
-    // First API call via agent-hub
+    // First API call via agent-hub (both use Sonnet for quality)
     let response = await hubChat({
       messages,
       system: systemPrompt,
       task: 'chat',
-      maxTokens: 1024,
+      maxTokens: isNounIrl ? 1024 : 512, // homepage chat gets shorter responses to save tokens
       temperature: 0.7,
       ...(isNounIrl ? { tools: nounIrlTools } : {}),
     });

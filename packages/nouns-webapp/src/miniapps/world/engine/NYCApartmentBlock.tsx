@@ -481,6 +481,11 @@ export function NYCApartmentBlock() {
       {/* External metal stairs (ramp-facing side) — walkable to roof/ramp top */}
       <ExternalStairs />
 
+      {/* External stairs (island side) — mirrored */}
+      <group scale={[-1, 1, 1]}>
+        <ExternalStairs />
+      </group>
+
       {/* Windows (front face) */}
       <Windows />
 
@@ -490,6 +495,16 @@ export function NYCApartmentBlock() {
 
       {/* Ground-level door */}
       <GroundDoor />
+
+      {/* FOR SALE sign in 2nd floor window */}
+      <mesh position={[-0.8, -BUILDING_H / 2 + 4.5, BUILDING_D / 2 + 0.06]}>
+        <planeGeometry args={[0.6, 0.3]} />
+        <meshBasicMaterial color="#fff" side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[-0.8, -BUILDING_H / 2 + 4.5, BUILDING_D / 2 + 0.07]}>
+        <planeGeometry args={[0.55, 0.25]} />
+        <meshBasicMaterial color="#cc0000" side={THREE.DoubleSide} />
+      </mesh>
 
       {/* Gritty stain patches */}
       <StainPatches />
