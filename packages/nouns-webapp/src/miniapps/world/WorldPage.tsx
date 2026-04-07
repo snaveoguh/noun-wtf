@@ -2586,8 +2586,8 @@ export default function WorldPage() {
 
       // Footsteps disabled — too noisy
 
-      // Combat input
-      if (ocean.phase === 'normal') {
+      // Combat input — disabled when skating (board handles its own controls)
+      if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
         let intendedMove = resolveIntendedMove(input);
 
         // If F pressed and gun equipped, override to gunshot
@@ -2706,11 +2706,13 @@ export default function WorldPage() {
         }
       }
 
-      // Tick player
-      tickPlayer(player, input, combat);
+      // Tick player — skip combat movement when skating (skating handles its own physics)
+      const sk = skateRef.current;
+      if (!sk.isSkating) {
+        tickPlayer(player, input, combat);
+      }
 
       // ── Skating physics tick ──
-      const sk = skateRef.current;
       if (sk.isSkating) {
         const skWx = player.x * WORLD_SCALE;
         const skWz = player.y * WORLD_SCALE;
@@ -3468,7 +3470,77 @@ export default function WorldPage() {
               zIndex: 15,
             }}
           >
-            [S] dismount {'  '} [SPACE] ollie {'  '} [SHIFT] pump
+            [S] dismount
+          </div>
+
+          {/* Tricks reference panel (right side) */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 80,
+              right: 16,
+              fontFamily: 'monospace',
+              fontSize: '10px',
+              color: '#ccc',
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              zIndex: 15,
+              background: 'rgba(0,0,0,0.5)',
+              borderRadius: 8,
+              padding: '10px 14px',
+              border: '1px solid rgba(0,255,204,0.2)',
+              lineHeight: 1.8,
+              minWidth: 180,
+            }}
+          >
+            <div
+              style={{
+                color: '#00ffcc',
+                fontWeight: 'bold',
+                fontSize: 12,
+                marginBottom: 6,
+                letterSpacing: 1,
+              }}
+            >
+              ⌐◨-◨ TRICKS
+            </div>
+            <div>
+              <span style={{ color: '#00ffcc' }}>SPACE</span> — Ollie
+            </div>
+            <div>
+              <span style={{ color: '#00ffcc' }}>SPACE+←</span> — Kickflip
+            </div>
+            <div>
+              <span style={{ color: '#00ffcc' }}>SPACE+→</span> — Heelflip
+            </div>
+            <div>
+              <span style={{ color: '#00ffcc' }}>SPACE+↑</span> — Hardflip
+            </div>
+            <div>
+              <span style={{ color: '#00ffcc' }}>SPACE+↓</span> — Pop Shove-it
+            </div>
+            <div>
+              <span style={{ color: '#ffaa00' }}>J</span> — 180 Spin
+            </div>
+            <div>
+              <span style={{ color: '#ffaa00' }}>K</span> — Kickflip
+            </div>
+            <div>
+              <span style={{ color: '#ff4444' }}>G</span> — Grind (near rail)
+            </div>
+            <div
+              style={{ marginTop: 4, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4 }}
+            >
+              <div>
+                <span style={{ color: '#8888ff' }}>SHIFT</span> — Pump/Crouch
+              </div>
+              <div>
+                <span style={{ color: '#8888ff' }}>←/→</span> — Balance (grind)
+              </div>
+              <div>
+                <span style={{ color: '#888' }}>S</span> — Dismount
+              </div>
+            </div>
           </div>
         </>
       )}
