@@ -237,14 +237,28 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           }
           // Disable frustum culling on EVERYTHING to prevent disappearing on turn
           child.frustumCulled = false;
-          // Debug: log all visible meshes to find the lump
-          if ((child as THREE.Mesh).isMesh && child.visible) {
-            console.log('[Character3D] visible mesh:', child.name, child.type);
-          }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.visible) {
             const mesh = child as THREE.SkinnedMesh;
             const color = child.name.includes('Leg') ? '#443322' : bodyColor;
-            mesh.material = new THREE.MeshBasicMaterial({ color });
+            mesh.material = new THREE.MeshBasicMaterial({ color, side: THREE.FrontSide });
+            // Clip the left arm stump from Rogue_Body by zeroing out vertices
+            // that extend too far to the character's left (positive X in model space)
+            if (child.name === 'Rogue_Body') {
+              const geo = mesh.geometry;
+              const pos = geo.getAttribute('position');
+              if (pos) {
+                const arr = pos.array as Float32Array;
+                for (let i = 0; i < arr.length; i += 3) {
+                  // Model's left arm extends in +X. Clip vertices beyond the shoulder
+                  if (arr[i] > 0.35) {
+                    arr[i] = 0.35; // clamp X to shoulder width
+                    arr[i + 1] *= 0.95; // slightly flatten
+                  }
+                }
+                pos.needsUpdate = true;
+                geo.computeBoundingSphere();
+              }
+            }
           }
         });
 
