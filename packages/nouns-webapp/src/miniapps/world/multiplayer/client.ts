@@ -89,6 +89,8 @@ export function setupMessageHandler(
             attackTimer: ps.attackTimer,
             airborneY: ps.airborneY,
             flipRotation: ps.flipRotation,
+            isSkating: ps.isSkating ?? false,
+            trickName: ps.trickName ?? null,
             hitFlash: 0,
             lastSeen: Date.now(),
           });
@@ -113,6 +115,8 @@ export function setupMessageHandler(
           existing.attackTimer = msg.attackTimer;
           existing.airborneY = msg.airborneY;
           existing.flipRotation = msg.flipRotation;
+          existing.isSkating = msg.isSkating ?? false;
+          existing.trickName = msg.trickName ?? null;
           existing.lastSeen = Date.now();
         } else {
           mp.remotePlayers.set(msg.id, {
@@ -132,6 +136,8 @@ export function setupMessageHandler(
             attackTimer: msg.attackTimer,
             airborneY: msg.airborneY,
             flipRotation: msg.flipRotation,
+            isSkating: msg.isSkating ?? false,
+            trickName: msg.trickName ?? null,
             hitFlash: 0,
             lastSeen: Date.now(),
           });
@@ -206,6 +212,8 @@ export function sendPlayerUpdate(mp: MultiplayerState, player: Player) {
     attackTimer: player.attackTimer,
     airborneY: player.airborneY,
     flipRotation: player.flipRotation,
+    isSkating: player.isSkating,
+    trickName: player.trickName ?? undefined,
   };
   mp.ws.send(JSON.stringify(msg));
 }

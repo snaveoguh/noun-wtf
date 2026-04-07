@@ -18,6 +18,8 @@ export interface WorldMoveMessage {
   attackTimer: number;
   airborneY: number;
   flipRotation: number;
+  isSkating?: boolean;
+  trickName?: string;
 }
 
 export interface WorldAttackMessage {
@@ -77,6 +79,8 @@ export interface WorldPlayerState {
   attackTimer: number;
   airborneY: number;
   flipRotation: number;
+  isSkating?: boolean;
+  trickName?: string;
 }
 
 export interface WorldSyncMessage {
@@ -100,6 +104,8 @@ export interface WorldPlayerMessage {
   attackTimer: number;
   airborneY: number;
   flipRotation: number;
+  isSkating?: boolean;
+  trickName?: string;
 }
 
 export interface WorldJoinMessage {

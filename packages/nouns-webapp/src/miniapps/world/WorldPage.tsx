@@ -120,7 +120,7 @@ import {
   APARTMENT_GRAFFITI_WALL,
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
-import { createSkatingState, mountBoard, dismountBoard, type SkatingState } from './engine/skating';
+import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, type SkatingState } from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import {
@@ -1211,6 +1211,18 @@ const BEHIND_ANGLE: Record<string, number> = {
   'down-right': -Math.PI * 0.75,
 };
 
+// Camera zoom presets: 1=first person, 2=close, 3=default, 4=far, 5=bird's eye
+const CAMERA_ZOOM_PRESETS = [
+  { dist: 0.3, y: 0.02 },  // 1 — first person
+  { dist: 1.5, y: 0.12 },  // 2 — close
+  { dist: 3.5, y: 0.3 },   // 3 — default (medium)
+  { dist: 7, y: 0.5 },     // 4 — far
+  { dist: 15, y: 0.8 },    // 5 — bird's eye
+];
+
+// Global so keydown handler can set it
+let cameraZoomLevel = 2; // default = preset index 2 (dist 3.5)
+
 function CameraController({
   target,
   inputRef,
@@ -1221,7 +1233,7 @@ function CameraController({
   playerCharState: React.RefObject<CharacterState>;
 }) {
   const { camera } = useThree();
-  const angleX = useRef(0); // start behind (facing up = -Z, cam at +Z = angle 0)
+  const angleX = useRef(0);
   const angleY = useRef(0.12);
   const dist = useRef(1.5);
 
@@ -1229,23 +1241,27 @@ function CameraController({
     const input = inputRef.current;
     const pcs = playerCharState.current;
 
-    // Z key → zoom WAY out (bird's eye to see the ASCII noun in the sky)
+    // Z key → zoom WAY out (bird's eye)
     const zoomOut = input?.keys.has('z');
     const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
-    const wantDist = zoomOut ? 40 : moving ? 3.5 : 1.5;
-    const wantY = zoomOut ? 1.2 : moving ? 0.3 : 0.12;
-    const zoomSpeed = zoomOut ? 0.08 : 0.04; // faster zoom out/in for Z key
+    const skating = pcs?.isSkating;
+
+    // Use zoom preset, override with Z for max zoom out
+    const preset = CAMERA_ZOOM_PRESETS[cameraZoomLevel] ?? CAMERA_ZOOM_PRESETS[2];
+    const wantDist = zoomOut ? 40 : (moving || skating) ? preset.dist : Math.max(preset.dist * 0.6, 1.0);
+    const wantY = zoomOut ? 1.2 : preset.y;
+    const zoomSpeed = zoomOut ? 0.08 : 0.04;
     dist.current += (wantDist - dist.current) * zoomSpeed;
     angleY.current += (wantY - angleY.current) * 0.03;
 
-    // When walking, smoothly swing camera behind the character's facing direction
-    // Safe because WASD is world-relative — no feedback loop
-    if (moving && pcs) {
+    // Swing camera behind character's facing direction (walking + skating)
+    if ((moving || skating) && pcs) {
       const behindAngle = BEHIND_ANGLE[pcs.direction] ?? 0;
       let diff = behindAngle - angleX.current;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      angleX.current += diff * 0.08;
+      // Faster follow when skating so camera stays directly behind
+      angleX.current += diff * (skating ? 0.15 : 0.08);
     }
 
     const d = dist.current;
@@ -1255,10 +1271,9 @@ function CameraController({
       target.z + Math.cos(angleX.current) * Math.cos(angleY.current) * d,
     );
 
-    camera.position.lerp(desired, 0.08);
+    camera.position.lerp(desired, skating ? 0.12 : 0.08);
     camera.lookAt(target.x, target.y + 0.4, target.z);
 
-    // Feed camera angle to input so WASD is camera-relative
     if (input) input.cameraAngle = angleX.current;
   });
 
@@ -2319,6 +2334,8 @@ export default function WorldPage() {
     weaponEquipped: null,
     muzzleFlash: 0,
     isSkating: false,
+    trickName: null,
+    trickTimer: 0,
     airborneVy: 0,
     vx: 0,
     vy: 0,
@@ -2339,6 +2356,8 @@ export default function WorldPage() {
       weaponEquipped: null,
       muzzleFlash: 0,
       isSkating: false,
+      trickName: null,
+      trickTimer: 0,
       airborneVy: 0,
       vx: 0,
       vy: 0,
@@ -2403,6 +2422,8 @@ export default function WorldPage() {
     wantedLevel: 0,
     // Skating
     isSkating: false,
+    trickName: null,
+    trickTimer: 0,
     airborneVy: 0,
     vx: 0,
     vy: 0,
@@ -2655,6 +2676,49 @@ export default function WorldPage() {
           return;
         }
       }
+      // ── Skating tricks ──
+      if (skateRef.current.isSkating) {
+        if (e.key === ' ') {
+          e.preventDefault();
+          const skTrick = skateRef.current;
+          const inp = inputRef.current;
+          if (skTrick.airborne) {
+            const holdLeft = inp?.keys.has('a');
+            const holdRight = inp?.keys.has('d');
+            const holdUp = inp?.keys.has('w');
+            const holdDown = inp?.keys.has('s');
+            if (holdLeft) airTrick(skTrick, 'left');
+            else if (holdRight) airTrick(skTrick, 'right');
+            else if (holdUp) airTrick(skTrick, 'up');
+            else if (holdDown) airTrick(skTrick, 'down');
+            else spin180(skTrick);
+          } else {
+            const wx = (playerRef.current?.x ?? 0) * WORLD_SCALE;
+            const wz = (playerRef.current?.y ?? 0) * WORLD_SCALE;
+            const terrainY = getTerrainHeight(wx, wz);
+            const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
+            ollie(skTrick, rampData);
+          }
+          return;
+        }
+        if (e.key === 'j' || e.key === 'J') { spin180(skateRef.current); return; }
+        if (e.key === 'k' || e.key === 'K') { kickflip(skateRef.current); return; }
+      }
+      // ── Camera zoom levels (1-5) ──
+      if (e.key >= '1' && e.key <= '5') {
+        cameraZoomLevel = parseInt(e.key, 10) - 1;
+        return;
+      }
+      // ── Teleport to ramp top (press 0) ──
+      if (e.key === '0') {
+        const p = playerRef.current;
+        if (p) {
+          const rb = MEGA_RAMP_BOUNDS;
+          p.x = rb.x / WORLD_SCALE;
+          p.y = (rb.z + rb.length / 2 + 2) / WORLD_SCALE;
+        }
+        return;
+      }
       if (e.key === 'e' || e.key === 'E') {
         const p = playerRef.current;
         if (!p) return;
@@ -2765,7 +2829,20 @@ export default function WorldPage() {
       tickReload(weapon);
       tickMuzzleFlash(weapon);
 
-      // Hoverboard disabled for now — TODO: fix board physics before re-enabling
+      // ── Hoverboard physics ──
+      if (sk.isSkating) {
+        const wx = player.x * WORLD_SCALE;
+        const wz = player.y * WORLD_SCALE;
+        const terrainY = getTerrainHeight(wx, wz);
+        const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
+        const dir: [number, number] = [
+          input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
+          input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
+        ];
+        const move = tickSkating(sk, dir, 1 / 60, terrainY, rampData);
+        player.x += move.dx / WORLD_SCALE;
+        player.y += move.dz / WORLD_SCALE;
+      }
 
       // ── Paint can pickup check (auto on walk-over) ──
       const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
@@ -3042,6 +3119,12 @@ export default function WorldPage() {
       pcs.weaponEquipped = weaponRef.current.equipped;
       pcs.muzzleFlash = weaponRef.current.muzzleFlash;
       pcs.isSkating = skateRef.current.isSkating;
+      pcs.trickName = skateRef.current.currentTrick || null;
+      pcs.trickTimer = skateRef.current.trickTimer > 0
+        ? 1 - (skateRef.current.trickTimer / 0.8) // normalize to 0-1 progress (0.8s trick duration)
+        : 0;
+      player.isSkating = skateRef.current.isSkating;
+      player.trickName = skateRef.current.currentTrick || null;
       pcs.airborneVy = player.airborneVy;
       pcs.vx = player.vx;
       pcs.vy = player.vy;
@@ -3099,6 +3182,8 @@ export default function WorldPage() {
               weaponEquipped: null,
               muzzleFlash: 0,
               isSkating: false,
+              trickName: null,
+              trickTimer: 0,
               airborneVy: 0,
               vx: 0,
               vy: 0,
@@ -3119,6 +3204,7 @@ export default function WorldPage() {
           rp.state === 'walking' ? 'walking' : rp.state === 'attacking' ? 'attacking' : 'idle';
         entry.state.hitFlash = rp.hitFlash;
         entry.state.hp = rp.hp;
+        entry.state.isSkating = rp.isSkating ?? false;
       }
       // Remove disconnected players
       for (const id of remoteCharStates.current.keys()) {

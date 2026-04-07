@@ -84,6 +84,8 @@ export function createPlayer(x: number, y: number, nounId: number, seedKey: stri
     hitFlash: 0,
     deathTimer: 0,
     respawnTimer: 0,
+    isSkating: false,
+    trickName: null,
   };
 }
 
