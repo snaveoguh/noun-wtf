@@ -129,7 +129,6 @@ function ShadowCircle({ stateRef }: { stateRef: React.RefObject<CharacterState> 
 /** Hoverboard mesh — leans into turns, tilts with speed */
 function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState> }) {
   const groupRef = useRef<THREE.Group>(null);
-  const prevVxRef = useRef(0);
   useFrame(() => {
     const g = groupRef.current;
     const s = stateRef.current;
@@ -141,24 +140,14 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
     const vy = s.vy || 0;
     const speed = Math.sqrt(vx * vx + vy * vy);
 
-    // Board TWISTS to face travel direction when turning
-    if (speed > 0.3) {
-      const travelAngle = Math.atan2(vx, vy);
-      // Shortest path angle lerp
-      let diff = travelAngle - g.rotation.y;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      g.rotation.y += diff * 0.12;
-    }
+    // Board sits under character — no Y rotation (inherits from parent group)
+    g.rotation.y = 0;
 
-    // Lean into turns — roll
-    const targetLean = -vx * 0.2;
-    g.rotation.z += (targetLean - g.rotation.z) * 0.15;
+    // Subtle lean into turns
+    g.rotation.z = -vx * 0.08;
 
-    // Nose tilt on acceleration
-    const accel = vy - prevVxRef.current;
-    g.rotation.x = -accel * 0.2 + Math.sin(Date.now() * 0.003) * 0.02;
-    prevVxRef.current = vy;
+    // Gentle hover bob
+    g.rotation.x = Math.sin(Date.now() * 0.003) * 0.015;
 
     // Hover bob
     g.position.y = 0.01 + Math.sin(Date.now() * 0.005) * (0.005 + speed * 0.003);
