@@ -307,10 +307,18 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             const headGroup = new THREE.Group();
             headGroup.scale.set(VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE, VOXEL_HEAD_SCALE);
             headGroup.position.set(0, 0.65, 0);
+            headGroup.frustumCulled = false;
             const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-            if (nounHead.headGeo) headGroup.add(new THREE.Mesh(nounHead.headGeo, mat));
-            if (nounHead.glassesGeo)
-              headGroup.add(new THREE.Mesh(nounHead.glassesGeo, mat.clone()));
+            if (nounHead.headGeo) {
+              const headMesh = new THREE.Mesh(nounHead.headGeo, mat);
+              headMesh.frustumCulled = false;
+              headGroup.add(headMesh);
+            }
+            if (nounHead.glassesGeo) {
+              const glassesMesh = new THREE.Mesh(nounHead.glassesGeo, mat.clone());
+              glassesMesh.frustumCulled = false;
+              headGroup.add(glassesMesh);
+            }
             child.add(headGroup);
             voxelHeadRef.current = headGroup;
           }
