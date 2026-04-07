@@ -992,43 +992,66 @@ function Gravestone({
 }) {
   return (
     <group position={[x, 0.35, z]} rotation={[0, rot, 0]}>
-      {/* Headstone */}
-      <mesh position={[0, 0.3, 0]}>
-        <boxGeometry args={[0.5, 0.6, 0.08]} />
-        <meshStandardMaterial color="#777777" roughness={0.95} />
+      {/* Headstone — curved top */}
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.55, 0.7, 0.08]} />
+        <meshStandardMaterial color="#8a8a8a" roughness={0.95} />
       </mesh>
-      {/* Rounded top */}
-      <mesh position={[0, 0.62, 0]}>
-        <cylinderGeometry args={[0.25, 0.25, 0.08, 12, 1, false, 0, Math.PI]} />
-        <meshStandardMaterial color="#777777" roughness={0.95} />
+      {/* Curved top arch */}
+      <mesh position={[0, 0.72, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.275, 0.275, 0.08, 16, 1, false, 0, Math.PI]} />
+        <meshStandardMaterial color="#8a8a8a" roughness={0.95} />
       </mesh>
-      {/* Base */}
-      <mesh position={[0, -0.02, 0]}>
-        <boxGeometry args={[0.6, 0.06, 0.15]} />
-        <meshStandardMaterial color="#666666" roughness={0.9} />
+      {/* Slight bevel/edge on headstone */}
+      <mesh position={[0, 0.35, 0.005]}>
+        <boxGeometry args={[0.5, 0.64, 0.005]} />
+        <meshStandardMaterial color="#7a7a7a" roughness={0.9} />
+      </mesh>
+      {/* Base plinth */}
+      <mesh position={[0, -0.03, 0]}>
+        <boxGeometry args={[0.7, 0.08, 0.18]} />
+        <meshStandardMaterial color="#6a6a6a" roughness={0.9} />
       </mesh>
       {/* Dirt mound */}
-      <mesh position={[0, -0.03, 0.25]} rotation={[-0.3, 0, 0]}>
-        <boxGeometry args={[0.5, 0.04, 0.4]} />
+      <mesh position={[0, -0.05, 0.3]} rotation={[-0.25, 0, 0]} scale={[1, 0.3, 1]}>
+        <sphereGeometry args={[0.3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshBasicMaterial color="#5a4a3a" />
       </mesh>
-      {/* Text — RIP + name + years */}
-      <Html position={[0, 0.45, 0.05]} center>
+      {/* Carved text — large, indented look */}
+      <Html position={[0, 0.48, 0.05]} center>
         <div
           style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: '7px',
-            color: '#333',
+            fontFamily: "'Times New Roman', Georgia, serif",
             textAlign: 'center',
-            lineHeight: 1.3,
+            lineHeight: 1.4,
             userSelect: 'none',
             pointerEvents: 'none',
-            textShadow: '0 0 2px rgba(255,255,255,0.3)',
+            color: '#4a4a4a',
+            textShadow: '1px 1px 0 rgba(255,255,255,0.15), -1px -1px 0 rgba(0,0,0,0.3)',
           }}
         >
-          <div style={{ fontSize: '8px', fontWeight: 'bold', letterSpacing: 1 }}>RIP</div>
-          <div style={{ fontSize: '6px', marginTop: 2 }}>{name}</div>
-          <div style={{ fontSize: '5px', color: '#555', marginTop: 1 }}>{years}</div>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              letterSpacing: 3,
+              fontVariant: 'small-caps',
+            }}
+          >
+            RIP
+          </div>
+          <div
+            style={{
+              fontSize: '11px',
+              marginTop: 4,
+              fontStyle: 'italic',
+              maxWidth: 80,
+              wordWrap: 'break-word',
+            }}
+          >
+            {name}
+          </div>
+          <div style={{ fontSize: '9px', color: '#666', marginTop: 3 }}>{years}</div>
         </div>
       </Html>
     </group>
@@ -1898,7 +1921,7 @@ function HoverboardPurchaseModal({
 
         {txConfirmed && (
           <div style={{ color: '#00ffcc', fontSize: 13, marginTop: 8 }}>
-            HOVERBOARD ACQUIRED! Press S to mount.
+            HOVERBOARD ACQUIRED! Press V to mount.
           </div>
         )}
 
@@ -2558,8 +2581,8 @@ export default function WorldPage() {
         }
         return;
       }
-      // S = toggle skate mode on/off when near hoverboard pickup
-      if (e.key === 's' || e.key === 'S') {
+      // V = toggle skate mode on/off (mount/dismount hoverboard)
+      if (e.key === 'v' || e.key === 'V') {
         const p = playerRef.current;
         if (!p) return;
         const sk = skateRef.current;
@@ -3595,7 +3618,7 @@ export default function WorldPage() {
               zIndex: 15,
             }}
           >
-            [S] dismount
+            [V] dismount
           </div>
 
           {/* Tricks reference panel (right side) */}
@@ -3663,7 +3686,7 @@ export default function WorldPage() {
                 <span style={{ color: '#8888ff' }}>←/→</span> — Balance (grind)
               </div>
               <div>
-                <span style={{ color: '#888' }}>S</span> — Dismount
+                <span style={{ color: '#888' }}>V</span> — Dismount
               </div>
             </div>
           </div>
