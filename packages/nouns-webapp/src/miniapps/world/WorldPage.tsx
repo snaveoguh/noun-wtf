@@ -2974,10 +2974,16 @@ export default function WorldPage() {
         const skMove = tickSkating(sk, [sdx, sdz], delta, skTerrainY, rampData);
 
         // Apply skating movement to player position
-        // skMove is in world-scale units, player pos is in pixel units
-        // Scale down heavily — skating physics outputs are way too fast otherwise
         player.x += skMove.dx * 0.5;
         player.y += skMove.dz * 0.5;
+
+        // Update direction so character/camera follow
+        if (sdx !== 0 || sdz !== 0) {
+          player.direction = directionFromDelta(sdx, sdz);
+          player.state = 'walking';
+        }
+        player.vx = skMove.dx * 5;
+        player.vy = skMove.dz * 5;
       }
 
       // Update camera target + character state ref
