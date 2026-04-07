@@ -232,25 +232,21 @@ export function createPeerConnection(
   return pc;
 }
 
-/** Add local audio tracks to all existing peer connections (after late mic enable) */
+/** Reconnect all peers after mic enable — tear down and recreate with local tracks */
 export async function addTracksToExistingPeers(
   state: VoipState,
   ws: PartySocket,
   myId: string,
 ) {
   if (!state.localStream) return;
-  const tracks = state.localStream.getTracks();
 
-  for (const [peerId, pc] of state.peers) {
-    // Check if tracks already added
-    const senders = pc.getSenders();
-    const hasAudio = senders.some(s => s.track?.kind === 'audio');
-    if (hasAudio) continue;
-
-    // Add tracks and renegotiate
-    for (const track of tracks) {
-      pc.addTrack(track, state.localStream);
-    }
+  // Get list of current peers, then reconnect each
+  const peerIds = Array.from(state.peers.keys());
+  for (const peerId of peerIds) {
+    // Close old connection
+    removePeer(state, peerId);
+    // Create fresh connection with local tracks included
+    const pc = createPeerConnection(state, peerId, ws, myId);
     try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -260,9 +256,9 @@ export async function addTracksToExistingPeers(
         to: peerId,
         sdp: JSON.stringify(offer),
       }));
-      console.log(`[VOIP] Renegotiated with ${peerId} after adding local tracks`);
+      console.log(`[VOIP] Reconnected to ${peerId} with local mic tracks`);
     } catch (err) {
-      console.warn(`[VOIP] Failed to renegotiate with ${peerId}:`, err);
+      console.warn(`[VOIP] Failed to reconnect to ${peerId}:`, err);
     }
   }
 }
@@ -274,11 +270,11 @@ export async function callPeer(
   ws: PartySocket,
   myId: string,
 ) {
-  // Skip if we already have an active connection to this peer
+  // Close any existing connection first (clean reconnect)
   const existing = state.peers.get(peerId);
-  if (existing && existing.connectionState !== 'failed' && existing.connectionState !== 'closed') {
-    console.log(`[VOIP] Already connected to ${peerId}, skipping callPeer`);
-    return;
+  if (existing) {
+    existing.close();
+    state.peers.delete(peerId);
   }
 
   const pc = createPeerConnection(state, peerId, ws, myId);
