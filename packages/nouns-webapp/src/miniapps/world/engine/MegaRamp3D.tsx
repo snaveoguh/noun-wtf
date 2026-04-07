@@ -772,6 +772,39 @@ export function MegaRamp3D({ playerPosition, onPortalEnter }: MegaRamp3DProps) {
         </mesh>
       ))}
 
+      {/* ── Stairs on island side (back of platform, walk up from ground) ── */}
+      <group position={[RAMP_WIDTH / 2 + 1.5, 0, RAMP_LENGTH / 2 + 2]}>
+        {Array.from({ length: Math.ceil(RAMP_HEIGHT / 0.4) }, (_, i) => {
+          const stepY = i * 0.4;
+          const stepZ = i * 0.5;
+          return (
+            <group key={`stair-island-${i}`}>
+              {/* Step tread */}
+              <mesh position={[0, stepY + 0.2, stepZ]}>
+                <boxGeometry args={[1.5, 0.08, 0.5]} />
+                <meshStandardMaterial color="#777" roughness={0.6} metalness={0.3} />
+              </mesh>
+              {/* Step riser */}
+              <mesh position={[0, stepY, stepZ - 0.22]}>
+                <boxGeometry args={[1.5, 0.4, 0.06]} />
+                <meshStandardMaterial color="#666" roughness={0.7} />
+              </mesh>
+            </group>
+          );
+        })}
+        {/* Railing */}
+        {[-1, 1].map(side => (
+          <group key={`stair-rail-${side}`}>
+            {Array.from({ length: Math.ceil(RAMP_HEIGHT / 0.4) + 1 }, (_, i) => (
+              <mesh key={i} position={[side * 0.7, i * 0.4 + 0.5, i * 0.5]}>
+                <cylinderGeometry args={[0.03, 0.03, 0.8, 6]} />
+                <meshStandardMaterial color="#444" metalness={0.6} roughness={0.3} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+      </group>
+
       {/* ── Grind rail running down the ramp center ── */}
       {(() => {
         const segCount = 24;

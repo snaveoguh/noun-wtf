@@ -192,28 +192,27 @@ export function createPeerConnection(
     });
   }
 
-  // Handle incoming remote stream — spatial audio
+  // Handle incoming remote stream — full volume (Discord-style, no spatial falloff)
   pc.ontrack = (event) => {
     const remoteStream = event.streams[0];
     if (remoteStream && state.audioContext) {
       state.remoteStreams.set(peerId, remoteStream);
 
-      // Spatial audio: route through PannerNode for 3D positioning
+      // Direct connection: full volume, no distance rolloff
       const source = state.audioContext.createMediaStreamSource(remoteStream);
-      const panner = state.audioContext.createPanner();
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 1;
-      panner.maxDistance = 50;
-      panner.rolloffFactor = 1.5;
-      panner.coneInnerAngle = 360;
-      panner.coneOuterAngle = 360;
-      source.connect(panner);
-      panner.connect(state.audioContext.destination);
+      const gain = state.audioContext.createGain();
+      gain.gain.value = 1.5; // slight boost for clarity
+      source.connect(gain);
+      gain.connect(state.audioContext.destination);
 
-      // Store panner for position updates
-      (state as any)._panners = (state as any)._panners || new Map();
-      (state as any)._panners.set(peerId, panner);
+      // Also play via HTML Audio element as fallback (some browsers need this)
+      const audioEl = new Audio();
+      audioEl.srcObject = remoteStream;
+      audioEl.autoplay = true;
+      audioEl.volume = 1.0;
+      audioEl.play().catch(() => {});
+
+      console.log(`[VOIP] Playing audio from peer ${peerId} (full volume + HTML fallback)`);
 
       // Attach VAD for remote speaker detection
       setupRemoteVAD(state, peerId, remoteStream);

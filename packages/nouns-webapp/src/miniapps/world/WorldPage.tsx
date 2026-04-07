@@ -245,9 +245,14 @@ function getTerrainHeight(worldX: number, worldZ: number): number {
   const relX = worldX - rb.x;
   const relZ = worldZ - rb.z;
   // Wide bounds to catch ramp + side walls + stairs + top platform
-  if (Math.abs(relX) < rb.width / 2 + 6 && relZ > -rb.length / 2 - 8 && relZ < rb.length / 2 + 6) {
+  if (Math.abs(relX) < rb.width / 2 + 6 && relZ > -rb.length / 2 - 8 && relZ < rb.length / 2 + 12) {
+    // Island-side stairs (right side, behind platform)
+    if (relX > rb.width / 2 && relX < rb.width / 2 + 3 && relZ > rb.length / 2) {
+      const stairProgress = Math.max(0, Math.min(1, (relZ - rb.length / 2) / (rb.height * 1.25)));
+      return stairProgress * rb.height;
+    }
     // Top platform (back of ramp, high end) — flat at RAMP_HEIGHT
-    if (relZ > rb.length / 2 - 2) {
+    if (relZ > rb.length / 2 - 2 && relZ < rb.length / 2 + 6) {
       return rb.height;
     }
     // On the curved ramp surface itself (within ramp width)
