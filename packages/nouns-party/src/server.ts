@@ -336,6 +336,15 @@ export default {
               speaking: data.speaking ?? false,
             }),
           );
+        } else if (data.type === 'world:voip:transcript') {
+          // Broadcast speech-to-text transcript to all players
+          room.broadcast(
+            JSON.stringify({
+              type: 'world:voip:transcript',
+              id: connection.id,
+              text: data.text ?? '',
+            }),
+          );
         }
 
         return; // Don't process as saber message
