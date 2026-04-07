@@ -52,6 +52,22 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    // TURN relay for NAT traversal (OpenRelay free tier — 500MB/mo)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
 };
 
@@ -173,9 +189,17 @@ export function createPeerConnection(
   };
 
   pc.onconnectionstatechange = () => {
+    console.log(`[VOIP] Peer ${peerId} connection: ${pc.connectionState}`);
     if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
       removePeer(state, peerId);
     }
+    if (pc.connectionState === 'connected') {
+      console.log(`[VOIP] Audio connected to peer ${peerId}`);
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[VOIP] Peer ${peerId} ICE: ${pc.iceConnectionState}`);
   };
 
   state.peers.set(peerId, pc);
