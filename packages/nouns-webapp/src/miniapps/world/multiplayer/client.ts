@@ -117,6 +117,8 @@ export function setupMessageHandler(
           existing.flipRotation = msg.flipRotation;
           existing.isSkating = msg.isSkating ?? false;
           existing.trickName = msg.trickName ?? null;
+          (existing as any).weaponEquipped = msg.weaponEquipped ?? null;
+          (existing as any).paintColor = msg.paintColor ?? null;
           existing.lastSeen = Date.now();
         } else {
           mp.remotePlayers.set(msg.id, {
@@ -214,6 +216,8 @@ export function sendPlayerUpdate(mp: MultiplayerState, player: Player) {
     flipRotation: player.flipRotation,
     isSkating: player.isSkating,
     trickName: player.trickName ?? undefined,
+    weaponEquipped: (player as any).weaponEquipped ?? null,
+    paintColor: (player as any).paintColor ?? null,
   };
   mp.ws.send(JSON.stringify(msg));
 }

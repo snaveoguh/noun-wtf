@@ -717,10 +717,10 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
             item.add(grip);
           }
 
-          // Scale relative to hand bone — must be large since character model is 0.14 world scale
-          item.scale.set(3, 3, 3);
-          item.position.set(0, 0.5, 0);
-          item.rotation.set(-Math.PI / 4, 0, 0);
+          // Scale relative to hand bone (character is 0.14 world scale)
+          item.scale.set(1.0, 1.0, 1.0);
+          item.position.set(0, 0.3, 0.2);
+          item.rotation.set(-Math.PI / 6, 0, 0);
           handBone.add(item);
           gunGroupRef.current = item;
         }
