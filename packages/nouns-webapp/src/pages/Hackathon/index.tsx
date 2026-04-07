@@ -78,23 +78,23 @@ const APIS = [
   },
   {
     name: 'Governance Feed',
-    url: 'https://pooter.world/api/v1/governance/live',
-    desc: 'Live proposals from Nouns + Lil Nouns. Status, votes, social signals. JSON REST.',
+    url: 'https://pooter.world/api/governance',
+    desc: 'Live proposals from Nouns, Lil Nouns + US Congress. Filter by ?filter=live|controversial|all. JSON REST.',
   },
   {
     name: 'Agent Hub (Free LLM)',
     url: 'https://heartfelt-flow-production-d872.up.railway.app',
-    desc: 'Free LLM via Groq (Qwen3-32B / Llama 3.3 70B). POST /v1/generate or /v1/chat. No API key needed.',
+    desc: 'Free LLM (Claude via Anthropic, Groq, Together fallback). POST /v1/generate with {"user":"your prompt","task":"chat"}. No API key needed.',
   },
   {
-    name: 'Newsroom / Editorial',
+    name: 'News Feed',
     url: 'https://pooter.world/api/feed',
-    desc: 'Aggregated RSS + AI editorial feed. Market impact extraction, bias analysis, daily editions.',
+    desc: 'Aggregated RSS feed with bias analysis. Filter by ?category=Business&tag=crypto. JSON REST.',
   },
   {
-    name: 'Prediction Market Ops',
-    url: 'https://pooter.world/api/predictions/ops',
-    desc: 'Operator snapshot: markets needing resolution, live markets, resolved markets.',
+    name: 'Sentiment & Signals',
+    url: 'https://pooter.world/api/sentiment',
+    desc: 'Real-time sentiment scores for BTC, ETH, SOL + more. Bias analysis, source diversity, contradiction detection.',
   },
 ];
 
@@ -408,7 +408,7 @@ export default function HackathonPage() {
             <span className={classes.comment}># Free LLM (no API key)</span>
           </div>
           <div>
-            <span className={classes.prompt}>$</span> curl -X POST https://heartfelt-flow-production-d872.up.railway.app/v1/generate -H 'Content-Type: application/json' -d '&#123;"task":"editorial","prompt":"What should I build?"&#125;'
+            <span className={classes.prompt}>$</span> curl -X POST https://heartfelt-flow-production-d872.up.railway.app/v1/generate -H 'Content-Type: application/json' -d '&#123;"user":"What should I build for Nouns?","task":"chat"&#125;'
           </div>
         </div>
       </div>
