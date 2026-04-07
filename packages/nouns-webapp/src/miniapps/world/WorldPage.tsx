@@ -126,6 +126,7 @@ import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wa
 import { parseEther } from 'viem';
 import {
   createVoipState,
+  initVoipListenOnly,
   initVoip,
   checkVoiceActivity,
   updateCrowdSettle,
@@ -2492,6 +2493,9 @@ export default function WorldPage() {
     connectMultiplayer(mp);
     setupMessageHandler(mp, { current: player }, combatRef);
 
+    // Auto-init listen-only VOIP so everyone can hear speakers
+    initVoipListenOnly(voipRef.current);
+
     // VOIP signaling + graffiti message handler
     if (mp.ws) {
       mp.ws.addEventListener('message', (evt: MessageEvent) => {
@@ -2732,6 +2736,18 @@ export default function WorldPage() {
           const rb = MEGA_RAMP_BOUNDS;
           p.x = rb.x / WORLD_SCALE;
           p.y = (rb.z + rb.length / 2 + 2) / WORLD_SCALE;
+          // Reset board state — totally still
+          const skReset = skateRef.current;
+          skReset.speed = 0;
+          skReset.momentum = [0, 0];
+          skReset.airborne = false;
+          skReset.airborneVy = 0;
+          skReset.airborneY = 0;
+          skReset.airborneTime = 0;
+          skReset.currentTrick = null;
+          skReset.trickTimer = 0;
+          skReset.spinAngle = 0;
+          skReset.bailed = false;
         }
         return;
       }
