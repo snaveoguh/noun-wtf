@@ -2146,6 +2146,7 @@ export default function WorldPage() {
     maxHp: PLAYER_MAX_HP,
     weaponEquipped: null,
     muzzleFlash: 0,
+    isSkating: false,
   });
   const npcCharStates = useRef<CharacterState[]>(
     npcsRef.current.map(npc => ({
@@ -2160,6 +2161,7 @@ export default function WorldPage() {
       maxHp: npc.maxHp,
       weaponEquipped: null,
       muzzleFlash: 0,
+      isSkating: false,
     })),
   );
   const frameRef = useRef(0);
@@ -2902,6 +2904,7 @@ export default function WorldPage() {
       // Write weapon state to character for gun rendering
       pcs.weaponEquipped = weaponRef.current.equipped;
       pcs.muzzleFlash = weaponRef.current.muzzleFlash;
+      pcs.isSkating = skateRef.current.isSkating;
     });
 
     return null;

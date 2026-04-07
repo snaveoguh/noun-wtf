@@ -60,6 +60,7 @@ export interface CharacterState {
   maxHp: number;
   weaponEquipped: string | null;
   muzzleFlash: number;
+  isSkating: boolean;
 }
 
 function getNounBodyColor(seed: INounSeed): string {
@@ -474,10 +475,46 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
 
   return (
     <group ref={groupRef}>
+      {/* Shadow circle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <circleGeometry args={[0.25, 12]} />
         <meshBasicMaterial color="#000" transparent opacity={0.15} />
       </mesh>
+      {/* Hoverboard — neon glowing board under feet when skating */}
+      {stateRef.current?.isSkating && (
+        <group position={[0, 0.08, 0]}>
+          {/* Board deck */}
+          <mesh>
+            <boxGeometry args={[0.25, 0.03, 0.6]} />
+            <meshStandardMaterial
+              color="#00ffcc"
+              emissive="#00ffcc"
+              emissiveIntensity={1.5}
+              metalness={0.8}
+              roughness={0.2}
+            />
+          </mesh>
+          {/* Thruster glow left */}
+          <pointLight
+            position={[-0.08, -0.05, -0.2]}
+            color="#00ffcc"
+            intensity={1}
+            distance={0.8}
+          />
+          {/* Thruster glow right */}
+          <pointLight position={[0.08, -0.05, 0.2]} color="#00ffcc" intensity={1} distance={0.8} />
+          {/* Nose accent */}
+          <mesh position={[0, 0.02, 0.28]}>
+            <boxGeometry args={[0.2, 0.015, 0.06]} />
+            <meshBasicMaterial color="#ff00ff" />
+          </mesh>
+          {/* Tail accent */}
+          <mesh position={[0, 0.02, -0.28]}>
+            <boxGeometry args={[0.2, 0.015, 0.06]} />
+            <meshBasicMaterial color="#ff00ff" />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
