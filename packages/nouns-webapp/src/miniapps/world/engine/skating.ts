@@ -83,8 +83,8 @@ const GRIND_FRICTION = 0.996;
 const SPEED_CAP = 4; // much lower — controllable cruising speed
 const PUSH_FORCE = 0.035; // gentle WASD acceleration
 const PUSH_FORCE_AIR = 0.005; // tiny air nudge
-const OLLIE_FORCE = 0.2; // gentle hop
-const OLLIE_RAMP_BONUS = 0.1; // small extra from ramp lip
+const OLLIE_FORCE = 0.3; // solid pop
+const OLLIE_RAMP_BONUS = 0.25; // big boost off ramp lip
 const OLLIE_SPEED_BONUS_FACTOR = 0.03; // speed → vertical conversion
 const OLLIE_COOLDOWN_FRAMES = 12;
 const GROUND_Y = 0;
@@ -547,7 +547,7 @@ export function tickSkating(
 
     // Lip launch: at ramp lip with enough speed → automatic airborne
     if (rampData.atLip && state.speed > 2.0) {
-      const verticalComponent = state.speed * rampData.rampNormalY * 0.35;
+      const verticalComponent = state.speed * rampData.rampNormalY * 0.6;
       state.airborneVy = Math.max(verticalComponent, 0.2);
       state.launchVy = state.airborneVy;
       state.launchY = terrainHeight;

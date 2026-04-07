@@ -76,7 +76,21 @@ const SETTLE_SPEAKER_THRESHOLD = 3; // need 3+ people talking to trigger
 const SETTLE_DURATION_MS = 3000; // must sustain for 3 seconds
 const VAD_CHECK_INTERVAL = 100; // check voice activity every 100ms
 
-// ── Initialize VOIP ─────────────────────────────────────────────────
+// ── Initialize listen-only (no mic needed — just receive audio) ─────
+
+export function initVoipListenOnly(state: VoipState): boolean {
+  try {
+    if (!state.audioContext) {
+      state.audioContext = new AudioContext();
+    }
+    return true;
+  } catch (err) {
+    console.warn('[VOIP] Failed to create audio context:', err);
+    return false;
+  }
+}
+
+// ── Initialize VOIP (with mic) ──────────────────────────────────────
 
 export async function initVoip(state: VoipState): Promise<boolean> {
   try {

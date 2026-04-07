@@ -31,8 +31,8 @@ const RAMP_WIDTH = 8; // width
 const CURVE_SEGMENTS = 48;
 
 // Launch/gap section
-const KICKER_LENGTH = 4; // launch kicker at end
-const KICKER_HEIGHT = 3; // kicker lip height above flat
+const KICKER_LENGTH = 5; // launch kicker at end (longer for smoother transition)
+const KICKER_HEIGHT = 4; // kicker lip height — taller for bigger air
 const GAP_LENGTH = 6; // gap between launch and landing
 const LANDING_LENGTH = 8; // landing ramp
 const LANDING_ANGLE = 0.4; // radians — gentle angle
@@ -148,8 +148,8 @@ function LaunchKicker() {
   const kickerZ = -RAMP_LENGTH / 2 - KICKER_LENGTH / 2;
   return (
     <group position={[0, 0, kickerZ]}>
-      {/* Curved kicker surface */}
-      <mesh rotation={[0.3, 0, 0]} position={[0, KICKER_HEIGHT / 2, 0]}>
+      {/* Curved kicker surface — steep angle for big air */}
+      <mesh rotation={[0.55, 0, 0]} position={[0, KICKER_HEIGHT / 2, 0]}>
         <boxGeometry args={[RAMP_WIDTH, 0.3, KICKER_LENGTH]} />
         <meshStandardMaterial color="#b0b0b0" roughness={0.5} metalness={0.2} />
       </mesh>
