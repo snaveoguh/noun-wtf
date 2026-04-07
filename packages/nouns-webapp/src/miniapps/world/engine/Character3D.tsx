@@ -405,8 +405,9 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     g.position.set(s.x, s.y + 0.05, s.z);
 
     // Always face current direction (8-way)
+    // On skateboard: rotate 90° so character stands SIDE-ON (like a real skater)
     const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
-    g.rotation.y = baseRotY;
+    g.rotation.y = s.isSkating ? baseRotY + Math.PI / 2 : baseRotY;
 
     // Airborne pose — different based on rising vs falling
     if (s.state === 'airborne' || s.state === 'backflip') {

@@ -3463,15 +3463,12 @@ export default function WorldPage() {
 
       <HUDLive hudRef={hudRef} />
 
-      {/* Fries logo + f·r·i·e·d — top left */}
+      {/* Fries logo — spinning, same position as homepage navbar */}
       <div
         style={{
           position: 'fixed',
           top: 14,
           left: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
           pointerEvents: 'none',
           zIndex: 20,
         }}
@@ -3479,21 +3476,15 @@ export default function WorldPage() {
         <img
           src="/sprites/accessory/accessory-fries.png"
           alt=""
-          style={{ width: 28, height: 28, imageRendering: 'pixelated' }}
-        />
-        <span
           style={{
-            fontFamily: 'monospace',
-            fontSize: 13,
-            fontWeight: 'bold',
-            color: '#fff',
-            letterSpacing: 4,
-            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            width: 28,
+            height: 28,
+            imageRendering: 'pixelated',
+            animation: 'fries-spin 4s linear infinite',
           }}
-        >
-          f · r · i · e · d
-        </span>
+        />
       </div>
+      <style>{`@keyframes fries-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
       {/* FEATURE 1: "NOUNS WORLD" cloud text intro */}
       {introPhase !== 'done' && (
