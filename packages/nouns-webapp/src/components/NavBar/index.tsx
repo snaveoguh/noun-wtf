@@ -11,8 +11,8 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
-import LolLogo from '@/components/LolLogo';
 import testnetNoun from '@/assets/testnet-noun.png';
+import LolLogo from '@/components/LolLogo';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import NavBarTreasury from '@/components/NavBarTreasury';
 import NavDropdown from '@/components/NavDropdown';
@@ -340,18 +340,6 @@ const NavBar = () => {
                   href="/playground"
                 >
                   Playground
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/studio"
-                >
-                  Studio
                 </Dropdown.Item>
                 <Dropdown.Divider />
                 <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
