@@ -3421,6 +3421,13 @@ export default function WorldPage() {
         <CloudLayer />
         <Dolphins />
 
+        {/* Joystick billboard near southeast coast */}
+        <Billboard
+          position={[25 * TILE_SIZE * WORLD_SCALE, 0.3, 45 * TILE_SIZE * WORLD_SCALE]}
+          text="🕹️ NOUN.WTF/WORLD"
+          rotation={0.3}
+        />
+
         {/* World objects */}
         <Billboard
           position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]}

@@ -450,6 +450,37 @@ function StainPatches() {
   );
 }
 
+// ── For Sale Sign ───────────────────────────────────────────────────
+
+function ForSaleSign({ position }: { position: [number, number, number] }) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 256, 128);
+    ctx.fillStyle = '#cc0000';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FOR SALE', 128, 45);
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('sewerpipe.eth', 128, 90);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, []);
+
+  return (
+    <mesh position={position}>
+      <planeGeometry args={[0.6, 0.3]} />
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 // ── Main Component ──────────────────────────────────────────────────
 
 export function NYCApartmentBlock() {
@@ -497,14 +528,7 @@ export function NYCApartmentBlock() {
       <GroundDoor />
 
       {/* FOR SALE sign in 2nd floor window */}
-      <mesh position={[-0.8, -BUILDING_H / 2 + 4.5, BUILDING_D / 2 + 0.06]}>
-        <planeGeometry args={[0.6, 0.3]} />
-        <meshBasicMaterial color="#fff" side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[-0.8, -BUILDING_H / 2 + 4.5, BUILDING_D / 2 + 0.07]}>
-        <planeGeometry args={[0.55, 0.25]} />
-        <meshBasicMaterial color="#cc0000" side={THREE.DoubleSide} />
-      </mesh>
+      <ForSaleSign position={[-0.8, -BUILDING_H / 2 + 4.5, BUILDING_D / 2 + 0.06]} />
 
       {/* Gritty stain patches */}
       <StainPatches />
