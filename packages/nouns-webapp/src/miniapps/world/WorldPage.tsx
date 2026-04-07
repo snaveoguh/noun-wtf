@@ -2786,7 +2786,9 @@ export default function WorldPage() {
       const pcs = playerCharState.current;
       pcs.x = wx;
       pcs.z = wz;
-      pcs.y = terrainY;
+      // airborneY is negative when jumping (up = negative in 2D), convert to positive 3D Y offset
+      const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
+      pcs.y = terrainY + jumpOffset;
       pcs.direction = player.direction;
       pcs.state = player.state;
       pcs.attackType = player.attackType;

@@ -292,7 +292,19 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     g.position.set(s.x, s.y + 0.05, s.z);
 
     // Always face current direction (8-way)
-    g.rotation.y = DIRECTION_ROTATION[s.direction] ?? 0;
+    const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
+    g.rotation.y = baseRotY;
+
+    // Flailing wobble at jump peak — arms/legs waving like it's sketchy
+    if (s.state === 'airborne' || s.state === 'backflip') {
+      const t = Date.now() * 0.015;
+      const wobbleAmount = 0.12; // how much it wobbles
+      g.rotation.x = Math.sin(t * 3.7) * wobbleAmount;
+      g.rotation.z = Math.cos(t * 4.3) * wobbleAmount * 0.7;
+    } else {
+      g.rotation.x = 0;
+      g.rotation.z = 0;
+    }
 
     // Animation crossfade
     if (mixer && Object.keys(actions).length > 0) {

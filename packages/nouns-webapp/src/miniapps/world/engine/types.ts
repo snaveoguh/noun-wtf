@@ -237,7 +237,7 @@ export const WORLD_SIZE = TILE_SIZE * MAP_SIZE; // 1024
 export const SPRITE_SIZE = 32;
 export const PLAYER_SPEED = 0.3;
 export const PLAYER_MAX_HP = 100;
-export const GRAVITY = 0.6;
+export const GRAVITY = 0.25; // floaty Spider-Man style — slow descent, long hang time
 export const GROUND_Y = 0; // airborneY baseline
 export const RESPAWN_TIME = 180; // 3 seconds at 60fps
 
