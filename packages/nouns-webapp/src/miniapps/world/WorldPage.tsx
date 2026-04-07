@@ -2367,6 +2367,7 @@ export default function WorldPage() {
   const [graffitiWallId, setGraffitiWallId] = useState<string | null>(null);
   // Saved graffiti tags loaded from PartyKit — keyed by wallId
   const graffitiTagsRef = useRef<Record<string, GraffitiTagData[]>>({});
+  const [graffitiVersion, setGraffitiVersion] = useState(0); // bump to force wall re-render
 
   // ── Billboard ad state ──
   const [billboardAdOpen, setBillboardAdOpen] = useState(false);
@@ -3246,7 +3247,7 @@ export default function WorldPage() {
         <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
 
         {/* Graffiti walls */}
-        <GraffitiWalls tagsMap={graffitiTagsRef.current} />
+        <GraffitiWalls key={graffitiVersion} tagsMap={graffitiTagsRef.current} />
 
         {/* Paint can pickups */}
         {paintCans
@@ -3760,6 +3761,20 @@ export default function WorldPage() {
           paintColor={paintRef.current.color || '#ff0000'}
           ws={mpRef.current.ws as WebSocket | null}
           onClose={() => {
+            // The GraffitiUI already saved to PartyKit via saveGraffitiTag
+            // Also save locally so the wall updates immediately
+            const c = document.querySelector('canvas[width="256"]') as HTMLCanvasElement | null;
+            if (c && graffitiWallId) {
+              const base64 = c.toDataURL('image/png');
+              const existing = graffitiTagsRef.current[graffitiWallId] || [];
+              existing.push({
+                imageData: base64,
+                playerId: mpRef.current.myId,
+                timestamp: Date.now(),
+              });
+              graffitiTagsRef.current[graffitiWallId] = existing;
+              setGraffitiVersion(v => v + 1); // force wall re-render
+            }
             setGraffitiOpen(false);
             setGraffitiWallId(null);
           }}
