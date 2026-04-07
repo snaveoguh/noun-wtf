@@ -598,6 +598,14 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
     player.state = 'airborne';
     applyGravity(player);
     applyFriction(player, 0.98);
+    // Air control — WASD steers while airborne (skydiving navigation)
+    const { dx: adx, dy: ady } = getMovementVector(input.keys, input.cameraAngle);
+    if (adx !== 0 || ady !== 0) {
+      const airControl = 0.8;
+      player.vx += adx * airControl;
+      player.vy += ady * airControl;
+      player.direction = directionFromDelta(adx, ady);
+    }
     const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
     player.x = pos.x;
     player.y = pos.y;
