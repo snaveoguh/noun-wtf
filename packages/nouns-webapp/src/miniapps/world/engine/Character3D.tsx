@@ -480,37 +480,30 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         <circleGeometry args={[0.25, 12]} />
         <meshBasicMaterial color="#000" transparent opacity={0.15} />
       </mesh>
-      {/* Hoverboard — neon glowing board under feet when skating */}
+      {/* Hoverboard — small neon board under feet, side-on (long axis = X) */}
       {stateRef.current?.isSkating && (
-        <group position={[0, 0.08, 0]}>
-          {/* Board deck */}
+        <group position={[0, 0.01, 0]} scale={[0.35, 0.35, 0.35]}>
+          {/* Board deck — long on X axis so it's side-on to character */}
           <mesh>
-            <boxGeometry args={[0.25, 0.03, 0.6]} />
+            <boxGeometry args={[1.2, 0.04, 0.3]} />
             <meshStandardMaterial
               color="#00ffcc"
               emissive="#00ffcc"
-              emissiveIntensity={1.5}
+              emissiveIntensity={2}
               metalness={0.8}
               roughness={0.2}
             />
           </mesh>
-          {/* Thruster glow left */}
-          <pointLight
-            position={[-0.08, -0.05, -0.2]}
-            color="#00ffcc"
-            intensity={1}
-            distance={0.8}
-          />
-          {/* Thruster glow right */}
-          <pointLight position={[0.08, -0.05, 0.2]} color="#00ffcc" intensity={1} distance={0.8} />
+          {/* Thruster glow */}
+          <pointLight position={[0, -0.06, 0]} color="#00ffcc" intensity={0.8} distance={0.5} />
           {/* Nose accent */}
-          <mesh position={[0, 0.02, 0.28]}>
-            <boxGeometry args={[0.2, 0.015, 0.06]} />
+          <mesh position={[0.55, 0.03, 0]}>
+            <boxGeometry args={[0.1, 0.02, 0.24]} />
             <meshBasicMaterial color="#ff00ff" />
           </mesh>
           {/* Tail accent */}
-          <mesh position={[0, 0.02, -0.28]}>
-            <boxGeometry args={[0.2, 0.015, 0.06]} />
+          <mesh position={[-0.55, 0.03, 0]}>
+            <boxGeometry args={[0.1, 0.02, 0.24]} />
             <meshBasicMaterial color="#ff00ff" />
           </mesh>
         </group>
