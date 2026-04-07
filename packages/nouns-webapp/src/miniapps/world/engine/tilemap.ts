@@ -104,6 +104,22 @@ function generateIslandMap(): Tile[][] {
     }
   }
 
+  // ── Clear trees around buildings (Caribbean Office at ~tile 39,39)
+  const clearZones = [
+    { tx: 39, ty: 39, radius: 4 }, // Caribbean Office
+  ];
+  for (const zone of clearZones) {
+    for (let dy = -zone.radius; dy <= zone.radius; dy++) {
+      for (let dx = -zone.radius; dx <= zone.radius; dx++) {
+        const ty = zone.ty + dy;
+        const tx = zone.tx + dx;
+        if (map[ty]?.[tx] === Tile.Tree) {
+          map[ty][tx] = Tile.Grass;
+        }
+      }
+    }
+  }
+
   // ── Rocks: individual scattered
   const rockPositions = [
     [cx - 4, cy - 3],
