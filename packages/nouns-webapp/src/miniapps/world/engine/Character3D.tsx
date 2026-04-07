@@ -404,7 +404,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     // Position
     g.position.set(s.x, s.y + 0.05, s.z);
 
-    // Face current direction — on skateboard, rotate 90° for side-on stance
+    // Face direction — on board: character 90° side-on, board points forward
     const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
     g.rotation.y = s.isSkating ? baseRotY + Math.PI / 2 : baseRotY;
 

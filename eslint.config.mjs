@@ -258,6 +258,7 @@ export default defineConfig([
     files: [
       '**/packages/nouns-webapp/src/miniapps/world/**/*.{ts,tsx}',
       '**/packages/nouns-webapp/src/components/AsciiNoun/**/*.{ts,tsx}',
+      '**/packages/nouns-webapp/src/components/NounParallax/**/*.{ts,tsx}',
     ],
     rules: {
       'react/no-unknown-property': 'off',
