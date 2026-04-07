@@ -61,6 +61,9 @@ export interface CharacterState {
   weaponEquipped: string | null;
   muzzleFlash: number;
   isSkating: boolean;
+  airborneVy: number; // vertical velocity — negative=rising, positive=falling
+  vx: number; // horizontal velocity for lean direction
+  vy: number;
 }
 
 function getNounBodyColor(seed: INounSeed): string {
@@ -365,12 +368,31 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
     g.rotation.y = baseRotY;
 
-    // Flailing wobble at jump peak — arms/legs waving like it's sketchy
+    // Airborne pose — different based on rising vs falling
     if (s.state === 'airborne' || s.state === 'backflip') {
+      const isFalling = s.airborneVy > 0.5;
+      const isRising = s.airborneVy < -0.5;
       const t = Date.now() * 0.015;
-      const wobbleAmount = 0.12; // how much it wobbles
-      g.rotation.x = Math.sin(t * 3.7) * wobbleAmount;
-      g.rotation.z = Math.cos(t * 4.3) * wobbleAmount * 0.7;
+
+      if (isFalling) {
+        // SKYDIVING — stomach down, arms out, lean into movement direction
+        g.rotation.x = Math.PI / 2.5; // tilt forward ~72 degrees (face down)
+        // Lean based on movement input (vx/vy from air control)
+        const leanX = (s.vx || 0) * 0.08; // lean into horizontal movement
+        const leanZ = (s.vy || 0) * 0.08;
+        g.rotation.z = -leanX + Math.sin(t * 2) * 0.03; // slight wobble
+        g.rotation.x += leanZ * 0.5; // forward/back lean
+        // Subtle body sway from wind
+        g.rotation.y = baseRotY + Math.sin(t * 1.5) * 0.05;
+      } else if (isRising) {
+        // RISING — slight backward tilt, arms flailing
+        g.rotation.x = -0.15 + Math.sin(t * 3.7) * 0.1;
+        g.rotation.z = Math.cos(t * 4.3) * 0.08;
+      } else {
+        // PEAK — maximum wobble/flailing
+        g.rotation.x = Math.sin(t * 3.7) * 0.15;
+        g.rotation.z = Math.cos(t * 4.3) * 0.12;
+      }
     } else {
       g.rotation.x = 0;
       g.rotation.z = 0;
