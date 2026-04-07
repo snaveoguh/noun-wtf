@@ -64,6 +64,8 @@ export interface CharacterState {
   airborneVy: number; // vertical velocity — negative=rising, positive=falling
   vx: number; // horizontal velocity for lean direction
   vy: number;
+  paintColor: string | null; // spray can color if holding one
+  swordEquipped: boolean;
 }
 
 function getNounBodyColor(seed: INounSeed): string {
@@ -358,6 +360,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           // Store hand bone for gun attachment
           if (child.name === 'handslot.r') {
             handBoneRef.current = child;
+            console.log('[Character3D] Found handslot.r bone for item attachment');
           }
         });
 
@@ -559,58 +562,112 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       });
     }
 
-    // ── Gun in hand ──
+    // ── Item in hand ──
     const handBone = handBoneRef.current;
     if (handBone) {
-      const wep = s.weaponEquipped;
-      if (wep && !gunGroupRef.current) {
-        // Create tiny gun mesh and attach to hand
-        const gun = new THREE.Group();
-        const gunScale = 0.08; // very small to not drag on floor
-        const mat = new THREE.MeshBasicMaterial({
-          color: wep === 'shotgun' ? '#8B4513' : wep === 'uzi' ? '#333' : '#555',
-        });
-        // Barrel
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 6), mat);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.z = 1;
-        gun.add(barrel);
-        // Body
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), mat);
-        gun.add(body);
-        // Grip
-        const grip = new THREE.Mesh(
-          new THREE.BoxGeometry(0.15, 0.5, 0.2),
-          new THREE.MeshBasicMaterial({ color: '#222' }),
-        );
-        grip.position.set(0, -0.4, -0.05);
-        gun.add(grip);
-        // Muzzle flash light (starts off)
-        const flash = new THREE.PointLight('#ff8800', 0, 3);
-        flash.name = '__gunFlash';
-        flash.position.set(0, 0, 2.2);
-        gun.add(flash);
+      // Determine what should be in hand (priority: gun > spray can > sword > nothing)
+      const wantedItem = s.weaponEquipped
+        ? `gun:${s.weaponEquipped}`
+        : s.paintColor
+          ? `spray:${s.paintColor}`
+          : s.swordEquipped
+            ? 'sword'
+            : null;
+      const currentItem = gunGroupRef.current?.name ?? null;
 
-        gun.scale.set(gunScale, gunScale, gunScale);
-        gun.position.set(0, 0, 0.3);
-        gun.rotation.set(0, 0, -Math.PI / 4);
-        handBone.add(gun);
-        gunGroupRef.current = gun;
-      } else if (!wep && gunGroupRef.current) {
-        // Remove gun
-        handBone.remove(gunGroupRef.current);
-        gunGroupRef.current = null;
+      if (wantedItem !== currentItem) {
+        // Remove old item
+        if (gunGroupRef.current) {
+          handBone.remove(gunGroupRef.current);
+          gunGroupRef.current = null;
+        }
+
+        if (wantedItem) {
+          const item = new THREE.Group();
+          item.name = wantedItem;
+          const sc = 0.08;
+
+          if (wantedItem.startsWith('gun:')) {
+            // Gun mesh
+            const gunType = wantedItem.split(':')[1];
+            const mat = new THREE.MeshBasicMaterial({
+              color: gunType === 'shotgun' ? '#8B4513' : gunType === 'uzi' ? '#333' : '#555',
+            });
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 6), mat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.z = 1;
+            item.add(barrel);
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), mat);
+            item.add(body);
+            const grip = new THREE.Mesh(
+              new THREE.BoxGeometry(0.15, 0.5, 0.2),
+              new THREE.MeshBasicMaterial({ color: '#222' }),
+            );
+            grip.position.set(0, -0.4, -0.05);
+            item.add(grip);
+            const flash = new THREE.PointLight('#ff8800', 0, 3);
+            flash.name = '__gunFlash';
+            flash.position.set(0, 0, 2.2);
+            item.add(flash);
+          } else if (wantedItem.startsWith('spray:')) {
+            // Spray can mesh
+            const canColor = wantedItem.split(':')[1];
+            const canBody = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.12, 0.12, 0.5, 8),
+              new THREE.MeshBasicMaterial({ color: canColor }),
+            );
+            item.add(canBody);
+            // Nozzle
+            const nozzle = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.06, 0.06, 0.08, 6),
+              new THREE.MeshBasicMaterial({ color: '#444' }),
+            );
+            nozzle.position.y = 0.29;
+            item.add(nozzle);
+            // White tip
+            const tip = new THREE.Mesh(
+              new THREE.SphereGeometry(0.03, 6, 6),
+              new THREE.MeshBasicMaterial({ color: '#fff' }),
+            );
+            tip.position.y = 0.35;
+            item.add(tip);
+          } else if (wantedItem === 'sword') {
+            // Sword mesh
+            const blade = new THREE.Mesh(
+              new THREE.BoxGeometry(0.06, 1.8, 0.02),
+              new THREE.MeshBasicMaterial({ color: '#c0c0c0' }),
+            );
+            blade.position.y = 1;
+            item.add(blade);
+            // Guard
+            const guard = new THREE.Mesh(
+              new THREE.BoxGeometry(0.3, 0.06, 0.06),
+              new THREE.MeshBasicMaterial({ color: '#8B7355' }),
+            );
+            guard.position.y = 0.1;
+            item.add(guard);
+            // Grip
+            const grip = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6),
+              new THREE.MeshBasicMaterial({ color: '#5C4033' }),
+            );
+            grip.position.y = -0.1;
+            item.add(grip);
+          }
+
+          item.scale.set(sc, sc, sc);
+          item.position.set(0, 0, 0.3);
+          item.rotation.set(0, 0, -Math.PI / 4);
+          handBone.add(item);
+          gunGroupRef.current = item;
+        }
       }
 
-      // Muzzle flash
-      if (gunGroupRef.current) {
+      // Muzzle flash for guns
+      if (gunGroupRef.current && s.weaponEquipped) {
         const flash = gunGroupRef.current.getObjectByName('__gunFlash') as THREE.PointLight;
         if (flash) {
-          if (s.muzzleFlash > 0) {
-            flash.intensity = 5 + Math.random() * 3;
-          } else {
-            flash.intensity = 0;
-          }
+          flash.intensity = s.muzzleFlash > 0 ? 5 + Math.random() * 3 : 0;
         }
       }
     }

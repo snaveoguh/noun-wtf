@@ -2319,6 +2319,8 @@ export default function WorldPage() {
     airborneVy: 0,
     vx: 0,
     vy: 0,
+    paintColor: null,
+    swordEquipped: false,
   });
   const npcCharStates = useRef<CharacterState[]>(
     npcsRef.current.map(npc => ({
@@ -2337,6 +2339,8 @@ export default function WorldPage() {
       airborneVy: 0,
       vx: 0,
       vy: 0,
+      paintColor: null,
+      swordEquipped: false,
     })),
   );
   const frameRef = useRef(0);
@@ -2398,6 +2402,8 @@ export default function WorldPage() {
     airborneVy: 0,
     vx: 0,
     vy: 0,
+    paintColor: null,
+    swordEquipped: false,
     skateSpeed: 0,
     trickScore: 0,
     currentTrick: null as string | null,
@@ -3035,6 +3041,8 @@ export default function WorldPage() {
       pcs.airborneVy = player.airborneVy;
       pcs.vx = player.vx;
       pcs.vy = player.vy;
+      pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
+      pcs.swordEquipped = false; // TODO: wire sword pickup
     });
 
     return null;
@@ -3090,6 +3098,8 @@ export default function WorldPage() {
               airborneVy: 0,
               vx: 0,
               vy: 0,
+              paintColor: null,
+              swordEquipped: false,
             },
           };
           remoteCharStates.current.set(id, entry);
