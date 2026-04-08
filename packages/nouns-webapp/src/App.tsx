@@ -44,6 +44,7 @@ import UndergroundPage from '@/pages/Underground';
 import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
 import StatsPage from '@/pages/StatsPage';
+import NonsensePage from '@/pages/NonsensePage';
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 import VotePage from '@/pages/Vote';
@@ -142,6 +143,7 @@ function AppRouter() {
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/settlers" element={<SettlersPage />} />
         <Route path="/stats" element={<StatsPage />} />
+        <Route path="/nonsense" element={<NonsensePage />} />
         <Route path="/dreams" element={<DreamsPage />} />
         <Route path="/dreams/create" element={<DreamCreatePage />} />
         {/* Miniapp routes (lazy loaded) */}
