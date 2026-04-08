@@ -376,6 +376,7 @@ const NavBar = () => {
                 <Dropdown.Divider />
                 <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
                 <Dropdown.Item href="/world">World</Dropdown.Item>
+                <Dropdown.Item href="/nonsense">Nonsense</Dropdown.Item>
               </NavDropdown>
             </div>
             <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />

@@ -14,8 +14,6 @@ import NounsWorldBanner from '@/components/NounsWorldBanner';
 import PropdatesBanner from '@/components/PropdatesBanner';
 import { Bone } from '@/components/Skeleton';
 
-// Lazy-load TreasuryFlow (Three.js ~600KB — keep out of initial bundle)
-const TreasuryFlowSection = React.lazy(() => import('@/components/TreasuryFlow'));
 const LilNounsGrid = React.lazy(() => import('@/components/LilNounsGrid'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
@@ -69,9 +67,6 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
       <NounsWorldBanner />
       <div style={{ background: '#fff' }}>
         <NounsIntroSection />
-        <Suspense fallback={<Bone w="100%" h={200} style={{ borderRadius: 0 }} />}>
-          <TreasuryFlowSection />
-        </Suspense>
         <Documentation backgroundColor="#ffffff" />
       </div>
     </>
