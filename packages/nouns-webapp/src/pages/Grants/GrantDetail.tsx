@@ -26,6 +26,7 @@ interface GrantData {
   endBlock: string;
   executionETA: string | null;
   createdAt: string;
+  createdAtTransaction: string;
 }
 
 interface GrantVote {
@@ -55,6 +56,7 @@ export default function GrantDetailPage() {
 
   const [grant, setGrant] = useState<GrantData | null>(null);
   const [votes, setVotes] = useState<GrantVote[]>([]);
+  const [statusChanges, setStatusChanges] = useState<Array<{ status: string; createdAtBlock: string; createdAtTransaction: string }>>([]);
   const [loading, setLoading] = useState(true);
 
   // Vote form state
@@ -101,7 +103,10 @@ export default function GrantDetailPage() {
             createdAt createdAtBlock createdAtTransaction
           }
           grantVotes(where: { grantId: "${grantId}" }, orderBy: "createdAtBlock", orderDirection: "desc", limit: 100) {
-            items { voter support votes reason }
+            items { voter support votes reason createdAtTransaction }
+          }
+          grantStatusChanges(where: { grantId: "${grantId}" }, orderBy: "createdAtBlock", orderDirection: "asc", limit: 20) {
+            items { status createdAtBlock createdAtTransaction }
           }
         }`,
       }),
@@ -122,10 +127,14 @@ export default function GrantDetailPage() {
             endBlock: String(g.endBlock),
             executionETA: g.executionETA ? String(g.executionETA) : null,
             createdAt: g.createdAt,
+            createdAtTransaction: g.createdAtTransaction || '',
           });
         }
         if (d.data?.grantVotes?.items) {
           setVotes(d.data.grantVotes.items);
+        }
+        if (d.data?.grantStatusChanges?.items) {
+          setStatusChanges(d.data.grantStatusChanges.items);
         }
       })
       .catch(() => {})
@@ -150,7 +159,10 @@ export default function GrantDetailPage() {
           args: [BigInt(grantId), support],
         });
       }
-      toast.success('Vote submitted!');
+      toast.success(
+        <span>Vote submitted! {txHash && <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a>}</span>,
+        { duration: 10000 },
+      );
     } catch (e: any) {
       toast.error(e?.shortMessage || 'Vote failed');
     }
@@ -158,13 +170,16 @@ export default function GrantDetailPage() {
 
   async function handleQueue() {
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: SMALL_GRANTS_TREASURY_ADDRESS,
         abi: smallGrantsTreasuryAbi,
         functionName: 'queue',
         args: [BigInt(grantId)],
       });
-      toast.success('Grant queued for execution!');
+      toast.success(
+        <span>Grant queued! <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a></span>,
+        { duration: 10000 },
+      );
     } catch (e: any) {
       toast.error(e?.shortMessage || 'Queue failed');
     }
@@ -172,13 +187,16 @@ export default function GrantDetailPage() {
 
   async function handleExecute() {
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: SMALL_GRANTS_TREASURY_ADDRESS,
         abi: smallGrantsTreasuryAbi,
         functionName: 'execute',
         args: [BigInt(grantId)],
       });
-      toast.success('Grant executed!');
+      toast.success(
+        <span>Grant executed! <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a></span>,
+        { duration: 10000 },
+      );
     } catch (e: any) {
       toast.error(e?.shortMessage || 'Execution failed');
     }
@@ -186,13 +204,16 @@ export default function GrantDetailPage() {
 
   async function handleCancel() {
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: SMALL_GRANTS_TREASURY_ADDRESS,
         abi: smallGrantsTreasuryAbi,
         functionName: 'cancel',
         args: [BigInt(grantId)],
       });
-      toast.success('Grant cancelled');
+      toast.success(
+        <span>Grant cancelled. <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#ff4444' }}>View TX →</a></span>,
+        { duration: 10000 },
+      );
     } catch (e: any) {
       toast.error(e?.shortMessage || 'Cancel failed');
     }
@@ -331,6 +352,53 @@ export default function GrantDetailPage() {
               <span style={{ color: supportColor(v.support) }}>{supportLabel(v.support)}</span>
               <span>{v.votes} votes</span>
               {v.reason && <span className={classes.voteReason}>"{v.reason}"</span>}
+              {(v as any).createdAtTransaction && (
+                <a
+                  href={`https://etherscan.io/tx/${(v as any).createdAtTransaction}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: '0.7rem', color: '#666', marginLeft: 8 }}
+                >
+                  tx
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Transaction History */}
+      {(statusChanges.length > 0 || grant.createdAtTransaction) && (
+        <div className={classes.votesList} style={{ marginTop: 16 }}>
+          <h3>Transaction History</h3>
+          {grant.createdAtTransaction && (
+            <div className={classes.voteRow}>
+              <span style={{ color: '#60a5fa' }}>CREATED</span>
+              <a
+                href={`https://etherscan.io/tx/${grant.createdAtTransaction}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace' }}
+              >
+                {grant.createdAtTransaction.slice(0, 18)}...
+              </a>
+            </div>
+          )}
+          {statusChanges.map((sc, i) => (
+            <div key={i} className={classes.voteRow}>
+              <span style={{
+                color: sc.status === 'EXECUTED' ? '#4ade80' : sc.status === 'CANCELED' ? '#f87171' : sc.status === 'QUEUED' ? '#fbbf24' : '#94a3b8',
+              }}>
+                {sc.status}
+              </span>
+              <a
+                href={`https://etherscan.io/tx/${sc.createdAtTransaction}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace' }}
+              >
+                {sc.createdAtTransaction.slice(0, 18)}...
+              </a>
             </div>
           ))}
         </div>
