@@ -116,7 +116,7 @@ function SceneLighting({ preset = 'spotlight' }: { preset?: LightingPreset }) {
       <directionalLight position={c.dir1.position} intensity={c.dir1.intensity} color={c.dir1.color} />
       <directionalLight position={c.dir2.position} intensity={c.dir2.intensity} color={c.dir2.color} />
       <pointLight position={c.point1.position} intensity={c.point1.intensity} color={c.point1.color} />
-      <spotLight position={c.spot.position} intensity={c.spot.intensity} color={c.spot.color} angle={c.spot.angle} penumbra={0.6} castShadow />
+      <spotLight position={c.spot.position} intensity={c.spot.intensity} color={c.spot.color} angle={c.spot.angle} penumbra={0.6} />
     </>
   );
   /* eslint-enable react/no-unknown-property */

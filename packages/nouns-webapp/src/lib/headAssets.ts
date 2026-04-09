@@ -45,6 +45,7 @@ export function normalizeHeadName(name: string): string {
   return name
     .replace(/\.glb$/i, '') // strip .glb extension
     .replace(/^head[-_]?/i, '') // strip "head-" or "Head" prefix
+    .replace(/head$/i, '') // strip "Head" suffix (e.g. mushroomHead → mushroom)
     .replace(/[-_\s().]/g, '') // strip separators, parens, dots
     .toLowerCase();
 }

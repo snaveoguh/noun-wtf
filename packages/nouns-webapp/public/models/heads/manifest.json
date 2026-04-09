@@ -9,7 +9,7 @@
     "traitIndex": 1,
     "traitName": "abstract",
     "noundryGlb": "/models/heads/noundry/abstract.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/abstractHead.glb"
   },
   {
     "traitIndex": 2,
@@ -45,7 +45,7 @@
     "traitIndex": 7,
     "traitName": "baseball-gameball",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadBaseball.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 8,
@@ -69,7 +69,7 @@
     "traitIndex": 11,
     "traitName": "beer",
     "noundryGlb": "/models/heads/noundry/beer.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/beerHead.glb"
   },
   {
     "traitIndex": 12,
@@ -87,7 +87,7 @@
     "traitIndex": 14,
     "traitName": "bigfoot-yeti",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/bigfootyetiHead.glb"
   },
   {
     "traitIndex": 15,
@@ -123,13 +123,13 @@
     "traitIndex": 20,
     "traitName": "boombox",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/boomboxHead.glb"
   },
   {
     "traitIndex": 21,
     "traitName": "boot",
     "noundryGlb": "/models/heads/noundry/boot.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/bootHead.glb"
   },
   {
     "traitIndex": 22,
@@ -171,7 +171,7 @@
     "traitIndex": 28,
     "traitName": "cake",
     "noundryGlb": "/models/heads/noundry/cake.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/cakeHead.glb"
   },
   {
     "traitIndex": 29,
@@ -195,7 +195,7 @@
     "traitIndex": 32,
     "traitName": "cannedham",
     "noundryGlb": "/models/heads/noundry/cannedham.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/cannedhamHead.glb"
   },
   {
     "traitIndex": 33,
@@ -219,13 +219,13 @@
     "traitIndex": 36,
     "traitName": "cat",
     "noundryGlb": "/models/heads/noundry/cat.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/catHead.glb"
   },
   {
     "traitIndex": 37,
     "traitName": "cd",
     "noundryGlb": "/models/heads/noundry/cd.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/cdHead.glb"
   },
   {
     "traitIndex": 38,
@@ -279,7 +279,7 @@
     "traitIndex": 46,
     "traitName": "chilli",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadChili.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 47,
@@ -303,13 +303,13 @@
     "traitIndex": 50,
     "traitName": "cloud",
     "noundryGlb": "/models/heads/noundry/cloud.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/cloudHead.glb"
   },
   {
     "traitIndex": 51,
     "traitName": "clover",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/cloverHead.glb"
   },
   {
     "traitIndex": 52,
@@ -333,7 +333,7 @@
     "traitIndex": 55,
     "traitName": "console-handheld",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/consolehandheldHead.glb"
   },
   {
     "traitIndex": 56,
@@ -363,7 +363,7 @@
     "traitIndex": 60,
     "traitName": "crab",
     "noundryGlb": "/models/heads/noundry/crab.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/crabHead.glb"
   },
   {
     "traitIndex": 61,
@@ -381,7 +381,7 @@
     "traitIndex": 63,
     "traitName": "crown",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/crownHead.glb"
   },
   {
     "traitIndex": 64,
@@ -477,7 +477,7 @@
     "traitIndex": 79,
     "traitName": "factory-dark",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadFactory.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 80,
@@ -537,7 +537,7 @@
     "traitIndex": 89,
     "traitName": "frog",
     "noundryGlb": "/models/heads/noundry/frog.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/frogHead.glb"
   },
   {
     "traitIndex": 90,
@@ -567,13 +567,13 @@
     "traitIndex": 94,
     "traitName": "gnome",
     "noundryGlb": "/models/heads/noundry/gnome.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/gnomeHead.glb"
   },
   {
     "traitIndex": 95,
     "traitName": "goat",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/goatHead.glb"
   },
   {
     "traitIndex": 96,
@@ -591,7 +591,7 @@
     "traitIndex": 98,
     "traitName": "grouper",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/grouperHead.glb"
   },
   {
     "traitIndex": 99,
@@ -609,19 +609,19 @@
     "traitIndex": 101,
     "traitName": "heart",
     "noundryGlb": "/models/heads/noundry/heart.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/heartHead.glb"
   },
   {
     "traitIndex": 102,
     "traitName": "helicopter",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/HelicopterHead.glb"
   },
   {
     "traitIndex": 103,
     "traitName": "highheel",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadHighHeels.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 104,
@@ -693,7 +693,7 @@
     "traitIndex": 115,
     "traitName": "laptop",
     "noundryGlb": "/models/heads/noundry/laptop.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/laptopHead.glb"
   },
   {
     "traitIndex": 116,
@@ -717,7 +717,7 @@
     "traitIndex": 119,
     "traitName": "lipstick2",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadLipstick.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 120,
@@ -747,7 +747,7 @@
     "traitIndex": 124,
     "traitName": "microwave",
     "noundryGlb": "/models/heads/noundry/microwave.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/microwaveHead.glb"
   },
   {
     "traitIndex": 125,
@@ -765,7 +765,7 @@
     "traitIndex": 127,
     "traitName": "mixer",
     "noundryGlb": "/models/heads/noundry/mixer.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/mixerHead.glb"
   },
   {
     "traitIndex": 128,
@@ -789,7 +789,7 @@
     "traitIndex": 131,
     "traitName": "mountain-snowcap",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadMountain.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 132,
@@ -807,7 +807,7 @@
     "traitIndex": 134,
     "traitName": "mushroom",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/mushroomHead.glb"
   },
   {
     "traitIndex": 135,
@@ -819,13 +819,13 @@
     "traitIndex": 136,
     "traitName": "nigiri",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/nigiriHead.glb"
   },
   {
     "traitIndex": 137,
     "traitName": "noodles",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/NoodlesHead.glb"
   },
   {
     "traitIndex": 138,
@@ -837,7 +837,7 @@
     "traitIndex": 139,
     "traitName": "orangutan",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/OrangutanHead.glb"
   },
   {
     "traitIndex": 140,
@@ -861,7 +861,7 @@
     "traitIndex": 143,
     "traitName": "owl",
     "noundryGlb": "/models/heads/noundry/owl.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/owlHead.glb"
   },
   {
     "traitIndex": 144,
@@ -885,7 +885,7 @@
     "traitIndex": 147,
     "traitName": "paperclip",
     "noundryGlb": "/models/heads/noundry/paperclip.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/paperclipHead.glb"
   },
   {
     "traitIndex": 148,
@@ -897,7 +897,7 @@
     "traitIndex": 149,
     "traitName": "pencil-tip",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadPencil.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 150,
@@ -945,7 +945,7 @@
     "traitIndex": 157,
     "traitName": "pineapple",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/pineappleHead.glb"
   },
   {
     "traitIndex": 158,
@@ -957,7 +957,7 @@
     "traitIndex": 159,
     "traitName": "pirateship",
     "noundryGlb": "/models/heads/noundry/pirateship.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/pirateshipHead.glb"
   },
   {
     "traitIndex": 160,
@@ -981,7 +981,7 @@
     "traitIndex": 163,
     "traitName": "porkbao",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/porkbaoHead.glb"
   },
   {
     "traitIndex": 164,
@@ -1011,13 +1011,13 @@
     "traitIndex": 168,
     "traitName": "queencrown",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/queencrownHead.glb"
   },
   {
     "traitIndex": 169,
     "traitName": "rabbit",
     "noundryGlb": "/models/heads/noundry/rabbit.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/rabbitHead.glb"
   },
   {
     "traitIndex": 170,
@@ -1065,7 +1065,7 @@
     "traitIndex": 177,
     "traitName": "robot",
     "noundryGlb": "/models/heads/noundry/robot.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/robotHead.glb"
   },
   {
     "traitIndex": 178,
@@ -1077,7 +1077,7 @@
     "traitIndex": 179,
     "traitName": "rosebud",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadRose.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 180,
@@ -1095,13 +1095,13 @@
     "traitIndex": 182,
     "traitName": "sailboat",
     "noundryGlb": "/models/heads/noundry/sailboat.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/sailboatHead.glb"
   },
   {
     "traitIndex": 183,
     "traitName": "sandwich",
     "noundryGlb": "/models/heads/noundry/sandwich.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/sandwichHead.glb"
   },
   {
     "traitIndex": 184,
@@ -1125,7 +1125,7 @@
     "traitIndex": 187,
     "traitName": "shark",
     "noundryGlb": "/models/heads/noundry/shark.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/sharkHead.glb"
   },
   {
     "traitIndex": 188,
@@ -1143,7 +1143,7 @@
     "traitIndex": 190,
     "traitName": "skeleton-hat",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/skeletonhatHead.glb"
   },
   {
     "traitIndex": 191,
@@ -1167,7 +1167,7 @@
     "traitIndex": 194,
     "traitName": "snowmobile",
     "noundryGlb": "/models/heads/noundry/snowmobile.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/SnowMobileHead.glb"
   },
   {
     "traitIndex": 195,
@@ -1185,7 +1185,7 @@
     "traitIndex": 197,
     "traitName": "squid",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/squidHead.glb"
   },
   {
     "traitIndex": 198,
@@ -1197,7 +1197,7 @@
     "traitIndex": 199,
     "traitName": "star-sparkles",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadStarSparkle.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 200,
@@ -1209,13 +1209,13 @@
     "traitIndex": 201,
     "traitName": "sunset",
     "noundryGlb": "/models/heads/noundry/sunset.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/sunsetHead.glb"
   },
   {
     "traitIndex": 202,
     "traitName": "taco-classic",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadTaco.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 203,
@@ -1233,13 +1233,13 @@
     "traitIndex": 205,
     "traitName": "toaster",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/toasterHead.glb"
   },
   {
     "traitIndex": 206,
     "traitName": "toiletpaper-full",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadToiletPaper.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 207,
@@ -1251,7 +1251,7 @@
     "traitIndex": 208,
     "traitName": "toothbrush-fresh",
     "noundryGlb": null,
-    "threeDNounsGlb": "/models/heads/3dnouns/HeadToothBrush.glb"
+    "threeDNounsGlb": null
   },
   {
     "traitIndex": 209,
@@ -1263,7 +1263,7 @@
     "traitIndex": 210,
     "traitName": "trashcan",
     "noundryGlb": "/models/heads/noundry/trashcan.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/trashcanHead.glb"
   },
   {
     "traitIndex": 211,
@@ -1281,7 +1281,7 @@
     "traitIndex": 213,
     "traitName": "undead",
     "noundryGlb": "/models/heads/noundry/undead.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/undeadHead.glb"
   },
   {
     "traitIndex": 214,
@@ -1353,13 +1353,13 @@
     "traitIndex": 225,
     "traitName": "wave",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/WaveHead.glb"
   },
   {
     "traitIndex": 226,
     "traitName": "weed",
     "noundryGlb": "/models/heads/noundry/weed.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/weedHead.glb"
   },
   {
     "traitIndex": 227,
@@ -1407,7 +1407,7 @@
     "traitIndex": 234,
     "traitName": "capybara",
     "noundryGlb": "/models/heads/noundry/capybara.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/CapybaraHead.glb"
   },
   {
     "traitIndex": 235,
@@ -1419,37 +1419,37 @@
     "traitIndex": 236,
     "traitName": "hanger",
     "noundryGlb": "/models/heads/noundry/hanger.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/HangerHead.glb"
   },
   {
     "traitIndex": 237,
     "traitName": "index-card",
     "noundryGlb": "/models/heads/noundry/indexcard.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/IndexCardHead.glb"
   },
   {
     "traitIndex": 238,
     "traitName": "snowman",
     "noundryGlb": "/models/heads/noundry/snowman.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/SnowmanHead.glb"
   },
   {
     "traitIndex": 239,
     "traitName": "treasurechest",
     "noundryGlb": "/models/heads/noundry/treasurechest.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/TreasureChestHead.glb"
   },
   {
     "traitIndex": 240,
     "traitName": "vending-machine",
     "noundryGlb": "/models/heads/noundry/vendingmachine.glb",
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/VendingMachineHead.glb"
   },
   {
     "traitIndex": 241,
     "traitName": "wine-barrel",
     "noundryGlb": null,
-    "threeDNounsGlb": null
+    "threeDNounsGlb": "/models/heads/3dnouns/WineBarrelHead.glb"
   },
   {
     "traitIndex": 242,
