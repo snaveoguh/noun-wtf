@@ -174,8 +174,9 @@ function majority(arr) {
 
 // ── Generate textures ──────────────────────────────────────────────
 
-// Indices we already have correct extracted textures for — skip generation
-const skipIndices = new Set([2, 8, 14]);
+// Generate ALL from RLE — the old GLB-extracted textures had legacy multi-color designs
+// that were updated by DAO proposal to single-color frames
+const skipIndices = new Set();
 
 console.log(`Generating ${glassesTraits.length} glasses textures...\n`);
 
@@ -192,18 +193,45 @@ for (let i = 0; i < glassesTraits.length; i++) {
   // Create 32x32 RGBA buffer (transparent)
   const buf = Buffer.alloc(32 * 32 * 4, 0);
 
+  // Check if this type has any non-majority eye pixels (glint, RGB dots, etc.)
+  const rlePixels = decodeToPixelMap(glassesTraits[i].data);
+  // Build eye-area pixel map: UV position → actual RLE color
+  // The template eye_white pixels correspond to RLE x=11-12,18-19 and eye_black to x=13-14,20-21
+  // But fullblack has white glints at x=14,21 which are in the "black half"
+  // So: for each template eye pixel, find the matching RLE pixel and use its actual color
+  const eyeOverrides = new Map();
+  if (i === 7 || i === 1) {
+    // For types with non-standard eye patterns, map each eye pixel individually
+    // Template eye region rows in UV space = RLE rows 12-15, columns = RLE columns 11-14 (left) and 18-21 (right)
+    for (const [rleKey, px] of rlePixels) {
+      const [rx, ry] = rleKey.split(',').map(Number);
+      // Only eye interior pixels (not frame border)
+      if (ry >= 12 && ry <= 15 && ((rx >= 11 && rx <= 14) || (rx >= 18 && rx <= 21))) {
+        // These map to the same UV position in the template
+        // Template uses the same coordinate space for eye pixels
+        eyeOverrides.set(rleKey, px);
+      }
+    }
+  }
+
   for (const [key, role] of pixelRoles) {
     const [x, y] = key.split(',').map(Number);
     if (x >= 32 || y >= 32) continue;
     const idx = (y * 32 + x) * 4;
 
     let color;
-    switch (role) {
-      case 'frame_left':  color = colors.frameLeft; break;
-      case 'frame_right': color = colors.frameRight; break;
-      case 'bridge':      color = colors.frameLeft; break;  // bridge = left frame color for single-color
-      case 'eye_white':   color = colors.eyeWhite; break;
-      case 'eye_black':   color = colors.eyeBlack; break;
+    // Check for per-pixel eye override
+    const overrideColor = eyeOverrides.get(key);
+    if ((role === 'eye_white' || role === 'eye_black') && overrideColor) {
+      color = overrideColor;
+    } else {
+      switch (role) {
+        case 'frame_left':  color = colors.frameLeft; break;
+        case 'frame_right': color = colors.frameRight; break;
+        case 'bridge':      color = colors.frameLeft; break;
+        case 'eye_white':   color = colors.eyeWhite; break;
+        case 'eye_black':   color = colors.eyeBlack; break;
+      }
     }
 
     buf[idx] = color.r;

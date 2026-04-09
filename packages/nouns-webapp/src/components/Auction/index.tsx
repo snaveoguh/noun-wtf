@@ -173,6 +173,7 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
         }
       }}
     >
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginRight: 3, lineHeight: 1 }}>💡</span>
       {LIGHTING_PRESETS.map(p => {
         const isActive = p.name === preset;
         const show = hovered || isActive;
@@ -218,7 +219,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
-  const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
+  const [lightingPreset, setLightingPreset] = useState<LightingPreset>('spotlight');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
   const [editMode, setEditMode] = useState<EditMode>(null);
   const [playIntroSpin, setPlayIntroSpin] = useState(true);
