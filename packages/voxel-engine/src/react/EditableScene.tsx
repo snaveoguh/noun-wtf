@@ -317,6 +317,12 @@ export default function EditableScene({
   const localViewStateRef = useRef<EditableSceneViewState | null>(null);
   const orbitViewStateRef = viewStateRef ?? localViewStateRef;
 
+  // Flag to break the circular 3D→2D→3D rebuild loop:
+  // When the 3D editor syncs changes to the 2D pixel grid, the parent
+  // re-renders with new `pixels`. Without this guard the useEffect below
+  // would rebuild the voxel map from the 2D grid, reverting the edit.
+  const selfSyncRef = useRef(false);
+
   // Initialize as solid block with depth
   const [voxels, setVoxels] = useState<VoxelMap>(() =>
     initialVoxelMap ? new Map(initialVoxelMap) : pixelsToSolidBlock(pixels, DEFAULT_VOXEL_DEPTH),
@@ -329,8 +335,13 @@ export default function EditableScene({
   }, [initialVoxelMap]);
 
   // Re-init from the flat pixel grid when there is no saved voxel map
+  // (e.g. undo/redo from parent, layer toggle). Skip if we caused the change.
   useEffect(() => {
     if (initialVoxelMap) return;
+    if (selfSyncRef.current) {
+      selfSyncRef.current = false;
+      return;
+    }
     setVoxels(pixelsToSolidBlock(pixels, DEFAULT_VOXEL_DEPTH));
   }, [initialVoxelMap, pixels]);
 
@@ -373,6 +384,7 @@ export default function EditableScene({
       }
 
       if (changes.length > 0) {
+        selfSyncRef.current = true;
         onPixelsFill(changes);
       }
     },

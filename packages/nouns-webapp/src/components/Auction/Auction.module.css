@@ -95,11 +95,13 @@
 }
 
 .addTab {
-  min-width: 2.8rem;
-  padding-inline: 0.85rem;
+  min-width: auto;
+  padding-inline: 1rem;
   background: #f97316;
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   line-height: 1;
 }
 
@@ -131,6 +133,8 @@
 .heroArtFrame {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 .heroAscii {
@@ -161,14 +165,16 @@
 
 .railBtn {
   border: 0;
-  border-radius: 1.15rem;
-  padding: 0.65rem 0.78rem;
-  min-width: 4.35rem;
+  border-radius: 50%;
+  width: 3.8rem;
+  height: 3.8rem;
+  padding: 0.4rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.18rem;
+  gap: 0.15rem;
   background: rgba(255, 255, 255, 0.82);
   color: #201814;
   box-shadow: 0 12px 24px rgba(58, 37, 16, 0.12);
@@ -206,14 +212,13 @@
   left: 1rem;
   bottom: 1rem;
   z-index: 4;
-  border-radius: 999px;
-  padding: 0.55rem 0.85rem;
-  background: rgba(17, 24, 39, 0.86);
-  color: #fff7ed;
+  padding: 0;
+  background: none;
+  color: rgba(120, 110, 100, 0.5);
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

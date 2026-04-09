@@ -34,6 +34,94 @@ import { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './NounParallax.module.css';
 
+// ─── Lighting Presets ───────────────────────────────────────────────────────
+
+export type LightingPreset = 'spotlight' | 'studio' | 'storefront' | 'sunrise' | 'twilight' | 'ambient' | 'none';
+
+export const LIGHTING_PRESETS: { name: LightingPreset; label: string }[] = [
+  { name: 'spotlight', label: 'SPOT' },
+  { name: 'studio', label: 'STUDIO' },
+  { name: 'storefront', label: 'STORE' },
+  { name: 'sunrise', label: 'RISE' },
+  { name: 'twilight', label: 'TWLIT' },
+  { name: 'ambient', label: 'AMBI' },
+  { name: 'none', label: 'NONE' },
+];
+
+// Preset configs — same shape so React reuses the same DOM elements (no unmount/remount black flash)
+const LIGHT_CONFIGS: Record<LightingPreset, {
+  ambient: { intensity: number; color: string };
+  dir1: { position: [number, number, number]; intensity: number; color: string };
+  dir2: { position: [number, number, number]; intensity: number; color: string };
+  point1: { position: [number, number, number]; intensity: number; color: string };
+  spot: { position: [number, number, number]; intensity: number; color: string; angle: number };
+}> = {
+  spotlight: {
+    ambient: { intensity: 2.0, color: '#ffffff' },
+    dir1: { position: [-8, 5, 10], intensity: 0.8, color: '#ffffff' },
+    dir2: { position: [0, -5, -10], intensity: 0.2, color: '#ffffff' },
+    point1: { position: [0, -5, 8], intensity: 0.5, color: '#aaccff' },
+    spot: { position: [5, 12, 25], intensity: 4.0, color: '#ffffff', angle: 0.5 },
+  },
+  studio: {
+    ambient: { intensity: 1.5, color: '#ffffff' },
+    dir1: { position: [10, 15, 20], intensity: 2.0, color: '#ffffff' },
+    dir2: { position: [-10, 5, -5], intensity: 0.8, color: '#ccddff' },
+    point1: { position: [0, -5, -15], intensity: 0.5, color: '#ffeedd' },
+    spot: { position: [5, 12, 25], intensity: 0, color: '#ffffff', angle: 0.5 },
+  },
+  storefront: {
+    ambient: { intensity: 2.5, color: '#ffffff' },
+    dir1: { position: [0, 5, 15], intensity: 1.0, color: '#ffffff' },
+    dir2: { position: [0, 10, -5], intensity: 0.3, color: '#ffffff' },
+    point1: { position: [0, 0, 10], intensity: 0.2, color: '#ffffff' },
+    spot: { position: [5, 12, 25], intensity: 0, color: '#ffffff', angle: 0.5 },
+  },
+  sunrise: {
+    ambient: { intensity: 1.0, color: '#334466' },
+    dir1: { position: [20, 5, 10], intensity: 4.0, color: '#ffaa44' },
+    dir2: { position: [-10, -3, 5], intensity: 0.5, color: '#ff8833' },
+    point1: { position: [0, 0, 10], intensity: 0.2, color: '#ffcc66' },
+    spot: { position: [5, 12, 25], intensity: 0, color: '#ffffff', angle: 0.5 },
+  },
+  twilight: {
+    ambient: { intensity: 1.2, color: '#ff8844' },
+    dir1: { position: [-10, 15, -5], intensity: 2.0, color: '#cc6622' },
+    dir2: { position: [10, 5, 15], intensity: 0.6, color: '#6644cc' },
+    point1: { position: [8, -5, 10], intensity: 1.5, color: '#ff6644' },
+    spot: { position: [5, 12, 25], intensity: 0, color: '#ffffff', angle: 0.5 },
+  },
+  ambient: {
+    ambient: { intensity: 1.0, color: '#ff88cc' },
+    dir1: { position: [0, 15, 10], intensity: 0.4, color: '#ffddaa' },
+    dir2: { position: [0, 0, 10], intensity: 0, color: '#ffffff' },
+    point1: { position: [15, 5, 20], intensity: 3.0, color: '#ff44aa' },
+    spot: { position: [-15, 8, 10], intensity: 2.5, color: '#44ffee', angle: 1.0 },
+  },
+  none: {
+    ambient: { intensity: 0.5, color: '#ffffff' },
+    dir1: { position: [0, 10, 10], intensity: 0, color: '#ffffff' },
+    dir2: { position: [0, 0, 10], intensity: 0, color: '#ffffff' },
+    point1: { position: [0, 0, 10], intensity: 0, color: '#ffffff' },
+    spot: { position: [5, 12, 25], intensity: 0, color: '#ffffff', angle: 0.5 },
+  },
+};
+
+function SceneLighting({ preset = 'spotlight' }: { preset?: LightingPreset }) {
+  const c = LIGHT_CONFIGS[preset] ?? LIGHT_CONFIGS.storefront;
+  /* eslint-disable react/no-unknown-property */
+  return (
+    <>
+      <ambientLight intensity={c.ambient.intensity} color={c.ambient.color} />
+      <directionalLight position={c.dir1.position} intensity={c.dir1.intensity} color={c.dir1.color} />
+      <directionalLight position={c.dir2.position} intensity={c.dir2.intensity} color={c.dir2.color} />
+      <pointLight position={c.point1.position} intensity={c.point1.intensity} color={c.point1.color} />
+      <spotLight position={c.spot.position} intensity={c.spot.intensity} color={c.spot.color} angle={c.spot.angle} penumbra={0.6} castShadow />
+    </>
+  );
+  /* eslint-enable react/no-unknown-property */
+}
+
 // ─── Curated Head Component (self-contained, no external hook imports) ──────
 
 function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
@@ -127,13 +215,7 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
   }, [headIndex, seed?.glasses, bodyGeo]);
 
   if (!obj) return null;
-  return (
-    <>
-      <ambientLight intensity={2} />
-      <directionalLight position={[10, 20, 15]} intensity={0.8} />
-      <primitive object={obj} />
-    </>
-  );
+  return <primitive object={obj} />;
 }
 
 // ─── Tilt config ────────────────────────────────────────────────────────────
@@ -440,9 +522,10 @@ interface TiltSceneProps {
   tiltRef: React.MutableRefObject<Tilt>;
   layerVisibility?: LayerVisibility;
   autoSpin?: boolean;
+  lightingPreset?: LightingPreset;
 }
 
-function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false }: TiltSceneProps) {
+function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false, lightingPreset = 'spotlight' }: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
@@ -553,28 +636,26 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
 
   return (
     <>
-      {}
+      <SceneLighting preset={lightingPreset} />
       <group ref={groupRef}>
         {bodyGeo && (
-          <mesh geometry={bodyGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+          <mesh geometry={bodyGeo} receiveShadow>
+            <meshLambertMaterial vertexColors />
           </mesh>
         )}
         {blingGeo && (
-          <mesh geometry={blingGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+          <mesh geometry={blingGeo} receiveShadow>
+            <meshLambertMaterial vertexColors />
           </mesh>
         )}
-        {/* Head: hide voxel head when curated GLB loaded, but KEEP voxel glasses (correct trait) */}
         {!curatedHeadLoaded && headGeo && (
           <mesh geometry={headGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+            <meshLambertMaterial vertexColors />
           </mesh>
         )}
-        {/* Only show voxel glasses when no curated head (curated head has its own) */}
         {!curatedHeadLoaded && glassesGeo && (
           <mesh geometry={glassesGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+            <meshLambertMaterial vertexColors />
           </mesh>
         )}
         {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
@@ -592,6 +673,7 @@ interface InteractiveSceneProps {
   layerVisibility?: LayerVisibility;
   autoRotate?: boolean;
   interactionMode?: 'grab' | 'twist';
+  lightingPreset?: LightingPreset;
 }
 
 function InteractiveScene({
@@ -600,6 +682,7 @@ function InteractiveScene({
   layerVisibility,
   autoRotate = false,
   interactionMode = 'twist',
+  lightingPreset = 'spotlight',
 }: InteractiveSceneProps) {
   const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
   // Compare seed by value (not reference) so geometry rebuilds on navigation
@@ -634,25 +717,25 @@ function InteractiveScene({
 
   return (
     <>
-      {}
+      <SceneLighting preset={lightingPreset} />
       {bodyGeo && (
-        <mesh geometry={bodyGeo}>
-          <meshBasicMaterial vertexColors toneMapped={false} />
+        <mesh geometry={bodyGeo} receiveShadow>
+          <meshLambertMaterial vertexColors />
         </mesh>
       )}
       {blingGeo && (
-        <mesh geometry={blingGeo}>
-          <meshBasicMaterial vertexColors toneMapped={false} />
+        <mesh geometry={blingGeo} receiveShadow>
+          <meshLambertMaterial vertexColors />
         </mesh>
       )}
       {!curatedHeadLoaded && headGeo && (
         <mesh geometry={headGeo}>
-          <meshBasicMaterial vertexColors toneMapped={false} />
+          <meshLambertMaterial vertexColors />
         </mesh>
       )}
       {!curatedHeadLoaded && glassesGeo && (
         <mesh geometry={glassesGeo}>
-          <meshBasicMaterial vertexColors toneMapped={false} />
+          <meshLambertMaterial vertexColors />
         </mesh>
       )}
       {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
@@ -760,6 +843,7 @@ interface NounParallaxProps {
   autoSpin?: boolean;
   autoRotate?: boolean;
   pointerEnabled?: boolean;
+  lightingPreset?: LightingPreset;
 }
 
 // Lazy-load EditableScene (heavy — raycasting + individual meshes)
@@ -777,6 +861,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
   autoSpin = false,
   autoRotate = false,
   pointerEnabled = true,
+  lightingPreset = 'spotlight',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tiltRef = useRef<Tilt>({ x: 0, y: 0 });
@@ -907,14 +992,15 @@ const NounParallax: React.FC<NounParallaxProps> = ({
           fullscreen ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : undefined
         }
         camera={{ fov: 50, near: 1, far: 200 }}
+        shadows
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
           gl.outputColorSpace = THREE.SRGBColorSpace;
-          gl.toneMapping = THREE.NoToneMapping;
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.0;
         }}
         dpr={[1, 1.5]}
-        flat
         frameloop="always"
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
       >
@@ -943,6 +1029,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               layerVisibility={layerVisibility}
               autoRotate={autoRotate}
               interactionMode={interactionMode}
+              lightingPreset={lightingPreset}
             />
           ) : (
             <TiltScene
@@ -951,6 +1038,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               tiltRef={tiltRef}
               layerVisibility={layerVisibility}
               autoSpin={autoSpin}
+              lightingPreset={lightingPreset}
             />
           )}
         </Suspense>

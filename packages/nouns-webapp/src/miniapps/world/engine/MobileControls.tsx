@@ -1,6 +1,9 @@
 /**
- * MobileControls — Virtual joystick (left) + action buttons (right) for touch devices.
- * Feeds into the existing InputState system so game logic doesn't need changes.
+ * MobileControls — Virtual joystick (left) + arc of action buttons (right).
+ *
+ * 21 tiny buttons arranged in a curved arc along the right edge,
+ * Nokia N-Gage style. Each button injects its key into InputState
+ * so game logic doesn't need changes.
  */
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { InputState } from './input';
@@ -11,7 +14,83 @@ export function isTouchDevice(): boolean {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 }
 
-// ── Joystick Component ──────────────────────────────────────────────
+// ── Button definitions ─────────────────────────────────────────────
+
+interface ButtonDef {
+  icon: string;
+  key: string;       // key to inject into InputState
+  hold?: boolean;    // true = key stays held while touching
+  special?: 'jump' | 'shift'; // special handling
+}
+
+const BUTTONS: ButtonDef[] = [
+  // Combat (warm reds/oranges)
+  { icon: '👊', key: 'j' },
+  { icon: '🦶', key: 'k' },
+  { icon: '💥', key: 'h' },
+  { icon: '⬆', key: 'u' },
+  { icon: '🌀', key: 'q' },
+  // Movement (greens)
+  { icon: '⏫', key: ' ', special: 'jump' },
+  { icon: '🏃', key: 'r', hold: true },
+  { icon: '🛡', key: 'shift', hold: true, special: 'shift' },
+  // Weapons/Items (blues)
+  { icon: '🔫', key: 'f' },
+  { icon: '✋', key: 'e' },
+  // World actions (purples/pinks)
+  { icon: '🛹', key: 'v' },
+  { icon: '🎨', key: 'g' },
+  { icon: '🎤', key: 'm' },
+  { icon: '😄', key: 't' },
+  // Camera (light blues)
+  { icon: '🔍', key: 'z', hold: true },
+  { icon: '1', key: '1' },
+  { icon: '2', key: '2' },
+  { icon: '3', key: '3' },
+  { icon: '4', key: '4' },
+  { icon: '5', key: '5' },
+  // System
+  { icon: '✕', key: 'escape' },
+];
+
+// Rainbow gradient colors for the arc (bottom → top)
+const ARC_COLORS = [
+  '#ff4444', '#ff5533', '#ff6622', '#ff8811', '#ffaa00', // reds → orange
+  '#44ff88', '#22ddaa', '#00ccbb',                        // greens
+  '#4488ff', '#5566ff',                                   // blues
+  '#aa44ff', '#cc33ee', '#ee33aa', '#ff44aa',              // purples/pinks
+  '#88ddff', '#99ccff', '#aabbff', '#bbccff', '#ccddff', '#ddeeff', // camera blues
+  '#888888',                                               // exit gray
+];
+
+// ── Arc layout ─────────────────────────────────────────────────────
+
+const BTN_SIZE = 28;
+const ARC_RADIUS = 170;
+const ARC_CENTER_X = 30;  // offset from right edge (negative = off-screen right)
+const ARC_CENTER_Y_OFFSET = 60; // up from bottom
+const START_ANGLE = Math.PI * 0.05;  // near bottom-right
+const END_ANGLE = Math.PI * 0.48;    // near top-right
+
+// Seeded pseudo-random for consistent jitter
+function jitter(i: number): { dx: number; dy: number } {
+  const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  const dx = ((s - Math.floor(s)) - 0.5) * 4;
+  const t = Math.sin(i * 269.5 + 183.3) * 43758.5453;
+  const dy = ((t - Math.floor(t)) - 0.5) * 4;
+  return { dx, dy };
+}
+
+function getButtonPosition(index: number, total: number): { right: number; bottom: number } {
+  const t = total > 1 ? index / (total - 1) : 0;
+  const angle = START_ANGLE + t * (END_ANGLE - START_ANGLE);
+  const { dx, dy } = jitter(index);
+  const right = ARC_CENTER_X + Math.cos(angle) * ARC_RADIUS + dx;
+  const bottom = ARC_CENTER_Y_OFFSET + Math.sin(angle) * ARC_RADIUS + dy;
+  return { right, bottom };
+}
+
+// ── Joystick ───────────────────────────────────────────────────────
 
 const JOYSTICK_SIZE = 120;
 const KNOB_SIZE = 50;
@@ -20,11 +99,9 @@ const DEAD_ZONE = 0.15;
 interface MobileControlsProps {
   inputRef: React.RefObject<InputState>;
   onJump?: () => void;
-  onAttack?: () => void;
-  onInteract?: () => void;
 }
 
-const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump, onAttack, onInteract }) => {
+const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
   const joystickRef = useRef<HTMLDivElement>(null);
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
   const touchIdRef = useRef<number | null>(null);
@@ -56,7 +133,6 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump, onAttack, o
 
       setKnobPos({ x: nx * maxDist, y: ny * maxDist });
 
-      // Feed into input state
       const input = inputRef.current;
       if (input) {
         input.keys.delete('w');
@@ -94,6 +170,58 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump, onAttack, o
     return () => document.removeEventListener('touchmove', prevent);
   }, []);
 
+  // ── Button press/release handlers ──────────────────────────────
+
+  const handleButtonStart = useCallback((def: ButtonDef) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    if (def.special === 'jump') {
+      // Use the physics-aware jump callback
+      onJump?.();
+      // Also inject space for skating tricks etc
+      input.keys.add(' ');
+      input.justPressed.add(' ');
+      const now = Date.now();
+      if (now - input.lastSpaceTime < 400) {
+        input.spaceTaps++;
+      } else {
+        input.spaceTaps = 1;
+      }
+      input.lastSpaceTime = now;
+      if (!def.hold) {
+        setTimeout(() => { inputRef.current?.keys.delete(' '); }, 100);
+      }
+      return;
+    }
+
+    if (def.special === 'shift') {
+      input.shiftHeld = true;
+    }
+
+    input.keys.add(def.key);
+    input.justPressed.add(def.key);
+
+    if (!def.hold) {
+      setTimeout(() => { inputRef.current?.keys.delete(def.key); }, 100);
+    }
+  }, [inputRef, onJump]);
+
+  const handleButtonEnd = useCallback((def: ButtonDef) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    if (def.hold) {
+      input.keys.delete(def.key);
+    }
+    if (def.special === 'shift') {
+      input.shiftHeld = false;
+    }
+    if (def.special === 'jump' && def.hold) {
+      input.keys.delete(' ');
+    }
+  }, [inputRef]);
+
   return (
     <div data-mobile-controls style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
       {/* ── Left: Virtual Joystick ── */}
@@ -116,7 +244,6 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump, onAttack, o
           touchAction: 'none',
         }}
       >
-        {/* Knob */}
         <div
           style={{
             position: 'absolute',
@@ -133,84 +260,48 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump, onAttack, o
         />
       </div>
 
-      {/* ── Right: Action Buttons ── */}
-      <div
-        style={{
-          position: 'absolute',
-          right: 24,
-          bottom: 48,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          alignItems: 'center',
-          pointerEvents: 'auto',
-        }}
-      >
-        {/* Jump */}
-        <ActionButton
-          label="⬆"
-          color="rgba(0,255,200,0.25)"
-          borderColor="rgba(0,255,200,0.5)"
-          onPress={onJump}
-        />
-        {/* Attack */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <ActionButton
-            label="👊"
-            color="rgba(255,100,100,0.25)"
-            borderColor="rgba(255,100,100,0.5)"
-            onPress={onAttack}
-          />
-          {/* Interact */}
-          <ActionButton
-            label="E"
-            color="rgba(100,150,255,0.25)"
-            borderColor="rgba(100,150,255,0.5)"
-            onPress={onInteract}
-          />
-        </div>
-      </div>
+      {/* ── Right: Arc of action buttons ── */}
+      {BUTTONS.map((def, i) => {
+        const pos = getButtonPosition(i, BUTTONS.length);
+        const color = ARC_COLORS[i % ARC_COLORS.length];
+        return (
+          <button
+            key={def.key + i}
+            onTouchStart={(e) => { e.preventDefault(); handleButtonStart(def); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleButtonEnd(def); }}
+            onTouchCancel={() => handleButtonEnd(def)}
+            style={{
+              position: 'absolute',
+              right: pos.right,
+              bottom: pos.bottom,
+              width: BTN_SIZE,
+              height: BTN_SIZE,
+              borderRadius: '50%',
+              background: `${color}33`,
+              border: `1.5px solid ${color}88`,
+              color: '#fff',
+              fontSize: /^\d$/.test(def.icon) ? 11 : 13,
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'auto',
+              touchAction: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              lineHeight: 1,
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+              boxShadow: `0 0 6px ${color}44`,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {def.icon}
+          </button>
+        );
+      })}
     </div>
   );
 };
-
-function ActionButton({
-  label,
-  color,
-  borderColor,
-  onPress,
-}: {
-  label: string;
-  color: string;
-  borderColor: string;
-  onPress?: () => void;
-}) {
-  return (
-    <button
-      onTouchStart={(e) => {
-        e.preventDefault();
-        onPress?.();
-      }}
-      style={{
-        width: 56,
-        height: 56,
-        borderRadius: '50%',
-        background: color,
-        border: `2px solid ${borderColor}`,
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: 'bold',
-        fontFamily: 'monospace',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        touchAction: 'none',
-        cursor: 'pointer',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 export default MobileControls;
