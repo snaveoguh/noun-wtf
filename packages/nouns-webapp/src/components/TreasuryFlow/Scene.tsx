@@ -9,12 +9,39 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Html, OrbitControls, Stars } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
 import { getNounTexture, loadEnsAvatarTexture, loadNounSvgTexture } from './nounTextures';
 import type { NounSeed } from './nounTextures';
 import { particleFragmentShader, particleVertexShader } from './shaders';
+
+// ─── Force Resize (workaround for R3F not detecting parent dimensions) ──────
+
+function ForceResize() {
+  const { gl, camera, set } = useThree();
+  useEffect(() => {
+    const resize = () => {
+      const container = gl.domElement.parentElement?.parentElement;
+      if (!container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w < 100 || h < 100) return;
+      set({ size: { width: w, height: h, top: 0, left: 0 } });
+      gl.setSize(w, h);
+      gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      if ((camera as any).aspect) {
+        (camera as any).aspect = w / h;
+        (camera as any).updateProjectionMatrix();
+      }
+    };
+    resize();
+    const t1 = setTimeout(resize, 200);
+    const t2 = setTimeout(resize, 1000);
+    window.addEventListener('resize', resize);
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', resize); };
+  }, [gl, camera, set]);
+  return null;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -598,12 +625,15 @@ function NodeLabels({
   // Label top 40 nodes + treasury + hovered + searched
   const labelNodes = useMemo(() => {
     const sorted = [...nodes].sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut));
-    const topIds = new Set(sorted.slice(0, 40).map(n => n.id));
+    // Top 60 by volume always get labels
+    const topIds = new Set(sorted.slice(0, 60).map(n => n.id));
     topIds.add('treasury');
     if (hoveredId) topIds.add(hoveredId);
 
     return nodes.filter(n => {
       if (topIds.has(n.id)) return true;
+      // Any node with an ENS name gets a label (that's the point of resolving them)
+      if (n.ensName && !n.id.startsWith('0x') || (n.ensName && n.ensName !== n.id)) return true;
       if (hasSearch) {
         return searchTerms.some(
           t => n.name.toLowerCase().includes(t) || n.id.toLowerCase().includes(t),
@@ -847,6 +877,9 @@ export default function TreasuryScene({
       <pointLight position={[-100, -100, -200]} intensity={0.3} color="#8b5cf6" />
       <pointLight position={[0, 0, 0]} intensity={0.6} color="#FFD700" distance={200} decay={2} />
 
+      {/* Force resize on mount */}
+      <ForceResize />
+
       {/* Stars background */}
       <Stars radius={500} depth={100} count={3000} factor={3} saturation={0.1} fade speed={0.5} />
 
@@ -895,14 +928,10 @@ export default function TreasuryScene({
       {/* Camera auto-focus on search */}
       <CameraAutoFocus nodes={nodes} positions={positions} searchTerms={searchTerms} />
 
-      {/* Post-processing bloom */}
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.25}
-          luminanceSmoothing={0.9}
-          intensity={0.6}
-        />
-      </EffectComposer>
+      {/* Post-processing bloom — disabled for debugging */}
+      {/* <EffectComposer>
+        <Bloom luminanceThreshold={0.25} luminanceSmoothing={0.9} intensity={0.6} />
+      </EffectComposer> */}
     </>
   );
 }

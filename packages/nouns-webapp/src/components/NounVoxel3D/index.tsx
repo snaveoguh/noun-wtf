@@ -15,6 +15,10 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { useNounHead3D } from '@/hooks/useNounHead3D';
+import { HEAD_TRANSFORMS } from '@/lib/headAssets';
+import type { INounSeed } from '@/lib/headAssets';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface NounSeed {
@@ -40,12 +44,16 @@ export interface PredictResponse {
 
 type ViewMode = 'color' | 'silhouette';
 
-function VoxelScene({ layers, mode }: { layers: NounLayers; mode: ViewMode }) {
+function VoxelScene({ layers, mode, seed }: { layers: NounLayers; mode: ViewMode; seed?: INounSeed | null }) {
   const { bodyGeo, blingGeo, headGeo, glassesGeo } = useMemo(
     () => buildNounGeometries(layers),
     [layers],
   );
   const isColor = mode === 'color';
+
+  // 3-tier curated head loading
+  const { headObject, source: headSource } = useNounHead3D(seed);
+  const hasCuratedHead = headSource !== 'voxel' && headObject != null;
 
   const renderMesh = (geo: THREE.BufferGeometry | null, roughness: number) => {
     if (!geo) return null;
@@ -69,6 +77,9 @@ function VoxelScene({ layers, mode }: { layers: NounLayers; mode: ViewMode }) {
     );
   };
 
+  // Get transform for the curated head source
+  const headTransform = hasCuratedHead ? HEAD_TRANSFORMS[headSource] : null;
+
   return (
     <group>
       {/* eslint-disable react/no-unknown-property */}
@@ -77,10 +88,24 @@ function VoxelScene({ layers, mode }: { layers: NounLayers; mode: ViewMode }) {
       <directionalLight position={[-10, -5, -15]} intensity={0.1} />
       <directionalLight position={[-5, 10, -20]} intensity={0.15} />
 
+      {/* Body + Bling always voxel */}
       {renderMesh(bodyGeo, 0.8)}
       {renderMesh(blingGeo, 0.6)}
-      {renderMesh(headGeo, 0.72)}
-      {renderMesh(glassesGeo, 0.6)}
+
+      {/* Head: curated GLB if available, otherwise voxel */}
+      {hasCuratedHead && headTransform ? (
+        <primitive
+          object={headObject}
+          scale={headTransform.scale}
+          position={headTransform.position}
+          rotation={headTransform.rotation}
+        />
+      ) : (
+        <>
+          {renderMesh(headGeo, 0.72)}
+          {renderMesh(glassesGeo, 0.6)}
+        </>
+      )}
       {/* eslint-enable react/no-unknown-property */}
 
       <OrbitControls
@@ -186,7 +211,7 @@ const NounVoxel3D: FC<NounVoxel3DProps> = ({ onPredict, pollInterval = 3_000 }) 
           flat
         >
           <Suspense fallback={null}>
-            <VoxelScene layers={layers!} mode={mode} />
+            <VoxelScene layers={layers!} mode={mode} seed={prediction?.seed as INounSeed | null} />
           </Suspense>
         </Canvas>
       ) : (

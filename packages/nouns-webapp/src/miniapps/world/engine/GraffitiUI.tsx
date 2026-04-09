@@ -9,20 +9,24 @@ interface SprayUIProps {
   paintColor: string;
   ws: WebSocket | null;
   onClose: () => void;
+  /** Existing tags on this wall — drawn as base layer so new paint goes on top */
+  existingTags?: Array<{ imageData: string }>;
 }
 
 const SIZE = 256;
 const SPRAY_RADIUS = 8;
 
-export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayUIProps) {
+export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose, existingTags }: SprayUIProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
-  // Init canvas
+  // Init canvas — load existing graffiti as base layer so new paint goes ON TOP
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext('2d')!;
+
+    // Base wall color + noise texture
     ctx.fillStyle = '#c8c0b4';
     ctx.fillRect(0, 0, SIZE, SIZE);
     for (let i = 0; i < 300; i++) {
@@ -33,6 +37,27 @@ export function GraffitiUI({ wallId, playerId, paintColor, ws, onClose }: SprayU
         1 + Math.random() * 2,
         1 + Math.random() * 2,
       );
+    }
+
+    // Composite existing tags on top of base (oldest first)
+    if (existingTags && existingTags.length > 0) {
+      let loaded = 0;
+      const images: HTMLImageElement[] = [];
+      for (const tag of existingTags) {
+        const img = new Image();
+        img.onload = () => {
+          loaded++;
+          if (loaded === existingTags.length) {
+            ctx.imageSmoothingEnabled = false;
+            for (const loadedImg of images) {
+              ctx.drawImage(loadedImg, 0, 0, SIZE, SIZE);
+            }
+          }
+        };
+        img.onerror = () => { loaded++; };
+        img.src = tag.imageData;
+        images.push(img);
+      }
     }
   }, []);
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { useAccount, useBlockNumber, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useBlockNumber, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatEther } from 'viem';
 import { toast } from 'sonner';
 
 import {
@@ -79,6 +80,30 @@ export default function GrantDetailPage() {
           : writeError
             ? 'failed'
             : 'idle';
+
+  // Read grant actions (transactions) directly from contract
+  const { data: actions } = useReadContract({
+    address: SMALL_GRANTS_TREASURY_ADDRESS,
+    abi: smallGrantsTreasuryAbi,
+    functionName: 'getActions',
+    args: grantId ? [BigInt(grantId)] : undefined,
+    query: { enabled: !!grantId },
+  });
+
+  // Parse actions into readable format
+  const grantTransactions = actions
+    ? (actions as [string[], bigint[], string[], string[]])[0].map((target, i) => ({
+        target,
+        value: (actions as [string[], bigint[], string[], string[]])[1][i],
+        signature: (actions as [string[], bigint[], string[], string[]])[2][i],
+        calldata: (actions as [string[], bigint[], string[], string[]])[3][i],
+      }))
+    : [];
+
+  const totalEthRequested = grantTransactions.reduce(
+    (sum, tx) => sum + Number(formatEther(tx.value as bigint)),
+    0,
+  );
 
   useEffect(() => {
     toast.error('Noun Grants is experimental. Unaudited contract — use at your own risk.', {
@@ -263,6 +288,30 @@ export default function GrantDetailPage() {
       {totalVotes > 0 && (
         <div className={classes.voteBar}>
           <div className={classes.forBar} style={{ width: `${forPct}%` }} />
+        </div>
+      )}
+
+      {/* Requested Funds */}
+      {grantTransactions.length > 0 && (
+        <div className={classes.description} style={{ marginTop: '1.5rem', paddingTop: '1rem' }}>
+          <h3>Requested Funds — {totalEthRequested} ETH</h3>
+          {grantTransactions.map((tx, i) => (
+            <div key={i} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.5rem 0',
+              borderBottom: '1px solid #e5e7eb',
+              fontSize: '0.85rem',
+            }}>
+              <span style={{ fontFamily: 'monospace', color: '#555' }}>
+                → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
+              </span>
+              <span style={{ fontWeight: 700 }}>
+                {formatEther(tx.value as bigint)} ETH
+              </span>
+            </div>
+          ))}
         </div>
       )}
 

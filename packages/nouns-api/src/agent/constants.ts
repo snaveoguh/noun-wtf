@@ -112,4 +112,4 @@ export const MIN_NOUNS_FOR_DEPLOY = 4;
 // ─── Deploy Config ─────────────────────────────────────────────────────────
 export const MAX_DEPLOYS_PER_HOUR = 1;
 export const DEPLOY_ALLOWED_PATHS = ['packages/nouns-webapp/src/'] as const;
-export const GITHUB_REPO = process.env.GITHUB_REPO || 'mshrmstudio/noun-wtf';
+export const GITHUB_REPO = process.env.GITHUB_REPO || 'snaveoguh/noun-wtf';

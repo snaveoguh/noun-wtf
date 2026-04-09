@@ -34,6 +34,143 @@ import { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './NounParallax.module.css';
 
+// ─── Curated Head Component (self-contained, no external hook imports) ──────
+
+// Decode Nouns RLE image data to a 32x32 color grid (self-contained, no voxel-engine import)
+function decodeNounPartToCanvas(partData: string, palette: string[]): HTMLCanvasElement {
+  const hex = partData.replace(/^0x/, '');
+  const bounds = {
+    top: parseInt(hex.substring(2, 4), 16),
+    right: parseInt(hex.substring(4, 6), 16),
+    left: parseInt(hex.substring(8, 10), 16),
+  };
+  const pairs: [number, number][] =
+    hex.substring(10).match(/.{1,4}/g)
+      ?.map(r => [parseInt(r.substring(0, 2), 16), parseInt(r.substring(2, 4), 16)]) ?? [];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, 32, 32);
+
+  // Decode RLE pixels at their native coordinates (no offset needed —
+  // the 3DNouns GLB uses the same 32x32 Nouns pixel grid for UV mapping)
+  let x = bounds.left, y = bounds.top;
+  for (const [runLength, colorIndex] of pairs) {
+    for (let i = 0; i < runLength; i++) {
+      if (colorIndex !== 0 && y < 32 && x < 32) {
+        ctx.fillStyle = `#${palette[colorIndex]}`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      x++;
+      if (x >= bounds.right) {
+        x = bounds.left;
+        y++;
+      }
+    }
+  }
+  return canvas;
+}
+
+function CuratedHead({ headIndex, seed, bodyGeo, glassesGeo, onLoaded }: {
+  headIndex: number;
+  seed: INounSeed;
+  bodyGeo: THREE.BufferGeometry | null;
+  glassesGeo: THREE.BufferGeometry | null;
+  onLoaded?: (loaded: boolean) => void;
+}) {
+  const [obj, setObj] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    onLoaded?.(false);
+
+    (async () => {
+      try {
+        const res = await fetch('/models/heads/manifest.json');
+        if (!res.ok) return;
+        const manifest = await res.json();
+        const entry = manifest[headIndex];
+        const glbUrl = entry?.threeDNounsGlb;
+        if (!glbUrl || cancelled) return;
+
+        const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader');
+        const loader = new GLTFLoader();
+        const gltf = await loader.loadAsync(glbUrl);
+        if (cancelled) return;
+
+        const scene = gltf.scene;
+
+        // Swap glasses texture with pre-built one matching the seed's trait
+        const glassesTexUrl = `/models/heads/glasses-textures/${seed.glasses}.png`;
+        const texLoader = new THREE.TextureLoader();
+        const glassesTex = await texLoader.loadAsync(glassesTexUrl);
+        glassesTex.magFilter = THREE.NearestFilter;
+        glassesTex.minFilter = THREE.NearestFilter;
+        glassesTex.colorSpace = THREE.SRGBColorSpace;
+        scene.traverse((child) => {
+          if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
+            const mesh = child as THREE.Mesh;
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            if (mat?.map) {
+              glassesTex.flipY = mat.map.flipY;
+              mat.map.dispose();
+              mat.map = glassesTex;
+              mat.needsUpdate = true;
+            }
+          }
+        });
+
+        // All 3DNouns heads have identical bounds: x=-9..7, y=25..31, z=-0.5..0.5
+        // The GLB head bottom (Y=25) needs to align with the voxel body top
+        // The GLB center X (-1) needs to align with the voxel body center X (0)
+        // Voxel body/head are in a grid centered at (-15.5, -15.5) to (+15.5, +15.5)
+        // Head pixels sit at rows ~7-20 (Y = -8.5 to +4.5 in voxel coords)
+        // So GLB Y=25 should map to voxel Y ≈ -8.5 (where head meets body)
+
+        // Simple: shift GLB coords to voxel coords
+        // GLB X center = -1, voxel center = 0 → shift X by +1
+        // GLB Y=25 (head bottom) should go to voxel Y = -2 (rough neck line)
+        // GLB Z center = 0.25, voxel Z = 0.78 → shift Z by +0.53
+        const offsetX = 1;     // center the GLB horizontally
+        const offsetY = -27;   // shift GLB Y=25 down to voxel Y=-2
+        const offsetZ = 0.53;  // align Z depth
+
+        const matrix = new THREE.Matrix4();
+        matrix.makeTranslation(offsetX, offsetY, offsetZ);
+        scene.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh && child.visible) {
+            (child as THREE.Mesh).geometry?.applyMatrix4(matrix);
+          }
+        });
+
+        scene.position.set(0, 0, 0);
+        scene.scale.set(1, 1, 1);
+        scene.updateMatrixWorld(true);
+
+        if (!cancelled) {
+          setObj(scene);
+          onLoaded?.(true);
+        }
+      } catch {
+        if (!cancelled) onLoaded?.(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [headIndex, seed?.glasses, bodyGeo]);
+
+  if (!obj) return null;
+  return (
+    <>
+      <ambientLight intensity={2} />
+      <directionalLight position={[10, 20, 15]} intensity={0.8} />
+      <primitive object={obj} />
+    </>
+  );
+}
+
 // ─── Tilt config ────────────────────────────────────────────────────────────
 
 interface Tilt {
@@ -344,8 +481,10 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
+  const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
   const prevSeedRef = useRef<string>('');
   const prevVoxelsRef = useRef<FlatVoxel[] | null>(null);
+
   const [transition, setTransition] = useState<{
     oldVoxels: FlatVoxel[];
     newVoxels: FlatVoxel[];
@@ -461,16 +600,19 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
-        {headGeo && (
+        {/* Head: hide voxel head when curated GLB loaded, but KEEP voxel glasses (correct trait) */}
+        {!curatedHeadLoaded && headGeo && (
           <mesh geometry={headGeo}>
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
-        {glassesGeo && (
+        {/* Only show voxel glasses when no curated head (curated head has its own) */}
+        {!curatedHeadLoaded && glassesGeo && (
           <mesh geometry={glassesGeo}>
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
+        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} glassesGeo={glassesGeo} onLoaded={setCuratedHeadLoaded} />}
       </group>
       {}
     </>
@@ -494,6 +636,7 @@ function InteractiveScene({
   autoRotate = false,
   interactionMode = 'twist',
 }: InteractiveSceneProps) {
+  const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
   // Compare seed by value (not reference) so geometry rebuilds on navigation
   const seedKey = seed
     ? `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`
@@ -537,16 +680,17 @@ function InteractiveScene({
           <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
-      {headGeo && (
+      {!curatedHeadLoaded && headGeo && (
         <mesh geometry={headGeo}>
           <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
-      {glassesGeo && (
+      {!curatedHeadLoaded && glassesGeo && (
         <mesh geometry={glassesGeo}>
           <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
+      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} glassesGeo={glassesGeo} onLoaded={setCuratedHeadLoaded} />}
 
       <OrbitControls
         enablePan={interactionMode === 'grab'}

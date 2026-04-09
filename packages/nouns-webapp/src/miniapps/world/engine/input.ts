@@ -41,7 +41,17 @@ export function createInputState(): InputState {
 
 /** Attach listeners, return cleanup function */
 export function attachInputListeners(canvas: HTMLCanvasElement, state: InputState): () => void {
+  const isTyping = (e: KeyboardEvent): boolean => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if ((e.target as HTMLElement)?.isContentEditable) return true;
+    return false;
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
+    // Don't capture keys when user is typing in an input/textarea/chat
+    if (isTyping(e)) return;
+
     const k = e.key.toLowerCase();
     if (!state.keys.has(k)) {
       state.keys.add(k);
@@ -65,6 +75,9 @@ export function attachInputListeners(canvas: HTMLCanvasElement, state: InputStat
   };
 
   const onKeyUp = (e: KeyboardEvent) => {
+    // Don't capture keys when user is typing
+    if (isTyping(e)) return;
+
     const k = e.key.toLowerCase();
     state.keys.delete(k);
     if (k === 'shift') state.shiftHeld = false;
