@@ -406,7 +406,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   );
 
   const startEditing = useCallback(
-    (mode: Exclude<EditMode, null>) => {
+    async (mode: Exclude<EditMode, null>) => {
       if (mode === '2d') {
         const pixels = liveDrafts?.pixel?.pixels ?? baseGrid;
         resetLive2dSignature(pixels);
@@ -414,8 +414,21 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       } else {
         const pixels = liveDrafts?.voxel?.pixels ?? liveDrafts?.pixel?.pixels ?? baseGrid;
         resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
-        setEdit3dStartVoxelMap(liveVoxelMap);
-        voxelMapRef.current = liveVoxelMap;
+
+        // Try loading curated 3DNouns head as starting voxel map
+        let startMap = liveVoxelMap;
+        if (!startMap && currentNounSeed) {
+          try {
+            const curated = await loadCuratedVoxelMap(currentNounSeed.head);
+            if (curated && curated.size > 0) {
+              startMap = curated;
+              console.log(`[Editor] Loaded curated 3DNouns head for trait ${currentNounSeed.head}`);
+            }
+          } catch { /* no curated head available */ }
+        }
+
+        setEdit3dStartVoxelMap(startMap);
+        voxelMapRef.current = startMap;
         edit3dViewStateRef.current = null;
         setEdit3dInteractionMode('sculpt');
         setViewMode('edit-3d');
@@ -423,7 +436,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       }
       setEditMode(mode);
     },
-    [baseGrid, liveDrafts, liveVoxelMap, resetLive2dSignature, resetLive3dSignature],
+    [baseGrid, liveDrafts, liveVoxelMap, currentNounSeed, resetLive2dSignature, resetLive3dSignature],
   );
 
   // Load a curated 3D head into the editor as a starting point
