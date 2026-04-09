@@ -21,6 +21,8 @@
     0.45rem
     max(1.5rem, var(--page-edge-padding-left, 1.5rem)) !important;
   background: transparent;
+  position: relative;
+  z-index: 50;
 }
 
 .navBarInner {

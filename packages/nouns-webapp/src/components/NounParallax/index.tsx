@@ -57,11 +57,11 @@ const LIGHT_CONFIGS: Record<LightingPreset, {
   spot: { position: [number, number, number]; intensity: number; color: string; angle: number };
 }> = {
   spotlight: {
-    ambient: { intensity: 2.0, color: '#ffffff' },
-    dir1: { position: [-8, 5, 10], intensity: 0.8, color: '#ffffff' },
+    ambient: { intensity: 2.2, color: '#ffffff' },
+    dir1: { position: [-8, 5, 10], intensity: 0.6, color: '#ffffff' },
     dir2: { position: [0, -5, -10], intensity: 0.2, color: '#ffffff' },
-    point1: { position: [0, -5, 8], intensity: 0.5, color: '#aaccff' },
-    spot: { position: [5, 12, 25], intensity: 4.0, color: '#ffffff', angle: 0.5 },
+    point1: { position: [0, -5, 8], intensity: 0.3, color: '#aaccff' },
+    spot: { position: [5, 20, 30], intensity: 2.0, color: '#ffffff', angle: 0.8 },
   },
   studio: {
     ambient: { intensity: 1.5, color: '#ffffff' },
@@ -124,11 +124,12 @@ function SceneLighting({ preset = 'spotlight' }: { preset?: LightingPreset }) {
 
 // ─── Curated Head Component (self-contained, no external hook imports) ──────
 
-function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
+function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
   headIndex: number;
   seed: INounSeed;
   bodyGeo: THREE.BufferGeometry | null;
   onLoaded?: (loaded: boolean) => void;
+  onGlassesZ?: (z: number) => void;
 }) {
   const [obj, setObj] = useState<THREE.Object3D | null>(null);
 
@@ -152,26 +153,37 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
 
         const scene = gltf.scene;
 
-        // Swap glasses texture with pre-built one matching the seed's trait
-        const glassesTexUrl = `/models/heads/glasses-textures/${seed.glasses}.png`;
-        const texLoader = new THREE.TextureLoader();
-        const glassesTex = await texLoader.loadAsync(glassesTexUrl);
-        glassesTex.magFilter = THREE.NearestFilter;
-        glassesTex.minFilter = THREE.NearestFilter;
-        glassesTex.colorSpace = THREE.SRGBColorSpace;
-        scene.traverse((child) => {
-          if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
-            const mesh = child as THREE.Mesh;
-            const mat = mesh.material as THREE.MeshStandardMaterial;
-            if (mat?.map) {
-              glassesTex.flipY = mat.map.flipY;
-              mat.map.dispose();
-              mat.map = glassesTex;
-              mat.side = THREE.FrontSide;
-              mat.needsUpdate = true;
+        // Hip-rose (index 0) has a unique thicker shape the GLB mesh can't represent.
+        // Hide GLB glasses for hip-rose — the voxel glasses layer will be shown instead.
+        const isHipRose = seed.glasses === 0;
+        if (isHipRose) {
+          scene.traverse((child) => {
+            if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
+              child.visible = false;
             }
-          }
-        });
+          });
+        } else {
+          // Swap glasses texture with pre-built one matching the seed's trait
+          const glassesTexUrl = `/models/heads/glasses-textures/${seed.glasses}.png`;
+          const texLoader = new THREE.TextureLoader();
+          const glassesTex = await texLoader.loadAsync(glassesTexUrl);
+          glassesTex.magFilter = THREE.NearestFilter;
+          glassesTex.minFilter = THREE.NearestFilter;
+          glassesTex.colorSpace = THREE.SRGBColorSpace;
+          scene.traverse((child) => {
+            if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
+              const mesh = child as THREE.Mesh;
+              const mat = mesh.material as THREE.MeshStandardMaterial;
+              if (mat?.map) {
+                glassesTex.flipY = mat.map.flipY;
+                mat.map.dispose();
+                mat.map = glassesTex;
+                mat.side = THREE.FrontSide;
+                mat.needsUpdate = true;
+              }
+            }
+          });
+        }
 
         // All 3DNouns heads have identical bounds: x=-9..7, y=25..31, z=-0.5..0.5
         // The GLB head bottom (Y=25) needs to align with the voxel body top
@@ -204,6 +216,11 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
         scene.updateMatrixWorld(true);
 
         if (!cancelled) {
+          // Compute front face Z for voxel glasses positioning (hip-rose)
+          if (isHipRose) {
+            const box = new THREE.Box3().setFromObject(scene);
+            onGlassesZ?.(box.max.z + 0.5); // glasses sit just in front of the head
+          }
           setObj(scene);
           onLoaded?.(true);
         }
@@ -531,6 +548,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false,
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
   const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
+  const [glassesZ, setGlassesZ] = useState<number | null>(null);
   const prevSeedRef = useRef<string>('');
   const prevVoxelsRef = useRef<FlatVoxel[] | null>(null);
 
@@ -654,12 +672,15 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false,
             <meshLambertMaterial vertexColors />
           </mesh>
         )}
-        {!curatedHeadLoaded && glassesGeo && (
-          <mesh geometry={glassesGeo}>
-            <meshLambertMaterial vertexColors />
-          </mesh>
+        {/* Show voxel glasses when: no curated head, OR hip-rose (curated head hides its GLB glasses) */}
+        {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
+          <group position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}>
+            <mesh geometry={glassesGeo}>
+              <meshLambertMaterial vertexColors />
+            </mesh>
+          </group>
         )}
-        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
+        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} onGlassesZ={setGlassesZ} />}
       </group>
       {}
     </>
@@ -686,6 +707,7 @@ function InteractiveScene({
   lightingPreset = 'spotlight',
 }: InteractiveSceneProps) {
   const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
+  const [glassesZ, setGlassesZ] = useState<number | null>(null);
   // Compare seed by value (not reference) so geometry rebuilds on navigation
   const seedKey = seed
     ? `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`
@@ -734,12 +756,14 @@ function InteractiveScene({
           <meshLambertMaterial vertexColors />
         </mesh>
       )}
-      {!curatedHeadLoaded && glassesGeo && (
-        <mesh geometry={glassesGeo}>
-          <meshLambertMaterial vertexColors />
-        </mesh>
+      {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
+        <group position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}>
+          <mesh geometry={glassesGeo}>
+            <meshLambertMaterial vertexColors />
+          </mesh>
+        </group>
       )}
-      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
+      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} onGlassesZ={setGlassesZ} />}
 
       <OrbitControls
         enablePan={interactionMode === 'grab'}
