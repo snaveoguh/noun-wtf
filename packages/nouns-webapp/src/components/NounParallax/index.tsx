@@ -167,6 +167,7 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
               glassesTex.flipY = mat.map.flipY;
               mat.map.dispose();
               mat.map = glassesTex;
+              mat.side = THREE.FrontSide;
               mat.needsUpdate = true;
             }
           }
@@ -997,8 +998,8 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
           gl.outputColorSpace = THREE.SRGBColorSpace;
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.0;
+          gl.toneMapping = THREE.LinearToneMapping;
+          gl.toneMappingExposure = 1.2;
         }}
         dpr={[1, 1.5]}
         frameloop="always"
