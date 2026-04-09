@@ -1,0 +1,1550 @@
+[
+  {
+    "traitIndex": 0,
+    "traitName": "aardvark",
+    "noundryGlb": "/models/heads/noundry/aardvark.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadAardvark.glb"
+  },
+  {
+    "traitIndex": 1,
+    "traitName": "abstract",
+    "noundryGlb": "/models/heads/noundry/abstract.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 2,
+    "traitName": "ape",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadApe.glb"
+  },
+  {
+    "traitIndex": 3,
+    "traitName": "bag",
+    "noundryGlb": "/models/heads/noundry/bag.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBag.glb"
+  },
+  {
+    "traitIndex": 4,
+    "traitName": "bagpipe",
+    "noundryGlb": "/models/heads/noundry/bagpipe.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBagPipe.glb"
+  },
+  {
+    "traitIndex": 5,
+    "traitName": "banana",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBanana.glb"
+  },
+  {
+    "traitIndex": 6,
+    "traitName": "bank",
+    "noundryGlb": "/models/heads/noundry/bank.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBank.glb"
+  },
+  {
+    "traitIndex": 7,
+    "traitName": "baseball-gameball",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBaseball.glb"
+  },
+  {
+    "traitIndex": 8,
+    "traitName": "basketball",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBasketball.glb"
+  },
+  {
+    "traitIndex": 9,
+    "traitName": "bat",
+    "noundryGlb": "/models/heads/noundry/bat.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBat.glb"
+  },
+  {
+    "traitIndex": 10,
+    "traitName": "bear",
+    "noundryGlb": "/models/heads/noundry/bear.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBear.glb"
+  },
+  {
+    "traitIndex": 11,
+    "traitName": "beer",
+    "noundryGlb": "/models/heads/noundry/beer.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 12,
+    "traitName": "beet",
+    "noundryGlb": "/models/heads/noundry/beet.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBeet.glb"
+  },
+  {
+    "traitIndex": 13,
+    "traitName": "bell",
+    "noundryGlb": "/models/heads/noundry/bell.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBell.glb"
+  },
+  {
+    "traitIndex": 14,
+    "traitName": "bigfoot-yeti",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 15,
+    "traitName": "bigfoot",
+    "noundryGlb": "/models/heads/noundry/bigfoot.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBigfoot.glb"
+  },
+  {
+    "traitIndex": 16,
+    "traitName": "blackhole",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBlackhole.glb"
+  },
+  {
+    "traitIndex": 17,
+    "traitName": "blueberry",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBlueberry.glb"
+  },
+  {
+    "traitIndex": 18,
+    "traitName": "bomb",
+    "noundryGlb": "/models/heads/noundry/bomb.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBomb.glb"
+  },
+  {
+    "traitIndex": 19,
+    "traitName": "bonsai",
+    "noundryGlb": "/models/heads/noundry/bonsai.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBonsai.glb"
+  },
+  {
+    "traitIndex": 20,
+    "traitName": "boombox",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 21,
+    "traitName": "boot",
+    "noundryGlb": "/models/heads/noundry/boot.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 22,
+    "traitName": "box",
+    "noundryGlb": "/models/heads/noundry/box.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBox.glb"
+  },
+  {
+    "traitIndex": 23,
+    "traitName": "boxingglove",
+    "noundryGlb": "/models/heads/noundry/boxingglove.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBoxingGlove.glb"
+  },
+  {
+    "traitIndex": 24,
+    "traitName": "brain",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBrain.glb"
+  },
+  {
+    "traitIndex": 25,
+    "traitName": "bubble-speech",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBubbleSpeech.glb"
+  },
+  {
+    "traitIndex": 26,
+    "traitName": "bubblegum",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBubbleGum.glb"
+  },
+  {
+    "traitIndex": 27,
+    "traitName": "burger-dollarmenu",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadBurgerDollarMenu.glb"
+  },
+  {
+    "traitIndex": 28,
+    "traitName": "cake",
+    "noundryGlb": "/models/heads/noundry/cake.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 29,
+    "traitName": "calculator",
+    "noundryGlb": "/models/heads/noundry/calculator.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCalculator.glb"
+  },
+  {
+    "traitIndex": 30,
+    "traitName": "calendar",
+    "noundryGlb": "/models/heads/noundry/calendar.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCalendar.glb"
+  },
+  {
+    "traitIndex": 31,
+    "traitName": "camcorder",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCamcorder.glb"
+  },
+  {
+    "traitIndex": 32,
+    "traitName": "cannedham",
+    "noundryGlb": "/models/heads/noundry/cannedham.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 33,
+    "traitName": "car",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCar.glb"
+  },
+  {
+    "traitIndex": 34,
+    "traitName": "cash-register",
+    "noundryGlb": "/models/heads/noundry/cashregister.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCashRegister.glb"
+  },
+  {
+    "traitIndex": 35,
+    "traitName": "cassettetape",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 36,
+    "traitName": "cat",
+    "noundryGlb": "/models/heads/noundry/cat.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 37,
+    "traitName": "cd",
+    "noundryGlb": "/models/heads/noundry/cd.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 38,
+    "traitName": "chain",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChain.glb"
+  },
+  {
+    "traitIndex": 39,
+    "traitName": "chainsaw",
+    "noundryGlb": "/models/heads/noundry/chainsaw.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChainsaw.glb"
+  },
+  {
+    "traitIndex": 40,
+    "traitName": "chameleon",
+    "noundryGlb": "/models/heads/noundry/chameleon.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChameleon.glb"
+  },
+  {
+    "traitIndex": 41,
+    "traitName": "chart-bars",
+    "noundryGlb": "/models/heads/noundry/chartbars.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChartBars.glb"
+  },
+  {
+    "traitIndex": 42,
+    "traitName": "cheese",
+    "noundryGlb": "/models/heads/noundry/cheese.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCheese.glb"
+  },
+  {
+    "traitIndex": 43,
+    "traitName": "chefhat",
+    "noundryGlb": "/models/heads/noundry/chefhat.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChefHat.glb"
+  },
+  {
+    "traitIndex": 44,
+    "traitName": "cherry",
+    "noundryGlb": "/models/heads/noundry/cherry.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCherry.glb"
+  },
+  {
+    "traitIndex": 45,
+    "traitName": "chicken",
+    "noundryGlb": "/models/heads/noundry/chicken.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChicken.glb"
+  },
+  {
+    "traitIndex": 46,
+    "traitName": "chilli",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChili.glb"
+  },
+  {
+    "traitIndex": 47,
+    "traitName": "chipboard",
+    "noundryGlb": "/models/heads/noundry/chipboard.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChipBoard.glb"
+  },
+  {
+    "traitIndex": 48,
+    "traitName": "chips",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChips.glb"
+  },
+  {
+    "traitIndex": 49,
+    "traitName": "chocolate",
+    "noundryGlb": "/models/heads/noundry/chocolate.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadChocolate.glb"
+  },
+  {
+    "traitIndex": 50,
+    "traitName": "cloud",
+    "noundryGlb": "/models/heads/noundry/cloud.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 51,
+    "traitName": "clover",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 52,
+    "traitName": "clutch",
+    "noundryGlb": "/models/heads/noundry/clutch.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadClutch.glb"
+  },
+  {
+    "traitIndex": 53,
+    "traitName": "coffeebean",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCoffeebean.glb"
+  },
+  {
+    "traitIndex": 54,
+    "traitName": "cone",
+    "noundryGlb": "/models/heads/noundry/cone.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCone.glb"
+  },
+  {
+    "traitIndex": 55,
+    "traitName": "console-handheld",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 56,
+    "traitName": "cookie",
+    "noundryGlb": "/models/heads/noundry/cookie.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCookie.glb"
+  },
+  {
+    "traitIndex": 57,
+    "traitName": "cordlessphone",
+    "noundryGlb": "/models/heads/noundry/cordlessphone.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCordlessphone.glb"
+  },
+  {
+    "traitIndex": 58,
+    "traitName": "cottonball",
+    "noundryGlb": "/models/heads/noundry/cottonball.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCottonBall.glb"
+  },
+  {
+    "traitIndex": 59,
+    "traitName": "cow",
+    "noundryGlb": "/models/heads/noundry/cow.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCow.glb"
+  },
+  {
+    "traitIndex": 60,
+    "traitName": "crab",
+    "noundryGlb": "/models/heads/noundry/crab.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 61,
+    "traitName": "crane",
+    "noundryGlb": "/models/heads/noundry/crane.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCrane.glb"
+  },
+  {
+    "traitIndex": 62,
+    "traitName": "croc-hat",
+    "noundryGlb": "/models/heads/noundry/crochat.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCrocHat.glb"
+  },
+  {
+    "traitIndex": 63,
+    "traitName": "crown",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 64,
+    "traitName": "crt-bsod",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCrtBsod.glb"
+  },
+  {
+    "traitIndex": 65,
+    "traitName": "crystalball",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadCrystalBall.glb"
+  },
+  {
+    "traitIndex": 66,
+    "traitName": "diamond-blue",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDiamondBlue.glb"
+  },
+  {
+    "traitIndex": 67,
+    "traitName": "diamond-red",
+    "noundryGlb": "/models/heads/noundry/diamondred.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDiamondRed.glb"
+  },
+  {
+    "traitIndex": 68,
+    "traitName": "dictionary",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDictionary.glb"
+  },
+  {
+    "traitIndex": 69,
+    "traitName": "dino",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDino.glb"
+  },
+  {
+    "traitIndex": 70,
+    "traitName": "dna",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/DNAHead.glb"
+  },
+  {
+    "traitIndex": 71,
+    "traitName": "dog",
+    "noundryGlb": "/models/heads/noundry/dog.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDog.glb"
+  },
+  {
+    "traitIndex": 72,
+    "traitName": "doughnut",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDoughnut.glb"
+  },
+  {
+    "traitIndex": 73,
+    "traitName": "drill",
+    "noundryGlb": "/models/heads/noundry/drill.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDrill.glb"
+  },
+  {
+    "traitIndex": 74,
+    "traitName": "duck",
+    "noundryGlb": "/models/heads/noundry/duck.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDuck.glb"
+  },
+  {
+    "traitIndex": 75,
+    "traitName": "ducky",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadDucky.glb"
+  },
+  {
+    "traitIndex": 76,
+    "traitName": "earth",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadEarth.glb"
+  },
+  {
+    "traitIndex": 77,
+    "traitName": "egg",
+    "noundryGlb": "/models/heads/noundry/egg.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 78,
+    "traitName": "faberge",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFaberge.glb"
+  },
+  {
+    "traitIndex": 79,
+    "traitName": "factory-dark",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFactory.glb"
+  },
+  {
+    "traitIndex": 80,
+    "traitName": "fan",
+    "noundryGlb": "/models/heads/noundry/fan.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFan.glb"
+  },
+  {
+    "traitIndex": 81,
+    "traitName": "fence",
+    "noundryGlb": "/models/heads/noundry/fence.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFence.glb"
+  },
+  {
+    "traitIndex": 82,
+    "traitName": "film-35mm",
+    "noundryGlb": "/models/heads/noundry/film35mm.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFilm35mm.glb"
+  },
+  {
+    "traitIndex": 83,
+    "traitName": "film-strip",
+    "noundryGlb": "/models/heads/noundry/filmstrip.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFilmStrip.glb"
+  },
+  {
+    "traitIndex": 84,
+    "traitName": "fir",
+    "noundryGlb": "/models/heads/noundry/fir.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFir.glb"
+  },
+  {
+    "traitIndex": 85,
+    "traitName": "firehydrant",
+    "noundryGlb": "/models/heads/noundry/firehydrant.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFireHydrant.glb"
+  },
+  {
+    "traitIndex": 86,
+    "traitName": "flamingo",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFlamingo.glb"
+  },
+  {
+    "traitIndex": 87,
+    "traitName": "flower",
+    "noundryGlb": "/models/heads/noundry/flower.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadFlower.glb"
+  },
+  {
+    "traitIndex": 88,
+    "traitName": "fox",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/FoxHead.glb"
+  },
+  {
+    "traitIndex": 89,
+    "traitName": "frog",
+    "noundryGlb": "/models/heads/noundry/frog.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 90,
+    "traitName": "garlic",
+    "noundryGlb": "/models/heads/noundry/garlic.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadGarlic.glb"
+  },
+  {
+    "traitIndex": 91,
+    "traitName": "gavel",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadGavel.glb"
+  },
+  {
+    "traitIndex": 92,
+    "traitName": "ghost-B",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 93,
+    "traitName": "glasses-big",
+    "noundryGlb": "/models/heads/noundry/glassesbig.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 94,
+    "traitName": "gnome",
+    "noundryGlb": "/models/heads/noundry/gnome.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 95,
+    "traitName": "goat",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 96,
+    "traitName": "goldcoin",
+    "noundryGlb": "/models/heads/noundry/goldcoin.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadGoldcoin.glb"
+  },
+  {
+    "traitIndex": 97,
+    "traitName": "goldfish",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadGoldFish.glb"
+  },
+  {
+    "traitIndex": 98,
+    "traitName": "grouper",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 99,
+    "traitName": "hair",
+    "noundryGlb": "/models/heads/noundry/hair.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHair.glb"
+  },
+  {
+    "traitIndex": 100,
+    "traitName": "hardhat",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHardHat.glb"
+  },
+  {
+    "traitIndex": 101,
+    "traitName": "heart",
+    "noundryGlb": "/models/heads/noundry/heart.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 102,
+    "traitName": "helicopter",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 103,
+    "traitName": "highheel",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHighHeels.glb"
+  },
+  {
+    "traitIndex": 104,
+    "traitName": "hockeypuck",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHockeyPuck.glb"
+  },
+  {
+    "traitIndex": 105,
+    "traitName": "horse-deepfried",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHorseDeepFried.glb"
+  },
+  {
+    "traitIndex": 106,
+    "traitName": "hotdog",
+    "noundryGlb": "/models/heads/noundry/hotdog.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HotDog.glb"
+  },
+  {
+    "traitIndex": 107,
+    "traitName": "house",
+    "noundryGlb": "/models/heads/noundry/house.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadHouse.glb"
+  },
+  {
+    "traitIndex": 108,
+    "traitName": "icepop-b",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 109,
+    "traitName": "igloo",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadIgloo.glb"
+  },
+  {
+    "traitIndex": 110,
+    "traitName": "island",
+    "noundryGlb": "/models/heads/noundry/island.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadIsland.glb"
+  },
+  {
+    "traitIndex": 111,
+    "traitName": "jellyfish",
+    "noundryGlb": "/models/heads/noundry/jellyfish.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadJellyFish.glb"
+  },
+  {
+    "traitIndex": 112,
+    "traitName": "jupiter",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadJupiter.glb"
+  },
+  {
+    "traitIndex": 113,
+    "traitName": "kangaroo",
+    "noundryGlb": "/models/heads/noundry/kangaroo.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadKangaroo.glb"
+  },
+  {
+    "traitIndex": 114,
+    "traitName": "ketchup",
+    "noundryGlb": "/models/heads/noundry/ketchup.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadKetchup.glb"
+  },
+  {
+    "traitIndex": 115,
+    "traitName": "laptop",
+    "noundryGlb": "/models/heads/noundry/laptop.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 116,
+    "traitName": "lightning-bolt",
+    "noundryGlb": "/models/heads/noundry/lightningbolt.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadLightningBolt.glb"
+  },
+  {
+    "traitIndex": 117,
+    "traitName": "lint",
+    "noundryGlb": "/models/heads/noundry/lint.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadLint.glb"
+  },
+  {
+    "traitIndex": 118,
+    "traitName": "lips",
+    "noundryGlb": "/models/heads/noundry/lips.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadLips.glb"
+  },
+  {
+    "traitIndex": 119,
+    "traitName": "lipstick2",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadLipstick.glb"
+  },
+  {
+    "traitIndex": 120,
+    "traitName": "lock",
+    "noundryGlb": "/models/heads/noundry/lock.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadLock.glb"
+  },
+  {
+    "traitIndex": 121,
+    "traitName": "macaroni",
+    "noundryGlb": "/models/heads/noundry/macaroni.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMacaroni.glb"
+  },
+  {
+    "traitIndex": 122,
+    "traitName": "mailbox",
+    "noundryGlb": "/models/heads/noundry/mailbox.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMailbox.glb"
+  },
+  {
+    "traitIndex": 123,
+    "traitName": "maze",
+    "noundryGlb": "/models/heads/noundry/maze.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMaze.glb"
+  },
+  {
+    "traitIndex": 124,
+    "traitName": "microwave",
+    "noundryGlb": "/models/heads/noundry/microwave.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 125,
+    "traitName": "milk",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMilk.glb"
+  },
+  {
+    "traitIndex": 126,
+    "traitName": "mirror",
+    "noundryGlb": "/models/heads/noundry/mirror.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMirror.glb"
+  },
+  {
+    "traitIndex": 127,
+    "traitName": "mixer",
+    "noundryGlb": "/models/heads/noundry/mixer.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 128,
+    "traitName": "moon",
+    "noundryGlb": "/models/heads/noundry/moon.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMoon.glb"
+  },
+  {
+    "traitIndex": 129,
+    "traitName": "moose",
+    "noundryGlb": "/models/heads/noundry/moose.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMoose.glb"
+  },
+  {
+    "traitIndex": 130,
+    "traitName": "mosquito",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMosquito.glb"
+  },
+  {
+    "traitIndex": 131,
+    "traitName": "mountain-snowcap",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMountain.glb"
+  },
+  {
+    "traitIndex": 132,
+    "traitName": "mouse",
+    "noundryGlb": "/models/heads/noundry/mouse.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMouse.glb"
+  },
+  {
+    "traitIndex": 133,
+    "traitName": "mug",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMug.glb"
+  },
+  {
+    "traitIndex": 134,
+    "traitName": "mushroom",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 135,
+    "traitName": "mustard",
+    "noundryGlb": "/models/heads/noundry/mustard.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadMustard.glb"
+  },
+  {
+    "traitIndex": 136,
+    "traitName": "nigiri",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 137,
+    "traitName": "noodles",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 138,
+    "traitName": "onion",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadOnion.glb"
+  },
+  {
+    "traitIndex": 139,
+    "traitName": "orangutan",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 140,
+    "traitName": "orca",
+    "noundryGlb": "/models/heads/noundry/orca.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadOrca.glb"
+  },
+  {
+    "traitIndex": 141,
+    "traitName": "otter",
+    "noundryGlb": "/models/heads/noundry/otter.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadOtter.glb"
+  },
+  {
+    "traitIndex": 142,
+    "traitName": "outlet",
+    "noundryGlb": "/models/heads/noundry/outlet.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadOutlet.glb"
+  },
+  {
+    "traitIndex": 143,
+    "traitName": "owl",
+    "noundryGlb": "/models/heads/noundry/owl.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 144,
+    "traitName": "oyster",
+    "noundryGlb": "/models/heads/noundry/oyster.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadOyster.glb"
+  },
+  {
+    "traitIndex": 145,
+    "traitName": "paintbrush",
+    "noundryGlb": "/models/heads/noundry/paintbrush.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPaintbrush.glb"
+  },
+  {
+    "traitIndex": 146,
+    "traitName": "panda",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPanda.glb"
+  },
+  {
+    "traitIndex": 147,
+    "traitName": "paperclip",
+    "noundryGlb": "/models/heads/noundry/paperclip.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 148,
+    "traitName": "peanut",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPeanut.glb"
+  },
+  {
+    "traitIndex": 149,
+    "traitName": "pencil-tip",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPencil.glb"
+  },
+  {
+    "traitIndex": 150,
+    "traitName": "peyote",
+    "noundryGlb": "/models/heads/noundry/peyote.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPeyote.glb"
+  },
+  {
+    "traitIndex": 151,
+    "traitName": "piano",
+    "noundryGlb": "/models/heads/noundry/piano.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPiano.glb"
+  },
+  {
+    "traitIndex": 152,
+    "traitName": "pickle",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPickle.glb"
+  },
+  {
+    "traitIndex": 153,
+    "traitName": "pie",
+    "noundryGlb": "/models/heads/noundry/pie.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPie.glb"
+  },
+  {
+    "traitIndex": 154,
+    "traitName": "piggybank",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPiggyBank.glb"
+  },
+  {
+    "traitIndex": 155,
+    "traitName": "pill",
+    "noundryGlb": "/models/heads/noundry/pill.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPill.glb"
+  },
+  {
+    "traitIndex": 156,
+    "traitName": "pillow",
+    "noundryGlb": "/models/heads/noundry/pillow.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPillow.glb"
+  },
+  {
+    "traitIndex": 157,
+    "traitName": "pineapple",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 158,
+    "traitName": "pipe",
+    "noundryGlb": "/models/heads/noundry/pipe.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPipe.glb"
+  },
+  {
+    "traitIndex": 159,
+    "traitName": "pirateship",
+    "noundryGlb": "/models/heads/noundry/pirateship.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 160,
+    "traitName": "pizza",
+    "noundryGlb": "/models/heads/noundry/pizza.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPizza.glb"
+  },
+  {
+    "traitIndex": 161,
+    "traitName": "plane",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPlane.glb"
+  },
+  {
+    "traitIndex": 162,
+    "traitName": "pop",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPop.glb"
+  },
+  {
+    "traitIndex": 163,
+    "traitName": "porkbao",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 164,
+    "traitName": "potato",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPotato.glb"
+  },
+  {
+    "traitIndex": 165,
+    "traitName": "pufferfish",
+    "noundryGlb": "/models/heads/noundry/pufferfish.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPufferFish.glb"
+  },
+  {
+    "traitIndex": 166,
+    "traitName": "pumpkin",
+    "noundryGlb": "/models/heads/noundry/pumpkin.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPumpkin.glb"
+  },
+  {
+    "traitIndex": 167,
+    "traitName": "pyramid",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadPyramid.glb"
+  },
+  {
+    "traitIndex": 168,
+    "traitName": "queencrown",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 169,
+    "traitName": "rabbit",
+    "noundryGlb": "/models/heads/noundry/rabbit.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 170,
+    "traitName": "rainbow",
+    "noundryGlb": "/models/heads/noundry/rainbow.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRainbow.glb"
+  },
+  {
+    "traitIndex": 171,
+    "traitName": "rangefinder",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRangefinder.glb"
+  },
+  {
+    "traitIndex": 172,
+    "traitName": "raven",
+    "noundryGlb": "/models/heads/noundry/raven.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRaven.glb"
+  },
+  {
+    "traitIndex": 173,
+    "traitName": "retainer",
+    "noundryGlb": "/models/heads/noundry/retainer.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRetainer.glb"
+  },
+  {
+    "traitIndex": 174,
+    "traitName": "rgb",
+    "noundryGlb": "/models/heads/noundry/rgb.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRGB.glb"
+  },
+  {
+    "traitIndex": 175,
+    "traitName": "ring",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRing.glb"
+  },
+  {
+    "traitIndex": 176,
+    "traitName": "road",
+    "noundryGlb": "/models/heads/noundry/road.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRoad.glb"
+  },
+  {
+    "traitIndex": 177,
+    "traitName": "robot",
+    "noundryGlb": "/models/heads/noundry/robot.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 178,
+    "traitName": "rock",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRock.glb"
+  },
+  {
+    "traitIndex": 179,
+    "traitName": "rosebud",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRose.glb"
+  },
+  {
+    "traitIndex": 180,
+    "traitName": "ruler-triangular",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadRulerTriangular.glb"
+  },
+  {
+    "traitIndex": 181,
+    "traitName": "saguaro",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSaguaro.glb"
+  },
+  {
+    "traitIndex": 182,
+    "traitName": "sailboat",
+    "noundryGlb": "/models/heads/noundry/sailboat.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 183,
+    "traitName": "sandwich",
+    "noundryGlb": "/models/heads/noundry/sandwich.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 184,
+    "traitName": "saturn",
+    "noundryGlb": "/models/heads/noundry/saturn.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSaturn.glb"
+  },
+  {
+    "traitIndex": 185,
+    "traitName": "saw",
+    "noundryGlb": "/models/heads/noundry/saw.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSaw.glb"
+  },
+  {
+    "traitIndex": 186,
+    "traitName": "scorpion",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadScorpion.glb"
+  },
+  {
+    "traitIndex": 187,
+    "traitName": "shark",
+    "noundryGlb": "/models/heads/noundry/shark.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 188,
+    "traitName": "shower",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadShower.glb"
+  },
+  {
+    "traitIndex": 189,
+    "traitName": "skateboard",
+    "noundryGlb": "/models/heads/noundry/skateboard.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 190,
+    "traitName": "skeleton-hat",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 191,
+    "traitName": "skilift",
+    "noundryGlb": "/models/heads/noundry/skilift.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSkilift.glb"
+  },
+  {
+    "traitIndex": 192,
+    "traitName": "smile",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSmile.glb"
+  },
+  {
+    "traitIndex": 193,
+    "traitName": "snowglobe",
+    "noundryGlb": "/models/heads/noundry/snowglobe.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSnowglobe.glb"
+  },
+  {
+    "traitIndex": 194,
+    "traitName": "snowmobile",
+    "noundryGlb": "/models/heads/noundry/snowmobile.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 195,
+    "traitName": "spaghetti",
+    "noundryGlb": "/models/heads/noundry/spaghetti.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSpaghetti.glb"
+  },
+  {
+    "traitIndex": 196,
+    "traitName": "sponge",
+    "noundryGlb": "/models/heads/noundry/sponge.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSponge.glb"
+  },
+  {
+    "traitIndex": 197,
+    "traitName": "squid",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 198,
+    "traitName": "stapler",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadStapler.glb"
+  },
+  {
+    "traitIndex": 199,
+    "traitName": "star-sparkles",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadStarSparkle.glb"
+  },
+  {
+    "traitIndex": 200,
+    "traitName": "steak",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadSteak.glb"
+  },
+  {
+    "traitIndex": 201,
+    "traitName": "sunset",
+    "noundryGlb": "/models/heads/noundry/sunset.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 202,
+    "traitName": "taco-classic",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadTaco.glb"
+  },
+  {
+    "traitIndex": 203,
+    "traitName": "taxi",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/Headtaxi.glb"
+  },
+  {
+    "traitIndex": 204,
+    "traitName": "thumbsup",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadThumbsUp.glb"
+  },
+  {
+    "traitIndex": 205,
+    "traitName": "toaster",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 206,
+    "traitName": "toiletpaper-full",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadToiletPaper.glb"
+  },
+  {
+    "traitIndex": 207,
+    "traitName": "tooth",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadTooth.glb"
+  },
+  {
+    "traitIndex": 208,
+    "traitName": "toothbrush-fresh",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadToothBrush.glb"
+  },
+  {
+    "traitIndex": 209,
+    "traitName": "tornado",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadTornado.glb"
+  },
+  {
+    "traitIndex": 210,
+    "traitName": "trashcan",
+    "noundryGlb": "/models/heads/noundry/trashcan.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 211,
+    "traitName": "turing",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadTuring.glb"
+  },
+  {
+    "traitIndex": 212,
+    "traitName": "ufo",
+    "noundryGlb": "/models/heads/noundry/ufo.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadUFO.glb"
+  },
+  {
+    "traitIndex": 213,
+    "traitName": "undead",
+    "noundryGlb": "/models/heads/noundry/undead.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 214,
+    "traitName": "unicorn",
+    "noundryGlb": "/models/heads/noundry/unicorn.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadUnicorn.glb"
+  },
+  {
+    "traitIndex": 215,
+    "traitName": "vent",
+    "noundryGlb": "/models/heads/noundry/vent.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/Headvent.glb"
+  },
+  {
+    "traitIndex": 216,
+    "traitName": "void",
+    "noundryGlb": "/models/heads/noundry/void.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadVoid.glb"
+  },
+  {
+    "traitIndex": 217,
+    "traitName": "volcano",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadVolcano.glb"
+  },
+  {
+    "traitIndex": 218,
+    "traitName": "volleyball",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadVolleyBall.glb"
+  },
+  {
+    "traitIndex": 219,
+    "traitName": "wall",
+    "noundryGlb": "/models/heads/noundry/wall.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWall.glb"
+  },
+  {
+    "traitIndex": 220,
+    "traitName": "wallet",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWallet.glb"
+  },
+  {
+    "traitIndex": 221,
+    "traitName": "wallsafe",
+    "noundryGlb": "/models/heads/noundry/wallsafe.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWallSafe.glb"
+  },
+  {
+    "traitIndex": 222,
+    "traitName": "washingmachine",
+    "noundryGlb": "/models/heads/noundry/washingmachine.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWashingMachine.glb"
+  },
+  {
+    "traitIndex": 223,
+    "traitName": "watch",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWatch.glb"
+  },
+  {
+    "traitIndex": 224,
+    "traitName": "watermelon",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWatermelon.glb"
+  },
+  {
+    "traitIndex": 225,
+    "traitName": "wave",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 226,
+    "traitName": "weed",
+    "noundryGlb": "/models/heads/noundry/weed.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 227,
+    "traitName": "weight",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWeight.glb"
+  },
+  {
+    "traitIndex": 228,
+    "traitName": "werewolf",
+    "noundryGlb": "/models/heads/noundry/werewolf.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWerewolf.glb"
+  },
+  {
+    "traitIndex": 229,
+    "traitName": "whale-alive",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWhaleAlive.glb"
+  },
+  {
+    "traitIndex": 230,
+    "traitName": "whale",
+    "noundryGlb": "/models/heads/noundry/whale.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWhale.glb"
+  },
+  {
+    "traitIndex": 231,
+    "traitName": "wine",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWine.glb"
+  },
+  {
+    "traitIndex": 232,
+    "traitName": "wizardhat",
+    "noundryGlb": "/models/heads/noundry/wizardhat.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadWizardHat.glb"
+  },
+  {
+    "traitIndex": 233,
+    "traitName": "zebra",
+    "noundryGlb": "/models/heads/noundry/zebra.glb",
+    "threeDNounsGlb": "/models/heads/3dnouns/HeadZebra.glb"
+  },
+  {
+    "traitIndex": 234,
+    "traitName": "capybara",
+    "noundryGlb": "/models/heads/noundry/capybara.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 235,
+    "traitName": "couch",
+    "noundryGlb": null,
+    "threeDNounsGlb": "/models/heads/3dnouns/CouchHead.glb"
+  },
+  {
+    "traitIndex": 236,
+    "traitName": "hanger",
+    "noundryGlb": "/models/heads/noundry/hanger.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 237,
+    "traitName": "index-card",
+    "noundryGlb": "/models/heads/noundry/indexcard.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 238,
+    "traitName": "snowman",
+    "noundryGlb": "/models/heads/noundry/snowman.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 239,
+    "traitName": "treasurechest",
+    "noundryGlb": "/models/heads/noundry/treasurechest.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 240,
+    "traitName": "vending-machine",
+    "noundryGlb": "/models/heads/noundry/vendingmachine.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 241,
+    "traitName": "wine-barrel",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 242,
+    "traitName": "backpack",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 243,
+    "traitName": "beanie",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 244,
+    "traitName": "beluga",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 245,
+    "traitName": "cotton-candy",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 246,
+    "traitName": "curling-stone",
+    "noundryGlb": "/models/heads/noundry/curlingstone.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 247,
+    "traitName": "fax-machine",
+    "noundryGlb": "/models/heads/noundry/faxmachine.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 248,
+    "traitName": "satellite",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 249,
+    "traitName": "tiger",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 250,
+    "traitName": "tuba",
+    "noundryGlb": "/models/heads/noundry/tuba.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 251,
+    "traitName": "sand-castle",
+    "noundryGlb": "/models/heads/noundry/sandcastle.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 252,
+    "traitName": "shrimp-tempura",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 253,
+    "traitName": "green-snake",
+    "noundryGlb": null,
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 254,
+    "traitName": "sock",
+    "noundryGlb": "/models/heads/noundry/sock.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 255,
+    "traitName": "paper-bag",
+    "noundryGlb": "/models/heads/noundry/paperbag.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 256,
+    "traitName": "floppy-disk",
+    "noundryGlb": "/models/heads/noundry/floppydisk.glb",
+    "threeDNounsGlb": null
+  },
+  {
+    "traitIndex": 257,
+    "traitName": "abacus",
+    "noundryGlb": "/models/heads/noundry/abacus.glb",
+    "threeDNounsGlb": null
+  }
+]

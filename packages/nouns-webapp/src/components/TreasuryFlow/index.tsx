@@ -8,7 +8,7 @@
  * HTML overlays: stats bar, type filter pills, detail panel, tooltip, legend.
  * Three.js scene: Scene.tsx (force layout, instanced nodes, particles, bloom).
  */
-import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Canvas } from '@react-three/fiber';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
@@ -33,6 +33,12 @@ const ENTITY_TYPES: Record<string, { label: string; color: string; shape: string
   culture: { label: 'Culture', color: '#f97316', shape: '◆' },
   infra: { label: 'Infrastructure', color: '#06b6d4', shape: '◎' },
   education: { label: 'Education', color: '#10b981', shape: '◉' },
+  publicgoods: { label: 'Public Goods', color: '#22c55e', shape: '◉' },
+  art: { label: 'Art & Creative', color: '#f472b6', shape: '◆' },
+  events: { label: 'Events & IRL', color: '#fb923c', shape: '◆' },
+  media: { label: 'Media & Content', color: '#38bdf8', shape: '◆' },
+  dev: { label: 'Development', color: '#a78bfa', shape: '◎' },
+  community: { label: 'Community', color: '#fbbf24', shape: '◆' },
   bidder: { label: 'Bidders', color: '#6b7280', shape: '●' },
   wallet: { label: 'Wallets', color: '#64748b', shape: '●' },
 };
@@ -40,10 +46,44 @@ const ENTITY_TYPES: Record<string, { label: string; color: string; shape: string
 // Category dropdown groups
 const CATEGORY_GROUPS: { label: string; types: string[] }[] = [
   { label: 'Governance', types: ['governance', 'delegate', 'nounder'] },
-  { label: 'Builders', types: ['builder', 'culture', 'education'] },
-  { label: 'Infrastructure', types: ['subdao', 'infra', 'treasury'] },
-  { label: 'Participants', types: ['bidder', 'wallet'] },
+  { label: 'Builders', types: ['builder', 'dev', 'infra'] },
+  { label: 'Creative', types: ['art', 'culture', 'media', 'events'] },
+  { label: 'Impact', types: ['publicgoods', 'education', 'community'] },
+  { label: 'Participants', types: ['bidder', 'wallet', 'subdao'] },
 ];
+
+// ─── Proposal-Based Categorization ──────────────────────────────────────────
+
+const CATEGORY_KEYWORDS: { type: string; keywords: RegExp }[] = [
+  { type: 'publicgoods', keywords: /\b(public good|charity|charit|donat|retro(?:active)?\s*(?:public\s*)?good|retroPGF|open[\s-]?source\s+fund|grant(?:s\s+(?:for|to)))\b/i },
+  { type: 'art', keywords: /\b(art(?:ist|work)?|nft|gallery|museum|sculpture|mural|paint|illustrat|animation|comic|3d\s+noun|cc0|creative\s+commons|generative|pixel)\b/i },
+  { type: 'events', keywords: /\b(event|conference|hackathon|meetup|irl|party|fest(?:ival)?|summit|pop[\s-]?up|activation|camp|retreat)\b/i },
+  { type: 'media', keywords: /\b(podcast|youtube|video|film|documentary|show|series|content|newsletter|magazine|blog|media|broadcast|stream(?:ing)?|tv)\b/i },
+  { type: 'dev', keywords: /\b(sdk|api|protocol|contract|smart[\s-]?contract|audit|security|tool(?:ing)?|framework|library|open[\s-]?source|github|software|app(?:lication)?|platform|website|frontend|backend|infra(?:structure)?|devrel)\b/i },
+  { type: 'education', keywords: /\b(education|school|teach|learn|workshop|bootcamp|course|curriculum|student|universit|academ|research|fellowsh)\b/i },
+  { type: 'community', keywords: /\b(community|govern|dao|sub[\s-]?dao|proliferat|brand|merch|marketing|onboard|ambassador|outreach|awareness|campaign|social)\b/i },
+  { type: 'culture', keywords: /\b(culture|music|fashion|clothing|wearable|sport|game|gaming|play|toy|book|publish|zine|story|lore)\b/i },
+];
+
+function categorizeByProposalTitles(titles: string[]): string {
+  // Count category matches across all proposal titles
+  const scores: Record<string, number> = {};
+  for (const title of titles) {
+    for (const cat of CATEGORY_KEYWORDS) {
+      const matches = title.match(cat.keywords);
+      if (matches) {
+        scores[cat.type] = (scores[cat.type] || 0) + matches.length;
+      }
+    }
+  }
+  // Return the highest-scoring category, or 'builder' as fallback
+  let best = 'builder';
+  let bestScore = 0;
+  for (const [type, score] of Object.entries(scores)) {
+    if (score > bestScore) { best = type; bestScore = score; }
+  }
+  return best;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -515,26 +555,149 @@ const TreasuryFlowSection: FC = () => {
   }, [timeline, timePosition, timeEnabled]);
 
   // Enhance nodes: auto-classify wallets with proposals as builders
+  // Batch ENS resolution for top addresses
+  const [ensMap, setEnsMap] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!data) return;
+    // Resolve ENS for ALL addresses using ENS subgraph (batch query)
+    const addresses = data.nodes
+      .filter(n => n.id.startsWith('0x') && !n.ensName)
+      .map(n => n.id.toLowerCase());
+
+    if (addresses.length === 0) return;
+    let cancelled = false;
+
+    const resolve = async () => {
+      const batch = new Map<string, string>();
+      // Query ENS subgraph in batches of 500
+      const ENS_SUBGRAPH = 'https://api.thegraph.com/subgraphs/name/ensdomains/ens';
+      const BATCH_SIZE = 500;
+
+      for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+        if (cancelled) break;
+        const chunk = addresses.slice(i, i + BATCH_SIZE);
+        try {
+          const query = `{
+            domains(where: { resolvedAddress_in: [${chunk.map(a => `"${a}"`).join(',')}] }, first: 1000) {
+              name
+              resolvedAddress { id }
+            }
+          }`;
+          const res = await fetch(ENS_SUBGRAPH, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const domains = json?.data?.domains ?? [];
+            for (const d of domains) {
+              if (d.name && d.resolvedAddress?.id) {
+                const addr = d.resolvedAddress.id.toLowerCase();
+                const existing = batch.get(addr);
+                // Prefer direct .eth names over subdomains, then shortest
+                const isDirect = (d.name.match(/\./g) || []).length === 1;
+                const existingIsDirect = existing ? (existing.match(/\./g) || []).length === 1 : false;
+                if (!existing || (isDirect && !existingIsDirect) || (isDirect === existingIsDirect && d.name.length < existing.length)) {
+                  batch.set(addr, d.name);
+                }
+              }
+            }
+          }
+        } catch { /* skip failed batch */ }
+        // Progressive update after each batch
+        if (!cancelled && batch.size > 0) {
+          setEnsMap(new Map(batch));
+        }
+      }
+      if (!cancelled) setEnsMap(new Map(batch));
+    };
+    resolve();
+    return () => { cancelled = true; };
+  }, [data]);
+
+  // Fetch proposal titles for categorization
+  const [proposalTitles, setProposalTitles] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!data) return;
+    // Collect all unique proposal IDs referenced by nodes
+    const propIds = new Set<string>();
+    for (const n of data.nodes) {
+      if (n.proposals) for (const p of n.proposals) propIds.add(p);
+    }
+    if (propIds.size === 0) return;
+    let cancelled = false;
+
+    const fetchTitles = async () => {
+      const titles = new Map<string, string>();
+      const BATCH = 100;
+      const allIds = [...propIds];
+
+      for (let i = 0; i < allIds.length; i += BATCH) {
+        if (cancelled) break;
+        const chunk = allIds.slice(i, i + BATCH);
+        try {
+          const query = `{
+            proposals(where: { id_in: [${chunk.map(id => `"${id}"`).join(',')}] }, limit: ${BATCH}) {
+              items { id description }
+            }
+          }`;
+          const res = await fetch(`${SUBGRAPH_URL}/graphql`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const items = json?.data?.proposals?.items ?? [];
+            for (const p of items) {
+              // Title is the first line of description (strip markdown #)
+              const title = (p.description || '').split('\n')[0].replace(/^#+\s*/, '').trim();
+              if (title) titles.set(p.id, title);
+            }
+          }
+        } catch { /* skip batch */ }
+        if (!cancelled && titles.size > 0) setProposalTitles(new Map(titles));
+      }
+      if (!cancelled) setProposalTitles(new Map(titles));
+    };
+    fetchTitles();
+    return () => { cancelled = true; };
+  }, [data]);
+
   const enhancedNodes = useMemo(() => {
     if (!data) return [];
     return data.nodes.map(n => {
-      if (n.type === 'wallet' && n.proposals.length > 0) {
-        const propLabel = n.proposals.length <= 3
-          ? `Props #${n.proposals.join(', #')}`
-          : `${n.proposals.length} Props`;
+      // Apply resolved ENS names
+      const resolvedEns = ensMap.get(n.id.toLowerCase());
+      const withEns = resolvedEns ? { ...n, ensName: resolvedEns, name: resolvedEns } : n;
+
+      // Categorize funded wallets by proposal titles
+      if ((withEns.type === 'wallet' || withEns.type === 'builder') && withEns.proposals.length > 0) {
+        const titles = withEns.proposals
+          .map((pid: string) => proposalTitles.get(pid))
+          .filter(Boolean) as string[];
+
+        const category = titles.length > 0
+          ? categorizeByProposalTitles(titles)
+          : 'builder';
+
+        const topTitle = titles[0] || '';
+        const propLabel = withEns.proposals.length <= 3
+          ? `Props #${withEns.proposals.join(', #')}`
+          : `${withEns.proposals.length} Props`;
+
         return {
-          ...n,
-          type: 'builder',
-          name: n.name.startsWith('0x')
-            ? `${propLabel} · ${n.name}`
-            : n.name,
-          description: n.description || `Funded by proposal${n.proposals.length > 1 ? 's' : ''} #${n.proposals.slice(0, 5).join(', #')}${n.proposals.length > 5 ? '...' : ''}`,
-          color: ENTITY_TYPES.builder.color,
+          ...withEns,
+          type: category,
+          name: withEns.ensName || withEns.name,
+          description: topTitle || withEns.description || `Funded via ${propLabel}`,
+          color: (ENTITY_TYPES[category] || ENTITY_TYPES.builder).color,
         };
       }
-      return n;
+      return withEns;
     });
-  }, [data]);
+  }, [data, ensMap, proposalTitles]);
 
   // Count nodes by type
   const typeCounts = useMemo(() => {
@@ -683,7 +846,7 @@ const TreasuryFlowSection: FC = () => {
     return (
       <div style={{
         width: '100%', padding: '3rem 1rem', textAlign: 'center',
-        background: '#ffffff', fontFamily: "'PT Root UI', sans-serif",
+        background: '#0a0a0f', fontFamily: "'PT Root UI', sans-serif",
       }}>
         <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
           <span style={{ display: 'inline-block', animation: 'pulse 2s infinite', opacity: 0.6 }}>
@@ -700,17 +863,19 @@ const TreasuryFlowSection: FC = () => {
 
   return (
     <>
-      <div style={{ width: '100%', background: '#ffffff', position: 'relative' }}>
-        {/* Stats bar */}
+      <div style={{ width: '100%', height: '100%', background: '#0a0a0f', color: '#e2e8f0', position: 'relative' }}>
+        {/* Stats bar — floating overlay on top of canvas */}
         <div style={{
           display: 'flex', flexWrap: 'wrap' as const, gap: '12px 20px',
-          padding: '12px 24px', borderBottom: '1px solid rgba(0,0,0,0.08)',
-          fontSize: '0.7rem', fontFamily: "'PT Root UI', sans-serif", color: '#6b7280',
+          padding: '8px 24px',
+          fontSize: '0.7rem', fontFamily: "'PT Root UI', sans-serif", color: '#94a3b8',
           justifyContent: 'center',
+          position: 'relative', zIndex: 5, background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(8px)',
+          pointerEvents: 'none',
         }}>
           {timeStats ? (
             <>
-              <span><strong style={{ color: '#1f2937' }}>{timeStats.nounsMinted}</strong> nouns minted</span>
+              <span><strong style={{ color: '#e2e8f0' }}>{timeStats.nounsMinted}</strong> nouns minted</span>
               <span><strong style={{ color: '#16a34a' }}>{timeStats.auctionRevenue.toLocaleString()}</strong> ETH raised</span>
               <span><strong style={{ color: '#dc2626' }}>{timeStats.funded.toLocaleString()}</strong> ETH funded</span>
               <span style={{ color: '#b45309', fontWeight: 700 }}>
@@ -719,11 +884,11 @@ const TreasuryFlowSection: FC = () => {
             </>
           ) : (
             <>
-              <span><strong style={{ color: '#1f2937' }}>{s.nounsSettled ?? s.uniqueAddresses}</strong> nouns settled</span>
-              <span><strong style={{ color: '#1f2937' }}>{(s.totalBids ?? 0).toLocaleString()}</strong> bids</span>
+              <span><strong style={{ color: '#e2e8f0' }}>{s.nounsSettled ?? s.uniqueAddresses}</strong> nouns settled</span>
+              <span><strong style={{ color: '#e2e8f0' }}>{(s.totalBids ?? 0).toLocaleString()}</strong> bids</span>
               <span><strong style={{ color: '#16a34a' }}>{s.totalInflow.toLocaleString()}</strong> ETH raised</span>
               <span><strong style={{ color: '#dc2626' }}>{s.totalOutflow.toLocaleString()}</strong> ETH funded</span>
-              <span><strong style={{ color: '#1f2937' }}>{s.propsPassed ?? 0}</strong> props passed</span>
+              <span><strong style={{ color: '#e2e8f0' }}>{s.propsPassed ?? 0}</strong> props passed</span>
               <span><strong style={{ color: '#dc2626' }}>{s.propsFailed ?? 0}</strong> defeated</span>
               <span><strong style={{ color: '#7c3aed' }}>{(s.totalVotes ?? 0).toLocaleString()}</strong> votes</span>
               <span><strong style={{ color: '#7c3aed' }}>{s.uniqueVoters ?? 0}</strong> voters</span>
@@ -735,13 +900,14 @@ const TreasuryFlowSection: FC = () => {
         {/* Header + filters */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 24px 8px', flexWrap: 'wrap' as const, gap: 10,
+          padding: '8px 24px 6px', flexWrap: 'wrap' as const, gap: 10,
+          position: 'relative', zIndex: 5, background: 'rgba(10,10,15,0.6)', backdropFilter: 'blur(6px)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#b45309' }}>
               &#x2310;&#x25E8;-&#x25E8;
             </span>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#374151' }}>
+            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#94a3b8' }}>
               NEURAL TREASURY
             </span>
             {/* Freeze toggle */}
@@ -951,17 +1117,12 @@ const TreasuryFlowSection: FC = () => {
         </div>
 
         {/* Three.js Canvas */}
-        <div style={{ width: '100%', height: 600 }}>
-          <Suspense fallback={
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-              Initializing 3D scene...
-            </div>
-          }>
+        <div style={{ position: 'absolute', inset: 0 }}>
             <Canvas
               camera={{ position: [0, 80, 300], fov: 55 }}
-              style={{ width: '100%', height: '100%' }}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
               gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-              onCreated={({ gl }) => { gl.setClearColor('#ffffff'); }}
+              onCreated={({ gl }) => { gl.setClearColor('#0a0a0f'); }}
             >
               <TreasuryScene
                 nodes={filteredData.nodes}
@@ -972,7 +1133,6 @@ const TreasuryFlowSection: FC = () => {
                 onNodeHover={setHoveredNode}
               />
             </Canvas>
-          </Suspense>
         </div>
 
         {/* Time Slider — provenance timeline */}
@@ -981,10 +1141,10 @@ const TreasuryFlowSection: FC = () => {
             position: 'absolute', bottom: 70, left: 24, right: 24,
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '8px 16px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(0,0,0,0.1)', zIndex: 5,
-            fontFamily: "'PT Root UI', sans-serif",
-            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            background: 'rgba(15,15,25,0.85)', backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.1)', zIndex: 5,
+            fontFamily: "'PT Root UI', sans-serif", color: '#e2e8f0',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
           }}>
             {/* Play/Pause button */}
             <button
@@ -1071,10 +1231,10 @@ const TreasuryFlowSection: FC = () => {
         {hoveredNode && (
           <div style={{
             position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)',
-            padding: '10px 16px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)',
+            padding: '2px 8px', borderRadius: 6,
+            background: 'rgba(15,15,25,0.8)', backdropFilter: 'blur(12px)',
             border: '1px solid rgba(0,0,0,0.1)',
-            color: '#1f2937', fontSize: '0.75rem', fontFamily: "'PT Root UI', sans-serif",
+            color: '#fbbf24', fontSize: '0.75rem', fontFamily: "'PT Root UI', sans-serif",
             whiteSpace: 'nowrap' as const, pointerEvents: 'none', zIndex: 5,
             maxWidth: '90vw',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',

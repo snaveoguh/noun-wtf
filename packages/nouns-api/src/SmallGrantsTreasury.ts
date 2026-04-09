@@ -18,9 +18,42 @@ ponder.on('SmallGrantsTreasury:ProposalCreated', async ({ event, context }) => {
     createdAtTransaction: event.transaction.hash,
   });
 
-  // Fetch transaction data from the contract
-  // Note: getActions is a view function, we read it from the contract
-  // For now we store what we can from the event. Transaction data is on-chain.
+  // Read transaction data from the contract (not in the event args)
+  try {
+    const actions = await context.client.readContract({
+      abi: [{
+        type: 'function',
+        name: 'getActions',
+        inputs: [{ name: 'proposalId', type: 'uint256' }],
+        outputs: [
+          { name: 'targets', type: 'address[]' },
+          { name: 'values', type: 'uint256[]' },
+          { name: 'signatures', type: 'string[]' },
+          { name: 'calldatas', type: 'bytes[]' },
+        ],
+        stateMutability: 'view',
+      }],
+      address: event.log.address,
+      functionName: 'getActions',
+      args: [event.args.id],
+    });
+
+    const [targets, values, signatures, calldatas] = actions;
+    if (targets.length > 0) {
+      await context.db.insert(grantTransaction).values(
+        targets.map((target, index) => ({
+          index,
+          grantId: event.args.id,
+          target,
+          value: values[index]!,
+          signature: signatures[index]!,
+          calldata: calldatas[index]!,
+        })),
+      );
+    }
+  } catch {
+    // Contract read failed — transactions won't be indexed for this grant
+  }
 });
 
 ponder.on('SmallGrantsTreasury:VoteCast', async ({ event, context }) => {

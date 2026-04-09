@@ -1,5 +1,6 @@
 /* eslint-disable import/order, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine';
+import { loadCuratedVoxelMap } from '@/lib/loadCuratedVoxelMap';
 import React, {
   Suspense,
   useCallback,
@@ -367,6 +368,24 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     },
     [baseGrid, liveDrafts, liveVoxelMap, resetLive2dSignature, resetLive3dSignature],
   );
+
+  // Load a curated 3D head into the editor as a starting point
+  const loadCuratedHeadIntoEditor = useCallback(async (headIndex: number) => {
+    const voxelMap = await loadCuratedVoxelMap(headIndex);
+    if (!voxelMap) return;
+    setEdit3dStartVoxelMap(voxelMap);
+    voxelMapRef.current = voxelMap;
+    setVoxelMapVersion(v => v + 1);
+    if (editMode !== '3d') {
+      startEditing('3d');
+    }
+  }, [editMode, startEditing]);
+
+  // Expose to window for console testing / external triggers
+  useEffect(() => {
+    (window as any).__loadCuratedHead = loadCuratedHeadIntoEditor;
+    return () => { delete (window as any).__loadCuratedHead; };
+  }, [loadCuratedHeadIntoEditor]);
 
   // Listen for Noundry trait clicks — open 2D editor
   useEffect(() => {

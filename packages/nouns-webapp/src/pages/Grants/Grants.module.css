@@ -2,7 +2,7 @@
   max-width: 800px;
   margin: 2rem auto;
   padding: 0 1.5rem;
-  color: #e2e8f0;
+  color: #1a1a2e;
   font-family: 'PT Root UI', monospace, sans-serif;
 }
 
@@ -19,7 +19,7 @@
 .title {
   font-size: 2rem;
   font-weight: 700;
-  color: #22d3ee;
+  color: #0891b2;
   margin: 0;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .subtitle {
-  color: #94a3b8;
+  color: #666;
   font-size: 0.9rem;
   margin: 0.5rem 0 1.5rem;
   line-height: 1.5;
@@ -40,8 +40,8 @@
   display: inline-block;
   padding: 0.6rem 1.2rem;
   background: transparent;
-  border: 1px solid #22d3ee;
-  color: #22d3ee;
+  border: 1px solid #0891b2;
+  color: #0891b2;
   text-decoration: none;
   font-size: 0.9rem;
   cursor: pointer;
@@ -49,18 +49,18 @@
 }
 .createBtn:hover {
   background: rgba(34, 211, 238, 0.1);
-  color: #22d3ee;
+  color: #0891b2;
 }
 
 .loading {
-  color: #64748b;
+  color: #888;
   font-style: italic;
 }
 
 .empty {
   text-align: center;
   padding: 3rem;
-  color: #64748b;
+  color: #888;
 }
 
 /* ─── Grant List ─────────────────────────────────────────────── */
@@ -74,15 +74,15 @@
 .card {
   display: block;
   padding: 1rem 1.25rem;
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid #e2e8f0;
+  background: #fafafa;
   text-decoration: none;
-  color: #e2e8f0;
+  color: #1a1a2e;
   transition: border-color 0.2s;
 }
 .card:hover {
-  border-color: #22d3ee;
-  color: #e2e8f0;
+  border-color: #0891b2;
+  color: #1a1a2e;
 }
 
 .cardHeader {
@@ -94,7 +94,7 @@
 
 .grantId {
   font-size: 0.8rem;
-  color: #64748b;
+  color: #888;
   font-weight: 600;
 }
 
@@ -115,7 +115,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #64748b;
+  color: #888;
   margin-bottom: 0.5rem;
 }
 
@@ -136,14 +136,14 @@
 /* ─── Detail Page ────────────────────────────────────────────── */
 
 .backLink {
-  color: #64748b;
+  color: #888;
   text-decoration: none;
   font-size: 0.85rem;
   display: inline-block;
   margin-bottom: 1.5rem;
 }
 .backLink:hover {
-  color: #22d3ee;
+  color: #0891b2;
 }
 
 .detailHeader {
@@ -155,7 +155,7 @@
 
 .detailTitle {
   font-size: 1.5rem;
-  color: #22d3ee;
+  color: #0891b2;
   margin: 0;
 }
 
@@ -163,17 +163,17 @@
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
+  color: #888;
 }
 
 .detailName {
   font-size: 1.2rem;
-  color: #e2e8f0;
+  color: #1a1a2e;
   margin: 0.25rem 0 0.25rem;
 }
 
 .detailProposer {
-  color: #64748b;
+  color: #888;
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
 }
@@ -181,8 +181,8 @@
 .timeBar {
   padding: 0.5rem 0.75rem;
   background: rgba(34, 211, 238, 0.08);
-  border: 1px solid #164e63;
-  color: #22d3ee;
+  border: 1px solid #a5f3fc;
+  color: #0891b2;
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
 }
@@ -202,7 +202,7 @@
 }
 
 .votePanel {
-  border: 1px solid #1e293b;
+  border: 1px solid #e2e8f0;
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -217,15 +217,15 @@
   flex: 1;
   padding: 0.6rem;
   background: transparent;
-  border: 1px solid #334155;
-  color: #94a3b8;
+  border: 1px solid #d1d5db;
+  color: #666;
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
   transition: all 0.15s;
 }
 .voteBtn:hover {
-  border-color: #64748b;
+  border-color: #888;
 }
 .voteBtnActive {
   background: rgba(255, 255, 255, 0.05);
@@ -233,9 +233,9 @@
 
 .reasonInput {
   width: 100%;
-  background: #0a0a0a;
-  border: 1px solid #334155;
-  color: #e2e8f0;
+  background: #fafafa;
+  border: 1px solid #d1d5db;
+  color: #1a1a2e;
   padding: 0.5rem;
   font-size: 0.85rem;
   resize: vertical;
@@ -267,7 +267,7 @@
   margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
-  border: 1px solid #1e293b;
+  border: 1px solid #e2e8f0;
   animation: fadeSlideIn 0.25s ease-out;
 }
 .voteStatusBar[data-status='signing'] {
@@ -310,11 +310,11 @@
 
 .voteStatusText {
   flex: 1;
-  color: #cbd5e1;
+  color: #333;
 }
 
 .voteStatusTx {
-  color: #22d3ee;
+  color: #0891b2;
   font-size: 0.75rem;
   font-family: monospace;
   text-decoration: none;
@@ -376,11 +376,11 @@
 
 .description {
   margin-top: 2rem;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid #e2e8f0;
   padding-top: 1.5rem;
 }
 .description h3 {
-  color: #94a3b8;
+  color: #666;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -388,7 +388,7 @@
 }
 
 .descBody {
-  color: #cbd5e1;
+  color: #333;
   font-size: 0.9rem;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -402,11 +402,11 @@
 
 .votesList {
   margin-top: 2rem;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid #e2e8f0;
   padding-top: 1.5rem;
 }
 .votesList h3 {
-  color: #94a3b8;
+  color: #666;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -418,12 +418,12 @@
   gap: 1rem;
   padding: 0.4rem 0;
   font-size: 0.85rem;
-  border-bottom: 1px solid #0f172a;
+  border-bottom: 1px solid #e5e7eb;
   align-items: center;
 }
 
 .voteReason {
-  color: #64748b;
+  color: #888;
   font-style: italic;
   flex: 1;
   text-align: right;
@@ -432,10 +432,10 @@
 .txLink {
   margin-top: 1rem;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #888;
 }
 .txLink a {
-  color: #22d3ee;
+  color: #0891b2;
 }
 
 /* ─── Create Form ────────────────────────────────────────────── */
@@ -446,7 +446,7 @@
 
 .label {
   display: block;
-  color: #94a3b8;
+  color: #666;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -456,9 +456,9 @@
 
 .input {
   width: 100%;
-  background: #0a0a0a;
-  border: 1px solid #334155;
-  color: #e2e8f0;
+  background: #fafafa;
+  border: 1px solid #d1d5db;
+  color: #1a1a2e;
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;
@@ -466,14 +466,14 @@
 }
 .input:focus {
   outline: none;
-  border-color: #22d3ee;
+  border-color: #0891b2;
 }
 
 .textarea {
   width: 100%;
-  background: #0a0a0a;
-  border: 1px solid #334155;
-  color: #e2e8f0;
+  background: #fafafa;
+  border: 1px solid #d1d5db;
+  color: #1a1a2e;
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;
@@ -481,11 +481,11 @@
 }
 .textarea:focus {
   outline: none;
-  border-color: #22d3ee;
+  border-color: #0891b2;
 }
 
 .txRow {
-  border: 1px solid #1e293b;
+  border: 1px solid #e2e8f0;
   padding: 0.75rem;
   margin-bottom: 0.5rem;
 }
@@ -494,7 +494,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #64748b;
+  color: #888;
   margin-bottom: 0.5rem;
 }
 
@@ -508,8 +508,8 @@
 
 .addTxBtn {
   background: transparent;
-  border: 1px dashed #334155;
-  color: #64748b;
+  border: 1px dashed #d1d5db;
+  color: #888;
   padding: 0.5rem;
   width: 100%;
   cursor: pointer;
@@ -517,8 +517,8 @@
   margin-top: 0.5rem;
 }
 .addTxBtn:hover {
-  border-color: #22d3ee;
-  color: #22d3ee;
+  border-color: #0891b2;
+  color: #0891b2;
 }
 
 .submitBtn {
