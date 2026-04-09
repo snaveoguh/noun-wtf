@@ -81,6 +81,10 @@ const PanZoomImage = ({
       onPointerUp={interactive ? onPointerUp : undefined}
       onPointerCancel={interactive ? onPointerUp : undefined}
       onDoubleClick={interactive ? reset : undefined}
+      onWheel={interactive ? (e) => {
+        e.preventDefault();
+        setScale(s => Math.min(6, Math.max(0.3, s * (e.deltaY < 0 ? 1.15 : 0.87))));
+      } : undefined}
     >
       <img
         src={src}
@@ -90,10 +94,8 @@ const PanZoomImage = ({
           position: 'absolute',
           top: '50%',
           left: '50%',
-          maxWidth: fill ? '100%' : '85%',
-          maxHeight: fill ? '100%' : '85%',
-          width: fill ? '100%' : undefined,
-          height: fill ? '100%' : undefined,
+          maxWidth: '85%',
+          maxHeight: '85%',
           objectFit: 'contain',
           imageRendering: pixelated ? 'pixelated' : 'auto',
           transform: `translate(-50%, -50%) translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
