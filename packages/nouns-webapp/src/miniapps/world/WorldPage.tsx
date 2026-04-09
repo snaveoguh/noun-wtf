@@ -115,12 +115,14 @@ import {
 } from './engine/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
 import { MegaRamp3D, HoverboardPickup3D, MEGA_RAMP_BOUNDS } from './engine/MegaRamp3D';
+import Halfpipe3D, { HALFPIPE_BOUNDS, getHalfpipeHeight } from './engine/Halfpipe3D';
 import {
   NYCApartmentBlock,
   APARTMENT_GRAFFITI_WALL,
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
-import CaribbeanOffice, { OFFICE_WHITEBOARD_WALL } from './engine/CaribbeanOffice';
+// Caribbean office removed — was too rough
+import { GasStation as BeachGasStation, BeachBar, Dock, Surfboards, PalmTree } from './engine/BeachObjects';
 import MobileControls, { isTouchDevice } from './engine/MobileControls';
 import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, boardGrab, type SkatingState } from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
@@ -240,6 +242,10 @@ const HEIGHT_SCALE = WORLD_SCALE * 8;
 
 /** Get terrain height in Three.js Y at a given world X/Z position */
 function getTerrainHeight(worldX: number, worldZ: number): number {
+  // Check halfpipe first
+  const hpHeight = getHalfpipeHeight(worldX, worldZ);
+  if (hpHeight !== null) return hpHeight;
+
   // Check if on the mega ramp or its surrounding structures
   const rb = MEGA_RAMP_BOUNDS;
   const relX = worldX - rb.x;
@@ -254,6 +260,15 @@ function getTerrainHeight(worldX: number, worldZ: number): number {
     // Top platform (back of ramp, high end) — flat at RAMP_HEIGHT
     if (relZ > rb.length / 2 - 2 && relZ < rb.length / 2 + 6) {
       return rb.height;
+    }
+    // Launch kicker (past bottom of ramp — steep upward ramp for big air)
+    // Kicker at relZ between -length/2 - kickerLen and -length/2, rises to KICKER_HEIGHT
+    const KICKER_LEN = 5;
+    const KICKER_HT = 4;
+    if (Math.abs(relX) < rb.width / 2 + 0.5 && relZ < -rb.length / 2 && relZ > -rb.length / 2 - KICKER_LEN) {
+      const kt = 1 - (relZ + rb.length / 2 + KICKER_LEN) / KICKER_LEN; // 0 at entrance, 1 at lip
+      const kickerY = KICKER_HT * Math.sin((kt * Math.PI) / 2); // smooth curve up
+      return Math.max(kickerY, 0.35);
     }
     // On the curved ramp surface itself (within ramp width)
     // Must match createMegaRampGeometry: curveT = 1 - pow(1-t, 1.8), y = H * sin(curveT * PI/2)
@@ -469,8 +484,7 @@ const GRAFFITI_WALLS = [
     rotation: -Math.PI / 4,
     label: 'NOUNS WUZ HERE',
   },
-  // Office whiteboard
-  OFFICE_WHITEBOARD_WALL,
+  // Office whiteboard (removed)
   // Joystick billboard (near water, southeast)
   {
     id: 'wall-spawn-billboard',
@@ -1322,10 +1336,10 @@ function Lighting() {
   useFrame(() => {
     const dn = getDayNightOverlay();
     if (ambientRef.current) {
-      ambientRef.current.intensity = Math.max(0.3, 1 - dn.alpha * 2);
+      ambientRef.current.intensity = dn.ambientIntensity;
     }
     if (dirLightRef.current) {
-      dirLightRef.current.intensity = Math.max(0.2, 1 - dn.alpha * 1.5);
+      dirLightRef.current.intensity = Math.max(0.15, dn.ambientIntensity * 0.9);
     }
   });
 
@@ -2428,6 +2442,12 @@ export default function WorldPage() {
   const paintRef = useRef<PaintCanState>(createPaintState());
   const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
   const [graffitiOpen, setGraffitiOpen] = useState(false);
+  // NPC dialogue state
+  const [npcChatOpen, setNpcChatOpen] = useState(false);
+  const [npcChatMessages, setNpcChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [npcChatInput, setNpcChatInput] = useState('');
+  const [npcChatLoading, setNpcChatLoading] = useState(false);
+  const NOUNIRL_NPC = { x: SPAWN_X * 0.1 + 3, z: SPAWN_Y * 0.1 - 2, name: 'NounIRL' };
   const [graffitiWallId, setGraffitiWallId] = useState<string | null>(null);
   // Saved graffiti tags loaded from PartyKit — keyed by wallId
   const graffitiTagsRef = useRef<Record<string, GraffitiTagData[]>>({});
@@ -2666,6 +2686,11 @@ export default function WorldPage() {
   // ESC + E + M key handler
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Allow Escape through always, but skip other keys when typing in inputs
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable;
+      if (isTyping && e.key !== 'Escape') return;
+
       if (e.key === 'Escape') {
         if (graffitiOpen) {
           setGraffitiOpen(false);
@@ -2824,10 +2849,37 @@ export default function WorldPage() {
           return;
         }
 
-        // Check distance to chest
+        // Check distance to chest — drops random game items
         const chestDist = Math.sqrt((px - chestWorldX) ** 2 + (pz - chestWorldZ) ** 2);
         if (chestDist < 3) {
-          setDepositOpen(true);
+          // Random item drop
+          const items = ['shotgun', 'uzi', 'pistol', 'sword'];
+          const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+          const roll = Math.random();
+          if (roll < 0.4) {
+            // Weapon drop
+            const weapon = items[Math.floor(Math.random() * items.length)];
+            weaponRef.current.equipped = weapon;
+            weaponRef.current.ammo = 30;
+            toast.success(`Found: ${weapon.toUpperCase()}! 🎁`);
+          } else if (roll < 0.7) {
+            // Paint can drop
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            paintRef.current.hasPaint = true;
+            paintRef.current.color = color;
+            toast.success(`Found: SPRAY CAN (${color})! 🎨`);
+          } else {
+            // HP refill
+            if (p) { p.hp = Math.min(p.maxHp, p.hp + 50); }
+            toast.success('Found: HEALTH PACK! ❤️ +50 HP');
+          }
+          return;
+        }
+
+        // Check distance to NounIRL NPC — open chat
+        const npcDist = Math.sqrt((px - NOUNIRL_NPC.x) ** 2 + (pz - NOUNIRL_NPC.z) ** 2);
+        if (npcDist < 3) {
+          setNpcChatOpen(true);
           return;
         }
 
@@ -2927,6 +2979,41 @@ export default function WorldPage() {
         const wz = player.y * WORLD_SCALE;
         const terrainY = getTerrainHeight(wx, wz);
         const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
+
+        // Kicker auto-launch: detect when player rides off the kicker lip
+        const rb = MEGA_RAMP_BOUNDS;
+        const relZ = wz - rb.z;
+        const onKickerLip = Math.abs(wx - rb.x) < rb.width / 2 &&
+          relZ < -rb.length / 2 - 4.5 && relZ > -rb.length / 2 - 5.5 &&
+          !sk.airborne && sk.speed > 0.5;
+        if (onKickerLip) {
+          sk.airborneVy = Math.max(sk.speed * 0.8, 0.4);
+          sk.launchVy = sk.airborneVy;
+          sk.launchY = terrainY;
+          sk.airborne = true;
+          sk.airborneTime = 0;
+          sk.spinAngle = 0;
+        }
+
+        // Halfpipe lip launch: at top of either wall, launch into air
+        const hp = HALFPIPE_BOUNDS;
+        const hpRelX = wx - hp.x;
+        const hpRelZ = wz - hp.z;
+        const inHalfpipe = Math.abs(hpRelZ) < hp.length / 2 + 1;
+        if (inHalfpipe && !sk.airborne && sk.speed > 0.8) {
+          const distFromCenter = Math.abs(hpRelX);
+          const lipX = hp.flatWidth / 2 + hp.radius;
+          // Near the lip of either wall
+          if (distFromCenter > lipX - 0.5 && distFromCenter < lipX + 0.5) {
+            sk.airborneVy = Math.max(sk.speed * 0.7, 0.35);
+            sk.launchVy = sk.airborneVy;
+            sk.launchY = terrainY;
+            sk.airborne = true;
+            sk.airborneTime = 0;
+            sk.spinAngle = 0;
+          }
+        }
+
         const dir: [number, number] = [
           input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
           input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
@@ -2950,6 +3037,26 @@ export default function WorldPage() {
       if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
         let intendedMove = resolveIntendedMove(input);
 
+        // Paintball mode: F with spray can equipped = paint shot
+        if (intendedMove === 'gunshot' && paintRef.current.hasPaint && !weapon.equipped) {
+          // Paint projectile — uses force push visual with paint color
+          const facingAngle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
+          if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
+            mp.ws.send(JSON.stringify({
+              type: 'world:force',
+              x: player.x,
+              y: player.y,
+              angle: facingAngle,
+              color: paintRef.current.color,
+            }));
+          }
+          // Damage nearby players with paint
+          const hits = executeMove(player, 'punch', player.x + Math.cos(facingAngle) * 50, player.y + Math.sin(facingAngle) * 50, mp.remotePlayers, combat);
+          for (const hit of hits) {
+            sendHit(mp, hit.targetId, 5, hit.knockX * 0.3, hit.knockY * 0.3, 'punch', 0);
+          }
+          intendedMove = null;
+        }
         // If F pressed and gun equipped, override to gunshot
         if (intendedMove === 'gunshot' && weapon.equipped) {
           const result = fireWeapon(weapon);
@@ -3086,10 +3193,13 @@ export default function WorldPage() {
       const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
       const totalYOffset = jumpOffset + skateOffset;
 
-      // Smooth Y interpolation — prevents jolty terrain transitions
+      // Smooth Y interpolation — tighter on ramp surfaces, looser on flat ground
       const targetY = terrainY + totalYOffset;
       const prevY = playerTargetRef.current.y;
-      const smoothY = prevY + (targetY - prevY) * 0.15; // lerp factor
+      // On ramp/kicker: snap tight to surface. Flat ground: smooth lerp
+      const onRampSurface = sk.isSkating && !sk.airborne && terrainY > 1.0;
+      const lerpFactor = onRampSurface ? 0.5 : 0.18;
+      const smoothY = prevY + (targetY - prevY) * lerpFactor;
 
       // Camera follows the smoothed height
       playerTargetRef.current.set(wx, smoothY, wz);
@@ -3410,6 +3520,41 @@ export default function WorldPage() {
         <Rocks />
         <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
         <Gravestones />
+
+        {/* NounIRL NPC — standing near spawn */}
+        <group position={[NOUNIRL_NPC.x, 0.35, NOUNIRL_NPC.z]}>
+          {/* Body */}
+          <mesh position={[0, 0.4, 0]}>
+            <boxGeometry args={[0.25, 0.4, 0.15]} />
+            <meshStandardMaterial color="#1a1a2e" />
+          </mesh>
+          {/* Head (noggle glasses) */}
+          <mesh position={[0, 0.75, 0]}>
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
+            <meshStandardMaterial color="#ff6600" />
+          </mesh>
+          {/* Glasses */}
+          <mesh position={[0, 0.77, 0.11]}>
+            <boxGeometry args={[0.22, 0.06, 0.02]} />
+            <meshBasicMaterial color="#000" />
+          </mesh>
+          {/* Label */}
+          <Html position={[0, 1.2, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+            <div style={{
+              fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold',
+              color: '#00ffcc', textShadow: '0 0 6px rgba(0,255,204,0.5)',
+              whiteSpace: 'nowrap',
+            }}>
+              ⌐◨-◨ NounIRL
+            </div>
+            <div style={{
+              fontFamily: 'monospace', fontSize: 9, color: '#666',
+              textAlign: 'center', marginTop: 2,
+            }}>
+              Press E to talk
+            </div>
+          </Html>
+        </group>
         <VenetianBoats />
         <GasStation
           position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
@@ -3506,6 +3651,7 @@ export default function WorldPage() {
 
         {/* Mega Ramp */}
         <MegaRamp3D />
+        <Halfpipe3D />
 
         {/* NYC Apartment Block (adjacent to mega ramp) */}
         <NYCApartmentBlock />
@@ -3513,8 +3659,18 @@ export default function WorldPage() {
         {/* Burj Khalifa — so tall it disappears into the clouds */}
         <BurjKhalifa />
 
-        {/* Caribbean Office (southeast coast) */}
-        <CaribbeanOffice />
+        {/* Beach objects */}
+        <BeachGasStation position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]} rotation={0.4} />
+        <BeachBar position={[25 * TILE_SIZE * WORLD_SCALE, 0.2, 40 * TILE_SIZE * WORLD_SCALE]} rotation={-0.3} />
+        <Dock position={[20 * TILE_SIZE * WORLD_SCALE, -0.3, 32 * TILE_SIZE * WORLD_SCALE]} rotation={-Math.PI / 4} />
+        <Surfboards position={[24 * TILE_SIZE * WORLD_SCALE, 0.15, 39 * TILE_SIZE * WORLD_SCALE]} />
+        {/* Palm trees along coast */}
+        {[
+          [22, 35], [23, 37], [21, 40], [25, 42], [27, 44],
+          [42, 25], [44, 24], [46, 25], [40, 43], [38, 44],
+        ].map(([tx, tz], i) => (
+          <PalmTree key={`palm-${i}`} position={[tx * TILE_SIZE * WORLD_SCALE, 0.2, tz * TILE_SIZE * WORLD_SCALE]} />
+        ))}
 
         {/* Hoverboard Pickup (near mega ramp) */}
         {!hasHoverboard && (
@@ -4022,6 +4178,7 @@ export default function WorldPage() {
           playerId={mpRef.current.myId}
           paintColor={paintRef.current.color || '#ff0000'}
           ws={mpRef.current.ws as WebSocket | null}
+          existingTags={graffitiTagsRef.current[graffitiWallId] || []}
           onClose={() => {
             // The GraffitiUI already saved to PartyKit via saveGraffitiTag
             // Also save locally so the wall updates immediately
@@ -4061,6 +4218,82 @@ export default function WorldPage() {
           }}
         >
           SPRAY CAN EQUIPPED — FIND A WALL AND PRESS [G]
+        </div>
+      )}
+
+      {/* NPC Chat Dialog */}
+      {npcChatOpen && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          width: 400, maxHeight: 500, background: 'rgba(0,0,0,0.92)', borderRadius: 16,
+          border: '2px solid #333', padding: 16, zIndex: 40, fontFamily: 'monospace',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ color: '#00ffcc', fontWeight: 'bold', fontSize: 14 }}>⌐◨-◨ NounIRL</span>
+            <button onClick={() => setNpcChatOpen(false)} style={{
+              background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 18,
+            }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12, maxHeight: 350 }}>
+            {npcChatMessages.length === 0 && (
+              <div style={{ color: '#555', fontSize: 12, padding: 8 }}>
+                NounIRL is an autonomous agent. Ask about Nouns, governance, or the auction.
+              </div>
+            )}
+            {npcChatMessages.map((m, i) => (
+              <div key={i} style={{
+                padding: '6px 10px', marginBottom: 6, borderRadius: 8,
+                background: m.role === 'user' ? 'rgba(255,255,255,0.08)' : 'rgba(0,255,204,0.08)',
+                color: m.role === 'user' ? '#ccc' : '#00ffcc',
+                fontSize: 12, lineHeight: 1.4,
+              }}>
+                {m.content}
+              </div>
+            ))}
+            {npcChatLoading && <div style={{ color: '#555', fontSize: 12, padding: 8 }}>thinking...</div>}
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!npcChatInput.trim() || npcChatLoading) return;
+            const msg = npcChatInput.trim();
+            setNpcChatInput('');
+            setNpcChatMessages(prev => [...prev, { role: 'user', content: msg }]);
+            setNpcChatLoading(true);
+            try {
+              const res = await fetch('https://heartfelt-flow-production-d872.up.railway.app/v1/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  system: 'You are NounIRL, an autonomous agent in the Nouns world. Keep responses short (2-3 sentences). Be helpful and nouny. ⌐◨-◨',
+                  user: msg,
+                  task: 'chat',
+                  maxTokens: 200,
+                }),
+              });
+              const data = await res.json();
+              setNpcChatMessages(prev => [...prev, { role: 'assistant', content: data.text || data.error || 'No response' }]);
+            } catch {
+              setNpcChatMessages(prev => [...prev, { role: 'assistant', content: 'Connection lost...' }]);
+            }
+            setNpcChatLoading(false);
+          }} style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={npcChatInput}
+              onChange={e => setNpcChatInput(e.target.value)}
+              placeholder="Talk to NounIRL..."
+              style={{
+                flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid #333',
+                borderRadius: 8, padding: '8px 12px', color: '#fff', fontFamily: 'monospace',
+                fontSize: 12, outline: 'none',
+              }}
+              autoFocus
+            />
+            <button type="submit" disabled={npcChatLoading} style={{
+              background: '#00ffcc', color: '#000', border: 'none', borderRadius: 8,
+              padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'monospace',
+            }}>Send</button>
+          </form>
         </div>
       )}
 
