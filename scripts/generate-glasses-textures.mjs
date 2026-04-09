@@ -101,7 +101,10 @@ for (let y = 0; y < H; y++) {
     if (a === 0) continue;
 
     const key = `${x},${y}`;
-    if (dist(r, g, b, 255, 99, 141) < 20) {           // pink → left frame
+    // Arm pixels (x < 7) are always left frame — even in back view where template has purple
+    if (x < 7) {
+      pixelRoles.set(key, 'frame_left');
+    } else if (dist(r, g, b, 255, 99, 141) < 20) {    // pink → left frame
       pixelRoles.set(key, 'frame_left');
     } else if (dist(r, g, b, 204, 5, 149) < 20) {     // purple → right frame
       pixelRoles.set(key, 'frame_right');
