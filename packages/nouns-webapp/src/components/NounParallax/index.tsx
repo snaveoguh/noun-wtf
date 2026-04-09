@@ -180,6 +180,10 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
                 mat.map.dispose();
                 mat.map = glassesTex;
                 mat.side = THREE.FrontSide;
+                mat.depthWrite = true;
+                mat.polygonOffset = true;
+                mat.polygonOffsetFactor = -4;
+                mat.polygonOffsetUnits = -4;
                 mat.needsUpdate = true;
               }
             }
