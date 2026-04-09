@@ -1,49 +1,56 @@
 /**
- * SceneEnvironment — Friendsies-inspired dreamy background.
- * Renders inside the R3F canvas behind the noun.
- * Uses drei Sparkles + Cloud + gradient sky sphere.
- * Lightweight: all instanced geometry, single draw calls.
+ * SceneEnvironment — Holographic card background + distant planet with noun sprites.
+ * Main noun sits front-center like a shiny card.
+ * Behind it: a distant green planet with colorful spike columns and 5 tiny
+ * randomly-generated noun sprites walking around. Small orbiting mini-planets drift by.
  */
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { Cloud, Sparkles } from '@react-three/drei';
+import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { buildSVG } from '@nouns/sdk';
+import { Sparkles } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// ─── Gradient Sky Sphere ───────────────────────────────────────────
+// ─── Holographic Background Sphere ─────────────────────────────────
 
-function GradientSky() {
+function HoloBackground() {
   const material = useMemo(() => {
     return new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
-      uniforms: {},
+      uniforms: { uTime: { value: 0 } },
       vertexShader: `
         varying vec3 vWorldPosition;
         void main() {
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPos.xyz;
+          vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: `
+        uniform float uTime;
         varying vec3 vWorldPosition;
+        vec3 holo(float t) {
+          return vec3(0.5) + vec3(0.5) * cos(6.283 * (vec3(1.0) * t + vec3(0.0, 0.1, 0.2)));
+        }
         void main() {
-          float h = normalize(vWorldPosition).y;
-          // Sky gradient: deep blue top → light blue → warm white at horizon → soft green below
-          vec3 topColor = vec3(0.45, 0.75, 0.95);    // soft blue
-          vec3 midColor = vec3(0.72, 0.88, 0.96);    // light blue
-          vec3 horizonColor = vec3(0.95, 0.96, 0.90); // warm white
-          vec3 groundColor = vec3(0.42, 0.72, 0.38);  // soft green
-
-          vec3 color;
+          vec3 norm = normalize(vWorldPosition);
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+          float angle = dot(viewDir, norm);
+          float holoT = angle * 2.0 + norm.y * 0.5 + uTime * 0.05;
+          vec3 holoColor = holo(holoT);
+          // Clear sky with subtle holo tint — not washed out
+          vec3 topSky = vec3(0.55, 0.78, 0.98);
+          vec3 horizonSky = vec3(0.88, 0.90, 0.92);
+          vec3 bottomSky = vec3(0.35, 0.60, 0.30);
+          float h = norm.y;
+          vec3 base;
           if (h > 0.0) {
-            float t = clamp(h * 2.0, 0.0, 1.0);
-            color = mix(horizonColor, mix(midColor, topColor, t), t);
+            base = mix(horizonSky, topSky, clamp(h * 2.0, 0.0, 1.0));
           } else {
-            float t = clamp(-h * 3.0, 0.0, 1.0);
-            color = mix(horizonColor, groundColor, t);
+            base = mix(horizonSky, bottomSky, clamp(-h * 3.0, 0.0, 1.0));
           }
+          vec3 color = mix(base, holoColor, 0.06);
           gl_FragColor = vec4(color, 1.0);
         }
       `,
@@ -51,117 +58,199 @@ function GradientSky() {
   }, []);
 
   return (
-    <mesh material={material} renderOrder={-1}>
-      <sphereGeometry args={[80, 32, 32]} />
+    <mesh material={material} renderOrder={-1}
+      onBeforeRender={() => { material.uniforms.uTime.value = performance.now() / 1000; }}
+    >
+      <sphereGeometry args={[100, 32, 32]} />
     </mesh>
   );
 }
 
-// ─── Floating Orbs (the iconic Friendsies light balls) ─────────────
+// ─── Distant Planet with Spike Columns ─────────────────────────────
 
-function FloatingOrbs() {
-  const groupRef = useRef<THREE.Group>(null);
-  const orbData = useMemo(() => {
-    return Array.from({ length: 12 }, (_, i) => ({
-      position: [
-        (Math.sin(i * 2.39) * 20) + (Math.random() - 0.5) * 10,
-        3 + Math.random() * 12,
-        -15 + (Math.cos(i * 1.73) * 15) + (Math.random() - 0.5) * 8,
-      ] as [number, number, number],
-      scale: 0.3 + Math.random() * 0.6,
-      speed: 0.3 + Math.random() * 0.4,
-      phase: Math.random() * Math.PI * 2,
-      color: ['#ffffff', '#ffe4b5', '#e0f0ff', '#ffe8f0', '#e8ffe0'][i % 5],
-    }));
-  }, []);
+const PR = 12; // planet radius
+const PP: [number, number, number] = [0, -18, -55]; // planet position (far back, below)
 
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (!groupRef.current) return;
-    groupRef.current.children.forEach((child, i) => {
-      const d = orbData[i];
-      if (!d) return;
-      child.position.y = d.position[1] + Math.sin(t * d.speed + d.phase) * 1.5;
-      child.position.x = d.position[0] + Math.sin(t * d.speed * 0.7 + d.phase) * 0.8;
-    });
-  });
-
-  return (
-    /* eslint-disable react/no-unknown-property */
-    <group ref={groupRef}>
-      {orbData.map((orb, i) => (
-        <mesh key={i} position={orb.position}>
-          <sphereGeometry args={[orb.scale, 16, 16]} />
-          <meshBasicMaterial
-            color={orb.color}
-            transparent
-            opacity={0.35}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
-    </group>
-    /* eslint-enable react/no-unknown-property */
-  );
-}
-
-// ─── Pastel Columns (the rounded tree/pillar shapes) ───────────────
-
-function PastelColumns() {
+function DistantPlanet() {
   const columns = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const angle = (i / 14) * Math.PI * 2;
-      const radius = 25 + (i % 3) * 8;
+    const colors = [
+      '#ff6b1a', '#ff4488', '#44dd22', '#ffcc00', '#ff3355',
+      '#22cc88', '#ff8800', '#88dd00', '#ff2266', '#44bb44',
+      '#ffaa22', '#33cc66', '#ff5533', '#66dd44', '#ee4422',
+    ];
+    return Array.from({ length: 15 }, (_, i) => {
+      const phi = (i / 15) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const theta = 0.15 + Math.random() * 0.45;
+      const sx = Math.sin(theta) * Math.cos(phi);
+      const sy = Math.cos(theta);
+      const sz = Math.sin(theta) * Math.sin(phi);
       return {
-        position: [
-          Math.sin(angle) * radius,
-          0,
-          Math.cos(angle) * radius - 20,
-        ] as [number, number, number],
-        height: 6 + Math.random() * 10,
-        radius: 1.5 + Math.random() * 2,
-        color: [
-          '#f5c882', '#e8a860', '#c8e890', '#f5d890',
-          '#e0c080', '#b8d880', '#f0c870', '#d0e088',
-          '#e8b870', '#c0d880', '#ddb870', '#b0d070',
-          '#e8c478', '#c8d878',
-        ][i],
+        pos: [PP[0] + sx * PR, PP[1] + sy * PR, PP[2] + sz * PR] as [number, number, number],
+        normal: [sx, sy, sz] as [number, number, number],
+        h: 1.5 + Math.random() * 3.5,
+        r: 0.25 + Math.random() * 0.5,
+        color: colors[i],
       };
     });
   }, []);
 
   return (
-    /* eslint-disable react/no-unknown-property */
     <group>
-      {columns.map((col, i) => (
-        <group key={i} position={col.position}>
-          {/* Column body */}
-          <mesh position={[0, col.height / 2, 0]}>
-            <cylinderGeometry args={[col.radius, col.radius * 1.1, col.height, 12]} />
-            <meshLambertMaterial color={col.color} />
-          </mesh>
-          {/* Rounded top cap */}
-          <mesh position={[0, col.height, 0]}>
-            <sphereGeometry args={[col.radius, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshLambertMaterial color={col.color} />
-          </mesh>
-        </group>
-      ))}
+      {/* eslint-disable react/no-unknown-property */}
+      <mesh position={PP}>
+        <sphereGeometry args={[PR, 32, 32]} />
+        <meshLambertMaterial color="#2a8a2a" />
+      </mesh>
+      {columns.map((c, i) => {
+        const q = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(...c.normal),
+        );
+        return (
+          <group key={i} position={c.pos} quaternion={q}>
+            <mesh position={[0, c.h / 2, 0]}>
+              <cylinderGeometry args={[c.r * 0.8, c.r, c.h, 8]} />
+              <meshLambertMaterial color={c.color} />
+            </mesh>
+            <mesh position={[0, c.h, 0]}>
+              <sphereGeometry args={[c.r * 0.8, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshLambertMaterial color={c.color} />
+            </mesh>
+          </group>
+        );
+      })}
+      {/* eslint-enable react/no-unknown-property */}
     </group>
+  );
+}
+
+// ─── Walking Noun Sprites on Planet ────────────────────────────────
+
+function randomSeed() {
+  return {
+    background: Math.floor(Math.random() * ImageData.bgcolors.length),
+    body: Math.floor(Math.random() * ImageData.images.bodies.length),
+    accessory: Math.floor(Math.random() * ImageData.images.accessories.length),
+    head: Math.floor(Math.random() * ImageData.images.heads.length),
+    glasses: Math.floor(Math.random() * ImageData.images.glasses.length),
+  };
+}
+
+function NounSprite({ seed, orbitAngle, orbitSpeed }: {
+  seed: ReturnType<typeof randomSeed>;
+  orbitAngle: number;
+  orbitSpeed: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const texRef = useRef<THREE.Texture | null>(null);
+
+  // Generate SVG texture
+  useEffect(() => {
+    try {
+      const { parts, background } = getNounData(seed);
+      const svg = buildSVG(parts, ImageData.palette, background);
+      const img = new Image();
+      img.onload = () => {
+        const tex = new THREE.Texture(img);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        tex.needsUpdate = true;
+        texRef.current = tex;
+        if (meshRef.current) {
+          (meshRef.current.material as THREE.MeshBasicMaterial).map = tex;
+          (meshRef.current.material as THREE.MeshBasicMaterial).needsUpdate = true;
+        }
+      };
+      img.src = `data:image/svg+xml;base64,${btoa(svg)}`;
+    } catch { /* skip broken seeds */ }
+  }, [seed]);
+
+  // Walk around planet surface
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.getElapsedTime() * orbitSpeed + orbitAngle;
+    const theta = 0.3; // stay near top of planet
+    const phi = t;
+    const surfR = PR + 0.6; // slightly above surface
+    const x = PP[0] + Math.sin(theta) * Math.cos(phi) * surfR;
+    const y = PP[1] + Math.cos(theta) * surfR;
+    const z = PP[2] + Math.sin(theta) * Math.sin(phi) * surfR;
+    meshRef.current.position.set(x, y, z);
+    // Billboard: always face camera
+    meshRef.current.lookAt(0, 0, 35);
+  });
+
+  return (
+    /* eslint-disable react/no-unknown-property */
+    <mesh ref={meshRef}>
+      <planeGeometry args={[1.2, 1.2]} />
+      <meshBasicMaterial transparent toneMapped={false} />
+    </mesh>
     /* eslint-enable react/no-unknown-property */
   );
 }
 
-// ─── Ground Hill ───────────────────────────────────────────────────
+function WalkingNouns() {
+  const sprites = useMemo(() => {
+    return Array.from({ length: 5 }, (_, i) => ({
+      seed: randomSeed(),
+      orbitAngle: (i / 5) * Math.PI * 2,
+      orbitSpeed: 0.08 + Math.random() * 0.06,
+    }));
+  }, []);
 
-function GroundHill() {
   return (
-    /* eslint-disable react/no-unknown-property */
-    <mesh position={[0, -18, -5]} rotation={[-0.1, 0, 0]}>
-      <sphereGeometry args={[30, 32, 32]} />
-      <meshLambertMaterial color="#4aad4a" />
-    </mesh>
-    /* eslint-enable react/no-unknown-property */
+    <>
+      {sprites.map((s, i) => (
+        <NounSprite key={i} seed={s.seed} orbitAngle={s.orbitAngle} orbitSpeed={s.orbitSpeed} />
+      ))}
+    </>
+  );
+}
+
+// ─── Small Orbiting Mini-Planets ───────────────────────────────────
+
+function OrbitingPlanets() {
+  const planets = useMemo(() => {
+    const colors = ['#ff6644', '#4488ff', '#ffaa22', '#aa44ff'];
+    return Array.from({ length: 4 }, (_, i) => ({
+      orbitRadius: 22 + i * 6,
+      orbitSpeed: 0.03 + i * 0.01,
+      phase: (i / 4) * Math.PI * 2,
+      size: 0.8 + Math.random() * 1.2,
+      color: colors[i],
+      y: PP[1] + (Math.random() - 0.5) * 8,
+    }));
+  }, []);
+
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.getElapsedTime();
+    groupRef.current.children.forEach((child, i) => {
+      const p = planets[i];
+      if (!p) return;
+      const angle = t * p.orbitSpeed + p.phase;
+      child.position.set(
+        PP[0] + Math.cos(angle) * p.orbitRadius,
+        p.y + Math.sin(t * 0.1 + p.phase) * 2,
+        PP[2] + Math.sin(angle) * p.orbitRadius,
+      );
+    });
+  });
+
+  return (
+    <group ref={groupRef}>
+      {planets.map((p, i) => (
+        /* eslint-disable react/no-unknown-property */
+        <mesh key={i}>
+          <sphereGeometry args={[p.size, 12, 12]} />
+          <meshLambertMaterial color={p.color} />
+        </mesh>
+        /* eslint-enable react/no-unknown-property */
+      ))}
+    </group>
   );
 }
 
@@ -170,55 +259,17 @@ function GroundHill() {
 export default function SceneEnvironment() {
   return (
     <>
-      <GradientSky />
-      <GroundHill />
-      <PastelColumns />
-      <FloatingOrbs />
-      {/* Drei sparkles — tiny twinkling particles */}
+      <HoloBackground />
+      <DistantPlanet />
+      <WalkingNouns />
+      <OrbitingPlanets />
+
       {/* eslint-disable react/no-unknown-property */}
-      <Sparkles
-        count={80}
-        scale={[50, 30, 40]}
-        size={2}
-        speed={0.3}
-        opacity={0.6}
-        color="#ffffff"
-        position={[0, 8, -10]}
-      />
-      <Sparkles
-        count={30}
-        scale={[40, 20, 30]}
-        size={3}
-        speed={0.2}
-        opacity={0.3}
-        color="#ffe8c0"
-        position={[0, 12, -5]}
-      />
-      {/* Soft clouds */}
-      <Cloud
-        position={[-15, 18, -25]}
-        speed={0.1}
-        opacity={0.4}
-        width={12}
-        depth={3}
-        segments={8}
-      />
-      <Cloud
-        position={[10, 22, -30]}
-        speed={0.15}
-        opacity={0.3}
-        width={10}
-        depth={2}
-        segments={6}
-      />
-      <Cloud
-        position={[20, 16, -20]}
-        speed={0.08}
-        opacity={0.35}
-        width={8}
-        depth={2}
-        segments={6}
-      />
+      <Sparkles count={80} scale={[40, 25, 35]} size={1} speed={0.1} opacity={0.2} color="#ffffff" position={[0, 2, 0]} />
+      <Sparkles count={50} scale={[50, 30, 40]} size={2} speed={0.15} opacity={0.3} color="#ffffff" position={[0, 3, -10]} />
+      <Sparkles count={30} scale={[60, 35, 50]} size={3.5} speed={0.05} opacity={0.15} color="#e0d8ff" position={[0, 5, -15]} />
+      <Sparkles count={25} scale={[35, 20, 30]} size={2.5} speed={0.08} opacity={0.12} color="#ffd4a0" position={[0, 0, -5]} />
+      <Sparkles count={100} scale={[30, 18, 25]} size={0.8} speed={0.4} opacity={0.35} color="#ffffff" position={[0, 1, 2]} />
       {/* eslint-enable react/no-unknown-property */}
     </>
   );
