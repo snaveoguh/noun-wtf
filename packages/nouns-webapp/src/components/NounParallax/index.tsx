@@ -36,48 +36,10 @@ import classes from './NounParallax.module.css';
 
 // ─── Curated Head Component (self-contained, no external hook imports) ──────
 
-// Decode Nouns RLE image data to a 32x32 color grid (self-contained, no voxel-engine import)
-function decodeNounPartToCanvas(partData: string, palette: string[]): HTMLCanvasElement {
-  const hex = partData.replace(/^0x/, '');
-  const bounds = {
-    top: parseInt(hex.substring(2, 4), 16),
-    right: parseInt(hex.substring(4, 6), 16),
-    left: parseInt(hex.substring(8, 10), 16),
-  };
-  const pairs: [number, number][] =
-    hex.substring(10).match(/.{1,4}/g)
-      ?.map(r => [parseInt(r.substring(0, 2), 16), parseInt(r.substring(2, 4), 16)]) ?? [];
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, 32, 32);
-
-  // Decode RLE pixels at their native coordinates (no offset needed —
-  // the 3DNouns GLB uses the same 32x32 Nouns pixel grid for UV mapping)
-  let x = bounds.left, y = bounds.top;
-  for (const [runLength, colorIndex] of pairs) {
-    for (let i = 0; i < runLength; i++) {
-      if (colorIndex !== 0 && y < 32 && x < 32) {
-        ctx.fillStyle = `#${palette[colorIndex]}`;
-        ctx.fillRect(x, y, 1, 1);
-      }
-      x++;
-      if (x >= bounds.right) {
-        x = bounds.left;
-        y++;
-      }
-    }
-  }
-  return canvas;
-}
-
-function CuratedHead({ headIndex, seed, bodyGeo, glassesGeo, onLoaded }: {
+function CuratedHead({ headIndex, seed, bodyGeo, onLoaded }: {
   headIndex: number;
   seed: INounSeed;
   bodyGeo: THREE.BufferGeometry | null;
-  glassesGeo: THREE.BufferGeometry | null;
   onLoaded?: (loaded: boolean) => void;
 }) {
   const [obj, setObj] = useState<THREE.Object3D | null>(null);
@@ -615,7 +577,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false 
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
-        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} glassesGeo={glassesGeo} onLoaded={setCuratedHeadLoaded} />}
+        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
       </group>
       {}
     </>
@@ -693,7 +655,7 @@ function InteractiveScene({
           <meshBasicMaterial vertexColors toneMapped={false} />
         </mesh>
       )}
-      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} glassesGeo={glassesGeo} onLoaded={setCuratedHeadLoaded} />}
+      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} />}
 
       <OrbitControls
         enablePan={interactionMode === 'grab'}
