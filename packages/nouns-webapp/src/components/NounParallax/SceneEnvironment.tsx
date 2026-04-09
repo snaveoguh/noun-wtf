@@ -317,7 +317,7 @@ function Spaceships() {
 
 // ─── Export ─────────────────────────────────────────────────────────
 
-export default function SceneEnvironment() {
+export default function SceneEnvironment({ tiltX = 0, tiltY = 0 }: { tiltX?: number; tiltY?: number }) {
   return (
     <>
       <HoloSky />

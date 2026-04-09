@@ -546,9 +546,15 @@
   }
 
   .railBtn {
-    min-width: calc(25% - 0.35rem);
-    flex: 1 1 calc(50% - 0.35rem);
-    padding: 0.58rem 0.6rem;
+    width: 2.8rem;
+    height: 2.8rem;
+    min-width: 0;
+    flex: none;
+    padding: 0.3rem;
+  }
+
+  .addTab {
+    display: none;
   }
 
   .navArrow {
