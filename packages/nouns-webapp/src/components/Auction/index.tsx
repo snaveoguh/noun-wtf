@@ -158,7 +158,7 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
   return (
     <div
       style={{
-        position: 'absolute', top: 16, right: 16, zIndex: 10,
+        position: 'absolute', top: 16, right: 16, zIndex: 2,
         display: 'flex', gap: 3, alignItems: 'center', height: 22,
         background: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: '0 8px',
         fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.05em',
