@@ -129,13 +129,16 @@ function CuratedHead({ headIndex, seed, bodyGeo, glassesGeo, onLoaded }: {
         // Head pixels sit at rows ~7-20 (Y = -8.5 to +4.5 in voxel coords)
         // So GLB Y=25 should map to voxel Y ≈ -8.5 (where head meets body)
 
-        // Simple: shift GLB coords to voxel coords
-        // GLB X center = -1, voxel center = 0 → shift X by +1
-        // GLB Y=25 (head bottom) should go to voxel Y = -2 (rough neck line)
-        // GLB Z center = 0.25, voxel Z = 0.78 → shift Z by +0.53
-        const offsetX = 1;     // center the GLB horizontally
-        const offsetY = -27;   // shift GLB Y=25 down to voxel Y=-2
-        const offsetZ = 0.53;  // align Z depth
+        // Shift GLB coords to voxel coords.
+        // GLB native Z spans -0.5..+0.5 (1 voxel deep).
+        // Voxel body is at Z=0, depth 2.5 → front face at +1.25.
+        // We want the GLB head's back face (Z=-0.5 + offset) to align
+        // with the voxel body's back face (Z=-1.25), so offset = -0.75.
+        // But that buries it — instead align centers: body center Z=0,
+        // GLB center Z=0.25 → shift back by -0.25 to sit at Z=0.
+        const offsetX = 0;     // center the GLB horizontally
+        const offsetY = -26;   // shift GLB head up 1 voxel to sit flush on body
+        const offsetZ = -0.25; // align GLB Z center with body Z center
 
         const matrix = new THREE.Matrix4();
         matrix.makeTranslation(offsetX, offsetY, offsetZ);
