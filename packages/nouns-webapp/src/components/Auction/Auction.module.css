@@ -6,6 +6,7 @@
     var(--page-edge-padding-right)
     2rem
     var(--page-edge-padding-left);
+  background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.6) 40%, rgba(240,235,230,0.3) 100%);
 }
 
 .heroShell {

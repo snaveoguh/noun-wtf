@@ -10,6 +10,8 @@ body {
   text-transform: uppercase;
   font-weight: bold;
   font-size: 13px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%);
+  background-attachment: fixed;
 }
 
 /* Global font shrink — Comic Sans bold runs large */

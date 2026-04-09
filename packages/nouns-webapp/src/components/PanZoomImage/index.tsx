@@ -17,6 +17,8 @@ interface PanZoomImageProps {
   alt?: string;
   pixelated?: boolean;
   interactive?: boolean;
+  /** Fill the entire container edge-to-edge */
+  fill?: boolean;
 }
 
 const PanZoomImage = ({
@@ -25,6 +27,7 @@ const PanZoomImage = ({
   alt = '',
   pixelated = false,
   interactive = true,
+  fill = false,
 }: PanZoomImageProps & { ref?: React.RefObject<PanZoomHandle | null> }) => {
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
@@ -87,8 +90,10 @@ const PanZoomImage = ({
           position: 'absolute',
           top: '50%',
           left: '50%',
-          maxWidth: '85%',
-          maxHeight: '85%',
+          maxWidth: fill ? '100%' : '85%',
+          maxHeight: fill ? '100%' : '85%',
+          width: fill ? '100%' : undefined,
+          height: fill ? '100%' : undefined,
           objectFit: 'contain',
           imageRendering: pixelated ? 'pixelated' : 'auto',
           transform: `translate(-50%, -50%) translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
