@@ -153,7 +153,6 @@ function formatUpdateLabel(updatedAt?: string) {
 function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange: (p: LightingPreset) => void }) {
   const [hovered, setHovered] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const activeLabel = LIGHTING_PRESETS.find(p => p.name === preset)?.label ?? 'STORE';
 
   return (
     <div
