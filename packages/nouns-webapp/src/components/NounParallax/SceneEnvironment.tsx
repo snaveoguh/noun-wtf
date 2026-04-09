@@ -73,9 +73,7 @@ function HoloSky() {
 
 function HoloOrbs() {
   const ref = useRef<THREE.Group>(null);
-  const orbs = useMemo(() => Array.from({ length: 120 }, (_, i) => {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 25 + Math.random() * 70;
+  const orbs = useMemo(() => Array.from({ length: 120 }, () => {
     // Neon orange heavy like holo card — no purple/pink
     const hueBucket = Math.random();
     let hue: number;
