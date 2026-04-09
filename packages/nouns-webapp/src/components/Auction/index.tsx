@@ -920,6 +920,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           alt={`Noun ${currentAuction?.nounId}`}
           pixelated
           interactive={imageInteractive}
+          fill={viewMode === 'real'}
         />
       );
     }
@@ -1269,7 +1270,15 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           </div>
 
           <div className={classes.heroMain}>
-            <section className={classes.heroStage}>
+            <section
+              className={classes.heroStage}
+              style={(() => {
+                const bg = currentNounSeed?.background;
+                const bgHex = bg != null ? ImageData.bgcolors?.[bg] : undefined;
+                if (!bgHex) return undefined;
+                return { background: `#${bgHex}` };
+              })()}
+            >
               <div className={`${classes.heroArtFrame} ${viewMode === 'sprite' ? classes.spriteTransition : ''}`} data-hero-artwork-root="true">
                 {renderHeroArtwork()}
               </div>
