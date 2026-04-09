@@ -33,6 +33,7 @@ import * as THREE from 'three';
 import { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './NounParallax.module.css';
+import SceneEnvironment from './SceneEnvironment';
 
 // ─── Lighting Presets ───────────────────────────────────────────────────────
 
@@ -216,10 +217,19 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
         scene.updateMatrixWorld(true);
 
         if (!cancelled) {
-          // Compute front face Z for voxel glasses positioning (hip-rose)
+          // Compute front face Z from VISIBLE meshes only (hip-rose voxel glasses positioning)
           if (isHipRose) {
-            const box = new THREE.Box3().setFromObject(scene);
-            onGlassesZ?.(box.max.z + 0.5); // glasses sit just in front of the head
+            const box = new THREE.Box3();
+            scene.traverse((child) => {
+              if ((child as THREE.Mesh).isMesh && child.visible) {
+                const meshBox = new THREE.Box3().setFromObject(child);
+                box.union(meshBox);
+              }
+            });
+            if (!box.isEmpty()) {
+              console.log(`[CuratedHead] hip-rose front Z: ${box.max.z.toFixed(2)}`);
+              onGlassesZ?.(box.max.z + 0.5);
+            }
           }
           setObj(scene);
           onLoaded?.(true);
@@ -656,6 +666,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false,
   return (
     <>
       <SceneLighting preset={lightingPreset} />
+      <SceneEnvironment />
       <group ref={groupRef}>
         {bodyGeo && (
           <mesh geometry={bodyGeo} receiveShadow>
@@ -741,6 +752,7 @@ function InteractiveScene({
   return (
     <>
       <SceneLighting preset={lightingPreset} />
+      <SceneEnvironment />
       {bodyGeo && (
         <mesh geometry={bodyGeo} receiveShadow>
           <meshLambertMaterial vertexColors />
