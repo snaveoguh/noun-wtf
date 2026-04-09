@@ -38,16 +38,17 @@ function HoloSky() {
         vec3 n = normalize(vPos);
         float fresnel = dot(vViewDir, n);
 
-        // Silver holofoil base
-        vec3 base = vec3(0.82, 0.80, 0.84);
+        // Chrome mirror base — shifts between silver and warm
+        float chromeShift = sin(fresnel * 4.0 + n.x * 2.0 + uTime * 0.08) * 0.5 + 0.5;
+        vec3 base = mix(vec3(0.85, 0.83, 0.88), vec3(0.92, 0.88, 0.82), chromeShift);
 
         // Holographic rainbow shimmer — shifts with view angle
         float holoT = fresnel * 3.0 + n.x * 1.5 + n.y * 0.8 + uTime * 0.04;
         vec3 rainbow = holo(holoT);
 
         // Mix rainbow in subtly — more at edges (fresnel)
-        float edgeFactor = pow(1.0 - abs(fresnel), 2.0);
-        vec3 color = mix(base, rainbow, edgeFactor * 0.15 + 0.05);
+        float edgeFactor = pow(1.0 - abs(fresnel), 1.5);
+        vec3 color = mix(base, rainbow, edgeFactor * 0.2 + 0.08);
 
         // Add subtle sparkle noise
         float sparkle = fract(sin(dot(n.xy * 400.0, vec2(12.9898, 78.233))) * 43758.5453);
@@ -75,14 +76,14 @@ function HoloOrbs() {
   const orbs = useMemo(() => Array.from({ length: 120 }, (_, i) => {
     const angle = Math.random() * Math.PI * 2;
     const dist = 25 + Math.random() * 70;
-    // Neon orange dominant, with cyan/blue accents — zero pink
+    // Neon orange heavy like holo card — no purple/pink
     const hueBucket = Math.random();
     let hue: number;
-    if (hueBucket < 0.40) hue = 0.05 + Math.random() * 0.07;       // neon orange
-    else if (hueBucket < 0.55) hue = 0.10 + Math.random() * 0.05;  // amber/gold
-    else if (hueBucket < 0.70) hue = 0.50 + Math.random() * 0.10;  // cyan
-    else if (hueBucket < 0.85) hue = 0.58 + Math.random() * 0.10;  // blue
-    else hue = 0.30 + Math.random() * 0.08;                          // green
+    if (hueBucket < 0.50) hue = 0.04 + Math.random() * 0.06;       // neon orange
+    else if (hueBucket < 0.70) hue = 0.10 + Math.random() * 0.06;  // amber/gold
+    else if (hueBucket < 0.82) hue = 0.50 + Math.random() * 0.08;  // cyan
+    else if (hueBucket < 0.92) hue = 0.56 + Math.random() * 0.08;  // blue
+    else hue = 0.30 + Math.random() * 0.06;                          // green
     return {
       pos: [
         (Math.random() - 0.5) * 160,

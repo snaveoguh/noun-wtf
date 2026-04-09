@@ -219,7 +219,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
-  const [lightingPreset, setLightingPreset] = useState<LightingPreset>('spotlight');
+  const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
   const [editMode, setEditMode] = useState<EditMode>(null);
   const [playIntroSpin, setPlayIntroSpin] = useState(true);
@@ -920,7 +920,6 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           alt={`Noun ${currentAuction?.nounId}`}
           pixelated
           interactive={imageInteractive}
-          fill={viewMode === 'real'}
         />
       );
     }
@@ -1271,13 +1270,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
           <div className={classes.heroMain}>
             <section
-              className={classes.heroStage}
-              style={(() => {
-                const bg = currentNounSeed?.background;
-                const bgHex = bg != null ? ImageData.bgcolors?.[bg] : undefined;
-                if (!bgHex) return undefined;
-                return { background: `#${bgHex}` };
-              })()}
+              className={`${classes.heroStage} ${viewMode === 'real' && currentNounSeed ? (currentNounSeed.background === 0 ? classes.bgCool : classes.bgWarm) : ''}`}
             >
               <div className={`${classes.heroArtFrame} ${viewMode === 'sprite' ? classes.spriteTransition : ''}`} data-hero-artwork-root="true">
                 {renderHeroArtwork()}

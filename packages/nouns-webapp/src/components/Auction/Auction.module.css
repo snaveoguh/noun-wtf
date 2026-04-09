@@ -131,6 +131,14 @@
     0 24px 60px rgba(112, 82, 45, 0.12);
 }
 
+.bgCool {
+  background: #d5d7e1 !important;
+}
+
+.bgWarm {
+  background: #e1d7d5 !important;
+}
+
 .heroArtFrame {
   position: absolute;
   inset: 0;
