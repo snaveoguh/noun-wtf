@@ -18,7 +18,7 @@ import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
 import NounderNounContent from '@/components/NounderNounContent';
-import NounParallax from '@/components/NounParallax';
+import NounParallax, { LIGHTING_PRESETS, type LightingPreset } from '@/components/NounParallax';
 import PanZoomImage from '@/components/PanZoomImage';
 import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -149,6 +149,62 @@ function formatUpdateLabel(updatedAt?: string) {
   })}`;
 }
 
+/** Collapsible lighting preset picker — hover expands on desktop, tap cycles on mobile */
+function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange: (p: LightingPreset) => void }) {
+  const [hovered, setHovered] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const activeLabel = LIGHTING_PRESETS.find(p => p.name === preset)?.label ?? 'STORE';
+
+  return (
+    <div
+      style={{
+        position: 'absolute', top: 16, right: 16, zIndex: 10,
+        display: 'flex', gap: 3, alignItems: 'center', height: 22,
+        background: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: '0 8px',
+        fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.05em',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={() => !isMobile && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => {
+        if (isMobile) {
+          const idx = LIGHTING_PRESETS.findIndex(p => p.name === preset);
+          onChange(LIGHTING_PRESETS[(idx + 1) % LIGHTING_PRESETS.length].name);
+        }
+      }}
+    >
+      {LIGHTING_PRESETS.map(p => {
+        const isActive = p.name === preset;
+        const show = hovered || isActive;
+        return (
+          <button
+            key={p.name}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange(p.name); }}
+            style={{
+              fontSize: 9, border: 'none', borderRadius: 4, lineHeight: '14px',
+              padding: show ? '2px 5px' : '2px 0',
+              maxWidth: show ? 50 : 0,
+              opacity: show ? 1 : 0,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              background: isActive ? 'rgba(255,255,255,0.25)' : 'transparent',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
+              fontFamily: 'monospace', cursor: 'pointer', letterSpacing: '0.05em',
+              transition: 'max-width 0.25s ease, opacity 0.2s ease, padding 0.25s ease',
+            }}
+          >
+            {p.label}
+          </button>
+        );
+      })}
+      {!isMobile && !hovered && (
+        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 1, transition: 'opacity 0.2s' }}>‹</span>
+      )}
+    </div>
+  );
+}
+
 interface AuctionProps {
   auction?: IAuction;
 }
@@ -162,6 +218,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
+  const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
   const [editMode, setEditMode] = useState<EditMode>(null);
   const [playIntroSpin, setPlayIntroSpin] = useState(true);
@@ -763,6 +820,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           autoSpin={showSpin}
           fullscreen
           pointerEnabled={parallaxInteractive}
+          lightingPreset={lightingPreset}
           editable={
             editMode === '3d'
               ? {
@@ -1079,15 +1137,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     );
   };
 
+  const statusIcon = isEditing ? '✎' : interactionMode === 'grab' ? '🖐' : interactionMode === 'twist' ? '🌀' : '📱';
   const statusLabel = isEditing
     ? editMode === '3d'
-      ? 'Live 3D editing'
-      : 'Live 2D editing'
+      ? `${statusIcon} Live 3D editing`
+      : `${statusIcon} Live 2D editing`
     : interactionMode === 'grab'
-      ? 'Grab mode'
+      ? `${statusIcon} Grab mode`
       : interactionMode === 'twist'
-        ? 'Twist mode'
-        : 'Scroll mode';
+        ? `${statusIcon} Twist mode`
+        : `${statusIcon} Scroll mode`;
 
   return (
     <div style={{ backgroundColor: stateBgColor }}>
@@ -1186,7 +1245,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   setComposerMode('art');
                 }}
               >
-                +
+                MAKE ART
               </button>
             </div>
 
@@ -1235,18 +1294,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                       <span className={classes.railLabel}>Twist</span>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className={classes.railBtn}
-                    onClick={() =>
-                      startEditing(viewMode === 'real' || viewMode === 'edit-2d' ? '2d' : '3d')
-                    }
-                    title="Live edit"
-                  >
-                    <span className={classes.railIcon}>✎</span>
-                    <span className={classes.railLabel}>Edit</span>
-                  </button>
                 </div>
+              )}
+
+              {!isEditing && is3dView && (
+                <LightingPicker preset={lightingPreset} onChange={setLightingPreset} />
               )}
 
               <div className={classes.stageStatus}>{statusLabel}</div>

@@ -4102,16 +4102,6 @@ export default function WorldPage() {
               p.state = 'airborne';
             }
           }}
-          onAttack={() => {
-            const input = inputRef.current;
-            if (input) input.keys.add('f');
-            setTimeout(() => { inputRef.current?.keys.delete('f'); }, 100);
-          }}
-          onInteract={() => {
-            const input = inputRef.current;
-            if (input) input.keys.add('e');
-            setTimeout(() => { inputRef.current?.keys.delete('e'); }, 100);
-          }}
         />
       )}
     </div>
