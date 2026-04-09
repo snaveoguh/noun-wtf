@@ -63,30 +63,19 @@ const ARC_COLORS = [
   '#888888',                                               // exit gray
 ];
 
-// ── Arc layout ─────────────────────────────────────────────────────
+// ── Grid layout — 3 columns, no overlap ───────────────────────────
 
-const BTN_SIZE = 28;
-const ARC_RADIUS = 170;
-const ARC_CENTER_X = 30;  // offset from right edge (negative = off-screen right)
-const ARC_CENTER_Y_OFFSET = 60; // up from bottom
-const START_ANGLE = Math.PI * 0.05;  // near bottom-right
-const END_ANGLE = Math.PI * 0.48;    // near top-right
+const BTN_SIZE = 26;
+const BTN_GAP = 4;
+const COLS = 3;
+const MARGIN_RIGHT = 8;
+const MARGIN_BOTTOM = 50;
 
-// Seeded pseudo-random for consistent jitter
-function jitter(i: number): { dx: number; dy: number } {
-  const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-  const dx = ((s - Math.floor(s)) - 0.5) * 4;
-  const t = Math.sin(i * 269.5 + 183.3) * 43758.5453;
-  const dy = ((t - Math.floor(t)) - 0.5) * 4;
-  return { dx, dy };
-}
-
-function getButtonPosition(index: number, total: number): { right: number; bottom: number } {
-  const t = total > 1 ? index / (total - 1) : 0;
-  const angle = START_ANGLE + t * (END_ANGLE - START_ANGLE);
-  const { dx, dy } = jitter(index);
-  const right = ARC_CENTER_X + Math.cos(angle) * ARC_RADIUS + dx;
-  const bottom = ARC_CENTER_Y_OFFSET + Math.sin(angle) * ARC_RADIUS + dy;
+function getButtonPosition(index: number): { right: number; bottom: number } {
+  const col = index % COLS;
+  const row = Math.floor(index / COLS);
+  const right = MARGIN_RIGHT + col * (BTN_SIZE + BTN_GAP);
+  const bottom = MARGIN_BOTTOM + row * (BTN_SIZE + BTN_GAP);
   return { right, bottom };
 }
 
@@ -262,7 +251,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
 
       {/* ── Right: Arc of action buttons ── */}
       {BUTTONS.map((def, i) => {
-        const pos = getButtonPosition(i, BUTTONS.length);
+        const pos = getButtonPosition(i);
         const color = ARC_COLORS[i % ARC_COLORS.length];
         return (
           <button
