@@ -670,7 +670,7 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false,
   return (
     <>
       <SceneLighting preset={lightingPreset} />
-      <SceneEnvironment />
+      <SceneEnvironment tiltRef={tiltRef} />
       <group ref={groupRef}>
         {bodyGeo && (
           <mesh geometry={bodyGeo} receiveShadow>
@@ -810,6 +810,65 @@ function InteractiveScene({
   );
 }
 
+// ─── Background body layers for editable mode ─────────────────────────────
+
+/** Render non-editable body/bling/glasses as static lit meshes behind the editor. */
+function EditableBackgroundBody({
+  seed,
+  layerVisibility,
+  lightingPreset = 'storefront',
+}: {
+  seed: INounSeed;
+  layerVisibility?: LayerVisibility;
+  lightingPreset?: LightingPreset;
+}) {
+  const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
+
+  // Build only body + bling + glasses (NOT head — editor handles that)
+  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+    const vis: LayerVisibility = {
+      body: layerVisibility?.body ?? true,
+      accessory: layerVisibility?.accessory ?? true,
+      head: false, // head is in the editable voxel layer
+      glasses: layerVisibility?.glasses ?? true,
+    };
+    const layers = seedToLayers(seed, getNounData, ImageData.palette, vis);
+    const geos = buildNounGeometries(layers);
+    // headGeo will be null since vis.head=false; dispose it defensively
+    geos.headGeo?.dispose();
+    return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo, glassesGeo: geos.glassesGeo };
+  }, [seedKey, layerVisibility]);
+
+  useEffect(() => {
+    return () => {
+      bodyGeo?.dispose();
+      blingGeo?.dispose();
+      glassesGeo?.dispose();
+    };
+  }, [bodyGeo, blingGeo, glassesGeo]);
+
+  return (
+    <>
+      <SceneLighting preset={lightingPreset} />
+      {bodyGeo && (
+        <mesh geometry={bodyGeo}>
+          <meshLambertMaterial vertexColors />
+        </mesh>
+      )}
+      {blingGeo && (
+        <mesh geometry={blingGeo}>
+          <meshLambertMaterial vertexColors />
+        </mesh>
+      )}
+      {glassesGeo && (
+        <mesh geometry={glassesGeo}>
+          <meshLambertMaterial vertexColors />
+        </mesh>
+      )}
+    </>
+  );
+}
+
 // ─── Responsive camera ──────────────────────────────────────────────────────
 
 function ResponsiveCamera({
@@ -870,6 +929,10 @@ export interface EditableConfig {
   displayPixels?: string[][];
   viewStateRef?: { current: EditableSceneViewState | null };
   onVoxelMapChange?: (map: VoxelMap) => void;
+  /** Seed for rendering non-editable background body/glasses layers */
+  backgroundSeed?: INounSeed;
+  /** Which background layers to show alongside the editor */
+  backgroundVisibility?: LayerVisibility;
 }
 
 interface NounParallaxProps {
@@ -1048,21 +1111,30 @@ const NounParallax: React.FC<NounParallaxProps> = ({
         <Suspense fallback={null}>
           <ResponsiveCamera fullscreen={fullscreen} viewStateRef={editable?.viewStateRef} />
           {editable ? (
-            <EditableSceneComponent
-              pixels={editable.pixels}
-              initialVoxelMap={editable.initialVoxelMap ?? undefined}
-              activeTool={editable.activeTool}
-              activeColor={editable.activeColor}
-              onPixelChange={editable.onPixelChange}
-              onPixelsFill={editable.onPixelsFill}
-              onColorPick={editable.onColorPick}
-              voxelDepth={editable.voxelDepth}
-              interactionMode={editable.interactionMode}
-              visibilityMask={editable.visibilityMask}
-              displayPixels={editable.displayPixels}
-              viewStateRef={editable.viewStateRef}
-              onVoxelMapChange={editable.onVoxelMapChange}
-            />
+            <>
+              {editable.backgroundSeed && (
+                <EditableBackgroundBody
+                  seed={editable.backgroundSeed}
+                  layerVisibility={editable.backgroundVisibility}
+                  lightingPreset={lightingPreset}
+                />
+              )}
+              <EditableSceneComponent
+                pixels={editable.pixels}
+                initialVoxelMap={editable.initialVoxelMap ?? undefined}
+                activeTool={editable.activeTool}
+                activeColor={editable.activeColor}
+                onPixelChange={editable.onPixelChange}
+                onPixelsFill={editable.onPixelsFill}
+                onColorPick={editable.onColorPick}
+                voxelDepth={editable.voxelDepth}
+                interactionMode={editable.interactionMode}
+                visibilityMask={editable.visibilityMask}
+                displayPixels={editable.displayPixels}
+                viewStateRef={editable.viewStateRef}
+                onVoxelMapChange={editable.onVoxelMapChange}
+              />
+            </>
           ) : interactive ? (
             <InteractiveScene
               seed={seed}

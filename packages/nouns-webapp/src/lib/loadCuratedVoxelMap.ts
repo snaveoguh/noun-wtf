@@ -18,6 +18,28 @@ interface CuratedVoxelData {
   source: string;
 }
 
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+/**
+ * Remap a 3DNouns native coordinate key to editor grid space.
+ *
+ * 3DNouns native: X≈-16..16, Y≈-3..42, Z≈-9..8
+ * Editor grid:    X=0..31,   Y=0..31,   Z=any integer
+ *
+ * X: +16 to center in the 32-wide grid
+ * Y: -3 to align the head area (~20-34) with the upper grid (~17-31)
+ * Z: +4 to push the head in front of the body (body at z=0..2, head starts ~z=4)
+ */
+function remapKey(nativeKey: string): string | null {
+  const [nx, ny, nz] = nativeKey.split(',').map(Number);
+  const ex = clamp(Math.round(nx + 16), 0, 31);
+  const ey = clamp(Math.round(ny - 3), 0, 31);
+  const ez = Math.round(nz + 4);
+  return `${ex},${ey},${ez}`;
+}
+
 /**
  * Load curated voxel data for a head trait and return as editor-compatible VoxelMap.
  * Returns null if no curated data available.
@@ -39,14 +61,16 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
     if (!res.ok) return null;
     const data: CuratedVoxelData = await res.json();
 
-    // Merge head + glasses into a single VoxelMap
+    // Merge head + glasses into a single VoxelMap, remapping coordinates
     const voxelMap: VoxelMap = new Map();
 
     for (const [key, color] of Object.entries(data.head)) {
-      voxelMap.set(key, color);
+      const editorKey = remapKey(key);
+      if (editorKey) voxelMap.set(editorKey, color);
     }
     for (const [key, color] of Object.entries(data.glasses)) {
-      voxelMap.set(key, color);
+      const editorKey = remapKey(key);
+      if (editorKey) voxelMap.set(editorKey, color);
     }
 
     return voxelMap;

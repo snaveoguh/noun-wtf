@@ -2,6 +2,43 @@ import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
+
+// ─── Types (matches Neynar v2 response) ─────────────────────────────────────
+
+interface EmbedMetadata {
+  content_type?: string;
+  image?: { width_px: number; height_px: number };
+  video?: {
+    streams: Array<{ height_px: number; width_px: number; codec_name: string }>;
+    duration_s: number;
+  };
+  html?: {
+    ogTitle?: string;
+    ogImage?: Array<{ url: string }>;
+    ogDescription?: string;
+    fcFrame?: {
+      version?: string;
+      imageUrl?: string;
+      image?: { url: string };
+      button?: { title: string; action?: { url?: string; name?: string } };
+    };
+  };
+  _status?: string;
+}
+
+interface CastEmbed {
+  url?: string;
+  metadata?: EmbedMetadata;
+  cast_id?: { fid: number; hash: string };
+  cast?: {
+    hash: string;
+    author: { username: string; display_name: string; pfp_url: string };
+    text: string;
+    timestamp: string;
+    embeds?: CastEmbed[];
+  };
+}
 
 interface FarcasterCast {
   hash: string;
@@ -20,12 +57,156 @@ interface FarcasterCast {
   replies: {
     count: number;
   };
-  embeds?: Array<{ url?: string }>;
+  embeds?: CastEmbed[];
 }
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
   'https://spirited-flexibility-production-3c30.up.railway.app';
+
+// ─── Inline Embed Renderer ──────────────────────────────────────────────────
+
+const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
+  if (!embeds || embeds.length === 0) return null;
+
+  const images: string[] = [];
+  const videos: string[] = [];
+  const quotedCasts: CastEmbed[] = [];
+  const links: CastEmbed[] = [];
+
+  for (const e of embeds) {
+    if (e.cast_id && e.cast) {
+      quotedCasts.push(e);
+      continue;
+    }
+    if (!e.url) continue;
+    const meta = e.metadata;
+    if (meta?.video) {
+      videos.push(e.url);
+    } else if (meta?.image) {
+      images.push(e.url);
+    } else if (/\.(jpg|jpeg|png|gif|webp|svg)/i.test(e.url)) {
+      images.push(e.url);
+    } else if (meta?.html?.ogTitle) {
+      links.push(e);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+      {/* Videos */}
+      {videos.map((src, i) => (
+        <video
+          key={`v-${i}`}
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          style={{
+            width: '100%',
+            maxHeight: 280,
+            borderRadius: 10,
+            background: '#000',
+            objectFit: 'contain',
+          }}
+        />
+      ))}
+
+      {/* Images */}
+      {images.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+          {images.map((src, i) => (
+            <img
+              key={`img-${i}`}
+              src={src}
+              alt=""
+              loading="lazy"
+              style={{
+                maxHeight: 260,
+                borderRadius: 10,
+                objectFit: 'cover',
+                cursor: 'pointer',
+              }}
+              onClick={() => window.open(src, '_blank')}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Quoted casts */}
+      {quotedCasts.map((qc, i) => {
+        const cast = qc.cast!;
+        return (
+          <div
+            key={`qc-${i}`}
+            style={{
+              border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: 10,
+              padding: 10,
+              background: 'rgba(0,0,0,0.02)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              {cast.author.pfp_url && (
+                <img
+                  src={cast.author.pfp_url}
+                  alt=""
+                  style={{ width: 18, height: 18, borderRadius: '50%' }}
+                />
+              )}
+              <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{cast.author.display_name}</span>
+              <span style={{ fontSize: '0.7rem', color: '#999' }}>@{cast.author.username}</span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#444', margin: 0, whiteSpace: 'pre-wrap' }}>
+              {cast.text.length > 200 ? cast.text.slice(0, 200) + '...' : cast.text}
+            </p>
+          </div>
+        );
+      })}
+
+      {/* Link previews */}
+      {links.map((link, i) => {
+        const html = link.metadata!.html!;
+        const ogImg = html.ogImage?.[0]?.url;
+        return (
+          <a
+            key={`link-${i}`}
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'flex',
+              borderRadius: 10,
+              border: '1px solid rgba(0,0,0,0.1)',
+              overflow: 'hidden',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            {ogImg && (
+              <img
+                src={ogImg}
+                alt=""
+                style={{ width: 72, height: 72, objectFit: 'cover', flexShrink: 0 }}
+                loading="lazy"
+              />
+            )}
+            <div style={{ padding: '8px 10px', minWidth: 0 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {html.ogTitle}
+              </div>
+              {html.ogDescription && (
+                <div style={{ fontSize: '0.7rem', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {html.ogDescription.slice(0, 80)}
+                </div>
+              )}
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Cast Modal ─────────────────────────────────────────────────────────────
 
@@ -34,6 +215,16 @@ const CastModal: FC<{
   onClose: () => void;
 }> = ({ cast, onClose }) => {
   const [visible, setVisible] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [showReply, setShowReply] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [recasted, setRecasted] = useState(false);
+  const [localLikes, setLocalLikes] = useState(cast.reactions.likes_count);
+  const [localRecasts, setLocalRecasts] = useState(cast.reactions.recasts_count);
+  const [localReplies, setLocalReplies] = useState(cast.replies.count);
+
+  const { auth, isLoggedIn, login, publishCast, react } = useFarcasterAuth();
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -47,11 +238,17 @@ const CastModal: FC<{
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  // Lock scroll + hide navbar
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
+    const navbar = document.querySelector('nav.navbar') as HTMLElement;
+    if (navbar) navbar.style.display = 'none';
+
     return () => {
       document.body.style.overflow = prev;
+      if (navbar) navbar.style.display = '';
     };
   }, []);
 
@@ -64,8 +261,42 @@ const CastModal: FC<{
     minute: '2-digit',
   });
 
-  // Extract image embeds
-  const imageUrl = cast.embeds?.find(e => e.url && /\.(jpg|jpeg|png|gif|webp)/i.test(e.url))?.url;
+  const handleLike = async () => {
+    if (!isLoggedIn) { login(); return; }
+    try {
+      await react(cast.hash, 'like');
+      setLiked(true);
+      setLocalLikes(n => n + 1);
+    } catch (err) {
+      console.error('Like failed:', err);
+    }
+  };
+
+  const handleRecast = async () => {
+    if (!isLoggedIn) { login(); return; }
+    try {
+      await react(cast.hash, 'recast');
+      setRecasted(true);
+      setLocalRecasts(n => n + 1);
+    } catch (err) {
+      console.error('Recast failed:', err);
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || sending) return;
+    setSending(true);
+    try {
+      await publishCast(replyText.trim(), { parent: cast.hash });
+      setReplyText('');
+      setShowReply(false);
+      setLocalReplies(n => n + 1);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const backdrop = (
     <div
@@ -134,39 +365,13 @@ const CastModal: FC<{
         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.6)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.4)')}
       >
-        ✕
+        &#x2715;
       </button>
-
-      {/* Image embed */}
-      {imageUrl && (
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <img
-            src={imageUrl}
-            alt=""
-            style={{
-              width: '100%',
-              maxHeight: 300,
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 60,
-              background: 'linear-gradient(0deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 100%)',
-            }}
-          />
-        </div>
-      )}
 
       {/* Content */}
       <div
         style={{
-          padding: '16px 24px 24px',
+          padding: '20px 24px 24px',
           overflowY: 'auto',
           flex: 1,
         }}
@@ -184,11 +389,7 @@ const CastModal: FC<{
             <img
               src={cast.author.pfp_url}
               alt=""
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-              }}
+              style={{ width: 40, height: 40, borderRadius: '50%' }}
             />
           )}
           <div>
@@ -212,6 +413,7 @@ const CastModal: FC<{
               @{cast.author.username}
             </div>
           </div>
+          <div style={{ marginLeft: 'auto', fontSize: '0.7rem', color: '#999' }}>{dateStr}</div>
         </div>
 
         {/* Cast text */}
@@ -221,69 +423,205 @@ const CastModal: FC<{
             fontSize: '0.95rem',
             lineHeight: 1.6,
             color: '#2a2a3a',
-            margin: '0 0 14px',
+            margin: '0 0 4px',
             whiteSpace: 'pre-wrap',
           }}
         >
           {cast.text}
         </p>
 
-        {/* Stats */}
+        {/* Inline embeds (images, video, quotes, links) */}
+        {cast.embeds && cast.embeds.length > 0 && <InlineEmbeds embeds={cast.embeds} />}
+
+        {/* ── Action bar (like, recast, reply) ─────────────────────────── */}
         <div
           style={{
             display: 'flex',
-            gap: 20,
-            fontSize: '0.78rem',
-            color: '#888',
-            marginBottom: 16,
-          }}
-        >
-          <span>♥ {cast.reactions.likes_count}</span>
-          <span>↻ {cast.reactions.recasts_count}</span>
-          <span>💬 {cast.replies.count}</span>
-        </div>
-
-        <div
-          style={{
-            fontSize: '0.7rem',
-            color: '#999',
-            marginBottom: 16,
-          }}
-        >
-          {dateStr}
-        </div>
-
-        {/* View on Warpcast */}
-        <a
-          href={`https://warpcast.com/~/conversations/${cast.hash}`}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: 'inline-flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '10px 20px',
-            borderRadius: 10,
-            background: '#7c3aed',
-            color: '#fff',
-            fontFamily: "'PT Root UI'",
-            fontWeight: 700,
-            fontSize: '0.82rem',
-            textDecoration: 'none',
-            transition: 'background 0.15s',
+            gap: 4,
+            marginTop: 16,
+            paddingTop: 12,
+            borderTop: '1px solid rgba(0,0,0,0.06)',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#6d28d9')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#7c3aed')}
         >
-          View on Warpcast
-          <span style={{ fontSize: '1rem' }}>→</span>
-        </a>
+          {/* Like */}
+          <button
+            onClick={handleLike}
+            disabled={liked}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: liked ? 'rgba(239,68,68,0.1)' : 'rgba(0,0,0,0.04)',
+              color: liked ? '#ef4444' : '#666',
+              cursor: liked ? 'default' : 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>{liked ? '\u2764' : '\u2661'}</span>
+            {localLikes}
+          </button>
+
+          {/* Recast */}
+          <button
+            onClick={handleRecast}
+            disabled={recasted}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: recasted ? 'rgba(34,197,94,0.1)' : 'rgba(0,0,0,0.04)',
+              color: recasted ? '#22c55e' : '#666',
+              cursor: recasted ? 'default' : 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ fontSize: '0.9rem' }}>{'\u21BB'}</span>
+            {localRecasts}
+          </button>
+
+          {/* Reply toggle */}
+          <button
+            onClick={() => {
+              if (!isLoggedIn) { login(); return; }
+              setShowReply(v => !v);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: showReply ? 'rgba(124,58,237,0.1)' : 'rgba(0,0,0,0.04)',
+              color: showReply ? '#7c3aed' : '#666',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ fontSize: '0.9rem' }}>{'\uD83D\uDCAC'}</span>
+            {localReplies}
+          </button>
+
+          {/* Auth status */}
+          <div style={{ marginLeft: 'auto' }}>
+            {isLoggedIn ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: '0.65rem',
+                  color: '#999',
+                }}
+              >
+                {auth!.user.pfp_url && (
+                  <img
+                    src={auth!.user.pfp_url}
+                    alt=""
+                    style={{ width: 16, height: 16, borderRadius: '50%' }}
+                  />
+                )}
+                @{auth!.user.username}
+              </div>
+            ) : (
+              <button
+                onClick={login}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #7c3aed',
+                  background: 'transparent',
+                  color: '#7c3aed',
+                  cursor: 'pointer',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                }}
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Reply box ────────────────────────────────────────────── */}
+        {showReply && (
+          <div style={{ marginTop: 10 }}>
+            <textarea
+              value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              placeholder={`Reply to @${cast.author.username}...`}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.12)',
+                background: 'rgba(0,0,0,0.02)',
+                fontFamily: "'PT Root UI', sans-serif",
+                fontSize: '0.85rem',
+                resize: 'vertical',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <button
+                onClick={() => { setShowReply(false); setReplyText(''); }}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  background: 'transparent',
+                  color: '#666',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReply}
+                disabled={!replyText.trim() || sending}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: replyText.trim() ? '#7c3aed' : '#ccc',
+                  color: '#fff',
+                  cursor: replyText.trim() && !sending ? 'pointer' : 'default',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  opacity: sending ? 0.6 : 1,
+                }}
+              >
+                {sending ? 'Sending...' : 'Reply'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Branding */}
         <div
           style={{
-            marginTop: 16,
-            paddingTop: 12,
+            marginTop: 14,
+            paddingTop: 10,
             borderTop: '1px solid rgba(0,0,0,0.06)',
             fontSize: '0.65rem',
             fontWeight: 700,
@@ -505,7 +843,7 @@ const NocTicker: FC = () => {
                   flexShrink: 0,
                 }}
               >
-                ♥{cast.reactions.likes_count}
+                &#9829;{cast.reactions.likes_count}
               </span>
             </div>
           ))}
