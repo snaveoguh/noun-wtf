@@ -28,7 +28,9 @@ interface Props {
 
 const fmt = (wei: bigint): string => {
   const n = parseFloat(formatEther(wei));
-  return n < 0.001 ? n.toFixed(6) : n.toFixed(4);
+  if (n === 0) return '0';
+  if (n < 0.000001) return n.toExponential(2);
+  return n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 };
 
 const MAX_BID_REASON_LENGTH = 280;
@@ -178,7 +180,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <input
               type="number"
-              step="0.001"
+              step="0.000001"
               min={minBid}
               placeholder={`≥ ${minBid} ETH`}
               value={bidInput}
@@ -265,7 +267,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <input
             type="number"
-            step="0.001"
+            step="0.000001"
             min={minBid}
             placeholder={`≥ ${minBid} ETH`}
             value={bidInput}

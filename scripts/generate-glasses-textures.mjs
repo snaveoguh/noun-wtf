@@ -244,8 +244,10 @@ for (let i = 0; i < glassesTraits.length; i++) {
   }
 
   // Fullblack: manually inject white glint pixels (not in RLE data — all RLE eyes are black)
+  // UV eye_white positions: left eye x=10-11, right eye x=21-22, front view y=9-12
+  // Use a 2x2 block per eye so the glint is visible in the 3D render
   if (i === 7) {
-    for (const [gx, gy] of [[12,9],[12,10],[23,9],[23,10]]) {
+    for (const [gx, gy] of [[10,9],[11,9],[10,10],[11,10],[21,9],[22,9],[21,10],[22,10]]) {
       const gi = (gy * 32 + gx) * 4;
       buf[gi] = 255; buf[gi+1] = 255; buf[gi+2] = 255; buf[gi+3] = 255;
     }

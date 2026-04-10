@@ -1,3 +1,5 @@
+import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
+
 // Agent Hub client — replaces direct Anthropic SDK calls
 const AGENT_HUB_URL = process.env.AGENT_HUB_URL || 'http://localhost:3100';
 const AGENT_HUB_SECRET = process.env.AGENT_HUB_SECRET || '';
@@ -197,11 +199,126 @@ app.use(
   }),
 );
 
+// Request metrics
+app.use('*', metricsMiddleware);
+
 // ============================================================
-// GraphQL (Ponder)
+// GraphQL (Ponder) — with derived proposal status
 // ============================================================
-app.use('/', graphql({ db, schema }));
-app.use('/graphql', graphql({ db, schema }));
+
+// Cache latest block for status computation (refreshed every 30s)
+let cachedLatestBlock: bigint = 0n;
+let cachedBlockAt = 0;
+
+async function getLatestBlockCached(): Promise<bigint> {
+  if (Date.now() - cachedBlockAt < 30_000 && cachedLatestBlock > 0n) return cachedLatestBlock;
+  try {
+    cachedLatestBlock = await getCurrentBlock();
+    cachedBlockAt = Date.now();
+  } catch {
+    /* keep stale value */
+  }
+  return cachedLatestBlock;
+}
+
+/** Recursively walk a JSON value and patch any proposal-like objects with computed status */
+function patchProposalStatuses(data: unknown, latestBlock: bigint): void {
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data)) {
+    for (const item of data) patchProposalStatuses(item, latestBlock);
+    return;
+  }
+  const obj = data as Record<string, unknown>;
+  // A proposal-like object has status + endBlock + forVotes
+  if (typeof obj.status === 'string' && obj.endBlock !== undefined && obj.forVotes !== undefined) {
+    obj.status = computeDerivedStatus(
+      {
+        status: obj.status as string,
+        forVotes: Number(obj.forVotes),
+        againstVotes: Number(obj.againstVotes ?? 0),
+        quorumVotes: BigInt(obj.quorumVotes ?? 0),
+        endBlock: BigInt(obj.endBlock ?? 0),
+        objectionPeriodEndBlock: obj.objectionPeriodEndBlock
+          ? BigInt(obj.objectionPeriodEndBlock as string)
+          : null,
+        executionETA: obj.executionETA ? BigInt(obj.executionETA as string) : null,
+        onTimelockV1: obj.onTimelockV1 === true,
+        startBlock: BigInt(obj.startBlock ?? 0),
+      },
+      latestBlock,
+    );
+  }
+  // A grant-like object has status + endBlock + forVotes but NO quorumVotes
+  if (
+    typeof obj.status === 'string' &&
+    obj.endBlock !== undefined &&
+    obj.forVotes !== undefined &&
+    obj.quorumVotes === undefined &&
+    obj.snapshotBlock !== undefined
+  ) {
+    obj.status = computeDerivedGrantStatus(obj, latestBlock);
+  }
+
+  // Recurse into nested objects (items, proposals, node, edges, etc.)
+  for (const val of Object.values(obj)) {
+    if (val && typeof val === 'object') patchProposalStatuses(val, latestBlock);
+  }
+}
+
+/** Compute derived grant status — grants have no quorum, simple majority wins */
+function computeDerivedGrantStatus(g: Record<string, unknown>, latestBlock: bigint): string {
+  const status = g.status as string;
+  if (['CANCELED', 'EXECUTED'].includes(status)) return status;
+
+  if (status === 'QUEUED') {
+    if (g.executionETA) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const gracePeriod = 14 * 86400;
+      if (nowSeconds >= Number(g.executionETA) + gracePeriod) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+
+  // ACTIVE grants past endBlock: check votes
+  if (status === 'ACTIVE') {
+    const endBlock = BigInt(g.endBlock as string | number);
+    if (latestBlock > endBlock) {
+      const forVotes = Number(g.forVotes);
+      const againstVotes = Number(g.againstVotes ?? 0);
+      if (forVotes === 0 || forVotes <= againstVotes) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+  }
+
+  return status;
+}
+
+/** Middleware that wraps the Ponder graphql handler to compute derived proposal statuses */
+async function graphqlWithDerivedStatus(
+  c: { res: Response; [key: string]: unknown },
+  next: () => Promise<void>,
+) {
+  await next();
+  // Only patch JSON responses
+  const ct = c.res.headers.get('content-type') || '';
+  if (!ct.includes('json')) return;
+  try {
+    const body = await c.res.json();
+    if (body?.data) {
+      const latestBlock = await getLatestBlockCached();
+      if (latestBlock > 0n) patchProposalStatuses(body.data, latestBlock);
+    }
+    c.res = new Response(JSON.stringify(body), {
+      status: c.res.status,
+      headers: c.res.headers,
+    });
+  } catch {
+    /* if parsing fails, pass through original response */
+  }
+}
+
+app.use('/', graphqlWithDerivedStatus, graphql({ db, schema }));
+app.use('/graphql', graphqlWithDerivedStatus, graphql({ db, schema }));
 
 // ============================================================
 // Terminal — Claude AI chat for Nouns governance
@@ -1196,7 +1313,7 @@ app.post('/api/chat', async c => {
     }
 
     // Require wallet connection — no anonymous chat (prevents spam, enables per-wallet rate limiting)
-    if (!wallet || typeof wallet !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+    if (!wallet || typeof wallet !== 'string' || !/^0x[\dA-Fa-f]{40}$/.test(wallet)) {
       return c.json({ error: 'Connect your wallet to use chat. ⌐◨-◨', requiresWallet: true }, 401);
     }
 
@@ -3791,7 +3908,14 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
       });
     }
 
-    const text = response.text || '';
+    let text = response.text || '';
+
+    // If agent used tools but returned no text, provide a fallback
+    if (!text && pendingAction) {
+      text = 'Action prepared — confirm below. ⌐◨-◨';
+    } else if (!text) {
+      text = "I processed your request but didn't have anything to say. Try rephrasing? ⌐◨-◨";
+    }
 
     // Include governance action if one was prepared by a tool
     const responsePayload: { response: string; action?: Record<string, unknown> } = {
@@ -6098,6 +6222,107 @@ app.delete('/api/farcaster/reaction', async c => {
 // Health check
 app.get('/api/health', c => {
   return c.json({ status: 'ok', timestamp: Date.now() });
+});
+
+// ============================================================
+// Dashboard Stats
+// ============================================================
+
+function checkDashboardKey(c: { req: { query: (k: string) => string | undefined } }): boolean {
+  const key = c.req.query('key');
+  const expected = process.env.DASHBOARD_API_KEY;
+  return !!expected && key === expected;
+}
+
+app.get('/api/stats', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+  const window = parseInt(c.req.query('window') || '60', 10);
+  return c.json(getMetrics(window));
+});
+
+app.get('/api/stats/errors', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+  return c.json(getRecentErrors(50));
+});
+
+// Plausible Stats API proxy (cached 5 min)
+let plausibleCache: { data: unknown; fetchedAt: number; period: string } | null = null;
+const PLAUSIBLE_TTL = 300_000;
+
+app.get('/api/stats/plausible', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+
+  const plausibleKey = process.env.PLAUSIBLE_API_KEY;
+  if (!plausibleKey) return c.json({ error: 'Plausible not configured' }, 503);
+
+  const period = c.req.query('period') || '30d';
+  const site = 'noun.wtf';
+
+  if (
+    plausibleCache &&
+    plausibleCache.period === period &&
+    Date.now() - plausibleCache.fetchedAt < PLAUSIBLE_TTL
+  ) {
+    return c.json(plausibleCache.data);
+  }
+
+  try {
+    const headers = { Authorization: `Bearer ${plausibleKey}` };
+    const base = 'https://plausible.io/api/v1/stats';
+
+    const [aggregate, timeseries, topPages, topReferrers] = await Promise.all([
+      fetch(
+        `${base}/aggregate?site_id=${site}&period=${period}&metrics=visitors,pageviews,bounce_rate,visit_duration`,
+        { headers },
+      ).then(r => r.json()),
+      fetch(`${base}/timeseries?site_id=${site}&period=${period}&metrics=visitors,pageviews`, {
+        headers,
+      }).then(r => r.json()),
+      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=event:page&limit=10`, {
+        headers,
+      }).then(r => r.json()),
+      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=visit:source&limit=10`, {
+        headers,
+      }).then(r => r.json()),
+    ]);
+
+    const data = { aggregate, timeseries, topPages, topReferrers, period };
+    plausibleCache = { data, fetchedAt: Date.now(), period };
+    return c.json(data);
+  } catch (err) {
+    console.error('[Dashboard] Plausible fetch error:', err);
+    return c.json({ error: 'Failed to fetch Plausible data' }, 502);
+  }
+});
+
+app.get('/api/stats/health', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+
+  let latestBlock: string = 'unknown';
+  try {
+    latestBlock = (await getCurrentBlock()).toString();
+  } catch {}
+
+  let dbStatus: { ok: boolean; error?: string } = { ok: false };
+  try {
+    await db.select().from(schema.noun).limit(1);
+    dbStatus = { ok: true };
+  } catch (e: unknown) {
+    dbStatus = { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const mem = process.memoryUsage();
+  return c.json({
+    api: {
+      status: 'ok',
+      uptimeSeconds: Math.round(process.uptime()),
+      memoryMB: Math.round(mem.heapUsed / 1024 / 1024),
+    },
+    indexer: { latestBlock },
+    database: dbStatus,
+    metricsBufferSize: getBufferSize(),
+    timestamp: Date.now(),
+  });
 });
 
 export default app;

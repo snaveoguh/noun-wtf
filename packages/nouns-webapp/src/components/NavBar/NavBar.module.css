@@ -31,6 +31,7 @@
   padding: 0 !important;
   gap: 1rem;
   position: relative;
+  flex-wrap: nowrap !important;
 }
 
 /* Logo — left side, half size, 1px lower */
@@ -51,8 +52,8 @@
 
 @media (max-width: 992px) {
   .navBarLogo {
-    width: 55px;
-    height: 55px;
+    width: 28px;
+    height: 28px;
   }
 
   .navBarCustom {
@@ -164,9 +165,10 @@
   flex-flow: row nowrap;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 1;
   min-width: 0;
   gap: 0.5rem;
+  overflow: hidden;
 }
 
 .navBarToggle {
