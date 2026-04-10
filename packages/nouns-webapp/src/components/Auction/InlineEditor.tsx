@@ -42,6 +42,7 @@ interface InlineEditorProps {
   onSave?: (pixels: string[][], thumbnail: string) => void;
   toolRef?: React.MutableRefObject<{
     setTool: (t: Tool) => void;
+    setColor: (c: string) => void;
     undo: () => void;
     redo: () => void;
     getActiveTool: () => Tool;
@@ -157,6 +158,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
   if (toolRef) {
     toolRef.current = {
       setTool: setActiveTool,
+      setColor: setActiveColor,
       undo,
       redo,
       getActiveTool: () => activeTool,

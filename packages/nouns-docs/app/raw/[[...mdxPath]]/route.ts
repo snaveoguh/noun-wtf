@@ -13,7 +13,7 @@ export async function generateStaticParams(): Promise<{ mdxPath: string[] }[]> {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ mdxPath: string[] }> },
+  { params }: { params: Promise<{ mdxPath?: string[] }> },
 ) {
   try {
     const { mdxPath } = await params;

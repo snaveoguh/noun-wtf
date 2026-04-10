@@ -223,6 +223,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [editMode, setEditMode] = useState<EditMode>(null);
   const [playIntroSpin, setPlayIntroSpin] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>('art');
   const [liveDrafts, setLiveDrafts] = useState<NounDayDrafts | null>(null);
@@ -231,6 +232,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const editorToolRef = useRef<{
     setTool: (tool: Tool) => void;
+    setColor: (color: string) => void;
     undo: () => void;
     redo: () => void;
     getActiveTool: () => Tool;
@@ -332,6 +334,18 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       setLiveDrafts(null);
     }
   }, []);
+
+  // Close download menu on outside click
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest?.('[class*="downloadWrap"]')) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [downloadMenuOpen]);
 
   useEffect(() => {
     if (!currentAuction) return;
@@ -792,6 +806,42 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     },
   });
 
+  const downloadAs = useCallback((format: 'png' | 'svg' | 'webp') => {
+    setDownloadMenuOpen(false);
+    const canvas = document.querySelector(
+      '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
+    ) as HTMLCanvasElement | null;
+
+    if (format === 'svg') {
+      // SVG: use the raw noun SVG data
+      const svgSource = nounSvg ?? '';
+      if (!svgSource) return;
+      const link = document.createElement('a');
+      link.href = svgSource.startsWith('data:') ? svgSource : `data:image/svg+xml;base64,${btoa(svgSource)}`;
+      link.download = `noun-${currentNounId}.svg`;
+      link.click();
+      return;
+    }
+
+    const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
+    if (canvas) {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL(mimeType);
+      link.download = `noun-${currentNounId}.${format}`;
+      link.click();
+      return;
+    }
+
+    // Fallback: derivative/link/draft image
+    const imageSource =
+      activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
+    if (!imageSource) return;
+    const link = document.createElement('a');
+    link.href = imageSource;
+    link.download = `noun-${currentNounId}.${format}`;
+    link.click();
+  }, [currentNounId, nounSvg, activeDerivative, activeLink, liveDrafts]);
+
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
   const activityContent = hasAuctionBounds ? (
     isNounderNoun(BigInt(currentAuction.nounId)) ? (
@@ -846,6 +896,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   onPixelsFill: changes => edit3dDispatch({ type: 'SET_PIXELS', changes }),
                   onColorPick: color => {
                     setEdit3dColor(color);
+                    editorToolRef.current?.setColor(color);
                     editorToolRef.current?.setTool('pencil');
                   },
                   voxelDepth: edit3dVoxelDepth,
@@ -857,6 +908,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     voxelMapRef.current = map;
                     setVoxelMapVersion(version => version + 1);
                   },
+                  backgroundSeed: currentNounSeed ?? undefined,
+                  backgroundVisibility: edit3dVisibility,
                 }
               : undefined
           }
@@ -1309,6 +1362,24 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                       <span className={classes.railLabel}>Twist</span>
                     </button>
                   )}
+                  <div className={classes.downloadWrap}>
+                    <button
+                      type="button"
+                      className={classes.railBtn}
+                      onClick={() => setDownloadMenuOpen(v => !v)}
+                      title="Download artwork (S)"
+                    >
+                      <span className={classes.railIcon}>💾</span>
+                      <span className={classes.railLabel}>Save</span>
+                    </button>
+                    {downloadMenuOpen && (
+                      <div className={classes.downloadMenu}>
+                        <button type="button" onClick={() => downloadAs('png')}>PNG</button>
+                        <button type="button" onClick={() => downloadAs('svg')}>SVG</button>
+                        <button type="button" onClick={() => downloadAs('webp')}>WebP</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

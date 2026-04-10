@@ -5,7 +5,7 @@
   "license": "MIT",
   "author": "Nouns DAO",
   "scripts": {
-    "build": "next build",
+    "build": "next build --webpack",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "dev": "next dev",
     "postinstall": "playwright install --only-shell chromium",

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
 import { FeedSkeleton } from '@/components/Skeleton';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 
 // ─── Notification Sound (Web Audio API — no external file) ───────────────────
 
@@ -336,27 +337,244 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
   );
 };
 
-// ─── Compose Box ──────────────────────────────────────────────────────────────
+// ─── Inline Compose Box ──────────────────────────────────────────────────────
 
-const ComposeBox: React.FC<{ channel: FeedTab }> = ({ channel }) => {
+const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({ channel, onCasted }) => {
+  const { auth, isLoggedIn, login, publishCast } = useFarcasterAuth();
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
   const targetChannel = channel === 'all' ? 'nouns' : channel;
-  const composeUrl = `https://warpcast.com/~/compose?channelKey=${targetChannel}`;
+
+  const handleSubmit = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      await publishCast(text.trim(), { channel_id: targetChannel });
+      setText('');
+      onCasted?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to publish');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <button
+        onClick={login}
+        className="mb-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-purple-300 p-3 text-purple-500 transition-colors hover:border-purple-400 hover:bg-purple-50"
+      >
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm">
+          &#9998;
+        </div>
+        <span className="text-sm">
+          Sign in with Farcaster to cast to /{targetChannel}
+        </span>
+      </button>
+    );
+  }
 
   return (
-    <a
-      href={composeUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mb-4 flex items-center gap-3 rounded-lg border border-dashed border-gray-300 p-3 transition-colors hover:border-gray-400 hover:bg-gray-50"
-      style={{ textDecoration: 'none', color: 'inherit' }}
-    >
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm">
-        &#9998;
+    <div className="mb-4 rounded-lg border border-gray-200 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        {auth!.user.pfp_url && (
+          <img src={auth!.user.pfp_url} alt="" className="h-6 w-6 rounded-full" />
+        )}
+        <span className="text-xs font-bold text-gray-600">@{auth!.user.username}</span>
+        <span className="ml-auto text-xs text-gray-400">/{targetChannel}</span>
       </div>
-      <span className="text-sm text-gray-400">
-        Cast to /{targetChannel} on Warpcast...
-      </span>
-    </a>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder={`Cast to /${targetChannel}...`}
+        rows={2}
+        className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm outline-none focus:border-purple-400"
+        style={{ textTransform: 'none' }}
+      />
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      <div className="mt-2 flex justify-end">
+        <button
+          onClick={handleSubmit}
+          disabled={!text.trim() || sending}
+          className="rounded-lg bg-purple-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300 disabled:hover:bg-gray-300"
+        >
+          {sending ? 'Casting...' : 'Cast'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Cast Card with Inline Actions ──────────────────────────────────────────
+
+const CastCard: React.FC<{
+  cast: FarcasterCast;
+  isNew: boolean;
+}> = ({ cast, isNew }) => {
+  const { isLoggedIn, login, publishCast, react } = useFarcasterAuth();
+  const [liked, setLiked] = useState(false);
+  const [recasted, setRecasted] = useState(false);
+  const [localLikes, setLocalLikes] = useState(cast.reactions.likes_count);
+  const [localRecasts, setLocalRecasts] = useState(cast.reactions.recasts_count);
+  const [localReplies, setLocalReplies] = useState(cast.replies?.count ?? 0);
+  const [showReply, setShowReply] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleLike = async () => {
+    if (!isLoggedIn) { login(); return; }
+    try {
+      await react(cast.hash, 'like');
+      setLiked(true);
+      setLocalLikes(n => n + 1);
+    } catch (err) {
+      console.error('Like failed:', err);
+    }
+  };
+
+  const handleRecast = async () => {
+    if (!isLoggedIn) { login(); return; }
+    try {
+      await react(cast.hash, 'recast');
+      setRecasted(true);
+      setLocalRecasts(n => n + 1);
+    } catch (err) {
+      console.error('Recast failed:', err);
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || sending) return;
+    setSending(true);
+    try {
+      await publishCast(replyText.trim(), { parent: cast.hash });
+      setReplyText('');
+      setShowReply(false);
+      setLocalReplies(n => n + 1);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-lg border p-4 transition-colors hover:bg-gray-50"
+      style={isNew ? {
+        borderColor: '#22d3ee',
+        animation: 'feedPulse 0.5s ease-out',
+        background: 'rgba(34, 211, 238, 0.04)',
+      } : undefined}
+    >
+      {/* Author header */}
+      <div className="mb-2 flex items-center gap-2">
+        {cast.author.pfp_url && (
+          <img
+            src={cast.author.pfp_url}
+            alt=""
+            className="h-8 w-8 rounded-full"
+            loading="lazy"
+          />
+        )}
+        <div className="flex flex-col">
+          <span className="text-sm font-bold">{cast.author.display_name}</span>
+          <span className="text-xs text-gray-400">@{cast.author.username}</span>
+        </div>
+        <span className="ml-auto text-xs text-gray-400">{timeAgo(cast.timestamp)}</span>
+      </div>
+
+      {/* Cast text */}
+      <p className="text-sm" style={{ textTransform: 'none' }}>
+        {cast.text}
+      </p>
+
+      {/* Embeds (images, videos, quoted casts, link previews) */}
+      {cast.embeds && cast.embeds.length > 0 && (
+        <EmbedRenderer embeds={cast.embeds} />
+      )}
+
+      {/* Action bar */}
+      <div className="mt-3 flex items-center gap-1">
+        {/* Like */}
+        <button
+          onClick={handleLike}
+          disabled={liked}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            liked
+              ? 'bg-red-50 text-red-500'
+              : 'bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-400'
+          }`}
+        >
+          <span className="text-sm">{liked ? '\u2764' : '\u2661'}</span>
+          {localLikes}
+        </button>
+
+        {/* Recast */}
+        <button
+          onClick={handleRecast}
+          disabled={recasted}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            recasted
+              ? 'bg-green-50 text-green-500'
+              : 'bg-gray-50 text-gray-500 hover:bg-green-50 hover:text-green-400'
+          }`}
+        >
+          <span className="text-sm">{'\u21BB'}</span>
+          {localRecasts}
+        </button>
+
+        {/* Reply */}
+        <button
+          onClick={() => {
+            if (!isLoggedIn) { login(); return; }
+            setShowReply(v => !v);
+          }}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            showReply
+              ? 'bg-purple-50 text-purple-500'
+              : 'bg-gray-50 text-gray-500 hover:bg-purple-50 hover:text-purple-400'
+          }`}
+        >
+          <span className="text-sm">{'\uD83D\uDCAC'}</span>
+          {localReplies}
+        </button>
+      </div>
+
+      {/* Inline reply */}
+      {showReply && (
+        <div className="mt-2">
+          <textarea
+            value={replyText}
+            onChange={e => setReplyText(e.target.value)}
+            placeholder={`Reply to @${cast.author.username}...`}
+            rows={2}
+            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm outline-none focus:border-purple-400"
+            style={{ textTransform: 'none' }}
+            autoFocus
+          />
+          <div className="mt-1.5 flex justify-end gap-2">
+            <button
+              onClick={() => { setShowReply(false); setReplyText(''); }}
+              className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReply}
+              disabled={!replyText.trim() || sending}
+              className="rounded-lg bg-purple-600 px-4 py-1 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300"
+            >
+              {sending ? 'Sending...' : 'Reply'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -365,6 +583,7 @@ const ComposeBox: React.FC<{ channel: FeedTab }> = ({ channel }) => {
 const POLL_INTERVAL = 30_000; // 30s
 
 const FeedPage: React.FC = () => {
+  const { isLoggedIn, auth, login, logout } = useFarcasterAuth();
   const [tab, setTab] = useState<FeedTab>('all');
   const [casts, setCasts] = useState<FarcasterCast[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -440,7 +659,32 @@ const FeedPage: React.FC = () => {
           100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <h1 className="mb-4 text-2xl font-bold">Activity Feed</h1>
+
+      {/* Header with auth */}
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Activity Feed</h1>
+        {isLoggedIn ? (
+          <div className="flex items-center gap-2">
+            {auth!.user.pfp_url && (
+              <img src={auth!.user.pfp_url} alt="" className="h-6 w-6 rounded-full" />
+            )}
+            <span className="text-xs font-bold text-gray-600">@{auth!.user.username}</span>
+            <button
+              onClick={logout}
+              className="ml-1 text-xs text-gray-400 hover:text-gray-600"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={login}
+            className="rounded-lg border border-purple-500 px-3 py-1 text-xs font-bold text-purple-500 transition-colors hover:bg-purple-50"
+          >
+            Sign in with Farcaster
+          </button>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="mb-4 flex gap-2 border-b pb-2">
@@ -460,7 +704,7 @@ const FeedPage: React.FC = () => {
       </div>
 
       {/* Compose */}
-      <ComposeBox channel={tab} />
+      <ComposeBox channel={tab} onCasted={() => fetchFeed(tab)} />
 
       {/* Content */}
       {isLoading && <FeedSkeleton inline />}
@@ -481,57 +725,11 @@ const FeedPage: React.FC = () => {
       {/* Cast list */}
       <div className="flex flex-col gap-3">
         {casts.map(cast => (
-          <div
+          <CastCard
             key={cast.hash}
-            className="rounded-lg border p-4 transition-colors hover:bg-gray-50"
-            style={newHashes.has(cast.hash) ? {
-              borderColor: '#22d3ee',
-              animation: 'feedPulse 0.5s ease-out',
-              background: 'rgba(34, 211, 238, 0.04)',
-            } : undefined}
-          >
-            {/* Author header */}
-            <div className="mb-2 flex items-center gap-2">
-              {cast.author.pfp_url && (
-                <img
-                  src={cast.author.pfp_url}
-                  alt=""
-                  className="h-8 w-8 rounded-full"
-                  loading="lazy"
-                />
-              )}
-              <div className="flex flex-col">
-                <span className="text-sm font-bold">{cast.author.display_name}</span>
-                <span className="text-xs text-gray-400">@{cast.author.username}</span>
-              </div>
-              <span className="ml-auto text-xs text-gray-400">{timeAgo(cast.timestamp)}</span>
-            </div>
-
-            {/* Cast text */}
-            <p className="text-sm" style={{ textTransform: 'none' }}>
-              {cast.text}
-            </p>
-
-            {/* Embeds (images, videos, quoted casts, link previews) */}
-            {cast.embeds && cast.embeds.length > 0 && (
-              <EmbedRenderer embeds={cast.embeds} />
-            )}
-
-            {/* Engagement footer */}
-            <div className="mt-2 flex gap-4 text-xs text-gray-400">
-              <span>&#9829; {cast.reactions.likes_count}</span>
-              <span>&#128257; {cast.reactions.recasts_count}</span>
-              <span>&#128172; {cast.replies?.count ?? 0}</span>
-              <a
-                href={`https://warpcast.com/~/conversations/${cast.hash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto text-blue-400 hover:text-blue-600"
-              >
-                View on Warpcast
-              </a>
-            </div>
-          </div>
+            cast={cast}
+            isNew={newHashes.has(cast.hash)}
+          />
         ))}
       </div>
     </div>
