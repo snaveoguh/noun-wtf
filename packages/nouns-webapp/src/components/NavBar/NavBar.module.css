@@ -98,31 +98,27 @@
 }
 
 .makeArtHeaderBtn {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 10px;
-  padding: 0.5rem 0.85rem;
-  background: #f97316;
-  color: #fff;
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  background: #ffc110;
+  color: #e11833;
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.65rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   white-space: nowrap;
-  margin-right: 0.5rem;
+  margin-left: auto;
+  margin-right: 0.4rem;
   position: relative;
   z-index: 60;
 }
 
-@media (max-width: 991px) {
-  .makeArtHeaderBtn {
-    display: flex;
-  }
-}
 
 .greenStatusCircle {
   display: relative;

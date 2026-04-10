@@ -4,8 +4,6 @@ import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Trans } from '@lingui/react/macro';
 
-import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
-import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
 import AuctionActivityWrapper from '@/components/AuctionActivityWrapper';
 import AuctionTimer from '@/components/AuctionTimer';
 import Bid from '@/components/Bid';
@@ -16,8 +14,6 @@ import CurrentBid from '@/components/CurrentBid';
 import Holder from '@/components/Holder';
 import NounInfoCard from '@/components/NounInfoCard';
 import Winner from '@/components/Winner';
-import { useAppSelector } from '@/hooks';
-import { RootState } from '@/store';
 import { Auction } from '@/wrappers/nounsAuction';
 
 import classes from './AuctionActivity.module.css';
@@ -34,8 +30,6 @@ interface AuctionActivityProps {
 
 const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityProps) => {
   const { auction, isLastAuction, displayGraphDepComps } = props;
-
-  const isCool = useAppSelector((state: RootState) => state.application.isCoolBackground);
 
   const [auctionEnded, setAuctionEnded] = useState(false);
   const [auctionTimer, setAuctionTimer] = useState(false);
@@ -83,21 +77,13 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
       )}
 
       <AuctionActivityWrapper>
-        {/* Row 1: Title + Current Bid badge */}
-        <div className={classes.headerRow}>
-          <div className={classes.headerLeft}>
-            <AuctionActivityDateHeadline startTime={BigInt(auction.startTime)} />
-            <AuctionActivityNounTitle isCool={isCool} nounId={BigInt(auction.nounId)} />
-          </div>
-          <div className={classes.bidBadge}>
-            <CurrentBid
-              currentBid={BigInt(auction.amount?.toString() ?? '0')}
-              auctionEnded={auctionEnded}
-            />
-          </div>
-        </div>
+        {/* Current Bid — inline, no background */}
+        <CurrentBid
+          currentBid={BigInt(auction.amount?.toString() ?? '0')}
+          auctionEnded={auctionEnded}
+        />
 
-        {/* Row 2: Timer (single line) */}
+        {/* Timer */}
         <div className={classes.timerRow}>
           {auctionEnded ? (
             renderAuctionWinner()

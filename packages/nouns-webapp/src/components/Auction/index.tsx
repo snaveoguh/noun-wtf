@@ -15,6 +15,8 @@ import React, {
 import { useNavigate } from 'react-router';
 
 import AuctionActivity from '@/components/AuctionActivity';
+import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
+import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
@@ -31,7 +33,6 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
-import { traitName } from '@/lib/traitName';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
 import { nounPath } from '@/utils/history';
@@ -930,8 +931,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   },
                   voxelDepth: edit3dVoxelDepth,
                   interactionMode: edit3dInteractionMode,
-                  visibilityMask: edit3dVisibilityMask,
-                  displayPixels: edit3dVisiblePixels,
+                  // Skip 2D masks when curated 3D head is loaded — the 2D pixel grid
+                  // paints standard glasses/head colors onto wrong 3D voxel positions
+                  visibilityMask: edit3dStartVoxelMap ? undefined : edit3dVisibilityMask,
+                  displayPixels: edit3dStartVoxelMap ? undefined : edit3dVisiblePixels,
                   viewStateRef: edit3dViewStateRef,
                   onVoxelMapChange: map => {
                     voxelMapRef.current = map;
@@ -1205,29 +1208,18 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       );
     }
 
-    // Generate a haiku from the Noun's traits
-    const traitHaiku = (() => {
-      if (!currentNounSeed) return { l1: 'Pixels come alive', l2: 'One noun born every day', l3: 'Forever onchain' };
-      const headName = traitName('head', currentNounSeed.head).replace('head-', '').replace(/-/g, ' ');
-      const bodyName = traitName('body', currentNounSeed.body).replace('body-', '').replace(/-/g, ' ');
-      const accName = traitName('accessory', currentNounSeed.accessory).replace('accessory-', '').replace(/-/g, ' ');
-      // Simple deterministic haiku from trait words
-      const haikus = [
-        { l1: `A ${headName}`, l2: `Dressed in ${bodyName} warmth`, l3: `${accName} dreams` },
-        { l1: `${headName} watches`, l2: `Through noggles, ${bodyName}`, l3: `${accName} in hand` },
-        { l1: `Born from the chain`, l2: `${headName}, ${bodyName}`, l3: `${accName} forever` },
-      ];
-      return haikus[currentNounId % haikus.length];
-    })();
-
     return (
       <div className={classes.metaCard}>
-        <p className={classes.metaEyebrow}>Noun #{currentNounId}</p>
-        <div style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: '1.05rem', lineHeight: 1.8, color: '#555', padding: '8px 0' }}>
-          <div>{traitHaiku.l1}</div>
-          <div>{traitHaiku.l2}</div>
-          <div>{traitHaiku.l3}</div>
-        </div>
+        {currentAuction && (
+          <div>
+            <AuctionActivityDateHeadline startTime={BigInt(currentAuction.startTime)} />
+            <AuctionActivityNounTitle
+              isCool={currentNounSeed?.background === 0}
+              nounId={BigInt(currentAuction.nounId)}
+            />
+          </div>
+        )}
+        <HomePrompt nounId={currentNounId} seed={currentNounSeed ?? undefined} />
       </div>
     );
   };
@@ -1344,9 +1336,6 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
               </button>
             </div>
 
-            <div className={classes.heroPromptBar}>
-              <HomePrompt />
-            </div>
           </div>
 
           <div className={classes.heroMain}>
@@ -1503,6 +1492,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
               </div>
             </aside>
           </div>
+
         </div>
 
         {composerOpen && (

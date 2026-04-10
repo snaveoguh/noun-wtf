@@ -11,13 +11,13 @@ const AuctionActivityNounTitle: React.FC<AuctionActivityNounTitleProps> = props 
   return (
     <div className="inline-block leading-[0.85]">
       <h1
-        className="mb-0 font-['Londrina_Solid'] text-[36px] md:text-[32px] lg:text-[36px]"
+        className="mb-0 font-['Londrina_Solid'] text-[42px] md:text-[38px] lg:text-[42px]"
         style={{ color, lineHeight: 0.85, margin: 0 }}
       >
         Noun
       </h1>
       <span
-        className="block font-['Londrina_Solid'] text-[46px] md:text-[40px] lg:text-[46px]"
+        className="block font-['Londrina_Solid'] text-[62px] md:text-[54px] lg:text-[62px]"
         style={{ color, lineHeight: 0.85 }}
       >
         {nounId.toString()}

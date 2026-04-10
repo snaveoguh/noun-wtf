@@ -1,13 +1,17 @@
 /**
- * HomePrompt — Minimal inline chat bar for the homepage.
+ * HomePrompt — Always-visible intrigue + search/chat bar at the bottom of the hero.
  *
- * Sits above the auction, same background color as the noun of the day.
- * "What would you like to do here?" — user types, gets AI response inline.
- * Thin, quiet, unobtrusive. Expands to show conversation when active.
+ * Shows a mysterious, poetic line about the current noun that invites engagement.
+ * The input doubles as search (type a noun # to jump) and chat reply.
  */
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
+
+import { traitName } from '@/lib/traitName';
+import { nounPath } from '@/utils/history';
+import type { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './HomePrompt.module.css';
 
@@ -26,34 +30,56 @@ interface ChatResponse {
   error?: string;
 }
 
-function createMessage(role: Message['role'], content: string): Message {
-  return {
-    id: `${role}-${crypto.randomUUID()}`,
-    role,
-    content,
-  };
+interface Props {
+  nounId?: number;
+  seed?: INounSeed;
 }
 
-const HomePrompt: FC = () => {
+function createMessage(role: Message['role'], content: string): Message {
+  return { id: `${role}-${crypto.randomUUID()}`, role, content };
+}
+
+function generateIntrigue(nounId: number, seed: INounSeed): string {
+  const head = traitName('head', seed.head).toLowerCase();
+  const body = traitName('body', seed.body).toLowerCase();
+  const acc = traitName('accessory', seed.accessory).toLowerCase();
+  const bg = seed.background === 0 ? 'cool' : 'warm';
+
+  const lines = [
+    `a ${head} watches through noggles, ${acc} catching ${bg} light...`,
+    `this ${head} appeared from the chain. its ${acc} hums quietly.`,
+    `${bg} haze. a ${head} in ${body}. the noggles see everything.`,
+    `born onchain — a ${head}, draped in ${body}. what does it want?`,
+    `the ${head} stares through noggles. ${acc} whispers of what's next.`,
+    `a ${head} wearing ${body} emerged today. it knows something...`,
+    `through noggles, a ${head} contemplates its ${acc}. and you.`,
+    `${head}. ${body}. ${acc}. three fragments of an onchain mystery.`,
+    `in the ${bg} between blocks, a ${head} stirs. ${acc} at the ready.`,
+    `a ${head} peers through noggles at forever, ${acc} gleaming.`,
+    `every ${head} keeps a secret. this one wears ${body}, carries ${acc}.`,
+    `the noggles see further than you think. ask this ${head}.`,
+  ];
+
+  return lines[nounId % lines.length];
+}
+
+const HomePrompt: FC<Props> = ({ nounId, seed }) => {
   const { address } = useAccount();
+  const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus();
-    }
-  }, [isOpen]);
+  const intrigueText = useMemo(() => {
+    if (seed == null || nounId == null) return 'the noggles see everything. what do you see?';
+    return generateIntrigue(nounId, seed);
+  }, [nounId, seed]);
 
   // Auto-scroll conversation
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   const sendMessage = useCallback(
@@ -63,7 +89,6 @@ const HomePrompt: FC = () => {
       const userMsg = createMessage('user', text);
       setMessages(prev => [...prev, userMsg]);
       setInput('');
-      setIsOpen(true);
       setIsLoading(true);
 
       try {
@@ -80,8 +105,7 @@ const HomePrompt: FC = () => {
         const data = (await res.json()) as ChatResponse;
 
         if (!res.ok || data.error != null) {
-          const errMsg = data.error ?? `HTTP ${res.status}`;
-          throw new Error(errMsg);
+          throw new Error(data.error ?? `HTTP ${res.status}`);
         }
 
         const responseText =
@@ -100,81 +124,83 @@ const HomePrompt: FC = () => {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      sendMessage(input);
+      const text = input.trim();
+      if (!text || isLoading) return;
+
+      // Noun # navigation: "123" or "#123"
+      const nounMatch = text.match(/^#?(\d+)$/);
+      if (nounMatch) {
+        navigate(nounPath(parseInt(nounMatch[1], 10)));
+        setInput('');
+        return;
+      }
+
+      sendMessage(text);
     },
-    [input, sendMessage],
+    [input, isLoading, navigate, sendMessage],
   );
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      setIsOpen(false);
+      setMessages([]);
       inputRef.current?.blur();
     }
   }, []);
 
   return (
-    <div className={`${classes.wrapper} ${!isOpen ? classes.wrapperClosed : ''}`}>
-      {!isOpen && (
-        <button type="button" className={classes.triggerBtn} onClick={() => setIsOpen(true)}>
-          <span className={classes.triggerIcon}>⌕</span>
-          <span>Search</span>
-        </button>
-      )}
+    <div className={classes.wrapper}>
+      <p className={classes.intrigue}>{intrigueText}</p>
 
-      {/* Conversation area (visible when expanded and has messages) */}
-      {isOpen && messages.length > 0 && (
+      {messages.length > 0 && (
         <div ref={scrollRef} className={classes.conversation}>
           {messages.map(msg => (
             <div
               key={msg.id}
               className={msg.role === 'user' ? classes.msgUser : classes.msgAssistant}
             >
-              <span className={classes.msgLabel}>{msg.role === 'user' ? '>' : '⌐◨-◨'}</span>
+              <span className={classes.msgLabel}>{msg.role === 'user' ? '>' : '\u2310\u25E8-\u25E8'}</span>
               <span className={classes.msgText}>{msg.content}</span>
             </div>
           ))}
           {isLoading && (
             <div className={classes.msgAssistant}>
-              <span className={classes.msgLabel}>⌐◨-◨</span>
+              <span className={classes.msgLabel}>{'\u2310\u25E8-\u25E8'}</span>
               <span className={classes.thinking}>thinking</span>
             </div>
           )}
         </div>
       )}
 
-      {isOpen && (
-        <form onSubmit={handleSubmit} className={classes.inputBar}>
-          <span className={classes.caret}>{'>'}</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="what would you like to know about nouns?"
-            className={classes.input}
-            disabled={isLoading}
-            autoComplete="off"
-            spellCheck={false}
-          />
+      <form onSubmit={handleSubmit} className={classes.inputBar}>
+        <span className={classes.caret}>{'>'}</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="reply... or # to jump to a noun"
+          className={classes.input}
+          disabled={isLoading}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {messages.length > 0 && (
           <button
             type="button"
             className={classes.closeBtn}
-            onClick={() => {
-              setIsOpen(false);
-              setMessages([]);
-            }}
-            title="Close"
+            onClick={() => setMessages([])}
+            title="Clear"
           >
             ×
           </button>
-          {input.trim() && (
-            <button type="submit" className={classes.sendBtn} disabled={isLoading}>
-              ↵
-            </button>
-          )}
-        </form>
-      )}
+        )}
+        {input.trim() && (
+          <button type="submit" className={classes.sendBtn} disabled={isLoading}>
+            ↵
+          </button>
+        )}
+      </form>
     </div>
   );
 };

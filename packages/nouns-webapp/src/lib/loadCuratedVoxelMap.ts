@@ -30,13 +30,13 @@ function clamp(v: number, lo: number, hi: number) {
  *
  * X: +16 to center in the 32-wide grid
  * Y: -10 to match GLB offsetY=-26 (editorY = nativeY - 26 + 15.5)
- * Z: +2 to push head just past body front face (body at z=-1.25..+1.25)
+ * Z: +0 to match GLB offsetZ=-0.25 (centers head on body, back half occluded)
  */
 function remapKey(nativeKey: string): string | null {
   const [nx, ny, nz] = nativeKey.split(',').map(Number);
   const ex = clamp(Math.round(nx + 16), 0, 31);
   const ey = clamp(Math.round(ny - 10), 0, 31);
-  const ez = Math.round(nz + 2);
+  const ez = Math.round(nz);
   return `${ex},${ey},${ez}`;
 }
 
@@ -61,14 +61,11 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
     if (!res.ok) return null;
     const data: CuratedVoxelData = await res.json();
 
-    // Merge head + glasses into a single VoxelMap, remapping coordinates
+    // Only load head voxels — skip glasses (curated glasses don't match
+    // the noun's actual glasses trait; standard glasses come from background body)
     const voxelMap: VoxelMap = new Map();
 
     for (const [key, color] of Object.entries(data.head)) {
-      const editorKey = remapKey(key);
-      if (editorKey) voxelMap.set(editorKey, color);
-    }
-    for (const [key, color] of Object.entries(data.glasses)) {
       const editorKey = remapKey(key);
       if (editorKey) voxelMap.set(editorKey, color);
     }

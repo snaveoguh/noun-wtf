@@ -292,8 +292,8 @@ interface Tilt {
   y: number;
 }
 
-const ROT_Y_DEG = 8;
-const ROT_X_DEG = 5;
+const ROT_Y_DEG = 15;
+const ROT_X_DEG = 10;
 const ROT_Z_DEG = 2.5;
 
 function clamp(v: number, min: number, max: number) {
@@ -874,40 +874,43 @@ function InteractiveScene({
 
 // ─── Background body layers for editable mode ─────────────────────────────
 
-/** Render non-editable body/bling as static lit meshes behind the editor.
- *  Head and glasses are excluded — the curated head voxeldata includes both. */
+/** Render non-editable body/bling/glasses as static lit meshes behind the editor.
+ *  Head excluded — curated head voxeldata replaces it.
+ *  Glasses included — curated data only has the head shape, not the noun's actual glasses trait.
+ *  glassesZShift moves glasses to the front face of the curated head. */
 function EditableBackgroundBody({
   seed,
   layerVisibility,
   lightingPreset = 'storefront',
+  glassesZShift = 0,
 }: {
   seed: INounSeed;
   layerVisibility?: LayerVisibility;
   lightingPreset?: LightingPreset;
+  glassesZShift?: number;
 }) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
-  // Build only body + bling (NOT head or glasses — editor voxel layer has both)
-  const { bodyGeo, blingGeo } = useMemo(() => {
+  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
     const vis: LayerVisibility = {
       body: layerVisibility?.body ?? true,
       accessory: layerVisibility?.accessory ?? true,
-      head: false,
-      glasses: false,
+      head: false, // editor voxel layer has the curated head
+      glasses: layerVisibility?.glasses ?? true,
     };
     const layers = seedToLayers(seed, getNounData, ImageData.palette, vis);
     const geos = buildNounGeometries(layers);
     geos.headGeo?.dispose();
-    geos.glassesGeo?.dispose();
-    return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo };
+    return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo, glassesGeo: geos.glassesGeo };
   }, [seedKey, layerVisibility]);
 
   useEffect(() => {
     return () => {
       bodyGeo?.dispose();
       blingGeo?.dispose();
+      glassesGeo?.dispose();
     };
-  }, [bodyGeo, blingGeo]);
+  }, [bodyGeo, blingGeo, glassesGeo]);
 
   return (
     <>
@@ -921,6 +924,13 @@ function EditableBackgroundBody({
         <mesh geometry={blingGeo}>
           <meshLambertMaterial vertexColors />
         </mesh>
+      )}
+      {glassesGeo && (
+        <group position={[0, 0, glassesZShift]}>
+          <mesh geometry={glassesGeo}>
+            <meshLambertMaterial vertexColors />
+          </mesh>
+        </group>
       )}
     </>
   );
@@ -1174,6 +1184,16 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                   seed={editable.backgroundSeed}
                   layerVisibility={editable.backgroundVisibility}
                   lightingPreset={lightingPreset}
+                  glassesZShift={(() => {
+                    // Shift glasses to front face of curated head (standard glasses baked at z≈2.55)
+                    if (!editable.initialVoxelMap) return 0;
+                    let maxZ = 0;
+                    for (const key of editable.initialVoxelMap.keys()) {
+                      const z = Number(key.split(',')[2]);
+                      if (z > maxZ) maxZ = z;
+                    }
+                    return Math.max(0, maxZ - 2.55 + GLASSES_DEPTH);
+                  })()}
                 />
               )}
               <EditableSceneComponent

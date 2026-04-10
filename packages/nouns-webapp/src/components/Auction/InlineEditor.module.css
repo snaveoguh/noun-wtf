@@ -110,16 +110,18 @@
 .collapseBtn {
   margin-left: auto;
   border: none;
-  background: none;
-  font-size: 0.6rem;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font-size: 0.7rem;
   line-height: 1;
-  color: rgba(0, 0, 0, 0.3);
+  color: rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  padding: 0 2px;
+  padding: 2px 5px;
 }
 
 .collapseBtn:hover {
-  color: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 /* ── Tools (top-left) ───────────────────────────── */
