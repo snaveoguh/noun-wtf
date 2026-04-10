@@ -4,6 +4,8 @@
  * 21 tiny buttons arranged in a curved arc along the right edge,
  * Nokia N-Gage style. Each button injects its key into InputState
  * so game logic doesn't need changes.
+ *
+ * Also has a swipe-up gesture on the right half to trigger jump.
  */
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { InputState } from './input';
@@ -63,13 +65,13 @@ const ARC_COLORS = [
   '#888888',                                               // exit gray
 ];
 
-// ── Grid layout — 3 columns, no overlap ───────────────────────────
+// ── Grid layout — 3 columns, safe-area aware ──────────────────────
 
-const BTN_SIZE = 26;
-const BTN_GAP = 4;
+const BTN_SIZE = 30;
+const BTN_GAP = 5;
 const COLS = 3;
-const MARGIN_RIGHT = 8;
-const MARGIN_BOTTOM = 50;
+const MARGIN_RIGHT = 10;
+const MARGIN_BOTTOM = 64; // extra room for iOS home indicator
 
 function getButtonPosition(index: number): { right: number; bottom: number } {
   const col = index % COLS;
@@ -85,6 +87,11 @@ const JOYSTICK_SIZE = 120;
 const KNOB_SIZE = 50;
 const DEAD_ZONE = 0.15;
 
+// ── Swipe detection constants ──────────────────────────────────────
+
+const SWIPE_MIN_DIST = 50;   // px vertical minimum
+const SWIPE_MAX_TIME = 300;  // ms maximum swipe duration
+
 interface MobileControlsProps {
   inputRef: React.RefObject<InputState>;
   onJump?: () => void;
@@ -95,6 +102,9 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
   const touchIdRef = useRef<number | null>(null);
   const centerRef = useRef({ x: 0, y: 0 });
+
+  // Swipe tracking
+  const swipeRef = useRef<{ id: number; startY: number; startTime: number } | null>(null);
 
   const handleJoystickStart = useCallback((e: React.TouchEvent) => {
     const touch = e.changedTouches[0];
@@ -159,6 +169,51 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     return () => document.removeEventListener('touchmove', prevent);
   }, []);
 
+  // ── Swipe-up-to-jump on right half of screen ─────────────────────
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    // Only track swipes on right half (left half is joystick area)
+    if (touch.clientX < window.innerWidth * 0.4) return;
+    swipeRef.current = {
+      id: touch.identifier,
+      startY: touch.clientY,
+      startTime: Date.now(),
+    };
+  }, []);
+
+  const handleSwipeEnd = useCallback((e: React.TouchEvent) => {
+    if (!swipeRef.current) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier !== swipeRef.current.id) continue;
+
+      const dy = swipeRef.current.startY - touch.clientY; // positive = upward
+      const dt = Date.now() - swipeRef.current.startTime;
+
+      if (dy > SWIPE_MIN_DIST && dt < SWIPE_MAX_TIME) {
+        // Swipe up detected — trigger jump
+        onJump?.();
+        const input = inputRef.current;
+        if (input) {
+          input.keys.add(' ');
+          input.justPressed.add(' ');
+          const now = Date.now();
+          if (now - input.lastSpaceTime < 400) {
+            input.spaceTaps++;
+          } else {
+            input.spaceTaps = 1;
+          }
+          input.lastSpaceTime = now;
+          setTimeout(() => { inputRef.current?.keys.delete(' '); }, 100);
+        }
+      }
+      swipeRef.current = null;
+      break;
+    }
+  }, [inputRef, onJump]);
+
   // ── Button press/release handlers ──────────────────────────────
 
   const handleButtonStart = useCallback((def: ButtonDef) => {
@@ -211,8 +266,19 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     }
   }, [inputRef]);
 
+  // Grid dimensions for the tray background
+  const totalRows = Math.ceil(BUTTONS.length / COLS);
+  const gridW = COLS * (BTN_SIZE + BTN_GAP) - BTN_GAP;
+  const gridH = totalRows * (BTN_SIZE + BTN_GAP) - BTN_GAP;
+
   return (
-    <div data-mobile-controls style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+    <div
+      data-mobile-controls
+      onTouchStart={handleSwipeStart}
+      onTouchEnd={handleSwipeEnd}
+      onTouchCancel={() => { swipeRef.current = null; }}
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 20 }}
+    >
       {/* ── Left: Virtual Joystick ── */}
       <div
         ref={joystickRef}
@@ -223,7 +289,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         style={{
           position: 'absolute',
           left: 24,
-          bottom: 48,
+          bottom: 64,
           width: JOYSTICK_SIZE,
           height: JOYSTICK_SIZE,
           borderRadius: '50%',
@@ -249,6 +315,23 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         />
       </div>
 
+      {/* ── Right: Button tray background ── */}
+      <div
+        style={{
+          position: 'absolute',
+          right: MARGIN_RIGHT - 6,
+          bottom: MARGIN_BOTTOM - 6,
+          width: gridW + 12,
+          height: gridH + 12,
+          borderRadius: 14,
+          background: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* ── Right: Arc of action buttons ── */}
       {BUTTONS.map((def, i) => {
         const pos = getButtonPosition(i);
@@ -269,7 +352,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
               background: `${color}33`,
               border: `1.5px solid ${color}88`,
               color: '#fff',
-              fontSize: /^\d$/.test(def.icon) ? 11 : 13,
+              fontSize: /^\d$/.test(def.icon) ? 12 : 14,
               fontFamily: 'monospace',
               fontWeight: 'bold',
               display: 'flex',
@@ -289,6 +372,22 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
           </button>
         );
       })}
+
+      {/* Swipe hint — fades out after first swipe */}
+      <div
+        style={{
+          position: 'absolute',
+          right: MARGIN_RIGHT + gridW + 16,
+          bottom: MARGIN_BOTTOM + gridH / 2 - 8,
+          color: 'rgba(255,255,255,0.3)',
+          fontSize: 11,
+          fontFamily: 'monospace',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        swipe up = jump
+      </div>
     </div>
   );
 };
