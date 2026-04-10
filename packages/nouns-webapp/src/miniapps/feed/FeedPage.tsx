@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types, @typescript-eslint/strict-boolean-expressions */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Hls from 'hls.js';
@@ -116,8 +117,7 @@ const TAB_LABELS: Record<FeedTab, string> = {
 };
 
 const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+  import.meta.env.VITE_API_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const fetchChannel = async (channel: string): Promise<FarcasterCast[]> => {
   const res = await fetch(`${API_URL}/api/feed/${channel}`);
@@ -206,9 +206,7 @@ const FrameCard: React.FC<{ embed: CastEmbed }> = ({ embed }) => {
         >
           {buttonTitle}
         </a>
-        {appName && (
-          <span className="text-xs text-purple-400">{appName}</span>
-        )}
+        {appName && <span className="text-xs text-purple-400">{appName}</span>}
       </div>
     </div>
   );
@@ -277,7 +275,9 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
 
       {/* Quoted casts */}
       {quotedCasts.map((qc, i) => {
-        const cast = qc.cast!;
+        const cast = qc.cast;
+        if (!cast?.hash) return null;
+        const text = cast.text ?? '';
         return (
           <a
             key={`qc-${i}`}
@@ -288,14 +288,14 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
             <div className="mb-1 flex items-center gap-2">
-              {cast.author.pfp_url && (
+              {cast.author?.pfp_url && (
                 <img src={cast.author.pfp_url} alt="" className="h-5 w-5 rounded-full" />
               )}
-              <span className="text-xs font-bold">{cast.author.display_name}</span>
-              <span className="text-xs text-gray-400">@{cast.author.username}</span>
+              <span className="text-xs font-bold">{cast.author?.display_name ?? 'Unknown'}</span>
+              <span className="text-xs text-gray-400">@{cast.author?.username ?? '?'}</span>
             </div>
             <p className="text-xs text-gray-600" style={{ textTransform: 'none' }}>
-              {cast.text.length > 200 ? cast.text.slice(0, 200) + '...' : cast.text}
+              {text.length > 200 ? text.slice(0, 200) + '...' : text}
             </p>
           </a>
         );
@@ -339,7 +339,10 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
 
 // ─── Inline Compose Box ──────────────────────────────────────────────────────
 
-const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({ channel, onCasted }) => {
+const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({
+  channel,
+  onCasted,
+}) => {
   const { auth, isLoggedIn, login, publishCast } = useFarcasterAuth();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -371,9 +374,7 @@ const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({ cha
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm">
           &#9998;
         </div>
-        <span className="text-sm">
-          Sign in with Farcaster to cast to /{targetChannel}
-        </span>
+        <span className="text-sm">Sign in with Farcaster to cast to /{targetChannel}</span>
       </button>
     );
   }
@@ -426,7 +427,10 @@ const CastCard: React.FC<{
   const [sending, setSending] = useState(false);
 
   const handleLike = async () => {
-    if (!isLoggedIn) { login(); return; }
+    if (!isLoggedIn) {
+      login();
+      return;
+    }
     try {
       await react(cast.hash, 'like');
       setLiked(true);
@@ -437,7 +441,10 @@ const CastCard: React.FC<{
   };
 
   const handleRecast = async () => {
-    if (!isLoggedIn) { login(); return; }
+    if (!isLoggedIn) {
+      login();
+      return;
+    }
     try {
       await react(cast.hash, 'recast');
       setRecasted(true);
@@ -465,21 +472,20 @@ const CastCard: React.FC<{
   return (
     <div
       className="rounded-lg border p-4 transition-colors hover:bg-gray-50"
-      style={isNew ? {
-        borderColor: '#22d3ee',
-        animation: 'feedPulse 0.5s ease-out',
-        background: 'rgba(34, 211, 238, 0.04)',
-      } : undefined}
+      style={
+        isNew
+          ? {
+              borderColor: '#22d3ee',
+              animation: 'feedPulse 0.5s ease-out',
+              background: 'rgba(34, 211, 238, 0.04)',
+            }
+          : undefined
+      }
     >
       {/* Author header */}
       <div className="mb-2 flex items-center gap-2">
         {cast.author.pfp_url && (
-          <img
-            src={cast.author.pfp_url}
-            alt=""
-            className="h-8 w-8 rounded-full"
-            loading="lazy"
-          />
+          <img src={cast.author.pfp_url} alt="" className="h-8 w-8 rounded-full" loading="lazy" />
         )}
         <div className="flex flex-col">
           <span className="text-sm font-bold">{cast.author.display_name}</span>
@@ -494,9 +500,7 @@ const CastCard: React.FC<{
       </p>
 
       {/* Embeds (images, videos, quoted casts, link previews) */}
-      {cast.embeds && cast.embeds.length > 0 && (
-        <EmbedRenderer embeds={cast.embeds} />
-      )}
+      {cast.embeds && cast.embeds.length > 0 && <EmbedRenderer embeds={cast.embeds} />}
 
       {/* Action bar */}
       <div className="mt-3 flex items-center gap-1">
@@ -531,7 +535,10 @@ const CastCard: React.FC<{
         {/* Reply */}
         <button
           onClick={() => {
-            if (!isLoggedIn) { login(); return; }
+            if (!isLoggedIn) {
+              login();
+              return;
+            }
             setShowReply(v => !v);
           }}
           className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -559,7 +566,10 @@ const CastCard: React.FC<{
           />
           <div className="mt-1.5 flex justify-end gap-2">
             <button
-              onClick={() => { setShowReply(false); setReplyText(''); }}
+              onClick={() => {
+                setShowReply(false);
+                setReplyText('');
+              }}
               className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500"
             >
               Cancel
@@ -669,10 +679,7 @@ const FeedPage: React.FC = () => {
               <img src={auth!.user.pfp_url} alt="" className="h-6 w-6 rounded-full" />
             )}
             <span className="text-xs font-bold text-gray-600">@{auth!.user.username}</span>
-            <button
-              onClick={logout}
-              className="ml-1 text-xs text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={logout} className="ml-1 text-xs text-gray-400 hover:text-gray-600">
               Sign out
             </button>
           </div>
@@ -693,9 +700,7 @@ const FeedPage: React.FC = () => {
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
-              tab === t
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              tab === t ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {TAB_LABELS[t]}
@@ -725,11 +730,7 @@ const FeedPage: React.FC = () => {
       {/* Cast list */}
       <div className="flex flex-col gap-3">
         {casts.map(cast => (
-          <CastCard
-            key={cast.hash}
-            cast={cast}
-            isNew={newHashes.has(cast.hash)}
-          />
+          <CastCard key={cast.hash} cast={cast} isNew={newHashes.has(cast.hash)} />
         ))}
       </div>
     </div>

@@ -210,9 +210,9 @@ for (let i = 0; i < glassesTraits.length; i++) {
       const [rx, ry] = rleKey.split(',').map(Number);
       // Only eye interior pixels (not frame border)
       if (ry >= 12 && ry <= 15 && ((rx >= 11 && rx <= 14) || (rx >= 18 && rx <= 21))) {
-        // These map to the same UV position in the template
-        // Template uses the same coordinate space for eye pixels
-        eyeOverrides.set(rleKey, px);
+        // Fullblack glints are 2px too far left in UV space — shift right
+        const uvX = i === 7 ? rx + 2 : rx;
+        eyeOverrides.set(`${uvX},${ry}`, px);
       }
     }
   }

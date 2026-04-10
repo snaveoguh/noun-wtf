@@ -6,7 +6,7 @@
     var(--page-edge-padding-right)
     2rem
     var(--page-edge-padding-left);
-  background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.6) 40%, rgba(240,235,230,0.3) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%);
 }
 
 .heroShell {
@@ -330,11 +330,9 @@
 }
 
 .auctionCard {
-  padding: 1rem 1rem 2rem;
-  min-height: 18rem;
+  padding: 1.1rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .metaHeader {

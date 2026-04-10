@@ -49,7 +49,7 @@ const Holder: React.FC<HolderProps> = props => {
           <Trans>View on Etherscan</Trans>
         </TooltipContent>
         <TooltipTrigger>
-          <ShortAddress size={40} address={holder} avatar={true} />
+          <ShortAddress size={16} address={holder} avatar={true} />
         </TooltipTrigger>
       </Tooltip>
     </a>

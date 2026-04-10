@@ -1,7 +1,7 @@
 .wrapper {
-  margin-left: 0.5rem;
+  margin-left: 0;
   margin-top: 2px;
-  padding-left: 1.5rem;
+  padding-left: 0;
 }
 
 .youCopy {
@@ -22,15 +22,15 @@
 }
 
 .section h4 {
-  font-family: 'PT Root UI';
-  font-size: 18px;
-  line-height: 27px;
+  font-family: 'PT Root UI' !important;
+  font-size: 10px !important;
+  line-height: 14px !important;
 }
 
 .section h2 {
-  font-family: 'PT Root UI';
+  font-family: 'PT Root UI' !important;
   font-weight: bold;
-  font-size: 32px;
+  font-size: 14px !important;
 }
 
 .leftCol {
@@ -43,11 +43,11 @@
 
 @media (max-width: 992px) {
   .section h4 {
-    font-size: 18px;
+    font-size: 10px;
   }
 
   .section h2 {
-    font-size: 23px;
+    font-size: 13px;
   }
 
   .section {
