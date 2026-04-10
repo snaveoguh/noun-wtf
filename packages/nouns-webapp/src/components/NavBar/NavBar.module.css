@@ -74,12 +74,6 @@
 
 }
 
-@media (max-width: 991px) {
-  .makeArtHeaderBtn {
-    display: flex;
-  }
-}
-
 /* connect button displays differently to default NavBarItems, thus the !importants */
 .connectBtn {
   cursor: pointer;
@@ -120,6 +114,14 @@
   cursor: pointer;
   white-space: nowrap;
   margin-right: 0.5rem;
+  position: relative;
+  z-index: 60;
+}
+
+@media (max-width: 991px) {
+  .makeArtHeaderBtn {
+    display: flex;
+  }
 }
 
 .greenStatusCircle {
