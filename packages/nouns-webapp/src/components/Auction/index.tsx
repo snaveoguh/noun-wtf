@@ -226,6 +226,13 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>('art');
+
+  // Listen for "Make Art" from navbar hamburger menu
+  useEffect(() => {
+    const handler = () => { setComposerOpen(true); setComposerMode('art'); };
+    window.addEventListener('noun-make-art', handler);
+    return () => window.removeEventListener('noun-make-art', handler);
+  }, []);
   const [liveDrafts, setLiveDrafts] = useState<NounDayDrafts | null>(null);
   const [liveSaveMode, setLiveSaveMode] = useState<EditMode>(null);
   const [voxelMapVersion, setVoxelMapVersion] = useState(0);
