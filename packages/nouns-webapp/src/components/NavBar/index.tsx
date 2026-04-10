@@ -278,18 +278,6 @@ const NavBar = () => {
               </Nav.Link>
               <Nav.Link
                 as={Link}
-                to="/nouns"
-                className={clsx(classes.nounsNavLink, classes.exploreButton)}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText={<Trans>Nouns</Trans>}
-                  buttonIcon={<NogglesIcon />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
                 to="/traits"
                 className={clsx(classes.nounsNavLink, classes.exploreButton)}
                 onClick={closeNav}
@@ -328,20 +316,6 @@ const NavBar = () => {
                 <NavBarButton
                   buttonText="Feed"
                   buttonIcon={<span>📡</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link as={Link} to="/highway" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="Highway"
-                  buttonIcon={<span>🛣️</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link as={Link} to="/stats" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="Stats"
-                  buttonIcon={<span>📊</span>}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>

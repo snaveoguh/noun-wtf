@@ -135,6 +135,15 @@ const InlineEditor: FC<InlineEditorProps> = ({
     return '#000000';
   });
   const [paletteExpanded, setPaletteExpanded] = useState(false);
+  const [collapsedPanels, setCollapsedPanels] = useState<Record<PanelKey, boolean>>({
+    tools: false,
+    palette: false,
+    actions: false,
+  });
+  const toggleCollapse = useCallback(
+    (key: PanelKey) => setCollapsedPanels(prev => ({ ...prev, [key]: !prev[key] })),
+    [],
+  );
   const [panelOffsets, setPanelOffsets] = useState<Record<PanelKey, { x: number; y: number }>>({
     tools: { x: 0, y: 0 },
     palette: { x: 0, y: 0 },
@@ -300,109 +309,116 @@ const InlineEditor: FC<InlineEditorProps> = ({
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('tools')}>
           <span className={classes.panelHandleDots}>:::</span>
           <span className={classes.panelHandleLabel}>Tools</span>
-        </div>
-        <div className={classes.toolRow}>
-          {(['pencil', 'eraser', 'fill', 'eyedropper'] as Tool[]).map(tool => (
-            <button
-              key={tool}
-              type="button"
-              className={`${classes.toolBtn} ${activeTool === tool ? classes.toolActive : ''}`}
-              onClick={() => setActiveTool(tool)}
-              title={tool[0].toUpperCase() + tool.slice(1)}
-            >
-              {tool === 'pencil' && '✏'}
-              {tool === 'eraser' && '⌫'}
-              {tool === 'fill' && '🪣'}
-              {tool === 'eyedropper' && '💉'}
-            </button>
-          ))}
-          <div className={classes.toolDivider} />
-          <button
-            type="button"
-            className={classes.toolBtn}
-            onClick={undo}
-            disabled={pastLen === 0}
-            title="Undo (Ctrl+Z)"
-          >
-            ↩
-          </button>
-          <button
-            type="button"
-            className={classes.toolBtn}
-            onClick={redo}
-            disabled={futureLen === 0}
-            title="Redo (Ctrl+Y)"
-          >
-            ↪
-          </button>
-          <div className={classes.toolDivider} />
-          <button
-            type="button"
-            className={classes.toolBtn}
-            onClick={() => dispatch({ type: 'CLEAR' })}
-            title="Clear all"
-          >
-            🗑
+          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('tools')}>
+            {collapsedPanels.tools ? '▸' : '▾'}
           </button>
         </div>
+        {!collapsedPanels.tools && (
+          <>
+            <div className={classes.toolRow}>
+              {(['pencil', 'eraser', 'fill', 'eyedropper'] as Tool[]).map(tool => (
+                <button
+                  key={tool}
+                  type="button"
+                  className={`${classes.toolBtn} ${activeTool === tool ? classes.toolActive : ''}`}
+                  onClick={() => setActiveTool(tool)}
+                  title={tool[0].toUpperCase() + tool.slice(1)}
+                >
+                  {tool === 'pencil' && '✏'}
+                  {tool === 'eraser' && '⌫'}
+                  {tool === 'fill' && '🪣'}
+                  {tool === 'eyedropper' && '💉'}
+                </button>
+              ))}
+              <div className={classes.toolDivider} />
+              <button
+                type="button"
+                className={classes.toolBtn}
+                onClick={undo}
+                disabled={pastLen === 0}
+                title="Undo (Ctrl+Z)"
+              >
+                ↩
+              </button>
+              <button
+                type="button"
+                className={classes.toolBtn}
+                onClick={redo}
+                disabled={futureLen === 0}
+                title="Redo (Ctrl+Y)"
+              >
+                ↪
+              </button>
+              <div className={classes.toolDivider} />
+              <button
+                type="button"
+                className={classes.toolBtn}
+                onClick={() => dispatch({ type: 'CLEAR' })}
+                title="Clear all"
+              >
+                🗑
+              </button>
+            </div>
 
-        {/* Layer toggles */}
-        <div className={classes.layerToggles}>
-          {LAYER_NAMES.map(({ key, label, emoji }) => (
-            <button
-              key={key}
-              type="button"
-              className={`${classes.layerBtn} ${visibility[key] ? classes.layerOn : classes.layerOff}`}
-              onClick={() => toggleLayer(key)}
-              title={`Toggle ${label}`}
-            >
-              <span>{emoji}</span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
+            {/* Layer toggles */}
+            <div className={classes.layerToggles}>
+              {LAYER_NAMES.map(({ key, label, emoji }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${classes.layerBtn} ${visibility[key] ? classes.layerOn : classes.layerOff}`}
+                  onClick={() => toggleLayer(key)}
+                  title={`Toggle ${label}`}
+                >
+                  <span>{emoji}</span>
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
 
-        {/* Voxel depth slider (3D mode only) */}
-        {panelsOnly && onVoxelDepthChange && (
-          <div className={classes.depthSlider}>
-            <span className={classes.depthLabel}>Brush</span>
-            <input
-              type="range"
-              min="1"
-              max="4"
-              step="1"
-              value={voxelDepth}
-              onChange={e => onVoxelDepthChange(parseFloat(e.target.value))}
-              className={classes.depthRange}
-            />
-            <span className={classes.depthValue}>{voxelDepth}</span>
-          </div>
-        )}
+            {/* Voxel depth slider (3D mode only) */}
+            {panelsOnly && onVoxelDepthChange && (
+              <div className={classes.depthSlider}>
+                <span className={classes.depthLabel}>Brush</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="4"
+                  step="1"
+                  value={voxelDepth}
+                  onChange={e => onVoxelDepthChange(parseFloat(e.target.value))}
+                  className={classes.depthRange}
+                />
+                <span className={classes.depthValue}>{voxelDepth}</span>
+              </div>
+            )}
 
-        {panelsOnly && onInteractionModeChange && (
-          <div className={classes.editorModeRow}>
-            <button
-              type="button"
-              className={`${classes.modeBtn} ${interactionMode === 'sculpt' ? classes.modeBtnActive : ''}`}
-              onClick={() => onInteractionModeChange('sculpt')}
-            >
-              Build
-            </button>
-            <button
-              type="button"
-              className={`${classes.modeBtn} ${interactionMode === 'grab' ? classes.modeBtnActive : ''}`}
-              onClick={() => onInteractionModeChange('grab')}
-            >
-              Grab
-            </button>
-            <button
-              type="button"
-              className={`${classes.modeBtn} ${interactionMode === 'twist' ? classes.modeBtnActive : ''}`}
-              onClick={() => onInteractionModeChange('twist')}
-            >
-              Twist
-            </button>
-          </div>
+            {panelsOnly && onInteractionModeChange && (
+              <div className={classes.editorModeRow}>
+                <button
+                  type="button"
+                  className={`${classes.modeBtn} ${interactionMode === 'sculpt' ? classes.modeBtnActive : ''}`}
+                  onClick={() => onInteractionModeChange('sculpt')}
+                >
+                  Build
+                </button>
+                <button
+                  type="button"
+                  className={`${classes.modeBtn} ${interactionMode === 'grab' ? classes.modeBtnActive : ''}`}
+                  onClick={() => onInteractionModeChange('grab')}
+                >
+                  Grab
+                </button>
+                <button
+                  type="button"
+                  className={`${classes.modeBtn} ${interactionMode === 'twist' ? classes.modeBtnActive : ''}`}
+                  onClick={() => onInteractionModeChange('twist')}
+                >
+                  Twist
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -414,46 +430,53 @@ const InlineEditor: FC<InlineEditorProps> = ({
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('palette')}>
           <span className={classes.panelHandleDots}>:::</span>
           <span className={classes.panelHandleLabel}>Palette</span>
-        </div>
-        <div className={classes.currentColor}>
-          <div
-            className={classes.colorSwatch}
-            style={{
-              background:
-                activeColor || 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px',
-            }}
-          />
-          <span className={classes.colorHex}>{activeColor || 'none'}</span>
-        </div>
-        <div className={classes.paletteGrid}>
-          <button
-            type="button"
-            className={`${classes.paletteSwatch} ${activeColor === '' ? classes.paletteActive : ''}`}
-            onClick={() => setActiveColor('')}
-            title="Transparent"
-            style={{
-              background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 6px 6px',
-            }}
-          />
-          {displayPalette.map(color => (
-            <button
-              key={color}
-              type="button"
-              className={`${classes.paletteSwatch} ${activeColor === color ? classes.paletteActive : ''}`}
-              onClick={() => setActiveColor(color)}
-              style={{ background: color }}
-              title={color}
-            />
-          ))}
-        </div>
-        {palette.length > 64 && (
-          <button
-            type="button"
-            className={classes.showMoreBtn}
-            onClick={() => setPaletteExpanded(e => !e)}
-          >
-            {paletteExpanded ? 'Less' : `All ${palette.length}`}
+          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('palette')}>
+            {collapsedPanels.palette ? '▸' : '▾'}
           </button>
+        </div>
+        {!collapsedPanels.palette && (
+          <>
+            <div className={classes.currentColor}>
+              <div
+                className={classes.colorSwatch}
+                style={{
+                  background:
+                    activeColor || 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px',
+                }}
+              />
+              <span className={classes.colorHex}>{activeColor || 'none'}</span>
+            </div>
+            <div className={classes.paletteGrid}>
+              <button
+                type="button"
+                className={`${classes.paletteSwatch} ${activeColor === '' ? classes.paletteActive : ''}`}
+                onClick={() => setActiveColor('')}
+                title="Transparent"
+                style={{
+                  background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 6px 6px',
+                }}
+              />
+              {displayPalette.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`${classes.paletteSwatch} ${activeColor === color ? classes.paletteActive : ''}`}
+                  onClick={() => setActiveColor(color)}
+                  style={{ background: color }}
+                  title={color}
+                />
+              ))}
+            </div>
+            {palette.length > 64 && (
+              <button
+                type="button"
+                className={classes.showMoreBtn}
+                onClick={() => setPaletteExpanded(e => !e)}
+              >
+                {paletteExpanded ? 'Less' : `All ${palette.length}`}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -465,19 +488,26 @@ const InlineEditor: FC<InlineEditorProps> = ({
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('actions')}>
           <span className={classes.panelHandleDots}>:::</span>
           <span className={classes.panelHandleLabel}>Actions</span>
-        </div>
-        {hasChanges && onSave && (
-          <button type="button" className={classes.actionBtn} onClick={handleSave}>
-            Save
+          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('actions')}>
+            {collapsedPanels.actions ? '▸' : '▾'}
           </button>
+        </div>
+        {!collapsedPanels.actions && (
+          <>
+            {hasChanges && onSave && (
+              <button type="button" className={classes.actionBtn} onClick={handleSave}>
+                Save
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${classes.actionBtn} ${classes.exitBtn}`}
+              onClick={onExit}
+            >
+              {hasChanges ? 'Discard' : 'Exit'}
+            </button>
+          </>
         )}
-        <button
-          type="button"
-          className={`${classes.actionBtn} ${classes.exitBtn}`}
-          onClick={onExit}
-        >
-          {hasChanges ? 'Discard' : 'Exit'}
-        </button>
       </div>
 
       {/* Hint bar */}

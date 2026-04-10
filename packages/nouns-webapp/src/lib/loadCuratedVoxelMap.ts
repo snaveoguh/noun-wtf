@@ -29,14 +29,14 @@ function clamp(v: number, lo: number, hi: number) {
  * Editor grid:    X=0..31,   Y=0..31,   Z=any integer
  *
  * X: +16 to center in the 32-wide grid
- * Y: -3 to align the head area (~20-34) with the upper grid (~17-31)
- * Z: +4 to push the head in front of the body (body at z=0..2, head starts ~z=4)
+ * Y: -10 to match GLB offsetY=-26 (editorY = nativeY - 26 + 15.5)
+ * Z: +2 to push head just past body front face (body at z=-1.25..+1.25)
  */
 function remapKey(nativeKey: string): string | null {
   const [nx, ny, nz] = nativeKey.split(',').map(Number);
   const ex = clamp(Math.round(nx + 16), 0, 31);
-  const ey = clamp(Math.round(ny - 3), 0, 31);
-  const ez = Math.round(nz + 4);
+  const ey = clamp(Math.round(ny - 10), 0, 31);
+  const ez = Math.round(nz + 2);
   return `${ex},${ey},${ez}`;
 }
 
