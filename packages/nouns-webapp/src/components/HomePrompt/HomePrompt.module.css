@@ -1,45 +1,26 @@
-/* ─── HomePrompt: thin inline chat on homepage ─── */
+/* ─── HomePrompt: intrigue + search/chat at bottom of hero ─── */
 
 .wrapper {
   width: 100%;
-  max-width: 620px;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-.wrapperClosed {
-  width: auto;
-  max-width: none;
-  align-items: center;
+/* ─── Intrigue text ────────────────────────────────── */
+
+.intrigue {
+  margin: 0;
+  padding: 0 0 8px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: rgba(0, 0, 0, 0.42);
+  letter-spacing: 0.01em;
 }
 
-.triggerBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 0;
-  border-radius: 999px;
-  padding: 0.72rem 1rem;
-  background: rgba(255, 255, 255, 0.78);
-  color: #1f1a17;
-  font-family: 'PT Root UI', sans-serif;
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  box-shadow: 0 10px 25px rgba(82, 54, 25, 0.08);
-}
-
-.triggerIcon {
-  font-size: 0.9rem;
-  line-height: 1;
-  opacity: 0.65;
-}
-
-/* ─── Input bar ─────────────────────────────────── */
+/* ─── Input bar ────────────────────────────────────── */
 
 .inputBar {
   display: flex;
@@ -127,7 +108,7 @@
   color: rgba(0, 0, 0, 0.5);
 }
 
-/* ─── Conversation ──────────────────────────────── */
+/* ─── Conversation ──────────────────────────────────── */
 
 .conversation {
   max-height: 240px;
@@ -193,16 +174,11 @@
   animation: blink 1.2s ease-in-out infinite;
 }
 
-/* ─── Responsive ────────────────────────────────── */
+/* ─── Responsive ────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  .wrapper {
-    max-width: 100%;
-  }
-
-  .triggerBtn {
-    width: auto;
-    justify-content: center;
+  .intrigue {
+    font-size: 0.85rem;
   }
 
   .conversation {

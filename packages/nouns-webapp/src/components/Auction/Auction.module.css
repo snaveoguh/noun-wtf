@@ -96,14 +96,7 @@
 }
 
 .addTab {
-  min-width: auto;
-  padding-inline: 1rem;
-  background: #f97316;
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1;
+  display: none;
 }
 
 .heroMain {
@@ -337,8 +330,11 @@
 }
 
 .auctionCard {
-  padding: 1rem 1rem 1rem;
+  padding: 1rem 1rem 2rem;
   min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .metaHeader {
