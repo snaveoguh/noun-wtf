@@ -243,6 +243,14 @@ for (let i = 0; i < glassesTraits.length; i++) {
     buf[idx + 3] = 255;
   }
 
+  // Fullblack: manually inject white glint pixels (not in RLE data — all RLE eyes are black)
+  if (i === 7) {
+    for (const [gx, gy] of [[12,9],[12,10],[23,9],[23,10]]) {
+      const gi = (gy * 32 + gx) * 4;
+      buf[gi] = 255; buf[gi+1] = 255; buf[gi+2] = 255; buf[gi+3] = 255;
+    }
+  }
+
   const outPath = path.join(outDir, `${i}.png`);
   await sharp(buf, { raw: { width: 32, height: 32, channels: 4 } }).png().toFile(outPath);
 
