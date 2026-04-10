@@ -1,9 +1,10 @@
 /**
  * SceneEnvironment — Holographic foil card background.
  * Dark base with iridescent rainbow orbs, shimmering dust, cosmic mist.
- * Reactive to camera angle (gyro on mobile = holographic card effect).
+ * Reactive to tilt (gyro on mobile = holographic card effect).
+ * tiltRef drives per-frame hue/shimmer shifts without re-renders.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
@@ -11,12 +12,25 @@ import { Sparkles } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+interface Tilt {
+  x: number;
+  y: number;
+}
+
+interface SceneEnvironmentProps {
+  tiltRef?: React.RefObject<Tilt>;
+}
+
 // ─── Holographic Foil Sky ──────────────────────────────────────────
 
-function HoloSky() {
+function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
   const mat = useMemo(() => new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, transparent: true,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: {
+      uTime: { value: 0 },
+      uTiltX: { value: 0 },
+      uTiltY: { value: 0 },
+    },
     vertexShader: `
       varying vec3 vPos;
       varying vec3 vViewDir;
@@ -27,6 +41,8 @@ function HoloSky() {
       }`,
     fragmentShader: `
       uniform float uTime;
+      uniform float uTiltX;
+      uniform float uTiltY;
       varying vec3 vPos;
       varying vec3 vViewDir;
 
@@ -38,17 +54,20 @@ function HoloSky() {
         vec3 n = normalize(vPos);
         float fresnel = dot(vViewDir, n);
 
-        // Chrome mirror base — shifts between silver and warm
-        float chromeShift = sin(fresnel * 4.0 + n.x * 2.0 + uTime * 0.08) * 0.5 + 0.5;
+        // Chrome mirror base — tilt shifts the color bands
+        float chromeShift = sin(fresnel * 4.0 + n.x * 2.0 + uTime * 0.08 + uTiltX * 3.0) * 0.5 + 0.5;
         vec3 base = mix(vec3(0.85, 0.83, 0.88), vec3(0.92, 0.88, 0.82), chromeShift);
 
-        // Holographic rainbow shimmer — shifts with view angle
-        float holoT = fresnel * 3.0 + n.x * 1.5 + n.y * 0.8 + uTime * 0.04;
+        // Holographic rainbow shimmer — tilt drives the phase like tilting a real holo card
+        float holoT = fresnel * 3.0 + n.x * 1.5 + n.y * 0.8 + uTime * 0.04
+                     + uTiltX * 2.5 + uTiltY * 1.8;
         vec3 rainbow = holo(holoT);
 
-        // Mix rainbow in subtly — more at edges (fresnel)
+        // Mix rainbow in — more at edges (fresnel) and more when tilting
+        float tiltMag = length(vec2(uTiltX, uTiltY));
         float edgeFactor = pow(1.0 - abs(fresnel), 1.5);
-        vec3 color = mix(base, rainbow, edgeFactor * 0.2 + 0.08);
+        float rainbowMix = edgeFactor * 0.2 + 0.08 + tiltMag * 0.15;
+        vec3 color = mix(base, rainbow, rainbowMix);
 
         // Add subtle sparkle noise
         float sparkle = fract(sin(dot(n.xy * 400.0, vec2(12.9898, 78.233))) * 43758.5453);
@@ -61,9 +80,16 @@ function HoloSky() {
       }`,
   }), []);
 
+  useFrame(() => {
+    mat.uniforms.uTime.value = performance.now() / 1000;
+    if (tiltRef?.current) {
+      mat.uniforms.uTiltX.value = tiltRef.current.x;
+      mat.uniforms.uTiltY.value = tiltRef.current.y;
+    }
+  });
+
   return (
-    <mesh material={mat} renderOrder={-1}
-      onBeforeRender={() => { mat.uniforms.uTime.value = performance.now() / 1000; }}>
+    <mesh material={mat} renderOrder={-1}>
       <sphereGeometry args={[110, 48, 48]} />
     </mesh>
   );
@@ -71,7 +97,7 @@ function HoloSky() {
 
 // ─── Iridescent Orbs (the big colored spheres from the reference) ──
 
-function HoloOrbs() {
+function HoloOrbs({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
   const ref = useRef<THREE.Group>(null);
   const orbs = useMemo(() => Array.from({ length: 120 }, () => {
     // Neon orange heavy like holo card — no purple/pink
@@ -96,13 +122,12 @@ function HoloOrbs() {
     };
   }), []);
 
-  useFrame(({ clock, camera }) => {
+  useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
-    // Camera direction drives hue shift — tilting phone shifts all orb colors
-    const camDir = new THREE.Vector3();
-    camera.getWorldDirection(camDir);
-    const hueShift = camDir.x * 0.3 + camDir.y * 0.2;
+    // Tilt drives hue shift — tilting phone shifts all orb colors like a holo card
+    const tilt = tiltRef?.current;
+    const hueShift = tilt ? tilt.x * 0.35 + tilt.y * 0.2 : 0;
 
     ref.current.children.forEach((child, i) => {
       const o = orbs[i]; if (!o) return;
@@ -110,7 +135,7 @@ function HoloOrbs() {
       child.position.x = o.pos[0] + Math.cos(t * o.speed * 0.7 + o.phase) * 1.5;
       const pulse = 0.35 + Math.sin(t * o.pulseSpeed + o.phase) * 0.2;
 
-      // Shift hue based on camera angle
+      // Shift hue based on tilt
       const shiftedHue = (o.hue + hueShift + t * 0.005) % 1.0;
       const newColor = new THREE.Color().setHSL(shiftedHue, 0.9, 0.55);
       if (!child.children || child.children.length < 4) return;
@@ -242,7 +267,8 @@ function NounSprite({ orbitAngle, orbitSpeed }: { orbitAngle: number; orbitSpeed
     glasses: Math.floor(Math.random() * ImageData.images.glasses.length),
   }), []);
 
-  useEffect(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useMemo(() => {
     try {
       const { parts } = getNounData(seed);
       let svg = buildSVG(parts, ImageData.palette, '');
@@ -257,7 +283,7 @@ function NounSprite({ orbitAngle, orbitSpeed }: { orbitAngle: number; orbitSpeed
         }
       };
       img.src = `data:image/svg+xml;base64,${btoa(svg)}`;
-    } catch {}
+    } catch { /* seed might be out of range */ }
   }, [seed]);
 
   useFrame(({ clock }) => {
@@ -317,11 +343,11 @@ function Spaceships() {
 
 // ─── Export ─────────────────────────────────────────────────────────
 
-export default function SceneEnvironment({ tiltX = 0, tiltY = 0 }: { tiltX?: number; tiltY?: number }) {
+export default function SceneEnvironment({ tiltRef }: SceneEnvironmentProps) {
   return (
     <>
-      <HoloSky />
-      <HoloOrbs />
+      <HoloSky tiltRef={tiltRef} />
+      <HoloOrbs tiltRef={tiltRef} />
       <MistRings />
       <Planet />
       {Array.from({ length: 5 }, (_, i) => (
