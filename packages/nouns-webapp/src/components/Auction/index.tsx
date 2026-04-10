@@ -1,5 +1,6 @@
 /* eslint-disable import/order, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine';
+import type * as THREE from 'three';
 import { loadCuratedVoxelMap } from '@/lib/loadCuratedVoxelMap';
 import React, {
   Suspense,
@@ -813,11 +814,32 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     },
   });
 
-  const downloadAs = useCallback((format: 'png' | 'svg' | 'webp') => {
+  const downloadAs = useCallback(async (format: 'png' | 'svg' | 'webp' | 'glb') => {
     setDownloadMenuOpen(false);
     const canvas = document.querySelector(
       '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
     ) as HTMLCanvasElement | null;
+
+    if (format === 'glb') {
+      // GLB: export the 3D scene from the R3F canvas
+      // R3F stores its fiber root on the <canvas> DOM element
+      const r3fCanvas = document.querySelector('[data-noun-parallax-root="true"] canvas') as
+        (HTMLCanvasElement & { __r3f?: { store?: { getState: () => { scene: THREE.Scene } } } }) | null;
+      const scene = r3fCanvas?.__r3f?.store?.getState()?.scene;
+      if (!scene) return;
+      // @ts-expect-error — types are at three/examples/jsm but runtime is three/addons
+      const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+      const exporter = new GLTFExporter();
+      exporter.parse(scene, (result: ArrayBuffer | object) => {
+        const blob = new Blob([result as ArrayBuffer], { type: 'model/gltf-binary' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `noun-${currentNounId}.glb`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, (error: unknown) => { console.error('GLB export failed:', error); }, { binary: true });
+      return;
+    }
 
     if (format === 'svg') {
       // SVG: use the raw noun SVG data
@@ -1384,6 +1406,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                         <button type="button" onClick={() => downloadAs('png')}>PNG</button>
                         <button type="button" onClick={() => downloadAs('svg')}>SVG</button>
                         <button type="button" onClick={() => downloadAs('webp')}>WebP</button>
+                        {is3dView && <button type="button" onClick={() => downloadAs('glb')}>GLB</button>}
                       </div>
                     )}
                   </div>
