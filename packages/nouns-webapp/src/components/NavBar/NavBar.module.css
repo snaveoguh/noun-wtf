@@ -71,6 +71,13 @@
   .navBarCustom :global(.navbar-collapse) {
     padding-top: 0.75rem;
   }
+
+}
+
+@media (max-width: 767px) {
+  .makeArtHeaderBtn {
+    display: flex;
+  }
 }
 
 /* connect button displays differently to default NavBarItems, thus the !importants */
@@ -94,6 +101,25 @@
 .disconnectBtn:active,
 .disconnectBtn:focus {
   cursor: pointer !important;
+}
+
+.makeArtHeaderBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+  background: #f97316;
+  color: #fff;
+  font-family: 'PT Root UI', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-right: 0.5rem;
 }
 
 .greenStatusCircle {
