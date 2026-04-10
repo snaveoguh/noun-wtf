@@ -219,6 +219,9 @@ function CuratedHead({
                 mat.polygonOffsetUnits = -4;
                 mat.needsUpdate = true;
               }
+              // Nudge glasses forward to eliminate seam with head mesh
+              mesh.renderOrder = 1;
+              mesh.position.z += 0.08;
             }
           });
         }
@@ -712,7 +715,7 @@ function TiltScene({
   return (
     <>
       <SceneLighting preset={lightingPreset} />
-      <SceneEnvironment tiltRef={tiltRef} />
+      <SceneEnvironment tiltRef={tiltRef} lightingPreset={lightingPreset} />
       <group ref={groupRef}>
         {bodyGeo && (
           <mesh geometry={bodyGeo} receiveShadow>
@@ -808,7 +811,7 @@ function InteractiveScene({
   return (
     <>
       <SceneLighting preset={lightingPreset} />
-      <SceneEnvironment />
+      <SceneEnvironment lightingPreset={lightingPreset} />
       {bodyGeo && (
         <mesh geometry={bodyGeo} receiveShadow>
           <meshLambertMaterial vertexColors />

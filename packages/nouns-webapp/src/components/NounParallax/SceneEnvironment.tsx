@@ -3,6 +3,7 @@
  * Dark base with iridescent rainbow orbs, shimmering dust, cosmic mist.
  * Reactive to tilt (gyro on mobile = holographic card effect).
  * tiltRef drives per-frame hue/shimmer shifts without re-renders.
+ * lightingPreset tints the entire scene to match the noun's lighting.
  */
 import { useMemo, useRef } from 'react';
 
@@ -12,6 +13,8 @@ import { Sparkles } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import type { LightingPreset } from './index';
+
 interface Tilt {
   x: number;
   y: number;
@@ -19,19 +22,46 @@ interface Tilt {
 
 interface SceneEnvironmentProps {
   tiltRef?: React.RefObject<Tilt>;
+  lightingPreset?: LightingPreset;
 }
+
+// ─── Scene tint per lighting preset ───────────────────────────────
+const SCENE_TINTS: Record<
+  string,
+  { hueShift: number; saturation: number; brightness: number; skyTint: [number, number, number] }
+> = {
+  spotlight: { hueShift: 0, saturation: 0.7, brightness: 0.9, skyTint: [0.88, 0.88, 0.92] },
+  studio: { hueShift: 0, saturation: 0.8, brightness: 1.0, skyTint: [0.9, 0.9, 0.92] },
+  storefront: { hueShift: 0, saturation: 0.9, brightness: 1.0, skyTint: [0.88, 0.86, 0.84] },
+  sunrise: { hueShift: 0.06, saturation: 1.0, brightness: 1.1, skyTint: [0.95, 0.82, 0.6] },
+  twilight: { hueShift: 0.02, saturation: 1.0, brightness: 0.85, skyTint: [0.9, 0.65, 0.5] },
+  ambient: { hueShift: -0.15, saturation: 1.0, brightness: 1.0, skyTint: [0.85, 0.7, 0.9] },
+  none: { hueShift: 0, saturation: 0.3, brightness: 0.5, skyTint: [0.8, 0.8, 0.82] },
+};
 
 // ─── Holographic Foil Sky ──────────────────────────────────────────
 
-function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, transparent: true,
-    uniforms: {
-      uTime: { value: 0 },
-      uTiltX: { value: 0 },
-      uTiltY: { value: 0 },
-    },
-    vertexShader: `
+function HoloSky({
+  tiltRef,
+  lightingPreset = 'storefront',
+}: {
+  tiltRef?: React.RefObject<Tilt>;
+  lightingPreset?: LightingPreset;
+}) {
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        transparent: true,
+        uniforms: {
+          uTime: { value: 0 },
+          uTiltX: { value: 0 },
+          uTiltY: { value: 0 },
+          uSkyTint: { value: new THREE.Vector3(0.88, 0.86, 0.84) },
+          uBrightness: { value: 1.0 },
+        },
+        vertexShader: `
       varying vec3 vPos;
       varying vec3 vViewDir;
       void main() {
@@ -39,10 +69,12 @@ function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
         vViewDir = normalize(cameraPosition - vPos);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
-    fragmentShader: `
+        fragmentShader: `
       uniform float uTime;
       uniform float uTiltX;
       uniform float uTiltY;
+      uniform vec3 uSkyTint;
+      uniform float uBrightness;
       varying vec3 vPos;
       varying vec3 vViewDir;
 
@@ -54,31 +86,40 @@ function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
         vec3 n = normalize(vPos);
         float fresnel = dot(vViewDir, n);
 
-        // Chrome mirror base — tilt shifts the color bands
+        // Chrome mirror base — tilt shifts the color bands, tinted by preset
         float chromeShift = sin(fresnel * 4.0 + n.x * 2.0 + uTime * 0.08 + uTiltX * 3.0) * 0.5 + 0.5;
-        vec3 base = mix(vec3(0.85, 0.83, 0.88), vec3(0.92, 0.88, 0.82), chromeShift);
+        vec3 base = mix(uSkyTint * 0.95, uSkyTint * 1.05, chromeShift);
 
-        // Holographic rainbow shimmer — tilt drives the phase like tilting a real holo card
+        // Holographic rainbow shimmer
         float holoT = fresnel * 3.0 + n.x * 1.5 + n.y * 0.8 + uTime * 0.04
                      + uTiltX * 2.5 + uTiltY * 1.8;
         vec3 rainbow = holo(holoT);
 
-        // Mix rainbow in — more at edges (fresnel) and more when tilting
+        // Holo swirl bands — concentric rings that shimmer like a real holo card
+        float swirl1 = sin(fresnel * 8.0 + n.x * 4.0 + n.y * 3.0 + uTime * 0.12 + uTiltX * 4.0) * 0.5 + 0.5;
+        float swirl2 = sin(fresnel * 12.0 - n.x * 3.0 + n.y * 5.0 + uTime * 0.08 - uTiltY * 3.0) * 0.5 + 0.5;
+        float swirlMask = pow(swirl1 * swirl2, 0.8) * 0.25;
+
+        // Mix rainbow in
         float tiltMag = length(vec2(uTiltX, uTiltY));
         float edgeFactor = pow(1.0 - abs(fresnel), 1.5);
-        float rainbowMix = edgeFactor * 0.2 + 0.08 + tiltMag * 0.15;
+        float rainbowMix = edgeFactor * 0.2 + 0.08 + tiltMag * 0.15 + swirlMask;
         vec3 color = mix(base, rainbow, rainbowMix);
 
-        // Add subtle sparkle noise
+        // Sparkle noise
         float sparkle = fract(sin(dot(n.xy * 400.0, vec2(12.9898, 78.233))) * 43758.5453);
         sparkle = pow(sparkle, 20.0) * 0.4;
         color += vec3(sparkle) * rainbow;
+
+        color *= uBrightness;
 
         // Fade to transparent at top
         float topFade = smoothstep(0.15, 0.55, n.y);
         gl_FragColor = vec4(color, 1.0 - topFade);
       }`,
-  }), []);
+      }),
+    [],
+  );
 
   useFrame(() => {
     mat.uniforms.uTime.value = performance.now() / 1000;
@@ -86,6 +127,9 @@ function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
       mat.uniforms.uTiltX.value = tiltRef.current.x;
       mat.uniforms.uTiltY.value = tiltRef.current.y;
     }
+    const tint = SCENE_TINTS[lightingPreset] ?? SCENE_TINTS.storefront;
+    mat.uniforms.uSkyTint.value.set(...tint.skyTint);
+    mat.uniforms.uBrightness.value = tint.brightness;
   });
 
   return (
@@ -95,57 +139,90 @@ function HoloSky({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
   );
 }
 
-// ─── Iridescent Orbs (the big colored spheres from the reference) ──
+// ─── Iridescent Orbs ──────────────────────────────────────────────
 
-function HoloOrbs({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
+function HoloOrbs({
+  tiltRef,
+  lightingPreset = 'storefront',
+}: {
+  tiltRef?: React.RefObject<Tilt>;
+  lightingPreset?: LightingPreset;
+}) {
   const ref = useRef<THREE.Group>(null);
-  const orbs = useMemo(() => Array.from({ length: 120 }, () => {
-    // Neon orange heavy like holo card — no purple/pink
-    const hueBucket = Math.random();
-    let hue: number;
-    if (hueBucket < 0.50) hue = 0.04 + Math.random() * 0.06;       // neon orange
-    else if (hueBucket < 0.70) hue = 0.10 + Math.random() * 0.06;  // amber/gold
-    else if (hueBucket < 0.82) hue = 0.50 + Math.random() * 0.08;  // cyan
-    else if (hueBucket < 0.92) hue = 0.56 + Math.random() * 0.08;  // blue
-    else hue = 0.30 + Math.random() * 0.06;                          // green
-    return {
-      pos: [
-        (Math.random() - 0.5) * 160,
-        (Math.random() - 0.5) * 80,
-        -15 - Math.random() * 60,
-      ] as [number, number, number],
-      size: 0.1 + Math.random() * 2.0,
-      hue,
-      speed: 0.05 + Math.random() * 0.2,
-      phase: Math.random() * Math.PI * 2,
-      pulseSpeed: 0.3 + Math.random() * 1.0,
-    };
-  }), []);
+  const orbs = useMemo(
+    () =>
+      Array.from({ length: 200 }, () => {
+        // Heavy fluorescent yellows and oranges
+        const hueBucket = Math.random();
+        let hue: number;
+        if (hueBucket < 0.35)
+          hue = 0.04 + Math.random() * 0.06; // neon orange
+        else if (hueBucket < 0.55)
+          hue = 0.1 + Math.random() * 0.06; // amber/gold
+        else if (hueBucket < 0.7)
+          hue = 0.13 + Math.random() * 0.04; // fluorescent yellow
+        else if (hueBucket < 0.8)
+          hue = 0.5 + Math.random() * 0.08; // cyan
+        else if (hueBucket < 0.9)
+          hue = 0.56 + Math.random() * 0.08; // blue
+        else hue = 0.3 + Math.random() * 0.06; // green
+        return {
+          pos: [
+            (Math.random() - 0.5) * 200, // wider spread X
+            (Math.random() - 0.5) * 100, // wider spread Y
+            -75 + Math.random() * 85, // Z: -75 to +10 (some in front, mostly behind)
+          ] as [number, number, number],
+          size: 0.1 + Math.random() * 2.2,
+          hue,
+          speed: 0.05 + Math.random() * 0.2,
+          phase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.3 + Math.random() * 1.0,
+        };
+      }),
+    [],
+  );
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
-    // Tilt drives hue shift — tilting phone shifts all orb colors like a holo card
     const tilt = tiltRef?.current;
     const hueShift = tilt ? tilt.x * 0.35 + tilt.y * 0.2 : 0;
+    const presetTint = SCENE_TINTS[lightingPreset] ?? SCENE_TINTS.storefront;
 
     ref.current.children.forEach((child, i) => {
-      const o = orbs[i]; if (!o) return;
+      const o = orbs[i];
+      if (!o) return;
       child.position.y = o.pos[1] + Math.sin(t * o.speed + o.phase) * 2;
       child.position.x = o.pos[0] + Math.cos(t * o.speed * 0.7 + o.phase) * 1.5;
       const pulse = 0.35 + Math.sin(t * o.pulseSpeed + o.phase) * 0.2;
 
-      // Shift hue based on tilt
-      const shiftedHue = (o.hue + hueShift + t * 0.005) % 1.0;
-      const newColor = new THREE.Color().setHSL(shiftedHue, 0.9, 0.55);
+      const shiftedHue = (((o.hue + hueShift + presetTint.hueShift + t * 0.005) % 1.0) + 1.0) % 1.0;
+      const newColor = new THREE.Color().setHSL(
+        shiftedHue,
+        presetTint.saturation,
+        0.55 * presetTint.brightness,
+      );
       if (!child.children || child.children.length < 4) return;
-      // Core stays white, body/edge/glow get shifted color
-      const bodyMat = (child.children[1] as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
-      const edgeMat = (child.children[2] as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
-      const glowMat = (child.children[3] as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
-      if (bodyMat) { bodyMat.color.copy(newColor); bodyMat.opacity = 0.6 + pulse * 0.2; }
-      if (edgeMat) { edgeMat.color.copy(newColor); edgeMat.opacity = 0.2 + pulse * 0.1; }
-      if (glowMat) { glowMat.color.copy(newColor); }
+      const bodyMat = (child.children[1] as THREE.Mesh).material as
+        | THREE.MeshBasicMaterial
+        | undefined;
+      const edgeMat = (child.children[2] as THREE.Mesh).material as
+        | THREE.MeshBasicMaterial
+        | undefined;
+      const glowMat = (child.children[3] as THREE.Mesh).material as
+        | THREE.MeshBasicMaterial
+        | undefined;
+      if (bodyMat) {
+        bodyMat.color.copy(newColor);
+        bodyMat.opacity = 0.6 + pulse * 0.2;
+      }
+      if (edgeMat) {
+        edgeMat.color.copy(newColor);
+        edgeMat.opacity = 0.2 + pulse * 0.1;
+      }
+      if (glowMat) {
+        glowMat.color.copy(newColor);
+      }
     });
   });
 
@@ -155,28 +232,30 @@ function HoloOrbs({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
         const color = new THREE.Color().setHSL(o.hue, 0.9, 0.55);
         return (
           <group key={i} position={o.pos}>
-            {/* eslint-disable react/no-unknown-property */}
-            {/* Bright core */}
+            {}
             <mesh>
               <sphereGeometry args={[o.size * 0.35, 10, 10]} />
               <meshBasicMaterial color="#ffffff" transparent opacity={0.9} toneMapped={false} />
             </mesh>
-            {/* Main color body */}
             <mesh>
               <sphereGeometry args={[o.size * 0.7, 10, 10]} />
               <meshBasicMaterial color={color} transparent opacity={0.7} toneMapped={false} />
             </mesh>
-            {/* Dark edge ring */}
             <mesh>
               <sphereGeometry args={[o.size, 10, 10]} />
               <meshBasicMaterial color={color} transparent opacity={0.25} toneMapped={false} />
             </mesh>
-            {/* Outer glow */}
             <mesh>
               <sphereGeometry args={[o.size * 1.8, 8, 8]} />
-              <meshBasicMaterial color={color} transparent opacity={0.06} toneMapped={false} side={THREE.BackSide} />
+              <meshBasicMaterial
+                color={color}
+                transparent
+                opacity={0.06}
+                toneMapped={false}
+                side={THREE.BackSide}
+              />
             </mesh>
-            {/* eslint-enable react/no-unknown-property */}
+            {}
           </group>
         );
       })}
@@ -184,46 +263,92 @@ function HoloOrbs({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
   );
 }
 
-// ─── Mist Rings ────────────────────────────────────────────────────
+// ─── Holo Swirl Rings ─────────────────────────────────────────────
 
-function MistRings() {
+function HoloSwirls({
+  tiltRef,
+  lightingPreset = 'storefront',
+}: {
+  tiltRef?: React.RefObject<Tilt>;
+  lightingPreset?: LightingPreset;
+}) {
   const ref = useRef<THREE.Group>(null);
+  const rings = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, i) => ({
+        radius: 15 + i * 10,
+        thickness: 0.3 + i * 0.15,
+        hue: i * 0.15,
+        speed: (0.012 + i * 0.004) * (i % 2 ? 1 : -1),
+        tiltY: (i - 3) * 0.1,
+      })),
+    [],
+  );
+
   useFrame(({ clock }) => {
     if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    const tilt = tiltRef?.current;
+    const presetTint = SCENE_TINTS[lightingPreset] ?? SCENE_TINTS.storefront;
+
     ref.current.children.forEach((child, i) => {
-      child.rotation.z = clock.getElapsedTime() * (0.02 + i * 0.005) * (i % 2 ? 1 : -1);
+      const r = rings[i];
+      if (!r) return;
+      child.rotation.z = t * r.speed;
+      // Tilt shifts the ring colors
+      const tiltShift = tilt ? tilt.x * 0.3 : 0;
+      const hue = (((r.hue + t * 0.02 + tiltShift + presetTint.hueShift) % 1.0) + 1.0) % 1.0;
+      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      if (mat) {
+        mat.color.setHSL(hue, presetTint.saturation, 0.6 * presetTint.brightness);
+      }
     });
   });
 
   return (
-    <group ref={ref} position={[0, 0, -35]}>
-      {[18, 25, 33, 42].map((radius, i) => (
-        /* eslint-disable react/no-unknown-property */
-        <mesh key={i} rotation={[Math.PI / 2 + (i - 2) * 0.15, 0, 0]}>
-          <torusGeometry args={[radius, 1.5 + i * 0.5, 8, 48]} />
+    <group ref={ref} position={[0, 0, -40]}>
+      {rings.map((r, i) => (
+        <mesh key={i} rotation={[Math.PI / 2 + r.tiltY, 0, 0]}>
+          <torusGeometry args={[r.radius, r.thickness, 8, 64]} />
           <meshBasicMaterial
-            color={['#4466ff', '#ff44aa', '#44ffaa', '#ffaa44'][i]}
-            transparent opacity={0.04} toneMapped={false} side={THREE.DoubleSide}
+            color={new THREE.Color().setHSL(r.hue, 0.9, 0.7)}
+            transparent
+            opacity={0.03}
+            toneMapped={false}
+            side={THREE.DoubleSide}
           />
         </mesh>
-        /* eslint-enable react/no-unknown-property */
       ))}
     </group>
   );
 }
 
-// ─── Distant Planet (pushed way back, blurred via small size) ──────
+// ─── Distant Planet ───────────────────────────────────────────────
 
 const PR = 8;
 const PP: [number, number, number] = [15, -12, -65];
 
 function Planet() {
   const cloudRef = useRef<THREE.Mesh>(null);
-  useFrame(() => { if (cloudRef.current) cloudRef.current.rotation.y += 0.0005; });
+  useFrame(() => {
+    if (cloudRef.current) cloudRef.current.rotation.y += 0.0005;
+  });
 
   const cols = useMemo(() => {
-    const c = ['#ff6b1a','#ff4488','#44dd22','#ffcc00','#ff3355','#22cc88','#ff8800',
-      '#88dd00','#ff2266','#44bb44','#ffaa22','#33cc66'];
+    const c = [
+      '#ff6b1a',
+      '#ff4488',
+      '#44dd22',
+      '#ffcc00',
+      '#ff3355',
+      '#22cc88',
+      '#ff8800',
+      '#88dd00',
+      '#ff2266',
+      '#44bb44',
+      '#ffaa22',
+      '#33cc66',
+    ];
     return Array.from({ length: 12 }, (_, i) => {
       const phi = (i / 12) * Math.PI * 2;
       const theta = 0.2 + Math.random() * 0.45;
@@ -236,38 +361,77 @@ function Planet() {
 
   return (
     <group>
-      {/* eslint-disable react/no-unknown-property */}
-      <mesh position={PP}><sphereGeometry args={[PR, 24, 24]} /><meshLambertMaterial color="#338833" /></mesh>
-      <mesh ref={cloudRef} position={PP}><sphereGeometry args={[PR*1.04, 16, 16]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} /></mesh>
-      <mesh position={PP}><sphereGeometry args={[PR*1.15, 16, 16]} /><meshBasicMaterial color="#66bbff" transparent opacity={0.08} side={THREE.BackSide} toneMapped={false} /></mesh>
-      <mesh position={PP}><sphereGeometry args={[PR*1.3, 16, 16]} /><meshBasicMaterial color="#88ccff" transparent opacity={0.04} side={THREE.BackSide} toneMapped={false} /></mesh>
+      {}
+      <mesh position={PP}>
+        <sphereGeometry args={[PR, 24, 24]} />
+        <meshLambertMaterial color="#338833" />
+      </mesh>
+      <mesh ref={cloudRef} position={PP}>
+        <sphereGeometry args={[PR * 1.04, 16, 16]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} />
+      </mesh>
+      <mesh position={PP}>
+        <sphereGeometry args={[PR * 1.15, 16, 16]} />
+        <meshBasicMaterial
+          color="#66bbff"
+          transparent
+          opacity={0.08}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={PP}>
+        <sphereGeometry args={[PR * 1.3, 16, 16]} />
+        <meshBasicMaterial
+          color="#88ccff"
+          transparent
+          opacity={0.04}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
       {cols.map((c, i) => {
-        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(c.x,c.y,c.z));
+        const q = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(c.x, c.y, c.z),
+        );
         return (
-          <group key={i} position={[PP[0]+c.x*PR, PP[1]+c.y*PR, PP[2]+c.z*PR]} quaternion={q}>
-            <mesh position={[0,c.h/2,0]}><cylinderGeometry args={[c.r*0.7,c.r,c.h,6]} /><meshLambertMaterial color={c.color} /></mesh>
-            <mesh position={[0,c.h,0]}><sphereGeometry args={[c.r*0.7,6,4,0,Math.PI*2,0,Math.PI/2]} /><meshLambertMaterial color={c.color} /></mesh>
+          <group
+            key={i}
+            position={[PP[0] + c.x * PR, PP[1] + c.y * PR, PP[2] + c.z * PR]}
+            quaternion={q}
+          >
+            <mesh position={[0, c.h / 2, 0]}>
+              <cylinderGeometry args={[c.r * 0.7, c.r, c.h, 6]} />
+              <meshLambertMaterial color={c.color} />
+            </mesh>
+            <mesh position={[0, c.h, 0]}>
+              <sphereGeometry args={[c.r * 0.7, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshLambertMaterial color={c.color} />
+            </mesh>
           </group>
         );
       })}
-      {/* eslint-enable react/no-unknown-property */}
+      {}
     </group>
   );
 }
 
-// ─── Noun Sprites ──────────────────────────────────────────────────
+// ─── Noun Sprites ─────────────────────────────────────────────────
 
 function NounSprite({ orbitAngle, orbitSpeed }: { orbitAngle: number; orbitSpeed: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const seed = useMemo(() => ({
-    background: 0,
-    body: Math.floor(Math.random() * ImageData.images.bodies.length),
-    accessory: Math.floor(Math.random() * ImageData.images.accessories.length),
-    head: Math.floor(Math.random() * ImageData.images.heads.length),
-    glasses: Math.floor(Math.random() * ImageData.images.glasses.length),
-  }), []);
+  const seed = useMemo(
+    () => ({
+      background: 0,
+      body: Math.floor(Math.random() * ImageData.images.bodies.length),
+      accessory: Math.floor(Math.random() * ImageData.images.accessories.length),
+      head: Math.floor(Math.random() * ImageData.images.heads.length),
+      glasses: Math.floor(Math.random() * ImageData.images.glasses.length),
+    }),
+    [],
+  );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useMemo(() => {
     try {
       const { parts } = getNounData(seed);
@@ -276,14 +440,20 @@ function NounSprite({ orbitAngle, orbitSpeed }: { orbitAngle: number; orbitSpeed
       const img = new Image();
       img.onload = () => {
         const tex = new THREE.Texture(img);
-        tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        tex.needsUpdate = true;
         if (meshRef.current) {
           const m = meshRef.current.material as THREE.MeshBasicMaterial;
-          m.map = tex; m.transparent = true; m.needsUpdate = true;
+          m.map = tex;
+          m.transparent = true;
+          m.needsUpdate = true;
         }
       };
       img.src = `data:image/svg+xml;base64,${btoa(svg)}`;
-    } catch { /* seed might be out of range */ }
+    } catch {
+      /* seed might be out of range */
+    }
   }, [seed]);
 
   useFrame(({ clock }) => {
@@ -300,68 +470,122 @@ function NounSprite({ orbitAngle, orbitSpeed }: { orbitAngle: number; orbitSpeed
 
   return (
     <mesh ref={meshRef}>
-      {/* eslint-disable react/no-unknown-property */}
+      {}
       <planeGeometry args={[1.2, 1.2]} />
       <meshBasicMaterial transparent toneMapped={false} side={THREE.DoubleSide} />
-      {/* eslint-enable react/no-unknown-property */}
+      {}
     </mesh>
   );
 }
 
-// ─── Cigar Spaceships ──────────────────────────────────────────────
+// ─── Cigar Spaceships ─────────────────────────────────────────────
 
 function Spaceships() {
-  const ships = useMemo(() => Array.from({ length: 4 }, (_, i) => ({
-    speed: 0.2 + Math.random() * 0.3, y: -5 + Math.random() * 20,
-    z: -50 - Math.random() * 25, phase: Math.random() * 200,
-    size: 0.3 + Math.random() * 0.4,
-    color: ['#cc4444','#4466cc','#44aa44','#cc8844'][i],
-  })), []);
+  const ships = useMemo(
+    () =>
+      Array.from({ length: 4 }, (_, i) => ({
+        speed: 0.2 + Math.random() * 0.3,
+        y: -5 + Math.random() * 20,
+        z: -50 - Math.random() * 25,
+        phase: Math.random() * 200,
+        size: 0.3 + Math.random() * 0.4,
+        color: ['#cc4444', '#4466cc', '#44aa44', '#cc8844'][i],
+      })),
+    [],
+  );
   const ref = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
     ref.current.children.forEach((ship, i) => {
-      const s = ships[i]; if (!s) return;
-      ship.position.set(((t * s.speed + s.phase) % 100) - 50, s.y + Math.sin(t * 0.15 + s.phase) * 1, s.z);
+      const s = ships[i];
+      if (!s) return;
+      ship.position.set(
+        ((t * s.speed + s.phase) % 100) - 50,
+        s.y + Math.sin(t * 0.15 + s.phase) * 1,
+        s.z,
+      );
     });
   });
   return (
     <group ref={ref}>
       {ships.map((s, i) => (
         <group key={i} rotation={[0, 0, Math.PI / 2]}>
-          {/* eslint-disable react/no-unknown-property */}
-          <mesh><capsuleGeometry args={[s.size*0.3, s.size*2.5, 6, 8]} /><meshLambertMaterial color={s.color} /></mesh>
-          <mesh position={[0, s.size, s.size*0.25]}><sphereGeometry args={[s.size*0.2, 6, 6]} /><meshBasicMaterial color="#88ddff" toneMapped={false} /></mesh>
-          <mesh position={[0, -s.size*1.5, 0]}><sphereGeometry args={[s.size*0.2, 6, 6]} /><meshBasicMaterial color="#ffaa44" transparent opacity={0.6} toneMapped={false} /></mesh>
-          {/* eslint-enable react/no-unknown-property */}
+          {}
+          <mesh>
+            <capsuleGeometry args={[s.size * 0.3, s.size * 2.5, 6, 8]} />
+            <meshLambertMaterial color={s.color} />
+          </mesh>
+          <mesh position={[0, s.size, s.size * 0.25]}>
+            <sphereGeometry args={[s.size * 0.2, 6, 6]} />
+            <meshBasicMaterial color="#88ddff" toneMapped={false} />
+          </mesh>
+          <mesh position={[0, -s.size * 1.5, 0]}>
+            <sphereGeometry args={[s.size * 0.2, 6, 6]} />
+            <meshBasicMaterial color="#ffaa44" transparent opacity={0.6} toneMapped={false} />
+          </mesh>
+          {}
         </group>
       ))}
     </group>
   );
 }
 
-// ─── Export ─────────────────────────────────────────────────────────
+// ─── Export ────────────────────────────────────────────────────────
 
-export default function SceneEnvironment({ tiltRef }: SceneEnvironmentProps) {
+export default function SceneEnvironment({
+  tiltRef,
+  lightingPreset = 'storefront',
+}: SceneEnvironmentProps) {
   return (
     <>
-      <HoloSky tiltRef={tiltRef} />
-      <HoloOrbs tiltRef={tiltRef} />
-      <MistRings />
+      <HoloSky tiltRef={tiltRef} lightingPreset={lightingPreset} />
+      <HoloOrbs tiltRef={tiltRef} lightingPreset={lightingPreset} />
+      <HoloSwirls tiltRef={tiltRef} lightingPreset={lightingPreset} />
       <Planet />
       {Array.from({ length: 5 }, (_, i) => (
         <NounSprite key={i} orbitAngle={(i / 5) * Math.PI * 2} orbitSpeed={0.05 + i * 0.01} />
       ))}
       <Spaceships />
 
-      {/* eslint-disable react/no-unknown-property */}
-      {/* Multi-color holographic dust */}
-      <Sparkles count={100} scale={[50, 30, 40]} size={1.5} speed={0.12} opacity={0.25} color="#ffffff" position={[0, 3, -20]} />
-      <Sparkles count={60} scale={[45, 25, 35]} size={1} speed={0.2} opacity={0.2} color="#aaccff" position={[0, 0, -15]} />
-      <Sparkles count={40} scale={[55, 30, 45]} size={2.5} speed={0.05} opacity={0.12} color="#ffccaa" position={[0, 5, -25]} />
-      <Sparkles count={80} scale={[35, 20, 30]} size={0.6} speed={0.35} opacity={0.3} color="#ffffff" position={[0, 2, -12]} />
-      {/* eslint-enable react/no-unknown-property */}
+      {}
+      <Sparkles
+        count={120}
+        scale={[60, 35, 50]}
+        size={1.5}
+        speed={0.12}
+        opacity={0.25}
+        color="#ffffff"
+        position={[0, 3, -10]}
+      />
+      <Sparkles
+        count={80}
+        scale={[50, 30, 40]}
+        size={1}
+        speed={0.2}
+        opacity={0.2}
+        color="#aaccff"
+        position={[0, 0, 0]}
+      />
+      <Sparkles
+        count={50}
+        scale={[65, 35, 50]}
+        size={2.5}
+        speed={0.05}
+        opacity={0.12}
+        color="#ffccaa"
+        position={[0, 5, -15]}
+      />
+      <Sparkles
+        count={100}
+        scale={[40, 25, 35]}
+        size={0.6}
+        speed={0.35}
+        opacity={0.3}
+        color="#ffffff"
+        position={[0, 2, 5]}
+      />
+      {}
     </>
   );
 }

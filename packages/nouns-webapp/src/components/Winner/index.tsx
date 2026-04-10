@@ -28,7 +28,9 @@ const Winner: React.FC<WinnerProps> = props => {
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
   const isWinnerYou =
-    activeAccount !== undefined && winner !== undefined && activeAccount.toLocaleLowerCase() === winner.toLocaleLowerCase();
+    activeAccount !== undefined &&
+    winner !== undefined &&
+    activeAccount.toLocaleLowerCase() === winner.toLocaleLowerCase();
 
   const activeLocale = useActiveLocale();
 
@@ -47,7 +49,7 @@ const Winner: React.FC<WinnerProps> = props => {
     </Row>
   ) : (
     <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-      <ShortAddress size={40} address={winner} avatar={true} />
+      <ShortAddress size={16} address={winner} avatar={true} />
       <ClientBadge clientId={clientId} size={20} />
     </span>
   );
@@ -88,7 +90,7 @@ const Winner: React.FC<WinnerProps> = props => {
               color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)',
             }}
           >
-            {isNounders ? nounderNounContent : nonNounderNounContent}
+            {isNounders === true ? nounderNounContent : nonNounderNounContent}
           </h2>
         </Col>
       </Row>
