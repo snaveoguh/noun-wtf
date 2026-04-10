@@ -40,10 +40,11 @@ import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 import NounsPage from '@/pages/NounsPage';
 import Playground from '@/pages/Playground';
-import UndergroundPage from '@/pages/Underground';
 import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
 import StatsPage from '@/pages/StatsPage';
+import UndergroundPage from '@/pages/Underground';
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 import NonsensePage from '@/pages/NonsensePage';
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
@@ -95,7 +96,9 @@ function AppRouter() {
   // World — full-screen canvas, no chrome
   if (location.pathname === '/world') {
     return (
-      <Suspense fallback={<div style={{ background: '#1a4f8a', width: '100vw', height: '100vh' }} />}>
+      <Suspense
+        fallback={<div style={{ background: '#1a4f8a', width: '100vw', height: '100vh' }} />}
+      >
         <WorldPage />
       </Suspense>
     );
@@ -104,7 +107,9 @@ function AppRouter() {
   // Classic mode or deep link — show full site chrome
   return (
     <>
-      <NocTicker />
+      <div className="hidden lg:block">
+        <NocTicker />
+      </div>
       <NavBar />
       <Routes>
         <Route path="/" element={<AuctionPage />} />
@@ -143,6 +148,14 @@ function AppRouter() {
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/settlers" element={<SettlersPage />} />
         <Route path="/stats" element={<StatsPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <DashboardPage />
+            </Suspense>
+          }
+        />
         <Route path="/nonsense" element={<NonsensePage />} />
         <Route path="/dreams" element={<DreamsPage />} />
         <Route path="/dreams/create" element={<DreamCreatePage />} />

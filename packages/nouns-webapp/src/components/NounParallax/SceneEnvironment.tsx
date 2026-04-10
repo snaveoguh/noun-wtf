@@ -152,20 +152,18 @@ function HoloOrbs({
   const orbs = useMemo(
     () =>
       Array.from({ length: 200 }, () => {
-        // Heavy fluorescent yellows and oranges
+        // Silver / chrome holofoil palette
         const hueBucket = Math.random();
         let hue: number;
-        if (hueBucket < 0.35)
-          hue = 0.04 + Math.random() * 0.06; // neon orange
-        else if (hueBucket < 0.55)
-          hue = 0.1 + Math.random() * 0.06; // amber/gold
-        else if (hueBucket < 0.7)
-          hue = 0.13 + Math.random() * 0.04; // fluorescent yellow
+        if (hueBucket < 0.45)
+          hue = 0.0 + Math.random() * 0.02; // silver/white (near-zero saturation below)
+        else if (hueBucket < 0.65)
+          hue = 0.55 + Math.random() * 0.1; // cool blue-steel
         else if (hueBucket < 0.8)
-          hue = 0.5 + Math.random() * 0.08; // cyan
+          hue = 0.75 + Math.random() * 0.1; // violet chrome
         else if (hueBucket < 0.9)
-          hue = 0.56 + Math.random() * 0.08; // blue
-        else hue = 0.3 + Math.random() * 0.06; // green
+          hue = 0.47 + Math.random() * 0.06; // cyan flash
+        else hue = 0.1 + Math.random() * 0.05; // warm gold accent
         return {
           pos: [
             (Math.random() - 0.5) * 200, // wider spread X
@@ -173,6 +171,7 @@ function HoloOrbs({
             -75 + Math.random() * 85, // Z: -75 to +10 (some in front, mostly behind)
           ] as [number, number, number],
           size: 0.1 + Math.random() * 2.2,
+          flatness: 0.08 + Math.random() * 0.15, // Y-scale: 0.08–0.23 (pressed flat)
           hue,
           speed: 0.05 + Math.random() * 0.2,
           phase: Math.random() * Math.PI * 2,
@@ -182,7 +181,7 @@ function HoloOrbs({
     [],
   );
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
     const tilt = tiltRef?.current;
@@ -194,13 +193,15 @@ function HoloOrbs({
       if (!o) return;
       child.position.y = o.pos[1] + Math.sin(t * o.speed + o.phase) * 2;
       child.position.x = o.pos[0] + Math.cos(t * o.speed * 0.7 + o.phase) * 1.5;
+      // Billboard: face camera so flat discs are always visible
+      child.quaternion.copy(camera.quaternion);
       const pulse = 0.35 + Math.sin(t * o.pulseSpeed + o.phase) * 0.2;
 
       const shiftedHue = (((o.hue + hueShift + presetTint.hueShift + t * 0.005) % 1.0) + 1.0) % 1.0;
       const newColor = new THREE.Color().setHSL(
         shiftedHue,
-        presetTint.saturation,
-        0.55 * presetTint.brightness,
+        presetTint.saturation * 0.35,
+        0.75 * presetTint.brightness,
       );
       if (!child.children || child.children.length < 4) return;
       const bodyMat = (child.children[1] as THREE.Mesh).material as
@@ -229,9 +230,9 @@ function HoloOrbs({
   return (
     <group ref={ref}>
       {orbs.map((o, i) => {
-        const color = new THREE.Color().setHSL(o.hue, 0.9, 0.55);
+        const color = new THREE.Color().setHSL(o.hue, 0.3, 0.75);
         return (
-          <group key={i} position={o.pos}>
+          <group key={i} position={o.pos} scale={[1, o.flatness, 1]}>
             {}
             <mesh>
               <sphereGeometry args={[o.size * 0.35, 10, 10]} />
@@ -531,6 +532,59 @@ function Spaceships() {
   );
 }
 
+// ─── Lens Flare ──────────────────────────────────────────────────
+
+function LensFlare({ tiltRef }: { tiltRef?: React.RefObject<Tilt> }) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  // 1 main flare + 5 ghosts at different scales / offsets along the tilt axis
+  const ghosts = useMemo(
+    () => [
+      { scale: 3.5, offset: 0, opacity: 0.18 }, // main bloom
+      { scale: 1.2, offset: 0.35, opacity: 0.09 },
+      { scale: 0.6, offset: 0.6, opacity: 0.12 },
+      { scale: 2.0, offset: 0.85, opacity: 0.06 },
+      { scale: 0.4, offset: 1.1, opacity: 0.1 },
+      { scale: 1.5, offset: 1.4, opacity: 0.04 },
+    ],
+    [],
+  );
+
+  useFrame(({ camera }) => {
+    if (!groupRef.current) return;
+    const tilt = tiltRef?.current;
+    // Flare position follows tilt (opposite direction like real lens flare)
+    const tx = tilt ? -tilt.x * 25 : 0;
+    const ty = tilt ? -tilt.y * 15 : 0;
+
+    groupRef.current.children.forEach((child, i) => {
+      const g = ghosts[i];
+      if (!g) return;
+      child.position.x = tx * g.offset;
+      child.position.y = ty * g.offset + 3;
+      child.quaternion.copy(camera.quaternion);
+    });
+  });
+
+  return (
+    <group ref={groupRef}>
+      {ghosts.map((g, i) => (
+        <mesh key={i} position={[0, 3, -5]}>
+          <circleGeometry args={[g.scale, 32]} />
+          <meshBasicMaterial
+            color="#ffffff"
+            transparent
+            opacity={g.opacity}
+            toneMapped={false}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 // ─── Export ────────────────────────────────────────────────────────
 
 export default function SceneEnvironment({
@@ -540,6 +594,7 @@ export default function SceneEnvironment({
   return (
     <>
       <HoloSky tiltRef={tiltRef} lightingPreset={lightingPreset} />
+      <LensFlare tiltRef={tiltRef} />
       <HoloOrbs tiltRef={tiltRef} lightingPreset={lightingPreset} />
       <HoloSwirls tiltRef={tiltRef} lightingPreset={lightingPreset} />
       <Planet />

@@ -8,6 +8,7 @@ import CurrentPropsBanner from '@/components/CurrentPropsBanner';
 import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
+import NocTicker from '@/components/NocTicker';
 import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
 import NounsWorldBanner from '@/components/NounsWorldBanner';
@@ -60,6 +61,9 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         <LilNounsGrid />
       </Suspense>
       <FundedPropsBanner />
+      <div className="block lg:hidden">
+        <NocTicker />
+      </div>
       <PropdatesBanner />
       <CurrentPropsBanner />
       <DreamsBanner />
