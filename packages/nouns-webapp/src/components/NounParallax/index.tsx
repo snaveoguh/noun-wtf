@@ -37,7 +37,14 @@ import SceneEnvironment from './SceneEnvironment';
 
 // ─── Lighting Presets ───────────────────────────────────────────────────────
 
-export type LightingPreset = 'spotlight' | 'studio' | 'storefront' | 'sunrise' | 'twilight' | 'ambient' | 'none';
+export type LightingPreset =
+  | 'spotlight'
+  | 'studio'
+  | 'storefront'
+  | 'sunrise'
+  | 'twilight'
+  | 'ambient'
+  | 'none';
 
 export const LIGHTING_PRESETS: { name: LightingPreset; label: string }[] = [
   { name: 'spotlight', label: 'SPOT' },
@@ -50,13 +57,16 @@ export const LIGHTING_PRESETS: { name: LightingPreset; label: string }[] = [
 ];
 
 // Preset configs — same shape so React reuses the same DOM elements (no unmount/remount black flash)
-const LIGHT_CONFIGS: Record<LightingPreset, {
-  ambient: { intensity: number; color: string };
-  dir1: { position: [number, number, number]; intensity: number; color: string };
-  dir2: { position: [number, number, number]; intensity: number; color: string };
-  point1: { position: [number, number, number]; intensity: number; color: string };
-  spot: { position: [number, number, number]; intensity: number; color: string; angle: number };
-}> = {
+const LIGHT_CONFIGS: Record<
+  LightingPreset,
+  {
+    ambient: { intensity: number; color: string };
+    dir1: { position: [number, number, number]; intensity: number; color: string };
+    dir2: { position: [number, number, number]; intensity: number; color: string };
+    point1: { position: [number, number, number]; intensity: number; color: string };
+    spot: { position: [number, number, number]; intensity: number; color: string; angle: number };
+  }
+> = {
   spotlight: {
     ambient: { intensity: 2.2, color: '#ffffff' },
     dir1: { position: [-8, 5, 10], intensity: 0.6, color: '#ffffff' },
@@ -110,22 +120,45 @@ const LIGHT_CONFIGS: Record<LightingPreset, {
 
 function SceneLighting({ preset = 'spotlight' }: { preset?: LightingPreset }) {
   const c = LIGHT_CONFIGS[preset] ?? LIGHT_CONFIGS.storefront;
-  /* eslint-disable react/no-unknown-property */
+
   return (
     <>
       <ambientLight intensity={c.ambient.intensity} color={c.ambient.color} />
-      <directionalLight position={c.dir1.position} intensity={c.dir1.intensity} color={c.dir1.color} />
-      <directionalLight position={c.dir2.position} intensity={c.dir2.intensity} color={c.dir2.color} />
-      <pointLight position={c.point1.position} intensity={c.point1.intensity} color={c.point1.color} />
-      <spotLight position={c.spot.position} intensity={c.spot.intensity} color={c.spot.color} angle={c.spot.angle} penumbra={0.6} />
+      <directionalLight
+        position={c.dir1.position}
+        intensity={c.dir1.intensity}
+        color={c.dir1.color}
+      />
+      <directionalLight
+        position={c.dir2.position}
+        intensity={c.dir2.intensity}
+        color={c.dir2.color}
+      />
+      <pointLight
+        position={c.point1.position}
+        intensity={c.point1.intensity}
+        color={c.point1.color}
+      />
+      <spotLight
+        position={c.spot.position}
+        intensity={c.spot.intensity}
+        color={c.spot.color}
+        angle={c.spot.angle}
+        penumbra={0.6}
+      />
     </>
   );
-  /* eslint-enable react/no-unknown-property */
 }
 
 // ─── Curated Head Component (self-contained, no external hook imports) ──────
 
-function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
+function CuratedHead({
+  headIndex,
+  seed,
+  bodyGeo,
+  onLoaded,
+  onGlassesZ,
+}: {
   headIndex: number;
   seed: INounSeed;
   bodyGeo: THREE.BufferGeometry | null;
@@ -158,7 +191,7 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
         // Hide GLB glasses for hip-rose — the voxel glasses layer will be shown instead.
         const isHipRose = seed.glasses === 0;
         if (isHipRose) {
-          scene.traverse((child) => {
+          scene.traverse(child => {
             if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
               child.visible = false;
             }
@@ -171,7 +204,7 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
           glassesTex.magFilter = THREE.NearestFilter;
           glassesTex.minFilter = THREE.NearestFilter;
           glassesTex.colorSpace = THREE.SRGBColorSpace;
-          scene.traverse((child) => {
+          scene.traverse(child => {
             if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
               const mesh = child as THREE.Mesh;
               const mat = mesh.material as THREE.MeshStandardMaterial;
@@ -204,13 +237,13 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
         // with the voxel body's back face (Z=-1.25), so offset = -0.75.
         // But that buries it — instead align centers: body center Z=0,
         // GLB center Z=0.25 → shift back by -0.25 to sit at Z=0.
-        const offsetX = 0;     // center the GLB horizontally
-        const offsetY = -26;   // shift GLB head up 1 voxel to sit flush on body
+        const offsetX = 0; // center the GLB horizontally
+        const offsetY = -26; // shift GLB head up 1 voxel to sit flush on body
         const offsetZ = -0.25; // align GLB Z center with body Z center
 
         const matrix = new THREE.Matrix4();
         matrix.makeTranslation(offsetX, offsetY, offsetZ);
-        scene.traverse((child) => {
+        scene.traverse(child => {
           if ((child as THREE.Mesh).isMesh && child.visible) {
             (child as THREE.Mesh).geometry?.applyMatrix4(matrix);
           }
@@ -224,7 +257,7 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
           // Compute front face Z from VISIBLE meshes only (hip-rose voxel glasses positioning)
           if (isHipRose) {
             const box = new THREE.Box3();
-            scene.traverse((child) => {
+            scene.traverse(child => {
               if ((child as THREE.Mesh).isMesh && child.visible) {
                 const meshBox = new THREE.Box3().setFromObject(child);
                 box.union(meshBox);
@@ -243,7 +276,9 @@ function CuratedHead({ headIndex, seed, bodyGeo, onLoaded, onGlassesZ }: {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [headIndex, seed?.glasses, bodyGeo]);
 
   if (!obj) return null;
@@ -557,7 +592,14 @@ interface TiltSceneProps {
   lightingPreset?: LightingPreset;
 }
 
-function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false, lightingPreset = 'spotlight' }: TiltSceneProps) {
+function TiltScene({
+  seed,
+  voxelMap,
+  tiltRef,
+  layerVisibility,
+  autoSpin = false,
+  lightingPreset = 'spotlight',
+}: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
   const spinTime = useRef(0);
@@ -689,13 +731,23 @@ function TiltScene({ seed, voxelMap, tiltRef, layerVisibility, autoSpin = false,
         )}
         {/* Show voxel glasses when: no curated head, OR hip-rose (curated head hides its GLB glasses) */}
         {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
-          <group position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}>
+          <group
+            position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}
+          >
             <mesh geometry={glassesGeo}>
               <meshLambertMaterial vertexColors />
             </mesh>
           </group>
         )}
-        {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} onGlassesZ={setGlassesZ} />}
+        {seed && !voxelMap && (
+          <CuratedHead
+            headIndex={seed.head}
+            seed={seed}
+            bodyGeo={bodyGeo}
+            onLoaded={setCuratedHeadLoaded}
+            onGlassesZ={setGlassesZ}
+          />
+        )}
       </group>
       {}
     </>
@@ -773,13 +825,23 @@ function InteractiveScene({
         </mesh>
       )}
       {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
-        <group position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}>
+        <group
+          position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}
+        >
           <mesh geometry={glassesGeo}>
             <meshLambertMaterial vertexColors />
           </mesh>
         </group>
       )}
-      {seed && !voxelMap && <CuratedHead headIndex={seed.head} seed={seed} bodyGeo={bodyGeo} onLoaded={setCuratedHeadLoaded} onGlassesZ={setGlassesZ} />}
+      {seed && !voxelMap && (
+        <CuratedHead
+          headIndex={seed.head}
+          seed={seed}
+          bodyGeo={bodyGeo}
+          onLoaded={setCuratedHeadLoaded}
+          onGlassesZ={setGlassesZ}
+        />
+      )}
 
       <OrbitControls
         enablePan={interactionMode === 'grab'}
@@ -812,7 +874,8 @@ function InteractiveScene({
 
 // ─── Background body layers for editable mode ─────────────────────────────
 
-/** Render non-editable body/bling/glasses as static lit meshes behind the editor. */
+/** Render non-editable body/bling as static lit meshes behind the editor.
+ *  Head and glasses are excluded — the curated head voxeldata includes both. */
 function EditableBackgroundBody({
   seed,
   layerVisibility,
@@ -824,28 +887,27 @@ function EditableBackgroundBody({
 }) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
-  // Build only body + bling + glasses (NOT head — editor handles that)
-  const { bodyGeo, blingGeo, glassesGeo } = useMemo(() => {
+  // Build only body + bling (NOT head or glasses — editor voxel layer has both)
+  const { bodyGeo, blingGeo } = useMemo(() => {
     const vis: LayerVisibility = {
       body: layerVisibility?.body ?? true,
       accessory: layerVisibility?.accessory ?? true,
-      head: false, // head is in the editable voxel layer
-      glasses: layerVisibility?.glasses ?? true,
+      head: false,
+      glasses: false,
     };
     const layers = seedToLayers(seed, getNounData, ImageData.palette, vis);
     const geos = buildNounGeometries(layers);
-    // headGeo will be null since vis.head=false; dispose it defensively
     geos.headGeo?.dispose();
-    return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo, glassesGeo: geos.glassesGeo };
+    geos.glassesGeo?.dispose();
+    return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo };
   }, [seedKey, layerVisibility]);
 
   useEffect(() => {
     return () => {
       bodyGeo?.dispose();
       blingGeo?.dispose();
-      glassesGeo?.dispose();
     };
-  }, [bodyGeo, blingGeo, glassesGeo]);
+  }, [bodyGeo, blingGeo]);
 
   return (
     <>
@@ -857,11 +919,6 @@ function EditableBackgroundBody({
       )}
       {blingGeo && (
         <mesh geometry={blingGeo}>
-          <meshLambertMaterial vertexColors />
-        </mesh>
-      )}
-      {glassesGeo && (
-        <mesh geometry={glassesGeo}>
           <meshLambertMaterial vertexColors />
         </mesh>
       )}

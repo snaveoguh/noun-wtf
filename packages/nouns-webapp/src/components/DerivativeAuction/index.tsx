@@ -20,6 +20,8 @@ import {
   hasDerivativesContract,
 } from '@/wrappers/nounDerivatives';
 
+import BidCommentThread from './BidCommentThread';
+
 interface Props {
   tokenId: number;
 }
@@ -119,18 +121,8 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           <span>{fmt(auction.amount)} ETH</span>
           <span style={{ color: 'rgba(255,255,255,0.5)' }}>→ {truncAddr(auction.bidder)}</span>
         </div>
-        {auction.supportsBidReason && auction.bidReason.trim().length > 0 && (
-          <div
-            style={{
-              padding: '6px 8px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.82)',
-              lineHeight: 1.45,
-            }}
-          >
-            “{auction.bidReason}”
-          </div>
+        {auction.supportsBidReason && (
+          <BidCommentThread tokenId={tokenId} isSettled={true} winnerAddress={auction.bidder} />
         )}
       </div>
     );
@@ -179,18 +171,8 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           </span>
           <span style={{ color: '#fbbf24', fontWeight: 600 }}>{countdown}</span>
         </div>
-        {auction.supportsBidReason && auction.bidReason.trim().length > 0 && (
-          <div
-            style={{
-              padding: '6px 8px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.82)',
-              lineHeight: 1.45,
-            }}
-          >
-            “{auction.bidReason}”
-          </div>
+        {auction.supportsBidReason && (
+          <BidCommentThread tokenId={tokenId} isSettled={false} winnerAddress={auction.bidder} />
         )}
         {isWalletConnected && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -220,11 +202,11 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
               <textarea
                 value={bidReasonInput}
                 onChange={e => setBidReasonInput(e.target.value.slice(0, MAX_BID_REASON_LENGTH))}
-                placeholder="BWR - ONLY AT NOUN.WTF"
+                placeholder="Say something about this art..."
                 rows={2}
                 style={{
                   resize: 'vertical',
-                  minHeight: 46,
+                  minHeight: 60,
                   border: '1px solid rgba(255,255,255,0.2)',
                   borderRadius: 8,
                   padding: '6px 8px',
@@ -307,11 +289,11 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
             <textarea
               value={bidReasonInput}
               onChange={e => setBidReasonInput(e.target.value.slice(0, MAX_BID_REASON_LENGTH))}
-              placeholder="BWR - ONLY AT NOUN.WTF"
+              placeholder="Say something about this art..."
               rows={2}
               style={{
                 resize: 'vertical',
-                minHeight: 46,
+                minHeight: 60,
                 border: '1px solid rgba(255,255,255,0.2)',
                 borderRadius: 8,
                 padding: '6px 8px',

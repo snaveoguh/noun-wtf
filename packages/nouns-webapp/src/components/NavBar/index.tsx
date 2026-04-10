@@ -120,7 +120,7 @@ const NavBar = () => {
   return (
     <>
       <Navbar
-        expand="md"
+        expand="lg"
         style={{ backgroundColor: 'transparent' }}
         className={classes.navBarCustom}
         expanded={isNavExpanded}
@@ -172,6 +172,13 @@ const NavBar = () => {
               </Nav.Item>
             )}
           </div>
+          <button
+            type="button"
+            className={classes.makeArtHeaderBtn}
+            onClick={() => window.dispatchEvent(new CustomEvent('noun-make-art'))}
+          >
+            MAKE ART
+          </button>
           <Navbar.Toggle
             className={classes.navBarToggle}
             aria-controls="basic-navbar-nav"
@@ -221,25 +228,6 @@ const NavBar = () => {
                   buttonText="Hack"
                   buttonIcon={<span>⚡</span>}
                   buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                className={classes.nounsNavLink}
-                onClick={() => {
-                  closeNav();
-                  window.dispatchEvent(new CustomEvent('noun-make-art'));
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <NavBarButton
-                  buttonText="Make Art"
-                  buttonIcon={<span>🎨</span>}
-                  buttonStyle={{
-                    ...nonWalletButtonStyle,
-                    backgroundColor: '#f97316',
-                    color: '#fff',
-                    borderRadius: '10px',
-                  }}
                 />
               </Nav.Link>
               <Nav.Link as={Link} to="/world" className={classes.nounsNavLink} onClick={closeNav}>

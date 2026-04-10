@@ -530,6 +530,10 @@
 }
 
 @media (max-width: 991px) {
+  .addTab {
+    display: none;
+  }
+
   .heroWrapper {
     padding:
       0.8rem
@@ -598,10 +602,6 @@
 
   .railLabel {
     font-size: 0.4rem;
-  }
-
-  .addTab {
-    display: none;
   }
 
   .navArrow {
