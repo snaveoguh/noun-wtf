@@ -196,24 +196,32 @@ for (let i = 0; i < glassesTraits.length; i++) {
   // Create 32x32 RGBA buffer (transparent)
   const buf = Buffer.alloc(32 * 32 * 4, 0);
 
-  // Check if this type has any non-majority eye pixels (glint, RGB dots, etc.)
+  // For types with non-standard eye patterns (RGB dots), map each RLE eye
+  // pixel to correct UV positions. RLE and UV use different coordinate systems:
+  //   RLE left eye:  x=11-14  y=12-15  (white=11-12, black=13-14)
+  //   UV front left: x=8-11   y=9-12   (black=8-9,   white=10-11)
+  //   UV back left:  x=8-11   y=17-20  (white=8-9,   black=10-11)
+  // Fullblack (7) uses standard path — majority is all-black, no overrides needed.
   const rlePixels = decodeToPixelMap(glassesTraits[i].data);
-  // Build eye-area pixel map: UV position → actual RLE color
-  // The template eye_white pixels correspond to RLE x=11-12,18-19 and eye_black to x=13-14,20-21
-  // But fullblack has white glints at x=14,21 which are in the "black half"
-  // So: for each template eye pixel, find the matching RLE pixel and use its actual color
   const eyeOverrides = new Map();
-  if (i === 7 || i === 1) {
-    // For types with non-standard eye patterns, map each eye pixel individually
-    // Template eye region rows in UV space = RLE rows 12-15, columns = RLE columns 11-14 (left) and 18-21 (right)
+  if (i === 2) {
+    // UV x-axis is flipped relative to RLE within each eye, so the mapping
+    // is a simple reversal: left front = 22 - rx, right front = 40 - rx
     for (const [rleKey, px] of rlePixels) {
       const [rx, ry] = rleKey.split(',').map(Number);
-      // Only eye interior pixels (not frame border)
-      if (ry >= 12 && ry <= 15 && ((rx >= 11 && rx <= 14) || (rx >= 18 && rx <= 21))) {
-        // Fullblack glints are 2px too far left in UV space — shift right
-        const uvX = i === 7 ? rx + 2 : rx;
-        eyeOverrides.set(`${uvX},${ry}`, px);
-      }
+      if (ry < 12 || ry > 15) continue;
+
+      let frontX, backX;
+      if (rx >= 11 && rx <= 14) {        // left eye
+        frontX = 22 - rx;               // 11→11, 12→10, 13→9, 14→8
+        backX  = rx - 3;                // 11→8,  12→9,  13→10, 14→11
+      } else if (rx >= 18 && rx <= 21) { // right eye
+        frontX = 40 - rx;               // 18→22, 19→21, 20→20, 21→19
+        backX  = rx + 1;                // 18→19, 19→20, 20→21, 21→22
+      } else { continue; }
+
+      eyeOverrides.set(`${frontX},${ry - 3}`, px);   // front: y offset -3
+      eyeOverrides.set(`${backX},${ry + 5}`, px);     // back:  y offset +5
     }
   }
 
@@ -243,15 +251,6 @@ for (let i = 0; i < glassesTraits.length; i++) {
     buf[idx + 3] = 255;
   }
 
-  // Fullblack: manually inject white glint pixels (not in RLE data — all RLE eyes are black)
-  // UV eye_white positions: left eye x=10-11, right eye x=21-22, front view y=9-12
-  // Use a 2x2 block per eye so the glint is visible in the 3D render
-  if (i === 7) {
-    for (const [gx, gy] of [[10,9],[11,9],[10,10],[11,10],[21,9],[22,9],[21,10],[22,10]]) {
-      const gi = (gy * 32 + gx) * 4;
-      buf[gi] = 255; buf[gi+1] = 255; buf[gi+2] = 255; buf[gi+3] = 255;
-    }
-  }
 
   const outPath = path.join(outDir, `${i}.png`);
   await sharp(buf, { raw: { width: 32, height: 32, channels: 4 } }).png().toFile(outPath);
