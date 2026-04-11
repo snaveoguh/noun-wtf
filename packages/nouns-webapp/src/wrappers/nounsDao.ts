@@ -839,8 +839,8 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
     const url = getSubgraphUrl();
     if (!url) { setError(new Error('No subgraph URL')); setLoading(false); return; }
 
-    // Ponder/Railway truncates large responses, so paginate in batches of 100
-    const PAGE = 100;
+    // Ponder/Railway truncates responses >~20KB, so paginate in small batches
+    const PAGE = 20;
     const allItems: GraphQLProposal[] = [];
 
     async function fetchAll() {
@@ -848,7 +848,7 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
         const query = `{
           proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
             items {
-              id status description forVotes againstVotes abstainVotes quorumVotes executionETA
+              id status forVotes againstVotes abstainVotes quorumVotes executionETA
               startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
               onTimelockV1 proposer
             }
