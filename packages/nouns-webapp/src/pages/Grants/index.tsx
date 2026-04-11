@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { formatEther } from 'viem';
 import { useBalance, useBlockNumber } from 'wagmi';
 
+import ShortAddress from '@/components/ShortAddress';
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
@@ -25,10 +26,6 @@ interface Grant {
   endBlock: string;
   executionETA: string | null;
   createdAt: string;
-}
-
-function shortAddr(addr: string) {
-  return addr ? `${addr.slice(0, 6)}..${addr.slice(-4)}` : '???';
 }
 
 function getTitle(desc: string) {
@@ -146,7 +143,9 @@ export default function GrantsPage() {
               </div>
               <div className={classes.cardTitle}>{title}</div>
               <div className={classes.cardMeta}>
-                <span>by {shortAddr(g.proposer)}</span>
+                <span>
+                  by <ShortAddress address={g.proposer as `0x${string}`} />
+                </span>
                 <span>
                   {g.forVotes} FOR / {g.againstVotes} AGAINST
                 </span>

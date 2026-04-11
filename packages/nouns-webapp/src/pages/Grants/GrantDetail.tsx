@@ -1,9 +1,18 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-explicit-any, react/no-unescaped-entities */
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
-import { useAccount, useBlockNumber, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther } from 'viem';
-import { toast } from 'sonner';
 
+import { Link, useParams } from 'react-router';
+import { toast } from 'sonner';
+import { formatEther } from 'viem';
+import {
+  useAccount,
+  useBlockNumber,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from 'wagmi';
+
+import ShortAddress from '@/components/ShortAddress';
 import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
@@ -37,10 +46,6 @@ interface GrantVote {
   reason: string;
 }
 
-function shortAddr(addr: string) {
-  return addr ? `${addr.slice(0, 6)}..${addr.slice(-4)}` : '???';
-}
-
 function supportLabel(s: number) {
   return s === 0 ? 'AGAINST' : s === 1 ? 'FOR' : 'ABSTAIN';
 }
@@ -57,7 +62,9 @@ export default function GrantDetailPage() {
 
   const [grant, setGrant] = useState<GrantData | null>(null);
   const [votes, setVotes] = useState<GrantVote[]>([]);
-  const [statusChanges, setStatusChanges] = useState<Array<{ status: string; createdAtBlock: string; createdAtTransaction: string }>>([]);
+  const [statusChanges, setStatusChanges] = useState<
+    Array<{ status: string; createdAtBlock: string; createdAtTransaction: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
 
   // Vote form state
@@ -65,7 +72,11 @@ export default function GrantDetailPage() {
   const [reason, setReason] = useState('');
 
   const { writeContractAsync, data: txHash, isPending, error: writeError } = useWriteContract();
-  const { isSuccess: txConfirmed, isLoading: txMining, isError: txFailed } = useWaitForTransactionReceipt({ hash: txHash });
+  const {
+    isSuccess: txConfirmed,
+    isLoading: txMining,
+    isError: txFailed,
+  } = useWaitForTransactionReceipt({ hash: txHash });
 
   // Vote lifecycle: idle → signing → mining → confirmed / failed
   type VoteStatus = 'idle' | 'signing' | 'mining' | 'confirmed' | 'failed';
@@ -185,7 +196,19 @@ export default function GrantDetailPage() {
         });
       }
       toast.success(
-        <span>Vote submitted! {txHash && <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a>}</span>,
+        <span>
+          Vote submitted!{' '}
+          {txHash && (
+            <a
+              href={`https://etherscan.io/tx/${txHash}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: '#00ff41' }}
+            >
+              View TX →
+            </a>
+          )}
+        </span>,
         { duration: 10000 },
       );
     } catch (e: any) {
@@ -202,7 +225,17 @@ export default function GrantDetailPage() {
         args: [BigInt(grantId)],
       });
       toast.success(
-        <span>Grant queued! <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a></span>,
+        <span>
+          Grant queued!{' '}
+          <a
+            href={`https://etherscan.io/tx/${hash}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: '#00ff41' }}
+          >
+            View TX →
+          </a>
+        </span>,
         { duration: 10000 },
       );
     } catch (e: any) {
@@ -219,7 +252,17 @@ export default function GrantDetailPage() {
         args: [BigInt(grantId)],
       });
       toast.success(
-        <span>Grant executed! <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#00ff41' }}>View TX →</a></span>,
+        <span>
+          Grant executed!{' '}
+          <a
+            href={`https://etherscan.io/tx/${hash}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: '#00ff41' }}
+          >
+            View TX →
+          </a>
+        </span>,
         { duration: 10000 },
       );
     } catch (e: any) {
@@ -236,7 +279,17 @@ export default function GrantDetailPage() {
         args: [BigInt(grantId)],
       });
       toast.success(
-        <span>Grant cancelled. <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ color: '#ff4444' }}>View TX →</a></span>,
+        <span>
+          Grant cancelled.{' '}
+          <a
+            href={`https://etherscan.io/tx/${hash}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: '#ff4444' }}
+          >
+            View TX →
+          </a>
+        </span>,
         { duration: 10000 },
       );
     } catch (e: any) {
@@ -244,19 +297,32 @@ export default function GrantDetailPage() {
     }
   }
 
-  if (loading) return <div className={classes.container}><p className={classes.loading}>Loading grant...</p></div>;
-  if (!grant) return <div className={classes.container}><p>Grant #{grantId} not found</p></div>;
+  if (loading)
+    return (
+      <div className={classes.container}>
+        <p className={classes.loading}>Loading grant...</p>
+      </div>
+    );
+  if (!grant)
+    return (
+      <div className={classes.container}>
+        <p>Grant #{grantId} not found</p>
+      </div>
+    );
 
-  const title = (grant.description.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120) || 'Untitled';
+  const title =
+    (grant.description.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120) || 'Untitled';
   const body = grant.description.split('\n').slice(1).join('\n').trim();
   const totalVotes = grant.forVotes + grant.againstVotes;
   const forPct = totalVotes > 0 ? (grant.forVotes / totalVotes) * 100 : 50;
   const isActive = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) > blockNumber;
-  const votingEnded = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) <= blockNumber;
+  const votingEnded =
+    grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) <= blockNumber;
   const isSucceeded = votingEnded && grant.forVotes > grant.againstVotes;
   const isDefeated = votingEnded && grant.forVotes <= grant.againstVotes;
   const isQueued = grant.status === 'QUEUED';
-  const canExecute = isQueued && grant.executionETA && Date.now() / 1000 >= parseInt(grant.executionETA);
+  const canExecute =
+    isQueued && grant.executionETA && Date.now() / 1000 >= parseInt(grant.executionETA);
   const isProposer = userAddr?.toLowerCase() === grant.proposer.toLowerCase();
   const hasVoted = votes.some(v => v.voter.toLowerCase() === userAddr?.toLowerCase());
 
@@ -265,20 +331,29 @@ export default function GrantDetailPage() {
 
   return (
     <div className={classes.container}>
-      <Link to="/grants" className={classes.backLink}>&larr; All Grants</Link>
+      <Link to="/grants" className={classes.backLink}>
+        &larr; All Grants
+      </Link>
 
       <div className={classes.detailHeader}>
         <h1 className={classes.detailTitle}>Grant #{grant.id}</h1>
-        <span className={classes.detailStatus} style={{ color: isSucceeded ? '#34d399' : isDefeated ? '#ef4444' : undefined }}>
+        <span
+          className={classes.detailStatus}
+          style={{ color: isSucceeded ? '#34d399' : isDefeated ? '#ef4444' : undefined }}
+        >
           {isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : grant.status}
         </span>
       </div>
 
       <h2 className={classes.detailName}>{title}</h2>
-      <p className={classes.detailProposer}>by {shortAddr(grant.proposer)}</p>
+      <p className={classes.detailProposer}>
+        by <ShortAddress address={grant.proposer as `0x${string}`} />
+      </p>
 
       {isActive && (
-        <div className={classes.timeBar}>Voting ends in ~{hoursLeft.toFixed(1)} hours ({blocksLeft} blocks)</div>
+        <div className={classes.timeBar}>
+          Voting ends in ~{hoursLeft.toFixed(1)} hours ({blocksLeft} blocks)
+        </div>
       )}
 
       {/* Vote Counts */}
@@ -298,20 +373,21 @@ export default function GrantDetailPage() {
         <div className={classes.description} style={{ marginTop: '1.5rem', paddingTop: '1rem' }}>
           <h3>Requested Funds — {totalEthRequested} ETH</h3>
           {grantTransactions.map((tx, i) => (
-            <div key={i} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '0.5rem 0',
-              borderBottom: '1px solid #e5e7eb',
-              fontSize: '0.85rem',
-            }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0.5rem 0',
+                borderBottom: '1px solid #e5e7eb',
+                fontSize: '0.85rem',
+              }}
+            >
               <span style={{ fontFamily: 'monospace', color: '#555' }}>
                 → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
               </span>
-              <span style={{ fontWeight: 700 }}>
-                {formatEther(tx.value as bigint)} ETH
-              </span>
+              <span style={{ fontWeight: 700 }}>{formatEther(tx.value as bigint)} ETH</span>
             </div>
           ))}
         </div>
@@ -326,7 +402,9 @@ export default function GrantDetailPage() {
                 <button
                   key={s}
                   className={`${classes.voteBtn} ${support === s ? classes.voteBtnActive : ''}`}
-                  style={support === s ? { borderColor: supportColor(s), color: supportColor(s) } : {}}
+                  style={
+                    support === s ? { borderColor: supportColor(s), color: supportColor(s) } : {}
+                  }
                   onClick={() => setSupport(s)}
                 >
                   {supportLabel(s)}
@@ -354,12 +432,19 @@ export default function GrantDetailPage() {
                   {voteStatus === 'signing' && 'Waiting for wallet signature...'}
                   {voteStatus === 'mining' && 'Transaction pending — confirming onchain...'}
                   {voteStatus === 'confirmed' && 'Vote cast successfully'}
-                  {voteStatus === 'failed' && (writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')
-                    ? 'Transaction rejected by wallet'
-                    : 'Vote failed — try again')}
+                  {voteStatus === 'failed' &&
+                    (writeError?.message?.includes('User rejected') ||
+                    writeError?.message?.includes('User denied')
+                      ? 'Transaction rejected by wallet'
+                      : 'Vote failed — try again')}
                 </span>
                 {txHash && (
-                  <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" className={classes.voteStatusTx}>
+                  <a
+                    href={`https://etherscan.io/tx/${txHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={classes.voteStatusTx}
+                  >
                     {txHash.slice(0, 10)}...
                   </a>
                 )}
@@ -368,7 +453,7 @@ export default function GrantDetailPage() {
           </div>
         )}
         {hasVoted && <p className={classes.voted}>You already voted on this grant.</p>}
-        {(isSucceeded || (grant.status === 'SUCCEEDED')) && (
+        {(isSucceeded || grant.status === 'SUCCEEDED') && (
           <button className={classes.actionBtn} onClick={handleQueue} disabled={isPending}>
             Queue for Execution
           </button>
@@ -399,7 +484,9 @@ export default function GrantDetailPage() {
           <h3>Votes ({votes.length})</h3>
           {votes.map((v, i) => (
             <div key={i} className={classes.voteRow}>
-              <span>{shortAddr(v.voter)}</span>
+              <span>
+                <ShortAddress address={v.voter as `0x${string}`} />
+              </span>
               <span style={{ color: supportColor(v.support) }}>{supportLabel(v.support)}</span>
               <span>{v.votes} votes</span>
               {v.reason && <span className={classes.voteReason}>"{v.reason}"</span>}
@@ -437,9 +524,18 @@ export default function GrantDetailPage() {
           )}
           {statusChanges.map((sc, i) => (
             <div key={i} className={classes.voteRow}>
-              <span style={{
-                color: sc.status === 'EXECUTED' ? '#4ade80' : sc.status === 'CANCELED' ? '#f87171' : sc.status === 'QUEUED' ? '#fbbf24' : '#94a3b8',
-              }}>
+              <span
+                style={{
+                  color:
+                    sc.status === 'EXECUTED'
+                      ? '#4ade80'
+                      : sc.status === 'CANCELED'
+                        ? '#f87171'
+                        : sc.status === 'QUEUED'
+                          ? '#fbbf24'
+                          : '#94a3b8',
+                }}
+              >
                 {sc.status}
               </span>
               <a
@@ -457,7 +553,10 @@ export default function GrantDetailPage() {
 
       {txHash && voteStatus === 'idle' && (
         <p className={classes.txLink}>
-          TX: <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer">{txHash.slice(0, 16)}...</a>
+          TX:{' '}
+          <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer">
+            {txHash.slice(0, 16)}...
+          </a>
         </p>
       )}
     </div>
