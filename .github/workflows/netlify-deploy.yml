@@ -59,6 +59,7 @@ jobs:
           VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
           VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}
           VITE_ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
+          VITE_DASHBOARD_API_KEY: ${{ secrets.VITE_DASHBOARD_API_KEY }}
         run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify
