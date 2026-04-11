@@ -21,6 +21,7 @@ const transports = {
     ...(import.meta.env.VITE_MAINNET_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_MAINNET_JSONRPC)]
       : []),
+    http('https://ethereum-rpc.publicnode.com'),
   ]),
   [sepolia.id]: fallback([
     ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
