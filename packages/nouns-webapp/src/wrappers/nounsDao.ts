@@ -36,11 +36,10 @@ interface GraphQLProposal {
   signers?: { id: string }[];
 }
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
-import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
   type AbiParameter,
@@ -93,6 +92,7 @@ import {
   forkJoinsQuery,
   forksQuery,
   isForkActiveQuery,
+  partialProposalsQuery,
   proposalQuery,
   proposalTitlesQuery,
   proposalVersionsQuery,
@@ -830,51 +830,13 @@ const parseSubgraphProposal = (
 
 export const useAllProposalsViaSubgraph = (): PartialProposalData => {
   const chainId = defaultChain.id;
-
-  const [data, setData] = useState<{ proposals: { items: GraphQLProposal[] } } | undefined>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | undefined>();
-
-  useEffect(() => {
-    const url = getSubgraphUrl();
-    if (!url) { setError(new Error('No subgraph URL')); setLoading(false); return; }
-
-    // Ponder/Railway truncates responses >~20KB, so paginate in small batches
-    const PAGE = 20;
-    const allItems: GraphQLProposal[] = [];
-
-    async function fetchAll() {
-      for (let offset = 0; ; offset += PAGE) {
-        const query = `{
-          proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
-            items {
-              id status forVotes againstVotes abstainVotes quorumVotes executionETA
-              startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
-              onTimelockV1 proposer
-            }
-          }
-        }`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (json.errors?.length) throw new Error(json.errors[0].message);
-        const items = json.data?.proposals?.items ?? [];
-        allItems.push(...items);
-        if (items.length < PAGE) break; // last page
-      }
-      return allItems;
-    }
-
-    fetchAll()
-      .then(items => setData({ proposals: { items } }))
-      .catch(e => setError(e))
-      .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const { query, variables } = partialProposalsQuery();
+  const { loading, data, error } = useQuery<{
+    proposals: { items: GraphQLProposal[] };
+  }>(query, {
+    variables,
+    fetchPolicy: 'no-cache',
+  });
   const isDaoGteV3 = useIsDaoGteV3();
   const { data: blockNumber } = useBlockNumber();
   const timestamp = useBlockTimestamp(blockNumber);
@@ -884,11 +846,14 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
   const adaptedProposals = rawProposals.map(p => ({
     ...p,
     // Adapt flat Ponder fields to match what parsing functions expect
-    createdBlock: p.createdAtBlock ?? 0n,
+    createdBlock: p.createdAtBlock,
     createdTimestamp: BigInt(p.createdAt ?? 0),
     createdTransactionHash: p.createdAtTransaction ?? '',
     voteSnapshotBlock: p.startBlock,
-    signers: [],
+    signers:
+      (p as unknown as { signers?: { items?: { signer: string }[] } }).signers?.items?.map(
+        (s: { signer: string }) => ({ id: s.signer }),
+      ) ?? [],
   }));
 
   // Fetch authoritative on-chain state() only for non-terminal proposals.
