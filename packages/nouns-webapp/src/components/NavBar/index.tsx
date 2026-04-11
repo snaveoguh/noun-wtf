@@ -175,7 +175,13 @@ const NavBar = () => {
           <button
             type="button"
             className={classes.makeArtHeaderBtn}
-            onClick={() => window.dispatchEvent(new CustomEvent('noun-make-art'))}
+            onClick={() => {
+              if (location.pathname === '/' || location.pathname.startsWith('/noun/')) {
+                window.dispatchEvent(new CustomEvent('noun-make-art'));
+              } else {
+                navigate('/?makeArt=1');
+              }
+            }}
           >
             MAKE ART
           </button>

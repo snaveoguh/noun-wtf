@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { isNumber } from 'remeda';
 
 import Auction from '@/components/Auction';
@@ -25,6 +25,7 @@ type AuctionPageProps = object;
 
 const AuctionPage: React.FC<AuctionPageProps> = () => {
   const { id: auctionId } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const onDisplayAuction = useOnDisplayAuction();
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
   const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
@@ -54,8 +55,20 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     }
   }, [auctionId, lastAuctionNounId, dispatch, navigate, onDisplayAuctionNounId]);
 
+  // Handle ?makeArt=1 from navbar on other pages
+  useEffect(() => {
+    if (searchParams.get('makeArt')) {
+      window.dispatchEvent(new CustomEvent('noun-make-art'));
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   return (
-    <>
+    <div
+      style={{
+        background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
+      }}
+    >
       <Auction auction={onDisplayAuction} />
       <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
         <LilNounsGrid />
@@ -73,7 +86,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         <NounsIntroSection />
         <Documentation backgroundColor="#ffffff" />
       </div>
-    </>
+    </div>
   );
 };
 export default AuctionPage;
