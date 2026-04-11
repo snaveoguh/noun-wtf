@@ -177,7 +177,6 @@ export const partialProposalsQuery = (first = 1_000) => ({
       proposals(limit: $first, orderBy: "createdAtBlock", orderDirection: "asc") {
         items {
           id
-          description
           status
           forVotes
           againstVotes
