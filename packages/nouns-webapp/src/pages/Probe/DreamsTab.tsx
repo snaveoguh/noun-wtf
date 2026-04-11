@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { useDreamCandidates, type OnChainDream } from '@/hooks/useDreamCandidates';
 import { useDreamDrafts } from '@/hooks/useDreamDrafts';
+import { useProbeDreams, type ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
 import { type SavedDream } from '@/lib/dreamStorage';
 import { useCandidateProposal } from '@/wrappers/nounsData';
 
@@ -15,7 +16,7 @@ import DreamCreatePanel from './Dreams/DreamCreatePanel';
 import DreamProposeDialog from './Dreams/DreamProposeDialog';
 import DreamSignDialog from './Dreams/DreamSignDialog';
 
-type DreamSubTab = 'drafts' | 'onchain';
+type DreamSubTab = 'drafts' | 'archive' | 'onchain';
 
 function DreamDraftCard({
   dream,
@@ -144,10 +145,56 @@ function OnChainDreamCard({
   );
 }
 
+function ProbeDreamCard({ dream }: { dream: ProbeDreamWithPreview }) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      <div
+        className="relative flex items-end justify-center overflow-hidden"
+        style={{ backgroundColor: `#${ImageData.bgcolors[dream.seeds.background] ?? 'd5d7e1'}` }}
+      >
+        {/* Full composed noun — default view, flush to bottom */}
+        <img
+          src={dream.nounSvgUrl}
+          alt={`Dream #${dream.id}`}
+          className={`w-full ${dream.customTraitUrl ? 'group-hover:opacity-0' : ''} transition-opacity`}
+          style={{ imageRendering: 'pixelated', display: 'block' }}
+        />
+        {/* Custom trait only — shown on hover */}
+        {dream.customTraitUrl && (
+          <img
+            src={dream.customTraitUrl}
+            alt="Custom trait"
+            className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity group-hover:opacity-100"
+            style={{ imageRendering: 'pixelated' }}
+          />
+        )}
+      </div>
+
+      <div className="p-3">
+        <h3 className="truncate text-sm font-bold">Dream #{dream.id}</h3>
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          {dream.customLayer && (
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700">
+              Custom {dream.customLayer}
+            </span>
+          )}
+          <span className="text-muted-foreground text-[10px]">
+            {new Date(dream.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+        <p className="text-muted-foreground mt-1 text-[10px]">
+          {dream.dreamer.slice(0, 6)}...{dream.dreamer.slice(-4)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const DreamsTab: FC = () => {
   const { drafts, saveDraft, removeDraft } = useDreamDrafts();
   const { dreams: onChainDreams, loading: onChainLoading } = useDreamCandidates();
-  const [subTab, setSubTab] = useState<DreamSubTab>('drafts');
+  const { dreams: probeDreams, loading: probeLoading } = useProbeDreams();
+  const [subTab, setSubTab] = useState<DreamSubTab>('archive');
   const [showCreate, setShowCreate] = useState(false);
   const [proposingDream, setProposingDream] = useState<SavedDream | null>(null);
   const [signingCandidateId, setSigningCandidateId] = useState<string | null>(null);
@@ -167,17 +214,21 @@ const DreamsTab: FC = () => {
       {/* Sub-tabs + create button */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
-          {(['drafts', 'onchain'] as const).map(t => (
+          {([
+            { key: 'archive' as const, label: `All Dreams (${probeDreams.length})` },
+            { key: 'onchain' as const, label: `On-Chain (${onChainDreams.length})` },
+            { key: 'drafts' as const, label: `My Drafts (${drafts.length})` },
+          ]).map(t => (
             <button
-              key={t}
-              onClick={() => setSubTab(t)}
+              key={t.key}
+              onClick={() => setSubTab(t.key)}
               className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
-                subTab === t
+                subTab === t.key
                   ? 'bg-gray-800 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {t === 'drafts' ? `My Drafts (${drafts.length})` : `On-Chain (${onChainDreams.length})`}
+              {t.label}
             </button>
           ))}
         </div>
@@ -186,6 +237,23 @@ const DreamsTab: FC = () => {
           Create Dream
         </Button>
       </div>
+
+      {/* Archive view — all probe.wtf dreams */}
+      {subTab === 'archive' && (
+        <>
+          {probeLoading ? (
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground">Loading dreams...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {probeDreams.map(dream => (
+                <ProbeDreamCard key={dream.id} dream={dream} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Drafts view */}
       {subTab === 'drafts' && (
