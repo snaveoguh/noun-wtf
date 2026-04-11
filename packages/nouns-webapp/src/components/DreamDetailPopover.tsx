@@ -1,8 +1,7 @@
 import { FC, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
-import { buildSVG } from '@nouns/sdk';
+import { ImageData } from '@noundry/nouns-assets';
 
 import { getNounColors } from '@/components/NounPalette';
 import { traitName } from '@/lib/traitName';
@@ -17,7 +16,7 @@ interface Props {
 
 const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const dreamerEns = useReverseENSLookUp(dream.dreamer);
+  const dreamerEns = useReverseENSLookUp(dream.dreamer as `0x${string}`);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

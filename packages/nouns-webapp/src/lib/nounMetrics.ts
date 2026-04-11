@@ -63,8 +63,7 @@ function saturation(r: number, g: number, b: number) {
 
 function computeFromPixels(seed: INounSeed): NounMetrics {
   try {
-    const { parts, background } = getNounData(seed);
-    const [bgR, bgG, bgB] = hexToRGB(background);
+    const { parts } = getNounData(seed);
     const grid = new Int16Array(32 * 32);
 
     for (const part of parts) {

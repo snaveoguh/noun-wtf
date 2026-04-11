@@ -5,8 +5,6 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 import { formatEther } from 'viem';
 
-import { getNounColors } from '@/components/NounPalette';
-import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 import { useNounHoverData } from '@/components/NounHoverCard/useNounHoverData';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
@@ -58,7 +56,7 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
 
   const bgColor = seed ? `#${ImageData.bgcolors[seed.background]}` : '#d5d7e1';
-  const ownerEns = useReverseENSLookUp(owner ?? '');
+  const ownerEns = useReverseENSLookUp((owner ?? '') as `0x${string}`);
   const ownerDisplay = ownerEns || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : '');
 
   const traitList = traits

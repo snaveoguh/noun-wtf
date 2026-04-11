@@ -832,37 +832,67 @@ const parseSubgraphProposal = (
 let _proposalsCache: GraphQLProposal[] | null = null;
 let _proposalsFetchPromise: Promise<GraphQLProposal[]> | null = null;
 
+async function gqlPost(url: string, query: string) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors?.length) throw new Error(json.errors[0].message);
+  return json;
+}
+
 function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
   if (_proposalsCache) return Promise.resolve(_proposalsCache);
   if (_proposalsFetchPromise) return _proposalsFetchPromise;
 
-  // Railway proxy truncates responses >~50KB, so paginate in small batches
   _proposalsFetchPromise = (async () => {
-    const PAGE = 50;
+    // Phase 1: fetch proposal metadata WITHOUT description (keeps responses small)
+    const PAGE = 100;
     const allItems: GraphQLProposal[] = [];
     for (let offset = 0; ; offset += PAGE) {
       const query = `{
         proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
           items {
-            id description status forVotes againstVotes abstainVotes quorumVotes executionETA
+            id status forVotes againstVotes abstainVotes quorumVotes executionETA
             startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
             onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
             signers(limit: 100) { items { signer } }
           }
         }
       }`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (json.errors?.length) throw new Error(json.errors[0].message);
+      const json = await gqlPost(url, query);
       const items = json.data?.proposals?.items ?? [];
       allItems.push(...items);
       if (items.length < PAGE) break;
     }
+
+    // Phase 2: backfill descriptions for title extraction.
+    // Fetch in parallel batches of 10 to stay under Railway's response size limit.
+    const TITLE_PAGE = 10;
+    const titleFetches: Promise<void>[] = [];
+    for (let offset = 0; offset < allItems.length; offset += TITLE_PAGE) {
+      const off = offset;
+      titleFetches.push(
+        gqlPost(url, `{
+          proposals(limit: ${TITLE_PAGE}, offset: ${off}, orderBy: "createdAtBlock", orderDirection: "asc") {
+            items { id description }
+          }
+        }`)
+          .then(json => {
+            const descItems = json.data?.proposals?.items ?? [];
+            for (const d of descItems) {
+              const match = allItems.find(p => String(p.id) === String(d.id));
+              if (match) (match as any).description = d.description;
+            }
+          })
+          .catch(() => {}), // title batch failed — falls back to "Proposal #N"
+      );
+    }
+    await Promise.all(titleFetches);
+
     _proposalsCache = allItems;
     _proposalsFetchPromise = null;
     return allItems;
