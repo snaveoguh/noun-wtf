@@ -54,7 +54,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
           NODE_OPTIONS: --max-old-space-size=4096
-          VITE_CHAIN_ID: "1"
+          VITE_CHAIN_ID: ${{ github.ref_name == 'staging' && '11155111' || '1' }}
           VITE_MAINNET_JSONRPC: "https://ethereum-rpc.publicnode.com"
           VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
           VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}

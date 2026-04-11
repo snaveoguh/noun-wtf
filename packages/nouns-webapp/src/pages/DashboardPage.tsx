@@ -84,7 +84,7 @@ const DashboardPage: React.FC = () => {
   } = usePlausibleStats(period.plausible);
   const { data: health } = useSystemHealth();
 
-  const noKey = ((import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ?? '') === '';
+  const hasKey = ((import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ?? '').length > 0;
 
   return (
     <div
@@ -110,13 +110,6 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {noKey && (
-        <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
-          Set <code className="rounded bg-white/10 px-1">VITE_DASHBOARD_API_KEY</code> to enable
-          live data. Showing empty state.
-        </div>
-      )}
-
       {/* ── System Health ─────────────────────────────────────────────── */}
       {health && (
         <div className="mb-2 flex flex-wrap gap-3">
@@ -136,116 +129,129 @@ const DashboardPage: React.FC = () => {
       )}
 
       {/* ── Website Traffic (Plausible) ───────────────────────────────── */}
-      <SectionTitle>Website Traffic</SectionTitle>
-
-      {plausibleError ? (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
-          Plausible not configured. Add{' '}
-          <code className="rounded bg-white/10 px-1">PLAUSIBLE_API_KEY</code> to Railway env.
-        </div>
-      ) : plausibleLoading ? (
-        <div className="text-sm text-white/30">Loading Plausible...</div>
-      ) : plausible?.aggregate?.results ? (
+      {hasKey && (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatCard
-              label="Visitors"
-              value={(plausible.aggregate.results.visitors?.value ?? 0).toLocaleString()}
-            />
-            <StatCard
-              label="Pageviews"
-              value={(plausible.aggregate.results.pageviews?.value ?? 0).toLocaleString()}
-            />
-            <StatCard
-              label="Bounce Rate"
-              value={`${plausible.aggregate.results.bounce_rate?.value ?? 0}%`}
-            />
-            <StatCard
-              label="Avg Visit"
-              value={`${Math.round((plausible.aggregate.results.visit_duration?.value ?? 0) / 60)}m`}
-              sub={`${plausible.aggregate.results.visit_duration?.value ?? 0}s`}
-            />
-          </div>
+          <SectionTitle>Website Traffic</SectionTitle>
 
-          {plausible.timeseries?.results != null && (
-            <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="mb-2 text-xs text-white/40">Visitors over time</div>
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={plausible.timeseries.results}>
-                  <defs>
-                    <linearGradient id="plausibleGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#818cf8" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10, fill: '#ffffff40' }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: '#ffffff40' }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={30}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: '#1e1e2e',
-                      border: '1px solid #ffffff20',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: '#ffffff80' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="visitors"
-                    stroke="#818cf8"
-                    fill="url(#plausibleGrad)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          {plausibleError ? (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
+              Plausible not configured — add{' '}
+              <code className="rounded bg-white/10 px-1">PLAUSIBLE_API_KEY</code> to Railway env.
             </div>
-          )}
+          ) : plausibleLoading ? (
+            <div className="text-sm text-white/30">Loading Plausible...</div>
+          ) : plausible?.aggregate?.results &&
+            (plausible.aggregate.results.visitors?.value ?? 0) > 0 ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StatCard
+                  label="Visitors"
+                  value={(plausible.aggregate.results.visitors?.value ?? 0).toLocaleString()}
+                />
+                <StatCard
+                  label="Pageviews"
+                  value={(plausible.aggregate.results.pageviews?.value ?? 0).toLocaleString()}
+                />
+                <StatCard
+                  label="Bounce Rate"
+                  value={`${plausible.aggregate.results.bounce_rate?.value ?? 0}%`}
+                />
+                <StatCard
+                  label="Avg Visit"
+                  value={`${Math.round((plausible.aggregate.results.visit_duration?.value ?? 0) / 60)}m`}
+                  sub={`${plausible.aggregate.results.visit_duration?.value ?? 0}s`}
+                />
+              </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {plausible.topPages?.results != null && (
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <div className="mb-2 text-xs text-white/40">Top Pages</div>
-                <div className="space-y-1">
-                  {plausible.topPages.results.slice(0, 8).map(p => (
-                    <div key={p.page} className="flex justify-between text-xs">
-                      <span className="mr-2 truncate text-white/70">{p.page}</span>
-                      <span className="shrink-0 text-white/40">{p.visitors}</span>
-                    </div>
-                  ))}
+              {plausible.timeseries?.results != null && (
+                <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 text-xs text-white/40">Visitors over time</div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <AreaChart data={plausible.timeseries.results}>
+                      <defs>
+                        <linearGradient id="plausibleGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#818cf8" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: '#ffffff40' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: '#ffffff40' }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={30}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: '#1e1e2e',
+                          border: '1px solid #ffffff20',
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: '#ffffff80' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="visitors"
+                        stroke="#818cf8"
+                        fill="url(#plausibleGrad)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
-            )}
-            {plausible.topReferrers?.results != null && (
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <div className="mb-2 text-xs text-white/40">Top Referrers</div>
-                <div className="space-y-1">
-                  {plausible.topReferrers.results.slice(0, 8).map(r => (
-                    <div key={r.source} className="flex justify-between text-xs">
-                      <span className="mr-2 truncate text-white/70">{r.source}</span>
-                      <span className="shrink-0 text-white/40">{r.visitors}</span>
+              )}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {plausible.topPages?.results != null && (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="mb-2 text-xs text-white/40">Top Pages</div>
+                    <div className="space-y-1">
+                      {plausible.topPages.results.slice(0, 8).map(p => (
+                        <div key={p.page} className="flex justify-between text-xs">
+                          <span className="mr-2 truncate text-white/70">{p.page}</span>
+                          <span className="shrink-0 text-white/40">{p.visitors}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+                {plausible.topReferrers?.results != null && (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="mb-2 text-xs text-white/40">Top Referrers</div>
+                    <div className="space-y-1">
+                      {plausible.topReferrers.results.slice(0, 8).map(r => (
+                        <div key={r.source} className="flex justify-between text-xs">
+                          <span className="mr-2 truncate text-white/70">{r.source}</span>
+                          <span className="shrink-0 text-white/40">{r.visitors}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : plausible?.aggregate?.results ? (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
+              No traffic data for this period
+            </div>
+          ) : null}
         </>
-      ) : null}
+      )}
 
       {/* ── API Usage ─────────────────────────────────────────────────── */}
       <SectionTitle>API Usage</SectionTitle>
 
-      {metricsLoading ? (
+      {!hasKey ? (
+        <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
+          Metrics require dashboard key
+        </div>
+      ) : metricsLoading ? (
         <div className="text-sm text-white/30">Loading metrics...</div>
       ) : metrics ? (
         <>
