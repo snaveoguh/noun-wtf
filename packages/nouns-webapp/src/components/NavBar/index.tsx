@@ -357,7 +357,6 @@ const NavBar = () => {
                   Playground
                 </Dropdown.Item>
                 <Dropdown.Divider />
-                <Dropdown.Item href="/probe">Probe</Dropdown.Item>
                 <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
                 <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
                 <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
