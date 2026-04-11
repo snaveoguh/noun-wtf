@@ -1,6 +1,6 @@
 import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
 
-import { Loader2, ThumbsDown, ThumbsUp, Minus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { NOUN_WTF_CLIENT_ID } from '@/config';
 import {
