@@ -8,7 +8,6 @@ import { useAccount } from 'wagmi';
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
-import HeliosStatusBar from '@/components/HeliosStatusBar';
 import NavBar from '@/components/NavBar';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
@@ -28,8 +27,6 @@ import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
-import DreamCreatePage from '@/pages/DreamCreatePage';
-import DreamsPage from '@/pages/DreamsPage';
 import EditProposalPage from '@/pages/EditProposal';
 import GovernancePage from '@/pages/Governance';
 import GrantsPage from '@/pages/Grants';
@@ -38,7 +35,7 @@ import GrantDetailPage from '@/pages/Grants/GrantDetail';
 import HackathonPage from '@/pages/Hackathon';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
-import NounsPage from '@/pages/NounsPage';
+const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
 import Playground from '@/pages/Playground';
 import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
@@ -143,8 +140,16 @@ function AppRouter() {
         <Route path="/underground" element={<UndergroundPage />} />
         <Route path="/delegate" element={<DelegatePage />} />
         <Route path="/traits" element={<TraitsPage />} />
-        <Route path="/explore" element={<Navigate to="/nouns" replace />} />
-        <Route path="/nouns" element={<NounsPage />} />
+        <Route path="/explore" element={<Navigate to="/probe" replace />} />
+        <Route path="/nouns" element={<Navigate to="/probe" replace />} />
+        <Route
+          path="/probe"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <ProbePage />
+            </Suspense>
+          }
+        />
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/settlers" element={<SettlersPage />} />
         <Route path="/stats" element={<StatsPage />} />
@@ -157,8 +162,8 @@ function AppRouter() {
           }
         />
         <Route path="/nonsense" element={<NonsensePage />} />
-        <Route path="/dreams" element={<DreamsPage />} />
-        <Route path="/dreams/create" element={<DreamCreatePage />} />
+        <Route path="/dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
+        <Route path="/dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
         {/* Miniapp routes (lazy loaded) */}
         <Route
           path="/terminal"

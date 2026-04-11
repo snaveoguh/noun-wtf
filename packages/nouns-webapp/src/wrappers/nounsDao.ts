@@ -93,7 +93,6 @@ import {
   forkJoinsQuery,
   forksQuery,
   isForkActiveQuery,
-  partialProposalsQuery,
   proposalQuery,
   proposalTitlesQuery,
   proposalVersionsQuery,
@@ -831,17 +830,6 @@ const parseSubgraphProposal = (
 
 export const useAllProposalsViaSubgraph = (): PartialProposalData => {
   const chainId = defaultChain.id;
-
-  // Direct fetch instead of Apollo — Apollo InMemoryCache chokes on 953+ proposals.
-  const PROPOSALS_GQL = `{
-    proposals(limit: 1000, orderBy: "createdAtBlock", orderDirection: "asc") {
-      items {
-        id status forVotes againstVotes abstainVotes quorumVotes executionETA
-        startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
-        onTimelockV1 proposer
-      }
-    }
-  }`;
 
   const [data, setData] = useState<{ proposals: { items: GraphQLProposal[] } } | undefined>();
   const [loading, setLoading] = useState(true);
