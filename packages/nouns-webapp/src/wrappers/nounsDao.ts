@@ -832,16 +832,28 @@ const parseSubgraphProposal = (
 let _proposalsCache: GraphQLProposal[] | null = null;
 let _proposalsFetchPromise: Promise<GraphQLProposal[]> | null = null;
 
-async function gqlPost(url: string, query: string) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.errors?.length) throw new Error(json.errors[0].message);
-  return json;
+/**
+ * Fetch JSON from the Ponder GraphQL API with retry logic.
+ * Railway/Fastly proxy intermittently truncates chunked responses,
+ * so we read as text first and retry on parse failure.
+ */
+async function gqlPost(url: string, query: string, retries = 3): Promise<any> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    try {
+      const json = JSON.parse(text);
+      if (json.errors?.length) throw new Error(json.errors[0].message);
+      return json;
+    } catch {
+      if (attempt === retries - 1) throw new Error(`Truncated response (${text.length} bytes)`);
+    }
+  }
 }
 
 function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
@@ -849,49 +861,43 @@ function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
   if (_proposalsFetchPromise) return _proposalsFetchPromise;
 
   _proposalsFetchPromise = (async () => {
-    // Phase 1: fetch proposal metadata WITHOUT description (keeps responses small)
-    const PAGE = 100;
-    const allItems: GraphQLProposal[] = [];
-    for (let offset = 0; ; offset += PAGE) {
-      const query = `{
-        proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
-          items {
-            id status forVotes againstVotes abstainVotes quorumVotes executionETA
-            startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
-            onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
-            signers(limit: 100) { items { signer } }
-          }
-        }
-      }`;
-      const json = await gqlPost(url, query);
-      const items = json.data?.proposals?.items ?? [];
-      allItems.push(...items);
-      if (items.length < PAGE) break;
-    }
+    // Fetch all proposal metadata via individual queries (immune to proxy truncation).
+    // First discover how many proposals exist with a small list query.
+    const countJson = await gqlPost(url, `{
+      proposals(limit: 1, orderBy: "createdAtBlock", orderDirection: "desc") {
+        items { id }
+      }
+    }`);
+    const maxId = Number(countJson.data?.proposals?.items?.[0]?.id ?? 0);
+    if (maxId === 0) return [];
 
-    // Phase 2: backfill descriptions for title extraction.
-    // Fetch in parallel batches of 10 to stay under Railway's response size limit.
-    const TITLE_PAGE = 10;
-    const titleFetches: Promise<void>[] = [];
-    for (let offset = 0; offset < allItems.length; offset += TITLE_PAGE) {
-      const off = offset;
-      titleFetches.push(
-        gqlPost(url, `{
-          proposals(limit: ${TITLE_PAGE}, offset: ${off}, orderBy: "createdAtBlock", orderDirection: "asc") {
-            items { id description }
-          }
-        }`)
-          .then(json => {
-            const descItems = json.data?.proposals?.items ?? [];
-            for (const d of descItems) {
-              const match = allItems.find(p => String(p.id) === String(d.id));
-              if (match) (match as any).description = d.description;
-            }
-          })
-          .catch(() => {}), // title batch failed — falls back to "Proposal #N"
+    // Fetch each proposal individually — single-entity queries bypass proxy truncation.
+    // Low concurrency (5) avoids overwhelming the Railway/Fastly proxy.
+    const CONCURRENCY = 5;
+    const allItems: GraphQLProposal[] = [];
+    for (let start = 1; start <= maxId; start += CONCURRENCY) {
+      const batch = Array.from(
+        { length: Math.min(CONCURRENCY, maxId - start + 1) },
+        (_, i) => start + i,
       );
+      const results = await Promise.all(
+        batch.map(id =>
+          gqlPost(url, `{
+            proposal(id: "${id}") {
+              id description status forVotes againstVotes abstainVotes quorumVotes executionETA
+              startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
+              onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
+              signers(limit: 100) { items { signer } }
+            }
+          }`)
+            .then(json => json.data?.proposal as GraphQLProposal | null)
+            .catch(() => null),
+        ),
+      );
+      for (const p of results) {
+        if (p) allItems.push(p);
+      }
     }
-    await Promise.all(titleFetches);
 
     _proposalsCache = allItems;
     _proposalsFetchPromise = null;

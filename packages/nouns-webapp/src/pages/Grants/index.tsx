@@ -71,51 +71,53 @@ export default function GrantsPage() {
   useEffect(() => {
     // Fetch grants without description first (Railway truncates large responses),
     // then fetch each grant's description individually
-    const gqlFetch = (query: string) =>
-      fetch(`${API_BASE}/graphql`, {
+    // Railway/Fastly proxy truncates list query responses, so fetch each grant
+    // individually. Only ~6 grants exist — this is fast.
+    const gqlFetch = async (query: string) => {
+      const res = await fetch(`${API_BASE}/graphql`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
-      }).then(r => r.json());
+      });
+      const text = await res.text();
+      return JSON.parse(text);
+    };
 
-    gqlFetch(`{
-      grants(orderBy: "id", orderDirection: "desc", limit: 100) {
-        items {
-          id proposer status
-          forVotes againstVotes abstainVotes
-          startBlock endBlock executionETA
-          createdAt
-        }
-      }
-    }`)
+    // Discover grant IDs via minimal query, then fetch each individually
+    gqlFetch(`{ grants(limit: 1, orderBy: "id", orderDirection: "desc") { items { id } } }`)
       .then(async d => {
-        const rawItems = d.data?.grants?.items || [];
-        // Fetch descriptions one by one (they can be large markdown)
-        const items = await Promise.all(
-          rawItems.map(async (g: any) => {
-            let description = '';
-            try {
-              const dd = await gqlFetch(`{ grant(id: "${g.id}") { description } }`);
-              description = dd.data?.grant?.description || '';
-            } catch {}
-            return {
-              id: Number(g.id),
-              proposer: g.proposer,
-              description,
-              status: g.status || 'ACTIVE',
-              forVotes: g.forVotes || 0,
-              againstVotes: g.againstVotes || 0,
-              abstainVotes: g.abstainVotes || 0,
-              startBlock: String(g.startBlock || '0'),
-              endBlock: String(g.endBlock || '0'),
-              executionETA: g.executionETA ? String(g.executionETA) : null,
-              createdAt: g.createdAt,
-            };
-          }),
+        const maxId = Number(d.data?.grants?.items?.[0]?.id ?? 0);
+        if (maxId === 0) return;
+        // Fetch all grants individually in parallel
+        const results = await Promise.all(
+          Array.from({ length: maxId }, (_, i) => i + 1).map(id =>
+            gqlFetch(`{ grant(id: "${id}") {
+              id proposer description status forVotes againstVotes abstainVotes
+              startBlock endBlock executionETA createdAt
+            } }`)
+              .then(dd => dd.data?.grant)
+              .catch(() => null),
+          ),
         );
+        const items = results
+          .filter(Boolean)
+          .map((g: any) => ({
+            id: Number(g.id),
+            proposer: g.proposer,
+            description: g.description || '',
+            status: g.status || 'ACTIVE',
+            forVotes: g.forVotes || 0,
+            againstVotes: g.againstVotes || 0,
+            abstainVotes: g.abstainVotes || 0,
+            startBlock: String(g.startBlock || '0'),
+            endBlock: String(g.endBlock || '0'),
+            executionETA: g.executionETA ? String(g.executionETA) : null,
+            createdAt: g.createdAt,
+          }))
+          .sort((a, b) => b.id - a.id);
         setGrants(items);
       })
-      .catch(() => {})
+      .catch(e => console.error('[Grants] Fetch failed:', e))
       .finally(() => setLoading(false));
   }, []);
 
