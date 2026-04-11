@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { t } from '@lingui/core/macro';
@@ -70,7 +71,14 @@ const CreateCandidatePage = () => {
 
     // Pre-fill title and slug
     const name = traitName ?? 'Custom Trait';
-    const layerLabel = traitLayer === 'head' ? 'Head' : traitLayer === 'body' ? 'Body' : traitLayer === 'accessory' ? 'Accessory' : 'Glasses';
+    const layerLabel =
+      traitLayer === 'head'
+        ? 'Head'
+        : traitLayer === 'body'
+          ? 'Body'
+          : traitLayer === 'accessory'
+            ? 'Accessory'
+            : 'Glasses';
     handleTitleInput(`Add ${name} ${layerLabel} to Nouns Collection`);
     setBodyValue(
       `## Summary\n\nThis proposal adds a new ${layerLabel.toLowerCase()} trait "${name}" to the Nouns collection.\n\n## Artwork\n\n${traitImage ? `![${name}](${traitImage})` : ''}\n\n### Proposed via noun.wtf/probe`,
@@ -92,11 +100,22 @@ const CreateCandidatePage = () => {
           const encoded = encodeImageToRLE(imgData, name);
 
           // Build the descriptor function signature based on layer
-          const fnName = traitLayer === 'head' ? 'addHeads' : traitLayer === 'body' ? 'addBodies' : traitLayer === 'accessory' ? 'addAccessories' : 'addGlasses';
+          const fnName =
+            traitLayer === 'head'
+              ? 'addHeads'
+              : traitLayer === 'body'
+                ? 'addBodies'
+                : traitLayer === 'accessory'
+                  ? 'addAccessories'
+                  : 'addGlasses';
           const signature = `${fnName}(bytes,uint80,uint16)`;
 
           // Match probe.wtf encoding: ABI-encode the RLE as bytes[], then compress
-          const { encodeAbiParameters: encodeParams, hexToBytes, bytesToHex } = await import('viem');
+          const {
+            encodeAbiParameters: encodeParams,
+            hexToBytes,
+            bytesToHex,
+          } = await import('viem');
 
           // Step 1: ABI-encode the raw RLE data as bytes[] (array of 1 element)
           const abiEncodedArtwork = encodeParams(
@@ -110,7 +129,7 @@ const CreateCandidatePage = () => {
 
           const cs = new CompressionStream('deflate-raw');
           const writer = cs.writable.getWriter();
-          writer.write(uncompressedBytes);
+          writer.write(uncompressedBytes as unknown as Uint8Array<ArrayBuffer>);
           writer.close();
           const compressedBuf = await new Response(cs.readable).arrayBuffer();
           const compressedHex = bytesToHex(new Uint8Array(compressedBuf));
@@ -138,11 +157,12 @@ const CreateCandidatePage = () => {
         }
       })();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDreamProposal]);
 
   // Artwork agreement — matches probe.wtf legal format exactly
-  const AGREEMENT_URL = 'https://ern3fbtsj23a2achuj5kqa4xtp2yvplqjy2r6cemo6ep52lfn2cq.arweave.net/JFuyhnJOtg0AR6J6qAOXm_WKvXBONR8IjHeI_ullboU';
+  const AGREEMENT_URL =
+    'https://ern3fbtsj23a2achuj5kqa4xtp2yvplqjy2r6cemo6ep52lfn2cq.arweave.net/JFuyhnJOtg0AR6J6qAOXm_WKvXBONR8IjHeI_ullboU';
 
   const agreementMessage = useMemo(() => {
     if (!address || !traitName) return '';
@@ -150,17 +170,21 @@ const CreateCandidatePage = () => {
   }, [address, traitName, traitImage]);
 
   const handleSignArtworkAgreement = async () => {
-    if (!address) { toast.error('Connect wallet first'); return; }
+    if (!address) {
+      toast.error('Connect wallet first');
+      return;
+    }
     try {
       const sig = await signMessageAsync({ message: agreementMessage });
       setArtworkSignature(sig);
       setArtworkAgreementSigned(true);
       // Append beautifully formatted legal agreement to proposal description
-      setBodyValue(prev =>
-        `${prev}\n\n---\n\n## CC0 Artwork Contribution Agreement\n\n> ${agreementMessage}\n\n| | |\n|---|---|\n| **Signer** | \`${address}\` |\n| **Signature** | \`${sig.slice(0, 32)}...${sig.slice(-8)}\` |\n| **Full Agreement** | [Nouns Art Contribution Agreement](${AGREEMENT_URL}) |\n| **License** | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) |`,
+      setBodyValue(
+        prev =>
+          `${prev}\n\n---\n\n## CC0 Artwork Contribution Agreement\n\n> ${agreementMessage}\n\n| | |\n|---|---|\n| **Signer** | \`${address}\` |\n| **Signature** | \`${sig.slice(0, 32)}...${sig.slice(-8)}\` |\n| **Full Agreement** | [Nouns Art Contribution Agreement](${AGREEMENT_URL}) |\n| **License** | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) |`,
       );
       toast.success('CC0 waiver signed!');
-    } catch (err) {
+    } catch {
       toast.error('Failed to sign waiver');
     }
   };
@@ -336,7 +360,7 @@ const CreateCandidatePage = () => {
           </strong>
         </Alert>
         <div className="d-grid">
-          {/* @ts-expect-error — react-bootstrap union type too complex */}
+          {/* @ts-expect-error — react-bootstrap Button union type too complex */}
           <Button
             className={classes.proposalActionButton}
             variant="dark"
@@ -371,23 +395,36 @@ const CreateCandidatePage = () => {
         />
         {/* CC0 Artwork Waiver — only for dream proposals */}
         {isDreamProposal && (
-          <div style={{
-            margin: '24px 0',
-            borderRadius: 16,
-            overflow: 'hidden',
-            border: artworkAgreementSigned ? '2px solid #22c55e' : '2px solid #1a1a2e',
-          }}>
+          <div
+            style={{
+              margin: '24px 0',
+              borderRadius: 16,
+              overflow: 'hidden',
+              border: artworkAgreementSigned ? '2px solid #22c55e' : '2px solid #1a1a2e',
+            }}
+          >
             {/* Header */}
-            <div style={{
-              background: artworkAgreementSigned ? '#22c55e' : '#1a1a2e',
-              padding: '14px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
+            <div
+              style={{
+                background: artworkAgreementSigned ? '#22c55e' : '#1a1a2e',
+                padding: '14px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: '1.1rem' }}>{artworkAgreementSigned ? '\u2713' : '\uD83D\uDD12'}</span>
-                <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.02em' }}>
+                <span style={{ fontSize: '1.1rem' }}>
+                  {artworkAgreementSigned ? '\u2713' : '\uD83D\uDD12'}
+                </span>
+                <span
+                  style={{
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    letterSpacing: '0.02em',
+                  }}
+                >
                   {artworkAgreementSigned ? 'CC0 Waiver Signed' : 'CC0 Artwork Waiver Required'}
                 </span>
               </div>
@@ -395,19 +432,37 @@ const CreateCandidatePage = () => {
                 <img
                   src={traitImage}
                   alt={traitName ?? ''}
-                  style={{ width: 32, height: 32, imageRendering: 'pixelated', borderRadius: 6, border: '2px solid rgba(255,255,255,0.3)' }}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    imageRendering: 'pixelated',
+                    borderRadius: 6,
+                    border: '2px solid rgba(255,255,255,0.3)',
+                  }}
                 />
               )}
             </div>
 
             {/* Body */}
-            <div style={{ padding: '16px 20px', background: artworkAgreementSigned ? '#f0fdf4' : '#fafafa' }}>
+            <div
+              style={{
+                padding: '16px 20px',
+                background: artworkAgreementSigned ? '#f0fdf4' : '#fafafa',
+              }}
+            >
               {!artworkAgreementSigned ? (
                 <>
-                  <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.6, marginBottom: 12 }}>
-                    To add <strong>{traitName ?? 'this trait'}</strong> to the Nouns collection,
-                    you must sign a CC0 waiver confirming this is your original work and releasing
-                    all rights to the public domain.
+                  <p
+                    style={{
+                      fontSize: '0.78rem',
+                      color: '#374151',
+                      lineHeight: 1.6,
+                      marginBottom: 12,
+                    }}
+                  >
+                    To add <strong>{traitName ?? 'this trait'}</strong> to the Nouns collection, you
+                    must sign a CC0 waiver confirming this is your original work and releasing all
+                    rights to the public domain.
                   </p>
                   <p style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 16 }}>
                     This is a legal requirement for all artwork contributions to Nouns DAO.{' '}
@@ -438,7 +493,9 @@ const CreateCandidatePage = () => {
                       transition: 'all 0.15s',
                     }}
                   >
-                    {address ? '\uD83D\uDD0F Sign CC0 Waiver with Wallet' : 'Connect Wallet to Sign'}
+                    {address
+                      ? '\uD83D\uDD0F Sign CC0 Waiver with Wallet'
+                      : 'Connect Wallet to Sign'}
                   </button>
                 </>
               ) : (
@@ -447,21 +504,50 @@ const CreateCandidatePage = () => {
                     <img
                       src={traitImage ?? ''}
                       alt={traitName ?? ''}
-                      style={{ width: 40, height: 40, imageRendering: 'pixelated', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        imageRendering: 'pixelated',
+                        borderRadius: 8,
+                        border: '1px solid #e5e7eb',
+                      }}
                     />
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>{traitName ?? 'Custom Trait'}</p>
-                      <p style={{ fontSize: '0.65rem', color: '#22c55e', margin: 0 }}>Released under CC0 1.0</p>
+                      <p style={{ fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
+                        {traitName ?? 'Custom Trait'}
+                      </p>
+                      <p style={{ fontSize: '0.65rem', color: '#22c55e', margin: 0 }}>
+                        Released under CC0 1.0
+                      </p>
                     </div>
                   </div>
-                  <div style={{
-                    background: '#ecfdf5',
-                    borderRadius: 8,
-                    padding: '8px 12px',
-                    marginTop: 8,
-                  }}>
-                    <p style={{ fontSize: '0.6rem', color: '#6b7280', margin: '0 0 4px', fontWeight: 600 }}>SIGNATURE</p>
-                    <p style={{ fontSize: '0.6rem', color: '#374151', fontFamily: 'monospace', wordBreak: 'break-all', margin: 0 }}>
+                  <div
+                    style={{
+                      background: '#ecfdf5',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      marginTop: 8,
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: '0.6rem',
+                        color: '#6b7280',
+                        margin: '0 0 4px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      SIGNATURE
+                    </p>
+                    <p
+                      style={{
+                        fontSize: '0.6rem',
+                        color: '#374151',
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all',
+                        margin: 0,
+                      }}
+                    >
                       {artworkSignature}
                     </p>
                   </div>
@@ -469,7 +555,13 @@ const CreateCandidatePage = () => {
                     href={AGREEMENT_URL}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: '0.65rem', color: '#3b82f6' }}
+                    style={{
+                      display: 'block',
+                      textAlign: 'center',
+                      marginTop: 10,
+                      fontSize: '0.65rem',
+                      color: '#3b82f6',
+                    }}
                   >
                     View Full Agreement on Arweave &rarr;
                   </a>

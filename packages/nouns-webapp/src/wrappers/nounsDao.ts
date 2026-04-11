@@ -845,7 +845,7 @@ function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
     // Adapt REST response shape to match GraphQL shape expected downstream
     const allItems: GraphQLProposal[] = items.map(p => ({
       ...p,
-      signers: { items: (p.signers ?? []).map((s: string) => ({ signer: s })) },
+      signers: (p.signers ?? []).map((s: string) => ({ id: s })),
     }));
 
     _proposalsCache = allItems;
