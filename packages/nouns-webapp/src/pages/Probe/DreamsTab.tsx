@@ -6,11 +6,14 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { Button } from '@/components/ui/button';
+import { useAppSelector } from '@/hooks';
 import { useDreamCandidates, type OnChainDream } from '@/hooks/useDreamCandidates';
 import { useDreamDrafts } from '@/hooks/useDreamDrafts';
 import { useProbeDreams, type ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
 import { type SavedDream } from '@/lib/dreamStorage';
 import { useCandidateProposal } from '@/wrappers/nounsData';
+import { useUserVotes } from '@/wrappers/nounToken';
+import { useAccount } from 'wagmi';
 
 import DreamDetailPopover from '@/components/DreamDetailPopover';
 
@@ -98,70 +101,104 @@ function DreamDraftCard({
 
 function OnChainDreamCard({
   dream,
-  selected,
-  onSelect,
+  onSponsor,
+  onPromote,
+  isProposer,
+  hasVotes,
 }: {
   dream: OnChainDream;
-  selected: boolean;
-  onSelect: (dream: OnChainDream) => void;
+  onSponsor: () => void;
+  onPromote: () => void;
+  isProposer: boolean;
+  hasVotes: boolean;
 }) {
+  const previewSrc = dream.customTraitUrl ?? dream.nounSvgUrl ?? dream.artworkUri;
+  // Threshold for promotion: need at least 2 noun votes from signatures
+  const canPromote = isProposer && dream.signaturesCount >= 2;
+
   return (
-    <div
-      onClick={() => onSelect(dream)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border-2 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg ${
-        selected ? 'border-black' : 'border-gray-200'
-      }`}
-    >
-      <div className="flex items-center justify-center bg-gray-100 py-4">
-        {dream.artworkUri ? (
+    <div className="group overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      <div className="relative flex items-end justify-center overflow-hidden bg-gray-100">
+        {previewSrc ? (
           <img
-            src={dream.artworkUri}
+            src={previewSrc}
             alt={dream.title}
-            className="h-24 w-24"
-            style={{ imageRendering: 'pixelated' }}
+            className="w-full"
+            style={{ imageRendering: 'pixelated', display: 'block' }}
           />
         ) : (
-          <div className="flex h-24 w-24 items-center justify-center text-3xl text-gray-300">
-            ?
-          </div>
+          <div className="flex h-32 w-full items-center justify-center text-3xl text-gray-300">?</div>
         )}
       </div>
 
       <div className="p-3">
         <h3 className="truncate text-sm font-bold">{dream.title}</h3>
         <div className="mt-1 flex items-center gap-2">
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">
-            On-chain
-          </span>
           {dream.signaturesCount > 0 && (
-            <span className="text-xs text-gray-500">
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
               {dream.signaturesCount} sig{dream.signaturesCount !== 1 && 's'}
             </span>
           )}
         </div>
-        <p className="text-muted-foreground mt-1 text-xs">
-          by {dream.proposer.slice(0, 6)}...{dream.proposer.slice(-4)}
+        <p className="text-muted-foreground mt-1 text-[10px]">
+          {dream.proposer.slice(0, 6)}...{dream.proposer.slice(-4)}
         </p>
+
+        {/* Action buttons */}
+        <div className="mt-2 flex gap-1.5">
+          {hasVotes && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onSponsor(); }}
+              className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
+            >
+              Sponsor
+            </button>
+          )}
+          {canPromote ? (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onPromote(); }}
+              className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-green-700"
+            >
+              Promote
+            </button>
+          ) : (
+            <Link to={`/candidates/${dream.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+              <button type="button" className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200">
+                View
+              </button>
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function ProbeDreamCard({ dream, onClick }: { dream: ProbeDreamWithPreview; onClick?: (e: React.MouseEvent) => void }) {
+function ProbeDreamCard({
+  dream,
+  onClick,
+  onPropose,
+}: {
+  dream: ProbeDreamWithPreview;
+  onClick?: (e: React.MouseEvent) => void;
+  onPropose?: () => void;
+}) {
+  const hasCustomTrait = !!dream.customLayer;
+
   return (
     <div onClick={onClick} className="group relative cursor-pointer overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
       <div
         className="relative flex items-end justify-center overflow-hidden"
         style={{ backgroundColor: `#${ImageData.bgcolors[dream.seeds.background] ?? 'd5d7e1'}` }}
       >
-        {/* Full composed noun */}
         <img
           src={dream.nounSvgUrl}
           alt={`Dream #${dream.id}`}
           className="w-full transition-opacity"
           style={{ imageRendering: 'pixelated', display: 'block' }}
         />
-        {/* On hover: dim the noun and overlay just the custom trait, scaled up */}
         {dream.customTraitUrl && (
           <>
             <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -178,7 +215,7 @@ function ProbeDreamCard({ dream, onClick }: { dream: ProbeDreamWithPreview; onCl
       <div className="p-3">
         <h3 className="truncate text-sm font-bold">Dream #{dream.id}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-1">
-          {dream.customLayer && (
+          {hasCustomTrait && (
             <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700">
               Custom {dream.customLayer}
             </span>
@@ -190,6 +227,17 @@ function ProbeDreamCard({ dream, onClick }: { dream: ProbeDreamWithPreview; onCl
         <p className="text-muted-foreground mt-1 text-[10px]">
           {dream.dreamer.slice(0, 6)}...{dream.dreamer.slice(-4)}
         </p>
+
+        {/* Propose button — only for dreams with a custom trait */}
+        {hasCustomTrait && onPropose && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onPropose(); }}
+            className="mt-2 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
+          >
+            Propose Trait
+          </button>
+        )}
       </div>
     </div>
   );
@@ -206,6 +254,11 @@ const DreamsTab: FC = () => {
   const [selectedDraft, setSelectedDraft] = useState<SavedDream | null>(null);
   const [selectedOnChain, setSelectedOnChain] = useState<OnChainDream | null>(null);
   const [dreamPopover, setDreamPopover] = useState<{ dream: ProbeDreamWithPreview; rect: DOMRect } | null>(null);
+
+  // Wallet state for sponsor/promote
+  const { address } = useAccount();
+  const availableVotes = useUserVotes();
+  const hasVotes = (availableVotes ?? 0) > 0;
 
   // Fetch full candidate data when signing
   const { data: signingCandidate } = useCandidateProposal(signingCandidateId ?? '', 0, false);
@@ -261,6 +314,17 @@ const DreamsTab: FC = () => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setDreamPopover(prev => prev?.dream.id === dream.id ? null : { dream, rect });
                   }}
+                  onPropose={dream.customLayer && address && dream.dreamer.toLowerCase() === address.toLowerCase() ? () => {
+                    // Navigate to create-candidate with dream pre-filled
+                    // The custom trait image URL and layer info encode into the proposal
+                    const params = new URLSearchParams({
+                      dreamId: String(dream.id),
+                      traitLayer: dream.customLayer!,
+                      traitImage: dream.customTraitUrl ?? '',
+                      traitName: dream.customImage?.replace(/\.\w+$/, '').replace(/[-_]/g, ' ') ?? 'Custom Trait',
+                    });
+                    window.location.href = `/create-candidate?${params}`;
+                  } : undefined}
                 />
               ))}
             </div>
@@ -318,11 +382,14 @@ const DreamsTab: FC = () => {
                       </Button>
                     )}
                   </Link>
-                  {selectedDraft.status === 'draft' && (
+                  {selectedDraft.status === 'draft' && selectedDraft.customTraitLayer && (
                     <Button size="sm" className="gap-1" onClick={() => setProposingDream(selectedDraft)}>
                       <Upload className="h-3 w-3" />
-                      Propose On-Chain
+                      Propose Trait
                     </Button>
+                  )}
+                  {selectedDraft.status === 'draft' && !selectedDraft.customTraitLayer && (
+                    <span className="text-xs text-gray-400">Standard traits only — add a custom trait to propose</span>
                   )}
                 </div>
               </div>
@@ -352,47 +419,18 @@ const DreamsTab: FC = () => {
                 <OnChainDreamCard
                   key={dream.id}
                   dream={dream}
-                  selected={selectedOnChain?.id === dream.id}
-                  onSelect={setSelectedOnChain}
+                  isProposer={!!address && dream.proposer.toLowerCase() === address.toLowerCase()}
+                  hasVotes={hasVotes}
+                  onSponsor={() => setSigningCandidateId(dream.id)}
+                  onPromote={() => {
+                    // Navigate to create-candidate with dream context
+                    window.location.href = `/candidates/${dream.id}`;
+                  }}
                 />
               ))}
             </div>
           )}
 
-          {/* Selected on-chain dream detail */}
-          {selectedOnChain && (
-            <div className="border-border mt-4 rounded-2xl border bg-white p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-xl font-bold">{selectedOnChain.title}</h3>
-                  <p className="text-muted-foreground mt-1">{selectedOnChain.description}</p>
-                  <p className="text-muted-foreground mt-2 text-sm">
-                    Proposer: {selectedOnChain.proposer.slice(0, 6)}...
-                    {selectedOnChain.proposer.slice(-4)}
-                  </p>
-                  {selectedOnChain.signaturesCount > 0 && (
-                    <p className="mt-1 text-sm font-semibold text-blue-600">
-                      {selectedOnChain.signaturesCount} sponsor signature
-                      {selectedOnChain.signaturesCount !== 1 && 's'}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => setSigningCandidateId(selectedOnChain.id)}
-                  >
-                    Sponsor
-                  </Button>
-                  <Link to={`/candidates/${selectedOnChain.id}`}>
-                    <Button variant="outline" size="sm">
-                      View Candidate
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
 

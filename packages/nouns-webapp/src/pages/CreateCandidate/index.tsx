@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { Alert, Button, Col } from 'react-bootstrap';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { withStepProgress } from 'react-stepz';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
+import { useAccount, useSignMessage } from 'wagmi';
 
 import CreateCandidateButton from '@/components/CreateCandidateButton';
 import ProposalActionModal from '@/components/ProposalActionsModal';
@@ -45,6 +46,96 @@ const CreateCandidatePage = () => {
   const { _ } = useLingui();
 
   const hasVotes = availableVotes && availableVotes > 0;
+  const [searchParams] = useSearchParams();
+  const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+
+  // Dream trait pre-fill state
+  const dreamId = searchParams.get('dreamId');
+  const traitLayer = searchParams.get('traitLayer');
+  const traitImage = searchParams.get('traitImage');
+  const traitName = searchParams.get('traitName');
+  const isDreamProposal = !!dreamId && !!traitLayer;
+  const [artworkAgreementSigned, setArtworkAgreementSigned] = useState(false);
+  const [artworkSignature, setArtworkSignature] = useState('');
+  const dreamInitRef = useRef(false);
+
+  // NounsDescriptor address
+  const DESCRIPTOR_ADDRESS = '0x33a9c445fb4fb21f2c030a6b2d3e2f12d017bfac' as const;
+
+  // Auto-add trait TX when coming from a dream
+  useEffect(() => {
+    if (!isDreamProposal || dreamInitRef.current) return;
+    dreamInitRef.current = true;
+
+    // Pre-fill title and slug
+    const name = traitName ?? 'Custom Trait';
+    const layerLabel = traitLayer === 'head' ? 'Head' : traitLayer === 'body' ? 'Body' : traitLayer === 'accessory' ? 'Accessory' : 'Glasses';
+    handleTitleInput(`Add ${name} ${layerLabel} to Nouns Collection`);
+    setBodyValue(
+      `## Summary\n\nThis proposal adds a new ${layerLabel.toLowerCase()} trait "${name}" to the Nouns collection.\n\n## Artwork\n\n${traitImage ? `![${name}](${traitImage})` : ''}\n\n### Proposed via noun.wtf/probe`,
+    );
+    setSlug(`nounwtf-dream-${dreamId}`);
+
+    // Build the addHeads/addBodies/etc. calldata
+    // For now, add a placeholder TX targeting the descriptor
+    // The actual RLE encoding happens when the trait image is loaded
+    if (traitImage) {
+      (async () => {
+        try {
+          // Load the trait image and encode to RLE
+          const { fileToImageData, encodeImageToRLE } = await import('@/lib/rleEncode');
+          const response = await fetch(traitImage);
+          const blob = await response.blob();
+          const file = new File([blob], `${name}.png`, { type: 'image/png' });
+          const imgData = await fileToImageData(file);
+          const encoded = encodeImageToRLE(imgData, name);
+
+          // Build the descriptor function signature based on layer
+          const fnName = traitLayer === 'head' ? 'addHeads' : traitLayer === 'body' ? 'addBodies' : traitLayer === 'accessory' ? 'addAccessories' : 'addGlasses';
+          const signature = `${fnName}(bytes,uint80,uint16)`;
+
+          // ABI-encode just the parameters (no function selector) — matches probe.wtf format
+          const { encodeAbiParameters } = await import('viem');
+          const calldata = encodeAbiParameters(
+            [
+              { name: 'encodedCompressed', type: 'bytes' },
+              { name: 'decompressedLength', type: 'uint80' },
+              { name: 'imageCount', type: 'uint16' },
+            ],
+            [encoded.data as `0x${string}`, BigInt((encoded.data.length - 2) / 2), 1],
+          );
+
+          handleAddProposalAction({
+            address: DESCRIPTOR_ADDRESS,
+            value: 0n,
+            signature,
+            calldata,
+          });
+        } catch (err) {
+          console.error('Failed to encode trait:', err);
+          toast.error('Failed to encode trait artwork');
+        }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDreamProposal]);
+
+  // Artwork agreement signing
+  const handleSignArtworkAgreement = async () => {
+    if (!address) { toast.error('Connect wallet first'); return; }
+    const message = `I, ${address}, agree to contribute the artwork "${traitName ?? 'Custom Trait'}" under the CC0 1.0 Universal Public Domain Dedication.\n\nThis artwork is my original creation, and I waive all copyright and related rights.\n\nhttps://creativecommons.org/publicdomain/zero/1.0/`;
+    try {
+      const sig = await signMessageAsync({ message });
+      setArtworkSignature(sig);
+      setArtworkAgreementSigned(true);
+      // Append agreement to proposal body
+      setBodyValue(prev => `${prev}\n\n---\n\n### Artwork Contribution Agreement\n\nSigned by: ${address}\nSignature: ${sig}\n\nCC0 1.0 Universal Public Domain Dedication`);
+      toast.success('Artwork agreement signed!');
+    } catch (err) {
+      toast.error('Failed to sign agreement');
+    }
+  };
 
   const handleAddProposalAction = useCallback(
     (transactions: ProposalTransaction | ProposalTransaction[]) => {
@@ -249,12 +340,56 @@ const CreateCandidatePage = () => {
           onBodyInput={handleBodyInput}
           isCandidate={true}
         />
+        {/* Artwork Agreement — only for dream proposals */}
+        {isDreamProposal && (
+          <div style={{
+            margin: '20px 0',
+            padding: '16px 20px',
+            borderRadius: 12,
+            border: artworkAgreementSigned ? '2px solid #22c55e' : '2px solid #f59e0b',
+            background: artworkAgreementSigned ? '#f0fdf4' : '#fffbeb',
+          }}>
+            <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 8 }}>
+              {artworkAgreementSigned ? '✓ Artwork Agreement Signed' : 'Artwork Contribution Agreement'}
+            </h4>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>
+              By signing, you confirm this artwork is your original creation and you agree to release it
+              under the <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>CC0 1.0 Universal Public Domain Dedication</a>.
+            </p>
+            {traitImage && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <img
+                  src={traitImage}
+                  alt={traitName ?? 'Trait'}
+                  style={{ width: 48, height: 48, imageRendering: 'pixelated', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{traitName ?? 'Custom Trait'}</span>
+              </div>
+            )}
+            {!artworkAgreementSigned ? (
+              <Button
+                variant="warning"
+                size="sm"
+                onClick={handleSignArtworkAgreement}
+                disabled={!address}
+                style={{ fontWeight: 700 }}
+              >
+                {address ? 'Sign Agreement with Wallet' : 'Connect Wallet to Sign'}
+              </Button>
+            ) : (
+              <p style={{ fontSize: '0.65rem', color: '#22c55e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                Sig: {artworkSignature.slice(0, 20)}...{artworkSignature.slice(-8)}
+              </p>
+            )}
+          </div>
+        )}
+
         <CreateCandidateButton
           className={classes.createProposalButton}
           isLoading={isProposePending}
           proposalThreshold={proposalThreshold ?? undefined}
-          hasActiveOrPendingProposal={false} // not needed for candidates
-          isFormInvalid={isFormInvalid}
+          hasActiveOrPendingProposal={false}
+          isFormInvalid={isFormInvalid || (isDreamProposal && !artworkAgreementSigned)}
           handleCreateProposal={handleCreateProposal}
         />
         <p className={classes.feeNotice}>
