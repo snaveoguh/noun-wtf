@@ -341,6 +341,56 @@ app.use('/', graphqlWithDerivedStatus, graphql({ db, schema }));
 app.use('/graphql', graphqlWithDerivedStatus, graphql({ db, schema }));
 
 // ============================================================
+// REST endpoints — bypass GraphQL/Yoga chunked encoding (Fastly truncates it)
+// ============================================================
+
+/** All proposals with signers — single JSON response, no chunked encoding */
+app.get('/api/proposals', async c => {
+  const proposals = await db
+    .select()
+    .from(schema.proposal)
+    .orderBy(desc(schema.proposal.createdAtBlock));
+  const signers = await db.select().from(schema.proposalSigner);
+  const signerMap = new Map<string, string[]>();
+  for (const s of signers) {
+    const key = String(s.proposalId);
+    if (!signerMap.has(key)) signerMap.set(key, []);
+    signerMap.get(key)!.push(s.signer);
+  }
+  const items = proposals.map(p => ({
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    proposalThreshold: String(p.proposalThreshold),
+    quorumVotes: String(p.quorumVotes),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    objectionPeriodEndBlock:
+      p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+    updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+    voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+    createdAtBlock: String(p.createdAtBlock),
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    signers: signerMap.get(String(p.id)) ?? [],
+  }));
+  return c.json(items);
+});
+
+/** All grants — single JSON response */
+app.get('/api/grants', async c => {
+  const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
+  const items = grants.map(g => ({
+    ...g,
+    id: String(g.id),
+    startBlock: String(g.startBlock),
+    endBlock: String(g.endBlock),
+    executionETA: g.executionETA != null ? String(g.executionETA) : null,
+    createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+  }));
+  return c.json(items);
+});
+
+// ============================================================
 // Terminal — Claude AI chat for Nouns governance
 // ============================================================
 

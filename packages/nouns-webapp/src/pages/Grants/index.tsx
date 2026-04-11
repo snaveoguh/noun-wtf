@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
+
 import { Link } from 'react-router';
+import { toast } from 'sonner';
 import { formatEther } from 'viem';
 import { useBalance, useBlockNumber } from 'wagmi';
-import { toast } from 'sonner';
 
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
 
 const API_BASE =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app';
 
 interface Grant {
@@ -69,55 +70,27 @@ export default function GrantsPage() {
   }, []);
 
   useEffect(() => {
-    // Fetch grants without description first (Railway truncates large responses),
-    // then fetch each grant's description individually
-    // Railway/Fastly proxy truncates list query responses, so fetch each grant
-    // individually. Only ~6 grants exist — this is fast.
-    const gqlFetch = async (query: string) => {
-      const res = await fetch(`${API_BASE}/graphql`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      const text = await res.text();
-      return JSON.parse(text);
-    };
-
-    // Discover grant IDs via minimal query, then fetch each individually
-    gqlFetch(`{ grants(limit: 1, orderBy: "id", orderDirection: "desc") { items { id } } }`)
-      .then(async d => {
-        const maxId = Number(d.data?.grants?.items?.[0]?.id ?? 0);
-        if (maxId === 0) return;
-        // Fetch all grants individually in parallel
-        const results = await Promise.all(
-          Array.from({ length: maxId }, (_, i) => i + 1).map(id =>
-            gqlFetch(`{ grant(id: "${id}") {
-              id proposer description status forVotes againstVotes abstainVotes
-              startBlock endBlock executionETA createdAt
-            } }`)
-              .then(dd => dd.data?.grant)
-              .catch(() => null),
-          ),
-        );
-        const items = results
-          .filter(Boolean)
-          .map((g: any) => ({
+    // REST endpoint — single request, bypasses Fastly chunked-encoding truncation
+    fetch(`${API_BASE}/api/grants`)
+      .then(r => r.json())
+      .then((items: Grant[]) => {
+        setGrants(
+          items.map(g => ({
             id: Number(g.id),
-            proposer: g.proposer,
-            description: g.description || '',
-            status: g.status || 'ACTIVE',
-            forVotes: g.forVotes || 0,
-            againstVotes: g.againstVotes || 0,
-            abstainVotes: g.abstainVotes || 0,
-            startBlock: String(g.startBlock || '0'),
-            endBlock: String(g.endBlock || '0'),
-            executionETA: g.executionETA ? String(g.executionETA) : null,
-            createdAt: g.createdAt,
-          }))
-          .sort((a, b) => b.id - a.id);
-        setGrants(items);
+            proposer: g.proposer ?? '',
+            description: g.description ?? '',
+            status: g.status ?? 'ACTIVE',
+            forVotes: Number(g.forVotes ?? 0),
+            againstVotes: Number(g.againstVotes ?? 0),
+            abstainVotes: Number(g.abstainVotes ?? 0),
+            startBlock: String(g.startBlock ?? '0'),
+            endBlock: String(g.endBlock ?? '0'),
+            executionETA: g.executionETA != null ? String(g.executionETA) : null,
+            createdAt: String(g.createdAt ?? ''),
+          })),
+        );
       })
-      .catch(e => console.error('[Grants] Fetch failed:', e))
+      .catch((e: unknown) => console.error('[Grants] Fetch failed:', e))
       .finally(() => setLoading(false));
   }, []);
 
@@ -132,8 +105,7 @@ export default function GrantsPage() {
         </div>
         <p className={classes.subtitle}>
           24-hour governance. No quorum. 12hr vote + 12hr timelock.
-          <br />
-          A proposal passes with just 1 FOR vote if nobody votes AGAINST.
+          <br />A proposal passes with just 1 FOR vote if nobody votes AGAINST.
         </p>
         <Link to="/grants/create" className={classes.createBtn}>
           + Create Grant Proposal
@@ -153,12 +125,14 @@ export default function GrantsPage() {
           const title = getTitle(g.description);
           const totalVotes = g.forVotes + g.againstVotes;
           const forPct = totalVotes > 0 ? (g.forVotes / totalVotes) * 100 : 50;
-          const isActive = g.status === 'ACTIVE' && blockNumber && BigInt(g.endBlock) > blockNumber;
-          const votingEnded = g.status === 'ACTIVE' && blockNumber && BigInt(g.endBlock) <= blockNumber;
-          const isDefeated = votingEnded && g.forVotes <= g.againstVotes;
-          const isSucceeded = votingEnded && g.forVotes > g.againstVotes;
+          const isActive =
+            g.status === 'ACTIVE' && blockNumber != null && BigInt(g.endBlock) > blockNumber;
+          const votingEnded =
+            g.status === 'ACTIVE' && blockNumber != null && BigInt(g.endBlock) <= blockNumber;
+          const isDefeated = Boolean(votingEnded) && g.forVotes <= g.againstVotes;
+          const isSucceeded = Boolean(votingEnded) && g.forVotes > g.againstVotes;
           const displayStatus = isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : g.status;
-          const blocksLeft = isActive ? Number(BigInt(g.endBlock) - blockNumber!) : 0;
+          const blocksLeft = isActive ? Number(BigInt(g.endBlock) - (blockNumber ?? 0n)) : 0;
           const hoursLeft = Math.max(0, (blocksLeft * 12) / 3600);
 
           return (
@@ -167,7 +141,7 @@ export default function GrantsPage() {
                 <span className={classes.grantId}>Grant #{g.id}</span>
                 <span className={classes.status} style={{ color: statusColor(displayStatus) }}>
                   {displayStatus}
-                  {isActive && ` (${hoursLeft.toFixed(1)}h left)`}
+                  {isActive === true && ` (${hoursLeft.toFixed(1)}h left)`}
                 </span>
               </div>
               <div className={classes.cardTitle}>{title}</div>

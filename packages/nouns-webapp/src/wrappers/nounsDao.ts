@@ -40,7 +40,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
-import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
   type AbiParameter,
@@ -83,6 +82,7 @@ import {
   useWriteNounsGovernorWithdrawFromForkEscrow,
 } from '@/contracts';
 import { useBlockTimestamp } from '@/hooks/useBlockTimestamp';
+import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { defaultChain } from '@/wagmi';
 
 import {
@@ -832,72 +832,21 @@ const parseSubgraphProposal = (
 let _proposalsCache: GraphQLProposal[] | null = null;
 let _proposalsFetchPromise: Promise<GraphQLProposal[]> | null = null;
 
-/**
- * Fetch JSON from the Ponder GraphQL API with retry logic.
- * Railway/Fastly proxy intermittently truncates chunked responses,
- * so we read as text first and retry on parse failure.
- */
-async function gqlPost(url: string, query: string, retries = 3): Promise<any> {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    try {
-      const json = JSON.parse(text);
-      if (json.errors?.length) throw new Error(json.errors[0].message);
-      return json;
-    } catch {
-      if (attempt === retries - 1) throw new Error(`Truncated response (${text.length} bytes)`);
-    }
-  }
-}
-
 function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
   if (_proposalsCache) return Promise.resolve(_proposalsCache);
   if (_proposalsFetchPromise) return _proposalsFetchPromise;
 
   _proposalsFetchPromise = (async () => {
-    // Fetch all proposal metadata via individual queries (immune to proxy truncation).
-    // First discover how many proposals exist with a small list query.
-    const countJson = await gqlPost(url, `{
-      proposals(limit: 1, orderBy: "createdAtBlock", orderDirection: "desc") {
-        items { id }
-      }
-    }`);
-    const maxId = Number(countJson.data?.proposals?.items?.[0]?.id ?? 0);
-    if (maxId === 0) return [];
-
-    // Fetch each proposal individually — single-entity queries bypass proxy truncation.
-    // Low concurrency (5) avoids overwhelming the Railway/Fastly proxy.
-    const CONCURRENCY = 5;
-    const allItems: GraphQLProposal[] = [];
-    for (let start = 1; start <= maxId; start += CONCURRENCY) {
-      const batch = Array.from(
-        { length: Math.min(CONCURRENCY, maxId - start + 1) },
-        (_, i) => start + i,
-      );
-      const results = await Promise.all(
-        batch.map(id =>
-          gqlPost(url, `{
-            proposal(id: "${id}") {
-              id description status forVotes againstVotes abstainVotes quorumVotes executionETA
-              startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
-              onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
-              signers(limit: 100) { items { signer } }
-            }
-          }`)
-            .then(json => json.data?.proposal as GraphQLProposal | null)
-            .catch(() => null),
-        ),
-      );
-      for (const p of results) {
-        if (p) allItems.push(p);
-      }
-    }
+    // Use REST endpoint — single request, no chunked encoding, no Fastly truncation.
+    const baseUrl = url.replace(/\/graphql$/, '').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/api/proposals`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const items: Array<GraphQLProposal & { signers?: string[] }> = await res.json();
+    // Adapt REST response shape to match GraphQL shape expected downstream
+    const allItems: GraphQLProposal[] = items.map(p => ({
+      ...p,
+      signers: { items: (p.signers ?? []).map((s: string) => ({ signer: s })) },
+    }));
 
     _proposalsCache = allItems;
     _proposalsFetchPromise = null;
@@ -926,11 +875,21 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
       return;
     }
     const url = getSubgraphUrl();
-    if (!url) { setError(new Error('No subgraph URL')); setLoading(false); return; }
+    if (!url) {
+      setError(new Error('No subgraph URL'));
+      setLoading(false);
+      return;
+    }
     fetchAllProposals(url)
-      .then(items => { setData({ proposals: { items } }); setLoading(false); })
-      .catch(e => { setError(e); setLoading(false); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .then(items => {
+        setData({ proposals: { items } });
+        setLoading(false);
+      })
+      .catch(e => {
+        setError(e);
+        setLoading(false);
+      });
+  }, []);
 
   const isDaoGteV3 = useIsDaoGteV3();
   const { data: blockNumber } = useBlockNumber();
