@@ -95,20 +95,25 @@ const CreateCandidatePage = () => {
           const fnName = traitLayer === 'head' ? 'addHeads' : traitLayer === 'body' ? 'addBodies' : traitLayer === 'accessory' ? 'addAccessories' : 'addGlasses';
           const signature = `${fnName}(bytes,uint80,uint16)`;
 
-          // Compress RLE data with deflateRaw (same as probe.wtf uses pako.deflateRaw)
-          const rawBytes = new Uint8Array(
-            (encoded.data.slice(2).match(/.{2}/g) ?? []).map(b => parseInt(b, 16))
-          );
-          const decompressedLength = rawBytes.length;
+          // Match probe.wtf encoding: ABI-encode the RLE as bytes[], then compress
+          const { encodeAbiParameters: encodeParams, hexToBytes, bytesToHex } = await import('viem');
 
-          // Use CompressionStream API (browser-native, same as pako.deflateRaw)
+          // Step 1: ABI-encode the raw RLE data as bytes[] (array of 1 element)
+          const abiEncodedArtwork = encodeParams(
+            [{ type: 'bytes[]' }],
+            [[encoded.data as `0x${string}`]],
+          );
+
+          // Step 2: Compress the ABI-encoded bytes with deflateRaw
+          const uncompressedBytes = hexToBytes(abiEncodedArtwork);
+          const decompressedLength = uncompressedBytes.length;
+
           const cs = new CompressionStream('deflate-raw');
           const writer = cs.writable.getWriter();
-          writer.write(rawBytes);
+          writer.write(uncompressedBytes);
           writer.close();
           const compressedBuf = await new Response(cs.readable).arrayBuffer();
-          const compressedBytes = new Uint8Array(compressedBuf);
-          const compressedHex = '0x' + Array.from(compressedBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+          const compressedHex = bytesToHex(new Uint8Array(compressedBuf));
 
           // ABI-encode: compressed bytes + original length + image count
           const { encodeAbiParameters } = await import('viem');
