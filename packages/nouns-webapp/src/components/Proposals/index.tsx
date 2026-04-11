@@ -135,7 +135,7 @@ function MobileProposalActions({
                   className={btnClass}
                   onClick={hasEnoughVotesToPropose ? onNavigate : undefined}
                 >
-                  <Trans>Submit Prop</Trans>
+                  <Trans>Propose</Trans>
                 </Button>
               </div>
               {hasNounBalance && (
@@ -255,7 +255,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                     className={classes.generateBtn}
                     onClick={() => navigate('/create-proposal')}
                   >
-                    <Trans>Submit Prop</Trans>
+                    <Trans>Propose</Trans>
                   </Button>
                 </div>
 
@@ -276,7 +276,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                 {!isMobile && (
                   <div className={classes.nullBtnWrapper}>
                     <Button className={classes.generateBtnDisabled}>
-                      <Trans>Submit Prop</Trans>
+                      <Trans>Propose</Trans>
                     </Button>
                   </div>
                 )}

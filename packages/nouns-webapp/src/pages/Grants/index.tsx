@@ -139,6 +139,10 @@ export default function GrantsPage() {
           const totalVotes = g.forVotes + g.againstVotes;
           const forPct = totalVotes > 0 ? (g.forVotes / totalVotes) * 100 : 50;
           const isActive = g.status === 'ACTIVE' && blockNumber && BigInt(g.endBlock) > blockNumber;
+          const votingEnded = g.status === 'ACTIVE' && blockNumber && BigInt(g.endBlock) <= blockNumber;
+          const isDefeated = votingEnded && g.forVotes <= g.againstVotes;
+          const isSucceeded = votingEnded && g.forVotes > g.againstVotes;
+          const displayStatus = isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : g.status;
           const blocksLeft = isActive ? Number(BigInt(g.endBlock) - blockNumber!) : 0;
           const hoursLeft = Math.max(0, (blocksLeft * 12) / 3600);
 
@@ -146,8 +150,8 @@ export default function GrantsPage() {
             <Link key={g.id} to={`/grants/${g.id}`} className={classes.card}>
               <div className={classes.cardHeader}>
                 <span className={classes.grantId}>Grant #{g.id}</span>
-                <span className={classes.status} style={{ color: statusColor(g.status) }}>
-                  {g.status}
+                <span className={classes.status} style={{ color: statusColor(displayStatus) }}>
+                  {displayStatus}
                   {isActive && ` (${hoursLeft.toFixed(1)}h left)`}
                 </span>
               </div>
