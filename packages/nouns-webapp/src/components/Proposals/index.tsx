@@ -212,7 +212,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
       }
       return <Trans>You have no Votes.</Trans>;
     }
-    return <Trans>Connect wallet to make a proposal.</Trans>;
+    return <Trans>Connect wallet.</Trans>;
   };
 
   return (

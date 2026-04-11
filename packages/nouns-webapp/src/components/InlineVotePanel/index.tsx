@@ -234,7 +234,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
             selected={selectedVote === Vote.FOR}
             onClick={() => setSelectedVote(Vote.FOR)}
             color="#43b369"
-            icon={<ThumbsUp size={16} />}
+            icon={<span style={{ fontSize: 18 }}>{'\uD83D\uDC4D'}</span>}
             label="For"
             disabled={isLoading}
           />
@@ -243,7 +243,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
           selected={selectedVote === Vote.AGAINST}
           onClick={() => setSelectedVote(Vote.AGAINST)}
           color="#e40536"
-          icon={<ThumbsDown size={16} />}
+          icon={<span style={{ fontSize: 18 }}>{'\uD83D\uDC4E'}</span>}
           label="Against"
           disabled={isLoading}
         />
@@ -252,7 +252,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
             selected={selectedVote === Vote.ABSTAIN}
             onClick={() => setSelectedVote(Vote.ABSTAIN)}
             color="#8c8d92"
-            icon={<Minus size={16} />}
+            icon={<span style={{ fontSize: 18 }}>{'\uD83E\uDD37'}</span>}
             label="Abstain"
             disabled={isLoading}
           />
