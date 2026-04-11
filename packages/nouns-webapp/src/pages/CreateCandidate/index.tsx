@@ -360,7 +360,6 @@ const CreateCandidatePage = () => {
           </strong>
         </Alert>
         <div className="d-grid">
-          {/* @ts-expect-error — react-bootstrap Button union type too complex */}
           <Button
             className={classes.proposalActionButton}
             variant="dark"
