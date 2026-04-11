@@ -40,7 +40,6 @@ const emptyFilters: TraitFilter = {
 export function useNounFilters(
   nounIds: bigint[],
   seeds: Record<string, INounSeed> | undefined,
-  ownerNounIds?: Set<bigint>,
 ) {
   const [sortBy, setSortBy] = useState<SortOption>('id-desc');
   const [search, setSearch] = useState('');
@@ -73,11 +72,6 @@ export function useNounFilters(
 
   const filteredAndSorted = useMemo(() => {
     let filtered = [...nounIds];
-
-    // Owner filter
-    if (ownerNounIds) {
-      filtered = filtered.filter(id => ownerNounIds.has(id));
-    }
 
     // Search filter (by noun ID)
     if (search.trim()) {
@@ -137,7 +131,7 @@ export function useNounFilters(
     });
 
     return filtered;
-  }, [nounIds, seeds, search, traitFilters, sortBy, ownerNounIds]);
+  }, [nounIds, seeds, search, traitFilters, sortBy]);
 
   // Trait counts for filter UI
   const traitCounts = useMemo(() => {

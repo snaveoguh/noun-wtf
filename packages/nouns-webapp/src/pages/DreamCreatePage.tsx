@@ -48,7 +48,6 @@ const DreamCreatePage: FC = () => {
       description: description.trim(),
       seed,
       createdAt: Date.now(),
-      status: 'draft',
     });
     navigate('/dreams');
   }, [navigate, title, description, seed]);
