@@ -33,9 +33,6 @@ function ownersQuery(offset: number) {
   return `{ nouns(limit: 1000, offset: ${offset}, orderBy: "id", orderDirection: "desc") { items { id owner } } }`;
 }
 
-function auctionsQuery(offset: number) {
-  return `{ auctions(limit: 1000, offset: ${offset}, orderBy: "nounId", orderDirection: "desc", where: { settled: true }) { items { nounId winner } } }`;
-}
 
 function aggregateAddresses(records: { address: string }[]): DirectoryEntry[] {
   const counts = new Map<string, number>();

@@ -3,7 +3,7 @@
  * Remove this file when DigitalOcean is sunset.
  */
 
-import type { CustomTraitLayer, SavedDream } from '@/lib/dreamStorage';
+import type { SavedDream } from '@/lib/dreamStorage';
 
 const PROBE_API = 'https://api.probe.wtf/api/dream-nouns';
 
