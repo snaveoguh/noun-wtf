@@ -95,7 +95,22 @@ const CreateCandidatePage = () => {
           const fnName = traitLayer === 'head' ? 'addHeads' : traitLayer === 'body' ? 'addBodies' : traitLayer === 'accessory' ? 'addAccessories' : 'addGlasses';
           const signature = `${fnName}(bytes,uint80,uint16)`;
 
-          // ABI-encode just the parameters (no function selector) — matches probe.wtf format
+          // Compress RLE data with deflateRaw (same as probe.wtf uses pako.deflateRaw)
+          const rawBytes = new Uint8Array(
+            (encoded.data.slice(2).match(/.{2}/g) ?? []).map(b => parseInt(b, 16))
+          );
+          const decompressedLength = rawBytes.length;
+
+          // Use CompressionStream API (browser-native, same as pako.deflateRaw)
+          const cs = new CompressionStream('deflate-raw');
+          const writer = cs.writable.getWriter();
+          writer.write(rawBytes);
+          writer.close();
+          const compressedBuf = await new Response(cs.readable).arrayBuffer();
+          const compressedBytes = new Uint8Array(compressedBuf);
+          const compressedHex = '0x' + Array.from(compressedBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+          // ABI-encode: compressed bytes + original length + image count
           const { encodeAbiParameters } = await import('viem');
           const calldata = encodeAbiParameters(
             [
@@ -103,7 +118,7 @@ const CreateCandidatePage = () => {
               { name: 'decompressedLength', type: 'uint80' },
               { name: 'imageCount', type: 'uint16' },
             ],
-            [encoded.data as `0x${string}`, BigInt((encoded.data.length - 2) / 2), 1],
+            [compressedHex as `0x${string}`, BigInt(decompressedLength), 1],
           );
 
           handleAddProposalAction({
@@ -308,6 +323,7 @@ const CreateCandidatePage = () => {
           </strong>
         </Alert>
         <div className="d-grid">
+          {/* @ts-expect-error — react-bootstrap union type too complex */}
           <Button
             className={classes.proposalActionButton}
             variant="dark"
