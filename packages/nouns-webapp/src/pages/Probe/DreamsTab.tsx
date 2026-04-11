@@ -4,18 +4,16 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router';
+import { useAccount } from 'wagmi';
 
+import DreamDetailPopover from '@/components/DreamDetailPopover';
 import { Button } from '@/components/ui/button';
-import { useAppSelector } from '@/hooks';
 import { useDreamCandidates, type OnChainDream } from '@/hooks/useDreamCandidates';
 import { useDreamDrafts } from '@/hooks/useDreamDrafts';
 import { useProbeDreams, type ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
 import { type SavedDream } from '@/lib/dreamStorage';
 import { useCandidateProposal } from '@/wrappers/nounsData';
 import { useUserVotes } from '@/wrappers/nounToken';
-import { useAccount } from 'wagmi';
-
-import DreamDetailPopover from '@/components/DreamDetailPopover';
 
 import DreamCreatePanel from './Dreams/DreamCreatePanel';
 import DreamProposeDialog from './Dreams/DreamProposeDialog';
@@ -127,7 +125,9 @@ function OnChainDreamCard({
             style={{ imageRendering: 'pixelated', display: 'block' }}
           />
         ) : (
-          <div className="flex h-32 w-full items-center justify-center text-3xl text-gray-300">?</div>
+          <div className="flex h-32 w-full items-center justify-center text-3xl text-gray-300">
+            ?
+          </div>
         )}
       </div>
 
@@ -149,7 +149,10 @@ function OnChainDreamCard({
           {hasVotes && (
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); onSponsor(); }}
+              onClick={e => {
+                e.stopPropagation();
+                onSponsor();
+              }}
               className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
             >
               Sponsor
@@ -158,14 +161,24 @@ function OnChainDreamCard({
           {canPromote ? (
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); onPromote(); }}
+              onClick={e => {
+                e.stopPropagation();
+                onPromote();
+              }}
               className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-green-700"
             >
               Promote
             </button>
           ) : (
-            <Link to={`/candidates/${dream.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
-              <button type="button" className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200">
+            <Link
+              to={`/candidates/${dream.id}`}
+              className="flex-1"
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200"
+              >
                 View
               </button>
             </Link>
@@ -188,7 +201,10 @@ function ProbeDreamCard({
   const hasCustomTrait = !!dream.customLayer;
 
   return (
-    <div onClick={onClick} className="group relative cursor-pointer overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div
+      onClick={onClick}
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+    >
       <div
         className="relative flex items-end justify-center overflow-hidden"
         style={{ backgroundColor: `#${ImageData.bgcolors[dream.seeds.background] ?? 'd5d7e1'}` }}
@@ -232,7 +248,10 @@ function ProbeDreamCard({
         {hasCustomTrait && onPropose && (
           <button
             type="button"
-            onClick={e => { e.stopPropagation(); onPropose(); }}
+            onClick={e => {
+              e.stopPropagation();
+              onPropose();
+            }}
             className="mt-2 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
           >
             Propose Trait
@@ -252,8 +271,11 @@ const DreamsTab: FC = () => {
   const [proposingDream, setProposingDream] = useState<SavedDream | null>(null);
   const [signingCandidateId, setSigningCandidateId] = useState<string | null>(null);
   const [selectedDraft, setSelectedDraft] = useState<SavedDream | null>(null);
-  const [selectedOnChain, setSelectedOnChain] = useState<OnChainDream | null>(null);
-  const [dreamPopover, setDreamPopover] = useState<{ dream: ProbeDreamWithPreview; rect: DOMRect } | null>(null);
+
+  const [dreamPopover, setDreamPopover] = useState<{
+    dream: ProbeDreamWithPreview;
+    rect: DOMRect;
+  } | null>(null);
 
   // Wallet state for sponsor/promote
   const { address } = useAccount();
@@ -273,11 +295,19 @@ const DreamsTab: FC = () => {
       {/* Sub-tabs + create button */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
-          {([
-            { key: 'archive' as const, icon: String.fromCodePoint(0x1F4AD), count: probeDreams.length },
-            { key: 'onchain' as const, icon: String.fromCodePoint(0x26D3), count: onChainDreams.length },
-            { key: 'drafts' as const, icon: String.fromCodePoint(0x1F58C), count: drafts.length },
-          ]).map(t => (
+          {[
+            {
+              key: 'archive' as const,
+              icon: String.fromCodePoint(0x1f4ad),
+              count: probeDreams.length,
+            },
+            {
+              key: 'onchain' as const,
+              icon: String.fromCodePoint(0x26d3),
+              count: onChainDreams.length,
+            },
+            { key: 'drafts' as const, icon: String.fromCodePoint(0x1f58c), count: drafts.length },
+          ].map(t => (
             <button
               key={t.key}
               onClick={() => setSubTab(t.key)}
@@ -312,19 +342,27 @@ const DreamsTab: FC = () => {
                   dream={dream}
                   onClick={e => {
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setDreamPopover(prev => prev?.dream.id === dream.id ? null : { dream, rect });
+                    setDreamPopover(prev => (prev?.dream.id === dream.id ? null : { dream, rect }));
                   }}
-                  onPropose={dream.customLayer && address && dream.dreamer.toLowerCase() === address.toLowerCase() ? () => {
-                    // Navigate to create-candidate with dream pre-filled
-                    // The custom trait image URL and layer info encode into the proposal
-                    const params = new URLSearchParams({
-                      dreamId: String(dream.id),
-                      traitLayer: dream.customLayer!,
-                      traitImage: dream.customTraitUrl ?? '',
-                      traitName: dream.customImage?.replace(/\.\w+$/, '').replace(/[-_]/g, ' ') ?? 'Custom Trait',
-                    });
-                    window.location.href = `/create-candidate?${params}`;
-                  } : undefined}
+                  onPropose={
+                    dream.customLayer &&
+                    address &&
+                    dream.dreamer.toLowerCase() === address.toLowerCase()
+                      ? () => {
+                          // Navigate to create-candidate with dream pre-filled
+                          // The custom trait image URL and layer info encode into the proposal
+                          const params = new URLSearchParams({
+                            dreamId: String(dream.id),
+                            traitLayer: dream.customLayer!,
+                            traitImage: dream.customTraitUrl ?? '',
+                            traitName:
+                              dream.customImage?.replace(/\.\w+$/, '').replace(/[_-]/g, ' ') ??
+                              'Custom Trait',
+                          });
+                          window.location.href = `/create-candidate?${params}`;
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -383,13 +421,19 @@ const DreamsTab: FC = () => {
                     )}
                   </Link>
                   {selectedDraft.status === 'draft' && selectedDraft.customTraitLayer && (
-                    <Button size="sm" className="gap-1" onClick={() => setProposingDream(selectedDraft)}>
+                    <Button
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => setProposingDream(selectedDraft)}
+                    >
                       <Upload className="h-3 w-3" />
                       Propose Trait
                     </Button>
                   )}
                   {selectedDraft.status === 'draft' && !selectedDraft.customTraitLayer && (
-                    <span className="text-xs text-gray-400">Standard traits only — add a custom trait to propose</span>
+                    <span className="text-xs text-gray-400">
+                      Standard traits only — add a custom trait to propose
+                    </span>
                   )}
                 </div>
               </div>
@@ -409,9 +453,7 @@ const DreamsTab: FC = () => {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="mb-2 text-5xl">&#x1F30C;</p>
               <p className="mb-1 text-xl font-bold">No on-chain dreams yet</p>
-              <p className="text-muted-foreground">
-                Create a dream and propose it to see it here.
-              </p>
+              <p className="text-muted-foreground">Create a dream and propose it to see it here.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -430,7 +472,6 @@ const DreamsTab: FC = () => {
               ))}
             </div>
           )}
-
         </>
       )}
 
@@ -444,9 +485,7 @@ const DreamsTab: FC = () => {
       )}
 
       {/* Create dream dialog */}
-      {showCreate && (
-        <DreamCreatePanel onSave={saveDraft} onClose={() => setShowCreate(false)} />
-      )}
+      {showCreate && <DreamCreatePanel onSave={saveDraft} onClose={() => setShowCreate(false)} />}
 
       {/* Propose dialog */}
       {proposingDream && (
