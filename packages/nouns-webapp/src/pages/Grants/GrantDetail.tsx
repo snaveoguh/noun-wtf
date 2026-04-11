@@ -252,7 +252,9 @@ export default function GrantDetailPage() {
   const totalVotes = grant.forVotes + grant.againstVotes;
   const forPct = totalVotes > 0 ? (grant.forVotes / totalVotes) * 100 : 50;
   const isActive = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) > blockNumber;
-  const isSucceeded = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) <= blockNumber && grant.forVotes > grant.againstVotes;
+  const votingEnded = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) <= blockNumber;
+  const isSucceeded = votingEnded && grant.forVotes > grant.againstVotes;
+  const isDefeated = votingEnded && grant.forVotes <= grant.againstVotes;
   const isQueued = grant.status === 'QUEUED';
   const canExecute = isQueued && grant.executionETA && Date.now() / 1000 >= parseInt(grant.executionETA);
   const isProposer = userAddr?.toLowerCase() === grant.proposer.toLowerCase();
@@ -267,8 +269,8 @@ export default function GrantDetailPage() {
 
       <div className={classes.detailHeader}>
         <h1 className={classes.detailTitle}>Grant #{grant.id}</h1>
-        <span className={classes.detailStatus} style={{ color: isSucceeded ? '#34d399' : undefined }}>
-          {isSucceeded ? 'SUCCEEDED' : grant.status}
+        <span className={classes.detailStatus} style={{ color: isSucceeded ? '#34d399' : isDefeated ? '#ef4444' : undefined }}>
+          {isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : grant.status}
         </span>
       </div>
 
