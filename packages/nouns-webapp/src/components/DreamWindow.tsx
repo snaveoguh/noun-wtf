@@ -54,6 +54,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
       description: description.trim(),
       seed,
       createdAt: Date.now(),
+      status: 'draft',
     };
     saveDreamToStorage(dream);
     setSaved(true);
