@@ -40,7 +40,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
-import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
   type AbiParameter,
@@ -83,6 +82,7 @@ import {
   useWriteNounsGovernorWithdrawFromForkEscrow,
 } from '@/contracts';
 import { useBlockTimestamp } from '@/hooks/useBlockTimestamp';
+import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { defaultChain } from '@/wagmi';
 
 import {
@@ -836,33 +836,18 @@ function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
   if (_proposalsCache) return Promise.resolve(_proposalsCache);
   if (_proposalsFetchPromise) return _proposalsFetchPromise;
 
-  // Railway proxy truncates responses >~50KB, so paginate in small batches
   _proposalsFetchPromise = (async () => {
-    const PAGE = 50;
-    const allItems: GraphQLProposal[] = [];
-    for (let offset = 0; ; offset += PAGE) {
-      const query = `{
-        proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
-          items {
-            id description status forVotes againstVotes abstainVotes quorumVotes executionETA
-            startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
-            onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
-            signers(limit: 100) { items { signer } }
-          }
-        }
-      }`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (json.errors?.length) throw new Error(json.errors[0].message);
-      const items = json.data?.proposals?.items ?? [];
-      allItems.push(...items);
-      if (items.length < PAGE) break;
-    }
+    // Use REST endpoint — single request, no chunked encoding, no Fastly truncation.
+    const baseUrl = url.replace(/\/graphql$/, '').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/api/proposals`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const items: Array<GraphQLProposal & { signers?: string[] }> = await res.json();
+    // Adapt REST response shape to match GraphQL shape expected downstream
+    const allItems: GraphQLProposal[] = items.map(p => ({
+      ...p,
+      signers: (p.signers ?? []).map((s: string) => ({ id: s })),
+    }));
+
     _proposalsCache = allItems;
     _proposalsFetchPromise = null;
     return allItems;
@@ -890,11 +875,21 @@ export const useAllProposalsViaSubgraph = (): PartialProposalData => {
       return;
     }
     const url = getSubgraphUrl();
-    if (!url) { setError(new Error('No subgraph URL')); setLoading(false); return; }
+    if (!url) {
+      setError(new Error('No subgraph URL'));
+      setLoading(false);
+      return;
+    }
     fetchAllProposals(url)
-      .then(items => { setData({ proposals: { items } }); setLoading(false); })
-      .catch(e => { setError(e); setLoading(false); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .then(items => {
+        setData({ proposals: { items } });
+        setLoading(false);
+      })
+      .catch(e => {
+        setError(e);
+        setLoading(false);
+      });
+  }, []);
 
   const isDaoGteV3 = useIsDaoGteV3();
   const { data: blockNumber } = useBlockNumber();

@@ -293,32 +293,102 @@ function computeDerivedGrantStatus(g: Record<string, unknown>, latestBlock: bigi
   return status;
 }
 
-/** Middleware that wraps the Ponder graphql handler to compute derived proposal statuses */
+/**
+ * Middleware that:
+ * 1. Buffers Yoga's response fully to avoid Railway/Fastly chunked-transfer truncation
+ * 2. Computes derived proposal statuses
+ * 3. Re-emits with explicit Content-Length (no chunked encoding)
+ */
 async function graphqlWithDerivedStatus(
   c: { res: Response; [key: string]: unknown },
   next: () => Promise<void>,
 ) {
   await next();
-  // Only patch JSON responses
   const ct = c.res.headers.get('content-type') || '';
   if (!ct.includes('json')) return;
+
+  // Read full body as text first — works even if JSON is malformed
+  let text: string;
   try {
-    const body = await c.res.json();
+    text = await c.res.text();
+  } catch {
+    return; // stream error — pass through
+  }
+
+  // Try to parse, patch statuses, re-stringify
+  try {
+    const body = JSON.parse(text);
     if (body?.data) {
       const latestBlock = await getLatestBlockCached();
       if (latestBlock > 0n) patchProposalStatuses(body.data, latestBlock);
     }
-    c.res = new Response(JSON.stringify(body), {
-      status: c.res.status,
-      headers: c.res.headers,
-    });
+    text = JSON.stringify(body);
   } catch {
-    /* if parsing fails, pass through original response */
+    // Malformed JSON — still re-emit the raw text with proper headers
   }
+
+  // Re-emit with explicit Content-Length and no chunked transfer-encoding
+  const headers = new Headers(c.res.headers);
+  headers.delete('transfer-encoding');
+  headers.set('content-length', String(new TextEncoder().encode(text).byteLength));
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+  c.res = new Response(text, { status: 200, headers });
 }
 
 app.use('/', graphqlWithDerivedStatus, graphql({ db, schema }));
 app.use('/graphql', graphqlWithDerivedStatus, graphql({ db, schema }));
+
+// ============================================================
+// REST endpoints — bypass GraphQL/Yoga chunked encoding (Fastly truncates it)
+// ============================================================
+
+/** All proposals with signers — single JSON response, no chunked encoding */
+app.get('/api/proposals', async c => {
+  const proposals = await db
+    .select()
+    .from(schema.proposal)
+    .orderBy(desc(schema.proposal.createdAtBlock));
+  const signers = await db.select().from(schema.proposalSigner);
+  const signerMap = new Map<string, string[]>();
+  for (const s of signers) {
+    const key = String(s.proposalId);
+    if (!signerMap.has(key)) signerMap.set(key, []);
+    signerMap.get(key)!.push(s.signer);
+  }
+  const items = proposals.map(p => ({
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    proposalThreshold: String(p.proposalThreshold),
+    quorumVotes: String(p.quorumVotes),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    objectionPeriodEndBlock:
+      p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+    updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+    voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+    createdAtBlock: String(p.createdAtBlock),
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    signers: signerMap.get(String(p.id)) ?? [],
+  }));
+  return c.json(items);
+});
+
+/** All grants — single JSON response */
+app.get('/api/grants', async c => {
+  const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
+  const items = grants.map(g => ({
+    ...g,
+    id: String(g.id),
+    startBlock: String(g.startBlock),
+    endBlock: String(g.endBlock),
+    executionETA: g.executionETA != null ? String(g.executionETA) : null,
+    createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+  }));
+  return c.json(items);
+});
 
 // ============================================================
 // Terminal — Claude AI chat for Nouns governance
@@ -6296,8 +6366,6 @@ app.get('/api/stats/plausible', async c => {
 });
 
 app.get('/api/stats/health', async c => {
-  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
-
   let latestBlock: string = 'unknown';
   try {
     latestBlock = (await getCurrentBlock()).toString();

@@ -30,6 +30,7 @@ const transports = {
     ...(import.meta.env.VITE_SEPOLIA_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_SEPOLIA_JSONRPC)]
       : []),
+    http('https://ethereum-sepolia-rpc.publicnode.com'),
   ]),
 };
 
