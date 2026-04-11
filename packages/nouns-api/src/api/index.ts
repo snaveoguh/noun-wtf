@@ -293,28 +293,48 @@ function computeDerivedGrantStatus(g: Record<string, unknown>, latestBlock: bigi
   return status;
 }
 
-/** Middleware that wraps the Ponder graphql handler to compute derived proposal statuses */
+/**
+ * Middleware that:
+ * 1. Buffers Yoga's response fully to avoid Railway/Fastly chunked-transfer truncation
+ * 2. Computes derived proposal statuses
+ * 3. Re-emits with explicit Content-Length (no chunked encoding)
+ */
 async function graphqlWithDerivedStatus(
   c: { res: Response; [key: string]: unknown },
   next: () => Promise<void>,
 ) {
   await next();
-  // Only patch JSON responses
   const ct = c.res.headers.get('content-type') || '';
   if (!ct.includes('json')) return;
+
+  // Read full body as text first — works even if JSON is malformed
+  let text: string;
   try {
-    const body = await c.res.json();
+    text = await c.res.text();
+  } catch {
+    return; // stream error — pass through
+  }
+
+  // Try to parse, patch statuses, re-stringify
+  try {
+    const body = JSON.parse(text);
     if (body?.data) {
       const latestBlock = await getLatestBlockCached();
       if (latestBlock > 0n) patchProposalStatuses(body.data, latestBlock);
     }
-    c.res = new Response(JSON.stringify(body), {
-      status: c.res.status,
-      headers: c.res.headers,
-    });
+    text = JSON.stringify(body);
   } catch {
-    /* if parsing fails, pass through original response */
+    // Malformed JSON — still re-emit the raw text with proper headers
   }
+
+  // Re-emit with explicit Content-Length and no chunked transfer-encoding
+  const headers = new Headers(c.res.headers);
+  headers.delete('transfer-encoding');
+  headers.set('content-length', String(new TextEncoder().encode(text).byteLength));
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+  c.res = new Response(text, { status: 200, headers });
 }
 
 app.use('/', graphqlWithDerivedStatus, graphql({ db, schema }));
@@ -6296,8 +6316,6 @@ app.get('/api/stats/plausible', async c => {
 });
 
 app.get('/api/stats/health', async c => {
-  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
-
   let latestBlock: string = 'unknown';
   try {
     latestBlock = (await getCurrentBlock()).toString();
