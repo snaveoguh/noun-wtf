@@ -69,37 +69,50 @@ export default function GrantsPage() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE}/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `{
-          grants(orderBy: "id", orderDirection: "desc", limit: 100) {
-            items {
-              id proposer description status
-              forVotes againstVotes abstainVotes
-              startBlock endBlock executionETA
-              createdAt
-            }
-          }
-        }`,
-      }),
-    })
-      .then(r => r.json())
-      .then(d => {
-        const items = (d.data?.grants?.items || []).map((g: any) => ({
-          id: Number(g.id),
-          proposer: g.proposer,
-          description: g.description || '',
-          status: g.status || 'ACTIVE',
-          forVotes: g.forVotes || 0,
-          againstVotes: g.againstVotes || 0,
-          abstainVotes: g.abstainVotes || 0,
-          startBlock: String(g.startBlock || '0'),
-          endBlock: String(g.endBlock || '0'),
-          executionETA: g.executionETA ? String(g.executionETA) : null,
-          createdAt: g.createdAt,
-        }));
+    // Fetch grants without description first (Railway truncates large responses),
+    // then fetch each grant's description individually
+    const gqlFetch = (query: string) =>
+      fetch(`${API_BASE}/graphql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      }).then(r => r.json());
+
+    gqlFetch(`{
+      grants(orderBy: "id", orderDirection: "desc", limit: 100) {
+        items {
+          id proposer status
+          forVotes againstVotes abstainVotes
+          startBlock endBlock executionETA
+          createdAt
+        }
+      }
+    }`)
+      .then(async d => {
+        const rawItems = d.data?.grants?.items || [];
+        // Fetch descriptions one by one (they can be large markdown)
+        const items = await Promise.all(
+          rawItems.map(async (g: any) => {
+            let description = '';
+            try {
+              const dd = await gqlFetch(`{ grant(id: "${g.id}") { description } }`);
+              description = dd.data?.grant?.description || '';
+            } catch {}
+            return {
+              id: Number(g.id),
+              proposer: g.proposer,
+              description,
+              status: g.status || 'ACTIVE',
+              forVotes: g.forVotes || 0,
+              againstVotes: g.againstVotes || 0,
+              abstainVotes: g.abstainVotes || 0,
+              startBlock: String(g.startBlock || '0'),
+              endBlock: String(g.endBlock || '0'),
+              executionETA: g.executionETA ? String(g.executionETA) : null,
+              createdAt: g.createdAt,
+            };
+          }),
+        );
         setGrants(items);
       })
       .catch(() => {})

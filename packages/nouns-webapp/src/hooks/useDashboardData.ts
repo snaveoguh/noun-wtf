@@ -92,6 +92,5 @@ export function useSystemHealth() {
         return r.json();
       }),
     refetchInterval: 60_000,
-    enabled: DASHBOARD_KEY.length > 0,
   });
 }

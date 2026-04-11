@@ -143,8 +143,36 @@ const ExploreTab: React.FC = () => {
   const { owners, loading: ownersLoading } = useNounOwners();
   const { settlers, loading: settlersLoading } = useNounSettlers();
 
-  // Settler filter state
+  // Settler filter state — loads from static settlers.json
   const [settlerAddress, setSettlerAddress] = useState('');
+  const [settlerNounIds, setSettlerNounIds] = useState<Set<bigint> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!settlerAddress) { setSettlerNounIds(undefined); return; }
+    fetch('/probe-dreams/settlers.json')
+      .then(r => r.json())
+      .then((data: Record<string, string>) => {
+        const ids = new Set<bigint>();
+        for (const [nounId, addr] of Object.entries(data)) {
+          if (addr.toLowerCase() === settlerAddress.toLowerCase()) ids.add(BigInt(nounId));
+        }
+        setSettlerNounIds(ids);
+      })
+      .catch(() => setSettlerNounIds(new Set()));
+  }, [settlerAddress]);
+
+  // Combine owner + settler filters
+  const combinedFilterIds = useMemo(() => {
+    if (!ownedNounIds && !settlerNounIds) return undefined;
+    if (ownedNounIds && !settlerNounIds) return ownedNounIds;
+    if (!ownedNounIds && settlerNounIds) return settlerNounIds;
+    // Both active — intersection
+    const intersection = new Set<bigint>();
+    for (const id of ownedNounIds!) {
+      if (settlerNounIds!.has(id)) intersection.add(id);
+    }
+    return intersection;
+  }, [ownedNounIds, settlerNounIds]);
 
   const {
     sortBy,
@@ -156,7 +184,7 @@ const ExploreTab: React.FC = () => {
     clearFilters,
     hasActiveFilters,
     filteredAndSorted,
-  } = useNounFilters(nounsList, seeds, ownedNounIds);
+  } = useNounFilters(nounsList, seeds, combinedFilterIds);
 
   const [showTraits, setShowTraits] = useState(false);
 

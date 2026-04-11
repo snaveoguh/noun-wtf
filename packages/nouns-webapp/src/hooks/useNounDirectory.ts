@@ -121,19 +121,21 @@ export function useNounSettlers() {
 
     (async () => {
       try {
-        const allAuctions: { nounId: string; winner: string }[] = [];
-        for (let offset = 0; ; offset += 1000) {
-          const result = await ponderQuery<{
-            auctions: { items: { nounId: string; winner: string }[] };
-          }>(auctionsQuery(offset));
-          const items = result?.auctions?.items ?? [];
-          allAuctions.push(...items);
-          if (items.length < 1000) break;
+        // Load real settler data from pre-computed JSON (tx senders from settlement calls)
+        const res = await fetch('/probe-dreams/settlers.json');
+        const data = (await res.json()) as Record<string, string>;
+
+        // Aggregate: count how many nouns each address settled
+        const counts = new Map<string, number>();
+        for (const addr of Object.values(data)) {
+          const key = addr.toLowerCase();
+          counts.set(key, (counts.get(key) ?? 0) + 1);
         }
-        if (allAuctions.length === 0) throw new Error('No auctions data');
-        let entries = aggregateAddresses(
-          allAuctions.filter(a => a.winner).map(a => ({ address: a.winner })),
-        );
+
+        let entries: DirectoryEntry[] = Array.from(counts.entries())
+          .map(([address, count]) => ({ address, ens: null, count }))
+          .sort((a, b) => b.count - a.count);
+
         setSettlers(entries);
         setLoading(false);
 
