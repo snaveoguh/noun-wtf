@@ -6296,7 +6296,6 @@ app.get('/api/stats/plausible', async c => {
 });
 
 app.get('/api/stats/health', async c => {
-  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
 
   let latestBlock: string = 'unknown';
   try {
