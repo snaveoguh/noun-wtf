@@ -36,10 +36,11 @@ interface GraphQLProposal {
   signers?: { id: string }[];
 }
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
+import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
   type AbiParameter,
@@ -92,7 +93,6 @@ import {
   forkJoinsQuery,
   forksQuery,
   isForkActiveQuery,
-  partialProposalsQuery,
   proposalQuery,
   proposalTitlesQuery,
   proposalVersionsQuery,
@@ -828,15 +828,74 @@ const parseSubgraphProposal = (
   };
 };
 
+// Module-level cache so paginated fetch survives React remounts
+let _proposalsCache: GraphQLProposal[] | null = null;
+let _proposalsFetchPromise: Promise<GraphQLProposal[]> | null = null;
+
+function fetchAllProposals(url: string): Promise<GraphQLProposal[]> {
+  if (_proposalsCache) return Promise.resolve(_proposalsCache);
+  if (_proposalsFetchPromise) return _proposalsFetchPromise;
+
+  // Railway proxy truncates responses >~50KB, so paginate in small batches
+  _proposalsFetchPromise = (async () => {
+    const PAGE = 50;
+    const allItems: GraphQLProposal[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const query = `{
+        proposals(limit: ${PAGE}, offset: ${offset}, orderBy: "createdAtBlock", orderDirection: "asc") {
+          items {
+            id description status forVotes againstVotes abstainVotes quorumVotes executionETA
+            startBlock endBlock updatePeriodEndBlock objectionPeriodEndBlock
+            onTimelockV1 proposer createdAtBlock createdAt createdAtTransaction
+            signers(limit: 100) { items { signer } }
+          }
+        }
+      }`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.errors?.length) throw new Error(json.errors[0].message);
+      const items = json.data?.proposals?.items ?? [];
+      allItems.push(...items);
+      if (items.length < PAGE) break;
+    }
+    _proposalsCache = allItems;
+    _proposalsFetchPromise = null;
+    return allItems;
+  })().catch(e => {
+    _proposalsFetchPromise = null;
+    throw e;
+  });
+
+  return _proposalsFetchPromise;
+}
+
 export const useAllProposalsViaSubgraph = (): PartialProposalData => {
   const chainId = defaultChain.id;
-  const { query, variables } = partialProposalsQuery();
-  const { loading, data, error } = useQuery<{
-    proposals: { items: GraphQLProposal[] };
-  }>(query, {
-    variables,
-    fetchPolicy: 'no-cache',
-  });
+
+  const [data, setData] = useState<{ proposals: { items: GraphQLProposal[] } } | undefined>(
+    _proposalsCache ? { proposals: { items: _proposalsCache } } : undefined,
+  );
+  const [loading, setLoading] = useState(!_proposalsCache);
+  const [error, setError] = useState<Error | undefined>();
+
+  useEffect(() => {
+    if (_proposalsCache) {
+      setData({ proposals: { items: _proposalsCache } });
+      setLoading(false);
+      return;
+    }
+    const url = getSubgraphUrl();
+    if (!url) { setError(new Error('No subgraph URL')); setLoading(false); return; }
+    fetchAllProposals(url)
+      .then(items => { setData({ proposals: { items } }); setLoading(false); })
+      .catch(e => { setError(e); setLoading(false); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isDaoGteV3 = useIsDaoGteV3();
   const { data: blockNumber } = useBlockNumber();
   const timestamp = useBlockTimestamp(blockNumber);
