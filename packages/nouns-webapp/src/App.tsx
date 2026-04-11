@@ -219,7 +219,7 @@ function AppRouter() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
-      <HeliosStatusBar />
+      {/* <HeliosStatusBar /> — disabled: a16z consensus endpoints are down, causes infinite 502 retry loop */}
       <Toaster
         expand
         closeButton
