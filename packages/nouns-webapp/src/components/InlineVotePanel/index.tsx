@@ -141,7 +141,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
             justifyContent: 'center',
           }}
         >
-          <ThumbsUp size={16} color="#fff" />
+          <span style={{ fontSize: 16 }}>{'\uD83D\uDC4D'}</span>
         </div>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>

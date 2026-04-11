@@ -136,7 +136,7 @@ const NavBar = () => {
                 TESTNET
               </Nav.Item>
             )}
-            <Nav.Item>
+            <Nav.Item className="d-none d-sm-block">
               {treasuryBalance !== undefined ? (
                 <Nav.Link
                   href={daoEtherscanLink}
@@ -328,9 +328,9 @@ const NavBar = () => {
                       navDropdownClasses.warmInfoSelected,
                     ),
                   )}
-                  href="/nouns"
+                  href="/probe"
                 >
-                  <Trans>Nouns</Trans>
+                  Probe
                 </Dropdown.Item>
                 <Dropdown.Item
                   className={clsx(
