@@ -328,9 +328,9 @@ const NavBar = () => {
                       navDropdownClasses.warmInfoSelected,
                     ),
                   )}
-                  href="/nouns"
+                  href="/probe"
                 >
-                  <Trans>Nouns</Trans>
+                  Probe
                 </Dropdown.Item>
                 <Dropdown.Item
                   className={clsx(

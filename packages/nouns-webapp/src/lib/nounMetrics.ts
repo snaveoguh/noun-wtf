@@ -1,14 +1,14 @@
-import { ImageData } from '@noundry/nouns-assets';
+import { ImageData, getNounData } from '@noundry/nouns-assets';
 
 import { INounSeed } from '@/wrappers/nounToken';
 
 export interface NounMetrics {
   area: number; // 0-1, proportion of non-bg pixels
-  colorfulness: number; // 0-100, color variety score
-  brightness: number; // 0-255, average luminance
+  colorfulness: number; // 0-100, color variety + saturation score
+  brightness: number; // 0-255, average luminance of the ART pixels only (not background)
 }
 
-const CACHE_KEY = 'noun-metrics-v1';
+const CACHE_KEY = 'noun-metrics-v3';
 const metricsCache = new Map<number, NounMetrics>();
 
 // Load from localStorage on init
@@ -20,6 +20,14 @@ try {
       metricsCache.set(Number(k), v);
     }
   }
+} catch {
+  // ignore
+}
+
+// Clear old caches
+try {
+  localStorage.removeItem('noun-metrics-v1');
+  localStorage.removeItem('noun-metrics-v2');
 } catch {
   // ignore
 }
@@ -36,83 +44,144 @@ function saveCache() {
   }
 }
 
+/** Decode RLE-encoded trait data into pixel color indices */
+function decodeRLE(hexData: string): {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  pixels: number[];
+} {
+  const hex = hexData.startsWith('0x') ? hexData.slice(2) : hexData;
+  const top = parseInt(hex.slice(2, 4), 16);
+  const right = parseInt(hex.slice(4, 6), 16);
+  const bottom = parseInt(hex.slice(6, 8), 16);
+  const left = parseInt(hex.slice(8, 10), 16);
+
+  const pixels: number[] = [];
+  let i = 10;
+  while (i + 3 <= hex.length) {
+    const length = parseInt(hex.slice(i, i + 2), 16);
+    const colorIndex = parseInt(hex.slice(i + 2, i + 4), 16);
+    for (let j = 0; j < length; j++) pixels.push(colorIndex);
+    i += 4;
+  }
+
+  return { top, right, bottom, left, pixels };
+}
+
+/** Parse hex color to RGB */
+function hexToRGB(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16),
+  ];
+}
+
+/** ITU-R BT.601 weighted luminance */
+function luminance(r: number, g: number, b: number): number {
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+/** Saturation of an RGB color (0-1) */
+function saturation(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === 0) return 0;
+  return (max - min) / max;
+}
+
 /**
- * Compute visual metrics for a noun by rendering its SVG to a canvas
- * and analyzing pixel data.
+ * Compute pixel-accurate metrics by decoding RLE trait data
+ * and analyzing the composite 32x32 grid.
+ *
+ * Brightness and colorfulness are computed on ART pixels only
+ * (excluding background), so the sort produces visually meaningful results.
  */
-export function computeNounMetrics(seed: INounSeed, nounId: number): NounMetrics {
-  const cached = metricsCache.get(nounId);
-  if (cached) return cached;
-
+function computeFromPixels(seed: INounSeed): NounMetrics {
   try {
-    // Parse background color
-    const bgHex = ImageData.bgcolors[seed.background];
-    const bgR = parseInt(bgHex.slice(0, 2), 16);
-    const bgG = parseInt(bgHex.slice(2, 4), 16);
-    const bgB = parseInt(bgHex.slice(4, 6), 16);
+    const { parts, background } = getNounData(seed);
 
-    // Since we can't easily render SVG to canvas synchronously,
-    // use a deterministic heuristic based on trait indices
-    const metrics = computeFromSeed(seed, bgR, bgG, bgB);
-    metricsCache.set(nounId, metrics);
+    // Composite all parts onto 32x32 grid (0 = transparent/background)
+    const grid = new Int16Array(32 * 32);
 
-    // Batch save periodically
-    if (metricsCache.size % 50 === 0) {
-      saveCache();
+    for (const part of parts) {
+      const decoded = decodeRLE(part.data);
+      let pixelIdx = 0;
+      for (let y = decoded.top; y < decoded.bottom && y < 32; y++) {
+        for (let x = decoded.left; x < decoded.right && x < 32; x++) {
+          if (pixelIdx < decoded.pixels.length) {
+            const colorIdx = decoded.pixels[pixelIdx];
+            if (colorIdx !== 0) {
+              grid[y * 32 + x] = colorIdx;
+            }
+            pixelIdx++;
+          }
+        }
+      }
     }
 
-    return metrics;
+    // Analyze art pixels only (skip background)
+    let artBrightness = 0;
+    let artPixelCount = 0;
+    let totalSaturation = 0;
+    const uniqueColors = new Set<number>();
+
+    const totalPixels = 32 * 32;
+
+    for (let i = 0; i < totalPixels; i++) {
+      const colorIdx = grid[i];
+      if (colorIdx === 0) continue; // skip background
+
+      const hex = ImageData.palette[colorIdx];
+      if (!hex) continue;
+
+      const [r, g, b] = hexToRGB(hex);
+      artBrightness += luminance(r, g, b);
+      totalSaturation += saturation(r, g, b);
+      artPixelCount++;
+      uniqueColors.add(colorIdx);
+    }
+
+    const area = artPixelCount / totalPixels;
+
+    // Brightness: average luminance of art pixels only
+    const avgBrightness = artPixelCount > 0 ? artBrightness / artPixelCount : 128;
+
+    // Colorfulness: unique colors + average saturation
+    // More unique colors + higher saturation = more colorful
+    const avgSaturation = artPixelCount > 0 ? totalSaturation / artPixelCount : 0;
+    const colorfulness = Math.min(
+      100,
+      uniqueColors.size * 2.5 + avgSaturation * 60,
+    );
+
+    return {
+      area: Math.max(0, Math.min(1, area)),
+      colorfulness: Math.max(0, Math.min(100, colorfulness)),
+      brightness: Math.max(0, Math.min(255, avgBrightness)),
+    };
   } catch {
-    const fallback: NounMetrics = { area: 0.5, colorfulness: 50, brightness: 128 };
-    metricsCache.set(nounId, fallback);
-    return fallback;
+    return { area: 0.5, colorfulness: 50, brightness: 128 };
   }
 }
 
 /**
- * Approximate metrics from seed values without rendering.
- * This is fast and deterministic.
- */
-function computeFromSeed(seed: INounSeed, bgR: number, bgG: number, bgB: number): NounMetrics {
-  // Area: heads with more detail tend to have higher indices
-  // Normalize head + accessory + body indices to estimate coverage
-  const headCount = ImageData.images.heads.length;
-  const bodyCount = ImageData.images.bodies.length;
-  const accessoryCount = ImageData.images.accessories.length;
-  const glassesCount = ImageData.images.glasses.length;
-
-  // Use a hash of all traits to create pseudo-random but deterministic metrics
-  const combined = seed.head * 1000 + seed.body * 100 + seed.accessory * 10 + seed.glasses;
-  const hash = (combined * 2654435761) >>> 0; // Knuth multiplicative hash
-
-  // Area: 0.3 to 0.8 range based on head + body complexity
-  const area = 0.3 + ((seed.head / headCount + seed.body / bodyCount) / 2) * 0.5;
-
-  // Colorfulness: based on trait diversity and background
-  const traitVariety =
-    (seed.head / headCount +
-      seed.body / bodyCount +
-      seed.accessory / accessoryCount +
-      seed.glasses / glassesCount) /
-    4;
-  const colorfulness = 20 + traitVariety * 60 + ((hash % 20) - 10);
-
-  // Brightness: based on background + trait indices
-  const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
-  const brightness = bgBrightness * 0.4 + 128 * 0.3 + ((hash >> 8) % 64) + 32;
-
-  return {
-    area: Math.max(0, Math.min(1, area)),
-    colorfulness: Math.max(0, Math.min(100, colorfulness)),
-    brightness: Math.max(0, Math.min(255, brightness)),
-  };
-}
-
-/**
- * Get cached metrics or compute them.
+ * Get cached metrics or compute them (pixel-accurate, art-only).
  */
 export function getNounMetrics(seed: INounSeed, nounId: number): NounMetrics {
-  return computeNounMetrics(seed, nounId);
+  const cached = metricsCache.get(nounId);
+  if (cached) return cached;
+
+  const metrics = computeFromPixels(seed);
+  metricsCache.set(nounId, metrics);
+
+  if (metricsCache.size % 50 === 0) {
+    saveCache();
+  }
+
+  return metrics;
 }
 
 /**

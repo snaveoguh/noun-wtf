@@ -19,6 +19,10 @@ interface GalleryFiltersProps {
   hasActiveFilters: boolean;
   totalCount: number;
   filteredCount: number;
+  /** Owner address filter */
+  ownerAddress?: string;
+  onOwnerChange?: (address: string) => void;
+  ownerLoading?: boolean;
 }
 
 const sortOptions: { label: string; value: SortOption }[] = [
@@ -51,6 +55,9 @@ export const GalleryFilters: FC<GalleryFiltersProps> = ({
   hasActiveFilters,
   totalCount,
   filteredCount,
+  ownerAddress,
+  onOwnerChange,
+  ownerLoading,
 }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [expandedTrait, setExpandedTrait] = useState<string | null>(null);
@@ -68,6 +75,25 @@ export const GalleryFilters: FC<GalleryFiltersProps> = ({
           className="border-border rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
           style={{ width: 200 }}
         />
+
+        {/* Owner filter */}
+        {onOwnerChange && (
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filter by owner..."
+              value={ownerAddress ?? ''}
+              onChange={e => onOwnerChange(e.target.value)}
+              className="border-border rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+              style={{ width: 200 }}
+            />
+            {ownerLoading && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                ...
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Sort */}
         <select
