@@ -95,20 +95,25 @@ const CreateCandidatePage = () => {
           const fnName = traitLayer === 'head' ? 'addHeads' : traitLayer === 'body' ? 'addBodies' : traitLayer === 'accessory' ? 'addAccessories' : 'addGlasses';
           const signature = `${fnName}(bytes,uint80,uint16)`;
 
-          // Compress RLE data with deflateRaw (same as probe.wtf uses pako.deflateRaw)
-          const rawBytes = new Uint8Array(
-            (encoded.data.slice(2).match(/.{2}/g) ?? []).map(b => parseInt(b, 16))
-          );
-          const decompressedLength = rawBytes.length;
+          // Match probe.wtf encoding: ABI-encode the RLE as bytes[], then compress
+          const { encodeAbiParameters: encodeParams, hexToBytes, bytesToHex } = await import('viem');
 
-          // Use CompressionStream API (browser-native, same as pako.deflateRaw)
+          // Step 1: ABI-encode the raw RLE data as bytes[] (array of 1 element)
+          const abiEncodedArtwork = encodeParams(
+            [{ type: 'bytes[]' }],
+            [[encoded.data as `0x${string}`]],
+          );
+
+          // Step 2: Compress the ABI-encoded bytes with deflateRaw
+          const uncompressedBytes = hexToBytes(abiEncodedArtwork);
+          const decompressedLength = uncompressedBytes.length;
+
           const cs = new CompressionStream('deflate-raw');
           const writer = cs.writable.getWriter();
-          writer.write(rawBytes);
+          writer.write(uncompressedBytes);
           writer.close();
           const compressedBuf = await new Response(cs.readable).arrayBuffer();
-          const compressedBytes = new Uint8Array(compressedBuf);
-          const compressedHex = '0x' + Array.from(compressedBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+          const compressedHex = bytesToHex(new Uint8Array(compressedBuf));
 
           // ABI-encode: compressed bytes + original length + image count
           const { encodeAbiParameters } = await import('viem');
@@ -136,19 +141,27 @@ const CreateCandidatePage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDreamProposal]);
 
-  // Artwork agreement signing
+  // Artwork agreement — matches probe.wtf legal format exactly
+  const AGREEMENT_URL = 'https://ern3fbtsj23a2achuj5kqa4xtp2yvplqjy2r6cemo6ep52lfn2cq.arweave.net/JFuyhnJOtg0AR6J6qAOXm_WKvXBONR8IjHeI_ullboU';
+
+  const agreementMessage = useMemo(() => {
+    if (!address || !traitName) return '';
+    return `I, the individual controlling Ethereum address ${address}, hereby waive all copyright and all related or neighboring rights, together with any associated claims or causes of action, to the extent permitted by law. I have read and understand the terms and intended legal effect of the Nouns Art Contribution Agreement, available at ${AGREEMENT_URL}, and hereby voluntarily elect to apply it to this contribution. Contribution name: ${traitName}. Contribution specification: ${traitImage ?? 'N/A'}.`;
+  }, [address, traitName, traitImage]);
+
   const handleSignArtworkAgreement = async () => {
     if (!address) { toast.error('Connect wallet first'); return; }
-    const message = `I, ${address}, agree to contribute the artwork "${traitName ?? 'Custom Trait'}" under the CC0 1.0 Universal Public Domain Dedication.\n\nThis artwork is my original creation, and I waive all copyright and related rights.\n\nhttps://creativecommons.org/publicdomain/zero/1.0/`;
     try {
-      const sig = await signMessageAsync({ message });
+      const sig = await signMessageAsync({ message: agreementMessage });
       setArtworkSignature(sig);
       setArtworkAgreementSigned(true);
-      // Append agreement to proposal body
-      setBodyValue(prev => `${prev}\n\n---\n\n### Artwork Contribution Agreement\n\nSigned by: ${address}\nSignature: ${sig}\n\nCC0 1.0 Universal Public Domain Dedication`);
-      toast.success('Artwork agreement signed!');
+      // Append beautifully formatted legal agreement to proposal description
+      setBodyValue(prev =>
+        `${prev}\n\n---\n\n## CC0 Artwork Contribution Agreement\n\n> ${agreementMessage}\n\n| | |\n|---|---|\n| **Signer** | \`${address}\` |\n| **Signature** | \`${sig.slice(0, 32)}...${sig.slice(-8)}\` |\n| **Full Agreement** | [Nouns Art Contribution Agreement](${AGREEMENT_URL}) |\n| **License** | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) |`,
+      );
+      toast.success('CC0 waiver signed!');
     } catch (err) {
-      toast.error('Failed to sign agreement');
+      toast.error('Failed to sign waiver');
     }
   };
 
@@ -356,47 +369,113 @@ const CreateCandidatePage = () => {
           onBodyInput={handleBodyInput}
           isCandidate={true}
         />
-        {/* Artwork Agreement — only for dream proposals */}
+        {/* CC0 Artwork Waiver — only for dream proposals */}
         {isDreamProposal && (
           <div style={{
-            margin: '20px 0',
-            padding: '16px 20px',
-            borderRadius: 12,
-            border: artworkAgreementSigned ? '2px solid #22c55e' : '2px solid #f59e0b',
-            background: artworkAgreementSigned ? '#f0fdf4' : '#fffbeb',
+            margin: '24px 0',
+            borderRadius: 16,
+            overflow: 'hidden',
+            border: artworkAgreementSigned ? '2px solid #22c55e' : '2px solid #1a1a2e',
           }}>
-            <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 8 }}>
-              {artworkAgreementSigned ? '✓ Artwork Agreement Signed' : 'Artwork Contribution Agreement'}
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>
-              By signing, you confirm this artwork is your original creation and you agree to release it
-              under the <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>CC0 1.0 Universal Public Domain Dedication</a>.
-            </p>
-            {traitImage && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            {/* Header */}
+            <div style={{
+              background: artworkAgreementSigned ? '#22c55e' : '#1a1a2e',
+              padding: '14px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '1.1rem' }}>{artworkAgreementSigned ? '\u2713' : '\uD83D\uDD12'}</span>
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.02em' }}>
+                  {artworkAgreementSigned ? 'CC0 Waiver Signed' : 'CC0 Artwork Waiver Required'}
+                </span>
+              </div>
+              {traitImage && (
                 <img
                   src={traitImage}
-                  alt={traitName ?? 'Trait'}
-                  style={{ width: 48, height: 48, imageRendering: 'pixelated', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  alt={traitName ?? ''}
+                  style={{ width: 32, height: 32, imageRendering: 'pixelated', borderRadius: 6, border: '2px solid rgba(255,255,255,0.3)' }}
                 />
-                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{traitName ?? 'Custom Trait'}</span>
-              </div>
-            )}
-            {!artworkAgreementSigned ? (
-              <Button
-                variant="warning"
-                size="sm"
-                onClick={handleSignArtworkAgreement}
-                disabled={!address}
-                style={{ fontWeight: 700 }}
-              >
-                {address ? 'Sign Agreement with Wallet' : 'Connect Wallet to Sign'}
-              </Button>
-            ) : (
-              <p style={{ fontSize: '0.65rem', color: '#22c55e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                Sig: {artworkSignature.slice(0, 20)}...{artworkSignature.slice(-8)}
-              </p>
-            )}
+              )}
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '16px 20px', background: artworkAgreementSigned ? '#f0fdf4' : '#fafafa' }}>
+              {!artworkAgreementSigned ? (
+                <>
+                  <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.6, marginBottom: 12 }}>
+                    To add <strong>{traitName ?? 'this trait'}</strong> to the Nouns collection,
+                    you must sign a CC0 waiver confirming this is your original work and releasing
+                    all rights to the public domain.
+                  </p>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 16 }}>
+                    This is a legal requirement for all artwork contributions to Nouns DAO.{' '}
+                    <a
+                      href={AGREEMENT_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#3b82f6', textDecoration: 'underline' }}
+                    >
+                      Read the full Nouns Art Contribution Agreement
+                    </a>
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleSignArtworkAgreement}
+                    disabled={!address}
+                    style={{
+                      width: '100%',
+                      padding: '12px 0',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: address ? '#1a1a2e' : '#d1d5db',
+                      color: address ? '#fff' : '#9ca3af',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: address ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {address ? '\uD83D\uDD0F Sign CC0 Waiver with Wallet' : 'Connect Wallet to Sign'}
+                  </button>
+                </>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <img
+                      src={traitImage ?? ''}
+                      alt={traitName ?? ''}
+                      style={{ width: 40, height: 40, imageRendering: 'pixelated', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                    />
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>{traitName ?? 'Custom Trait'}</p>
+                      <p style={{ fontSize: '0.65rem', color: '#22c55e', margin: 0 }}>Released under CC0 1.0</p>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#ecfdf5',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                    marginTop: 8,
+                  }}>
+                    <p style={{ fontSize: '0.6rem', color: '#6b7280', margin: '0 0 4px', fontWeight: 600 }}>SIGNATURE</p>
+                    <p style={{ fontSize: '0.6rem', color: '#374151', fontFamily: 'monospace', wordBreak: 'break-all', margin: 0 }}>
+                      {artworkSignature}
+                    </p>
+                  </div>
+                  <a
+                    href={AGREEMENT_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: '0.65rem', color: '#3b82f6' }}
+                  >
+                    View Full Agreement on Arweave &rarr;
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
