@@ -14,7 +14,7 @@ const LIL_SEEDS_URL = '/probe-dreams/lil-seeds.json';
 const LIL_OWNERS_URL = '/probe-dreams/lil-owners.json';
 const LIL_NOUNS_TOKEN = '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B' as const;
 const MIN_CELL = 72;
-const GAP = 4;
+const GAP = 6;
 
 const ENS_API = import.meta.env.VITE_MAINNET_SUBGRAPH || 'https://spirited-flexibility-production-3c30.up.railway.app';
 

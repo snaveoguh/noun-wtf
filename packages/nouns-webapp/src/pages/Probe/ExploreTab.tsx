@@ -18,7 +18,7 @@ import { useNounSeeds } from '@/wrappers/nounToken';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
 
 const MIN_CELL = 72;
-const GAP = 4;
+const GAP = 6;
 
 const sortOptions: { label: string; value: SortOption }[] = [
   { label: 'Latest', value: 'id-desc' },
