@@ -382,8 +382,10 @@ app.get('/api/grants', async c => {
   const items = grants.map(g => ({
     ...g,
     id: String(g.id),
+    snapshotBlock: String(g.snapshotBlock),
     startBlock: String(g.startBlock),
     endBlock: String(g.endBlock),
+    createdAtBlock: String(g.createdAtBlock),
     executionETA: g.executionETA != null ? String(g.executionETA) : null,
     createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
   }));
