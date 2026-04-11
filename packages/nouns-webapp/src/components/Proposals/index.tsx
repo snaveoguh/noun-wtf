@@ -202,8 +202,6 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
   useEffect(() => {
     if (activeTab === 1) {
       navigate('/candidates');
-    } else {
-      navigate('/vote');
     }
   }, [activeTab, navigate]);
 
