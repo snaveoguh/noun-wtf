@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import React, { useEffect, useState } from 'react';
 
 import { t } from '@lingui/core/macro';
@@ -27,7 +28,6 @@ type VoteSignalsProps = {
   isFeedbackClosed?: boolean;
 };
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 function VoteSignals({
   candidateSlug,
   feedback: feedbackList,
@@ -245,61 +245,60 @@ function VoteSignals({
                             <p className="m-0 p-0 text-base font-bold leading-tight">
                               <Trans>Add your feedback</Trans>
                             </p>
-                            <div className="flex flex-row gap-2.5 md:w-full md:flex-col">
+                            <div className="flex flex-row gap-2 md:w-full md:flex-col">
                               <button
+                                type="button"
                                 className={clsx(
-                                  'duration-125 cursor-pointer rounded-[10px] border-0 border-2 border-transparent bg-[var(--brand-color-green)] px-4 py-2.5 text-sm font-bold leading-none text-white outline-2 outline-transparent transition-all ease-in-out md:w-full',
-                                  support === undefined && 'opacity-100',
-                                  support && support === 1
-                                    ? 'border-2 border-white outline-2 outline-black'
-                                    : 'opacity-40',
-                                  support === undefined && 'opacity-100',
-                                  'hover:border-2 hover:border-white hover:opacity-80 hover:outline-2 hover:outline-[rgba(0,0,0,0.05)]',
+                                  'duration-125 cursor-pointer rounded-lg border-2 border-transparent px-3 py-2 text-xl leading-none outline-2 outline-transparent transition-all ease-in-out',
+                                  support === 1
+                                    ? 'border-green-500 bg-green-100 outline-green-300'
+                                    : support === undefined
+                                      ? 'bg-gray-100 opacity-100 hover:bg-green-50'
+                                      : 'bg-gray-100 opacity-40 hover:opacity-70',
                                 )}
                                 disabled={isTransactionPending || isTransactionWaiting}
                                 onClick={() =>
                                   support === 1 ? setSupport(undefined) : setSupport(1)
                                 }
+                                title="For"
                               >
-                                <Trans>For</Trans>
+                                👍
                               </button>
                               <button
+                                type="button"
                                 className={clsx(
-                                  'duration-125 cursor-pointer rounded-[10px] border-0 border-2 border-transparent bg-[var(--brand-color-red)] px-4 py-2.5 text-sm font-bold leading-none text-white outline-2 outline-transparent transition-all ease-in-out md:w-full',
-                                  support === undefined && 'opacity-100',
-                                  support !== undefined && support === 0
-                                    ? 'border-2 border-white outline-2 outline-black'
-                                    : 'opacity-40',
-                                  support === undefined && 'opacity-100',
-                                  'hover:border-2 hover:border-white hover:opacity-80 hover:outline-2 hover:outline-[rgba(0,0,0,0.05)]',
+                                  'duration-125 cursor-pointer rounded-lg border-2 border-transparent px-3 py-2 text-xl leading-none outline-2 outline-transparent transition-all ease-in-out',
+                                  support === 0
+                                    ? 'border-red-500 bg-red-100 outline-red-300'
+                                    : support === undefined
+                                      ? 'bg-gray-100 opacity-100 hover:bg-red-50'
+                                      : 'bg-gray-100 opacity-40 hover:opacity-70',
                                 )}
                                 disabled={isTransactionPending || isTransactionWaiting}
                                 onClick={() =>
                                   support === 0 ? setSupport(undefined) : setSupport(0)
                                 }
+                                title="Against"
                               >
-                                <Trans>Against</Trans>
+                                👎
                               </button>
                               <button
+                                type="button"
                                 className={clsx(
-                                  'duration-125 cursor-pointer rounded-[10px] border-0 border-2 border-transparent bg-[var(--brand-gray-light-text)] px-4 py-2.5 text-sm font-bold leading-none text-white outline-2 outline-transparent transition-all ease-in-out md:w-full',
-                                  support === undefined && 'opacity-100',
-                                  support && support === 2
-                                    ? 'border-2 border-white outline-2 outline-black'
-                                    : 'opacity-40',
-                                  support === undefined && 'opacity-100',
-                                  'hover:border-2 hover:border-white hover:opacity-80 hover:outline-2 hover:outline-[rgba(0,0,0,0.05)]',
+                                  'duration-125 cursor-pointer rounded-lg border-2 border-transparent px-3 py-2 text-xl leading-none outline-2 outline-transparent transition-all ease-in-out',
+                                  support === 2
+                                    ? 'border-gray-500 bg-gray-200 outline-gray-300'
+                                    : support === undefined
+                                      ? 'bg-gray-100 opacity-100 hover:bg-gray-50'
+                                      : 'bg-gray-100 opacity-40 hover:opacity-70',
                                 )}
                                 disabled={isTransactionPending || isTransactionWaiting}
-                                onClick={() => {
-                                  if (support === 2) {
-                                    setSupport(undefined);
-                                  } else {
-                                    setSupport(2);
-                                  }
-                                }}
+                                onClick={() =>
+                                  support === 2 ? setSupport(undefined) : setSupport(2)
+                                }
+                                title="Abstain"
                               >
-                                <Trans>Abstain</Trans>
+                                🤷
                               </button>
                             </div>
                             <>

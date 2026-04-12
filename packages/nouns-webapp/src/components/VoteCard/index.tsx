@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import React, { useEffect, useState } from 'react';
 
 import { i18n } from '@lingui/core';
@@ -45,19 +46,31 @@ const VoteCard: React.FC<VoteCardProps> = props => {
   switch (variant) {
     case VoteCardVariant.FOR:
       titleClass = classes.for;
-      titleCopy = <Trans>For</Trans>;
+      titleCopy = (
+        <>
+          👍 <Trans>For</Trans>
+        </>
+      );
       voteCount = proposal.forCount;
       supportDetailedValue = 1;
       break;
     case VoteCardVariant.AGAINST:
       titleClass = classes.against;
-      titleCopy = <Trans>Against</Trans>;
+      titleCopy = (
+        <>
+          👎 <Trans>Against</Trans>
+        </>
+      );
       voteCount = proposal.againstCount;
       supportDetailedValue = 0;
       break;
     default:
       titleClass = classes.abstain;
-      titleCopy = <Trans>Abstain</Trans>;
+      titleCopy = (
+        <>
+          🤷 <Trans>Abstain</Trans>
+        </>
+      );
       voteCount = proposal.abstainCount;
       supportDetailedValue = 2;
       break;
