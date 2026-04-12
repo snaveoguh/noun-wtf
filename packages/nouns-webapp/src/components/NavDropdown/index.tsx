@@ -9,7 +9,6 @@ import { usePickByState } from '@/utils/colorResponsiveUIUtils';
 import classes from './NavDropdown.module.css';
 
 import navDropdownClasses from '@/components/NavBar/NavBarDropdown.module.css';
-import responsiveUiUtilsClasses from '@/utils/ResponsiveUIUtils.module.css';
 
 interface NavDropDownProps {
   buttonStyle?: NavBarButtonStyle;
@@ -63,13 +62,10 @@ const NavDropDown: React.FC<NavDropDownProps> = props => {
   return (
     <>
       <Dropdown
-        className={clsx(
-          classes.dropdownButton,
-          navDropdownClasses.nounsNavLink,
-          responsiveUiUtilsClasses.desktopOnly,
-        )}
+        className={clsx(classes.dropdownButton, navDropdownClasses.nounsNavLink)}
         onToggle={() => setButtonUp(!buttonUp)}
         autoClose={true}
+        align="end"
       >
         <Dropdown.Toggle as={customDropdownToggle} id="dropdown" />
         <Dropdown.Menu
