@@ -201,10 +201,10 @@ for (let i = 0; i < glassesTraits.length; i++) {
   //   RLE left eye:  x=11-14  y=12-15  (white=11-12, black=13-14)
   //   UV front left: x=8-11   y=9-12   (black=8-9,   white=10-11)
   //   UV back left:  x=8-11   y=17-20  (white=8-9,   black=10-11)
-  // Fullblack (7) uses standard path — majority is all-black, no overrides needed.
+  // Fullblack (7) has white glint pixels that need correct UV mapping too.
   const rlePixels = decodeToPixelMap(glassesTraits[i].data);
   const eyeOverrides = new Map();
-  if (i === 2) {
+  if (i === 2 || i === 7) {
     // UV x-axis is flipped relative to RLE within each eye, so the mapping
     // is a simple reversal: left front = 22 - rx, right front = 40 - rx
     for (const [rleKey, px] of rlePixels) {
