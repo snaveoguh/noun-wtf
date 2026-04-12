@@ -30,13 +30,13 @@ function clamp(v: number, lo: number, hi: number) {
  * Editor grid:    X=0..31,   Y=0..31,   Z=any integer
  *
  * X: +16 to center in the 32-wide grid
- * Y: -16 to map native head Y (~21-37) to sprite grid Y (~5-21)
+ * Y: dynamic — each head is centered on sprite grid Y=12 based on its native range
  * Z: +0 (native Z centered near 0, matches background head at z≈0.78)
  */
-function remapKey(nativeKey: string): string | null {
+function remapKey(nativeKey: string, yOffset: number = 15): string | null {
   const [nx, ny, nz] = nativeKey.split(',').map(Number);
   const ex = clamp(Math.round(nx + 16), 0, 31);
-  const ey = clamp(Math.round(ny - 16), 0, 31);
+  const ey = clamp(Math.round(ny - yOffset), 0, 31);
   const ez = Math.round(nz);
   return `${ex},${ey},${ez}`;
 }
@@ -66,8 +66,20 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
     // the noun's actual glasses trait; standard glasses come from background body)
     const voxelMap: VoxelMap = new Map();
 
+    // Dynamically center the head: find native Y range, map midpoint to sprite grid Y=12
+    const headKeys = Object.keys(data.head);
+    let minY = Infinity,
+      maxY = -Infinity;
+    for (const key of headKeys) {
+      const y = Number(key.split(',')[1]);
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const nativeMidY = (minY + maxY) / 2;
+    const yOffset = Math.round(nativeMidY - 12); // center on sprite grid Y=12
+
     for (const [key, color] of Object.entries(data.head)) {
-      const editorKey = remapKey(key);
+      const editorKey = remapKey(key, yOffset);
       if (editorKey) voxelMap.set(editorKey, color);
     }
 

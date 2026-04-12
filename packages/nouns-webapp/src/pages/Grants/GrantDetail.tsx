@@ -20,9 +20,10 @@ import {
 
 import classes from './Grants.module.css';
 
-const API_BASE =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+const API_BASE = (
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
+  'https://spirited-flexibility-production-3c30.up.railway.app'
+).replace(/\/graphql\/?$/, '');
 
 interface GrantData {
   id: number;

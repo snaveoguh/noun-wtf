@@ -10,9 +10,10 @@ import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury
 
 import classes from './Grants.module.css';
 
-const API_BASE =
+const API_BASE = (
   (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+  'https://spirited-flexibility-production-3c30.up.railway.app'
+).replace(/\/graphql\/?$/, '');
 
 interface Grant {
   id: number;
