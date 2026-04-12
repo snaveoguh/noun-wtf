@@ -66,17 +66,10 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
     // the noun's actual glasses trait; standard glasses come from background body)
     const voxelMap: VoxelMap = new Map();
 
-    // Dynamically center the head: find native Y range, map midpoint to sprite grid Y=12
-    const headKeys = Object.keys(data.head);
-    let minY = Infinity,
-      maxY = -Infinity;
-    for (const key of headKeys) {
-      const y = Number(key.split(',')[1]);
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    }
-    const nativeMidY = (minY + maxY) / 2;
-    const yOffset = Math.round(nativeMidY - 12); // center on sprite grid Y=12
+    // Align voxel head around glasses: native glasses always at Y≈25-31 (mid=28),
+    // sprite glasses at Y≈11-16 (mid=13.5). Offset = 28 - 13.5 ≈ 15.
+    // This is constant because all 3DNouns GLBs have glasses at the same native Y.
+    const yOffset = 15;
 
     for (const [key, color] of Object.entries(data.head)) {
       const editorKey = remapKey(key, yOffset);
