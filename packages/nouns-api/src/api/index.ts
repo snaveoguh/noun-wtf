@@ -3982,11 +3982,29 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
 
     let text = response.text || '';
 
+    // If LLM returned empty, retry once with a nudge
+    if (!text && !pendingAction) {
+      try {
+        messages.push({ role: 'assistant', content: '' });
+        messages.push({ role: 'user', content: 'Please respond to my previous message.' });
+        const retry = await hubChat({
+          messages,
+          system: systemPrompt,
+          task: 'chat',
+          maxTokens: 1024,
+          temperature: 0.7,
+        });
+        text = retry.text || '';
+      } catch {
+        /* ignore retry failure */
+      }
+    }
+
     // If agent used tools but returned no text, provide a fallback
     if (!text && pendingAction) {
       text = 'Action prepared — confirm below. ⌐◨-◨';
     } else if (!text) {
-      text = "I processed your request but didn't have anything to say. Try rephrasing? ⌐◨-◨";
+      text = "Hmm, I'm having trouble responding right now. Try again? ⌐◨-◨";
     }
 
     // Include governance action if one was prepared by a tool

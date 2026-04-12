@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 
 import { i18n } from '@lingui/core';
@@ -151,7 +152,11 @@ const VoteModal = ({
             <>
               <div onClick={() => setVote(Vote.FOR)}>
                 <NavBarButton
-                  buttonText={<Trans>For</Trans>}
+                  buttonText={
+                    <>
+                      👍 <Trans>For</Trans>
+                    </>
+                  }
                   buttonIcon={<></>}
                   buttonStyle={NavBarButtonStyle.FOR_VOTE_SUBMIT}
                   className={cn(
@@ -165,7 +170,11 @@ const VoteModal = ({
           )}
           <div onClick={() => setVote(Vote.AGAINST)}>
             <NavBarButton
-              buttonText={<Trans>Against</Trans>}
+              buttonText={
+                <>
+                  👎 <Trans>Against</Trans>
+                </>
+              }
               buttonIcon={<></>}
               buttonStyle={NavBarButtonStyle.AGAINST_VOTE_SUBMIT}
               className={cn(
@@ -179,7 +188,11 @@ const VoteModal = ({
               <br />
               <div onClick={() => setVote(Vote.ABSTAIN)}>
                 <NavBarButton
-                  buttonText={<Trans>Abstain</Trans>}
+                  buttonText={
+                    <>
+                      🤷 <Trans>Abstain</Trans>
+                    </>
+                  }
                   buttonIcon={<></>}
                   buttonStyle={NavBarButtonStyle.ABSTAIN_VOTE_SUBMIT}
                   className={cn(
@@ -213,7 +226,9 @@ const VoteModal = ({
               if (isReasonEmpty) {
                 castRefundableVote({ args: [BigInt(proposalId), vote, NOUN_WTF_CLIENT_ID] });
               } else {
-                castRefundableVoteWithReason({ args: [BigInt(proposalId), vote, voteReason, NOUN_WTF_CLIENT_ID] });
+                castRefundableVoteWithReason({
+                  args: [BigInt(proposalId), vote, voteReason, NOUN_WTF_CLIENT_ID],
+                });
               }
             }}
             className={vote === undefined ? classes.submitBtnDisabled : classes.submitBtn}
