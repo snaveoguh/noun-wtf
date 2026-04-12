@@ -18,7 +18,24 @@ import {
   useState,
 } from 'react';
 
+import {
+  BoxIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  EraserIcon,
+  GripHorizontalIcon,
+  PaintBucketIcon,
+  PencilIcon,
+  PipetteIcon,
+  Redo2Icon,
+  Trash2Icon,
+  Undo2Icon,
+} from 'lucide-react';
+
 import { PixelCanvas, type Tool } from '@/components/Studio/PixelCanvas';
+
+type MeshTool = Tool | 'build';
 import {
   mergeLayersToGrid,
   resolveEditableVisibility,
@@ -50,9 +67,20 @@ interface InlineEditorProps {
   } | null>;
   /** When true, only render floating panels (tools, palette, actions) — no 2D canvas. */
   panelsOnly?: boolean;
-  /** Current voxel depth (3D mode) */
+  /** Current voxel depth (3D voxel mode) */
   voxelDepth?: number;
   onVoxelDepthChange?: (depth: number) => void;
+  /** Mesh editor brush size (3D mesh mode) */
+  meshBrushSize?: number;
+  onMeshBrushSizeChange?: (size: number) => void;
+  /** Whether mesh editor is active (hides voxel-specific controls) */
+  isMeshMode?: boolean;
+  /** Callback when tool changes (needed in mesh mode to update parent state) */
+  onToolChange?: (tool: Tool) => void;
+  /** Callback when color changes (needed in mesh mode to update parent state) */
+  onColorChange?: (color: string) => void;
+  /** Download/export handler (mesh mode) — receives format string */
+  onDownload?: (format: 'glb' | 'stl' | 'obj') => void;
   /** External pixel state from parent (for 3D mode sync). If provided, editor uses this instead of own reducer. */
   externalPixels?: string[][];
   externalDispatch?: React.Dispatch<import('@/lib/pixelHistory').HistoryAction>;
@@ -90,6 +118,12 @@ const InlineEditor: FC<InlineEditorProps> = ({
   onInteractionModeChange,
   voxelDepth = 1,
   onVoxelDepthChange,
+  meshBrushSize = 1,
+  onMeshBrushSizeChange,
+  isMeshMode = false,
+  onToolChange,
+  onColorChange,
+  onDownload,
 }) => {
   void _nounSvg;
   // Decode seed into per-layer pixel grids
@@ -163,6 +197,14 @@ const InlineEditor: FC<InlineEditorProps> = ({
   const undo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const redo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);
 
+  // Sync tool/color changes to parent (critical for mesh mode where parent needs to re-render)
+  useEffect(() => {
+    onToolChange?.(activeTool);
+  }, [activeTool, onToolChange]);
+  useEffect(() => {
+    onColorChange?.(activeColor);
+  }, [activeColor, onColorChange]);
+
   // Expose to parent for keyboard shortcuts + 3D sync
   if (toolRef) {
     toolRef.current = {
@@ -231,11 +273,19 @@ const InlineEditor: FC<InlineEditorProps> = ({
     const onPointerMove = (event: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag) return;
+      const rawX = drag.originX + (event.clientX - drag.startX);
+      const rawY = drag.originY + (event.clientY - drag.startY);
+      // Clamp: keep at least 40px of the panel visible on each edge
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Panels are positioned relative to their CSS initial position (top/left in the overlay)
+      // rawX/rawY are translate offsets from that initial position
+      // Clamp so the panel handle never leaves the viewport
       setPanelOffsets(prev => ({
         ...prev,
         [drag.key]: {
-          x: drag.originX + (event.clientX - drag.startX),
-          y: drag.originY + (event.clientY - drag.startY),
+          x: Math.max(-(vw - 60), Math.min(vw - 60, rawX)),
+          y: Math.max(-40, Math.min(vh - 60, rawY)),
         },
       }));
     };
@@ -307,27 +357,36 @@ const InlineEditor: FC<InlineEditorProps> = ({
       {/* ── Tools + Layers panel (top-left) ──────────────────── */}
       <div className={`${classes.glassFloat} ${classes.toolsPanel}`} style={getPanelStyle('tools')}>
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('tools')}>
-          <span className={classes.panelHandleDots}>:::</span>
+          <GripHorizontalIcon size={14} strokeWidth={2} className={classes.panelHandleDots} />
           <span className={classes.panelHandleLabel}>Tools</span>
-          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('tools')}>
-            {collapsedPanels.tools ? '▸' : '▾'}
+          <button
+            type="button"
+            className={classes.collapseBtn}
+            onClick={() => toggleCollapse('tools')}
+          >
+            {collapsedPanels.tools ? <ChevronRightIcon size={12} /> : <ChevronDownIcon size={12} />}
           </button>
         </div>
         {!collapsedPanels.tools && (
           <>
             <div className={classes.toolRow}>
-              {(['pencil', 'eraser', 'fill', 'eyedropper'] as Tool[]).map(tool => (
+              {[
+                { id: 'pencil' as MeshTool, icon: PencilIcon, label: 'Paint (B)', key: 'b' },
+                { id: 'eraser' as MeshTool, icon: EraserIcon, label: 'Erase (E)', key: 'e' },
+                { id: 'fill' as MeshTool, icon: PaintBucketIcon, label: 'Fill (G)', key: 'g' },
+                { id: 'eyedropper' as MeshTool, icon: PipetteIcon, label: 'Pick (I)', key: 'i' },
+                ...(isMeshMode
+                  ? [{ id: 'build' as MeshTool, icon: BoxIcon, label: 'Build (V)', key: 'v' }]
+                  : []),
+              ].map(({ id, icon: Icon, label }) => (
                 <button
-                  key={tool}
+                  key={id}
                   type="button"
-                  className={`${classes.toolBtn} ${activeTool === tool ? classes.toolActive : ''}`}
-                  onClick={() => setActiveTool(tool)}
-                  title={tool[0].toUpperCase() + tool.slice(1)}
+                  className={`${classes.toolBtn} ${activeTool === id ? classes.toolActive : ''}`}
+                  onClick={() => setActiveTool(id as Tool)}
+                  title={label}
                 >
-                  {tool === 'pencil' && '✏'}
-                  {tool === 'eraser' && '⌫'}
-                  {tool === 'fill' && '🪣'}
-                  {tool === 'eyedropper' && '💉'}
+                  <Icon size={16} strokeWidth={2} />
                 </button>
               ))}
               <div className={classes.toolDivider} />
@@ -338,7 +397,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
                 disabled={pastLen === 0}
                 title="Undo (Ctrl+Z)"
               >
-                ↩
+                <Undo2Icon size={16} strokeWidth={2} />
               </button>
               <button
                 type="button"
@@ -347,7 +406,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
                 disabled={futureLen === 0}
                 title="Redo (Ctrl+Y)"
               >
-                ↪
+                <Redo2Icon size={16} strokeWidth={2} />
               </button>
               <div className={classes.toolDivider} />
               <button
@@ -356,7 +415,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
                 onClick={() => dispatch({ type: 'CLEAR' })}
                 title="Clear all"
               >
-                🗑
+                <Trash2Icon size={16} strokeWidth={2} />
               </button>
             </div>
 
@@ -376,10 +435,26 @@ const InlineEditor: FC<InlineEditorProps> = ({
               ))}
             </div>
 
-            {/* Voxel depth slider (3D mode only) */}
-            {panelsOnly && onVoxelDepthChange && (
+            {/* Brush size slider (3D mode) */}
+            {panelsOnly && isMeshMode && onMeshBrushSizeChange && (
               <div className={classes.depthSlider}>
                 <span className={classes.depthLabel}>Brush</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  value={meshBrushSize}
+                  onChange={e => onMeshBrushSizeChange(parseInt(e.target.value, 10))}
+                  className={classes.depthRange}
+                />
+                <span className={classes.depthValue}>{meshBrushSize}</span>
+              </div>
+            )}
+            {/* Voxel depth slider (3D voxel mode only) */}
+            {panelsOnly && !isMeshMode && onVoxelDepthChange && (
+              <div className={classes.depthSlider}>
+                <span className={classes.depthLabel}>Depth</span>
                 <input
                   type="range"
                   min="1"
@@ -428,10 +503,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
         style={getPanelStyle('palette')}
       >
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('palette')}>
-          <span className={classes.panelHandleDots}>:::</span>
+          <GripHorizontalIcon size={14} strokeWidth={2} className={classes.panelHandleDots} />
           <span className={classes.panelHandleLabel}>Palette</span>
-          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('palette')}>
-            {collapsedPanels.palette ? '▸' : '▾'}
+          <button
+            type="button"
+            className={classes.collapseBtn}
+            onClick={() => toggleCollapse('palette')}
+          >
+            {collapsedPanels.palette ? (
+              <ChevronRightIcon size={12} />
+            ) : (
+              <ChevronDownIcon size={12} />
+            )}
           </button>
         </div>
         {!collapsedPanels.palette && (
@@ -441,7 +524,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
                 className={classes.colorSwatch}
                 style={{
                   background:
-                    activeColor || 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px',
+                    activeColor ||
+                    'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px',
                 }}
               />
               <span className={classes.colorHex}>{activeColor || 'none'}</span>
@@ -486,10 +570,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
         style={getPanelStyle('actions')}
       >
         <div className={classes.panelHandle} onPointerDown={startDraggingPanel('actions')}>
-          <span className={classes.panelHandleDots}>:::</span>
+          <GripHorizontalIcon size={14} strokeWidth={2} className={classes.panelHandleDots} />
           <span className={classes.panelHandleLabel}>Actions</span>
-          <button type="button" className={classes.collapseBtn} onClick={() => toggleCollapse('actions')}>
-            {collapsedPanels.actions ? '▸' : '▾'}
+          <button
+            type="button"
+            className={classes.collapseBtn}
+            onClick={() => toggleCollapse('actions')}
+          >
+            {collapsedPanels.actions ? (
+              <ChevronRightIcon size={12} />
+            ) : (
+              <ChevronDownIcon size={12} />
+            )}
           </button>
         </div>
         {!collapsedPanels.actions && (
@@ -498,6 +590,39 @@ const InlineEditor: FC<InlineEditorProps> = ({
               <button type="button" className={classes.actionBtn} onClick={handleSave}>
                 Save
               </button>
+            )}
+            {onDownload && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  type="button"
+                  className={classes.actionBtn}
+                  onClick={() => onDownload('glb')}
+                  title="GLB (universal 3D)"
+                >
+                  <DownloadIcon
+                    size={14}
+                    strokeWidth={2}
+                    style={{ marginRight: 3, verticalAlign: -2 }}
+                  />
+                  GLB
+                </button>
+                <button
+                  type="button"
+                  className={`${classes.actionBtn} ${classes.exitBtn}`}
+                  onClick={() => onDownload('stl')}
+                  title="STL (3D printer)"
+                >
+                  STL
+                </button>
+                <button
+                  type="button"
+                  className={`${classes.actionBtn} ${classes.exitBtn}`}
+                  onClick={() => onDownload('obj')}
+                  title="OBJ (modeling)"
+                >
+                  OBJ
+                </button>
+              </div>
             )}
             <button
               type="button"
@@ -512,8 +637,15 @@ const InlineEditor: FC<InlineEditorProps> = ({
 
       {/* Hint bar */}
       <div className={classes.hint}>
-        <kbd>Esc</kbd> exit · <kbd>B</kbd> pencil · <kbd>E</kbd> eraser · <kbd>G</kbd> fill ·{' '}
-        <kbd>I</kbd> picker · <kbd>Ctrl+Z</kbd> undo · Drag the panel grips to move them
+        <kbd>Esc</kbd> exit · <kbd>B</kbd> paint · <kbd>E</kbd> erase · <kbd>G</kbd> fill ·{' '}
+        <kbd>I</kbd> pick
+        {isMeshMode && (
+          <>
+            {' '}
+            · <kbd>V</kbd> build
+          </>
+        )}{' '}
+        · <kbd>Ctrl+Z</kbd> undo
       </div>
     </div>
   );

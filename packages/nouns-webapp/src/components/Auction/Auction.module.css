@@ -44,13 +44,14 @@
 
 .heroTabs {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex: 1 1 30rem;
   gap: 0.45rem;
   overflow-x: auto;
   min-width: 0;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: -0.3rem;
   scrollbar-width: none;
 }
 
