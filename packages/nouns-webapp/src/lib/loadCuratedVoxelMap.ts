@@ -10,6 +10,7 @@
  * For the editor, we remap to the standard 32x32 grid centered at (0,0):
  *   X: x + 16, Y: 31 - (y - 21), Z: z + 5
  */
+/* eslint-disable @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-explicit-any */
 import type { VoxelMap } from '@nouns/voxel-engine';
 
 interface CuratedVoxelData {
@@ -29,13 +30,13 @@ function clamp(v: number, lo: number, hi: number) {
  * Editor grid:    X=0..31,   Y=0..31,   Z=any integer
  *
  * X: +16 to center in the 32-wide grid
- * Y: -10 to match GLB offsetY=-26 (editorY = nativeY - 26 + 15.5)
- * Z: +0 to match GLB offsetZ=-0.25 (centers head on body, back half occluded)
+ * Y: -16 to map native head Y (~21-37) to sprite grid Y (~5-21)
+ * Z: +0 (native Z centered near 0, matches background head at z≈0.78)
  */
 function remapKey(nativeKey: string): string | null {
   const [nx, ny, nz] = nativeKey.split(',').map(Number);
   const ex = clamp(Math.round(nx + 16), 0, 31);
-  const ey = clamp(Math.round(ny - 10), 0, 31);
+  const ey = clamp(Math.round(ny - 16), 0, 31);
   const ez = Math.round(nz);
   return `${ex},${ey},${ez}`;
 }
@@ -79,11 +80,13 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
 /**
  * Get list of available curated heads for the editor picker.
  */
-export async function listCuratedHeads(): Promise<Array<{
-  index: number;
-  name: string;
-  hasVoxelData: boolean;
-}>> {
+export async function listCuratedHeads(): Promise<
+  Array<{
+    index: number;
+    name: string;
+    hasVoxelData: boolean;
+  }>
+> {
   try {
     const res = await fetch('/models/heads/manifest.json');
     if (!res.ok) return [];

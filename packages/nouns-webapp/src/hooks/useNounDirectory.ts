@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import { useEffect, useState } from 'react';
 
 const API_BASE =
@@ -15,7 +16,14 @@ async function ponderQuery<T>(query: string): Promise<T> {
   });
   if (!res.ok) throw new Error(`Ponder query failed: ${res.status}`);
   const json = await res.json();
-  console.log('[NounDir] url:', url, 'keys:', Object.keys(json?.data ?? {}), 'raw:', JSON.stringify(json).slice(0, 100));
+  console.log(
+    '[NounDir] url:',
+    url,
+    'keys:',
+    Object.keys(json?.data ?? {}),
+    'raw:',
+    JSON.stringify(json).slice(0, 100),
+  );
   return json.data as T;
 }
 
@@ -28,11 +36,11 @@ interface DirectoryEntry {
 // No module-level cache — React state handles it
 let cachedOwners: DirectoryEntry[] | undefined;
 let cachedSettlers: DirectoryEntry[] | undefined;
+let cachedCurators: DirectoryEntry[] | undefined;
 
 function ownersQuery(offset: number) {
   return `{ nouns(limit: 1000, offset: ${offset}, orderBy: "id", orderDirection: "desc") { items { id owner } } }`;
 }
-
 
 function aggregateAddresses(records: { address: string }[]): DirectoryEntry[] {
   const counts = new Map<string, number>();
@@ -148,4 +156,42 @@ export function useNounSettlers() {
   }, []);
 
   return { settlers, loading };
+}
+
+export function useNounCurators() {
+  const [curators, setCurators] = useState<DirectoryEntry[]>(cachedCurators || []);
+  const [loading, setLoading] = useState(!cachedCurators);
+
+  useEffect(() => {
+    if (cachedCurators?.length) return;
+
+    (async () => {
+      try {
+        const res = await fetch('/probe-dreams/curated.json');
+        const data = (await res.json()) as Record<string, string>;
+
+        const counts = new Map<string, number>();
+        for (const addr of Object.values(data)) {
+          const key = addr.toLowerCase();
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+
+        let entries: DirectoryEntry[] = Array.from(counts.entries())
+          .map(([address, count]) => ({ address, ens: null, count }))
+          .sort((a, b) => b.count - a.count);
+
+        setCurators(entries);
+        setLoading(false);
+
+        entries = await resolveEnsNames(entries);
+        cachedCurators = entries;
+        setCurators(entries);
+      } catch (err) {
+        console.error('Failed to fetch curators:', err);
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  return { curators, loading };
 }

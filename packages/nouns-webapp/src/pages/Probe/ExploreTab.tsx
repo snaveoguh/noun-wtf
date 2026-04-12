@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData } from '@noundry/nouns-assets';
@@ -10,12 +11,12 @@ import NounDetailPopover from '@/components/NounDetailPopover';
 import { Trait } from '@/components/Trait';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/hooks';
+import { useNounOwners, useNounSettlers, useNounCurators } from '@/hooks/useNounDirectory';
 import { type SortOption, type TraitFilter, useNounFilters } from '@/hooks/useNounFilters';
 import { useOwnerFilter } from '@/hooks/useOwnerFilter';
-import { useNounOwners, useNounSettlers } from '@/hooks/useNounDirectory';
 import { traitName } from '@/lib/traitName';
-import { useNounSeeds } from '@/wrappers/nounToken';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
+import { useNounSeeds } from '@/wrappers/nounToken';
 
 const MIN_CELL = 72;
 const GAP = 6;
@@ -68,13 +69,15 @@ function AddressDropdown({
   const filtered = useMemo(() => {
     if (!query) return entries.slice(0, 50);
     const q = query.toLowerCase();
-    return entries.filter(
-      e => e.address.toLowerCase().includes(q) || (e.ens && e.ens.toLowerCase().includes(q)),
-    ).slice(0, 50);
+    return entries
+      .filter(
+        e => e.address.toLowerCase().includes(q) || (e.ens && e.ens.toLowerCase().includes(q)),
+      )
+      .slice(0, 50);
   }, [entries, query]);
 
   const selectedLabel = value
-    ? entries.find(e => e.address === value)?.ens ?? `${value.slice(0, 6)}...${value.slice(-4)}`
+    ? (entries.find(e => e.address === value)?.ens ?? `${value.slice(0, 6)}...${value.slice(-4)}`)
     : label;
 
   return (
@@ -87,7 +90,11 @@ function AddressDropdown({
         {value ? (
           <X
             className="h-3 w-3 shrink-0 text-gray-400 hover:text-red-500"
-            onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }}
+            onClick={e => {
+              e.stopPropagation();
+              onChange('');
+              setOpen(false);
+            }}
           />
         ) : (
           <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
@@ -111,7 +118,11 @@ function AddressDropdown({
               filtered.map(e => (
                 <button
                   key={e.address}
-                  onClick={() => { onChange(e.address); setOpen(false); setQuery(''); }}
+                  onClick={() => {
+                    onChange(e.address);
+                    setOpen(false);
+                    setQuery('');
+                  }}
                   className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-gray-50"
                 >
                   <span className="truncate font-medium">
@@ -142,13 +153,17 @@ const ExploreTab: React.FC = () => {
   const [popover, setPopover] = useState<{ nounId: bigint; rect: DOMRect } | null>(null);
   const { owners, loading: ownersLoading } = useNounOwners();
   const { settlers, loading: settlersLoading } = useNounSettlers();
+  const { curators, loading: curatorsLoading } = useNounCurators();
 
   // Settler filter state — loads from static settlers.json
   const [settlerAddress, setSettlerAddress] = useState('');
   const [settlerNounIds, setSettlerNounIds] = useState<Set<bigint> | undefined>(undefined);
 
   useEffect(() => {
-    if (!settlerAddress) { setSettlerNounIds(undefined); return; }
+    if (!settlerAddress) {
+      setSettlerNounIds(undefined);
+      return;
+    }
     fetch('/probe-dreams/settlers.json')
       .then(r => r.json())
       .then((data: Record<string, string>) => {
@@ -161,18 +176,43 @@ const ExploreTab: React.FC = () => {
       .catch(() => setSettlerNounIds(new Set()));
   }, [settlerAddress]);
 
-  // Combine owner + settler filters
-  const combinedFilterIds = useMemo(() => {
-    if (!ownedNounIds && !settlerNounIds) return undefined;
-    if (ownedNounIds && !settlerNounIds) return ownedNounIds;
-    if (!ownedNounIds && settlerNounIds) return settlerNounIds;
-    // Both active — intersection
-    const intersection = new Set<bigint>();
-    for (const id of ownedNounIds!) {
-      if (settlerNounIds!.has(id)) intersection.add(id);
+  // Curated filter state — loads from static curated.json
+  const [curatorAddress, setCuratorAddress] = useState('');
+  const [curatedNounIds, setCuratedNounIds] = useState<Set<bigint> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!curatorAddress) {
+      setCuratedNounIds(undefined);
+      return;
     }
-    return intersection;
-  }, [ownedNounIds, settlerNounIds]);
+    fetch('/probe-dreams/curated.json')
+      .then(r => r.json())
+      .then((data: Record<string, string>) => {
+        const ids = new Set<bigint>();
+        for (const [nounId, addr] of Object.entries(data)) {
+          if (addr.toLowerCase() === curatorAddress.toLowerCase()) ids.add(BigInt(nounId));
+        }
+        setCuratedNounIds(ids);
+      })
+      .catch(() => setCuratedNounIds(new Set()));
+  }, [curatorAddress]);
+
+  // Combine owner + settler + curated filters (intersection)
+  const combinedFilterIds = useMemo(() => {
+    const sets = [ownedNounIds, settlerNounIds, curatedNounIds].filter(Boolean) as Set<bigint>[];
+    if (sets.length === 0) return undefined;
+    if (sets.length === 1) return sets[0];
+    // Intersection of all active filters
+    let result = sets[0];
+    for (let i = 1; i < sets.length; i++) {
+      const next = new Set<bigint>();
+      for (const id of result) {
+        if (sets[i].has(id)) next.add(id);
+      }
+      result = next;
+    }
+    return result;
+  }, [ownedNounIds, settlerNounIds, curatedNounIds]);
 
   const {
     sortBy,
@@ -216,8 +256,11 @@ const ExploreTab: React.FC = () => {
     scrollMargin: containerRef.current?.offsetTop ?? 0,
   });
 
-  const activeFilterCount = Object.values(traitFilters).reduce((sum, arr) => sum + arr.length, 0)
-    + (ownerAddress ? 1 : 0) + (settlerAddress ? 1 : 0);
+  const activeFilterCount =
+    Object.values(traitFilters).reduce((sum, arr) => sum + arr.length, 0) +
+    (ownerAddress ? 1 : 0) +
+    (settlerAddress ? 1 : 0) +
+    (curatorAddress ? 1 : 0);
 
   return (
     <>
@@ -247,13 +290,23 @@ const ExploreTab: React.FC = () => {
           loading={settlersLoading}
         />
 
+        <AddressDropdown
+          label="Curated"
+          entries={curators}
+          value={curatorAddress}
+          onChange={setCuratorAddress}
+          loading={curatorsLoading}
+        />
+
         <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value as SortOption)}
           className="border-border rounded-lg border bg-white px-3 py-2 text-sm"
         >
           {sortOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
           ))}
         </select>
 
@@ -273,15 +326,28 @@ const ExploreTab: React.FC = () => {
         </Button>
 
         {activeFilterCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => { clearFilters(); setOwnerAddress(''); setSettlerAddress(''); }} className="gap-1 text-red-500">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              clearFilters();
+              setOwnerAddress('');
+              setSettlerAddress('');
+              setCuratorAddress('');
+            }}
+            className="gap-1 text-red-500"
+          >
             <X className="h-4 w-4" /> Clear
           </Button>
         )}
 
         <span className="text-muted-foreground ml-auto text-sm">
-          {hasActiveFilters || ownerAddress || settlerAddress
+          {hasActiveFilters || ownerAddress || settlerAddress || curatorAddress
             ? `${displayCount} / ${nounCount >= 0 ? nounCount : 0}`
-            : nounCount >= 0 ? nounCount : 0} Nouns
+            : nounCount >= 0
+              ? nounCount
+              : 0}{' '}
+          Nouns
         </span>
       </div>
 
@@ -291,9 +357,18 @@ const ExploreTab: React.FC = () => {
           <div className="space-y-2">
             {traitTypes.map(({ key, label }) => {
               const selectedCount = traitFilters[key].length;
-              const traitCount = key === 'background'
-                ? ImageData.bgcolors.length
-                : ImageData.images[key === 'head' ? 'heads' : key === 'body' ? 'bodies' : key === 'accessory' ? 'accessories' : 'glasses'].length;
+              const traitCount =
+                key === 'background'
+                  ? ImageData.bgcolors.length
+                  : ImageData.images[
+                      key === 'head'
+                        ? 'heads'
+                        : key === 'body'
+                          ? 'bodies'
+                          : key === 'accessory'
+                            ? 'accessories'
+                            : 'glasses'
+                    ].length;
 
               return (
                 <TraitFilterRow
@@ -344,7 +419,7 @@ const ExploreTab: React.FC = () => {
                       key={`${nounId}`}
                       onClick={e => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        setPopover(prev => prev?.nounId === nounId ? null : { nounId, rect });
+                        setPopover(prev => (prev?.nounId === nounId ? null : { nounId, rect }));
                       }}
                       className="group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg"
                       style={{ width: layout.cellSize, height: layout.cellSize }}
@@ -419,21 +494,27 @@ function TraitFilterRow({
         <div className="flex max-h-48 flex-wrap gap-1 overflow-y-auto border-t p-2">
           {Array.from({ length: traitCount }, (_, i) => {
             const isSelected = traitFilters[traitKey].includes(i);
-            const name = traitKey === 'background' ? (i === 0 ? 'Cool' : 'Warm') : traitName(traitKey, i);
+            const name =
+              traitKey === 'background' ? (i === 0 ? 'Cool' : 'Warm') : traitName(traitKey, i);
 
             return (
               <button
                 key={i}
                 onClick={() => onToggle(traitKey, i)}
                 className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-all ${
-                  isSelected ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-gray-400'
+                  isSelected
+                    ? 'border-black bg-black text-white'
+                    : 'border-gray-200 hover:border-gray-400'
                 }`}
               >
                 {traitKey !== 'background' && (
                   <Trait type={traitKey} seed={i} className="h-6 w-6 rounded" />
                 )}
                 {traitKey === 'background' && (
-                  <div className="h-6 w-6 rounded" style={{ backgroundColor: `#${ImageData.bgcolors[i]}` }} />
+                  <div
+                    className="h-6 w-6 rounded"
+                    style={{ backgroundColor: `#${ImageData.bgcolors[i]}` }}
+                  />
                 )}
                 <span className="max-w-20 truncate">{name}</span>
               </button>
