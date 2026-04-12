@@ -76,7 +76,7 @@ const NavBar = () => {
 
   const v3DaoNavItem = (
     <NavDropdown
-      buttonText="DAO"
+      buttonText=""
       buttonIcon={<FontAwesomeIcon icon={faUsers} />}
       buttonStyle={nonWalletButtonStyle}
     >
@@ -115,11 +115,7 @@ const NavBar = () => {
 
   return (
     <>
-      <Navbar
-        expand
-        style={{ backgroundColor: 'transparent' }}
-        className={classes.navBarCustom}
-      >
+      <Navbar expand style={{ backgroundColor: 'transparent' }} className={classes.navBarCustom}>
         <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
             <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
@@ -178,7 +174,7 @@ const NavBar = () => {
               }
             }}
           >
-            MAKE ART
+            🖌️
           </button>
           <div className={clsx('justify-content-end', classes.navBarItems)}>
             {isDaoGteV3 ? (
@@ -186,14 +182,14 @@ const NavBar = () => {
             ) : (
               <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink}>
                 <NavBarButton
-                  buttonText={<Trans>DAO</Trans>}
+                  buttonText=""
                   buttonIcon={<FontAwesomeIcon icon={faUsers} />}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
             )}
             <NavDropdown
-              buttonText="Explore"
+              buttonText=""
               buttonIcon={<NogglesIcon />}
               buttonStyle={nonWalletButtonStyle}
             >
@@ -310,7 +306,9 @@ const NavBar = () => {
                   );
                 return (
                   <NavBarButton
-                    buttonText={<ShortAddress address={address!} avatar={true} size={24} />}
+                    buttonText={
+                      <ShortAddress address={address!} avatar={true} size={28} avatarOnly />
+                    }
                     buttonStyle={nonWalletButtonStyle}
                     onClick={show}
                   />

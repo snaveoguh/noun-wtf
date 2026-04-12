@@ -11,10 +11,16 @@ import { Address } from '@/utils/types';
 interface ShortAddressProps {
   address: Address;
   avatar?: boolean;
+  avatarOnly?: boolean;
   size?: number;
 }
 
-const ShortAddress: React.FC<ShortAddressProps> = ({ address, avatar = false, size = 24 }) => {
+const ShortAddress: React.FC<ShortAddressProps> = ({
+  address,
+  avatar = false,
+  avatarOnly = false,
+  size = 24,
+}) => {
   const { data: ensName } = useEnsName({ address });
   const resolvedName = ensName ?? resolveNounContractAddress(address);
   const isBlocklisted = resolvedName ? containsBlockedText(resolvedName, 'en') : false;
@@ -41,7 +47,9 @@ const ShortAddress: React.FC<ShortAddressProps> = ({ address, avatar = false, si
         src={ensAvatar ?? blo(address)}
         style={{ width: size, height: size, backgroundImage: `url(${blo(address)})` }}
       />
-      <span className="font-[PT_Root_UI] font-bold tracking-[0.2px]">{displayName}</span>
+      {!avatarOnly && (
+        <span className="font-[PT_Root_UI] font-bold tracking-[0.2px]">{displayName}</span>
+      )}
     </div>
   );
 };

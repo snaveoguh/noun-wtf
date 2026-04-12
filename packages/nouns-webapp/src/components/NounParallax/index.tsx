@@ -241,7 +241,7 @@ function CuratedHead({
         // But that buries it — instead align centers: body center Z=0,
         // GLB center Z=0.25 → shift back by -0.25 to sit at Z=0.
         const offsetX = 0; // center the GLB horizontally
-        const offsetY = -26; // shift GLB head up 1 voxel to sit flush on body
+        const offsetY = -27; // shift GLB head down 1px to align with body
         const offsetZ = -0.25; // align GLB Z center with body Z center
 
         const matrix = new THREE.Matrix4();
