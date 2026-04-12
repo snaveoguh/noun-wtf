@@ -1,15 +1,31 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther } from 'viem';
-import { toast } from 'sonner';
 
-import {
-  smallGrantsTreasuryAbi,
-  SMALL_GRANTS_TREASURY_ADDRESS,
-} from '@/contracts/small-grants-treasury';
+import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import { parseEther } from 'viem';
+import { useAccount, useSignTypedData } from 'wagmi';
+
+import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
+
+// EIP-712 domain and types — must match the API relayer
+const GRANT_PROPOSAL_DOMAIN = {
+  name: 'NounGrants',
+  version: '1',
+  chainId: 1,
+  verifyingContract: SMALL_GRANTS_TREASURY_ADDRESS,
+} as const;
+
+const GRANT_PROPOSAL_TYPES = {
+  Proposal: [
+    { name: 'targets', type: 'address[]' },
+    { name: 'values', type: 'uint256[]' },
+    { name: 'signatures', type: 'string[]' },
+    { name: 'calldatas', type: 'bytes[]' },
+    { name: 'description', type: 'string' },
+  ],
+} as const;
 
 interface GrantTx {
   target: string;
@@ -23,24 +39,20 @@ export default function CreateGrantPage() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [transactions, setTransactions] = useState<GrantTx[]>([
-    { target: '', value: '0', signature: '', calldata: '0x' },
+  const [submitting, setSubmitting] = useState(false);
+  const [txIdCounter, setTxIdCounter] = useState(1);
+  const [transactions, setTransactions] = useState<(GrantTx & { _id: number })[]>([
+    { _id: 0, target: '', value: '0', signature: '', calldata: '0x' },
   ]);
 
-  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { signTypedDataAsync } = useSignTypedData();
 
   useEffect(() => {
-    toast.error('Noun Grants is experimental. Unaudited contract — use at your own risk.', {
-      duration: 8000,
-      id: 'grants-risk-warning',
+    toast.info('Grant proposals are gasless — you only sign a message, no ETH needed.', {
+      duration: 6000,
+      id: 'grants-gasless-info',
     });
   }, []);
-
-  if (isSuccess) {
-    toast.success('Grant proposal created!');
-    navigate('/grants');
-  }
 
   function updateTx(idx: number, field: keyof GrantTx, val: string) {
     setTransactions(prev => prev.map((t, i) => (i === idx ? { ...t, [field]: val } : t)));
@@ -48,7 +60,11 @@ export default function CreateGrantPage() {
 
   function addTx() {
     if (transactions.length >= 10) return;
-    setTransactions(prev => [...prev, { target: '', value: '0', signature: '', calldata: '0x' }]);
+    setTxIdCounter(c => c + 1);
+    setTransactions(prev => [
+      ...prev,
+      { _id: txIdCounter, target: '', value: '0', signature: '', calldata: '0x' },
+    ]);
   }
 
   function removeTx(idx: number) {
@@ -56,6 +72,10 @@ export default function CreateGrantPage() {
   }
 
   async function handleSubmit() {
+    if (!address) {
+      toast.error('Connect your wallet first');
+      return;
+    }
     if (!title.trim()) {
       toast.error('Title is required');
       return;
@@ -72,15 +92,52 @@ export default function CreateGrantPage() {
     const signatures = validTxs.map(t => t.signature || '');
     const calldatas = validTxs.map(t => (t.calldata || '0x') as `0x${string}`);
 
+    setSubmitting(true);
     try {
-      await writeContractAsync({
-        address: SMALL_GRANTS_TREASURY_ADDRESS,
-        abi: smallGrantsTreasuryAbi,
-        functionName: 'propose',
-        args: [targets, values, signatures, calldatas, description],
+      // Step 1: Sign EIP-712 typed data (free, no gas)
+      const signature = await signTypedDataAsync({
+        domain: GRANT_PROPOSAL_DOMAIN,
+        types: GRANT_PROPOSAL_TYPES,
+        primaryType: 'Proposal',
+        message: {
+          targets,
+          values,
+          signatures,
+          calldatas,
+          description,
+        },
       });
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Failed to create grant');
+
+      // Step 2: Submit to relay API (relayer pays gas)
+      const res = await fetch('/api/grants/propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposer: address,
+          targets,
+          values: values.map(v => v.toString()),
+          signatures,
+          calldatas,
+          description,
+          signature,
+        }),
+      });
+
+      const data = (await res.json()) as { error?: string; txHash?: string };
+
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Relay failed');
+      }
+
+      toast.success(`Grant proposal submitted! Tx: ${(data.txHash ?? '').slice(0, 10)}...`);
+      navigate('/grants');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to create grant';
+      if (!msg.includes('User rejected')) {
+        toast.error(msg);
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -88,9 +145,9 @@ export default function CreateGrantPage() {
     <div className={classes.container}>
       <h1 className={classes.title}>Create Grant Proposal</h1>
       <p className={classes.subtitle}>
-        This proposal enters a 12-hour voting period immediately.
+        Gasless — you sign a message, we submit the transaction.
         <br />
-        If it passes (even with just 1 FOR vote), it has a 12-hour timelock before execution.
+        The proposal enters a 12-hour voting period immediately.
       </p>
 
       <div className={classes.form}>
@@ -114,11 +171,11 @@ export default function CreateGrantPage() {
 
         <label className={classes.label}>Transactions</label>
         {transactions.map((tx, idx) => (
-          <div key={idx} className={classes.txRow}>
+          <div key={tx._id} className={classes.txRow}>
             <div className={classes.txHeader}>
               <span>Transaction #{idx + 1}</span>
               {transactions.length > 1 && (
-                <button className={classes.removeTx} onClick={() => removeTx(idx)}>
+                <button type="button" className={classes.removeTx} onClick={() => removeTx(idx)}>
                   remove
                 </button>
               )}
@@ -150,17 +207,22 @@ export default function CreateGrantPage() {
           </div>
         ))}
         {transactions.length < 10 && (
-          <button className={classes.addTxBtn} onClick={addTx}>
+          <button type="button" className={classes.addTxBtn} onClick={addTx}>
             + Add Transaction
           </button>
         )}
 
         <button
+          type="button"
           className={classes.submitBtn}
-          disabled={isPending || !address}
+          disabled={submitting || !address}
           onClick={handleSubmit}
         >
-          {isPending ? 'Signing...' : !address ? 'Connect Wallet' : 'Submit Grant Proposal'}
+          {submitting
+            ? 'Signing & submitting...'
+            : !address
+              ? 'Connect Wallet'
+              : 'Submit Grant Proposal (Gasless)'}
         </button>
       </div>
     </div>
