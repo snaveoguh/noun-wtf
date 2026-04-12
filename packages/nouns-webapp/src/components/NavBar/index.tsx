@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { faFile, faPenToSquare, faPlay, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faUsers } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Trans } from '@lingui/react/macro';
 import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
@@ -34,8 +34,6 @@ import { INounSeed } from '@/wrappers/nounToken';
 import classes from './NavBar.module.css';
 import navDropdownClasses from './NavBarDropdown.module.css';
 
-import responsiveUiUtilsClasses from '@/utils/ResponsiveUIUtils.module.css';
-
 const NavBar = () => {
   const chainId = defaultChain.id;
   const isDaoGteV3 = useIsDaoGteV3();
@@ -55,7 +53,6 @@ const NavBar = () => {
     },
   }).data;
   const daoEtherscanLink = buildEtherscanAddressLink(nounsTreasuryAddress[chainId]);
-  const [isNavExpanded, setIsNavExpanded] = useState(false);
 
   const useStateBg =
     location.pathname === '/' ||
@@ -66,7 +63,6 @@ const NavBar = () => {
 
   const nonWalletButtonStyle = !useStateBg ? NavBarButtonStyle.WHITE_INFO : stateBasedButtonStyle;
 
-  const closeNav = () => setIsNavExpanded(false);
   const buttonClasses = usePickByState(
     navDropdownClasses.whiteInfoSelectedBottom,
     navDropdownClasses.coolInfoSelected,
@@ -120,10 +116,9 @@ const NavBar = () => {
   return (
     <>
       <Navbar
-        expand="lg"
+        expand
         style={{ backgroundColor: 'transparent' }}
         className={classes.navBarCustom}
-        expanded={isNavExpanded}
       >
         <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
@@ -185,241 +180,124 @@ const NavBar = () => {
           >
             MAKE ART
           </button>
-          <Navbar.Toggle
-            className={classes.navBarToggle}
-            aria-controls="basic-navbar-nav"
-            onClick={() => setIsNavExpanded(!isNavExpanded)}
-          />
-          <Navbar.Collapse className="justify-content-end z-10" style={{ visibility: 'visible' }}>
-            <div className={clsx(responsiveUiUtilsClasses.mobileOnly)}>
-              <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink} onClick={closeNav}>
+          <div className={clsx('justify-content-end', classes.navBarItems)}>
+            {isDaoGteV3 ? (
+              v3DaoNavItem
+            ) : (
+              <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink}>
                 <NavBarButton
-                  buttonText={isDaoGteV3 ? <Trans>Proposals</Trans> : <Trans>DAO</Trans>}
-                  buttonIcon={<FontAwesomeIcon icon={faFile} />}
+                  buttonText={<Trans>DAO</Trans>}
+                  buttonIcon={<FontAwesomeIcon icon={faUsers} />}
                   buttonStyle={nonWalletButtonStyle}
                 />
               </Nav.Link>
-              {isDaoGteV3 && (
-                <>
-                  {config.featureToggles.candidates && (
-                    <Nav.Link
-                      as={Link}
-                      to="/candidates"
-                      className={classes.nounsNavLink}
-                      onClick={closeNav}
-                    >
-                      <NavBarButton
-                        buttonText={<Trans>Candidates</Trans>}
-                        buttonIcon={<FontAwesomeIcon icon={faPenToSquare} />}
-                        buttonStyle={nonWalletButtonStyle}
-                      />
-                    </Nav.Link>
-                  )}
-                </>
-              )}
-              <Nav.Link as={Link} to="/grants" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="Grants"
-                  buttonIcon={<FontAwesomeIcon icon={faFile} />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/hackathons"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText="Hack"
-                  buttonIcon={<span>⚡</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link as={Link} to="/world" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="World"
-                  buttonIcon={<span>🌍</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-            </div>
-            <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
-              {isDaoGteV3 ? (
-                v3DaoNavItem
-              ) : (
-                <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink} onClick={closeNav}>
-                  <NavBarButton
-                    buttonText={<Trans>DAO</Trans>}
-                    buttonIcon={<FontAwesomeIcon icon={faUsers} />}
-                    buttonStyle={nonWalletButtonStyle}
-                  />
-                </Nav.Link>
-              )}
-            </div>
-            <div className={clsx(responsiveUiUtilsClasses.mobileOnly)}>
-              <Nav.Link
-                as={Link}
-                to="/playground"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText={<Trans>Playground</Trans>}
-                  buttonIcon={<FontAwesomeIcon icon={faPlay} />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/traits"
-                className={clsx(classes.nounsNavLink, classes.exploreButton)}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText={<Trans>Traits</Trans>}
-                  buttonIcon={<NogglesIcon />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/terminal"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText="Terminal"
-                  buttonIcon={<span>⌐◨-◨</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/crystal-ball"
-                className={classes.nounsNavLink}
-                onClick={closeNav}
-              >
-                <NavBarButton
-                  buttonText="Crystal Ball"
-                  buttonIcon={<span>🔮</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-              <Nav.Link as={Link} to="/feed" className={classes.nounsNavLink} onClick={closeNav}>
-                <NavBarButton
-                  buttonText="Feed"
-                  buttonIcon={<span>📡</span>}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-            </div>
-            <div className={clsx(responsiveUiUtilsClasses.desktopOnly)}>
-              <NavDropdown
-                buttonText="Explore"
-                buttonIcon={<NogglesIcon />}
-                buttonStyle={nonWalletButtonStyle}
-              >
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/probe"
-                >
-                  Probe
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/traits"
-                >
-                  <Trans>Traits</Trans>
-                </Dropdown.Item>
-                <Dropdown.Item
-                  className={clsx(
-                    usePickByState(
-                      navDropdownClasses.whiteInfoSelectedBottom,
-                      navDropdownClasses.coolInfoSelected,
-                      navDropdownClasses.warmInfoSelected,
-                    ),
-                  )}
-                  href="/playground"
-                >
-                  Playground
-                </Dropdown.Item>
-                <Dropdown.Divider />
-                <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
-                <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
-                <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
-                <Dropdown.Item href="/feed">Feed</Dropdown.Item>
-                <Dropdown.Divider />
-                <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
-                <Dropdown.Item href="/world">World</Dropdown.Item>
-                <Dropdown.Item href="/nonsense">Nonsense</Dropdown.Item>
-              </NavDropdown>
-            </div>
-            <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
-            <button
-              type="button"
-              onClick={() => navDispatch(setTorchMode(!torchMode))}
-              title={torchMode ? 'Turn on the lights' : 'Turn off the lights'}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1.2rem',
-                padding: '6px 8px',
-                lineHeight: 1,
-                opacity: 0.7,
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.opacity = '1';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.opacity = '0.7';
-              }}
+            )}
+            <NavDropdown
+              buttonText="Explore"
+              buttonIcon={<NogglesIcon />}
+              buttonStyle={nonWalletButtonStyle}
             >
-              {torchMode ? '☀️' : '🌙'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSiteMode('new');
-                navigate('/');
-              }}
-              title="Switch to Terminal Feed"
-              style={{
-                background: 'none',
-                border: '1px solid rgba(0,255,65,0.3)',
-                cursor: 'pointer',
-                fontSize: '0.65rem',
-                padding: '3px 8px',
-                lineHeight: 1,
-                color: '#00ff41',
-                borderRadius: '3px',
-                letterSpacing: '0.5px',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(0,255,65,0.1)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'none';
-              }}
-            >
-              NEW
-            </button>
-            <SubgraphSettings />
+              <Dropdown.Item
+                className={clsx(
+                  usePickByState(
+                    navDropdownClasses.whiteInfoSelectedBottom,
+                    navDropdownClasses.coolInfoSelected,
+                    navDropdownClasses.warmInfoSelected,
+                  ),
+                )}
+                href="/probe"
+              >
+                Probe
+              </Dropdown.Item>
+              <Dropdown.Item
+                className={clsx(
+                  usePickByState(
+                    navDropdownClasses.whiteInfoSelectedBottom,
+                    navDropdownClasses.coolInfoSelected,
+                    navDropdownClasses.warmInfoSelected,
+                  ),
+                )}
+                href="/traits"
+              >
+                <Trans>Traits</Trans>
+              </Dropdown.Item>
+              <Dropdown.Item
+                className={clsx(
+                  usePickByState(
+                    navDropdownClasses.whiteInfoSelectedBottom,
+                    navDropdownClasses.coolInfoSelected,
+                    navDropdownClasses.warmInfoSelected,
+                  ),
+                )}
+                href="/playground"
+              >
+                Playground
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
+              <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
+              <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
+              <Dropdown.Item href="/feed">Feed</Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
+              <Dropdown.Item href="/world">World</Dropdown.Item>
+              <Dropdown.Item href="/nonsense">Nonsense</Dropdown.Item>
+            </NavDropdown>
+            <div className={classes.navBarSecondary}>
+              <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
+              <button
+                type="button"
+                onClick={() => navDispatch(setTorchMode(!torchMode))}
+                title={torchMode ? 'Turn on the lights' : 'Turn off the lights'}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  padding: '6px 8px',
+                  lineHeight: 1,
+                  opacity: 0.7,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.opacity = '0.7';
+                }}
+              >
+                {torchMode ? '☀️' : '🌙'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSiteMode('new');
+                  navigate('/');
+                }}
+                title="Switch to Terminal Feed"
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(0,255,65,0.3)',
+                  cursor: 'pointer',
+                  fontSize: '0.65rem',
+                  padding: '3px 8px',
+                  lineHeight: 1,
+                  color: '#00ff41',
+                  borderRadius: '3px',
+                  letterSpacing: '0.5px',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(0,255,65,0.1)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'none';
+                }}
+              >
+                NEW
+              </button>
+              <SubgraphSettings />
+            </div>
             <ConnectKitButton.Custom>
               {({ isConnected, show, address }) => {
                 if (!isConnected)
@@ -439,7 +317,7 @@ const NavBar = () => {
                 );
               }}
             </ConnectKitButton.Custom>
-          </Navbar.Collapse>
+          </div>
         </Container>
       </Navbar>
     </>

@@ -144,25 +144,18 @@
 @media (max-width: 992px) {
   .wrapper,
   .button {
-    height: 48px;
-    font-size: 18px;
+    height: 40px;
+    font-size: 14px;
   }
 }
 
-@media (max-width: 330px) {
-  .button {
-    width: 70px;
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 0 0 0 8px;
   }
-}
 
-@media (max-width: 370px) {
   .button {
-    width: 90px;
-  }
-}
-
-@media (min-width: 400px) {
-  .button {
+    padding-right: 8px;
     width: auto;
   }
 }

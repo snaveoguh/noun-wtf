@@ -50,6 +50,23 @@
   gap: 0.45rem;
 }
 
+.navBarItems {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.navBarSecondary {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+}
+
 @media (max-width: 992px) {
   .navBarLogo {
     width: 28px;
@@ -73,6 +90,33 @@
     padding-top: 0.75rem;
   }
 
+  .navBarItems {
+    gap: 0.3rem;
+  }
+}
+
+/* Mobile: hide secondary items (locale / torch / NEW / subgraph) so DAO + EXPLORE + Connect fit */
+@media (max-width: 768px) {
+  .navBarSecondary {
+    display: none;
+  }
+
+  .makeArtHeaderBtn {
+    margin-left: auto;
+    margin-right: 0.3rem;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.65rem;
+  }
+
+  .navBarItems {
+    gap: 0.25rem;
+  }
+}
+
+/* Ensure dropdown menus overlay the page rather than pushing content */
+.navBarCustom :global(.dropdown-menu) {
+  position: absolute !important;
+  z-index: 1050;
 }
 
 /* connect button displays differently to default NavBarItems, thus the !importants */
