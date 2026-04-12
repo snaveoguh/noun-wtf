@@ -886,11 +886,14 @@ function EditableBackgroundBody({
   layerVisibility,
   lightingPreset = 'storefront',
   glassesZShift = 0,
+  hideGlasses = false,
 }: {
   seed: INounSeed;
   layerVisibility?: LayerVisibility;
   lightingPreset?: LightingPreset;
   glassesZShift?: number;
+  /** Hide voxel glasses — used in mesh mode where GLB provides its own glasses */
+  hideGlasses?: boolean;
 }) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
@@ -928,7 +931,7 @@ function EditableBackgroundBody({
           <meshLambertMaterial vertexColors />
         </mesh>
       )}
-      {glassesGeo && (
+      {glassesGeo && !hideGlasses && (
         <group position={[0, 0, glassesZShift]}>
           <mesh geometry={glassesGeo}>
             <meshLambertMaterial vertexColors />
@@ -985,10 +988,22 @@ function ResponsiveCamera({
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
+/** Mesh editing config — when present, renders GLB mesh editor instead of voxels */
+export interface MeshEditConfig {
+  glbPath: string;
+  glassesIndex: number;
+  brushSize: number;
+  persistenceKey: string;
+  onStateChange?: () => void;
+  undoRef?: React.MutableRefObject<(() => void) | null>;
+  redoRef?: React.MutableRefObject<(() => void) | null>;
+  sceneRef?: React.MutableRefObject<THREE.Object3D | null>;
+}
+
 export interface EditableConfig {
   pixels: string[][];
   initialVoxelMap?: VoxelMap | null;
-  activeTool: Tool;
+  activeTool: Tool | 'build';
   activeColor: string;
   onPixelChange: (x: number, y: number, color: string) => void;
   onPixelsFill: (changes: [number, number, string][]) => void;
@@ -1003,6 +1018,8 @@ export interface EditableConfig {
   backgroundSeed?: INounSeed;
   /** Which background layers to show alongside the editor */
   backgroundVisibility?: LayerVisibility;
+  /** When present, use mesh editor instead of voxel editor */
+  meshConfig?: MeshEditConfig;
 }
 
 interface NounParallaxProps {
@@ -1021,8 +1038,9 @@ interface NounParallaxProps {
 }
 
 // Lazy-load EditableScene (heavy — raycasting + individual meshes)
-// Lazy-load EditableScene from voxel engine
 const EditableSceneComponent = React.lazy(() => import('./VoxelEditableScene'));
+// Lazy-load MeshEditableScene (GLB mesh painting — replaces voxel editor when GLB available)
+const MeshEditableSceneComponent = React.lazy(() => import('./MeshEditableScene'));
 
 const NounParallax: React.FC<NounParallaxProps> = ({
   seed,
@@ -1188,7 +1206,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                   layerVisibility={editable.backgroundVisibility}
                   lightingPreset={lightingPreset}
                   glassesZShift={(() => {
-                    // Shift glasses to front face of curated head (standard glasses baked at z≈2.55)
+                    // Voxel mode: shift glasses to front face of curated head
                     if (!editable.initialVoxelMap) return 0;
                     let maxZ = 0;
                     for (const key of editable.initialVoxelMap.keys()) {
@@ -1197,23 +1215,43 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                     }
                     return Math.max(0, maxZ - 2.55 + GLASSES_DEPTH);
                   })()}
+                  hideGlasses={!!editable.meshConfig && editable.meshConfig.glassesIndex !== 0}
                 />
               )}
-              <EditableSceneComponent
-                pixels={editable.pixels}
-                initialVoxelMap={editable.initialVoxelMap ?? undefined}
-                activeTool={editable.activeTool}
-                activeColor={editable.activeColor}
-                onPixelChange={editable.onPixelChange}
-                onPixelsFill={editable.onPixelsFill}
-                onColorPick={editable.onColorPick}
-                voxelDepth={editable.voxelDepth}
-                interactionMode={editable.interactionMode}
-                visibilityMask={editable.visibilityMask}
-                displayPixels={editable.displayPixels}
-                viewStateRef={editable.viewStateRef}
-                onVoxelMapChange={editable.onVoxelMapChange}
-              />
+              {editable.meshConfig ? (
+                <MeshEditableSceneComponent
+                  glbPath={editable.meshConfig.glbPath}
+                  glassesIndex={editable.meshConfig.glassesIndex}
+                  activeTool={editable.activeTool}
+                  activeColor={editable.activeColor}
+                  brushSize={editable.meshConfig.brushSize}
+                  interactionMode={editable.interactionMode ?? 'sculpt'}
+                  onColorPick={editable.onColorPick}
+                  viewStateRef={editable.viewStateRef}
+                  onStateChange={editable.meshConfig.onStateChange}
+                  persistenceKey={editable.meshConfig.persistenceKey}
+                  undoRef={editable.meshConfig.undoRef}
+                  redoRef={editable.meshConfig.redoRef}
+                  headVisible={editable.backgroundVisibility?.head ?? true}
+                  sceneRef={editable.meshConfig.sceneRef}
+                />
+              ) : (
+                <EditableSceneComponent
+                  pixels={editable.pixels}
+                  initialVoxelMap={editable.initialVoxelMap ?? undefined}
+                  activeTool={editable.activeTool === 'build' ? 'pencil' : editable.activeTool}
+                  activeColor={editable.activeColor}
+                  onPixelChange={editable.onPixelChange}
+                  onPixelsFill={editable.onPixelsFill}
+                  onColorPick={editable.onColorPick}
+                  voxelDepth={editable.voxelDepth}
+                  interactionMode={editable.interactionMode}
+                  visibilityMask={editable.visibilityMask}
+                  displayPixels={editable.displayPixels}
+                  viewStateRef={editable.viewStateRef}
+                  onVoxelMapChange={editable.onVoxelMapChange}
+                />
+              )}
             </>
           ) : interactive ? (
             <InteractiveScene

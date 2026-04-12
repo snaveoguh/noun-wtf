@@ -30,7 +30,7 @@ export interface AuctionShortcutConfig {
   onToggleHelp: () => void;
 
   // Edit mode (optional — only used when editing)
-  onSetTool?: (tool: Tool) => void;
+  onSetTool?: (tool: Tool | 'build') => void;
   onUndo?: () => void;
   onRedo?: () => void;
 }
@@ -77,6 +77,9 @@ export function useAuctionKeyboardShortcuts(config: AuctionShortcutConfig) {
               return;
             case 'i':
               config.onSetTool?.('eyedropper');
+              return;
+            case 'v':
+              config.onSetTool?.('build');
               return;
           }
         }

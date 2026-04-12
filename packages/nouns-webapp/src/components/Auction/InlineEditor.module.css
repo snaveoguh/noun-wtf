@@ -22,11 +22,11 @@
   }
 }
 
-/* Panels-only mode (3D) — no canvas, just floating panels */
+/* Panels-only mode (3D) — fixed so panels can be dragged anywhere on page */
 .panelsOverlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 200;
   pointer-events: none;
 }
 
@@ -289,9 +289,12 @@
   top: 188px;
   left: 16px;
   width: 200px;
-  max-height: calc(100% - 204px);
+  min-width: 100px;
+  max-height: calc(100vh - 204px);
   overflow-y: auto;
   scrollbar-width: thin;
+  resize: both;
+  overflow: auto;
 }
 
 .currentColor {

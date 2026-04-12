@@ -152,17 +152,33 @@ function formatUpdateLabel(updatedAt?: string) {
 }
 
 /** Collapsible lighting preset picker — hover expands on desktop, tap cycles on mobile */
-function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange: (p: LightingPreset) => void }) {
+function LightingPicker({
+  preset,
+  onChange,
+}: {
+  preset: LightingPreset;
+  onChange: (p: LightingPreset) => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   return (
     <div
       style={{
-        position: 'absolute', top: 16, right: 16, zIndex: 2,
-        display: 'flex', gap: 3, alignItems: 'center', height: 22,
-        background: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: '0 8px',
-        fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.05em',
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 2,
+        display: 'flex',
+        gap: 3,
+        alignItems: 'center',
+        height: 22,
+        background: 'rgba(0,0,0,0.5)',
+        borderRadius: 999,
+        padding: '0 8px',
+        fontFamily: 'monospace',
+        fontSize: 9,
+        letterSpacing: '0.05em',
         cursor: 'pointer',
       }}
       onMouseEnter={() => !isMobile && setHovered(true)}
@@ -174,7 +190,9 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
         }
       }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginRight: 3, lineHeight: 1 }}>💡</span>
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginRight: 3, lineHeight: 1 }}>
+        💡
+      </span>
       {LIGHTING_PRESETS.map(p => {
         const isActive = p.name === preset;
         const show = hovered || isActive;
@@ -182,9 +200,15 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
           <button
             key={p.name}
             type="button"
-            onClick={(e) => { e.stopPropagation(); onChange(p.name); }}
+            onClick={e => {
+              e.stopPropagation();
+              onChange(p.name);
+            }}
             style={{
-              fontSize: 9, border: 'none', borderRadius: 4, lineHeight: '14px',
+              fontSize: 9,
+              border: 'none',
+              borderRadius: 4,
+              lineHeight: '14px',
               padding: show ? '2px 5px' : '2px 0',
               maxWidth: show ? 50 : 0,
               opacity: show ? 1 : 0,
@@ -192,7 +216,9 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
               whiteSpace: 'nowrap',
               background: isActive ? 'rgba(255,255,255,0.25)' : 'transparent',
               color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
-              fontFamily: 'monospace', cursor: 'pointer', letterSpacing: '0.05em',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              letterSpacing: '0.05em',
               transition: 'max-width 0.25s ease, opacity 0.2s ease, padding 0.25s ease',
             }}
           >
@@ -201,7 +227,16 @@ function LightingPicker({ preset, onChange }: { preset: LightingPreset; onChange
         );
       })}
       {!isMobile && !hovered && (
-        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 1, transition: 'opacity 0.2s' }}>‹</span>
+        <span
+          style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontSize: 10,
+            marginLeft: 1,
+            transition: 'opacity 0.2s',
+          }}
+        >
+          ‹
+        </span>
       )}
     </div>
   );
@@ -231,7 +266,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   // Listen for "Make Art" from navbar hamburger menu
   useEffect(() => {
-    const handler = () => { setComposerOpen(true); setComposerMode('art'); };
+    const handler = () => {
+      setComposerOpen(true);
+      setComposerMode('art');
+    };
     window.addEventListener('noun-make-art', handler);
     return () => window.removeEventListener('noun-make-art', handler);
   }, []);
@@ -259,12 +297,19 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit2dVisibility, setEdit2dVisibility] = useState({ ...DEFAULT_VISIBILITY });
   const [edit3dVisibility, setEdit3dVisibility] = useState({ ...DEFAULT_VISIBILITY });
-  const [edit3dTool, setEdit3dTool] = useState<Tool>('pencil');
+  const [edit3dTool, setEdit3dTool] = useState<Tool | 'build'>('pencil');
   const [edit3dColor, setEdit3dColor] = useState('#000000');
   const [edit3dVoxelDepth, setEdit3dVoxelDepth] = useState(3);
   const [edit3dStartVoxelMap, setEdit3dStartVoxelMap] = useState<VoxelMap | null>(null);
   const [edit3dInteractionMode, setEdit3dInteractionMode] =
     useState<Edit3DInteractionMode>('sculpt');
+
+  // Mesh editor state (when GLB head is available)
+  const [meshGlbPath, setMeshGlbPath] = useState<string | null>(null);
+  const [meshBrushSize, setMeshBrushSize] = useState(5);
+  const meshUndoRef = useRef<(() => void) | null>(null);
+  const meshRedoRef = useRef<(() => void) | null>(null);
+  const meshSceneRef = useRef<THREE.Object3D | null>(null);
 
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
   const [editingAuctionUrl, setEditingAuctionUrl] = useState(false);
@@ -438,16 +483,39 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         const pixels = liveDrafts?.voxel?.pixels ?? liveDrafts?.pixel?.pixels ?? baseGrid;
         resetLive3dSignature(pixels, liveDrafts?.voxel?.voxelData);
 
-        // Try loading curated 3DNouns head as starting voxel map
+        // Try to resolve GLB path from manifest for mesh editor
+        let resolvedGlbPath: string | null = null;
+        if (currentNounSeed) {
+          try {
+            const manifestRes = await fetch('/models/heads/manifest.json');
+            if (manifestRes.ok) {
+              const manifest: Array<{ threeDNounsGlb?: string }> = await manifestRes.json();
+              const entry = manifest[currentNounSeed.head];
+              if (entry?.threeDNounsGlb != null) {
+                resolvedGlbPath = entry.threeDNounsGlb;
+                console.log(`[Editor] Mesh editor: using GLB ${resolvedGlbPath}`);
+              }
+            }
+          } catch {
+            /* no manifest */
+          }
+        }
+        setMeshGlbPath(resolvedGlbPath);
+
+        // Fallback: load curated voxel map for heads without GLB
         let startMap = liveVoxelMap;
-        if (!startMap && currentNounSeed) {
+        if (!resolvedGlbPath && !startMap && currentNounSeed) {
           try {
             const curated = await loadCuratedVoxelMap(currentNounSeed.head);
             if (curated && curated.size > 0) {
               startMap = curated;
-              console.log(`[Editor] Loaded curated 3DNouns head for trait ${currentNounSeed.head}`);
+              console.log(
+                `[Editor] Voxel fallback: loaded curated head for trait ${currentNounSeed.head}`,
+              );
             }
-          } catch { /* no curated head available */ }
+          } catch {
+            /* no curated head available */
+          }
         }
 
         setEdit3dStartVoxelMap(startMap);
@@ -459,25 +527,39 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       }
       setEditMode(mode);
     },
-    [baseGrid, liveDrafts, liveVoxelMap, currentNounSeed, resetLive2dSignature, resetLive3dSignature],
+    [
+      baseGrid,
+      liveDrafts,
+      liveVoxelMap,
+      currentNounSeed,
+      resetLive2dSignature,
+      resetLive3dSignature,
+    ],
   );
 
   // Load a curated 3D head into the editor as a starting point
-  const loadCuratedHeadIntoEditor = useCallback(async (headIndex: number) => {
-    const voxelMap = await loadCuratedVoxelMap(headIndex);
-    if (!voxelMap) return;
-    setEdit3dStartVoxelMap(voxelMap);
-    voxelMapRef.current = voxelMap;
-    setVoxelMapVersion(v => v + 1);
-    if (editMode !== '3d') {
-      startEditing('3d');
-    }
-  }, [editMode, startEditing]);
+  const loadCuratedHeadIntoEditor = useCallback(
+    async (headIndex: number) => {
+      const voxelMap = await loadCuratedVoxelMap(headIndex);
+      if (!voxelMap) return;
+      setEdit3dStartVoxelMap(voxelMap);
+      voxelMapRef.current = voxelMap;
+      setVoxelMapVersion(v => v + 1);
+      if (editMode !== '3d') {
+        startEditing('3d');
+      }
+    },
+    [editMode, startEditing],
+  );
 
   // Expose to window for console testing / external triggers
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__loadCuratedHead = loadCuratedHeadIntoEditor;
-    return () => { delete (window as any).__loadCuratedHead; };
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).__loadCuratedHead;
+    };
   }, [loadCuratedHeadIntoEditor]);
 
   // Listen for Noundry trait clicks — open 2D editor
@@ -803,74 +885,124 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     onToggleHelp: () => setShowHelp(value => !value),
     onSetTool: tool => {
       if (editMode === '3d') setEdit3dTool(tool);
-      else editorToolRef.current?.setTool(tool);
+      else if (tool !== 'build') editorToolRef.current?.setTool(tool);
     },
     onUndo: () => {
-      if (editMode === '3d') edit3dDispatch({ type: 'UNDO' });
-      else edit2dDispatch({ type: 'UNDO' });
+      if (editMode === '3d') {
+        // Mesh editor handles its own undo via ref
+        if (meshGlbPath && meshUndoRef.current) meshUndoRef.current();
+        else edit3dDispatch({ type: 'UNDO' });
+      } else {
+        edit2dDispatch({ type: 'UNDO' });
+      }
     },
     onRedo: () => {
-      if (editMode === '3d') edit3dDispatch({ type: 'REDO' });
-      else edit2dDispatch({ type: 'REDO' });
+      if (editMode === '3d') {
+        if (meshGlbPath && meshRedoRef.current) meshRedoRef.current();
+        else edit3dDispatch({ type: 'REDO' });
+      } else {
+        edit2dDispatch({ type: 'REDO' });
+      }
     },
   });
 
-  const downloadAs = useCallback(async (format: 'png' | 'svg' | 'webp' | 'glb') => {
-    setDownloadMenuOpen(false);
-    const canvas = document.querySelector(
-      '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
-    ) as HTMLCanvasElement | null;
+  // Download mesh from the editor scene ref (noun only, no environment)
+  const downloadMesh = useCallback(
+    async (format: 'glb' | 'stl' | 'obj') => {
+      const obj = meshSceneRef.current;
+      if (!obj) return;
 
-    if (format === 'glb') {
-      // GLB: export the 3D scene from the R3F canvas
-      // R3F stores its fiber root on the <canvas> DOM element
-      const r3fCanvas = document.querySelector('[data-noun-parallax-root="true"] canvas') as
-        (HTMLCanvasElement & { __r3f?: { store?: { getState: () => { scene: THREE.Scene } } } }) | null;
-      const scene = r3fCanvas?.__r3f?.store?.getState()?.scene;
-      if (!scene) return;
-      // @ts-expect-error — types are at three/examples/jsm but runtime is three/addons
-      const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
-      const exporter = new GLTFExporter();
-      exporter.parse(scene, (result: ArrayBuffer | object) => {
-        const blob = new Blob([result as ArrayBuffer], { type: 'model/gltf-binary' });
+      const filename = `noun-${currentNounId}.${format}`;
+      if (format === 'glb') {
+        // @ts-expect-error — types at three/examples/jsm, runtime at three/addons
+        const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+        const exporter = new GLTFExporter();
+        exporter.parse(
+          obj,
+          (result: ArrayBuffer) => {
+            const blob = new Blob([result], { type: 'model/gltf-binary' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          },
+          (err: unknown) => console.error('GLB export failed:', err),
+          { binary: true },
+        );
+      } else if (format === 'stl') {
+        // @ts-expect-error — three.js addon types at examples/jsm, runtime at addons
+        const { STLExporter } = await import('three/addons/exporters/STLExporter.js');
+        const buffer = new STLExporter().parse(obj, { binary: true });
+        const blob = new Blob([buffer], { type: 'model/stl' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } else {
+        // @ts-expect-error — three.js addon types at examples/jsm, runtime at addons
+        const { OBJExporter } = await import('three/addons/exporters/OBJExporter.js');
+        const result = new OBJExporter().parse(obj);
+        const blob = new Blob([result], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    },
+    [currentNounId],
+  );
+
+  const downloadAs = useCallback(
+    async (format: 'png' | 'svg' | 'webp' | 'glb' | 'stl' | 'obj') => {
+      setDownloadMenuOpen(false);
+      const canvas = document.querySelector(
+        '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
+      ) as HTMLCanvasElement | null;
+
+      if (format === 'glb' || format === 'stl' || format === 'obj') {
+        // 3D export uses the mesh scene ref directly (noun only, no environment)
+        if (meshSceneRef.current) {
+          await downloadMesh(format as 'glb' | 'stl' | 'obj');
+        }
+        return;
+      }
+
+      if (format === 'svg') {
+        // SVG: use the raw noun SVG data
+        const svgSource = nounSvg ?? '';
+        if (!svgSource) return;
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `noun-${currentNounId}.glb`;
+        link.href = svgSource.startsWith('data:')
+          ? svgSource
+          : `data:image/svg+xml;base64,${btoa(svgSource)}`;
+        link.download = `noun-${currentNounId}.svg`;
         link.click();
-        URL.revokeObjectURL(link.href);
-      }, (error: unknown) => { console.error('GLB export failed:', error); }, { binary: true });
-      return;
-    }
+        return;
+      }
 
-    if (format === 'svg') {
-      // SVG: use the raw noun SVG data
-      const svgSource = nounSvg ?? '';
-      if (!svgSource) return;
-      const link = document.createElement('a');
-      link.href = svgSource.startsWith('data:') ? svgSource : `data:image/svg+xml;base64,${btoa(svgSource)}`;
-      link.download = `noun-${currentNounId}.svg`;
-      link.click();
-      return;
-    }
+      const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
+      if (canvas) {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL(mimeType);
+        link.download = `noun-${currentNounId}.${format}`;
+        link.click();
+        return;
+      }
 
-    const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
-    if (canvas) {
+      // Fallback: derivative/link/draft image
+      const imageSource =
+        activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
+      if (!imageSource) return;
       const link = document.createElement('a');
-      link.href = canvas.toDataURL(mimeType);
+      link.href = imageSource;
       link.download = `noun-${currentNounId}.${format}`;
       link.click();
-      return;
-    }
-
-    // Fallback: derivative/link/draft image
-    const imageSource =
-      activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
-    if (!imageSource) return;
-    const link = document.createElement('a');
-    link.href = imageSource;
-    link.download = `noun-${currentNounId}.${format}`;
-    link.click();
-  }, [currentNounId, nounSvg, activeDerivative, activeLink, liveDrafts]);
+    },
+    [currentNounId, nounSvg, activeDerivative, activeLink, liveDrafts, downloadMesh],
+  );
 
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
   const activityContent = hasAuctionBounds ? (
@@ -918,9 +1050,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             editMode === '3d'
               ? {
                   pixels: edit3dHistory.present,
-                  initialVoxelMap: edit3dStartVoxelMap,
-                  activeTool: editorToolRef.current?.getActiveTool() ?? edit3dTool,
-                  activeColor: editorToolRef.current?.getActiveColor() ?? edit3dColor,
+                  initialVoxelMap: meshGlbPath ? undefined : edit3dStartVoxelMap,
+                  activeTool: edit3dTool,
+                  activeColor: edit3dColor,
                   onPixelChange: (x, y, color) =>
                     edit3dDispatch({ type: 'SET_PIXEL', x, y, color }),
                   onPixelsFill: changes => edit3dDispatch({ type: 'SET_PIXELS', changes }),
@@ -931,8 +1063,6 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   },
                   voxelDepth: edit3dVoxelDepth,
                   interactionMode: edit3dInteractionMode,
-                  // Skip 2D masks when curated 3D head is loaded — the 2D pixel grid
-                  // paints standard glasses/head colors onto wrong 3D voxel positions
                   visibilityMask: edit3dStartVoxelMap ? undefined : edit3dVisibilityMask,
                   displayPixels: edit3dStartVoxelMap ? undefined : edit3dVisiblePixels,
                   viewStateRef: edit3dViewStateRef,
@@ -942,6 +1072,20 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   },
                   backgroundSeed: currentNounSeed ?? undefined,
                   backgroundVisibility: edit3dVisibility,
+                  // Mesh editor config — when GLB available, render actual mesh instead of voxels
+                  meshConfig:
+                    meshGlbPath && currentNounSeed
+                      ? {
+                          glbPath: meshGlbPath,
+                          glassesIndex: currentNounSeed.glasses,
+                          brushSize: meshBrushSize,
+                          persistenceKey: `noun-${currentNounId}-head-${currentNounSeed.head}`,
+                          onStateChange: () => setVoxelMapVersion(v => v + 1),
+                          undoRef: meshUndoRef,
+                          redoRef: meshRedoRef,
+                          sceneRef: meshSceneRef,
+                        }
+                      : undefined,
                 }
               : undefined
           }
@@ -1224,7 +1368,13 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     );
   };
 
-  const statusIcon = isEditing ? '✎' : interactionMode === 'grab' ? '🖐' : interactionMode === 'twist' ? '🌀' : '📱';
+  const statusIcon = isEditing
+    ? '✎'
+    : interactionMode === 'grab'
+      ? '🖐'
+      : interactionMode === 'twist'
+        ? '🌀'
+        : '📱';
   const statusLabel = isEditing
     ? editMode === '3d'
       ? `${statusIcon} Live 3D editing`
@@ -1273,7 +1423,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                       new Audio('/sounds/batman-transition.mp3').play().catch(() => {});
                       setViewMode('sprite');
                       const s = currentNounSeed;
-                      const seedParam = s ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}` : '';
+                      const seedParam = s
+                        ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`
+                        : '';
                       setTimeout(() => navigate(`/world${seedParam}`), 800);
                       return;
                     }
@@ -1335,14 +1487,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 MAKE ART
               </button>
             </div>
-
           </div>
 
           <div className={classes.heroMain}>
             <section
               className={`${classes.heroStage} ${viewMode === 'real' && currentNounSeed ? (currentNounSeed.background === 0 ? classes.bgCool : classes.bgWarm) : ''}`}
             >
-              <div className={`${classes.heroArtFrame} ${viewMode === 'sprite' ? classes.spriteTransition : ''}`} data-hero-artwork-root="true">
+              <div
+                className={`${classes.heroArtFrame} ${viewMode === 'sprite' ? classes.spriteTransition : ''}`}
+                data-hero-artwork-root="true"
+              >
                 {renderHeroArtwork()}
               </div>
 
@@ -1392,10 +1546,20 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     </button>
                     {downloadMenuOpen && (
                       <div className={classes.downloadMenu}>
-                        <button type="button" onClick={() => downloadAs('png')}>PNG</button>
-                        <button type="button" onClick={() => downloadAs('svg')}>SVG</button>
-                        <button type="button" onClick={() => downloadAs('webp')}>WebP</button>
-                        {is3dView && <button type="button" onClick={() => downloadAs('glb')}>GLB</button>}
+                        <button type="button" onClick={() => downloadAs('png')}>
+                          PNG
+                        </button>
+                        <button type="button" onClick={() => downloadAs('svg')}>
+                          SVG
+                        </button>
+                        <button type="button" onClick={() => downloadAs('webp')}>
+                          WebP
+                        </button>
+                        {is3dView && (
+                          <button type="button" onClick={() => downloadAs('glb')}>
+                            GLB
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1472,8 +1636,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     externalDispatch={edit3dDispatch}
                     externalPast={edit3dHistory.past}
                     externalFuture={edit3dHistory.future}
-                    voxelDepth={edit3dVoxelDepth}
-                    onVoxelDepthChange={setEdit3dVoxelDepth}
+                    voxelDepth={meshGlbPath ? undefined : edit3dVoxelDepth}
+                    onVoxelDepthChange={meshGlbPath ? undefined : setEdit3dVoxelDepth}
+                    meshBrushSize={meshGlbPath ? meshBrushSize : undefined}
+                    onMeshBrushSizeChange={meshGlbPath ? setMeshBrushSize : undefined}
+                    isMeshMode={!!meshGlbPath}
+                    onToolChange={setEdit3dTool}
+                    onColorChange={setEdit3dColor}
+                    onDownload={
+                      meshGlbPath ? (fmt: 'glb' | 'stl' | 'obj') => downloadMesh(fmt) : undefined
+                    }
                     onExit={stopEditing}
                     visibility={edit3dVisibility}
                     onVisibilityChange={setEdit3dVisibility}
@@ -1492,7 +1664,6 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
               </div>
             </aside>
           </div>
-
         </div>
 
         {composerOpen && (
