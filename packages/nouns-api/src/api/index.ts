@@ -80,9 +80,11 @@ import { graphql } from 'ponder';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import sharp from 'sharp';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, createWalletClient, http, type Hex, verifyTypedData } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
+import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
 import {
   initAgent,
@@ -402,22 +404,19 @@ app.get('/api/grants', async c => {
 /** Single grant with votes and status changes — bypasses GraphQL truncation */
 app.get('/api/grants/:id', async c => {
   const id = c.req.param('id');
-  const [g] = await db
-    .select()
-    .from(schema.grant)
-    .where(eq(schema.grant.id, BigInt(id)));
+  const [g] = await db.select().from(schema.grant).where(eq(schema.grant.id, id));
   if (!g) return c.json({ error: 'not found' }, 404);
 
   const votes = await db
     .select()
     .from(schema.grantVote)
-    .where(eq(schema.grantVote.grantId, BigInt(id)))
+    .where(eq(schema.grantVote.grantId, id))
     .orderBy(desc(schema.grantVote.createdAtBlock));
 
   const changes = await db
     .select()
     .from(schema.grantStatusChange)
-    .where(eq(schema.grantStatusChange.grantId, BigInt(id)))
+    .where(eq(schema.grantStatusChange.grantId, id))
     .orderBy(schema.grantStatusChange.createdAtBlock);
 
   const latestBlock = await getLatestBlockCached();
@@ -451,6 +450,120 @@ app.get('/api/grants/:id', async c => {
       createdAtTransaction: sc.createdAtTransaction,
     })),
   });
+});
+
+// ============================================================
+// Gasless grant proposals — relayer submits on behalf of users
+// ============================================================
+
+const SMALL_GRANTS_ADDRESS = '0xBAc9233725440c595b19d975309CC98cb259253a' as const;
+
+// EIP-712 domain and types for grant proposal signing
+const GRANT_PROPOSAL_DOMAIN = {
+  name: 'NounGrants',
+  version: '1',
+  chainId: 1,
+  verifyingContract: SMALL_GRANTS_ADDRESS,
+} as const;
+
+const GRANT_PROPOSAL_TYPES = {
+  Proposal: [
+    { name: 'targets', type: 'address[]' },
+    { name: 'values', type: 'uint256[]' },
+    { name: 'signatures', type: 'string[]' },
+    { name: 'calldatas', type: 'bytes[]' },
+    { name: 'description', type: 'string' },
+  ],
+} as const;
+
+// Rate limiting: 1 proposal per address per hour
+const proposalRateLimit = new Map<string, number>();
+
+// Relayer wallet (nounirl)
+const relayerPrivateKey = process.env.NOUNIRL_PRIVATE_KEY;
+const relayerRpcUrl = process.env.NOUNIRL_RPC_URL || process.env.PONDER_RPC_URL_1;
+const relayerAccount = relayerPrivateKey ? privateKeyToAccount(relayerPrivateKey as Hex) : null;
+const relayerWallet =
+  relayerAccount && relayerRpcUrl
+    ? createWalletClient({
+        chain: mainnet,
+        transport: http(relayerRpcUrl),
+        account: relayerAccount,
+      })
+    : null;
+
+app.post('/api/grants/propose', async c => {
+  if (!relayerWallet || !relayerAccount) {
+    return c.json({ error: 'Relayer not configured' }, 503);
+  }
+
+  const body = await c.req.json();
+  const { proposer, targets, values, signatures, calldatas, description, signature } = body;
+
+  // Validate required fields
+  if (!proposer || !targets?.length || !values?.length || !description || !signature) {
+    return c.json({ error: 'Missing required fields' }, 400);
+  }
+  if (targets.length > 10) {
+    return c.json({ error: 'Max 10 transactions' }, 400);
+  }
+  if (
+    targets.length !== values.length ||
+    targets.length !== signatures.length ||
+    targets.length !== calldatas.length
+  ) {
+    return c.json({ error: 'Array length mismatch' }, 400);
+  }
+
+  // Rate limiting
+  const addr = proposer.toLowerCase();
+  const lastProposal = proposalRateLimit.get(addr);
+  if (lastProposal && Date.now() - lastProposal < 3600_000) {
+    return c.json({ error: 'Rate limited — 1 proposal per hour' }, 429);
+  }
+
+  // Verify EIP-712 signature
+  try {
+    const valid = await verifyTypedData({
+      address: proposer as Hex,
+      domain: GRANT_PROPOSAL_DOMAIN,
+      types: GRANT_PROPOSAL_TYPES,
+      primaryType: 'Proposal',
+      message: { targets, values, signatures, calldatas, description },
+      signature: signature as Hex,
+    });
+    if (!valid) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+  } catch {
+    return c.json({ error: 'Signature verification failed' }, 401);
+  }
+
+  // Submit proposal on-chain via relayer wallet
+  try {
+    const txHash = await relayerWallet.writeContract({
+      address: SMALL_GRANTS_ADDRESS,
+      abi: smallGrantsTreasuryAbi,
+      functionName: 'propose',
+      args: [
+        targets as Hex[],
+        values.map((v: string) => BigInt(v)),
+        signatures as string[],
+        calldatas as Hex[],
+        description as string,
+      ],
+    });
+
+    // Update rate limit
+    proposalRateLimit.set(addr, Date.now());
+
+    console.log(`[Relayer] Grant proposal submitted by ${proposer} — tx: ${txHash}`);
+    return c.json({ txHash, relayer: relayerAccount.address });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`[Relayer] Grant proposal failed:`, msg);
+    return c.json({ error: 'Transaction failed', details: msg }, 500);
+  }
 });
 
 // ============================================================
