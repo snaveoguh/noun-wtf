@@ -123,14 +123,11 @@ export default function GrantsPage() {
           const title = getTitle(g.description);
           const totalVotes = g.forVotes + g.againstVotes;
           const forPct = totalVotes > 0 ? (g.forVotes / totalVotes) * 100 : 50;
-          const isActive =
-            g.status === 'ACTIVE' && blockNumber != null && BigInt(g.endBlock) > blockNumber;
-          const votingEnded =
-            g.status === 'ACTIVE' && blockNumber != null && BigInt(g.endBlock) <= blockNumber;
-          const isDefeated = Boolean(votingEnded) && g.forVotes <= g.againstVotes;
-          const isSucceeded = Boolean(votingEnded) && g.forVotes > g.againstVotes;
-          const displayStatus = isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : g.status;
-          const blocksLeft = isActive ? Number(BigInt(g.endBlock) - (blockNumber ?? 0n)) : 0;
+          // Status is computed server-side (DEFEATED/SUCCEEDED derived from endBlock + vote tallies)
+          const isActive = g.status === 'ACTIVE';
+          const displayStatus = g.status;
+          const blocksLeft =
+            isActive && blockNumber != null ? Number(BigInt(g.endBlock) - (blockNumber ?? 0n)) : 0;
           const hoursLeft = Math.max(0, (blocksLeft * 12) / 3600);
 
           return (

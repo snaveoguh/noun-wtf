@@ -376,10 +376,53 @@ app.get('/api/proposals', async c => {
   return c.json(items);
 });
 
-/** All grants — single JSON response */
+/** All grants — single JSON response, with derived status (DEFEATED/SUCCEEDED) */
 app.get('/api/grants', async c => {
   const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
-  const items = grants.map(g => ({
+  const latestBlock = await getLatestBlockCached();
+  const items = grants.map(g => {
+    const item: Record<string, unknown> = {
+      ...g,
+      id: String(g.id),
+      snapshotBlock: String(g.snapshotBlock),
+      startBlock: String(g.startBlock),
+      endBlock: String(g.endBlock),
+      createdAtBlock: String(g.createdAtBlock),
+      executionETA: g.executionETA != null ? String(g.executionETA) : null,
+      createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedGrantStatus(item, latestBlock);
+    }
+    return item;
+  });
+  return c.json(items);
+});
+
+/** Single grant with votes and status changes — bypasses GraphQL truncation */
+app.get('/api/grants/:id', async c => {
+  const id = c.req.param('id');
+  const [g] = await db
+    .select()
+    .from(schema.grant)
+    .where(eq(schema.grant.id, BigInt(id)));
+  if (!g) return c.json({ error: 'not found' }, 404);
+
+  const votes = await db
+    .select()
+    .from(schema.grantVote)
+    .where(eq(schema.grantVote.grantId, BigInt(id)))
+    .orderBy(desc(schema.grantVote.createdAtBlock));
+
+  const changes = await db
+    .select()
+    .from(schema.grantStatusChange)
+    .where(eq(schema.grantStatusChange.grantId, BigInt(id)))
+    .orderBy(schema.grantStatusChange.createdAtBlock);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const item: Record<string, unknown> = {
     ...g,
     id: String(g.id),
     snapshotBlock: String(g.snapshotBlock),
@@ -388,8 +431,26 @@ app.get('/api/grants', async c => {
     createdAtBlock: String(g.createdAtBlock),
     executionETA: g.executionETA != null ? String(g.executionETA) : null,
     createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
-  }));
-  return c.json(items);
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedGrantStatus(item, latestBlock);
+  }
+
+  return c.json({
+    grant: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+    statusChanges: changes.map(sc => ({
+      status: sc.status,
+      createdAtBlock: String(sc.createdAtBlock),
+      createdAtTransaction: sc.createdAtTransaction,
+    })),
+  });
 });
 
 // ============================================================

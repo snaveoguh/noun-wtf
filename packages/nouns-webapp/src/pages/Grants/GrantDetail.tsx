@@ -124,42 +124,22 @@ export default function GrantDetailPage() {
     });
   }, []);
 
-  // Fetch grant data from activity feed
+  // Fetch grant data from REST endpoint (bypasses GraphQL truncation, status pre-computed)
   useEffect(() => {
     if (!grantId) return;
-    // Fetch from Ponder GraphQL
-    fetch(`${API_BASE}/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `{
-          grant(id: "${grantId}") {
-            id proposer description status
-            forVotes againstVotes abstainVotes
-            snapshotBlock startBlock endBlock executionETA
-            createdAt createdAtBlock createdAtTransaction
-          }
-          grantVotes(where: { grantId: "${grantId}" }, orderBy: "createdAtBlock", orderDirection: "desc", limit: 100) {
-            items { voter support votes reason createdAtTransaction }
-          }
-          grantStatusChanges(where: { grantId: "${grantId}" }, orderBy: "createdAtBlock", orderDirection: "asc", limit: 20) {
-            items { status createdAtBlock createdAtTransaction }
-          }
-        }`,
-      }),
-    })
+    fetch(`${API_BASE}/api/grants/${grantId}`)
       .then(r => r.json())
       .then(d => {
-        if (d.data?.grant) {
-          const g = d.data.grant;
+        if (d.grant) {
+          const g = d.grant;
           setGrant({
             id: Number(g.id),
             proposer: g.proposer,
             description: g.description,
             status: g.status,
-            forVotes: g.forVotes,
-            againstVotes: g.againstVotes,
-            abstainVotes: g.abstainVotes,
+            forVotes: Number(g.forVotes),
+            againstVotes: Number(g.againstVotes),
+            abstainVotes: Number(g.abstainVotes),
             startBlock: String(g.startBlock),
             endBlock: String(g.endBlock),
             executionETA: g.executionETA ? String(g.executionETA) : null,
@@ -167,11 +147,11 @@ export default function GrantDetailPage() {
             createdAtTransaction: g.createdAtTransaction || '',
           });
         }
-        if (d.data?.grantVotes?.items) {
-          setVotes(d.data.grantVotes.items);
+        if (d.votes) {
+          setVotes(d.votes);
         }
-        if (d.data?.grantStatusChanges?.items) {
-          setStatusChanges(d.data.grantStatusChanges.items);
+        if (d.statusChanges) {
+          setStatusChanges(d.statusChanges);
         }
       })
       .catch(() => {})
@@ -316,11 +296,10 @@ export default function GrantDetailPage() {
   const body = grant.description.split('\n').slice(1).join('\n').trim();
   const totalVotes = grant.forVotes + grant.againstVotes;
   const forPct = totalVotes > 0 ? (grant.forVotes / totalVotes) * 100 : 50;
-  const isActive = grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) > blockNumber;
-  const votingEnded =
-    grant.status === 'ACTIVE' && blockNumber && BigInt(grant.endBlock) <= blockNumber;
-  const isSucceeded = votingEnded && grant.forVotes > grant.againstVotes;
-  const isDefeated = votingEnded && grant.forVotes <= grant.againstVotes;
+  // Status is computed server-side (DEFEATED/SUCCEEDED derived from endBlock + vote tallies)
+  const isActive = grant.status === 'ACTIVE';
+  const isSucceeded = grant.status === 'SUCCEEDED';
+  const isDefeated = grant.status === 'DEFEATED';
   const isQueued = grant.status === 'QUEUED';
   const canExecute =
     isQueued && grant.executionETA && Date.now() / 1000 >= parseInt(grant.executionETA);
@@ -342,7 +321,7 @@ export default function GrantDetailPage() {
           className={classes.detailStatus}
           style={{ color: isSucceeded ? '#34d399' : isDefeated ? '#ef4444' : undefined }}
         >
-          {isDefeated ? 'DEFEATED' : isSucceeded ? 'SUCCEEDED' : grant.status}
+          {grant.status}
         </span>
       </div>
 
@@ -454,7 +433,7 @@ export default function GrantDetailPage() {
           </div>
         )}
         {hasVoted && <p className={classes.voted}>You already voted on this grant.</p>}
-        {(isSucceeded || grant.status === 'SUCCEEDED') && (
+        {isSucceeded && (
           <button className={classes.actionBtn} onClick={handleQueue} disabled={isPending}>
             Queue for Execution
           </button>
