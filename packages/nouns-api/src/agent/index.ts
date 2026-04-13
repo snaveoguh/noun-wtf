@@ -3,19 +3,40 @@
 // Starts the block watcher and exports all agent modules for use by the API.
 
 import { startWatcher, stopWatcher, getWatcherState, checkNow } from './blockWatcher.js';
-import { reservationStore } from './reservations.js';
-import { verifyTip, getAgentBalance } from './tipVerifier.js';
-import { predictSeed, seedToTraitNames, matchesTraits, parseTraitDescription, getAllTraitNames } from './traitPredictor.js';
-import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import { isBridgeConfigured } from './bridge.js';
-import { remember, recall, forget, recallAll, buildMemoryContext, countByScope } from './memory.js';
-import { learnFromUrl, batchLearn, getKnowledgeStats, buildKnowledgeContext } from './knowledge.js';
-import { runSelfLearn, learnFromProposals, learnFromAuctions, learnFromDelegates } from './selfLearn.js';
-import { buildGovernanceContext, buildLiveAuctionContext } from './governanceContext.js';
+import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import {
-  buildPeopleDb, getBuildStatus, listPeople, getPerson, searchPeople,
-  getPeopleCount, buildPeopleContext, lookupPersonForChat,
+  buildGovernanceContext,
+  buildLiveAuctionContext,
+  buildProposalsAndGrantsContext,
+} from './governanceContext.js';
+import { learnFromUrl, batchLearn, getKnowledgeStats, buildKnowledgeContext } from './knowledge.js';
+import { remember, recall, forget, recallAll, buildMemoryContext, countByScope } from './memory.js';
+import {
+  buildPeopleDb,
+  getBuildStatus,
+  listPeople,
+  getPerson,
+  searchPeople,
+  getPeopleCount,
+  buildPeopleContext,
+  lookupPersonForChat,
 } from './peopleDb.js';
+import { reservationStore } from './reservations.js';
+import {
+  runSelfLearn,
+  learnFromProposals,
+  learnFromAuctions,
+  learnFromDelegates,
+} from './selfLearn.js';
+import { verifyTip, getAgentBalance } from './tipVerifier.js';
+import {
+  predictSeed,
+  seedToTraitNames,
+  matchesTraits,
+  parseTraitDescription,
+  getAllTraitNames,
+} from './traitPredictor.js';
 
 // ─── Auto-start on import ──────────────────────────────────────────────────
 
@@ -86,9 +107,10 @@ export {
   learnFromAuctions,
   learnFromDelegates,
 
-  // Governance context (per-wallet profile + live auction for chat)
+  // Governance context (per-wallet profile + live auction + global overview for chat)
   buildGovernanceContext,
   buildLiveAuctionContext,
+  buildProposalsAndGrantsContext,
 
   // People database
   buildPeopleDb,
