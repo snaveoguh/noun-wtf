@@ -30,7 +30,6 @@ import {
   type WalletClient,
   type Hex,
 } from 'viem';
-
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
@@ -299,13 +298,22 @@ async function settleAuction(): Promise<{ txHash: string } | null> {
     ) {
       console.log(`[NounIRL] Using pre-signed tx (nonce ${currentNonce})`);
 
-      // Try Flashbots first (MEV-safe, ~0 extra latency)
-      try {
-        hash = await sendRawTx(preSignedTx, true);
-      } catch {
-        // Fall back to public mempool
-        hash = await sendRawTx(preSignedTx, false);
-      }
+      // Submit to BOTH Flashbots AND public mempool simultaneously.
+      // Settlement is a public function (no MEV risk) — we just need inclusion speed.
+      // Flashbots Protect silently drops txs if builders don't pick them up,
+      // so public mempool is the reliability backstop.
+      const [flashbotsResult, mempoolResult] = await Promise.allSettled([
+        sendRawTx(preSignedTx, true),
+        sendRawTx(preSignedTx, false),
+      ]);
+      hash =
+        (mempoolResult.status === 'fulfilled' ? mempoolResult.value : null) ??
+        (flashbotsResult.status === 'fulfilled' ? flashbotsResult.value : null) ??
+        (() => {
+          throw new Error(
+            `Both paths failed: flashbots=${flashbotsResult.status === 'rejected' ? flashbotsResult.reason : '?'}, mempool=${mempoolResult.status === 'rejected' ? mempoolResult.reason : '?'}`,
+          );
+        })();
     } else {
       // FALLBACK: Fresh sign + send via walletClient
       console.log(
