@@ -426,7 +426,8 @@ async function onNewBlock(
     for (const reservation of activeReservations) {
       const isMatch = matchesTraits(traits, reservation.traits);
 
-      if (isMatch && auctionEnded) {
+      const forceSettle = process.env.NOUNIRL_FORCE_SETTLE === 'true';
+      if (isMatch && (auctionEnded || forceSettle)) {
         const freshAuction = await getCurrentAuction(true);
         if (!freshAuction || freshAuction.settled) {
           console.log('[NounIRL] Match found but auction already settled — skipping');
