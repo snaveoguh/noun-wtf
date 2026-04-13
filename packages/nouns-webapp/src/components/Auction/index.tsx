@@ -581,7 +581,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       options?: { keepalive?: boolean },
     ) => {
       const image = buildPixelImage(pixels);
-      if (!image || !currentAuction) return;
+      if (!currentAuction) return;
+      if (!image && !voxelData) return;
 
       setLiveSaveMode(mode);
       try {

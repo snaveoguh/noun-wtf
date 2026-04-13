@@ -1,6 +1,6 @@
 import type { Address } from '@/utils/types';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
 import { zeroAddress } from 'viem';
@@ -74,18 +74,23 @@ interface PonderSeedsResponse {
 }
 
 export const useNounSeeds = () => {
-  const cache = localStorage.getItem(seedCacheKey);
-  const cachedSeeds = cache ? JSON.parse(cache) : undefined;
+  // Read from localStorage once on mount, then keep in state so React re-renders
+  // when seeds arrive from the network.
+  const [seeds, setSeeds] = useState<Record<string, INounSeed> | undefined>(() => {
+    const cached = localStorage.getItem(seedCacheKey);
+    return cached ? JSON.parse(cached) : undefined;
+  });
+
   const { query, variables } = seedsQuery();
   const { data } = useQuery<PonderSeedsResponse>(query, {
-    skip: !!cachedSeeds,
+    skip: !!seeds,
     variables,
   });
 
   useEffect(() => {
-    const seeds = data?.nouns?.items;
-    if (!cachedSeeds && seeds !== undefined) {
-      const transformedSeeds = seeds.map(seed => ({
+    const items = data?.nouns?.items;
+    if (!seeds && items !== undefined && items.length > 0) {
+      const transformedSeeds = items.map(seed => ({
         ...seed,
         accessory: Number(seed.accessory),
         background: Number(seed.background),
@@ -94,11 +99,13 @@ export const useNounSeeds = () => {
         head: Number(seed.head),
         id: seed.id,
       }));
-      localStorage.setItem(seedCacheKey, JSON.stringify(seedArrayToObject(transformedSeeds)));
+      const seedObj = seedArrayToObject(transformedSeeds);
+      localStorage.setItem(seedCacheKey, JSON.stringify(seedObj));
+      setSeeds(seedObj);
     }
-  }, [data, cachedSeeds]);
+  }, [data, seeds]);
 
-  return cachedSeeds;
+  return seeds;
 };
 
 export const useNounSeed = (nounId: bigint): INounSeed | undefined => {
@@ -228,6 +235,7 @@ export const useUserOwnedNounIds = (pollInterval: number) => {
 };
 
 // Escrowed nouns not indexed by Ponder — return empty
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useUserEscrowedNounIds = (pollInterval: number, _forkId: string) => {
   const { query, variables } = accountEscrowedNounsQuery('');
   const { loading, error, refetch } = useQuery(query, {
@@ -285,7 +293,11 @@ export const useIsApprovedForAll = () => {
 // We synthesize `nounsRepresented` as a dummy array of the correct length for vote counting.
 export const useDelegateNounsAtBlockQuery = (signers: string[], block: bigint) => {
   const { query, variables } = delegateNounsAtBlockQuery(signers, block);
-  const { loading, data: rawData, error } = useQuery<{
+  const {
+    loading,
+    data: rawData,
+    error,
+  } = useQuery<{
     delegates: { items: Array<{ id: string; delegatedVotes: number }> };
   }>(query, { variables });
 

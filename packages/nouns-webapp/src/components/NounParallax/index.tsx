@@ -222,6 +222,17 @@ function CuratedHead({
               // Nudge glasses forward to eliminate seam with head mesh
               mesh.renderOrder = 1;
               mesh.position.z += 0.08;
+              // Per-head glasses Y nudge (positive = up) — bake into geometry
+              const GLASSES_Y_NUDGE: Record<string, number> = {
+                cd: 1,
+                'ruler-triangular': 1,
+                watch: 1,
+              };
+              const glassesYNudge = GLASSES_Y_NUDGE[entry.traitName] ?? 0;
+              if (glassesYNudge && mesh.geometry) {
+                const nudgeMatrix = new THREE.Matrix4().makeTranslation(0, glassesYNudge, 0);
+                mesh.geometry.applyMatrix4(nudgeMatrix);
+              }
             }
           });
         }
@@ -240,8 +251,93 @@ function CuratedHead({
         // with the voxel body's back face (Z=-1.25), so offset = -0.75.
         // But that buries it — instead align centers: body center Z=0,
         // GLB center Z=0.25 → shift back by -0.25 to sit at Z=0.
-        const offsetX = 0; // center the GLB horizontally
-        const offsetY = -27; // shift GLB head down 1px to align with body
+        // Per-head nudges — eyeballed against 2D counterparts
+        // Y: positive = up, X: positive = right
+        const HEAD_Y_NUDGE: Record<string, number> = {
+          ape: 1,
+          bag: 1,
+          bagpipe: 1,
+          bear: 1,
+          beer: 1,
+          bigfoot: 1,
+          'bigfoot-yeti': 1,
+          beet: 1,
+          blueberry: -2,
+          bomb: 1,
+          calendar: 1,
+          cd: -1,
+          cannedham: 1,
+          'cash-register': 1,
+          chain: -1,
+          chefhat: 1,
+          cone: 1,
+          'console-handheld': 1,
+          cottonball: 1,
+          cow: 1,
+          crab: 1,
+          croc: 1,
+          'crt-bsod': 1,
+          crystalball: 1,
+          'diamond-red': 1,
+          dog: 1,
+          'film-strip': 1,
+          flamingo: 1,
+          frog: 1,
+          goldcoin: 1,
+          grouper: 1,
+          goldfish: 1,
+          hair: 1,
+          hanger: 1,
+          'index-card': 1,
+          jupiter: -4,
+          ketchup: 1,
+          laptop: 1,
+          lint: 2,
+          lips: 1,
+          lock: 1,
+          macaroni: 1,
+          maze: 1,
+          mirror: 1,
+          mustard: 1,
+          orca: 1,
+          outlet: -1,
+          otter: 1,
+          owl: 1,
+          oyster: 1,
+          paintbrush: 1,
+          piggybank: 1,
+          pipe: 1,
+          pirateship: 1,
+          pizza: 1,
+          porkbao: 1,
+          pyramid: 1,
+          rabbit: 1,
+          ring: 1,
+          road: 1,
+          safe: 1,
+          shower: 1,
+          'skeleton-hat': 1,
+          snowman: 1,
+          spaghetti: 1,
+          spam: 1,
+          stapler: 1,
+          sponge: 1,
+          thumbsup: 1,
+          sunset: 1,
+          turing: 1,
+          undead: 1,
+          vent: 1,
+          washingmachine: 1,
+          zebra: 1,
+        };
+        const HEAD_X_NUDGE: Record<string, number> = {
+          bagpipe: 1,
+          calendar: -1,
+          zebra: 2,
+        };
+
+        const offsetX = 0 + (HEAD_X_NUDGE[entry.traitName] ?? 0);
+        const offsetY = -27 + (HEAD_Y_NUDGE[entry.traitName] ?? 0);
         const offsetZ = -0.25; // align GLB Z center with body Z center
 
         const matrix = new THREE.Matrix4();

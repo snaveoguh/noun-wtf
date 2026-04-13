@@ -22,7 +22,7 @@
     max(1.5rem, var(--page-edge-padding-left, 1.5rem)) !important;
   background: #ffffff !important;
   position: relative;
-  z-index: 50;
+  z-index: 70;
 }
 
 .navBarInner {

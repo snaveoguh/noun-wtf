@@ -82,7 +82,7 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
  * - glasses: GLASSES_DEPTH, always top-most
  */
 export function buildNounGeometries(layers: NounLayers) {
-  const bodyZ = 0;
+  const bodyZ = 0.75; // shifted forward to align body front face flush with heads
   // Bling sits flush on body front face
   const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2;
   // Head protrudes in front of accessory so it always reads above bling.
