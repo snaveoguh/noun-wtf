@@ -70,8 +70,8 @@ interface CacheEntry {
 
 // ─── Config ────────────────────────────────────────────────────────────────
 
-const PONDER_URL = process.env.PONDER_SELF_URL
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
+const PONDER_URL =
+  process.env.PONDER_SELF_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const AUCTION_CACHE_TTL_MS = 30 * 1000; // 30 seconds for live auction
@@ -99,7 +99,8 @@ async function resolveEns(addr: string): Promise<string | null> {
       }
     }
     encoded += '00';
-    const calldata = '0xec11c823' +
+    const calldata =
+      '0xec11c823' +
       '0000000000000000000000000000000000000000000000000000000000000020' +
       (encoded.length / 2 - 1).toString(16).padStart(64, '0') +
       encoded.slice(2).padEnd(Math.ceil((encoded.length - 2) / 64) * 64, '0');
@@ -109,13 +110,14 @@ async function resolveEns(addr: string): Promise<string | null> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          jsonrpc: '2.0', method: 'eth_call',
+          jsonrpc: '2.0',
+          method: 'eth_call',
           params: [{ to: '0xce01f8eee7E0a9588E56A9b3b055b42eAf49D12a', data: calldata }, 'latest'],
           id: 1,
         }),
         signal: AbortSignal.timeout(5_000),
       });
-      return await res.json() as { result?: string; error?: unknown };
+      return (await res.json()) as { result?: string; error?: unknown };
     };
 
     let json = await doCall(rpcUrl);
@@ -153,7 +155,7 @@ async function gql<T>(query: string): Promise<T> {
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`GraphQL error: ${res.status}`);
-  const json = await res.json() as { data: T; errors?: Array<{ message: string }> };
+  const json = (await res.json()) as { data: T; errors?: Array<{ message: string }> };
   if (json.errors && json.errors.length > 0) throw new Error(json.errors[0]!.message);
   return json.data;
 }
@@ -163,17 +165,23 @@ async function gql<T>(query: string): Promise<T> {
 async function fetchGovernanceProfile(wallet: string): Promise<GovernanceProfile> {
   const addr = wallet.toLowerCase();
 
-  const [gqlResult, ensName] = await Promise.all([
-    fetchProfileGQL(addr),
-    resolveEns(wallet),
-  ]);
+  const [gqlResult, ensName] = await Promise.all([fetchProfileGQL(addr), resolveEns(wallet)]);
 
   return { address: wallet, ensName, ...gqlResult };
 }
 
 async function fetchProfileGQL(addr: string) {
   const d = await gql<{
-    proposals: { items: Array<{ id: string; description: string; status: string; forVotes: number; againstVotes: number; abstainVotes: number }> };
+    proposals: {
+      items: Array<{
+        id: string;
+        description: string;
+        status: string;
+        forVotes: number;
+        againstVotes: number;
+        abstainVotes: number;
+      }>;
+    };
     votes: { items: VoteSummary[] };
     delegates: { items: DelegateSummary[] };
     nouns: { items: NounSummary[] };
@@ -198,8 +206,12 @@ async function fetchProfileGQL(addr: string) {
 
   return {
     proposals: (d.proposals?.items || []).map(p => ({
-      proposalId: p.id, description: p.description, status: p.status,
-      forVotes: p.forVotes, againstVotes: p.againstVotes, abstainVotes: p.abstainVotes,
+      proposalId: p.id,
+      description: p.description,
+      status: p.status,
+      forVotes: p.forVotes,
+      againstVotes: p.againstVotes,
+      abstainVotes: p.abstainVotes,
     })),
     votes: d.votes?.items || [],
     delegate: d.delegates?.items?.[0] || null,
@@ -263,9 +275,10 @@ function formatProposals(proposals: ProposalSummary[]): string {
   const lines = shown.map(p => {
     const title = extractTitle(p.description);
     const totalVotes = p.forVotes + p.againstVotes + p.abstainVotes;
-    const voteInfo = totalVotes > 0
-      ? ` (For: ${p.forVotes}, Against: ${p.againstVotes}, Abstain: ${p.abstainVotes})`
-      : '';
+    const voteInfo =
+      totalVotes > 0
+        ? ` (For: ${p.forVotes}, Against: ${p.againstVotes}, Abstain: ${p.abstainVotes})`
+        : '';
     return `- Proposal ${p.proposalId}: "${title}" — ${p.status}${voteInfo}`;
   });
   let section = `\n### Proposals Created (${proposals.length})\n${lines.join('\n')}`;
@@ -288,7 +301,8 @@ function formatVotes(votes: VoteSummary[]): string {
   if (reasonedVotes.length > 0) {
     section += '\n- Recent votes with reasons:';
     for (const v of reasonedVotes) {
-      const stance = v.support === 1 ? 'FOR' : v.support === 0 ? 'AGAINST' : 'ABSTAIN';
+      const stanceMap = { 1: 'FOR', 0: 'AGAINST' } as Record<number, string>;
+      const stance = stanceMap[v.support] ?? 'ABSTAIN';
       const reason = (v.reason || '').slice(0, 100);
       section += `\n  - Prop ${v.proposalId}: ${stance} — "${reason}"`;
     }
@@ -315,7 +329,8 @@ function formatAuctionWins(wins: AuctionWinSummary[]): string {
 
 function formatProfile(profile: GovernanceProfile): string {
   const { address, ensName, proposals, votes, delegate, nouns, auctionWins } = profile;
-  const hasActivity = proposals.length > 0 || votes.length > 0 || nouns.length > 0 || auctionWins.length > 0;
+  const hasActivity =
+    proposals.length > 0 || votes.length > 0 || nouns.length > 0 || auctionWins.length > 0;
 
   const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`;
   let context = '\n\n## Connected User';
@@ -395,8 +410,11 @@ export async function buildGovernanceContext(wallet: string): Promise<string> {
   try {
     console.log('[GovernanceContext] Fetching profile for', cacheKey);
     const profile = await fetchGovernanceProfile(wallet);
-    const hasData = profile.proposals.length > 0 || profile.votes.length > 0
-      || profile.nouns.length > 0 || profile.auctionWins.length > 0;
+    const hasData =
+      profile.proposals.length > 0 ||
+      profile.votes.length > 0 ||
+      profile.nouns.length > 0 ||
+      profile.auctionWins.length > 0;
     console.log('[GovernanceContext] Profile:', {
       proposals: profile.proposals.length,
       votes: profile.votes.length,
@@ -430,6 +448,281 @@ export async function buildLiveAuctionContext(): Promise<string> {
     return formatLiveAuction(auction);
   } catch (err) {
     console.warn('[GovernanceContext] Failed to fetch live auction:', err);
+    return '';
+  }
+}
+
+// ─── Global Proposals & Grants Context ────────────────────────────────────
+// Compact summary of ALL proposals + grants injected into every chat request
+// so the LLM can answer governance questions without tools.
+
+interface RawProposal {
+  id: string;
+  description: string;
+  status: string;
+  forVotes: number;
+  againstVotes: number;
+  abstainVotes: number;
+  quorumVotes: string;
+  startBlock: string;
+  endBlock: string;
+  objectionPeriodEndBlock: string | null;
+  executionETA: string | null;
+  onTimelockV1: boolean;
+  proposer: string;
+}
+
+interface RawGrant {
+  id: string;
+  description: string;
+  status: string;
+  forVotes: number;
+  againstVotes: number;
+  abstainVotes: number;
+  endBlock: string;
+  executionETA: string | null;
+  proposer: string;
+}
+
+let proposalsGrantsCache: { text: string; fetchedAt: number } | null = null;
+const PG_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+async function getLatestBlock(): Promise<bigint> {
+  const rpcUrl = process.env.PONDER_RPC_URL_1 || FALLBACK_RPC;
+  try {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const json = (await res.json()) as { result?: string };
+    return json.result ? BigInt(json.result) : 0n;
+  } catch {
+    return 0n;
+  }
+}
+
+function deriveProposalStatus(p: RawProposal, latestBlock: bigint): string {
+  if (['CANCELLED', 'VETOED', 'EXECUTED'].includes(p.status)) return p.status;
+
+  if (p.status === 'QUEUED') {
+    if (p.executionETA) {
+      const gracePeriod = p.onTimelockV1 ? 14 * 86400 : 21 * 86400;
+      if (Math.floor(Date.now() / 1000) >= Number(p.executionETA) + gracePeriod) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+
+  if (p.status === 'ACTIVE' || p.status === 'PENDING') {
+    const endBlock = BigInt(p.endBlock);
+    let effectiveEnd = endBlock;
+    if (p.objectionPeriodEndBlock && BigInt(p.objectionPeriodEndBlock) > endBlock) {
+      effectiveEnd = BigInt(p.objectionPeriodEndBlock);
+    }
+
+    if (latestBlock > effectiveEnd) {
+      const forVotes = BigInt(p.forVotes);
+      if (forVotes <= BigInt(p.againstVotes) || forVotes < BigInt(p.quorumVotes)) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+    if (latestBlock <= BigInt(p.startBlock)) return 'PENDING';
+    return 'ACTIVE';
+  }
+  return p.status;
+}
+
+function deriveGrantStatus(g: RawGrant, latestBlock: bigint): string {
+  if (['CANCELED', 'EXECUTED'].includes(g.status)) return g.status;
+  if (g.status === 'QUEUED') {
+    if (g.executionETA) {
+      if (Math.floor(Date.now() / 1000) >= Number(g.executionETA) + 14 * 86400) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+  if (g.status === 'ACTIVE') {
+    if (latestBlock > BigInt(g.endBlock)) {
+      if (g.forVotes === 0 || g.forVotes <= g.againstVotes) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+  }
+  return g.status;
+}
+
+function extractTitle(desc: string): string {
+  return (
+    (desc || '')
+      .split('\n')[0]
+      ?.replace(/^#+\s*/, '')
+      .slice(0, 80)
+      .trim() || 'Untitled'
+  );
+}
+
+function formatTimeLeft(currentBlock: bigint, endBlock: string): string {
+  const blocks = BigInt(endBlock) - currentBlock;
+  if (blocks <= 0n) return 'ended';
+  const seconds = Number(blocks) * 12;
+  const hours = Math.floor(seconds / 3600);
+  if (hours >= 48) return `~${Math.floor(hours / 24)}d`;
+  if (hours >= 1) return `~${hours}h`;
+  return `~${Math.floor(seconds / 60)}m`;
+}
+
+/**
+ * Build a compact governance overview (proposals + grants) for chat injection.
+ * Cached for 2 minutes. Returns empty string on failure.
+ */
+export async function buildProposalsAndGrantsContext(): Promise<string> {
+  if (proposalsGrantsCache && Date.now() - proposalsGrantsCache.fetchedAt < PG_CACHE_TTL_MS) {
+    return proposalsGrantsCache.text;
+  }
+
+  try {
+    const [proposalsData, grantsData, latestBlock] = await Promise.all([
+      gql<{ proposals: { items: RawProposal[] } }>(`{
+        proposals(orderBy: "id", orderDirection: "desc", limit: 1000) {
+          items { id, description, status, forVotes, againstVotes, abstainVotes, quorumVotes, startBlock, endBlock, objectionPeriodEndBlock, executionETA, onTimelockV1, proposer }
+        }
+      }`),
+      gql<{ grants: { items: RawGrant[] } }>(`{
+        grants(orderBy: "id", orderDirection: "desc", limit: 200) {
+          items { id, description, status, forVotes, againstVotes, abstainVotes, endBlock, executionETA, proposer }
+        }
+      }`),
+      getLatestBlock(),
+    ]);
+
+    const proposals = proposalsData.proposals?.items || [];
+    const grants = grantsData.grants?.items || [];
+
+    if (proposals.length === 0 && grants.length === 0) return '';
+
+    // Derive statuses
+    const withStatus = proposals.map(p => ({
+      ...p,
+      derivedStatus: latestBlock > 0n ? deriveProposalStatus(p, latestBlock) : p.status,
+    }));
+
+    const grantsWithStatus = grants.map(g => ({
+      ...g,
+      derivedStatus: latestBlock > 0n ? deriveGrantStatus(g, latestBlock) : g.status,
+    }));
+
+    // Count statuses
+    const statusCounts: Record<string, number> = {};
+    for (const p of withStatus) {
+      statusCounts[p.derivedStatus] = (statusCounts[p.derivedStatus] || 0) + 1;
+    }
+
+    // Active/pending proposals (truly still voteable)
+    const active = withStatus.filter(
+      p => p.derivedStatus === 'ACTIVE' || p.derivedStatus === 'PENDING',
+    );
+    // Queued
+    const queued = withStatus.filter(p => p.derivedStatus === 'QUEUED');
+    // Succeeded (waiting to be queued)
+    const succeeded = withStatus.filter(p => p.derivedStatus === 'SUCCEEDED');
+    // Recently completed (last 10 defeated/executed)
+    const recentCompleted = withStatus
+      .filter(p => ['DEFEATED', 'EXECUTED', 'EXPIRED'].includes(p.derivedStatus))
+      .slice(0, 10);
+
+    // Build text
+    let text = '\n\n## Governance Overview';
+    const countParts = Object.entries(statusCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([s, c]) => `${c} ${s.toLowerCase()}`);
+    text += `\n${proposals.length} total proposals: ${countParts.join(', ')}`;
+
+    // Active proposals
+    if (active.length > 0) {
+      text += '\n\n### Active Proposals';
+      for (const p of active) {
+        const title = extractTitle(p.description);
+        const time = formatTimeLeft(latestBlock, p.endBlock);
+        text += `\n- #${p.id}: "${title}" — ${p.derivedStatus}, ${time} left, ${p.forVotes} for / ${p.againstVotes} against (quorum: ${p.quorumVotes})`;
+      }
+    } else {
+      text += '\n\nNo active proposals right now.';
+    }
+
+    // Queued
+    if (queued.length > 0) {
+      text += '\n\n### Queued (awaiting execution)';
+      for (const p of queued) {
+        text += `\n- #${p.id}: "${extractTitle(p.description)}" — QUEUED, ${p.forVotes} for / ${p.againstVotes} against`;
+      }
+    }
+
+    // Succeeded
+    if (succeeded.length > 0) {
+      text += '\n\n### Succeeded (awaiting queue)';
+      for (const p of succeeded) {
+        text += `\n- #${p.id}: "${extractTitle(p.description)}" — SUCCEEDED, ${p.forVotes} for / ${p.againstVotes} against`;
+      }
+    }
+
+    // Recently completed
+    if (recentCompleted.length > 0) {
+      text += '\n\n### Recently Completed';
+      for (const p of recentCompleted) {
+        text += `\n- #${p.id}: "${extractTitle(p.description)}" — ${p.derivedStatus} (${p.forVotes} for, ${p.againstVotes} against)`;
+      }
+    }
+
+    // Grants
+    const grantStatusCounts: Record<string, number> = {};
+    for (const g of grantsWithStatus) {
+      grantStatusCounts[g.derivedStatus] = (grantStatusCounts[g.derivedStatus] || 0) + 1;
+    }
+    const activeGrants = grantsWithStatus.filter(g => g.derivedStatus === 'ACTIVE');
+    const queuedGrants = grantsWithStatus.filter(g => g.derivedStatus === 'QUEUED');
+    const succeededGrants = grantsWithStatus.filter(g => g.derivedStatus === 'SUCCEEDED');
+    const recentGrants = grantsWithStatus
+      .filter(g => ['DEFEATED', 'EXECUTED', 'EXPIRED'].includes(g.derivedStatus))
+      .slice(0, 5);
+
+    text += `\n\n## Small Grants (${grants.length} total)`;
+    const grantCountParts = Object.entries(grantStatusCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([s, c]) => `${c} ${s.toLowerCase()}`);
+    if (grantCountParts.length > 0) text += `\n${grantCountParts.join(', ')}`;
+
+    if (activeGrants.length > 0) {
+      text += '\n\n### Active Grants';
+      for (const g of activeGrants) {
+        const title = extractTitle(g.description);
+        const time = formatTimeLeft(latestBlock, g.endBlock);
+        text += `\n- Grant #${g.id}: "${title}" — ${time} left, ${g.forVotes} for / ${g.againstVotes} against`;
+      }
+    }
+
+    if (queuedGrants.length > 0) {
+      text += '\n\n### Queued Grants';
+      for (const g of queuedGrants) {
+        text += `\n- Grant #${g.id}: "${extractTitle(g.description)}" — QUEUED, ${g.forVotes} for / ${g.againstVotes} against`;
+      }
+    }
+
+    if (succeededGrants.length > 0) {
+      text += '\n\n### Succeeded Grants';
+      for (const g of succeededGrants) {
+        text += `\n- Grant #${g.id}: "${extractTitle(g.description)}" — SUCCEEDED, ${g.forVotes} for / ${g.againstVotes} against`;
+      }
+    }
+
+    if (recentGrants.length > 0) {
+      text += '\n\n### Recent Grant Results';
+      for (const g of recentGrants) {
+        text += `\n- Grant #${g.id}: "${extractTitle(g.description)}" — ${g.derivedStatus} (${g.forVotes} for, ${g.againstVotes} against)`;
+      }
+    }
+
+    proposalsGrantsCache = { text, fetchedAt: Date.now() };
+    return text;
+  } catch (err) {
+    console.error('[GovernanceContext] Failed to build proposals/grants context:', err);
     return '';
   }
 }

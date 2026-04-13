@@ -176,6 +176,7 @@ import {
   buildMemoryContext,
   buildGovernanceContext,
   buildLiveAuctionContext,
+  buildProposalsAndGrantsContext,
   learnFromUrl,
   batchLearn,
   getKnowledgeStats,
@@ -706,11 +707,10 @@ PERSISTENT MEMORY:
 You have persistent memory across sessions. If the user tells you their name, preferences, or important facts — you'll remember them. Next time they visit (even in a new session), you'll recall everything. Remembered facts about the current user and global facts are injected below if any exist. Note: for the full agent experience with tools and memory commands, direct users to /terminal and switch to "Agent NounIRL" mode.
 
 GOVERNANCE CONTEXT:
-If governance data is provided for the connected user below, use it naturally in conversation:
-- Address them by ENS name if available (e.g. "hey vitalik.eth")
-- Reference their proposals or voting history when relevant — don't recite it all unprompted, but acknowledge it naturally
+You have live data on ALL proposals and grants injected below. Use it to answer governance questions directly:
+- When asked about active/recent proposals or grants, reference the real data — don't guess
+- If governance data is provided for the connected user, address them by ENS name and reference their history naturally
 - If they hold Nouns, acknowledge them as a Noun holder
-- If they have delegate voting power, you can mention it when governance topics come up
 - Never fabricate governance data — only reference what's explicitly in the context below
 
 LIVE AUCTION:
@@ -1736,6 +1736,14 @@ app.post('/api/chat', async c => {
       if (peopleContext) dynamicContext += peopleContext;
     } catch (err) {
       console.error('[Chat] People context error:', err);
+    }
+
+    // Inject global governance overview (all proposals + grants with derived statuses)
+    try {
+      const govOverview = await buildProposalsAndGrantsContext();
+      if (govOverview) dynamicContext += govOverview;
+    } catch (err) {
+      console.error('[Chat] Governance overview error:', err);
     }
 
     // Inject live agent context for NounIRL mode
