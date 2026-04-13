@@ -150,16 +150,21 @@ const GasLeaderboardPage: FC = () => {
   // ENS resolution for visible rows
   const resolveEns = useCallback(
     async (addresses: string[]) => {
-      const unresolved = addresses.filter(a => !(a.toLowerCase() in ensMap));
+      const unresolved = addresses.filter(a => ensMap[a.toLowerCase()] === undefined);
       if (unresolved.length < 1) return;
       try {
         const res = await fetch(`${API_URL}/api/ens?addresses=${unresolved.join(',')}`);
         if (!res.ok) return;
         const json = await res.json();
+        const names = json.names ?? json;
         setEnsMap(prev => {
           const next = { ...prev };
-          for (const [addr, name] of Object.entries(json)) {
+          for (const [addr, name] of Object.entries(names)) {
             if (typeof name === 'string' && name.length > 0) next[addr.toLowerCase()] = name;
+          }
+          // Mark null results so we don't re-fetch them
+          for (const a of unresolved) {
+            if (!(a.toLowerCase() in next)) next[a.toLowerCase()] = '';
           }
           return next;
         });
