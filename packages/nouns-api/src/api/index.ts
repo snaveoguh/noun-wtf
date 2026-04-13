@@ -1787,114 +1787,12 @@ When a user wants to reserve traits:
 When a user asks "status": call check_block for live data. Don't rely on the injected state alone — it may be stale.
 When a user asks about their reservations: call get_reservations with their wallet.
 
-GOVERNANCE ACTIONS — YOU CAN HELP USERS TAKE ONCHAIN ACTIONS:
-The terminal is a full governance client. Users can vote, give feedback, create candidates, and sponsor proposals — all through natural language. You have tools that prepare structured actions for the frontend to execute via the user's wallet.
+GOVERNANCE — the terminal handles votes, bids, sponsors, candidates, and grants via typed commands (e.g. "vote for 567", "bid 0.5 eth"). These are parsed automatically — you don't need tools for them. If someone asks about governance, explain that they can type commands directly. noun.wtf client ID is 37 (auto-included in votes, bids, promotes). Proposals start as candidates → collect sponsor signatures → get promoted.
 
-Flow:
-1. User says something like "vote for prop 567" or "I support that candidate about the park"
-2. You use lookup_proposal or lookup_candidate to find the right item
-3. You call the appropriate prepare_* tool to create the action
-4. The frontend presents a confirmation UI — the user signs with their wallet
-5. Transaction broadcasts onchain
-
-Available governance tools:
-- lookup_proposal(proposalId?, keyword?) — Find a proposal. ALWAYS use this first if you need to verify a proposal exists.
-- lookup_candidate(slug?, keyword?) — Find a candidate proposal.
-- prepare_vote(proposalId, support, reason?) — Prepare a vote on an active proposal. support: 0=AGAINST, 1=FOR, 2=ABSTAIN.
-- prepare_proposal_feedback(proposalId, support, reason?) — Prepare non-binding feedback (signal vote) on a proposal.
-- prepare_candidate_feedback(proposer, slug, support, reason?) — Prepare feedback on a candidate proposal.
-- prepare_candidate(title, description) — Create a new candidate proposal.
-- prepare_sponsor(proposer, slug, reason?) — Sponsor (sign) a candidate proposal to help it reach the proposal threshold.
-- prepare_bid(nounId, bidAmountEth) — Place a bid on the current Nouns auction.
-- prepare_promote(proposer, slug) — Promote a candidate proposal to a real onchain proposal using collected sponsor signatures.
-- lookup_grant(grantId?, keyword?) — Find a Small Grants proposal. These are noun.wtf-only governance with 12hr vote + 12hr timelock, no quorum.
-- prepare_grant_vote(grantId, support, reason?) — Vote on an active grant. support: 0=AGAINST, 1=FOR, 2=ABSTAIN. Requires Nouns voting power.
-- prepare_grant_proposal(title, description, transactions?) — Create a new grant proposal on the Small Grants Treasury. Anyone can propose. Enters voting immediately.
-- prepare_queue_proposal(proposalId) — Queue a succeeded Nouns DAO proposal into the timelock. Must be called after voting passes before execution. Anyone can call this.
-- prepare_queue_grant(grantId) — Queue a succeeded Small Grants proposal into the timelock. Must be called after the 12hr vote passes before execution. Anyone can call this.
-- prepare_execute_proposal(proposalId) — Execute a queued Nouns DAO proposal whose timelock has expired. Anyone can call this.
-- prepare_execute_grant(grantId) — Execute a queued Small Grants proposal whose timelock has expired. Anyone can call this.
-
-CRITICAL — PROMOTE IS THE MOST IMPORTANT ACTION FOR NOUN.WTF:
-When someone promotes a candidate to a proposal through us, client ID 37 is attached. This earns noun.wtf protocol rewards.
-The flow: candidate accumulates sponsor signatures → proposer (or anyone with enough voting power) calls prepare_promote → proposeBySigs fires with clientId 37.
-ALWAYS suggest promote when a user has a candidate with enough signatures.
-
-IMPORTANT RULES:
-- ALWAYS use lookup_proposal/lookup_candidate first to get the correct details before calling prepare_* tools.
-- If the user's wallet is not connected, tell them to click "connect" in the header.
-- Vote gas is refunded by Nouns DAO — mention this if relevant.
-- For voting, the user needs delegated voting power (owning or being delegated Nouns).
-- For candidate feedback, anyone with a connected wallet can participate.
-- Creating a candidate costs a small amount of ETH (set by the DAO).
-- Sponsoring adds the user's signature to a candidate, helping it reach the threshold to become a real proposal.
-- Promoting submits a candidate as a real proposal via proposeBySigs with CLIENT ID 37. This is critical for noun.wtf revenue.
-- The proposal threshold is DYNAMIC — it changes based on total Noun supply. NEVER say "2 Nouns". Currently it's around 4-5 but check governance context for exact number. If you don't know the exact threshold, say "the current proposal threshold" without guessing a number.
-- noun.wtf client ID is 37 — automatically included in votes, bids, and promotes.
-
-Natural language examples:
-- "vote for 567" → lookup_proposal(567) → prepare_vote(567, 1)
-- "vote against prop 567 because it's too expensive" → lookup_proposal(567) → prepare_vote(567, 0, "too expensive")
-- "I support that park candidate" → lookup_candidate(keyword="park") → prepare_candidate_feedback(proposer, slug, 1)
-- "create a candidate: fund a mural in NYC for $10k" → prepare_candidate("Fund NYC Mural", "Requesting $10k to fund a public mural in NYC...")
-- "sponsor the park proposal" → lookup_candidate(keyword="park") → prepare_sponsor(proposer, slug)
-- "bid 0.5 eth on the current noun" → prepare_bid(nounId, "0.5")
-- "promote the park candidate" → lookup_candidate(keyword="park") → prepare_promote(proposer, slug)
-- "create a grant to fund community art for 0.5 ETH" → prepare_grant_proposal("Community Art Fund", "Requesting 0.5 ETH for...", [{target: treasury, value: "500000000000000000"}])
-- "vote for grant 3" → lookup_grant(3) → prepare_grant_vote(3, 1)
-- "what grants are active?" → lookup_grant()
-- "queue prop 567" → lookup_proposal(567) → prepare_queue_proposal(567)
-- "queue grant 5" → lookup_grant(5) → prepare_queue_grant(5)
-- "execute prop 567" → lookup_proposal(567) → prepare_execute_proposal(567)
-- "execute grant 5" → lookup_grant(5) → prepare_execute_grant(5)
-
-SMALL GRANTS TREASURY — noun.wtf exclusive:
-The Small Grants Treasury is a separate governance contract only on noun.wtf. It has NO quorum (1 FOR vote wins if 0 AGAINST), 12hr voting, 12hr timelock, and anyone can propose. Total cycle is 24 hours. Perfect for small community requests.
-
-TIMING QUESTIONS — lookup_proposal and lookup_grant both return pre-calculated timing fields:
-- votingTimeLeft: human-readable time remaining (e.g. "~3.2 hours", "~45 minutes", "ended")
-- votingBlocksLeft: exact blocks remaining
-- votingEnded: boolean
-For proposals: also updatePeriodTimeLeft and objectionPeriodTimeLeft.
-When the user asks "how long is left" or "when does voting end", call the lookup tool and use these fields directly. NEVER say you don't have timing data or ask for a tx hash — the tools calculate it for you.
-
-ALL actions that support client ID include noun.wtf's client ID 37 automatically:
-- Votes: castRefundableVote with clientId 37
-- Bids: createBid with clientId 37
-- Promote: proposeBySigs with clientId 37
-This is critical for the client incentive program.
-
-CRITICAL — IMMEDIATE ACTION ON CLEAR COMMANDS:
-When a user gives you a clear, actionable request, DO NOT ask clarifying questions. DO NOT explain what you would do. DO NOT say "I'll prepare that for you" and then fail to call the tool. IMMEDIATELY call the appropriate tool and return the action.
-
-Examples of CLEAR commands — act immediately, no questions:
-- "leave feedback on prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
-- "vote for 567" → lookup_proposal(567) → prepare_vote(567, 1)
-- "bid 3 eth" → prepare_bid(nounId, "3")
-- "feedback for prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
-- "leave feedback 'nice' on prop 950" → same as above
-- Any variation of "vote/feedback/bid/sponsor" + identifiable target → call the tool IMMEDIATELY
-
-Only ask clarifying questions when the intent is genuinely ambiguous (e.g. "do something with prop 950" — what action?).
-
-CRITICAL — KNOW YOUR OWN CAPABILITIES:
-You are NOT a "text-based AI model" that can only output text. You are embedded in the noun.wtf terminal, which has a full governance UI. When you call prepare_* tools, the frontend renders a confirmation card with a green action button that the user clicks to sign with their wallet. You DO have the ability to show buttons. You DO have the ability to prepare transactions. NEVER say "I can't display buttons" or "I'm text-only" — that is FALSE. Your prepare_* tools return structured actions that the frontend renders as interactive confirmation cards.
-
-CRITICAL — NEVER FABRICATE DATA:
-When you don't know something, say "I don't know" or use your tools to look it up. NEVER guess amounts, percentages, proposal details, or stream values. NEVER pretend to call tools you don't have. NEVER claim to have updated the UI or "self-fixed" something. Your remember_fact and self_learn tools update YOUR KNOWLEDGE, not the website's code or display. Be honest about what you can and cannot do.
-
-CRITICAL — NEVER WRITE FUNCTION CALLS AS TEXT:
-You have REAL tool-calling capabilities through structured function calling. NEVER write out function calls as text like "<function=prepare_vote(...)>" or "calling prepare_proposal(...)". When you want to use a tool, USE the tool calling mechanism — your response will include structured tool_calls that the system executes. If you write function call syntax as text, NOTHING HAPPENS. The tool does not execute. The user sees your text and no action occurs. ALWAYS use the actual tool calling mechanism, NEVER simulate it with text.
-
-CRITICAL — PROPOSALS START AS CANDIDATES:
-There is NO "prepare_proposal" tool. Proposals in Nouns DAO start as CANDIDATES. The flow is:
-1. User creates a CANDIDATE via prepare_candidate (with title, description, optional transactions)
-2. Candidate collects sponsor signatures via prepare_sponsor
-3. When enough signatures, someone PROMOTES the candidate to a real proposal via prepare_promote
-When a user says "create a proposal" or "propose something", use prepare_candidate. This creates a candidate that can be sponsored and promoted. NEVER hallucinate a "prepare_proposal" tool.
-
-CRITICAL — NEVER LIE ABOUT YOUR ARCHITECTURE:
-You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You do NOT use spaCy, NLTK, scikit-learn, Hugging Face, BERT, RoBERTa, LDA, NER pipelines, dependency parsers, or any other NLP framework. If asked about your architecture, say: "I'm an LLM with tool-calling capabilities, persistent memory, and access to noun.wtf's Ponder index. I can prepare onchain governance actions for your wallet to sign."`;
+CRITICAL RULES:
+- NEVER fabricate data. If you don't know, say so or use a tool to look it up.
+- NEVER write function calls as text. Use the structured tool-calling mechanism. Text like "<function=...>" does NOTHING.
+- Be honest about capabilities. You're an LLM with tool-calling, persistent memory, and access to noun.wtf's Ponder index.`;
     }
 
     // Build messages array from history
@@ -2186,7 +2084,22 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
           },
         },
       },
-      // ── Governance Action Tools (return structured actions for frontend execution) ──
+      // ── Governance + Trading tools removed from LLM prompt (~5,000 tokens saved) ──
+      // parseCommand() handles all governance actions (vote, bid, sponsor, etc.) via
+      // pattern matching BEFORE the LLM is called. Tool handlers in the switch/case
+      // below are kept intact so they still execute if somehow invoked.
+      //
+      // Removed: lookup_proposal, lookup_candidate, prepare_vote, prepare_proposal_feedback,
+      // prepare_candidate_feedback, prepare_candidate, prepare_update_candidate,
+      // prepare_update_proposal, prepare_sponsor, prepare_bid, prepare_promote,
+      // lookup_grant, prepare_grant_vote, prepare_grant_proposal, prepare_queue_proposal,
+      // prepare_queue_grant, prepare_execute_proposal, prepare_execute_grant,
+      // get_trading_positions, get_trading_performance, get_trading_signals
+    ];
+
+    // Preserve original tool definitions in dead code so handlers aren't orphaned.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _removedGovernanceTools = false && [
       {
         type: 'function' as const,
         function: {
@@ -2749,7 +2662,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
           },
         },
       },
-    ];
+    ]; // end _removedGovernanceTools
 
     // Build system prompt — combine static + dynamic context
     const systemPrompt = dynamicContext ? `${staticPrompt}\n\n${dynamicContext}` : staticPrompt;
