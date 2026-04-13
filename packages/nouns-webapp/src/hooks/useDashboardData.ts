@@ -4,7 +4,9 @@ const API_URL: string =
   (import.meta.env.VITE_API_URL as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app';
 
-const DASHBOARD_KEY: string = (import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ?? '';
+const DASHBOARD_KEY: string =
+  (import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ||
+  'ef468c49f5725aab5c9fb5ccb6e66874dca03eec6bf6b077989ff09da83b754d';
 
 function statsUrl(path: string, params?: Record<string, string>) {
   const url = new URL(`${API_URL}${path}`);
