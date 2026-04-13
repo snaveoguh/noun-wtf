@@ -67,6 +67,56 @@ function isUpstreamAiFailure(errMsg: string) {
     errMsg,
   );
 }
+
+/**
+ * Fallback parser for when the LLM generates XML tool calls in its text response
+ * instead of returning structured tool_calls (common with Groq/Llama models).
+ * Mutates the response in-place: extracts tool calls, sets finishReason, strips XML from text.
+ */
+function patchXmlToolCalls(response: HubChatResponse): void {
+  if (response.finishReason === 'tool_calls' && response.toolCalls?.length) return; // already structured
+  if (!response.text?.includes('<invoke name=')) return; // no XML tool calls
+
+  const invokePattern = /<invoke\s+name="([^"]+)">([\S\s]*?)<\/invoke>/g;
+  const paramPattern = /<parameter\s+name="([^"]+)">([\S\s]*?)<\/parameter>/g;
+  const toolCalls: HubChatResponse['toolCalls'] = [];
+  let idx = 0;
+
+  for (const match of response.text.matchAll(invokePattern)) {
+    const name = match[1];
+    const body = match[2];
+    const params: Record<string, unknown> = {};
+
+    for (const pm of body.matchAll(paramPattern)) {
+      const key = pm[1];
+      const raw = pm[2].trim();
+      // Try to parse JSON values (arrays, numbers, booleans); fall back to string
+      try {
+        params[key] = JSON.parse(raw);
+      } catch {
+        params[key] = raw;
+      }
+    }
+
+    toolCalls.push({
+      id: `xml-fallback-${idx++}`,
+      type: 'function',
+      function: { name, arguments: JSON.stringify(params) },
+    });
+  }
+
+  if (toolCalls.length) {
+    console.log(
+      `[NounIRL] Recovered ${toolCalls.length} tool call(s) from XML text: ${toolCalls.map(t => t.function.name).join(', ')}`,
+    );
+    response.toolCalls = toolCalls;
+    response.finishReason = 'tool_calls';
+    // Strip XML blocks from the text so the user doesn't see raw XML
+    response.text =
+      (response.text ?? '').replace(/<function_calls>[\S\s]*?<\/function_calls>/g, '').trim() ||
+      null;
+  }
+}
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -2672,6 +2722,9 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
       ...(isNounIrl ? { tools: nounIrlTools } : {}),
     });
 
+    // Recover XML tool calls if the LLM hallucinated them as text (Groq/Llama fallback)
+    patchXmlToolCalls(response);
+
     // Track governance actions prepared by tools (returned in response for frontend execution)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let pendingAction: Record<string, any> | null = null;
@@ -4153,6 +4206,9 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
         temperature: 0.7,
         ...(isNounIrl ? { tools: nounIrlTools } : {}),
       });
+
+      // Recover XML tool calls on continuation responses too
+      patchXmlToolCalls(response);
     }
 
     let text = response.text || '';
@@ -6716,7 +6772,7 @@ async function fetchEtherscanTxList(
   const all: Record<string, string>[] = [];
   let page = 1;
   while (true) {
-    const url = `https://api.etherscan.io/api?module=account&action=${action}&address=${contractAddress}&startblock=0&endblock=99999999&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
+    const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=${action}&address=${contractAddress}&startblock=0&endblock=99999999&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     const json = await res.json();
     if (json.status !== '1' || !Array.isArray(json.result)) break;
