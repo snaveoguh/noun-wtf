@@ -9,6 +9,7 @@ import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
+import NetworkAlert from '@/components/NetworkAlert';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
@@ -18,7 +19,6 @@ import '@/index.css';
 // Register all miniapps
 import '@/miniapps';
 
-import NetworkAlert from '@/components/NetworkAlert';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -39,6 +39,7 @@ const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
 import Playground from '@/pages/Playground';
 import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
+import GasLeaderboardPage from '@/pages/GasLeaderboardPage';
 import StatsPage from '@/pages/StatsPage';
 import UndergroundPage from '@/pages/Underground';
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
@@ -152,6 +153,7 @@ function AppRouter() {
         />
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/settlers" element={<SettlersPage />} />
+        <Route path="/gas" element={<GasLeaderboardPage />} />
         <Route path="/stats" element={<StatsPage />} />
         <Route
           path="/dashboard"

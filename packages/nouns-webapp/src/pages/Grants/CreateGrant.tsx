@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { CopyIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
@@ -8,6 +9,11 @@ import { useAccount, useSignTypedData } from 'wagmi';
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
+
+const API_BASE = (
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
+  'https://spirited-flexibility-production-3c30.up.railway.app'
+).replace(/\/graphql\/?$/, '');
 
 // EIP-712 domain and types — must match the API relayer
 const GRANT_PROPOSAL_DOMAIN = {
@@ -42,8 +48,17 @@ export default function CreateGrantPage() {
   const [submitting, setSubmitting] = useState(false);
   const [txIdCounter, setTxIdCounter] = useState(1);
   const [transactions, setTransactions] = useState<(GrantTx & { _id: number })[]>([
-    { _id: 0, target: '', value: '0', signature: '', calldata: '0x' },
+    { _id: 0, target: address ?? '', value: '0', signature: '', calldata: '0x' },
   ]);
+
+  // Prefill target with connected wallet when it becomes available
+  useEffect(() => {
+    if (address) {
+      setTransactions(prev =>
+        prev.map((t, i) => (i === 0 && !t.target ? { ...t, target: address } : t)),
+      );
+    }
+  }, [address]);
 
   const { signTypedDataAsync } = useSignTypedData();
 
@@ -109,7 +124,7 @@ export default function CreateGrantPage() {
       });
 
       // Step 2: Submit to relay API (relayer pays gas)
-      const res = await fetch('/api/grants/propose', {
+      const res = await fetch(`${API_BASE}/api/grants/propose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,6 +185,43 @@ export default function CreateGrantPage() {
         />
 
         <label className={classes.label}>Transactions</label>
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: '8px',
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            fontSize: '0.8rem',
+            marginBottom: '8px',
+            textTransform: 'none',
+            color: '#334155',
+          }}
+        >
+          Funded by{' '}
+          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+            {SMALL_GRANTS_TREASURY_ADDRESS.slice(0, 6)}...{SMALL_GRANTS_TREASURY_ADDRESS.slice(-4)}
+          </span>{' '}
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(SMALL_GRANTS_TREASURY_ADDRESS);
+              toast.success('Address copied');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0 4px',
+              fontSize: '0.75rem',
+              color: '#64748b',
+              textTransform: 'none',
+            }}
+            title="Copy full address"
+          >
+            <CopyIcon size={13} />
+          </button>{' '}
+          <span style={{ color: '#64748b' }}>(Small Grants Treasury)</span>
+        </div>
         {transactions.map((tx, idx) => (
           <div key={tx._id} className={classes.txRow}>
             <div className={classes.txHeader}>
@@ -182,7 +234,7 @@ export default function CreateGrantPage() {
             </div>
             <input
               className={classes.input}
-              placeholder="Target address (0x...)"
+              placeholder="Recipient address (0x...)"
               value={tx.target}
               onChange={e => updateTx(idx, 'target', e.target.value)}
             />

@@ -231,6 +231,7 @@ const NavBar = () => {
               </Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
+              <Dropdown.Item href="/gas">Gas</Dropdown.Item>
               <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
               <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
               <Dropdown.Item href="/feed">Feed</Dropdown.Item>
