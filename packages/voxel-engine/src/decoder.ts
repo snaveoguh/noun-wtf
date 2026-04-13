@@ -123,6 +123,9 @@ export function decodeParts(
 const FLAT_ACCESSORY_PATTERNS = [
   'body-gradient-',
   'checker',
+  'chain-logo',
+  'collar-sunset',
+  'sweater',
   'stripes-',
   'stripes_',
   'grid-',
@@ -135,6 +138,8 @@ const FLAT_ACCESSORY_PATTERNS = [
   'decay-',
   'rainbow-steps',
   'taxi-checkers',
+  'tatewaku',
+  'uroko',
   'lines-45-',
 ];
 

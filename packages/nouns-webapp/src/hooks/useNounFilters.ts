@@ -47,24 +47,16 @@ export function useNounFilters(
   const [traitFilters, setTraitFilters] = useState<TraitFilter>({ ...emptyFilters });
 
   const hasActiveFilters = useMemo(() => {
-    return (
-      search.trim() !== '' ||
-      Object.values(traitFilters).some(arr => arr.length > 0)
-    );
+    return search.trim() !== '' || Object.values(traitFilters).some(arr => arr.length > 0);
   }, [search, traitFilters]);
 
-  const toggleTraitFilter = useCallback(
-    (type: keyof TraitFilter, index: number) => {
-      setTraitFilters(prev => {
-        const current = prev[type];
-        const next = current.includes(index)
-          ? current.filter(i => i !== index)
-          : [...current, index];
-        return { ...prev, [type]: next };
-      });
-    },
-    [],
-  );
+  const toggleTraitFilter = useCallback((type: keyof TraitFilter, index: number) => {
+    setTraitFilters(prev => {
+      const current = prev[type];
+      const next = current.includes(index) ? current.filter(i => i !== index) : [...current, index];
+      return { ...prev, [type]: next };
+    });
+  }, []);
 
   const clearFilters = useCallback(() => {
     setSearch('');
@@ -86,12 +78,18 @@ export function useNounFilters(
     }
 
     // Trait filters
-    if (seeds) {
+    if (seeds != null) {
+      const hasTraitFilter =
+        traitFilters.head.length > 0 ||
+        traitFilters.body.length > 0 ||
+        traitFilters.accessory.length > 0 ||
+        traitFilters.glasses.length > 0 ||
+        traitFilters.background.length > 0;
       filtered = filtered.filter(id => {
         const seed = seeds[Number(id)];
-        if (!seed) return true; // include if no seed data
+        if (seed == null) return !hasTraitFilter;
 
-        for (const [type, indices] of Object.entries(traitFilters)) {
+        for (const [type, indices] of Object.entries(traitFilters) as [string, number[]][]) {
           if (indices.length > 0) {
             const seedValue = seed[type as keyof INounSeed];
             if (!indices.includes(seedValue)) return false;
@@ -109,11 +107,11 @@ export function useNounFilters(
       if (sortBy === 'id-desc') return bNum - aNum;
       if (sortBy === 'id-asc') return aNum - bNum;
 
-      if (!seeds) return bNum - aNum;
+      if (seeds == null) return bNum - aNum;
 
       const seedA = seeds[aNum];
       const seedB = seeds[bNum];
-      if (!seedA || !seedB) return bNum - aNum;
+      if (seedA == null || seedB == null) return bNum - aNum;
 
       const metricsA = getNounMetrics(seedA, aNum);
       const metricsB = getNounMetrics(seedB, bNum);
