@@ -31,7 +31,7 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
-import { mainnet } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 import { bridgePublish } from './bridge.js';
 import {
@@ -42,7 +42,10 @@ import {
   BLOCK_POLL_INTERVAL_MS,
   SAFETY_NET_POLL_INTERVAL_MS,
   AGENT_RPC_URL,
+  NOUNIRL_CHAIN,
 } from './constants.js';
+
+const AGENT_CHAIN = NOUNIRL_CHAIN === 'sepolia' ? sepolia : mainnet;
 import { reservationStore } from './reservations.js';
 import {
   predictSeed,
@@ -66,7 +69,10 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
 
 // ─── Multi-Provider Config ───────────────────────────────────────────────
 // Free WebSocket endpoints — race them all, first block wins.
-const FREE_WS_ENDPOINTS = ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
+const FREE_WS_ENDPOINTS =
+  NOUNIRL_CHAIN === 'sepolia'
+    ? ['wss://ethereum-sepolia-rpc.publicnode.com']
+    : ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
 
 // Flashbots Protect RPC — free, MEV-safe submission
 const FLASHBOTS_RPC = 'https://rpc.flashbots.net';
@@ -131,21 +137,24 @@ function initClients(): boolean {
   const rpcUrl = AGENT_RPC_URL;
 
   publicClient = createPublicClient({
-    chain: mainnet,
+    chain: AGENT_CHAIN,
     transport: http(rpcUrl),
   });
 
-  flashbotsClient = createPublicClient({
-    chain: mainnet,
-    transport: http(FLASHBOTS_RPC),
-  });
+  // Flashbots Protect is mainnet-only — skip on testnet
+  if (NOUNIRL_CHAIN !== 'sepolia') {
+    flashbotsClient = createPublicClient({
+      chain: AGENT_CHAIN,
+      transport: http(FLASHBOTS_RPC),
+    });
+  }
 
   const privateKey = process.env.NOUNIRL_PRIVATE_KEY;
   if (privateKey) {
     try {
       agentAccount = privateKeyToAccount(privateKey as Hex);
       walletClient = createWalletClient({
-        chain: mainnet,
+        chain: AGENT_CHAIN,
         transport: http(rpcUrl),
         account: agentAccount,
       });
@@ -198,7 +207,7 @@ async function refreshPreSignedTx(): Promise<void> {
       maxFeePerGas: SETTLEMENT_MAX_FEE,
       maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
       nonce,
-      chainId: 1,
+      chainId: AGENT_CHAIN.id,
       type: 'eip1559' as const,
     };
 
@@ -328,7 +337,7 @@ async function settleAuction(): Promise<{ txHash: string } | null> {
         gas: SETTLEMENT_GAS_LIMIT,
         maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         maxFeePerGas: SETTLEMENT_MAX_FEE,
-        chain: mainnet,
+        chain: AGENT_CHAIN,
       });
     }
 
@@ -596,7 +605,7 @@ async function poll(): Promise<void> {
 function subscribeWsProvider(wsUrl: string, label: string): (() => void) | null {
   try {
     const client = createPublicClient({
-      chain: mainnet,
+      chain: AGENT_CHAIN,
       transport: webSocket(wsUrl, {
         reconnect: { attempts: 20, delay: 3_000 },
       }),
@@ -672,7 +681,9 @@ export function startWatcher(): void {
 
   if (wsConnected > 0) {
     state.transportMode = 'websocket';
-    console.log(`[NounIRL] 🚀 Started — ${wsConnected} WebSocket providers racing`);
+    console.log(
+      `[NounIRL] 🚀 Started on ${NOUNIRL_CHAIN} (chain ${AGENT_CHAIN.id}) — ${wsConnected} WebSocket providers racing`,
+    );
   } else {
     state.transportMode = 'http-poll';
     pollTimer = setInterval(poll, BLOCK_POLL_INTERVAL_MS);
