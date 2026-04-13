@@ -74,9 +74,10 @@ function isUpstreamAiFailure(errMsg: string) {
  * Mutates the response in-place: extracts tool calls, sets finishReason, strips XML from text.
  */
 function patchXmlToolCalls(response: HubChatResponse): void {
-  console.log(
-    `[NounIRL:patchXml] finishReason=${response.finishReason} toolCalls=${response.toolCalls?.length ?? 0} hasInvoke=${response.text?.includes('<invoke name=') ?? false}`,
-  );
+  // Normalize Anthropic's 'tool_use' → 'tool_calls' so the main loop condition works
+  if (response.finishReason === 'tool_use') {
+    response.finishReason = 'tool_calls';
+  }
   if (response.finishReason === 'tool_calls' && response.toolCalls?.length) return; // already structured
   if (!response.text?.includes('<invoke name=')) return; // no XML tool calls
 
