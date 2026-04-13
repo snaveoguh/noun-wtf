@@ -74,6 +74,9 @@ function isUpstreamAiFailure(errMsg: string) {
  * Mutates the response in-place: extracts tool calls, sets finishReason, strips XML from text.
  */
 function patchXmlToolCalls(response: HubChatResponse): void {
+  console.log(
+    `[NounIRL:patchXml] finishReason=${response.finishReason} toolCalls=${response.toolCalls?.length ?? 0} hasInvoke=${response.text?.includes('<invoke name=') ?? false}`,
+  );
   if (response.finishReason === 'tool_calls' && response.toolCalls?.length) return; // already structured
   if (!response.text?.includes('<invoke name=')) return; // no XML tool calls
 
@@ -409,22 +412,43 @@ app.get('/api/proposals', async c => {
     if (!signerMap.has(key)) signerMap.set(key, []);
     signerMap.get(key)!.push(s.signer);
   }
-  const items = proposals.map(p => ({
-    ...p,
-    id: String(p.id),
-    startBlock: String(p.startBlock),
-    endBlock: String(p.endBlock),
-    proposalThreshold: String(p.proposalThreshold),
-    quorumVotes: String(p.quorumVotes),
-    executionETA: p.executionETA != null ? String(p.executionETA) : null,
-    objectionPeriodEndBlock:
-      p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
-    updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
-    voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
-    createdAtBlock: String(p.createdAtBlock),
-    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
-    signers: signerMap.get(String(p.id)) ?? [],
-  }));
+  const latestBlock = await getLatestBlockCached();
+  const items = proposals.map(p => {
+    const item: Record<string, unknown> = {
+      ...p,
+      id: String(p.id),
+      startBlock: String(p.startBlock),
+      endBlock: String(p.endBlock),
+      proposalThreshold: String(p.proposalThreshold),
+      quorumVotes: String(p.quorumVotes),
+      executionETA: p.executionETA != null ? String(p.executionETA) : null,
+      objectionPeriodEndBlock:
+        p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+      updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+      voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+      createdAtBlock: String(p.createdAtBlock),
+      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+      signers: signerMap.get(String(p.id)) ?? [],
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedStatus(
+        {
+          status: p.status,
+          forVotes: p.forVotes,
+          againstVotes: p.againstVotes,
+          quorumVotes: BigInt(p.quorumVotes),
+          endBlock: BigInt(p.endBlock),
+          objectionPeriodEndBlock:
+            p.objectionPeriodEndBlock != null ? BigInt(p.objectionPeriodEndBlock) : null,
+          executionETA: p.executionETA != null ? BigInt(p.executionETA) : null,
+          onTimelockV1: p.onTimelockV1,
+          startBlock: BigInt(p.startBlock),
+        },
+        latestBlock,
+      );
+    }
+    return item;
+  });
   return c.json(items);
 });
 
