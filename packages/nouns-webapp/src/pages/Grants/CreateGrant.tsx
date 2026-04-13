@@ -46,6 +46,7 @@ export default function CreateGrantPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submittedTx, setSubmittedTx] = useState<string | null>(null);
   const [txIdCounter, setTxIdCounter] = useState(1);
   const [transactions, setTransactions] = useState<(GrantTx & { _id: number })[]>([
     { _id: 0, target: address ?? '', value: '0', signature: '', calldata: '0x' },
@@ -144,8 +145,7 @@ export default function CreateGrantPage() {
         throw new Error(data.error ?? 'Relay failed');
       }
 
-      toast.success(`Grant proposal submitted! Tx: ${(data.txHash ?? '').slice(0, 10)}...`);
-      navigate('/grants');
+      setSubmittedTx(data.txHash ?? '');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to create grant';
       if (!msg.includes('User rejected')) {
@@ -154,6 +154,62 @@ export default function CreateGrantPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (submittedTx) {
+    return (
+      <div className={classes.container}>
+        <div
+          style={{
+            maxWidth: 480,
+            margin: '4rem auto',
+            textAlign: 'center',
+            padding: '2.5rem 2rem',
+            border: '2px solid #e2e8f0',
+            borderRadius: 16,
+            background: '#fff',
+          }}
+        >
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{'\u2310\u25E8-\u25E8'}</div>
+          <h2 style={{ fontSize: '1.3rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+            Grant Submitted On-Chain
+          </h2>
+          <p
+            style={{
+              color: '#64748b',
+              fontSize: '0.9rem',
+              lineHeight: 1.6,
+              marginBottom: '1.5rem',
+            }}
+          >
+            Your proposal is confirmed on Ethereum. The indexer needs ~1-2 minutes to pick it up
+            before it appears in the grants list. Voting starts immediately.
+          </p>
+          <a
+            href={`https://etherscan.io/tx/${submittedTx}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'inline-block',
+              fontFamily: 'monospace',
+              fontSize: '0.8rem',
+              color: '#3b82f6',
+              marginBottom: '1.5rem',
+            }}
+          >
+            {submittedTx.slice(0, 18)}... (view on Etherscan)
+          </a>
+          <br />
+          <button
+            className={classes.submitBtn}
+            onClick={() => navigate('/grants')}
+            style={{ marginTop: '0.5rem' }}
+          >
+            Go to Grants
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
