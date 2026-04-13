@@ -79,46 +79,63 @@ function patchXmlToolCalls(response: HubChatResponse): void {
     response.finishReason = 'tool_calls';
   }
   if (response.finishReason === 'tool_calls' && response.toolCalls?.length) return; // already structured
-  if (!response.text?.includes('<invoke name=')) return; // no XML tool calls
 
-  const invokePattern = /<invoke\s+name="([^"]+)">([\S\s]*?)<\/invoke>/g;
-  const paramPattern = /<parameter\s+name="([^"]+)">([\S\s]*?)<\/parameter>/g;
-  const toolCalls: HubChatResponse['toolCalls'] = [];
+  const text = response.text ?? '';
+  const toolCalls: NonNullable<HubChatResponse['toolCalls']> = [];
   let idx = 0;
 
-  for (const match of response.text.matchAll(invokePattern)) {
-    const name = match[1];
-    const body = match[2];
-    const params: Record<string, unknown> = {};
-
-    for (const pm of body.matchAll(paramPattern)) {
-      const key = pm[1];
-      const raw = pm[2].trim();
-      // Try to parse JSON values (arrays, numbers, booleans); fall back to string
-      try {
-        params[key] = JSON.parse(raw);
-      } catch {
-        params[key] = raw;
+  // ── Format 1: <tool_call>{"name":"...", "arguments":{...}}</tool_call> ──
+  for (const m of text.matchAll(/<tool_call>\s*([\S\s]*?)\s*<\/tool_call>/g)) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      const name = parsed.name ?? parsed.function?.name;
+      const args = parsed.arguments ?? parsed.function?.arguments ?? {};
+      if (name) {
+        toolCalls.push({
+          id: `text-fallback-${idx++}`,
+          type: 'function',
+          function: { name, arguments: typeof args === 'string' ? args : JSON.stringify(args) },
+        });
       }
+    } catch {
+      /* malformed JSON — skip */
     }
+  }
 
-    toolCalls.push({
-      id: `xml-fallback-${idx++}`,
-      type: 'function',
-      function: { name, arguments: JSON.stringify(params) },
-    });
+  // ── Format 2: <invoke name="..."><parameter name="...">value</parameter></invoke> ──
+  if (!toolCalls.length) {
+    const paramPattern = /<parameter\s+name="([^"]+)">([\S\s]*?)<\/parameter>/g;
+    for (const m of text.matchAll(/<invoke\s+name="([^"]+)">([\S\s]*?)<\/invoke>/g)) {
+      const params: Record<string, unknown> = {};
+      for (const pm of m[2].matchAll(paramPattern)) {
+        const raw = pm[2].trim();
+        try {
+          params[pm[1]] = JSON.parse(raw);
+        } catch {
+          params[pm[1]] = raw;
+        }
+      }
+      toolCalls.push({
+        id: `text-fallback-${idx++}`,
+        type: 'function',
+        function: { name: m[1], arguments: JSON.stringify(params) },
+      });
+    }
   }
 
   if (toolCalls.length) {
     console.log(
-      `[NounIRL] Recovered ${toolCalls.length} tool call(s) from XML text: ${toolCalls.map(t => t.function.name).join(', ')}`,
+      `[NounIRL] Recovered ${toolCalls.length} tool call(s) from text: ${toolCalls.map(t => t.function.name).join(', ')}`,
     );
     response.toolCalls = toolCalls;
     response.finishReason = 'tool_calls';
-    // Strip XML blocks from the text so the user doesn't see raw XML
+    // Strip all tool-call markup from text so the user sees clean output
     response.text =
-      (response.text ?? '').replace(/<function_calls>[\S\s]*?<\/function_calls>/g, '').trim() ||
-      null;
+      text
+        .replace(/<tool_call>[\S\s]*?<\/tool_call>/g, '')
+        .replace(/<function_calls>[\S\s]*?<\/function_calls>/g, '')
+        .replace(/<invoke\s+name="[^"]*">[\S\s]*?<\/invoke>/g, '')
+        .trim() || null;
   }
 }
 import { readFileSync } from 'node:fs';
