@@ -6,6 +6,7 @@ import { Trans } from '@lingui/react/macro';
 import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
+import { PencilLine } from 'lucide-react';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
@@ -174,7 +175,7 @@ const NavBar = () => {
               }
             }}
           >
-            🖌️
+            <PencilLine size={18} />
           </button>
           <div className={clsx('justify-content-end', classes.navBarItems)}>
             {isDaoGteV3 ? (
