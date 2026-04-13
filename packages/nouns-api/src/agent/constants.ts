@@ -1,7 +1,13 @@
 // ─── Agent NounIRL — Constants ──────────────────────────────────────────────
 
-// Nouns Auction House V2 (mainnet)
-export const AUCTION_HOUSE_ADDRESS = '0x830BD73E4184ceF73443C15111a1DF14e495C706' as const;
+// Chain-aware: set NOUNIRL_CHAIN=sepolia to run on testnet
+export const NOUNIRL_CHAIN = (process.env.NOUNIRL_CHAIN || 'mainnet') as 'mainnet' | 'sepolia';
+const IS_SEPOLIA = NOUNIRL_CHAIN === 'sepolia';
+
+// Nouns Auction House V2
+export const AUCTION_HOUSE_ADDRESS = IS_SEPOLIA
+  ? ('0x488609b7113FCf3B761A05956300d605E8f6BcAf' as const)
+  : ('0x830BD73E4184ceF73443C15111a1DF14e495C706' as const);
 
 // NounIRL agent wallet — resolved from nounirl.eth
 // Set via NOUNIRL_ADDRESS env var at runtime
@@ -73,10 +79,16 @@ export const SAFETY_NET_POLL_INTERVAL_MS = 30_000; // 30s backup poll when WS is
 
 // Agent uses a FREE public RPC for its HTTP calls (auction reads, nonce checks, block polls).
 // This avoids competing with Ponder for the Infura rate limit.
-export const AGENT_RPC_URL = process.env.NOUNIRL_RPC_URL || 'https://ethereum-rpc.publicnode.com';
+export const AGENT_RPC_URL =
+  process.env.NOUNIRL_RPC_URL ||
+  (IS_SEPOLIA
+    ? 'https://ethereum-sepolia-rpc.publicnode.com'
+    : 'https://ethereum-rpc.publicnode.com');
 
-// NounsToken contract (mainnet) — for Noun-gated access control
-export const NOUNS_TOKEN_ADDRESS = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
+// NounsToken contract — for Noun-gated access control
+export const NOUNS_TOKEN_ADDRESS = IS_SEPOLIA
+  ? ('0x4C4674bb72a096855496a7204962297bd7e12b85' as const)
+  : ('0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const);
 export const NOUNS_TOKEN_ABI = [
   {
     type: 'function',
