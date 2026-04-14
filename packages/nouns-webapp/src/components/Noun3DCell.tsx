@@ -40,6 +40,8 @@ interface Noun3DGridProps {
   scrollOffset: number;
   /** Currently hovered noun ID */
   hoveredId: bigint | null;
+  /** Mouse viewport position for ocean-parting effect */
+  mousePos: { x: number; y: number } | null;
 }
 
 // ─── Geometry cache ────────────────────────────────────────────────────────
@@ -234,12 +236,17 @@ const _qTarget = new THREE.Quaternion();
 const _qSpin = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
 
+const _pushEuler = new THREE.Euler();
+const _pushQuat = new THREE.Quaternion();
+
 function NounMesh({
   cell,
   isHovered,
+  mousePos,
 }: {
   cell: NounCell;
   isHovered: boolean;
+  mousePos: { x: number; y: number } | null;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const geos = useMemo(() => getGeometries(cell.seed), [cell.seed]);
@@ -259,13 +266,35 @@ function NounMesh({
     const g = groupRef.current;
     if (!g) return;
 
-    if (isHovered) {
-      _qTarget.identity();
-      g.quaternion.slerp(_qTarget, 0.12);
+    // Compute mouse proximity influence (ocean-parting effect)
+    const INFLUENCE_RADIUS = cell.size * 2.5; // pixels
+    let proximity = 0; // 0 = no influence, 1 = directly on top
+    let pushX = 0, pushY = 0; // direction to push away
+
+    if (mousePos) {
+      const dx = cell.cx - mousePos.x;
+      const dy = cell.cy - mousePos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < INFLUENCE_RADIUS && dist > 0.1) {
+        proximity = 1 - dist / INFLUENCE_RADIUS;
+        proximity = proximity * proximity; // ease-in for snappier falloff
+        // Normalize push direction (away from mouse)
+        pushX = dx / dist;
+        pushY = dy / dist;
+      }
+    }
+
+    if (proximity > 0.01) {
+      // Tilt away from mouse — rotate around the axis perpendicular to push direction
+      const tiltAmount = proximity * 1.2; // max ~70 degrees
+      _pushEuler.set(pushY * tiltAmount, -pushX * tiltAmount, 0);
+      _pushQuat.setFromEuler(_pushEuler);
+      g.quaternion.slerp(_pushQuat, 0.25);
     } else {
+      // Default: slow random tumble
       _axis.set(spin.ax, spin.ay, spin.az).normalize();
       _qSpin.setFromAxisAngle(_axis, state.clock.elapsedTime * spin.speed);
-      g.quaternion.copy(_qSpin);
+      g.quaternion.slerp(_qSpin, 0.08);
     }
     invalidate();
   });
@@ -342,6 +371,7 @@ export default function Noun3DGrid({
   containerWidth,
   scrollOffset,
   hoveredId,
+  mousePos,
 }: Noun3DGridProps) {
   return (
     <Canvas
@@ -364,6 +394,7 @@ export default function Noun3DGrid({
           key={cell.nounId.toString()}
           cell={cell}
           isHovered={hoveredId === cell.nounId}
+          mousePos={mousePos}
         />
       ))}
     </Canvas>

@@ -161,6 +161,7 @@ const ExploreTab: React.FC = () => {
   // 3D view mode
   const [view3D, setView3D] = useState(true);
   const [hoveredNounId, setHoveredNounId] = useState<bigint | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
   // Click-to-open detail popover
   const [popover, setPopover] = useState<{ nounId: bigint; rect: DOMRect } | null>(null);
@@ -410,7 +411,12 @@ const ExploreTab: React.FC = () => {
       )}
 
       {/* Grid — extends page, no separate scroll */}
-      <div ref={containerRef} style={{ overflow: 'hidden', position: 'relative' }}>
+      <div
+        ref={containerRef}
+        style={{ overflow: 'hidden', position: 'relative' }}
+        onMouseMove={view3D ? (e => setMousePos({ x: e.clientX, y: e.clientY })) : undefined}
+        onMouseLeave={view3D ? (() => setMousePos(null)) : undefined}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -502,6 +508,7 @@ const ExploreTab: React.FC = () => {
                 containerWidth={window.innerWidth}
                 scrollOffset={0}
                 hoveredId={hoveredNounId}
+                mousePos={mousePos}
               />
             </React.Suspense>
           </div>
