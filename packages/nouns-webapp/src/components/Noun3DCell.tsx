@@ -14,6 +14,7 @@ import * as THREE from 'three';
 
 import { buildNounGeometries, seedToLayers } from '@nouns/voxel-engine';
 
+import { HEAD_BASE_OFFSET, HEAD_X_NUDGE, HEAD_Y_NUDGE, HEAD_Z_NUDGE } from '@/lib/headNudges';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -61,6 +62,128 @@ function getGeometries(seed: INounSeed) {
   return geos;
 }
 
+// ─── GLB head loader ───────────────────────────────────────────────────────
+
+type ManifestEntry = { traitName: string; threeDNounsGlb?: string };
+let manifestPromise: Promise<ManifestEntry[]> | null = null;
+function getManifest(): Promise<ManifestEntry[]> {
+  if (!manifestPromise) {
+    manifestPromise = fetch('/models/heads/manifest.json').then(r => r.json());
+  }
+  return manifestPromise;
+}
+
+const glbHeadCache = new Map<string, THREE.Object3D | null>();
+const glbLoadingSet = new Set<string>();
+const glbListeners = new Map<string, Array<(obj: THREE.Object3D | null) => void>>();
+
+/** Load a 3DNouns GLB head for a seed, with shared caching. Returns null if unavailable. */
+function loadGlbHead(
+  seed: INounSeed,
+  onLoaded: (obj: THREE.Object3D | null) => void,
+): () => void {
+  const cacheKey = `${seed.head}-${seed.glasses}`;
+
+  // Already cached
+  if (glbHeadCache.has(cacheKey)) {
+    const cached = glbHeadCache.get(cacheKey)!;
+    onLoaded(cached ? cached.clone() : null);
+    return () => {};
+  }
+
+  // Already loading — add listener
+  if (glbLoadingSet.has(cacheKey)) {
+    const listeners = glbListeners.get(cacheKey) ?? [];
+    listeners.push(onLoaded);
+    glbListeners.set(cacheKey, listeners);
+    return () => {
+      const ls = glbListeners.get(cacheKey);
+      if (ls) glbListeners.set(cacheKey, ls.filter(l => l !== onLoaded));
+    };
+  }
+
+  // Start loading
+  glbLoadingSet.add(cacheKey);
+  glbListeners.set(cacheKey, [onLoaded]);
+
+  (async () => {
+    try {
+      const manifest = await getManifest();
+      const entry = manifest[seed.head];
+      if (!entry?.threeDNounsGlb) {
+        glbHeadCache.set(cacheKey, null);
+        glbListeners.get(cacheKey)?.forEach(cb => cb(null));
+        return;
+      }
+
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader');
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(entry.threeDNounsGlb);
+      const scene = gltf.scene;
+
+      // Swap glasses texture
+      const isHipRose = seed.glasses === 0;
+      if (isHipRose) {
+        scene.traverse(child => {
+          if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses'))
+            child.visible = false;
+        });
+      } else {
+        const texLoader = new THREE.TextureLoader();
+        const glassesTex = await texLoader.loadAsync(`/models/heads/glasses-textures/${seed.glasses}.png`);
+        glassesTex.magFilter = THREE.NearestFilter;
+        glassesTex.minFilter = THREE.NearestFilter;
+        glassesTex.colorSpace = THREE.SRGBColorSpace;
+        scene.traverse(child => {
+          if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
+            const mesh = child as THREE.Mesh;
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            if (mat?.map) {
+              glassesTex.flipY = mat.map.flipY;
+              mat.map.dispose();
+              mat.map = glassesTex;
+              mat.side = THREE.FrontSide;
+              mat.polygonOffset = true;
+              mat.polygonOffsetFactor = -4;
+              mat.polygonOffsetUnits = -4;
+              mat.needsUpdate = true;
+            }
+            mesh.renderOrder = 1;
+            mesh.position.z += 0.08;
+          }
+        });
+      }
+
+      // Apply per-head offset
+      const offsetX = HEAD_BASE_OFFSET[0] + (HEAD_X_NUDGE[entry.traitName] ?? 0);
+      const offsetY = HEAD_BASE_OFFSET[1] + (HEAD_Y_NUDGE[entry.traitName] ?? 0);
+      const offsetZ = HEAD_BASE_OFFSET[2] + (HEAD_Z_NUDGE[entry.traitName] ?? 0);
+      const matrix = new THREE.Matrix4().makeTranslation(offsetX, offsetY, offsetZ);
+      scene.traverse(child => {
+        if ((child as THREE.Mesh).isMesh && child.visible)
+          (child as THREE.Mesh).geometry?.applyMatrix4(matrix);
+      });
+      scene.position.set(0, 0, 0);
+      scene.scale.set(1, 1, 1);
+      scene.updateMatrixWorld(true);
+
+      glbHeadCache.set(cacheKey, scene);
+      glbListeners.get(cacheKey)?.forEach(cb => cb(scene.clone()));
+    } catch {
+      glbHeadCache.set(cacheKey, null);
+      glbListeners.get(cacheKey)?.forEach(cb => cb(null));
+    } finally {
+      glbLoadingSet.delete(cacheKey);
+      glbListeners.delete(cacheKey);
+    }
+  })();
+
+  return () => {
+    const ls = glbListeners.get(cacheKey);
+    if (ls) glbListeners.set(cacheKey, ls.filter(l => l !== onLoaded));
+  };
+}
+
 // ─── Per-noun random spin state ────────────────────────────────────────────
 
 /** Seeded pseudo-random for consistent spin per noun */
@@ -97,16 +220,23 @@ function NounMesh({
   const spin = useMemo(() => nounRandom(cell.nounId), [cell.nounId]);
   const { invalidate } = useThree();
 
+  // Load curated GLB head (async, replaces voxel head when ready)
+  const [glbHead, setGlbHead] = useState<THREE.Object3D | null>(null);
+  useEffect(() => {
+    return loadGlbHead(cell.seed, obj => {
+      setGlbHead(obj);
+      invalidate();
+    });
+  }, [cell.seed.head, cell.seed.glasses]);
+
   useFrame((state) => {
     const g = groupRef.current;
     if (!g) return;
 
     if (isHovered) {
-      // Slerp toward front-facing (identity quaternion)
       _qTarget.identity();
       g.quaternion.slerp(_qTarget, 0.12);
     } else {
-      // Slow random tumble
       _axis.set(spin.ax, spin.ay, spin.az).normalize();
       _qSpin.setFromAxisAngle(_axis, state.clock.elapsedTime * spin.speed);
       g.quaternion.copy(_qSpin);
@@ -114,7 +244,6 @@ function NounMesh({
     invalidate();
   });
 
-  // Scale the noun to fit the cell. Noun is ~32 units wide, cell is `size` pixels.
   const scale = cell.size / 38;
 
   return (
@@ -133,15 +262,21 @@ function NounMesh({
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
-        {geos.headGeo && (
-          <mesh geometry={geos.headGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
-        )}
-        {geos.glassesGeo && (
-          <mesh geometry={geos.glassesGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
-          </mesh>
+        {glbHead ? (
+          <primitive object={glbHead} />
+        ) : (
+          <>
+            {geos.headGeo && (
+              <mesh geometry={geos.headGeo}>
+                <meshBasicMaterial vertexColors toneMapped={false} />
+              </mesh>
+            )}
+            {geos.glassesGeo && (
+              <mesh geometry={geos.glassesGeo}>
+                <meshBasicMaterial vertexColors toneMapped={false} />
+              </mesh>
+            )}
+          </>
         )}
       </group>
     </group>
