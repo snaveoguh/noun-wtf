@@ -474,7 +474,10 @@ function AnimOverlay({
     }
 
     scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_ANIM_PARCELS).map(s => s[0]);
+    // Only show animated parcels when zoomed into a cluster (3+ nearby)
+    const nearest = scored.length >= 3
+      ? scored.slice(0, MAX_ANIM_PARCELS).map(s => s[0])
+      : [];
     const newIds = nearest.map(p => p.tokenId).join(',');
     const oldIds = nearParcels.map(p => p.tokenId).join(',');
     if (newIds !== oldIds) setNearParcels(nearest);
@@ -630,7 +633,7 @@ const TerrainViewCanvas: FC<{
   setHoveredId: (id: number | null) => void;
 }> = (props) => {
   const PRESETS = {
-    default: { height: 0.15, sat: 1.0, bloom: 0.3, label: 'Default' },
+    default: { height: 0.35, sat: 1.2, bloom: 0.4, label: 'Default' },
     deepFried: { height: 0.5, sat: 2.2, bloom: 1.2, label: 'Deep Fried' },
     flat: { height: 0, sat: 1.0, bloom: 0.1, label: 'Flat' },
     extreme: { height: 1.2, sat: 2.8, bloom: 1.8, label: 'Extreme' },
