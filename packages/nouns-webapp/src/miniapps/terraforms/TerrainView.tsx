@@ -49,10 +49,10 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 40; // distance below which terrain voxels are shown
-const MAX_TERRAIN_PARCELS = 20; // max parcels to render as terrain simultaneously
-const VOXEL_SCALE = 0.025; // scale of each voxel cell (32 cells = 0.8 unit parcel)
-const TERRAIN_HEIGHT_SCALE = 0.015; // height per level (max 9 = 0.135 unit — flat islands)
+const NEAR_DISTANCE = 30; // distance below which terrain voxels are shown
+const MAX_TERRAIN_PARCELS = 15; // max parcels to render as terrain simultaneously
+const VOXEL_SCALE = 1.2 / 32; // each cell = 1/32 of parcel cube (~0.0375)
+const TERRAIN_HEIGHT_SCALE = 0.04; // height per level (max 9 = 0.36 unit)
 const GRID_SIZE = 32;
 
 // Shared geometries and materials
@@ -267,7 +267,7 @@ function FarCubes({
       onClick={handleClick}
     >
       <boxGeometry args={[0.85, 0.85, 0.85]} />
-      <meshStandardMaterial roughness={0.4} metalness={0.1} transparent opacity={0.6} />
+      <meshStandardMaterial roughness={0.4} metalness={0.1} />
     </instancedMesh>
   );
 }
