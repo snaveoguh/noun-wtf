@@ -53,6 +53,7 @@ const PARCEL_SIZE = 1.2;
 const GRID_SIZE = 32;
 const CELL_PX = 4; // pixels per cell in the atlas (4px × 32 = 128px per parcel)
 const ATLAS_COLS = 100; // 100×100 grid = 10,000 slots, fits all 9,910
+const HEIGHT_SCALE = 0.3; // max height displacement per parcel (in scene units)
 
 const tempObj = new THREE.Object3D();
 const tempColor = new THREE.Color();
@@ -69,24 +70,31 @@ type TokenEntry = [string, string[], string, Record<string, string>];
 function buildAtlas(
   parcels: ParcelData[],
   terrainData: TerrainData,
-): { texture: THREE.CanvasTexture; uvMap: Map<number, [number, number]> } {
+): { colorTex: THREE.CanvasTexture; heightTex: THREE.CanvasTexture; uvMap: Map<number, [number, number]> } {
   const tileSize = CELL_PX * GRID_SIZE; // 128px per parcel
   const atlasSize = ATLAS_COLS * tileSize; // 12800px
 
-  const canvas = document.createElement('canvas');
-  canvas.width = atlasSize;
-  canvas.height = atlasSize;
-  const ctx = canvas.getContext('2d')!;
+  // Color atlas — ASCII art
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = atlasSize;
+  colorCanvas.height = atlasSize;
+  const colorCtx = colorCanvas.getContext('2d')!;
+  colorCtx.fillStyle = '#000';
+  colorCtx.fillRect(0, 0, atlasSize, atlasSize);
 
-  // Black base
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, atlasSize, atlasSize);
+  // Height atlas — grayscale heightmap (bright = tall, dark = flat)
+  const heightCanvas = document.createElement('canvas');
+  heightCanvas.width = atlasSize;
+  heightCanvas.height = atlasSize;
+  const heightCtx = heightCanvas.getContext('2d')!;
+  heightCtx.fillStyle = '#000';
+  heightCtx.fillRect(0, 0, atlasSize, atlasSize);
 
   const uvMap = new Map<number, [number, number]>();
   const fontSize = Math.max(2, Math.floor(CELL_PX * 0.9));
-  ctx.font = `${fontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  colorCtx.font = `${fontSize}px monospace`;
+  colorCtx.textAlign = 'center';
+  colorCtx.textBaseline = 'middle';
 
   let slot = 0;
   for (const p of parcels) {
@@ -100,33 +108,42 @@ function buildAtlas(
 
     const [bg, palette, classGrid, chars] = td;
 
-    // Fill parcel background
-    ctx.fillStyle = bg;
-    ctx.fillRect(ox, oy, tileSize, tileSize);
+    // Color: fill background + draw characters
+    colorCtx.fillStyle = bg;
+    colorCtx.fillRect(ox, oy, tileSize, tileSize);
 
-    // Draw characters
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const cls = classGrid[r * GRID_SIZE + c];
-        const clsIdx = cls.charCodeAt(0) - 97;
-        ctx.fillStyle = palette[clsIdx] || '#fff';
+        const clsIdx = cls.charCodeAt(0) - 97; // a=0, j=9
+        const height = 9 - clsIdx; // a=9 (peak), j=0 (bg)
+
+        // Color atlas: draw the character
+        colorCtx.fillStyle = palette[clsIdx] || '#fff';
         const char = chars[cls] || ' ';
-        ctx.fillText(char, ox + c * CELL_PX + CELL_PX / 2, oy + r * CELL_PX + CELL_PX / 2);
+        colorCtx.fillText(char, ox + c * CELL_PX + CELL_PX / 2, oy + r * CELL_PX + CELL_PX / 2);
+
+        // Height atlas: grayscale brightness = height (0-9 → 0-255)
+        const brightness = Math.round((height / 9) * 255);
+        heightCtx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+        heightCtx.fillRect(ox + c * CELL_PX, oy + r * CELL_PX, CELL_PX, CELL_PX);
       }
     }
 
-    // UV offset: normalized position in atlas
     uvMap.set(p.tokenId, [col / ATLAS_COLS, row / ATLAS_COLS]);
     slot++;
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.generateMipmaps = true;
+  const colorTex = new THREE.CanvasTexture(colorCanvas);
+  colorTex.magFilter = THREE.NearestFilter;
+  colorTex.minFilter = THREE.LinearMipmapLinearFilter;
+  colorTex.colorSpace = THREE.SRGBColorSpace;
 
-  return { texture, uvMap };
+  const heightTex = new THREE.CanvasTexture(heightCanvas);
+  heightTex.magFilter = THREE.NearestFilter;
+  heightTex.minFilter = THREE.NearestFilter;
+
+  return { colorTex, heightTex, uvMap };
 }
 
 // ─── All Parcels InstancedMesh (single draw call) ─────────────────────────
@@ -156,28 +173,36 @@ function AllParcelsInstanced({
   // Build atlas once
   const atlas = useMemo(() => buildAtlas(parcels, terrainData), [parcels, terrainData]);
 
-  // Custom shader material that uses per-instance UV offset
+  // Custom shader: sample color atlas for texture, height atlas for vertex displacement
   const material = useMemo(() => {
     const uvScale = 1 / ATLAS_COLS;
     return new THREE.ShaderMaterial({
       uniforms: {
-        atlas: { value: atlas.texture },
+        colorAtlas: { value: atlas.colorTex },
+        heightAtlas: { value: atlas.heightTex },
         uvScale: { value: uvScale },
+        heightScale: { value: HEIGHT_SCALE },
       },
       vertexShader: `
         attribute vec2 uvOffset;
         varying vec2 vUv;
         uniform float uvScale;
+        uniform sampler2D heightAtlas;
+        uniform float heightScale;
         void main() {
           vUv = uv * uvScale + uvOffset;
-          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          // Sample height and displace vertex along local Z (becomes Y after rotation)
+          float h = texture2D(heightAtlas, vUv).r;
+          vec3 pos = position;
+          pos.z += h * heightScale;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(pos, 1.0);
         }
       `,
       fragmentShader: `
-        uniform sampler2D atlas;
+        uniform sampler2D colorAtlas;
         varying vec2 vUv;
         void main() {
-          gl_FragColor = texture2D(atlas, vUv);
+          gl_FragColor = texture2D(colorAtlas, vUv);
         }
       `,
       side: THREE.DoubleSide,
@@ -242,7 +267,7 @@ function AllParcelsInstanced({
   return (
     <instancedMesh
       ref={meshRef}
-      args={[new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE), material, parcels.length]}
+      args={[new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE), material, parcels.length]}
       onPointerMove={handlePointerMove}
       onPointerOut={() => setHoveredId(null)}
       onClick={handleClick}
