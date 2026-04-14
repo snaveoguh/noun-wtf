@@ -6,6 +6,43 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChevronDown, X } from 'lucide-react';
 
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+
+// ─── ENS resolution ────────────────────────────────────────────────────────
+
+const ensClient = createPublicClient({ chain: mainnet, transport: http('https://ethereum-rpc.publicnode.com') });
+const ensCache = new Map<string, string | null>();
+
+async function resolveENS(addresses: string[]): Promise<Map<string, string>> {
+  const results = new Map<string, string>();
+  const toResolve = addresses.filter(a => a && a !== '0x0000000000000000000000000000000000000000' && !ensCache.has(a.toLowerCase()));
+
+  // Batch resolve (max 20 at a time to avoid rate limits)
+  for (let i = 0; i < toResolve.length; i += 20) {
+    const batch = toResolve.slice(i, i + 20);
+    const settled = await Promise.allSettled(
+      batch.map(async addr => {
+        const name = await ensClient.getEnsName({ address: addr as `0x${string}` });
+        ensCache.set(addr.toLowerCase(), name);
+        return [addr.toLowerCase(), name] as const;
+      }),
+    );
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value[1]) {
+        results.set(r.value[0], r.value[1]);
+      }
+    }
+  }
+
+  // Return all cached results for requested addresses
+  for (const addr of addresses) {
+    const cached = ensCache.get(addr.toLowerCase());
+    if (cached) results.set(addr.toLowerCase(), cached);
+  }
+  return results;
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const BUILDER_SUBGRAPH =
@@ -66,11 +103,17 @@ async function fetchAllTokens(): Promise<YCToken[]> {
     const tokens = json?.data?.tokens ?? [];
 
     for (const t of tokens) {
+      // Subgraph returns owner as plain string or { id } depending on version
+      const ownerRaw = t.owner;
+      const ownerAddr =
+        typeof ownerRaw === 'string'
+          ? ownerRaw
+          : (ownerRaw as { id?: string } | null)?.id ?? '';
       all.push({
         tokenId: Number(t.tokenId),
         name: (t.name as string) ?? `Collective Nouns #${t.tokenId}`,
         image: (t.image as string) ?? '',
-        owner: (t.owner as { id?: string } | null)?.id ?? '',
+        owner: ownerAddr,
       });
     }
 
@@ -92,12 +135,19 @@ function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+function displayName(addr: string, names: Map<string, string>): string {
+  if (!addr) return '';
+  const ens = names.get(addr.toLowerCase());
+  return ens || shortenAddress(addr);
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 const YellowCollectiveTab: FC = () => {
   const [tokens, setTokens] = useState<YCToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ensNames, setEnsNames] = useState<Map<string, string>>(new Map());
 
   // Filters
   const [sort, setSort] = useState<SortOption>('id-desc');
@@ -114,6 +164,13 @@ const YellowCollectiveTab: FC = () => {
       .catch((e: unknown) => setError((e instanceof Error ? e.message : String(e)).slice(0, 120)))
       .finally(() => setLoading(false));
   }, []);
+
+  // Resolve ENS names for unique owners
+  useEffect(() => {
+    if (tokens.length === 0) return;
+    const uniqueOwners = [...new Set(tokens.map(t => t.owner).filter(Boolean))];
+    resolveENS(uniqueOwners).then(setEnsNames).catch(() => {});
+  }, [tokens]);
 
   // Close owner dropdown on outside click
   useEffect(() => {
@@ -207,7 +264,7 @@ const YellowCollectiveTab: FC = () => {
                 : 'border-gray-200 bg-white text-gray-600'
             }`}
           >
-            {ownerFilter ? shortenAddress(ownerFilter) : 'Owner'}
+            {ownerFilter ? displayName(ownerFilter, ensNames) : 'Owner'}
             {ownerFilter ? (
               <X
                 size={12}
@@ -241,7 +298,7 @@ const YellowCollectiveTab: FC = () => {
                   }}
                   className="flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50"
                 >
-                  <span className="font-mono">{shortenAddress(addr)}</span>
+                  <span className="font-mono">{displayName(addr, ensNames)}</span>
                   <span className="text-gray-400">{count}</span>
                 </button>
               ))}
@@ -292,7 +349,7 @@ const YellowCollectiveTab: FC = () => {
                 rel="noreferrer"
                 className="font-mono text-blue-500 hover:underline"
               >
-                {shortenAddress(selectedToken.owner)}
+                {displayName(selectedToken.owner, ensNames)}
               </a>
             </div>
             <div className="mt-2 flex gap-2">
