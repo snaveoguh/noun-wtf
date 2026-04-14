@@ -370,7 +370,19 @@ function createHiresTexture(tokenId: number, td: TokenEntry): THREE.CanvasTextur
   return tex;
 }
 
-/** Hi-res ASCII plane with character-level displacement for one parcel. */
+const rpcClient = createPublicClient({
+  chain: mainnet,
+  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
+});
+
+const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
+const TOKEN_HTML_ABI = [{
+  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
+  inputs: [{ name: 'tokenId', type: 'uint256' }],
+  outputs: [{ name: '', type: 'string' }],
+}] as const;
+
+/** Hi-res animated terrain plane — starts static, upgrades to live animation from tokenHTML iframe. */
 function HiresTerrainPlane({ parcel, tokenData, normalization }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
@@ -381,9 +393,98 @@ function HiresTerrainPlane({ parcel, tokenData, normalization }: {
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
 
-  const texture = useMemo(() => createHiresTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
+  // Static texture as initial fallback
+  const staticTex = useMemo(() => createHiresTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
+  const [texture, setTexture] = useState<THREE.Texture>(staticTex);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const intervalRef = useRef<number>(0);
 
-  // Geometry with per-vertex height from class data
+  // Fetch tokenHTML and start capturing animation frames
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const html = await rpcClient.readContract({
+          address: TERRAFORMS_ADDRESS, abi: TOKEN_HTML_ABI,
+          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
+        });
+        if (cancelled) return;
+
+        // Hidden iframe for animation
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
+        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
+        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
+        document.body.appendChild(iframe);
+        iframeRef.current = iframe;
+
+        // Capture canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = HIRES_TEX;
+        canvas.height = HIRES_TEX;
+
+        iframe.onload = () => {
+          if (cancelled) return;
+
+          const animTex = new THREE.CanvasTexture(canvas);
+          animTex.magFilter = THREE.NearestFilter;
+          animTex.minFilter = THREE.NearestFilter;
+          animTex.colorSpace = THREE.SRGBColorSpace;
+
+          const captureFrame = () => {
+            const doc = iframe.contentDocument;
+            if (!doc) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const gridEls = doc.querySelectorAll('.r p, .meta p');
+            if (gridEls.length < 1024) return;
+
+            const cellW = HIRES_TEX / GRID_SIZE;
+            const cellH = HIRES_TEX / GRID_SIZE;
+            const fontSize = Math.floor(cellH * 0.88);
+
+            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, HIRES_TEX, HIRES_TEX);
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
+              const el = gridEls[i] as HTMLElement;
+              const row = Math.floor(i / GRID_SIZE);
+              const col = i % GRID_SIZE;
+              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
+              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
+            }
+            animTex.needsUpdate = true;
+          };
+
+          // Let animation JS start, then begin capturing
+          setTimeout(() => {
+            captureFrame();
+            setTexture(animTex);
+            intervalRef.current = window.setInterval(captureFrame, 200);
+          }, 800);
+        };
+      } catch {
+        // Static fallback already set
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (iframeRef.current) {
+        try { document.body.removeChild(iframeRef.current); } catch {}
+        iframeRef.current = null;
+      }
+    };
+  }, [parcel.tokenId]);
+
+  // Geometry with per-vertex height
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.01, PARCEL_SIZE * 1.01, GRID_SIZE, GRID_SIZE);
     const pos = geo.attributes.position;
@@ -675,9 +776,22 @@ const TerrainViewCanvas: FC<{
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
 }> = (props) => {
-  const [heightScale, setHeightScale] = useState(0.25);
-  const [saturation, setSaturation] = useState(1.4);
-  const [bloomIntensity, setBloomIntensity] = useState(0.6);
+  const PRESETS = {
+    default: { height: 0.15, sat: 1.0, bloom: 0.3, label: 'Default' },
+    deepFried: { height: 0.5, sat: 2.2, bloom: 1.2, label: 'Deep Fried' },
+    flat: { height: 0, sat: 1.0, bloom: 0.1, label: 'Flat' },
+    extreme: { height: 1.2, sat: 2.8, bloom: 1.8, label: 'Extreme' },
+  };
+
+  const [heightScale, setHeightScale] = useState(PRESETS.default.height);
+  const [saturation, setSaturation] = useState(PRESETS.default.sat);
+  const [bloomIntensity, setBloomIntensity] = useState(PRESETS.default.bloom);
+
+  const applyPreset = (p: typeof PRESETS.default) => {
+    setHeightScale(p.height);
+    setSaturation(p.sat);
+    setBloomIntensity(p.bloom);
+  };
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -711,6 +825,22 @@ const TerrainViewCanvas: FC<{
           <div style={sliderLabelStyle}><span>Glow</span><span>{bloomIntensity.toFixed(1)}</span></div>
           <input type="range" min="0" max="2" step="0.1" value={bloomIntensity}
             onChange={e => setBloomIntensity(parseFloat(e.target.value))} style={sliderStyle} />
+        </div>
+        {/* Presets */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+          {Object.values(PRESETS).map(p => (
+            <button
+              key={p.label}
+              onClick={() => applyPreset(p)}
+              style={{
+                padding: '3px 8px', borderRadius: 4, border: '1px solid #334155',
+                background: '#0f172a', color: '#94a3b8', fontSize: '0.5rem',
+                cursor: 'pointer', fontFamily: 'monospace',
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
