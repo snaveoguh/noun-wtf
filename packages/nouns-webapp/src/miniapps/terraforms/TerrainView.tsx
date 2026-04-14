@@ -13,7 +13,6 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
-import { useNavigate } from 'react-router';
 import * as THREE from 'three';
 import { createPublicClient, http } from 'viem';
 import { mainnet } from 'viem/chains';
@@ -482,83 +481,6 @@ function AnimOverlay({
         <AnimatedParcel key={p.tokenId} parcel={p} normalization={normalization} />
       ))}
     </group>
-  );
-}
-
-// ─── Far Cubes (all parcels, LOD fallback) ─────────────────────────────────
-
-function FarCubes({
-  parcels,
-  normalization,
-  onClickParcel,
-  hoveredId,
-  setHoveredId,
-}: {
-  parcels: ParcelData[];
-  normalization: { cx: number; cy: number; cz: number; scale: number };
-  onClickParcel: (id: number) => void;
-  hoveredId: number | null;
-  setHoveredId: (id: number | null) => void;
-}) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const idMapRef = useRef<number[]>([]);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh || parcels.length === 0) return;
-
-    const { cx, cy, cz, scale } = normalization;
-    const ids: number[] = [];
-
-    for (let i = 0; i < parcels.length; i++) {
-      const p = parcels[i];
-      tempObj.position.set(
-        (p.sx - cx) * scale,
-        (p.sy - cy) * scale,
-        (p.sz - cz) * scale,
-      );
-      tempObj.scale.setScalar(hoveredId === p.tokenId ? 2.5 : 1.2);
-      tempObj.updateMatrix();
-      mesh.setMatrixAt(i, tempObj.matrix);
-
-      tempColor.set(p.color);
-      if (hoveredId === p.tokenId) tempColor.multiplyScalar(1.5);
-      mesh.setColorAt(i, tempColor);
-      ids.push(p.tokenId);
-    }
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    idMapRef.current = ids;
-  }, [parcels, normalization, hoveredId]);
-
-  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
-      setHoveredId(idMapRef.current[e.instanceId]);
-    }
-  }, [setHoveredId]);
-
-  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
-      onClickParcel(idMapRef.current[e.instanceId]);
-    }
-  }, [onClickParcel]);
-
-  if (parcels.length === 0) return null;
-
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, parcels.length]}
-      onPointerMove={handlePointerMove}
-      onPointerOut={() => setHoveredId(null)}
-      onClick={handleClick}
-    >
-      <sphereGeometry args={[0.4, 6, 4]} />
-      <meshBasicMaterial />
-    </instancedMesh>
   );
 }
 
