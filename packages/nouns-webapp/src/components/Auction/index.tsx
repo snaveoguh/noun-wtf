@@ -1,6 +1,7 @@
 /* eslint-disable import/order, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine';
 import type * as THREE from 'three';
+import { getHeadOffset } from '@/lib/headNudges';
 import { loadCuratedVoxelMap } from '@/lib/loadCuratedVoxelMap';
 import React, {
   Suspense,
@@ -306,10 +307,12 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   // Mesh editor state (when GLB head is available)
   const [meshGlbPath, setMeshGlbPath] = useState<string | null>(null);
+  const [meshHeadTrait, setMeshHeadTrait] = useState<string | null>(null);
   const [meshBrushSize, setMeshBrushSize] = useState(5);
   const meshUndoRef = useRef<(() => void) | null>(null);
   const meshRedoRef = useRef<(() => void) | null>(null);
   const meshSceneRef = useRef<THREE.Object3D | null>(null);
+  const meshSnapshotRef = useRef<(() => string | null) | null>(null);
 
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
   const [editingAuctionUrl, setEditingAuctionUrl] = useState(false);
@@ -485,14 +488,17 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
         // Try to resolve GLB path from manifest for mesh editor
         let resolvedGlbPath: string | null = null;
+        let resolvedTraitName: string | null = null;
         if (currentNounSeed) {
           try {
             const manifestRes = await fetch('/models/heads/manifest.json');
             if (manifestRes.ok) {
-              const manifest: Array<{ threeDNounsGlb?: string }> = await manifestRes.json();
+              const manifest: Array<{ traitName?: string; threeDNounsGlb?: string }> =
+                await manifestRes.json();
               const entry = manifest[currentNounSeed.head];
               if (entry?.threeDNounsGlb != null) {
                 resolvedGlbPath = entry.threeDNounsGlb;
+                resolvedTraitName = entry.traitName ?? null;
                 console.log(`[Editor] Mesh editor: using GLB ${resolvedGlbPath}`);
               }
             }
@@ -501,6 +507,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           }
         }
         setMeshGlbPath(resolvedGlbPath);
+        setMeshHeadTrait(resolvedTraitName);
 
         // Fallback: load curated voxel map for heads without GLB
         let startMap = liveVoxelMap;
@@ -578,9 +585,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       mode: Exclude<EditMode, null>,
       pixels: string[][],
       voxelData?: string,
-      options?: { keepalive?: boolean },
+      options?: { keepalive?: boolean; imageOverride?: string },
     ) => {
-      const image = buildPixelImage(pixels);
+      const image = options?.imageOverride || buildPixelImage(pixels);
       if (!currentAuction) return;
       if (!image && !voxelData) return;
 
@@ -625,13 +632,27 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     }
 
     if (editMode === '3d') {
-      const voxelData = serializeVoxelMap(voxelMapRef.current);
-      const signature = JSON.stringify({
-        pixels: edit3dHistory.present,
-        voxelData,
-      });
-      if (voxelData && signature !== live3dSignatureRef.current) {
-        void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+      if (meshGlbPath) {
+        // Mesh mode: flush canvas snapshot
+        const snapshotFn = meshSnapshotRef.current;
+        if (snapshotFn) {
+          const image = snapshotFn();
+          if (image) {
+            void persistLiveDraft('3d', edit3dHistory.present, undefined, {
+              keepalive: true,
+              imageOverride: image,
+            });
+          }
+        }
+      } else {
+        const voxelData = serializeVoxelMap(voxelMapRef.current);
+        const signature = JSON.stringify({
+          pixels: edit3dHistory.present,
+          voxelData,
+        });
+        if (voxelData && signature !== live3dSignatureRef.current) {
+          void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+        }
       }
     }
 
@@ -640,7 +661,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     voxelMapRef.current = null;
     edit3dViewStateRef.current = null;
     setInteractionMode('scroll');
-  }, [edit2dHistory.present, edit3dHistory.present, editMode, persistLiveDraft]);
+  }, [edit2dHistory.present, edit3dHistory.present, editMode, meshGlbPath, persistLiveDraft]);
 
   useEffect(() => {
     if (editMode !== '2d') return;
@@ -668,6 +689,21 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     return () => window.clearTimeout(timer);
   }, [edit3dHistory.present, editMode, persistLiveDraft, voxelMapVersion]);
 
+  // Mesh editor auto-save to server (vertex color deltas don't produce voxelData,
+  // so the effect above skips mesh mode — this one captures a canvas snapshot instead)
+  useEffect(() => {
+    if (editMode !== '3d' || !meshGlbPath) return;
+
+    const timer = window.setTimeout(() => {
+      const snapshotFn = meshSnapshotRef.current;
+      if (!snapshotFn) return;
+      const image = snapshotFn();
+      if (!image) return;
+      void persistLiveDraft('3d', edit3dHistory.present, undefined, { imageOverride: image });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [voxelMapVersion, editMode, meshGlbPath, persistLiveDraft, edit3dHistory.present]);
+
   useEffect(() => {
     const flushOnPageHide = () => {
       if (editMode === '2d') {
@@ -678,20 +714,35 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       }
 
       if (editMode === '3d') {
-        const voxelData = serializeVoxelMap(voxelMapRef.current);
-        const signature = JSON.stringify({
-          pixels: edit3dHistory.present,
-          voxelData,
-        });
-        if (voxelData && signature !== live3dSignatureRef.current) {
-          void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+        // Mesh mode: snapshot canvas
+        if (meshGlbPath) {
+          const snapshotFn = meshSnapshotRef.current;
+          if (snapshotFn) {
+            const image = snapshotFn();
+            if (image) {
+              void persistLiveDraft('3d', edit3dHistory.present, undefined, {
+                keepalive: true,
+                imageOverride: image,
+              });
+            }
+          }
+        } else {
+          // Voxel mode: serialize voxel map
+          const voxelData = serializeVoxelMap(voxelMapRef.current);
+          const signature = JSON.stringify({
+            pixels: edit3dHistory.present,
+            voxelData,
+          });
+          if (voxelData && signature !== live3dSignatureRef.current) {
+            void persistLiveDraft('3d', edit3dHistory.present, voxelData, { keepalive: true });
+          }
         }
       }
     };
 
     window.addEventListener('pagehide', flushOnPageHide);
     return () => window.removeEventListener('pagehide', flushOnPageHide);
-  }, [edit2dHistory.present, edit3dHistory.present, editMode, persistLiveDraft]);
+  }, [edit2dHistory.present, edit3dHistory.present, editMode, meshGlbPath, persistLiveDraft]);
 
   const handleDerivativeUploaded = useCallback(() => {
     if (!currentAuction) return;
@@ -1086,6 +1137,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                           undoRef: meshUndoRef,
                           redoRef: meshRedoRef,
                           sceneRef: meshSceneRef,
+                          headOffset: meshHeadTrait
+                            ? getHeadOffset(meshHeadTrait)
+                            : undefined,
+                          snapshotRef: meshSnapshotRef,
                         }
                       : undefined,
                 }
