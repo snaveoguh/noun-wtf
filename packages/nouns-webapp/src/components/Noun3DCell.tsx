@@ -267,7 +267,7 @@ function NounMesh({
     if (!g) return;
 
     // Compute mouse proximity influence (ocean-parting effect)
-    const INFLUENCE_RADIUS = cell.size * 2.5; // pixels
+    const INFLUENCE_RADIUS = cell.size * 1.2; // pixels — tight radius, ~1 neighbor
     let proximity = 0; // 0 = no influence, 1 = directly on top
     let pushX = 0, pushY = 0; // direction to push away
 
