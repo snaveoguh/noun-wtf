@@ -317,167 +317,139 @@ function AllParcelsInstanced({
   );
 }
 
-// ─── ASCII Character Terrain (nearest parcels) ───────────────────────────
+// ─── Animated Overlay (nearest parcels) ───────────────────────────────────
 //
-// Merged BufferGeometry per parcel: 1024 quads, each with correct UVs
-// pointing to the right character tile in an atlas. Standard meshBasicMaterial.
-// Each quad faces up at its height level. No custom shaders.
+// Flat texture planes showing LIVE animated tokenHTML art.
+// Each near parcel gets a hidden iframe → canvas capture every 250ms.
+// Positioned at parcel coords slightly above the atlas.
 
-const CHAR_DISTANCE = 30;
-const MAX_CHAR_PARCELS = 15;
-const CELL_SIZE = PARCEL_SIZE / GRID_SIZE;
-const CHAR_TILE = 32; // px per character tile in atlas
+const ANIM_DISTANCE = 25;
+const MAX_ANIM_PARCELS = 8;
+const ANIM_TEX = 256; // capture resolution
+const animPlaneGeo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.02, PARCEL_SIZE * 1.02);
 
-/**
- * Build merged geometry + texture for one parcel.
- * 1024 quads facing up (-PI/2 on X), each at its height, UVs → character atlas.
- */
-/** Build merged geometry in LOCAL space (centered at origin). Height uses raw 0-9 values.
- *  The caller positions and scales via mesh position + group scaleY. */
-function buildParcelCharMesh(
-  td: TokenEntry,
-): { geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture } {
-  const [bg, palette, classGrid, chars] = td;
+const rpcClient = createPublicClient({
+  chain: mainnet,
+  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
+});
 
-  // Build character atlas: each unique (char, colorIdx) combo gets a tile
-  // Layout: one row, each tile is CHAR_TILE × CHAR_TILE
-  const uniqueChars = [...new Set(Object.values(chars))].filter(c => c && c !== ' ');
-  if (uniqueChars.length === 0) uniqueChars.push('?');
-  const numClasses = 10; // a-j
-  const tilesPerRow = uniqueChars.length;
-  const atlasW = tilesPerRow * CHAR_TILE;
-  const atlasH = numClasses * CHAR_TILE;
+const TERRAFORMS_ADDRESS_2 = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
+const TOKEN_HTML_ABI_2 = [{
+  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
+  inputs: [{ name: 'tokenId', type: 'uint256' }],
+  outputs: [{ name: '', type: 'string' }],
+}] as const;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = atlasW;
-  canvas.height = atlasH;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, atlasW, atlasH);
-
-  const fontSize = Math.floor(CHAR_TILE * 0.85);
-  ctx.font = `${fontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // charIdx map: character string → column index
-  const charCol = new Map<string, number>();
-  uniqueChars.forEach((c, i) => charCol.set(c, i));
-
-  // Draw all (char, class) combinations
-  for (let cls = 0; cls < numClasses; cls++) {
-    const color = palette[cls] || '#fff';
-    ctx.fillStyle = color;
-    for (let ci = 0; ci < uniqueChars.length; ci++) {
-      ctx.fillText(uniqueChars[ci], ci * CHAR_TILE + CHAR_TILE / 2, cls * CHAR_TILE + CHAR_TILE / 2);
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-
-  // Build merged geometry: 1024 quads
-  const numQuads = GRID_SIZE * GRID_SIZE;
-  const positions = new Float32Array(numQuads * 4 * 3); // 4 verts × 3 coords
-  const uvs = new Float32Array(numQuads * 4 * 2);
-  const indices = new Uint32Array(numQuads * 6);
-  const halfCell = CELL_SIZE * 0.48;
-  const BASE_H = 0.04; // height unit per level (scaled by relief slider externally)
-
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const cellIdx = row * GRID_SIZE + col;
-      const cls = classGrid[cellIdx];
-      const clsIdx = cls.charCodeAt(0) - 97;
-      const height = 9 - clsIdx;
-      const char = chars[cls] || ' ';
-
-      // Local coords centered at origin
-      const cx = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
-      const cy = height * BASE_H; // raw height, slider scales via group
-      const cz = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
-
-      // 4 vertices of a quad facing up (on XZ plane)
-      const vi = cellIdx * 4;
-      // v0: top-left, v1: top-right, v2: bottom-right, v3: bottom-left
-      positions[vi * 3]     = cx - halfCell; positions[vi * 3 + 1] = cy; positions[vi * 3 + 2] = cz - halfCell;
-      positions[(vi+1) * 3] = cx + halfCell; positions[(vi+1) * 3 + 1] = cy; positions[(vi+1) * 3 + 2] = cz - halfCell;
-      positions[(vi+2) * 3] = cx + halfCell; positions[(vi+2) * 3 + 1] = cy; positions[(vi+2) * 3 + 2] = cz + halfCell;
-      positions[(vi+3) * 3] = cx - halfCell; positions[(vi+3) * 3 + 1] = cy; positions[(vi+3) * 3 + 2] = cz + halfCell;
-
-      // UVs: map to the right tile in atlas
-      const charC = charCol.get(char) ?? 0;
-      const u0 = charC / tilesPerRow;
-      const u1 = (charC + 1) / tilesPerRow;
-      const v0 = clsIdx / numClasses;
-      const v1 = (clsIdx + 1) / numClasses;
-
-      uvs[vi * 2]     = u0; uvs[vi * 2 + 1] = 1 - v0;
-      uvs[(vi+1) * 2] = u1; uvs[(vi+1) * 2 + 1] = 1 - v0;
-      uvs[(vi+2) * 2] = u1; uvs[(vi+2) * 2 + 1] = 1 - v1;
-      uvs[(vi+3) * 2] = u0; uvs[(vi+3) * 2 + 1] = 1 - v1;
-
-      // Two triangles per quad
-      const ii = cellIdx * 6;
-      indices[ii]   = vi; indices[ii+1] = vi+1; indices[ii+2] = vi+2;
-      indices[ii+3] = vi; indices[ii+4] = vi+2; indices[ii+5] = vi+3;
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.computeVertexNormals();
-
-  return { geometry, texture };
-}
-
-/** One parcel rendered as merged ASCII character quads. Geometry built once in local space. */
-function CharParcel({ parcel, tokenData, normalization, heightScale }: {
+/** One animated parcel: iframe captures live art to texture. */
+function AnimatedParcel({ parcel, normalization }: {
   parcel: ParcelData;
-  tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
-  heightScale: number;
 }) {
   const { cx, cy, cz, scale } = normalization;
   const px = (parcel.sx - cx) * scale;
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
 
-  // Build geometry + texture once (no heightScale dependency)
-  const { geometry, texture } = useMemo(
-    () => buildParcelCharMesh(tokenData),
-    [tokenData],
-  );
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const intervalRef = useRef<number>(0);
 
-  // Relief slider scales Y axis of the group
-  const yScale = Math.max(0.01, heightScale * 10);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const html = await rpcClient.readContract({
+          address: TERRAFORMS_ADDRESS_2, abi: TOKEN_HTML_ABI_2,
+          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
+        });
+        if (cancelled) return;
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
+        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
+        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
+        document.body.appendChild(iframe);
+        iframeRef.current = iframe;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = ANIM_TEX;
+        canvas.height = ANIM_TEX;
+
+        iframe.onload = () => {
+          if (cancelled) return;
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.magFilter = THREE.NearestFilter;
+          tex.minFilter = THREE.NearestFilter;
+          tex.colorSpace = THREE.SRGBColorSpace;
+
+          const capture = () => {
+            const doc = iframe.contentDocument;
+            if (!doc) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            const gridEls = doc.querySelectorAll('.r p, .meta p');
+            if (gridEls.length < 1024) return;
+
+            const cellW = ANIM_TEX / GRID_SIZE;
+            const cellH = ANIM_TEX / GRID_SIZE;
+            const fontSize = Math.floor(cellH * 0.85);
+            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, ANIM_TEX, ANIM_TEX);
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
+              const el = gridEls[i] as HTMLElement;
+              const row = Math.floor(i / GRID_SIZE);
+              const col = i % GRID_SIZE;
+              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
+              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
+            }
+            tex.needsUpdate = true;
+          };
+
+          setTimeout(() => {
+            capture();
+            setTexture(tex);
+            intervalRef.current = window.setInterval(capture, 250);
+          }, 800);
+        };
+      } catch { /* fallback: no overlay */ }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (iframeRef.current) {
+        try { document.body.removeChild(iframeRef.current); } catch {}
+        iframeRef.current = null;
+      }
+    };
+  }, [parcel.tokenId]);
+
+  if (!texture) return null;
 
   return (
-    <group position={[px, py, pz]} scale={[1, yScale, 1]}>
-      <mesh geometry={geometry}>
-        <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
+    <mesh geometry={animPlaneGeo} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.03, pz]}>
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} transparent opacity={0.95} />
+    </mesh>
   );
 }
 
-/** Renders ASCII character overlays for nearest parcels. */
-function CharOverlay({
+/** Renders animated overlays for nearest parcels. */
+function AnimOverlay({
   parcels,
   terrainData,
   cameraRef,
   normalization,
-  heightScale,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
-  heightScale: number;
 }) {
   const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
@@ -494,11 +466,11 @@ function CharOverlay({
       const ppy = (p.sy - cy) * scale;
       const ppz = (p.sz - cz) * scale;
       const dist = Math.sqrt((camPos.x - ppx) ** 2 + (camPos.y - ppy) ** 2 + (camPos.z - ppz) ** 2);
-      if (dist < CHAR_DISTANCE) scored.push([p, dist]);
+      if (dist < ANIM_DISTANCE) scored.push([p, dist]);
     }
 
     scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
+    const nearest = scored.slice(0, MAX_ANIM_PARCELS).map(s => s[0]);
     const newIds = nearest.map(p => p.tokenId).join(',');
     const oldIds = nearParcels.map(p => p.tokenId).join(',');
     if (newIds !== oldIds) setNearParcels(nearest);
@@ -506,11 +478,9 @@ function CharOverlay({
 
   return (
     <group>
-      {nearParcels.map(p => {
-        const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
-        if (!td) return null;
-        return <CharParcel key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
-      })}
+      {nearParcels.map(p => (
+        <AnimatedParcel key={p.tokenId} parcel={p} normalization={normalization} />
+      ))}
     </group>
   );
 }
@@ -653,12 +623,11 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             heightScale={heightScale}
             saturation={saturation}
           />
-          <CharOverlay
+          <AnimOverlay
             parcels={parcels}
             terrainData={terrainData}
             cameraRef={cameraRef}
             normalization={normalization}
-            heightScale={heightScale}
           />
         </>
       )}
