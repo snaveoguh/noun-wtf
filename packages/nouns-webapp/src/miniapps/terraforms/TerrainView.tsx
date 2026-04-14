@@ -51,9 +51,9 @@ interface TerrainViewProps {
 
 const PARCEL_SIZE = 1.2;
 const GRID_SIZE = 32;
-const CELL_PX = 4; // pixels per cell in the atlas (4px × 32 = 128px per parcel)
-const ATLAS_COLS = 100; // 100×100 grid = 10,000 slots, fits all 9,910
-const HEIGHT_SCALE = 0.3; // max height displacement per parcel (in scene units)
+const CELL_PX = 1; // 1px per cell (32×32px per parcel) — color patterns, not text
+const ATLAS_COLS = 100; // 100×100 grid = 3200×3200px atlas — fits in GPU
+const HEIGHT_SCALE = 0.25; // max height displacement per parcel
 
 const tempObj = new THREE.Object3D();
 const tempColor = new THREE.Color();
@@ -91,48 +91,64 @@ function buildAtlas(
   heightCtx.fillRect(0, 0, atlasSize, atlasSize);
 
   const uvMap = new Map<number, [number, number]>();
-  const fontSize = Math.max(2, Math.floor(CELL_PX * 0.9));
-  colorCtx.font = `${fontSize}px monospace`;
-  colorCtx.textAlign = 'center';
-  colorCtx.textBaseline = 'middle';
+
+  // Use ImageData for fast pixel-level atlas painting (no fillRect/fillText overhead)
+  const colorData = colorCtx.getImageData(0, 0, atlasSize, atlasSize);
+  const heightData = heightCtx.getImageData(0, 0, atlasSize, atlasSize);
+  const cPixels = colorData.data;
+  const hPixels = heightData.data;
+
+  // Helper to parse hex color
+  const hexToRGB = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
 
   let slot = 0;
   for (const p of parcels) {
     const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
     if (!td) continue;
 
-    const col = slot % ATLAS_COLS;
-    const row = Math.floor(slot / ATLAS_COLS);
-    const ox = col * tileSize;
-    const oy = row * tileSize;
+    const tileCol = slot % ATLAS_COLS;
+    const tileRow = Math.floor(slot / ATLAS_COLS);
+    const ox = tileCol * tileSize;
+    const oy = tileRow * tileSize;
 
-    const [bg, palette, classGrid, chars] = td;
-
-    // Color: fill background + draw characters
-    colorCtx.fillStyle = bg;
-    colorCtx.fillRect(ox, oy, tileSize, tileSize);
+    const [bg, palette, classGrid] = td;
+    const bgRGB = hexToRGB(bg || '#000000');
 
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const cls = classGrid[r * GRID_SIZE + c];
-        const clsIdx = cls.charCodeAt(0) - 97; // a=0, j=9
-        const height = 9 - clsIdx; // a=9 (peak), j=0 (bg)
+        const clsIdx = cls.charCodeAt(0) - 97;
+        const height = 9 - clsIdx; // a=9 peak, j=0 flat
 
-        // Color atlas: draw the character
-        colorCtx.fillStyle = palette[clsIdx] || '#fff';
-        const char = chars[cls] || ' ';
-        colorCtx.fillText(char, ox + c * CELL_PX + CELL_PX / 2, oy + r * CELL_PX + CELL_PX / 2);
+        const px = ox + c;
+        const py = oy + r;
+        const idx = (py * atlasSize + px) * 4;
 
-        // Height atlas: grayscale brightness = height (0-9 → 0-255)
+        // Color: use zone color (bg for height 0)
+        const rgb = height > 0 ? hexToRGB(palette[clsIdx] || '#fff') : bgRGB;
+        cPixels[idx] = rgb[0];
+        cPixels[idx + 1] = rgb[1];
+        cPixels[idx + 2] = rgb[2];
+        cPixels[idx + 3] = 255;
+
+        // Height: grayscale 0-255
         const brightness = Math.round((height / 9) * 255);
-        heightCtx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
-        heightCtx.fillRect(ox + c * CELL_PX, oy + r * CELL_PX, CELL_PX, CELL_PX);
+        hPixels[idx] = brightness;
+        hPixels[idx + 1] = brightness;
+        hPixels[idx + 2] = brightness;
+        hPixels[idx + 3] = 255;
       }
     }
 
-    uvMap.set(p.tokenId, [col / ATLAS_COLS, row / ATLAS_COLS]);
+    uvMap.set(p.tokenId, [tileCol / ATLAS_COLS, tileRow / ATLAS_COLS]);
     slot++;
   }
+
+  colorCtx.putImageData(colorData, 0, 0);
+  heightCtx.putImageData(heightData, 0, 0);
 
   const colorTex = new THREE.CanvasTexture(colorCanvas);
   colorTex.magFilter = THREE.NearestFilter;
