@@ -19,8 +19,8 @@ import { mainnet } from 'viem/chains';
 
 const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
 const TOTAL_SUPPLY = 9910;
-const BATCH_SIZE = 20; // tokens per multicall batch (smaller to avoid RPC rate limits)
-const BATCH_DELAY = 500; // ms between batches
+const BATCH_SIZE = 80; // tokens per multicall batch
+const BATCH_DELAY = 200; // ms between batches
 
 // Zone colors for parcels that haven't loaded yet (gradient by level)
 const LEVEL_COLORS = [
@@ -226,11 +226,28 @@ function ParcelInstances({
     const mesh = meshRef.current;
     if (!mesh || parcels.length === 0) return;
 
+    // Compute bounding box to center + scale the scene
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const p of parcels) {
+      if (p.sx < minX) minX = p.sx; if (p.sx > maxX) maxX = p.sx;
+      if (p.sy < minY) minY = p.sy; if (p.sy > maxY) maxY = p.sy;
+      if (p.sz < minZ) minZ = p.sz; if (p.sz > maxZ) maxZ = p.sz;
+    }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+    const range = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1);
+    const scale = 80 / range; // normalize to ~80 unit cube
+
     const ids: number[] = [];
     for (let i = 0; i < parcels.length; i++) {
       const p = parcels[i];
-      tempObj.position.set(p.sx, p.sy, p.sz);
-      tempObj.scale.setScalar(hoveredId === p.tokenId ? 1.8 : 0.85);
+      tempObj.position.set(
+        (p.sx - cx) * scale,
+        (p.sy - cy) * scale,
+        (p.sz - cz) * scale,
+      );
+      tempObj.scale.setScalar(hoveredId === p.tokenId ? 2.5 : 1.2);
       tempObj.updateMatrix();
       mesh.setMatrixAt(i, tempObj.matrix);
 
