@@ -49,311 +49,204 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 200; // show terrain for all visible parcels
-const MAX_TERRAIN_PARCELS = 200;
-const MAX_ANIMATED = 6; // closest N get live animation from tokenHTML
-const PARCEL_SIZE = 1.4; // slightly larger so art is more visible
+const PARCEL_SIZE = 1.2;
 const GRID_SIZE = 32;
-const TEX_RES = 512;
-const LRU_LIMIT = 50;
+const CELL_PX = 4; // pixels per cell in the atlas (4px × 32 = 128px per parcel)
+const ATLAS_COLS = 100; // 100×100 grid = 10,000 slots, fits all 9,910
 
 const tempObj = new THREE.Object3D();
 const tempColor = new THREE.Color();
 
-// ─── ASCII Art Texture Generator ──────────────────────────────────────────
-
 type TokenEntry = [string, string[], string, Record<string, string>];
 
-// LRU caches (module-level, persist across re-renders)
-const textureCache = new Map<number, THREE.CanvasTexture>();
+// ─── Texture Atlas (all 9,910 parcels in one texture) ─────────────────────
 
-function evictLRU<T extends { dispose(): void }>(cache: Map<number, T>, limit: number) {
-  while (cache.size > limit) {
-    const oldest = cache.keys().next().value;
-    if (oldest === undefined) break;
-    cache.get(oldest)?.dispose();
-    cache.delete(oldest);
-  }
-}
+/**
+ * Build a single atlas texture containing all parcel arts.
+ * Each parcel gets a CELL_PX*32 × CELL_PX*32 tile in a 100×100 grid.
+ * Returns { texture, uvOffsets } where uvOffsets maps tokenId → [u, v].
+ */
+function buildAtlas(
+  parcels: ParcelData[],
+  terrainData: TerrainData,
+): { texture: THREE.CanvasTexture; uvMap: Map<number, [number, number]> } {
+  const tileSize = CELL_PX * GRID_SIZE; // 128px per parcel
+  const atlasSize = ATLAS_COLS * tileSize; // 12800px
 
-/** Render onchain ASCII art to a CanvasTexture (NearestFilter for pixel art look). */
-function getOrCreateTexture(tokenId: number, td: TokenEntry): THREE.CanvasTexture {
-  let tex = textureCache.get(tokenId);
-  if (tex) {
-    // Move to end (LRU refresh)
-    textureCache.delete(tokenId);
-    textureCache.set(tokenId, tex);
-    return tex;
-  }
-
-  const [bg, palette, classGrid, chars] = td;
   const canvas = document.createElement('canvas');
-  canvas.width = TEX_RES;
-  canvas.height = TEX_RES;
+  canvas.width = atlasSize;
+  canvas.height = atlasSize;
   const ctx = canvas.getContext('2d')!;
-  const cellW = TEX_RES / GRID_SIZE;
-  const cellH = TEX_RES / GRID_SIZE;
-  const fontSize = Math.floor(cellH * 0.92);
 
-  // Fill background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, TEX_RES, TEX_RES);
+  // Black base
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, atlasSize, atlasSize);
 
-  // Draw each character with its exact onchain color
+  const uvMap = new Map<number, [number, number]>();
+  const fontSize = Math.max(2, Math.floor(CELL_PX * 0.9));
   ctx.font = `${fontSize}px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const cls = classGrid[row * GRID_SIZE + col];
-      const clsIdx = cls.charCodeAt(0) - 97;
-      ctx.fillStyle = palette[clsIdx] || '#fff';
-      const char = chars[cls] || ' ';
-      ctx.fillText(char, col * cellW + cellW / 2, row * cellH + cellH / 2);
+  let slot = 0;
+  for (const p of parcels) {
+    const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
+    if (!td) continue;
+
+    const col = slot % ATLAS_COLS;
+    const row = Math.floor(slot / ATLAS_COLS);
+    const ox = col * tileSize;
+    const oy = row * tileSize;
+
+    const [bg, palette, classGrid, chars] = td;
+
+    // Fill parcel background
+    ctx.fillStyle = bg;
+    ctx.fillRect(ox, oy, tileSize, tileSize);
+
+    // Draw characters
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const cls = classGrid[r * GRID_SIZE + c];
+        const clsIdx = cls.charCodeAt(0) - 97;
+        ctx.fillStyle = palette[clsIdx] || '#fff';
+        const char = chars[cls] || ' ';
+        ctx.fillText(char, ox + c * CELL_PX + CELL_PX / 2, oy + r * CELL_PX + CELL_PX / 2);
+      }
     }
+
+    // UV offset: normalized position in atlas
+    uvMap.set(p.tokenId, [col / ATLAS_COLS, row / ATLAS_COLS]);
+    slot++;
   }
 
-  tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.colorSpace = THREE.SRGBColorSpace;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = true;
 
-  textureCache.set(tokenId, tex);
-  evictLRU(textureCache, LRU_LIMIT);
-  return tex;
+  return { texture, uvMap };
 }
 
-// Shared flat plane geometry — no displacement, the ASCII art IS the depth
-const flatPlaneGeo = new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE);
+// ─── All Parcels InstancedMesh (single draw call) ─────────────────────────
 
-// ─── Single Terrain Plane (one parcel) ────────────────────────────────────
-
-function TerrainPlane({ parcel, tokenData, normalization }: {
-  parcel: ParcelData;
-  tokenData: TokenEntry;
-  normalization: { cx: number; cy: number; cz: number; scale: number };
-}) {
-  const { cx, cy, cz, scale } = normalization;
-  const px = (parcel.sx - cx) * scale;
-  const py = (parcel.sy - cy) * scale;
-  const pz = (parcel.sz - cz) * scale;
-
-  const texture = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
-
-  return (
-    <mesh
-      geometry={flatPlaneGeo}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[px, py + 0.01, pz]}
-    >
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-// ─── Animated Terrain Plane (live tokenHTML → texture) ─────────────────────
-
-const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
-const TOKEN_HTML_ABI = [{
-  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'string' }],
-}] as const;
-
-const rpcClient = createPublicClient({
-  chain: mainnet,
-  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
-});
-
-/** Animated terrain: hidden iframe renders tokenHTML, we capture to texture every 200ms. */
-function AnimatedTerrainPlane({ parcel, tokenData, normalization }: {
-  parcel: ParcelData;
-  tokenData: TokenEntry;
-  normalization: { cx: number; cy: number; cz: number; scale: number };
-}) {
-  const { cx, cy, cz, scale } = normalization;
-  const px = (parcel.sx - cx) * scale;
-  const py = (parcel.sy - cy) * scale;
-  const pz = (parcel.sz - cz) * scale;
-
-  // Start with static texture, upgrade to animated when iframe loads
-  const staticTex = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
-  const [texture, setTexture] = useState<THREE.CanvasTexture>(staticTex);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const intervalRef = useRef<number>(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Fetch tokenHTML
-    (async () => {
-      try {
-        const html = await rpcClient.readContract({
-          address: TERRAFORMS_ADDRESS, abi: TOKEN_HTML_ABI,
-          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
-        });
-        if (cancelled) return;
-
-        // Create hidden iframe
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
-        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
-        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
-        document.body.appendChild(iframe);
-        iframeRef.current = iframe;
-
-        // Create capture canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = TEX_RES;
-        canvas.height = TEX_RES;
-        canvasRef.current = canvas;
-
-        // Wait for iframe to load, then start capturing
-        iframe.onload = () => {
-          if (cancelled) return;
-
-          const animTex = new THREE.CanvasTexture(canvas);
-          animTex.magFilter = THREE.NearestFilter;
-          animTex.minFilter = THREE.NearestFilter;
-          animTex.colorSpace = THREE.SRGBColorSpace;
-
-          const captureFrame = () => {
-            const doc = iframe.contentDocument;
-            if (!doc) return;
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            const gridEls = doc.querySelectorAll('.r p, .meta p');
-            if (gridEls.length < 1024) return;
-
-            const cellW = TEX_RES / GRID_SIZE;
-            const cellH = TEX_RES / GRID_SIZE;
-            const fontSize = Math.floor(cellH * 0.92);
-
-            // Read bg from iframe
-            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
-            ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, TEX_RES, TEX_RES);
-
-            ctx.font = `${fontSize}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
-              const el = gridEls[i] as HTMLElement;
-              const row = Math.floor(i / GRID_SIZE);
-              const col = i % GRID_SIZE;
-              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
-              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
-            }
-
-            animTex.needsUpdate = true;
-          };
-
-          // Capture first frame, then every 200ms
-          setTimeout(() => {
-            captureFrame();
-            setTexture(animTex);
-            intervalRef.current = window.setInterval(captureFrame, 200);
-          }, 500); // give animation JS time to start
-        };
-      } catch (err) {
-        // Fallback to static — already set
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (iframeRef.current) {
-        document.body.removeChild(iframeRef.current);
-        iframeRef.current = null;
-      }
-    };
-  }, [parcel.tokenId]);
-
-  return (
-    <mesh geometry={flatPlaneGeo} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.01, pz]}>
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-// ─── Terrain Planes (near parcels) ────────────────────────────────────────
-
-function TerrainPlanes({
+/**
+ * Renders ALL 9,910 parcels as instanced flat planes with atlas-mapped textures.
+ * One draw call, one texture. Each instance has a custom UV offset attribute.
+ */
+function AllParcelsInstanced({
   parcels,
   terrainData,
-  cameraRef,
   normalization,
+  onClickParcel,
+  hoveredId,
+  setHoveredId,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
-  cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  onClickParcel: (id: number) => void;
+  hoveredId: number | null;
+  setHoveredId: (id: number | null) => void;
 }) {
-  const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const idMapRef = useRef<number[]>([]);
 
-  useFrame(() => {
-    const cam = cameraRef.current;
-    if (!cam) return;
+  // Build atlas once
+  const atlas = useMemo(() => buildAtlas(parcels, terrainData), [parcels, terrainData]);
 
-    const camPos = cam.position;
+  // Custom shader material that uses per-instance UV offset
+  const material = useMemo(() => {
+    const uvScale = 1 / ATLAS_COLS;
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        atlas: { value: atlas.texture },
+        uvScale: { value: uvScale },
+      },
+      vertexShader: `
+        attribute vec2 uvOffset;
+        varying vec2 vUv;
+        uniform float uvScale;
+        void main() {
+          vUv = uv * uvScale + uvOffset;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D atlas;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = texture2D(atlas, vUv);
+        }
+      `,
+      side: THREE.DoubleSide,
+    });
+  }, [atlas]);
+
+  // Set up instances
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || parcels.length === 0) return;
+
     const { cx, cy, cz, scale } = normalization;
+    const ids: number[] = [];
+    const offsets = new Float32Array(parcels.length * 2);
 
-    const scored: [ParcelData, number][] = [];
-    for (const p of parcels) {
-      const px = (p.sx - cx) * scale;
-      const py = (p.sy - cy) * scale;
-      const pz = (p.sz - cz) * scale;
-      const dist = Math.sqrt(
-        (camPos.x - px) ** 2 + (camPos.y - py) ** 2 + (camPos.z - pz) ** 2,
+    for (let i = 0; i < parcels.length; i++) {
+      const p = parcels[i];
+
+      // Position
+      tempObj.position.set(
+        (p.sx - cx) * scale,
+        (p.sy - cy) * scale,
+        (p.sz - cz) * scale,
       );
-      if (dist < NEAR_DISTANCE && terrainData.tokens[p.tokenId]) {
-        scored.push([p, dist]);
-      }
+      tempObj.rotation.set(-Math.PI / 2, 0, 0);
+      tempObj.scale.setScalar(hoveredId === p.tokenId ? 1.6 : 1.0);
+      tempObj.updateMatrix();
+      mesh.setMatrixAt(i, tempObj.matrix);
+
+      // UV offset for this parcel's tile in the atlas
+      const uv = atlas.uvMap.get(p.tokenId);
+      offsets[i * 2] = uv ? uv[0] : 0;
+      offsets[i * 2 + 1] = uv ? uv[1] : 0;
+
+      ids.push(p.tokenId);
     }
 
-    scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_TERRAIN_PARCELS).map(s => s[0]);
+    // Set per-instance UV offset attribute
+    const uvAttr = new THREE.InstancedBufferAttribute(offsets, 2);
+    mesh.geometry.setAttribute('uvOffset', uvAttr);
 
-    const newIds = nearest.map(p => p.tokenId).join(',');
-    const oldIds = nearParcels.map(p => p.tokenId).join(',');
-    if (newIds !== oldIds) {
-      setNearParcels(nearest);
+    mesh.instanceMatrix.needsUpdate = true;
+    idMapRef.current = ids;
+  }, [parcels, normalization, atlas, hoveredId]);
+
+  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+      setHoveredId(idMapRef.current[e.instanceId]);
     }
-  });
+  }, [setHoveredId]);
+
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+      onClickParcel(idMapRef.current[e.instanceId]);
+    }
+  }, [onClickParcel]);
+
+  if (parcels.length === 0) return null;
 
   return (
-    <group>
-      {nearParcels.map((p, i) => {
-        const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
-        if (!td) return null;
-
-        // Closest parcels get live animation, rest get static texture
-        if (i < MAX_ANIMATED) {
-          return (
-            <AnimatedTerrainPlane
-              key={p.tokenId}
-              parcel={p}
-              tokenData={td}
-              normalization={normalization}
-            />
-          );
-        }
-        return (
-          <TerrainPlane
-            key={p.tokenId}
-            parcel={p}
-            tokenData={td}
-            normalization={normalization}
-          />
-        );
-      })}
-    </group>
+    <instancedMesh
+      ref={meshRef}
+      args={[new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE), material, parcels.length]}
+      onPointerMove={handlePointerMove}
+      onPointerOut={() => setHoveredId(null)}
+      onClick={handleClick}
+    />
   );
 }
 
@@ -484,13 +377,15 @@ const TerrainScene: FC<TerrainViewProps> = ({
       <directionalLight position={[50, 80, 30]} intensity={0.8} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
 
-      {/* ASCII art terrain planes only — no cubes, no dots */}
+      {/* All 9,910 parcels as ASCII art planes — single draw call via atlas */}
       {terrainData && (
-        <TerrainPlanes
+        <AllParcelsInstanced
           parcels={parcels}
           terrainData={terrainData}
-          cameraRef={cameraRef}
           normalization={normalization}
+          onClickParcel={onClickParcel}
+          hoveredId={hoveredId}
+          setHoveredId={setHoveredId}
         />
       )}
 
