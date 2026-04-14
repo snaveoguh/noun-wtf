@@ -317,211 +317,94 @@ function AllParcelsInstanced({
   );
 }
 
-// ─── Hi-Res ASCII Overlay (nearest parcels) ──────────────────────────────
+// ─── Voxel Block Overlay (nearest parcels) ────────────────────────────────
+//
+// Each cell of the 32×32 grid rendered as a flat-topped colored block
+// at its correct height. No texture stretching — blocks are solid color.
+// This matches the TerraformBoxBuilder approach from ThousandAnt.
 
-const HIRES_DISTANCE = 25;
-const MAX_HIRES = 25;
-const HIRES_TEX = 512;
+const VOXEL_DISTANCE = 25;
+const MAX_VOXEL_PARCELS = 20;
+const CELL_SIZE = PARCEL_SIZE / GRID_SIZE; // size of one cell in scene units
+const boxGeo = new THREE.BoxGeometry(CELL_SIZE * 0.95, 1, CELL_SIZE * 0.95); // Y=1, scaled per instance
 
-const hiresTextureCache = new Map<number, THREE.CanvasTexture>();
-
-function createHiresTexture(tokenId: number, td: TokenEntry): THREE.CanvasTexture {
-  let tex = hiresTextureCache.get(tokenId);
-  if (tex) return tex;
-
-  const [bg, palette, classGrid, chars] = td;
-  const canvas = document.createElement('canvas');
-  canvas.width = HIRES_TEX;
-  canvas.height = HIRES_TEX;
-  const ctx = canvas.getContext('2d')!;
-  const cellW = HIRES_TEX / GRID_SIZE;
-  const cellH = HIRES_TEX / GRID_SIZE;
-  const fontSize = Math.floor(cellH * 0.88);
-
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, HIRES_TEX, HIRES_TEX);
-  ctx.font = `${fontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      const cls = classGrid[r * GRID_SIZE + c];
-      const clsIdx = cls.charCodeAt(0) - 97;
-      ctx.fillStyle = palette[clsIdx] || '#fff';
-      ctx.fillText(chars[cls] || ' ', c * cellW + cellW / 2, r * cellH + cellH / 2);
-    }
-  }
-
-  tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.colorSpace = THREE.SRGBColorSpace;
-
-  hiresTextureCache.set(tokenId, tex);
-  // Evict old entries
-  if (hiresTextureCache.size > 60) {
-    const oldest = hiresTextureCache.keys().next().value;
-    if (oldest !== undefined) {
-      hiresTextureCache.get(oldest)?.dispose();
-      hiresTextureCache.delete(oldest);
-    }
-  }
-  return tex;
-}
-
-const rpcClient = createPublicClient({
-  chain: mainnet,
-  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
-});
-
-const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
-const TOKEN_HTML_ABI = [{
-  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'string' }],
-}] as const;
-
-/** Hi-res animated terrain plane — starts static, upgrades to live animation from tokenHTML iframe. */
-function HiresTerrainPlane({ parcel, tokenData, normalization }: {
+/** Renders one parcel as 1024 instanced colored blocks at correct heights. */
+function VoxelParcel({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  heightScale: number;
 }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
   const { cx, cy, cz, scale } = normalization;
   const px = (parcel.sx - cx) * scale;
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
 
-  // Static texture as initial fallback
-  const staticTex = useMemo(() => createHiresTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
-  const [texture, setTexture] = useState<THREE.Texture>(staticTex);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const intervalRef = useRef<number>(0);
-
-  // Fetch tokenHTML and start capturing animation frames
   useEffect(() => {
-    let cancelled = false;
+    const mesh = meshRef.current;
+    if (!mesh) return;
 
-    (async () => {
-      try {
-        const html = await rpcClient.readContract({
-          address: TERRAFORMS_ADDRESS, abi: TOKEN_HTML_ABI,
-          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
-        });
-        if (cancelled) return;
+    const [, palette, classGrid] = tokenData;
+    let idx = 0;
 
-        // Hidden iframe for animation
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
-        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
-        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
-        document.body.appendChild(iframe);
-        iframeRef.current = iframe;
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cls = classGrid[row * GRID_SIZE + col];
+        const clsIdx = cls.charCodeAt(0) - 97;
+        const height = 9 - clsIdx; // a=9 peak, j=0 bg
 
-        // Capture canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = HIRES_TEX;
-        canvas.height = HIRES_TEX;
+        if (height === 0) {
+          // Hide background cells
+          tempObj.scale.set(0, 0, 0);
+          tempObj.updateMatrix();
+          mesh.setMatrixAt(idx, tempObj.matrix);
+          tempColor.set('#000');
+          mesh.setColorAt(idx, tempColor);
+          idx++;
+          continue;
+        }
 
-        iframe.onload = () => {
-          if (cancelled) return;
+        const h = height * heightScale * 0.04; // scale with slider
+        const ox = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+        const oz = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
 
-          const animTex = new THREE.CanvasTexture(canvas);
-          animTex.magFilter = THREE.NearestFilter;
-          animTex.minFilter = THREE.NearestFilter;
-          animTex.colorSpace = THREE.SRGBColorSpace;
+        tempObj.position.set(px + ox, py + h / 2, pz + oz);
+        tempObj.scale.set(1, Math.max(0.01, h), 1);
+        tempObj.rotation.set(0, 0, 0);
+        tempObj.updateMatrix();
+        mesh.setMatrixAt(idx, tempObj.matrix);
 
-          const captureFrame = () => {
-            const doc = iframe.contentDocument;
-            if (!doc) return;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            const gridEls = doc.querySelectorAll('.r p, .meta p');
-            if (gridEls.length < 1024) return;
-
-            const cellW = HIRES_TEX / GRID_SIZE;
-            const cellH = HIRES_TEX / GRID_SIZE;
-            const fontSize = Math.floor(cellH * 0.88);
-
-            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
-            ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, HIRES_TEX, HIRES_TEX);
-            ctx.font = `${fontSize}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
-              const el = gridEls[i] as HTMLElement;
-              const row = Math.floor(i / GRID_SIZE);
-              const col = i % GRID_SIZE;
-              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
-              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
-            }
-            animTex.needsUpdate = true;
-          };
-
-          // Let animation JS start, then begin capturing
-          setTimeout(() => {
-            captureFrame();
-            setTexture(animTex);
-            intervalRef.current = window.setInterval(captureFrame, 200);
-          }, 800);
-        };
-      } catch {
-        // Static fallback already set
+        tempColor.set(palette[clsIdx] || '#fff');
+        mesh.setColorAt(idx, tempColor);
+        idx++;
       }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (iframeRef.current) {
-        try { document.body.removeChild(iframeRef.current); } catch {}
-        iframeRef.current = null;
-      }
-    };
-  }, [parcel.tokenId]);
-
-  // Geometry with per-vertex height
-  const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.01, PARCEL_SIZE * 1.01, GRID_SIZE, GRID_SIZE);
-    const pos = geo.attributes.position;
-    const classGrid = tokenData[2];
-    for (let i = 0; i < pos.count; i++) {
-      const col = i % (GRID_SIZE + 1);
-      const row = Math.floor(i / (GRID_SIZE + 1));
-      const gc = Math.min(col, GRID_SIZE - 1);
-      const gr = Math.min(row, GRID_SIZE - 1);
-      const cls = classGrid[gr * GRID_SIZE + gc];
-      const clsIdx = cls.charCodeAt(0) - 97;
-      const height = (9 - clsIdx) * HEIGHT_SCALE;
-      pos.setZ(i, height);
     }
-    pos.needsUpdate = true;
-    geo.computeVertexNormals();
-    return geo;
-  }, [tokenData]);
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [tokenData, normalization, heightScale]);
 
   return (
-    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.02, pz]}>
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
-    </mesh>
+    <instancedMesh ref={meshRef} args={[boxGeo, undefined, GRID_SIZE * GRID_SIZE]}>
+      <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} />
+    </instancedMesh>
   );
 }
 
-/** Renders hi-res ASCII overlays for the nearest parcels. */
-function HiresOverlay({
+/** Renders voxel block overlays for nearest parcels. */
+function VoxelOverlay({
   parcels,
   terrainData,
   cameraRef,
   normalization,
+  heightScale,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  heightScale: number;
 }) {
   const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
@@ -534,15 +417,15 @@ function HiresOverlay({
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
       if (!terrainData.tokens[p.tokenId]) continue;
-      const px = (p.sx - cx) * scale;
-      const py = (p.sy - cy) * scale;
-      const pz = (p.sz - cz) * scale;
-      const dist = Math.sqrt((camPos.x - px) ** 2 + (camPos.y - py) ** 2 + (camPos.z - pz) ** 2);
-      if (dist < HIRES_DISTANCE) scored.push([p, dist]);
+      const ppx = (p.sx - cx) * scale;
+      const ppy = (p.sy - cy) * scale;
+      const ppz = (p.sz - cz) * scale;
+      const dist = Math.sqrt((camPos.x - ppx) ** 2 + (camPos.y - ppy) ** 2 + (camPos.z - ppz) ** 2);
+      if (dist < VOXEL_DISTANCE) scored.push([p, dist]);
     }
 
     scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_HIRES).map(s => s[0]);
+    const nearest = scored.slice(0, MAX_VOXEL_PARCELS).map(s => s[0]);
     const newIds = nearest.map(p => p.tokenId).join(',');
     const oldIds = nearParcels.map(p => p.tokenId).join(',');
     if (newIds !== oldIds) setNearParcels(nearest);
@@ -553,7 +436,7 @@ function HiresOverlay({
       {nearParcels.map(p => {
         const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
         if (!td) return null;
-        return <HiresTerrainPlane key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} />;
+        return <VoxelParcel key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
       })}
     </group>
   );
@@ -697,11 +580,12 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             heightScale={heightScale}
             saturation={saturation}
           />
-          <HiresOverlay
+          <VoxelOverlay
             parcels={parcels}
             terrainData={terrainData}
             cameraRef={cameraRef}
             normalization={normalization}
+            heightScale={heightScale}
           />
         </>
       )}
