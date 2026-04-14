@@ -6,7 +6,7 @@
  *
  * Uses an orthographic camera sized to the grid container so 1 unit = 1 pixel.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -231,21 +231,16 @@ function nounRandom(nounId: bigint): { ax: number; ay: number; az: number; speed
 
 // ─── Single noun mesh group ────────────────────────────────────────────────
 
-const _euler = new THREE.Euler();
-const _qTarget = new THREE.Quaternion();
 const _qSpin = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
-
 const _pushEuler = new THREE.Euler();
 const _pushQuat = new THREE.Quaternion();
 
 function NounMesh({
   cell,
-  isHovered,
   mousePos,
 }: {
   cell: NounCell;
-  isHovered: boolean;
   mousePos: { x: number; y: number } | null;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -373,7 +368,6 @@ function CameraSync() {
 
 export default function Noun3DGrid({
   cells,
-  totalHeight,
   hoveredId,
   mousePos,
 }: Noun3DGridProps) {
@@ -397,7 +391,6 @@ export default function Noun3DGrid({
         <NounMesh
           key={cell.nounId.toString()}
           cell={cell}
-          isHovered={hoveredId === cell.nounId}
           mousePos={mousePos}
         />
       ))}
