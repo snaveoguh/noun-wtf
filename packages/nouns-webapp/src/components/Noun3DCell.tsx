@@ -350,6 +350,7 @@ export default function Noun3DGrid({
       style={{
         width: '100%',
         height: '100%',
+        pointerEvents: 'none',
       }}
       gl={{ antialias: true, alpha: true }}
       frameloop="always"
