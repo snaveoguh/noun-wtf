@@ -285,7 +285,7 @@ async function getCurrentAuction(forceRefresh = false): Promise<AuctionState | n
 
 // ─── Settlement (ULTRA-FAST PATH) ───────────────────────────────────────
 
-async function settleAuction(): Promise<{ txHash: string } | null> {
+export async function settleAuction(): Promise<{ txHash: string } | null> {
   if (!walletClient || !publicClient || !agentAccount) {
     console.error('[NounIRL] Cannot settle — wallet not configured');
     return null;

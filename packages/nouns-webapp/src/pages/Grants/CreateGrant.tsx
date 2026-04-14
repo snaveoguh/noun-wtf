@@ -48,6 +48,8 @@ export default function CreateGrantPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedTx, setSubmittedTx] = useState<string | null>(null);
   const [txIdCounter, setTxIdCounter] = useState(1);
+  const [advanced, setAdvanced] = useState(false);
+  const [ethAmount, setEthAmount] = useState('');
   const [transactions, setTransactions] = useState<(GrantTx & { _id: number })[]>([
     { _id: 0, target: address ?? '', value: '0', signature: '', calldata: '0x' },
   ]);
@@ -96,17 +98,40 @@ export default function CreateGrantPage() {
       toast.error('Title is required');
       return;
     }
-    const validTxs = transactions.filter(t => t.target.startsWith('0x') && t.target.length === 42);
-    if (validTxs.length === 0) {
-      toast.error('At least one transaction is required');
-      return;
+    let targets: `0x${string}`[];
+    let values: bigint[];
+    let signatures: string[];
+    let calldatas: `0x${string}`[];
+
+    if (advanced) {
+      const validTxs = transactions.filter(
+        t => t.target.startsWith('0x') && t.target.length === 42,
+      );
+      if (validTxs.length === 0) {
+        toast.error('At least one transaction is required');
+        return;
+      }
+      targets = validTxs.map(t => t.target as `0x${string}`);
+      values = validTxs.map(t => parseEther(t.value || '0'));
+      signatures = validTxs.map(t => t.signature || '');
+      calldatas = validTxs.map(t => (t.calldata || '0x') as `0x${string}`);
+    } else {
+      const amt = parseFloat(ethAmount || '0');
+      if (amt <= 0) {
+        toast.error('Enter an ETH amount');
+        return;
+      }
+      if (amt > 0.42) {
+        toast.error('Max 0.42 ETH');
+        return;
+      }
+      targets = [address];
+      values = [parseEther(ethAmount)];
+      signatures = [''];
+      calldatas = ['0x'];
     }
 
     const description = `# ${title.trim()}\n\n${body.trim()}`;
-    const targets = validTxs.map(t => t.target as `0x${string}`);
-    const values = validTxs.map(t => parseEther(t.value || '0'));
-    const signatures = validTxs.map(t => t.signature || '');
-    const calldatas = validTxs.map(t => (t.calldata || '0x') as `0x${string}`);
 
     setSubmitting(true);
     try {
@@ -240,6 +265,57 @@ export default function CreateGrantPage() {
           rows={8}
         />
 
+        {/* Advanced toggle */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            marginTop: '1.25rem',
+            marginBottom: '0.25rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setAdvanced(a => !a)}
+            style={{
+              position: 'relative',
+              width: 40,
+              height: 22,
+              borderRadius: 11,
+              border: 'none',
+              background: advanced ? '#22d3ee' : '#d1d5db',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                top: 2,
+                left: advanced ? 20 : 2,
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: '#fff',
+                transition: 'left 0.2s',
+              }}
+            />
+          </button>
+          <span
+            style={{
+              fontSize: '0.8rem',
+              color: advanced ? '#0891b2' : '#888',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Advanced
+          </span>
+        </div>
+
         <label className={classes.label}>Transactions</label>
         <div
           style={{
@@ -278,46 +354,82 @@ export default function CreateGrantPage() {
           </button>{' '}
           <span style={{ color: '#64748b' }}>(Small Grants Treasury)</span>
         </div>
-        {transactions.map((tx, idx) => (
-          <div key={tx._id} className={classes.txRow}>
-            <div className={classes.txHeader}>
-              <span>Transaction #{idx + 1}</span>
-              {transactions.length > 1 && (
-                <button type="button" className={classes.removeTx} onClick={() => removeTx(idx)}>
-                  remove
-                </button>
-              )}
+
+        {advanced ? (
+          <>
+            {transactions.map((tx, idx) => (
+              <div key={tx._id} className={classes.txRow}>
+                <div className={classes.txHeader}>
+                  <span>Transaction #{idx + 1}</span>
+                  {transactions.length > 1 && (
+                    <button
+                      type="button"
+                      className={classes.removeTx}
+                      onClick={() => removeTx(idx)}
+                    >
+                      remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  className={classes.input}
+                  placeholder="Recipient address (0x...)"
+                  value={tx.target}
+                  onChange={e => updateTx(idx, 'target', e.target.value)}
+                />
+                <input
+                  className={classes.input}
+                  placeholder="ETH value (e.g. 0.5)"
+                  value={tx.value}
+                  onChange={e => updateTx(idx, 'value', e.target.value)}
+                />
+                <input
+                  className={classes.input}
+                  placeholder="Function signature (optional, e.g. transfer(address,uint256))"
+                  value={tx.signature}
+                  onChange={e => updateTx(idx, 'signature', e.target.value)}
+                />
+                <input
+                  className={classes.input}
+                  placeholder="Calldata hex (optional, 0x)"
+                  value={tx.calldata}
+                  onChange={e => updateTx(idx, 'calldata', e.target.value)}
+                />
+              </div>
+            ))}
+            {transactions.length < 10 && (
+              <button type="button" className={classes.addTxBtn} onClick={addTx}>
+                + Add Transaction
+              </button>
+            )}
+          </>
+        ) : (
+          <div className={classes.txRow}>
+            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>
+              How much ETH do you need?
             </div>
             <input
               className={classes.input}
-              placeholder="Recipient address (0x...)"
-              value={tx.target}
-              onChange={e => updateTx(idx, 'target', e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+              max="0.42"
+              placeholder="ETH amount (max 0.42)"
+              value={ethAmount}
+              onChange={e => {
+                const v = e.target.value;
+                if (v === '' || (parseFloat(v) >= 0 && parseFloat(v) <= 0.42)) {
+                  setEthAmount(v);
+                }
+              }}
+              style={{ marginBottom: 0 }}
             />
-            <input
-              className={classes.input}
-              placeholder="ETH value (e.g. 0.5)"
-              value={tx.value}
-              onChange={e => updateTx(idx, 'value', e.target.value)}
-            />
-            <input
-              className={classes.input}
-              placeholder="Function signature (optional, e.g. transfer(address,uint256))"
-              value={tx.signature}
-              onChange={e => updateTx(idx, 'signature', e.target.value)}
-            />
-            <input
-              className={classes.input}
-              placeholder="Calldata hex (optional, 0x)"
-              value={tx.calldata}
-              onChange={e => updateTx(idx, 'calldata', e.target.value)}
-            />
+            {parseFloat(ethAmount) > 0.42 && (
+              <div style={{ fontSize: '0.75rem', color: '#f87171', marginTop: 4 }}>
+                Max 0.42 ETH
+              </div>
+            )}
           </div>
-        ))}
-        {transactions.length < 10 && (
-          <button type="button" className={classes.addTxBtn} onClick={addTx}>
-            + Add Transaction
-          </button>
         )}
 
         <button

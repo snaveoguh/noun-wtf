@@ -1,7 +1,9 @@
 .container {
+  width: 100%;
   max-width: 800px;
   margin: 2rem auto;
   padding: 0 1.5rem;
+  box-sizing: border-box;
   color: #1a1a2e;
   font-family: 'PT Root UI', monospace, sans-serif;
 }

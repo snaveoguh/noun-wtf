@@ -28,6 +28,7 @@ const API_BASE = (
 interface GrantData {
   id: number;
   proposer: string;
+  signer: string | null;
   description: string;
   status: string;
   forVotes: number;
@@ -135,6 +136,7 @@ export default function GrantDetailPage() {
           setGrant({
             id: Number(g.id),
             proposer: g.proposer,
+            signer: g.signer ?? null,
             description: g.description,
             status: g.status,
             forVotes: Number(g.forVotes),
@@ -303,7 +305,9 @@ export default function GrantDetailPage() {
   const isQueued = grant.status === 'QUEUED';
   const canExecute =
     isQueued && grant.executionETA && Date.now() / 1000 >= parseInt(grant.executionETA);
-  const isProposer = userAddr?.toLowerCase() === grant.proposer.toLowerCase();
+  const isProposer =
+    userAddr?.toLowerCase() === grant.proposer.toLowerCase() ||
+    userAddr?.toLowerCase() === grant.signer?.toLowerCase();
   const hasVoted = votes.some(v => v.voter.toLowerCase() === userAddr?.toLowerCase());
 
   const blocksLeft = isActive ? Number(BigInt(grant.endBlock) - blockNumber!) : 0;
@@ -327,7 +331,7 @@ export default function GrantDetailPage() {
 
       <h2 className={classes.detailName}>{title}</h2>
       <p className={classes.detailProposer}>
-        by <ShortAddress address={grant.proposer as `0x${string}`} />
+        by <ShortAddress address={(grant.signer || grant.proposer) as `0x${string}`} />
       </p>
 
       {isActive && (
