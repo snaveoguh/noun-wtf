@@ -432,7 +432,12 @@ function AnimatedParcel({ parcel, normalization }: {
   if (!texture) return null;
 
   return (
-    <mesh geometry={animPlaneGeo} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.03, pz]}>
+    <mesh
+      geometry={animPlaneGeo}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[px, py + 0.03, pz]}
+      raycast={() => {}} // pass-through — atlas handles interaction
+    >
       <meshBasicMaterial map={texture} side={THREE.DoubleSide} transparent opacity={0.95} />
     </mesh>
   );
