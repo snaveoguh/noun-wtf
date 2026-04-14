@@ -6,10 +6,11 @@
  * renders each parcel as a colored cube at its structureSpace position.
  * Click a parcel to navigate to its detail view.
  */
-import { FC, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { FC, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useNavigate } from 'react-router';
 import * as THREE from 'three';
 import { createPublicClient, http } from 'viem';
@@ -332,130 +333,223 @@ const TabButton: FC<{
   </button>
 );
 
-// ─── ASCII Art Canvas Thumbnail ────────────────────────────────────────────
+// ─── tokenHTML batch fetcher ───────────────────────────────────────────────
 
-const AsciiThumbnail: FC<{
-  tokenId: number;
-  td: [string, string[], string, Record<string, string>];
-  onClick: () => void;
-  zoneName: string;
-  level: number;
-}> = ({ tokenId, td, onClick, zoneName, level }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const TOKEN_HTML_ABI = [{
+  name: 'tokenHTML',
+  type: 'function',
+  stateMutability: 'view' as const,
+  inputs: [{ name: 'tokenId', type: 'uint256' }],
+  outputs: [{ name: '', type: 'string' }],
+}];
 
+function useTokenHTMLBatch() {
+  const htmlCache = useRef(new Map<number, string>());
+  const pendingRef = useRef(new Set<number>());
+  const queueRef = useRef<number[]>([]);
+  const [, forceUpdate] = useState(0);
+
+  // Process fetch queue in batches
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    let active = true;
+    const BATCH = 5;
+    const DELAY = 400;
 
-    const [bg, palette, classGrid, chars] = td;
-    const size = 128; // canvas pixel size
-    const cellW = size / 32;
-    const cellH = size / 32;
-    const fontSize = Math.floor(cellH * 0.95);
+    async function processBatch() {
+      while (active && queueRef.current.length > 0) {
+        const batch = queueRef.current.splice(0, BATCH)
+          .filter(id => !htmlCache.current.has(id) && !pendingRef.current.has(id));
+        if (batch.length === 0) { await new Promise(r => setTimeout(r, DELAY)); continue; }
 
-    // Fill background
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, size, size);
-
-    // Draw each character
-    ctx.font = `${fontSize}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (let row = 0; row < 32; row++) {
-      for (let col = 0; col < 32; col++) {
-        const cls = classGrid[row * 32 + col];
-        const clsIdx = cls.charCodeAt(0) - 97;
-        const color = palette[clsIdx];
-        const char = chars[cls] || ' ';
-
-        // Draw cell background (subtle, for contrast)
-        ctx.fillStyle = bg;
-        ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
-
-        // Draw character
-        ctx.fillStyle = color;
-        ctx.fillText(char, col * cellW + cellW / 2, row * cellH + cellH / 2);
+        batch.forEach(id => pendingRef.current.add(id));
+        try {
+          const calls = batch.map(id => ({
+            address: TERRAFORMS_ADDRESS, abi: TOKEN_HTML_ABI,
+            functionName: 'tokenHTML' as const, args: [BigInt(id)] as const,
+          }));
+          const results = await publicClient.multicall({ contracts: calls });
+          for (let i = 0; i < results.length; i++) {
+            if (results[i].status === 'success') {
+              htmlCache.current.set(batch[i], results[i].result as string);
+            }
+            pendingRef.current.delete(batch[i]);
+          }
+          forceUpdate(n => n + 1);
+        } catch {
+          batch.forEach(id => pendingRef.current.delete(id));
+        }
+        await new Promise(r => setTimeout(r, DELAY));
       }
     }
-  }, [td]);
+
+    processBatch();
+    return () => { active = false; };
+  }, []);
+
+  const requestTokens = useCallback((ids: number[]) => {
+    const needed = ids.filter(id => !htmlCache.current.has(id) && !pendingRef.current.has(id));
+    if (needed.length > 0) {
+      // Prepend to queue (newest requests first)
+      queueRef.current = [...needed, ...queueRef.current.filter(id => !needed.includes(id))];
+    }
+  }, []);
+
+  return { htmlCache: htmlCache.current, requestTokens };
+}
+
+// ─── Live Iframe Cell ─────────────────────────────────────────────────────
+
+const LiveCell: FC<{
+  tokenId: number;
+  html: string | undefined;
+  color: string;
+  zoneName: string;
+  level: number;
+  onClick: () => void;
+  size: number;
+}> = ({ tokenId, html, color, zoneName, level, onClick, size }) => {
+  const srcdoc = useMemo(() => {
+    if (!html) return '';
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
+  }, [html]);
 
   return (
-    <button
+    <div
       onClick={onClick}
       title={`#${tokenId} · ${zoneName} · L${level}`}
       style={{
-        width: '100%', aspectRatio: '1', border: 'none',
-        borderRadius: 4, cursor: 'pointer', padding: 0,
-        position: 'relative', overflow: 'hidden', background: '#000',
+        width: size, height: size, borderRadius: 4, cursor: 'pointer',
+        overflow: 'hidden', position: 'relative', background: color,
       }}
     >
-      <canvas
-        ref={canvasRef}
-        width={128}
-        height={128}
-        style={{ width: '100%', height: '100%', display: 'block', imageRendering: 'pixelated' }}
-      />
+      {srcdoc ? (
+        <iframe
+          srcDoc={srcdoc}
+          sandbox="allow-scripts allow-same-origin"
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block', pointerEvents: 'none' }}
+          title={`Terraform #${tokenId}`}
+          loading="lazy"
+        />
+      ) : (
+        <div style={{
+          width: '100%', height: '100%', background: color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem', fontFamily: 'monospace',
+        }}>
+          #{tokenId}
+        </div>
+      )}
       <span style={{
         position: 'absolute', bottom: 1, left: 2,
         fontSize: '0.4rem', color: 'rgba(255,255,255,0.5)',
         fontFamily: 'monospace', textShadow: '0 0 3px #000',
+        pointerEvents: 'none',
       }}>
         {tokenId}
       </span>
-    </button>
+    </div>
   );
 };
 
-// ─── Grid View (2D thumbnail gallery) ──────────────────────────────────────
+// ─── Grid View (virtualized live iframes) ─────────────────────────────────
+
+const GRID_CELL = 150;
+const GRID_GAP = 6;
 
 const GridView: FC<{
   parcels: ParcelData[];
   onClickParcel: (id: number) => void;
   terrainData: TerrainData | null;
 }> = ({ parcels, onClickParcel, terrainData }) => {
-  const visible = parcels.slice(0, 200);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { htmlCache, requestTokens } = useTokenHTMLBatch();
+
+  // Responsive column count
+  const [cols, setCols] = useState(8);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      setCols(Math.max(2, Math.floor((w + GRID_GAP) / (GRID_CELL + GRID_GAP))));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const totalRows = Math.ceil(parcels.length / cols);
+  const cellSize = useMemo(() => {
+    const containerW = containerRef.current?.clientWidth ?? 1200;
+    return Math.floor((containerW - GRID_GAP * (cols - 1)) / cols);
+  }, [cols]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => cellSize + GRID_GAP,
+    overscan: 3,
+  });
+
+  // Request tokenHTML for visible rows
+  useEffect(() => {
+    const visibleItems = rowVirtualizer.getVirtualItems();
+    const ids: number[] = [];
+    for (const vRow of visibleItems) {
+      const startIdx = vRow.index * cols;
+      for (let c = 0; c < cols; c++) {
+        const idx = startIdx + c;
+        if (idx < parcels.length) ids.push(parcels[idx].tokenId);
+      }
+    }
+    if (ids.length > 0) requestTokens(ids);
+  }, [rowVirtualizer.getVirtualItems(), cols, parcels, requestTokens]);
 
   return (
-    <div style={{
-      width: '100%', height: '100vh', background: '#050510',
-      overflow: 'auto', padding: '80px 20px 40px',
-    }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-        gap: 6, maxWidth: 1400, margin: '0 auto',
-      }}>
-        {visible.map(p => {
-          const td = terrainData?.tokens[p.tokenId] as [string, string[], string, Record<string, string>] | undefined;
-          if (td) {
+    <div
+      ref={scrollRef}
+      style={{
+        width: '100%', height: '100vh', background: '#050510',
+        overflow: 'auto', padding: '80px 0 40px',
+      }}
+    >
+      <div ref={containerRef} style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px' }}>
+        <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+          {rowVirtualizer.getVirtualItems().map(vRow => {
+            const startIdx = vRow.index * cols;
             return (
-              <AsciiThumbnail
-                key={p.tokenId}
-                tokenId={p.tokenId}
-                td={td}
-                onClick={() => onClickParcel(p.tokenId)}
-                zoneName={p.zoneName}
-                level={p.level}
-              />
+              <div
+                key={vRow.key}
+                style={{
+                  position: 'absolute',
+                  top: vRow.start,
+                  left: 0, right: 0,
+                  display: 'flex', gap: GRID_GAP,
+                }}
+              >
+                {Array.from({ length: cols }, (_, c) => {
+                  const idx = startIdx + c;
+                  if (idx >= parcels.length) return null;
+                  const p = parcels[idx];
+                  return (
+                    <LiveCell
+                      key={p.tokenId}
+                      tokenId={p.tokenId}
+                      html={htmlCache.get(p.tokenId)}
+                      color={p.color}
+                      zoneName={p.zoneName}
+                      level={p.level}
+                      onClick={() => onClickParcel(p.tokenId)}
+                      size={cellSize}
+                    />
+                  );
+                })}
+              </div>
             );
-          }
-          // Fallback: flat color
-          return (
-            <button
-              key={p.tokenId}
-              onClick={() => onClickParcel(p.tokenId)}
-              title={`#${p.tokenId} · ${p.zoneName} · L${p.level}`}
-              style={{
-                width: '100%', aspectRatio: '1', border: 'none',
-                borderRadius: 4, cursor: 'pointer', padding: 0,
-                background: p.color,
-              }}
-            />
-          );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );
