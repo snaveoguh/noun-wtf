@@ -774,12 +774,14 @@ function CameraAutoFocus({
   positions: Map<string, [number, number, number]>;
   searchTerms: string[];
 }) {
-  const { camera } = useThree();
-  const targetRef = useRef<THREE.Vector3 | null>(null);
+  const { camera, controls } = useThree();
+  const camTargetRef = useRef<THREE.Vector3 | null>(null);
+  const orbitTargetRef = useRef<THREE.Vector3 | null>(null);
 
   useEffect(() => {
     if (searchTerms.length === 0) {
-      targetRef.current = null;
+      camTargetRef.current = null;
+      orbitTargetRef.current = null;
       return;
     }
 
@@ -809,12 +811,20 @@ function CameraAutoFocus({
 
     const pullback = Math.max(100, maxDist * 2.5 + 80);
     const dir = camera.position.clone().sub(center).normalize();
-    targetRef.current = center.clone().add(dir.multiplyScalar(pullback));
+    camTargetRef.current = center.clone().add(dir.multiplyScalar(pullback));
+    orbitTargetRef.current = center.clone();
   }, [searchTerms, nodes, positions, camera]);
 
   useFrame(() => {
-    if (targetRef.current) {
-      camera.position.lerp(targetRef.current, 0.04);
+    if (camTargetRef.current) {
+      camera.position.lerp(camTargetRef.current, 0.04);
+    }
+    // Also move the orbit pivot so the camera orbits around the searched node
+    if (orbitTargetRef.current && controls) {
+      const oc = controls as unknown as { target: THREE.Vector3 };
+      if (oc.target) {
+        oc.target.lerp(orbitTargetRef.current, 0.04);
+      }
     }
   });
 
