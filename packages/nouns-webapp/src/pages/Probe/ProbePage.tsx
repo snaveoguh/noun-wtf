@@ -8,13 +8,17 @@ import ExploreTab from './ExploreTab';
 
 const DreamsTab = lazy(() => import('./DreamsTab'));
 const LilNounsTab = lazy(() => import('./LilNounsTab'));
+const TerraformsProbeTab = lazy(() => import('./TerraformsProbeTab'));
+const YellowCollectiveTab = lazy(() => import('./YellowCollectiveTab'));
 
-type ProbeTab = 'explore' | 'dreams' | 'lils';
+type ProbeTab = 'explore' | 'dreams' | 'lils' | 'terraforms' | 'yellow';
 
 const TAB_CONFIG: { key: ProbeTab; label: string }[] = [
   { key: 'explore', label: 'Nouns' },
   { key: 'dreams', label: 'Dreams' },
   { key: 'lils', label: 'Lils' },
+  { key: 'yellow', label: 'Yellow' },
+  { key: 'terraforms', label: 'Terraforms' },
 ];
 
 const ProbePage: React.FC = () => {
@@ -40,9 +44,7 @@ const ProbePage: React.FC = () => {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`rounded-full px-3 py-1 text-xs font-bold transition-colors sm:px-4 sm:py-1.5 sm:text-sm ${
-              tab === t.key
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              tab === t.key ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {t.label}
@@ -59,6 +61,16 @@ const ProbePage: React.FC = () => {
       {tab === 'lils' && (
         <Suspense fallback={<GenericSkeleton />}>
           <LilNounsTab />
+        </Suspense>
+      )}
+      {tab === 'yellow' && (
+        <Suspense fallback={<GenericSkeleton />}>
+          <YellowCollectiveTab />
+        </Suspense>
+      )}
+      {tab === 'terraforms' && (
+        <Suspense fallback={<GenericSkeleton />}>
+          <TerraformsProbeTab />
         </Suspense>
       )}
     </div>
