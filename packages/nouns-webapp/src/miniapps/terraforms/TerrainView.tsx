@@ -49,10 +49,10 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 50; // distance below which terrain voxels are shown
-const MAX_TERRAIN_PARCELS = 30; // max parcels to render as terrain simultaneously
-const VOXEL_SCALE = 0.02; // scale of each voxel relative to parcel spacing
-const TERRAIN_HEIGHT_SCALE = 0.06; // how tall the voxels extrude
+const NEAR_DISTANCE = 40; // distance below which terrain voxels are shown
+const MAX_TERRAIN_PARCELS = 20; // max parcels to render as terrain simultaneously
+const VOXEL_SCALE = 0.025; // scale of each voxel cell (32 cells = 0.8 unit parcel)
+const TERRAIN_HEIGHT_SCALE = 0.015; // height per level (max 9 = 0.135 unit — flat islands)
 const GRID_SIZE = 32;
 
 // Shared geometries and materials
@@ -144,19 +144,19 @@ function TerrainVoxels({
           const height = 9 - clsIdx; // a=9 (peak), j=0 (bg)
           if (height === 0) continue; // skip background cells
 
-          // Position: offset from parcel center
+          // Position: grid on XZ plane, height extrudes up on Y
           const ox = (col - 16) * VOXEL_SCALE;
           const oz = (row - 16) * VOXEL_SCALE;
-          const oy = height * TERRAIN_HEIGHT_SCALE * 0.5;
+          const voxelH = height * TERRAIN_HEIGHT_SCALE;
 
           tempObj.position.set(
             parcelX + ox,
-            parcelY + oy,
+            parcelY + voxelH * 0.5, // base sits at parcel Y
             parcelZ + oz,
           );
           tempObj.scale.set(
             VOXEL_SCALE,
-            height * TERRAIN_HEIGHT_SCALE,
+            voxelH,
             VOXEL_SCALE,
           );
           tempObj.updateMatrix();
