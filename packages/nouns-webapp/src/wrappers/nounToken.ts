@@ -84,7 +84,9 @@ export const useNounSeeds = () => {
   });
 
   useEffect(() => {
-    if (seeds) return; // Already have seeds from cache
+    // Refetch if no cache or cache is stale (< 1500 seeds = missing nouns)
+    const seedCount = seeds ? Object.keys(seeds).length : 0;
+    if (seedCount >= 1500) return;
 
     // Fetch all seeds with pagination (API caps at 1000 per request)
     let cancelled = false;
