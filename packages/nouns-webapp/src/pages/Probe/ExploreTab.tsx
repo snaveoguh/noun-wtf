@@ -3,10 +3,19 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData } from '@noundry/nouns-assets';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, Filter, X } from 'lucide-react';
+import { Box, ChevronDown, Filter, X } from 'lucide-react';
 import { range } from 'remeda';
 
 import { Noun } from '@/components/Noun';
+const Noun3DGrid = React.lazy(() => import('@/components/Noun3DCell'));
+
+interface NounCell {
+  nounId: bigint;
+  seed: import('@/wrappers/nounToken').INounSeed;
+  cx: number;
+  cy: number;
+  size: number;
+}
 import NounDetailPopover from '@/components/NounDetailPopover';
 import { Trait } from '@/components/Trait';
 import { Button } from '@/components/ui/button';
@@ -148,6 +157,10 @@ const ExploreTab: React.FC = () => {
 
   const seeds = useNounSeeds();
   const { ownerAddress, setOwnerAddress, ownedNounIds } = useOwnerFilter();
+
+  // 3D view mode
+  const [view3D, setView3D] = useState(false);
+  const [hoveredNounId, setHoveredNounId] = useState<bigint | null>(null);
 
   // Click-to-open detail popover
   const [popover, setPopover] = useState<{ nounId: bigint; rect: DOMRect } | null>(null);
@@ -311,6 +324,16 @@ const ExploreTab: React.FC = () => {
         </select>
 
         <Button
+          variant={view3D ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setView3D(!view3D)}
+          className="gap-1"
+        >
+          <Box className="h-4 w-4" />
+          3D
+        </Button>
+
+        <Button
           variant={showTraits ? 'default' : 'outline'}
           size="sm"
           onClick={() => setShowTraits(!showTraits)}
@@ -387,7 +410,7 @@ const ExploreTab: React.FC = () => {
       )}
 
       {/* Grid — extends page, no separate scroll */}
-      <div ref={containerRef} style={{ overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ overflow: 'hidden', position: 'relative' }}>
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -414,6 +437,7 @@ const ExploreTab: React.FC = () => {
                   if (itemIndex >= displayCount) return <div key={colIdx} />;
 
                   const nounId = filteredAndSorted[itemIndex];
+
                   return (
                     <div
                       key={`${nounId}`}
@@ -421,17 +445,21 @@ const ExploreTab: React.FC = () => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         setPopover(prev => (prev?.nounId === nounId ? null : { nounId, rect }));
                       }}
-                      className="group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg"
+                      onMouseEnter={() => view3D && setHoveredNounId(nounId)}
+                      onMouseLeave={() => view3D && setHoveredNounId(prev => prev === nounId ? null : prev)}
+                      className={`group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg ${view3D ? 'bg-transparent' : ''}`}
                       style={{ width: layout.cellSize, height: layout.cellSize }}
                     >
-                      <Noun
-                        nounId={nounId != null ? BigInt(nounId) : undefined}
-                        loadingNounFallback
-                        minFallbackDuration={1000}
-                        style={{ width: layout.cellSize, height: layout.cellSize }}
-                        className="bg-cool-background"
-                      />
-                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block">
+                      {!view3D && (
+                        <Noun
+                          nounId={nounId != null ? BigInt(nounId) : undefined}
+                          loadingNounFallback
+                          minFallbackDuration={1000}
+                          style={{ width: layout.cellSize, height: layout.cellSize }}
+                          className="bg-cool-background"
+                        />
+                      )}
+                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block" style={{ zIndex: 2 }}>
                         {nounId.toString()}
                       </span>
                     </div>
@@ -441,6 +469,37 @@ const ExploreTab: React.FC = () => {
             );
           })}
         </div>
+
+        {/* Single shared Canvas for all 3D nouns */}
+        {view3D && (
+          <React.Suspense fallback={null}>
+            <Noun3DGrid
+              cells={(() => {
+                const cells: NounCell[] = [];
+                const scrollMargin = rowVirtualizer.options.scrollMargin ?? 0;
+                for (const virtualRow of rowVirtualizer.getVirtualItems()) {
+                  const startIdx = virtualRow.index * layout.cols;
+                  const rowTop = virtualRow.start - scrollMargin;
+                  for (let colIdx = 0; colIdx < layout.cols; colIdx++) {
+                    const itemIndex = startIdx + colIdx;
+                    if (itemIndex >= displayCount) continue;
+                    const nounId = filteredAndSorted[itemIndex];
+                    const seed = seeds?.[nounId.toString()];
+                    if (!seed) continue;
+                    const cx = colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
+                    const cy = rowTop + layout.cellSize / 2;
+                    cells.push({ nounId, seed, cx, cy, size: layout.cellSize });
+                  }
+                }
+                return cells;
+              })()}
+              totalHeight={rowVirtualizer.getTotalSize()}
+              containerWidth={layout.cols * (layout.cellSize + GAP) - GAP}
+              scrollOffset={0}
+              hoveredId={hoveredNounId}
+            />
+          </React.Suspense>
+        )}
       </div>
 
       {/* Click popover */}
