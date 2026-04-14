@@ -165,7 +165,8 @@ function useHypercastleData() {
               const r = results[i];
               if (r.status !== 'success') continue;
               const m = r.result as any;
-              const tokenId = Number(m.tokenId);
+              // Derive tokenId from the call args (m.tokenId is broken — always 0)
+              const tokenId = Number(calls[i].args[0]);
               const level = Number(m.level);
               const colors = [...m.zoneColors].filter((c: string) => c.length > 0);
 
@@ -331,6 +332,83 @@ const TabButton: FC<{
   </button>
 );
 
+// ─── ASCII Art Canvas Thumbnail ────────────────────────────────────────────
+
+const AsciiThumbnail: FC<{
+  tokenId: number;
+  td: [string, string[], string, Record<string, string>];
+  onClick: () => void;
+  zoneName: string;
+  level: number;
+}> = ({ tokenId, td, onClick, zoneName, level }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const [bg, palette, classGrid, chars] = td;
+    const size = 128; // canvas pixel size
+    const cellW = size / 32;
+    const cellH = size / 32;
+    const fontSize = Math.floor(cellH * 0.95);
+
+    // Fill background
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size, size);
+
+    // Draw each character
+    ctx.font = `${fontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let row = 0; row < 32; row++) {
+      for (let col = 0; col < 32; col++) {
+        const cls = classGrid[row * 32 + col];
+        const clsIdx = cls.charCodeAt(0) - 97;
+        const color = palette[clsIdx];
+        const char = chars[cls] || ' ';
+
+        // Draw cell background (subtle, for contrast)
+        ctx.fillStyle = bg;
+        ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
+
+        // Draw character
+        ctx.fillStyle = color;
+        ctx.fillText(char, col * cellW + cellW / 2, row * cellH + cellH / 2);
+      }
+    }
+  }, [td]);
+
+  return (
+    <button
+      onClick={onClick}
+      title={`#${tokenId} · ${zoneName} · L${level}`}
+      style={{
+        width: '100%', aspectRatio: '1', border: 'none',
+        borderRadius: 4, cursor: 'pointer', padding: 0,
+        position: 'relative', overflow: 'hidden', background: '#000',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        width={128}
+        height={128}
+        style={{ width: '100%', height: '100%', display: 'block', imageRendering: 'pixelated' }}
+      />
+      <span style={{
+        position: 'absolute', bottom: 1, left: 2,
+        fontSize: '0.4rem', color: 'rgba(255,255,255,0.5)',
+        fontFamily: 'monospace', textShadow: '0 0 3px #000',
+      }}>
+        {tokenId}
+      </span>
+    </button>
+  );
+};
+
 // ─── Grid View (2D thumbnail gallery) ──────────────────────────────────────
 
 const GridView: FC<{
@@ -338,7 +416,6 @@ const GridView: FC<{
   onClickParcel: (id: number) => void;
   terrainData: TerrainData | null;
 }> = ({ parcels, onClickParcel, terrainData }) => {
-  // Show a subset (first 200 parcels sorted by level/tokenId)
   const visible = parcels.slice(0, 200);
 
   return (
@@ -348,11 +425,24 @@ const GridView: FC<{
     }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
-        gap: 4, maxWidth: 1200, margin: '0 auto',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+        gap: 6, maxWidth: 1400, margin: '0 auto',
       }}>
         {visible.map(p => {
-          const td = terrainData?.tokens[p.tokenId];
+          const td = terrainData?.tokens[p.tokenId] as [string, string[], string, Record<string, string>] | undefined;
+          if (td) {
+            return (
+              <AsciiThumbnail
+                key={p.tokenId}
+                tokenId={p.tokenId}
+                td={td}
+                onClick={() => onClickParcel(p.tokenId)}
+                zoneName={p.zoneName}
+                level={p.level}
+              />
+            );
+          }
+          // Fallback: flat color
           return (
             <button
               key={p.tokenId}
@@ -361,41 +451,9 @@ const GridView: FC<{
               style={{
                 width: '100%', aspectRatio: '1', border: 'none',
                 borderRadius: 4, cursor: 'pointer', padding: 0,
-                background: p.color, position: 'relative',
-                overflow: 'hidden',
+                background: p.color,
               }}
-            >
-              {/* Mini terrain preview — exact onchain colors */}
-              {td && (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'grid', gridTemplateColumns: 'repeat(32, 1fr)',
-                  gridTemplateRows: 'repeat(32, 1fr)',
-                  opacity: 0.9,
-                }}>
-                  {Array.from({ length: 1024 }, (_, i) => {
-                    // v2 format: [bg, palette[10], classGrid, chars]
-                    const cls = td[2][i]; // class letter a-j
-                    const clsIdx = cls.charCodeAt(0) - 97;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          background: td[1][clsIdx] || p.color,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-              <span style={{
-                position: 'absolute', bottom: 1, left: 2,
-                fontSize: '0.4rem', color: 'rgba(255,255,255,0.6)',
-                fontFamily: 'monospace', textShadow: '0 0 3px #000',
-              }}>
-                {p.tokenId}
-              </span>
-            </button>
+            />
           );
         })}
       </div>
