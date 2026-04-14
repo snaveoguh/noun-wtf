@@ -51,10 +51,8 @@ const PARCEL_SIZE = 1.2;
 const GRID_SIZE = 32;
 const CELL_PX = 1; // 1px per cell (32×32px per parcel) — color patterns, not text
 const ATLAS_COLS = 100; // 100×100 grid = 3200×3200px atlas — fits in GPU
-const HEIGHT_SCALE = 0.25; // max height displacement per parcel
 
 const tempObj = new THREE.Object3D();
-const tempColor = new THREE.Color();
 
 type TokenEntry = [string, string[], string, Record<string, string>];
 

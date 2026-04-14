@@ -374,8 +374,6 @@ function CameraSync() {
 export default function Noun3DGrid({
   cells,
   totalHeight,
-  containerWidth,
-  scrollOffset,
   hoveredId,
   mousePos,
 }: Noun3DGridProps) {
