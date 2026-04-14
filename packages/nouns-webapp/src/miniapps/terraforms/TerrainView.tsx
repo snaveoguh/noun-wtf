@@ -12,6 +12,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
+import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import { useNavigate } from 'react-router';
 import * as THREE from 'three';
 import { createPublicClient, http } from 'viem';
@@ -175,6 +176,8 @@ function AllParcelsInstanced({
   onClickParcel,
   hoveredId,
   setHoveredId,
+  heightScale,
+  saturation,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
@@ -182,6 +185,8 @@ function AllParcelsInstanced({
   onClickParcel: (id: number) => void;
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
+  heightScale: number;
+  saturation: number;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const idMapRef = useRef<number[]>([]);
@@ -189,26 +194,29 @@ function AllParcelsInstanced({
   // Build atlas once
   const atlas = useMemo(() => buildAtlas(parcels, terrainData), [parcels, terrainData]);
 
-  // Custom shader: sample color atlas for texture, height atlas for vertex displacement
+  // Custom shader: color atlas + height displacement + saturation boost
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
   const material = useMemo(() => {
     const uvScale = 1 / ATLAS_COLS;
-    return new THREE.ShaderMaterial({
+    const mat = new THREE.ShaderMaterial({
       uniforms: {
         colorAtlas: { value: atlas.colorTex },
         heightAtlas: { value: atlas.heightTex },
         uvScale: { value: uvScale },
-        heightScale: { value: HEIGHT_SCALE },
+        heightScale: { value: heightScale },
+        saturation: { value: saturation },
       },
       vertexShader: `
         attribute vec2 uvOffset;
         varying vec2 vUv;
+        varying float vHeight;
         uniform float uvScale;
         uniform sampler2D heightAtlas;
         uniform float heightScale;
         void main() {
           vUv = uv * uvScale + uvOffset;
-          // Sample height and displace vertex along local Z (becomes Y after rotation)
           float h = texture2D(heightAtlas, vUv).r;
+          vHeight = h;
           vec3 pos = position;
           pos.z += h * heightScale;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(pos, 1.0);
@@ -216,14 +224,32 @@ function AllParcelsInstanced({
       `,
       fragmentShader: `
         uniform sampler2D colorAtlas;
+        uniform float saturation;
         varying vec2 vUv;
+        varying float vHeight;
         void main() {
-          gl_FragColor = texture2D(colorAtlas, vUv);
+          vec4 col = texture2D(colorAtlas, vUv);
+          // Saturation boost
+          float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+          col.rgb = mix(vec3(gray), col.rgb, saturation);
+          // Slight emission boost on higher terrain for glow pickup
+          col.rgb *= 1.0 + vHeight * 0.3;
+          gl_FragColor = col;
         }
       `,
       side: THREE.DoubleSide,
     });
+    materialRef.current = mat;
+    return mat;
   }, [atlas]);
+
+  // Update uniforms when sliders change (no material rebuild needed)
+  useEffect(() => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.heightScale.value = heightScale;
+      materialRef.current.uniforms.saturation.value = saturation;
+    }
+  }, [heightScale, saturation]);
 
   // Set up instances
   useEffect(() => {
@@ -521,19 +547,20 @@ function CameraRefSetter({ cameraRef }: { cameraRef: React.RefObject<THREE.Camer
 
 // ─── Scene ─────────────────────────────────────────────────────────────────
 
-const TerrainScene: FC<TerrainViewProps> = ({
+const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: number; bloomIntensity: number }> = ({
   parcels,
   terrainData,
   onClickParcel,
   hoveredId,
   setHoveredId,
+  heightScale,
+  saturation,
+  bloomIntensity,
 }) => {
   const cameraRef = useRef<THREE.Camera | null>(null);
 
-  // Compute normalization from parcels (center + scale to ~80 unit cube)
   const normalization = useMemo(() => {
     if (parcels.length === 0) return { cx: 0, cy: 0, cz: 0, scale: 1 };
-
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
@@ -542,24 +569,21 @@ const TerrainScene: FC<TerrainViewProps> = ({
       if (p.sy < minY) minY = p.sy; if (p.sy > maxY) maxY = p.sy;
       if (p.sz < minZ) minZ = p.sz; if (p.sz > maxZ) maxZ = p.sz;
     }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const range = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1);
-    const scale = 80 / range;
-
-    return { cx, cy, cz, scale };
+    return {
+      cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, cz: (minZ + maxZ) / 2,
+      scale: 80 / Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1),
+    };
   }, [parcels]);
 
   return (
     <>
       <CameraRefSetter cameraRef={cameraRef} />
 
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[50, 80, 30]} intensity={0.8} />
-      <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[50, 80, 30]} intensity={0.6} />
+      <pointLight position={[0, 50, 0]} intensity={0.4} color="#4466ff" />
+      <pointLight position={[-30, 20, -30]} intensity={0.2} color="#ff4466" />
 
-      {/* All 9,910 parcels — atlas for overview + hi-res ASCII when close */}
       {terrainData && (
         <>
           <AllParcelsInstanced
@@ -569,6 +593,8 @@ const TerrainScene: FC<TerrainViewProps> = ({
             onClickParcel={onClickParcel}
             hoveredId={hoveredId}
             setHoveredId={setHoveredId}
+            heightScale={heightScale}
+            saturation={saturation}
           />
           <HiresOverlay
             parcels={parcels}
@@ -580,17 +606,21 @@ const TerrainScene: FC<TerrainViewProps> = ({
       )}
 
       <OrbitControls
-        enableDamping
-        dampingFactor={0.06}
-        autoRotate
-        autoRotateSpeed={0.15}
-        minDistance={5}
-        maxDistance={200}
-        enablePan
-        maxPolarAngle={Math.PI * 0.9}
+        enableDamping dampingFactor={0.06}
+        autoRotate autoRotateSpeed={0.15}
+        minDistance={5} maxDistance={200}
+        enablePan maxPolarAngle={Math.PI * 0.9}
       />
 
-      <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
+      {/* Bloom glow effect */}
+      <EffectComposer>
+        <Bloom
+          intensity={bloomIntensity}
+          luminanceThreshold={0.3}
+          luminanceSmoothing={0.9}
+          mipmapBlur
+        />
+      </EffectComposer>
     </>
   );
 };
@@ -624,21 +654,67 @@ function useTerrainData() {
 export { useTerrainData };
 export type { TerrainData, TerrainViewProps };
 
+// ─── Slider HUD ───────────────────────────────────────────────────────────
+
+const sliderStyle: React.CSSProperties = {
+  width: '100%', height: 4, appearance: 'none' as const, background: '#1e293b',
+  borderRadius: 2, outline: 'none', cursor: 'pointer',
+  accentColor: '#22c55e',
+};
+const sliderLabelStyle: React.CSSProperties = {
+  fontSize: '0.55rem', color: '#64748b', fontFamily: 'monospace',
+  display: 'flex', justifyContent: 'space-between', marginBottom: 2,
+};
+
+// ─── Main Export ──────────────────────────────────────────────────────────
+
 const TerrainViewCanvas: FC<{
   parcels: ParcelData[];
   terrainData: TerrainData | null;
   onClickParcel: (id: number) => void;
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
-}> = (props) => (
-  <Canvas
-    camera={{ position: [60, 40, 60], fov: 55 }}
-    gl={{ antialias: true, alpha: false }}
-    onCreated={({ gl }) => gl.setClearColor('#050510')}
-    style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
-  >
-    <TerrainScene {...props} />
-  </Canvas>
-);
+}> = (props) => {
+  const [heightScale, setHeightScale] = useState(0.25);
+  const [saturation, setSaturation] = useState(1.4);
+  const [bloomIntensity, setBloomIntensity] = useState(0.6);
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <Canvas
+        camera={{ position: [60, 40, 60], fov: 55 }}
+        gl={{ antialias: true, alpha: false }}
+        onCreated={({ gl }) => gl.setClearColor('#050510')}
+        style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
+      >
+        <TerrainScene {...props} heightScale={heightScale} saturation={saturation} bloomIntensity={bloomIntensity} />
+      </Canvas>
+
+      {/* Slider HUD — bottom right */}
+      <div style={{
+        position: 'absolute', bottom: 20, right: 20, width: 180,
+        background: 'rgba(0,0,0,0.7)', borderRadius: 10, padding: '12px 14px',
+        border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div>
+          <div style={sliderLabelStyle}><span>Relief</span><span>{heightScale.toFixed(2)}</span></div>
+          <input type="range" min="0" max="1.5" step="0.01" value={heightScale}
+            onChange={e => setHeightScale(parseFloat(e.target.value))} style={sliderStyle} />
+        </div>
+        <div>
+          <div style={sliderLabelStyle}><span>Saturation</span><span>{saturation.toFixed(1)}</span></div>
+          <input type="range" min="0.5" max="3" step="0.1" value={saturation}
+            onChange={e => setSaturation(parseFloat(e.target.value))} style={sliderStyle} />
+        </div>
+        <div>
+          <div style={sliderLabelStyle}><span>Glow</span><span>{bloomIntensity.toFixed(1)}</span></div>
+          <input type="range" min="0" max="2" step="0.1" value={bloomIntensity}
+            onChange={e => setBloomIntensity(parseFloat(e.target.value))} style={sliderStyle} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default TerrainViewCanvas;
