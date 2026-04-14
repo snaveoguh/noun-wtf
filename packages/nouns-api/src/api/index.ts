@@ -1377,13 +1377,22 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   }
 
   // ─── Bid ──────────────────────────────────────────────────
-  const bidMatch = m.match(/^bid\s+([\d.]+)\s*eth$/);
+  // Accepts: "bid 0.5 eth", "bid 0.5", "bid 0.5 eth on noun 123", "bid 0.5 on noun 123"
+  const bidMatch = m.match(/^bid\s+([\d.]+)\s*(?:eth)?\s*(?:on\s+(?:noun\s+)?(\d+))?$/);
   if (bidMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to bid.' };
     const bidAmount = bidMatch[1];
     const state = getWatcherState();
-    const nounId = state.nextNounId ? state.nextNounId - 1 : undefined;
-    if (!nounId) return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const currentNounId = state.nextNounId ? state.nextNounId - 1 : undefined;
+    if (!currentNounId) return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const specifiedNounId = bidMatch[2] ? parseInt(bidMatch[2]) : undefined;
+    if (specifiedNounId && specifiedNounId !== currentNounId) {
+      return {
+        handled: true,
+        response: `Noun ${specifiedNounId} is not the current auction. The active auction is Noun ${currentNounId}.`,
+      };
+    }
+    const nounId = currentNounId;
     const action = { type: 'BID', nounId, bidAmountEth: bidAmount };
     return {
       handled: true,
