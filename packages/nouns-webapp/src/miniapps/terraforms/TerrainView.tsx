@@ -1,14 +1,12 @@
 /**
- * TerrainView — 3D voxel terrain renderer for Terraforms parcels.
+ * TerrainView — 3D terrain renderer for Terraforms parcels.
  *
- * Loads pre-generated terrain JSON and renders each parcel as extruded
- * voxels positioned at its structureSpace coordinates. Uses LOD:
- *   - Far (>50u): colored cube (same as lofi view)
- *   - Near (<50u): full 32×32 voxel terrain
+ * Renders each nearby parcel as a displacement-mapped plane with the exact
+ * onchain ASCII art as its texture. Uses PlaneGeometry with direct vertex
+ * displacement (same pattern as WorldPage.tsx Terrain component).
  *
- * Terrain data: per-token grid of heights 0-9, colors from zoneColors palette.
- * Height 0 = valley (flat), 9 = peak (tallest voxel).
- * Color = zoneColors[9 - height] (0 = peak color, 9 = background).
+ * LOD: Far parcels = colored cubes, near parcels = textured terrain planes.
+ * Textures + geometries cached in LRU maps for smooth navigation.
  */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -49,40 +47,158 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 30; // distance below which terrain voxels are shown
-const MAX_TERRAIN_PARCELS = 15; // max parcels to render as terrain simultaneously
-const VOXEL_SCALE = 1.2 / 32; // each cell = 1/32 of parcel cube (~0.0375)
-const TERRAIN_HEIGHT_SCALE = 0.04; // height per level (max 9 = 0.36 unit)
+const NEAR_DISTANCE = 30;
+const MAX_TERRAIN_PARCELS = 15;
+const PARCEL_SIZE = 1.2; // visual size of a parcel in scene units
+const HEIGHT_SCALE = 0.05; // height per level (max 9 = 0.45 unit)
 const GRID_SIZE = 32;
+const TEX_RES = 512; // canvas texture resolution
+const LRU_LIMIT = 30; // max cached textures + geometries
 
-// Shared geometries and materials
 const tempObj = new THREE.Object3D();
 const tempColor = new THREE.Color();
-const tempVec = new THREE.Vector3();
 
-// ─── Terrain Voxels (near parcels) ────────────────────────────────────────
+// ─── ASCII Art Texture Generator ──────────────────────────────────────────
 
-/**
- * Renders terrain voxels for parcels close to the camera.
- * Uses InstancedMesh for all voxels of nearby parcels combined.
- */
-function TerrainVoxels({
+type TokenEntry = [string, string[], string, Record<string, string>];
+
+// LRU caches (module-level, persist across re-renders)
+const textureCache = new Map<number, THREE.CanvasTexture>();
+const geometryCache = new Map<number, THREE.PlaneGeometry>();
+
+function evictLRU<T extends { dispose(): void }>(cache: Map<number, T>, limit: number) {
+  while (cache.size > limit) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.get(oldest)?.dispose();
+    cache.delete(oldest);
+  }
+}
+
+/** Render onchain ASCII art to a CanvasTexture (NearestFilter for pixel art look). */
+function getOrCreateTexture(tokenId: number, td: TokenEntry): THREE.CanvasTexture {
+  let tex = textureCache.get(tokenId);
+  if (tex) {
+    // Move to end (LRU refresh)
+    textureCache.delete(tokenId);
+    textureCache.set(tokenId, tex);
+    return tex;
+  }
+
+  const [bg, palette, classGrid, chars] = td;
+  const canvas = document.createElement('canvas');
+  canvas.width = TEX_RES;
+  canvas.height = TEX_RES;
+  const ctx = canvas.getContext('2d')!;
+  const cellW = TEX_RES / GRID_SIZE;
+  const cellH = TEX_RES / GRID_SIZE;
+  const fontSize = Math.floor(cellH * 0.92);
+
+  // Fill background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, TEX_RES, TEX_RES);
+
+  // Draw each character with its exact onchain color
+  ctx.font = `${fontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      const cls = classGrid[row * GRID_SIZE + col];
+      const clsIdx = cls.charCodeAt(0) - 97;
+      ctx.fillStyle = palette[clsIdx] || '#fff';
+      const char = chars[cls] || ' ';
+      ctx.fillText(char, col * cellW + cellW / 2, row * cellH + cellH / 2);
+    }
+  }
+
+  tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  textureCache.set(tokenId, tex);
+  evictLRU(textureCache, LRU_LIMIT);
+  return tex;
+}
+
+/** Create PlaneGeometry with vertex displacement from height data. */
+function getOrCreateGeometry(tokenId: number, classGrid: string): THREE.PlaneGeometry {
+  let geo = geometryCache.get(tokenId);
+  if (geo) {
+    geometryCache.delete(tokenId);
+    geometryCache.set(tokenId, geo);
+    return geo;
+  }
+
+  geo = new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE);
+  // PlaneGeometry has (segments+1)^2 vertices = 33x33
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const col = i % (GRID_SIZE + 1);
+    const row = Math.floor(i / (GRID_SIZE + 1));
+    const gc = Math.min(col, GRID_SIZE - 1);
+    const gr = Math.min(row, GRID_SIZE - 1);
+    const cls = classGrid[gr * GRID_SIZE + gc];
+    const clsIdx = cls.charCodeAt(0) - 97;
+    const height = (9 - clsIdx) * HEIGHT_SCALE;
+    pos.setZ(i, height); // Z before rotation → Y after -PI/2 X rotation
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  geometryCache.set(tokenId, geo);
+  evictLRU(geometryCache, LRU_LIMIT);
+  return geo;
+}
+
+// ─── Single Terrain Plane (one parcel) ────────────────────────────────────
+
+function TerrainPlane({ parcel, tokenData, normalization }: {
+  parcel: ParcelData;
+  tokenData: TokenEntry;
+  normalization: { cx: number; cy: number; cz: number; scale: number };
+}) {
+  const { cx, cy, cz, scale } = normalization;
+  const px = (parcel.sx - cx) * scale;
+  const py = (parcel.sy - cy) * scale;
+  const pz = (parcel.sz - cz) * scale;
+
+  const texture = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
+  const geometry = useMemo(() => getOrCreateGeometry(parcel.tokenId, tokenData[2]), [parcel.tokenId, tokenData]);
+
+  return (
+    <mesh
+      geometry={geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[px, py + 0.01, pz]}
+    >
+      <meshStandardMaterial
+        map={texture}
+        side={THREE.DoubleSide}
+        roughness={0.6}
+        metalness={0.05}
+      />
+    </mesh>
+  );
+}
+
+// ─── Terrain Planes (near parcels) ────────────────────────────────────────
+
+function TerrainPlanes({
   parcels,
   terrainData,
   cameraRef,
   normalization,
-  hoveredId,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
-  hoveredId: number | null;
 }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
   const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
-  // Update which parcels are near the camera
   useFrame(() => {
     const cam = cameraRef.current;
     if (!cam) return;
@@ -90,7 +206,6 @@ function TerrainVoxels({
     const camPos = cam.position;
     const { cx, cy, cz, scale } = normalization;
 
-    // Find parcels within NEAR_DISTANCE
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
       const px = (p.sx - cx) * scale;
@@ -104,11 +219,9 @@ function TerrainVoxels({
       }
     }
 
-    // Sort by distance, take closest N
     scored.sort((a, b) => a[1] - b[1]);
     const nearest = scored.slice(0, MAX_TERRAIN_PARCELS).map(s => s[0]);
 
-    // Only update if the set changed
     const newIds = nearest.map(p => p.tokenId).join(',');
     const oldIds = nearParcels.map(p => p.tokenId).join(',');
     if (newIds !== oldIds) {
@@ -116,82 +229,21 @@ function TerrainVoxels({
     }
   });
 
-  // Build instanced mesh when near parcels change
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh || nearParcels.length === 0) return;
-
-    const { cx, cy, cz, scale } = normalization;
-    let instanceIdx = 0;
-
-    for (const p of nearParcels) {
-      const tokenData = terrainData.tokens[p.tokenId];
-      if (!tokenData) continue;
-
-      const [, palette, classGrid] = tokenData;
-      const parcelX = (p.sx - cx) * scale;
-      const parcelY = (p.sy - cy) * scale;
-      const parcelZ = (p.sz - cz) * scale;
-
-      // Render 32x32 grid of voxels for this parcel
-      for (let row = 0; row < GRID_SIZE; row++) {
-        for (let col = 0; col < GRID_SIZE; col++) {
-          if (instanceIdx >= mesh.count) break;
-
-          // Class letter → height + color (exact onchain mapping)
-          const cls = classGrid[row * GRID_SIZE + col];
-          const clsIdx = cls.charCodeAt(0) - 97; // a=0, j=9
-          const height = 9 - clsIdx; // a=9 (peak), j=0 (bg)
-          if (height === 0) continue; // skip background cells
-
-          // Position: grid on XZ plane, height extrudes up on Y
-          const ox = (col - 16) * VOXEL_SCALE;
-          const oz = (row - 16) * VOXEL_SCALE;
-          const voxelH = height * TERRAIN_HEIGHT_SCALE;
-
-          tempObj.position.set(
-            parcelX + ox,
-            parcelY + voxelH * 0.5, // base sits at parcel Y
-            parcelZ + oz,
-          );
-          tempObj.scale.set(
-            VOXEL_SCALE,
-            voxelH,
-            VOXEL_SCALE,
-          );
-          tempObj.updateMatrix();
-          mesh.setMatrixAt(instanceIdx, tempObj.matrix);
-
-          // Color from exact onchain palette
-          const color = palette[clsIdx] || '#ffffff';
-          tempColor.set(color);
-          if (hoveredId === p.tokenId) tempColor.multiplyScalar(1.3);
-          mesh.setColorAt(instanceIdx, tempColor);
-
-          instanceIdx++;
-        }
-      }
-    }
-
-    // Zero out remaining instances
-    tempObj.scale.setScalar(0);
-    tempObj.updateMatrix();
-    for (let i = instanceIdx; i < mesh.count; i++) {
-      mesh.setMatrixAt(i, tempObj.matrix);
-    }
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [nearParcels, terrainData, normalization, hoveredId]);
-
-  // Max possible voxels: MAX_TERRAIN_PARCELS * 1024
-  const maxInstances = MAX_TERRAIN_PARCELS * GRID_SIZE * GRID_SIZE;
-
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, maxInstances]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial roughness={0.5} metalness={0.05} />
-    </instancedMesh>
+    <group>
+      {nearParcels.map(p => {
+        const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
+        if (!td) return null;
+        return (
+          <TerrainPlane
+            key={p.tokenId}
+            parcel={p}
+            tokenData={td}
+            normalization={normalization}
+          />
+        );
+      })}
+    </group>
   );
 }
 
@@ -331,14 +383,13 @@ const TerrainScene: FC<TerrainViewProps> = ({
         setHoveredId={setHoveredId}
       />
 
-      {/* Near LOD: terrain voxels for nearby parcels */}
+      {/* Near LOD: displacement-mapped ASCII art terrain */}
       {terrainData && (
-        <TerrainVoxels
+        <TerrainPlanes
           parcels={parcels}
           terrainData={terrainData}
           cameraRef={cameraRef}
           normalization={normalization}
-          hoveredId={hoveredId}
         />
       )}
 
