@@ -365,7 +365,7 @@ const GridView: FC<{
                 overflow: 'hidden',
               }}
             >
-              {/* Mini terrain preview using canvas-like grid */}
+              {/* Mini terrain preview — exact onchain colors */}
               {td && (
                 <div style={{
                   position: 'absolute', inset: 0,
@@ -374,13 +374,14 @@ const GridView: FC<{
                   opacity: 0.9,
                 }}>
                   {Array.from({ length: 1024 }, (_, i) => {
-                    const h = parseInt(td[1][i], 10);
-                    const colorIdx = Math.max(0, Math.min(9, 9 - h));
+                    // v2 format: [bg, palette[10], classGrid, chars]
+                    const cls = td[2][i]; // class letter a-j
+                    const clsIdx = cls.charCodeAt(0) - 97;
                     return (
                       <div
                         key={i}
                         style={{
-                          background: td[0][colorIdx] || p.color,
+                          background: td[1][clsIdx] || p.color,
                         }}
                       />
                     );

@@ -35,7 +35,8 @@ interface ParcelData {
 interface TerrainData {
   v: number;
   count: number;
-  tokens: Record<string, [string[], string]>; // [colors[10], gridString(1024)]
+  // v2: [bg, palette[10], classGrid(1024 a-j chars), chars{class→char}]
+  tokens: Record<string, [string, string[], string, Record<string, string>]>;
 }
 
 interface TerrainViewProps {
@@ -127,7 +128,7 @@ function TerrainVoxels({
       const tokenData = terrainData.tokens[p.tokenId];
       if (!tokenData) continue;
 
-      const [colors, grid] = tokenData;
+      const [, palette, classGrid] = tokenData;
       const parcelX = (p.sx - cx) * scale;
       const parcelY = (p.sy - cy) * scale;
       const parcelZ = (p.sz - cz) * scale;
@@ -137,8 +138,11 @@ function TerrainVoxels({
         for (let col = 0; col < GRID_SIZE; col++) {
           if (instanceIdx >= mesh.count) break;
 
-          const height = parseInt(grid[row * GRID_SIZE + col], 10);
-          if (height === 0) continue; // skip flat/background cells
+          // Class letter → height + color (exact onchain mapping)
+          const cls = classGrid[row * GRID_SIZE + col];
+          const clsIdx = cls.charCodeAt(0) - 97; // a=0, j=9
+          const height = 9 - clsIdx; // a=9 (peak), j=0 (bg)
+          if (height === 0) continue; // skip background cells
 
           // Position: offset from parcel center
           const ox = (col - 16) * VOXEL_SCALE;
@@ -158,9 +162,8 @@ function TerrainVoxels({
           tempObj.updateMatrix();
           mesh.setMatrixAt(instanceIdx, tempObj.matrix);
 
-          // Color from zone palette: zoneColors[9 - height]
-          const colorIdx = Math.max(0, Math.min(9, 9 - height));
-          const color = colors[colorIdx] || '#ffffff';
+          // Color from exact onchain palette
+          const color = palette[clsIdx] || '#ffffff';
           tempColor.set(color);
           if (hoveredId === p.tokenId) tempColor.multiplyScalar(1.3);
           mesh.setColorAt(instanceIdx, tempColor);

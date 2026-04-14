@@ -2,15 +2,15 @@
 /**
  * generate-terraform-terrain.mjs
  *
- * Fetches terrain data for all 9,910 Terraforms parcels using the contract's
- * tokenTerrainValues(tokenId) → int256[32][32] (actual signed terrain heights,
- * typically -50K to +50K) and tokenSupplementalData for zone colors.
+ * Fetches tokenSVG for all 9,910 Terraforms parcels and parses the onchain
+ * SVG to extract the EXACT per-cell colors and class assignments.
  *
- * Per-token normalization maps terrain values to 0-9:
- *   0 = lowest point (valley), 9 = highest point (peak)
+ * Each SVG contains a 32×32 grid of <p class='X'>char</p> cells, where X
+ * is a CSS class (a-j) with a defined color. This matches the onchain art
+ * exactly — colors, class assignments, everything.
  *
- * Color mapping: zoneColors[9 - height] where zoneColors[0] = peak color
- * (This matches the SVG class system: class a = peak, class j = background)
+ * Height is derived from the class letter: a=9 (peak), b=8, ..., i=1, j=0 (bg).
+ * The renderer uses these heights for 3D extrusion while keeping exact colors.
  *
  * Output: packages/nouns-webapp/public/data/terraforms-terrain.json
  *
@@ -47,35 +47,12 @@ const [viem, chains] = await Promise.all([import(viemPath), import(chainsPath)])
 const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56';
 const TOTAL_SUPPLY = 9910;
 
-const TERRAIN_ABI = [{
-  name: 'tokenTerrainValues',
+const SVG_ABI = [{
+  name: 'tokenSVG',
   type: 'function',
   stateMutability: 'view',
   inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'int256[32][32]' }],
-}];
-
-const SUPPLEMENTAL_ABI = [{
-  name: 'tokenSupplementalData',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{
-    name: '', type: 'tuple',
-    components: [
-      { name: 'tokenId', type: 'uint256' },
-      { name: 'level', type: 'uint256' },
-      { name: 'xCoordinate', type: 'uint256' },
-      { name: 'yCoordinate', type: 'uint256' },
-      { name: 'elevation', type: 'int256' },
-      { name: 'structureSpaceX', type: 'uint256' },
-      { name: 'structureSpaceY', type: 'uint256' },
-      { name: 'structureSpaceZ', type: 'uint256' },
-      { name: 'zoneName', type: 'string' },
-      { name: 'zoneColors', type: 'string[10]' },
-      { name: 'characterSet', type: 'string[9]' },
-    ],
-  }],
+  outputs: [{ name: '', type: 'string' }],
 }];
 
 // ─── CLI Args ──────────────────────────────────────────────────────────────
@@ -87,8 +64,8 @@ function getArg(name, defaultVal) {
 }
 const isSample = process.argv.includes('--sample');
 const isResume = process.argv.includes('--resume');
-const BATCH_SIZE = parseInt(getArg('batch-size', '5'), 10);
-const BATCH_DELAY = parseInt(getArg('delay', '300'), 10);
+const BATCH_SIZE = parseInt(getArg('batch-size', '3'), 10);
+const BATCH_DELAY = parseInt(getArg('delay', '400'), 10);
 const START_FROM = parseInt(getArg('start', '1'), 10);
 const RPC_URL = getArg('rpc', 'https://mainnet.infura.io/v3/03c669afb3a948d588e7f41dd1f5a70b');
 
@@ -99,48 +76,63 @@ const client = viem.createPublicClient({
   transport: viem.http(RPC_URL),
 });
 
-// ─── Data Processing ───────────────────────────────────────────────────────
+// ─── SVG Parser ───────────────────────────────────────────────────────────
+
+// Class letter → 3D height: a=9 (peak), b=8, ..., i=1, j=0 (background)
+const CLASS_HEIGHT = { a: 9, b: 8, c: 7, d: 6, e: 5, f: 4, g: 3, h: 2, i: 1, j: 0 };
 
 /**
- * Convert int256[32][32] terrain values to compact grid string.
- * Uses per-token normalization: maps [min, max] → [0, 9].
- * Output: 1024-char string, each char '0'-'9' (0=valley, 9=peak).
+ * Parse a tokenSVG output to extract exact onchain art data.
+ * Returns { bg, palette, grid, chars } where:
+ *   bg: background hex color
+ *   palette: [10] hex colors for classes a-j
+ *   grid: 1024-char string of class letters (a-j)
+ *   chars: object mapping class letter → character used
  */
-function terrainToGrid(tv) {
-  // Flatten and find range
-  const flat = [];
-  for (let row = 0; row < 32; row++) {
-    for (let col = 0; col < 32; col++) {
-      flat.push(Number(tv[row][col]));
+function parseSVG(svg) {
+  const palette = new Array(10).fill(null);
+  let bg = '#000000';
+
+  // Extract CSS color classes: .a{color:#xxx} through .j{color:#xxx}
+  const styleMatch = svg.match(/<style>([\s\S]*?)<\/style>/);
+  if (styleMatch) {
+    const css = styleMatch[1];
+    const colorRe = /\.([a-j])\s*\{\s*color\s*:\s*(#[0-9a-fA-F]{6})\s*;?\s*\}/g;
+    let m;
+    while ((m = colorRe.exec(css)) !== null) {
+      palette[m[1].charCodeAt(0) - 97] = m[2].toLowerCase();
+    }
+    const bgMatch = css.match(/\.r\s*\{[^}]*background-color\s*:\s*(#[0-9a-fA-F]{6})/);
+    if (bgMatch) bg = bgMatch[1].toLowerCase();
+  }
+
+  // Fill missing palette entries with background
+  for (let i = 0; i < 10; i++) {
+    if (!palette[i]) palette[i] = bg;
+  }
+
+  // Extract grid cells: <p class='X'>char</p>
+  const cellRe = /<p class='([a-j])'>([\s\S]*?)<\/p>/g;
+  let grid = '';
+  const chars = {};
+  let cellMatch;
+  while ((cellMatch = cellRe.exec(svg)) !== null) {
+    grid += cellMatch[1];
+    if (!chars[cellMatch[1]]) chars[cellMatch[1]] = cellMatch[2];
+  }
+
+  // Fallback: try double-quote attributes
+  if (grid.length !== 1024) {
+    const cellRe2 = /<p class="([a-j])">([\s\S]*?)<\/p>/g;
+    grid = '';
+    while ((cellMatch = cellRe2.exec(svg)) !== null) {
+      grid += cellMatch[1];
+      if (!chars[cellMatch[1]]) chars[cellMatch[1]] = cellMatch[2];
     }
   }
 
-  const min = Math.min(...flat);
-  const max = Math.max(...flat);
-  const range = max - min;
-
-  // Normalize to 0-9
-  let grid = '';
-  for (const val of flat) {
-    const height = range > 0
-      ? Math.min(9, Math.floor(((val - min) / range) * 9.999))
-      : 0;
-    grid += height.toString();
-  }
-  return grid;
-}
-
-/**
- * Extract zone colors from supplemental data.
- * Returns array of 10 hex color strings.
- */
-function extractColors(supplemental) {
-  const colors = [...supplemental.zoneColors]
-    .map(c => c.length > 0 ? c.toLowerCase() : null);
-  for (let i = 0; i < 10; i++) {
-    if (!colors[i]) colors[i] = '#000000';
-  }
-  return colors;
+  if (grid.length !== 1024) return null;
+  return { bg, palette, grid, chars };
 }
 
 // ─── Progress Management ───────────────────────────────────────────────────
@@ -173,31 +165,31 @@ async function main() {
     for (const id of sampleIds) {
       console.log('--- Token #' + id + ' ---');
       try {
-        const [tv, meta] = await Promise.all([
-          client.readContract({
-            address: TERRAFORMS_ADDRESS, abi: TERRAIN_ABI,
-            functionName: 'tokenTerrainValues', args: [BigInt(id)],
-          }),
-          client.readContract({
-            address: TERRAFORMS_ADDRESS, abi: SUPPLEMENTAL_ABI,
-            functionName: 'tokenSupplementalData', args: [BigInt(id)],
-          }),
-        ]);
+        const svg = await client.readContract({
+          address: TERRAFORMS_ADDRESS, abi: SVG_ABI,
+          functionName: 'tokenSVG', args: [BigInt(id)],
+        });
 
-        const grid = terrainToGrid(tv);
-        const colors = extractColors(meta);
+        console.log('  SVG: ' + svg.length + ' chars');
+        const parsed = parseSVG(svg);
+        if (!parsed) { console.log('  PARSE FAILED'); continue; }
 
-        console.log('  Zone: ' + meta.zoneName + ', Level: ' + Number(meta.level));
-        console.log('  Colors: ' + colors.join(', '));
-        console.log('  Grid (row 0):  ' + grid.slice(0, 32));
-        console.log('  Grid (row 15): ' + grid.slice(15 * 32, 16 * 32));
-        console.log('  Grid (row 31): ' + grid.slice(31 * 32));
+        console.log('  Background: ' + parsed.bg);
+        console.log('  Palette: ' + parsed.palette.join(', '));
+        console.log('  Chars: ' + Object.entries(parsed.chars).map(([k,v]) => k + '=' + v).join(' '));
+        console.log('  Grid (row 0):  ' + parsed.grid.slice(0, 32));
+        console.log('  Grid (row 15): ' + parsed.grid.slice(15 * 32, 16 * 32));
+        console.log('  Grid (row 31): ' + parsed.grid.slice(31 * 32));
 
+        // Height distribution
         const dist = {};
-        for (const ch of grid) dist[ch] = (dist[ch] || 0) + 1;
+        for (const ch of parsed.grid) {
+          const h = CLASS_HEIGHT[ch] || 0;
+          dist[h] = (dist[h] || 0) + 1;
+        }
         console.log('  Heights:');
         for (let h = 0; h <= 9; h++) {
-          const count = dist[h.toString()] || 0;
+          const count = dist[h] || 0;
           const bar = Array(Math.round(count / 15)).fill('#').join('');
           console.log('    ' + h + ': ' + bar + ' (' + count + ')');
         }
@@ -232,17 +224,11 @@ async function main() {
     }
     if (ids.length === 0) continue;
 
-    // Build multicall: heightmap + supplemental for each token
-    const calls = ids.flatMap(id => [
-      {
-        address: TERRAFORMS_ADDRESS, abi: TERRAIN_ABI,
-        functionName: 'tokenTerrainValues', args: [BigInt(id)],
-      },
-      {
-        address: TERRAFORMS_ADDRESS, abi: SUPPLEMENTAL_ABI,
-        functionName: 'tokenSupplementalData', args: [BigInt(id)],
-      },
-    ]);
+    // Build multicall: tokenSVG for each token
+    const calls = ids.map(id => ({
+      address: TERRAFORMS_ADDRESS, abi: SVG_ABI,
+      functionName: 'tokenSVG', args: [BigInt(id)],
+    }));
 
     let success = false;
     for (let attempt = 0; attempt < 3 && !success; attempt++) {
@@ -256,21 +242,24 @@ async function main() {
         const results = await client.multicall({ contracts: calls });
 
         for (let i = 0; i < ids.length; i++) {
-          const tvResult = results[i * 2];
-          const metaResult = results[i * 2 + 1];
+          const r = results[i];
           const id = ids[i];
 
-          if (tvResult.status !== 'success' || metaResult.status !== 'success') {
+          if (r.status !== 'success') {
             console.warn('\n  Token #' + id + ': call failed');
             failed++;
             continue;
           }
 
-          const grid = terrainToGrid(tvResult.result);
-          const colors = extractColors(metaResult.result);
+          const parsed = parseSVG(r.result);
+          if (!parsed) {
+            console.warn('\n  Token #' + id + ': SVG parse failed');
+            failed++;
+            continue;
+          }
 
-          // Store: [colors[10], gridString(1024)]
-          tokens[id] = [colors, grid];
+          // Store: [bg, palette[10], classGrid(1024), chars{a:'⛓',...}]
+          tokens[id] = [parsed.bg, parsed.palette, parsed.grid, parsed.chars];
           processed++;
         }
         success = true;
@@ -311,7 +300,7 @@ async function main() {
   // ── Write output ───────────────────────────────────────────────────────
   mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const output = { v: 1, count: Object.keys(tokens).length, tokens };
+  const output = { v: 2, count: Object.keys(tokens).length, tokens };
   const json = JSON.stringify(output);
   writeFileSync(OUTPUT_FILE, json);
   console.log('Output: ' + OUTPUT_FILE + ' (' + (json.length / 1024 / 1024).toFixed(1) + 'MB)');
