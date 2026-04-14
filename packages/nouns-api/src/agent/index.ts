@@ -2,7 +2,7 @@
 //
 // Starts the block watcher and exports all agent modules for use by the API.
 
-import { startWatcher, stopWatcher, getWatcherState, checkNow } from './blockWatcher.js';
+import { startWatcher, stopWatcher, getWatcherState, checkNow, settleAuction } from './blockWatcher.js';
 import { isBridgeConfigured } from './bridge.js';
 import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import {
@@ -63,6 +63,7 @@ export {
   stopWatcher,
   getWatcherState,
   checkNow,
+  settleAuction,
 
   // Reservations
   reservationStore,

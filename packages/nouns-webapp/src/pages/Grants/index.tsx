@@ -18,6 +18,7 @@ const API_BASE = (
 interface Grant {
   id: number;
   proposer: string;
+  signer: string | null;
   description: string;
   status: string;
   forVotes: number;
@@ -76,6 +77,7 @@ export default function GrantsPage() {
           items.map(g => ({
             id: Number(g.id),
             proposer: g.proposer ?? '',
+            signer: (g as Grant & { signer?: string }).signer ?? null,
             description: g.description ?? '',
             status: g.status ?? 'ACTIVE',
             forVotes: Number(g.forVotes ?? 0),
@@ -142,7 +144,7 @@ export default function GrantsPage() {
               <div className={classes.cardTitle}>{title}</div>
               <div className={classes.cardMeta}>
                 <span>
-                  by <ShortAddress address={g.proposer as `0x${string}`} />
+                  by <ShortAddress address={(g.signer || g.proposer) as `0x${string}`} />
                 </span>
                 <span>
                   {g.forVotes} FOR / {g.againstVotes} AGAINST

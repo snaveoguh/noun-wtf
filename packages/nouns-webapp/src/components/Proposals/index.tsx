@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ClockIcon } from '@heroicons/react/solid';
 import { i18n } from '@lingui/core';
@@ -176,6 +176,25 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
   const isDaoGteV3 = useIsDaoGteV3();
   const tabs = ['Proposals', config.featureToggles.candidates && isDaoGteV3 && 'Candidates'];
   const { hash } = useLocation();
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(false);
+
+  useEffect(() => {
+    const sentinel = bottomSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsNearBottom(entry.isIntersecting);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [proposals, activeTab]);
+
+  const handleJumpToBottom = useCallback(() => {
+    bottomSentinelRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -377,6 +396,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                 </p>
               </Alert>
             )}
+            <div ref={bottomSentinelRef} />
           </Col>
         )}
         {activeTab === 1 && (
@@ -450,6 +470,17 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
           </Col>
         )}
       </Section>
+
+      {activeTab === 0 && proposals && proposals.length > 0 && (
+        <button
+          type="button"
+          className={clsx(classes.jumpToBottomBtn, isNearBottom && classes.jumpToBottomBtnHidden)}
+          onClick={handleJumpToBottom}
+          aria-label="Jump to latest proposals"
+        >
+          Latest Props <span className={classes.jumpToBottomArrow}>&darr;</span>
+        </button>
+      )}
     </div>
   );
 };

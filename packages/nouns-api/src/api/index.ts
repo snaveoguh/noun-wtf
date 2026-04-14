@@ -164,6 +164,7 @@ import {
   getAgentBalance,
   getWatcherState,
   checkNow,
+  settleAuction,
   parseTraitDescription,
   getAllTraitNames,
   getDeployHistory,
@@ -471,14 +472,26 @@ app.get('/api/proposals', async c => {
   return c.json(items);
 });
 
+/** Extract original signer from description tag, strip the tag */
+function extractSigner(desc: string): { signer: string | null; description: string } {
+  const match = desc.match(/^<!--\s*signer:(0x[a-fA-F0-9]{40})\s*-->\n?/);
+  if (match) {
+    return { signer: match[1], description: desc.slice(match[0].length) };
+  }
+  return { signer: null, description: desc };
+}
+
 /** All grants — single JSON response, with derived status (DEFEATED/SUCCEEDED) */
 app.get('/api/grants', async c => {
   const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
   const latestBlock = await getLatestBlockCached();
   const items = grants.map(g => {
+    const { signer, description } = extractSigner(g.description);
     const item: Record<string, unknown> = {
       ...g,
       id: String(g.id),
+      description,
+      signer,
       snapshotBlock: String(g.snapshotBlock),
       startBlock: String(g.startBlock),
       endBlock: String(g.endBlock),
@@ -515,9 +528,12 @@ app.get('/api/grants/:id', async c => {
 
   const latestBlock = await getLatestBlockCached();
 
+  const { signer, description } = extractSigner(g.description);
   const item: Record<string, unknown> = {
     ...g,
     id: String(g.id),
+    description,
+    signer,
     snapshotBlock: String(g.snapshotBlock),
     startBlock: String(g.startBlock),
     endBlock: String(g.endBlock),
@@ -633,6 +649,9 @@ app.post('/api/grants/propose', async c => {
     return c.json({ error: 'Signature verification failed' }, 401);
   }
 
+  // Embed original signer in description so we can attribute correctly
+  const taggedDescription = `<!-- signer:${proposer} -->\n${description}`;
+
   // Submit proposal on-chain via relayer wallet
   try {
     const txHash = await relayerWallet.writeContract({
@@ -644,7 +663,7 @@ app.post('/api/grants/propose', async c => {
         values.map((v: string) => BigInt(v)),
         signatures as string[],
         calldatas as Hex[],
-        description as string,
+        taggedDescription,
       ],
     });
 
@@ -5457,6 +5476,27 @@ app.post('/api/agent/parse-traits', async c => {
   }
 });
 
+// ── Manual Settlement (crystal ball twin-snipe) ────────────────────────
+app.post('/api/agent/settle', async c => {
+  const w = getWatcherState();
+  if (!w.running) {
+    return c.json({ error: 'Watcher not running' }, 503);
+  }
+  if (!w.auctionEndTime || Date.now() / 1000 < w.auctionEndTime) {
+    return c.json({ error: 'Auction not ended yet' }, 400);
+  }
+  try {
+    const result = await settleAuction();
+    if (!result) {
+      return c.json({ error: 'Settlement failed — wallet not configured or tx error' }, 500);
+    }
+    return c.json({ txHash: result.txHash });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
+  }
+});
+
 // ── Settlement History ──────────────────────────────────────────────────
 app.get('/api/agent/settlements', c => {
   const limit = Number(c.req.query('limit') || 20);
@@ -6325,6 +6365,31 @@ app.get('/api/ens', async c => {
   }
 
   return c.json({ names });
+});
+
+// ─── Noun Seeds (compact, for twin matching) ────────────────────────────
+
+app.get('/api/nouns/seeds', async c => {
+  try {
+    const nouns = await db
+      .select({
+        id: schema.noun.id,
+        background: schema.noun.background,
+        body: schema.noun.body,
+        accessory: schema.noun.accessory,
+        head: schema.noun.head,
+        glasses: schema.noun.glasses,
+      })
+      .from(schema.noun)
+      .orderBy(schema.noun.id);
+
+    // Set long cache — seeds of minted nouns never change
+    c.header('Cache-Control', 'public, max-age=300');
+    return c.json(nouns.map(n => ({ ...n, id: Number(n.id) })));
+  } catch (err) {
+    console.error('[NounSeeds] Error:', err);
+    return c.json([], 500);
+  }
 });
 
 // ─── Noun Holders ────────────────────────────────────────────────────────

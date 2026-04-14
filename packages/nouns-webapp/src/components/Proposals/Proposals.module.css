@@ -404,3 +404,59 @@
   align-items: center;
   justify-content: center;
 }
+
+.jumpToBottomBtn {
+  position: fixed;
+  bottom: 2.5rem;
+  right: 2rem;
+  z-index: 100;
+  background: linear-gradient(135deg, #e40536, #d63c5e, #e40536, #ff6b6b, #e40536);
+  background-size: 300% 300%;
+  animation: nounGradient 4s ease infinite;
+  border: none;
+  border-radius: 12px;
+  padding: 0.625rem 1rem;
+  font-family: 'PT Root UI';
+  font-weight: bold;
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(228, 5, 54, 0.35);
+  transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.15s ease;
+  opacity: 1;
+  transform: translateY(0);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+@keyframes nounGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.jumpToBottomBtn:hover {
+  box-shadow: 0 6px 24px rgba(228, 5, 54, 0.5);
+  transform: translateY(-2px);
+}
+
+.jumpToBottomBtnHidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+.jumpToBottomArrow {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 992px) {
+  .jumpToBottomBtn {
+    bottom: 1.25rem;
+    right: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 13px;
+  }
+}
