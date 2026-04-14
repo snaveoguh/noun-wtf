@@ -26,7 +26,6 @@ import {
   accountEscrowedNounsQuery,
   delegateNounsAtBlockQuery,
   ownedNounsQuery,
-  seedsQuery,
 } from './subgraph';
 
 export interface INounSeed {

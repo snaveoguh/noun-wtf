@@ -337,11 +337,11 @@ const TabButton: FC<{
 
 const TOKEN_HTML_ABI = [{
   name: 'tokenHTML',
-  type: 'function',
+  type: 'function' as const,
   stateMutability: 'view' as const,
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'string' }],
-}];
+  inputs: [{ name: 'tokenId', type: 'uint256' }] as const,
+  outputs: [{ name: '', type: 'string' }] as const,
+}] as const;
 
 function useTokenHTMLBatch() {
   const htmlCache = useRef(new Map<number, string>());
@@ -460,7 +460,7 @@ const GridView: FC<{
   parcels: ParcelData[];
   onClickParcel: (id: number) => void;
   terrainData: TerrainData | null;
-}> = ({ parcels, onClickParcel, terrainData }) => {
+}> = ({ parcels, onClickParcel, terrainData: _terrainData }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { htmlCache, requestTokens } = useTokenHTMLBatch();
