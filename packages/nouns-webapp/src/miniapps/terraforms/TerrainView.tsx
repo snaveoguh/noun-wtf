@@ -322,8 +322,8 @@ function AllParcelsInstanced({
 // Each near parcel gets a hidden iframe → canvas capture every 250ms.
 // Positioned at parcel coords slightly above the atlas.
 
-const ANIM_DISTANCE = 25;
-const MAX_ANIM_PARCELS = 8;
+const ANIM_DISTANCE = 20;
+const MAX_ANIM_PARCELS = 4; // keep low — each is a hidden iframe + 250ms capture
 const ANIM_TEX = 256; // capture resolution
 const animPlaneGeo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.02, PARCEL_SIZE * 1.02);
 
@@ -569,15 +569,17 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
         enablePan maxPolarAngle={Math.PI * 0.9}
       />
 
-      {/* Bloom glow effect */}
-      <EffectComposer>
-        <Bloom
-          intensity={bloomIntensity}
-          luminanceThreshold={0.3}
-          luminanceSmoothing={0.9}
-          mipmapBlur
-        />
-      </EffectComposer>
+      {/* Bloom glow — only active when slider > 0 to save GPU */}
+      {bloomIntensity > 0 && (
+        <EffectComposer>
+          <Bloom
+            intensity={bloomIntensity}
+            luminanceThreshold={0.4}
+            luminanceSmoothing={0.9}
+            mipmapBlur
+          />
+        </EffectComposer>
+      )}
     </>
   );
 };
@@ -633,9 +635,9 @@ const TerrainViewCanvas: FC<{
   setHoveredId: (id: number | null) => void;
 }> = (props) => {
   const PRESETS = {
-    default: { height: 0.35, sat: 1.2, bloom: 0.4, label: 'Default' },
+    default: { height: 0.35, sat: 1.2, bloom: 0, label: 'Default' },
     deepFried: { height: 0.5, sat: 2.2, bloom: 1.2, label: 'Deep Fried' },
-    flat: { height: 0, sat: 1.0, bloom: 0.1, label: 'Flat' },
+    flat: { height: 0, sat: 1.0, bloom: 0, label: 'Flat' },
     extreme: { height: 1.2, sat: 2.8, bloom: 1.8, label: 'Extreme' },
   };
 
