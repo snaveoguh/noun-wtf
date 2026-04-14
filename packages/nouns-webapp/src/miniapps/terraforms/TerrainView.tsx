@@ -49,9 +49,9 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 50;
-const MAX_TERRAIN_PARCELS = 40; // more parcels since no far cubes
-const MAX_ANIMATED = 8; // closest N get live animation from tokenHTML
+const NEAR_DISTANCE = 80; // show terrain for most visible parcels
+const MAX_TERRAIN_PARCELS = 60;
+const MAX_ANIMATED = 6; // closest N get live animation from tokenHTML
 const PARCEL_SIZE = 1.2;
 const HEIGHT_SCALE = 0.05;
 const GRID_SIZE = 32;
@@ -465,8 +465,8 @@ function FarCubes({
       onPointerOut={() => setHoveredId(null)}
       onClick={handleClick}
     >
-      <boxGeometry args={[0.85, 0.85, 0.85]} />
-      <meshStandardMaterial roughness={0.4} metalness={0.1} />
+      <planeGeometry args={[1.0, 1.0]} />
+      <meshStandardMaterial roughness={0.4} metalness={0.1} side={THREE.DoubleSide} />
     </instancedMesh>
   );
 }
@@ -521,7 +521,16 @@ const TerrainScene: FC<TerrainViewProps> = ({
       <directionalLight position={[50, 80, 30]} intensity={0.8} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
 
-      {/* Displacement-mapped ASCII art terrain — no cubes */}
+      {/* Far: small colored dots for castle structure visibility */}
+      <FarCubes
+        parcels={parcels}
+        normalization={normalization}
+        onClickParcel={onClickParcel}
+        hoveredId={hoveredId}
+        setHoveredId={setHoveredId}
+      />
+
+      {/* Near: displacement-mapped ASCII art terrain (replaces dots when close) */}
       {terrainData && (
         <TerrainPlanes
           parcels={parcels}
