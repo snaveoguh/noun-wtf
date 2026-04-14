@@ -470,35 +470,41 @@ const ExploreTab: React.FC = () => {
           })}
         </div>
 
-        {/* Single shared Canvas for all 3D nouns */}
+        {/* Fixed viewport-overlay Canvas for all visible 3D nouns */}
         {view3D && (
-          <React.Suspense fallback={null}>
-            <Noun3DGrid
-              cells={(() => {
-                const cells: NounCell[] = [];
-                const scrollMargin = rowVirtualizer.options.scrollMargin ?? 0;
-                for (const virtualRow of rowVirtualizer.getVirtualItems()) {
-                  const startIdx = virtualRow.index * layout.cols;
-                  const rowTop = virtualRow.start - scrollMargin;
-                  for (let colIdx = 0; colIdx < layout.cols; colIdx++) {
-                    const itemIndex = startIdx + colIdx;
-                    if (itemIndex >= displayCount) continue;
-                    const nounId = filteredAndSorted[itemIndex];
-                    const seed = seeds?.[nounId.toString()];
-                    if (!seed) continue;
-                    const cx = colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
-                    const cy = rowTop + layout.cellSize / 2;
-                    cells.push({ nounId, seed, cx, cy, size: layout.cellSize });
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 10 }}>
+            <React.Suspense fallback={null}>
+              <Noun3DGrid
+                cells={(() => {
+                  const cells: NounCell[] = [];
+                  const scrollMargin = rowVirtualizer.options.scrollMargin ?? 0;
+                  const containerRect = containerRef.current?.getBoundingClientRect();
+                  const containerLeft = containerRect?.left ?? 0;
+                  const containerTop = containerRect?.top ?? 0;
+                  for (const virtualRow of rowVirtualizer.getVirtualItems()) {
+                    const startIdx = virtualRow.index * layout.cols;
+                    // Row Y relative to viewport
+                    const rowViewportY = containerTop + (virtualRow.start - scrollMargin);
+                    for (let colIdx = 0; colIdx < layout.cols; colIdx++) {
+                      const itemIndex = startIdx + colIdx;
+                      if (itemIndex >= displayCount) continue;
+                      const nounId = filteredAndSorted[itemIndex];
+                      const seed = seeds?.[nounId.toString()];
+                      if (!seed) continue;
+                      const cx = containerLeft + colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
+                      const cy = rowViewportY + layout.cellSize / 2;
+                      cells.push({ nounId, seed, cx, cy, size: layout.cellSize });
+                    }
                   }
-                }
-                return cells;
-              })()}
-              totalHeight={rowVirtualizer.getTotalSize()}
-              containerWidth={layout.cols * (layout.cellSize + GAP) - GAP}
-              scrollOffset={0}
-              hoveredId={hoveredNounId}
-            />
-          </React.Suspense>
+                  return cells;
+                })()}
+                totalHeight={window.innerHeight}
+                containerWidth={window.innerWidth}
+                scrollOffset={0}
+                hoveredId={hoveredNounId}
+              />
+            </React.Suspense>
+          </div>
         )}
       </div>
 
