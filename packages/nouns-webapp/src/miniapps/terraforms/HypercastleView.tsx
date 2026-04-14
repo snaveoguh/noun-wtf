@@ -642,21 +642,38 @@ const HypercastleView: FC = () => {
       </div>
 
       {/* Hovered parcel info (3D modes only) */}
-      {hoveredId && viewMode !== 'grid' && (
-        <div style={{
-          position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 10, background: 'rgba(0,0,0,0.8)', padding: '8px 20px',
-          borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
-          fontSize: '0.75rem', color: '#e2e8f0', fontFamily: 'monospace',
-          pointerEvents: 'none', whiteSpace: 'nowrap',
-        }}>
-          {(() => {
-            const p = parcels.find(p => p.tokenId === hoveredId);
-            if (!p) return `#${hoveredId}`;
-            return `#${p.tokenId} · ${p.zoneName} · Level ${p.level} · (${p.x},${p.y}) · Elev ${p.elevation}`;
-          })()}
-        </div>
-      )}
+      {hoveredId && viewMode !== 'grid' && (() => {
+        const p = parcels.find(p => p.tokenId === hoveredId);
+        if (!p) return null;
+        return (
+          <div style={{
+            position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 10, background: 'rgba(0,0,0,0.85)', padding: '10px 18px',
+            borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)',
+            fontFamily: 'monospace', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', color: p.color, fontWeight: 700 }}>
+                Terraform #{p.tokenId}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: '#94a3b8', marginTop: 2 }}>
+                {p.zoneName} · Level {p.level} · ({p.x},{p.y}) · Elev {p.elevation}
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/terraforms/${p.tokenId}`)}
+              style={{
+                padding: '5px 12px', borderRadius: 6, border: '1px solid #334155',
+                background: '#1e293b', color: '#e2e8f0', fontSize: '0.6rem',
+                cursor: 'pointer', fontFamily: 'monospace', whiteSpace: 'nowrap',
+              }}
+            >
+              View →
+            </button>
+          </div>
+        );
+      })()}
 
       {/* ── Terrain View (default) ── */}
       {viewMode === 'terrain' && (
