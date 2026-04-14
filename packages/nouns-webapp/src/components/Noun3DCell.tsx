@@ -167,6 +167,27 @@ function loadGlbHead(
       scene.scale.set(1, 1, 1);
       scene.updateMatrixWorld(true);
 
+      // Convert all materials to MeshBasicMaterial (unlit) for consistent grid rendering
+      scene.traverse(child => {
+        if (!(child as THREE.Mesh).isMesh) return;
+        const mesh = child as THREE.Mesh;
+        const oldMat = mesh.material as THREE.MeshStandardMaterial;
+        const basicMat = new THREE.MeshBasicMaterial({
+          map: oldMat.map ?? undefined,
+          vertexColors: !!mesh.geometry.attributes.color,
+          side: oldMat.side,
+          transparent: oldMat.transparent,
+          opacity: oldMat.opacity,
+          toneMapped: false,
+        });
+        if (oldMat.polygonOffset) {
+          basicMat.polygonOffset = true;
+          basicMat.polygonOffsetFactor = oldMat.polygonOffsetFactor;
+          basicMat.polygonOffsetUnits = oldMat.polygonOffsetUnits;
+        }
+        mesh.material = basicMat;
+      });
+
       glbHeadCache.set(cacheKey, scene);
       glbListeners.get(cacheKey)?.forEach(cb => cb(scene.clone()));
     } catch {
@@ -325,6 +346,8 @@ export default function Noun3DGrid({
       frameloop="always"
     >
       <CameraSync />
+      <ambientLight intensity={1.5} />
+      <directionalLight position={[50, 80, 100]} intensity={0.5} />
 
       {cells.map(cell => (
         <NounMesh
