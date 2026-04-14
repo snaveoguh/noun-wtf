@@ -110,10 +110,10 @@ export interface Delegates {
 // Ponder v0.12 wraps plural results in { items: [...], totalCount }
 // and uses limit/after/before instead of first/skip
 
-export const seedsQuery = (first = 1_000) => ({
+export const seedsQuery = (first = 1_000, after?: string) => ({
   query: gql`
-    query GetSeeds($first: Int!) {
-      nouns(limit: $first, orderBy: "id", orderDirection: "asc") {
+    query GetSeeds($first: Int!, $after: String) {
+      nouns(limit: $first, orderBy: "id", orderDirection: "asc", after: $after) {
         items {
           id
           background
@@ -122,10 +122,14 @@ export const seedsQuery = (first = 1_000) => ({
           head
           glasses
         }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
       }
     }
   `,
-  variables: { first },
+  variables: { first, after: after ?? null },
 });
 
 export const proposalQuery = (id: string | number) => ({

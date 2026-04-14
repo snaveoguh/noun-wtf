@@ -150,20 +150,21 @@ function NounMesh({
 
 // ─── Camera sync ───────────────────────────────────────────────────────────
 
-function CameraSync({ width, height }: { width: number; height: number }) {
-  const { camera } = useThree();
+function CameraSync() {
+  const { camera, size } = useThree();
 
   useEffect(() => {
     const cam = camera as THREE.OrthographicCamera;
+    // Map pixel coordinates: (0,0) at top-left, (width, height) at bottom-right
     cam.left = 0;
-    cam.right = width;
+    cam.right = size.width;
     cam.top = 0;
-    cam.bottom = -height;
-    cam.near = -100;
-    cam.far = 100;
+    cam.bottom = -size.height;
+    cam.near = -500;
+    cam.far = 500;
     cam.position.set(0, 0, 50);
     cam.updateProjectionMatrix();
-  }, [camera, width, height]);
+  }, [camera, size.width, size.height]);
 
   return null;
 }
@@ -180,20 +181,15 @@ export default function Noun3DGrid({
   return (
     <Canvas
       orthographic
-      camera={{ position: [0, 0, 50], zoom: 1, near: -100, far: 100 }}
+      camera={{ position: [0, 0, 50], zoom: 1, near: -500, far: 500 }}
       style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
         width: '100%',
-        height: `${totalHeight}px`,
-        pointerEvents: 'none',
-        zIndex: 1,
+        height: '100%',
       }}
       gl={{ antialias: true, alpha: true }}
       frameloop="always"
     >
-      <CameraSync width={containerWidth} height={totalHeight} />
+      <CameraSync />
 
       {cells.map(cell => (
         <NounMesh
