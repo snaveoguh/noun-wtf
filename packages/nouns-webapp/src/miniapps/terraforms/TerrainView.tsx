@@ -14,8 +14,6 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { createPublicClient, http } from 'viem';
-import { mainnet } from 'viem/chains';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -316,178 +314,195 @@ function AllParcelsInstanced({
   );
 }
 
-// ─── Animated Overlay (nearest parcels) ───────────────────────────────────
+// ─── ASCII Character Terrain (nearest parcels) ───────────────────────────
 //
-// Flat texture planes showing LIVE animated tokenHTML art.
-// Each near parcel gets a hidden iframe → canvas capture every 250ms.
-// Positioned at parcel coords slightly above the atlas.
+// Each parcel = merged BufferGeometry of 1024 quads facing up.
+// Each quad at (col, row, height), UVs pointing to a character atlas.
+// Standard meshBasicMaterial — no custom shaders needed.
 
-const ANIM_DISTANCE = 20;
-const MAX_ANIM_PARCELS = 4; // keep low — each is a hidden iframe + 250ms capture
-const ANIM_TEX = 256; // capture resolution
-const animPlaneGeo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.02, PARCEL_SIZE * 1.02);
+const CHAR_DISTANCE = 30;
+const MAX_CHAR_PARCELS = 20;
+const CELL = PARCEL_SIZE / GRID_SIZE; // scene units per cell
+const CHAR_PX = 32; // pixels per character tile in atlas
+const HEIGHT_UNIT = 0.04; // height per level (scaled by relief slider)
 
-const rpcClient = createPublicClient({
-  chain: mainnet,
-  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
-});
+type CharAtlasResult = {
+  texture: THREE.CanvasTexture;
+  // Maps "classLetter" → { col, row } in the atlas grid
+  tileMap: Map<string, { u0: number; v0: number; u1: number; v1: number }>;
+};
 
-const TERRAFORMS_ADDRESS_2 = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
-const TOKEN_HTML_ABI_2 = [{
-  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'string' }],
-}] as const;
+const charAtlasCache = new Map<string, CharAtlasResult>();
 
-/** One animated parcel: iframe captures live art to texture. */
-function AnimatedParcel({ parcel, normalization }: {
+/** Build atlas: one tile per (class letter) — character drawn in its zone color on bg. */
+function buildCharAtlas(td: TokenEntry): CharAtlasResult {
+  const [bg, palette, , chars] = td;
+  // Key by palette + chars for caching
+  const key = palette.join(',') + '|' + Object.values(chars).join(',') + '|' + bg;
+  if (charAtlasCache.has(key)) return charAtlasCache.get(key)!;
+
+  // 10 classes (a-j), one tile each. Layout: 10 columns × 1 row
+  const numTiles = 10;
+  const canvas = document.createElement('canvas');
+  canvas.width = numTiles * CHAR_PX;
+  canvas.height = CHAR_PX;
+  const ctx = canvas.getContext('2d')!;
+
+  // Fill background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const fontSize = Math.floor(CHAR_PX * 0.82);
+  ctx.font = `${fontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const tileMap = new Map<string, { u0: number; v0: number; u1: number; v1: number }>();
+
+  for (let i = 0; i < 10; i++) {
+    const cls = String.fromCharCode(97 + i); // 'a' to 'j'
+    const color = palette[i] || '#fff';
+    const char = chars[cls] || ' ';
+
+    // Draw character in its color on the bg
+    ctx.fillStyle = bg;
+    ctx.fillRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
+    ctx.fillStyle = color;
+    ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
+
+    tileMap.set(cls, {
+      u0: i / numTiles,
+      v0: 0,
+      u1: (i + 1) / numTiles,
+      v1: 1,
+    });
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const result = { texture, tileMap };
+  charAtlasCache.set(key, result);
+  return result;
+}
+
+/** Build merged geometry: 1024 upward-facing quads at correct heights, UVs to atlas. */
+function buildCharGeometry(td: TokenEntry, atlas: CharAtlasResult): THREE.BufferGeometry {
+  const [, , classGrid] = td;
+  const N = GRID_SIZE * GRID_SIZE;
+  const positions = new Float32Array(N * 4 * 3);
+  const uvs = new Float32Array(N * 4 * 2);
+  const indices = new Uint32Array(N * 6);
+  const half = CELL * 0.47;
+
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      const i = row * GRID_SIZE + col;
+      const cls = classGrid[i];
+      const clsIdx = cls.charCodeAt(0) - 97;
+      const height = (9 - clsIdx) * HEIGHT_UNIT;
+
+      // Quad center in local space (origin = parcel center)
+      const cx = (col - GRID_SIZE / 2 + 0.5) * CELL;
+      const cy = height;
+      const cz = (row - GRID_SIZE / 2 + 0.5) * CELL;
+
+      // 4 vertices: quad on XZ plane facing Y-up
+      const vi = i * 4;
+      positions[vi * 3] = cx - half;     positions[vi * 3 + 1] = cy; positions[vi * 3 + 2] = cz - half;
+      positions[(vi+1) * 3] = cx + half; positions[(vi+1) * 3 + 1] = cy; positions[(vi+1) * 3 + 2] = cz - half;
+      positions[(vi+2) * 3] = cx + half; positions[(vi+2) * 3 + 1] = cy; positions[(vi+2) * 3 + 2] = cz + half;
+      positions[(vi+3) * 3] = cx - half; positions[(vi+3) * 3 + 1] = cy; positions[(vi+3) * 3 + 2] = cz + half;
+
+      // UVs: map to the right atlas tile for this class
+      const tile = atlas.tileMap.get(cls);
+      const u0 = tile?.u0 ?? 0, u1 = tile?.u1 ?? 0.1;
+      // v: 0=top, 1=bottom in Three.js UV space
+      uvs[vi * 2] = u0;     uvs[vi * 2 + 1] = 1;
+      uvs[(vi+1) * 2] = u1; uvs[(vi+1) * 2 + 1] = 1;
+      uvs[(vi+2) * 2] = u1; uvs[(vi+2) * 2 + 1] = 0;
+      uvs[(vi+3) * 2] = u0; uvs[(vi+3) * 2 + 1] = 0;
+
+      // Two triangles
+      const ii = i * 6;
+      indices[ii] = vi; indices[ii+1] = vi+1; indices[ii+2] = vi+2;
+      indices[ii+3] = vi; indices[ii+4] = vi+2; indices[ii+5] = vi+3;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  return geo;
+}
+
+/** One parcel: merged character quads at height levels. */
+function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
+  tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  heightScale: number;
 }) {
   const { cx, cy, cz, scale } = normalization;
   const px = (parcel.sx - cx) * scale;
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
 
-  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const intervalRef = useRef<number>(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const html = await rpcClient.readContract({
-          address: TERRAFORMS_ADDRESS_2, abi: TOKEN_HTML_ABI_2,
-          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
-        });
-        if (cancelled) return;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
-        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
-        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
-        document.body.appendChild(iframe);
-        iframeRef.current = iframe;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = ANIM_TEX;
-        canvas.height = ANIM_TEX;
-
-        iframe.onload = () => {
-          if (cancelled) return;
-          const tex = new THREE.CanvasTexture(canvas);
-          tex.magFilter = THREE.NearestFilter;
-          tex.minFilter = THREE.NearestFilter;
-          tex.colorSpace = THREE.SRGBColorSpace;
-
-          const capture = () => {
-            const doc = iframe.contentDocument;
-            if (!doc) return;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-            const gridEls = doc.querySelectorAll('.r p, .meta p');
-            if (gridEls.length < 1024) return;
-
-            const cellW = ANIM_TEX / GRID_SIZE;
-            const cellH = ANIM_TEX / GRID_SIZE;
-            const fontSize = Math.floor(cellH * 0.85);
-            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
-            ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, ANIM_TEX, ANIM_TEX);
-            ctx.font = `${fontSize}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
-              const el = gridEls[i] as HTMLElement;
-              const row = Math.floor(i / GRID_SIZE);
-              const col = i % GRID_SIZE;
-              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
-              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
-            }
-            tex.needsUpdate = true;
-          };
-
-          setTimeout(() => {
-            capture();
-            setTexture(tex);
-            intervalRef.current = window.setInterval(capture, 250);
-          }, 800);
-        };
-      } catch { /* fallback: no overlay */ }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (iframeRef.current) {
-        try { document.body.removeChild(iframeRef.current); } catch {}
-        iframeRef.current = null;
-      }
-    };
-  }, [parcel.tokenId]);
-
-  if (!texture) return null;
+  const atlas = useMemo(() => buildCharAtlas(tokenData), [tokenData]);
+  const geometry = useMemo(() => buildCharGeometry(tokenData, atlas), [tokenData, atlas]);
 
   return (
-    <mesh
-      geometry={animPlaneGeo}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[px, py + 0.03, pz]}
-      raycast={() => {}} // pass-through — atlas handles interaction
-    >
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} transparent opacity={0.95} />
-    </mesh>
+    <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
+      <mesh geometry={geometry} raycast={() => {}}>
+        <meshBasicMaterial map={atlas.texture} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
-/** Renders animated overlays for nearest parcels. */
-function AnimOverlay({
-  parcels,
-  terrainData,
-  cameraRef,
-  normalization,
+/** Renders character terrain for nearest parcels. */
+function CharOverlay({
+  parcels, terrainData, cameraRef, normalization, heightScale,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  heightScale: number;
 }) {
   const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
   useFrame(() => {
     const cam = cameraRef.current;
     if (!cam) return;
-    const camPos = cam.position;
     const { cx, cy, cz, scale } = normalization;
+    const camPos = cam.position;
 
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
       if (!terrainData.tokens[p.tokenId]) continue;
-      const ppx = (p.sx - cx) * scale;
-      const ppy = (p.sy - cy) * scale;
-      const ppz = (p.sz - cz) * scale;
-      const dist = Math.sqrt((camPos.x - ppx) ** 2 + (camPos.y - ppy) ** 2 + (camPos.z - ppz) ** 2);
-      if (dist < ANIM_DISTANCE) scored.push([p, dist]);
+      const dx = camPos.x - (p.sx - cx) * scale;
+      const dy = camPos.y - (p.sy - cy) * scale;
+      const dz = camPos.z - (p.sz - cz) * scale;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < CHAR_DISTANCE) scored.push([p, dist]);
     }
-
     scored.sort((a, b) => a[1] - b[1]);
-    // Only show animated parcels when zoomed into a cluster (3+ nearby)
-    const nearest = scored.length >= 3
-      ? scored.slice(0, MAX_ANIM_PARCELS).map(s => s[0])
-      : [];
-    const newIds = nearest.map(p => p.tokenId).join(',');
-    const oldIds = nearParcels.map(p => p.tokenId).join(',');
-    if (newIds !== oldIds) setNearParcels(nearest);
+    const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
+    const ids = nearest.map(p => p.tokenId).join(',');
+    if (ids !== nearParcels.map(p => p.tokenId).join(',')) setNearParcels(nearest);
   });
 
   return (
     <group>
-      {nearParcels.map(p => (
-        <AnimatedParcel key={p.tokenId} parcel={p} normalization={normalization} />
-      ))}
+      {nearParcels.map(p => {
+        const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
+        if (!td) return null;
+        return <CharTerrain key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
+      })}
     </group>
   );
 }
@@ -553,11 +568,12 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             heightScale={heightScale}
             saturation={saturation}
           />
-          <AnimOverlay
+          <CharOverlay
             parcels={parcels}
             terrainData={terrainData}
             cameraRef={cameraRef}
             normalization={normalization}
+            heightScale={heightScale}
           />
         </>
       )}
