@@ -1,7 +1,7 @@
 import { find, pipe } from 'remeda';
 import { createConfig, http, fallback, webSocket } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
-import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
+import { coinbaseWallet, injected, safe, walletConnect } from 'wagmi/connectors';
 
 import { CHAIN_ID, WALLET_CONNECT_V2_PROJECT_ID } from './config';
 
@@ -47,6 +47,7 @@ export const config = createConfig({
       appName: 'Nouns.WTF',
       appLogoUrl: 'https://nouns.wtf/static/media/logo.cdea1650.svg',
     }),
+    safe(),
   ],
 });
 
