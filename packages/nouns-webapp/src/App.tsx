@@ -46,7 +46,7 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 import NonsensePage from '@/pages/NonsensePage';
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
-import VotePage from '@/pages/Vote';
+const VotePageRouter = lazy(() => import('@/pages/Vote/VotePageRouter'));
 import { setActiveAccount } from '@/state/slices/account';
 import NocTicker from '@/components/NocTicker';
 import SaberOverlay from '@/components/SaberOverlay';
@@ -117,7 +117,14 @@ function AppRouter() {
         <Route path="/create-proposal" element={<CreateProposalPage />} />
         <Route path="/create-candidate" element={<CreateCandidatePage />} />
         <Route path="/vote" element={<GovernancePage />} />
-        <Route path="/vote/:id" element={<VotePage />} />
+        <Route
+          path="/vote/:id"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <VotePageRouter />
+            </Suspense>
+          }
+        />
         <Route path="/vote/:id/history" element={<ProposalHistory />} />
         <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
         <Route
