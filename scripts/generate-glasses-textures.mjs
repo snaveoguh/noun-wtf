@@ -101,10 +101,10 @@ for (let y = 0; y < H; y++) {
     if (a === 0) continue;
 
     const key = `${x},${y}`;
-    // Arm pixels (x < 7) are always left frame — even in back view where template has purple
-    if (x < 7) {
-      pixelRoles.set(key, 'frame_left');
-    } else if (dist(r, g, b, 255, 99, 141) < 20) {    // pink → left frame
+    // Arm pixels (x < 7) are classified by template color like everything else.
+    // The template 14.png has pink for left-arm pixels and purple for right-arm
+    // pixels, so the color-matching below handles them correctly.
+    if (dist(r, g, b, 255, 99, 141) < 20) {    // pink → left frame
       pixelRoles.set(key, 'frame_left');
     } else if (dist(r, g, b, 204, 5, 149) < 20) {     // purple → right frame
       pixelRoles.set(key, 'frame_right');

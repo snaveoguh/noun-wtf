@@ -81,19 +81,20 @@ export function buildGeometryFromVoxelMap(map: VoxelMap): THREE.BufferGeometry |
  * - head: full HEAD_DEPTH, pushed in front of accessory
  * - glasses: GLASSES_DEPTH, always top-most
  */
-export function buildNounGeometries(layers: NounLayers) {
+export function buildNounGeometries(layers: NounLayers, headDepth?: number) {
+  const hd = headDepth ?? HEAD_DEPTH;
   const bodyZ = 0.75; // shifted forward to align body front face flush with heads
   // Bling sits flush on body front face
   const blingZ = BODY_DEPTH / 2 + BLING_DEPTH / 2;
   // Head protrudes in front of accessory so it always reads above bling.
   const headZ = BODY_DEPTH / 2 - BLING_DEPTH / 2 + 0.03;
   // Glasses sit just in front of the head. Tiny offset prevents z-fighting.
-  const glassesZ = headZ + HEAD_DEPTH / 2 + GLASSES_DEPTH / 2 + 0.02;
+  const glassesZ = headZ + hd / 2 + GLASSES_DEPTH / 2 + 0.02;
 
   return {
     bodyGeo: buildMergedGeometry(layers.body, BODY_DEPTH, bodyZ),
     blingGeo: buildMergedGeometry(layers.bling, BLING_DEPTH, blingZ),
-    headGeo: buildMergedGeometry(layers.head, HEAD_DEPTH, headZ),
+    headGeo: buildMergedGeometry(layers.head, hd, headZ),
     glassesGeo: buildMergedGeometry(layers.glasses, GLASSES_DEPTH, glassesZ),
   };
 }
