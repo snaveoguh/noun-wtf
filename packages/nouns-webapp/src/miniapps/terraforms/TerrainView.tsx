@@ -317,153 +317,147 @@ function AllParcelsInstanced({
   );
 }
 
-// ─── ASCII Character Terrain Overlay (nearest parcels) ────────────────────
+// ─── ASCII Character Terrain (nearest parcels) ───────────────────────────
 //
-// Each cell is a flat square with the actual ASCII character rendered on it,
-// positioned at (col, height, row). Looking from above = identical to the NFT.
-// Height between characters creates the 3D relief.
+// Merged BufferGeometry per parcel: 1024 quads, each with correct UVs
+// pointing to the right character tile in an atlas. Standard meshBasicMaterial.
+// Each quad faces up at its height level. No custom shaders.
 
 const CHAR_DISTANCE = 30;
 const MAX_CHAR_PARCELS = 15;
 const CELL_SIZE = PARCEL_SIZE / GRID_SIZE;
+const CHAR_TILE = 32; // px per character tile in atlas
 
-// Build a character sprite atlas: each unique char gets a tile in a texture
-const charAtlasCache = new Map<string, { texture: THREE.CanvasTexture; uvMap: Map<string, number> }>();
+/**
+ * Build merged geometry + texture for one parcel.
+ * 1024 quads facing up (-PI/2 on X), each at its height, UVs → character atlas.
+ */
+function buildParcelCharMesh(
+  td: TokenEntry,
+  parcelPos: [number, number, number],
+  heightScale: number,
+): { geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture } {
+  const [bg, palette, classGrid, chars] = td;
 
-function getCharAtlas(chars: Record<string, string>, palette: string[], bg: string) {
-  // Unique chars across all classes
+  // Build character atlas: each unique (char, colorIdx) combo gets a tile
+  // Layout: one row, each tile is CHAR_TILE × CHAR_TILE
   const uniqueChars = [...new Set(Object.values(chars))].filter(c => c && c !== ' ');
-  const key = uniqueChars.join('|') + bg;
-  if (charAtlasCache.has(key)) return charAtlasCache.get(key)!;
+  if (uniqueChars.length === 0) uniqueChars.push('?');
+  const numClasses = 10; // a-j
+  const tilesPerRow = uniqueChars.length;
+  const atlasW = tilesPerRow * CHAR_TILE;
+  const atlasH = numClasses * CHAR_TILE;
 
-  const TILE = 64; // px per character tile
-  const cols = Math.max(1, uniqueChars.length);
   const canvas = document.createElement('canvas');
-  canvas.width = cols * TILE;
-  canvas.height = TILE;
+  canvas.width = atlasW;
+  canvas.height = atlasH;
   const ctx = canvas.getContext('2d')!;
-
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = `${Math.floor(TILE * 0.85)}px monospace`;
+  ctx.fillRect(0, 0, atlasW, atlasH);
+
+  const fontSize = Math.floor(CHAR_TILE * 0.85);
+  ctx.font = `${fontSize}px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const uvMap = new Map<string, number>();
-  uniqueChars.forEach((char, i) => {
-    ctx.fillStyle = '#ffffff'; // white — we'll tint with vertex color
-    ctx.fillText(char, i * TILE + TILE / 2, TILE / 2);
-    uvMap.set(char, i);
-  });
+  // charIdx map: character string → column index
+  const charCol = new Map<string, number>();
+  uniqueChars.forEach((c, i) => charCol.set(c, i));
+
+  // Draw all (char, class) combinations
+  for (let cls = 0; cls < numClasses; cls++) {
+    const color = palette[cls] || '#fff';
+    ctx.fillStyle = color;
+    for (let ci = 0; ci < uniqueChars.length; ci++) {
+      ctx.fillText(uniqueChars[ci], ci * CHAR_TILE + CHAR_TILE / 2, cls * CHAR_TILE + CHAR_TILE / 2);
+    }
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.colorSpace = THREE.SRGBColorSpace;
 
-  const result = { texture, uvMap };
-  charAtlasCache.set(key, result);
-  return result;
+  // Build merged geometry: 1024 quads
+  const numQuads = GRID_SIZE * GRID_SIZE;
+  const positions = new Float32Array(numQuads * 4 * 3); // 4 verts × 3 coords
+  const uvs = new Float32Array(numQuads * 4 * 2);
+  const indices = new Uint32Array(numQuads * 6);
+  const halfCell = CELL_SIZE * 0.48;
+
+  const [px, py, pz] = parcelPos;
+
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      const cellIdx = row * GRID_SIZE + col;
+      const cls = classGrid[cellIdx];
+      const clsIdx = cls.charCodeAt(0) - 97;
+      const height = 9 - clsIdx;
+      const char = chars[cls] || ' ';
+
+      const cx = px + (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+      const cy = py + height * heightScale * 0.04;
+      const cz = pz + (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+
+      // 4 vertices of a quad facing up (on XZ plane)
+      const vi = cellIdx * 4;
+      // v0: top-left, v1: top-right, v2: bottom-right, v3: bottom-left
+      positions[vi * 3]     = cx - halfCell; positions[vi * 3 + 1] = cy; positions[vi * 3 + 2] = cz - halfCell;
+      positions[(vi+1) * 3] = cx + halfCell; positions[(vi+1) * 3 + 1] = cy; positions[(vi+1) * 3 + 2] = cz - halfCell;
+      positions[(vi+2) * 3] = cx + halfCell; positions[(vi+2) * 3 + 1] = cy; positions[(vi+2) * 3 + 2] = cz + halfCell;
+      positions[(vi+3) * 3] = cx - halfCell; positions[(vi+3) * 3 + 1] = cy; positions[(vi+3) * 3 + 2] = cz + halfCell;
+
+      // UVs: map to the right tile in atlas
+      const charC = charCol.get(char) ?? 0;
+      const u0 = charC / tilesPerRow;
+      const u1 = (charC + 1) / tilesPerRow;
+      const v0 = clsIdx / numClasses;
+      const v1 = (clsIdx + 1) / numClasses;
+
+      uvs[vi * 2]     = u0; uvs[vi * 2 + 1] = 1 - v0;
+      uvs[(vi+1) * 2] = u1; uvs[(vi+1) * 2 + 1] = 1 - v0;
+      uvs[(vi+2) * 2] = u1; uvs[(vi+2) * 2 + 1] = 1 - v1;
+      uvs[(vi+3) * 2] = u0; uvs[(vi+3) * 2 + 1] = 1 - v1;
+
+      // Two triangles per quad
+      const ii = cellIdx * 6;
+      indices[ii]   = vi; indices[ii+1] = vi+1; indices[ii+2] = vi+2;
+      indices[ii+3] = vi; indices[ii+4] = vi+2; indices[ii+5] = vi+3;
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeVertexNormals();
+
+  return { geometry, texture };
 }
 
-// Shared plane geometry for character sprites (faces up)
-const charPlaneGeo = new THREE.PlaneGeometry(CELL_SIZE * 0.95, CELL_SIZE * 0.95);
-
-/** Renders one parcel as 1024 instanced ASCII characters at correct heights. */
+/** One parcel rendered as merged ASCII character quads. */
 function CharParcel({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
   heightScale: number;
 }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
   const { cx, cy, cz, scale } = normalization;
-  const px = (parcel.sx - cx) * scale;
-  const py = (parcel.sy - cy) * scale;
-  const pz = (parcel.sz - cz) * scale;
+  const pos: [number, number, number] = [
+    (parcel.sx - cx) * scale,
+    (parcel.sy - cy) * scale,
+    (parcel.sz - cz) * scale,
+  ];
 
-  const [, palette, classGrid, chars] = tokenData;
-  const charAtlas = useMemo(() => getCharAtlas(chars, palette, tokenData[0]), [chars, palette, tokenData]);
-  const totalChars = charAtlas.uvMap.size || 1;
-
-  // Custom material: character atlas tinted by vertex color
-  const material = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      uniforms: { charTex: { value: charAtlas.texture } },
-      vertexShader: `
-        attribute float charIdx;
-        attribute float charCount;
-        varying vec2 vUv;
-        varying vec3 vColor;
-        void main() {
-          // Map UV to the right character tile in the atlas
-          float u = (uv.x + charIdx) / charCount;
-          vUv = vec2(u, uv.y);
-          vColor = instanceColor;
-          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D charTex;
-        varying vec2 vUv;
-        varying vec3 vColor;
-        void main() {
-          vec4 tex = texture2D(charTex, vUv);
-          // White character → tint with vertex color. Black bg → transparent
-          float alpha = tex.r; // character is white on black
-          if (alpha < 0.1) discard;
-          gl_FragColor = vec4(vColor * alpha, 1.0);
-        }
-      `,
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-  }, [charAtlas]);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-
-    const charIdxArr = new Float32Array(GRID_SIZE * GRID_SIZE);
-    const charCountArr = new Float32Array(GRID_SIZE * GRID_SIZE);
-
-    for (let row = 0; row < GRID_SIZE; row++) {
-      for (let col = 0; col < GRID_SIZE; col++) {
-        const idx = row * GRID_SIZE + col;
-        const cls = classGrid[idx];
-        const clsIdx = cls.charCodeAt(0) - 97;
-        const height = 9 - clsIdx;
-        const char = chars[cls] || ' ';
-
-        const h = height * heightScale * 0.04;
-        const ox = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
-        const oz = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
-
-        // Position: flat on XZ plane at height Y
-        tempObj.position.set(px + ox, py + h, pz + oz);
-        tempObj.rotation.set(-Math.PI / 2, 0, 0); // face up
-        tempObj.scale.setScalar(1);
-        tempObj.updateMatrix();
-        mesh.setMatrixAt(idx, tempObj.matrix);
-
-        // Color from palette
-        tempColor.set(height > 0 ? (palette[clsIdx] || '#fff') : (tokenData[0] || '#000'));
-        mesh.setColorAt(idx, tempColor);
-
-        // Character index in atlas
-        charIdxArr[idx] = charAtlas.uvMap.get(char) ?? 0;
-        charCountArr[idx] = totalChars;
-      }
-    }
-
-    mesh.geometry.setAttribute('charIdx', new THREE.InstancedBufferAttribute(charIdxArr, 1));
-    mesh.geometry.setAttribute('charCount', new THREE.InstancedBufferAttribute(charCountArr, 1));
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [tokenData, normalization, heightScale, charAtlas, totalChars]);
+  const { geometry, texture } = useMemo(
+    () => buildParcelCharMesh(tokenData, pos, heightScale),
+    [tokenData, pos[0], pos[1], pos[2], heightScale],
+  );
 
   return (
-    <instancedMesh ref={meshRef} args={[charPlaneGeo, material, GRID_SIZE * GRID_SIZE]} />
+    <mesh geometry={geometry}>
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
+    </mesh>
   );
 }
 
