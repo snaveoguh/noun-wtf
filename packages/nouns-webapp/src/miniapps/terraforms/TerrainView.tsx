@@ -49,10 +49,10 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 80; // show terrain for most visible parcels
-const MAX_TERRAIN_PARCELS = 60;
+const NEAR_DISTANCE = 200; // show terrain for all visible parcels
+const MAX_TERRAIN_PARCELS = 200;
 const MAX_ANIMATED = 6; // closest N get live animation from tokenHTML
-const PARCEL_SIZE = 1.2;
+const PARCEL_SIZE = 1.4; // slightly larger so art is more visible
 const GRID_SIZE = 32;
 const TEX_RES = 512;
 const LRU_LIMIT = 50;
@@ -484,16 +484,7 @@ const TerrainScene: FC<TerrainViewProps> = ({
       <directionalLight position={[50, 80, 30]} intensity={0.8} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
 
-      {/* Far: small colored dots for castle structure visibility */}
-      <FarCubes
-        parcels={parcels}
-        normalization={normalization}
-        onClickParcel={onClickParcel}
-        hoveredId={hoveredId}
-        setHoveredId={setHoveredId}
-      />
-
-      {/* Near: displacement-mapped ASCII art terrain (replaces dots when close) */}
+      {/* ASCII art terrain planes only — no cubes, no dots */}
       {terrainData && (
         <TerrainPlanes
           parcels={parcels}
