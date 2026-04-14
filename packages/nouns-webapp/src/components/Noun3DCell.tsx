@@ -322,6 +322,12 @@ function NounMesh({
             {glbMeshes.map((m, i) => (
               <mesh key={i} geometry={m.geometry} material={m.material} />
             ))}
+            {/* Hip-rose (glasses index 0): GLB glasses hidden, show voxel glasses instead */}
+            {cell.seed.glasses === 0 && geos.glassesGeo && (
+              <mesh geometry={geos.glassesGeo}>
+                <meshBasicMaterial vertexColors toneMapped={false} />
+              </mesh>
+            )}
           </>
         ) : (
           <>
