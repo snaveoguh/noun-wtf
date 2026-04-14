@@ -53,7 +53,6 @@ const NEAR_DISTANCE = 80; // show terrain for most visible parcels
 const MAX_TERRAIN_PARCELS = 60;
 const MAX_ANIMATED = 6; // closest N get live animation from tokenHTML
 const PARCEL_SIZE = 1.2;
-const HEIGHT_SCALE = 0.05;
 const GRID_SIZE = 32;
 const TEX_RES = 512;
 const LRU_LIMIT = 50;
@@ -67,7 +66,6 @@ type TokenEntry = [string, string[], string, Record<string, string>];
 
 // LRU caches (module-level, persist across re-renders)
 const textureCache = new Map<number, THREE.CanvasTexture>();
-const geometryCache = new Map<number, THREE.PlaneGeometry>();
 
 function evictLRU<T extends { dispose(): void }>(cache: Map<number, T>, limit: number) {
   while (cache.size > limit) {
@@ -126,35 +124,8 @@ function getOrCreateTexture(tokenId: number, td: TokenEntry): THREE.CanvasTextur
   return tex;
 }
 
-/** Create PlaneGeometry with vertex displacement from height data. */
-function getOrCreateGeometry(tokenId: number, classGrid: string): THREE.PlaneGeometry {
-  let geo = geometryCache.get(tokenId);
-  if (geo) {
-    geometryCache.delete(tokenId);
-    geometryCache.set(tokenId, geo);
-    return geo;
-  }
-
-  geo = new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE);
-  // PlaneGeometry has (segments+1)^2 vertices = 33x33
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const col = i % (GRID_SIZE + 1);
-    const row = Math.floor(i / (GRID_SIZE + 1));
-    const gc = Math.min(col, GRID_SIZE - 1);
-    const gr = Math.min(row, GRID_SIZE - 1);
-    const cls = classGrid[gr * GRID_SIZE + gc];
-    const clsIdx = cls.charCodeAt(0) - 97;
-    const height = (9 - clsIdx) * HEIGHT_SCALE;
-    pos.setZ(i, height); // Z before rotation → Y after -PI/2 X rotation
-  }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
-
-  geometryCache.set(tokenId, geo);
-  evictLRU(geometryCache, LRU_LIMIT);
-  return geo;
-}
+// Shared flat plane geometry — no displacement, the ASCII art IS the depth
+const flatPlaneGeo = new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE);
 
 // ─── Single Terrain Plane (one parcel) ────────────────────────────────────
 
@@ -169,20 +140,14 @@ function TerrainPlane({ parcel, tokenData, normalization }: {
   const pz = (parcel.sz - cz) * scale;
 
   const texture = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
-  const geometry = useMemo(() => getOrCreateGeometry(parcel.tokenId, tokenData[2]), [parcel.tokenId, tokenData]);
 
   return (
     <mesh
-      geometry={geometry}
+      geometry={flatPlaneGeo}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[px, py + 0.01, pz]}
     >
-      <meshStandardMaterial
-        map={texture}
-        side={THREE.DoubleSide}
-        roughness={0.6}
-        metalness={0.05}
-      />
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
     </mesh>
   );
 }
@@ -211,8 +176,6 @@ function AnimatedTerrainPlane({ parcel, tokenData, normalization }: {
   const px = (parcel.sx - cx) * scale;
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
-
-  const geometry = useMemo(() => getOrCreateGeometry(parcel.tokenId, tokenData[2]), [parcel.tokenId, tokenData]);
 
   // Start with static texture, upgrade to animated when iframe loads
   const staticTex = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
@@ -313,8 +276,8 @@ function AnimatedTerrainPlane({ parcel, tokenData, normalization }: {
   }, [parcel.tokenId]);
 
   return (
-    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.01, pz]}>
-      <meshStandardMaterial map={texture} side={THREE.DoubleSide} roughness={0.6} metalness={0.05} />
+    <mesh geometry={flatPlaneGeo} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.01, pz]}>
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
     </mesh>
   );
 }
