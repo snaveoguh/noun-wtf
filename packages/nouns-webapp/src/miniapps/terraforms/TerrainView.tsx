@@ -291,6 +291,147 @@ function AllParcelsInstanced({
   );
 }
 
+// ─── Hi-Res ASCII Overlay (nearest parcels) ──────────────────────────────
+
+const HIRES_DISTANCE = 25;
+const MAX_HIRES = 25;
+const HIRES_TEX = 512;
+
+const hiresTextureCache = new Map<number, THREE.CanvasTexture>();
+
+function createHiresTexture(tokenId: number, td: TokenEntry): THREE.CanvasTexture {
+  let tex = hiresTextureCache.get(tokenId);
+  if (tex) return tex;
+
+  const [bg, palette, classGrid, chars] = td;
+  const canvas = document.createElement('canvas');
+  canvas.width = HIRES_TEX;
+  canvas.height = HIRES_TEX;
+  const ctx = canvas.getContext('2d')!;
+  const cellW = HIRES_TEX / GRID_SIZE;
+  const cellH = HIRES_TEX / GRID_SIZE;
+  const fontSize = Math.floor(cellH * 0.88);
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, HIRES_TEX, HIRES_TEX);
+  ctx.font = `${fontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const cls = classGrid[r * GRID_SIZE + c];
+      const clsIdx = cls.charCodeAt(0) - 97;
+      ctx.fillStyle = palette[clsIdx] || '#fff';
+      ctx.fillText(chars[cls] || ' ', c * cellW + cellW / 2, r * cellH + cellH / 2);
+    }
+  }
+
+  tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  hiresTextureCache.set(tokenId, tex);
+  // Evict old entries
+  if (hiresTextureCache.size > 60) {
+    const oldest = hiresTextureCache.keys().next().value;
+    if (oldest !== undefined) {
+      hiresTextureCache.get(oldest)?.dispose();
+      hiresTextureCache.delete(oldest);
+    }
+  }
+  return tex;
+}
+
+/** Hi-res ASCII plane with character-level displacement for one parcel. */
+function HiresTerrainPlane({ parcel, tokenData, normalization }: {
+  parcel: ParcelData;
+  tokenData: TokenEntry;
+  normalization: { cx: number; cy: number; cz: number; scale: number };
+}) {
+  const { cx, cy, cz, scale } = normalization;
+  const px = (parcel.sx - cx) * scale;
+  const py = (parcel.sy - cy) * scale;
+  const pz = (parcel.sz - cz) * scale;
+
+  const texture = useMemo(() => createHiresTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
+
+  // Geometry with per-vertex height from class data
+  const geometry = useMemo(() => {
+    const geo = new THREE.PlaneGeometry(PARCEL_SIZE * 1.01, PARCEL_SIZE * 1.01, GRID_SIZE, GRID_SIZE);
+    const pos = geo.attributes.position;
+    const classGrid = tokenData[2];
+    for (let i = 0; i < pos.count; i++) {
+      const col = i % (GRID_SIZE + 1);
+      const row = Math.floor(i / (GRID_SIZE + 1));
+      const gc = Math.min(col, GRID_SIZE - 1);
+      const gr = Math.min(row, GRID_SIZE - 1);
+      const cls = classGrid[gr * GRID_SIZE + gc];
+      const clsIdx = cls.charCodeAt(0) - 97;
+      const height = (9 - clsIdx) * HEIGHT_SCALE;
+      pos.setZ(i, height);
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }, [tokenData]);
+
+  return (
+    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.02, pz]}>
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+/** Renders hi-res ASCII overlays for the nearest parcels. */
+function HiresOverlay({
+  parcels,
+  terrainData,
+  cameraRef,
+  normalization,
+}: {
+  parcels: ParcelData[];
+  terrainData: TerrainData;
+  cameraRef: React.RefObject<THREE.Camera | null>;
+  normalization: { cx: number; cy: number; cz: number; scale: number };
+}) {
+  const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
+
+  useFrame(() => {
+    const cam = cameraRef.current;
+    if (!cam) return;
+    const camPos = cam.position;
+    const { cx, cy, cz, scale } = normalization;
+
+    const scored: [ParcelData, number][] = [];
+    for (const p of parcels) {
+      if (!terrainData.tokens[p.tokenId]) continue;
+      const px = (p.sx - cx) * scale;
+      const py = (p.sy - cy) * scale;
+      const pz = (p.sz - cz) * scale;
+      const dist = Math.sqrt((camPos.x - px) ** 2 + (camPos.y - py) ** 2 + (camPos.z - pz) ** 2);
+      if (dist < HIRES_DISTANCE) scored.push([p, dist]);
+    }
+
+    scored.sort((a, b) => a[1] - b[1]);
+    const nearest = scored.slice(0, MAX_HIRES).map(s => s[0]);
+    const newIds = nearest.map(p => p.tokenId).join(',');
+    const oldIds = nearParcels.map(p => p.tokenId).join(',');
+    if (newIds !== oldIds) setNearParcels(nearest);
+  });
+
+  return (
+    <group>
+      {nearParcels.map(p => {
+        const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
+        if (!td) return null;
+        return <HiresTerrainPlane key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} />;
+      })}
+    </group>
+  );
+}
+
 // ─── Far Cubes (all parcels, LOD fallback) ─────────────────────────────────
 
 function FarCubes({
@@ -418,16 +559,24 @@ const TerrainScene: FC<TerrainViewProps> = ({
       <directionalLight position={[50, 80, 30]} intensity={0.8} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
 
-      {/* All 9,910 parcels as ASCII art planes — single draw call via atlas */}
+      {/* All 9,910 parcels — atlas for overview + hi-res ASCII when close */}
       {terrainData && (
-        <AllParcelsInstanced
-          parcels={parcels}
-          terrainData={terrainData}
-          normalization={normalization}
-          onClickParcel={onClickParcel}
-          hoveredId={hoveredId}
-          setHoveredId={setHoveredId}
-        />
+        <>
+          <AllParcelsInstanced
+            parcels={parcels}
+            terrainData={terrainData}
+            normalization={normalization}
+            onClickParcel={onClickParcel}
+            hoveredId={hoveredId}
+            setHoveredId={setHoveredId}
+          />
+          <HiresOverlay
+            parcels={parcels}
+            terrainData={terrainData}
+            cameraRef={cameraRef}
+            normalization={normalization}
+          />
+        </>
       )}
 
       <OrbitControls
