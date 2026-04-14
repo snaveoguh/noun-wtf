@@ -317,19 +317,60 @@ function AllParcelsInstanced({
   );
 }
 
-// ─── Voxel Block Overlay (nearest parcels) ────────────────────────────────
+// ─── ASCII Character Terrain Overlay (nearest parcels) ────────────────────
 //
-// Each cell of the 32×32 grid rendered as a flat-topped colored block
-// at its correct height. No texture stretching — blocks are solid color.
-// This matches the TerraformBoxBuilder approach from ThousandAnt.
+// Each cell is a flat square with the actual ASCII character rendered on it,
+// positioned at (col, height, row). Looking from above = identical to the NFT.
+// Height between characters creates the 3D relief.
 
-const VOXEL_DISTANCE = 25;
-const MAX_VOXEL_PARCELS = 20;
-const CELL_SIZE = PARCEL_SIZE / GRID_SIZE; // size of one cell in scene units
-const boxGeo = new THREE.BoxGeometry(CELL_SIZE * 0.95, 1, CELL_SIZE * 0.95); // Y=1, scaled per instance
+const CHAR_DISTANCE = 30;
+const MAX_CHAR_PARCELS = 15;
+const CELL_SIZE = PARCEL_SIZE / GRID_SIZE;
 
-/** Renders one parcel as 1024 instanced colored blocks at correct heights. */
-function VoxelParcel({ parcel, tokenData, normalization, heightScale }: {
+// Build a character sprite atlas: each unique char gets a tile in a texture
+const charAtlasCache = new Map<string, { texture: THREE.CanvasTexture; uvMap: Map<string, number> }>();
+
+function getCharAtlas(chars: Record<string, string>, palette: string[], bg: string) {
+  // Unique chars across all classes
+  const uniqueChars = [...new Set(Object.values(chars))].filter(c => c && c !== ' ');
+  const key = uniqueChars.join('|') + bg;
+  if (charAtlasCache.has(key)) return charAtlasCache.get(key)!;
+
+  const TILE = 64; // px per character tile
+  const cols = Math.max(1, uniqueChars.length);
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * TILE;
+  canvas.height = TILE;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `${Math.floor(TILE * 0.85)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const uvMap = new Map<string, number>();
+  uniqueChars.forEach((char, i) => {
+    ctx.fillStyle = '#ffffff'; // white — we'll tint with vertex color
+    ctx.fillText(char, i * TILE + TILE / 2, TILE / 2);
+    uvMap.set(char, i);
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const result = { texture, uvMap };
+  charAtlasCache.set(key, result);
+  return result;
+}
+
+// Shared plane geometry for character sprites (faces up)
+const charPlaneGeo = new THREE.PlaneGeometry(CELL_SIZE * 0.95, CELL_SIZE * 0.95);
+
+/** Renders one parcel as 1024 instanced ASCII characters at correct heights. */
+function CharParcel({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
@@ -341,59 +382,93 @@ function VoxelParcel({ parcel, tokenData, normalization, heightScale }: {
   const py = (parcel.sy - cy) * scale;
   const pz = (parcel.sz - cz) * scale;
 
+  const [, palette, classGrid, chars] = tokenData;
+  const charAtlas = useMemo(() => getCharAtlas(chars, palette, tokenData[0]), [chars, palette, tokenData]);
+  const totalChars = charAtlas.uvMap.size || 1;
+
+  // Custom material: character atlas tinted by vertex color
+  const material = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      uniforms: { charTex: { value: charAtlas.texture } },
+      vertexShader: `
+        attribute float charIdx;
+        attribute float charCount;
+        varying vec2 vUv;
+        varying vec3 vColor;
+        void main() {
+          // Map UV to the right character tile in the atlas
+          float u = (uv.x + charIdx) / charCount;
+          vUv = vec2(u, uv.y);
+          vColor = instanceColor;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D charTex;
+        varying vec2 vUv;
+        varying vec3 vColor;
+        void main() {
+          vec4 tex = texture2D(charTex, vUv);
+          // White character → tint with vertex color. Black bg → transparent
+          float alpha = tex.r; // character is white on black
+          if (alpha < 0.1) discard;
+          gl_FragColor = vec4(vColor * alpha, 1.0);
+        }
+      `,
+      side: THREE.DoubleSide,
+      transparent: true,
+    });
+  }, [charAtlas]);
+
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
 
-    const [, palette, classGrid] = tokenData;
-    let idx = 0;
+    const charIdxArr = new Float32Array(GRID_SIZE * GRID_SIZE);
+    const charCountArr = new Float32Array(GRID_SIZE * GRID_SIZE);
 
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
-        const cls = classGrid[row * GRID_SIZE + col];
+        const idx = row * GRID_SIZE + col;
+        const cls = classGrid[idx];
         const clsIdx = cls.charCodeAt(0) - 97;
-        const height = 9 - clsIdx; // a=9 peak, j=0 bg
+        const height = 9 - clsIdx;
+        const char = chars[cls] || ' ';
 
-        if (height === 0) {
-          // Hide background cells
-          tempObj.scale.set(0, 0, 0);
-          tempObj.updateMatrix();
-          mesh.setMatrixAt(idx, tempObj.matrix);
-          tempColor.set('#000');
-          mesh.setColorAt(idx, tempColor);
-          idx++;
-          continue;
-        }
-
-        const h = height * heightScale * 0.04; // scale with slider
+        const h = height * heightScale * 0.04;
         const ox = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
         const oz = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
 
-        tempObj.position.set(px + ox, py + h / 2, pz + oz);
-        tempObj.scale.set(1, Math.max(0.01, h), 1);
-        tempObj.rotation.set(0, 0, 0);
+        // Position: flat on XZ plane at height Y
+        tempObj.position.set(px + ox, py + h, pz + oz);
+        tempObj.rotation.set(-Math.PI / 2, 0, 0); // face up
+        tempObj.scale.setScalar(1);
         tempObj.updateMatrix();
         mesh.setMatrixAt(idx, tempObj.matrix);
 
-        tempColor.set(palette[clsIdx] || '#fff');
+        // Color from palette
+        tempColor.set(height > 0 ? (palette[clsIdx] || '#fff') : (tokenData[0] || '#000'));
         mesh.setColorAt(idx, tempColor);
-        idx++;
+
+        // Character index in atlas
+        charIdxArr[idx] = charAtlas.uvMap.get(char) ?? 0;
+        charCountArr[idx] = totalChars;
       }
     }
 
+    mesh.geometry.setAttribute('charIdx', new THREE.InstancedBufferAttribute(charIdxArr, 1));
+    mesh.geometry.setAttribute('charCount', new THREE.InstancedBufferAttribute(charCountArr, 1));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [tokenData, normalization, heightScale]);
+  }, [tokenData, normalization, heightScale, charAtlas, totalChars]);
 
   return (
-    <instancedMesh ref={meshRef} args={[boxGeo, undefined, GRID_SIZE * GRID_SIZE]}>
-      <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} />
-    </instancedMesh>
+    <instancedMesh ref={meshRef} args={[charPlaneGeo, material, GRID_SIZE * GRID_SIZE]} />
   );
 }
 
-/** Renders voxel block overlays for nearest parcels. */
-function VoxelOverlay({
+/** Renders ASCII character overlays for nearest parcels. */
+function CharOverlay({
   parcels,
   terrainData,
   cameraRef,
@@ -421,11 +496,11 @@ function VoxelOverlay({
       const ppy = (p.sy - cy) * scale;
       const ppz = (p.sz - cz) * scale;
       const dist = Math.sqrt((camPos.x - ppx) ** 2 + (camPos.y - ppy) ** 2 + (camPos.z - ppz) ** 2);
-      if (dist < VOXEL_DISTANCE) scored.push([p, dist]);
+      if (dist < CHAR_DISTANCE) scored.push([p, dist]);
     }
 
     scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_VOXEL_PARCELS).map(s => s[0]);
+    const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
     const newIds = nearest.map(p => p.tokenId).join(',');
     const oldIds = nearParcels.map(p => p.tokenId).join(',');
     if (newIds !== oldIds) setNearParcels(nearest);
@@ -436,7 +511,7 @@ function VoxelOverlay({
       {nearParcels.map(p => {
         const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
         if (!td) return null;
-        return <VoxelParcel key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
+        return <CharParcel key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
       })}
     </group>
   );
@@ -580,7 +655,7 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             heightScale={heightScale}
             saturation={saturation}
           />
-          <VoxelOverlay
+          <CharOverlay
             parcels={parcels}
             terrainData={terrainData}
             cameraRef={cameraRef}
