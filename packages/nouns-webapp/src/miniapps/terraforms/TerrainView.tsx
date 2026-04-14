@@ -14,6 +14,8 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { useNavigate } from 'react-router';
 import * as THREE from 'three';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -47,13 +49,14 @@ interface TerrainViewProps {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const NEAR_DISTANCE = 30;
-const MAX_TERRAIN_PARCELS = 15;
-const PARCEL_SIZE = 1.2; // visual size of a parcel in scene units
-const HEIGHT_SCALE = 0.05; // height per level (max 9 = 0.45 unit)
+const NEAR_DISTANCE = 50;
+const MAX_TERRAIN_PARCELS = 40; // more parcels since no far cubes
+const MAX_ANIMATED = 8; // closest N get live animation from tokenHTML
+const PARCEL_SIZE = 1.2;
+const HEIGHT_SCALE = 0.05;
 const GRID_SIZE = 32;
-const TEX_RES = 512; // canvas texture resolution
-const LRU_LIMIT = 30; // max cached textures + geometries
+const TEX_RES = 512;
+const LRU_LIMIT = 50;
 
 const tempObj = new THREE.Object3D();
 const tempColor = new THREE.Color();
@@ -184,6 +187,138 @@ function TerrainPlane({ parcel, tokenData, normalization }: {
   );
 }
 
+// ─── Animated Terrain Plane (live tokenHTML → texture) ─────────────────────
+
+const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
+const TOKEN_HTML_ABI = [{
+  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
+  inputs: [{ name: 'tokenId', type: 'uint256' }],
+  outputs: [{ name: '', type: 'string' }],
+}] as const;
+
+const rpcClient = createPublicClient({
+  chain: mainnet,
+  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
+});
+
+/** Animated terrain: hidden iframe renders tokenHTML, we capture to texture every 200ms. */
+function AnimatedTerrainPlane({ parcel, tokenData, normalization }: {
+  parcel: ParcelData;
+  tokenData: TokenEntry;
+  normalization: { cx: number; cy: number; cz: number; scale: number };
+}) {
+  const { cx, cy, cz, scale } = normalization;
+  const px = (parcel.sx - cx) * scale;
+  const py = (parcel.sy - cy) * scale;
+  const pz = (parcel.sz - cz) * scale;
+
+  const geometry = useMemo(() => getOrCreateGeometry(parcel.tokenId, tokenData[2]), [parcel.tokenId, tokenData]);
+
+  // Start with static texture, upgrade to animated when iframe loads
+  const staticTex = useMemo(() => getOrCreateTexture(parcel.tokenId, tokenData), [parcel.tokenId, tokenData]);
+  const [texture, setTexture] = useState<THREE.CanvasTexture>(staticTex);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const intervalRef = useRef<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // Fetch tokenHTML
+    (async () => {
+      try {
+        const html = await rpcClient.readContract({
+          address: TERRAFORMS_ADDRESS, abi: TOKEN_HTML_ABI,
+          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
+        });
+        if (cancelled) return;
+
+        // Create hidden iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
+        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
+        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
+        document.body.appendChild(iframe);
+        iframeRef.current = iframe;
+
+        // Create capture canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = TEX_RES;
+        canvas.height = TEX_RES;
+        canvasRef.current = canvas;
+
+        // Wait for iframe to load, then start capturing
+        iframe.onload = () => {
+          if (cancelled) return;
+
+          const animTex = new THREE.CanvasTexture(canvas);
+          animTex.magFilter = THREE.NearestFilter;
+          animTex.minFilter = THREE.NearestFilter;
+          animTex.colorSpace = THREE.SRGBColorSpace;
+
+          const captureFrame = () => {
+            const doc = iframe.contentDocument;
+            if (!doc) return;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const gridEls = doc.querySelectorAll('.r p, .meta p');
+            if (gridEls.length < 1024) return;
+
+            const cellW = TEX_RES / GRID_SIZE;
+            const cellH = TEX_RES / GRID_SIZE;
+            const fontSize = Math.floor(cellH * 0.92);
+
+            // Read bg from iframe
+            const bg = getComputedStyle(doc.querySelector('.r') || doc.body).backgroundColor || '#000';
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, TEX_RES, TEX_RES);
+
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
+              const el = gridEls[i] as HTMLElement;
+              const row = Math.floor(i / GRID_SIZE);
+              const col = i % GRID_SIZE;
+              ctx.fillStyle = el.style.color || getComputedStyle(el).color || '#fff';
+              ctx.fillText(el.textContent || ' ', col * cellW + cellW / 2, row * cellH + cellH / 2);
+            }
+
+            animTex.needsUpdate = true;
+          };
+
+          // Capture first frame, then every 200ms
+          setTimeout(() => {
+            captureFrame();
+            setTexture(animTex);
+            intervalRef.current = window.setInterval(captureFrame, 200);
+          }, 500); // give animation JS time to start
+        };
+      } catch (err) {
+        // Fallback to static — already set
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (iframeRef.current) {
+        document.body.removeChild(iframeRef.current);
+        iframeRef.current = null;
+      }
+    };
+  }, [parcel.tokenId]);
+
+  return (
+    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[px, py + 0.01, pz]}>
+      <meshStandardMaterial map={texture} side={THREE.DoubleSide} roughness={0.6} metalness={0.05} />
+    </mesh>
+  );
+}
+
 // ─── Terrain Planes (near parcels) ────────────────────────────────────────
 
 function TerrainPlanes({
@@ -231,9 +366,21 @@ function TerrainPlanes({
 
   return (
     <group>
-      {nearParcels.map(p => {
+      {nearParcels.map((p, i) => {
         const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
         if (!td) return null;
+
+        // Closest parcels get live animation, rest get static texture
+        if (i < MAX_ANIMATED) {
+          return (
+            <AnimatedTerrainPlane
+              key={p.tokenId}
+              parcel={p}
+              tokenData={td}
+              normalization={normalization}
+            />
+          );
+        }
         return (
           <TerrainPlane
             key={p.tokenId}
@@ -374,16 +521,7 @@ const TerrainScene: FC<TerrainViewProps> = ({
       <directionalLight position={[50, 80, 30]} intensity={0.8} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
 
-      {/* Far LOD: colored cubes for all parcels */}
-      <FarCubes
-        parcels={parcels}
-        normalization={normalization}
-        onClickParcel={onClickParcel}
-        hoveredId={hoveredId}
-        setHoveredId={setHoveredId}
-      />
-
-      {/* Near LOD: displacement-mapped ASCII art terrain */}
+      {/* Displacement-mapped ASCII art terrain — no cubes */}
       {terrainData && (
         <TerrainPlanes
           parcels={parcels}
