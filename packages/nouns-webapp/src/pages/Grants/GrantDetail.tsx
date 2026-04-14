@@ -20,6 +20,8 @@ import {
 
 import classes from './Grants.module.css';
 
+const RELAYER_ADDRESS = '0xacc74b39976d50522621f54c18dc85e2822ec22c';
+
 const API_BASE = (
   (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app'
@@ -332,6 +334,11 @@ export default function GrantDetailPage() {
       <h2 className={classes.detailName}>{title}</h2>
       <p className={classes.detailProposer}>
         by <ShortAddress address={(grant.signer || grant.proposer) as `0x${string}`} />
+        {grant.proposer.toLowerCase() === RELAYER_ADDRESS && (
+          <span style={{ color: '#6b7280', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+            (GASLESS VIA NOUNIRL)
+          </span>
+        )}
       </p>
 
       {isActive && (
