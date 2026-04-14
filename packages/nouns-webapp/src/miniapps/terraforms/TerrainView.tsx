@@ -465,8 +465,8 @@ function FarCubes({
       onPointerOut={() => setHoveredId(null)}
       onClick={handleClick}
     >
-      <planeGeometry args={[1.0, 1.0]} />
-      <meshStandardMaterial roughness={0.4} metalness={0.1} side={THREE.DoubleSide} />
+      <sphereGeometry args={[0.4, 6, 4]} />
+      <meshBasicMaterial />
     </instancedMesh>
   );
 }
