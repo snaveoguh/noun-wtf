@@ -317,6 +317,12 @@ export default function EditableScene({
   const localViewStateRef = useRef<EditableSceneViewState | null>(null);
   const orbitViewStateRef = viewStateRef ?? localViewStateRef;
 
+  // Tool/color refs for use in pointer handlers (avoid stale closures in R3F events)
+  const toolRef = useRef(activeTool);
+  const colorRef = useRef(activeColor);
+  toolRef.current = activeTool;
+  colorRef.current = activeColor;
+
   // Flag to break the circular 3D→2D→3D rebuild loop:
   // When the 3D editor syncs changes to the 2D pixel grid, the parent
   // re-renders with new `pixels`. Without this guard the useEffect below
@@ -424,10 +430,14 @@ export default function EditableScene({
       e.stopPropagation();
       if (isDrag(e)) return;
 
+      // Read from refs to avoid stale closures in R3F event callbacks
+      const tool = toolRef.current;
+      const color = colorRef.current;
+
       const pos = parseKey(key);
       const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
 
-      switch (activeTool) {
+      switch (tool) {
         case 'pencil': {
           const adjacent = getAdjacentPos(
             { x: faceNormal.vector[0], y: faceNormal.vector[1], z: faceNormal.vector[2] },
@@ -438,7 +448,7 @@ export default function EditableScene({
 
           const next = new Map(voxels);
           for (const position of brushPositions) {
-            next.set(voxelKey(...position), activeColor);
+            next.set(voxelKey(...position), color);
           }
           setVoxels(next);
           syncPixelsFromVoxelMap(next);
@@ -457,7 +467,7 @@ export default function EditableScene({
           break;
         }
         case 'fill': {
-          const changes = floodFill3D(voxels, key, activeColor);
+          const changes = floodFill3D(voxels, key, color);
           if (changes.size > 0) {
             const next = new Map(voxels);
             for (const [k, v] of changes) next.set(k, v);
@@ -467,15 +477,13 @@ export default function EditableScene({
           break;
         }
         case 'eyedropper': {
-          const color = getDisplayColor(key);
-          if (color) onColorPick(color);
+          const c = getDisplayColor(key);
+          if (c) onColorPick(c);
           break;
         }
       }
     },
     [
-      activeTool,
-      activeColor,
       brushSize,
       getDisplayColor,
       interactionMode,
@@ -492,7 +500,7 @@ export default function EditableScene({
       if (interactionMode !== 'sculpt') return;
       e.stopPropagation();
       setHoveredKey(key);
-      if (activeTool === 'pencil' && activeColor) {
+      if (toolRef.current === 'pencil' && colorRef.current) {
         const pos = parseKey(key);
         const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
         const adjacent = getAdjacentPos(
@@ -504,7 +512,7 @@ export default function EditableScene({
         setGhostPositions([]);
       }
     },
-    [activeTool, activeColor, brushSize, interactionMode],
+    [brushSize, interactionMode],
   );
 
   const voxelEntries = useMemo(() => {

@@ -205,8 +205,12 @@ const InlineEditor: FC<InlineEditorProps> = ({
     onColorChange?.(activeColor);
   }, [activeColor, onColorChange]);
 
-  // Expose to parent for keyboard shortcuts + 3D sync
-  if (toolRef) {
+  // Expose to parent for keyboard shortcuts + 3D sync.
+  // Must live in useEffect so the ref is assigned after mount and cleaned up
+  // on unmount — assigning in the render body can be lost across Suspense
+  // boundaries or concurrent renders, causing the eyedropper race condition.
+  useEffect(() => {
+    if (!toolRef) return;
     toolRef.current = {
       setTool: setActiveTool,
       setColor: setActiveColor,
@@ -215,7 +219,10 @@ const InlineEditor: FC<InlineEditorProps> = ({
       getActiveTool: () => activeTool,
       getActiveColor: () => activeColor,
     };
-  }
+    return () => {
+      toolRef.current = null;
+    };
+  }, [toolRef, activeTool, activeColor, undo, redo]);
 
   const handlePixelChange = useCallback(
     (x: number, y: number, color: string) => {
@@ -275,7 +282,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
       if (!drag) return;
       const rawX = drag.originX + (event.clientX - drag.startX);
       const rawY = drag.originY + (event.clientY - drag.startY);
-      // Clamp: keep at least 40px of the panel visible on each edge
+      // Clamp: keep at least 50px of the panel visible on each edge
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       // Panels are positioned relative to their CSS initial position (top/left in the overlay)
@@ -284,8 +291,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
       setPanelOffsets(prev => ({
         ...prev,
         [drag.key]: {
-          x: Math.max(-(vw - 60), Math.min(vw - 60, rawX)),
-          y: Math.max(-40, Math.min(vh - 60, rawY)),
+          x: Math.max(-(vw - 50), Math.min(vw - 50, rawX)),
+          y: Math.max(-50, Math.min(vh - 50, rawY)),
         },
       }));
     };

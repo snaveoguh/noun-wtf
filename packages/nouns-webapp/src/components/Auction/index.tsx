@@ -1059,7 +1059,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   onPixelsFill: changes => edit3dDispatch({ type: 'SET_PIXELS', changes }),
                   onColorPick: color => {
                     setEdit3dColor(color);
-                    editorToolRef.current?.setColor(color);
+                    setEdit3dTool('pencil');
+                    // Also poke InlineEditor ref if mounted (belt-and-suspenders)
                     editorToolRef.current?.setTool('pencil');
                   },
                   voxelDepth: edit3dVoxelDepth,

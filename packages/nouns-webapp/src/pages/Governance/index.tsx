@@ -112,7 +112,7 @@ const GovernancePage = () => {
             color: daoTab === 'yc' ? '#14141f' : '#8c8d92',
           }}
         >
-          Yellow Collective
+          YC (beta)
         </button>
       </div>
 

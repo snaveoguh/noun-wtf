@@ -180,7 +180,7 @@ const YellowCollectiveProposals: FC = () => {
             fontWeight: 400,
           }}
         >
-          Yellow Collective
+          YC (beta)
         </h1>
         <p
           style={{
