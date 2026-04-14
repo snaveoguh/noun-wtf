@@ -70,6 +70,10 @@ export interface EditableMeshSceneProps {
   headVisible?: boolean;
   /** Ref to expose the loaded scene for export */
   sceneRef?: React.MutableRefObject<THREE.Object3D | null>;
+  /** Per-head offset override (replaces HEAD_OFFSET when provided) */
+  headOffset?: [number, number, number];
+  /** Ref exposing a snapshot function — returns PNG data URL of the current render */
+  snapshotRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 // ─── Hover Highlight ────────────────────────────────────────────────────────
@@ -240,6 +244,8 @@ export default function EditableMeshScene({
   redoRef,
   headVisible = true,
   sceneRef,
+  headOffset,
+  snapshotRef,
 }: EditableMeshSceneProps) {
   // Loading state
   const [scene, setScene] = useState<THREE.Object3D | null>(null);
@@ -318,9 +324,10 @@ export default function EditableMeshScene({
           });
         }
 
-        // Apply head offset (same as CuratedHead: 0, -27, -0.25)
+        // Apply head offset — use per-head nudge when provided, else fixed base
+        const off = headOffset ?? HEAD_OFFSET;
         const matrix = new THREE.Matrix4();
-        matrix.makeTranslation(HEAD_OFFSET[0], HEAD_OFFSET[1], HEAD_OFFSET[2]);
+        matrix.makeTranslation(off[0], off[1], off[2]);
 
         // Find the main head mesh for editing
         let headMesh: THREE.Mesh | null = null;
@@ -704,8 +711,36 @@ export default function EditableMeshScene({
           adjacency={editStateRef.current?.adjacency ?? null}
         />
       )}
+
+      {snapshotRef && <SnapshotExporter snapshotRef={snapshotRef} />}
     </>
   );
+}
+
+// ─── Snapshot Exporter ─────────────────────────────────────────────────────
+
+function SnapshotExporter({
+  snapshotRef,
+}: {
+  snapshotRef: React.MutableRefObject<(() => string | null) | null>;
+}) {
+  const { gl, scene: threeScene, camera } = useThree();
+
+  useEffect(() => {
+    snapshotRef.current = () => {
+      try {
+        gl.render(threeScene, camera);
+        return gl.domElement.toDataURL('image/png');
+      } catch {
+        return null;
+      }
+    };
+    return () => {
+      snapshotRef.current = null;
+    };
+  }, [gl, threeScene, camera, snapshotRef]);
+
+  return null;
 }
 
 // ─── Build Voxels Renderer ────────────────────────────────────────────────

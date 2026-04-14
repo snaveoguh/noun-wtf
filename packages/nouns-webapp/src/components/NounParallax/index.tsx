@@ -31,6 +31,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { INounSeed } from '@/wrappers/nounToken';
+import { HEAD_X_NUDGE, HEAD_Y_NUDGE, HEAD_Z_NUDGE, HEAD_BASE_OFFSET } from '@/lib/headNudges';
 
 import classes from './NounParallax.module.css';
 import SceneEnvironment from './SceneEnvironment';
@@ -253,143 +254,10 @@ function CuratedHead({
         // with the voxel body's back face (Z=-1.25), so offset = -0.75.
         // But that buries it — instead align centers: body center Z=0,
         // GLB center Z=0.25 → shift back by -0.25 to sit at Z=0.
-        // Per-head nudges — eyeballed against 2D counterparts
-        // Y: positive = up, X: positive = right
-        const HEAD_Y_NUDGE: Record<string, number> = {
-          ape: 1,
-          bag: 1,
-          bagpipe: 1,
-          bat: 1,
-          bear: 1,
-          beer: 1,
-          bigfoot: 1,
-          'bigfoot-yeti': 1,
-          beet: 1,
-          blueberry: -2,
-          boot: 1,
-          bomb: 1,
-          calculator: 1,
-          calendar: 1,
-          cd: -1,
-          camcorder: 1,
-          cannedham: 1,
-          'cash-register': 1,
-          chain: -1,
-          'chart-bars': 1,
-          chefhat: 1,
-          cone: 1,
-          'console-handheld': 1,
-          cookie: 1,
-          cottonball: 1,
-          cow: 1,
-          crab: 1,
-          croc: 1,
-          'crt-bsod': 1,
-          crystalball: 1,
-          'diamond-red': 1,
-          dictionary: 1,
-          dog: 1,
-          'film-strip': 1,
-          fan: 1,
-          'film-35mm': 1,
-          flamingo: 1,
-          fox: 1,
-          frog: 1,
-          garlic: 1,
-          goldcoin: 1,
-          grouper: 1,
-          goldfish: 1,
-          hair: 1,
-          hanger: 1,
-          'index-card': 1,
-          island: 1,
-          jellyfish: 1,
-          jupiter: -4,
-          ketchup: 1,
-          laptop: 1,
-          lint: 2,
-          lips: 1,
-          lock: 1,
-          macaroni: 1,
-          maze: 1,
-          mirror: 1,
-          mug: 1,
-          mustard: 1,
-          noodles: 1,
-          orca: 1,
-          outlet: -1,
-          otter: 1,
-          owl: 1,
-          oyster: 1,
-          paintbrush: 1,
-          paperclip: 1,
-          pineapple: 1,
-          pill: 1,
-          pie: 1,
-          piggybank: 1,
-          pipe: 1,
-          pirateship: 1,
-          pizza: 1,
-          pop: 1,
-          porkbao: 1,
-          pumpkin: 1,
-          pyramid: 1,
-          rabbit: 1,
-          retainer: 1,
-          ring: 1,
-          road: 1,
-          rock: 1,
-          safe: 1,
-          saw: 1,
-          shark: 1,
-          shower: 1,
-          'skeleton-hat': 1,
-          skilift: 1,
-          snowman: 1,
-          spaghetti: 1,
-          spam: 1,
-          stapler: 1,
-          sponge: 1,
-          squid: 1,
-          taxi: 1,
-          thumbsup: 1,
-          sunset: 1,
-          sushi: 1,
-          trashcan: 1,
-          turing: 1,
-          undead: 1,
-          unicorn: 1,
-          vent: 1,
-          void: 1,
-          wallet: 1,
-          washingmachine: 1,
-          wine: 1,
-          zebra: 1,
-        };
-        const HEAD_X_NUDGE: Record<string, number> = {
-          bagpipe: 1,
-          calendar: -1,
-          'cash-register': 1,
-          jellyfish: 1,
-          zebra: 2,
-        };
-        // Z: positive = forward (toward viewer)
-        const HEAD_Z_NUDGE: Record<string, number> = {
-          camcorder: 2,
-          'film-strip': 1,
-          fox: 1,
-          mirror: 1,
-          noodles: 1,
-          pipe: 1,
-          pineapple: 1,
-          pirateship: 1,
-          skilift: 1,
-          wine: 1,
-        };
-
-        const offsetX = 0 + (HEAD_X_NUDGE[entry.traitName] ?? 0);
-        const offsetY = -27 + (HEAD_Y_NUDGE[entry.traitName] ?? 0);
-        const offsetZ = -0.25 + (HEAD_Z_NUDGE[entry.traitName] ?? 0);
+        // Per-head nudges — imported from shared module (lib/headNudges.ts)
+        const offsetX = HEAD_BASE_OFFSET[0] + (HEAD_X_NUDGE[entry.traitName] ?? 0);
+        const offsetY = HEAD_BASE_OFFSET[1] + (HEAD_Y_NUDGE[entry.traitName] ?? 0);
+        const offsetZ = HEAD_BASE_OFFSET[2] + (HEAD_Z_NUDGE[entry.traitName] ?? 0);
 
         const matrix = new THREE.Matrix4();
         matrix.makeTranslation(offsetX, offsetY, offsetZ);
@@ -1148,6 +1016,8 @@ export interface MeshEditConfig {
   undoRef?: React.MutableRefObject<(() => void) | null>;
   redoRef?: React.MutableRefObject<(() => void) | null>;
   sceneRef?: React.MutableRefObject<THREE.Object3D | null>;
+  headOffset?: [number, number, number];
+  snapshotRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 export interface EditableConfig {
@@ -1384,6 +1254,8 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                   redoRef={editable.meshConfig.redoRef}
                   headVisible={editable.backgroundVisibility?.head ?? true}
                   sceneRef={editable.meshConfig.sceneRef}
+                  headOffset={editable.meshConfig.headOffset}
+                  snapshotRef={editable.meshConfig.snapshotRef}
                 />
               ) : (
                 <EditableSceneComponent
