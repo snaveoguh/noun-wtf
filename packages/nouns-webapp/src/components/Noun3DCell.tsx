@@ -73,21 +73,25 @@ function getManifest(): Promise<ManifestEntry[]> {
   return manifestPromise;
 }
 
-const glbHeadCache = new Map<string, THREE.Object3D | null>();
+/** Extracted mesh data from a GLB head — geometry + material pairs ready to render */
+interface GlbMeshData {
+  geometry: THREE.BufferGeometry;
+  material: THREE.Material;
+}
+const glbHeadCache = new Map<string, GlbMeshData[] | null>();
 const glbLoadingSet = new Set<string>();
-const glbListeners = new Map<string, Array<(obj: THREE.Object3D | null) => void>>();
+const glbListeners = new Map<string, Array<(meshes: GlbMeshData[] | null) => void>>();
 
-/** Load a 3DNouns GLB head for a seed, with shared caching. Returns null if unavailable. */
+/** Load a 3DNouns GLB head for a seed, with shared caching. Returns mesh data array or null. */
 function loadGlbHead(
   seed: INounSeed,
-  onLoaded: (obj: THREE.Object3D | null) => void,
+  onLoaded: (meshes: GlbMeshData[] | null) => void,
 ): () => void {
   const cacheKey = `${seed.head}-${seed.glasses}`;
 
-  // Already cached
+  // Already cached — geometry+material are shareable across instances
   if (glbHeadCache.has(cacheKey)) {
-    const cached = glbHeadCache.get(cacheKey)!;
-    onLoaded(cached ? cached.clone() : null);
+    onLoaded(glbHeadCache.get(cacheKey) ?? null);
     return () => {};
   }
 
@@ -167,9 +171,10 @@ function loadGlbHead(
       scene.scale.set(1, 1, 1);
       scene.updateMatrixWorld(true);
 
-      // Convert all materials to MeshBasicMaterial (unlit) for consistent grid rendering
+      // Extract mesh geometry+material pairs (converted to MeshBasicMaterial)
+      const meshes: GlbMeshData[] = [];
       scene.traverse(child => {
-        if (!(child as THREE.Mesh).isMesh) return;
+        if (!(child as THREE.Mesh).isMesh || !child.visible) return;
         const mesh = child as THREE.Mesh;
         const oldMat = mesh.material as THREE.MeshStandardMaterial;
         const basicMat = new THREE.MeshBasicMaterial({
@@ -185,11 +190,11 @@ function loadGlbHead(
           basicMat.polygonOffsetFactor = oldMat.polygonOffsetFactor;
           basicMat.polygonOffsetUnits = oldMat.polygonOffsetUnits;
         }
-        mesh.material = basicMat;
+        meshes.push({ geometry: mesh.geometry, material: basicMat });
       });
 
-      glbHeadCache.set(cacheKey, scene);
-      glbListeners.get(cacheKey)?.forEach(cb => cb(scene.clone()));
+      glbHeadCache.set(cacheKey, meshes.length > 0 ? meshes : null);
+      glbListeners.get(cacheKey)?.forEach(cb => cb(meshes.length > 0 ? meshes : null));
     } catch {
       glbHeadCache.set(cacheKey, null);
       glbListeners.get(cacheKey)?.forEach(cb => cb(null));
@@ -242,10 +247,10 @@ function NounMesh({
   const { invalidate } = useThree();
 
   // Load curated GLB head (async, replaces voxel head when ready)
-  const [glbHead, setGlbHead] = useState<THREE.Object3D | null>(null);
+  const [glbMeshes, setGlbMeshes] = useState<GlbMeshData[] | null>(null);
   useEffect(() => {
-    return loadGlbHead(cell.seed, obj => {
-      setGlbHead(obj);
+    return loadGlbHead(cell.seed, meshes => {
+      setGlbMeshes(meshes);
       invalidate();
     });
   }, [cell.seed.head, cell.seed.glasses]);
@@ -283,8 +288,12 @@ function NounMesh({
             <meshBasicMaterial vertexColors toneMapped={false} />
           </mesh>
         )}
-        {glbHead ? (
-          <primitive object={glbHead} />
+        {glbMeshes ? (
+          <>
+            {glbMeshes.map((m, i) => (
+              <mesh key={i} geometry={m.geometry} material={m.material} />
+            ))}
+          </>
         ) : (
           <>
             {geos.headGeo && (
