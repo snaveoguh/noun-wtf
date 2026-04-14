@@ -242,13 +242,13 @@ function AllParcelsInstanced({
     return mat;
   }, [atlas]);
 
-  // Update uniforms when sliders change (no material rebuild needed)
-  useEffect(() => {
+  // Sync uniforms every frame — avoids race conditions with useEffect
+  useFrame(() => {
     if (materialRef.current) {
       materialRef.current.uniforms.heightScale.value = heightScale;
       materialRef.current.uniforms.saturation.value = saturation;
     }
-  }, [heightScale, saturation]);
+  });
 
   // Set up instances
   useEffect(() => {
