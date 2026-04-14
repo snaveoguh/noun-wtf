@@ -159,7 +159,7 @@ const ExploreTab: React.FC = () => {
   const { ownerAddress, setOwnerAddress, ownedNounIds } = useOwnerFilter();
 
   // 3D view mode
-  const [view3D, setView3D] = useState(false);
+  const [view3D, setView3D] = useState(true);
   const [hoveredNounId, setHoveredNounId] = useState<bigint | null>(null);
 
   // Click-to-open detail popover
