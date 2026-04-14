@@ -332,10 +332,10 @@ const CHAR_TILE = 32; // px per character tile in atlas
  * Build merged geometry + texture for one parcel.
  * 1024 quads facing up (-PI/2 on X), each at its height, UVs → character atlas.
  */
+/** Build merged geometry in LOCAL space (centered at origin). Height uses raw 0-9 values.
+ *  The caller positions and scales via mesh position + group scaleY. */
 function buildParcelCharMesh(
   td: TokenEntry,
-  parcelPos: [number, number, number],
-  heightScale: number,
 ): { geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture } {
   const [bg, palette, classGrid, chars] = td;
 
@@ -384,8 +384,7 @@ function buildParcelCharMesh(
   const uvs = new Float32Array(numQuads * 4 * 2);
   const indices = new Uint32Array(numQuads * 6);
   const halfCell = CELL_SIZE * 0.48;
-
-  const [px, py, pz] = parcelPos;
+  const BASE_H = 0.04; // height unit per level (scaled by relief slider externally)
 
   for (let row = 0; row < GRID_SIZE; row++) {
     for (let col = 0; col < GRID_SIZE; col++) {
@@ -395,9 +394,10 @@ function buildParcelCharMesh(
       const height = 9 - clsIdx;
       const char = chars[cls] || ' ';
 
-      const cx = px + (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
-      const cy = py + height * heightScale * 0.04;
-      const cz = pz + (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+      // Local coords centered at origin
+      const cx = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+      const cy = height * BASE_H; // raw height, slider scales via group
+      const cz = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
 
       // 4 vertices of a quad facing up (on XZ plane)
       const vi = cellIdx * 4;
@@ -435,7 +435,7 @@ function buildParcelCharMesh(
   return { geometry, texture };
 }
 
-/** One parcel rendered as merged ASCII character quads. */
+/** One parcel rendered as merged ASCII character quads. Geometry built once in local space. */
 function CharParcel({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
@@ -443,21 +443,25 @@ function CharParcel({ parcel, tokenData, normalization, heightScale }: {
   heightScale: number;
 }) {
   const { cx, cy, cz, scale } = normalization;
-  const pos: [number, number, number] = [
-    (parcel.sx - cx) * scale,
-    (parcel.sy - cy) * scale,
-    (parcel.sz - cz) * scale,
-  ];
+  const px = (parcel.sx - cx) * scale;
+  const py = (parcel.sy - cy) * scale;
+  const pz = (parcel.sz - cz) * scale;
 
+  // Build geometry + texture once (no heightScale dependency)
   const { geometry, texture } = useMemo(
-    () => buildParcelCharMesh(tokenData, pos, heightScale),
-    [tokenData, pos[0], pos[1], pos[2], heightScale],
+    () => buildParcelCharMesh(tokenData),
+    [tokenData],
   );
 
+  // Relief slider scales Y axis of the group
+  const yScale = Math.max(0.01, heightScale * 10);
+
   return (
-    <mesh geometry={geometry}>
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
-    </mesh>
+    <group position={[px, py, pz]} scale={[1, yScale, 1]}>
+      <mesh geometry={geometry}>
+        <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
