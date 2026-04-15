@@ -25,6 +25,7 @@ type ViewMode = 'terrain' | 'lofi' | 'grid';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
+const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
 const TOTAL_SUPPLY = 9910;
 
 // Zone colors for parcels that haven't loaded yet (gradient by level)
