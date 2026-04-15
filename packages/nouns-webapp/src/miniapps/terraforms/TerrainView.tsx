@@ -747,16 +747,7 @@ const TerrainViewCanvas: FC<{
         <CameraSync onCamera={setLiveCamera} />
       </Canvas>
 
-      {/* CSS3D overlay — real iframes in 3D space for nearest parcels */}
-      {props.terrainData && liveCamera && (
-        <CSS3DTerrainLayer
-          containerRef={containerRef}
-          camera={liveCamera}
-          parcels={props.parcels}
-          terrainData={props.terrainData}
-          normalization={normalization}
-        />
-      )}
+      {/* CSS3D overlay disabled — was causing blue blob + potential rendering issues */}
 
       {/* Controls */}
       <div style={{
