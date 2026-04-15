@@ -120,10 +120,11 @@ function useHypercastleData() {
         saveCache(mapped);
       })
       .catch(err => {
-        console.warn('Failed to load hypercastle.json, falling back to cache:', err);
-        if (cached.length > 0) {
-          setParcels(cached);
-          setLoadedCount(cached.length);
+        console.warn('Failed to load hypercastle.json:', err);
+        const fallback = loadCache();
+        if (fallback.length > 0) {
+          setParcels(fallback);
+          setLoadedCount(fallback.length);
         }
       })
       .finally(() => setIsLoading(false));
