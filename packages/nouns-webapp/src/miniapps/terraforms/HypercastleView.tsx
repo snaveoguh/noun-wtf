@@ -376,23 +376,24 @@ const LiveCell: FC<{
 const GRID_CELL = 150;
 const GRID_GAP = 6;
 
+// ─── Grid View (live iframes, virtualized, lazy fetch) ────────────────────
+
 const GridView: FC<{
   parcels: ParcelData[];
   onClickParcel: (id: number) => void;
   terrainData: TerrainData | null;
-}> = ({ parcels, onClickParcel, terrainData: _terrainData }) => {
+}> = ({ parcels, onClickParcel }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { htmlCache, requestTokens } = useTokenHTMLBatch();
 
-  // Responsive column count
   const [cols, setCols] = useState(8);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
       const w = el.clientWidth;
-      setCols(Math.max(2, Math.floor((w + GRID_GAP) / (GRID_CELL + GRID_GAP))));
+      setCols(Math.max(3, Math.floor((w + GRID_GAP) / (GRID_CELL + GRID_GAP))));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -407,60 +408,48 @@ const GridView: FC<{
     count: totalRows,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => cellSize + GRID_GAP,
-    overscan: 3,
+    overscan: 2, // minimal overscan — fewer iframes alive
   });
 
-  // Request tokenHTML for visible rows
+  // Only fetch tokenHTML for currently visible cells
   useEffect(() => {
-    const visibleItems = rowVirtualizer.getVirtualItems();
+    const items = rowVirtualizer.getVirtualItems();
     const ids: number[] = [];
-    for (const vRow of visibleItems) {
-      const startIdx = vRow.index * cols;
+    for (const vRow of items) {
+      const start = vRow.index * cols;
       for (let c = 0; c < cols; c++) {
-        const idx = startIdx + c;
-        if (idx < parcels.length) ids.push(parcels[idx].tokenId);
+        const idx = start + c;
+        if (idx < parcels.length && !htmlCache.has(parcels[idx].tokenId)) {
+          ids.push(parcels[idx].tokenId);
+        }
       }
     }
     if (ids.length > 0) requestTokens(ids);
-  }, [rowVirtualizer.getVirtualItems(), cols, parcels, requestTokens]);
+  }, [rowVirtualizer.getVirtualItems(), cols, parcels, requestTokens, htmlCache]);
 
   return (
-    <div
-      ref={scrollRef}
-      style={{
-        width: '100%', height: '100vh', background: '#050510',
-        overflow: 'auto', padding: '80px 0 40px',
-      }}
-    >
+    <div ref={scrollRef} style={{
+      width: '100%', height: '100vh', background: '#050510',
+      overflow: 'auto', padding: '80px 0 40px',
+    }}>
       <div ref={containerRef} style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px' }}>
         <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
           {rowVirtualizer.getVirtualItems().map(vRow => {
             const startIdx = vRow.index * cols;
             return (
-              <div
-                key={vRow.key}
-                style={{
-                  position: 'absolute',
-                  top: vRow.start,
-                  left: 0, right: 0,
-                  display: 'flex', gap: GRID_GAP,
-                }}
-              >
+              <div key={vRow.key} style={{
+                position: 'absolute', top: vRow.start, left: 0, right: 0,
+                display: 'flex', gap: GRID_GAP,
+              }}>
                 {Array.from({ length: cols }, (_, c) => {
                   const idx = startIdx + c;
                   if (idx >= parcels.length) return null;
                   const p = parcels[idx];
                   return (
-                    <LiveCell
-                      key={p.tokenId}
-                      tokenId={p.tokenId}
-                      html={htmlCache.get(p.tokenId)}
-                      color={p.color}
-                      zoneName={p.zoneName}
-                      level={p.level}
-                      onClick={() => onClickParcel(p.tokenId)}
-                      size={cellSize}
-                    />
+                    <LiveCell key={p.tokenId} tokenId={p.tokenId}
+                      html={htmlCache.get(p.tokenId)} color={p.color}
+                      zoneName={p.zoneName} level={p.level}
+                      onClick={() => onClickParcel(p.tokenId)} size={cellSize} />
                   );
                 })}
               </div>
