@@ -523,7 +523,7 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
   return (
     <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
       <mesh geometry={geometry} raycast={() => {}}>
-        <meshBasicMaterial ref={materialRef} map={atlas.texture} side={THREE.DoubleSide} transparent alphaTest={0.1} />
+        <meshBasicMaterial map={atlas.texture} side={THREE.DoubleSide} transparent alphaTest={0.1} />
       </mesh>
     </group>
   );
