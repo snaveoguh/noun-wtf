@@ -209,8 +209,12 @@ function AllParcelsInstanced({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const idMapRef = useRef<number[]>([]);
 
-  // Build atlas once
-  const atlas = useMemo(() => buildAtlas(parcels, terrainData), [parcels, terrainData]);
+  // Build atlas once — use ref to prevent rebuilds on re-render
+  const atlasRef = useRef<ReturnType<typeof buildAtlas> | null>(null);
+  if (!atlasRef.current && parcels.length > 0) {
+    atlasRef.current = buildAtlas(parcels, terrainData);
+  }
+  const atlas = atlasRef.current!;
 
   // Custom shader: color atlas + height displacement + saturation boost
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -328,7 +332,7 @@ function AllParcelsInstanced({
     }
   }, [onClickParcel]);
 
-  if (parcels.length === 0) return null;
+  if (parcels.length === 0 || !atlasRef.current) return null;
 
   return (
     <instancedMesh
