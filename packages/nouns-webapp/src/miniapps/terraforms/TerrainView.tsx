@@ -14,6 +14,19 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+
+const rpcClient = createPublicClient({
+  chain: mainnet,
+  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
+});
+const TF_ADDR = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
+const TF_HTML_ABI = [{
+  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
+  inputs: [{ name: 'tokenId', type: 'uint256' }],
+  outputs: [{ name: '', type: 'string' }],
+}] as const;
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -437,7 +450,7 @@ function buildCharGeometry(td: TokenEntry, atlas: CharAtlasResult): THREE.Buffer
   return geo;
 }
 
-/** One parcel: merged character quads at height levels. */
+/** One parcel: merged character quads at height levels + live animation from tokenHTML. */
 function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
   parcel: ParcelData;
   tokenData: TokenEntry;
@@ -451,11 +464,105 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
 
   const atlas = useMemo(() => buildCharAtlas(tokenData), [tokenData]);
   const geometry = useMemo(() => buildCharGeometry(tokenData, atlas), [tokenData, atlas]);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const intervalRef = useRef<number>(0);
+
+  // Fetch tokenHTML and animate the atlas texture by re-reading iframe DOM
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const html = await rpcClient.readContract({
+          address: TF_ADDR, abi: TF_HTML_ABI,
+          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
+        });
+        if (cancelled) return;
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
+        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
+        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
+        document.body.appendChild(iframe);
+        iframeRef.current = iframe;
+
+        iframe.onload = () => {
+          if (cancelled) return;
+
+          // Repaint the atlas texture from live iframe DOM every 300ms
+          const repaint = () => {
+            const doc = iframe.contentDocument;
+            if (!doc || !atlas.texture) return;
+
+            const gridEls = doc.querySelectorAll('.r p, .meta p');
+            if (gridEls.length < 1024) return;
+
+            const canvas = atlas.texture.image as HTMLCanvasElement;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const [bg] = tokenData;
+            const numTiles = 10;
+            const fontSize = Math.floor(CHAR_PX * 0.82);
+
+            // Clear and redraw each class tile with the current animation state
+            // Group cells by class to find current char per class
+            const classChars = new Map<string, string>();
+            const classColors = new Map<string, string>();
+            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
+              const el = gridEls[i] as HTMLElement;
+              const cls = el.className || '';
+              if (cls && !classChars.has(cls)) {
+                classChars.set(cls, el.textContent || ' ');
+                classColors.set(cls, el.style.color || getComputedStyle(el).color || '#fff');
+              }
+            }
+
+            // Repaint each tile
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let i = 0; i < numTiles; i++) {
+              const cls = String.fromCharCode(97 + i);
+              const iframeClass = cls; // CSS class matches our letter
+              const char = classChars.get(iframeClass) || tokenData[3][cls] || ' ';
+              const color = classColors.get(iframeClass) || tokenData[1][i] || '#fff';
+
+              ctx.fillStyle = bg;
+              ctx.fillRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
+              ctx.fillStyle = color;
+              ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
+            }
+
+            atlas.texture.needsUpdate = true;
+          };
+
+          setTimeout(() => {
+            repaint();
+            intervalRef.current = window.setInterval(repaint, 300);
+          }, 1000);
+        };
+      } catch {
+        // Static atlas remains — no animation
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (iframeRef.current) {
+        try { document.body.removeChild(iframeRef.current); } catch {}
+        iframeRef.current = null;
+      }
+    };
+  }, [parcel.tokenId, atlas, tokenData]);
 
   return (
     <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
       <mesh geometry={geometry} raycast={() => {}}>
-        <meshBasicMaterial map={atlas.texture} side={THREE.DoubleSide} />
+        <meshBasicMaterial ref={materialRef} map={atlas.texture} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
