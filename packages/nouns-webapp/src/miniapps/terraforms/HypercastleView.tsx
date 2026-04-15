@@ -87,18 +87,13 @@ function saveCache(data: ParcelData[]) {
 
 /** Load all 9,909 parcels from static JSON (extracted from ThousandAnt's Hypercastle Explorer). */
 function useHypercastleData() {
-  const [parcels, setParcels] = useState<ParcelData[]>([]);
-  const [loadedCount, setLoadedCount] = useState(0);
+  const [parcels, setParcels] = useState<ParcelData[]>(() => loadCache());
+  const [loadedCount, setLoadedCount] = useState(() => loadCache().length);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Try localStorage cache first
-    const cached = loadCache();
-    if (cached.length >= TOTAL_SUPPLY) {
-      setParcels(cached);
-      setLoadedCount(cached.length);
-      return;
-    }
+    // Already loaded from cache on init?
+    if (parcels.length >= TOTAL_SUPPLY - 10) return; // -10 tolerance (JSON has 9909 vs 9910)
 
     setIsLoading(true);
     fetch('/data/hypercastle.json')
@@ -406,10 +401,7 @@ const GridView: FC<{
   }, []);
 
   const totalRows = Math.ceil(parcels.length / cols);
-  const cellSize = useMemo(() => {
-    const containerW = containerRef.current?.clientWidth ?? 1200;
-    return Math.floor((containerW - GRID_GAP * (cols - 1)) / cols);
-  }, [cols]);
+  const cellSize = Math.max(80, Math.floor(((containerRef.current?.clientWidth || 1200) - GRID_GAP * (cols - 1)) / cols));
 
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
