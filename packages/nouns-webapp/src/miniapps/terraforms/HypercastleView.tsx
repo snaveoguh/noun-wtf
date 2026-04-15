@@ -113,13 +113,14 @@ function saveCache(data: ParcelData[]) {
   } catch { /* quota exceeded, ignore */ }
 }
 
+/** Load all 9,909 parcels from static JSON (extracted from ThousandAnt's Hypercastle Explorer). */
 function useHypercastleData() {
-  const [parcels, setParcels] = useState<ParcelData[]>(() => loadCache());
-  const [loadedCount, setLoadedCount] = useState(() => loadCache().length);
+  const [parcels, setParcels] = useState<ParcelData[]>([]);
+  const [loadedCount, setLoadedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const cancelRef = useRef(false);
 
   useEffect(() => {
+    // Try localStorage cache first
     const cached = loadCache();
     if (cached.length >= TOTAL_SUPPLY) {
       setParcels(cached);
@@ -127,86 +128,38 @@ function useHypercastleData() {
       return;
     }
 
-    // Start from where cache left off
-    const startFrom = cached.length;
-    const existing = new Map(cached.map(p => [p.tokenId, p]));
-    cancelRef.current = false;
     setIsLoading(true);
-
-    (async () => {
-      const allParcels = [...cached];
-
-      for (let batchStart = startFrom; batchStart < TOTAL_SUPPLY; batchStart += BATCH_SIZE) {
-        if (cancelRef.current) break;
-
-        const batchEnd = Math.min(batchStart + BATCH_SIZE, TOTAL_SUPPLY);
-        const calls = [];
-
-        for (let i = batchStart; i < batchEnd; i++) {
-          const tokenId = i + 1; // 1-indexed
-          if (existing.has(tokenId)) continue;
-          calls.push({
-            address: TERRAFORMS_ADDRESS,
-            abi: TERRAFORMS_ABI,
-            functionName: 'tokenSupplementalData' as const,
-            args: [BigInt(tokenId)] as const,
-          });
+    fetch('/data/hypercastle.json')
+      .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+      .then((data: { terraformRecords: any[] }) => {
+        const mapped: ParcelData[] = data.terraformRecords.map((r: any) => {
+          const level = r.TerraformAttributes?.Level ?? 0;
+          const colors = (r.ZoneColors || []).filter((c: string) => c.length > 0);
+          return {
+            tokenId: r.TokenId,
+            level,
+            x: r.TerraformAttributes?.XCoordinate ?? 0,
+            y: r.TerraformAttributes?.YCoordinate ?? 0,
+            elevation: 0,
+            sx: r.StructureSpaceX,
+            sy: r.StructureSpaceY,
+            sz: r.StructureSpaceZ,
+            zoneName: r.TerraformAttributes?.Zone ?? '',
+            color: colors[0] || LEVEL_COLORS[Math.min(level - 1, 19)],
+          };
+        });
+        setParcels(mapped);
+        setLoadedCount(mapped.length);
+        saveCache(mapped);
+      })
+      .catch(err => {
+        console.warn('Failed to load hypercastle.json, falling back to cache:', err);
+        if (cached.length > 0) {
+          setParcels(cached);
+          setLoadedCount(cached.length);
         }
-
-        if (calls.length === 0) continue;
-
-        // Retry up to 3 times with exponential backoff
-        let success = false;
-        for (let attempt = 0; attempt < 3 && !success; attempt++) {
-          try {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-            const results = await publicClient.multicall({ contracts: calls });
-
-            for (let i = 0; i < results.length; i++) {
-              const r = results[i];
-              if (r.status !== 'success') continue;
-              const m = r.result as any;
-              // Derive tokenId from the call args (m.tokenId is broken — always 0)
-              const tokenId = Number(calls[i].args[0]);
-              const level = Number(m.level);
-              const colors = [...m.zoneColors].filter((c: string) => c.length > 0);
-
-              allParcels.push({
-                tokenId,
-                level,
-                x: Number(m.xCoordinate),
-                y: Number(m.yCoordinate),
-                elevation: Number(m.elevation),
-                sx: Number(m.structureSpaceX),
-                sy: Number(m.structureSpaceY),
-                sz: Number(m.structureSpaceZ),
-                zoneName: m.zoneName,
-                color: colors[0] || LEVEL_COLORS[Math.min(level - 1, 19)],
-              });
-            }
-
-            setParcels([...allParcels]);
-            setLoadedCount(allParcels.length);
-
-            // Save progress periodically
-            if (allParcels.length % (BATCH_SIZE * 5) === 0 || batchEnd >= TOTAL_SUPPLY) {
-              saveCache(allParcels);
-            }
-            success = true;
-          } catch (err) {
-            console.warn(`Terraforms batch fetch error (attempt ${attempt + 1}/3):`, err);
-          }
-        }
-
-        // Delay between batches to avoid rate limiting
-        await new Promise(r => setTimeout(r, BATCH_DELAY));
-      }
-
-      saveCache(allParcels);
-      setIsLoading(false);
-    })();
-
-    return () => { cancelRef.current = true; };
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   return { parcels, loadedCount, isLoading, total: TOTAL_SUPPLY };
