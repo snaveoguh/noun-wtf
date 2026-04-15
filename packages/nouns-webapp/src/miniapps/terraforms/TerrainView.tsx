@@ -146,7 +146,7 @@ function buildAtlas(
           rgb = hexToRGB(palette[clsIdx] || '#fff');
         } else {
           const base = hexToRGB(palette[0] || '#222');
-          rgb = [Math.round(base[0] * 0.4), Math.round(base[1] * 0.4), Math.round(base[2] * 0.4)];
+          rgb = [Math.round(base[0] * 0.6), Math.round(base[1] * 0.6), Math.round(base[2] * 0.6)];
         }
         cPixels[idx] = rgb[0];
         cPixels[idx + 1] = rgb[1];
@@ -251,7 +251,7 @@ function AllParcelsInstanced({
           float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
           col.rgb = mix(vec3(gray), col.rgb, saturation);
           // Bright at all distances — parcels always visible, peaks pop more
-          col.rgb *= 2.2 + vHeight * 0.8;
+          col.rgb *= 3.5 + vHeight * 1.2;
           gl_FragColor = col;
         }
       `,
@@ -641,13 +641,7 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             heightScale={heightScale}
             saturation={saturation}
           />
-          <CharOverlay
-            parcels={parcels}
-            terrainData={terrainData}
-            cameraRef={cameraRef}
-            normalization={normalization}
-            heightScale={heightScale}
-          />
+          {/* CharOverlay disabled — atlas handles rendering for now */}
         </>
       )}
 
