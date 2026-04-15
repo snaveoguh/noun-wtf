@@ -125,8 +125,8 @@ function buildAtlas(
     const ox = tileCol * tileSize;
     const oy = tileRow * tileSize;
 
-    const [bg, palette, classGrid] = td;
-    const bgRGB = hexToRGB(bg || '#000000');
+    const [_bg, palette, classGrid] = td;
+    void _bg; // bg not used in atlas (transparent background)
 
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
@@ -514,7 +514,8 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            const [bg] = tokenData;
+            const [_bg2] = tokenData;
+            void _bg2;
             const numTiles = 10;
             const fontSize = Math.floor(CHAR_PX * 0.82);
 
