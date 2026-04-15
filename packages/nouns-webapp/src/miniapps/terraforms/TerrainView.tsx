@@ -282,10 +282,25 @@ function AllParcelsInstanced({
     const ids: number[] = [];
     const offsets = new Float32Array(parcels.length * 2);
 
+    let mapped = 0;
     for (let i = 0; i < parcels.length; i++) {
       const p = parcels[i];
+      const uv = atlas.uvMap.get(p.tokenId);
 
-      // Position
+      if (!uv) {
+        // No terrain data — hide this instance completely
+        tempObj.position.set(0, -9999, 0);
+        tempObj.scale.setScalar(0);
+        tempObj.rotation.set(0, 0, 0);
+        tempObj.updateMatrix();
+        mesh.setMatrixAt(i, tempObj.matrix);
+        offsets[i * 2] = 0;
+        offsets[i * 2 + 1] = 0;
+        ids.push(p.tokenId);
+        continue;
+      }
+
+      mapped++;
       tempObj.position.set(
         (p.sx - cx) * scale,
         (p.sy - cy) * scale,
@@ -296,18 +311,13 @@ function AllParcelsInstanced({
       tempObj.updateMatrix();
       mesh.setMatrixAt(i, tempObj.matrix);
 
-      // UV offset for this parcel's tile in the atlas
-      const uv = atlas.uvMap.get(p.tokenId);
-      if (!uv) {
-        // No terrain data — hide this instance
-        tempObj.scale.setScalar(0);
-        tempObj.updateMatrix();
-        mesh.setMatrixAt(i, tempObj.matrix);
-      }
-      offsets[i * 2] = uv ? uv[0] : 0;
-      offsets[i * 2 + 1] = uv ? uv[1] : 0;
-
+      offsets[i * 2] = uv[0];
+      offsets[i * 2 + 1] = uv[1];
       ids.push(p.tokenId);
+    }
+
+    if (mapped === 0) {
+      console.warn('TerrainView: 0 parcels mapped to atlas. uvMap size:', atlas.uvMap.size, 'parcels:', parcels.length);
     }
 
     // Set per-instance UV offset attribute
