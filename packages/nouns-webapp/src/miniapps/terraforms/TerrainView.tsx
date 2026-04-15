@@ -284,6 +284,12 @@ function AllParcelsInstanced({
 
       // UV offset for this parcel's tile in the atlas
       const uv = atlas.uvMap.get(p.tokenId);
+      if (!uv) {
+        // No terrain data — hide this instance
+        tempObj.scale.setScalar(0);
+        tempObj.updateMatrix();
+        mesh.setMatrixAt(i, tempObj.matrix);
+      }
       offsets[i * 2] = uv ? uv[0] : 0;
       offsets[i * 2 + 1] = uv ? uv[1] : 0;
 
@@ -734,19 +740,10 @@ function useTerrainData() {
 export { useTerrainData };
 export type { TerrainData, TerrainViewProps };
 
-// ─── Slider HUD ───────────────────────────────────────────────────────────
-
-const sliderStyle: React.CSSProperties = {
-  width: '100%', height: 4, appearance: 'none' as const, background: '#1e293b',
-  borderRadius: 2, outline: 'none', cursor: 'pointer',
-  accentColor: '#22c55e',
-};
-const sliderLabelStyle: React.CSSProperties = {
-  fontSize: '0.55rem', color: '#64748b', fontFamily: 'monospace',
-  display: 'flex', justifyContent: 'space-between', marginBottom: 2,
-};
-
 // ─── Main Export ──────────────────────────────────────────────────────────
+
+const DEFAULT_SETTINGS = { height: 0.35, sat: 1.2, bloom: 0 };
+const DEEP_FRIED = { height: 0.5, sat: 2.2, bloom: 1.2 };
 
 const TerrainViewCanvas: FC<{
   parcels: ParcelData[];
@@ -755,22 +752,8 @@ const TerrainViewCanvas: FC<{
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
 }> = (props) => {
-  const PRESETS = {
-    default: { height: 0.35, sat: 1.2, bloom: 0, label: 'Default' },
-    deepFried: { height: 0.5, sat: 2.2, bloom: 1.2, label: 'Deep Fried' },
-    flat: { height: 0, sat: 1.0, bloom: 0, label: 'Flat' },
-    extreme: { height: 1.2, sat: 2.8, bloom: 1.8, label: 'Extreme' },
-  };
-
-  const [heightScale, setHeightScale] = useState(PRESETS.default.height);
-  const [saturation, setSaturation] = useState(PRESETS.default.sat);
-  const [bloomIntensity, setBloomIntensity] = useState(PRESETS.default.bloom);
-
-  const applyPreset = (p: typeof PRESETS.default) => {
-    setHeightScale(p.height);
-    setSaturation(p.sat);
-    setBloomIntensity(p.bloom);
-  };
+  const [fried, setFried] = useState(false);
+  const s = fried ? DEEP_FRIED : DEFAULT_SETTINGS;
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -780,48 +763,24 @@ const TerrainViewCanvas: FC<{
         onCreated={({ gl }) => gl.setClearColor('#050510')}
         style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
       >
-        <TerrainScene {...props} heightScale={heightScale} saturation={saturation} bloomIntensity={bloomIntensity} />
+        <TerrainScene {...props} heightScale={s.height} saturation={s.sat} bloomIntensity={s.bloom} />
       </Canvas>
 
-      {/* Slider HUD — bottom right */}
-      <div style={{
-        position: 'absolute', bottom: 20, right: 20, width: 180,
-        background: 'rgba(0,0,0,0.7)', borderRadius: 10, padding: '12px 14px',
-        border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)',
-        display: 'flex', flexDirection: 'column', gap: 10,
-      }}>
-        <div>
-          <div style={sliderLabelStyle}><span>Relief</span><span>{heightScale.toFixed(2)}</span></div>
-          <input type="range" min="0" max="1.5" step="0.01" value={heightScale}
-            onChange={e => setHeightScale(parseFloat(e.target.value))} style={sliderStyle} />
-        </div>
-        <div>
-          <div style={sliderLabelStyle}><span>Saturation</span><span>{saturation.toFixed(1)}</span></div>
-          <input type="range" min="0.5" max="3" step="0.1" value={saturation}
-            onChange={e => setSaturation(parseFloat(e.target.value))} style={sliderStyle} />
-        </div>
-        <div>
-          <div style={sliderLabelStyle}><span>Glow</span><span>{bloomIntensity.toFixed(1)}</span></div>
-          <input type="range" min="0" max="2" step="0.1" value={bloomIntensity}
-            onChange={e => setBloomIntensity(parseFloat(e.target.value))} style={sliderStyle} />
-        </div>
-        {/* Presets */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-          {Object.values(PRESETS).map(p => (
-            <button
-              key={p.label}
-              onClick={() => applyPreset(p)}
-              style={{
-                padding: '3px 8px', borderRadius: 4, border: '1px solid #334155',
-                background: '#0f172a', color: '#94a3b8', fontSize: '0.5rem',
-                cursor: 'pointer', fontFamily: 'monospace',
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Deep Fried toggle */}
+      <button
+        onClick={() => setFried(!fried)}
+        style={{
+          position: 'absolute', bottom: 20, right: 20,
+          padding: '6px 14px', borderRadius: 8,
+          border: fried ? '1px solid #f59e0b' : '1px solid #334155',
+          background: fried ? '#78350f' : '#1e293b',
+          color: fried ? '#fbbf24' : '#94a3b8',
+          fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'monospace',
+          fontWeight: 700,
+        }}
+      >
+        {fried ? '🔥 DEEP FRIED' : 'Deep Fry'}
+      </button>
     </div>
   );
 };
