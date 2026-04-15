@@ -750,10 +750,22 @@ const TerrainViewCanvas: FC<{
     };
   }, [props.parcels]);
 
+  // Spawn camera above a random parcel — immersed in the castle
+  const spawnPos = useMemo(() => {
+    if (props.parcels.length === 0) return [80, 60, 80] as [number, number, number];
+    const { cx, cy, cz, scale } = normalization;
+    const randParcel = props.parcels[Math.floor(Math.random() * props.parcels.length)];
+    const px = (randParcel.sx - cx) * scale;
+    const py = (randParcel.sy - cy) * scale;
+    const pz = (randParcel.sz - cz) * scale;
+    return [px + 2, py + 3, pz + 2] as [number, number, number];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.parcels.length, normalization]);
+
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [80, 60, 80], fov: 60 }}
+        camera={{ position: spawnPos, fov: 60 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl, camera }) => {
           gl.setClearColor('#050510');
@@ -774,9 +786,14 @@ const TerrainViewCanvas: FC<{
       }}>
         <button
           onClick={() => {
-            if (liveCamera) {
-              liveCamera.position.set(40, 30, 40);
-              liveCamera.lookAt(0, 0, 0);
+            if (liveCamera && props.parcels.length > 0) {
+              const { cx, cy, cz, scale } = normalization;
+              const rp = props.parcels[Math.floor(Math.random() * props.parcels.length)];
+              const px = (rp.sx - cx) * scale;
+              const py = (rp.sy - cy) * scale;
+              const pz = (rp.sz - cz) * scale;
+              liveCamera.position.set(px + 2, py + 3, pz + 2);
+              liveCamera.lookAt(px, py, pz);
             }
           }}
           style={{
@@ -786,7 +803,7 @@ const TerrainViewCanvas: FC<{
             fontFamily: 'monospace', fontWeight: 700,
           }}
         >
-          Reset View
+          Teleport
         </button>
         <button
           onClick={() => setFried(!fried)}
