@@ -654,8 +654,9 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
       <OrbitControls
         enableDamping dampingFactor={0.06}
         autoRotate autoRotateSpeed={0.15}
-        minDistance={5} maxDistance={200}
-        enablePan maxPolarAngle={Math.PI * 0.9}
+        minDistance={2} maxDistance={300}
+        enablePan
+        target={[0, 0, 0]}
       />
 
       {/* Bloom glow — only active when slider > 0 to save GPU */}
@@ -739,7 +740,7 @@ const TerrainViewCanvas: FC<{
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [60, 40, 60], fov: 55 }}
+        camera={{ position: [40, 30, 40], fov: 60 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl, camera }) => {
           gl.setClearColor('#050510');
@@ -762,21 +763,41 @@ const TerrainViewCanvas: FC<{
         />
       )}
 
-      {/* Deep Fried toggle */}
-      <button
-        onClick={() => setFried(!fried)}
-        style={{
-          position: 'absolute', bottom: 20, right: 20, zIndex: 10,
-          padding: '6px 14px', borderRadius: 8,
-          border: fried ? '1px solid #f59e0b' : '1px solid #334155',
-          background: fried ? '#78350f' : '#1e293b',
-          color: fried ? '#fbbf24' : '#94a3b8',
-          fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'monospace',
-          fontWeight: 700,
-        }}
-      >
-        {fried ? '🔥 DEEP FRIED' : 'Deep Fry'}
-      </button>
+      {/* Controls */}
+      <div style={{
+        position: 'absolute', bottom: 20, right: 20, zIndex: 10,
+        display: 'flex', gap: 8,
+      }}>
+        <button
+          onClick={() => {
+            if (liveCamera) {
+              liveCamera.position.set(40, 30, 40);
+              liveCamera.lookAt(0, 0, 0);
+            }
+          }}
+          style={{
+            padding: '6px 14px', borderRadius: 8,
+            border: '1px solid #334155', background: '#1e293b',
+            color: '#94a3b8', fontSize: '0.65rem', cursor: 'pointer',
+            fontFamily: 'monospace', fontWeight: 700,
+          }}
+        >
+          Reset View
+        </button>
+        <button
+          onClick={() => setFried(!fried)}
+          style={{
+            padding: '6px 14px', borderRadius: 8,
+            border: fried ? '1px solid #f59e0b' : '1px solid #334155',
+            background: fried ? '#78350f' : '#1e293b',
+            color: fried ? '#fbbf24' : '#94a3b8',
+            fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'monospace',
+            fontWeight: 700,
+          }}
+        >
+          {fried ? '🔥 DEEP FRIED' : 'Deep Fry'}
+        </button>
+      </div>
     </div>
   );
 };
