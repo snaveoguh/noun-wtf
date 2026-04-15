@@ -169,6 +169,8 @@ function buildAtlas(
   colorCtx.putImageData(colorData, 0, 0);
   heightCtx.putImageData(heightData, 0, 0);
 
+  console.log('Atlas built:', { slots: slot, uvMapSize: uvMap.size, atlasSize, tileSize });
+
   const colorTex = new THREE.CanvasTexture(colorCanvas);
   colorTex.magFilter = THREE.NearestFilter;
   colorTex.minFilter = THREE.LinearMipmapLinearFilter;
