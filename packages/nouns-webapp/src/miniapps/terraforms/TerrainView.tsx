@@ -251,7 +251,7 @@ function AllParcelsInstanced({
           float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
           col.rgb = mix(vec3(gray), col.rgb, saturation);
           // Bright at all distances — parcels always visible, peaks pop more
-          col.rgb *= 3.5 + vHeight * 1.2;
+          col.rgb *= 5.0 + vHeight * 2.0;
           gl_FragColor = col;
         }
       `,
@@ -530,6 +530,7 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
 }
 
 /** Renders character terrain for nearest parcels. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CharOverlay({
   parcels, terrainData, cameraRef, normalization, heightScale,
 }: {
@@ -734,7 +735,7 @@ const TerrainViewCanvas: FC<{
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [40, 30, 40], fov: 60 }}
+        camera={{ position: [80, 60, 80], fov: 60 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl, camera }) => {
           gl.setClearColor('#050510');
