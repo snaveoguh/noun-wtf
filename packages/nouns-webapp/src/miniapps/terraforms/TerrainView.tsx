@@ -159,7 +159,7 @@ function buildAtlas(
           rgb = hexToRGB(palette[clsIdx] || '#fff');
         } else {
           const base = hexToRGB(palette[0] || '#222');
-          rgb = [Math.round(base[0] * 0.18), Math.round(base[1] * 0.18), Math.round(base[2] * 0.18)];
+          rgb = [Math.round(base[0] * 0.4), Math.round(base[1] * 0.4), Math.round(base[2] * 0.4)];
         }
         cPixels[idx] = rgb[0];
         cPixels[idx + 1] = rgb[1];
@@ -263,8 +263,8 @@ function AllParcelsInstanced({
           // Saturation boost
           float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
           col.rgb = mix(vec3(gray), col.rgb, saturation);
-          // Emission boost — base lift so parcels glow from distance, extra on peaks
-          col.rgb *= 1.4 + vHeight * 0.5;
+          // Bright at all distances — parcels always visible, peaks pop more
+          col.rgb *= 2.2 + vHeight * 0.8;
           gl_FragColor = col;
         }
       `,
