@@ -74,14 +74,12 @@ type TokenEntry = [string, string[], string, Record<string, string>];
 // ─── Mathcastles Font Loader ──────────────────────────────────────────────
 // Load the onchain WOFF font so canvas fillText renders exact characters
 const FONT_NAME = 'MathcastlesRemix';
-let fontLoaded = false;
-
+// Self-executing font loader — loads once on module init
 (async () => {
   try {
     const font = new FontFace(FONT_NAME, 'url(/data/terraforms-font.woff)');
     await font.load();
     document.fonts.add(font);
-    fontLoaded = true;
   } catch {
     console.warn('Mathcastles font not available, using monospace fallback');
   }
