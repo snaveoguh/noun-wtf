@@ -333,11 +333,21 @@ export default function GrantDetailPage() {
 
       <h2 className={classes.detailName}>{title}</h2>
       <p className={classes.detailProposer}>
-        by <ShortAddress address={(grant.signer || grant.proposer) as `0x${string}`} />
-        {grant.proposer.toLowerCase() === RELAYER_ADDRESS && (
-          <span style={{ color: '#6b7280', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
-            (GASLESS VIA NOUNIRL)
-          </span>
+        {grant.proposer.toLowerCase() === RELAYER_ADDRESS ? (
+          grant.signer ? (
+            <>
+              by <ShortAddress address={grant.signer as `0x${string}`} />
+              <span style={{ color: '#6b7280', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+                (GASLESS VIA NOUNIRL)
+              </span>
+            </>
+          ) : (
+            <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+              GASLESS VIA NOUNIRL
+            </span>
+          )
+        ) : (
+          <>by <ShortAddress address={grant.proposer as `0x${string}`} /></>
         )}
       </p>
 

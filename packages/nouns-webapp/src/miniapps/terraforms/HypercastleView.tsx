@@ -561,7 +561,7 @@ const HypercastleView: FC = () => {
   const navigate = useNavigate();
   const { parcels, loadedCount, isLoading, total } = useHypercastleData();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('terrain');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const { data: terrainData } = useTerrainData();
 
   const onClickParcel = useCallback((tokenId: number) => {
