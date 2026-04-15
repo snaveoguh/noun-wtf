@@ -71,6 +71,22 @@ const tempObj = new THREE.Object3D();
 
 type TokenEntry = [string, string[], string, Record<string, string>];
 
+// ─── Mathcastles Font Loader ──────────────────────────────────────────────
+// Load the onchain WOFF font so canvas fillText renders exact characters
+const FONT_NAME = 'MathcastlesRemix';
+let fontLoaded = false;
+
+(async () => {
+  try {
+    const font = new FontFace(FONT_NAME, 'url(/data/terraforms-font.woff)');
+    await font.load();
+    document.fonts.add(font);
+    fontLoaded = true;
+  } catch {
+    console.warn('Mathcastles font not available, using monospace fallback');
+  }
+})();
+
 // ─── Texture Atlas (all 9,910 parcels in one texture) ─────────────────────
 
 /**
@@ -350,7 +366,7 @@ const CHAR_DISTANCE = 30;
 const MAX_CHAR_PARCELS = 20;
 const CELL = PARCEL_SIZE / GRID_SIZE; // scene units per cell
 const CHAR_PX = 32; // pixels per character tile in atlas
-const HEIGHT_UNIT = 0.04; // height per level (scaled by relief slider)
+const HEIGHT_UNIT = 0.08; // height per level — doubled for more vertical drama
 
 type CharAtlasResult = {
   texture: THREE.CanvasTexture;
@@ -378,7 +394,7 @@ function buildCharAtlas(td: TokenEntry): CharAtlasResult {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const fontSize = Math.floor(CHAR_PX * 0.82);
-  ctx.font = `${fontSize}px monospace`;
+  ctx.font = `${fontSize}px '${FONT_NAME}', monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -756,8 +772,8 @@ export type { TerrainData, TerrainViewProps };
 
 // ─── Main Export ──────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS = { height: 0.35, sat: 1.0, bloom: 0 };
-const DEEP_FRIED = { height: 0.35, sat: 2.5, bloom: 1.0 };
+const DEFAULT_SETTINGS = { height: 0.5, sat: 1.1, bloom: 0 };
+const DEEP_FRIED = { height: 0.7, sat: 2.5, bloom: 1.0 };
 
 const TerrainViewCanvas: FC<{
   parcels: ParcelData[];
