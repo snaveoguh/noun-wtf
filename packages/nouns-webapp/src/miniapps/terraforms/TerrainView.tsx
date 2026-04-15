@@ -16,19 +16,6 @@ import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
 import { CSS3DTerrainLayer } from './CSS3DTerrain';
-import { createPublicClient, http } from 'viem';
-import { mainnet } from 'viem/chains';
-
-const rpcClient = createPublicClient({
-  chain: mainnet,
-  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://ethereum-rpc.publicnode.com'),
-});
-const TF_ADDR = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
-const TF_HTML_ABI = [{
-  name: 'tokenHTML', type: 'function', stateMutability: 'view' as const,
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'string' }],
-}] as const;
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -490,101 +477,48 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
 
   const atlas = useMemo(() => buildCharAtlas(tokenData), [tokenData]);
   const geometry = useMemo(() => buildCharGeometry(tokenData, atlas), [tokenData, atlas]);
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Pure math animation — no iframes, no RPC
+  // Uses the exact onchain formula: charIndex = floor(0.25*t + (h + 0.5*col + 0.1*DIR*row)) % charSet.length
   const intervalRef = useRef<number>(0);
+  const airshipRef = useRef(0);
 
-  // Fetch tokenHTML and animate the atlas texture by re-reading iframe DOM
   useEffect(() => {
-    let cancelled = false;
+    const [, palette, , chars] = tokenData;
+    const charSet = Object.values(chars).filter(c => c && c !== ' ');
+    if (charSet.length === 0) return;
 
-    (async () => {
-      try {
-        const html = await rpcClient.readContract({
-          address: TF_ADDR, abi: TF_HTML_ABI,
-          functionName: 'tokenHTML', args: [BigInt(parcel.tokenId)],
-        });
-        if (cancelled) return;
+    const numTiles = 10;
+    const fontSize = Math.floor(CHAR_PX * 0.82);
 
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:388px;height:560px;border:none;';
-        iframe.sandbox.add('allow-scripts', 'allow-same-origin');
-        iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
-        document.body.appendChild(iframe);
-        iframeRef.current = iframe;
+    const animate = () => {
+      airshipRef.current += 1;
+      const t = airshipRef.current;
 
-        iframe.onload = () => {
-          if (cancelled) return;
+      const canvas = atlas.texture.image as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-          // Repaint the atlas texture from live iframe DOM every 300ms
-          const repaint = () => {
-            const doc = iframe.contentDocument;
-            if (!doc || !atlas.texture) return;
+      ctx.font = `${fontSize}px '${FONT_NAME}', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
 
-            const gridEls = doc.querySelectorAll('.r p, .meta p');
-            if (gridEls.length < 1024) return;
+      for (let i = 0; i < numTiles; i++) {
+        const h = 9 - i; // class a=9, j=0
+        const charIdx = Math.abs(Math.floor(0.25 * t + h)) % charSet.length;
+        const char = charSet[charIdx] || ' ';
+        const color = palette[i] || '#fff';
 
-            const canvas = atlas.texture.image as HTMLCanvasElement;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            const [_bg2] = tokenData;
-            void _bg2;
-            const numTiles = 10;
-            const fontSize = Math.floor(CHAR_PX * 0.82);
-
-            // Clear and redraw each class tile with the current animation state
-            // Group cells by class to find current char per class
-            const classChars = new Map<string, string>();
-            const classColors = new Map<string, string>();
-            for (let i = 0; i < Math.min(1024, gridEls.length); i++) {
-              const el = gridEls[i] as HTMLElement;
-              const cls = el.className || '';
-              if (cls && !classChars.has(cls)) {
-                classChars.set(cls, el.textContent || ' ');
-                classColors.set(cls, el.style.color || getComputedStyle(el).color || '#fff');
-              }
-            }
-
-            // Repaint each tile
-            ctx.font = `${fontSize}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            for (let i = 0; i < numTiles; i++) {
-              const cls = String.fromCharCode(97 + i);
-              const iframeClass = cls; // CSS class matches our letter
-              const char = classChars.get(iframeClass) || tokenData[3][cls] || ' ';
-              const color = classColors.get(iframeClass) || tokenData[1][i] || '#fff';
-
-              // Clear to transparent — characters float over terrain, no bg squares
-              ctx.clearRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
-              ctx.fillStyle = color;
-              ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
-            }
-
-            atlas.texture.needsUpdate = true;
-          };
-
-          setTimeout(() => {
-            repaint();
-            intervalRef.current = window.setInterval(repaint, 300);
-          }, 1000);
-        };
-      } catch {
-        // Static atlas remains — no animation
+        ctx.clearRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
+        ctx.fillStyle = color;
+        ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
       }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (iframeRef.current) {
-        try { document.body.removeChild(iframeRef.current); } catch {}
-        iframeRef.current = null;
-      }
+      atlas.texture.needsUpdate = true;
     };
-  }, [parcel.tokenId, atlas, tokenData]);
+
+    intervalRef.current = window.setInterval(animate, 100);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [tokenData, atlas]);
 
   return (
     <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
