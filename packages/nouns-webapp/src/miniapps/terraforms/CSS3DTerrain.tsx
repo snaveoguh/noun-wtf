@@ -9,7 +9,7 @@
  * Usage: Mount as a sibling to the R3F Canvas, passing the same
  * container ref and camera state.
  */
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef } from 'react';
 
 import * as THREE from 'three';
 import { CSS3DObject, CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
