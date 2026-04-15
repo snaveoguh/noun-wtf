@@ -136,8 +136,15 @@ function buildAtlas(
         const py = oy + r;
         const idx = (py * atlasSize + px) * 4;
 
-        // Color: use zone color (bg for height 0)
-        const rgb = height > 0 ? hexToRGB(palette[clsIdx] || '#fff') : bgRGB;
+        // Color: zone color for elevated cells, dark tint of zone color for ground
+        // (pure black bg gets averaged to invisible by mipmapping from distance)
+        let rgb;
+        if (height > 0) {
+          rgb = hexToRGB(palette[clsIdx] || '#fff');
+        } else {
+          const base = hexToRGB(palette[0] || '#222');
+          rgb = [Math.round(base[0] * 0.18), Math.round(base[1] * 0.18), Math.round(base[2] * 0.18)];
+        }
         cPixels[idx] = rgb[0];
         cPixels[idx + 1] = rgb[1];
         cPixels[idx + 2] = rgb[2];
@@ -240,8 +247,8 @@ function AllParcelsInstanced({
           // Saturation boost
           float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
           col.rgb = mix(vec3(gray), col.rgb, saturation);
-          // Slight emission boost on higher terrain for glow pickup
-          col.rgb *= 1.0 + vHeight * 0.3;
+          // Emission boost — base lift so parcels glow from distance, extra on peaks
+          col.rgb *= 1.4 + vHeight * 0.5;
           gl_FragColor = col;
         }
       `,
@@ -533,8 +540,8 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
               const char = classChars.get(iframeClass) || tokenData[3][cls] || ' ';
               const color = classColors.get(iframeClass) || tokenData[1][i] || '#fff';
 
-              ctx.fillStyle = bg;
-              ctx.fillRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
+              // Clear to transparent — characters float over terrain, no bg squares
+              ctx.clearRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
               ctx.fillStyle = color;
               ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
             }
