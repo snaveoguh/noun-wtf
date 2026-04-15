@@ -25,10 +25,7 @@ type ViewMode = 'terrain' | 'lofi' | 'grid';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const TERRAFORMS_ADDRESS = '0x4E1f41613c9084FdB9E34E11fAE9412427480e56' as const;
 const TOTAL_SUPPLY = 9910;
-const BATCH_SIZE = 80; // tokens per multicall batch
-const BATCH_DELAY = 200; // ms between batches
 
 // Zone colors for parcels that haven't loaded yet (gradient by level)
 const LEVEL_COLORS = [
@@ -37,32 +34,6 @@ const LEVEL_COLORS = [
   '#0885ff', '#0093e6', '#00a1cc', '#00afb3', '#00bd99',
   '#00cb80', '#00d966', '#00e74d', '#00f533', '#00ff1a',
 ];
-
-const TERRAFORMS_ABI = [
-  {
-    name: 'tokenSupplementalData',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{
-      name: '',
-      type: 'tuple',
-      components: [
-        { name: 'tokenId', type: 'uint256' },
-        { name: 'level', type: 'uint256' },
-        { name: 'xCoordinate', type: 'uint256' },
-        { name: 'yCoordinate', type: 'uint256' },
-        { name: 'elevation', type: 'int256' },
-        { name: 'structureSpaceX', type: 'uint256' },
-        { name: 'structureSpaceY', type: 'uint256' },
-        { name: 'structureSpaceZ', type: 'uint256' },
-        { name: 'zoneName', type: 'string' },
-        { name: 'zoneColors', type: 'string[10]' },
-        { name: 'characterSet', type: 'string[9]' },
-      ],
-    }],
-  },
-] as const;
 
 const publicClient = createPublicClient({
   chain: mainnet,
