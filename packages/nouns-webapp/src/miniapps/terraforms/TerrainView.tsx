@@ -328,7 +328,9 @@ function AllParcelsInstanced({
 
     mesh.instanceMatrix.needsUpdate = true;
     idMapRef.current = ids;
-  }, [parcels, normalization, atlas, hoveredId]);
+    console.log('Instances set:', mapped, 'mapped,', parcels.length - mapped, 'hidden');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcels.length, normalization, atlas]); // NO hoveredId — don't rebuild 9910 matrices on hover
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
