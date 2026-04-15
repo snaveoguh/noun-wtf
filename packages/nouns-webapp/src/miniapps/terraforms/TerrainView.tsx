@@ -365,9 +365,8 @@ function buildCharAtlas(td: TokenEntry): CharAtlasResult {
   canvas.height = CHAR_PX;
   const ctx = canvas.getContext('2d')!;
 
-  // Fill background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Transparent background — characters float in space
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const fontSize = Math.floor(CHAR_PX * 0.82);
   ctx.font = `${fontSize}px monospace`;
@@ -381,9 +380,7 @@ function buildCharAtlas(td: TokenEntry): CharAtlasResult {
     const color = palette[i] || '#fff';
     const char = chars[cls] || ' ';
 
-    // Draw character in its color on the bg
-    ctx.fillStyle = bg;
-    ctx.fillRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
+    // Draw character only — no background fill
     ctx.fillStyle = color;
     ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
 
@@ -568,7 +565,7 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
   return (
     <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
       <mesh geometry={geometry} raycast={() => {}}>
-        <meshBasicMaterial ref={materialRef} map={atlas.texture} side={THREE.DoubleSide} />
+        <meshBasicMaterial ref={materialRef} map={atlas.texture} side={THREE.DoubleSide} transparent alphaTest={0.1} />
       </mesh>
     </group>
   );
@@ -742,8 +739,8 @@ export type { TerrainData, TerrainViewProps };
 
 // ─── Main Export ──────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS = { height: 0.35, sat: 1.2, bloom: 0 };
-const DEEP_FRIED = { height: 0.5, sat: 2.2, bloom: 1.2 };
+const DEFAULT_SETTINGS = { height: 0.35, sat: 1.0, bloom: 0 };
+const DEEP_FRIED = { height: 0.35, sat: 2.5, bloom: 1.0 };
 
 const TerrainViewCanvas: FC<{
   parcels: ParcelData[];
