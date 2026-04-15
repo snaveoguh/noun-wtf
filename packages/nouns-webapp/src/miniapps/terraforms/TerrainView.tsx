@@ -209,12 +209,12 @@ function AllParcelsInstanced({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const idMapRef = useRef<number[]>([]);
 
-  // Build atlas once — use ref to prevent rebuilds on re-render
-  const atlasRef = useRef<ReturnType<typeof buildAtlas> | null>(null);
-  if (!atlasRef.current && parcels.length > 0) {
-    atlasRef.current = buildAtlas(parcels, terrainData);
-  }
-  const atlas = atlasRef.current!;
+  // Build atlas once when both parcels + terrainData are ready
+  const atlas = useMemo(
+    () => buildAtlas(parcels, terrainData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [parcels.length, terrainData], // only rebuild when data actually changes, not on hover
+  );
 
   // Custom shader: color atlas + height displacement + saturation boost
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -332,7 +332,7 @@ function AllParcelsInstanced({
     }
   }, [onClickParcel]);
 
-  if (parcels.length === 0 || !atlasRef.current) return null;
+  if (parcels.length === 0) return null;
 
   return (
     <instancedMesh
