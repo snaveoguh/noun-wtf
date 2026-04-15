@@ -14,6 +14,8 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
+
+import { CSS3DTerrainLayer } from './CSS3DTerrain';
 import { createPublicClient, http } from 'viem';
 import { mainnet } from 'viem/chains';
 
@@ -632,6 +634,13 @@ function CameraRefSetter({ cameraRef }: { cameraRef: React.RefObject<THREE.Camer
   return null;
 }
 
+/** Exports the R3F camera to external state for CSS3DRenderer sync. */
+function CameraSync({ onCamera }: { onCamera: (cam: THREE.Camera) => void }) {
+  const { camera } = useThree();
+  useEffect(() => { onCamera(camera); }, [camera, onCamera]);
+  return null;
+}
+
 // ─── Scene ─────────────────────────────────────────────────────────────────
 
 const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: number; bloomIntensity: number }> = ({
@@ -758,23 +767,57 @@ const TerrainViewCanvas: FC<{
 }> = (props) => {
   const [fried, setFried] = useState(false);
   const s = fried ? DEEP_FRIED : DEFAULT_SETTINGS;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [liveCamera, setLiveCamera] = useState<THREE.Camera | null>(null);
+
+  // Compute normalization here too (same as TerrainScene) for CSS3D layer
+  const normalization = useMemo(() => {
+    if (props.parcels.length === 0) return { cx: 0, cy: 0, cz: 0, scale: 1 };
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const p of props.parcels) {
+      if (p.sx < minX) minX = p.sx; if (p.sx > maxX) maxX = p.sx;
+      if (p.sy < minY) minY = p.sy; if (p.sy > maxY) maxY = p.sy;
+      if (p.sz < minZ) minZ = p.sz; if (p.sz > maxZ) maxZ = p.sz;
+    }
+    return {
+      cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, cz: (minZ + maxZ) / 2,
+      scale: 80 / Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1),
+    };
+  }, [props.parcels]);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={{ position: [60, 40, 60], fov: 55 }}
         gl={{ antialias: true, alpha: false }}
-        onCreated={({ gl }) => gl.setClearColor('#050510')}
+        onCreated={({ gl, camera }) => {
+          gl.setClearColor('#050510');
+          setLiveCamera(camera);
+        }}
         style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
       >
         <TerrainScene {...props} heightScale={s.height} saturation={s.sat} bloomIntensity={s.bloom} />
+        <CameraSync onCamera={setLiveCamera} />
       </Canvas>
+
+      {/* CSS3D overlay — real iframes in 3D space for nearest parcels */}
+      {props.terrainData && liveCamera && (
+        <CSS3DTerrainLayer
+          containerRef={containerRef}
+          camera={liveCamera}
+          parcels={props.parcels}
+          terrainData={props.terrainData}
+          normalization={normalization}
+        />
+      )}
 
       {/* Deep Fried toggle */}
       <button
         onClick={() => setFried(!fried)}
         style={{
-          position: 'absolute', bottom: 20, right: 20,
+          position: 'absolute', bottom: 20, right: 20, zIndex: 10,
           padding: '6px 14px', borderRadius: 8,
           border: fried ? '1px solid #f59e0b' : '1px solid #334155',
           background: fried ? '#78350f' : '#1e293b',
