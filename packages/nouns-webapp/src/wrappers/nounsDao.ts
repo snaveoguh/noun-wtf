@@ -1211,6 +1211,9 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       againstVotes: BigInt((rd.againstVotes as number) ?? 0),
       abstainVotes: BigInt((rd.abstainVotes as number) ?? 0),
       createdBlock: BigInt((rd.createdAtBlock as string) ?? '0'),
+      createdAtBlock: BigInt((rd.createdAtBlock as string) ?? '0'),
+      createdAt: (rd.createdAt as string) ?? '0',
+      createdAtTransaction: (rd.createdAtTransaction as string) ?? '',
       createdTimestamp: BigInt((rd.createdAt as string) ?? '0'),
       createdTransactionHash: (rd.createdAtTransaction as string) ?? '',
       startBlock: BigInt((rd.startBlock as string) ?? '0'),
@@ -1221,7 +1224,9 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
       executionETA: rd.executionETA != null ? BigInt(rd.executionETA as string) : null,
       onTimelockV1: (rd.onTimelockV1 as boolean) ?? null,
       voteSnapshotBlock:
-        rd.voteSnapshotBlock != null ? BigInt(rd.voteSnapshotBlock as string) : null,
+        rd.voteSnapshotBlock != null
+          ? BigInt(rd.voteSnapshotBlock as string)
+          : BigInt((rd.startBlock as string) ?? '0'),
       proposer: (rd.proposer as string) ?? '',
       clientId: (rd.clientId as number) ?? null,
       signers: ((rd.signers as string[]) ?? []).map(s => ({ id: s })),
