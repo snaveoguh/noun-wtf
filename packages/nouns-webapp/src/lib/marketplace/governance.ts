@@ -147,7 +147,7 @@ async function fetchNounsProposals(): Promise<PredictionProposal[]> {
         proposalId: String(p.id),
         title,
         status,
-        url: `https://nouns.wtf/vote/${p.id}`,
+        url: `/vote/${p.id}`,
         votesFor: Number(p.forVotes ?? 0),
         votesAgainst: Number(p.againstVotes ?? 0),
         quorum: Number(p.quorumVotes ?? 0),
