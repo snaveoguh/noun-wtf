@@ -1127,6 +1127,22 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
   const timestamp = useBlockTimestamp(blockNumber);
   const isDaoGteV3 = useIsDaoGteV3();
 
+  // Fetch from REST endpoint first (bypasses Fastly/GraphQL truncation)
+  const subgraphUrl = getSubgraphUrl();
+  const restBase = subgraphUrl.replace(/\/graphql\/?$/, '').replace(/\/$/, '');
+  const [restData, setRestData] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    if (id == null || id === '') return;
+    fetch(`${restBase}/api/proposals/${id}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: Record<string, unknown> | null) => {
+        if (d != null && d.proposal != null) setRestData(d.proposal as Record<string, unknown>);
+      })
+      .catch(() => {});
+  }, [id, restBase]);
+
+  // Also try GraphQL as fallback
   const { query, variables } = proposalQuery(id);
   const { data } = useQuery<{
     proposal: Maybe<{
@@ -1178,22 +1194,62 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
     query: { enabled: Boolean(id) },
   });
 
-  // Adapt Ponder flat shape to GraphQLProposal shape
+  // Prefer REST data if available, otherwise use GraphQL
   const raw = data?.proposal;
-  const proposal: GraphQLProposal | undefined = raw
-    ? {
-        ...raw,
-        createdBlock: raw.createdAtBlock,
-        createdTimestamp: BigInt(raw.createdAt ?? 0),
-        createdTransactionHash: raw.createdAtTransaction ?? '',
-        voteSnapshotBlock: raw.voteSnapshotBlock ?? raw.startBlock,
-        signers: raw.signers?.items?.map(s => ({ id: s.signer })) ?? [],
-        targets: raw.transactions?.items?.map(t => t.target) ?? [],
-        values: raw.transactions?.items?.map(t => t.value) ?? [],
-        signatures: raw.transactions?.items?.map(t => t.signature) ?? [],
-        calldatas: raw.transactions?.items?.map(t => t.calldata) ?? [],
-      }
-    : undefined;
+  let proposal: GraphQLProposal | undefined;
+
+  if (restData) {
+    // REST shape: flat object with signers[] and transactions[]
+    const rd = restData;
+    proposal = {
+      id: String(rd.id),
+      description: (rd.description as string) ?? '',
+      status: (rd.status as string) ?? '',
+      proposalThreshold: BigInt((rd.proposalThreshold as string) ?? '0'),
+      quorumVotes: BigInt((rd.quorumVotes as string) ?? '0'),
+      forVotes: BigInt((rd.forVotes as number) ?? 0),
+      againstVotes: BigInt((rd.againstVotes as number) ?? 0),
+      abstainVotes: BigInt((rd.abstainVotes as number) ?? 0),
+      createdBlock: BigInt((rd.createdAtBlock as string) ?? '0'),
+      createdAtBlock: BigInt((rd.createdAtBlock as string) ?? '0'),
+      createdAt: (rd.createdAt as string) ?? '0',
+      createdAtTransaction: (rd.createdAtTransaction as string) ?? '',
+      createdTimestamp: BigInt((rd.createdAt as string) ?? '0'),
+      createdTransactionHash: (rd.createdAtTransaction as string) ?? '',
+      startBlock: BigInt((rd.startBlock as string) ?? '0'),
+      endBlock: BigInt((rd.endBlock as string) ?? '0'),
+      updatePeriodEndBlock:
+        rd.updatePeriodEndBlock != null ? BigInt(rd.updatePeriodEndBlock as string) : null,
+      objectionPeriodEndBlock: BigInt((rd.objectionPeriodEndBlock as string) ?? '0'),
+      executionETA: rd.executionETA != null ? BigInt(rd.executionETA as string) : null,
+      onTimelockV1: (rd.onTimelockV1 as boolean) ?? null,
+      voteSnapshotBlock:
+        rd.voteSnapshotBlock != null
+          ? BigInt(rd.voteSnapshotBlock as string)
+          : BigInt((rd.startBlock as string) ?? '0'),
+      proposer: (rd.proposer as string) ?? '',
+      clientId: (rd.clientId as number) ?? null,
+      signers: ((rd.signers as string[]) ?? []).map(s => ({ id: s })),
+      targets: ((rd.transactions as { target: string }[]) ?? []).map(t => t.target),
+      values: ((rd.transactions as { value: string }[]) ?? []).map(t => String(t.value)),
+      signatures: ((rd.transactions as { signature: string }[]) ?? []).map(t => t.signature),
+      calldatas: ((rd.transactions as { calldata: string }[]) ?? []).map(t => t.calldata),
+    };
+  } else if (raw) {
+    // GraphQL shape: nested signers.items and transactions.items
+    proposal = {
+      ...raw,
+      createdBlock: raw.createdAtBlock,
+      createdTimestamp: BigInt(raw.createdAt ?? 0),
+      createdTransactionHash: raw.createdAtTransaction ?? '',
+      voteSnapshotBlock: raw.voteSnapshotBlock ?? raw.startBlock,
+      signers: raw.signers?.items?.map(s => ({ id: s.signer })) ?? [],
+      targets: raw.transactions?.items?.map(t => t.target) ?? [],
+      values: raw.transactions?.items?.map(t => t.value) ?? [],
+      signatures: raw.transactions?.items?.map(t => t.signature) ?? [],
+      calldatas: raw.transactions?.items?.map(t => t.calldata) ?? [],
+    };
+  }
 
   const parsed = parseSubgraphProposal(
     proposal,

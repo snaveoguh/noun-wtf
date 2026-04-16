@@ -4,9 +4,9 @@ import { CopyIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
-import { useAccount, useSignTypedData } from 'wagmi';
+import { useAccount, useSignTypedData, useWriteContract } from 'wagmi';
 
-import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
+import { smallGrantsTreasuryAbi, SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
 
@@ -64,13 +64,7 @@ export default function CreateGrantPage() {
   }, [address]);
 
   const { signTypedDataAsync } = useSignTypedData();
-
-  useEffect(() => {
-    toast.info('Grant proposals are gasless — you only sign a message, no ETH needed.', {
-      duration: 6000,
-      id: 'grants-gasless-info',
-    });
-  }, []);
+  const { writeContractAsync } = useWriteContract();
 
   function updateTx(idx: number, field: keyof GrantTx, val: string) {
     setTransactions(prev => prev.map((t, i) => (i === idx ? { ...t, [field]: val } : t)));
@@ -89,19 +83,21 @@ export default function CreateGrantPage() {
     setTransactions(prev => prev.filter((_, i) => i !== idx));
   }
 
-  async function handleSubmit() {
+  function buildProposal(): {
+    targets: `0x${string}`[];
+    values: bigint[];
+    signatures: string[];
+    calldatas: `0x${string}`[];
+    description: string;
+  } | null {
     if (!address) {
       toast.error('Connect your wallet first');
-      return;
+      return null;
     }
     if (!title.trim()) {
       toast.error('Title is required');
-      return;
+      return null;
     }
-    let targets: `0x${string}`[];
-    let values: bigint[];
-    let signatures: string[];
-    let calldatas: `0x${string}`[];
 
     if (advanced) {
       const validTxs = transactions.filter(
@@ -109,73 +105,95 @@ export default function CreateGrantPage() {
       );
       if (validTxs.length === 0) {
         toast.error('At least one transaction is required');
-        return;
+        return null;
       }
-      targets = validTxs.map(t => t.target as `0x${string}`);
-      values = validTxs.map(t => parseEther(t.value || '0'));
-      signatures = validTxs.map(t => t.signature || '');
-      calldatas = validTxs.map(t => (t.calldata || '0x') as `0x${string}`);
-    } else {
-      const amt = parseFloat(ethAmount || '0');
-      if (amt <= 0) {
-        toast.error('Enter an ETH amount');
-        return;
-      }
-      if (amt > 0.42) {
-        toast.error('Max 0.42 ETH');
-        return;
-      }
-      targets = [address];
-      values = [parseEther(ethAmount)];
-      signatures = [''];
-      calldatas = ['0x'];
+      return {
+        targets: validTxs.map(t => t.target as `0x${string}`),
+        values: validTxs.map(t => parseEther(t.value || '0')),
+        signatures: validTxs.map(t => t.signature || ''),
+        calldatas: validTxs.map(t => (t.calldata || '0x') as `0x${string}`),
+        description: `# ${title.trim()}\n\n${body.trim()}`,
+      };
     }
 
-    const description = `# ${title.trim()}\n\n${body.trim()}`;
+    const amt = parseFloat(ethAmount || '0');
+    if (amt <= 0) {
+      toast.error('Enter an ETH amount');
+      return null;
+    }
+    if (amt > 0.42) {
+      toast.error('Max 0.42 ETH');
+      return null;
+    }
+    return {
+      targets: [address],
+      values: [parseEther(ethAmount)],
+      signatures: [''],
+      calldatas: ['0x'],
+      description: `# ${title.trim()}\n\n${body.trim()}`,
+    };
+  }
+
+  async function handleGasless() {
+    const proposal = buildProposal();
+    if (!proposal) return;
 
     setSubmitting(true);
     try {
-      // Step 1: Sign EIP-712 typed data (free, no gas)
       const signature = await signTypedDataAsync({
         domain: GRANT_PROPOSAL_DOMAIN,
         types: GRANT_PROPOSAL_TYPES,
         primaryType: 'Proposal',
-        message: {
-          targets,
-          values,
-          signatures,
-          calldatas,
-          description,
-        },
+        message: proposal,
       });
 
-      // Step 2: Submit to relay API (relayer pays gas)
       const res = await fetch(`${API_BASE}/api/grants/propose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           proposer: address,
-          targets,
-          values: values.map(v => v.toString()),
-          signatures,
-          calldatas,
-          description,
+          targets: proposal.targets,
+          values: proposal.values.map(v => v.toString()),
+          signatures: proposal.signatures,
+          calldatas: proposal.calldatas,
+          description: proposal.description,
           signature,
         }),
       });
 
       const data = (await res.json()) as { error?: string; txHash?: string };
-
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Relay failed');
-      }
-
+      if (!res.ok) throw new Error(data.error ?? 'Relay failed');
       setSubmittedTx(data.txHash ?? '');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to create grant';
-      if (!msg.includes('User rejected')) {
-        toast.error(msg);
-      }
+      if (!msg.includes('User rejected')) toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleWithGas() {
+    const proposal = buildProposal();
+    if (!proposal) return;
+
+    setSubmitting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: SMALL_GRANTS_TREASURY_ADDRESS,
+        abi: smallGrantsTreasuryAbi,
+        functionName: 'propose',
+        args: [
+          proposal.targets,
+          proposal.values,
+          proposal.signatures,
+          proposal.calldatas,
+          proposal.description,
+        ],
+      });
+      setSubmittedTx(hash);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to create grant';
+      if (!msg.includes('User rejected')) toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -241,7 +259,7 @@ export default function CreateGrantPage() {
     <div className={classes.container}>
       <h1 className={classes.title}>Create Grant Proposal</h1>
       <p className={classes.subtitle}>
-        Gasless — you sign a message, we submit the transaction.
+        Submit gasless (we pay the gas) or pay gas yourself.
         <br />
         The proposal enters a 12-hour voting period immediately.
       </p>
@@ -432,18 +450,32 @@ export default function CreateGrantPage() {
           </div>
         )}
 
-        <button
-          type="button"
-          className={classes.submitBtn}
-          disabled={submitting || !address}
-          onClick={handleSubmit}
-        >
-          {submitting
-            ? 'Signing & submitting...'
-            : !address
-              ? 'Connect Wallet'
-              : 'Submit Grant Proposal (Gasless)'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
+          <button
+            type="button"
+            className={classes.submitBtn}
+            style={{ flex: 1, marginTop: 0 }}
+            disabled={submitting || !address}
+            onClick={handleGasless}
+          >
+            {submitting ? 'Submitting...' : !address ? 'Connect Wallet' : 'Submit Gasless'}
+          </button>
+          <button
+            type="button"
+            className={classes.submitBtn}
+            style={{
+              flex: 1,
+              marginTop: 0,
+              background: 'transparent',
+              border: '2px solid #22d3ee',
+              color: '#0891b2',
+            }}
+            disabled={submitting || !address}
+            onClick={handleWithGas}
+          >
+            {submitting ? 'Submitting...' : 'Pay Gas'}
+          </button>
+        </div>
       </div>
     </div>
   );

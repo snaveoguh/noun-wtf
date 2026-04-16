@@ -26,7 +26,6 @@ import {
   accountEscrowedNounsQuery,
   delegateNounsAtBlockQuery,
   ownedNounsQuery,
-  seedsQuery,
 } from './subgraph';
 
 export interface INounSeed {
@@ -70,40 +69,73 @@ interface PonderSeedsResponse {
       head: number;
       glasses: number;
     }>;
+    pageInfo?: {
+      hasNextPage: boolean;
+      endCursor: string;
+    };
   };
 }
 
 export const useNounSeeds = () => {
-  // Read from localStorage once on mount, then keep in state so React re-renders
-  // when seeds arrive from the network.
   const [seeds, setSeeds] = useState<Record<string, INounSeed> | undefined>(() => {
     const cached = localStorage.getItem(seedCacheKey);
     return cached ? JSON.parse(cached) : undefined;
   });
 
-  const { query, variables } = seedsQuery();
-  const { data } = useQuery<PonderSeedsResponse>(query, {
-    skip: !!seeds,
-    variables,
-  });
-
   useEffect(() => {
-    const items = data?.nouns?.items;
-    if (!seeds && items !== undefined && items.length > 0) {
-      const transformedSeeds = items.map(seed => ({
-        ...seed,
-        accessory: Number(seed.accessory),
-        background: Number(seed.background),
-        body: Number(seed.body),
-        glasses: Number(seed.glasses),
-        head: Number(seed.head),
-        id: seed.id,
-      }));
-      const seedObj = seedArrayToObject(transformedSeeds);
+    // Refetch if no cache or cache is stale (< 1500 seeds = missing nouns)
+    const seedCount = seeds ? Object.keys(seeds).length : 0;
+    if (seedCount >= 1500) return;
+
+    // Fetch all seeds with pagination (API caps at 1000 per request)
+    let cancelled = false;
+    (async () => {
+      const allItems: PonderSeedsResponse['nouns']['items'] = [];
+      let cursor: string | undefined;
+
+      const url = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
+      if (!url) return;
+
+      for (let page = 0; page < 10; page++) {
+        try {
+          const afterClause = cursor ? `, after: "${cursor}"` : '';
+          const q = `query { nouns(limit: 1000, orderBy: "id", orderDirection: "asc"${afterClause}) { items { id background body accessory head glasses } pageInfo { hasNextPage endCursor } } }`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: q }),
+          });
+          const json = (await res.json()) as { data: PonderSeedsResponse };
+          const items = json.data?.nouns?.items;
+          if (!items || items.length === 0) break;
+          allItems.push(...items);
+          const pageInfo = json.data?.nouns?.pageInfo;
+          if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+          cursor = pageInfo.endCursor;
+        } catch {
+          break;
+        }
+      }
+
+      if (cancelled || allItems.length === 0) return;
+
+      const seedObj = seedArrayToObject(
+        allItems.map(s => ({
+          ...s,
+          accessory: Number(s.accessory),
+          background: Number(s.background),
+          body: Number(s.body),
+          glasses: Number(s.glasses),
+          head: Number(s.head),
+          id: s.id,
+        })),
+      );
       localStorage.setItem(seedCacheKey, JSON.stringify(seedObj));
-      setSeeds(seedObj);
-    }
-  }, [data, seeds]);
+      if (!cancelled) setSeeds(seedObj);
+    })();
+
+    return () => { cancelled = true; };
+  }, [seeds]);
 
   return seeds;
 };
