@@ -19,12 +19,14 @@ import { useAllProposals, useProposalThreshold } from '@/wrappers/nounsDao';
 import classes from './Governance.module.css';
 
 const YellowCollectiveProposals = lazy(() => import('./YellowCollectiveProposals'));
+const LilNounsProposals = lazy(() => import('./LilNounsProposals'));
 
-type DaoTab = 'nouns' | 'yc';
+type DaoTab = 'nouns' | 'yc' | 'lil';
 
 const GovernancePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const daoTab: DaoTab = searchParams.get('dao') === 'yc' ? 'yc' : 'nouns';
+  const daoParam = searchParams.get('dao');
+  const daoTab: DaoTab = daoParam === 'yc' ? 'yc' : daoParam === 'lil' ? 'lil' : 'nouns';
 
   const { data: proposals } = useAllProposals();
   const threshold = useProposalThreshold();
@@ -114,6 +116,23 @@ const GovernancePage = () => {
         >
           YC (beta)
         </button>
+        <button
+          onClick={() => setDao('lil')}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 20,
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            fontFamily: "'PT Root UI', sans-serif",
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            background: daoTab === 'lil' ? '#ff638d' : '#f4f4f8',
+            color: daoTab === 'lil' ? '#fff' : '#8c8d92',
+          }}
+        >
+          LIL NOUNS
+        </button>
       </div>
 
       {daoTab === 'nouns' ? (
@@ -169,9 +188,13 @@ const GovernancePage = () => {
 
           <Proposals proposals={proposals ?? []} nounsRequired={nounsRequired} />
         </>
-      ) : (
+      ) : daoTab === 'yc' ? (
         <Suspense fallback={<GenericSkeleton />}>
           <YellowCollectiveProposals />
+        </Suspense>
+      ) : (
+        <Suspense fallback={<GenericSkeleton />}>
+          <LilNounsProposals />
         </Suspense>
       )}
     </>
