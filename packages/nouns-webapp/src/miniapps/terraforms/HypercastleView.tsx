@@ -468,8 +468,8 @@ const HypercastleView: FC = () => {
   const navigate = useNavigate();
   const { parcels, loadedCount, isLoading, total } = useHypercastleData();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const { data: terrainData } = useTerrainData();
+  const [viewMode, setViewMode] = useState<ViewMode>('terrain');
+  const { data: terrainData, loading: terrainLoading } = useTerrainData();
 
   const onClickParcel = useCallback((tokenId: number) => {
     navigate(`/terraforms/${tokenId}`);
@@ -483,7 +483,7 @@ const HypercastleView: FC = () => {
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Loading overlay */}
-      {isLoading && (
+      {(isLoading || terrainLoading) && (
         <div style={{
           position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
           zIndex: 10, background: 'rgba(0,0,0,0.7)', padding: '10px 24px',
@@ -503,7 +503,7 @@ const HypercastleView: FC = () => {
           <span style={{
             color: '#94a3b8', fontSize: '0.7rem', fontFamily: 'monospace',
           }}>
-            {loadedCount.toLocaleString()} / {total.toLocaleString()} parcels
+            {terrainLoading ? 'Loading terrain...' : `${loadedCount.toLocaleString()} / ${total.toLocaleString()} parcels`}
           </span>
         </div>
       )}
@@ -603,24 +603,22 @@ const HypercastleView: FC = () => {
           onCreated={({ gl }) => gl.setClearColor('#050510')}
           style={{ cursor: hoveredId ? 'pointer' : 'grab' }}
         >
-          <Suspense fallback={null}>
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[50, 80, 30]} intensity={0.8} />
-            <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
-            <ParcelInstances
-              parcels={parcels}
-              onClickParcel={onClickParcel}
-              hoveredId={hoveredId}
-              setHoveredId={setHoveredId}
-            />
-            <OrbitControls
-              enableDamping dampingFactor={0.06}
-              autoRotate autoRotateSpeed={0.3}
-              minDistance={10} maxDistance={200}
-              enablePan maxPolarAngle={Math.PI * 0.9}
-            />
-            <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
-          </Suspense>
+          <ambientLight intensity={0.5} />
+          <directionalLight position={[50, 80, 30]} intensity={0.8} />
+          <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
+          <ParcelInstances
+            parcels={parcels}
+            onClickParcel={onClickParcel}
+            hoveredId={hoveredId}
+            setHoveredId={setHoveredId}
+          />
+          <OrbitControls
+            enableDamping dampingFactor={0.06}
+            autoRotate autoRotateSpeed={0.3}
+            minDistance={10} maxDistance={200}
+            enablePan maxPolarAngle={Math.PI * 0.9}
+          />
+          <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
         </Canvas>
       )}
 
