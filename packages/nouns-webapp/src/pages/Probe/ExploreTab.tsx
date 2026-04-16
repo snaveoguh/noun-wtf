@@ -332,6 +332,12 @@ const ExploreTab: React.FC = () => {
         >
           <Box className="h-4 w-4" />
           3D
+          {view3D && (seeds == null || Object.keys(seeds).length < 1500) && (
+            <span className="ml-1 inline-flex items-center gap-1 font-mono text-[10px] opacity-70">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
+              {seeds == null ? 'loading…' : `${Object.keys(seeds).length.toLocaleString()}`}
+            </span>
+          )}
         </Button>
 
         <Button
@@ -414,8 +420,8 @@ const ExploreTab: React.FC = () => {
       <div
         ref={containerRef}
         style={{ overflow: 'hidden', position: 'relative' }}
-        onMouseMove={view3D ? (e => setMousePos({ x: e.clientX, y: e.clientY })) : undefined}
-        onMouseLeave={view3D ? (() => setMousePos(null)) : undefined}
+        onMouseMove={view3D ? e => setMousePos({ x: e.clientX, y: e.clientY }) : undefined}
+        onMouseLeave={view3D ? () => setMousePos(null) : undefined}
       >
         <div
           style={{
@@ -452,20 +458,25 @@ const ExploreTab: React.FC = () => {
                         setPopover(prev => (prev?.nounId === nounId ? null : { nounId, rect }));
                       }}
                       onMouseEnter={() => view3D && setHoveredNounId(nounId)}
-                      onMouseLeave={() => view3D && setHoveredNounId(prev => prev === nounId ? null : prev)}
+                      onMouseLeave={() =>
+                        view3D && setHoveredNounId(prev => (prev === nounId ? null : prev))
+                      }
                       className={`group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg ${view3D ? 'bg-transparent' : ''}`}
                       style={{ width: layout.cellSize, height: layout.cellSize }}
                     >
-                      {!view3D && (
-                        <Noun
-                          nounId={nounId != null ? BigInt(nounId) : undefined}
-                          loadingNounFallback
-                          minFallbackDuration={1000}
-                          style={{ width: layout.cellSize, height: layout.cellSize }}
-                          className="bg-cool-background"
-                        />
-                      )}
-                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block" style={{ zIndex: 2 }}>
+                      {/* 2D SVG always renders — serves as fallback while 3D GLB models load.
+                          Gets covered by the fixed 3D Canvas overlay once ready. */}
+                      <Noun
+                        nounId={nounId != null ? BigInt(nounId) : undefined}
+                        loadingNounFallback
+                        minFallbackDuration={1000}
+                        style={{ width: layout.cellSize, height: layout.cellSize }}
+                        className="bg-cool-background"
+                      />
+                      <span
+                        className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block"
+                        style={{ zIndex: 2 }}
+                      >
                         {nounId.toString()}
                       </span>
                     </div>
@@ -478,7 +489,17 @@ const ExploreTab: React.FC = () => {
 
         {/* Fixed viewport-overlay Canvas for all visible 3D nouns */}
         {view3D && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 10 }}>
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          >
             <React.Suspense fallback={null}>
               <Noun3DGrid
                 cells={(() => {
@@ -497,7 +518,8 @@ const ExploreTab: React.FC = () => {
                       const nounId = filteredAndSorted[itemIndex];
                       const seed = seeds?.[nounId.toString()];
                       if (!seed) continue;
-                      const cx = containerLeft + colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
+                      const cx =
+                        containerLeft + colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
                       const cy = rowViewportY + layout.cellSize / 2;
                       cells.push({ nounId, seed, cx, cy, size: layout.cellSize });
                     }
