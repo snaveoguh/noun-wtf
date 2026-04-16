@@ -15,8 +15,6 @@ import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
-import { CSS3DTerrainLayer } from './CSS3DTerrain';
-
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 interface ParcelData {
@@ -174,7 +172,6 @@ function buildAtlas(
   const colorTex = new THREE.CanvasTexture(colorCanvas);
   colorTex.magFilter = THREE.NearestFilter;
   colorTex.minFilter = THREE.LinearMipmapLinearFilter;
-  colorTex.colorSpace = THREE.SRGBColorSpace;
 
   const heightTex = new THREE.CanvasTexture(heightCanvas);
   heightTex.magFilter = THREE.NearestFilter;
@@ -197,7 +194,6 @@ function AllParcelsInstanced({
   hoveredId,
   setHoveredId,
   heightScale,
-  saturation,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
@@ -206,7 +202,6 @@ function AllParcelsInstanced({
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
   heightScale: number;
-  saturation: number;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const idMapRef = useRef<number[]>([]);
@@ -228,7 +223,6 @@ function AllParcelsInstanced({
         heightAtlas: { value: atlas.heightTex },
         uvScale: { value: uvScale },
         heightScale: { value: heightScale },
-        saturation: { value: saturation },
       },
       vertexShader: `
         attribute vec2 uvOffset;
@@ -248,16 +242,12 @@ function AllParcelsInstanced({
       `,
       fragmentShader: `
         uniform sampler2D colorAtlas;
-        uniform float saturation;
         varying vec2 vUv;
         varying float vHeight;
         void main() {
           vec4 col = texture2D(colorAtlas, vUv);
-          // Saturation boost
-          float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
-          col.rgb = mix(vec3(gray), col.rgb, saturation);
-          // Bright at all distances — parcels always visible, peaks pop more
-          col.rgb *= 5.0 + vHeight * 2.0;
+          // Subtle height-based brightening — peaks pop, valleys stay grounded
+          col.rgb *= 1.0 + vHeight * 0.3;
           gl_FragColor = col;
         }
       `,
@@ -271,7 +261,6 @@ function AllParcelsInstanced({
   useFrame(() => {
     if (materialRef.current) {
       materialRef.current.uniforms.heightScale.value = heightScale;
-      materialRef.current.uniforms.saturation.value = saturation;
     }
   });
 
@@ -365,8 +354,6 @@ function AllParcelsInstanced({
 // Each quad at (col, row, height), UVs pointing to a character atlas.
 // Standard meshBasicMaterial — no custom shaders needed.
 
-const CHAR_DISTANCE = 30;
-const MAX_CHAR_PARCELS = 20;
 const CELL = PARCEL_SIZE / GRID_SIZE; // scene units per cell
 const CHAR_PX = 32; // pixels per character tile in atlas
 const HEIGHT_UNIT = 0.08; // height per level — doubled for more vertical drama
@@ -547,39 +534,38 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
   );
 }
 
-/** Renders character terrain for nearest parcels. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function CharOverlay({
-  parcels, terrainData, cameraRef, normalization, heightScale,
+// ─── Hover-triggered CharOverlay (lightweight: only hovered + nearest) ────
+
+const MAX_HOVER_NEIGHBORS = 5;
+
+function HoverCharOverlay({
+  parcels, terrainData, normalization, hoveredId, heightScale,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
-  cameraRef: React.RefObject<THREE.Camera | null>;
   normalization: { cx: number; cy: number; cz: number; scale: number };
+  hoveredId: number | null;
   heightScale: number;
 }) {
-  const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
+  const nearParcels = useMemo(() => {
+    if (!hoveredId) return [];
+    const hovered = parcels.find(p => p.tokenId === hoveredId);
+    if (!hovered || !terrainData.tokens[hoveredId]) return [];
 
-  useFrame(() => {
-    const cam = cameraRef.current;
-    if (!cam) return;
-    const { cx, cy, cz, scale } = normalization;
-    const camPos = cam.position;
-
+    // Find nearest neighbors by structureSpace distance
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
-      if (!terrainData.tokens[p.tokenId]) continue;
-      const dx = camPos.x - (p.sx - cx) * scale;
-      const dy = camPos.y - (p.sy - cy) * scale;
-      const dz = camPos.z - (p.sz - cz) * scale;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist < CHAR_DISTANCE) scored.push([p, dist]);
+      if (p.tokenId === hoveredId || !terrainData.tokens[p.tokenId]) continue;
+      const dx = p.sx - hovered.sx;
+      const dy = p.sy - hovered.sy;
+      const dz = p.sz - hovered.sz;
+      const dist = dx * dx + dy * dy + dz * dz;
+      scored.push([p, dist]);
     }
     scored.sort((a, b) => a[1] - b[1]);
-    const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
-    const ids = nearest.map(p => p.tokenId).join(',');
-    if (ids !== nearParcels.map(p => p.tokenId).join(',')) setNearParcels(nearest);
-  });
+    const neighbors = scored.slice(0, MAX_HOVER_NEIGHBORS).map(s => s[0]);
+    return [hovered, ...neighbors];
+  }, [hoveredId, parcels, terrainData]);
 
   return (
     <group>
@@ -592,17 +578,7 @@ function CharOverlay({
   );
 }
 
-// ─── Camera Ref Helper ─────────────────────────────────────────────────────
-
-function CameraRefSetter({ cameraRef }: { cameraRef: React.RefObject<THREE.Camera | null> }) {
-  const { camera } = useThree();
-  useEffect(() => {
-    (cameraRef as React.MutableRefObject<THREE.Camera | null>).current = camera;
-  }, [camera, cameraRef]);
-  return null;
-}
-
-/** Exports the R3F camera to external state for CSS3DRenderer sync. */
+/** Exports the R3F camera to external state for Teleport button. */
 function CameraSync({ onCamera }: { onCamera: (cam: THREE.Camera) => void }) {
   const { camera } = useThree();
   useEffect(() => { onCamera(camera); }, [camera, onCamera]);
@@ -611,18 +587,15 @@ function CameraSync({ onCamera }: { onCamera: (cam: THREE.Camera) => void }) {
 
 // ─── Scene ─────────────────────────────────────────────────────────────────
 
-const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: number; bloomIntensity: number }> = ({
+const TerrainScene: FC<TerrainViewProps & { heightScale: number; bloomIntensity: number }> = ({
   parcels,
   terrainData,
   onClickParcel,
   hoveredId,
   setHoveredId,
   heightScale,
-  saturation,
   bloomIntensity,
 }) => {
-  const cameraRef = useRef<THREE.Camera | null>(null);
-
   const normalization = useMemo(() => {
     if (parcels.length === 0) return { cx: 0, cy: 0, cz: 0, scale: 1 };
     let minX = Infinity, maxX = -Infinity;
@@ -641,8 +614,6 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
 
   return (
     <>
-      <CameraRefSetter cameraRef={cameraRef} />
-
       <ambientLight intensity={0.4} />
       <directionalLight position={[50, 80, 30]} intensity={0.6} />
       <pointLight position={[0, 50, 0]} intensity={0.4} color="#4466ff" />
@@ -658,9 +629,14 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; saturation: num
             hoveredId={hoveredId}
             setHoveredId={setHoveredId}
             heightScale={heightScale}
-            saturation={saturation}
           />
-          {/* CharOverlay disabled — atlas handles rendering for now */}
+          <HoverCharOverlay
+            parcels={parcels}
+            terrainData={terrainData}
+            normalization={normalization}
+            hoveredId={hoveredId}
+            heightScale={heightScale}
+          />
         </>
       )}
 
@@ -718,8 +694,8 @@ export type { TerrainData, TerrainViewProps };
 
 // ─── Main Export ──────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS = { height: 0.5, sat: 1.1, bloom: 0 };
-const DEEP_FRIED = { height: 0.7, sat: 2.5, bloom: 1.0 };
+const DEFAULT_SETTINGS = { height: 0.5, bloom: 0 };
+const DEEP_FRIED = { height: 0.7, bloom: 1.0 };
 
 const TerrainViewCanvas: FC<{
   parcels: ParcelData[];
@@ -750,17 +726,10 @@ const TerrainViewCanvas: FC<{
     };
   }, [props.parcels]);
 
-  // Spawn camera above a random parcel — immersed in the castle
+  // Spawn camera overhead — see the full structure on load
   const spawnPos = useMemo(() => {
-    if (props.parcels.length === 0) return [80, 60, 80] as [number, number, number];
-    const { cx, cy, cz, scale } = normalization;
-    const randParcel = props.parcels[Math.floor(Math.random() * props.parcels.length)];
-    const px = (randParcel.sx - cx) * scale;
-    const py = (randParcel.sy - cy) * scale;
-    const pz = (randParcel.sz - cz) * scale;
-    return [px + 2, py + 3, pz + 2] as [number, number, number];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.parcels.length, normalization]);
+    return [60, 50, 60] as [number, number, number];
+  }, []);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -773,7 +742,7 @@ const TerrainViewCanvas: FC<{
         }}
         style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
       >
-        <TerrainScene {...props} heightScale={s.height} saturation={s.sat} bloomIntensity={s.bloom} />
+        <TerrainScene {...props} heightScale={s.height} bloomIntensity={s.bloom} />
         <CameraSync onCamera={setLiveCamera} />
       </Canvas>
 
