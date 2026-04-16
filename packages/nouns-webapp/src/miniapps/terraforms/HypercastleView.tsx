@@ -217,6 +217,7 @@ function ParcelInstances({
     <instancedMesh
       ref={meshRef}
       args={[undefined, undefined, parcels.length]}
+      frustumCulled={false}
       onPointerMove={handlePointerMove}
       onPointerOut={handlePointerOut}
       onClick={handleClick}
