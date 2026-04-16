@@ -1,12 +1,10 @@
+/* eslint-disable react/no-unknown-property, @typescript-eslint/strict-boolean-expressions */
 /**
  * TerrainView — 3D terrain renderer for Terraforms parcels.
  *
- * Renders each nearby parcel as a displacement-mapped plane with the exact
- * onchain ASCII art as its texture. Uses PlaneGeometry with direct vertex
- * displacement (same pattern as WorldPage.tsx Terrain component).
- *
- * LOD: Far parcels = colored cubes, near parcels = textured terrain planes.
- * Textures + geometries cached in LRU maps for smooth navigation.
+ * Renders all parcels as atlas-mapped instanced planes (single draw call).
+ * LOD: Nearest ~12 parcels get animated ASCII character overlays,
+ * distant parcels stay as atlas-textured terrain.
  */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -80,7 +78,11 @@ const FONT_NAME = 'MathcastlesRemix';
 function buildAtlas(
   parcels: ParcelData[],
   terrainData: TerrainData,
-): { colorTex: THREE.CanvasTexture; heightTex: THREE.CanvasTexture; uvMap: Map<number, [number, number]> } {
+): {
+  colorTex: THREE.CanvasTexture;
+  heightTex: THREE.CanvasTexture;
+  uvMap: Map<number, [number, number]>;
+} {
   const tileSize = CELL_PX * GRID_SIZE; // 128px per parcel
   const atlasSize = ATLAS_COLS * tileSize; // 12800px
 
@@ -292,11 +294,7 @@ function AllParcelsInstanced({
       }
 
       mapped++;
-      tempObj.position.set(
-        (p.sx - cx) * scale,
-        (p.sy - cy) * scale,
-        (p.sz - cz) * scale,
-      );
+      tempObj.position.set((p.sx - cx) * scale, (p.sy - cy) * scale, (p.sz - cz) * scale);
       tempObj.rotation.set(-Math.PI / 2, 0, 0);
       tempObj.scale.setScalar(hoveredId === p.tokenId ? 1.6 : 1.0);
       tempObj.updateMatrix();
@@ -308,7 +306,12 @@ function AllParcelsInstanced({
     }
 
     if (mapped === 0) {
-      console.warn('TerrainView: 0 parcels mapped to atlas. uvMap size:', atlas.uvMap.size, 'parcels:', parcels.length);
+      console.warn(
+        'TerrainView: 0 parcels mapped to atlas. uvMap size:',
+        atlas.uvMap.size,
+        'parcels:',
+        parcels.length,
+      );
     }
 
     // Set per-instance UV offset attribute
@@ -321,22 +324,31 @@ function AllParcelsInstanced({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parcels.length, normalization, atlas]); // NO hoveredId — don't rebuild 9910 matrices on hover
 
-  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
-      setHoveredId(idMapRef.current[e.instanceId]);
-    }
-  }, [setHoveredId]);
+  const handlePointerMove = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+        setHoveredId(idMapRef.current[e.instanceId]);
+      }
+    },
+    [setHoveredId],
+  );
 
-  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
-      onClickParcel(idMapRef.current[e.instanceId]);
-    }
-  }, [onClickParcel]);
+  const handleClick = useCallback(
+    (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
+      if (e.instanceId !== undefined && idMapRef.current[e.instanceId]) {
+        onClickParcel(idMapRef.current[e.instanceId]);
+      }
+    },
+    [onClickParcel],
+  );
 
   // Memoize geometry so R3F doesn't recreate the instanced mesh on every render
-  const geometry = useMemo(() => new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE), []);
+  const geometry = useMemo(
+    () => new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE),
+    [],
+  );
 
   if (parcels.length === 0) return null;
 
@@ -444,24 +456,41 @@ function buildCharGeometry(td: TokenEntry, atlas: CharAtlasResult): THREE.Buffer
 
       // 4 vertices: quad on XZ plane facing Y-up
       const vi = i * 4;
-      positions[vi * 3] = cx - half;     positions[vi * 3 + 1] = cy; positions[vi * 3 + 2] = cz - half;
-      positions[(vi+1) * 3] = cx + half; positions[(vi+1) * 3 + 1] = cy; positions[(vi+1) * 3 + 2] = cz - half;
-      positions[(vi+2) * 3] = cx + half; positions[(vi+2) * 3 + 1] = cy; positions[(vi+2) * 3 + 2] = cz + half;
-      positions[(vi+3) * 3] = cx - half; positions[(vi+3) * 3 + 1] = cy; positions[(vi+3) * 3 + 2] = cz + half;
+      positions[vi * 3] = cx - half;
+      positions[vi * 3 + 1] = cy;
+      positions[vi * 3 + 2] = cz - half;
+      positions[(vi + 1) * 3] = cx + half;
+      positions[(vi + 1) * 3 + 1] = cy;
+      positions[(vi + 1) * 3 + 2] = cz - half;
+      positions[(vi + 2) * 3] = cx + half;
+      positions[(vi + 2) * 3 + 1] = cy;
+      positions[(vi + 2) * 3 + 2] = cz + half;
+      positions[(vi + 3) * 3] = cx - half;
+      positions[(vi + 3) * 3 + 1] = cy;
+      positions[(vi + 3) * 3 + 2] = cz + half;
 
       // UVs: map to the right atlas tile for this class
       const tile = atlas.tileMap.get(cls);
-      const u0 = tile?.u0 ?? 0, u1 = tile?.u1 ?? 0.1;
+      const u0 = tile?.u0 ?? 0,
+        u1 = tile?.u1 ?? 0.1;
       // v: 0=top, 1=bottom in Three.js UV space
-      uvs[vi * 2] = u0;     uvs[vi * 2 + 1] = 1;
-      uvs[(vi+1) * 2] = u1; uvs[(vi+1) * 2 + 1] = 1;
-      uvs[(vi+2) * 2] = u1; uvs[(vi+2) * 2 + 1] = 0;
-      uvs[(vi+3) * 2] = u0; uvs[(vi+3) * 2 + 1] = 0;
+      uvs[vi * 2] = u0;
+      uvs[vi * 2 + 1] = 1;
+      uvs[(vi + 1) * 2] = u1;
+      uvs[(vi + 1) * 2 + 1] = 1;
+      uvs[(vi + 2) * 2] = u1;
+      uvs[(vi + 2) * 2 + 1] = 0;
+      uvs[(vi + 3) * 2] = u0;
+      uvs[(vi + 3) * 2 + 1] = 0;
 
       // Two triangles
       const ii = i * 6;
-      indices[ii] = vi; indices[ii+1] = vi+1; indices[ii+2] = vi+2;
-      indices[ii+3] = vi; indices[ii+4] = vi+2; indices[ii+5] = vi+3;
+      indices[ii] = vi;
+      indices[ii + 1] = vi + 1;
+      indices[ii + 2] = vi + 2;
+      indices[ii + 3] = vi;
+      indices[ii + 4] = vi + 2;
+      indices[ii + 5] = vi + 3;
     }
   }
 
@@ -473,7 +502,12 @@ function buildCharGeometry(td: TokenEntry, atlas: CharAtlasResult): THREE.Buffer
 }
 
 /** One parcel: merged character quads at height levels + live animation from tokenHTML. */
-function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
+function CharTerrain({
+  parcel,
+  tokenData,
+  normalization,
+  heightScale,
+}: {
   parcel: ParcelData;
   tokenData: TokenEntry;
   normalization: { cx: number; cy: number; cz: number; scale: number };
@@ -526,57 +560,77 @@ function CharTerrain({ parcel, tokenData, normalization, heightScale }: {
     };
 
     intervalRef.current = window.setInterval(animate, 100);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [tokenData, atlas]);
 
   return (
     <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
       <mesh geometry={geometry} raycast={() => {}}>
-        <meshBasicMaterial map={atlas.texture} side={THREE.DoubleSide} transparent alphaTest={0.1} />
+        <meshBasicMaterial
+          map={atlas.texture}
+          side={THREE.DoubleSide}
+          transparent
+          alphaTest={0.1}
+        />
       </mesh>
     </group>
   );
 }
 
-// ─── Hover-triggered CharOverlay (lightweight: only hovered + nearest) ────
+// ─── Camera-distance ASCII overlay (LOD: nearby = animated chars, far = atlas) ─
 
-const MAX_HOVER_NEIGHBORS = 5;
+const CHAR_RENDER_DISTANCE = 20; // scene units — show ASCII within this range
+const MAX_CHAR_PARCELS = 12; // cap to keep it lightweight
 
-function HoverCharOverlay({
-  parcels, terrainData, normalization, hoveredId, heightScale,
+function NearbyCharOverlay({
+  parcels,
+  terrainData,
+  normalization,
+  heightScale,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   normalization: { cx: number; cy: number; cz: number; scale: number };
-  hoveredId: number | null;
   heightScale: number;
 }) {
-  const nearParcels = useMemo(() => {
-    if (!hoveredId) return [];
-    const hovered = parcels.find(p => p.tokenId === hoveredId);
-    if (!hovered || !terrainData.tokens[hoveredId]) return [];
+  const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
-    // Find nearest neighbors by structureSpace distance
+  useFrame(({ camera }) => {
+    const { cx, cy, cz, scale } = normalization;
+    const camPos = camera.position;
+
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
-      if (p.tokenId === hoveredId || !terrainData.tokens[p.tokenId]) continue;
-      const dx = p.sx - hovered.sx;
-      const dy = p.sy - hovered.sy;
-      const dz = p.sz - hovered.sz;
-      const dist = dx * dx + dy * dy + dz * dz;
-      scored.push([p, dist]);
+      if (!terrainData.tokens[p.tokenId]) continue;
+      const dx = camPos.x - (p.sx - cx) * scale;
+      const dy = camPos.y - (p.sy - cy) * scale;
+      const dz = camPos.z - (p.sz - cz) * scale;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < CHAR_RENDER_DISTANCE) scored.push([p, dist]);
     }
     scored.sort((a, b) => a[1] - b[1]);
-    const neighbors = scored.slice(0, MAX_HOVER_NEIGHBORS).map(s => s[0]);
-    return [hovered, ...neighbors];
-  }, [hoveredId, parcels, terrainData]);
+    const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
+    // Only update state if the set actually changed
+    const ids = nearest.map(p => p.tokenId).join(',');
+    if (ids !== nearParcels.map(p => p.tokenId).join(',')) setNearParcels(nearest);
+  });
 
   return (
     <group>
       {nearParcels.map(p => {
         const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
         if (!td) return null;
-        return <CharTerrain key={p.tokenId} parcel={p} tokenData={td} normalization={normalization} heightScale={heightScale} />;
+        return (
+          <CharTerrain
+            key={p.tokenId}
+            parcel={p}
+            tokenData={td}
+            normalization={normalization}
+            heightScale={heightScale}
+          />
+        );
       })}
     </group>
   );
@@ -585,7 +639,9 @@ function HoverCharOverlay({
 /** Exports the R3F camera to external state for Teleport button. */
 function CameraSync({ onCamera }: { onCamera: (cam: THREE.Camera) => void }) {
   const { camera } = useThree();
-  useEffect(() => { onCamera(camera); }, [camera, onCamera]);
+  useEffect(() => {
+    onCamera(camera);
+  }, [camera, onCamera]);
   return null;
 }
 
@@ -602,16 +658,24 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; bloomIntensity:
 }) => {
   const normalization = useMemo(() => {
     if (parcels.length === 0) return { cx: 0, cy: 0, cz: 0, scale: 1 };
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
     for (const p of parcels) {
-      if (p.sx < minX) minX = p.sx; if (p.sx > maxX) maxX = p.sx;
-      if (p.sy < minY) minY = p.sy; if (p.sy > maxY) maxY = p.sy;
-      if (p.sz < minZ) minZ = p.sz; if (p.sz > maxZ) maxZ = p.sz;
+      if (p.sx < minX) minX = p.sx;
+      if (p.sx > maxX) maxX = p.sx;
+      if (p.sy < minY) minY = p.sy;
+      if (p.sy > maxY) maxY = p.sy;
+      if (p.sz < minZ) minZ = p.sz;
+      if (p.sz > maxZ) maxZ = p.sz;
     }
     return {
-      cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, cz: (minZ + maxZ) / 2,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      cz: (minZ + maxZ) / 2,
       scale: 80 / Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1),
     };
   }, [parcels]);
@@ -634,20 +698,22 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; bloomIntensity:
             setHoveredId={setHoveredId}
             heightScale={heightScale}
           />
-          <HoverCharOverlay
+          <NearbyCharOverlay
             parcels={parcels}
             terrainData={terrainData}
             normalization={normalization}
-            hoveredId={hoveredId}
             heightScale={heightScale}
           />
         </>
       )}
 
       <OrbitControls
-        enableDamping dampingFactor={0.06}
-        autoRotate autoRotateSpeed={0.15}
-        minDistance={2} maxDistance={300}
+        enableDamping
+        dampingFactor={0.06}
+        autoRotate
+        autoRotateSpeed={0.15}
+        minDistance={2}
+        maxDistance={300}
         enablePan
         target={[0, 0, 0]}
       />
@@ -707,7 +773,7 @@ const TerrainViewCanvas: FC<{
   onClickParcel: (id: number) => void;
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
-}> = (props) => {
+}> = props => {
   const [fried, setFried] = useState(false);
   const s = fried ? DEEP_FRIED : DEFAULT_SETTINGS;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -716,16 +782,24 @@ const TerrainViewCanvas: FC<{
   // Compute normalization here too (same as TerrainScene) for CSS3D layer
   const normalization = useMemo(() => {
     if (props.parcels.length === 0) return { cx: 0, cy: 0, cz: 0, scale: 1 };
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
     for (const p of props.parcels) {
-      if (p.sx < minX) minX = p.sx; if (p.sx > maxX) maxX = p.sx;
-      if (p.sy < minY) minY = p.sy; if (p.sy > maxY) maxY = p.sy;
-      if (p.sz < minZ) minZ = p.sz; if (p.sz > maxZ) maxZ = p.sz;
+      if (p.sx < minX) minX = p.sx;
+      if (p.sx > maxX) maxX = p.sx;
+      if (p.sy < minY) minY = p.sy;
+      if (p.sy > maxY) maxY = p.sy;
+      if (p.sz < minZ) minZ = p.sz;
+      if (p.sz > maxZ) maxZ = p.sz;
     }
     return {
-      cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, cz: (minZ + maxZ) / 2,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      cz: (minZ + maxZ) / 2,
       scale: 80 / Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1),
     };
   }, [props.parcels]);
@@ -753,10 +827,16 @@ const TerrainViewCanvas: FC<{
       {/* CSS3D overlay disabled — was causing blue blob + potential rendering issues */}
 
       {/* Controls */}
-      <div style={{
-        position: 'absolute', bottom: 20, right: 20, zIndex: 10,
-        display: 'flex', gap: 8,
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          zIndex: 10,
+          display: 'flex',
+          gap: 8,
+        }}
+      >
         <button
           onClick={() => {
             if (liveCamera && props.parcels.length > 0) {
@@ -770,10 +850,15 @@ const TerrainViewCanvas: FC<{
             }
           }}
           style={{
-            padding: '6px 14px', borderRadius: 8,
-            border: '1px solid #334155', background: '#1e293b',
-            color: '#94a3b8', fontSize: '0.65rem', cursor: 'pointer',
-            fontFamily: 'monospace', fontWeight: 700,
+            padding: '6px 14px',
+            borderRadius: 8,
+            border: '1px solid #334155',
+            background: '#1e293b',
+            color: '#94a3b8',
+            fontSize: '0.65rem',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            fontWeight: 700,
           }}
         >
           Teleport
@@ -781,11 +866,14 @@ const TerrainViewCanvas: FC<{
         <button
           onClick={() => setFried(!fried)}
           style={{
-            padding: '6px 14px', borderRadius: 8,
+            padding: '6px 14px',
+            borderRadius: 8,
             border: fried ? '1px solid #f59e0b' : '1px solid #334155',
             background: fried ? '#78350f' : '#1e293b',
             color: fried ? '#fbbf24' : '#94a3b8',
-            fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'monospace',
+            fontSize: '0.65rem',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
             fontWeight: 700,
           }}
         >
