@@ -2,13 +2,14 @@
  * Prediction market governance bridge.
  *
  * Fetches active Nouns/Lil Nouns proposals for prediction market display.
- * In the Vite SPA, this runs client-side — we fetch proposals from the
- * Nouns subgraph directly.
+ * Uses our own Ponder API (spirited-flexibility) for Nouns proposals,
+ * and the Lil Nouns subgraph for Lil Nouns.
  */
 
-const NOUNS_SUBGRAPH =
-  (import.meta.env.VITE_NOUNS_SUBGRAPH_URL as string | undefined) ??
-  'https://api.goldsky.com/api/public/project_cldf2o9pqagp43svvbk5u3kmo/subgraphs/nouns/prod/gn';
+const API_BASE = (
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
+  'https://spirited-flexibility-production-3c30.up.railway.app'
+).replace(/\/graphql\/?$/, '');
 
 const LIL_NOUNS_SUBGRAPH =
   (import.meta.env.VITE_LIL_NOUNS_SUBGRAPH_URL as string | undefined) ??
@@ -47,17 +48,52 @@ const RESOLVED_STATUSES = [
   'VETOED',
 ];
 
-async function fetchSubgraphProposals(
-  url: string,
-  first: number = 25,
-): Promise<SubgraphProposal[]> {
+/** Fetch Nouns proposals from our Ponder REST API */
+async function fetchNounsProposals(): Promise<PredictionProposal[]> {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/api/proposals`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return [];
+    const proposals = await res.json();
+    if (!Array.isArray(proposals)) return [];
+    return proposals.map((p: Record<string, unknown>) => {
+      const desc = (p.description as string) ?? '';
+      const firstLine = desc.split('\n')[0] ?? '';
+      const title =
+        (p.title as string) ??
+        (firstLine
+          .replace(/^#+\s*/, '')
+          .trim()
+          .slice(0, 120) ||
+          'Untitled Proposal');
+      const status = ((p.status as string) ?? '').toLowerCase().replace(/_/g, '-');
+      return {
+        dao: 'nouns',
+        proposalId: String(p.id),
+        title,
+        status,
+        url: `https://nouns.wtf/vote/${p.id}`,
+        votesFor: Number(p.forVotes ?? 0),
+        votesAgainst: Number(p.againstVotes ?? 0),
+        quorum: Number(p.quorumVotes ?? 0),
+        votingClosed: RESOLVED_STATUSES.includes(((p.status as string) ?? '').toUpperCase()),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch Lil Nouns proposals from subgraph */
+async function fetchLilNounsProposals(): Promise<PredictionProposal[]> {
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: `{
-          proposals(first: ${first}, orderBy: createdBlock, orderDirection: desc) {
+          proposals(first: 25, orderBy: createdBlock, orderDirection: desc) {
             id
             description
             status
@@ -71,67 +107,55 @@ async function fetchSubgraphProposals(
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data?.data?.proposals ?? [];
+    const proposals: SubgraphProposal[] = data?.data?.proposals ?? [];
+    return proposals.map(raw => {
+      const status = raw.status.toLowerCase().replace(/_/g, '-');
+      return {
+        dao: 'lil-nouns',
+        proposalId: raw.id,
+        title:
+          raw.title ??
+          raw.description
+            .split('\n')[0]
+            ?.replace(/^#+\s*/, '')
+            .trim()
+            .slice(0, 120) ??
+          'Untitled Proposal',
+        status,
+        url: `https://lilnouns.wtf/vote/${raw.id}`,
+        votesFor: Number(raw.forVotes),
+        votesAgainst: Number(raw.againstVotes),
+        quorum: Number(raw.quorumVotes),
+        votingClosed: RESOLVED_STATUSES.includes(raw.status),
+      };
+    });
   } catch {
     return [];
   }
 }
 
-function extractTitle(description: string): string {
-  const firstLine = description.split('\n')[0] || '';
-  return (
-    firstLine
-      .replace(/^#+\s*/, '')
-      .trim()
-      .slice(0, 120) || 'Untitled Proposal'
-  );
-}
-
-function convertProposal(raw: SubgraphProposal, dao: string, baseUrl: string): PredictionProposal {
-  const status = raw.status.toLowerCase().replace(/_/g, '-');
-  return {
-    dao,
-    proposalId: raw.id,
-    title: raw.title || extractTitle(raw.description),
-    status,
-    url: `${baseUrl}${raw.id}`,
-    votesFor: Number(raw.forVotes),
-    votesAgainst: Number(raw.againstVotes),
-    quorum: Number(raw.quorumVotes),
-    votingClosed: RESOLVED_STATUSES.includes(raw.status),
-  };
-}
-
 export async function fetchActivePredictionProposals(): Promise<PredictionProposal[]> {
-  const [nouns, lilNouns] = await Promise.all([
-    fetchSubgraphProposals(NOUNS_SUBGRAPH),
-    fetchSubgraphProposals(LIL_NOUNS_SUBGRAPH),
-  ]);
+  const [nouns, lilNouns] = await Promise.all([fetchNounsProposals(), fetchLilNounsProposals()]);
 
-  const nounsProposals = nouns
-    .map(p => convertProposal(p, 'nouns', 'https://nouns.wtf/vote/'))
-    .filter(p => ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')));
+  const activeNouns = nouns.filter(p =>
+    ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
+  );
+  const activeLilNouns = lilNouns.filter(p =>
+    ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
+  );
 
-  const lilNounsProposals = lilNouns
-    .map(p => convertProposal(p, 'lil-nouns', 'https://lilnouns.wtf/vote/'))
-    .filter(p => ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')));
-
-  return [...nounsProposals, ...lilNounsProposals];
+  return [...activeNouns, ...activeLilNouns];
 }
 
 export async function fetchResolvedPredictionProposals(): Promise<PredictionProposal[]> {
-  const [nouns, lilNouns] = await Promise.all([
-    fetchSubgraphProposals(NOUNS_SUBGRAPH),
-    fetchSubgraphProposals(LIL_NOUNS_SUBGRAPH),
-  ]);
+  const [nouns, lilNouns] = await Promise.all([fetchNounsProposals(), fetchLilNounsProposals()]);
 
-  const nounsProposals = nouns
-    .map(p => convertProposal(p, 'nouns', 'https://nouns.wtf/vote/'))
-    .filter(p => RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')));
+  const resolvedNouns = nouns.filter(p =>
+    RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
+  );
+  const resolvedLilNouns = lilNouns.filter(p =>
+    RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
+  );
 
-  const lilNounsProposals = lilNouns
-    .map(p => convertProposal(p, 'lil-nouns', 'https://lilnouns.wtf/vote/'))
-    .filter(p => RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')));
-
-  return [...nounsProposals, ...lilNounsProposals];
+  return [...resolvedNouns, ...resolvedLilNouns];
 }
