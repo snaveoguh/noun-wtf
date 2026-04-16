@@ -15,10 +15,27 @@ function edgeKey(a: number, b: number): string {
 }
 
 /**
+ * Quantize a vertex position to a canonical string key.
+ * Used when geometry has non-shared vertices (trivial index) so we match
+ * edges by spatial position instead of by vertex index.
+ */
+function posKey(positions: ArrayLike<number>, vertexIndex: number): string {
+  const i = vertexIndex * 3;
+  const x = Math.round(positions[i] * 10000);
+  const y = Math.round(positions[i + 1] * 10000);
+  const z = Math.round(positions[i + 2] * 10000);
+  return `${x},${y},${z}`;
+}
+
+/**
  * Build a face adjacency graph from an indexed BufferGeometry.
  *
  * Assumes the geometry uses an index buffer with triangles (every 3 indices = 1 face).
  * Returns a map where each face index maps to the set of face indices that share an edge.
+ *
+ * When the geometry has non-shared vertices (e.g. GLB loaded as non-indexed, then given
+ * a trivial sequential index), falls back to position-based edge keys so faces that
+ * share spatial edges are still detected as adjacent.
  *
  * Performance: O(F) where F = face count. For typical GLB heads (2000-5000 faces),
  * this runs in well under 1ms.
@@ -31,6 +48,13 @@ export function buildAdjacencyGraph(geometry: THREE.BufferGeometry): FaceAdjacen
 
   const indices = index.array;
   const faceCount = Math.floor(indices.length / 3);
+  const vertexCount = geometry.attributes.position.count;
+  const positions = geometry.attributes.position.array;
+
+  // Detect non-shared geometry: every face has its own 3 unique vertices
+  // (trivial index created from non-indexed GLB). In that case vertex indices
+  // never repeat, so index-based edge keys produce zero adjacency.
+  const usePositionKeys = faceCount * 3 === vertexCount;
 
   // Step 1: Map each edge to the faces that contain it
   const edgeToFaces = new Map<string, number[]>();
@@ -40,7 +64,19 @@ export function buildAdjacencyGraph(geometry: THREE.BufferGeometry): FaceAdjacen
     const i1 = indices[f * 3 + 1];
     const i2 = indices[f * 3 + 2];
 
-    const edges = [edgeKey(i0, i1), edgeKey(i1, i2), edgeKey(i2, i0)];
+    let edges: string[];
+    if (usePositionKeys) {
+      const k0 = posKey(positions, i0);
+      const k1 = posKey(positions, i1);
+      const k2 = posKey(positions, i2);
+      edges = [
+        k0 < k1 ? `${k0}|${k1}` : `${k1}|${k0}`,
+        k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`,
+        k2 < k0 ? `${k2}|${k0}` : `${k0}|${k2}`,
+      ];
+    } else {
+      edges = [edgeKey(i0, i1), edgeKey(i1, i2), edgeKey(i2, i0)];
+    }
 
     for (const ek of edges) {
       let faces = edgeToFaces.get(ek);

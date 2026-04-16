@@ -1,3 +1,4 @@
+/* eslint-disable import/no-unresolved */
 import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
 
 // Agent Hub client — replaces direct Anthropic SDK calls
@@ -472,9 +473,75 @@ app.get('/api/proposals', async c => {
   return c.json(items);
 });
 
+/** Single proposal with votes, signers, transactions — bypasses GraphQL/Fastly truncation */
+app.get('/api/proposals/:id', async c => {
+  const idParam = c.req.param('id');
+  const allProposals = await db.select().from(schema.proposal);
+  const p = allProposals.find(pr => String(pr.id) === idParam);
+  if (!p) return c.json({ error: 'not found' }, 404);
+
+  const signers = await db.select().from(schema.proposalSigner);
+  const proposalSigners = signers.filter(s => String(s.proposalId) === idParam);
+
+  const allVotes = await db.select().from(schema.vote).orderBy(desc(schema.vote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.proposalId) === idParam);
+
+  const allTxs = await db.select().from(schema.transaction);
+  const proposalTxs = allTxs.filter(t => String(t.proposalId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const item: Record<string, unknown> = {
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    proposalThreshold: String(p.proposalThreshold),
+    quorumVotes: String(p.quorumVotes),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    objectionPeriodEndBlock:
+      p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+    updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+    voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+    createdAtBlock: String(p.createdAtBlock),
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    signers: proposalSigners.map(s => s.signer),
+    transactions: proposalTxs,
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedStatus(
+      {
+        status: p.status,
+        forVotes: p.forVotes,
+        againstVotes: p.againstVotes,
+        quorumVotes: BigInt(p.quorumVotes),
+        endBlock: BigInt(p.endBlock),
+        objectionPeriodEndBlock:
+          p.objectionPeriodEndBlock != null ? BigInt(p.objectionPeriodEndBlock) : null,
+        executionETA: p.executionETA != null ? BigInt(p.executionETA) : null,
+        onTimelockV1: p.onTimelockV1,
+        startBlock: BigInt(p.startBlock),
+      },
+      latestBlock,
+    );
+  }
+
+  return c.json({
+    proposal: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtBlock: String(v.createdAtBlock),
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+  });
+});
+
 /** Extract original signer from description tag, strip the tag */
 function extractSigner(desc: string): { signer: string | null; description: string } {
-  const match = desc.match(/^<!--\s*signer:(0x[a-fA-F0-9]{40})\s*-->\n?/);
+  const match = desc.match(/^<!--\s*signer:(0x[\dA-Fa-f]{40})\s*-->\n?/);
   if (match) {
     return { signer: match[1], description: desc.slice(match[0].length) };
   }
@@ -1377,13 +1444,23 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   }
 
   // ─── Bid ──────────────────────────────────────────────────
-  const bidMatch = m.match(/^bid\s+([\d.]+)\s*eth$/);
+  // Accepts: "bid 0.5 eth", "bid 0.5", "bid 0.5 eth on noun 123", "bid 0.5 on noun 123"
+  const bidMatch = m.match(/^bid\s+([\d.]+)\s*(?:eth)?\s*(?:on\s+(?:noun\s+)?(\d+))?$/);
   if (bidMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to bid.' };
     const bidAmount = bidMatch[1];
     const state = getWatcherState();
-    const nounId = state.nextNounId ? state.nextNounId - 1 : undefined;
-    if (!nounId) return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const currentNounId = state.nextNounId ? state.nextNounId - 1 : undefined;
+    if (!currentNounId)
+      return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const specifiedNounId = bidMatch[2] ? parseInt(bidMatch[2]) : undefined;
+    if (specifiedNounId && specifiedNounId !== currentNounId) {
+      return {
+        handled: true,
+        response: `Noun ${specifiedNounId} is not the current auction. The active auction is Noun ${currentNounId}.`,
+      };
+    }
+    const nounId = currentNounId;
     const action = { type: 'BID', nounId, bidAmountEth: bidAmount };
     return {
       handled: true,

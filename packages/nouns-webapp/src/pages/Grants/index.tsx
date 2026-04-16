@@ -34,6 +34,8 @@ function getTitle(desc: string) {
   return (desc.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 80) || 'Untitled';
 }
 
+const RELAYER_ADDRESS = '0xacc74b39976d50522621f54c18dc85e2822ec22c';
+
 function statusColor(status: string): string {
   switch (status) {
     case 'ACTIVE':
@@ -144,7 +146,22 @@ export default function GrantsPage() {
               <div className={classes.cardTitle}>{title}</div>
               <div className={classes.cardMeta}>
                 <span>
-                  by <ShortAddress address={(g.signer || g.proposer) as `0x${string}`} />
+                  {g.proposer.toLowerCase() === RELAYER_ADDRESS ? (
+                    g.signer ? (
+                      <>
+                        by <ShortAddress address={g.signer as `0x${string}`} />
+                        <span style={{ color: '#6b7280', fontSize: '0.75rem', marginLeft: '0.35rem' }}>
+                          (GASLESS VIA NOUNIRL)
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                        GASLESS VIA NOUNIRL
+                      </span>
+                    )
+                  ) : (
+                    <>by <ShortAddress address={g.proposer as `0x${string}`} /></>
+                  )}
                 </span>
                 <span>
                   {g.forVotes} FOR / {g.againstVotes} AGAINST

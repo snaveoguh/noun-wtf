@@ -36,6 +36,9 @@ import HackathonPage from '@/pages/Hackathon';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
+const PredictionsPage = lazy(() => import('@/pages/Predictions'));
+const MarketplacePage = lazy(() => import('@/pages/Marketplace'));
+const NounDetailPage = lazy(() => import('@/pages/Marketplace/NounDetail'));
 import Playground from '@/pages/Playground';
 import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
@@ -227,6 +230,30 @@ function AppRouter() {
           element={
             <Suspense fallback={<GenericSkeleton />}>
               <Pip3Page />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/predictions"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <PredictionsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/marketplace"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <MarketplacePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/marketplace/:nounId"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <NounDetailPage />
             </Suspense>
           }
         />
