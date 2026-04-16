@@ -335,12 +335,16 @@ function AllParcelsInstanced({
     }
   }, [onClickParcel]);
 
+  // Memoize geometry so R3F doesn't recreate the instanced mesh on every render
+  const geometry = useMemo(() => new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE), []);
+
   if (parcels.length === 0) return null;
 
   return (
     <instancedMesh
       ref={meshRef}
-      args={[new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE), material, parcels.length]}
+      args={[geometry, material, parcels.length]}
+      frustumCulled={false}
       onPointerMove={handlePointerMove}
       onPointerOut={() => setHoveredId(null)}
       onClick={handleClick}
