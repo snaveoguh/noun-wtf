@@ -9,10 +9,13 @@ export interface ProbeDream {
   id: number;
   dreamer: string;
   seeds: {
+    // Any layer can be null when the dream's custom trait replaces it on
+    // probe.wtf — not just head/accessory. Consumers must coalesce to 0
+    // before passing into nouns-assets image lookups.
     accessory: number | null;
     background: number;
-    body: number;
-    glasses: number;
+    body: number | null;
+    glasses: number | null;
     head: number | null;
   };
   createdAt: string;
@@ -66,36 +69,28 @@ interface LaravelPage {
 
 /**
  * Compose a noun SVG data URL client-side from seeds.
- * If a custom trait image URL is provided, overlays it via <image> tag.
- * Null seeds (head/accessory can be null when replaced by custom trait) fall back to 0.
+ * Any layer (body/accessory/head/glasses) can be null when the dream's
+ * custom trait replaces it — all coalesce to 0 so the base noun always
+ * renders; DreamsTab layers the custom PNG over the top via a regular
+ * <img> (inline SVG <image href> can't cross-origin fetch from DO CDN).
  */
 function buildDreamSvgDataUri(
   background: number,
-  body: number,
+  body: number | null,
   accessory: number | null,
   head: number | null,
-  glasses: number,
-  customImageUrl: string | null,
+  glasses: number | null,
 ): string {
   try {
     const seed = {
       background,
-      body,
+      body: body ?? 0,
       accessory: accessory ?? 0,
       head: head ?? 0,
-      glasses,
+      glasses: glasses ?? 0,
     };
     const { parts, background: bg } = getNounData(seed);
-    let svg = buildSVG(parts, ImageData.palette, bg);
-    if (customImageUrl !== null && customImageUrl.length > 0) {
-      // Overlay the custom trait at full canvas. Sits on top of all standard layers,
-      // which is correct for head/glasses; slightly imperfect for body/accessory but
-      // acceptable during the migration window.
-      svg = svg.replace(
-        '</svg>',
-        `<image href="${customImageUrl}" x="0" y="0" width="320" height="320" style="image-rendering:pixelated" /></svg>`,
-      );
-    }
+    const svg = buildSVG(parts, ImageData.palette, bg);
     return `data:image/svg+xml;base64,${btoa(svg)}`;
   } catch {
     return '';
@@ -104,10 +99,15 @@ function buildDreamSvgDataUri(
 
 function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
   const hasCustomTrait = d.custom_trait_image_url !== null && d.custom_trait_image_url.length > 0;
-  // For custom-trait dreams at or below the bundled id, use the pre-rendered SVG
-  // that has the custom trait baked in. Inline <image href="https://cdn..."> fails
-  // to load due to cross-origin restrictions on the DO CDN when embedded in an SVG
-  // data URL, which produces the "all look identical" broken-placeholder artifact.
+  // Three rendering paths:
+  //   1. Dream ≤721 with custom trait → use the bundled pre-rendered SVG (art
+  //      is baked in during probe.wtf's original render).
+  //   2. Dream >721 with custom trait → compose the base noun SVG client-side;
+  //      DreamsTab overlays the custom trait as a separate <img> on top of
+  //      this base (inline SVG <image href="cdn"> gets blocked by cross-origin
+  //      and breaks the whole data URL, which is why #722+ were showing as
+  //      broken-image icons).
+  //   3. No custom trait → just compose the base noun SVG from seeds.
   const nounSvgUrl =
     hasCustomTrait && d.id <= MAX_BUNDLED_RENDERED_ID
       ? `${STATIC_RENDERED_BASE}/${d.id}.svg`
@@ -117,7 +117,6 @@ function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
           d.accessory_seed_id,
           d.head_seed_id,
           d.glasses_seed_id,
-          d.custom_trait_image_url,
         );
   return {
     id: d.id,
