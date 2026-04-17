@@ -449,6 +449,8 @@ const ExploreTab: React.FC = () => {
                   if (itemIndex >= displayCount) return <div key={colIdx} />;
 
                   const nounId = filteredAndSorted[itemIndex];
+                  const hasSeed = seeds?.[nounId.toString()] != null;
+                  const show2D = !view3D || !hasSeed;
 
                   return (
                     <div
@@ -464,15 +466,19 @@ const ExploreTab: React.FC = () => {
                       className={`group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg ${view3D ? 'bg-transparent' : ''}`}
                       style={{ width: layout.cellSize, height: layout.cellSize }}
                     >
-                      {/* 2D SVG always renders — serves as fallback while 3D GLB models load.
-                          Gets covered by the fixed 3D Canvas overlay once ready. */}
-                      <Noun
-                        nounId={nounId != null ? BigInt(nounId) : undefined}
-                        loadingNounFallback
-                        minFallbackDuration={1000}
-                        style={{ width: layout.cellSize, height: layout.cellSize }}
-                        className="bg-cool-background"
-                      />
+                      {/* 2D SVG only renders as a fallback when 3D can't yet render
+                          (no seed loaded). Once the seed is available, the voxel 3D
+                          renders immediately on the overlay canvas, so we hide the 2D
+                          to avoid it peeking through the transparent/rotating 3D. */}
+                      {show2D && (
+                        <Noun
+                          nounId={nounId != null ? BigInt(nounId) : undefined}
+                          loadingNounFallback
+                          minFallbackDuration={1000}
+                          style={{ width: layout.cellSize, height: layout.cellSize }}
+                          className="bg-cool-background"
+                        />
+                      )}
                       <span
                         className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block"
                         style={{ zIndex: 2 }}
