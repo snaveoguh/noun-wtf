@@ -705,6 +705,79 @@ app.get('/api/lil-proposals', async c => {
   }
 });
 
+// Detail endpoint — single proposal with its full vote list, for LilNounsVotePage.
+// Cache per-id for LIL_NOUNS_CACHE_TTL_MS.
+const lilNounsDetailCache = new Map<string, { at: number; item: unknown }>();
+
+app.get('/api/lil-proposals/:id', async c => {
+  const id = c.req.param('id');
+  if (!/^\d+$/.test(id)) return c.json({ error: 'invalid id' }, 400);
+
+  const now = Date.now();
+  const cached = lilNounsDetailCache.get(id);
+  if (cached != null && now - cached.at < LIL_NOUNS_CACHE_TTL_MS) {
+    return c.json(cached.item);
+  }
+
+  const query = `{
+    proposal(id: "${id}") {
+      id
+      title
+      description
+      status
+      forVotes
+      againstVotes
+      abstainVotes
+      quorumVotes
+      proposalThreshold
+      startBlock
+      endBlock
+      createdBlock
+      createdTimestamp
+      executionETA
+      executedTimestamp
+      canceledTimestamp
+      vetoedTimestamp
+      queuedTimestamp
+      targets
+      values
+      signatures
+      calldatas
+      totalSupply
+      proposer { id }
+      votes(first: 1000, orderBy: blockNumber, orderDirection: desc) {
+        id
+        support
+        votes
+        reason
+        blockNumber
+        voter { id }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    const json = (await res.json()) as { data?: { proposal?: Record<string, unknown> | null } };
+    const proposal = json.data?.proposal;
+    if (proposal == null) return c.json({ error: 'not found' }, 404);
+
+    lilNounsDetailCache.set(id, { at: now, item: proposal });
+    return c.json(proposal);
+  } catch (err) {
+    if (cached != null) {
+      return c.json(cached.item, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
 /**
  * Auction price prediction market stats.
  * Returns current live auction + last 7 settled auctions (skipping nounder/empty)

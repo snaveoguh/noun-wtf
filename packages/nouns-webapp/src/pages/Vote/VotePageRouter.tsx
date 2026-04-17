@@ -1,6 +1,8 @@
 /**
- * VotePageRouter — Routes /vote/:id to either the standard Nouns VotePage
- * or the Yellow Collective VotePage based on ?dao=yc query param.
+ * VotePageRouter — Routes /vote/:id to the right detail page based on ?dao=:
+ *   ?dao=yc  → Yellow Collective (Snapshot)
+ *   ?dao=lil → Lil Nouns (Goldsky subgraph via /api/lil-proposals/:id)
+ *   default  → Nouns DAO
  */
 import { lazy, Suspense } from 'react';
 
@@ -10,14 +12,21 @@ import { GenericSkeleton } from '@/components/Skeleton';
 
 const VotePage = lazy(() => import('./index'));
 const YellowCollectiveVotePage = lazy(() => import('./YellowCollectiveVotePage'));
+const LilNounsVotePage = lazy(() => import('./LilNounsVotePage'));
 
 const VotePageRouter: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const isYC = searchParams.get('dao') === 'yc';
+  const dao = searchParams.get('dao');
 
   return (
     <Suspense fallback={<GenericSkeleton />}>
-      {isYC ? <YellowCollectiveVotePage /> : <VotePage />}
+      {dao === 'yc' ? (
+        <YellowCollectiveVotePage />
+      ) : dao === 'lil' || dao === 'lil-nouns' || dao === 'lilnouns' ? (
+        <LilNounsVotePage />
+      ) : (
+        <VotePage />
+      )}
     </Suspense>
   );
 };
