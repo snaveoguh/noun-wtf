@@ -379,7 +379,7 @@ function InlineWager({
           onClick={() => setSide('higher')}
           className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
             side === 'higher'
-              ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+              ? 'border-green-600 bg-green-600 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
           }`}
         >
@@ -390,7 +390,7 @@ function InlineWager({
           onClick={() => setSide('lower')}
           className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
             side === 'lower'
-              ? 'border-[var(--accent-red)] bg-[var(--accent-red)] text-[var(--paper)]'
+              ? 'border-red-500 bg-red-500 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
           }`}
         >

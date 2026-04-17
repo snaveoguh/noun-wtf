@@ -170,7 +170,9 @@ const RESOLVED_STATUSES = [
 async function fetchNounsProposals(): Promise<PredictionProposal[]> {
   try {
     const res = await fetch(`${API_BASE}/api/proposals`, {
-      signal: AbortSignal.timeout(10_000),
+      // Endpoint returns ~1MB across 955+ proposals — cold response is 8-9s,
+      // so the old 10s ceiling dropped Nouns markets silently on slow loads.
+      signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) return [];
     const proposals = await res.json();
