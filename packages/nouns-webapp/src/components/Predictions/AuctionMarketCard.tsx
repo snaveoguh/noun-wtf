@@ -222,7 +222,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         )}
         {market?.exists !== true && !auctionEnded && (
           <div className="text-[8px] uppercase tracking-wider">
-            First wager auto-creates the market onchain
+            No market yet — first mover opens it onchain
           </div>
         )}
       </div>
