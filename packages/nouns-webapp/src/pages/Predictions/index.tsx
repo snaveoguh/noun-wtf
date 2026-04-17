@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { AsyncMarketGrid } from '@/components/Predictions/AsyncMarketGrid';
+import { AuctionMarketCard } from '@/components/Predictions/AuctionMarketCard';
 import { MarketCard } from '@/components/Predictions/MarketCard';
 import { OperatorPanel } from '@/components/Predictions/OperatorPanel';
 import {
@@ -25,6 +26,14 @@ export default function PredictionsPage() {
           Parimutuel · Ethereum Mainnet · 2% Resolution Fee
         </p>
       </div>
+
+      {/* Next Auction · Price Guess */}
+      <section className="mb-8">
+        <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">
+          Next Auction · Price Guess
+        </h2>
+        <AuctionMarketCard />
+      </section>
 
       <AsyncMarketGrid />
 

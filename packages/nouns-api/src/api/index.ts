@@ -629,6 +629,42 @@ app.get('/api/grants/:id', async c => {
   });
 });
 
+/**
+ * Auction price prediction market stats.
+ * Returns current live auction + last 7 settled auctions (skipping nounder/empty)
+ * and their trailing average.
+ */
+app.get('/api/auction-stats', async c => {
+  const auctions = await db.select().from(schema.auction).orderBy(desc(schema.auction.nounId));
+
+  const current = auctions.find(a => !a.settled);
+  const settledWithBid = auctions
+    .filter(a => a.settled && a.amount != null && a.amount > 0n)
+    .slice(0, 7);
+
+  const avgWei =
+    settledWithBid.length > 0
+      ? settledWithBid.reduce((acc, a) => acc + (a.amount as bigint), 0n) /
+        BigInt(settledWithBid.length)
+      : 0n;
+
+  const toItem = (a: (typeof auctions)[number]) => ({
+    nounId: String(a.nounId),
+    amount: a.amount != null ? String(a.amount) : null,
+    endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+    settled: a.settled,
+    winner: a.winner,
+  });
+
+  return c.json({
+    current: current ? toItem(current) : null,
+    prior7: settledWithBid.map(toItem),
+    sampleSize: settledWithBid.length,
+    avgWei: String(avgWei),
+    avgEth: Number(avgWei) / 1e18,
+  });
+});
+
 // ============================================================
 // Gasless grant proposals — relayer submits on behalf of users
 // ============================================================
