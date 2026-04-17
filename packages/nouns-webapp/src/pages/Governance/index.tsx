@@ -114,7 +114,7 @@ const GovernancePage = () => {
             color: daoTab === 'yc' ? '#14141f' : '#8c8d92',
           }}
         >
-          YC (beta)
+          Yellow
         </button>
         <button
           onClick={() => setDao('lil')}

@@ -95,7 +95,6 @@ const NavBar = () => {
       </Dropdown.Item>
       {candidatesNavItem}
       <Dropdown.Item href="/grants">Grants</Dropdown.Item>
-      <Dropdown.Item href="/vote?dao=yc">YC (beta)</Dropdown.Item>
     </NavDropdown>
   );
 
