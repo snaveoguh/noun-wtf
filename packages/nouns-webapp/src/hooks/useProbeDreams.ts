@@ -35,6 +35,11 @@ const STATIC_URL = '/probe-dreams/dreams.json';
 const STATIC_RENDERED_BASE = '/probe-dreams/rendered';
 const STATIC_TRAITS_BASE = '/probe-dreams/traits';
 
+// Highest dream id with a bundled pre-rendered SVG in public/probe-dreams/rendered/.
+// Dreams at or below this id with a custom trait use the baked-in bundled render
+// (avoids cross-origin <image> issues loading from the DO CDN inside inline SVG).
+const MAX_BUNDLED_RENDERED_ID = 721;
+
 interface LaravelDream {
   id: number;
   dreamer: string;
@@ -98,6 +103,22 @@ function buildDreamSvgDataUri(
 }
 
 function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
+  const hasCustomTrait = d.custom_trait_image_url !== null && d.custom_trait_image_url.length > 0;
+  // For custom-trait dreams at or below the bundled id, use the pre-rendered SVG
+  // that has the custom trait baked in. Inline <image href="https://cdn..."> fails
+  // to load due to cross-origin restrictions on the DO CDN when embedded in an SVG
+  // data URL, which produces the "all look identical" broken-placeholder artifact.
+  const nounSvgUrl =
+    hasCustomTrait && d.id <= MAX_BUNDLED_RENDERED_ID
+      ? `${STATIC_RENDERED_BASE}/${d.id}.svg`
+      : buildDreamSvgDataUri(
+          d.background_seed_id,
+          d.body_seed_id,
+          d.accessory_seed_id,
+          d.head_seed_id,
+          d.glasses_seed_id,
+          d.custom_trait_image_url,
+        );
   return {
     id: d.id,
     dreamer: d.dreamer,
@@ -111,14 +132,7 @@ function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
     createdAt: d.created_at,
     customLayer: d.custom_trait_layer ?? undefined,
     customImage: d.custom_trait_image ?? undefined,
-    nounSvgUrl: buildDreamSvgDataUri(
-      d.background_seed_id,
-      d.body_seed_id,
-      d.accessory_seed_id,
-      d.head_seed_id,
-      d.glasses_seed_id,
-      d.custom_trait_image_url,
-    ),
+    nounSvgUrl,
     customTraitUrl: d.custom_trait_image_url,
   };
 }
