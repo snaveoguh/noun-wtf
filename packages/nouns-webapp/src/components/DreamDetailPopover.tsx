@@ -1,12 +1,13 @@
+import type { ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
+
 import { FC, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 
 import { ImageData } from '@noundry/nouns-assets';
+import { createPortal } from 'react-dom';
 
 import { getNounColors } from '@/components/NounPalette';
 import { traitName } from '@/lib/traitName';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
-import type { ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
 
 interface Props {
   dream: ProbeDreamWithPreview;
@@ -33,25 +34,34 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
     };
   }, [onClose]);
 
-  // Build seed for standard traits (use 0 for null custom layer slots)
-  const seed = useMemo(() => ({
-    background: dream.seeds.background,
-    body: dream.seeds.body,
-    accessory: dream.seeds.accessory ?? 0,
-    head: dream.seeds.head ?? 0,
-    glasses: dream.seeds.glasses,
-  }), [dream.seeds]);
+  // Build seed for standard traits (use 0 for null custom layer slots).
+  // ALL layers can be null when a dream's custom trait replaces that layer
+  // on probe.wtf — seed IDs come back as null for head / accessory / glasses
+  // / body alike, not just head + accessory.
+  const seed = useMemo(
+    () => ({
+      background: dream.seeds.background,
+      body: dream.seeds.body ?? 0,
+      accessory: dream.seeds.accessory ?? 0,
+      head: dream.seeds.head ?? 0,
+      glasses: dream.seeds.glasses ?? 0,
+    }),
+    [dream.seeds],
+  );
 
   // Get colors from the standard traits
   const colors = useMemo(() => getNounColors(seed), [seed]);
 
-  // Clean up custom trait filename to a readable name
+  // Clean up custom trait filename to a readable name.
+  // probe.wtf stores the full CDN path like "custom-traits/glasses/swaggy_frames.png"
+  // — strip the directory + extension so we show just "Swaggy Frames".
   const customTraitName = useMemo(() => {
     if (!dream.customImage) return 'Custom';
-    return dream.customImage
-      .replace(/\.\w+$/, '')       // remove extension
-      .replace(/[-_]/g, ' ')       // dashes/underscores to spaces
-      .replace(/\b\w/g, c => c.toUpperCase()) // title case
+    const baseName = dream.customImage.split('/').pop() ?? dream.customImage;
+    return baseName
+      .replace(/\.\w+$/, '')
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
       .trim();
   }, [dream.customImage]);
 
@@ -61,12 +71,14 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
     const name = (layer: string, seedVal: number | null) => {
       if (seedVal == null && customLayer === layer) return customTraitName;
       if (customLayer === layer) return customTraitName;
-      return seedVal != null ? traitName(layer as 'head' | 'body' | 'accessory' | 'glasses', seedVal) : '—';
+      return seedVal != null
+        ? traitName(layer as 'head' | 'body' | 'accessory' | 'glasses', seedVal)
+        : '—';
     };
 
     return [
       ['Head', name('head', dream.seeds.head)],
-      ['Noggles', traitName('glasses', dream.seeds.glasses)],
+      ['Noggles', name('glasses', dream.seeds.glasses)],
       ['Body', name('body', dream.seeds.body)],
       ['Accessory', name('accessory', dream.seeds.accessory)],
       ['BG', traitName('background', dream.seeds.background)],
@@ -77,7 +89,7 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
   const popW = 280;
   const popEstH = 420;
   let left = anchorRect.left + anchorRect.width / 2 - popW / 2;
-  let top = Math.max(8, (window.innerHeight - popEstH) / 2);
+  const top = Math.max(8, (window.innerHeight - popEstH) / 2);
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
 
@@ -114,11 +126,18 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
       {/* Card body */}
       <div style={{ padding: '10px 12px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>
-            Dream {dream.id}
-          </span>
+          <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Dream {dream.id}</span>
           {dream.customLayer && (
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#7c3aed', background: '#ede9fe', padding: '2px 6px', borderRadius: 8 }}>
+            <span
+              style={{
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                color: '#7c3aed',
+                background: '#ede9fe',
+                padding: '2px 6px',
+                borderRadius: 8,
+              }}
+            >
               Custom {dream.customLayer}
             </span>
           )}
@@ -128,13 +147,23 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
           href={`https://etherscan.io/address/${dream.dreamer}`}
           target="_blank"
           rel="noreferrer"
-          style={{ fontSize: '0.65rem', color: '#3b82f6', textDecoration: 'none', display: 'block', marginTop: 2 }}
+          style={{
+            fontSize: '0.65rem',
+            color: '#3b82f6',
+            textDecoration: 'none',
+            display: 'block',
+            marginTop: 2,
+          }}
         >
           {dreamerDisplay}
         </a>
 
         <p style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: 2 }}>
-          {new Date(dream.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+          {new Date(dream.createdAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
         </p>
 
         {/* Traits */}
