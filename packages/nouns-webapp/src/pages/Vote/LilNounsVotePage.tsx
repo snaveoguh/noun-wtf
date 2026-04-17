@@ -1,15 +1,20 @@
 /**
  * LilNounsVotePage — Detail view for a Lil Nouns governance proposal.
  * Pulls data from our /api/lil-proposals/:id proxy (Goldsky subgraph).
- * Read-only for now; casting a vote still sends users to lilnouns.wtf.
+ * Supports casting on-chain votes directly against the Lil Nouns governor.
  */
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { ConnectKitButton } from 'connectkit';
 import { ExternalLinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import { mainnet } from 'viem/chains';
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+
+import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 
 const API_BASE = (
   (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
@@ -300,30 +305,11 @@ const LilNounsVotePage: FC = () => {
         </div>
       )}
 
-      {/* Action row */}
+      {/* Cast vote panel — only renders on ACTIVE/OBJECTION proposals */}
+      {canVote && <CastVotePanel proposalId={BigInt(proposal.id)} />}
+
+      {/* External lilnouns.wtf link (always shown) */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        {canVote && (
-          <a
-            href={`https://lilnouns.wtf/vote/${proposal.id}`}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              background: '#ff638d',
-              color: '#fff',
-              padding: '6px 14px',
-              borderRadius: 999,
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            Cast vote on lilnouns.wtf
-            <ExternalLinkIcon size={12} />
-          </a>
-        )}
         <a
           href={`https://lilnouns.wtf/vote/${proposal.id}`}
           target="_blank"
@@ -533,5 +519,243 @@ const VoteCount: FC<{ label: string; value: number; color: string }> = ({
     </div>
   </div>
 );
+
+// ─── Cast vote panel ────────────────────────────────────────────────────────
+
+const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; color: string }[] = [
+  { value: 1, label: 'For', color: '#43b369' },
+  { value: 0, label: 'Against', color: '#e40536' },
+  { value: 2, label: 'Abstain', color: '#8c8d92' },
+];
+
+/**
+ * Casts an on-chain vote against the Lil Nouns governor.
+ * Reads the user's Receipt first so we can show "already voted" instead of the form.
+ */
+const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
+  const { address, isConnected, chainId } = useAccount();
+  const [selected, setSelected] = useState<0 | 1 | 2 | null>(null);
+  const [reason, setReason] = useState('');
+
+  // Has this wallet already voted?
+  const { data: receiptData, refetch: refetchReceipt } = useReadContract({
+    address: LIL_NOUNS_GOVERNOR,
+    abi: LIL_NOUNS_GOVERNOR_ABI,
+    functionName: 'getReceipt',
+    args: address !== undefined ? [proposalId, address] : undefined,
+    chainId: mainnet.id,
+    query: { enabled: address !== undefined },
+  });
+  const receipt = receiptData as { hasVoted: boolean; support: number; votes: bigint } | undefined;
+
+  const { writeContract, data: txHash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash: txHash,
+    chainId: mainnet.id,
+    query: { enabled: txHash !== undefined },
+  });
+
+  useEffect(() => {
+    if (isSuccess) {
+      refetchReceipt();
+    }
+  }, [isSuccess, refetchReceipt]);
+
+  const onWrongChain = isConnected && chainId !== undefined && chainId !== mainnet.id;
+
+  const handleCast = useCallback(() => {
+    if (selected === null) return;
+    if (reason.trim().length > 0) {
+      writeContract({
+        address: LIL_NOUNS_GOVERNOR,
+        abi: LIL_NOUNS_GOVERNOR_ABI,
+        functionName: 'castVoteWithReason',
+        args: [proposalId, selected, reason.trim()],
+        chainId: mainnet.id,
+      });
+    } else {
+      writeContract({
+        address: LIL_NOUNS_GOVERNOR,
+        abi: LIL_NOUNS_GOVERNOR_ABI,
+        functionName: 'castVote',
+        args: [proposalId, selected],
+        chainId: mainnet.id,
+      });
+    }
+  }, [selected, reason, writeContract, proposalId]);
+
+  const panelStyle: React.CSSProperties = {
+    background: '#fff',
+    border: '1px solid #e0e0e0',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 20,
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: '#14141f',
+    marginBottom: 8,
+  };
+
+  if (!isConnected) {
+    return (
+      <div style={panelStyle}>
+        <div style={labelStyle}>Cast your vote</div>
+        <ConnectKitButton.Custom>
+          {({ show }) => (
+            <button
+              type="button"
+              onClick={() => show?.()}
+              style={{
+                width: '100%',
+                background: '#ff638d',
+                color: '#fff',
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Connect wallet to vote
+            </button>
+          )}
+        </ConnectKitButton.Custom>
+      </div>
+    );
+  }
+
+  if (onWrongChain) {
+    return (
+      <div style={panelStyle}>
+        <div style={labelStyle}>Cast your vote</div>
+        <p style={{ fontSize: '0.8rem', color: '#8c8d92', margin: 0 }}>
+          Switch to Ethereum mainnet to vote. Lil Nouns governance is on L1.
+        </p>
+      </div>
+    );
+  }
+
+  if (receipt?.hasVoted === true) {
+    const voted = SUPPORT_OPTIONS.find(o => o.value === receipt.support);
+    return (
+      <div style={panelStyle}>
+        <div style={labelStyle}>Your vote</div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 12px',
+            borderRadius: 8,
+            background: `${voted?.color ?? '#8c8d92'}1a`,
+            color: voted?.color ?? '#8c8d92',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+          }}
+        >
+          Voted {voted?.label ?? '?'} with {Number(receipt.votes)} votes
+        </div>
+      </div>
+    );
+  }
+
+  if (isSuccess) {
+    return (
+      <div style={{ ...panelStyle, borderColor: '#43b369', background: '#e8f7ee' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2a8653' }}>
+          ✓ Vote cast on-chain. Receipt updating…
+        </div>
+      </div>
+    );
+  }
+
+  const disabled = selected === null || isPending || isConfirming;
+
+  return (
+    <div style={panelStyle}>
+      <div style={labelStyle}>Cast your vote</div>
+
+      {/* Support selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {SUPPORT_OPTIONS.map(o => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => setSelected(o.value)}
+            style={{
+              flex: 1,
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: selected === o.value ? `2px solid ${o.color}` : '1px solid #e0e0e0',
+              background: selected === o.value ? `${o.color}1a` : '#fff',
+              color: selected === o.value ? o.color : '#14141f',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Reason textarea */}
+      <textarea
+        value={reason}
+        onChange={e => setReason(e.target.value.slice(0, 500))}
+        placeholder="Optional reason (onchain, public)…"
+        rows={3}
+        style={{
+          width: '100%',
+          padding: 10,
+          borderRadius: 8,
+          border: '1px solid #e0e0e0',
+          fontSize: '0.85rem',
+          fontFamily: 'inherit',
+          resize: 'vertical',
+          marginBottom: 10,
+          boxSizing: 'border-box',
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={handleCast}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          background: disabled ? '#e0e0e0' : '#ff638d',
+          color: disabled ? '#8c8d92' : '#fff',
+          border: 'none',
+          padding: '10px 14px',
+          borderRadius: 8,
+          fontSize: '0.85rem',
+          fontWeight: 700,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: 'background 0.15s',
+        }}
+      >
+        {isPending
+          ? 'Confirming in wallet…'
+          : isConfirming
+            ? 'Submitting on-chain…'
+            : selected === null
+              ? 'Pick a side'
+              : `Cast ${SUPPORT_OPTIONS.find(o => o.value === selected)?.label ?? ''} vote`}
+      </button>
+
+      {error !== null && (
+        <p style={{ fontSize: '0.75rem', color: '#e40536', marginTop: 8 }}>
+          {(error as { shortMessage?: string }).shortMessage ?? error.message}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default LilNounsVotePage;
