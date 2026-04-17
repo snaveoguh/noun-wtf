@@ -18,7 +18,7 @@ const MAINNET_RPC_URL =
   (import.meta.env.VITE_MAINNET_JSONRPC as string | undefined) ??
   'https://mainnet.rpc.buidlguidl.com';
 
-const LIL_NOUNS_GOVERNOR: Address = '0x5d2C31ce16924C2a71D317e5BbFd5ce387854039';
+export const LIL_NOUNS_GOVERNOR: Address = '0x5d2C31ce16924C2a71D317e5BbFd5ce387854039';
 
 let cachedClient: ReturnType<typeof createPublicClient> | null = null;
 function getPublicClient() {
@@ -31,7 +31,7 @@ function getPublicClient() {
   return cachedClient;
 }
 
-const GOVERNOR_ABI = [
+export const LIL_NOUNS_GOVERNOR_ABI = [
   {
     type: 'function',
     name: 'proposalCount',
@@ -76,7 +76,51 @@ const GOVERNOR_ABI = [
     outputs: [{ name: '', type: 'uint8' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'getReceipt',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'voter', type: 'address' },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'hasVoted', type: 'bool' },
+          { name: 'support', type: 'uint8' },
+          { name: 'votes', type: 'uint96' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'castVote',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'uint8' },
+    ],
+    outputs: [{ name: '', type: 'uint96' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'castVoteWithReason',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'uint8' },
+      { name: 'reason', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'uint96' }],
+    stateMutability: 'nonpayable',
+  },
 ] as const;
+
+/** Back-compat internal alias for the existing on-chain fetcher below. */
+const GOVERNOR_ABI = LIL_NOUNS_GOVERNOR_ABI;
 
 // State code → subgraph-style uppercase status label
 // 0=PENDING, 1=ACTIVE, 2=CANCELLED, 3=DEFEATED, 4=SUCCEEDED, 5=QUEUED,
