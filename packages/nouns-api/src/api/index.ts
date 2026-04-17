@@ -747,7 +747,7 @@ app.get('/api/lil-proposals/:id', async c => {
       proposer { id }
       votes(first: 1000, orderBy: blockNumber, orderDirection: desc) {
         id
-        support
+        support: supportDetailed
         votes
         reason
         blockNumber
