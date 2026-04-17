@@ -95,7 +95,6 @@ const NavBar = () => {
       </Dropdown.Item>
       {candidatesNavItem}
       <Dropdown.Item href="/grants">Grants</Dropdown.Item>
-      <Dropdown.Item href="/vote?dao=yc">YC (beta)</Dropdown.Item>
     </NavDropdown>
   );
 
@@ -231,6 +230,9 @@ const NavBar = () => {
               >
                 Playground
               </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item href="/marketplace">Marketplace</Dropdown.Item>
+              <Dropdown.Item href="/predictions">Predictions</Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
               <Dropdown.Item href="/gas">Gas</Dropdown.Item>
