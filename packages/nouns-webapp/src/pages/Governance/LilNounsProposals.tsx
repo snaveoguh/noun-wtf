@@ -1,11 +1,15 @@
 /**
- * LilNounsProposals — Shows Lil Nouns governance proposals fetched directly
- * from the Lil Nouns Governor contract (bypasses the dead Goldsky subgraph).
- * Each row links out to lilnouns.wtf in a new tab.
+ * LilNounsProposals — Shows Lil Nouns governance proposals sourced from the
+ * Goldsky subgraph via our Ponder API proxy (falls back to on-chain multicall
+ * if the proxy is unreachable). Each row links out to lilnouns.wtf in a new tab.
  */
 import { FC, useEffect, useState } from 'react';
 
-import { fetchLilNounsProposalsOnchain, type LilNounsProposal } from '@/lib/marketplace/governance';
+import {
+  fetchLilNounsProposalsFromProxy,
+  fetchLilNounsProposalsOnchain,
+  type LilNounsProposal,
+} from '@/lib/marketplace/governance';
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: '#a78bfa',
@@ -37,20 +41,29 @@ const LilNounsProposals: FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLilNounsProposalsOnchain(25)
-      .then(list => {
+    // Proxy first (full titles + abstain votes + timestamps). Fall back to
+    // direct on-chain multicall if the proxy is down.
+    (async () => {
+      try {
+        const list = await fetchLilNounsProposalsFromProxy();
         if (cancelled) return;
-        setProposals(list);
-        if (list.length === 0) {
-          setError('No proposals found on-chain.');
+        // Sort newest first and cap at 25 to match the prior on-chain UX.
+        const top = list.sort((a, b) => b.id - a.id).slice(0, 25);
+        setProposals(top);
+        if (top.length === 0) setError('No proposals found.');
+      } catch {
+        try {
+          const list = await fetchLilNounsProposalsOnchain(25);
+          if (cancelled) return;
+          setProposals(list);
+          if (list.length === 0) setError('No proposals found on-chain.');
+        } catch {
+          if (!cancelled) setError('Failed to load Lil Nouns proposals.');
         }
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load Lil Nouns proposals.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      }
+    })().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
