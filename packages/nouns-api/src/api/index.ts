@@ -642,6 +642,74 @@ const LIL_NOUNS_SUBGRAPH =
 const LIL_NOUNS_CACHE_TTL_MS = 60_000;
 let lilNounsCache: { at: number; items: unknown[] } | null = null;
 
+const LIL_NOUNS_GOVERNOR = '0x5d2C31ce16924C2a71D317e5BbFd5ce387854039' as const;
+const LIL_NOUNS_GOVERNOR_STATE_ABI = [
+  {
+    type: 'function',
+    name: 'state',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [{ type: 'uint8' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// Governor state enum → uppercase status matching the subgraph's values.
+// Bravo-style states; Nouns / Lil Nouns extend with OBJECTION_PERIOD + UPDATABLE.
+const GOVERNOR_STATE_CODES = [
+  'PENDING',
+  'ACTIVE',
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+  'OBJECTION_PERIOD',
+  'UPDATABLE',
+] as const;
+
+/**
+ * Overwrite stale ACTIVE statuses from the subgraph with on-chain governor state.
+ * The Goldsky subgraph only updates status on explicit events (Queued/Executed/
+ * Cancelled/Vetoed); proposals that timed out without resolution stay stuck at
+ * ACTIVE, which misrepresents DEFEATED + EXPIRED in the UI.
+ */
+async function overlayOnchainStatus(
+  items: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const staleIds = items
+    .filter(p => typeof p.status === 'string' && p.status.toUpperCase() === 'ACTIVE')
+    .map(p => p.id as string);
+  if (staleIds.length === 0) return items;
+
+  try {
+    const results = await nounCheckClient.multicall({
+      contracts: staleIds.map(id => ({
+        address: LIL_NOUNS_GOVERNOR,
+        abi: LIL_NOUNS_GOVERNOR_STATE_ABI,
+        functionName: 'state' as const,
+        args: [BigInt(id)],
+      })),
+      allowFailure: true,
+    });
+    const idToStatus = new Map<string, string>();
+    for (let i = 0; i < staleIds.length; i++) {
+      const r = results[i];
+      if (r?.status === 'success' && typeof r.result === 'number') {
+        idToStatus.set(staleIds[i], GOVERNOR_STATE_CODES[r.result] ?? 'ACTIVE');
+      }
+    }
+    return items.map(p => {
+      const mapped = idToStatus.get(p.id as string);
+      return mapped !== undefined ? { ...p, status: mapped } : p;
+    });
+  } catch (err) {
+    console.warn('[lil-proposals] onchain state overlay failed, falling back:', err);
+    return items;
+  }
+}
+
 async function fetchLilNounsFromSubgraph() {
   // Paginate in chunks of 500 (subgraph max is usually 1000; 500 is conservative).
   const PAGE = 500;
@@ -693,7 +761,8 @@ app.get('/api/lil-proposals', async c => {
     return c.json(lilNounsCache.items);
   }
   try {
-    const items = await fetchLilNounsFromSubgraph();
+    const raw = await fetchLilNounsFromSubgraph();
+    const items = await overlayOnchainStatus(raw);
     lilNounsCache = { at: now, items };
     return c.json(items);
   } catch (err) {
@@ -768,8 +837,12 @@ app.get('/api/lil-proposals/:id', async c => {
     const proposal = json.data?.proposal;
     if (proposal == null) return c.json({ error: 'not found' }, 404);
 
-    lilNounsDetailCache.set(id, { at: now, item: proposal });
-    return c.json(proposal);
+    // Overwrite stale ACTIVE status with the on-chain governor state.
+    const [enriched] = await overlayOnchainStatus([proposal]);
+    const finalProposal = enriched ?? proposal;
+
+    lilNounsDetailCache.set(id, { at: now, item: finalProposal });
+    return c.json(finalProposal);
   } catch (err) {
     if (cached != null) {
       return c.json(cached.item, 200, { 'x-cache': 'stale' });
@@ -783,35 +856,117 @@ app.get('/api/lil-proposals/:id', async c => {
  * Returns current live auction + last 7 settled auctions (skipping nounder/empty)
  * and their trailing average.
  */
+// Direct contract reads so current bid + settlement data are always fresh,
+// not gated on Ponder indexing latency (which was showing stale #1877 with
+// amount=0 while #1878 was live at 0.57 ETH).
+const NOUNS_AUCTION_HOUSE = '0x830BD73E4184ceF73443C15111a1DF14e495C706' as const;
+const AUCTION_HOUSE_ABI = [
+  {
+    type: 'function',
+    name: 'auction',
+    inputs: [],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'nounId', type: 'uint96' },
+          { name: 'amount', type: 'uint128' },
+          { name: 'startTime', type: 'uint40' },
+          { name: 'endTime', type: 'uint40' },
+          { name: 'bidder', type: 'address' },
+          { name: 'settled', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getSettlements',
+    inputs: [
+      { name: 'auctionCount', type: 'uint256' },
+      { name: 'skipEmptyValues', type: 'bool' },
+    ],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 'blockTimestamp', type: 'uint32' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'winner', type: 'address' },
+          { name: 'nounId', type: 'uint256' },
+          { name: 'clientId', type: 'uint32' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+// Cache auction + settlements briefly to avoid hammering RPC.
+const AUCTION_STATS_CACHE_TTL_MS = 15_000;
+let auctionStatsCache: { at: number; payload: unknown } | null = null;
+
 app.get('/api/auction-stats', async c => {
-  const auctions = await db.select().from(schema.auction).orderBy(desc(schema.auction.nounId));
+  const now = Date.now();
+  if (auctionStatsCache !== null && now - auctionStatsCache.at < AUCTION_STATS_CACHE_TTL_MS) {
+    return c.json(auctionStatsCache.payload);
+  }
 
-  const current = auctions.find(a => !a.settled);
-  const settledWithBid = auctions
-    .filter(a => a.settled && a.amount != null && a.amount > 0n)
-    .slice(0, 7);
+  try {
+    // Parallel: current live auction + most recent non-empty settlements.
+    const [current, settlements] = await Promise.all([
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'auction',
+      }),
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'getSettlements',
+        args: [7n, true],
+      }),
+    ]);
 
-  const avgWei =
-    settledWithBid.length > 0
-      ? settledWithBid.reduce((acc, a) => acc + (a.amount as bigint), 0n) /
-        BigInt(settledWithBid.length)
-      : 0n;
+    const prior7 = settlements
+      .filter(s => s.amount > 0n)
+      .slice(0, 7)
+      .map(s => ({
+        nounId: String(s.nounId),
+        amount: String(s.amount),
+        winner: s.winner,
+        settled: true,
+        endTime: Number(s.blockTimestamp),
+      }));
 
-  const toItem = (a: (typeof auctions)[number]) => ({
-    nounId: String(a.nounId),
-    amount: a.amount != null ? String(a.amount) : null,
-    endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
-    settled: a.settled,
-    winner: a.winner,
-  });
+    const avgWei =
+      prior7.length > 0
+        ? prior7.reduce((acc, p) => acc + BigInt(p.amount), 0n) / BigInt(prior7.length)
+        : 0n;
 
-  return c.json({
-    current: current ? toItem(current) : null,
-    prior7: settledWithBid.map(toItem),
-    sampleSize: settledWithBid.length,
-    avgWei: String(avgWei),
-    avgEth: Number(avgWei) / 1e18,
-  });
+    const payload = {
+      current: {
+        nounId: String(current.nounId),
+        amount: String(current.amount),
+        endTime: Number(current.endTime),
+        settled: current.settled,
+        winner: current.bidder,
+      },
+      prior7,
+      sampleSize: prior7.length,
+      avgWei: String(avgWei),
+      avgEth: Number(avgWei) / 1e18,
+    };
+
+    auctionStatsCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (auctionStatsCache !== null) {
+      return c.json(auctionStatsCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
 });
 
 // ============================================================
