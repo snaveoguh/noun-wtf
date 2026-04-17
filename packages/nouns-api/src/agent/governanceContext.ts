@@ -549,16 +549,6 @@ function deriveGrantStatus(g: RawGrant, latestBlock: bigint): string {
   return g.status;
 }
 
-function extractTitle(desc: string): string {
-  return (
-    (desc || '')
-      .split('\n')[0]
-      ?.replace(/^#+\s*/, '')
-      .slice(0, 80)
-      .trim() || 'Untitled'
-  );
-}
-
 function formatTimeLeft(currentBlock: bigint, endBlock: string): string {
   const blocks = BigInt(endBlock) - currentBlock;
   if (blocks <= 0n) return 'ended';

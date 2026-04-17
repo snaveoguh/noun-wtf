@@ -9,39 +9,48 @@ const PROBE_API = 'https://api.probe.wtf/api/dream-nouns';
 
 /**
  * Post a new dream to probe.wtf's Laravel API.
- * Fire-and-forget — failures are logged but don't block the local save.
+ * Throws on network error or non-2xx response so callers can surface the failure.
+ * If a custom trait is uploaded, the layer's seed is sent as null so probe's renderer
+ * knows to use the uploaded image instead of a standard trait.
  */
 export async function syncDreamToProbe(
   dream: SavedDream,
   walletAddress: string,
   customTraitFile?: File,
 ): Promise<void> {
-  try {
-    const formData = new FormData();
-    formData.append('dreamer', walletAddress);
-    formData.append('accessory_seed_id', String(dream.seed.accessory));
-    formData.append('background_seed_id', String(dream.seed.background));
-    formData.append('body_seed_id', String(dream.seed.body));
-    formData.append('glasses_seed_id', String(dream.seed.glasses));
-    formData.append('head_seed_id', String(dream.seed.head));
+  const formData = new FormData();
+  formData.append('dreamer', walletAddress);
+  formData.append('background_seed_id', String(dream.seed.background));
 
-    if (dream.customTraitLayer && customTraitFile) {
-      formData.append('custom_trait_image', customTraitFile);
-      formData.append('custom_trait_layer', dream.customTraitLayer);
-    }
+  const customLayer = dream.customTraitLayer;
+  const hasCustom = customLayer !== undefined && customTraitFile !== undefined;
 
-    const response = await fetch(PROBE_API, {
-      method: 'POST',
-      body: formData,
-    });
+  // For each standard layer, send the seed — but omit it (null) if a custom
+  // trait replaces that layer. Matches what probe's existing records show
+  // (e.g. head_seed_id = null when custom_trait_layer = 'head').
+  const layerSeeds: Array<[keyof SavedDream['seed'], string]> = [
+    ['accessory', 'accessory_seed_id'],
+    ['body', 'body_seed_id'],
+    ['glasses', 'glasses_seed_id'],
+    ['head', 'head_seed_id'],
+  ];
+  for (const [key, field] of layerSeeds) {
+    if (hasCustom && customLayer === key) continue;
+    formData.append(field, String(dream.seed[key]));
+  }
 
-    if (!response.ok) {
-      console.warn('[probeSync] Failed to sync dream:', response.status, await response.text());
-    } else {
-      console.log('[probeSync] Dream synced to probe.wtf');
-    }
-  } catch (err) {
-    // Non-blocking — probe.wtf sync is best-effort
-    console.warn('[probeSync] Failed to sync dream:', err);
+  if (hasCustom) {
+    formData.append('custom_trait_image', customTraitFile);
+    formData.append('custom_trait_layer', customLayer);
+  }
+
+  const response = await fetch(PROBE_API, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`probe.wtf POST ${response.status}: ${body.slice(0, 200)}`);
   }
 }

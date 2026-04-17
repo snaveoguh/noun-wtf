@@ -5,6 +5,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
+import AmbientMusic from '@/components/AmbientMusic';
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
@@ -285,6 +286,8 @@ function AppRouter() {
           alignItems: 'center',
         }}
       >
+        {/* Probe-only: ambient music play/pause above the saber button */}
+        {location.pathname.startsWith('/probe') && <AmbientMusic variant="inline" />}
         <button
           onClick={() => setSaberMode(s => !s)}
           title={saberMode ? 'Exit Saber' : 'Saber'}

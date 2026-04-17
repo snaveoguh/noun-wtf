@@ -10,14 +10,16 @@ const DreamsTab = lazy(() => import('./DreamsTab'));
 const LilNounsTab = lazy(() => import('./LilNounsTab'));
 const TerraformsProbeTab = lazy(() => import('./TerraformsProbeTab'));
 const YellowCollectiveTab = lazy(() => import('./YellowCollectiveTab'));
+const BitnounsTab = lazy(() => import('./BitnounsTab'));
 
-type ProbeTab = 'explore' | 'dreams' | 'lils' | 'terraforms' | 'yellow';
+type ProbeTab = 'explore' | 'dreams' | 'lils' | 'terraforms' | 'yellow' | 'bitnouns';
 
 const TAB_CONFIG: { key: ProbeTab; label: string }[] = [
   { key: 'explore', label: 'Nouns' },
   { key: 'dreams', label: 'Dreams' },
   { key: 'lils', label: 'Lils' },
   { key: 'yellow', label: 'Yellow' },
+  { key: 'bitnouns', label: 'bitNouns' },
   { key: 'terraforms', label: 'Terraforms' },
 ];
 
@@ -66,6 +68,11 @@ const ProbePage: React.FC = () => {
       {tab === 'yellow' && (
         <Suspense fallback={<GenericSkeleton />}>
           <YellowCollectiveTab />
+        </Suspense>
+      )}
+      {tab === 'bitnouns' && (
+        <Suspense fallback={<GenericSkeleton />}>
+          <BitnounsTab />
         </Suspense>
       )}
       {tab === 'terraforms' && (

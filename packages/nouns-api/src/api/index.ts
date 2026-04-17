@@ -630,6 +630,191 @@ app.get('/api/grants/:id', async c => {
 });
 
 // ============================================================
+// Lil Nouns proposals proxy — fetches from Goldsky subgraph on the server,
+// caches briefly, serves in the same shape as /api/proposals so the
+// prediction-market UI can drop it in without branching.
+// ============================================================
+
+const LIL_NOUNS_SUBGRAPH =
+  'https://api.goldsky.com/api/public/project_cldjvjgtylso13swq3dre13sf/subgraphs/lil-nouns-subgraph/1.0.10/gn';
+
+// Keep the cache tight — proposals change rarely but we want new votes to land quickly.
+const LIL_NOUNS_CACHE_TTL_MS = 60_000;
+let lilNounsCache: { at: number; items: unknown[] } | null = null;
+
+async function fetchLilNounsFromSubgraph() {
+  // Paginate in chunks of 500 (subgraph max is usually 1000; 500 is conservative).
+  const PAGE = 500;
+  const all: Array<Record<string, unknown>> = [];
+  let skip = 0;
+  while (true) {
+    const query = `{
+      proposals(first: ${PAGE}, skip: ${skip}, orderBy: createdBlock, orderDirection: desc) {
+        id
+        title
+        description
+        status
+        forVotes
+        againstVotes
+        abstainVotes
+        quorumVotes
+        proposalThreshold
+        startBlock
+        endBlock
+        createdBlock
+        createdTimestamp
+        executionETA
+        executedTimestamp
+        canceledTimestamp
+        vetoedTimestamp
+        queuedTimestamp
+        proposer { id }
+      }
+    }`;
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    const json = (await res.json()) as { data?: { proposals?: Array<Record<string, unknown>> } };
+    const page = json.data?.proposals ?? [];
+    all.push(...page);
+    if (page.length < PAGE) break;
+    skip += PAGE;
+  }
+  return all;
+}
+
+app.get('/api/lil-proposals', async c => {
+  const now = Date.now();
+  if (lilNounsCache !== null && now - lilNounsCache.at < LIL_NOUNS_CACHE_TTL_MS) {
+    return c.json(lilNounsCache.items);
+  }
+  try {
+    const items = await fetchLilNounsFromSubgraph();
+    lilNounsCache = { at: now, items };
+    return c.json(items);
+  } catch (err) {
+    // If Goldsky is down, serve stale cache if we have any.
+    if (lilNounsCache !== null) {
+      return c.json(lilNounsCache.items, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// Detail endpoint — single proposal with its full vote list, for LilNounsVotePage.
+// Cache per-id for LIL_NOUNS_CACHE_TTL_MS.
+const lilNounsDetailCache = new Map<string, { at: number; item: unknown }>();
+
+app.get('/api/lil-proposals/:id', async c => {
+  const id = c.req.param('id');
+  if (!/^\d+$/.test(id)) return c.json({ error: 'invalid id' }, 400);
+
+  const now = Date.now();
+  const cached = lilNounsDetailCache.get(id);
+  if (cached != null && now - cached.at < LIL_NOUNS_CACHE_TTL_MS) {
+    return c.json(cached.item);
+  }
+
+  const query = `{
+    proposal(id: "${id}") {
+      id
+      title
+      description
+      status
+      forVotes
+      againstVotes
+      abstainVotes
+      quorumVotes
+      proposalThreshold
+      startBlock
+      endBlock
+      createdBlock
+      createdTimestamp
+      executionETA
+      executedTimestamp
+      canceledTimestamp
+      vetoedTimestamp
+      queuedTimestamp
+      targets
+      values
+      signatures
+      calldatas
+      totalSupply
+      proposer { id }
+      votes(first: 1000, orderBy: blockNumber, orderDirection: desc) {
+        id
+        support: supportDetailed
+        votes
+        reason
+        blockNumber
+        voter { id }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    const json = (await res.json()) as { data?: { proposal?: Record<string, unknown> | null } };
+    const proposal = json.data?.proposal;
+    if (proposal == null) return c.json({ error: 'not found' }, 404);
+
+    lilNounsDetailCache.set(id, { at: now, item: proposal });
+    return c.json(proposal);
+  } catch (err) {
+    if (cached != null) {
+      return c.json(cached.item, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+/**
+ * Auction price prediction market stats.
+ * Returns current live auction + last 7 settled auctions (skipping nounder/empty)
+ * and their trailing average.
+ */
+app.get('/api/auction-stats', async c => {
+  const auctions = await db.select().from(schema.auction).orderBy(desc(schema.auction.nounId));
+
+  const current = auctions.find(a => !a.settled);
+  const settledWithBid = auctions
+    .filter(a => a.settled && a.amount != null && a.amount > 0n)
+    .slice(0, 7);
+
+  const avgWei =
+    settledWithBid.length > 0
+      ? settledWithBid.reduce((acc, a) => acc + (a.amount as bigint), 0n) /
+        BigInt(settledWithBid.length)
+      : 0n;
+
+  const toItem = (a: (typeof auctions)[number]) => ({
+    nounId: String(a.nounId),
+    amount: a.amount != null ? String(a.amount) : null,
+    endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+    settled: a.settled,
+    winner: a.winner,
+  });
+
+  return c.json({
+    current: current ? toItem(current) : null,
+    prior7: settledWithBid.map(toItem),
+    sampleSize: settledWithBid.length,
+    avgWei: String(avgWei),
+    avgEth: Number(avgWei) / 1e18,
+  });
+});
+
+// ============================================================
 // Gasless grant proposals — relayer submits on behalf of users
 // ============================================================
 

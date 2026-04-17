@@ -1,6 +1,6 @@
 import { INounSeed } from '@/wrappers/nounToken';
 
-export type DreamStatus = 'draft' | 'candidate' | 'proposed';
+export type DreamStatus = 'draft' | 'published' | 'candidate' | 'proposed';
 export type CustomTraitLayer = 'head' | 'body' | 'accessory' | 'glasses';
 
 export interface SavedDream {
