@@ -506,7 +506,15 @@ app.get('/api/proposals/:id', async c => {
     createdAtBlock: String(p.createdAtBlock),
     createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
     signers: proposalSigners.map(s => s.signer),
-    transactions: proposalTxs,
+    // Ponder returns BigInts for proposalId / value — stringify so Hono can JSON-serialize.
+    transactions: proposalTxs.map(t => ({
+      index: t.index,
+      proposalId: String(t.proposalId),
+      target: t.target,
+      value: String(t.value),
+      signature: t.signature,
+      calldata: t.calldata,
+    })),
   };
   if (latestBlock > 0n) {
     item.status = computeDerivedStatus(
