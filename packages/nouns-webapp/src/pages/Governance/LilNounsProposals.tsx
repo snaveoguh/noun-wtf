@@ -125,9 +125,7 @@ const LilNounsProposals: FC = () => {
             return (
               <a
                 key={p.id}
-                href={`https://lilnouns.wtf/vote/${p.id}`}
-                target="_blank"
-                rel="noreferrer"
+                href={`/vote/${p.id}?dao=lil`}
                 style={{
                   display: 'block',
                   padding: '16px 20px',

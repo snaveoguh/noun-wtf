@@ -338,7 +338,7 @@ async function fetchLilNounsProposals(): Promise<PredictionProposal[]> {
       proposalId: String(p.id),
       title: p.title,
       status: normalizedStatus,
-      url: `https://lilnouns.wtf/vote/${p.id}`,
+      url: `/vote/${p.id}?dao=lil`,
       votesFor: p.forVotes,
       votesAgainst: p.againstVotes,
       quorum: p.quorumVotes,
