@@ -131,7 +131,7 @@ export const PREDICTION_MARKET_ABI = [
 
 export const AUCTION_PRICE_MARKET_ADDRESS = ((import.meta.env.VITE_AUCTION_PRICE_MARKET_ADDRESS as
   | string
-  | undefined) ?? '0x0000000000000000000000000000000000000000') as Address;
+  | undefined) ?? '0xC9c201A7AfB67Ecc08238Cbd690d39658Aed39b6') as Address;
 
 export const AUCTION_PRICE_MARKET_ABI = [
   {
