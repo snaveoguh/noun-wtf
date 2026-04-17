@@ -1,7 +1,8 @@
 /**
  * LilNounsProposals — Shows Lil Nouns governance proposals sourced from the
  * Goldsky subgraph via our Ponder API proxy (falls back to on-chain multicall
- * if the proxy is unreachable). Each row links out to lilnouns.wtf in a new tab.
+ * if the proxy is unreachable). Rows link to the native detail page at
+ * /vote/:id?dao=lil which supports reading + casting on-chain votes.
  */
 import { FC, useEffect, useState } from 'react';
 
@@ -97,8 +98,9 @@ const LilNounsProposals: FC = () => {
             margin: '0 0 16px',
           }}
         >
-          Lil Nouns is a CC0 experiment forked from Nouns DAO. Proposals are read directly from the
-          Lil Nouns Governor contract. Click a proposal to view and vote on lilnouns.wtf.
+          Lil Nouns is a CC0 experiment forked from Nouns DAO. Proposals and votes are indexed from
+          the Lil Nouns Governor contract. Click any proposal to view details and cast a vote
+          on-chain.
         </p>
       </div>
 
@@ -153,7 +155,7 @@ const LilNounsProposals: FC = () => {
                   </span>
                   <span style={{ color: '#8c8d92', fontSize: '0.75rem' }}>#{p.id}</span>
                   <span style={{ color: '#8c8d92', fontSize: '0.7rem', marginLeft: 'auto' }}>
-                    ↗ lilnouns.wtf
+                    View →
                   </span>
                 </div>
 
