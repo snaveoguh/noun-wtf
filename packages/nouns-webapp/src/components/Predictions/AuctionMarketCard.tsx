@@ -222,7 +222,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         )}
         {market?.exists !== true && !auctionEnded && (
           <div className="text-[8px] uppercase tracking-wider">
-            First wager auto-creates the market onchain
+            No market yet — first mover opens it onchain
           </div>
         )}
       </div>
@@ -247,7 +247,12 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
       )}
 
       {!auctionEnded && !isResolved && (
-        <InlineWager nounId={nounId} onSuccess={() => refetchMarket()} isConnected={isConnected} />
+        <InlineWager
+          nounId={nounId}
+          marketExists={market?.exists === true}
+          onSuccess={() => refetchMarket()}
+          isConnected={isConnected}
+        />
       )}
 
       {auctionEnded && !isResolved && (
@@ -272,14 +277,18 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
 
 function InlineWager({
   nounId,
+  marketExists,
   onSuccess,
   isConnected,
 }: {
   nounId: bigint;
+  marketExists: boolean;
   onSuccess: () => void;
   isConnected: boolean;
 }) {
   const [side, setSide] = useState<'higher' | 'lower' | null>(null);
+  // Track the pending tx type so we can chain create → stake if needed.
+  const [pendingAction, setPendingAction] = useState<'create' | 'stake' | null>(null);
   const { writeContract, data: txHash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -288,8 +297,11 @@ function InlineWager({
   });
 
   useEffect(() => {
-    if (isSuccess) onSuccess();
-  }, [isSuccess, onSuccess]);
+    if (isSuccess) {
+      onSuccess();
+      if (pendingAction === 'create') setPendingAction(null);
+    }
+  }, [isSuccess, onSuccess, pendingAction]);
 
   if (!isConnected) {
     return (
@@ -299,7 +311,7 @@ function InlineWager({
     );
   }
 
-  if (isSuccess) {
+  if (isSuccess && pendingAction === 'stake') {
     return (
       <div className="border border-[var(--rule-light)] p-2 text-center font-mono text-[9px] font-bold text-[var(--ink)]">
         Wager placed.
@@ -307,8 +319,20 @@ function InlineWager({
     );
   }
 
+  function handleCreateMarket() {
+    setPendingAction('create');
+    writeContract({
+      chainId: PREDICTION_MARKET_CHAIN_ID,
+      address: AUCTION_PRICE_MARKET_ADDRESS,
+      abi: AUCTION_PRICE_MARKET_ABI,
+      functionName: 'createMarket',
+      args: [nounId],
+    });
+  }
+
   function handleQuickStake(amount: string) {
     if (!side) return;
+    setPendingAction('stake');
     writeContract({
       chainId: PREDICTION_MARKET_CHAIN_ID,
       address: AUCTION_PRICE_MARKET_ADDRESS,
@@ -317,6 +341,34 @@ function InlineWager({
       args: [nounId, side === 'higher'],
       value: parseEther(amount),
     });
+  }
+
+  // First mover must create the market before anyone can stake.
+  if (!marketExists) {
+    return (
+      <div className="space-y-2">
+        <p className="font-mono text-[9px] text-[var(--ink-faint)]">
+          No market yet — open it (one tx), then stake in the next.
+        </p>
+        <button
+          type="button"
+          onClick={handleCreateMarket}
+          disabled={isPending || isConfirming}
+          className="w-full border border-[var(--rule)] bg-[var(--paper)] py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+        >
+          {isPending
+            ? 'Confirming in wallet…'
+            : isConfirming
+              ? 'Opening market onchain…'
+              : 'Open Market'}
+        </button>
+        {error !== null && (
+          <p className="font-mono text-[8px] text-[var(--accent-red)]">
+            {(error as { shortMessage?: string }).shortMessage || error.message}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (
