@@ -268,9 +268,69 @@ export async function fetchLilNounsProposalsOnchain(count = 25): Promise<LilNoun
   }
 }
 
-/** Fetch Lil Nouns proposals (on-chain) in the PredictionProposal shape. */
+/** Subgraph proposal shape returned by our /api/lil-proposals proxy. */
+interface SubgraphLilProposal {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  status: string;
+  forVotes: string;
+  againstVotes: string;
+  abstainVotes?: string;
+  quorumVotes: string;
+  startBlock: string;
+  endBlock: string;
+  createdBlock?: string;
+  createdTimestamp?: string;
+  proposer?: { id: string };
+}
+
+/**
+ * Fetch Lil Nouns proposals from the subgraph via our Ponder API proxy.
+ * The proxy caches briefly + shields the browser from Goldsky rate limits.
+ * Falls back to direct on-chain multicall if the proxy fails.
+ */
+export async function fetchLilNounsProposalsFromProxy(): Promise<LilNounsProposal[]> {
+  const res = await fetch(`${API_BASE}/api/lil-proposals`, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`lil-proposals proxy ${res.status}`);
+  const items = (await res.json()) as SubgraphLilProposal[];
+  return items.map(p => {
+    const description = p.description ?? '';
+    const title =
+      (p.title ?? '').trim().length > 0
+        ? (p.title as string).trim()
+        : parseTitle(description, `Lil Proposal ${p.id}`);
+    return {
+      id: Number(p.id),
+      proposer: p.proposer?.id ?? '',
+      quorumVotes: Number(p.quorumVotes),
+      startBlock: Number(p.startBlock),
+      endBlock: Number(p.endBlock),
+      forVotes: Number(p.forVotes),
+      againstVotes: Number(p.againstVotes),
+      abstainVotes: Number(p.abstainVotes ?? 0),
+      canceled: p.status.toUpperCase() === 'CANCELLED' || p.status.toUpperCase() === 'CANCELED',
+      vetoed: p.status.toUpperCase() === 'VETOED',
+      executed: p.status.toUpperCase() === 'EXECUTED',
+      status: p.status.toUpperCase(),
+      description,
+      title,
+    };
+  });
+}
+
+/** Fetch Lil Nouns proposals in the PredictionProposal shape. Proxy first, on-chain fallback. */
 async function fetchLilNounsProposals(): Promise<PredictionProposal[]> {
-  const proposals = await fetchLilNounsProposalsOnchain(25);
+  let proposals: LilNounsProposal[];
+  try {
+    proposals = await fetchLilNounsProposalsFromProxy();
+  } catch (err) {
+    console.warn('[lil-nouns] proxy failed, falling back to on-chain multicall:', err);
+    proposals = await fetchLilNounsProposalsOnchain(25);
+  }
   return proposals.map(p => {
     const normalizedStatus = p.status.toLowerCase().replace(/_/g, '-');
     return {

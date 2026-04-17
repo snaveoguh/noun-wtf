@@ -1,6 +1,6 @@
 /**
- * YellowCollectiveTab — Grid browser for Yellow Collective NFTs on Base.
- * Fetches token data from the Nouns Builder subgraph on Base.
+ * BitnounsTab — Grid browser for bitNouns NFTs on Ethereum mainnet.
+ * Fetches token data from the Nouns Builder subgraph on Ethereum.
  * Hover/tap a token to see traits, owner, and external links.
  * Clicking a trait in the popover filters the grid to that trait.
  */
@@ -60,13 +60,13 @@ async function resolveENS(addresses: string[]): Promise<Map<string, string>> {
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const BUILDER_SUBGRAPH =
-  'https://api.goldsky.com/api/public/project_cm33ek8kjx6pz010i2c3w8z25/subgraphs/nouns-builder-base-mainnet/latest/gn';
-const YC_TOKEN_ADDRESS = '0x220e41499cf4d93a3629a5509410cbf9e6e0b109';
+  'https://api.goldsky.com/api/public/project_cm33ek8kjx6pz010i2c3w8z25/subgraphs/nouns-builder-ethereum-mainnet/latest/gn';
+const BITNOUNS_TOKEN_ADDRESS = '0xd7cb208297f661867a43c08afe5980ee88dfc678';
 const PAGE_SIZE = 100;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface YCToken {
+interface BitnounsToken {
   tokenId: number;
   name: string;
   image: string;
@@ -83,12 +83,12 @@ const sortOptions: { label: string; value: SortOption }[] = [
 
 // ─── Data fetching ──────────────────────────────────────────────────────────
 
-let tokenCache: YCToken[] | null = null;
+let tokenCache: BitnounsToken[] | null = null;
 
-async function fetchAllTokens(): Promise<YCToken[]> {
+async function fetchAllTokens(): Promise<BitnounsToken[]> {
   if (tokenCache !== null) return tokenCache;
 
-  const all: YCToken[] = [];
+  const all: BitnounsToken[] = [];
   let skip = 0;
   let hasMore = true;
 
@@ -101,7 +101,7 @@ async function fetchAllTokens(): Promise<YCToken[]> {
           tokens(
             first: ${PAGE_SIZE},
             skip: ${skip},
-            where: { dao: "${YC_TOKEN_ADDRESS}" },
+            where: { dao: "${BITNOUNS_TOKEN_ADDRESS}" },
             orderBy: tokenId,
             orderDirection: desc
           ) {
@@ -124,7 +124,7 @@ async function fetchAllTokens(): Promise<YCToken[]> {
       const image = (t.image as string) ?? '';
       all.push({
         tokenId: Number(t.tokenId),
-        name: (t.name as string) ?? `Collective Nouns #${t.tokenId}`,
+        name: (t.name as string) ?? `bitNouns #${t.tokenId}`,
         image,
         owner: ownerAddr,
         traits: orderTraitsForDisplay(parseBuilderTraitsFromImage(image)),
@@ -157,8 +157,8 @@ function displayName(addr: string, names: Map<string, string>): string {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-const YellowCollectiveTab: FC = () => {
-  const [tokens, setTokens] = useState<YCToken[]>([]);
+const BitnounsTab: FC = () => {
+  const [tokens, setTokens] = useState<BitnounsToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ensNames, setEnsNames] = useState<Map<string, string>>(new Map());
@@ -234,7 +234,7 @@ const YellowCollectiveTab: FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-gray-400">
-        Loading Yellow Collective tokens from Base...
+        Loading bitNouns tokens from Ethereum…
       </div>
     );
   }
@@ -317,7 +317,7 @@ const YellowCollectiveTab: FC = () => {
           <button
             type="button"
             onClick={() => setTraitFilter(null)}
-            className="flex h-8 items-center gap-1 rounded-lg border border-yellow-400 bg-yellow-300 px-2 text-xs font-semibold text-black"
+            className="flex h-8 items-center gap-1 rounded-lg border border-black bg-black px-2 text-xs font-semibold text-white"
           >
             <span className="font-mono text-[10px] uppercase opacity-60">{traitFilter.layer}:</span>
             <span>{traitFilter.label}</span>
@@ -355,11 +355,15 @@ const YellowCollectiveTab: FC = () => {
             key={token.tokenId}
             token={token}
             ownerDisplayName={displayName(token.owner, ensNames)}
-            chainSlug="base"
-            daoAddress={YC_TOKEN_ADDRESS}
-            accentColor="#FFC700"
+            chainSlug="ethereum"
+            daoAddress={BITNOUNS_TOKEN_ADDRESS}
+            accentColor="#14141f"
             onTraitClick={setTraitFilter}
             activeTrait={traitFilter}
+            extraLink={{
+              href: `https://brobe.wtf/api/bitnouns/${token.tokenId}/png`,
+              label: 'brobe.wtf',
+            }}
           >
             <button
               type="button"
@@ -371,7 +375,7 @@ const YellowCollectiveTab: FC = () => {
                 alt={token.name}
                 loading="lazy"
                 className="h-full w-full object-cover"
-                style={{ background: '#FFC700' }}
+                style={{ background: '#e1d7d5' }}
               />
             </button>
           </BuilderTokenHoverCard>
@@ -381,4 +385,4 @@ const YellowCollectiveTab: FC = () => {
   );
 };
 
-export default YellowCollectiveTab;
+export default BitnounsTab;
