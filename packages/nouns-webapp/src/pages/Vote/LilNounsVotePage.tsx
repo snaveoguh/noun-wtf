@@ -3,6 +3,8 @@
  * Pulls data from our /api/lil-proposals/:id proxy (Goldsky subgraph).
  * Supports casting on-chain votes directly against the Lil Nouns governor.
  */
+import type { Address } from '@/utils/types';
+
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
@@ -14,6 +16,7 @@ import remarkBreaks from 'remark-breaks';
 import { mainnet } from 'viem/chains';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
+import ShortAddress from '@/components/ShortAddress';
 import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 
 const API_BASE = (
@@ -76,11 +79,6 @@ const STATUS_COLORS: Record<string, string> = {
 function statusLabel(status: string): string {
   if (status === 'OBJECTION_PERIOD') return 'Objection';
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-}
-
-function shortAddress(addr: string): string {
-  if (addr === '' || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
 function formatTimestamp(ts: string | null): string {
@@ -248,7 +246,7 @@ const LilNounsVotePage: FC = () => {
             rel="noreferrer"
             style={{ color: '#ff638d', fontFamily: 'monospace', textDecoration: 'none' }}
           >
-            {shortAddress(proposal.proposer.id)}
+            <ShortAddress address={proposal.proposer.id as Address} />
           </a>
           {proposal.createdTimestamp !== '' && ` · ${formatTimestamp(proposal.createdTimestamp)}`}
         </div>
@@ -398,7 +396,7 @@ const LilNounsVotePage: FC = () => {
                           fontWeight: 600,
                         }}
                       >
-                        {shortAddress(v.voter.id)}
+                        <ShortAddress address={v.voter.id as Address} />
                       </a>
                       <span
                         style={{

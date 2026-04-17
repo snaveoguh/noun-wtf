@@ -509,7 +509,17 @@ export const formatProposalTransactionDetails = (details: {
     }
 
     try {
-      const abiParams: AbiParameter[] = types.split(/,(?![^(]*\))/g).map(t => ({ type: t.trim() }));
+      const abiParams: AbiParameter[] = splitTopLevelTypes(types).map(parseOneType);
+
+      // Pure parameter encoding is always 32-byte-aligned. If not, the calldata
+      // almost certainly has a 4-byte function selector prefix or is malformed;
+      // skip the decode attempt and go straight to the raw hex fallback so we
+      // don't spam viem's PositionOutOfBoundsError across the console.
+      const bytesLen = (callData.length - 2) / 2;
+      if (bytesLen % 32 !== 0) {
+        return { target, callData: concatSelectorToCalldata(signature, callData), value };
+      }
+
       const decoded = decodeAbiParameters(abiParams, callData);
       return {
         target,
@@ -518,10 +528,69 @@ export const formatProposalTransactionDetails = (details: {
         value,
       };
     } catch (err) {
-      console.error('decodeAbiParameters failed:', err);
+      // Fallback renders raw hex; debug-level so stale/malformed proposals
+      // don't flood the production console.
+      console.debug('decodeAbiParameters fallback:', err);
       return { target, callData: concatSelectorToCalldata(signature, callData), value };
     }
   });
+
+/**
+ * Split a comma-separated Solidity types string on top-level commas only, keeping
+ * nested tuples together. "(uint32,uint32),uint256" → ["(uint32,uint32)", "uint256"]
+ */
+function splitTopLevelTypes(types: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let buf = '';
+  for (let i = 0; i < types.length; i++) {
+    const ch = types[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) {
+      if (buf.trim() !== '') out.push(buf.trim());
+      buf = '';
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf.trim() !== '') out.push(buf.trim());
+  return out;
+}
+
+/**
+ * Turn one Solidity type string into a viem AbiParameter.
+ * Builds the AbiParameter tree directly rather than relying on parseAbiParameter,
+ * because abitype rejects bare anonymous tuples like "tuple(uint,address)"
+ * (it expects named components in its string parser).
+ * Handles:
+ * - "uint256"                   → { type: 'uint256' }
+ * - "(uint32,address)"          → { type: 'tuple', components: [...] }
+ * - "(uint32,address)[]"        → { type: 'tuple[]', components: [...] }
+ * - "((uint,bytes),address)"    → recursive nested tuples
+ */
+function parseOneType(t: string): AbiParameter {
+  const trimmed = t.trim();
+
+  // Pull off trailing array suffixes: "foo[]", "foo[3]", "foo[][4]" etc.
+  const arrayMatch = trimmed.match(/^(.+?)((?:\[\d*])+)$/);
+  if (arrayMatch !== null) {
+    const base = parseOneType(arrayMatch[1]);
+    return { ...base, type: `${base.type}${arrayMatch[2]}` } as AbiParameter;
+  }
+
+  // Tuple: "(t1,t2,t3)" → recurse into each inner type.
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    const inner = trimmed.slice(1, -1);
+    return {
+      type: 'tuple',
+      components: splitTopLevelTypes(inner).map(parseOneType),
+    } as AbiParameter;
+  }
+
+  // Primitive.
+  return { type: trimmed };
+}
 
 export const formatProposalTransactionDetailsToUpdate = (details: {
   targets: Address[];
