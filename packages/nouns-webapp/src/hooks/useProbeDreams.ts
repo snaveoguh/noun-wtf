@@ -24,10 +24,21 @@ export interface ProbeDream {
 }
 
 export interface ProbeDreamWithPreview extends ProbeDream {
-  /** Full composed noun SVG (data URL, rendered client-side from seeds) */
+  /** Base SVG (data URL). For custom-trait dreams built client-side, this is
+   *  only the layers BELOW the custom slot — the custom PNG overlays into the
+   *  gap and `overlayTopSvgUrl` (if set) sits on top. For bundled dreams ≤721
+   *  with a custom trait, the custom art is already baked in. For no-custom
+   *  dreams, this is the full noun. */
   nounSvgUrl: string;
-  /** Just the custom trait image (for hover), null if standard dream */
+  /** Custom trait PNG URL, or null. Overlay on top of `nounSvgUrl` unless
+   *  `customTraitIsBaked` is true. */
   customTraitUrl: string | null;
+  /** True when the custom trait is already composited into `nounSvgUrl` — don't overlay. */
+  customTraitIsBaked: boolean;
+  /** Standard layers that sit ABOVE the custom trait (e.g. glasses above a custom
+   *  head). Transparent-bg SVG to overlay after the custom PNG. Null when nothing
+   *  sits above the custom layer, or for no-custom / baked dreams. */
+  overlayTopSvgUrl: string | null;
 }
 
 // Live source: probe.wtf Laravel API
@@ -67,20 +78,38 @@ interface LaravelPage {
   };
 }
 
+// getNounData `parts` order: 0=body, 1=accessory, 2=head, 3=glasses.
+const LAYER_INDEX: Record<CustomTraitLayer, number> = {
+  body: 0,
+  accessory: 1,
+  head: 2,
+  glasses: 3,
+};
+
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
 /**
- * Compose a noun SVG data URL client-side from seeds.
- * Any layer (body/accessory/head/glasses) can be null when the dream's
- * custom trait replaces it — all coalesce to 0 so the base noun always
- * renders; DreamsTab layers the custom PNG over the top via a regular
- * <img> (inline SVG <image href> can't cross-origin fetch from DO CDN).
+ * Compose the render layers for a dream client-side.
+ *
+ * When `customLayer` is set, the base SVG excludes that slot (instead of
+ * falling back to index 0 = aardvark head) so the custom PNG overlays into
+ * a transparent gap. Anything in the standard layer order above the custom
+ * slot comes back as `overlayTopSvgUrl` so consumers can render it on top
+ * of the custom PNG (e.g. glasses above a custom head).
+ *
+ * Inline SVG `<image href>` can't cross-origin fetch from the probe CDN,
+ * which is why we split into separate <img>s instead of embedding.
  */
-function buildDreamSvgDataUri(
+function buildDreamLayers(
   background: number,
   body: number | null,
   accessory: number | null,
   head: number | null,
   glasses: number | null,
-): string {
+  customLayer: CustomTraitLayer | null,
+): { baseSvgUrl: string; overlayTopSvgUrl: string | null } {
   try {
     const seed = {
       background,
@@ -90,34 +119,48 @@ function buildDreamSvgDataUri(
       glasses: glasses ?? 0,
     };
     const { parts, background: bg } = getNounData(seed);
-    const svg = buildSVG(parts, ImageData.palette, bg);
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
+
+    if (!customLayer) {
+      return {
+        baseSvgUrl: svgToDataUrl(buildSVG(parts, ImageData.palette, bg)),
+        overlayTopSvgUrl: null,
+      };
+    }
+
+    const idx = LAYER_INDEX[customLayer];
+    const below = parts.slice(0, idx);
+    const above = parts.slice(idx + 1);
+
+    const baseSvgUrl = svgToDataUrl(buildSVG(below, ImageData.palette, bg));
+    const overlayTopSvgUrl =
+      above.length > 0 ? svgToDataUrl(buildSVG(above, ImageData.palette)) : null;
+    return { baseSvgUrl, overlayTopSvgUrl };
   } catch {
-    return '';
+    return { baseSvgUrl: '', overlayTopSvgUrl: null };
   }
 }
 
 function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
   const hasCustomTrait = d.custom_trait_image_url !== null && d.custom_trait_image_url.length > 0;
   // Three rendering paths:
-  //   1. Dream ≤721 with custom trait → use the bundled pre-rendered SVG (art
-  //      is baked in during probe.wtf's original render).
-  //   2. Dream >721 with custom trait → compose the base noun SVG client-side;
-  //      DreamsTab overlays the custom trait as a separate <img> on top of
-  //      this base (inline SVG <image href="cdn"> gets blocked by cross-origin
-  //      and breaks the whole data URL, which is why #722+ were showing as
-  //      broken-image icons).
-  //   3. No custom trait → just compose the base noun SVG from seeds.
-  const nounSvgUrl =
-    hasCustomTrait && d.id <= MAX_BUNDLED_RENDERED_ID
-      ? `${STATIC_RENDERED_BASE}/${d.id}.svg`
-      : buildDreamSvgDataUri(
-          d.background_seed_id,
-          d.body_seed_id,
-          d.accessory_seed_id,
-          d.head_seed_id,
-          d.glasses_seed_id,
-        );
+  //   1. Dream ≤721 with custom trait → use the bundled pre-rendered SVG with
+  //      the custom art already baked in (set `customTraitIsBaked` so consumers
+  //      don't double-render the PNG on top).
+  //   2. Dream >721 with custom trait → split into base (layers below custom),
+  //      the custom PNG (rendered by consumer), and an optional overlay SVG for
+  //      standard layers above the custom slot (e.g. glasses above custom head).
+  //   3. No custom trait → full composed noun SVG in nounSvgUrl.
+  const isBundled = hasCustomTrait && d.id <= MAX_BUNDLED_RENDERED_ID;
+  const { baseSvgUrl, overlayTopSvgUrl } = isBundled
+    ? { baseSvgUrl: `${STATIC_RENDERED_BASE}/${d.id}.svg`, overlayTopSvgUrl: null }
+    : buildDreamLayers(
+        d.background_seed_id,
+        d.body_seed_id,
+        d.accessory_seed_id,
+        d.head_seed_id,
+        d.glasses_seed_id,
+        d.custom_trait_layer,
+      );
   return {
     id: d.id,
     dreamer: d.dreamer,
@@ -131,17 +174,22 @@ function laravelToPreview(d: LaravelDream): ProbeDreamWithPreview {
     createdAt: d.created_at,
     customLayer: d.custom_trait_layer ?? undefined,
     customImage: d.custom_trait_image ?? undefined,
-    nounSvgUrl,
+    nounSvgUrl: baseSvgUrl,
     customTraitUrl: d.custom_trait_image_url,
+    customTraitIsBaked: isBundled,
+    overlayTopSvgUrl,
   };
 }
 
 function staticToPreview(d: ProbeDream): ProbeDreamWithPreview {
+  const hasCustom = d.customImage != null;
   return {
     ...d,
     // Use the bundled pre-rendered SVG for snapshot dreams (baked custom trait)
     nounSvgUrl: `${STATIC_RENDERED_BASE}/${d.id}.svg`,
-    customTraitUrl: d.customImage != null ? `${STATIC_TRAITS_BASE}/${d.id}_${d.customImage}` : null,
+    customTraitUrl: hasCustom ? `${STATIC_TRAITS_BASE}/${d.id}_${d.customImage}` : null,
+    customTraitIsBaked: hasCustom,
+    overlayTopSvgUrl: null,
   };
 }
 
