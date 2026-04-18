@@ -110,7 +110,9 @@ function OnChainDreamCard({
   isProposer: boolean;
   hasVotes: boolean;
 }) {
-  const previewSrc = dream.customTraitUrl ?? dream.nounSvgUrl ?? dream.artworkUri;
+  // Prefer the pre-rendered full noun SVG (has custom trait baked in) over the bare
+  // trait PNG — otherwise a custom-head dream shows as a floating head on white.
+  const previewSrc = dream.nounSvgUrl ?? dream.artworkUri ?? dream.customTraitUrl;
   // Threshold for promotion: need at least 2 noun votes from signatures
   const canPromote = isProposer && dream.signaturesCount >= 2;
 
@@ -212,19 +214,24 @@ function ProbeDreamCard({
         <img
           src={dream.nounSvgUrl}
           alt={`Dream #${dream.id}`}
-          className="w-full transition-opacity"
+          className="w-full"
           style={{ imageRendering: 'pixelated', display: 'block' }}
         />
-        {dream.customTraitUrl && (
-          <>
-            <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
-            <img
-              src={dream.customTraitUrl}
-              alt="Custom trait"
-              className="absolute inset-0 h-full w-full scale-75 opacity-0 transition-all group-hover:scale-100 group-hover:opacity-100"
-              style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
-            />
-          </>
+        {dream.customTraitUrl && !dream.customTraitIsBaked && (
+          <img
+            src={dream.customTraitUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full"
+            style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
+          />
+        )}
+        {dream.overlayTopSvgUrl && (
+          <img
+            src={dream.overlayTopSvgUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full"
+            style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
+          />
         )}
       </div>
 

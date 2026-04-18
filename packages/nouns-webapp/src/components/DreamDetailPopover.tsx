@@ -114,13 +114,41 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
         border: 'none',
       }}
     >
-      {/* Dream image */}
-      <div style={{ backgroundColor: bgColor, lineHeight: 0 }}>
+      {/* Dream image — base + (optional) custom trait PNG + (optional) top overlay */}
+      <div style={{ backgroundColor: bgColor, lineHeight: 0, position: 'relative' }}>
         <img
           src={dream.nounSvgUrl}
           alt={`Dream #${dream.id}`}
           style={{ width: '100%', imageRendering: 'pixelated', display: 'block' }}
         />
+        {dream.customTraitUrl && !dream.customTraitIsBaked && (
+          <img
+            src={dream.customTraitUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              imageRendering: 'pixelated',
+              objectFit: 'contain',
+            }}
+          />
+        )}
+        {dream.overlayTopSvgUrl && (
+          <img
+            src={dream.overlayTopSvgUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              imageRendering: 'pixelated',
+              objectFit: 'contain',
+            }}
+          />
+        )}
       </div>
 
       {/* Card body */}
