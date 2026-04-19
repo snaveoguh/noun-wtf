@@ -1,4 +1,5 @@
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
+
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
@@ -61,13 +62,13 @@ interface FarcasterCast {
 }
 
 const API_URL =
-  import.meta.env.VITE_API_URL ||
+  (import.meta.env.VITE_API_URL as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // ─── Inline Embed Renderer ──────────────────────────────────────────────────
 
 const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
-  if (!embeds || embeds.length === 0) return null;
+  if (embeds.length === 0) return null;
 
   const images: string[] = [];
   const videos: string[] = [];
@@ -154,7 +155,9 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
                   style={{ width: 18, height: 18, borderRadius: '50%' }}
                 />
               )}
-              <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{cast.author.display_name}</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                {cast.author.display_name}
+              </span>
               <span style={{ fontSize: '0.7rem', color: '#999' }}>@{cast.author.username}</span>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#444', margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -192,11 +195,27 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               />
             )}
             <div style={{ padding: '8px 10px', minWidth: 0 }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {html.ogTitle}
               </div>
               {html.ogDescription && (
-                <div style={{ fontSize: '0.7rem', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: '#888',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {html.ogDescription.slice(0, 80)}
                 </div>
               )}
@@ -243,12 +262,12 @@ const CastModal: FC<{
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const navbar = document.querySelector('nav.navbar') as HTMLElement;
-    if (navbar) navbar.style.display = 'none';
+    const navbar = document.querySelector<HTMLElement>('nav.navbar');
+    if (navbar !== null) navbar.style.display = 'none';
 
     return () => {
       document.body.style.overflow = prev;
-      if (navbar) navbar.style.display = '';
+      if (navbar !== null) navbar.style.display = '';
     };
   }, []);
 
@@ -262,7 +281,10 @@ const CastModal: FC<{
   });
 
   const handleLike = async () => {
-    if (!isLoggedIn) { login(); return; }
+    if (!isLoggedIn) {
+      login();
+      return;
+    }
     try {
       await react(cast.hash, 'like');
       setLiked(true);
@@ -273,7 +295,10 @@ const CastModal: FC<{
   };
 
   const handleRecast = async () => {
-    if (!isLoggedIn) { login(); return; }
+    if (!isLoggedIn) {
+      login();
+      return;
+    }
     try {
       await react(cast.hash, 'recast');
       setRecasted(true);
@@ -493,7 +518,10 @@ const CastModal: FC<{
           {/* Reply toggle */}
           <button
             onClick={() => {
-              if (!isLoggedIn) { login(); return; }
+              if (!isLoggedIn) {
+                login();
+                return;
+              }
               setShowReply(v => !v);
             }}
             style={{
@@ -582,7 +610,10 @@ const CastModal: FC<{
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
               <button
-                onClick={() => { setShowReply(false); setReplyText(''); }}
+                onClick={() => {
+                  setShowReply(false);
+                  setReplyText('');
+                }}
                 style={{
                   padding: '6px 14px',
                   borderRadius: 8,
@@ -678,8 +709,8 @@ const NocTicker: FC = () => {
 
   useEffect(() => {
     fetchCasts();
-    // Refresh every 2 min
-    const iv = setInterval(fetchCasts, 120_000);
+    // Refresh hourly — Neynar credits are expensive
+    const iv = setInterval(fetchCasts, 60 * 60_000);
     return () => clearInterval(iv);
   }, [fetchCasts]);
 
@@ -768,8 +799,12 @@ const NocTicker: FC = () => {
           ref={scrollRef}
           onPointerDown={onPointerDown}
           onClickCapture={onClickCapture}
-          onMouseEnter={() => { pausedRef.current = true; }}
-          onMouseLeave={() => { pausedRef.current = false; }}
+          onMouseEnter={() => {
+            pausedRef.current = true;
+          }}
+          onMouseLeave={() => {
+            pausedRef.current = false;
+          }}
           style={{
             display: 'flex',
             gap: '0',
@@ -795,8 +830,12 @@ const NocTicker: FC = () => {
                 transition: 'background 0.15s',
                 cursor: 'pointer',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
+              }}
             >
               {cast.author.pfp_url && (
                 <img
@@ -823,7 +862,8 @@ const NocTicker: FC = () => {
                   textTransform: 'none' as const,
                 }}
               >
-                {cast.text.slice(0, 80)}{cast.text.length > 80 ? '...' : ''}
+                {cast.text.slice(0, 80)}
+                {cast.text.length > 80 ? '...' : ''}
               </span>
               <span
                 style={{
@@ -850,9 +890,7 @@ const NocTicker: FC = () => {
         </div>
       </div>
 
-      {selectedCast && (
-        <CastModal cast={selectedCast} onClose={() => setSelectedCast(null)} />
-      )}
+      {selectedCast && <CastModal cast={selectedCast} onClose={() => setSelectedCast(null)} />}
     </>
   );
 };

@@ -68,6 +68,8 @@ export interface EditableMeshSceneProps {
   onFrontZ?: (z: number) => void;
   /** Whether the head mesh is visible (layer toggle) */
   headVisible?: boolean;
+  /** Whether the GLB's built-in glasses mesh is visible (layer toggle) */
+  glassesVisible?: boolean;
   /** Ref to expose the loaded scene for export */
   sceneRef?: React.MutableRefObject<THREE.Object3D | null>;
   /** Per-head offset override (replaces HEAD_OFFSET when provided) */
@@ -243,6 +245,7 @@ export default function EditableMeshScene({
   undoRef,
   redoRef,
   headVisible = true,
+  glassesVisible = true,
   sceneRef,
   headOffset,
   snapshotRef,
@@ -462,6 +465,19 @@ export default function EditableMeshScene({
       cancelled = true;
     };
   }, [glbPath, glassesIndex, persistenceKey]);
+
+  // ─── Glasses visibility toggle ──────────────────────────────────────────
+  // Hip-rose (index 0) keeps GLB glasses hidden regardless — voxel glasses in
+  // EditableBackgroundBody handle that trait.
+  useEffect(() => {
+    if (!scene) return;
+    const isHipRose = glassesIndex === 0;
+    scene.traverse(child => {
+      if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
+        child.visible = !isHipRose && glassesVisible;
+      }
+    });
+  }, [scene, glassesVisible, glassesIndex]);
 
   // ─── Undo/Redo Handlers ─────────────────────────────────────────────────
 
