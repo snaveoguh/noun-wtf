@@ -157,12 +157,14 @@ function CuratedHead({
   headIndex,
   seed,
   bodyGeo,
+  showGlasses = true,
   onLoaded,
   onGlassesZ,
 }: {
   headIndex: number;
   seed: INounSeed;
   bodyGeo: THREE.BufferGeometry | null;
+  showGlasses?: boolean;
   onLoaded?: (loaded: boolean) => void;
   onGlassesZ?: (z: number) => void;
 }) {
@@ -192,14 +194,16 @@ function CuratedHead({
 
         // Hip-rose (index 0) has a unique thicker shape the GLB mesh can't represent.
         // Hide GLB glasses for hip-rose — the voxel glasses layer will be shown instead.
+        // Also hide when the user has toggled off the glasses layer.
         const isHipRose = seed.glasses === 0;
-        if (isHipRose) {
+        if (isHipRose || !showGlasses) {
           scene.traverse(child => {
             if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
               child.visible = false;
             }
           });
-        } else {
+        }
+        if (!isHipRose && showGlasses) {
           // Swap glasses texture with pre-built one matching the seed's trait
           const glassesTexUrl = `/models/heads/glasses-textures/${seed.glasses}.png`;
           const texLoader = new THREE.TextureLoader();
@@ -297,7 +301,7 @@ function CuratedHead({
     return () => {
       cancelled = true;
     };
-  }, [headIndex, seed?.glasses, bodyGeo]);
+  }, [headIndex, seed?.glasses, bodyGeo, showGlasses]);
 
   if (!obj) return null;
   return <primitive object={obj} />;
@@ -751,20 +755,25 @@ function TiltScene({
           </mesh>
         )}
         {/* Show voxel glasses when: no curated head, OR hip-rose (curated head hides its GLB glasses) */}
-        {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
-          <group
-            position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}
-          >
-            <mesh geometry={glassesGeo}>
-              <meshLambertMaterial vertexColors />
-            </mesh>
-          </group>
-        )}
+        {glassesGeo &&
+          layerVisibility?.glasses !== false &&
+          (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
+            <group
+              position={
+                seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]
+              }
+            >
+              <mesh geometry={glassesGeo}>
+                <meshLambertMaterial vertexColors />
+              </mesh>
+            </group>
+          )}
         {seed && !voxelMap && (
           <CuratedHead
             headIndex={seed.head}
             seed={seed}
             bodyGeo={bodyGeo}
+            showGlasses={layerVisibility?.glasses !== false}
             onLoaded={setCuratedHeadLoaded}
             onGlassesZ={setGlassesZ}
           />
@@ -845,20 +854,23 @@ function InteractiveScene({
           <meshLambertMaterial vertexColors />
         </mesh>
       )}
-      {glassesGeo && (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
-        <group
-          position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}
-        >
-          <mesh geometry={glassesGeo}>
-            <meshLambertMaterial vertexColors />
-          </mesh>
-        </group>
-      )}
+      {glassesGeo &&
+        layerVisibility?.glasses !== false &&
+        (!curatedHeadLoaded || (seed?.glasses === 0 && glassesZ != null)) && (
+          <group
+            position={seed?.glasses === 0 && glassesZ != null ? [0, 0, glassesZ - 2.55] : [0, 0, 0]}
+          >
+            <mesh geometry={glassesGeo}>
+              <meshLambertMaterial vertexColors />
+            </mesh>
+          </group>
+        )}
       {seed && !voxelMap && (
         <CuratedHead
           headIndex={seed.head}
           seed={seed}
           bodyGeo={bodyGeo}
+          showGlasses={layerVisibility?.glasses !== false}
           onLoaded={setCuratedHeadLoaded}
           onGlassesZ={setGlassesZ}
         />
@@ -1253,6 +1265,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                   undoRef={editable.meshConfig.undoRef}
                   redoRef={editable.meshConfig.redoRef}
                   headVisible={editable.backgroundVisibility?.head ?? true}
+                  glassesVisible={editable.backgroundVisibility?.glasses ?? true}
                   sceneRef={editable.meshConfig.sceneRef}
                   headOffset={editable.meshConfig.headOffset}
                   snapshotRef={editable.meshConfig.snapshotRef}
