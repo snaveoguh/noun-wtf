@@ -3439,8 +3439,8 @@ export default function WorldPage() {
       >
         {/* Sky — twilight magenta-peach clear color behind the dome */}
         <color attach="background" args={['#6a3f55']} />
-        {/* Twilight fog — pulled way back so horizon reads; warm purple tint */}
-        <DystopianFog color="#5a4068" near={40} far={180} />
+        {/* Twilight fog — reaches the horizon ring (180-320u) so chunks fade through haze */}
+        <DystopianFog color="#5a4068" near={50} far={340} />
         <DystopianSky />
 
         <Lighting />
