@@ -5,7 +5,7 @@
  * tiltRef drives per-frame hue/shimmer shifts without re-renders.
  * lightingPreset tints the entire scene to match the noun's lighting.
  */
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
@@ -14,6 +14,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { LightingPreset } from './index';
+import { useHypercastleData } from '../../miniapps/terraforms/HypercastleView';
 
 interface Tilt {
   x: number;
@@ -324,7 +325,86 @@ function HoloSwirls({
   );
 }
 
-// ─── Distant Planet ───────────────────────────────────────────────
+// ─── Hypercastle Backdrop (Terraforms parcels as drifting voxel cloud) ──
+
+const HC_POSITION: [number, number, number] = [15, -8, -55];
+const HC_SPAN = 38;
+const hcTempObj = new THREE.Object3D();
+const hcTempColor = new THREE.Color();
+
+function Hypercastle() {
+  const { parcels } = useHypercastleData();
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    if (groupRef.current) groupRef.current.rotation.y += 0.0008;
+  });
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || parcels.length === 0) return;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
+    for (const p of parcels) {
+      if (p.sx < minX) minX = p.sx;
+      if (p.sx > maxX) maxX = p.sx;
+      if (p.sy < minY) minY = p.sy;
+      if (p.sy > maxY) maxY = p.sy;
+      if (p.sz < minZ) minZ = p.sz;
+      if (p.sz > maxZ) maxZ = p.sz;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const range = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1);
+    const scale = HC_SPAN / range;
+    for (let i = 0; i < parcels.length; i++) {
+      const p = parcels[i];
+      hcTempObj.position.set((p.sx - cx) * scale, (p.sy - cy) * scale, (p.sz - cz) * scale);
+      hcTempObj.scale.setScalar(0.55);
+      hcTempObj.updateMatrix();
+      mesh.setMatrixAt(i, hcTempObj.matrix);
+      hcTempColor.set(p.color);
+      mesh.setColorAt(i, hcTempColor);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [parcels]);
+
+  // Fall back to the green planet while the parcel JSON is in flight (first-visit only).
+  if (parcels.length === 0) return <Planet />;
+
+  return (
+    <group ref={groupRef} position={HC_POSITION}>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, parcels.length]}
+        frustumCulled={false}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshLambertMaterial />
+      </instancedMesh>
+      {/* faint atmospheric glow so the cloud reads as a coherent mass */}
+      <mesh>
+        <sphereGeometry args={[HC_SPAN * 0.6, 16, 16]} />
+        <meshBasicMaterial
+          color="#6688ff"
+          transparent
+          opacity={0.05}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// ─── Distant Planet (fallback while hypercastle loads) ────────────
 
 const PR = 8;
 const PP: [number, number, number] = [15, -12, -65];
@@ -597,7 +677,7 @@ export default function SceneEnvironment({
       <LensFlare tiltRef={tiltRef} />
       <HoloOrbs tiltRef={tiltRef} lightingPreset={lightingPreset} />
       <HoloSwirls tiltRef={tiltRef} lightingPreset={lightingPreset} />
-      <Planet />
+      <Hypercastle />
       {Array.from({ length: 5 }, (_, i) => (
         <NounSprite key={i} orbitAngle={(i / 5) * Math.PI * 2} orbitSpeed={0.05 + i * 0.01} />
       ))}
