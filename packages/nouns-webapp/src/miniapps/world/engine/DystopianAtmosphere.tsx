@@ -86,7 +86,7 @@ export function DystopianSky() {
   return (
     <group>
       <mesh ref={matRef as unknown as React.RefObject<THREE.Mesh>} position={[CENTER, 0, CENTER]}>
-        <sphereGeometry args={[140, 32, 24]} />
+        <sphereGeometry args={[500, 32, 24]} />
         <primitive object={material} attach="material" />
       </mesh>
       {/* Polluted sun/moon disk */}
