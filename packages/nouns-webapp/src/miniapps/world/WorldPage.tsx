@@ -99,20 +99,27 @@ import {
   type WeaponPickup,
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
-import { BirdFlocks, CloudLayer, AnimatedOcean, Dolphins } from './engine/Atmosphere';
-import { GraffitiUI } from './engine/GraffitiUI';
+import { AnimatedOcean, Dolphins } from './engine/Atmosphere';
+import {
+  DystopianSky,
+  SmogClouds,
+  Vultures,
+  RainParticles,
+  NeonBillboards,
+  DystopianFog,
+} from './engine/DystopianAtmosphere';
 import {
   createPaintState,
   spawnPaintCan,
   checkPaintPickup,
   getActivePaintCans,
   loadGraffitiTags,
-  parseGraffitiMessage,
-  saveTag,
   type PaintCanState,
   type PaintCan,
-  type GraffitiTagData,
 } from './engine/graffiti';
+import { Paintable } from '@nouns/graffiti/r3f';
+import { PaintHUD } from '@nouns/graffiti/ui';
+import { handleIncoming, sendSnapshot, type WsLike } from '@nouns/graffiti';
 import { Billboard, WinnieVan, MechanicSign } from './engine/WorldObjects';
 import { MegaRamp3D, HoverboardPickup3D, MEGA_RAMP_BOUNDS } from './engine/MegaRamp3D';
 import {
@@ -121,8 +128,34 @@ import {
   BurjKhalifa,
 } from './engine/NYCApartmentBlock';
 import CaribbeanOffice, { OFFICE_WHITEBOARD_WALL } from './engine/CaribbeanOffice';
+import CityBlock from './engine/CityBlock';
+import { computeAim, createAimHudSlot } from './engine/aim';
+import { Crosshair } from './engine/Crosshair';
+import { TerraformsHorizon } from './engine/TerraformsHorizon';
+import { preloadCatalog } from './engine/propCatalog';
+import { BuildMode, BuildHud } from './engine/BuildMode';
+import {
+  createPlacedPropsStore,
+  parseBuildMessage,
+  type BuildPieceKind,
+} from './engine/placedProps';
+
+// Fire-and-forget prop preload — checks GLB availability once at module load.
+preloadCatalog();
 import MobileControls, { isTouchDevice } from './engine/MobileControls';
-import { createSkatingState, mountBoard, dismountBoard, tickSkating, testRampCollision, ollie, airTrick, spin180, kickflip, boardGrab, type SkatingState } from './engine/skating';
+import {
+  createSkatingState,
+  mountBoard,
+  dismountBoard,
+  tickSkating,
+  testRampCollision,
+  ollie,
+  airTrick,
+  spin180,
+  kickflip,
+  boardGrab,
+  type SkatingState,
+} from './engine/skating';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import {
@@ -483,96 +516,36 @@ const GRAFFITI_WALLS = [
 
 const WALL_NEAR_DISTANCE = 4;
 
-/** Single graffiti wall mesh that can display a saved tag texture */
-function GraffitiWallMesh({ savedTags }: { savedTags: GraffitiTagData[] }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const textureRef = useRef<THREE.CanvasTexture | null>(null);
-
-  // Composite ALL saved tags as layered texture (multiple artists on one wall)
-  useEffect(() => {
-    if (savedTags.length === 0 || !meshRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d')!;
-    // Base wall color
-    ctx.fillStyle = '#d4cfc4';
-    ctx.fillRect(0, 0, 512, 512);
-
-    // Load and draw ALL tags in order (oldest first, newest on top)
-    let loaded = 0;
-    const images: HTMLImageElement[] = [];
-    for (const tag of savedTags) {
-      const img = new Image();
-      img.onload = () => {
-        loaded++;
-        if (loaded === savedTags.length) {
-          // All loaded — composite in order
-          ctx.imageSmoothingEnabled = false;
-          for (const loadedImg of images) {
-            ctx.drawImage(loadedImg, 0, 0, 512, 512);
-          }
-          const tex = new THREE.CanvasTexture(canvas);
-          tex.needsUpdate = true;
-          if (textureRef.current) textureRef.current.dispose();
-          textureRef.current = tex;
-          if (meshRef.current) {
-            (meshRef.current.material as THREE.MeshStandardMaterial).map = tex;
-            (meshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
-          }
-        }
-      };
-      img.onerror = () => { loaded++; }; // skip broken images
-      img.src = tag.imageData;
-      images.push(img);
-    }
-
-    return () => {
-      if (textureRef.current) {
-        textureRef.current.dispose();
-        textureRef.current = null;
-      }
-    };
-  }, [savedTags]);
-
-  return (
-    <mesh ref={meshRef}>
-      <planeGeometry args={[3.5, 3]} />
-      <meshStandardMaterial
-        color="#d4cfc4"
-        roughness={0.95}
-        metalness={0.02}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-}
-
-function GraffitiWalls({ tagsMap }: { tagsMap: Record<string, GraffitiTagData[]> }) {
+function GraffitiWalls({
+  activeWallId,
+  authorId,
+  onStrokeEnd,
+}: {
+  activeWallId: string | null;
+  authorId: string;
+  onStrokeEnd: (wallId: string) => void;
+}) {
   return (
     <group>
       {GRAFFITI_WALLS.map(wall => {
         const y = getTerrainHeight(wall.worldX, wall.worldZ);
+        const enabled = activeWallId === wall.id;
         return (
           <group
             key={wall.id}
             position={[wall.worldX, y + 1.8, wall.worldZ]}
             rotation={[0, wall.rotation, 0]}
           >
-            {/* Concrete wall slab — with optional graffiti texture */}
-            <GraffitiWallMesh savedTags={tagsMap[wall.id] || []} />
-            {/* Border frame behind */}
-            <mesh position={[0, 0, -0.02]}>
-              <planeGeometry args={[3.7, 3.2]} />
-              <meshStandardMaterial
-                color="#9a9488"
-                roughness={1}
-                metalness={0}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-            {/* Floating label text */}
+            <Paintable
+              surfaceId={wall.id}
+              width={3.5}
+              height={3}
+              authorId={authorId}
+              enabled={enabled}
+              frameColor="#9a9488"
+              framePad={0.2}
+              onStrokeEnd={() => onStrokeEnd(wall.id)}
+            />
             <Html position={[0, 2, 0]} center distanceFactor={12} style={{ pointerEvents: 'none' }}>
               <div
                 style={{
@@ -590,27 +563,28 @@ function GraffitiWalls({ tagsMap }: { tagsMap: Record<string, GraffitiTagData[]>
                 {wall.label}
               </div>
             </Html>
-            {/* Press G prompt */}
-            <Html
-              position={[0, -1.8, 0.1]}
-              center
-              distanceFactor={6}
-              style={{ pointerEvents: 'none' }}
-            >
-              <div
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  color: '#aaa',
-                  textShadow: '0 0 4px rgba(0,0,0,0.8)',
-                  whiteSpace: 'nowrap',
-                  userSelect: 'none',
-                  opacity: 0.7,
-                }}
+            {!enabled && (
+              <Html
+                position={[0, -1.8, 0.1]}
+                center
+                distanceFactor={6}
+                style={{ pointerEvents: 'none' }}
               >
-                [G] SPRAY PAINT
-              </div>
-            </Html>
+                <div
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: '#aaa',
+                    textShadow: '0 0 4px rgba(0,0,0,0.8)',
+                    whiteSpace: 'nowrap',
+                    userSelect: 'none',
+                    opacity: 0.7,
+                  }}
+                >
+                  [G] SPRAY PAINT
+                </div>
+              </Html>
+            )}
           </group>
         );
       })}
@@ -1246,11 +1220,11 @@ const BEHIND_ANGLE: Record<string, number> = {
 
 // Camera zoom presets: 1=first person, 2=close, 3=default, 4=far, 5=bird's eye
 const CAMERA_ZOOM_PRESETS = [
-  { dist: 0.3, y: 0.02 },  // 1 — first person
-  { dist: 1.5, y: 0.12 },  // 2 — close
-  { dist: 3.5, y: 0.3 },   // 3 — default (medium)
-  { dist: 7, y: 0.5 },     // 4 — far
-  { dist: 15, y: 0.8 },    // 5 — bird's eye
+  { dist: 0.3, y: 0.02 }, // 1 — first person
+  { dist: 1.5, y: 0.12 }, // 2 — close
+  { dist: 3.5, y: 0.3 }, // 3 — default (medium)
+  { dist: 7, y: 0.5 }, // 4 — far
+  { dist: 15, y: 0.8 }, // 5 — bird's eye
 ];
 
 // Global so keydown handler can set it
@@ -1281,7 +1255,11 @@ function CameraController({
 
     // Use zoom preset, override with Z for max zoom out
     const preset = CAMERA_ZOOM_PRESETS[cameraZoomLevel] ?? CAMERA_ZOOM_PRESETS[2];
-    const wantDist = zoomOut ? 40 : (moving || skating) ? preset.dist : Math.max(preset.dist * 0.6, 1.0);
+    const wantDist = zoomOut
+      ? 40
+      : moving || skating
+        ? preset.dist
+        : Math.max(preset.dist * 0.6, 1.0);
     const wantY = zoomOut ? 1.2 : preset.y;
     const zoomSpeed = zoomOut ? 0.08 : 0.04;
     dist.current += (wantDist - dist.current) * zoomSpeed;
@@ -1331,9 +1309,17 @@ function Lighting() {
 
   return (
     <>
-      <ambientLight ref={ambientRef} intensity={0.6} />
-      <directionalLight ref={dirLightRef} position={[20, 30, 10]} intensity={0.8} />
-      <hemisphereLight args={['#87ceeb', '#5a8f3c', 0.3]} />
+      {/* Twilight ambient — warm pink haze, brighter than dystopian-dark */}
+      <ambientLight ref={ambientRef} intensity={0.55} color="#e8a8c5" />
+      {/* Low-angle warm sun, 45min-past-sunset feel */}
+      <directionalLight
+        ref={dirLightRef}
+        position={[-14, 10, -18]}
+        intensity={1.05}
+        color="#ffb585"
+      />
+      {/* Twilight hemisphere: peach sky / cool violet ground */}
+      <hemisphereLight args={['#f5a67a', '#3a2f5a', 0.55]} />
     </>
   );
 }
@@ -2402,6 +2388,13 @@ export default function WorldPage() {
   const voipRef = useRef<VoipState>(createVoipState());
   const remoteTranscriptsRef = useRef<Map<string, { text: string; expires: number }>>(new Map());
   const weaponRef = useRef<WeaponState>(createWeaponState());
+  const aimSlotRef = useRef(createAimHudSlot());
+  // BuildMode — realtime placeable props
+  const buildStoreRef = useRef(createPlacedPropsStore());
+  const buildPlayerRef = useRef<{ x: number; y: number } | null>(null);
+  const buildWsRef = useRef<WebSocket | null>(null);
+  const [buildHudActive, setBuildHudActive] = useState(false);
+  const [buildHudKind, setBuildHudKind] = useState<BuildPieceKind>('wall');
   const [weaponPickups, setWeaponPickups] = useState<WeaponPickup[]>([]);
   const [micEnabled, setMicEnabled] = useState(false);
   const playerTargetRef = useRef(
@@ -2429,9 +2422,6 @@ export default function WorldPage() {
   const [paintCans, setPaintCans] = useState<PaintCan[]>([]);
   const [graffitiOpen, setGraffitiOpen] = useState(false);
   const [graffitiWallId, setGraffitiWallId] = useState<string | null>(null);
-  // Saved graffiti tags loaded from PartyKit — keyed by wallId
-  const graffitiTagsRef = useRef<Record<string, GraffitiTagData[]>>({});
-  const [graffitiVersion, setGraffitiVersion] = useState(0); // bump to force wall re-render
 
   // ── Billboard ad state ──
   const [billboardAdOpen, setBillboardAdOpen] = useState(false);
@@ -2504,6 +2494,8 @@ export default function WorldPage() {
   useEffect(() => {
     const player = createPlayer(SPAWN_X, SPAWN_Y, 0, seedKey);
     playerRef.current = player;
+    // Mirror for BuildMode (tile-world coords) — ws assigned later once mp is initialized
+    buildPlayerRef.current = { x: player.x, y: player.y };
 
     // Spawn weapon pickups around the island (clear first to avoid duplicates on re-mount)
     clearPickups();
@@ -2528,6 +2520,7 @@ export default function WorldPage() {
     const mp = mpRef.current;
     connectMultiplayer(mp);
     setupMessageHandler(mp, { current: player }, combatRef);
+    buildWsRef.current = (mp.ws as unknown as WebSocket) ?? null;
 
     // Auto-init listen-only VOIP so everyone can hear speakers
     initVoipListenOnly(voipRef.current);
@@ -2556,30 +2549,19 @@ export default function WorldPage() {
               expires: Date.now() + 4000,
             });
           }
-          // Handle graffiti persistence messages
-          const graffitiMsg = parseGraffitiMessage(evt.data);
-          if (graffitiMsg) {
-            if (graffitiMsg.type === 'world:graffiti:tags') {
-              graffitiTagsRef.current[(graffitiMsg as any).wallId] = (graffitiMsg as any).tags;
-            } else if (graffitiMsg.type === 'world:graffiti:save') {
-              // Another player saved a tag — add it to our local store
-              const msg = graffitiMsg as any;
-              const existing = graffitiTagsRef.current[msg.wallId] || [];
-              existing.push({
-                imageData: msg.imageData,
-                playerId: msg.playerId,
-                timestamp: Date.now(),
-              });
-              graffitiTagsRef.current[msg.wallId] = existing;
-              // Also save to in-memory tag store
-              saveTag({
-                id: `${graffitiMsg.wallId}-${Date.now()}`,
-                billboardId: graffitiMsg.wallId,
-                pixels: graffitiMsg.imageData,
-                author: graffitiMsg.playerId,
-                timestamp: Date.now(),
-                color: '#ffffff',
-              });
+          // Graffiti: @nouns/graffiti handles strokes + snapshots + legacy tag msgs.
+          void handleIncoming(evt.data);
+          // Build mode: apply remote placed-prop messages
+          const bMsg = parseBuildMessage(evt.data);
+          if (bMsg) {
+            const st = buildStoreRef.current;
+            if (bMsg.type === 'world:build:place') st.applyRemote(bMsg.prop);
+            else if (bMsg.type === 'world:build:update') {
+              const cur = st.list().find(p => p.id === bMsg.id);
+              if (cur) st.applyRemote({ ...cur, ...bMsg.patch });
+            } else if (bMsg.type === 'world:build:remove') st.applyRemoteRemove(bMsg.id);
+            else if (bMsg.type === 'world:build:snapshot') {
+              for (const p of bMsg.props) st.applyRemote(p);
             }
           }
         } catch {}
@@ -2764,8 +2746,14 @@ export default function WorldPage() {
           }
           return;
         }
-        if (e.key === 'j' || e.key === 'J') { spin180(skateRef.current); return; }
-        if (e.key === 'k' || e.key === 'K') { kickflip(skateRef.current); return; }
+        if (e.key === 'j' || e.key === 'J') {
+          spin180(skateRef.current);
+          return;
+        }
+        if (e.key === 'k' || e.key === 'K') {
+          kickflip(skateRef.current);
+          return;
+        }
         // Board grabs: hold direction + L while airborne
         if ((e.key === 'l' || e.key === 'L') && skateRef.current.airborne) {
           const inp = inputRef.current;
@@ -2896,6 +2884,20 @@ export default function WorldPage() {
         player.hp = player.maxHp;
       }
 
+      // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
+      if (weaponRef.current.equipped && frame % 3 === 0) {
+        const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+          lockRange: 140,
+          lockCone: Math.PI / 10,
+          enableLockOn: true,
+        });
+        aimSlotRef.current.lockedId = passiveAim.lockedId;
+        aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
+      } else if (!weaponRef.current.equipped) {
+        aimSlotRef.current.lockedId = null;
+        aimSlotRef.current.lockDistance = null;
+      }
+
       // ── Weapon pickup check (GTA style — auto on walk-over) ──
       const weapon = weaponRef.current;
       if (frame % 120 === 0) {
@@ -2971,9 +2973,23 @@ export default function WorldPage() {
           else if (intendedMove === 'backflip') playJumpSound();
           // block is silent — no annoying clang on shift
 
-          // Use player facing direction for attack direction
-          const facingAngle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
-          const angle = facingAngle;
+          // Aim resolution:
+          //   - Ranged moves use camera-ray aim + soft lock-on (continuous angle)
+          //   - Melee falls back to 8-way facing (keeps close-combat feel snappy)
+          const isRanged = intendedMove === 'gunshot' || intendedMove === 'forcePush';
+          let angle: number;
+          if (isRanged) {
+            const aim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+              lockRange: intendedMove === 'gunshot' ? 140 : 80,
+              lockCone: intendedMove === 'gunshot' ? Math.PI / 10 : Math.PI / 7,
+              enableLockOn: true,
+            });
+            angle = aim.angle;
+            aimSlotRef.current.lockedId = aim.lockedId;
+            aimSlotRef.current.lockDistance = aim.lockDistance ?? null;
+          } else {
+            angle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
+          }
           const mouseWorldX = player.x + Math.cos(angle) * 50;
           const mouseWorldY = player.y + Math.sin(angle) * 50;
 
@@ -3008,7 +3024,14 @@ export default function WorldPage() {
               });
               // Persist kill to K/D stats
               if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
-                mp.ws.send(JSON.stringify({ type: 'world:kd:save', wallet: connectedWallet, addKills: 1, addDeaths: 0 }));
+                mp.ws.send(
+                  JSON.stringify({
+                    type: 'world:kd:save',
+                    wallet: connectedWallet,
+                    addKills: 1,
+                    addDeaths: 0,
+                  }),
+                );
               }
             }
           }
@@ -3197,8 +3220,20 @@ export default function WorldPage() {
         setVoipDebugLines(getVoipDebugInfo(voipRef.current));
       }
       // Track death for K/D (only on transition to dead, not every frame)
-      if (player.state === 'dead' && player.deathTimer === 59 && connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
-        mp.ws.send(JSON.stringify({ type: 'world:kd:save', wallet: connectedWallet, addKills: 0, addDeaths: 1 }));
+      if (
+        player.state === 'dead' &&
+        player.deathTimer === 59 &&
+        connectedWallet &&
+        mp.ws?.readyState === WebSocket.OPEN
+      ) {
+        mp.ws.send(
+          JSON.stringify({
+            type: 'world:kd:save',
+            wallet: connectedWallet,
+            addKills: 0,
+            addDeaths: 1,
+          }),
+        );
       }
       // VOIP HUD
       hudRef.current.micEnabled = !!voipRef.current.localStream;
@@ -3229,9 +3264,10 @@ export default function WorldPage() {
       pcs.muzzleFlash = weaponRef.current.muzzleFlash;
       pcs.isSkating = skateRef.current.isSkating;
       pcs.trickName = skateRef.current.currentTrick || null;
-      pcs.trickTimer = skateRef.current.trickTimer > 0
-        ? 1 - (skateRef.current.trickTimer / 0.8) // normalize to 0-1 progress (0.8s trick duration)
-        : 0;
+      pcs.trickTimer =
+        skateRef.current.trickTimer > 0
+          ? 1 - skateRef.current.trickTimer / 0.8 // normalize to 0-1 progress (0.8s trick duration)
+          : 0;
       player.isSkating = skateRef.current.isSkating;
       player.trickName = skateRef.current.currentTrick || null;
       (player as any).weaponEquipped = weaponRef.current.equipped;
@@ -3353,20 +3389,22 @@ export default function WorldPage() {
                   distanceFactor={5}
                   style={{ pointerEvents: 'none' }}
                 >
-                  <div style={{
-                    background: 'rgba(255,255,255,0.92)',
-                    color: '#111',
-                    borderRadius: 10,
-                    padding: '4px 12px',
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: 'bold',
-                    maxWidth: 200,
-                    textAlign: 'center',
-                    wordBreak: 'break-word',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                    whiteSpace: 'nowrap',
-                  }}>
+                  <div
+                    style={{
+                      background: 'rgba(255,255,255,0.92)',
+                      color: '#111',
+                      borderRadius: 10,
+                      padding: '4px 12px',
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: 'bold',
+                      maxWidth: 200,
+                      textAlign: 'center',
+                      wordBreak: 'break-word',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {transcript.text}
                   </div>
                 </Html>
@@ -3399,9 +3437,11 @@ export default function WorldPage() {
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: false }}
       >
-        {/* Sky color */}
-        <color attach="background" args={['#87ceeb']} />
-        <fog attach="fog" args={['#87ceeb', 30, 80]} />
+        {/* Sky — twilight magenta-peach clear color behind the dome */}
+        <color attach="background" args={['#6a3f55']} />
+        {/* Twilight fog — pulled way back so horizon reads; warm purple tint */}
+        <DystopianFog color="#5a4068" near={40} far={180} />
+        <DystopianSky />
 
         <Lighting />
         <AnimatedOcean />
@@ -3416,9 +3456,11 @@ export default function WorldPage() {
           rotationY={-0.4}
         />
 
-        {/* Atmosphere */}
-        <BirdFlocks />
-        <CloudLayer />
+        {/* Dystopian atmosphere (replaces sunny birds + puffy clouds) */}
+        <SmogClouds />
+        <Vultures />
+        <RainParticles />
+        <NeonBillboards />
         <Dolphins />
 
         {/* Joystick billboard near southeast coast */}
@@ -3486,8 +3528,15 @@ export default function WorldPage() {
         <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
         <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
 
-        {/* Graffiti walls */}
-        <GraffitiWalls key={graffitiVersion} tagsMap={graffitiTagsRef.current} />
+        {/* Graffiti walls — powered by @nouns/graffiti */}
+        <GraffitiWalls
+          activeWallId={graffitiOpen ? graffitiWallId : null}
+          authorId={mpRef.current.myId || 'anon'}
+          onStrokeEnd={wallId => {
+            const ws = mpRef.current.ws;
+            if (ws) sendSnapshot(ws as unknown as WsLike, wallId, mpRef.current.myId || 'anon');
+          }}
+        />
 
         {/* Paint can pickups */}
         {paintCans
@@ -3515,6 +3564,25 @@ export default function WorldPage() {
 
         {/* Caribbean Office (southeast coast) */}
         <CaribbeanOffice />
+
+        {/* City block density — street furniture, parked cars, storefronts, dumpsters */}
+        <CityBlock />
+
+        {/* Distant lofi Terraforms-style skyline at the horizon */}
+        <TerraformsHorizon />
+
+        {/* Fortnite-style build mode — hold B, 1-7 pick, Space place */}
+        <BuildMode
+          inputRef={inputRef}
+          playerRef={buildPlayerRef}
+          authorId={mpRef.current.myId || 'anon'}
+          wsRef={buildWsRef}
+          store={buildStoreRef.current}
+          onActiveChange={(a, k) => {
+            setBuildHudActive(a);
+            setBuildHudKind(k);
+          }}
+        />
 
         {/* Hoverboard Pickup (near mega ramp) */}
         {!hasHoverboard && (
@@ -3957,7 +4025,7 @@ export default function WorldPage() {
                 letterSpacing: 1,
               }}
             >
-              ⌐◨-◨ TRICKS
+              🃏 TRICKS
             </div>
             <div>
               <span style={{ color: '#00ffcc' }}>SPACE</span> — Ollie
@@ -3992,7 +4060,13 @@ export default function WorldPage() {
               <div>
                 <span style={{ color: '#8888ff' }}>←/→</span> — Balance (grind)
               </div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 4 }}>
+              <div
+                style={{
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  paddingTop: 4,
+                  marginTop: 4,
+                }}
+              >
                 <span style={{ color: '#ff88ff' }}>L</span> — Method Air
               </div>
               <div>
@@ -4007,7 +4081,13 @@ export default function WorldPage() {
               <div>
                 <span style={{ color: '#ff88ff' }}>L+↓</span> — Tail Grab
               </div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 4 }}>
+              <div
+                style={{
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  paddingTop: 4,
+                  marginTop: 4,
+                }}
+              >
                 <span style={{ color: '#888' }}>V</span> — Dismount
               </div>
             </div>
@@ -4015,33 +4095,24 @@ export default function WorldPage() {
         </>
       )}
 
-      {/* Graffiti spray paint overlay */}
-      {graffitiOpen && graffitiWallId && (
-        <GraffitiUI
-          wallId={graffitiWallId}
-          playerId={mpRef.current.myId}
-          paintColor={paintRef.current.color || '#ff0000'}
-          ws={mpRef.current.ws as WebSocket | null}
-          onClose={() => {
-            // The GraffitiUI already saved to PartyKit via saveGraffitiTag
-            // Also save locally so the wall updates immediately
-            const c = document.querySelector('canvas[width="256"]') as HTMLCanvasElement | null;
-            if (c && graffitiWallId) {
-              const base64 = c.toDataURL('image/png');
-              const existing = graffitiTagsRef.current[graffitiWallId] || [];
-              existing.push({
-                imageData: base64,
-                playerId: mpRef.current.myId,
-                timestamp: Date.now(),
-              });
-              graffitiTagsRef.current[graffitiWallId] = existing;
-              setGraffitiVersion(v => v + 1); // force wall re-render
-            }
-            setGraffitiOpen(false);
-            setGraffitiWallId(null);
-          }}
-        />
-      )}
+      {/* Weapon crosshair — only visible when armed, tints red on lock-on */}
+      <Crosshair
+        slot={aimSlotRef.current}
+        visible={!!weaponRef.current.equipped && !graffitiOpen}
+      />
+
+      {/* Build-mode HUD — piece name + hotkeys hint */}
+      <BuildHud active={buildHudActive} kind={buildHudKind} />
+
+      {/* Graffiti paint HUD — powered by @nouns/graffiti */}
+      <PaintHUD
+        open={graffitiOpen && !!graffitiWallId}
+        onClose={() => {
+          setGraffitiOpen(false);
+          setGraffitiWallId(null);
+        }}
+        position="right"
+      />
 
       {/* Paint can HUD indicator */}
       {paintRef.current.hasPaint && !graffitiOpen && (

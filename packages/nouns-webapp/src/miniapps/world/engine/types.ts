@@ -241,11 +241,38 @@ export const TILE_SIZE = 16;
 export const MAP_SIZE = 64;
 export const WORLD_SIZE = TILE_SIZE * MAP_SIZE; // 1024
 export const SPRITE_SIZE = 32;
-export const PLAYER_SPEED = 0.3;
+export const PLAYER_SPEED = 0.3; // legacy slow baseline (kept for callers not yet on locomotion)
 export const PLAYER_MAX_HP = 100;
-export const GRAVITY = 0.25; // floaty Spider-Man style — slow descent, long hang time
+export const GRAVITY = 0.25; // floaty Spider-Man style — slow descent, long hang time (legacy)
 export const GROUND_Y = 0; // airborneY baseline
 export const RESPAWN_TIME = 180; // 3 seconds at 60fps
+
+// ── Locomotion tuning (new system) ────────────────────────────────────
+//
+// Movement is intentionally faster than the old 0.3 PLAYER_SPEED.
+// Users wanted "buttery smooth, way faster" — these values target that.
+//
+// Frame-rate assumption: 60fps tick. Numbers are per-frame deltas.
+export const PLAYER_WALK_SPEED = 0.55; // base cruise speed (~2x legacy)
+export const PLAYER_SPEED_FAST = 1.2; // sprint speed (+~2.2x cruise)
+export const PLAYER_ACCEL = 0.14; // ramp-up per frame toward target speed
+export const PLAYER_DECEL = 0.22; // ramp-down per frame when no input
+export const PLAYER_AIR_ACCEL = 0.055; // reduced steering while airborne
+export const PLAYER_MAX_HORIZ_VEL = 2.0; // hard cap to avoid tunneling
+export const PLAYER_JUMP_VZ = 7.8; // initial upward velocity (tile units/frame)
+export const PLAYER_JUMP_CUT_MULT = 0.45; // vz *= this when jump released early
+export const PLAYER_JUMPS_MAX = 1; // hard cap — no infinite jump
+export const PLAYER_COYOTE_FRAMES = 6; // ~100ms at 60fps
+export const PLAYER_JUMP_BUFFER_FRAMES = 6;
+export const LOCOMOTION_GRAVITY = 0.55; // proper ballistic (vs legacy 0.25 w/ hang-time)
+export const PLAYER_CLIMB_SPEED = 0.4; // vertical climb rate (tile units/frame)
+export const PLAYER_CLIMB_STRAFE = 0.25; // side-traversal rate on a face
+export const PLAYER_WALL_JUMP_VZ = 6.8; // pop-off velocity when jumping off a face
+export const PLAYER_WALL_JUMP_PUSH = 1.4; // horizontal shove away from the wall
+export const PLAYER_CLIMB_REACH = 2.5; // how close to a face to latch on
+
+// Material types — reported by MovementBody.groundMaterial.
+export type GroundMaterial = 'grass' | 'sand' | 'path' | 'stone' | 'metal' | 'wood' | 'water';
 
 // Combat constants
 export const PUNCH_RANGE = 28;
