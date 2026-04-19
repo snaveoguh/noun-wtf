@@ -17,30 +17,100 @@ const VOXEL_HEAD_SCALE = 0.14; // 50% smaller head
 const HEAD_VIS: LayerVisibility = { body: false, accessory: false, head: true, glasses: true };
 const BODY_SCALE = 0.14;
 
-const ANIM_MAP: Record<string, string> = {
-  idle: 'Idle',
-  walking: 'Walking_A',
-  dashing: 'Running_A',
-  attacking_punch: 'Unarmed_Melee_Attack_Punch_A',
-  attacking_kick: 'Unarmed_Melee_Attack_Kick',
-  attacking_headbutt: 'Unarmed_Melee_Attack_Punch_B',
-  attacking_uppercut: 'Unarmed_Melee_Attack_Punch_A',
-  attacking_spinAttack: '1H_Melee_Attack_Slice_Diagonal',
-  attacking_forcePush: 'Spellcast_Shoot',
-  attacking_gunshot: '1H_Ranged_Shoot',
-  attacking_headshot: '1H_Ranged_Shoot',
-  aiming: '1H_Ranged_Aiming',
-  reloading: '1H_Ranged_Reload',
-  blocking: 'Block',
-  backflip: 'Jump_Full_Long',
-  stunned: 'Hit_A', // punch/kick recoil — head sway, slight stumble
-  wounded: 'Hit_B', // gunshot — collapse to one knee, hold pose
-  knocked: 'Death_A', // 3-hit combo knockdown — played at 0.5x speed
-  dead: 'Death_A', // full death fall
-  dead_headshot: 'Death_B', // headshot instant kill — alternate death anim
-  respawning: 'Idle',
-  airborne: 'Jump_Full_Short',
-};
+// Set of clip names actually present in the loaded GLB. Populated the first
+// time the model is parsed; shared across all character instances (same GLB
+// buffer is reused). We read this lazily from pickClip().
+const availableClipNames = new Set<string>();
+let availableClipsLogged = false;
+
+/**
+ * Return the first clip in `candidates` that exists in the loaded GLB,
+ * falling back to `fallback` otherwise. Emits a dev-only warning when none
+ * of the candidates match — helpful for discovering missing mappings.
+ */
+function pickClip(candidates: string[], fallback: string): string {
+  // When availableClipNames hasn't been populated yet (very first frame),
+  // return the first candidate — it'll be reassigned on next render or the
+  // runtime look-up in actionsRef.current will fall back to Idle.
+  if (availableClipNames.size === 0) return candidates[0] ?? fallback;
+  for (const name of candidates) {
+    if (availableClipNames.has(name)) return name;
+  }
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[Character3D] No matching clip for candidates ${JSON.stringify(candidates)}; falling back to "${fallback}"`,
+    );
+  }
+  return availableClipNames.has(fallback) ? fallback : (candidates[0] ?? fallback);
+}
+
+// Idle variants — cycled every ~8-10 seconds while in the idle state so the
+// model doesn't look frozen. Filtered down at runtime to the ones that exist.
+const IDLE_VARIANT_CANDIDATES = ['Idle', 'Idle_A', 'Idle_B', 'Idle_Breathing'];
+const IDLE_CYCLE_SECONDS = 9;
+
+/**
+ * Animation state-key → clip-name mapping. Values go through pickClip() so
+ * missing clips fall back gracefully instead of blowing up the crossfade.
+ *
+ * Getters are used (not static lookup) because availableClipNames is
+ * populated asynchronously on GLB load; by calling getAnimMap() *after*
+ * load, we get correct resolution.
+ */
+function getAnimMap(): Record<string, string> {
+  return {
+    idle: pickClip(['Idle'], 'Idle'),
+    walking: pickClip(['Walking_A', 'Walking_B'], 'Walking_A'),
+    // Differentiated movement — dashing uses a full sprint if available,
+    // otherwise falls through to running.
+    dashing: pickClip(['Sprint', 'Dodge_Forward', 'Running_B', 'Running_A'], 'Running_A'),
+    walking_sprint: pickClip(['Running_B', 'Running_A'], 'Running_A'),
+    walking_fast: pickClip(['Running_A', 'Running_B'], 'Running_A'),
+    attacking_punch: pickClip(
+      ['Unarmed_Melee_Attack_Punch_A', 'Unarmed_Melee_Attack_Punch_B'],
+      'Unarmed_Melee_Attack_Punch_A',
+    ),
+    attacking_kick: pickClip(['Unarmed_Melee_Attack_Kick'], 'Unarmed_Melee_Attack_Kick'),
+    attacking_headbutt: pickClip(
+      ['Unarmed_Melee_Attack_Punch_B', 'Unarmed_Melee_Attack_Punch_A'],
+      'Unarmed_Melee_Attack_Punch_B',
+    ),
+    attacking_uppercut: pickClip(
+      ['Unarmed_Melee_Attack_Punch_A', 'Unarmed_Melee_Attack_Punch_B'],
+      'Unarmed_Melee_Attack_Punch_A',
+    ),
+    attacking_spinAttack: pickClip(
+      ['1H_Melee_Attack_Slice_Diagonal', '1H_Melee_Attack_Slice_Horizontal'],
+      '1H_Melee_Attack_Slice_Diagonal',
+    ),
+    attacking_forcePush: pickClip(['Spellcast_Shoot', 'Spellcast_Raise'], 'Spellcast_Shoot'),
+    attacking_gunshot: pickClip(['1H_Ranged_Shoot'], '1H_Ranged_Shoot'),
+    attacking_headshot: pickClip(['1H_Ranged_Shoot'], '1H_Ranged_Shoot'),
+    aiming: pickClip(['1H_Ranged_Aiming'], '1H_Ranged_Aiming'),
+    reloading: pickClip(['1H_Ranged_Reload'], '1H_Ranged_Reload'),
+    blocking: pickClip(['Block'], 'Block'),
+    blocking_hit: pickClip(['Block_Hit', 'Block'], 'Block'),
+    backflip: pickClip(['Jump_Full_Long', 'Jump_Full_Short'], 'Jump_Full_Long'),
+    stunned: pickClip(['Hit_A'], 'Hit_A'),
+    wounded: pickClip(['Hit_B', 'Hit_A'], 'Hit_B'),
+    knocked: pickClip(['Death_A'], 'Death_A'),
+    dead: pickClip(['Death_A'], 'Death_A'),
+    dead_headshot: pickClip(['Death_B', 'Death_A'], 'Death_B'),
+    respawning: pickClip(['Idle'], 'Idle'),
+    airborne: pickClip(['Jump_Full_Short', 'Jump_Full_Long'], 'Jump_Full_Short'),
+    // Rising vs. falling split. Many rigs ship distinct up/hang/down clips.
+    airborne_rising: pickClip(
+      ['Jump_Full_Short', 'Jump_Start', 'Jump_Full_Long'],
+      'Jump_Full_Short',
+    ),
+    airborne_falling: pickClip(
+      ['Jump_Full_Long_Fall', 'Jump_Land', 'Falling', 'Jump_Full_Long'],
+      'Jump_Full_Long',
+    ),
+    // Climbing / hanging — user added climb to locomotion.
+    climbing: pickClip(['Climbing_Ladder', 'Climbing', 'Hang_Idle', 'Hang'], 'Idle'),
+  };
+}
 
 // Animations that play at custom speeds
 const ANIM_SPEED: Partial<Record<string, number>> = {
@@ -245,6 +315,16 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
   const voxelHeadRef = useRef<THREE.Group | null>(null);
   const gunGroupRef = useRef<THREE.Group | null>(null);
   const handBoneRef = useRef<THREE.Object3D | null>(null);
+  // Anim map resolved post-GLB-load so pickClip can see availableClipNames.
+  const animMapRef = useRef<Record<string, string>>({});
+  // Idle clip variants actually present on the model (populated on load).
+  const idleVariantsRef = useRef<string[]>(['Idle']);
+  // Index into idleVariantsRef for cycling.
+  const idleVariantIndexRef = useRef(0);
+  // Timestamp (seconds elapsed since first idle frame) for variant cycling.
+  const idleTimerRef = useRef(0);
+  // Previous high-level state, used to reset the idle cycle on re-entry.
+  const prevStateRef = useRef<string>('');
 
   const nounHeadRef = useRef(
     (() => {
@@ -426,7 +506,7 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
               child.name === 'Hand_R' ||
               child.name === 'RightHand' ||
               child.name === 'mixamorig:RightHand' ||
-              child.name.toLowerCase().includes('hand') && child.name.toLowerCase().includes('r'))
+              (child.name.toLowerCase().includes('hand') && child.name.toLowerCase().includes('r')))
           ) {
             handBoneRef.current = child;
             console.log(`[Character3D] Found hand bone: ${child.name}`);
@@ -448,7 +528,24 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         const actions: Record<string, THREE.AnimationAction> = {};
         for (const clip of gltf.animations) {
           actions[clip.name] = mixer.clipAction(clip);
+          availableClipNames.add(clip.name);
         }
+        // One-time dev listing of every clip the model ships with — helps
+        // discover names for expanding ANIM_MAP further. Gated behind
+        // import.meta.env.DEV so production builds stay quiet.
+        if (import.meta.env.DEV && !availableClipsLogged) {
+          availableClipsLogged = true;
+
+          console.log(
+            `[Character3D] GLB animation clips (${gltf.animations.length}):`,
+            gltf.animations.map(c => c.name).sort(),
+          );
+        }
+        // Rebuild the idle-variant list now that we know what's actually in
+        // the GLB, and rebuild the anim map with resolved clip names.
+        idleVariantsRef.current = IDLE_VARIANT_CANDIDATES.filter(n => availableClipNames.has(n));
+        if (idleVariantsRef.current.length === 0) idleVariantsRef.current = ['Idle'];
+        animMapRef.current = getAnimMap();
         if (actions['Idle']) actions['Idle'].play();
 
         groupRef.current!.add(model);
@@ -518,12 +615,50 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
     // Animation crossfade
     if (mixer && Object.keys(actions).length > 0) {
       let animKey = s.state as string;
-      // On hoverboard or airborne — idle stance (rotation handles the visual)
-      if (s.isSkating || s.state === 'airborne') animKey = 'idle';
-      else if (s.state === 'attacking' && s.attackType) animKey = `attacking_${s.attackType}`;
+      // On hoverboard — idle stance (rotation handles the visual).
+      // Airborne resolves to rising/falling below when a clip exists.
+      if (s.isSkating) animKey = 'idle';
+      else if (s.state === 'airborne') {
+        // Rising vs falling split — negative vy = going up, positive = falling.
+        // Small deadband around 0 keeps it from flickering at the apex.
+        if (s.airborneVy < -0.2) animKey = 'airborne_rising';
+        else if (s.airborneVy > 0.2) animKey = 'airborne_falling';
+        else animKey = 'airborne';
+      } else if (s.state === 'attacking' && s.attackType) {
+        animKey = `attacking_${s.attackType}`;
+      }
       // Headshot death uses alternate death animation
       if (s.state === 'dead' && s.attackType === 'headshot') animKey = 'dead_headshot';
-      const clipName = ANIM_MAP[animKey] ?? 'Idle';
+
+      // Idle-variant cycling: when the character stays in 'idle' for
+      // IDLE_CYCLE_SECONDS, switch to the next available idle variant.
+      // Reset whenever the state changes (so we don't cycle mid-combat etc.).
+      if (animKey === 'idle') {
+        if (prevStateRef.current !== 'idle') {
+          idleTimerRef.current = 0;
+        } else {
+          idleTimerRef.current += delta;
+          if (idleTimerRef.current >= IDLE_CYCLE_SECONDS) {
+            idleTimerRef.current = 0;
+            const variants = idleVariantsRef.current;
+            if (variants.length > 1) {
+              idleVariantIndexRef.current = (idleVariantIndexRef.current + 1) % variants.length;
+            }
+          }
+        }
+      } else {
+        idleTimerRef.current = 0;
+      }
+      prevStateRef.current = animKey;
+
+      // Resolve the clip name through the (post-load) anim map.
+      // Special-case: idle goes through the cycling variant list instead.
+      let clipName: string;
+      if (animKey === 'idle' && idleVariantsRef.current.length > 0) {
+        clipName = idleVariantsRef.current[idleVariantIndexRef.current] ?? 'Idle';
+      } else {
+        clipName = animMapRef.current[animKey] ?? 'Idle';
+      }
       const isOneShot = ['attacking', 'dead', 'backflip', 'stunned', 'knocked', 'wounded'].includes(
         s.state,
       );

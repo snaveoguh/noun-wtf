@@ -3,8 +3,12 @@
  * Interior: table with seats, whiteboard (graffiti wall).
  * Players can sit in seats (E key) and pan camera while seated.
  */
-import { useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
+import { registerStructure, unregisterStructure } from './structures';
+
+// Scale factor used throughout the world (tile-world = Three.js × 10).
+const WORLD_SCALE = 0.1;
 
 // ── Dimensions ──────────────────────────────────────────────────────
 const SHACK_W = 5; // width (X)
@@ -87,7 +91,12 @@ function WoodPlanks({
         p.gap ? null : (
           <mesh key={i} position={[0, p.y, 0.005]}>
             <planeGeometry args={[width, 0.01]} />
-            <meshBasicMaterial color="#00000022" transparent opacity={0.15} side={THREE.DoubleSide} />
+            <meshBasicMaterial
+              color="#00000022"
+              transparent
+              opacity={0.15}
+              side={THREE.DoubleSide}
+            />
           </mesh>
         ),
       )}
@@ -99,6 +108,24 @@ function WoodPlanks({
 
 export default function CaribbeanOffice() {
   const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    const tileX = OFFICE_X / WORLD_SCALE;
+    const tileY = OFFICE_Z / WORLD_SCALE;
+    const tileW = SHACK_W / WORLD_SCALE;
+    const tileH = SHACK_D / WORLD_SCALE;
+    const tileTop = (SHACK_H + ROOF_H) / WORLD_SCALE;
+
+    registerStructure(
+      'office',
+      { x: tileX, y: tileY, w: tileW, h: tileH },
+      {
+        topHeight: tileTop,
+        topMaterial: 'wood',
+      },
+    );
+    return () => unregisterStructure('office');
+  }, []);
 
   return (
     <group ref={groupRef} position={[OFFICE_X, OFFICE_Y, OFFICE_Z]}>
@@ -144,7 +171,7 @@ export default function CaribbeanOffice() {
         width={(SHACK_W - DOOR_W) / 2}
         height={SHACK_H}
         color={WALL_COLORS[3]}
-        position={[(SHACK_W / 2 - (SHACK_W - DOOR_W) / 4), SHACK_H / 2, SHACK_D / 2]}
+        position={[SHACK_W / 2 - (SHACK_W - DOOR_W) / 4, SHACK_H / 2, SHACK_D / 2]}
         rotation={[0, Math.PI, 0]}
       />
       {/* Door header */}
@@ -170,11 +197,21 @@ export default function CaribbeanOffice() {
       {/* ── Roof (corrugated peak) ── */}
       <mesh position={[-SHACK_W / 4 - 0.3, SHACK_H + ROOF_H / 2, 0]} rotation={[0, 0, 0.45]}>
         <boxGeometry args={[SHACK_W / 2 + 1.2, 0.06, SHACK_D + 1]} />
-        <meshStandardMaterial color={ROOF_COLOR} roughness={0.8} metalness={0.3} side={THREE.DoubleSide} />
+        <meshStandardMaterial
+          color={ROOF_COLOR}
+          roughness={0.8}
+          metalness={0.3}
+          side={THREE.DoubleSide}
+        />
       </mesh>
       <mesh position={[SHACK_W / 4 + 0.3, SHACK_H + ROOF_H / 2, 0]} rotation={[0, 0, -0.45]}>
         <boxGeometry args={[SHACK_W / 2 + 1.2, 0.06, SHACK_D + 1]} />
-        <meshStandardMaterial color={ROOF_COLOR} roughness={0.8} metalness={0.3} side={THREE.DoubleSide} />
+        <meshStandardMaterial
+          color={ROOF_COLOR}
+          roughness={0.8}
+          metalness={0.3}
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
       {/* ── SIGN: "SERIOUS OFFICE" ── */}
@@ -199,7 +236,12 @@ export default function CaribbeanOffice() {
           <meshStandardMaterial color="#A0785A" roughness={0.85} />
         </mesh>
         {/* Table legs */}
-        {[[-0.9, -0.5], [-0.9, 0.5], [0.9, -0.5], [0.9, 0.5]].map(([lx, lz], i) => (
+        {[
+          [-0.9, -0.5],
+          [-0.9, 0.5],
+          [0.9, -0.5],
+          [0.9, 0.5],
+        ].map(([lx, lz], i) => (
           <mesh key={i} position={[lx, 0.36, lz]}>
             <boxGeometry args={[0.08, 0.72, 0.08]} />
             <meshStandardMaterial color="#6B4A30" roughness={0.9} />
@@ -226,7 +268,12 @@ export default function CaribbeanOffice() {
             <meshStandardMaterial color={WALL_COLORS[i]} roughness={0.8} />
           </mesh>
           {/* Legs */}
-          {[[-0.2, -0.2], [-0.2, 0.2], [0.2, -0.2], [0.2, 0.2]].map(([lx, lz], j) => (
+          {[
+            [-0.2, -0.2],
+            [-0.2, 0.2],
+            [0.2, -0.2],
+            [0.2, 0.2],
+          ].map(([lx, lz], j) => (
             <mesh key={j} position={[lx, 0.22, lz]}>
               <cylinderGeometry args={[0.03, 0.03, 0.44, 6]} />
               <meshStandardMaterial color="#5C4033" roughness={0.9} />

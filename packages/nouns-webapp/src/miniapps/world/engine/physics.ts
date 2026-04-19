@@ -1,7 +1,15 @@
 // ── Physics: knockback, gravity, juggle, collision ───────────────────
 
-import type { Player } from './types';
+import type { Player, GroundMaterial } from './types';
 import { Tile, WALKABLE, TILE_SIZE, MAP_SIZE, GRAVITY, GROUND_Y, SPRITE_SIZE } from './types';
+import {
+  aabbCircleOverlap,
+  aabbClosestPoint,
+  overlappingSolids,
+  raycastVertical,
+  type AABB,
+  type Structure,
+} from './structures';
 
 /** Simple lerp */
 export function lerp(a: number, b: number, t: number): number {
@@ -63,6 +71,9 @@ export function isWalkable(worldX: number, worldY: number, map: Tile[][]): boole
 }
 
 /**
+ * @deprecated Legacy single-point collision. New code uses
+ * `resolveWallSlide` (circle-vs-AABB with proper sliding).
+ *
  * Try to move player with wall-sliding collision.
  * Returns the final position after collision resolution.
  */
@@ -90,6 +101,210 @@ export function moveWithCollision(
   // Can't move
   return { x, y };
 }
+
+// ── New collision primitives (circle-vs-AABB + tile aware) ────────────
+
+/**
+ * Circle-vs-AABB overlap test. Same semantics as
+ * structures.aabbCircleOverlap — re-exported here so physics consumers
+ * can rely on a single import site.
+ */
+export function aabbOverlap(
+  ax: number,
+  ay: number,
+  aw: number,
+  ah: number,
+  px: number,
+  py: number,
+  radius: number,
+): boolean {
+  return aabbCircleOverlap({ x: ax, y: ay, w: aw, h: ah }, px, py, radius);
+}
+
+/**
+ * Is the tile under (x,y) walkable AND is the position clear of all
+ * solid registered structures whose top is above the body's feet?
+ *
+ * footZ = z of the player's feet (0 when on ground, higher when on a
+ * roof or mid-jump). A solid only blocks if its top is above the feet.
+ */
+function isPositionClear(
+  x: number,
+  y: number,
+  radius: number,
+  footZ: number,
+  map: Tile[][],
+): boolean {
+  // Tile check (sample both center and a few footprint points for
+  // correctness at high speeds; a single center-point check lets
+  // diagonals clip through thin walls).
+  if (!isWalkable(x, y, map)) return false;
+  if (!isWalkable(x + radius, y, map)) return false;
+  if (!isWalkable(x - radius, y, map)) return false;
+  if (!isWalkable(x, y + radius, map)) return false;
+  if (!isWalkable(x, y - radius, map)) return false;
+
+  // Structure check.
+  const solids = overlappingSolids(x, y, radius);
+  for (const s of solids) {
+    const top = s.opts.topHeight ?? Infinity;
+    // Player is below this solid's top → blocked.
+    if (footZ < top - 0.01) return false;
+  }
+  return true;
+}
+
+export interface SlideResult {
+  x: number;
+  y: number;
+  blockedX: boolean;
+  blockedY: boolean;
+}
+
+/**
+ * Resolve a horizontal movement step with proper wall-sliding against
+ * tiles AND registered solid structures.
+ *
+ * Strategy:
+ *   1. If full (x+vx, y+vy) is clear → take it.
+ *   2. Otherwise probe X-only and Y-only moves. Take whichever clears.
+ *   3. If neither clears, push the body out of any overlapping AABB
+ *      along the shortest axis and zero the corresponding velocity.
+ *
+ * High-speed tunneling is prevented by the caller: split large steps
+ * into sub-steps if |velocity| > radius.
+ */
+export function resolveWallSlide(
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  radius: number,
+  footZ: number,
+  map: Tile[][],
+): SlideResult {
+  const tx = x + vx;
+  const ty = y + vy;
+
+  if (isPositionClear(tx, ty, radius, footZ, map)) {
+    return { x: tx, y: ty, blockedX: false, blockedY: false };
+  }
+
+  const xOnlyOk = vx !== 0 && isPositionClear(tx, y, radius, footZ, map);
+  const yOnlyOk = vy !== 0 && isPositionClear(x, ty, radius, footZ, map);
+
+  if (xOnlyOk && yOnlyOk) {
+    // Both axes clear independently — pick the one that keeps more speed.
+    if (Math.abs(vx) >= Math.abs(vy)) {
+      return { x: tx, y, blockedX: false, blockedY: true };
+    }
+    return { x, y: ty, blockedX: true, blockedY: false };
+  }
+  if (xOnlyOk) return { x: tx, y, blockedX: false, blockedY: true };
+  if (yOnlyOk) return { x, y: ty, blockedX: true, blockedY: false };
+
+  // Fully blocked. Try pushing out of any overlapping structure along
+  // the shallowest axis so the body doesn't wedge inside walls.
+  const push = depenetrate(x, y, radius, footZ);
+  return { x: push.x, y: push.y, blockedX: true, blockedY: true };
+}
+
+/** Move the point out of any overlapping solid AABB. Single iteration. */
+function depenetrate(
+  x: number,
+  y: number,
+  radius: number,
+  footZ: number,
+): { x: number; y: number } {
+  const solids = overlappingSolids(x, y, radius);
+  if (solids.length === 0) return { x, y };
+
+  let outX = x;
+  let outY = y;
+
+  for (const s of solids) {
+    const top = s.opts.topHeight ?? Infinity;
+    if (footZ >= top - 0.01) continue; // we're above this structure
+    const { cx, cy, dx, dy, distSq } = aabbClosestPoint(s.aabb, outX, outY);
+    if (distSq >= radius * radius) continue; // clear now
+
+    if (distSq > 0.0001) {
+      const d = Math.sqrt(distSq);
+      // Push the circle center out to (radius + slack) from the nearest edge.
+      outX = cx + (dx / d) * (radius + 0.1);
+      outY = cy + (dy / d) * (radius + 0.1);
+    } else {
+      // Exactly on center — push toward the nearest face.
+      const hx = s.aabb.w / 2;
+      const hy = s.aabb.h / 2;
+      const dxl = s.aabb.x - hx - outX;
+      const dxr = s.aabb.x + hx - outX;
+      const dyt = s.aabb.y - hy - outY;
+      const dyb = s.aabb.y + hy - outY;
+      const best = Math.min(Math.abs(dxl), Math.abs(dxr), Math.abs(dyt), Math.abs(dyb));
+      if (best === Math.abs(dxl)) outX = s.aabb.x - hx - radius - 0.1;
+      else if (best === Math.abs(dxr)) outX = s.aabb.x + hx + radius + 0.1;
+      else if (best === Math.abs(dyt)) outY = s.aabb.y - hy - radius - 0.1;
+      else outY = s.aabb.y + hy + radius + 0.1;
+    }
+  }
+  return { x: outX, y: outY };
+}
+
+/**
+ * Ground material of the tile at (x,y). Mirrors the old visual-only
+ * tile palette but collapses to the GroundMaterial union.
+ */
+export function tileMaterialAt(x: number, y: number, map: Tile[][]): GroundMaterial {
+  const tile = getTileAt(x, y, map);
+  switch (tile) {
+    case Tile.Sand:
+      return 'sand';
+    case Tile.Path:
+      return 'path';
+    case Tile.Water:
+    case Tile.DeepWater:
+      return 'water';
+    case Tile.Rock:
+      return 'stone';
+    case Tile.Arena:
+      return 'stone';
+    case Tile.Grass:
+    case Tile.Tree:
+    case Tile.Flower:
+    case Tile.Spawn:
+    default:
+      return 'grass';
+  }
+}
+
+export interface GroundSample {
+  /** Z height of the ground surface at (x,y) — tiles stay at 0. */
+  topZ: number;
+  /** Material of that surface. */
+  material: GroundMaterial;
+  /** Structure id if a registered roof provides the surface, else null. */
+  structureId: string | null;
+}
+
+/**
+ * Highest walkable surface at (x,y) considering both the tilemap and
+ * any registered roof-bearing structure beneath the body's current z.
+ * Tilemap baseline is always 0 (the existing game world is flat at z=0);
+ * 3D tile heights are a visual-only concern (see WorldPage.getTerrainHeight).
+ */
+export function sampleGroundHeight(x: number, y: number, atZ: number, map: Tile[][]): GroundSample {
+  const tileMat = tileMaterialAt(x, y, map);
+  const struct = raycastVertical(x, y, atZ);
+
+  if (struct.structureId !== null && struct.topZ > 0) {
+    return { topZ: struct.topZ, material: struct.material, structureId: struct.structureId };
+  }
+  return { topZ: 0, material: tileMat, structureId: null };
+}
+
+// Re-export for convenience so locomotion only needs one import path.
+export type { AABB, Structure };
 
 /** Apply gravity to airborne player */
 export function applyGravity(player: Player) {

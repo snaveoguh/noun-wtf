@@ -43,6 +43,7 @@
     "@noundry/nouns-assets": "^1.17.0",
     "@nouns/assets": "workspace:*",
     "@nouns/contracts": "workspace:*",
+    "@nouns/graffiti": "workspace:*",
     "@nouns/mesh-editor": "workspace:*",
     "@nouns/sdk": "workspace:*",
     "@nouns/voxel-engine": "workspace:*",

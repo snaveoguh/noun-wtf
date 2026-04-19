@@ -8,8 +8,9 @@
 //   - Ground-level door with awning
 //   - Dark stain patches for grit
 
-import { useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
+import { registerStructure, unregisterStructure } from './structures';
 
 // ── Dimensions ──────────────────────────────────────────────────────
 
@@ -485,6 +486,29 @@ function ForSaleSign({ position }: { position: [number, number, number] }) {
 
 export function NYCApartmentBlock() {
   const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    // Convert Three.js units → tile-world (÷ WORLD_SCALE = ×10).
+    const tileX = APARTMENT_X / WORLD_SCALE;
+    const tileY = APARTMENT_Z / WORLD_SCALE;
+    const tileW = BUILDING_W / WORLD_SCALE;
+    const tileH = BUILDING_D / WORLD_SCALE;
+    const tileTop = BUILDING_H / WORLD_SCALE;
+
+    registerStructure(
+      'apt-1',
+      { x: tileX, y: tileY, w: tileW, h: tileH },
+      {
+        topHeight: tileTop,
+        topMaterial: 'stone',
+        climbFaces: [
+          // Fire escape runs the full west face (ramp-side), ground to roof
+          { id: 'fire-escape', side: 'west', startZ: 0, endZ: tileTop, material: 'metal' },
+        ],
+      },
+    );
+    return () => unregisterStructure('apt-1');
+  }, []);
 
   return (
     <group ref={groupRef} position={[APARTMENT_X, BUILDING_H / 2, APARTMENT_Z]}>
