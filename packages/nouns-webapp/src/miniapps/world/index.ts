@@ -13,7 +13,10 @@ export const worldMiniapp: Miniapp = {
     {
       path: '/world',
       lazy: async () => {
-        const { default: Component } = await import('./WorldPage');
+        // WorldShell is the new entry; it currently re-exports WorldPage
+        // while the full extraction is rolled out. Router contract stays
+        // identical: default export is the page component.
+        const { default: Component } = await import('./WorldShell');
         return { Component };
       },
     },

@@ -75,6 +75,11 @@ interface InlineEditorProps {
   onMeshBrushSizeChange?: (size: number) => void;
   /** Whether mesh editor is active (hides voxel-specific controls) */
   isMeshMode?: boolean;
+  /** Controlled tool value — when provided, the editor's tool is driven by parent state. */
+  activeTool?: Tool | 'build';
+  /** Controlled color value — when provided, the editor's color is driven by parent state.
+   *  Required so the eyedropper picked-color feeds back into the swatch and palette UI. */
+  activeColor?: string;
   /** Callback when tool changes (needed in mesh mode to update parent state) */
   onToolChange?: (tool: Tool) => void;
   /** Callback when color changes (needed in mesh mode to update parent state) */
@@ -121,6 +126,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
   meshBrushSize = 1,
   onMeshBrushSizeChange,
   isMeshMode = false,
+  activeTool: controlledTool,
+  activeColor: controlledColor,
   onToolChange,
   onColorChange,
   onDownload,
@@ -158,8 +165,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
     [nounLayers, pixels, visibility],
   );
 
-  const [activeTool, setActiveTool] = useState<Tool>('pencil');
-  const [activeColor, setActiveColor] = useState(() => {
+  const [localActiveTool, setLocalActiveTool] = useState<MeshTool>('pencil');
+  const [localActiveColor, setLocalActiveColor] = useState(() => {
     const grid = externalPixels ?? initialGrid;
     for (const row of grid) {
       for (const c of row) {
@@ -168,6 +175,29 @@ const InlineEditor: FC<InlineEditorProps> = ({
     }
     return '#000000';
   });
+
+  // Use controlled values when provided (3D mode passes parent state).
+  // setActiveTool/setActiveColor always update local state and notify the parent
+  // via onToolChange/onColorChange — this keeps the swatch UI in sync after the
+  // 3D scene's eyedropper picks a color (parent-side onColorPick).
+  const activeTool: MeshTool = controlledTool ?? localActiveTool;
+  const activeColor = controlledColor ?? localActiveColor;
+  const setActiveTool = useCallback(
+    (tool: MeshTool) => {
+      setLocalActiveTool(tool);
+      // onToolChange takes Tool but in mesh mode parent accepts 'build' too
+      // (parent's setEdit3dTool is typed Tool | 'build')
+      (onToolChange as ((t: MeshTool) => void) | undefined)?.(tool);
+    },
+    [onToolChange],
+  );
+  const setActiveColor = useCallback(
+    (color: string) => {
+      setLocalActiveColor(color);
+      onColorChange?.(color);
+    },
+    [onColorChange],
+  );
   const [paletteExpanded, setPaletteExpanded] = useState(false);
   const [collapsedPanels, setCollapsedPanels] = useState<Record<PanelKey, boolean>>({
     tools: false,
@@ -197,14 +227,6 @@ const InlineEditor: FC<InlineEditorProps> = ({
   const undo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const redo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);
 
-  // Sync tool/color changes to parent (critical for mesh mode where parent needs to re-render)
-  useEffect(() => {
-    onToolChange?.(activeTool);
-  }, [activeTool, onToolChange]);
-  useEffect(() => {
-    onColorChange?.(activeColor);
-  }, [activeColor, onColorChange]);
-
   // Expose to parent for keyboard shortcuts + 3D sync.
   // Must live in useEffect so the ref is assigned after mount and cleaned up
   // on unmount — assigning in the render body can be lost across Suspense
@@ -212,17 +234,17 @@ const InlineEditor: FC<InlineEditorProps> = ({
   useEffect(() => {
     if (!toolRef) return;
     toolRef.current = {
-      setTool: setActiveTool,
+      setTool: (t: Tool) => setActiveTool(t),
       setColor: setActiveColor,
       undo,
       redo,
-      getActiveTool: () => activeTool,
+      getActiveTool: () => (activeTool === 'build' ? 'pencil' : activeTool),
       getActiveColor: () => activeColor,
     };
     return () => {
       toolRef.current = null;
     };
-  }, [toolRef, activeTool, activeColor, undo, redo]);
+  }, [toolRef, activeTool, activeColor, undo, redo, setActiveTool, setActiveColor]);
 
   const handlePixelChange = useCallback(
     (x: number, y: number, color: string) => {
@@ -238,10 +260,13 @@ const InlineEditor: FC<InlineEditorProps> = ({
     [dispatch],
   );
 
-  const handleColorPick = useCallback((color: string) => {
-    setActiveColor(color);
-    setActiveTool('pencil');
-  }, []);
+  const handleColorPick = useCallback(
+    (color: string) => {
+      setActiveColor(color);
+      setActiveTool('pencil');
+    },
+    [setActiveColor, setActiveTool],
+  );
 
   const toggleLayer = useCallback(
     (layer: keyof LayerVisibility) => {
@@ -355,7 +380,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
             onPixelsFill={handlePixelsFill}
             onColorPick={handleColorPick}
             activeColor={activeColor}
-            activeTool={activeTool}
+            activeTool={activeTool === 'build' ? 'pencil' : activeTool}
             zoom={zoom}
           />
         </div>
@@ -390,7 +415,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
                   key={id}
                   type="button"
                   className={`${classes.toolBtn} ${activeTool === id ? classes.toolActive : ''}`}
-                  onClick={() => setActiveTool(id as Tool)}
+                  onClick={() => setActiveTool(id)}
                   title={label}
                 >
                   <Icon size={16} strokeWidth={2} />

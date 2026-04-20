@@ -15,7 +15,11 @@
     "paths": {
       "@/*": ["./src/*"],
       "@nouns/voxel-engine": ["../voxel-engine/src/index.ts"],
-      "@nouns/voxel-engine/*": ["../voxel-engine/*"]
+      "@nouns/voxel-engine/*": ["../voxel-engine/*"],
+      "@nouns/graffiti": ["../nouns-graffiti/src/index.ts"],
+      "@nouns/graffiti/r3f": ["../nouns-graffiti/src/adapters/r3f/index.ts"],
+      "@nouns/graffiti/ui": ["../nouns-graffiti/src/ui/index.ts"],
+      "@nouns/graffiti/core": ["../nouns-graffiti/src/core/index.ts"]
     },
 
     "plugins": [

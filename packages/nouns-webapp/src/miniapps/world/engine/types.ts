@@ -77,7 +77,11 @@ export type PlayerState =
   | 'backflip'
   | 'dashing'
   | 'knocked' // combo knockdown — on the ground, auto-stand after delay
-  | 'wounded'; // gunshot knee collapse — held pose
+  | 'wounded' // gunshot knee collapse — held pose
+  | 'doubleJumping' // mid-air second jump
+  | 'sliding' // crouch-slide after sprint
+  | 'wallRunning' // hugging a vertical face in motion
+  | 'mantling'; // auto pop-onto-ledge
 
 export type MoveType =
   | 'punch'
@@ -241,11 +245,39 @@ export const TILE_SIZE = 16;
 export const MAP_SIZE = 64;
 export const WORLD_SIZE = TILE_SIZE * MAP_SIZE; // 1024
 export const SPRITE_SIZE = 32;
-export const PLAYER_SPEED = 0.3;
+export const PLAYER_SPEED = 0.3; // legacy slow baseline (kept for callers not yet on locomotion)
 export const PLAYER_MAX_HP = 100;
-export const GRAVITY = 0.25; // floaty Spider-Man style — slow descent, long hang time
+export const GRAVITY = 0.25; // floaty Spider-Man style — slow descent, long hang time (legacy)
 export const GROUND_Y = 0; // airborneY baseline
 export const RESPAWN_TIME = 180; // 3 seconds at 60fps
+
+// ── Locomotion tuning (new system) ────────────────────────────────────
+//
+// Movement is intentionally faster than the old 0.3 PLAYER_SPEED.
+// Users wanted "buttery smooth, way faster" — these values target that.
+//
+// Frame-rate assumption: 60fps tick. Numbers are per-frame deltas.
+export const PLAYER_WALK_SPEED = 0.55; // base cruise speed (~2x legacy)
+export const PLAYER_SPEED_FAST = 1.2; // sprint speed (+~2.2x cruise)
+export const PLAYER_ACCEL = 0.14; // ramp-up per frame toward target speed
+export const PLAYER_DECEL = 0.22; // ramp-down per frame when no input
+export const PLAYER_AIR_ACCEL = 0.055; // reduced steering while airborne
+export const PLAYER_MAX_HORIZ_VEL = 2.0; // hard cap to avoid tunneling
+export const PLAYER_JUMP_VZ = 7.8; // initial upward velocity (tile units/frame)
+export const PLAYER_JUMP_CUT_MULT = 0.45; // vz *= this when jump released early
+export const PLAYER_JUMPS_MAX = 1; // hard cap — no infinite jump
+export const PLAYER_COYOTE_FRAMES = 7; // ~117ms at 60fps (retuned for looser feel)
+export const PLAYER_JUMP_BUFFER_FRAMES = 6; // ~100ms at 60fps
+export const PLAYER_AIR_JUMPS_MAX = 1; // double-jump total. NOT triple.
+export const LOCOMOTION_GRAVITY = 0.55; // proper ballistic (vs legacy 0.25 w/ hang-time)
+export const PLAYER_CLIMB_SPEED = 0.4; // vertical climb rate (tile units/frame)
+export const PLAYER_CLIMB_STRAFE = 0.25; // side-traversal rate on a face
+export const PLAYER_WALL_JUMP_VZ = 6.8; // pop-off velocity when jumping off a face
+export const PLAYER_WALL_JUMP_PUSH = 1.4; // horizontal shove away from the wall
+export const PLAYER_CLIMB_REACH = 2.5; // how close to a face to latch on
+
+// Material types — reported by MovementBody.groundMaterial.
+export type GroundMaterial = 'grass' | 'sand' | 'path' | 'stone' | 'metal' | 'wood' | 'water';
 
 // Combat constants
 export const PUNCH_RANGE = 28;
@@ -270,6 +302,19 @@ export const DASH_DURATION = 12;
 export const DASH_SPEED = 8;
 export const DASH_IFRAMES = 8;
 export const DASH_DAMAGE = 5;
+
+// ── Locomotion substates: dash / slide / wall-run / mantle ─────────────
+// Separate from combat-attack DASH_* values above. Those remain the
+// melee move; the locomotion dash below is the double-tap traversal
+// burst. Values are tile-units/frame (speed) or frames (durations).
+export const LOCO_DASH_SPEED = 40; // double-tap traversal dash velocity
+export const DASH_DURATION_FRAMES = 12;
+export const DASH_IFRAMES_FRAMES = 12;
+export const SLIDE_MAX_DURATION_FRAMES = 36;
+export const WALL_RUN_MAX_DURATION_FRAMES = 72;
+export const MANTLE_DURATION_FRAMES = 9;
+export const WALL_RUN_GRAVITY_FACTOR = 0.15;
+export const HARD_LANDING_VZ = 10; // |vz| above this on touchdown triggers hitstop
 export const SPIN_ATTACK_RANGE = 40;
 export const SPIN_ATTACK_DAMAGE = 20;
 export const SPIN_ATTACK_DURATION = 24;

@@ -5,6 +5,7 @@
 
 import type {
   Player,
+  PlayerState,
   RemotePlayer,
   MoveType,
   ForcePush,
@@ -26,12 +27,14 @@ import {
   WOUNDED_DURATION,
   KNOCKED_DURATION,
   GUNSHOT_RESPAWN_TIME,
-  PLAYER_SPEED,
   SPRITE_SIZE,
 } from './types';
 import { MOVE_DEFS, resolveDamage } from './moves';
 import { registerHit, tickCombo } from './combo';
-import { dist, angleBetween, applyGravity, applyFriction, moveWithCollision } from './physics';
+import { dist, angleBetween, applyFriction } from './physics';
+import { stepLocomotion, stepPassive, readLocomotionInput } from './locomotion';
+import { startDash } from './dash';
+import { playerToBody, bodyToPlayer, createMovementBody, type MovementBody } from './movementBody';
 import {
   spawnHitSparks,
   spawnDustTrail,
@@ -45,7 +48,7 @@ import {
   createScreenShake,
   createSlowMo,
 } from './particles';
-import { getMovementVector, directionFromDelta, type InputState } from './input';
+import { directionFromDelta, type InputState } from './input';
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './tilemap';
 
 // ── Player factory ────────────────────────────────────���───────────────
@@ -201,10 +204,25 @@ export function executeMove(
   }
 
   if (move === 'dash') {
-    player.state = 'dashing';
+    // Delegate velocity + bullet-time triggering to dash.ts. Combat
+    // still owns the attack-move side (iFrames, damage, anim state) —
+    // dash.ts handles the shared velocity/FOCUS plumbing that both
+    // locomotion (double-tap) and combat (move list) need.
+    const body = getBody(player);
+    startDash(body, Math.cos(angle), Math.sin(angle), {
+      speed: DASH_SPEED,
+      durationFrames: DASH_DURATION,
+      // Attack dash iFrames come from the MOVE_DEFS entry above; keep
+      // body.iFrames in sync so locomotion dispatchers don't clobber.
+      iFrames: player.iFrames,
+      kind: 'ground',
+    });
+    bodyToPlayer(body, player);
+    // Mirror dash fields onto Player for legacy consumers (net, anim).
     player.dashTimer = DASH_DURATION;
-    player.dashVx = Math.cos(angle) * DASH_SPEED;
-    player.dashVy = Math.sin(angle) * DASH_SPEED;
+    player.dashVx = body.dashVx;
+    player.dashVy = body.dashVy;
+    player.state = 'dashing';
     spawnDustTrail(combat.particles, player.x, player.y + SPRITE_SIZE / 2, 6);
     // Dash can do contact damage — check below
   }
@@ -449,6 +467,33 @@ export function applyDamageToPlayer(
 }
 
 // ── Tick player state each frame ──────────────────────────────────────
+//
+// Motion for non-combat states goes through locomotion.ts. Combat
+// states that need motion (knocked, wounded, attacking mid-move,
+// dashing) still call into locomotion via stepPassive() so they share
+// the same gravity / collision / ground-snap pipeline.
+//
+// A MovementBody is kept per-Player in a WeakMap so timers (coyote,
+// jumpBuffer, climb state) persist across frames.
+
+const playerBodies = new WeakMap<Player, MovementBody>();
+
+function getBody(player: Player): MovementBody {
+  let body = playerBodies.get(player);
+  if (!body) {
+    body = createMovementBody(player.x, player.y);
+    playerBodies.set(player, body);
+  }
+  return playerToBody(player, body);
+}
+
+export function getPlayerBody(player: Player): MovementBody | null {
+  return playerBodies.get(player) ?? null;
+}
+
+export function getOrCreatePlayerBody(player: Player): MovementBody {
+  return getBody(player);
+}
 
 export function tickPlayer(player: Player, input: InputState, combat: CombatState) {
   // Decrement timers
@@ -487,63 +532,66 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
       player.woundedTimer = 0;
       player.consecutiveGunshots = 0;
       player.attackType = null;
+      // Reset locomotion body so new spawn position sticks + no stale climb.
+      const body = getBody(player);
+      body.z = 0;
+      body.vz = 0;
+      body.climb = null;
     }
     return;
   }
 
-  // ── Knocked down (3-hit combo) — on the ground, auto-stand after delay ──
-  if (player.state === 'knocked') {
-    player.knockedTimer--;
-    applyFriction(player, 0.95);
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
-    if (player.knockedTimer <= 0) {
-      // Auto-stand — back to idle with brief i-frames
+  // ── Passive-motion combat states ──
+  // Knocked / wounded / stunned / blocking share the same physics:
+  // existing velocity + gravity + wall-slide, no locomotion input.
+  if (
+    player.state === 'knocked' ||
+    player.state === 'wounded' ||
+    player.state === 'blocking' ||
+    player.stunTimer > 0
+  ) {
+    if (player.state === 'knocked') {
+      player.knockedTimer--;
+      applyFriction(player, 0.95);
+    } else if (player.state === 'wounded') {
+      player.woundedTimer--;
+      applyFriction(player, 0.95);
+    } else if (player.state === 'blocking') {
+      player.blockTimer++;
+      applyFriction(player);
+    } else {
+      player.state = 'stunned';
+      applyFriction(player, 0.9);
+    }
+
+    const body = getBody(player);
+    stepPassive(body, ISLAND_MAP);
+    bodyToPlayer(body, player);
+
+    // Transitions out of passive.
+    if (player.state === 'knocked' && player.knockedTimer <= 0) {
       player.state = 'idle';
-      player.knockedTimer = 0;
       player.stunTimer = 0;
-      player.iFrames = 30; // half-second get-up protection
-    }
-    return;
-  }
-
-  // ── Wounded (gunshot knee collapse) — held pose, then recover ──
-  if (player.state === 'wounded') {
-    player.woundedTimer--;
-    applyFriction(player, 0.95);
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
-    if (player.woundedTimer <= 0) {
+      player.iFrames = 30;
+    } else if (player.state === 'wounded' && player.woundedTimer <= 0) {
       player.state = 'idle';
-      player.woundedTimer = 0;
-      player.iFrames = 20; // brief recovery protection
+      player.iFrames = 20;
+    } else if (player.state === 'blocking' && !input.shiftHeld) {
+      player.state = 'idle';
+      player.blockTimer = 0;
     }
     return;
   }
 
-  // ── Stunned ──
-  if (player.stunTimer > 0) {
-    player.state = 'stunned';
-    applyFriction(player, 0.9);
-    applyGravity(player);
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
-    return;
-  }
-
-  // ── Backflip animation ─���
+  // ── Backflip animation ──
   if (player.state === 'backflip') {
     player.flipRotation += (Math.PI * 2) / BACKFLIP_DURATION;
-    applyGravity(player);
     applyFriction(player, 0.92);
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
+    const body = getBody(player);
+    stepPassive(body, ISLAND_MAP);
+    bodyToPlayer(body, player);
     if (player.attackTimer <= 0) {
-      player.state = player.airborneY < GROUND_Y ? 'airborne' : 'idle';
+      player.state = body.grounded ? 'idle' : 'airborne';
       player.flipRotation = 0;
     }
     return;
@@ -552,87 +600,66 @@ export function tickPlayer(player: Player, input: InputState, combat: CombatStat
   // ── Dashing ──
   if (player.state === 'dashing') {
     player.dashTimer--;
-    const pos = moveWithCollision(player.x, player.y, player.dashVx, player.dashVy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
+    player.vx = player.dashVx;
+    player.vy = player.dashVy;
+    const body = getBody(player);
+    body.vz = 0; // dashes are grounded horizontal
+    stepPassive(body, ISLAND_MAP);
+    bodyToPlayer(body, player);
     if (player.dashTimer <= 0) {
       player.state = 'idle';
       player.vx = player.dashVx * 0.3;
       player.vy = player.dashVy * 0.3;
     }
-    // Dash dust
     if (player.dashTimer % 3 === 0) {
       spawnDustTrail(combat.particles, player.x, player.y + SPRITE_SIZE / 2, 2);
     }
     return;
   }
 
-  // ── Blocking ──
-  if (player.state === 'blocking') {
-    player.blockTimer++;
-    if (!input.shiftHeld) {
-      player.state = 'idle';
-      player.blockTimer = 0;
-    }
-    applyFriction(player);
-    return;
-  }
-
-  // ��─ Attacking ──
+  // ── Attacking ──
   if (player.state === 'attacking') {
     if (player.attackTimer <= 0) {
       // Attack finished — return to idle
       player.state = player.airborneY < GROUND_Y ? 'airborne' : 'idle';
       player.attackType = null;
-      // Fall through to normal movement
+      // Fall through to normal locomotion
     } else {
       applyFriction(player, 0.92);
-      applyGravity(player);
-      const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-      player.x = pos.x;
-      player.y = pos.y;
+      const body = getBody(player);
+      stepPassive(body, ISLAND_MAP);
+      bodyToPlayer(body, player);
       return;
     }
   }
 
-  // ── Airborne ���─
-  if (player.airborneY < GROUND_Y) {
-    player.state = 'airborne';
-    applyGravity(player);
-    applyFriction(player, 0.98);
-    // Air control — WASD steers while airborne (skydiving navigation)
-    const { dx: adx, dy: ady } = getMovementVector(input.keys, input.cameraAngle);
-    if (adx !== 0 || ady !== 0) {
-      const airControl = 0.04; // gentle lean, not a jetpack
-      player.vx += adx * airControl;
-      player.vy += ady * airControl;
-      player.direction = directionFromDelta(adx, ady);
-    }
-    const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-    player.x = pos.x;
-    player.y = pos.y;
-    return;
-  }
+  // ── Normal locomotion (walk / run / jump / climb) ──
+  const body = getBody(player);
+  const locoInput = readLocomotionInput(input);
+  // TS narrows player.state aggressively through the preceding returns;
+  // cast to the full PlayerState union so our sentinel checks compile.
+  const currentState = player.state as PlayerState;
+  locoInput.canClimb = currentState !== 'attacking';
 
-  // ── Normal movement ──
-  const { dx, dy } = getMovementVector(input.keys, input.cameraAngle);
+  stepLocomotion(body, locoInput, ISLAND_MAP);
+  bodyToPlayer(body, player);
 
-  if (dx !== 0 || dy !== 0) {
-    const sprinting = input.keys.has('r');
-    player.state = sprinting ? 'dashing' : 'walking';
-    player.direction = directionFromDelta(dx, dy);
-    if (dx !== 0) player.scaleX = dx > 0 ? 1 : -1;
-    const speed = sprinting ? PLAYER_SPEED * 2.2 : PLAYER_SPEED;
-    player.vx = dx * speed;
-    player.vy = dy * speed;
+  // Animation state reflects what locomotion did.
+  if (locoInput.moveX !== 0 || locoInput.moveY !== 0) {
+    player.state = locoInput.sprint ? 'dashing' : 'walking';
+    player.direction = directionFromDelta(locoInput.moveX, locoInput.moveY);
+    if (locoInput.moveX !== 0) player.scaleX = locoInput.moveX > 0 ? 1 : -1;
   } else {
-    if (player.state === 'walking') player.state = 'idle';
-    applyFriction(player);
+    const s = player.state as PlayerState;
+    if (s === 'walking' || s === 'dashing') {
+      player.state = 'idle';
+    }
   }
 
-  const pos = moveWithCollision(player.x, player.y, player.vx, player.vy, ISLAND_MAP);
-  player.x = pos.x;
-  player.y = pos.y;
+  // Airborne state wins for animation when off the ground.
+  if (!body.grounded && (player.state as PlayerState) !== 'backflip') {
+    player.state = 'airborne';
+  }
 }
 
 // ── Apply hit to remote player (visual only — authoritative on sender) ──
