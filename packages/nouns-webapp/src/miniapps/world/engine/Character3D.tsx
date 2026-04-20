@@ -64,6 +64,18 @@ function getAnimMap(): Record<string, string> {
     // Differentiated movement — dashing uses a full sprint if available,
     // otherwise falls through to running.
     dashing: pickClip(['Sprint', 'Dodge_Forward', 'Running_B', 'Running_A'], 'Running_A'),
+    // Aerial dash (locomotion double-tap mid-air) prefers a dodge clip.
+    dashing_air: pickClip(['Dodge_Forward', 'Sprint', 'Running_B', 'Running_A'], 'Running_A'),
+    // Slide — pulled from crouch/block poses since we have no dedicated slide clip.
+    sliding: pickClip(['Crouch_To_Stand', 'Idle_Crouch', 'Block'], 'Block'),
+    // Wall-run (left/right variants share the same base clip; the component
+    // applies a procedural Z-roll for the lean).
+    wallRunning_left: pickClip(['Running_B', 'Running_A', 'Climbing_Ladder'], 'Running_A'),
+    wallRunning_right: pickClip(['Running_B', 'Running_A', 'Climbing_Ladder'], 'Running_A'),
+    // Mantle — reuses climbing/short-jump motion.
+    mantling: pickClip(['Climbing_Ladder', 'Jump_Full_Short'], 'Jump_Full_Short'),
+    // Double jump — a flip flavor if available, otherwise a long jump.
+    doubleJumping: pickClip(['Backflip', 'Jump_Full_Long', 'Jump_Full_Short'], 'Jump_Full_Long'),
     walking_sprint: pickClip(['Running_B', 'Running_A'], 'Running_A'),
     walking_fast: pickClip(['Running_A', 'Running_B'], 'Running_A'),
     attacking_punch: pickClip(
@@ -138,6 +150,29 @@ export interface CharacterState {
   vy: number;
   paintColor: string | null; // spray can color if holding one
   swordEquipped: boolean;
+  /**
+   * Fine-grained locomotion substate (body.loco). Optional — legacy
+   * callers that only set `state` still work. When present it overrides
+   * clip selection for new substates (dashing-air, sliding, wallRunning,
+   * mantling, doubleJumping).
+   */
+  locoSubstate?:
+    | 'grounded'
+    | 'jumping'
+    | 'falling'
+    | 'doubleJumping'
+    | 'dashing'
+    | 'sliding'
+    | 'wallRunning'
+    | 'mantling';
+  /** |vz| at most recent ground contact. Drives landing squash. */
+  landingImpact?: number;
+  /**
+   * Which side the wall-run is hugging, relative to forward motion.
+   * 'left' tilts Z+25°, 'right' tilts Z-25°. Only read when
+   * locoSubstate === 'wallRunning'.
+   */
+  wallRunSide?: 'left' | 'right';
 }
 
 function getNounBodyColor(seed: INounSeed): string {
@@ -336,6 +371,12 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       }
     })(),
   );
+
+  // Landing-squash pulse state. When landingImpact spikes, we set
+  // pulseUntil to ~80ms in the future and animate scale during that
+  // window: compress Y to 0.85, overshoot to 1.05, then settle to 1.0.
+  const landingPulseEndRef = useRef<number>(0);
+  const lastLandingImpactRef = useRef<number>(0);
 
   const bodyColorRef = useRef(getNounBodyColor(seed));
 
@@ -607,9 +648,55 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       // Slight forward crouch on board — no velocity-based lean (vx compounds)
       g.rotation.x = 0.1;
       g.rotation.z = 0;
+    } else if (s.locoSubstate === 'wallRunning') {
+      // Wall-run — procedural 25° Z-roll toward the wall. We don't have
+      // a dedicated clip, so the lean is what sells the pose.
+      const lean = (25 * Math.PI) / 180;
+      g.rotation.x = 0;
+      g.rotation.z = s.wallRunSide === 'right' ? -lean : lean;
+    } else if (s.locoSubstate === 'sliding') {
+      // Slide — forward lean so the character isn't standing straight.
+      g.rotation.x = 0.4;
+      g.rotation.z = 0;
     } else {
       g.rotation.x = 0;
       g.rotation.z = 0;
+    }
+
+    // ── Landing squash ──
+    // When landingImpact spikes past 10, fire an 80ms pulse: squash Y
+    // to 0.85 → overshoot to 1.05 → settle to 1.0.
+    const impact = s.landingImpact ?? 0;
+    if (impact > 10 && impact !== lastLandingImpactRef.current) {
+      landingPulseEndRef.current = Date.now() + 80;
+      lastLandingImpactRef.current = impact;
+    } else if (impact === 0) {
+      // Reset gate so next landing can re-trigger.
+      lastLandingImpactRef.current = 0;
+    }
+    const now = Date.now();
+    const pulseLen = 80;
+    const pulseEnd = landingPulseEndRef.current;
+    if (pulseEnd > now) {
+      const remain = pulseEnd - now;
+      const t = 1 - remain / pulseLen; // 0 → 1 through pulse
+      // First half: 1.0 → 0.85 (compress). Second half: 0.85 → 1.05 → 1.0 overshoot.
+      let scaleY: number;
+      if (t < 0.5) {
+        const k = t / 0.5;
+        scaleY = 1 - 0.15 * k;
+      } else {
+        const k = (t - 0.5) / 0.5;
+        // 0.85 → 1.05 → 1.0. Parabola peaking near k=0.6.
+        scaleY = 0.85 + 0.2 * k - Math.pow(k - 0.6, 2) * 0.35;
+      }
+      g.scale.y = scaleY;
+      g.scale.x = 1 + (1 - scaleY) * 0.4;
+      g.scale.z = 1 + (1 - scaleY) * 0.4;
+    } else if (g.scale.y !== 1) {
+      g.scale.y = 1;
+      g.scale.x = 1;
+      g.scale.z = 1;
     }
 
     // Animation crossfade
@@ -629,6 +716,35 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
       }
       // Headshot death uses alternate death animation
       if (s.state === 'dead' && s.attackType === 'headshot') animKey = 'dead_headshot';
+
+      // Fine-grained locomotion substates override the coarse choice.
+      // Only consulted when the coarse state is a locomotion-owned one;
+      // combat states (attacking, stunned, dead, etc.) keep their key.
+      const sub = s.locoSubstate;
+      const isLocoCoarse =
+        s.state === 'idle' ||
+        s.state === 'walking' ||
+        s.state === 'airborne' ||
+        s.state === 'dashing' ||
+        s.state === 'doubleJumping' ||
+        s.state === 'sliding' ||
+        s.state === 'wallRunning' ||
+        s.state === 'mantling';
+      if (sub && isLocoCoarse) {
+        if (sub === 'dashing' && !s.isSkating) {
+          // Distinguish mid-air dash (dashing_air) from grounded dash
+          // based on airborneVy — non-zero vy = in the air.
+          animKey = Math.abs(s.airborneVy) > 0.2 ? 'dashing_air' : 'dashing';
+        } else if (sub === 'doubleJumping') {
+          animKey = 'doubleJumping';
+        } else if (sub === 'sliding') {
+          animKey = 'sliding';
+        } else if (sub === 'wallRunning') {
+          animKey = s.wallRunSide === 'right' ? 'wallRunning_right' : 'wallRunning_left';
+        } else if (sub === 'mantling') {
+          animKey = 'mantling';
+        }
+      }
 
       // Idle-variant cycling: when the character stays in 'idle' for
       // IDLE_CYCLE_SECONDS, switch to the next available idle variant.

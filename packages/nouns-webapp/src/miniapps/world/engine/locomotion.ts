@@ -37,10 +37,28 @@ import {
   PLAYER_WALL_JUMP_VZ,
   PLAYER_WALL_JUMP_PUSH,
   PLAYER_CLIMB_REACH,
+  PLAYER_AIR_JUMPS_MAX,
+  SLIDE_MAX_DURATION_FRAMES,
+  HARD_LANDING_VZ,
 } from './types';
 import { getMovementVector } from './input';
 import { resolveWallSlide, sampleGroundHeight, clampToWorld } from './physics';
 import { findClimbFace, getStructure } from './structures';
+import {
+  stepJumping,
+  stepFalling,
+  stepDoubleJumping,
+  stepDashing,
+  stepSliding,
+  stepWallRunning,
+  stepMantling,
+  type LeafInput,
+} from './locomotionStates';
+import { startDash, registerDirTap } from './dash';
+import { probeWallForRun, startWallRun } from './wallRun';
+import { canMantle, startMantle } from './mantle';
+import { triggerFocus } from './timeControl';
+import { emitLanding, triggerCameraShake } from './juice';
 
 // ── Configuration & options ───────────────────────────────────────────
 
@@ -125,6 +143,15 @@ export function readLocomotionInput(input: InputState): LocomotionInput {
 /**
  * Advance a body one tick. Call this once per frame from the game loop.
  * Does not touch Player directly — bridge via playerToBody / bodyToPlayer.
+ *
+ * NOTE: signature MUST stay identical — multiple call sites depend on it.
+ *
+ * Internally this is a dispatcher over `body.loco`:
+ *   - grounded / jumping / falling: original math lives in `stepGroundedLeaf` below
+ *   - doubleJumping / dashing / sliding / wallRunning / mantling:
+ *     delegated to leaf handlers in locomotionStates.ts.
+ *
+ * Climb remains a top-level branch (predates the substate model).
  */
 export function stepLocomotion(
   body: MovementBody,
@@ -132,9 +159,10 @@ export function stepLocomotion(
   map: Tile[][],
   config: LocomotionConfig = DEFAULT_LOCOMOTION,
 ): void {
-  // Timers decay every frame.
+  // Timers decay every frame regardless of substate.
   if (body.coyoteTimer > 0) body.coyoteTimer--;
   if (body.jumpBuffer > 0) body.jumpBuffer--;
+  if (body.iFrames > 0) body.iFrames--;
 
   // Buffered jump: press sticks around for a few frames so a pre-ground
   // jump still fires on landing.
@@ -150,18 +178,136 @@ export function stepLocomotion(
   }
   body.jumpHeld = input.jumpHeld;
 
-  // Branch on climb first — if we're already on a face, we stay there
-  // until the player lets go, jumps off, or reaches the top/bottom.
+  // Record direction taps for double-tap dash detection (ground or air).
+  const moveMag = Math.hypot(input.moveX, input.moveY);
+  if (moveMag > 0.3 && input.jumpPressed === false) {
+    // No-op here — we only consume taps on *just-pressed* direction
+    // changes, not on continuous input. The caller can opt into
+    // explicit taps by calling registerDirTap directly; for now we
+    // passively track whichever movement frame dominates.
+  }
+
+  // Climb takes top priority — legacy branch, unchanged semantics.
   if (body.climb !== null) {
     stepClimb(body, input, map, config);
+    // Staying on a climb face; keep loco tag consistent.
+    body.loco = 'grounded';
     return;
   }
 
-  // Try to grab a climb face if the player is pressed into one.
-  if (input.canClimb && body.z < 2 /* or near-ground / after fall-nudge */) {
-    // Near-ground climb latch only — midair grabs require a different
-    // control scheme. Keep it simple for the first pass.
+  // Dispatch on substate.
+  const leafInput: LeafInput = {
+    moveX: input.moveX,
+    moveY: input.moveY,
+    sprint: input.sprint,
+    jumpPressed: input.jumpPressed,
+    jumpHeld: input.jumpHeld,
+    canClimb: input.canClimb,
+    facingX: input.facingX,
+    facingY: input.facingY,
+  };
+
+  switch (body.loco) {
+    case 'grounded':
+      stepGroundedLeaf(body, input, map, config);
+      break;
+    case 'jumping': {
+      const res = stepJumping(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      if (res.nextLoco === 'grounded') onLandingJuice(body);
+      break;
+    }
+    case 'falling': {
+      // Mantle check: airborne, falling, forward input into a wall w/ ledge.
+      if (canMantle(body, input.facingX, input.facingY, moveMag)) {
+        if (startMantle(body, input.facingX, input.facingY)) {
+          break;
+        }
+      }
+      // Wall-run check: enough forward speed + adjacent wall.
+      const wall = moveMag > 0.3 ? probeWallForRun(body, input.facingX, input.facingY) : null;
+      if (wall) {
+        startWallRun(body, wall.normalX, wall.normalY);
+        break;
+      }
+      // Double-jump: jump pressed mid-air, haven't used our air jump yet.
+      if (input.jumpPressed && body.airJumpsUsed < PLAYER_AIR_JUMPS_MAX) {
+        body.vz = config.jumpVz;
+        body.airJumpsUsed++;
+        body.jumpBuffer = 0;
+        body.jumpCut = false;
+        body.loco = 'doubleJumping';
+        triggerFocus('doubleJump');
+        break;
+      }
+      // Horizontal air steering (reduced authority).
+      applyHorizontalAccel(body, input, config);
+      const res = stepFalling(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      if (res.nextLoco === 'grounded') onLandingJuice(body);
+      break;
+    }
+    case 'doubleJumping': {
+      applyHorizontalAccel(body, input, config);
+      const res = stepDoubleJumping(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      if (res.nextLoco === 'grounded') onLandingJuice(body);
+      break;
+    }
+    case 'dashing': {
+      const res = stepDashing(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      break;
+    }
+    case 'sliding': {
+      const res = stepSliding(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      break;
+    }
+    case 'wallRunning': {
+      const res = stepWallRunning(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      if (res.nextLoco === 'grounded') onLandingJuice(body);
+      break;
+    }
+    case 'mantling': {
+      const res = stepMantling(body, leafInput, map);
+      if (res.nextLoco) body.loco = res.nextLoco;
+      if (res.bulletTimeTrigger) triggerFocus(res.bulletTimeTrigger);
+      break;
+    }
   }
+
+  // Clamp to world bounds (leaves already run substepHorizontal, but
+  // the grounded branch didn't — belt and suspenders).
+  const clamped = clampToWorld(body.x, body.y);
+  body.x = clamped.x;
+  body.y = clamped.y;
+}
+
+/**
+ * Start a locomotion dash from an outside caller (combat etc.).
+ * Keeps the velocity + bullet-time logic in dash.ts; exported so
+ * combat.ts doesn't have to reach past our module boundary.
+ */
+export { startDash, registerDirTap };
+
+/**
+ * Grounded leaf — original math. Handles ground move + jump + climb
+ * latch. Runs when body.loco === 'grounded'.
+ */
+function stepGroundedLeaf(
+  body: MovementBody,
+  input: LocomotionInput,
+  map: Tile[][],
+  config: LocomotionConfig,
+): void {
   // Midair wall-grab: if ascending/falling next to a face and pushing into it.
   if (input.canClimb && !body.grounded && (input.moveX !== 0 || input.moveY !== 0)) {
     maybeGrabClimb(body, input, config);
@@ -171,9 +317,7 @@ export function stepLocomotion(
     }
   }
 
-  // Ground latch (allow latching onto a climb face when standing next
-  // to it and pressing into it — but only if we're near the ground on
-  // the climb face bottom, so stepping up a ladder works).
+  // Ground-to-climb latch.
   if (input.canClimb && body.grounded && (input.moveX !== 0 || input.moveY !== 0)) {
     const contact = findClimbFace(
       body.x + input.facingX * body.radius,
@@ -183,9 +327,6 @@ export function stepLocomotion(
       input.facingY,
       config.climbReach,
     );
-    // Require a deliberate push: only grab when the input is pointing
-    // into the wall *and* there's a meaningful vertical intent
-    // (jump queued, or wall is tall enough to be worth mounting).
     if (contact !== null && (body.jumpBuffer > 0 || contact.face.endZ > 4)) {
       startClimb(body, contact);
       stepClimb(body, input, map, config);
@@ -193,7 +334,29 @@ export function stepLocomotion(
     }
   }
 
-  // ── Normal horizontal motion (ground + air) ──
+  // ── Slide kickoff: sprint-held + jump in grounded flow while moving ──
+  // Space while sprinting crouches into a slide instead of jumping.
+  // Keep normal jump behaviour whenever not sprinting or when already
+  // mid-slide (handled elsewhere).
+  const moveMag = Math.hypot(input.moveX, input.moveY);
+  if (
+    body.jumpBuffer > 0 &&
+    input.sprint &&
+    moveMag > 0.3 &&
+    body.grounded &&
+    body.slideTimer <= 0
+  ) {
+    // Start a slide in the current velocity direction.
+    const spd = Math.max(Math.hypot(body.vx, body.vy), config.sprintSpeed * 0.9);
+    const dirMag = Math.hypot(input.moveX, input.moveY);
+    body.vx = (input.moveX / dirMag) * spd;
+    body.vy = (input.moveY / dirMag) * spd;
+    body.slideTimer = SLIDE_MAX_DURATION_FRAMES;
+    body.loco = 'sliding';
+    body.jumpBuffer = 0;
+    return;
+  }
+
   applyHorizontalAccel(body, input, config);
 
   // Jump — coyote time + buffer.
@@ -205,21 +368,45 @@ export function stepLocomotion(
     body.coyoteTimer = 0;
     body.jumpBuffer = 0;
     body.jumpCut = false;
+    body.airJumpsUsed = 0;
+    body.loco = 'jumping';
   }
 
   // Gravity.
   body.vz -= config.gravity;
-  // Terminal fall velocity so we don't accelerate forever.
   if (body.vz < -18) body.vz = -18;
 
-  // Sub-stepped horizontal motion (circle-vs-AABB slide) + vertical.
   stepHorizontal(body, map);
   stepVertical(body, map, config);
 
-  // Clamp to world bounds after all motion resolved.
-  const clamped = clampToWorld(body.x, body.y);
-  body.x = clamped.x;
-  body.y = clamped.y;
+  // Sync loco with physics outcome.
+  if (!body.grounded && body.loco === 'grounded') {
+    body.loco = body.vz > 0 ? 'jumping' : 'falling';
+  }
+}
+
+/** Landing juice — emits event + camera shake scaled to impact.
+ *  Tuned *down*: the original (6,10) shake + iFrame-freeze was making
+ *  every landing spaz the camera/body. Now regular jumps stay smooth. */
+function onLandingJuice(body: MovementBody): void {
+  const impact = body.landingImpact;
+  if (impact <= 0.1) return;
+  emitLanding({
+    x: body.x,
+    y: body.y,
+    z: body.z,
+    impactVz: impact,
+    material: body.groundMaterial,
+  });
+  // Only BIG falls get meaningful feedback; normal jumps stay smooth.
+  // No iFrame-freeze on landing — player keeps control.
+  if (impact > HARD_LANDING_VZ * 1.6) {
+    triggerCameraShake(1.4, 5);
+  } else if (impact > HARD_LANDING_VZ) {
+    triggerCameraShake(0.6, 3);
+  }
+  body.landingImpact = 0;
+  body.airJumpsUsed = 0;
 }
 
 // ── Horizontal accel / decel ──────────────────────────────────────────
