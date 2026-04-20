@@ -33,6 +33,7 @@ import { MOVE_DEFS, resolveDamage } from './moves';
 import { registerHit, tickCombo } from './combo';
 import { dist, angleBetween, applyFriction } from './physics';
 import { stepLocomotion, stepPassive, readLocomotionInput } from './locomotion';
+import { startDash } from './dash';
 import { playerToBody, bodyToPlayer, createMovementBody, type MovementBody } from './movementBody';
 import {
   spawnHitSparks,
@@ -203,10 +204,25 @@ export function executeMove(
   }
 
   if (move === 'dash') {
-    player.state = 'dashing';
+    // Delegate velocity + bullet-time triggering to dash.ts. Combat
+    // still owns the attack-move side (iFrames, damage, anim state) —
+    // dash.ts handles the shared velocity/FOCUS plumbing that both
+    // locomotion (double-tap) and combat (move list) need.
+    const body = getBody(player);
+    startDash(body, Math.cos(angle), Math.sin(angle), {
+      speed: DASH_SPEED,
+      durationFrames: DASH_DURATION,
+      // Attack dash iFrames come from the MOVE_DEFS entry above; keep
+      // body.iFrames in sync so locomotion dispatchers don't clobber.
+      iFrames: player.iFrames,
+      kind: 'ground',
+    });
+    bodyToPlayer(body, player);
+    // Mirror dash fields onto Player for legacy consumers (net, anim).
     player.dashTimer = DASH_DURATION;
-    player.dashVx = Math.cos(angle) * DASH_SPEED;
-    player.dashVy = Math.sin(angle) * DASH_SPEED;
+    player.dashVx = body.dashVx;
+    player.dashVy = body.dashVy;
+    player.state = 'dashing';
     spawnDustTrail(combat.particles, player.x, player.y + SPRITE_SIZE / 2, 6);
     // Dash can do contact damage — check below
   }
@@ -469,6 +485,14 @@ function getBody(player: Player): MovementBody {
     playerBodies.set(player, body);
   }
   return playerToBody(player, body);
+}
+
+export function getPlayerBody(player: Player): MovementBody | null {
+  return playerBodies.get(player) ?? null;
+}
+
+export function getOrCreatePlayerBody(player: Player): MovementBody {
+  return getBody(player);
 }
 
 export function tickPlayer(player: Player, input: InputState, combat: CombatState) {

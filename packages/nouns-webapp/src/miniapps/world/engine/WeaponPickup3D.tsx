@@ -1,16 +1,50 @@
 // ── 3D Weapon Pickup — GTA 3 Style ──────────────────────────────────
 //
 // Spinning, glowing gun on the ground. Walk over to auto-pickup.
-// Low-poly gun shape: cylinder barrel + box handle, tinted per weapon.
+// Models come from Kenney's Blaster Kit (CC0) — see
+// `public/models/weapons/CREDITS.md`. If a GLB fails to load we fall back
+// to the original procedural mesh so the scene never blanks out.
 
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
+import { GlbModel } from './glbProps';
 import type { WeaponType } from './weapons';
 import { WEAPON_DEFS } from './weapons';
 
-// ── Gun mesh builder (shared geometry) ──────────────────────────────
+// ── GLB mapping ─────────────────────────────────────────────────────
+
+/** WeaponType → /public GLB path. */
+const WEAPON_GLB_URL: Record<WeaponType, string> = {
+  pistol: '/models/weapons/pistol.glb',
+  shotgun: '/models/weapons/shotgun.glb',
+  uzi: '/models/weapons/uzi.glb',
+};
+
+/**
+ * Per-weapon render scale for the pickup. Kenney blasters are authored at
+ * roughly ~2m long; we want each to read as a ~0.4m ground pickup silhouette.
+ */
+const WEAPON_PICKUP_SCALE: Record<WeaponType, number> = {
+  pistol: 0.55,
+  shotgun: 0.4,
+  uzi: 0.45,
+};
+
+// Warm drei's cache on module load so pickups don't pop in the first time
+// the player sees them. `preload` is best-effort — wrap in try/catch so a
+// missing file in dev doesn't throw at import time.
+for (const url of Object.values(WEAPON_GLB_URL)) {
+  try {
+    useGLTF.preload(url);
+  } catch {
+    // ignore — GlbModel has its own error boundary at render time
+  }
+}
+
+// ── Procedural fallback (also exported for GunAttachment callers) ───
 
 function createGunShape(type: WeaponType): THREE.Group {
   const def = WEAPON_DEFS[type];
@@ -106,12 +140,15 @@ export function WeaponPickup3D({ position, type, picked }: WeaponPickup3DProps) 
   if (picked) return null;
 
   const def = WEAPON_DEFS[type];
+  const glbUrl = WEAPON_GLB_URL[type];
+  const modelScale = WEAPON_PICKUP_SCALE[type];
 
   return (
     <group ref={groupRef} position={position}>
-      {/* The spinning gun */}
-      <group ref={gunRef} scale={[1.8, 1.8, 1.8]}>
-        <primitive object={createGunShape(type)} />
+      {/* The spinning gun — GLB with error boundary; if it errors, GlbModel
+          renders nothing and the scene keeps running. */}
+      <group ref={gunRef}>
+        <GlbModel url={glbUrl} scale={modelScale} />
       </group>
 
       {/* Glow light */}
@@ -126,12 +163,7 @@ export function WeaponPickup3D({ position, type, picked }: WeaponPickup3DProps) 
       {/* Ground glow ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[0.2, 0.35, 16]} />
-        <meshBasicMaterial
-          color={def.color}
-          transparent
-          opacity={0.4}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={def.color} transparent opacity={0.4} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Shadow */}

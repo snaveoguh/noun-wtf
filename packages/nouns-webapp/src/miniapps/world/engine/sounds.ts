@@ -3,37 +3,35 @@
 // All sounds synthesized via Web Audio API. No external files.
 // Fire-and-forget: each play* function creates nodes, schedules
 // envelopes, and auto-disposes when done.
+//
+// ROUTING: every emitter connects to the shared `sfxBus` from
+// `audioFx.ts`, which routes through a lowpass biquad to `masterGain`.
+// During slomo the biquad cutoff sweeps down to muffle SFX. Voice
+// (VOIP) routes through a separate `voiceBus` and never gets filtered.
 
-// ── AudioContext singleton (lazy init) ──────────────────────────────
+import { getSfxContext, getSfxBus, getMasterGain } from './audioFx';
 
-let ctx: AudioContext | null = null;
-let masterGain: GainNode | null = null;
 let masterVolume = 0.7;
 
 function getCtx(): AudioContext {
-  if (!ctx) {
-    ctx = new AudioContext();
-    masterGain = ctx.createGain();
-    masterGain.gain.value = masterVolume;
-    masterGain.connect(ctx.destination);
+  const ac = getSfxContext();
+  // Apply the sounds.ts master volume onto the shared master gain.
+  // We do this every call (cheap) so the first emitter after volume
+  // changes always sees the right level.
+  const master = getMasterGain();
+  if (master.gain.value !== masterVolume) {
+    master.gain.value = masterVolume;
   }
-  // Resume if suspended (browsers require user gesture)
-  if (ctx.state === 'suspended') {
-    ctx.resume();
-  }
-  return ctx;
-}
-
-function getMaster(): GainNode {
-  getCtx();
-  return masterGain!;
+  return ac;
 }
 
 /** Set master volume (0-1). */
 export function setMasterVolume(v: number): void {
   masterVolume = Math.max(0, Math.min(1, v));
-  if (masterGain) {
-    masterGain.gain.value = masterVolume;
+  try {
+    getMasterGain().gain.value = masterVolume;
+  } catch {
+    // Audio context not yet initialized — value will be applied on next play.
   }
 }
 
@@ -43,12 +41,12 @@ export function getMasterVolume(): number {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Create a gain node routed to master, with optional volume multiplier. */
+/** Create a gain node routed to the SFX bus, with optional volume multiplier. */
 function makeGain(vol: number = 1): GainNode {
   const ac = getCtx();
   const g = ac.createGain();
   g.gain.value = vol;
-  g.connect(getMaster());
+  g.connect(getSfxBus());
   return g;
 }
 
@@ -99,14 +97,26 @@ function autoCleanup(
   const ac = getCtx();
   const stopAt = ac.currentTime + durationMs / 1000 + 0.05;
   for (const n of nodes) {
-    try { n.stop(stopAt); } catch { /* already stopped */ }
+    try {
+      n.stop(stopAt);
+    } catch {
+      /* already stopped */
+    }
   }
   setTimeout(() => {
     for (const n of nodes) {
-      try { n.disconnect(); } catch { /* ok */ }
+      try {
+        n.disconnect();
+      } catch {
+        /* ok */
+      }
     }
     for (const g of gains) {
-      try { g.disconnect(); } catch { /* ok */ }
+      try {
+        g.disconnect();
+      } catch {
+        /* ok */
+      }
     }
   }, durationMs + 100);
 }
@@ -165,7 +175,7 @@ export function playKickSound(volume: number = 1): void {
 
   noise.connect(hpf);
   hpf.connect(gNoise);
-  gNoise.connect(getMaster());
+  gNoise.connect(getSfxBus());
   noise.start(t);
 
   autoCleanup([osc, noise], [gOsc, gNoise], 170);
@@ -211,7 +221,7 @@ export function playHeadbuttSound(volume: number = 1): void {
   envelope(gN, 0.3 * volume, 2, 80, t);
   noise.connect(lpf);
   lpf.connect(gN);
-  gN.connect(getMaster());
+  gN.connect(getSfxBus());
   noise.start(t);
 
   autoCleanup([osc1, osc2, noise], [g1, g2, gN], 250);
@@ -236,7 +246,7 @@ export function playGunshot(volume: number = 1): void {
   envelope(gN, 0.8 * volume, 1, 70, t);
   noise.connect(bpf);
   bpf.connect(gN);
-  gN.connect(getMaster());
+  gN.connect(getSfxBus());
   noise.start(t);
 
   // Sine sweep
@@ -272,7 +282,7 @@ export function playShotgunSound(volume: number = 1): void {
   envelope(gN, 0.9 * volume, 2, 298, t);
   noise.connect(lpf);
   lpf.connect(gN);
-  gN.connect(getMaster());
+  gN.connect(getSfxBus());
   noise.start(t);
 
   // Low sine
@@ -296,7 +306,7 @@ export function playShotgunSound(volume: number = 1): void {
   envelope(gR, 0.25 * volume, 20, 380, t + 0.02);
   noise2.connect(lpf2);
   lpf2.connect(gR);
-  gR.connect(getMaster());
+  gR.connect(getSfxBus());
   noise2.start(t);
 
   autoCleanup([noise, osc, noise2], [gN, gO, gR], 450);
@@ -325,7 +335,7 @@ export function playFootstep(volume: number = 0.15): void {
   noise.connect(hpf);
   hpf.connect(lpf);
   lpf.connect(g);
-  g.connect(getMaster());
+  g.connect(getSfxBus());
   noise.start(t);
 
   autoCleanup([noise], [g], 80);
@@ -352,7 +362,7 @@ export function playDeathSound(volume: number = 1): void {
   envelope(gO, 0.5 * volume, 5, 495, t);
   osc.connect(lpf);
   lpf.connect(gO);
-  gO.connect(getMaster());
+  gO.connect(getSfxBus());
   osc.start(t);
 
   // Rumble
@@ -365,7 +375,7 @@ export function playDeathSound(volume: number = 1): void {
   envelope(gN, 0.4 * volume, 10, 490, t);
   noise.connect(lpf2);
   lpf2.connect(gN);
-  gN.connect(getMaster());
+  gN.connect(getSfxBus());
   noise.start(t);
 
   autoCleanup([osc, noise], [gO, gN], 550);
@@ -455,7 +465,7 @@ export function playJumpSound(volume: number = 0.4): void {
 
   noise.connect(bpf);
   bpf.connect(g);
-  g.connect(getMaster());
+  g.connect(getSfxBus());
   noise.start(t);
 
   autoCleanup([noise], [g], 250);
@@ -501,7 +511,7 @@ export function playBlockSound(volume: number = 1): void {
   envelope(gN, 0.25 * volume, 1, 30, t);
   noise.connect(hpf);
   hpf.connect(gN);
-  gN.connect(getMaster());
+  gN.connect(getSfxBus());
   noise.start(t);
 
   nodes.push(noise as unknown as OscillatorNode);

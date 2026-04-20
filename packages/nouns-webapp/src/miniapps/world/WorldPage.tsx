@@ -34,14 +34,28 @@ import {
 import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
 import { seedToKey, randomSeed } from './engine/sprites';
 import { isInDeepWater } from './engine/physics';
-import { createPlayer, createCombatState, executeMove, tickPlayer } from './engine/combat';
+import {
+  createPlayer,
+  createCombatState,
+  executeMove,
+  tickPlayer,
+  getPlayerBody,
+} from './engine/combat';
+import { setPlayerBodyForDojo } from './worlds/dojo/dojoState';
 import {
   updateParticles,
   updateFloatingTexts,
   updateForcePushes,
   updateScreenShake,
-  updateSlowMo,
 } from './engine/particles';
+import { CameraRig, setCameraZoomIndex } from './engine/camera/CameraRig';
+import { CameraTouchZone } from './engine/camera/CameraTouchZone';
+import { SlomoPostFX } from './engine/SlomoPostFX';
+import { setCombatRef, updateSlomo, updateFocusMeter } from './engine/timeControl';
+import { applySlomoAudio } from './engine/audioFx';
+import { useFocusTrigger } from './engine/useFocusTrigger';
+import { registerDirTap } from './engine/dash';
+import { createMovementBody } from './engine/movementBody';
 import {
   createOceanDeathState,
   tickOceanDeath,
@@ -140,8 +154,8 @@ import {
   type BuildPieceKind,
 } from './engine/placedProps';
 
-// Fire-and-forget prop preload — checks GLB availability once at module load.
-preloadCatalog();
+// Preload is now gated behind `current === 'fried'` via useEffect in the
+// main component so the white-room default doesn't eagerly fetch props.
 import MobileControls, { isTouchDevice } from './engine/MobileControls';
 import {
   createSkatingState,
@@ -180,12 +194,15 @@ import {
   getCurrentTranscript,
 } from './engine/voip';
 import { useNounSeed, type INounSeed } from '@/wrappers/nounToken';
+import { useWorldStore } from './shared/useWorldStore';
+import { GlitchEntry } from './shared/GlitchEntry';
+import { TransitionOverlay } from './shared/TransitionOverlay';
+import { WhiteRoom, monolithPositions } from './worlds/WhiteRoom';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
 const WORLD_SCALE = 0.1; // Scale world coords to Three.js units
 const TERRAIN_SIZE = MAP_SIZE * TILE_SIZE * WORLD_SCALE;
-// Camera params in CameraController
 
 // ── Tile colors for terrain texture ───────────────────────────────────
 
@@ -516,6 +533,21 @@ const GRAFFITI_WALLS = [
 
 const WALL_NEAR_DISTANCE = 4;
 
+// Imperative scene.background setter — bypasses R3F attach= race conditions
+// when sibling <color attach="background"> components mount/unmount.
+function SceneBackground({ color }: { color: string }) {
+  const { scene } = useThree();
+  const colorRef = useRef(new THREE.Color(color));
+  useEffect(() => {
+    colorRef.current.set(color);
+    scene.background = colorRef.current;
+    return () => {
+      // Leave whatever the next SceneBackground sets; don't null it.
+    };
+  }, [color, scene]);
+  return null;
+}
+
 function GraffitiWalls({
   activeWallId,
   authorId,
@@ -595,6 +627,11 @@ function GraffitiWalls({
 // ── Paint can pickup spawn positions ────────────────────────────────────
 
 const PAINT_CAN_SPAWNS: [number, number][] = [
+  // Close to spawn — reachable from white-room construct.
+  [SPAWN_X + 8, SPAWN_Y + 8],
+  [SPAWN_X - 8, SPAWN_Y + 8],
+  [SPAWN_X + 14, SPAWN_Y - 6],
+  // Out in fried world.
   [SPAWN_X + 60, SPAWN_Y - 40],
   [SPAWN_X - 70, SPAWN_Y + 30],
   [SPAWN_X + 30, SPAWN_Y + 70],
@@ -1200,95 +1237,6 @@ export function _Water() {
       <meshStandardMaterial color="#3377cc" transparent opacity={0.8} side={THREE.DoubleSide} />
     </mesh>
   );
-}
-
-// ── Third-Person Camera — arrow keys orbit, always behind player ──────
-
-// Map 2D direction → angle the camera should sit BEHIND the character
-// Camera orbit: angle 0 = +Z side, PI = -Z side
-// "up" = walking toward -Z, so camera BEHIND = at +Z = angle 0
-const BEHIND_ANGLE: Record<string, number> = {
-  up: 0,
-  down: Math.PI,
-  left: Math.PI * 0.5,
-  right: -Math.PI * 0.5,
-  'up-left': Math.PI * 0.25,
-  'up-right': -Math.PI * 0.25,
-  'down-left': Math.PI * 0.75,
-  'down-right': -Math.PI * 0.75,
-};
-
-// Camera zoom presets: 1=first person, 2=close, 3=default, 4=far, 5=bird's eye
-const CAMERA_ZOOM_PRESETS = [
-  { dist: 0.3, y: 0.02 }, // 1 — first person
-  { dist: 1.5, y: 0.12 }, // 2 — close
-  { dist: 3.5, y: 0.3 }, // 3 — default (medium)
-  { dist: 7, y: 0.5 }, // 4 — far
-  { dist: 15, y: 0.8 }, // 5 — bird's eye
-];
-
-// Global so keydown handler can set it
-let cameraZoomLevel = 2; // default = preset index 2 (dist 3.5)
-
-function CameraController({
-  target,
-  inputRef,
-  playerCharState,
-}: {
-  target: THREE.Vector3;
-  inputRef: React.RefObject<InputState>;
-  playerCharState: React.RefObject<CharacterState>;
-}) {
-  const { camera } = useThree();
-  const angleX = useRef(0);
-  const angleY = useRef(0.12);
-  const dist = useRef(1.5);
-
-  useFrame(() => {
-    const input = inputRef.current;
-    const pcs = playerCharState.current;
-
-    // Z key → zoom WAY out (bird's eye)
-    const zoomOut = input?.keys.has('z');
-    const moving = pcs && (pcs.state === 'walking' || pcs.state === 'dashing');
-    const skating = pcs?.isSkating;
-
-    // Use zoom preset, override with Z for max zoom out
-    const preset = CAMERA_ZOOM_PRESETS[cameraZoomLevel] ?? CAMERA_ZOOM_PRESETS[2];
-    const wantDist = zoomOut
-      ? 40
-      : moving || skating
-        ? preset.dist
-        : Math.max(preset.dist * 0.6, 1.0);
-    const wantY = zoomOut ? 1.2 : preset.y;
-    const zoomSpeed = zoomOut ? 0.08 : 0.04;
-    dist.current += (wantDist - dist.current) * zoomSpeed;
-    angleY.current += (wantY - angleY.current) * 0.03;
-
-    // Swing camera behind character's facing direction (walking + skating)
-    if ((moving || skating) && pcs) {
-      const behindAngle = BEHIND_ANGLE[pcs.direction] ?? 0;
-      let diff = behindAngle - angleX.current;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      // Faster follow when skating so camera stays directly behind
-      angleX.current += diff * (skating ? 0.15 : 0.08);
-    }
-
-    const d = dist.current;
-    const desired = new THREE.Vector3(
-      target.x + Math.sin(angleX.current) * Math.cos(angleY.current) * d,
-      target.y + Math.sin(angleY.current) * d + 0.3,
-      target.z + Math.cos(angleX.current) * Math.cos(angleY.current) * d,
-    );
-
-    camera.position.lerp(desired, skating ? 0.12 : 0.08);
-    camera.lookAt(target.x, target.y + 0.4, target.z);
-
-    if (input) input.cameraAngle = angleX.current;
-  });
-
-  return null;
 }
 
 // ── Day/Night Lighting ────────────────────────────────────────────────
@@ -2228,6 +2176,19 @@ function BillboardAdModal({
 export default function WorldPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // ── White/fried gating ──
+  // Default landing is the white room for everyone. Fried world is opt-in
+  // via the FriedMirror portal in front of spawn.
+  const worldCurrent = useWorldStore(s => s.current);
+
+  // Preload the prop catalog only when the user opts into fried world.
+  // Moved off module-load so the white-room default stays cheap.
+  useEffect(() => {
+    if (worldCurrent === 'fried') {
+      preloadCatalog();
+    }
+  }, [worldCurrent]);
   const currentNounSeed = useAppSelector(state => (state as any).onDisplayAuction?.seed);
   const lastAuctionNounId = useAppSelector(
     state => (state as any).onDisplayAuction?.lastAuctionNounId,
@@ -2401,9 +2362,39 @@ export default function WorldPage() {
     new THREE.Vector3(SPAWN_X * WORLD_SCALE, 0, SPAWN_Y * WORLD_SCALE),
   );
 
+  // ── Camera integration refs ────────────────────────────────────────
+  // CameraRig expects an Object3D ref; we keep a dummy <object3D> in the
+  // Canvas scene graph and sync its position from playerTargetRef each
+  // tick. This lets the rig read `.position` without us leaking a
+  // Vector3-only ref across the module boundary.
+  const cameraTargetObjRef = useRef<THREE.Object3D | null>(null);
+  // Scene root used for camera-collision raycasts. Wraps the fried-world
+  // static geometry so we don't raycast the entire scene (which includes
+  // HUD planes, helpers, etc).
+  const sceneRootRef = useRef<THREE.Group>(null);
+  // Local MovementBody used purely for double-tap dir-tap detection
+  // (registerDirTap writes lastDirTapTime/lastDirTapVec onto it). The
+  // authoritative locomotion body lives inside combat.ts, so this local
+  // tracker only drives triggerFocus('dash') visuals until the body is
+  // exposed across the module boundary.
+  const dashTapBodyRef = useRef(createMovementBody(SPAWN_X, SPAWN_Y));
+
+  // Register combatRef with the timeControl module so triggerFocus()
+  // can mutate combat.slowMo from anywhere (dash.ts, locomotion.ts, etc).
+  // Intentional [] deps — combatRef identity is stable.
+
+  useEffect(() => {
+    setCombatRef(combatRef);
+  }, []);
+
+  // Manual (Q-held) focus/bullet-time trigger — reads inputRef.keys.
+  useFocusTrigger(inputRef);
+
   // ── Skating / Hoverboard state ──
   const skateRef = useRef<SkatingState>(createSkatingState());
-  const [hasHoverboard, setHasHoverboard] = useState(false);
+  // Skateboard (née hoverboard) is free by default — let players ollie
+  // anywhere from the moment they spawn, not only after finding a pickup.
+  const [hasHoverboard, setHasHoverboard] = useState(true);
   const [hoverboardModalOpen, setHoverboardModalOpen] = useState(false);
   const { address: connectedWallet } = useAccount();
   // Owner wallet gets hoverboard free
@@ -2499,6 +2490,11 @@ export default function WorldPage() {
 
     // Spawn weapon pickups around the island (clear first to avoid duplicates on re-mount)
     clearPickups();
+    // Close to white-room spawn — reachable without leaving the construct.
+    spawnWeaponPickup('pistol', SPAWN_X + 12, SPAWN_Y - 18);
+    spawnWeaponPickup('shotgun', SPAWN_X - 18, SPAWN_Y + 12);
+    spawnWeaponPickup('uzi', SPAWN_X + 22, SPAWN_Y + 22);
+    // Fried-world specific — further out for exploration.
     spawnWeaponPickup('pistol', SPAWN_X + 80, SPAWN_Y - 60);
     spawnWeaponPickup('shotgun', SPAWN_X - 100, SPAWN_Y + 40);
     spawnWeaponPickup('uzi', SPAWN_X + 50, SPAWN_Y + 90);
@@ -2672,14 +2668,29 @@ export default function WorldPage() {
         if (!p) return;
         const px = p.x * WORLD_SCALE;
         const pz = p.y * WORLD_SCALE;
+        // White room = free paint (it's a construct, not a pickup-gated world).
+        const inWhiteRoom = useWorldStore.getState().current === 'white';
+        if (inWhiteRoom) paintRef.current.hasPaint = true;
         if (!paintRef.current.hasPaint) {
           console.log('[Graffiti] No paint can — pick one up first!');
           return;
         }
-        // Find nearest wall
-        let nearestWall: (typeof GRAFFITI_WALLS)[number] | null = null;
+        // Candidate walls — fried world's fixed set + white room's
+        // dynamic monoliths. id/worldX/worldZ normalized across both.
+        type WallCand = { id: string; worldX: number; worldZ: number };
+        const candidates: WallCand[] = [];
+        if (!inWhiteRoom) {
+          for (const w of GRAFFITI_WALLS) {
+            candidates.push({ id: w.id, worldX: w.worldX, worldZ: w.worldZ });
+          }
+        } else {
+          for (const m of monolithPositions(SPAWN_X, SPAWN_Y)) {
+            candidates.push({ id: m.id, worldX: m.x, worldZ: m.z });
+          }
+        }
+        let nearestWall: WallCand | null = null;
         let nearestDist = Infinity;
-        for (const wall of GRAFFITI_WALLS) {
+        for (const wall of candidates) {
           const dist = Math.sqrt((px - wall.worldX) ** 2 + (pz - wall.worldZ) ** 2);
           if (dist < nearestDist) {
             nearestDist = dist;
@@ -2771,8 +2782,11 @@ export default function WorldPage() {
         return;
       }
       // ── Camera zoom levels (1-5) ──
+      // CameraRig owns the zoom state (setCameraZoomIndex); keep this
+      // handler so non-focused canvas bubbles still cycle zoom, but
+      // route it through the rig's API.
       if (e.key >= '1' && e.key <= '5') {
-        cameraZoomLevel = parseInt(e.key, 10) - 1;
+        setCameraZoomIndex(parseInt(e.key, 10) - 1);
         return;
       }
       // ── Teleport to ramp top (press 0) ──
@@ -2802,6 +2816,26 @@ export default function WorldPage() {
         if (!p) return;
         const px = p.x * WORLD_SCALE;
         const pz = p.y * WORLD_SCALE;
+
+        // Return-portal check (fried → white). The portal sits at fried
+        // world spawn; pressing E within 3u swaps back. FriedMirror
+        // handles the white → fried direction itself.
+        {
+          const s = useWorldStore.getState();
+          if (s.current === 'fried' && s.transition === 'idle') {
+            const portalX = SPAWN_X * WORLD_SCALE;
+            const portalZ = SPAWN_Y * WORLD_SCALE;
+            const d = Math.hypot(px - portalX, pz - portalZ);
+            if (d < 3) {
+              s.enterWorld('white');
+              return;
+            }
+          }
+          // In white world, the mirror is the only E target. FriedMirror
+          // handles its own keydown, so bail out of the fried-only checks
+          // below to avoid phantom hoverboard/chest/ad/drop interactions.
+          if (s.current === 'white') return;
+        }
 
         // Check distance to hoverboard pickup — open purchase modal
         const boardDist = Math.sqrt(
@@ -2856,13 +2890,56 @@ export default function WorldPage() {
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
   function GameLogic() {
-    useFrame(() => {
+    // Priority -10: runs BEFORE CameraRig's default-priority useFrame so the
+    // camera reads the fresh player position each frame — otherwise during a
+    // jump the camera lags by one tick and "can't keep up."
+    useFrame((_, delta) => {
       const player = playerRef.current;
       const input = inputRef.current;
       const combat = combatRef.current;
       const ocean = oceanRef.current;
       const mp = mpRef.current;
       if (!player) return;
+      // Real (unscaled) delta, clamped so a tab-blur resume doesn't
+      // advance the focus meter / slomo state machine by seconds.
+      const dt = Math.min(delta, 1 / 20);
+
+      // Sync camera-target Object3D with the target Vector3 so CameraRig
+      // can read the player position via Object3D.position.
+      if (cameraTargetObjRef.current) {
+        cameraTargetObjRef.current.position.copy(playerTargetRef.current);
+      }
+
+      // Publish the authoritative body to dojoState so GravityZones /
+      // TrainingDummies can read it for proximity + impulse effects.
+      const playerBody = getPlayerBody(player);
+      setPlayerBodyForDojo(playerBody);
+
+      // Double-tap dash detection (edge-triggered on WASD just-pressed).
+      // Writes into the authoritative body so locomotion.ts picks up
+      // lastDirTapTime/Vec and triggers the actual dash state.
+      {
+        const jp = input.justPressed;
+        const body = playerBody ?? dashTapBodyRef.current;
+        const nowMs = performance.now();
+        // Camera-relative: W = forward, S = back, A = left, D = right.
+        const ca = input.cameraAngle ?? 0;
+        const forwardX = -Math.sin(ca);
+        const forwardY = -Math.cos(ca);
+        const rightX = Math.cos(ca);
+        const rightY = -Math.sin(ca);
+        const tryTap = (dx: number, dy: number) => {
+          // Consume the tap. When a double-tap closes, registerDirTap
+          // returns true — locomotion owns the actual dash + focus
+          // trigger inside combat.ts via its authoritative body, so we
+          // just record the edge here for the shared double-tap window.
+          registerDirTap(body, dx, dy, nowMs);
+        };
+        if (jp.has('w')) tryTap(forwardX, forwardY);
+        if (jp.has('s')) tryTap(-forwardX, -forwardY);
+        if (jp.has('a')) tryTap(-rightX, -rightY);
+        if (jp.has('d')) tryTap(rightX, rightY);
+      }
 
       // ── FEATURE 2: Poll gamepad each frame ──
       pollGamepad(input);
@@ -3127,6 +3204,23 @@ export default function WorldPage() {
       pcs.hitFlash = player.hitFlash;
       pcs.hp = player.hp;
 
+      // Fine-grained locomotion substate + landing juice + wall-run tilt
+      // read directly from the authoritative body so Character3D animations
+      // match the exact movement state.
+      if (playerBody) {
+        pcs.locoSubstate = playerBody.loco;
+        pcs.landingImpact = playerBody.landingImpact;
+        pcs.wallRunSide = playerBody.wallRun
+          ? playerBody.wallRun.normalX > 0
+            ? 'right'
+            : 'left'
+          : undefined;
+      } else {
+        pcs.locoSubstate = 'grounded';
+        pcs.landingImpact = 0;
+        pcs.wallRunSide = undefined;
+      }
+
       // Update NPC character state refs
       for (let i = 0; i < npcsRef.current.length; i++) {
         const npc = npcsRef.current[i];
@@ -3165,7 +3259,12 @@ export default function WorldPage() {
       updateFloatingTexts(combat.floatingTexts);
       updateForcePushes(combat.forcePushes);
       combat.shake = updateScreenShake(combat.shake);
-      combat.slowMo = updateSlowMo(combat.slowMo);
+      // Bullet-time state machine (ramped entry / hold / exit).
+      // updateSlomo tolerates legacy {factor, timer} objects created by
+      // combat.ts hitstops, so this coexists with createSlowMo callers.
+      combat.slowMo = updateSlomo(combat.slowMo, dt);
+      updateFocusMeter(dt);
+      applySlomoAudio(combat.slowMo?.factor ?? 1);
 
       // Prune old kills
       const now = Date.now();
@@ -3277,7 +3376,7 @@ export default function WorldPage() {
       pcs.vy = player.vy;
       pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
       pcs.swordEquipped = false; // TODO: wire sword pickup
-    });
+    }, -10);
 
     return null;
   }
@@ -3416,6 +3515,8 @@ export default function WorldPage() {
     );
   }
 
+  const isFried = worldCurrent === 'fried';
+
   return (
     <div
       ref={canvasContainerRef}
@@ -3425,11 +3526,11 @@ export default function WorldPage() {
         left: 0,
         width: '100vw',
         height: '100vh',
-        background: '#1a4f8a',
+        background: isFried ? '#1a4f8a' : '#f7f7f7',
         cursor: 'crosshair',
         overflow: 'hidden',
-        // Deep fried aesthetic — oversaturated, high contrast
-        filter: 'saturate(1.6) contrast(1.15) brightness(1.05)',
+        // Deep fried aesthetic is fried-world-only.
+        filter: isFried ? 'saturate(1.6) contrast(1.15) brightness(1.05)' : 'none',
       }}
     >
       <Canvas
@@ -3437,108 +3538,291 @@ export default function WorldPage() {
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: false }}
       >
-        {/* Sky — twilight magenta-peach clear color behind the dome */}
-        <color attach="background" args={['#6a3f55']} />
-        {/* Twilight fog — reaches the horizon ring (180-320u) so chunks fade through haze */}
-        <DystopianFog color="#5a4068" near={50} far={340} />
-        <DystopianSky />
+        {/* White room — default landing, minimal scene. */}
+        {!isFried && (
+          <WhiteRoom
+            playerRef={playerRef}
+            authorId={mpRef.current.myId || 'anon'}
+            spawnX={SPAWN_X}
+            spawnY={SPAWN_Y}
+            activeWallId={graffitiOpen ? graffitiWallId : null}
+            onStrokeEnd={wallId => {
+              const ws = mpRef.current.ws;
+              if (ws) sendSnapshot(ws as unknown as WsLike, wallId, mpRef.current.myId || 'anon');
+            }}
+          />
+        )}
 
-        <Lighting />
-        <AnimatedOcean />
-        <Terrain />
-        <Trees />
-        <Rocks />
-        <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
-        <Gravestones />
-        <VenetianBoats />
-        <GasStation
-          position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
-          rotationY={-0.4}
-        />
+        {/* Scene background — ALWAYS mounted (not gated on isFried) so the
+            scene.background gets set in both worlds. Imperative via useThree
+            so it bypasses R3F attach= race conditions. */}
+        <SceneBackground color={isFried ? '#6a3f55' : '#ffffff'} />
+        {!isFried && <fog attach="fog" args={['#ffffff', 40, 340]} />}
+        {isFried && (
+          <>
+            <DystopianFog color="#5a4068" near={50} far={340} />
+            <DystopianSky />
+          </>
+        )}
 
-        {/* Dystopian atmosphere (replaces sunny birds + puffy clouds) */}
-        <SmogClouds />
-        <Vultures />
-        <RainParticles />
-        <NeonBillboards />
-        <Dolphins />
+        {/* Fried world scene — only mount when opted in. */}
+        {isFried && (
+          <>
+            {/* Matrix-style post-FX stack — reads combat.slowMo via timeControl. */}
+            <SlomoPostFX />
 
-        {/* Joystick billboard near southeast coast */}
-        <Billboard
-          position={[25 * TILE_SIZE * WORLD_SCALE, 0.3, 45 * TILE_SIZE * WORLD_SCALE]}
-          text="🕹️ NOUN.WTF/WORLD"
-          rotation={0.3}
-        />
-
-        {/* World objects */}
-        <Billboard
-          position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]}
-          text={
-            billboardAds['ad-board-1']?.imageUrl
-              ? `AD: ${billboardAds['ad-board-1'].paidBy.slice(0, 8)}...`
-              : 'probe.wtf'
-          }
-          url={billboardAds['ad-board-1']?.imageUrl || 'https://probe.wtf'}
-        />
-        <Billboard
-          position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]}
-          text={
-            billboardAds['ad-board-2']?.imageUrl
-              ? `AD: ${billboardAds['ad-board-2'].paidBy.slice(0, 8)}...`
-              : 'YOUR AD HERE ⌐◧-◧'
-          }
-          url={billboardAds['ad-board-2']?.imageUrl}
-          rotation={0.5}
-        />
-        <Billboard
-          position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]}
-          text={
-            billboardAds['ad-board-3']?.imageUrl
-              ? `AD: ${billboardAds['ad-board-3'].paidBy.slice(0, 8)}...`
-              : 'pooter.world'
-          }
-          url={billboardAds['ad-board-3']?.imageUrl || 'https://pooter.world'}
-          rotation={-0.3}
-        />
-        {/* [E] ADVERTISE prompts near ad billboards */}
-        {AD_BILLBOARDS.map(board => (
-          <Html
-            key={`ad-prompt-${board.id}`}
-            position={[board.worldX * WORLD_SCALE, 0.3, board.worldZ * WORLD_SCALE]}
-            center
-            distanceFactor={6}
-            style={{ pointerEvents: 'none' }}
-          >
-            <div
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '10px',
-                color: '#ffaa00',
-                textShadow: '0 0 4px rgba(0,0,0,0.8)',
-                whiteSpace: 'nowrap',
-                userSelect: 'none',
-                opacity: 0.8,
-              }}
+            {/* Return portal to white room — wall-mounted frame at spawn. */}
+            <group
+              position={[SPAWN_X * WORLD_SCALE, 1.6, SPAWN_Y * WORLD_SCALE]}
+              rotation={[0, Math.PI, 0]}
             >
-              [E] ADVERTISE
-            </div>
-          </Html>
-        ))}
+              <mesh position={[0, 0, -0.02]}>
+                <planeGeometry args={[1.8, 3]} />
+                <meshBasicMaterial color="#0a0a0a" />
+              </mesh>
+              <mesh>
+                <planeGeometry args={[1.6, 2.8]} />
+                <meshBasicMaterial color="#ffffff" toneMapped={false} />
+              </mesh>
+              <Html
+                position={[0, 2, 0]}
+                center
+                distanceFactor={10}
+                style={{ pointerEvents: 'none' }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    background: 'rgba(0,0,0,0.85)',
+                    border: '1px solid #fff',
+                    padding: '5px 9px',
+                    letterSpacing: '2px',
+                    whiteSpace: 'nowrap',
+                    userSelect: 'none',
+                  }}
+                >
+                  [E] RETURN TO WHITE ROOM
+                </div>
+              </Html>
+            </group>
 
-        <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
-        <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
+            {/* World geometry root — bounded raycast target for camera
+            collision push-in (CameraRig uses this as sceneRootRef). */}
+            <group ref={sceneRootRef}>
+              <Lighting />
+              <AnimatedOcean />
+              <Terrain />
+              <Trees />
+              <Rocks />
+              <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
+              <Gravestones />
+              <VenetianBoats />
+              <GasStation
+                position={[48 * TILE_SIZE * WORLD_SCALE, 0.35, 45 * TILE_SIZE * WORLD_SCALE]}
+                rotationY={-0.4}
+              />
 
-        {/* Graffiti walls — powered by @nouns/graffiti */}
-        <GraffitiWalls
-          activeWallId={graffitiOpen ? graffitiWallId : null}
-          authorId={mpRef.current.myId || 'anon'}
-          onStrokeEnd={wallId => {
-            const ws = mpRef.current.ws;
-            if (ws) sendSnapshot(ws as unknown as WsLike, wallId, mpRef.current.myId || 'anon');
-          }}
-        />
+              {/* Dystopian atmosphere (replaces sunny birds + puffy clouds) */}
+              <SmogClouds />
+              <Vultures />
+              <RainParticles />
+              <NeonBillboards />
+              <Dolphins />
 
-        {/* Paint can pickups */}
+              {/* Joystick billboard near southeast coast */}
+              <Billboard
+                position={[25 * TILE_SIZE * WORLD_SCALE, 0.3, 45 * TILE_SIZE * WORLD_SCALE]}
+                text="🕹️ NOUN.WTF/WORLD"
+                rotation={0.3}
+              />
+
+              {/* World objects */}
+              <Billboard
+                position={[45 * WORLD_SCALE, 0.8, 38 * WORLD_SCALE]}
+                text={
+                  billboardAds['ad-board-1']?.imageUrl
+                    ? `AD: ${billboardAds['ad-board-1'].paidBy.slice(0, 8)}...`
+                    : 'probe.wtf'
+                }
+                url={billboardAds['ad-board-1']?.imageUrl || 'https://probe.wtf'}
+              />
+              <Billboard
+                position={[55 * WORLD_SCALE, 0.8, 42 * WORLD_SCALE]}
+                text={
+                  billboardAds['ad-board-2']?.imageUrl
+                    ? `AD: ${billboardAds['ad-board-2'].paidBy.slice(0, 8)}...`
+                    : 'YOUR AD HERE ⌐◧-◧'
+                }
+                url={billboardAds['ad-board-2']?.imageUrl}
+                rotation={0.5}
+              />
+              <Billboard
+                position={[35 * WORLD_SCALE, 0.8, 55 * WORLD_SCALE]}
+                text={
+                  billboardAds['ad-board-3']?.imageUrl
+                    ? `AD: ${billboardAds['ad-board-3'].paidBy.slice(0, 8)}...`
+                    : 'pooter.world'
+                }
+                url={billboardAds['ad-board-3']?.imageUrl || 'https://pooter.world'}
+                rotation={-0.3}
+              />
+              {/* [E] ADVERTISE prompts near ad billboards */}
+              {AD_BILLBOARDS.map(board => (
+                <Html
+                  key={`ad-prompt-${board.id}`}
+                  position={[board.worldX * WORLD_SCALE, 0.3, board.worldZ * WORLD_SCALE]}
+                  center
+                  distanceFactor={6}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '10px',
+                      color: '#ffaa00',
+                      textShadow: '0 0 4px rgba(0,0,0,0.8)',
+                      whiteSpace: 'nowrap',
+                      userSelect: 'none',
+                      opacity: 0.8,
+                    }}
+                  >
+                    [E] ADVERTISE
+                  </div>
+                </Html>
+              ))}
+
+              <WinnieVan position={[58 * WORLD_SCALE, 0.35, 54 * WORLD_SCALE]} rotation={0.8} />
+              <MechanicSign position={[56 * WORLD_SCALE, 0.35, 52 * WORLD_SCALE]} />
+
+              {/* Graffiti walls — powered by @nouns/graffiti */}
+              <GraffitiWalls
+                activeWallId={graffitiOpen ? graffitiWallId : null}
+                authorId={mpRef.current.myId || 'anon'}
+                onStrokeEnd={wallId => {
+                  const ws = mpRef.current.ws;
+                  if (ws)
+                    sendSnapshot(ws as unknown as WsLike, wallId, mpRef.current.myId || 'anon');
+                }}
+              />
+
+              {/* Mega Ramp */}
+              <MegaRamp3D />
+
+              {/* NYC Apartment Block (adjacent to mega ramp) */}
+              <NYCApartmentBlock />
+
+              {/* Burj Khalifa — so tall it disappears into the clouds */}
+              <BurjKhalifa />
+
+              {/* Caribbean Office (southeast coast) */}
+              <CaribbeanOffice />
+
+              {/* City block density — street furniture, parked cars, storefronts, dumpsters */}
+              <CityBlock />
+
+              {/* Distant lofi Terraforms-style skyline at the horizon */}
+              <TerraformsHorizon />
+
+              {/* Fortnite-style build mode — hold B, 1-7 pick, Space place */}
+              <BuildMode
+                inputRef={inputRef}
+                playerRef={buildPlayerRef}
+                authorId={mpRef.current.myId || 'anon'}
+                wsRef={buildWsRef}
+                store={buildStoreRef.current}
+                onActiveChange={(a, k) => {
+                  setBuildHudActive(a);
+                  setBuildHudKind(k);
+                }}
+              />
+
+              {/* Hoverboard Pickup (near mega ramp) */}
+              {!hasHoverboard && (
+                <HoverboardPickup3D
+                  position={[
+                    HOVERBOARD_PICKUP_X,
+                    getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 0.3,
+                    HOVERBOARD_PICKUP_Z,
+                  ]}
+                  playerDistance={(() => {
+                    const p = playerRef.current;
+                    if (!p) return 99;
+                    const px = p.x * WORLD_SCALE;
+                    const pz = p.y * WORLD_SCALE;
+                    return Math.sqrt(
+                      (px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2,
+                    );
+                  })()}
+                />
+              )}
+
+              {/* Price label floating above hoverboard pickup */}
+              {!hasHoverboard && (
+                <Html
+                  position={[
+                    HOVERBOARD_PICKUP_X,
+                    getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 1.8,
+                    HOVERBOARD_PICKUP_Z,
+                  ]}
+                  center
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: '#00ffcc',
+                      textShadow: '0 0 8px rgba(0,255,204,0.6), 0 2px 4px rgba(0,0,0,0.8)',
+                      whiteSpace: 'nowrap',
+                      textAlign: 'center',
+                    }}
+                  >
+                    0.01 ETH
+                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: 2 }}>
+                      [E] to interact
+                    </div>
+                  </div>
+                </Html>
+              )}
+
+              {/* Treasure Chest */}
+              <TreasureChest3D
+                position={[
+                  chestWorldX,
+                  getTerrainHeight(chestWorldX, chestWorldZ) + 0.1,
+                  chestWorldZ,
+                ]}
+                pendingCount={0}
+                onInteract={() => setDepositOpen(true)}
+                playerDistance={99}
+              />
+
+              {/* Dropped items from last drop party */}
+              {droppedItems
+                .filter(d => !d.claimed)
+                .map(item => (
+                  <DroppedItem3D
+                    key={item.dropId}
+                    position={[
+                      item.worldX * WORLD_SCALE,
+                      getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1,
+                      item.worldY * WORLD_SCALE,
+                    ]}
+                    itemType={item.itemType}
+                    claimed={item.claimed}
+                  />
+                ))}
+            </group>
+          </>
+        )}
+
+        {/* Paint cans + weapon pickups — rendered in BOTH worlds so
+            they're accessible from the white-room too. State is global
+            (getActivePaintCans / getActivePickups). */}
         {paintCans
           .filter(c => !c.picked)
           .map(can => (
@@ -3546,115 +3830,14 @@ export default function WorldPage() {
               key={can.id}
               position={[
                 can.worldX * WORLD_SCALE,
-                getTerrainHeight(can.worldX * WORLD_SCALE, can.worldY * WORLD_SCALE) + 0.3,
+                (isFried
+                  ? getTerrainHeight(can.worldX * WORLD_SCALE, can.worldY * WORLD_SCALE)
+                  : 0) + 0.3,
                 can.worldY * WORLD_SCALE,
               ]}
               color={can.color}
             />
           ))}
-
-        {/* Mega Ramp */}
-        <MegaRamp3D />
-
-        {/* NYC Apartment Block (adjacent to mega ramp) */}
-        <NYCApartmentBlock />
-
-        {/* Burj Khalifa — so tall it disappears into the clouds */}
-        <BurjKhalifa />
-
-        {/* Caribbean Office (southeast coast) */}
-        <CaribbeanOffice />
-
-        {/* City block density — street furniture, parked cars, storefronts, dumpsters */}
-        <CityBlock />
-
-        {/* Distant lofi Terraforms-style skyline at the horizon */}
-        <TerraformsHorizon />
-
-        {/* Fortnite-style build mode — hold B, 1-7 pick, Space place */}
-        <BuildMode
-          inputRef={inputRef}
-          playerRef={buildPlayerRef}
-          authorId={mpRef.current.myId || 'anon'}
-          wsRef={buildWsRef}
-          store={buildStoreRef.current}
-          onActiveChange={(a, k) => {
-            setBuildHudActive(a);
-            setBuildHudKind(k);
-          }}
-        />
-
-        {/* Hoverboard Pickup (near mega ramp) */}
-        {!hasHoverboard && (
-          <HoverboardPickup3D
-            position={[
-              HOVERBOARD_PICKUP_X,
-              getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 0.3,
-              HOVERBOARD_PICKUP_Z,
-            ]}
-            playerDistance={(() => {
-              const p = playerRef.current;
-              if (!p) return 99;
-              const px = p.x * WORLD_SCALE;
-              const pz = p.y * WORLD_SCALE;
-              return Math.sqrt((px - HOVERBOARD_PICKUP_X) ** 2 + (pz - HOVERBOARD_PICKUP_Z) ** 2);
-            })()}
-          />
-        )}
-
-        {/* Price label floating above hoverboard pickup */}
-        {!hasHoverboard && (
-          <Html
-            position={[
-              HOVERBOARD_PICKUP_X,
-              getTerrainHeight(HOVERBOARD_PICKUP_X, HOVERBOARD_PICKUP_Z) + 1.8,
-              HOVERBOARD_PICKUP_Z,
-            ]}
-            center
-            style={{ pointerEvents: 'none', userSelect: 'none' }}
-          >
-            <div
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: '#00ffcc',
-                textShadow: '0 0 8px rgba(0,255,204,0.6), 0 2px 4px rgba(0,0,0,0.8)',
-                whiteSpace: 'nowrap',
-                textAlign: 'center',
-              }}
-            >
-              0.01 ETH
-              <div style={{ fontSize: '10px', color: '#aaa', marginTop: 2 }}>[E] to interact</div>
-            </div>
-          </Html>
-        )}
-
-        {/* Treasure Chest */}
-        <TreasureChest3D
-          position={[chestWorldX, getTerrainHeight(chestWorldX, chestWorldZ) + 0.1, chestWorldZ]}
-          pendingCount={0}
-          onInteract={() => setDepositOpen(true)}
-          playerDistance={99}
-        />
-
-        {/* Dropped items from last drop party */}
-        {droppedItems
-          .filter(d => !d.claimed)
-          .map(item => (
-            <DroppedItem3D
-              key={item.dropId}
-              position={[
-                item.worldX * WORLD_SCALE,
-                getTerrainHeight(item.worldX * WORLD_SCALE, item.worldY * WORLD_SCALE) + 0.1,
-                item.worldY * WORLD_SCALE,
-              ]}
-              itemType={item.itemType}
-              claimed={item.claimed}
-            />
-          ))}
-
-        {/* Weapon pickups on the ground */}
         {weaponPickups
           .filter(p => !p.picked)
           .map(pickup => (
@@ -3662,7 +3845,9 @@ export default function WorldPage() {
               key={pickup.id}
               position={[
                 pickup.worldX * WORLD_SCALE,
-                getTerrainHeight(pickup.worldX * WORLD_SCALE, pickup.worldY * WORLD_SCALE) + 0.2,
+                (isFried
+                  ? getTerrainHeight(pickup.worldX * WORLD_SCALE, pickup.worldY * WORLD_SCALE)
+                  : 0) + 0.2,
                 pickup.worldY * WORLD_SCALE,
               ]}
               type={pickup.type}
@@ -3670,30 +3855,46 @@ export default function WorldPage() {
             />
           ))}
 
+        {/* Shared systems — mounted in both worlds so state (player pos,
+            multiplayer connection, camera follow, combat loop) survives
+            the white ↔ fried world swap. */}
         <PlayerCharacter3D />
         <RemotePlayers />
 
-        <CameraController
-          target={playerTargetRef.current}
+        {/* Invisible follow target — kept in sync with playerTargetRef
+            each tick so CameraRig can read its Object3D.position. */}
+        <object3D ref={cameraTargetObjRef} />
+        <CameraRig
+          target={cameraTargetObjRef}
           inputRef={inputRef}
           playerCharState={playerCharState}
+          combatRef={combatRef}
+          sceneRootRef={sceneRootRef}
         />
         <GameLogic />
       </Canvas>
 
-      {/* Deep fried grain overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          zIndex: 5,
-          background:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")",
-          opacity: 0.04,
-          mixBlendMode: 'overlay',
-        }}
-      />
+      {/* Deep fried grain overlay — fried world only */}
+      {isFried && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 5,
+            background:
+              "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")",
+            opacity: 0.04,
+            mixBlendMode: 'overlay',
+          }}
+        />
+      )}
+
+      {/* White → Fried transition overlay (CSS white flash + grain fade) */}
+      <TransitionOverlay />
+
+      {/* First-mount Matrix suck/zoom cinematic entry */}
+      <GlitchEntry />
 
       <HUDLive hudRef={hudRef} />
 
@@ -3711,8 +3912,8 @@ export default function WorldPage() {
         <LolLogo />
       </div>
 
-      {/* FEATURE 1: "NOUNS WORLD" cloud text intro */}
-      {introPhase !== 'done' && (
+      {/* FEATURE 1: "NOUNS WORLD" cloud text intro — only in fried world */}
+      {isFried && introPhase !== 'done' && (
         <div
           style={{
             position: 'fixed',
@@ -4160,6 +4361,10 @@ export default function WorldPage() {
           ))}
         </div>
       )}
+
+      {/* Mobile camera orbit zone — mid-right vertical strip, drag to
+          orbit the rig. Auto-hides on non-touch devices. */}
+      <CameraTouchZone inputRef={inputRef} />
 
       {/* Mobile virtual controls */}
       {isTouchDevice() && (

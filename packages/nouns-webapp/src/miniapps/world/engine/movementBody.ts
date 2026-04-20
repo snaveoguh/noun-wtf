@@ -30,6 +30,29 @@ export interface ClimbState {
   material: GroundMaterial;
 }
 
+/** Wall-run adhesion state. Null when not wall-running. */
+export interface WallRunState {
+  /** outward-facing normal from the wall, in world XY */
+  normalX: number;
+  normalY: number;
+  /** frames remaining before auto-release */
+  timeLeft: number;
+}
+
+/**
+ * Fine-grained locomotion substate. Player.state keeps the coarse
+ * networking-safe enum; body.loco is the internal dispatch tag.
+ */
+export type LocoSubstate =
+  | 'grounded'
+  | 'jumping'
+  | 'falling'
+  | 'doubleJumping'
+  | 'dashing'
+  | 'sliding'
+  | 'wallRunning'
+  | 'mantling';
+
 /**
  * Minimal motion state. Read and mutated by stepLocomotion.
  * Everything else the game needs (combat timers, hp, animation) stays
@@ -71,6 +94,46 @@ export interface MovementBody {
 
   /** active climb contact, or null when not climbing */
   climb: ClimbState | null;
+
+  // ── Fine-grained locomotion substate ────────────────────────────────
+  /** Dispatcher tag — which leaf step handles this frame. */
+  loco: LocoSubstate;
+
+  /** Mid-air jumps spent since last ground contact. */
+  airJumpsUsed: number;
+
+  // ── Dash ────────────────────────────────────────────────────────────
+  /** Frames remaining in the current dash (loco traversal burst). */
+  dashTimer: number;
+  /** Dash velocity components (so we can scale at exit w/o stateful math). */
+  dashVx: number;
+  dashVy: number;
+  /** Invincibility frames (dash / parry / etc). */
+  iFrames: number;
+
+  // ── Slide ───────────────────────────────────────────────────────────
+  /** Frames remaining in the current crouch-slide. */
+  slideTimer: number;
+
+  // ── Wall-run ────────────────────────────────────────────────────────
+  /** Wall-run adhesion state, or null when not wall-running. */
+  wallRun: WallRunState | null;
+
+  // ── Mantle ──────────────────────────────────────────────────────────
+  /** Frames remaining in the current mantle-up animation. */
+  mantleTimer: number;
+  /** World-Z we're lerping toward during a mantle. */
+  mantleTargetZ: number;
+
+  // ── Double-tap dash detection ───────────────────────────────────────
+  /** Timestamp (ms) of the last directional input tap we recorded. */
+  lastDirTapTime: number;
+  /** Unit vector of that last tap, or null if cleared. */
+  lastDirTapVec: [number, number] | null;
+
+  // ── Landing / juice telemetry ───────────────────────────────────────
+  /** Absolute |vz| at the moment of most recent ground contact. */
+  landingImpact: number;
 }
 
 export const DEFAULT_BODY_RADIUS = 5.5;
@@ -95,6 +158,20 @@ export function createMovementBody(x: number, y: number): MovementBody {
     jumpHeld: false,
     jumpCut: false,
     climb: null,
+    // Locomotion substate & feel fields.
+    loco: 'grounded',
+    airJumpsUsed: 0,
+    dashTimer: 0,
+    dashVx: 0,
+    dashVy: 0,
+    iFrames: 0,
+    slideTimer: 0,
+    wallRun: null,
+    mantleTimer: 0,
+    mantleTargetZ: 0,
+    lastDirTapTime: 0,
+    lastDirTapVec: null,
+    landingImpact: 0,
   };
 }
 
@@ -128,4 +205,30 @@ export function bodyToPlayer(body: MovementBody, player: Player): void {
   // Mirror jump-count so legacy code (animation, network) stays sane.
   // 0 when grounded, 1 while in a single jump arc.
   player.jumpCount = body.grounded ? 0 : Math.max(player.jumpCount, 1);
+}
+
+/**
+ * Map the fine-grained body.loco back to a coarse PlayerState for
+ * networking/animation. Combat states (attacking, stunned, dead, ...)
+ * take priority and are set by combat.ts — we only convert when the
+ * current state is a locomotion-owned one.
+ */
+export function locoToCoarseState(loco: MovementBody['loco']): Player['state'] {
+  switch (loco) {
+    case 'grounded':
+      return 'idle';
+    case 'jumping':
+    case 'falling':
+      return 'airborne';
+    case 'doubleJumping':
+      return 'doubleJumping';
+    case 'dashing':
+      return 'dashing';
+    case 'sliding':
+      return 'sliding';
+    case 'wallRunning':
+      return 'wallRunning';
+    case 'mantling':
+      return 'mantling';
+  }
 }

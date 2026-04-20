@@ -9,6 +9,7 @@
  */
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { InputState } from './input';
+import { triggerFocus, releaseManualFocus } from './timeControl';
 
 // ── Detect mobile ───────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ interface ButtonDef {
   icon: string;
   key: string; // key to inject into InputState
   hold?: boolean; // true = key stays held while touching
-  special?: 'jump' | 'shift'; // special handling
+  special?: 'jump' | 'shift' | 'focus'; // special handling
 }
 
 const BUTTONS: ButtonDef[] = [
@@ -36,6 +37,8 @@ const BUTTONS: ButtonDef[] = [
   { icon: '⏫', key: ' ', special: 'jump' },
   { icon: '🏃', key: 'r', hold: true },
   { icon: '🛡', key: 'shift', hold: true, special: 'shift' },
+  // Focus / bullet-time (tap = pulse, hold = maintained)
+  { icon: '⚡', key: '__focus', special: 'focus', hold: true },
   // Weapons/Items (blues)
   { icon: '🔫', key: 'f' },
   { icon: '✋', key: 'e' },
@@ -55,7 +58,8 @@ const BUTTONS: ButtonDef[] = [
   { icon: '✕', key: 'escape' },
 ];
 
-// Rainbow gradient colors for the arc (bottom → top)
+// Rainbow gradient colors for the arc (bottom → top). Index 8 is the
+// focus/slomo slot — a bright electric yellow so bullet-time stands out.
 const ARC_COLORS = [
   '#ff4444',
   '#ff5533',
@@ -65,6 +69,7 @@ const ARC_COLORS = [
   '#44ff88',
   '#22ddaa',
   '#00ccbb', // greens
+  '#ffee44', // focus — electric yellow (bullet-time)
   '#4488ff',
   '#5566ff', // blues
   '#aa44ff',
@@ -241,6 +246,16 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     [inputRef, onJump],
   );
 
+  // ── Focus button state (tap vs hold discrimination) ────────────
+  //
+  // Tap = quick pulse of slomo (triggerFocus('aimBurst') — ~200ms hold).
+  // Hold (>160ms) = maintained manual slomo until release.
+  // We detect "hold" by arming a timer on touchstart that promotes the
+  // tap to a manual hold if still pressed when the timer fires.
+
+  const focusTouchRef = useRef<{ held: boolean; holdTimer: number | null } | null>(null);
+  const FOCUS_HOLD_DELAY_MS = 160;
+
   // ── Button press/release handlers ──────────────────────────────
 
   const handleButtonStart = useCallback(
@@ -269,6 +284,22 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         return;
       }
 
+      if (def.special === 'focus') {
+        // Start a hold-arm timer. If touch is still down when the timer
+        // fires, we promote to manual hold. Otherwise end-handler fires
+        // a short aimBurst pulse.
+        const state: { held: boolean; holdTimer: number | null } = {
+          held: false,
+          holdTimer: null,
+        };
+        state.holdTimer = window.setTimeout(() => {
+          state.held = true;
+          triggerFocus('manual');
+        }, FOCUS_HOLD_DELAY_MS);
+        focusTouchRef.current = state;
+        return;
+      }
+
       if (def.special === 'shift') {
         input.shiftHeld = true;
       }
@@ -289,6 +320,23 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     (def: ButtonDef) => {
       const input = inputRef.current;
       if (!input) return;
+
+      if (def.special === 'focus') {
+        const state = focusTouchRef.current;
+        focusTouchRef.current = null;
+        if (!state) return;
+        if (state.holdTimer !== null) {
+          window.clearTimeout(state.holdTimer);
+        }
+        if (state.held) {
+          // Released after hold — stop manual slomo.
+          releaseManualFocus();
+        } else {
+          // Quick tap — short aimBurst pulse (~400ms total, sharp exit).
+          triggerFocus('aimBurst');
+        }
+        return;
+      }
 
       if (def.hold) {
         input.keys.delete(def.key);
