@@ -47,8 +47,11 @@ interface TerrainViewProps {
 
 const PARCEL_SIZE = 1.2;
 const GRID_SIZE = 32;
-const CELL_PX = 1; // 1px per cell (32×32px per parcel) — color patterns, not text
-const ATLAS_COLS = 100; // 100×100 grid = 3200×3200px atlas — fits in GPU
+// 1px per cell — one pixel per ASCII char. Atlas = 3200×3200 (~40 MB) which
+// fits well under the 4096² mobile WebGL cap. From distance the colored pixel
+// pattern reads as ASCII art; up close the CharTerrain overlay paints real glyphs.
+const CELL_PX = 1;
+const ATLAS_COLS = 100; // 100×100 grid = 3200×3200px atlas
 
 const tempObj = new THREE.Object3D();
 
@@ -71,51 +74,46 @@ const FONT_NAME = 'MathcastlesRemix';
 // ─── Texture Atlas (all 9,910 parcels in one texture) ─────────────────────
 
 /**
- * Build a single atlas texture containing all parcel arts.
+ * Build a single atlas texture containing all parcel arts as flat ASCII cards.
  * Each parcel gets a CELL_PX*32 × CELL_PX*32 tile in a 100×100 grid.
- * Returns { texture, uvOffsets } where uvOffsets maps tokenId → [u, v].
+ * Each cell renders the actual ASCII glyph (from the parcel's chars map) on a
+ * transparent background so flat planes look like ASCII art when seen from above.
+ * Returns { colorTex, uvMap } where uvMap maps tokenId → [u, v].
  */
 function buildAtlas(
   parcels: ParcelData[],
   terrainData: TerrainData,
 ): {
   colorTex: THREE.CanvasTexture;
-  heightTex: THREE.CanvasTexture;
   uvMap: Map<number, [number, number]>;
 } {
-  const tileSize = CELL_PX * GRID_SIZE; // 128px per parcel
-  const atlasSize = ATLAS_COLS * tileSize; // 12800px
+  const tileSize = CELL_PX * GRID_SIZE; // 32px per parcel (1px cells × 32 grid)
+  const atlasSize = ATLAS_COLS * tileSize; // 3200px
 
-  // Color atlas — ASCII art
+  // Color atlas — colored dots-on-transparent that READ as ASCII pixelation
+  // from any zoom level. The actual animated chars come from the near-set
+  // CharTerrain overlay; this layer just contributes the silhouette + palette.
   const colorCanvas = document.createElement('canvas');
   colorCanvas.width = atlasSize;
   colorCanvas.height = atlasSize;
-  const colorCtx = colorCanvas.getContext('2d')!;
-  colorCtx.fillStyle = '#000';
-  colorCtx.fillRect(0, 0, atlasSize, atlasSize);
-
-  // Height atlas — grayscale heightmap (bright = tall, dark = flat)
-  const heightCanvas = document.createElement('canvas');
-  heightCanvas.width = atlasSize;
-  heightCanvas.height = atlasSize;
-  const heightCtx = heightCanvas.getContext('2d')!;
-  heightCtx.fillStyle = '#000';
-  heightCtx.fillRect(0, 0, atlasSize, atlasSize);
+  const colorCtx = colorCanvas.getContext('2d', { alpha: true })!;
+  colorCtx.clearRect(0, 0, atlasSize, atlasSize);
 
   const uvMap = new Map<number, [number, number]>();
 
-  // Use ImageData for fast pixel-level atlas painting (no fillRect/fillText overhead)
-  const colorData = colorCtx.getImageData(0, 0, atlasSize, atlasSize);
-  const heightData = heightCtx.getImageData(0, 0, atlasSize, atlasSize);
-  const cPixels = colorData.data;
-  const hPixels = heightData.data;
+  // Use ImageData fast path — 6400² canvas is too slow to fill with thousands
+  // of fillRect calls. Direct pixel writes are ~50× quicker.
+  const imgData = colorCtx.getImageData(0, 0, atlasSize, atlasSize);
+  const px8 = imgData.data;
 
-  // Helper to parse hex color
-  const hexToRGB = (hex: string) => {
+  const hexToRGB = (hex: string): [number, number, number] => {
     const n = parseInt(hex.slice(1), 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   };
 
+  // Pre-resolve which class indices have a non-blank glyph per parcel — empty
+  // glyphs paint fully transparent (chars[k] === ' ') so the silhouette shows
+  // gaps where the original ASCII art has gaps.
   let slot = 0;
   for (const p of parcels) {
     const td = terrainData.tokens[p.tokenId] as TokenEntry | undefined;
@@ -126,39 +124,46 @@ function buildAtlas(
     const ox = tileCol * tileSize;
     const oy = tileRow * tileSize;
 
-    const [_bg, palette, classGrid] = td;
-    void _bg; // bg not used in atlas (transparent background)
+    const [bg, palette, classGrid, chars] = td;
+    const bgRGB = hexToRGB(bg || '#000000');
 
+    // Per-class: cached "is this glyph blank?" + RGB
+    const blankByClass = new Uint8Array(10);
+    const rgbByClass: Array<[number, number, number]> = new Array(10);
+    for (let i = 0; i < 10; i++) {
+      const k = String.fromCharCode(97 + i);
+      const g = chars[k];
+      blankByClass[i] = g && g !== ' ' ? 0 : 1;
+      rgbByClass[i] = hexToRGB(palette[i] || '#fff');
+    }
+
+    // Fill tile with parcel's onchain bg color first — Terraforms NFTs aren't
+    // transparent, they have a solid colored backdrop behind the chars.
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
-        const cls = classGrid[r * GRID_SIZE + c];
-        const clsIdx = cls.charCodeAt(0) - 97;
-        const height = 9 - clsIdx; // a=9 peak, j=0 flat
+        const xx = ox + c * CELL_PX;
+        const yy = oy + r * CELL_PX;
+        const i4 = (yy * atlasSize + xx) * 4;
+        px8[i4] = bgRGB[0];
+        px8[i4 + 1] = bgRGB[1];
+        px8[i4 + 2] = bgRGB[2];
+        px8[i4 + 3] = 255;
+      }
+    }
 
-        const px = ox + c;
-        const py = oy + r;
-        const idx = (py * atlasSize + px) * 4;
-
-        // Color: zone color for elevated cells, dark tint of zone color for ground
-        // (pure black bg gets averaged to invisible by mipmapping from distance)
-        let rgb;
-        if (height > 0) {
-          rgb = hexToRGB(palette[clsIdx] || '#fff');
-        } else {
-          const base = hexToRGB(palette[0] || '#222');
-          rgb = [Math.round(base[0] * 0.6), Math.round(base[1] * 0.6), Math.round(base[2] * 0.6)];
-        }
-        cPixels[idx] = rgb[0];
-        cPixels[idx + 1] = rgb[1];
-        cPixels[idx + 2] = rgb[2];
-        cPixels[idx + 3] = 255;
-
-        // Height: grayscale 0-255
-        const brightness = Math.round((height / 9) * 255);
-        hPixels[idx] = brightness;
-        hPixels[idx + 1] = brightness;
-        hPixels[idx + 2] = brightness;
-        hPixels[idx + 3] = 255;
+    // Now overlay the colored chars on top of the bg.
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const clsIdx = (classGrid.charCodeAt(r * GRID_SIZE + c) - 97) & 0x0f;
+        if (clsIdx > 9 || blankByClass[clsIdx]) continue; // bg shows through where char is blank
+        const rgb = rgbByClass[clsIdx];
+        const xx = ox + c * CELL_PX;
+        const yy = oy + r * CELL_PX;
+        const i4 = (yy * atlasSize + xx) * 4;
+        px8[i4] = rgb[0];
+        px8[i4 + 1] = rgb[1];
+        px8[i4 + 2] = rgb[2];
+        px8[i4 + 3] = 255;
       }
     }
 
@@ -166,20 +171,17 @@ function buildAtlas(
     slot++;
   }
 
-  colorCtx.putImageData(colorData, 0, 0);
-  heightCtx.putImageData(heightData, 0, 0);
+  colorCtx.putImageData(imgData, 0, 0);
 
   console.log('Atlas built:', { slots: slot, uvMapSize: uvMap.size, atlasSize, tileSize });
 
   const colorTex = new THREE.CanvasTexture(colorCanvas);
-  colorTex.magFilter = THREE.NearestFilter;
+  colorTex.magFilter = THREE.LinearFilter;
   colorTex.minFilter = THREE.LinearMipmapLinearFilter;
+  colorTex.generateMipmaps = true;
+  colorTex.colorSpace = THREE.SRGBColorSpace;
 
-  const heightTex = new THREE.CanvasTexture(heightCanvas);
-  heightTex.magFilter = THREE.NearestFilter;
-  heightTex.minFilter = THREE.NearestFilter;
-
-  return { colorTex, heightTex, uvMap };
+  return { colorTex, uvMap };
 }
 
 // ─── All Parcels InstancedMesh (single draw call) ─────────────────────────
@@ -196,6 +198,7 @@ function AllParcelsInstanced({
   hoveredId,
   setHoveredId,
   heightScale,
+  hiddenParcelIds,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
@@ -204,9 +207,14 @@ function AllParcelsInstanced({
   hoveredId: number | null;
   setHoveredId: (id: number | null) => void;
   heightScale: number;
+  hiddenParcelIds: Set<number>;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const idMapRef = useRef<number[]>([]);
+  // Track previous hidden set for diff-only matrix mutations
+  const prevHiddenRef = useRef<Set<number>>(new Set());
+  // Cache the "shown" matrix per index so we can restore quickly when unhiding
+  const baseMatrixRef = useRef<Float32Array | null>(null);
 
   // Build atlas once when both parcels + terrainData are ready
   const atlas = useMemo(
@@ -215,56 +223,47 @@ function AllParcelsInstanced({
     [parcels.length, terrainData], // only rebuild when data actually changes, not on hover
   );
 
-  // Custom shader: color atlas + height displacement + saturation boost
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  // Custom shader: flat ASCII atlas card — no extrusion, no per-vertex displacement.
+  // Each instance is a single textured plane. Transparent bg + alphaTest so empty
+  // cells in the ASCII art see through to whatever's behind.
   const material = useMemo(() => {
     const uvScale = 1 / ATLAS_COLS;
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         colorAtlas: { value: atlas.colorTex },
-        heightAtlas: { value: atlas.heightTex },
         uvScale: { value: uvScale },
-        heightScale: { value: heightScale },
       },
       vertexShader: `
         attribute vec2 uvOffset;
         varying vec2 vUv;
-        varying float vHeight;
         uniform float uvScale;
-        uniform sampler2D heightAtlas;
-        uniform float heightScale;
         void main() {
           vUv = uv * uvScale + uvOffset;
-          float h = texture2D(heightAtlas, vUv).r;
-          vHeight = h;
-          vec3 pos = position;
-          pos.z += h * heightScale;
-          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: `
         uniform sampler2D colorAtlas;
         varying vec2 vUv;
-        varying float vHeight;
         void main() {
           vec4 col = texture2D(colorAtlas, vUv);
-          // Subtle height-based brightening — peaks pop, valleys stay grounded
-          col.rgb *= 1.0 + vHeight * 0.3;
+          if (col.a < 0.5) discard;
           gl_FragColor = col;
         }
       `,
       side: THREE.DoubleSide,
+      // Opaque + alpha-discard rather than `transparent: true` — prevents
+      // z-fighting flicker between coplanar parcels (InstancedMesh doesn't
+      // sort transparent instances per-frame, so the transparent pass would
+      // render them in arbitrary order and flicker).
+      transparent: false,
+      depthWrite: true,
     });
-    materialRef.current = mat;
     return mat;
   }, [atlas]);
-
-  // Sync uniforms every frame — avoids race conditions with useEffect
-  useFrame(() => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.heightScale.value = heightScale;
-    }
-  });
+  // heightScale no longer affects this layer — flat cards by design.
+  // (NearbyCharOverlay still consumes heightScale for animated voxel layer.)
+  void heightScale;
 
   // Set up instances
   useEffect(() => {
@@ -274,6 +273,8 @@ function AllParcelsInstanced({
     const { cx, cy, cz, scale } = normalization;
     const ids: number[] = [];
     const offsets = new Float32Array(parcels.length * 2);
+    // Cache base matrices (each is 16 floats) so we can swap visible/hidden cheaply.
+    const base = new Float32Array(parcels.length * 16);
 
     let mapped = 0;
     for (let i = 0; i < parcels.length; i++) {
@@ -287,6 +288,7 @@ function AllParcelsInstanced({
         tempObj.rotation.set(0, 0, 0);
         tempObj.updateMatrix();
         mesh.setMatrixAt(i, tempObj.matrix);
+        for (let k = 0; k < 16; k++) base[i * 16 + k] = tempObj.matrix.elements[k];
         offsets[i * 2] = 0;
         offsets[i * 2 + 1] = 0;
         ids.push(p.tokenId);
@@ -294,11 +296,13 @@ function AllParcelsInstanced({
       }
 
       mapped++;
-      tempObj.position.set((p.sx - cx) * scale, (p.sy - cy) * scale, (p.sz - cz) * scale);
+      // Terraforms structureSpace is Z-up; Three.js is Y-up. Swap sy ↔ sz.
+      tempObj.position.set((p.sx - cx) * scale, (p.sz - cz) * scale, (p.sy - cy) * scale);
       tempObj.rotation.set(-Math.PI / 2, 0, 0);
       tempObj.scale.setScalar(hoveredId === p.tokenId ? 1.6 : 1.0);
       tempObj.updateMatrix();
       mesh.setMatrixAt(i, tempObj.matrix);
+      for (let k = 0; k < 16; k++) base[i * 16 + k] = tempObj.matrix.elements[k];
 
       offsets[i * 2] = uv[0];
       offsets[i * 2 + 1] = uv[1];
@@ -318,11 +322,92 @@ function AllParcelsInstanced({
     const uvAttr = new THREE.InstancedBufferAttribute(offsets, 2);
     mesh.geometry.setAttribute('uvOffset', uvAttr);
 
-    mesh.instanceMatrix.needsUpdate = true;
     idMapRef.current = ids;
+    baseMatrixRef.current = base;
+    // Reapply any current hidden ids on top of the fresh base — otherwise a near-set
+    // membership change that already fired before this rebuild would be lost.
+    prevHiddenRef.current = new Set();
+    for (const id of hiddenParcelIds) {
+      const i = ids.indexOf(id);
+      if (i < 0) continue;
+      tempObj.position.set(0, -9999, 0);
+      tempObj.rotation.set(0, 0, 0);
+      tempObj.scale.setScalar(0);
+      tempObj.updateMatrix();
+      mesh.setMatrixAt(i, tempObj.matrix);
+    }
+    prevHiddenRef.current = new Set(hiddenParcelIds);
+
+    mesh.instanceMatrix.needsUpdate = true;
     console.log('Instances set:', mapped, 'mapped,', parcels.length - mapped, 'hidden');
+    // Progressive top-down reveal — start at 0, ramp up to full count over
+    // ~1.6s so the castle visibly grows from the top peak downward (parcels
+    // are pre-sorted by sz descending in useHypercastleData).
+    mesh.count = 0;
+    const start = performance.now();
+    const total = parcels.length;
+    const DURATION = 1600;
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - start) / DURATION);
+      // Ease-out cubic for snappier early reveal
+      const eased = 1 - Math.pow(1 - t, 3);
+      mesh.count = Math.floor(eased * total);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else mesh.count = total;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parcels.length, normalization, atlas]); // NO hoveredId — don't rebuild 9910 matrices on hover
+
+  // Visibility filter — hide near-set parcels (the ones drawn as live ASCII voxel terrain)
+  // so the colored atlas mesh doesn't leak through underneath. Diff-only mutations:
+  // we only touch instances whose membership in the hidden set actually changed.
+  useEffect(() => {
+    const mesh = meshRef.current;
+    const base = baseMatrixRef.current;
+    const ids = idMapRef.current;
+    if (!mesh || !base || ids.length === 0) return;
+
+    const prev = prevHiddenRef.current;
+    const next = hiddenParcelIds;
+
+    // Build id → instance index map only when needed (small, cached per call)
+    const idIndex = new Map<number, number>();
+    for (let i = 0; i < ids.length; i++) idIndex.set(ids[i], i);
+
+    let touched = 0;
+
+    // Newly hidden — set scale 0 and park offscreen
+    for (const id of next) {
+      if (prev.has(id)) continue;
+      const i = idIndex.get(id);
+      if (i === undefined) continue;
+      tempObj.position.set(0, -9999, 0);
+      tempObj.rotation.set(0, 0, 0);
+      tempObj.scale.setScalar(0);
+      tempObj.updateMatrix();
+      mesh.setMatrixAt(i, tempObj.matrix);
+      touched++;
+    }
+
+    // Newly unhidden — restore base matrix
+    for (const id of prev) {
+      if (next.has(id)) continue;
+      const i = idIndex.get(id);
+      if (i === undefined) continue;
+      const off = i * 16;
+      tempObj.matrix.fromArray(base, off);
+      mesh.setMatrixAt(i, tempObj.matrix);
+      touched++;
+    }
+
+    if (touched > 0) {
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    prevHiddenRef.current = new Set(next);
+  }, [hiddenParcelIds]);
 
   const handlePointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -344,11 +429,9 @@ function AllParcelsInstanced({
     [onClickParcel],
   );
 
-  // Memoize geometry so R3F doesn't recreate the instanced mesh on every render
-  const geometry = useMemo(
-    () => new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE, GRID_SIZE, GRID_SIZE),
-    [],
-  );
+  // Memoize geometry so R3F doesn't recreate the instanced mesh on every render.
+  // 1×1 plane (no segments) — we no longer displace vertices, so segments are wasted.
+  const geometry = useMemo(() => new THREE.PlaneGeometry(PARCEL_SIZE, PARCEL_SIZE), []);
 
   if (parcels.length === 0) return null;
 
@@ -366,142 +449,69 @@ function AllParcelsInstanced({
 
 // ─── ASCII Character Terrain (nearest parcels) ───────────────────────────
 //
-// Each parcel = merged BufferGeometry of 1024 quads facing up.
-// Each quad at (col, row, height), UVs pointing to a character atlas.
-// Standard meshBasicMaterial — no custom shaders needed.
+// Each near-camera parcel = ONE tilted plane with a 32×32 ASCII canvas painted
+// at ~6fps. Characters cycle per cell using onchain-style time/position formula
+// (charIndex = floor(0.25*t + h + 0.5*col + 0.1*DIR*row) % chars.length).
+// Chars are sharp and readable at parcel-close zoom.
 
-const CELL = PARCEL_SIZE / GRID_SIZE; // scene units per cell
-const CHAR_PX = 32; // pixels per character tile in atlas
-const HEIGHT_UNIT = 0.08; // height per level — doubled for more vertical drama
+// ─── Per-cell glyph instance constants ──────────────────────────────────────
+// One small textured quad per cell. The atlas holds (glyphList.length * 10 palette)
+// tiles painted as colored glyphs on transparent bg. Each instance picks a tile by
+// (currentGlyphIdx, classIdx) and the picked tile cycles each animation tick.
+// Cell footprint = PARCEL_SIZE / GRID_SIZE. Quads are slightly smaller so chars
+// don't visually touch — gives the airy "floating chars" look the user wants.
+const CELL_SIZE = PARCEL_SIZE / GRID_SIZE;
+const QUAD_SIZE = CELL_SIZE * 0.95;
+const VOXEL_HEIGHT_UNIT = PARCEL_SIZE * 0.04; // 9 * unit ≈ 36% of parcel width at peak
+const PALETTE_LEN = 10; // a..j
+const TILE_PX = 64; // one glyph tile = 64×64 px (sharp at near zoom, manageable atlas)
 
-type CharAtlasResult = {
-  texture: THREE.CanvasTexture;
-  // Maps "classLetter" → { col, row } in the atlas grid
-  tileMap: Map<string, { u0: number; v0: number; u1: number; v1: number }>;
-};
-
-const charAtlasCache = new Map<string, CharAtlasResult>();
-
-/** Build atlas: one tile per (class letter) — character drawn in its zone color on bg. */
-function buildCharAtlas(td: TokenEntry): CharAtlasResult {
-  const [bg, palette, , chars] = td;
-  // Key by palette + chars for caching
-  const key = palette.join(',') + '|' + Object.values(chars).join(',') + '|' + bg;
-  if (charAtlasCache.has(key)) return charAtlasCache.get(key)!;
-
-  // 10 classes (a-j), one tile each. Layout: 10 columns × 1 row
-  const numTiles = 10;
+/**
+ * Build a per-parcel glyph atlas: rows = palette classes (10), cols = glyphList.
+ * Returns the texture + dimensions so the animation loop can encode UVs cheaply.
+ * Background is transparent; only the colored glyph pixels are opaque.
+ */
+function buildGlyphAtlas(
+  glyphList: string[],
+  palette: string[],
+): { texture: THREE.CanvasTexture; cols: number; rows: number } {
+  const cols = glyphList.length;
+  const rows = PALETTE_LEN;
   const canvas = document.createElement('canvas');
-  canvas.width = numTiles * CHAR_PX;
-  canvas.height = CHAR_PX;
-  const ctx = canvas.getContext('2d')!;
-
-  // Transparent background — characters float in space
+  canvas.width = cols * TILE_PX;
+  canvas.height = rows * TILE_PX;
+  const ctx = canvas.getContext('2d', { alpha: true })!;
+  // Transparent background — leave canvas cleared
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const fontSize = Math.floor(CHAR_PX * 0.82);
-  ctx.font = `${fontSize}px '${FONT_NAME}', monospace`;
+  ctx.font = `${Math.floor(TILE_PX * 0.95)}px '${FONT_NAME}', monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-
-  const tileMap = new Map<string, { u0: number; v0: number; u1: number; v1: number }>();
-
-  for (let i = 0; i < 10; i++) {
-    const cls = String.fromCharCode(97 + i); // 'a' to 'j'
-    const color = palette[i] || '#fff';
-    const char = chars[cls] || ' ';
-
-    // Draw character only — no background fill
-    ctx.fillStyle = color;
-    ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
-
-    tileMap.set(cls, {
-      u0: i / numTiles,
-      v0: 0,
-      u1: (i + 1) / numTiles,
-      v1: 1,
-    });
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-
-  const result = { texture, tileMap };
-  charAtlasCache.set(key, result);
-  return result;
-}
-
-/** Build merged geometry: 1024 upward-facing quads at correct heights, UVs to atlas. */
-function buildCharGeometry(td: TokenEntry, atlas: CharAtlasResult): THREE.BufferGeometry {
-  const [, , classGrid] = td;
-  const N = GRID_SIZE * GRID_SIZE;
-  const positions = new Float32Array(N * 4 * 3);
-  const uvs = new Float32Array(N * 4 * 2);
-  const indices = new Uint32Array(N * 6);
-  const half = CELL * 0.47;
-
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const i = row * GRID_SIZE + col;
-      const cls = classGrid[i];
-      const clsIdx = cls.charCodeAt(0) - 97;
-      const height = (9 - clsIdx) * HEIGHT_UNIT;
-
-      // Quad center in local space (origin = parcel center)
-      const cx = (col - GRID_SIZE / 2 + 0.5) * CELL;
-      const cy = height;
-      const cz = (row - GRID_SIZE / 2 + 0.5) * CELL;
-
-      // 4 vertices: quad on XZ plane facing Y-up
-      const vi = i * 4;
-      positions[vi * 3] = cx - half;
-      positions[vi * 3 + 1] = cy;
-      positions[vi * 3 + 2] = cz - half;
-      positions[(vi + 1) * 3] = cx + half;
-      positions[(vi + 1) * 3 + 1] = cy;
-      positions[(vi + 1) * 3 + 2] = cz - half;
-      positions[(vi + 2) * 3] = cx + half;
-      positions[(vi + 2) * 3 + 1] = cy;
-      positions[(vi + 2) * 3 + 2] = cz + half;
-      positions[(vi + 3) * 3] = cx - half;
-      positions[(vi + 3) * 3 + 1] = cy;
-      positions[(vi + 3) * 3 + 2] = cz + half;
-
-      // UVs: map to the right atlas tile for this class
-      const tile = atlas.tileMap.get(cls);
-      const u0 = tile?.u0 ?? 0,
-        u1 = tile?.u1 ?? 0.1;
-      // v: 0=top, 1=bottom in Three.js UV space
-      uvs[vi * 2] = u0;
-      uvs[vi * 2 + 1] = 1;
-      uvs[(vi + 1) * 2] = u1;
-      uvs[(vi + 1) * 2 + 1] = 1;
-      uvs[(vi + 2) * 2] = u1;
-      uvs[(vi + 2) * 2 + 1] = 0;
-      uvs[(vi + 3) * 2] = u0;
-      uvs[(vi + 3) * 2 + 1] = 0;
-
-      // Two triangles
-      const ii = i * 6;
-      indices[ii] = vi;
-      indices[ii + 1] = vi + 1;
-      indices[ii + 2] = vi + 2;
-      indices[ii + 3] = vi;
-      indices[ii + 4] = vi + 2;
-      indices[ii + 5] = vi + 3;
+  for (let ci = 0; ci < rows; ci++) {
+    ctx.fillStyle = palette[ci] || '#fff';
+    for (let gi = 0; gi < cols; gi++) {
+      const x = gi * TILE_PX + TILE_PX / 2;
+      const y = ci * TILE_PX + TILE_PX / 2;
+      ctx.fillText(glyphList[gi], x, y);
     }
   }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geo.setIndex(new THREE.BufferAttribute(indices, 1));
-  return geo;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  return { texture: tex, cols, rows };
 }
 
-/** One parcel: merged character quads at height levels + live animation from tokenHTML. */
+/**
+ * One parcel rendered as 1024 instanced glyph quads — each cell is its OWN
+ * floating textured plane at its class-derived height. Background between
+ * quads is fully transparent. No solid plate, no continuous surface.
+ *
+ * Per-cell glyph cycles via shifting the instance's UV offset (pointing at a
+ * different column of the per-parcel glyph atlas). Heights also shift each
+ * tick because the picked glyph's "row position" in the glyph list ripples
+ * through the diagonal wave formula.
+ */
 function CharTerrain({
   parcel,
   tokenData,
@@ -515,106 +525,282 @@ function CharTerrain({
 }) {
   const { cx, cy, cz, scale } = normalization;
   const px = (parcel.sx - cx) * scale;
-  const py = (parcel.sy - cy) * scale;
-  const pz = (parcel.sz - cz) * scale;
+  const py = (parcel.sz - cz) * scale;
+  const pz = (parcel.sy - cy) * scale;
+  // Sit just above the atlas-extruded base so we don't z-fight when the atlas
+  // mesh for this parcel briefly shows during membership transitions.
+  const liftY = Math.max(0.05, heightScale + 0.05);
 
-  const atlas = useMemo(() => buildCharAtlas(tokenData), [tokenData]);
-  const geometry = useMemo(() => buildCharGeometry(tokenData, atlas), [tokenData, atlas]);
+  // Pre-compute per-cell metadata
+  const cellMeta = useMemo(() => {
+    const [, palette, classGrid, chars] = tokenData;
+    const glyphList: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const k = String.fromCharCode(97 + i);
+      const g = chars[k];
+      if (g && g !== ' ') glyphList.push(g);
+    }
+    if (glyphList.length === 0) glyphList.push('.');
+    const N = GRID_SIZE * GRID_SIZE;
+    const clsIdx = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      clsIdx[i] = (classGrid.charCodeAt(i) - 97) & 0x0f;
+    }
+    return { palette, clsIdx, glyphList };
+  }, [tokenData]);
 
-  // Pure math animation — no iframes, no RPC
-  // Uses the exact onchain formula: charIndex = floor(0.25*t + (h + 0.5*col + 0.1*DIR*row)) % charSet.length
-  const intervalRef = useRef<number>(0);
-  const airshipRef = useRef(0);
+  // Build the per-parcel glyph atlas once
+  const atlas = useMemo(
+    () => buildGlyphAtlas(cellMeta.glyphList, cellMeta.palette as string[]),
+    [cellMeta],
+  );
 
+  // Geometry: a single PlaneGeometry — InstancedMesh replicates it 1024 times.
+  // Each instance gets its own matrix (position+scale) and uvOffset attribute.
+  const geom = useMemo(() => new THREE.PlaneGeometry(QUAD_SIZE, QUAD_SIZE), []);
+
+  // ShaderMaterial: standard textured + alpha test, but with per-instance uvOffset
+  // attribute to address into the atlas. Transparent everywhere except the glyph.
+  const material = useMemo(() => {
+    const m = new THREE.ShaderMaterial({
+      uniforms: {
+        atlas: { value: atlas.texture },
+        uTileSize: { value: new THREE.Vector2(1 / atlas.cols, 1 / atlas.rows) },
+      },
+      vertexShader: `
+        attribute vec2 uvOffset;
+        varying vec2 vUv;
+        uniform vec2 uTileSize;
+        void main() {
+          vUv = uv * uTileSize + uvOffset;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D atlas;
+        varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(atlas, vUv);
+          if (c.a < 0.5) discard;
+          gl_FragColor = c;
+        }
+      `,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: true,
+    });
+    return m;
+  }, [atlas]);
+
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const N = GRID_SIZE * GRID_SIZE;
+  // Per-instance uvOffset attribute storage (we mutate this each tick)
+  const uvOffsetsRef = useRef<Float32Array>(new Float32Array(N * 2));
+
+  // Sync init right after mount so the first paint already shows positioned
+  // glyphs (no 1-frame flicker of 1024 stacked quads at origin).
   useEffect(() => {
-    const [, palette, , chars] = tokenData;
-    const charSet = Object.values(chars).filter(c => c && c !== ' ');
-    if (charSet.length === 0) return;
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const attr = new THREE.InstancedBufferAttribute(uvOffsetsRef.current, 2);
+    attr.setUsage(THREE.DynamicDrawUsage);
+    mesh.geometry.setAttribute('uvOffset', attr);
+    // Run one tick of layout so the very first paint shows the parcel.
+    runTick(0);
+    mesh.instanceMatrix.needsUpdate = true;
+    attr.needsUpdate = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atlas, geom, material]);
 
-    const numTiles = 10;
-    const fontSize = Math.floor(CHAR_PX * 0.82);
+  // Layout one tick — called from init effect and the throttled animation loop.
+  const runTick = (t: number) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const { clsIdx, glyphList } = cellMeta;
+    const len = glyphList.length;
+    const tileU = 1 / atlas.cols;
+    const tileV = 1 / atlas.rows;
+    const uvs = uvOffsetsRef.current;
+    const half = (GRID_SIZE - 1) / 2;
 
-    const animate = () => {
-      airshipRef.current += 1;
-      const t = airshipRef.current;
+    for (let row = 0; row < GRID_SIZE; row++) {
+      const DIR = row % 2 === 0 ? 1 : -1;
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const i = row * GRID_SIZE + col;
+        const ci = clsIdx[i];
+        const baseH = 9 - ci;
+        const wave = Math.floor(0.25 * t + baseH + 0.5 * col + 0.1 * DIR * row);
+        const gIdx = ((wave % len) + len) % len;
+        const ripple = ((wave % 3) + 3) % 3;
+        const h = (baseH + ripple * 0.25) * VOXEL_HEIGHT_UNIT;
 
-      const canvas = atlas.texture.image as HTMLCanvasElement;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+        const lx = (col - half) * CELL_SIZE;
+        const lz = (row - half) * CELL_SIZE;
+        const ly = h;
 
-      ctx.font = `${fontSize}px '${FONT_NAME}', monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+        tempObj.position.set(lx, ly, lz);
+        // Tilt -π/2 around X makes the plane lie flat (face +Y), so glyphs are
+        // visible from above. doubleSide ensures they're also visible from below.
+        tempObj.rotation.set(-Math.PI / 2, 0, 0);
+        tempObj.scale.setScalar(1);
+        tempObj.updateMatrix();
+        mesh.setMatrixAt(i, tempObj.matrix);
 
-      for (let i = 0; i < numTiles; i++) {
-        const h = 9 - i; // class a=9, j=0
-        const charIdx = Math.abs(Math.floor(0.25 * t + h)) % charSet.length;
-        const char = charSet[charIdx] || ' ';
-        const color = palette[i] || '#fff';
-
-        ctx.clearRect(i * CHAR_PX, 0, CHAR_PX, CHAR_PX);
-        ctx.fillStyle = color;
-        ctx.fillText(char, i * CHAR_PX + CHAR_PX / 2, CHAR_PX / 2);
+        uvs[i * 2] = gIdx * tileU;
+        // CanvasTexture defaults to flipY=true: V=0 maps to canvas bottom (last
+        // class row painted), so invert to point at the right palette row.
+        uvs[i * 2 + 1] = (PALETTE_LEN - 1 - ci) * tileV;
       }
-      atlas.texture.needsUpdate = true;
-    };
+    }
+  };
 
-    intervalRef.current = window.setInterval(animate, 100);
+  const tickRef = useRef(0);
+  const frameRef = useRef(0);
+  useFrame(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    frameRef.current++;
+    if (frameRef.current % 6 !== 0) return;
+    tickRef.current++;
+    runTick(tickRef.current);
+    mesh.instanceMatrix.needsUpdate = true;
+    const uvAttr = mesh.geometry.getAttribute('uvOffset') as THREE.InstancedBufferAttribute;
+    if (uvAttr) uvAttr.needsUpdate = true;
+  });
+
+  // Cleanup
+  useEffect(() => {
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      atlas.texture.dispose();
+      geom.dispose();
+      material.dispose();
     };
-  }, [tokenData, atlas]);
+  }, [atlas, geom, material]);
 
   return (
-    <group position={[px, py, pz]} scale={[1, Math.max(0.01, heightScale * 8), 1]}>
-      <mesh geometry={geometry} raycast={() => {}}>
-        <meshBasicMaterial
-          map={atlas.texture}
-          side={THREE.DoubleSide}
-          transparent
-          alphaTest={0.1}
-        />
-      </mesh>
+    <group position={[px, py + liftY, pz]}>
+      <instancedMesh
+        ref={meshRef}
+        args={[geom, material, N]}
+        frustumCulled={false}
+        raycast={() => {}}
+      />
     </group>
   );
 }
 
 // ─── Camera-distance ASCII overlay (LOD: nearby = animated chars, far = atlas) ─
 
-const CHAR_RENDER_DISTANCE = 20; // scene units — show ASCII within this range
-const MAX_CHAR_PARCELS = 12; // cap to keep it lightweight
+const CHAR_RENDER_DISTANCE = 70; // scene units — show ASCII within this range
+const MAX_CHAR_PARCELS = 300; // cap to keep it lightweight (each parcel = 1 plane + 1 canvas)
+
+/**
+ * Wrapper that owns the shared "near set" state so the atlas-instanced layer
+ * can hide parcels currently being rendered as live ASCII voxel terrain
+ * (otherwise the colored extrusion leaks through underneath the chars).
+ */
+function TerrainLayers({
+  parcels,
+  terrainData,
+  normalization,
+  onClickParcel,
+  hoveredId,
+  setHoveredId,
+  heightScale,
+}: {
+  parcels: ParcelData[];
+  terrainData: TerrainData;
+  normalization: { cx: number; cy: number; cz: number; scale: number };
+  onClickParcel: (id: number) => void;
+  hoveredId: number | null;
+  setHoveredId: (id: number | null) => void;
+  heightScale: number;
+}) {
+  // Identity of the current near set. Updated by NearbyCharOverlay only when
+  // membership actually changes (not every frame), so AllParcelsInstanced
+  // re-runs its visibility-diff effect rarely.
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => new Set());
+
+  return (
+    <>
+      <AllParcelsInstanced
+        parcels={parcels}
+        terrainData={terrainData}
+        normalization={normalization}
+        onClickParcel={onClickParcel}
+        hoveredId={hoveredId}
+        setHoveredId={setHoveredId}
+        heightScale={heightScale}
+        hiddenParcelIds={hiddenIds}
+      />
+      <NearbyCharOverlay
+        parcels={parcels}
+        terrainData={terrainData}
+        normalization={normalization}
+        heightScale={heightScale}
+        onNearSetChange={setHiddenIds}
+      />
+    </>
+  );
+}
 
 function NearbyCharOverlay({
   parcels,
   terrainData,
   normalization,
   heightScale,
+  onNearSetChange,
 }: {
   parcels: ParcelData[];
   terrainData: TerrainData;
   normalization: { cx: number; cy: number; cz: number; scale: number };
   heightScale: number;
+  onNearSetChange: (ids: Set<number>) => void;
 }) {
   const [nearParcels, setNearParcels] = useState<ParcelData[]>([]);
 
   useFrame(({ camera }) => {
     const { cx, cy, cz, scale } = normalization;
     const camPos = camera.position;
+    // Camera forward vector for view-cone filtering — render parcels the
+    // camera is LOOKING AT (tunnel of detail in view direction), not the
+    // ones surrounding the camera.
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
 
     const scored: [ParcelData, number][] = [];
     for (const p of parcels) {
       if (!terrainData.tokens[p.tokenId]) continue;
-      const dx = camPos.x - (p.sx - cx) * scale;
-      const dy = camPos.y - (p.sy - cy) * scale;
-      const dz = camPos.z - (p.sz - cz) * scale;
+      const px = (p.sx - cx) * scale;
+      const py = (p.sz - cz) * scale;
+      const pz = (p.sy - cy) * scale;
+      const dx = px - camPos.x;
+      const dy = py - camPos.y;
+      const dz = pz - camPos.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist < CHAR_RENDER_DISTANCE) scored.push([p, dist]);
+      if (dist >= CHAR_RENDER_DISTANCE) continue;
+      if (dist < 0.5) continue;
+      // Dot product of (parcel-from-camera) ⋅ (camera-forward).
+      // > 0 = parcel in front of camera (full forward hemisphere).
+      const dot = (dx * camDir.x + dy * camDir.y + dz * camDir.z) / dist;
+      if (dot < 0) continue;
+      scored.push([p, dist]);
     }
     scored.sort((a, b) => a[1] - b[1]);
     const nearest = scored.slice(0, MAX_CHAR_PARCELS).map(s => s[0]);
-    // Only update state if the set actually changed
-    const ids = nearest.map(p => p.tokenId).join(',');
-    if (ids !== nearParcels.map(p => p.tokenId).join(',')) setNearParcels(nearest);
+    // Only update state if the set actually changed (membership, not order)
+    const ids = nearest
+      .map(p => p.tokenId)
+      .sort()
+      .join(',');
+    const prevIds = nearParcels
+      .map(p => p.tokenId)
+      .sort()
+      .join(',');
+    if (ids !== prevIds) {
+      setNearParcels(nearest);
+      onNearSetChange(new Set(nearest.map(p => p.tokenId)));
+    }
   });
 
   return (
@@ -688,23 +874,15 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; bloomIntensity:
       <pointLight position={[-30, 20, -30]} intensity={0.2} color="#ff4466" />
 
       {terrainData && (
-        <>
-          <AllParcelsInstanced
-            parcels={parcels}
-            terrainData={terrainData}
-            normalization={normalization}
-            onClickParcel={onClickParcel}
-            hoveredId={hoveredId}
-            setHoveredId={setHoveredId}
-            heightScale={heightScale}
-          />
-          <NearbyCharOverlay
-            parcels={parcels}
-            terrainData={terrainData}
-            normalization={normalization}
-            heightScale={heightScale}
-          />
-        </>
+        <TerrainLayers
+          parcels={parcels}
+          terrainData={terrainData}
+          normalization={normalization}
+          onClickParcel={onClickParcel}
+          hoveredId={hoveredId}
+          setHoveredId={setHoveredId}
+          heightScale={heightScale}
+        />
       )}
 
       <OrbitControls
@@ -712,10 +890,10 @@ const TerrainScene: FC<TerrainViewProps & { heightScale: number; bloomIntensity:
         dampingFactor={0.06}
         autoRotate
         autoRotateSpeed={0.15}
-        minDistance={2}
+        minDistance={0.5}
         maxDistance={300}
         enablePan
-        target={[0, 0, 0]}
+        target={[0, 40, 0]}
       />
 
       {/* Bloom glow — only active when slider > 0 to save GPU */}
@@ -804,9 +982,11 @@ const TerrainViewCanvas: FC<{
     };
   }, [props.parcels]);
 
-  // Spawn camera overhead — see the full structure on load
+  // Spawn camera DIRECTLY above the top peak looking straight down — clouds
+  // and mountains live at the highest sz parcels and read best from a true
+  // top-down view. Tiny Z offset avoids OrbitControls' axial gimbal lock.
   const spawnPos = useMemo(() => {
-    return [60, 50, 60] as [number, number, number];
+    return [0, 42, 0.01] as [number, number, number];
   }, []);
 
   return (
@@ -843,8 +1023,8 @@ const TerrainViewCanvas: FC<{
               const { cx, cy, cz, scale } = normalization;
               const rp = props.parcels[Math.floor(Math.random() * props.parcels.length)];
               const px = (rp.sx - cx) * scale;
-              const py = (rp.sy - cy) * scale;
-              const pz = (rp.sz - cz) * scale;
+              const py = (rp.sz - cz) * scale;
+              const pz = (rp.sy - cy) * scale;
               liveCamera.position.set(px + 2, py + 3, pz + 2);
               liveCamera.lookAt(px, py, pz);
             }
