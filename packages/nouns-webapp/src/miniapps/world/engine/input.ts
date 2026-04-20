@@ -3,12 +3,17 @@
 // WASD = movement
 // Arrow keys = camera pan
 // J = punch, K = kick, H = headbutt, U = uppercut
-// Q = force push, R = spin attack
+// Q = force push (tap) / focus-slomo "bullet-time" (hold)
+// R = sprint (held)
 // F = fire weapon (when gun equipped)
 // Space = backflip (+ direction = dash)
 // Shift = block/parry
 // E = interact
 // ESC = exit
+//
+// Q is double-purpose: `resolveIntendedMove` fires force-push on
+// justPressed, while `useFocusTrigger` observes `keys.has('q')` on each
+// frame to toggle manual bullet-time. Tap = quick push; hold = slomo.
 
 import type { Direction, MoveType } from './types';
 
@@ -101,10 +106,12 @@ export function attachInputListeners(canvas: HTMLCanvasElement, state: InputStat
 export function getMovementVector(keys: Set<string>, cameraAngle = 0): { dx: number; dy: number } {
   let fx = 0,
     fy = 0;
-  if (keys.has('w') || keys.has('arrowup')) fy -= 1;
-  if (keys.has('s') || keys.has('arrowdown')) fy += 1;
-  if (keys.has('a') || keys.has('arrowleft')) fx -= 1;
-  if (keys.has('d') || keys.has('arrowright')) fx += 1;
+  // Arrow keys are reserved for camera pan (Spyro-style). WASD only for
+  // movement. Gamepad still contributes via input.keys in poll.
+  if (keys.has('w')) fy -= 1;
+  if (keys.has('s')) fy += 1;
+  if (keys.has('a')) fx -= 1;
+  if (keys.has('d')) fx += 1;
   if (fx === 0 && fy === 0) return { dx: 0, dy: 0 };
   if (fx !== 0 && fy !== 0) {
     const inv = 1 / Math.SQRT2;

@@ -365,7 +365,9 @@ function Hypercastle() {
     const scale = HC_SPAN / range;
     for (let i = 0; i < parcels.length; i++) {
       const p = parcels[i];
-      hcTempObj.position.set((p.sx - cx) * scale, (p.sy - cy) * scale, (p.sz - cz) * scale);
+      // Terraforms structureSpace is Z-up; Three.js is Y-up. Swap sy ↔ sz so
+      // the castle stands upright instead of lying on its side.
+      hcTempObj.position.set((p.sx - cx) * scale, (p.sz - cz) * scale, (p.sy - cy) * scale);
       hcTempObj.scale.setScalar(0.55);
       hcTempObj.updateMatrix();
       mesh.setMatrixAt(i, hcTempObj.matrix);

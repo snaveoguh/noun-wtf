@@ -236,14 +236,20 @@ const STORAGE_KEY = 'noun-ambient-music';
 interface AmbientMusicProps {
   /** 'fixed' = own floating FAB at bottom-left. 'inline' = renders at flow position so parent can slot it. */
   variant?: 'fixed' | 'inline';
+  /** If true and the user hasn't set a preference yet, start playing on mount. Existing off-preferences still win. */
+  autoStart?: boolean;
 }
 
-const AmbientMusic: FC<AmbientMusicProps> = ({ variant = 'fixed' }) => {
+const AmbientMusic: FC<AmbientMusicProps> = ({ variant = 'fixed', autoStart = false }) => {
   const [enabled, setEnabled] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === 'on';
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === 'on') return true;
+      if (stored === 'off') return false;
+      // No preference yet — honor autoStart.
+      return autoStart;
     } catch {
-      return false;
+      return autoStart;
     }
   });
   const [started, setStarted] = useState(false);

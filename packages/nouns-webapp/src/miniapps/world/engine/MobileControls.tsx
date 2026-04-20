@@ -9,6 +9,7 @@
  */
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { InputState } from './input';
+import { triggerFocus, releaseManualFocus } from './timeControl';
 
 // ── Detect mobile ───────────────────────────────────────────────────
 
@@ -20,9 +21,9 @@ export function isTouchDevice(): boolean {
 
 interface ButtonDef {
   icon: string;
-  key: string;       // key to inject into InputState
-  hold?: boolean;    // true = key stays held while touching
-  special?: 'jump' | 'shift'; // special handling
+  key: string; // key to inject into InputState
+  hold?: boolean; // true = key stays held while touching
+  special?: 'jump' | 'shift' | 'focus'; // special handling
 }
 
 const BUTTONS: ButtonDef[] = [
@@ -36,6 +37,8 @@ const BUTTONS: ButtonDef[] = [
   { icon: '⏫', key: ' ', special: 'jump' },
   { icon: '🏃', key: 'r', hold: true },
   { icon: '🛡', key: 'shift', hold: true, special: 'shift' },
+  // Focus / bullet-time (tap = pulse, hold = maintained)
+  { icon: '⚡', key: '__focus', special: 'focus', hold: true },
   // Weapons/Items (blues)
   { icon: '🔫', key: 'f' },
   { icon: '✋', key: 'e' },
@@ -55,14 +58,31 @@ const BUTTONS: ButtonDef[] = [
   { icon: '✕', key: 'escape' },
 ];
 
-// Rainbow gradient colors for the arc (bottom → top)
+// Rainbow gradient colors for the arc (bottom → top). Index 8 is the
+// focus/slomo slot — a bright electric yellow so bullet-time stands out.
 const ARC_COLORS = [
-  '#ff4444', '#ff5533', '#ff6622', '#ff8811', '#ffaa00', // reds → orange
-  '#44ff88', '#22ddaa', '#00ccbb',                        // greens
-  '#4488ff', '#5566ff',                                   // blues
-  '#aa44ff', '#cc33ee', '#ee33aa', '#ff44aa',              // purples/pinks
-  '#88ddff', '#99ccff', '#aabbff', '#bbccff', '#ccddff', '#ddeeff', // camera blues
-  '#888888',                                               // exit gray
+  '#ff4444',
+  '#ff5533',
+  '#ff6622',
+  '#ff8811',
+  '#ffaa00', // reds → orange
+  '#44ff88',
+  '#22ddaa',
+  '#00ccbb', // greens
+  '#ffee44', // focus — electric yellow (bullet-time)
+  '#4488ff',
+  '#5566ff', // blues
+  '#aa44ff',
+  '#cc33ee',
+  '#ee33aa',
+  '#ff44aa', // purples/pinks
+  '#88ddff',
+  '#99ccff',
+  '#aabbff',
+  '#bbccff',
+  '#ccddff',
+  '#ddeeff', // camera blues
+  '#888888', // exit gray
 ];
 
 // ── Grid layout — 3 columns, safe-area aware ──────────────────────
@@ -89,8 +109,8 @@ const DEAD_ZONE = 0.15;
 
 // ── Swipe detection constants ──────────────────────────────────────
 
-const SWIPE_MIN_DIST = 50;   // px vertical minimum
-const SWIPE_MAX_TIME = 300;  // ms maximum swipe duration
+const SWIPE_MIN_DIST = 50; // px vertical minimum
+const SWIPE_MAX_TIME = 300; // ms maximum swipe duration
 
 interface MobileControlsProps {
   inputRef: React.RefObject<InputState>;
@@ -115,36 +135,39 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     centerRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }, []);
 
-  const handleJoystickMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      if (touch.identifier !== touchIdRef.current) continue;
+  const handleJoystickMove = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier !== touchIdRef.current) continue;
 
-      const dx = touch.clientX - centerRef.current.x;
-      const dy = touch.clientY - centerRef.current.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = JOYSTICK_SIZE / 2 - KNOB_SIZE / 2;
-      const clampedDist = Math.min(dist, maxDist);
-      const angle = Math.atan2(dy, dx);
-      const nx = (Math.cos(angle) * clampedDist) / maxDist;
-      const ny = (Math.sin(angle) * clampedDist) / maxDist;
+        const dx = touch.clientX - centerRef.current.x;
+        const dy = touch.clientY - centerRef.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const maxDist = JOYSTICK_SIZE / 2 - KNOB_SIZE / 2;
+        const clampedDist = Math.min(dist, maxDist);
+        const angle = Math.atan2(dy, dx);
+        const nx = (Math.cos(angle) * clampedDist) / maxDist;
+        const ny = (Math.sin(angle) * clampedDist) / maxDist;
 
-      setKnobPos({ x: nx * maxDist, y: ny * maxDist });
+        setKnobPos({ x: nx * maxDist, y: ny * maxDist });
 
-      const input = inputRef.current;
-      if (input) {
-        input.keys.delete('w');
-        input.keys.delete('s');
-        input.keys.delete('a');
-        input.keys.delete('d');
-        if (ny < -DEAD_ZONE) input.keys.add('w');
-        if (ny > DEAD_ZONE) input.keys.add('s');
-        if (nx < -DEAD_ZONE) input.keys.add('a');
-        if (nx > DEAD_ZONE) input.keys.add('d');
+        const input = inputRef.current;
+        if (input) {
+          input.keys.delete('w');
+          input.keys.delete('s');
+          input.keys.delete('a');
+          input.keys.delete('d');
+          if (ny < -DEAD_ZONE) input.keys.add('w');
+          if (ny > DEAD_ZONE) input.keys.add('s');
+          if (nx < -DEAD_ZONE) input.keys.add('a');
+          if (nx > DEAD_ZONE) input.keys.add('d');
+        }
       }
-    }
-  }, [inputRef]);
+    },
+    [inputRef],
+  );
 
   const handleJoystickEnd = useCallback(() => {
     touchIdRef.current = null;
@@ -174,6 +197,10 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
   const handleSwipeStart = useCallback((e: React.TouchEvent) => {
     const touch = e.changedTouches[0];
     if (!touch) return;
+    // Ignore touches that start on a button or inside the joystick —
+    // otherwise every button tap arms a swipe and the release fires a jump.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, [data-joystick]')) return;
     // Only track swipes on right half (left half is joystick area)
     if (touch.clientX < window.innerWidth * 0.4) return;
     swipeRef.current = {
@@ -183,88 +210,146 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
     };
   }, []);
 
-  const handleSwipeEnd = useCallback((e: React.TouchEvent) => {
-    if (!swipeRef.current) return;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      if (touch.identifier !== swipeRef.current.id) continue;
+  const handleSwipeEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!swipeRef.current) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier !== swipeRef.current.id) continue;
 
-      const dy = swipeRef.current.startY - touch.clientY; // positive = upward
-      const dt = Date.now() - swipeRef.current.startTime;
+        const dy = swipeRef.current.startY - touch.clientY; // positive = upward
+        const dt = Date.now() - swipeRef.current.startTime;
 
-      if (dy > SWIPE_MIN_DIST && dt < SWIPE_MAX_TIME) {
-        // Swipe up detected — trigger jump
-        onJump?.();
-        const input = inputRef.current;
-        if (input) {
-          input.keys.add(' ');
-          input.justPressed.add(' ');
-          const now = Date.now();
-          if (now - input.lastSpaceTime < 400) {
-            input.spaceTaps++;
-          } else {
-            input.spaceTaps = 1;
+        if (dy > SWIPE_MIN_DIST && dt < SWIPE_MAX_TIME) {
+          // Swipe up detected — trigger jump
+          onJump?.();
+          const input = inputRef.current;
+          if (input) {
+            input.keys.add(' ');
+            input.justPressed.add(' ');
+            const now = Date.now();
+            if (now - input.lastSpaceTime < 400) {
+              input.spaceTaps++;
+            } else {
+              input.spaceTaps = 1;
+            }
+            input.lastSpaceTime = now;
+            setTimeout(() => {
+              inputRef.current?.keys.delete(' ');
+            }, 100);
           }
-          input.lastSpaceTime = now;
-          setTimeout(() => { inputRef.current?.keys.delete(' '); }, 100);
         }
+        swipeRef.current = null;
+        break;
       }
-      swipeRef.current = null;
-      break;
-    }
-  }, [inputRef, onJump]);
+    },
+    [inputRef, onJump],
+  );
+
+  // ── Focus button state (tap vs hold discrimination) ────────────
+  //
+  // Tap = quick pulse of slomo (triggerFocus('aimBurst') — ~200ms hold).
+  // Hold (>160ms) = maintained manual slomo until release.
+  // We detect "hold" by arming a timer on touchstart that promotes the
+  // tap to a manual hold if still pressed when the timer fires.
+
+  const focusTouchRef = useRef<{ held: boolean; holdTimer: number | null } | null>(null);
+  const FOCUS_HOLD_DELAY_MS = 160;
 
   // ── Button press/release handlers ──────────────────────────────
 
-  const handleButtonStart = useCallback((def: ButtonDef) => {
-    const input = inputRef.current;
-    if (!input) return;
+  const handleButtonStart = useCallback(
+    (def: ButtonDef) => {
+      const input = inputRef.current;
+      if (!input) return;
 
-    if (def.special === 'jump') {
-      // Use the physics-aware jump callback
-      onJump?.();
-      // Also inject space for skating tricks etc
-      input.keys.add(' ');
-      input.justPressed.add(' ');
-      const now = Date.now();
-      if (now - input.lastSpaceTime < 400) {
-        input.spaceTaps++;
-      } else {
-        input.spaceTaps = 1;
+      if (def.special === 'jump') {
+        // Use the physics-aware jump callback
+        onJump?.();
+        // Also inject space for skating tricks etc
+        input.keys.add(' ');
+        input.justPressed.add(' ');
+        const now = Date.now();
+        if (now - input.lastSpaceTime < 400) {
+          input.spaceTaps++;
+        } else {
+          input.spaceTaps = 1;
+        }
+        input.lastSpaceTime = now;
+        if (!def.hold) {
+          setTimeout(() => {
+            inputRef.current?.keys.delete(' ');
+          }, 100);
+        }
+        return;
       }
-      input.lastSpaceTime = now;
+
+      if (def.special === 'focus') {
+        // Start a hold-arm timer. If touch is still down when the timer
+        // fires, we promote to manual hold. Otherwise end-handler fires
+        // a short aimBurst pulse.
+        const state: { held: boolean; holdTimer: number | null } = {
+          held: false,
+          holdTimer: null,
+        };
+        state.holdTimer = window.setTimeout(() => {
+          state.held = true;
+          triggerFocus('manual');
+        }, FOCUS_HOLD_DELAY_MS);
+        focusTouchRef.current = state;
+        return;
+      }
+
+      if (def.special === 'shift') {
+        input.shiftHeld = true;
+      }
+
+      input.keys.add(def.key);
+      input.justPressed.add(def.key);
+
       if (!def.hold) {
-        setTimeout(() => { inputRef.current?.keys.delete(' '); }, 100);
+        setTimeout(() => {
+          inputRef.current?.keys.delete(def.key);
+        }, 100);
       }
-      return;
-    }
+    },
+    [inputRef, onJump],
+  );
 
-    if (def.special === 'shift') {
-      input.shiftHeld = true;
-    }
+  const handleButtonEnd = useCallback(
+    (def: ButtonDef) => {
+      const input = inputRef.current;
+      if (!input) return;
 
-    input.keys.add(def.key);
-    input.justPressed.add(def.key);
+      if (def.special === 'focus') {
+        const state = focusTouchRef.current;
+        focusTouchRef.current = null;
+        if (!state) return;
+        if (state.holdTimer !== null) {
+          window.clearTimeout(state.holdTimer);
+        }
+        if (state.held) {
+          // Released after hold — stop manual slomo.
+          releaseManualFocus();
+        } else {
+          // Quick tap — short aimBurst pulse (~400ms total, sharp exit).
+          triggerFocus('aimBurst');
+        }
+        return;
+      }
 
-    if (!def.hold) {
-      setTimeout(() => { inputRef.current?.keys.delete(def.key); }, 100);
-    }
-  }, [inputRef, onJump]);
-
-  const handleButtonEnd = useCallback((def: ButtonDef) => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    if (def.hold) {
-      input.keys.delete(def.key);
-    }
-    if (def.special === 'shift') {
-      input.shiftHeld = false;
-    }
-    if (def.special === 'jump' && def.hold) {
-      input.keys.delete(' ');
-    }
-  }, [inputRef]);
+      if (def.hold) {
+        input.keys.delete(def.key);
+      }
+      if (def.special === 'shift') {
+        input.shiftHeld = false;
+      }
+      if (def.special === 'jump' && def.hold) {
+        input.keys.delete(' ');
+      }
+    },
+    [inputRef],
+  );
 
   // Grid dimensions for the tray background
   const totalRows = Math.ceil(BUTTONS.length / COLS);
@@ -276,12 +361,15 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
       data-mobile-controls
       onTouchStart={handleSwipeStart}
       onTouchEnd={handleSwipeEnd}
-      onTouchCancel={() => { swipeRef.current = null; }}
+      onTouchCancel={() => {
+        swipeRef.current = null;
+      }}
       style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 20 }}
     >
       {/* ── Left: Virtual Joystick ── */}
       <div
         ref={joystickRef}
+        data-joystick
         onTouchStart={handleJoystickStart}
         onTouchMove={handleJoystickMove}
         onTouchEnd={handleJoystickEnd}
@@ -339,8 +427,14 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         return (
           <button
             key={def.key + i}
-            onTouchStart={(e) => { e.preventDefault(); handleButtonStart(def); }}
-            onTouchEnd={(e) => { e.preventDefault(); handleButtonEnd(def); }}
+            onTouchStart={e => {
+              e.preventDefault();
+              handleButtonStart(def);
+            }}
+            onTouchEnd={e => {
+              e.preventDefault();
+              handleButtonEnd(def);
+            }}
             onTouchCancel={() => handleButtonEnd(def)}
             style={{
               position: 'absolute',
