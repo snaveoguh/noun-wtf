@@ -102,6 +102,18 @@ function AppRouter() {
         fallback={<div style={{ background: '#1a4f8a', width: '100vw', height: '100vh' }} />}
       >
         <WorldPage />
+        {/* Ambient music FAB — autostarts on /world, same procedural player
+            used on /probe and /terraforms. */}
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '1rem',
+            right: '1rem',
+            zIndex: 900,
+          }}
+        >
+          <AmbientMusic variant="inline" autoStart />
+        </div>
       </Suspense>
     );
   }
@@ -286,8 +298,12 @@ function AppRouter() {
           alignItems: 'center',
         }}
       >
-        {/* Probe-only: ambient music play/pause above the saber button */}
-        {location.pathname.startsWith('/probe') && <AmbientMusic variant="inline" />}
+        {/* Ambient music play/pause above the saber button — shown on Probe, Terraforms, and World (autostarts on /world) */}
+        {(location.pathname.startsWith('/probe') ||
+          location.pathname.startsWith('/terraforms') ||
+          location.pathname.startsWith('/world')) && (
+          <AmbientMusic variant="inline" autoStart={location.pathname.startsWith('/world')} />
+        )}
         <button
           onClick={() => setSaberMode(s => !s)}
           title={saberMode ? 'Exit Saber' : 'Saber'}

@@ -1098,6 +1098,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           fullscreen
           pointerEnabled={parallaxInteractive}
           lightingPreset={lightingPreset}
+          layerVisibility={editMode === '3d' ? edit3dVisibility : undefined}
           editable={
             editMode === '3d'
               ? {
@@ -1109,10 +1110,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     edit3dDispatch({ type: 'SET_PIXEL', x, y, color }),
                   onPixelsFill: changes => edit3dDispatch({ type: 'SET_PIXELS', changes }),
                   onColorPick: color => {
+                    // Update parent state — InlineEditor now reads these as
+                    // controlled props (activeTool/activeColor) so its swatch
+                    // and tool highlight stay in sync with the picked color.
                     setEdit3dColor(color);
                     setEdit3dTool('pencil');
-                    // Also poke InlineEditor ref if mounted (belt-and-suspenders)
-                    editorToolRef.current?.setTool('pencil');
                   },
                   voxelDepth: edit3dVoxelDepth,
                   interactionMode: edit3dInteractionMode,
@@ -1137,9 +1139,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                           undoRef: meshUndoRef,
                           redoRef: meshRedoRef,
                           sceneRef: meshSceneRef,
-                          headOffset: meshHeadTrait
-                            ? getHeadOffset(meshHeadTrait)
-                            : undefined,
+                          headOffset: meshHeadTrait ? getHeadOffset(meshHeadTrait) : undefined,
                           snapshotRef: meshSnapshotRef,
                         }
                       : undefined,
@@ -1698,6 +1698,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     meshBrushSize={meshGlbPath ? meshBrushSize : undefined}
                     onMeshBrushSizeChange={meshGlbPath ? setMeshBrushSize : undefined}
                     isMeshMode={!!meshGlbPath}
+                    activeTool={edit3dTool}
+                    activeColor={edit3dColor}
                     onToolChange={setEdit3dTool}
                     onColorChange={setEdit3dColor}
                     onDownload={
