@@ -415,7 +415,7 @@ const YellowCollectiveVotePage: FC = () => {
             ) : (
               <>
                 {/* Vote buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                   {proposal.choices.map((choice, i) => {
                     const choiceNum = i + 1;
                     const color = choiceColor(choiceNum, proposal.choices);
@@ -425,21 +425,20 @@ const YellowCollectiveVotePage: FC = () => {
                       <button
                         key={choice}
                         onClick={() => setSelectedChoice(isSelected ? null : choiceNum)}
+                        title={choice}
                         style={{
-                          padding: '10px 16px',
+                          flex: 1,
+                          padding: '10px',
                           borderRadius: 10,
                           border: `2px solid ${isSelected ? color : '#e2e3e8'}`,
                           background: isSelected ? color + '15' : '#fff',
                           cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          color: isSelected ? color : '#14141f',
+                          fontSize: '1.2rem',
                           transition: 'all 0.15s',
-                          textAlign: 'left',
+                          textAlign: 'center',
                         }}
                       >
-                        {choice === 'For' ? '👍 ' : choice === 'Against' ? '👎 ' : '🤷 '}
-                        {choice}
+                        {choice === 'For' ? '👍' : choice === 'Against' ? '👎' : '🤷'}
                       </button>
                     );
                   })}

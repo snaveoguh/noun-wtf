@@ -5,7 +5,6 @@ import { Trans } from '@lingui/react/macro';
 import ReactDOM from 'react-dom';
 
 import BidHistoryModalRow from '@/components/BidHistoryModalRow';
-import { StandaloneNounRoundedCorners } from '@/components/StandaloneNoun';
 import { Bid } from '@/utils/types';
 import { Auction } from '@/wrappers/nounsAuction';
 import { useAuctionBids } from '@/wrappers/onDisplayAuction';
@@ -38,18 +37,6 @@ const BidHistoryModalOverlay: React.FC<BidHistoryModalOverlayProps> = ({ auction
 
       <div className={classes.modal}>
         <div className={classes.content}>
-          <div className={classes.header}>
-            <div className={classes.nounWrapper}>
-              <StandaloneNounRoundedCorners nounId={BigInt(auction && auction.nounId)} />
-            </div>
-
-            <div className={classes.title}>
-              <h2>
-                <Trans>Bids for</Trans>
-              </h2>
-              <h1>Noun {auction && auction.nounId.toString()}</h1>
-            </div>
-          </div>
           <div className={classes.bidWrapper}>
             {bids && bids.length > 0 ? (
               <ul>

@@ -8,6 +8,26 @@
   padding-left: 0 !important;
 }
 
+/* Keep the "Held by" label and the address avatar on one line. */
+.inlineRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.inlineRow .holderCopy {
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.inlineRow .holderContent {
+  margin: 0;
+  min-width: 0;
+}
+
 .youCopy {
   margin-top: 0.25rem;
 }

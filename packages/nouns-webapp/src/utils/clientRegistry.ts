@@ -1,0 +1,110 @@
+/**
+ * Registry of known Nouns auction client IDs.
+ *
+ * Each client registers onchain via NounsAuctionHouseV2 / NounsClientRewards
+ * and is assigned a monotonically increasing integer ID. Clients also publish
+ * metadata (name + url) onchain, but this webapp doesn't currently query it —
+ * so we keep a hardcoded fallback map here that covers the common clients.
+ *
+ * TODO(tech-debt): Replace this hardcoded map with an onchain query of the
+ * NounsAuctionHouseV2 `getClient(uint32)` view (or the off-chain registry
+ * that Nouns DAO publishes). Until then, unknown clients show a neutral
+ * placeholder favicon and a "Client #N" label.
+ */
+
+export interface ClientInfo {
+  /** Display name */
+  name: string;
+  /** Landing-page URL — used as the link target and to derive the favicon */
+  url: string;
+  /** Short description shown in the hover tooltip */
+  description: string;
+  /**
+   * Optional explicit favicon URL. If omitted, we derive one from `url`
+   * via Google's s2 favicon service.
+   */
+  iconUrl?: string;
+}
+
+/**
+ * Known clients. Keyed by the uint32 clientId stored onchain.
+ *
+ * Some IDs were taken from <https://nouns.camp/> and the Nouns DAO client
+ * rewards dashboards. Fill in more as you verify them.
+ */
+export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
+  0: {
+    name: 'nouns.wtf',
+    url: 'https://nouns.wtf',
+    description: 'The official Nouns DAO frontend',
+  },
+  1: {
+    name: 'nouns.camp',
+    url: 'https://nouns.camp',
+    description: 'Governance-focused Nouns client by Federation',
+  },
+  2: {
+    name: 'Prop House',
+    url: 'https://prop.house',
+    description: 'Noun-funded grant rounds via Prop House',
+  },
+  3: {
+    name: 'Agora',
+    url: 'https://nounsagora.com',
+    description: 'Agora governance dashboard for Nouns DAO',
+  },
+  4: {
+    name: 'NounSwap',
+    url: 'https://nounswap.wtf',
+    description: 'Swap your Noun for another Noun',
+  },
+  5: {
+    name: 'Noundry',
+    url: 'https://noundry.wtf',
+    description: 'Community-generated Noun traits',
+  },
+  6: {
+    name: 'nouns.game',
+    url: 'https://nouns.game',
+    description: 'Nouns trait explorer and fun-fact generator',
+  },
+  11: {
+    name: 'nouns.com',
+    url: 'https://nouns.com',
+    description: 'Nouns-powered tools and utilities',
+  },
+  37: {
+    name: 'noun.wtf',
+    url: 'https://noun.wtf',
+    description: 'Community Nouns client by pip',
+  },
+};
+
+export const UNKNOWN_CLIENT: ClientInfo = {
+  name: 'Unknown client',
+  url: '',
+  description: 'Bid placed via an unrecognized client',
+};
+
+export function getClientInfo(clientId: number | null | undefined): ClientInfo | null {
+  if (clientId == null) return null;
+  const known = CLIENT_REGISTRY[clientId];
+  if (known) return known;
+  return { ...UNKNOWN_CLIENT, name: `Client #${clientId}` };
+}
+
+/**
+ * Derive a favicon URL from a client's URL. Uses Google's s2 favicon service
+ * which requires no extra backend and works for arbitrary domains.
+ * Falls back to undefined if the URL is empty / unparseable.
+ */
+export function getClientFaviconUrl(client: ClientInfo, size = 64): string | undefined {
+  if (client.iconUrl) return client.iconUrl;
+  if (!client.url) return undefined;
+  try {
+    const domain = new URL(client.url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+  } catch {
+    return undefined;
+  }
+}

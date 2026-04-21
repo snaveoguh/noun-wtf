@@ -650,7 +650,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
             justifyContent: 'space-between',
           }}
         >
-          <span>⌐◨-◨ noun.wtf dream creator</span>
+          <span>🦋 noun.wtf dream creator</span>
           <span>{loadDreams().length} dreams saved</span>
         </div>
       </div>
