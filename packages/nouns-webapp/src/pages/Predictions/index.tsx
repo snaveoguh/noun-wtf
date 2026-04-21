@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { AsyncMarketGrid } from '@/components/Predictions/AsyncMarketGrid';
 import { AuctionMarketCard } from '@/components/Predictions/AuctionMarketCard';
 import { MarketCard } from '@/components/Predictions/MarketCard';
-import { OperatorPanel } from '@/components/Predictions/OperatorPanel';
+import { MarketsTable } from '@/components/Predictions/MarketsTable';
 import {
   fetchResolvedPredictionProposals,
   type PredictionProposal,
@@ -37,7 +37,7 @@ export default function PredictionsPage() {
 
       <AsyncMarketGrid />
 
-      <OperatorPanel />
+      <MarketsTable />
 
       {resolved.length > 0 && (
         <section className="mt-8">

@@ -28,6 +28,13 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   GRANT_QUEUED: { label: 'GQUEUE', color: '#a5f3fc', filterKey: 'GRANT_QUEUED' },
   GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED' },
   GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED' },
+  LIL_BID: { label: 'L-BID', color: '#93c5fd', filterKey: 'LIL_BID' },
+  LIL_AUCTION_SETTLED: { label: 'L-SETTLED', color: '#86efac', filterKey: 'LIL_AUCTION_SETTLED' },
+  LIL_NOUN_CREATED: { label: 'L-NOUN', color: '#86efac', filterKey: 'LIL_NOUN_CREATED' },
+  LIL_VOTE: { label: 'L-VOTE', color: '#d8b4fe', filterKey: 'LIL_VOTE' },
+  LIL_PROPOSAL_CREATED: { label: 'L-PROP', color: '#fde047', filterKey: 'LIL_PROPOSAL_CREATED' },
+  LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER' },
+  SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE' },
 };
 
 // Filter tabs shown in the UI
@@ -42,6 +49,11 @@ export const FILTER_TABS = [
   { key: 'CANDIDATE_SPONSORED', label: 'SPONSORS' },
   { key: 'STREAM_CREATED', label: 'STREAMS' },
   { key: 'GRANT_CREATED', label: 'GRANTS' },
+  {
+    key: 'LIL_BID,LIL_AUCTION_SETTLED,LIL_NOUN_CREATED,LIL_VOTE,LIL_PROPOSAL_CREATED,LIL_TRANSFER',
+    label: 'LIL',
+  },
+  { key: 'SALE', label: 'SALES' },
   { key: '_CHAT', label: 'CHAT' },
 ];
 
@@ -218,6 +230,49 @@ export function formatEventDescription(
 
     case 'GRANT_CANCELED':
       return `Grant #${data.grantId} canceled`;
+
+    case 'LIL_BID': {
+      const comment = ((data.comment as string) || (data.reason as string) || '').trim();
+      const base = `${addr(data.bidder as string)} bid ${ethFromWei(data.value as string)} ETH on Lil Noun ${data.nounId}`;
+      return comment.length > 0
+        ? `${base} — "${comment.slice(0, 80)}${comment.length > 80 ? '...' : ''}"`
+        : base;
+    }
+
+    case 'LIL_AUCTION_SETTLED':
+      return `Lil Noun ${data.nounId} won by ${addr(data.winner as string)} for ${ethFromWei(data.amount as string)} ETH`;
+
+    case 'LIL_NOUN_CREATED':
+      return `Lil Noun ${data.nounId} minted to ${addr(data.owner as string)}`;
+
+    case 'LIL_VOTE': {
+      const reason = (data.reason as string) || '';
+      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on Lil Prop ${data.proposalId}`;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"`
+        : base;
+    }
+
+    case 'LIL_PROPOSAL_CREATED': {
+      const propTitle = (data.title as string) || 'untitled';
+      return `New Lil proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
+    }
+
+    case 'LIL_TRANSFER':
+      return `Lil Noun ${data.nounId} transferred ${addr(data.from as string)} → ${addr(data.to as string)}`;
+
+    case 'SALE': {
+      const name = (data.collectionName as string) || (data.collection as string) || 'Item';
+      const tokenId = data.tokenId != null && data.tokenId !== '' ? ` ${data.tokenId}` : '';
+      const priceEth =
+        typeof data.priceEth === 'number' ? data.priceEth : Number(data.priceEth ?? 0);
+      const priceStr =
+        priceEth === 0 ? '0' : priceEth < 0.001 ? '<0.001' : priceEth.toFixed(priceEth < 1 ? 4 : 2);
+      const currency = (data.currency as string) || 'ETH';
+      const market = (data.marketplace as string) || '';
+      const marketSuffix = market ? ` on ${market}` : '';
+      return `${name}${tokenId} sold for ${priceStr} ${currency} — ${addr(data.from as string)} → ${addr(data.to as string)}${marketSuffix}`;
+    }
 
     default:
       return JSON.stringify(data).slice(0, 100);
