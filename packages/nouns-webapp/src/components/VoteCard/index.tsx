@@ -46,31 +46,19 @@ const VoteCard: React.FC<VoteCardProps> = props => {
   switch (variant) {
     case VoteCardVariant.FOR:
       titleClass = classes.for;
-      titleCopy = (
-        <>
-          👍 <Trans>For</Trans>
-        </>
-      );
+      titleCopy = <>👍</>;
       voteCount = proposal.forCount;
       supportDetailedValue = 1;
       break;
     case VoteCardVariant.AGAINST:
       titleClass = classes.against;
-      titleCopy = (
-        <>
-          👎 <Trans>Against</Trans>
-        </>
-      );
+      titleCopy = <>👎</>;
       voteCount = proposal.againstCount;
       supportDetailedValue = 0;
       break;
     default:
       titleClass = classes.abstain;
-      titleCopy = (
-        <>
-          🤷 <Trans>Abstain</Trans>
-        </>
-      );
+      titleCopy = <>🤷</>;
       voteCount = proposal.abstainCount;
       supportDetailedValue = 2;
       break;

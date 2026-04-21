@@ -484,7 +484,7 @@ const DreamModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span style={{ color: '#9333ea' }}>⌐◨-◨</span>{' '}
+          <span>🧞</span>{' '}
           <span>nouns dreams</span>
         </div>
       </div>
@@ -584,7 +584,7 @@ const DreamsBanner: FC = () => {
             whiteSpace: 'nowrap' as const,
           }}
         >
-          <span style={{ color: '#9333ea' }}>⌐◨-◨</span>
+          <span>💭</span>
           <span style={{ color: '#7c3aed', marginLeft: '6px' }}>DREAMS</span>
         </div>
 

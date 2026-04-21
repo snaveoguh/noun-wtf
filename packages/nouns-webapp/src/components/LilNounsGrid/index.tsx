@@ -669,11 +669,11 @@ const LilNounsGrid: FC = () => {
           padding: '10px 16px 6px', flexWrap: 'wrap', gap: 8,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#ec4899' }}>
-              ⌐◨-◨
+            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+              🧚
             </span>
             <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: textMuted }}>
-              IF U TOO POOR TO BUY NOUN, BUY LIL NOUN, NFA
+              lil nouns are like nouns but little
             </span>
           </div>
           <button
@@ -708,11 +708,11 @@ const LilNounsGrid: FC = () => {
         padding: '10px 16px 6px', flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#ec4899' }}>
-            ⌐◨-◨
+          <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+            🧚
           </span>
           <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: textColor }}>
-            IF U TOO POOR TO BUY NOUN, BUY LIL NOUN, NFA
+            lil nouns are like nouns but little
           </span>
           {nounId !== undefined && (
             <span style={{ fontSize: '0.55rem', color: '#ec4899', fontFamily: "'PT Root UI', sans-serif", fontWeight: 700 }}>

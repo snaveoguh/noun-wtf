@@ -23,13 +23,19 @@ export function useDraggableScroll(
       const el = scrollRef.current;
       if (!el) return;
 
+      // Ignore non-primary buttons (right-click, middle-click)
+      if (e.button !== 0) return;
+
       isDragging.current = true;
       hasMoved.current = false;
       startX.current = e.clientX;
       scrollStart.current = el.scrollLeft;
       pausedRef.current = true;
-      el.style.cursor = 'grabbing';
-      el.setPointerCapture(e.pointerId);
+
+      // Don't call setPointerCapture on pointerdown — that redirects the
+      // subsequent click event to the scroll container, preventing clicks
+      // on children (cards) from ever firing. Only capture once the user
+      // has actually started dragging (past the movement threshold).
 
       // Clear any pending resume
       if (resumeTimer.current) {
@@ -37,16 +43,38 @@ export function useDraggableScroll(
         resumeTimer.current = null;
       }
 
+      const pointerId = e.pointerId;
+      let captured = false;
+
       const onPointerMove = (ev: PointerEvent) => {
         if (!isDragging.current) return;
         const dx = ev.clientX - startX.current;
-        if (Math.abs(dx) > 8) hasMoved.current = true;
-        el.scrollLeft = scrollStart.current - dx;
+        if (Math.abs(dx) > 8) {
+          if (!hasMoved.current) {
+            hasMoved.current = true;
+            el.style.cursor = 'grabbing';
+            // Now that we know this is a drag (not a click), capture the pointer
+            try {
+              el.setPointerCapture(pointerId);
+              captured = true;
+            } catch {
+              // Pointer may have been released already
+            }
+          }
+          el.scrollLeft = scrollStart.current - dx;
+        }
       };
 
       const onPointerUp = () => {
         isDragging.current = false;
         el.style.cursor = '';
+        if (captured) {
+          try {
+            el.releasePointerCapture(pointerId);
+          } catch {
+            // Already released
+          }
+        }
 
         // Resume auto-scroll after a short delay so it doesn't snap
         resumeTimer.current = setTimeout(() => {

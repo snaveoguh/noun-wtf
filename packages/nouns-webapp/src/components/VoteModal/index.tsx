@@ -152,11 +152,7 @@ const VoteModal = ({
             <>
               <div onClick={() => setVote(Vote.FOR)}>
                 <NavBarButton
-                  buttonText={
-                    <>
-                      👍 <Trans>For</Trans>
-                    </>
-                  }
+                  buttonText={<>👍</>}
                   buttonIcon={<></>}
                   buttonStyle={NavBarButtonStyle.FOR_VOTE_SUBMIT}
                   className={cn(
@@ -170,11 +166,7 @@ const VoteModal = ({
           )}
           <div onClick={() => setVote(Vote.AGAINST)}>
             <NavBarButton
-              buttonText={
-                <>
-                  👎 <Trans>Against</Trans>
-                </>
-              }
+              buttonText={<>👎</>}
               buttonIcon={<></>}
               buttonStyle={NavBarButtonStyle.AGAINST_VOTE_SUBMIT}
               className={cn(
@@ -188,11 +180,7 @@ const VoteModal = ({
               <br />
               <div onClick={() => setVote(Vote.ABSTAIN)}>
                 <NavBarButton
-                  buttonText={
-                    <>
-                      🤷 <Trans>Abstain</Trans>
-                    </>
-                  }
+                  buttonText={<>🤷</>}
                   buttonIcon={<></>}
                   buttonStyle={NavBarButtonStyle.ABSTAIN_VOTE_SUBMIT}
                   className={cn(
