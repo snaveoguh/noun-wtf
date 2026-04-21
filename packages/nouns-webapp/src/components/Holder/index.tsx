@@ -3,7 +3,6 @@ import React from 'react';
 import { useQuery } from '@apollo/client';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Col, Row } from 'react-bootstrap';
 
 import ShortAddress from '@/components/ShortAddress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -58,30 +57,24 @@ const Holder: React.FC<HolderProps> = props => {
   const nounderNounContent = 'nounders.eth';
 
   return (
-    <>
-      <Row className={clsx(classes.wrapper, classes.section)}>
-        <Col xs={1} lg={12} className={classes.leftCol}>
-          <h4
-            style={{
-              color: isCool ? 'var(--brand-cool-light-text)' : 'var(--brand-warm-light-text)',
-            }}
-            className={classes.holderCopy}
-          >
-            <Trans>Held by</Trans>
-          </h4>
-        </Col>
-        <Col xs="auto" lg={12}>
-          <h2
-            className={classes.holderContent}
-            style={{
-              color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)',
-            }}
-          >
-            {isNounders === true ? nounderNounContent : nonNounderNounContent}
-          </h2>
-        </Col>
-      </Row>
-    </>
+    <div className={clsx(classes.wrapper, classes.section, classes.inlineRow)}>
+      <h4
+        style={{
+          color: isCool ? 'var(--brand-cool-light-text)' : 'var(--brand-warm-light-text)',
+        }}
+        className={classes.holderCopy}
+      >
+        <Trans>Held by</Trans>
+      </h4>
+      <h2
+        className={classes.holderContent}
+        style={{
+          color: isCool ? 'var(--brand-cool-dark-text)' : 'var(--brand-warm-dark-text)',
+        }}
+      >
+        {isNounders === true ? nounderNounContent : nonNounderNounContent}
+      </h2>
+    </div>
   );
 };
 

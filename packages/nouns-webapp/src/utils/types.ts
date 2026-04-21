@@ -12,6 +12,7 @@ export interface BidEvent {
   transactionHash: string;
   transactionIndex: number;
   timestamp: BigNumberish;
+  clientId?: number | null;
 }
 
 export interface AuctionCreateEvent {
@@ -40,4 +41,5 @@ export interface Bid {
   transactionHash: string;
   transactionIndex: number;
   timestamp: bigint;
+  clientId?: number | null;
 }

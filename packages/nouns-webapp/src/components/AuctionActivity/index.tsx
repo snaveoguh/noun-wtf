@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Trans } from '@lingui/react/macro';
+import { Link } from 'react-router';
 
 import AuctionActivityWrapper from '@/components/AuctionActivityWrapper';
 import AuctionTimer from '@/components/AuctionTimer';
@@ -95,9 +96,9 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
         {auctionEnded && (
           <div className={classes.nextNounLink}>
             <FontAwesomeIcon icon={faInfoCircle} />
-            <a href={'https://www.nouns.game/crystal-ball'} target={'_blank'} rel="noreferrer">
+            <Link to="/crystal-ball">
               <Trans>Help mint the next Noun</Trans>
-            </a>
+            </Link>
           </div>
         )}
 

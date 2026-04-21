@@ -86,7 +86,7 @@ const CandidatesPage: React.FC = () => {
       {/* Header */}
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>⌐◨-◨ Candidates</h1>
+          <h1 style={styles.title}>🎴 Candidates</h1>
           <p style={styles.subtitle}>
             Proposal candidates from the community. Sponsor candidates to help them become proposals.
           </p>

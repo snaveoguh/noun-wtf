@@ -25,6 +25,7 @@ import {
   nounsAuctionHouseAddress,
   useReadNounsAuctionHouseAuction,
   useWatchNounsAuctionHouseAuctionBidEvent,
+  useWatchNounsAuctionHouseAuctionBidWithClientIdEvent,
   useWatchNounsAuctionHouseAuctionCreatedEvent,
   useWatchNounsAuctionHouseAuctionExtendedEvent,
   useWatchNounsAuctionHouseAuctionSettledEvent,
@@ -40,13 +41,14 @@ import {
   setActiveAuction,
   setAuctionExtended,
   setAuctionSettled,
+  setBidClientId,
   setFullAuction,
 } from './state/slices/auction';
 import { setLastAuctionNounId, setOnDisplayAuctionNounId } from './state/slices/onDisplayAuction';
-import { addPastAuctions } from './state/slices/pastAuctions';
+import { addPastAuctions, upsertPastAuction } from './state/slices/pastAuctions';
 import { nounPath } from './utils/history';
 import { defaultChain, config as wagmiConfig } from './wagmi';
-import { clientFactory, latestAuctionsQuery } from './wrappers/subgraph';
+import { clientFactory, latestAuctionsQuery, singleAuctionQuery } from './wrappers/subgraph';
 
 const queryClient = new QueryClient();
 
@@ -198,6 +200,25 @@ const ChainSubscriber: React.FC = () => {
     },
   });
 
+  // Watch for AuctionBidWithClientId (emitted alongside AuctionBid). Attach
+  // the clientId to the bid already appended above, matched by nounId + value.
+  useWatchNounsAuctionHouseAuctionBidWithClientIdEvent({
+    onLogs: logs => {
+      for (const {
+        args: { nounId, value, clientId },
+      } of logs) {
+        if (nounId == null || value == null || clientId == null) continue;
+        dispatch(
+          setBidClientId({
+            nounId: Number(nounId),
+            value: value.toString(),
+            clientId: Number(clientId),
+          }),
+        );
+      }
+    },
+  });
+
   // Watch for new auction extended events
   useWatchNounsAuctionHouseAuctionExtendedEvent({
     onLogs: logs => {
@@ -254,6 +275,7 @@ const PastAuctions: React.FC = () => {
               items: Array<{
                 value: string;
                 bidder: string;
+                clientId: number | null;
                 createdAtBlock: string;
                 createdAt: string;
                 createdAtTransaction: string;
@@ -277,6 +299,72 @@ const PastAuctions: React.FC = () => {
   return <></>;
 };
 
+/**
+ * Fills in auction data for a single noun on-demand when it's outside the
+ * latestAuctionsQuery(1000) window — e.g. Noun #1 once we're past Noun ~1870.
+ * Watches the currently-displayed nounId and fetches only if not already in
+ * the past-auctions cache (and not the live auction).
+ */
+const MissingAuctionFetcher: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const onDisplayAuctionNounId = useAppSelector(
+    state => state.onDisplayAuction.onDisplayAuctionNounId,
+  );
+  const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
+  const pastAuctions = useAppSelector(state => state.pastAuctions.pastAuctions);
+
+  const needsFetch =
+    onDisplayAuctionNounId != null &&
+    lastAuctionNounId != null &&
+    onDisplayAuctionNounId !== Number(lastAuctionNounId) &&
+    !pastAuctions.some(
+      a => a.activeAuction != null && Number(a.activeAuction.nounId) === onDisplayAuctionNounId,
+    );
+
+  const { data: fetchedAuction } = useQuery({
+    queryKey: ['singleAuction', onDisplayAuctionNounId],
+    enabled: needsFetch,
+    staleTime: Infinity, // settled auctions are immutable
+    queryFn: async () => {
+      if (onDisplayAuctionNounId == null) return null;
+      const { query, variables } = singleAuctionQuery(String(onDisplayAuctionNounId));
+      const result = await execute<{
+        auctions: {
+          items: Array<{
+            nounId: string;
+            amount: string;
+            settled: boolean;
+            winner: string | null;
+            startTime: string;
+            endTime: string;
+            clientId: number | null;
+            noun: { id: string; owner: string } | null;
+            bids: {
+              items: Array<{
+                value: string;
+                bidder: string;
+                clientId: number | null;
+                createdAtBlock: string;
+                createdAt: string;
+                createdAtTransaction: string;
+              }>;
+            };
+          }>;
+        };
+      }>(query, variables);
+      return result?.auctions?.items?.[0] ?? null;
+    },
+  });
+
+  useEffect(() => {
+    if (fetchedAuction) {
+      dispatch(upsertPastAuction(fetchedAuction));
+    }
+  }, [fetchedAuction, dispatch]);
+
+  return <></>;
+};
+
 createRoot(document.getElementById('root')!).render(
   <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">
     <TooltipProvider delayDuration={0}>
@@ -290,6 +378,7 @@ createRoot(document.getElementById('root')!).render(
               <ChainSubscriber />
               <ApolloProvider client={client}>
                 <PastAuctions />
+                <MissingAuctionFetcher />
                 <LanguageProvider>
                   <CustomConnectkitProvider>
                     <SiteThemeProvider>

@@ -381,6 +381,7 @@ export const auctionQuery = (id: string) => ({
           items {
             value
             bidder
+            clientId
             createdAtBlock
             createdAtTransaction
           }
@@ -463,6 +464,7 @@ export const latestAuctionsQuery = (first = 1000, _skip = 0) => {
               items {
                 value
                 bidder
+                clientId
                 createdAtBlock
                 createdAt
                 createdAtTransaction
@@ -475,6 +477,44 @@ export const latestAuctionsQuery = (first = 1000, _skip = 0) => {
     variables: { first },
   };
 };
+
+// Fetch a single auction by nounId. Used on-demand when the user navigates
+// to a noun that falls outside the initial latestAuctionsQuery(1000) window
+// (i.e. old nouns #0 – #~870 once the DAO gets past noun ~1870). The bulk
+// query caps at the most recent 1000 auctions to keep the initial page
+// payload small; this fills in the rest lazily.
+export const singleAuctionQuery = (nounId: string) => ({
+  query: gql`
+    query GetSingleAuction($nounId: BigInt!) {
+      auctions(where: { nounId: $nounId }, limit: 1) {
+        items {
+          nounId
+          amount
+          settled
+          winner
+          startTime
+          endTime
+          clientId
+          noun {
+            id
+            owner
+          }
+          bids(limit: 100, orderBy: "value", orderDirection: "desc") {
+            items {
+              value
+              bidder
+              clientId
+              createdAtBlock
+              createdAt
+              createdAtTransaction
+            }
+          }
+        }
+      }
+    }
+  `,
+  variables: { nounId },
+});
 
 export const latestBidsQuery = (first = 10) => ({
   query: gql`

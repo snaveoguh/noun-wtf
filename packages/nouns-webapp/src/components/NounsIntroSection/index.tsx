@@ -61,12 +61,22 @@ const NounsIntroSection = () => {
         <Col lg={6} className={`order-lg-2 order-1`}>
           <div className={`${classes.textWrapper} ${classes.youtubeSectionText}`}>
             <p>
-              <Trans>
-                There&apos;s a way for everyone to get involved with Nouns. From whimsical endeavors
-                like naming a frog, to ambitious projects like constructing a giant float for the
-                Rose Parade, or even crypto infrastructure like Prop House. Nouns funds projects of
-                all sizes and domains.
-              </Trans>
+              there&apos;s a way for everyone to get involved with Nouns. From whimsical endeavors
+              like naming a frog, to legal defence funds supporting Ethereum and privacy, or even
+              crypto infrastructure like{' '}
+              <a href="https://probe.wtf" target="_blank" rel="noopener noreferrer">
+                probe.wtf
+              </a>
+              . Nouns funds projects of all sizes and domains, the founders have mainly checked out
+              and the community is torn between Book Value and{' '}
+              <a
+                href="https://memevalue.pinit.eth.limo"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Meme Value
+              </a>
+              .
             </p>
           </div>
         </Col>

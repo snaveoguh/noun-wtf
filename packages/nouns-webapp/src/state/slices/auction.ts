@@ -6,6 +6,7 @@ import {
   AuctionExtendedEvent,
   AuctionSettledEvent,
   BidEvent,
+  BigNumberish,
 } from '@/utils/types';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
 
@@ -45,6 +46,7 @@ export const reduxSafeBid = (bid: BidEvent): BidEvent => ({
   transactionHash: bid.transactionHash,
   transactionIndex: bid.transactionIndex,
   timestamp: bid.timestamp.toString(),
+  clientId: bid.clientId ?? null,
 });
 
 const maxBid = (bids: BidEvent[]): BidEvent => {
@@ -96,6 +98,25 @@ export const auctionSlice = createSlice({
       if (!(state.activeAuction && auctionsEqual(state.activeAuction, action.payload))) return;
       state.activeAuction.endTime = BigInt(action.payload.endTime).toString();
     },
+    // Attach a clientId to a bid already in state, matched by nounId + value.
+    // The NounsAuctionHouseV2 contract emits both AuctionBid and
+    // AuctionBidWithClientId — the former populates the bid row, the latter
+    // provides the clientId for the favicon.
+    setBidClientId: (
+      state,
+      action: PayloadAction<{ nounId: BigNumberish; value: BigNumberish; clientId: number }>,
+    ) => {
+      const { nounId, value, clientId } = action.payload;
+      const targetNounId = BigInt(nounId).toString();
+      const targetValue = BigInt(value).toString();
+      state.bids = state.bids.map(bid =>
+        BigInt(bid.nounId).toString() === targetNounId &&
+        BigInt(bid.value).toString() === targetValue &&
+        (bid.clientId == null || bid.clientId === 0)
+          ? { ...bid, clientId }
+          : bid,
+      );
+    },
   },
 });
 
@@ -104,6 +125,7 @@ export const {
   appendBid,
   setAuctionExtended,
   setAuctionSettled,
+  setBidClientId,
   setFullAuction,
 } = auctionSlice.actions;
 

@@ -26,6 +26,7 @@ const deserializeBid = (reduxSafeBid: BidEvent): Bid => {
     transactionHash: reduxSafeBid.transactionHash,
     transactionIndex: reduxSafeBid.transactionIndex,
     timestamp: BigInt(reduxSafeBid.timestamp),
+    clientId: reduxSafeBid.clientId ?? null,
   };
 };
 const deserializeBids = (reduxSafeBids: BidEvent[]): Bid[] => {

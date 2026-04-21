@@ -187,14 +187,45 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
           {card.category}
         </div>
       </div>
-      <div style={{ textAlign: 'center', marginTop: 12 }}>
+      <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center' }}>
+        <button
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('noundry-trait-edit', {
+                detail: { category: card.category, index: parseInt(card.id.split('-')[1], 10) },
+              }),
+            );
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            onClose();
+          }}
+          style={{
+            padding: '6px 14px',
+            border: 'none',
+            borderRadius: 8,
+            background: '#d4544e',
+            color: '#fff',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Open in Editor
+        </button>
         <a
           href="https://gallery.noundry.wtf"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ fontSize: '0.6rem', color: '#e06c75', textDecoration: 'none', fontWeight: 700 }}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 8,
+            border: '1px solid rgba(0,0,0,0.1)',
+            fontSize: '0.7rem',
+            color: '#666',
+            textDecoration: 'none',
+            fontWeight: 700,
+          }}
         >
-          View on Noundry Gallery →
+          Gallery →
         </a>
       </div>
       <button
@@ -302,7 +333,7 @@ const NoundryBanner: FC = () => {
             whiteSpace: 'nowrap' as const,
           }}
         >
-          <span style={{ color: '#e06c75' }}>⌐◨-◨</span>
+          <span>🎨</span>
           <span style={{ color: '#d4544e', marginLeft: 6 }}>NOUNDRY</span>
         </div>
 
@@ -342,15 +373,7 @@ const NoundryBanner: FC = () => {
           {displayCards.map((card, i) => (
             <div
               key={`${card.id}-${i}`}
-              onClick={() => {
-                // Dispatch event to open 2D editor with this trait
-                window.dispatchEvent(
-                  new CustomEvent('noundry-trait-edit', {
-                    detail: { category: card.category, index: parseInt(card.id.split('-')[1], 10) },
-                  }),
-                );
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onClick={() => setSelectedCard(card)}
               role="button"
               tabIndex={0}
               onKeyDown={e => {

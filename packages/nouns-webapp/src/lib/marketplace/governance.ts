@@ -153,6 +153,10 @@ export interface PredictionProposal {
   votesAgainst?: number;
   quorum?: number;
   votingClosed?: boolean;
+  /** Unix seconds of proposal creation — used to sort Nouns + Lil Nouns together. */
+  createdTimestamp?: number;
+  /** End block — used as secondary sort for ACTIVE proposals. */
+  endBlock?: number;
 }
 
 const ACTIVE_STATUSES = ['ACTIVE', 'PENDING', 'OBJECTION_PERIOD', 'UPDATABLE'];
@@ -188,6 +192,8 @@ async function fetchNounsProposals(): Promise<PredictionProposal[]> {
           .slice(0, 120) ||
           'Untitled Proposal');
       const status = ((p.status as string) ?? '').toLowerCase().replace(/_/g, '-');
+      const createdAt = Number((p.createdAt as string | number | undefined) ?? 0);
+      const endBlock = Number((p.endBlock as string | number | undefined) ?? 0);
       return {
         dao: 'nouns',
         proposalId: String(p.id),
@@ -198,6 +204,8 @@ async function fetchNounsProposals(): Promise<PredictionProposal[]> {
         votesAgainst: Number(p.againstVotes ?? 0),
         quorum: Number(p.quorumVotes ?? 0),
         votingClosed: RESOLVED_STATUSES.includes(((p.status as string) ?? '').toUpperCase()),
+        createdTimestamp: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : undefined,
+        endBlock: Number.isFinite(endBlock) && endBlock > 0 ? endBlock : undefined,
       };
     });
   } catch {
@@ -220,6 +228,8 @@ export interface LilNounsProposal {
   canceled: boolean;
   vetoed: boolean;
   executed: boolean;
+  /** Unix seconds — available via proxy, zero for on-chain fallback. */
+  createdTimestamp?: number;
 }
 
 function parseTitle(description: string, fallback: string): string {
@@ -349,6 +359,7 @@ export async function fetchLilNounsProposalsFromProxy(): Promise<LilNounsProposa
       (p.title ?? '').trim().length > 0
         ? (p.title as string).trim()
         : parseTitle(description, `Lil Proposal ${p.id}`);
+    const createdTimestamp = Number(p.createdTimestamp ?? 0);
     return {
       id: Number(p.id),
       proposer: p.proposer?.id ?? '',
@@ -364,6 +375,8 @@ export async function fetchLilNounsProposalsFromProxy(): Promise<LilNounsProposa
       status: p.status.toUpperCase(),
       description,
       title,
+      createdTimestamp:
+        Number.isFinite(createdTimestamp) && createdTimestamp > 0 ? createdTimestamp : undefined,
     };
   });
 }
@@ -389,32 +402,47 @@ async function fetchLilNounsProposals(): Promise<PredictionProposal[]> {
       votesAgainst: p.againstVotes,
       quorum: p.quorumVotes,
       votingClosed: RESOLVED_STATUSES.includes(p.status),
+      createdTimestamp: p.createdTimestamp,
+      endBlock: Number.isFinite(p.endBlock) && p.endBlock > 0 ? p.endBlock : undefined,
     };
   });
+}
+
+/**
+ * Unified recency key for mixing Nouns + Lil Nouns chronologically.
+ * Prefers createdTimestamp (unix seconds) and falls back to endBlock — proposalId is a
+ * within-DAO tiebreaker, since IDs are not comparable across DAOs.
+ */
+function recencyKey(p: PredictionProposal): number {
+  if (p.createdTimestamp != null && p.createdTimestamp > 0) return p.createdTimestamp;
+  if (p.endBlock != null && p.endBlock > 0) return p.endBlock;
+  return 0;
+}
+
+function sortByRecencyDesc(a: PredictionProposal, b: PredictionProposal): number {
+  const delta = recencyKey(b) - recencyKey(a);
+  if (delta !== 0) return delta;
+  // Same DAO? Fall back to numeric proposalId desc. Cross-DAO ties keep input order.
+  if (a.dao === b.dao) return Number(b.proposalId) - Number(a.proposalId);
+  return 0;
 }
 
 export async function fetchActivePredictionProposals(): Promise<PredictionProposal[]> {
   const [nouns, lilNouns] = await Promise.all([fetchNounsProposals(), fetchLilNounsProposals()]);
 
-  const activeNouns = nouns.filter(p =>
-    ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
-  );
-  const activeLilNouns = lilNouns.filter(p =>
+  const merged = [...nouns, ...lilNouns].filter(p =>
     ACTIVE_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
   );
 
-  return [...activeNouns, ...activeLilNouns];
+  return merged.sort(sortByRecencyDesc);
 }
 
 export async function fetchResolvedPredictionProposals(): Promise<PredictionProposal[]> {
   const [nouns, lilNouns] = await Promise.all([fetchNounsProposals(), fetchLilNounsProposals()]);
 
-  const resolvedNouns = nouns.filter(p =>
-    RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
-  );
-  const resolvedLilNouns = lilNouns.filter(p =>
+  const merged = [...nouns, ...lilNouns].filter(p =>
     RESOLVED_STATUSES.some(s => p.status === s.toLowerCase().replace(/_/g, '-')),
   );
 
-  return [...resolvedNouns, ...resolvedLilNouns];
+  return merged.sort(sortByRecencyDesc);
 }
