@@ -1,4 +1,3 @@
-/* eslint-disable import/no-unresolved */
 import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
 
 // Agent Hub client — replaces direct Anthropic SDK calls
@@ -190,6 +189,8 @@ import {
   searchPeople,
   getPeopleCount,
   buildPeopleContext,
+  detectFunction,
+  buildFunctionSkillPromptSnippet,
 } from '../agent/index.js';
 import {
   getPositions as getTradingPositions,
@@ -859,6 +860,274 @@ app.get('/api/lil-proposals/:id', async c => {
   }
 });
 
+// ============================================================
+// Activity-feed external sources: Lil Nouns subgraph + Reservoir sales
+// ============================================================
+
+interface FeedEvent {
+  type: string;
+  blockNumber: number;
+  timestamp: string;
+  txHash: string;
+  data: Record<string, unknown>;
+}
+
+const LIL_ACTIVITY_TTL = 30_000;
+let lilActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
+
+async function fetchLilNounsActivity(
+  before: bigint | undefined,
+  limit: number,
+): Promise<FeedEvent[]> {
+  const key = `${before ?? 'latest'}:${limit}`;
+  const now = Date.now();
+  if (
+    lilActivityCache &&
+    lilActivityCache.key === key &&
+    now - lilActivityCache.at < LIL_ACTIVITY_TTL
+  ) {
+    return lilActivityCache.events;
+  }
+
+  const per = Math.max(20, Math.min(limit + 10, 100));
+  const blockFilter = before ? `, where: { blockNumber_lt: "${before.toString()}" }` : '';
+  const propBlockFilter = before ? `, where: { createdBlock_lt: "${before.toString()}" }` : '';
+  const query = `{
+    bids(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id noun { id } amount bidder { id } blockNumber blockTimestamp comment
+    }
+    auctions(first: ${per}, orderBy: endTime, orderDirection: desc, where: { settled: true${before ? `, endTime_lt: "${before.toString()}"` : ''} }) {
+      id amount bidder { id } noun { id } endTime startTime
+    }
+    votes(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id voter { id } proposal { id } support: supportDetailed votes reason blockNumber blockTimestamp transactionHash
+    }
+    proposals(first: ${per}, orderBy: createdBlock, orderDirection: desc${propBlockFilter}) {
+      id title proposer { id } createdBlock createdTimestamp description
+    }
+    transferEvents(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id noun { id } previousHolder { id } newHolder { id } blockNumber blockTimestamp
+    }
+  }`;
+
+  let body: {
+    data?: {
+      bids?: Array<Record<string, unknown>>;
+      auctions?: Array<Record<string, unknown>>;
+      votes?: Array<Record<string, unknown>>;
+      proposals?: Array<Record<string, unknown>>;
+      transferEvents?: Array<Record<string, unknown>>;
+    };
+  };
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    body = (await res.json()) as typeof body;
+  } catch (err) {
+    console.warn('[activity/lil] subgraph fetch failed:', err);
+    return [];
+  }
+
+  const events: FeedEvent[] = [];
+  const toISO = (ts: unknown): string => {
+    const n = Number(ts);
+    if (!Number.isFinite(n)) return new Date().toISOString();
+    return new Date(n < 1e12 ? n * 1000 : n).toISOString();
+  };
+  const accId = (a: unknown): string =>
+    typeof a === 'object' && a !== null && typeof (a as { id?: unknown }).id === 'string'
+      ? (a as { id: string }).id
+      : '';
+
+  for (const b of body.data?.bids ?? []) {
+    events.push({
+      type: 'LIL_BID',
+      blockNumber: Number(b.blockNumber),
+      timestamp: toISO(b.blockTimestamp),
+      txHash: '',
+      data: {
+        nounId: Number(accId(b.noun)),
+        value: String(b.amount ?? '0'),
+        bidder: accId(b.bidder),
+        comment: (b.comment as string) || '',
+      },
+    });
+  }
+
+  // Auction entity has no blockNumber — estimate from endTime so these events
+  // merge-sort sensibly against the bid/vote/transfer events that do.
+  const estBlock = (ts: number): number =>
+    Math.max(0, Math.floor(19_000_000 + (ts - 1_708_993_199) / 12));
+  for (const a of body.data?.auctions ?? []) {
+    const winner = accId(a.bidder);
+    if (!winner) continue;
+    const endTs = Number(a.endTime);
+    events.push({
+      type: 'LIL_AUCTION_SETTLED',
+      blockNumber: Number.isFinite(endTs) ? estBlock(endTs) : 0,
+      timestamp: toISO(a.endTime),
+      txHash: '',
+      data: {
+        nounId: Number(accId(a.noun)),
+        winner,
+        amount: String(a.amount ?? '0'),
+      },
+    });
+  }
+
+  for (const v of body.data?.votes ?? []) {
+    events.push({
+      type: 'LIL_VOTE',
+      blockNumber: Number(v.blockNumber),
+      timestamp: toISO(v.blockTimestamp),
+      txHash: (v.transactionHash as string) || '',
+      data: {
+        voter: accId(v.voter),
+        proposalId: Number(accId(v.proposal)),
+        support: Number(v.support),
+        votes: String(v.votes ?? '0'),
+        reason: (v.reason as string) || '',
+      },
+    });
+  }
+
+  for (const p of body.data?.proposals ?? []) {
+    const descText = (p.description as string) || '';
+    const derivedTitle =
+      ((p.title as string) || '').trim() ||
+      (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+    events.push({
+      type: 'LIL_PROPOSAL_CREATED',
+      blockNumber: Number(p.createdBlock),
+      timestamp: toISO(p.createdTimestamp),
+      txHash: '',
+      data: {
+        proposalId: Number(p.id),
+        proposer: accId(p.proposer),
+        title: derivedTitle,
+      },
+    });
+  }
+
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  for (const t of body.data?.transferEvents ?? []) {
+    const from = accId(t.previousHolder);
+    const to = accId(t.newHolder);
+    const nounId = Number(accId(t.noun));
+    const ts = toISO(t.blockTimestamp);
+    const block = Number(t.blockNumber);
+    if (from.toLowerCase() === ZERO) {
+      events.push({
+        type: 'LIL_NOUN_CREATED',
+        blockNumber: block,
+        timestamp: ts,
+        txHash: '',
+        data: { nounId, owner: to },
+      });
+    } else {
+      events.push({
+        type: 'LIL_TRANSFER',
+        blockNumber: block,
+        timestamp: ts,
+        txHash: '',
+        data: { nounId, from, to },
+      });
+    }
+  }
+
+  lilActivityCache = { at: now, key, events };
+  return events;
+}
+
+const SALES_ACTIVITY_TTL = 60_000;
+let salesActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
+
+const RESERVOIR_COLLECTIONS: Array<{
+  addr: string;
+  label: 'NOUN' | 'LIL' | 'TERRAFORM';
+  name: string;
+}> = [
+  { addr: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03', label: 'NOUN', name: 'Noun' },
+  { addr: '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B', label: 'LIL', name: 'Lil Noun' },
+  { addr: '0x4E1f41613c9084FdB9E34E11fAE9412427480e56', label: 'TERRAFORM', name: 'Terraform' },
+];
+
+async function fetchReservoirSales(
+  before: bigint | undefined,
+  limit: number,
+): Promise<FeedEvent[]> {
+  const key = `${before ?? 'latest'}:${limit}`;
+  const now = Date.now();
+  if (
+    salesActivityCache &&
+    salesActivityCache.key === key &&
+    now - salesActivityCache.at < SALES_ACTIVITY_TTL
+  ) {
+    return salesActivityCache.events;
+  }
+
+  const per = Math.max(20, Math.min(limit + 10, 50));
+  const all: FeedEvent[] = [];
+
+  const results = await Promise.all(
+    RESERVOIR_COLLECTIONS.map(async ({ addr, label, name }) => {
+      try {
+        const url = `https://api.reservoir.tools/sales/v6?contract=${addr}&limit=${per}&includeTokenMetadata=true&sortBy=time`;
+        const res = await fetch(url, {
+          headers: { accept: '*/*' },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!res.ok) throw new Error(`reservoir ${label} ${res.status}`);
+        const json = (await res.json()) as { sales?: Array<Record<string, unknown>> };
+        const out: FeedEvent[] = [];
+        for (const s of json.sales ?? []) {
+          const token = (s.token as Record<string, unknown>) || {};
+          const price = (s.price as Record<string, unknown>) || {};
+          const amount = (price.amount as Record<string, unknown>) || {};
+          const currency = (price.currency as Record<string, unknown>) || {};
+          const block = Number(s.block);
+          const ts = Number(s.timestamp);
+          if (!block || !ts) continue;
+          if (before && BigInt(block) >= before) continue;
+          out.push({
+            type: 'SALE',
+            blockNumber: block,
+            timestamp: new Date(ts * 1000).toISOString(),
+            txHash: (s.txHash as string) || '',
+            data: {
+              collection: label,
+              collectionName: name,
+              tokenId: String(token.tokenId ?? ''),
+              tokenName: (token.name as string) || `${name} ${token.tokenId ?? ''}`.trim(),
+              from: (s.from as string) || '',
+              to: (s.to as string) || '',
+              priceEth:
+                typeof amount.decimal === 'number' ? amount.decimal : Number(amount.decimal ?? 0),
+              priceWei: String(amount.raw ?? '0'),
+              priceUsd: typeof amount.usd === 'number' ? amount.usd : null,
+              currency: (currency.symbol as string) || 'ETH',
+              marketplace: (s.fillSource as string) || (s.orderSource as string) || '',
+            },
+          });
+        }
+        return out;
+      } catch (err) {
+        console.warn(`[activity/sales] ${label} fetch failed:`, err);
+        return [];
+      }
+    }),
+  );
+  for (const chunk of results) all.push(...chunk);
+
+  salesActivityCache = { at: now, key, events: all };
+  return all;
+}
+
 /**
  * Auction price prediction market stats.
  * Returns current live auction + last 7 settled auctions (skipping nounder/empty)
@@ -972,6 +1241,367 @@ app.get('/api/auction-stats', async c => {
   } catch (err) {
     if (auctionStatsCache !== null) {
       return c.json(auctionStatsCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Prediction markets — combined listing of noun auction markets
+// + proposal markets, for the /predictions page's "Markets" table.
+// Public, read-only; resolve() is permissionless on both contracts.
+// ============================================================
+
+const AUCTION_PRICE_MARKET_ADDRESS =
+  (process.env.AUCTION_PRICE_MARKET_ADDRESS as `0x${string}` | undefined) ??
+  '0xC9c201A7AfB67Ecc08238Cbd690d39658Aed39b6';
+
+const PREDICTION_MARKET_ADDRESS =
+  (process.env.PREDICTION_MARKET_ADDRESS as `0x${string}` | undefined) ??
+  '0x2ea7502C4db5B8cfB329d8a9866EB6705b036608';
+
+const AUCTION_PRICE_MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'getMarket',
+    inputs: [{ name: 'nounId', type: 'uint256' }],
+    outputs: [
+      { name: 'higherPool', type: 'uint256' },
+      { name: 'lowerPool', type: 'uint256' },
+      { name: 'higherStakers', type: 'uint256' },
+      { name: 'lowerStakers', type: 'uint256' },
+      { name: 'higherOddsBps', type: 'uint256' },
+      { name: 'lowerOddsBps', type: 'uint256' },
+      { name: 'outcome', type: 'uint8' },
+      { name: 'priceWei', type: 'uint256' },
+      { name: 'avgWei', type: 'uint256' },
+      { name: 'feeBps', type: 'uint16' },
+      { name: 'exists', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+const PREDICTION_MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'getMarket',
+    inputs: [
+      { name: 'dao', type: 'string' },
+      { name: 'proposalId', type: 'string' },
+    ],
+    outputs: [
+      { name: 'forPool', type: 'uint256' },
+      { name: 'againstPool', type: 'uint256' },
+      { name: 'forStakers', type: 'uint256' },
+      { name: 'againstStakers', type: 'uint256' },
+      { name: 'forOddsBps', type: 'uint256' },
+      { name: 'againstOddsBps', type: 'uint256' },
+      { name: 'outcome', type: 'uint8' },
+      { name: 'exists', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+type MarketEntry = {
+  kind: 'auction' | 'proposal';
+  id: string;
+  nounId?: string;
+  daoKey?: 'nouns' | 'lil-nouns';
+  proposalId?: string;
+  title: string;
+  link?: string;
+  outcome: number;
+  totalPoolWei: string;
+  stakers: number;
+  status: 'needs-resolution' | 'live' | 'resolved' | 'pending';
+  closesAt?: number;
+  note?: string;
+};
+
+const PREDICTION_MARKETS_CACHE_TTL_MS = 30_000;
+let predictionMarketsCache: {
+  at: number;
+  payload: { entries: MarketEntry[]; generatedAt: number };
+} | null = null;
+
+const ACTIVE_PROPOSAL_STATUSES = ['ACTIVE', 'PENDING', 'OBJECTION_PERIOD', 'UPDATABLE'];
+const RESOLVED_PROPOSAL_STATUSES = [
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+];
+
+/** Pick a market status bucket from the proposal status + market outcome. */
+function classifyProposalMarket(proposalStatus: string, outcome: number): MarketEntry['status'] {
+  const s = proposalStatus.toUpperCase();
+  if (outcome === 1 || outcome === 2 || outcome === 3) return 'resolved';
+  if (RESOLVED_PROPOSAL_STATUSES.includes(s)) return 'needs-resolution';
+  if (ACTIVE_PROPOSAL_STATUSES.includes(s)) return 'live';
+  return 'pending';
+}
+
+/** Extract a short title from a proposal description (first markdown heading or line). */
+function extractProposalTitle(description: string, fallback: string): string {
+  const first = (description.split('\n')[0] ?? '').replace(/^#+\s*/, '').trim();
+  if (!first) return fallback;
+  return first.slice(0, 120);
+}
+
+app.get('/api/predictions/markets', async c => {
+  const now = Date.now();
+  if (
+    predictionMarketsCache !== null &&
+    now - predictionMarketsCache.at < PREDICTION_MARKETS_CACHE_TTL_MS
+  ) {
+    return c.json(predictionMarketsCache.payload);
+  }
+
+  try {
+    // ── 1. Current nounId + recent settlement timestamps ────────────────────
+    const [currentAuction, settlements] = await Promise.all([
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'auction',
+      }),
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'getSettlements',
+        args: [50n, false],
+      }),
+    ]);
+
+    const currentNounId = Number(currentAuction.nounId);
+    const settlementByNounId = new Map<number, { amount: bigint; endTime: number }>();
+    for (const s of settlements) {
+      settlementByNounId.set(Number(s.nounId), {
+        amount: s.amount,
+        endTime: Number(s.blockTimestamp),
+      });
+    }
+
+    // ── 2. Multicall the last 50 auction markets ────────────────────────────
+    const auctionNounIds = Array.from({ length: 50 }, (_, i) => currentNounId - i).filter(
+      n => n >= 0,
+    );
+    const auctionResults = await nounCheckClient.multicall({
+      allowFailure: true,
+      contracts: auctionNounIds.map(id => ({
+        address: AUCTION_PRICE_MARKET_ADDRESS,
+        abi: AUCTION_PRICE_MARKET_ABI,
+        functionName: 'getMarket' as const,
+        args: [BigInt(id)] as const,
+      })),
+    });
+
+    const auctionEntries: MarketEntry[] = [];
+    for (let i = 0; i < auctionNounIds.length; i++) {
+      const res = auctionResults[i];
+      if (!res || res.status !== 'success') continue;
+      const tuple = res.result as unknown as readonly [
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        number,
+        bigint,
+        bigint,
+        number,
+        boolean,
+      ];
+      const higherPool = tuple[0];
+      const lowerPool = tuple[1];
+      const higherStakers = tuple[2];
+      const lowerStakers = tuple[3];
+      const outcome = tuple[6];
+      const exists = tuple[10];
+      if (!exists) continue;
+      const nounId = auctionNounIds[i]!;
+      const settlement = settlementByNounId.get(nounId);
+      const closesAt = settlement?.endTime;
+      const isCurrent = nounId === currentNounId;
+      const auctionEnded =
+        !isCurrent && (closesAt != null ? closesAt <= Math.floor(now / 1000) : true);
+      const outcomeNum = Number(outcome);
+      let status: MarketEntry['status'];
+      if (outcomeNum === 1 || outcomeNum === 2 || outcomeNum === 3) {
+        status = 'resolved';
+      } else if (auctionEnded) {
+        status = 'needs-resolution';
+      } else {
+        status = 'live';
+      }
+
+      auctionEntries.push({
+        kind: 'auction',
+        id: `auction-${nounId}`,
+        nounId: String(nounId),
+        title: `Noun #${nounId} · Higher/Lower`,
+        link: `/noun/${nounId}`,
+        outcome: outcomeNum,
+        totalPoolWei: String(higherPool + lowerPool),
+        stakers: Number(higherStakers) + Number(lowerStakers),
+        status,
+        closesAt,
+      });
+    }
+
+    // ── 3. Gather proposal markets (Nouns + LilNouns) ───────────────────────
+    const nounsProposalsRaw = await db
+      .select()
+      .from(schema.proposal)
+      .orderBy(desc(schema.proposal.createdAtBlock));
+    const latestBlock = await getLatestBlockCached();
+
+    type ProposalLookup = {
+      daoKey: 'nouns' | 'lil-nouns';
+      proposalId: string;
+      title: string;
+      status: string;
+      link: string;
+      createdAtBlock: number;
+    };
+
+    const nounsProposals: ProposalLookup[] = (
+      nounsProposalsRaw as Array<Record<string, unknown>>
+    ).map(p => {
+      const derivedStatus =
+        latestBlock > 0n
+          ? computeDerivedStatus(
+              {
+                status: p.status as string,
+                forVotes: p.forVotes as number,
+                againstVotes: p.againstVotes as number,
+                quorumVotes: BigInt(p.quorumVotes as string | number | bigint),
+                endBlock: BigInt(p.endBlock as string | number | bigint),
+                objectionPeriodEndBlock:
+                  p.objectionPeriodEndBlock != null
+                    ? BigInt(p.objectionPeriodEndBlock as string | number | bigint)
+                    : null,
+                executionETA:
+                  p.executionETA != null
+                    ? BigInt(p.executionETA as string | number | bigint)
+                    : null,
+                onTimelockV1: p.onTimelockV1 as boolean,
+                startBlock: BigInt(p.startBlock as string | number | bigint),
+              },
+              latestBlock,
+            )
+          : p.status;
+      return {
+        daoKey: 'nouns' as const,
+        proposalId: String(p.id),
+        title: extractProposalTitle(
+          (p.description as string | undefined) ?? '',
+          `Proposal ${String(p.id)}`,
+        ),
+        status: String(derivedStatus),
+        link: `/vote/${String(p.id)}`,
+        createdAtBlock: Number(p.createdAtBlock),
+      };
+    });
+
+    let lilNounsProposals: ProposalLookup[] = [];
+    try {
+      const raw = await fetchLilNounsFromSubgraph();
+      lilNounsProposals = raw.map(p => ({
+        daoKey: 'lil-nouns' as const,
+        proposalId: String(p.id),
+        title:
+          ((p.title as string | null | undefined) ?? '').trim() ||
+          extractProposalTitle((p.description as string) ?? '', `Lil Proposal ${p.id}`),
+        status: String(p.status ?? '').toUpperCase(),
+        link: `/vote/${p.id}?dao=lil`,
+        createdAtBlock: Number(p.createdBlock ?? 0),
+      }));
+    } catch (err) {
+      console.warn('[predictions/markets] lil subgraph failed:', err);
+    }
+
+    const allProposals = [...nounsProposals, ...lilNounsProposals];
+
+    const proposalResults = await nounCheckClient.multicall({
+      allowFailure: true,
+      contracts: allProposals.map(p => ({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'getMarket' as const,
+        args: [p.daoKey, p.proposalId] as const,
+      })),
+    });
+
+    const proposalEntries: MarketEntry[] = [];
+    for (let i = 0; i < allProposals.length; i++) {
+      const res = proposalResults[i];
+      if (!res || res.status !== 'success') continue;
+      const tuple = res.result as unknown as readonly [
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        number,
+        boolean,
+      ];
+      const forPool = tuple[0];
+      const againstPool = tuple[1];
+      const forStakers = tuple[2];
+      const againstStakers = tuple[3];
+      const outcome = tuple[6];
+      const exists = tuple[7];
+      if (!exists) continue;
+      const p = allProposals[i]!;
+      proposalEntries.push({
+        kind: 'proposal',
+        id: `${p.daoKey}-${p.proposalId}`,
+        daoKey: p.daoKey,
+        proposalId: p.proposalId,
+        title: p.title,
+        link: p.link,
+        outcome: Number(outcome),
+        totalPoolWei: String(forPool + againstPool),
+        stakers: Number(forStakers) + Number(againstStakers),
+        status: classifyProposalMarket(p.status, Number(outcome)),
+      });
+    }
+
+    // ── 4. Merge + sort: needs-resolution → live → pending → resolved ───────
+    const priority: Record<MarketEntry['status'], number> = {
+      'needs-resolution': 0,
+      live: 1,
+      pending: 2,
+      resolved: 3,
+    };
+    const entries = [...auctionEntries, ...proposalEntries].sort((a, b) => {
+      const pa = priority[a.status];
+      const pb = priority[b.status];
+      if (pa !== pb) return pa - pb;
+      // within bucket: auctions first (by nounId desc), proposals by id desc
+      if (a.kind === 'auction' && b.kind === 'auction') {
+        return Number(b.nounId) - Number(a.nounId);
+      }
+      if (a.kind === 'proposal' && b.kind === 'proposal') {
+        return Number(b.proposalId) - Number(a.proposalId);
+      }
+      return a.kind === 'auction' ? -1 : 1;
+    });
+
+    const payload = { entries, generatedAt: now };
+    predictionMarketsCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (predictionMarketsCache !== null) {
+      return c.json(predictionMarketsCache.payload, 200, { 'x-cache': 'stale' });
     }
     return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
   }
@@ -1449,7 +2079,11 @@ function candidateTitle(c: CandidateRow): string {
   );
 }
 
-async function parseCommand(msg: string, wallet: string | undefined): Promise<ParsedCommand> {
+async function parseCommand(
+  msg: string,
+  wallet: string | undefined,
+  opts: { skipFunctionSkill?: boolean } = {},
+): Promise<ParsedCommand> {
   const m = msg.trim().toLowerCase();
   const raw = msg.trim(); // preserve case for descriptions
 
@@ -2067,6 +2701,24 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     };
   }
 
+  // ─── "function" skill — loose NL → canonical command ──────
+  // Runs after the strict regexes miss. Translates natural phrasings like
+  // "bid 0.01eth on noun 1901", "i want to vote yes on prop 567",
+  // "sponsor the public-goods candidate" into canonical commands that the
+  // strict regex paths above already handle. Re-invokes parseCommand on the
+  // normalised form so there is one source of truth for action preparation.
+  if (!opts.skipFunctionSkill) {
+    const detected = detectFunction(raw);
+    if (detected && detected.canonical !== m && detected.canonical !== raw) {
+      const recursed = await parseCommand(detected.canonical, wallet, {
+        skipFunctionSkill: true,
+      });
+      if (recursed.handled) {
+        return recursed;
+      }
+    }
+  }
+
   // ─── Not matched ──────────────────────────────────────────
   return { handled: false };
 }
@@ -2240,7 +2892,7 @@ When a user asks "status": call check_block for live data. Don't rely on the inj
 When a user asks about their reservations: call get_reservations with their wallet.
 
 GOVERNANCE — the terminal handles votes, bids, sponsors, candidates, and grants via typed commands (e.g. "vote for 567", "bid 0.5 eth"). These are parsed automatically — you don't need tools for them. If someone asks about governance, explain that they can type commands directly. noun.wtf client ID is 37 (auto-included in votes, bids, promotes). Proposals start as candidates → collect sponsor signatures → get promoted.
-
+${buildFunctionSkillPromptSnippet()}
 CRITICAL RULES:
 - NEVER fabricate data. If you don't know, say so or use a tool to look it up.
 - NEVER write function calls as text. Use the structured tool-calling mechanism. Text like "<function=...>" does NOTHING.
@@ -4671,7 +5323,7 @@ CRITICAL RULES:
 const ALLOWED_CHANNELS = ['nouns', 'noc', 'lil'];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const feedCaches = new Map<string, { data: any; fetchedAt: number }>();
-const FEED_CACHE_TTL = 60_000; // 60 seconds
+const FEED_CACHE_TTL = 60 * 60_000; // 1 hour
 
 app.get('/api/feed/:channel', async c => {
   const channel = c.req.param('channel');
@@ -6235,6 +6887,14 @@ app.get('/api/activity', async c => {
       want('GRANT_QUEUED') ||
       want('GRANT_EXECUTED') ||
       want('GRANT_CANCELED');
+    const wantLil =
+      want('LIL_BID') ||
+      want('LIL_AUCTION_SETTLED') ||
+      want('LIL_NOUN_CREATED') ||
+      want('LIL_VOTE') ||
+      want('LIL_PROPOSAL_CREATED') ||
+      want('LIL_TRANSFER');
+    const wantSale = want('SALE');
 
     const [
       bids,
@@ -6253,6 +6913,8 @@ app.get('/api/activity', async c => {
       grants,
       grantVotes,
       grantStatusChanges,
+      lilEvents,
+      saleEvents,
     ] = await Promise.all([
       want('BID') ? fetchRows(schema.bid, schema.bid.createdAtBlock) : [],
       want('VOTE') ? fetchRows(schema.vote, schema.vote.createdAtBlock) : [],
@@ -6280,6 +6942,18 @@ app.get('/api/activity', async c => {
       wantGrant ? fetchRows(schema.grant, schema.grant.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantVote, schema.grantVote.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantStatusChange, schema.grantStatusChange.createdAtBlock) : [],
+      wantLil
+        ? fetchLilNounsActivity(before, limit).catch(err => {
+            console.warn('[activity] lil fetch failed:', err);
+            return [] as FeedEvent[];
+          })
+        : Promise.resolve([] as FeedEvent[]),
+      wantSale
+        ? fetchReservoirSales(before, limit).catch(err => {
+            console.warn('[activity] sales fetch failed:', err);
+            return [] as FeedEvent[];
+          })
+        : Promise.resolve([] as FeedEvent[]),
     ]);
 
     // Normalize BIDs
@@ -6542,6 +7216,13 @@ app.get('/api/activity', async c => {
         txHash: gs.createdAtTransaction || '',
         data: { grantId: Number(gs.grantId), status: gs.status },
       });
+    }
+
+    for (const e of lilEvents) {
+      if (want(e.type)) events.push(e);
+    }
+    for (const e of saleEvents) {
+      if (want(e.type)) events.push(e);
     }
 
     // Sort by blockNumber DESC

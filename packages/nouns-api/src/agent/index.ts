@@ -2,9 +2,16 @@
 //
 // Starts the block watcher and exports all agent modules for use by the API.
 
-import { startWatcher, stopWatcher, getWatcherState, checkNow, settleAuction } from './blockWatcher.js';
+import {
+  startWatcher,
+  stopWatcher,
+  getWatcherState,
+  checkNow,
+  settleAuction,
+} from './blockWatcher.js';
 import { isBridgeConfigured } from './bridge.js';
 import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
+import { DAO_FUNCTIONS, detectFunction, buildFunctionSkillPromptSnippet } from './functionSkill.js';
 import {
   buildGovernanceContext,
   buildLiveAuctionContext,
@@ -112,6 +119,11 @@ export {
   buildGovernanceContext,
   buildLiveAuctionContext,
   buildProposalsAndGrantsContext,
+
+  // Function skill (natural-language → DAO function intent detection)
+  DAO_FUNCTIONS,
+  detectFunction,
+  buildFunctionSkillPromptSnippet,
 
   // People database
   buildPeopleDb,
