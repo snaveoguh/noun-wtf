@@ -68,7 +68,7 @@ const BidHistoryModalRow: React.FC<BidHistoryModalRowProps> = ({ bid, index }) =
           <div className={clsx(classes.bidAmount, auctionActivityClasses.bidAmount)}>
             {bidAmount}
           </div>
-          <ClientFavicon clientId={bid.clientId} size={28} fallbackHref={txLink} />
+          <ClientFavicon clientId={bid.clientId} size={28} />
           <div className={auctionActivityClasses.linkSymbol} style={{ marginLeft: 8 }}>
             <a href={txLink} target="_blank" rel="noreferrer">
               <div className={classes.linkIcon}>

@@ -37,7 +37,7 @@ export const BidHistoryItem: React.FC<BidHistoryItemProps> = ({ bid, classes, is
         </div>
         <div className={classes.rightSectionWrapper}>
           <div className={classes.bidAmount}>{bidAmount}</div>
-          <ClientFavicon clientId={bid.clientId} size={26} fallbackHref={txLink} />
+          <ClientFavicon clientId={bid.clientId} size={26} />
           <div className={classes.linkSymbol} style={{ marginLeft: 8 }}>
             <a href={txLink} target="_blank" rel="noreferrer">
               <LinkIcon width={24} height={24} aria-label="link symbol" />
