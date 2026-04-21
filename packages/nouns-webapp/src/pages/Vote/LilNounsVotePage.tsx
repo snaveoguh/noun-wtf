@@ -344,7 +344,48 @@ const LilNounsVotePage: FC = () => {
           }}
           className="prose prose-sm max-w-none"
         >
-          <ReactMarkdown remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkBreaks]}
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              img: ({ src, alt, ...props }) => {
+                if (src != null && src.startsWith('data:')) {
+                  return (
+                    <span
+                      style={{
+                        display: 'block',
+                        padding: '12px 16px',
+                        background: '#f4f4f8',
+                        borderRadius: 8,
+                        color: '#8c8d92',
+                        fontSize: '0.8rem',
+                        margin: '8px 0',
+                      }}
+                    >
+                      Embedded image ({alt ?? 'image'})
+                    </span>
+                  );
+                }
+                return (
+                  <img
+                    {...props}
+                    src={src}
+                    alt={alt}
+                    style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
+                    loading="lazy"
+                  />
+                );
+              },
+              pre: ({ ...props }) => (
+                <pre {...props} style={{ overflowX: 'auto', maxWidth: '100%' }} />
+              ),
+              table: ({ ...props }) => (
+                <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                  <table {...props} />
+                </div>
+              ),
+            }}
+          >
             {cleanDescription}
           </ReactMarkdown>
         </div>
