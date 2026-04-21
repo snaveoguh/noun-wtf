@@ -4,7 +4,7 @@
 // sprites on billboarded quads, 3D island terrain, day/night cycle,
 // and the full combat + multiplayer system from the engine.
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -109,8 +109,12 @@ import {
   spawnWeaponPickup,
   getActivePickups,
   clearPickups,
+  switchWeapon,
+  cycleWeapon,
+  WEAPON_DEFS,
   type WeaponState,
   type WeaponPickup,
+  type WeaponType,
 } from './engine/weapons';
 import { WeaponPickup3D } from './engine/WeaponPickup3D';
 import { AnimatedOcean, Dolphins } from './engine/Atmosphere';
@@ -432,6 +436,110 @@ function Rocks() {
           <dodecahedronGeometry args={[0.3, 0]} />
           <meshStandardMaterial color="#888" roughness={0.9} />
         </mesh>
+      ))}
+    </group>
+  );
+}
+
+// ── Paintable floor tiles ──────────────────────────────────────────────
+//
+// Overlays the Terrain mesh with a grid of Paintable tiles so every
+// stroke on the ground persists via partykit (room: nouns-world).
+// Each tile's surfaceId is stable + coordinate-keyed so reloads rehydrate
+// from the snapshot/stroke log.
+//
+// We keep the existing terrain mesh underneath (for shadows, water, etc.)
+// and stack tiles just above it — each tile sampled at the *max* terrain
+// height of its 4 corners to avoid z-fighting / clipping into hills.
+
+interface PaintableFloorProps {
+  worldId: string;
+  /** Number of tiles per axis. */
+  tilesX: number;
+  tilesZ: number;
+  /** Size of each tile in world units. */
+  tileSize: number;
+  /** World-space origin (min corner) of the tiled area. */
+  origin: [number, number, number];
+  /** Optional: gate painting on or off globally (e.g. graffiti HUD open). */
+  enabled?: boolean;
+  /** Author id threaded into strokes. */
+  authorId?: string;
+  /** Fires once a stroke is committed so caller can broadcast a snapshot. */
+  onStrokeEnd?: (surfaceId: string) => void;
+  /** Texture pixels per tile side. */
+  resolution?: number;
+}
+
+function PaintableFloor({
+  worldId,
+  tilesX,
+  tilesZ,
+  tileSize,
+  origin,
+  enabled = true,
+  authorId,
+  onStrokeEnd,
+  resolution = 512,
+  baseFill = '#5a8f3c',
+}: PaintableFloorProps & { baseFill?: string }) {
+  const tiles = useMemo(() => {
+    const out: {
+      key: string;
+      ix: number;
+      iz: number;
+      x: number;
+      y: number;
+      z: number;
+    }[] = [];
+    for (let iz = 0; iz < tilesZ; iz++) {
+      for (let ix = 0; ix < tilesX; ix++) {
+        const cx = origin[0] + (ix + 0.5) * tileSize;
+        const cz = origin[2] + (iz + 0.5) * tileSize;
+        // Sample terrain at 4 tile corners + center, take max so tile
+        // sits above the highest vertex of the underlying heightmap.
+        const half = tileSize * 0.5;
+        const h00 = getTerrainHeight(cx - half, cz - half);
+        const h10 = getTerrainHeight(cx + half, cz - half);
+        const h01 = getTerrainHeight(cx - half, cz + half);
+        const h11 = getTerrainHeight(cx + half, cz + half);
+        const hc = getTerrainHeight(cx, cz);
+        const maxH = Math.max(h00, h10, h01, h11, hc);
+        // Skip tiles sitting on deep/ocean water — painting below waterline
+        // gets hidden by the animated ocean plane anyway.
+        if (maxH < -0.1) continue;
+        out.push({
+          key: `floor-${worldId}-${ix}-${iz}`,
+          ix,
+          iz,
+          x: cx,
+          y: origin[1] + maxH + 0.015, // tiny offset to avoid z-fighting
+          z: cz,
+        });
+      }
+    }
+    return out;
+  }, [worldId, tilesX, tilesZ, tileSize, origin]);
+
+  return (
+    <group>
+      {tiles.map(tile => (
+        <Paintable
+          key={tile.key}
+          surfaceId={tile.key}
+          width={tileSize}
+          height={tileSize}
+          position={[tile.x, tile.y, tile.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          resolutionWidth={resolution}
+          resolutionHeight={resolution}
+          baseFill={baseFill}
+          enabled={enabled}
+          authorId={authorId}
+          onStrokeEnd={onStrokeEnd ? () => onStrokeEnd(tile.key) : undefined}
+          frameColor={null}
+          side={THREE.DoubleSide}
+        />
       ))}
     </group>
   );
@@ -2641,6 +2749,53 @@ export default function WorldPage() {
     }
   };
 
+  // ── Open graffiti UI for the nearest wall (if any within range). ──
+  // Shared between the G key and the F/fire path when spray_can is equipped.
+  const openGraffitiForNearestWall = useCallback(() => {
+    const p = playerRef.current;
+    if (!p) return false;
+    const px = p.x * WORLD_SCALE;
+    const pz = p.y * WORLD_SCALE;
+    // White room = free paint (construct world, not a pickup-gated world).
+    const inWhiteRoom = useWorldStore.getState().current === 'white';
+    if (inWhiteRoom) paintRef.current.hasPaint = true;
+    // Equipped spray_can = the rainbow can IS the paint source.
+    if (weaponRef.current.equipped === 'spray_can') {
+      paintRef.current.hasPaint = true;
+    }
+    if (!paintRef.current.hasPaint) {
+      console.log('[Graffiti] No paint — pick up a can or equip spray_can!');
+      return false;
+    }
+    type WallCand = { id: string; worldX: number; worldZ: number };
+    const candidates: WallCand[] = [];
+    if (!inWhiteRoom) {
+      for (const w of GRAFFITI_WALLS) {
+        candidates.push({ id: w.id, worldX: w.worldX, worldZ: w.worldZ });
+      }
+    } else {
+      for (const m of monolithPositions(SPAWN_X, SPAWN_Y)) {
+        candidates.push({ id: m.id, worldX: m.x, worldZ: m.z });
+      }
+    }
+    let nearestWall: WallCand | null = null;
+    let nearestDist = Infinity;
+    for (const wall of candidates) {
+      const dist = Math.sqrt((px - wall.worldX) ** 2 + (pz - wall.worldZ) ** 2);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestWall = wall;
+      }
+    }
+    if (nearestWall && nearestDist < WALL_NEAR_DISTANCE) {
+      setGraffitiWallId(nearestWall.id);
+      setGraffitiOpen(true);
+      return true;
+    }
+    console.log('[Graffiti] No wall nearby — get closer to a wall!');
+    return false;
+  }, []);
+
   // ESC + E + M key handler
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -2664,46 +2819,7 @@ export default function WorldPage() {
       }
       // G = open graffiti spray UI when near a wall and have paint
       if ((e.key === 'g' || e.key === 'G') && !graffitiOpen) {
-        const p = playerRef.current;
-        if (!p) return;
-        const px = p.x * WORLD_SCALE;
-        const pz = p.y * WORLD_SCALE;
-        // White room = free paint (it's a construct, not a pickup-gated world).
-        const inWhiteRoom = useWorldStore.getState().current === 'white';
-        if (inWhiteRoom) paintRef.current.hasPaint = true;
-        if (!paintRef.current.hasPaint) {
-          console.log('[Graffiti] No paint can — pick one up first!');
-          return;
-        }
-        // Candidate walls — fried world's fixed set + white room's
-        // dynamic monoliths. id/worldX/worldZ normalized across both.
-        type WallCand = { id: string; worldX: number; worldZ: number };
-        const candidates: WallCand[] = [];
-        if (!inWhiteRoom) {
-          for (const w of GRAFFITI_WALLS) {
-            candidates.push({ id: w.id, worldX: w.worldX, worldZ: w.worldZ });
-          }
-        } else {
-          for (const m of monolithPositions(SPAWN_X, SPAWN_Y)) {
-            candidates.push({ id: m.id, worldX: m.x, worldZ: m.z });
-          }
-        }
-        let nearestWall: WallCand | null = null;
-        let nearestDist = Infinity;
-        for (const wall of candidates) {
-          const dist = Math.sqrt((px - wall.worldX) ** 2 + (pz - wall.worldZ) ** 2);
-          if (dist < nearestDist) {
-            nearestDist = dist;
-            nearestWall = wall;
-          }
-        }
-        if (nearestWall && nearestDist < WALL_NEAR_DISTANCE) {
-          setGraffitiWallId(nearestWall.id);
-          setGraffitiOpen(true);
-          console.log(`[Graffiti] Opening spray UI for ${nearestWall.id}`);
-        } else {
-          console.log('[Graffiti] No wall nearby — get closer to a wall!');
-        }
+        openGraffitiForNearestWall();
         return;
       }
       // V = toggle skate mode on/off (mount/dismount hoverboard)
@@ -2779,6 +2895,21 @@ export default function WorldPage() {
       // ── VOIP debug overlay (backtick key) ──
       if (e.key === '`') {
         setShowVoipDebug(prev => !prev);
+        return;
+      }
+      // ── Weapon slots 1-4 (desktop) ──
+      // 1=spray_can, 2=pistol, 3=shotgun, 4=uzi. Only switch if the
+      // player already owns the weapon. Falls through to camera zoom
+      // when the digit doesn't correspond to an owned weapon.
+      const slotMap: Record<string, WeaponType> = {
+        '1': 'spray_can',
+        '2': 'pistol',
+        '3': 'shotgun',
+        '4': 'uzi',
+      };
+      const slotType = slotMap[e.key];
+      if (slotType && weaponRef.current.owned.has(slotType)) {
+        switchWeapon(weaponRef.current, slotType);
         return;
       }
       // ── Camera zoom levels (1-5) ──
@@ -2885,6 +3016,7 @@ export default function WorldPage() {
     chestWorldX,
     chestWorldZ,
     hasHoverboard,
+    openGraffitiForNearestWall,
   ]);
 
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
@@ -2962,7 +3094,10 @@ export default function WorldPage() {
       }
 
       // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
-      if (weaponRef.current.equipped && frame % 3 === 0) {
+      // Only for real guns — spray can is a paint tool, no crosshair lock.
+      const wEq = weaponRef.current.equipped;
+      const isGun = !!wEq && !WEAPON_DEFS[wEq].isPaintTool;
+      if (isGun && frame % 3 === 0) {
         const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
           lockRange: 140,
           lockCone: Math.PI / 10,
@@ -2970,7 +3105,7 @@ export default function WorldPage() {
         });
         aimSlotRef.current.lockedId = passiveAim.lockedId;
         aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
-      } else if (!weaponRef.current.equipped) {
+      } else if (!isGun) {
         aimSlotRef.current.lockedId = null;
         aimSlotRef.current.lockDistance = null;
       }
@@ -3029,17 +3164,25 @@ export default function WorldPage() {
       if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
         let intendedMove = resolveIntendedMove(input);
 
-        // If F pressed and gun equipped, override to gunshot
+        // If F pressed and weapon equipped, handle it.
+        // Paint tools (spray_can) open the graffiti UI instead of firing
+        // a bullet. Regular guns fire + play a sound.
         if (intendedMove === 'gunshot' && weapon.equipped) {
-          const result = fireWeapon(weapon);
-          if (result.fired) {
-            if (weapon.equipped === 'shotgun') playShotgunSound();
-            else playGunshot();
+          const def = WEAPON_DEFS[weapon.equipped];
+          if (def.isPaintTool) {
+            openGraffitiForNearestWall();
+            intendedMove = null; // don't treat as combat hit
           } else {
-            intendedMove = null; // can't fire (cooldown/no ammo/reloading)
+            const result = fireWeapon(weapon);
+            if (result.fired) {
+              if (weapon.equipped === 'shotgun') playShotgunSound();
+              else playGunshot();
+            } else {
+              intendedMove = null; // can't fire (cooldown/no ammo/reloading)
+            }
           }
         } else if (intendedMove === 'gunshot' && !weapon.equipped) {
-          intendedMove = null; // no gun
+          intendedMove = null; // no weapon
         }
 
         if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
@@ -3615,6 +3758,21 @@ export default function WorldPage() {
               <Lighting />
               <AnimatedOcean />
               <Terrain />
+              {/* Paintable floor grid overlaid on the terrain — every stroke
+                  persists via partykit (surfaceId keyed by tile coords). */}
+              <PaintableFloor
+                worldId="city"
+                tilesX={16}
+                tilesZ={16}
+                tileSize={TERRAIN_SIZE / 16}
+                origin={[0, 0, 0]}
+                authorId={mpRef.current.myId || 'anon'}
+                onStrokeEnd={surfaceId => {
+                  const ws = mpRef.current.ws;
+                  if (ws)
+                    sendSnapshot(ws as unknown as WsLike, surfaceId, mpRef.current.myId || 'anon');
+                }}
+              />
               <Trees />
               <Rocks />
               <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
@@ -4296,10 +4454,15 @@ export default function WorldPage() {
         </>
       )}
 
-      {/* Weapon crosshair — only visible when armed, tints red on lock-on */}
+      {/* Weapon crosshair — only visible when armed with a *gun* (not the
+          spray can), tints red on lock-on. */}
       <Crosshair
         slot={aimSlotRef.current}
-        visible={!!weaponRef.current.equipped && !graffitiOpen}
+        visible={
+          !!weaponRef.current.equipped &&
+          !WEAPON_DEFS[weaponRef.current.equipped].isPaintTool &&
+          !graffitiOpen
+        }
       />
 
       {/* Build-mode HUD — piece name + hotkeys hint */}
@@ -4332,7 +4495,7 @@ export default function WorldPage() {
             letterSpacing: '1px',
           }}
         >
-          SPRAY CAN EQUIPPED — FIND A WALL AND PRESS [G]
+          SPRAY CAN EQUIPPED — FIND A WALL AND PRESS [G] OR [F]
         </div>
       )}
 
@@ -4378,6 +4541,18 @@ export default function WorldPage() {
               p.state = 'airborne';
             }
           }}
+          onWeaponCycle={() => {
+            const next = cycleWeapon(weaponRef.current);
+            if (!next) return null;
+            return next === 'spray_can' ? '🎨' : '🔫';
+          }}
+          weaponLabel={
+            weaponRef.current.equipped === 'spray_can'
+              ? '🎨'
+              : weaponRef.current.equipped
+                ? '🔫'
+                : '🔄'
+          }
         />
       )}
     </div>

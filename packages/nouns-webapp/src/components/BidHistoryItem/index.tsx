@@ -3,6 +3,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 
 import LinkIcon from '@/assets/icons/Link.svg?react';
+import ClientFavicon from '@/components/ClientFavicon';
 import ShortAddress from '@/components/ShortAddress';
 import TruncatedAmount from '@/components/TruncatedAmount';
 import { buildEtherscanTxLink } from '@/utils/etherscan';
@@ -36,7 +37,8 @@ export const BidHistoryItem: React.FC<BidHistoryItemProps> = ({ bid, classes, is
         </div>
         <div className={classes.rightSectionWrapper}>
           <div className={classes.bidAmount}>{bidAmount}</div>
-          <div className={classes.linkSymbol}>
+          <ClientFavicon clientId={bid.clientId} size={26} />
+          <div className={classes.linkSymbol} style={{ marginLeft: 8 }}>
             <a href={txLink} target="_blank" rel="noreferrer">
               <LinkIcon width={24} height={24} aria-label="link symbol" />
             </a>

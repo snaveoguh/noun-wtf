@@ -403,7 +403,7 @@ const PropModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span style={{ color: '#f59e0b' }}>&#x2310;&#x25E8;-&#x25E8;</span>{' '}
+          <span>🏛️</span>{' '}
           <span>current props</span>
         </div>
       </div>
@@ -592,7 +592,7 @@ const CurrentPropsBanner: FC = () => {
             whiteSpace: 'nowrap' as const,
           }}
         >
-          <span style={{ color: '#f59e0b' }}>&#x2310;&#x25E8;-&#x25E8;</span>
+          <span>🏛️</span>
           <span style={{ color: '#92400e', marginLeft: '6px' }}>PROPS</span>
         </div>
 
@@ -680,7 +680,7 @@ const CurrentPropsBanner: FC = () => {
                     opacity: 0.3,
                   }}
                 >
-                  &#x2310;&#x25E8;-&#x25E8;
+                  🏛️
                 </div>
               )}
 

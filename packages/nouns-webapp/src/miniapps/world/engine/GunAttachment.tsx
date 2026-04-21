@@ -1,9 +1,12 @@
-// ── Gun Attachment — Parents gun mesh to handslot.r bone ────────────
+// ── Gun Attachment — Parents weapon mesh to handslot.r bone ─────────
 //
 // Mirrors the voxel head attachment pattern from Character3D.tsx:
-// traverse the skeleton, find 'handslot.r', add gun mesh as child.
-// Gun is only visible when a weapon is equipped.
+// traverse the skeleton, find 'handslot.r', add weapon mesh as child.
+// The held mesh is picked dynamically from `weaponType` → WEAPON_DEFS,
+// so adding a new weapon to the registry automatically works here.
+//
 // Muzzle flash: brief orange point light at barrel tip when firing.
+// Spray can: rainbow hue-shifting emissive material (no muzzle flash).
 
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -12,9 +15,45 @@ import * as THREE from 'three';
 import type { WeaponType } from './weapons';
 import { WEAPON_DEFS } from './weapons';
 
-// ── Build a gun mesh for hand attachment ────────────────────────────
+// ── Build a weapon mesh for hand attachment ─────────────────────────
+
+function buildSprayCan(): THREE.Group {
+  const group = new THREE.Group();
+  // Body — rainbow emissive material (hue is animated in useFrame).
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: '#ff44ff',
+    emissive: '#ff44ff',
+    emissiveIntensity: 0.6,
+    metalness: 0.3,
+    roughness: 0.4,
+  });
+  bodyMat.name = 'sprayBodyMat';
+  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.14, 12);
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.name = 'sprayBody';
+  group.add(body);
+
+  // Cap on top
+  const capMat = new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.8 });
+  const capGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.y = 0.08;
+  group.add(cap);
+
+  // Nozzle tip — tiny white dot
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(0.012, 6, 6),
+    new THREE.MeshBasicMaterial({ color: '#ffffff' }),
+  );
+  tip.position.y = 0.095;
+  group.add(tip);
+
+  return group;
+}
 
 function buildHandGun(type: WeaponType): THREE.Group {
+  if (type === 'spray_can') return buildSprayCan();
+
   const def = WEAPON_DEFS[type];
   const color = def.color;
   const mat = new THREE.MeshBasicMaterial({ color });
@@ -22,7 +61,8 @@ function buildHandGun(type: WeaponType): THREE.Group {
 
   const group = new THREE.Group();
 
-  // Barrel — cylinder pointing forward (+Z in local hand space)
+  // Barrel — cylinder pointing forward (+Z in local hand space).
+  // Shape/size is varied per weapon so players see a distinct silhouette.
   const barrelLength = type === 'shotgun' ? 3.5 : type === 'uzi' ? 1.8 : 2.0;
   const barrelRadius = type === 'shotgun' ? 0.25 : type === 'uzi' ? 0.15 : 0.18;
   const barrelGeo = new THREE.CylinderGeometry(barrelRadius, barrelRadius, barrelLength, 6);
@@ -146,11 +186,28 @@ export function GunAttachment({ sceneRef, weaponType, muzzleFlash }: GunAttachme
     }
   }, [sceneRef, weaponType]);
 
-  // Muzzle flash effect — update per frame
+  // Per-frame effects:
+  //  • gun types → muzzle flash on fire
+  //  • spray_can → animated rainbow hue on body material
+  const hueRef = useRef(0);
   useFrame(() => {
     const gun = gunGroupRef.current;
     if (!gun) return;
 
+    // Spray can rainbow hue shift
+    if (currentTypeRef.current === 'spray_can') {
+      hueRef.current = (hueRef.current + 0.005) % 1;
+      const h = hueRef.current;
+      const body = gun.getObjectByName('sprayBody') as THREE.Mesh | undefined;
+      if (body) {
+        const mat = body.material as THREE.MeshStandardMaterial;
+        mat.color.setHSL(h, 1, 0.5);
+        mat.emissive.setHSL(h, 0.8, 0.3);
+      }
+      return;
+    }
+
+    // Gun muzzle flash
     const flashLight = gun.getObjectByName('muzzleFlash') as THREE.PointLight | undefined;
     const flashSprite = gun.getObjectByName('muzzleFlashSprite') as THREE.Sprite | undefined;
 

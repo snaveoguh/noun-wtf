@@ -116,7 +116,7 @@ const LoadingScreen: FC = () => (
       marginBottom: 16,
       animation: 'pulse 2s ease-in-out infinite',
     }}>
-      ⌐◨-◨
+      🐚
     </div>
     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
       Loading Treasury Corridor...

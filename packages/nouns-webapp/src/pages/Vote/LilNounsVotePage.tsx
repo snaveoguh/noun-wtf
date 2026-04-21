@@ -344,7 +344,48 @@ const LilNounsVotePage: FC = () => {
           }}
           className="prose prose-sm max-w-none"
         >
-          <ReactMarkdown remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkBreaks]}
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              img: ({ src, alt, ...props }) => {
+                if (src != null && src.startsWith('data:')) {
+                  return (
+                    <span
+                      style={{
+                        display: 'block',
+                        padding: '12px 16px',
+                        background: '#f4f4f8',
+                        borderRadius: 8,
+                        color: '#8c8d92',
+                        fontSize: '0.8rem',
+                        margin: '8px 0',
+                      }}
+                    >
+                      Embedded image ({alt ?? 'image'})
+                    </span>
+                  );
+                }
+                return (
+                  <img
+                    {...props}
+                    src={src}
+                    alt={alt}
+                    style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
+                    loading="lazy"
+                  />
+                );
+              },
+              pre: ({ ...props }) => (
+                <pre {...props} style={{ overflowX: 'auto', maxWidth: '100%' }} />
+              ),
+              table: ({ ...props }) => (
+                <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                  <table {...props} />
+                </div>
+              ),
+            }}
+          >
             {cleanDescription}
           </ReactMarkdown>
         </div>
@@ -520,10 +561,10 @@ const VoteCount: FC<{ label: string; value: number; color: string }> = ({
 
 // ─── Cast vote panel ────────────────────────────────────────────────────────
 
-const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; color: string }[] = [
-  { value: 1, label: 'For', color: '#43b369' },
-  { value: 0, label: 'Against', color: '#e40536' },
-  { value: 2, label: 'Abstain', color: '#8c8d92' },
+const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; emoji: string; color: string }[] = [
+  { value: 1, label: 'For', emoji: '👍', color: '#43b369' },
+  { value: 0, label: 'Against', emoji: '👎', color: '#e40536' },
+  { value: 2, label: 'Abstain', emoji: '🤷', color: '#8c8d92' },
 ];
 
 /**
@@ -685,19 +726,18 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
             key={o.value}
             type="button"
             onClick={() => setSelected(o.value)}
+            title={o.label}
             style={{
               flex: 1,
               padding: '8px 10px',
               borderRadius: 8,
               border: selected === o.value ? `2px solid ${o.color}` : '1px solid #e0e0e0',
               background: selected === o.value ? `${o.color}1a` : '#fff',
-              color: selected === o.value ? o.color : '#14141f',
-              fontSize: '0.85rem',
-              fontWeight: 700,
+              fontSize: '1.2rem',
               cursor: 'pointer',
             }}
           >
-            {o.label}
+            {o.emoji}
           </button>
         ))}
       </div>

@@ -11,6 +11,7 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 import type { INounSeed } from '@/wrappers/nounToken';
 import { DIRECTION_ROTATION } from './types';
 import type { Direction, MoveType, PlayerState } from './types';
+import { WEAPON_DEFS, type WeaponType } from './weapons';
 
 const MODEL_PATH = '/models/character.glb';
 const VOXEL_HEAD_SCALE = 0.14; // 50% smaller head
@@ -917,27 +918,88 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
           item.name = wantedItem;
 
           if (wantedItem.startsWith('gun:')) {
-            // Gun mesh
-            const gunType = wantedItem.split(':')[1];
-            const mat = new THREE.MeshBasicMaterial({
-              color: gunType === 'shotgun' ? '#8B4513' : gunType === 'uzi' ? '#333' : '#555',
-            });
-            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 6), mat);
-            barrel.rotation.x = Math.PI / 2;
-            barrel.position.z = 1;
-            item.add(barrel);
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), mat);
-            item.add(body);
-            const grip = new THREE.Mesh(
-              new THREE.BoxGeometry(0.15, 0.5, 0.2),
-              new THREE.MeshBasicMaterial({ color: '#222' }),
-            );
-            grip.position.set(0, -0.4, -0.05);
-            item.add(grip);
-            const flash = new THREE.PointLight('#ff8800', 0, 3);
-            flash.name = '__gunFlash';
-            flash.position.set(0, 0, 2.2);
-            item.add(flash);
+            // Registry-driven weapon mesh — shape varies per weapon type so
+            // players see a distinct silhouette instead of the same generic
+            // pistol for every gun (old bug: "holding this wack old gun").
+            const gunType = wantedItem.split(':')[1] as WeaponType;
+            const def = WEAPON_DEFS[gunType];
+
+            if (def?.isPaintTool) {
+              // Spray can — rainbow emissive body, hue animated each frame.
+              const bodyMat = new THREE.MeshStandardMaterial({
+                color: '#ff44ff',
+                emissive: '#ff44ff',
+                emissiveIntensity: 0.6,
+                metalness: 0.3,
+                roughness: 0.4,
+              });
+              const canBody = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.12, 0.5, 12),
+                bodyMat,
+              );
+              canBody.name = '__sprayBody';
+              item.add(canBody);
+              const cap = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.105, 0.105, 0.08, 12),
+                new THREE.MeshBasicMaterial({ color: '#222' }),
+              );
+              cap.position.y = 0.29;
+              item.add(cap);
+              const tip = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 8, 8),
+                new THREE.MeshBasicMaterial({ color: '#fff' }),
+              );
+              tip.position.y = 0.34;
+              item.add(tip);
+            } else {
+              // Shape & size varied by gun type.
+              const barrelLen = gunType === 'shotgun' ? 3.0 : gunType === 'uzi' ? 1.5 : 2.0;
+              const barrelRad = gunType === 'shotgun' ? 0.2 : gunType === 'uzi' ? 0.12 : 0.15;
+              const bodyW = gunType === 'shotgun' ? 0.45 : gunType === 'uzi' ? 0.32 : 0.3;
+              const bodyH = gunType === 'shotgun' ? 0.3 : gunType === 'uzi' ? 0.38 : 0.25;
+              const bodyD = gunType === 'shotgun' ? 0.6 : gunType === 'uzi' ? 0.5 : 0.4;
+
+              const mat = new THREE.MeshBasicMaterial({ color: def?.color ?? '#555' });
+              const darkMat = new THREE.MeshBasicMaterial({ color: '#222' });
+
+              const barrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(barrelRad, barrelRad, barrelLen, 6),
+                mat,
+              );
+              barrel.rotation.x = Math.PI / 2;
+              barrel.position.z = barrelLen / 2;
+              item.add(barrel);
+
+              const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), mat);
+              item.add(body);
+
+              const grip = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.2), darkMat);
+              grip.position.set(0, -0.4, -0.05);
+              item.add(grip);
+
+              // Shotgun pump grip
+              if (gunType === 'shotgun') {
+                const pump = new THREE.Mesh(
+                  new THREE.CylinderGeometry(0.13, 0.13, 0.5, 6),
+                  darkMat,
+                );
+                pump.rotation.x = Math.PI / 2;
+                pump.position.set(0, -0.18, 0.9);
+                item.add(pump);
+              }
+
+              // Uzi magazine
+              if (gunType === 'uzi') {
+                const mag = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.18), darkMat);
+                mag.position.set(0, -0.65, 0.15);
+                item.add(mag);
+              }
+
+              const flash = new THREE.PointLight('#ff8800', 0, 3);
+              flash.name = '__gunFlash';
+              flash.position.set(0, 0, barrelLen + 0.2);
+              item.add(flash);
+            }
           } else if (wantedItem.startsWith('spray:')) {
             // Spray can mesh
             const canColor = wantedItem.split(':')[1];
@@ -998,6 +1060,20 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         const flash = gunGroupRef.current.getObjectByName('__gunFlash') as THREE.PointLight;
         if (flash) {
           flash.intensity = s.muzzleFlash > 0 ? 5 + Math.random() * 3 : 0;
+        }
+      }
+
+      // Rainbow hue-shift for equipped spray can
+      if (gunGroupRef.current && s.weaponEquipped === 'spray_can') {
+        const body = gunGroupRef.current.getObjectByName('__sprayBody') as
+          | THREE.Mesh
+          | undefined;
+        if (body) {
+          const mat = body.material as THREE.MeshStandardMaterial;
+          // ~1 full cycle every ~3s (0.005 per frame @ 60fps = 0.3 Hz)
+          const h = ((performance.now() / 3000) % 1 + 1) % 1;
+          mat.color.setHSL(h, 1, 0.5);
+          mat.emissive.setHSL(h, 0.8, 0.3);
         }
       }
     }
