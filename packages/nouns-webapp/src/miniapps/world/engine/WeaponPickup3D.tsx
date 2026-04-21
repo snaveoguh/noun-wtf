@@ -16,8 +16,9 @@ import { WEAPON_DEFS } from './weapons';
 
 // ── GLB mapping ─────────────────────────────────────────────────────
 
-/** WeaponType → /public GLB path. */
-const WEAPON_GLB_URL: Record<WeaponType, string> = {
+/** WeaponType → /public GLB path. spray_can is the default weapon and has
+ *  no ground pickup, so it's absent here (Partial). */
+const WEAPON_GLB_URL: Partial<Record<WeaponType, string>> = {
   pistol: '/models/weapons/pistol.glb',
   shotgun: '/models/weapons/shotgun.glb',
   uzi: '/models/weapons/uzi.glb',
@@ -27,7 +28,7 @@ const WEAPON_GLB_URL: Record<WeaponType, string> = {
  * Per-weapon render scale for the pickup. Kenney blasters are authored at
  * roughly ~2m long; we want each to read as a ~0.4m ground pickup silhouette.
  */
-const WEAPON_PICKUP_SCALE: Record<WeaponType, number> = {
+const WEAPON_PICKUP_SCALE: Partial<Record<WeaponType, number>> = {
   pistol: 0.55,
   shotgun: 0.4,
   uzi: 0.45,
@@ -142,6 +143,10 @@ export function WeaponPickup3D({ position, type, picked }: WeaponPickup3DProps) 
   const def = WEAPON_DEFS[type];
   const glbUrl = WEAPON_GLB_URL[type];
   const modelScale = WEAPON_PICKUP_SCALE[type];
+
+  // Spray can and other pickup-less weapons have no GLB — render nothing
+  // rather than crashing the scene.
+  if (!glbUrl) return null;
 
   return (
     <group ref={groupRef} position={position}>

@@ -23,7 +23,7 @@ interface ButtonDef {
   icon: string;
   key: string; // key to inject into InputState
   hold?: boolean; // true = key stays held while touching
-  special?: 'jump' | 'shift' | 'focus'; // special handling
+  special?: 'jump' | 'shift' | 'focus' | 'weaponCycle'; // special handling
 }
 
 const BUTTONS: ButtonDef[] = [
@@ -41,6 +41,9 @@ const BUTTONS: ButtonDef[] = [
   { icon: '⚡', key: '__focus', special: 'focus', hold: true },
   // Weapons/Items (blues)
   { icon: '🔫', key: 'f' },
+  // Weapon cycle — taps through owned weapons (spray_can → pistol → shotgun → uzi).
+  // Label updates dynamically via the weaponLabel prop (host component).
+  { icon: '🔄', key: '__weapon_cycle', special: 'weaponCycle' },
   { icon: '✋', key: 'e' },
   // World actions (purples/pinks)
   { icon: '🛹', key: 'v' },
@@ -115,9 +118,24 @@ const SWIPE_MAX_TIME = 300; // ms maximum swipe duration
 interface MobileControlsProps {
   inputRef: React.RefObject<InputState>;
   onJump?: () => void;
+  /** Called when the weapon-cycle chip is tapped. Returns the new icon/label to show (e.g. '🎨' for spray_can, '🔫' for guns). */
+  onWeaponCycle?: () => string | null;
+  /** Initial weapon-cycle button label. Falls back to '🔄' if not provided. */
+  weaponLabel?: string;
 }
 
-const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
+const MobileControls: FC<MobileControlsProps> = ({
+  inputRef,
+  onJump,
+  onWeaponCycle,
+  weaponLabel,
+}) => {
+  const [dynamicLabel, setDynamicLabel] = useState<string>(weaponLabel ?? '🔄');
+
+  // Sync label when parent updates weaponLabel (e.g. after pickup).
+  useEffect(() => {
+    if (weaponLabel) setDynamicLabel(weaponLabel);
+  }, [weaponLabel]);
   const joystickRef = useRef<HTMLDivElement>(null);
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
   const touchIdRef = useRef<number | null>(null);
@@ -284,6 +302,12 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         return;
       }
 
+      if (def.special === 'weaponCycle') {
+        const newLabel = onWeaponCycle?.();
+        if (newLabel) setDynamicLabel(newLabel);
+        return;
+      }
+
       if (def.special === 'focus') {
         // Start a hold-arm timer. If touch is still down when the timer
         // fires, we promote to manual hold. Otherwise end-handler fires
@@ -313,7 +337,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
         }, 100);
       }
     },
-    [inputRef, onJump],
+    [inputRef, onJump, onWeaponCycle],
   );
 
   const handleButtonEnd = useCallback(
@@ -424,6 +448,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
       {BUTTONS.map((def, i) => {
         const pos = getButtonPosition(i);
         const color = ARC_COLORS[i % ARC_COLORS.length];
+        const iconText = def.special === 'weaponCycle' ? dynamicLabel : def.icon;
         return (
           <button
             key={def.key + i}
@@ -446,7 +471,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
               background: `${color}33`,
               border: `1.5px solid ${color}88`,
               color: '#fff',
-              fontSize: /^\d$/.test(def.icon) ? 12 : 14,
+              fontSize: /^\d$/.test(iconText) ? 12 : 14,
               fontFamily: 'monospace',
               fontWeight: 'bold',
               display: 'flex',
@@ -462,7 +487,7 @@ const MobileControls: FC<MobileControlsProps> = ({ inputRef, onJump }) => {
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            {def.icon}
+            {iconText}
           </button>
         );
       })}

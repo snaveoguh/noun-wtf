@@ -6,6 +6,7 @@ import { blo } from 'blo';
 import clsx from 'clsx';
 
 import _trophy from '@/assets/icons/trophy.svg';
+import ClientFavicon from '@/components/ClientFavicon';
 import TruncatedAmount from '@/components/TruncatedAmount';
 import { shortENS, formatShortAddress } from '@/utils/addressAndENSDisplayUtils';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
@@ -67,7 +68,8 @@ const BidHistoryModalRow: React.FC<BidHistoryModalRowProps> = ({ bid, index }) =
           <div className={clsx(classes.bidAmount, auctionActivityClasses.bidAmount)}>
             {bidAmount}
           </div>
-          <div className={auctionActivityClasses.linkSymbol}>
+          <ClientFavicon clientId={bid.clientId} size={28} fallbackHref={txLink} />
+          <div className={auctionActivityClasses.linkSymbol} style={{ marginLeft: 8 }}>
             <a href={txLink} target="_blank" rel="noreferrer">
               <div className={classes.linkIcon}>
                 <ExternalLinkIcon height={24} width={24} />

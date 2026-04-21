@@ -790,9 +790,11 @@ const NocTicker: FC = () => {
             textTransform: 'uppercase' as const,
             color: '#7c3aed',
             whiteSpace: 'nowrap' as const,
+            gap: '6px',
           }}
         >
-          /noc
+          <span>📡</span>
+          <span>/noc</span>
         </div>
 
         <div

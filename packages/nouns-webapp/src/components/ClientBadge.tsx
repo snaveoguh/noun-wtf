@@ -1,41 +1,25 @@
 import { FC, useState } from 'react';
 
+import {
+  CLIENT_REGISTRY,
+  ClientInfo,
+  getClientFaviconUrl,
+  getClientInfo,
+} from '@/utils/clientRegistry';
+
 /**
- * Registry of known Nouns auction client IDs.
- * Maps clientId → display info (emoji favicon, name, url, description).
+ * Emoji fallback for the small "Winner" badge. The onchain client registry
+ * doesn't define emojis — so we map a couple of the clients we care about
+ * to emoji. Everything else falls through to a link-chain.
  */
-interface ClientInfo {
-  emoji: string;
-  name: string;
-  url: string;
-  description: string;
-}
-
-const CLIENT_REGISTRY: Record<number, ClientInfo> = {
-  0: {
-    emoji: '\u2310\u25E8-\u25E8',
-    name: 'nouns.wtf',
-    url: 'https://nouns.wtf',
-    description: 'The official Nouns DAO frontend',
-  },
-  37: {
-    emoji: '\uD83C\uDF46',
-    name: 'noun.wtf',
-    url: 'https://noun.wtf',
-    description: 'Community Nouns client by pip',
-  },
+const BADGE_EMOJI: Record<number, string> = {
+  0: '\u2310\u25E8-\u25E8',
+  37: '\uD83C\uDF46',
 };
 
-const UNKNOWN_CLIENT: ClientInfo = {
-  emoji: '\uD83D\uDD17',
-  name: 'Unknown client',
-  url: '',
-  description: 'Bid placed via an unrecognized client',
-};
-
-function getClientInfo(clientId: number | null | undefined): ClientInfo | null {
-  if (clientId == null) return null;
-  return CLIENT_REGISTRY[clientId] ?? { ...UNKNOWN_CLIENT, name: `Client #${clientId}` };
+function getBadgeEmoji(clientId: number | null | undefined): string {
+  if (clientId == null) return '';
+  return BADGE_EMOJI[clientId] ?? '\uD83D\uDD17';
 }
 
 interface ClientBadgeProps {
@@ -50,6 +34,7 @@ interface ClientBadgeProps {
 const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const client = getClientInfo(clientId);
+  const emoji = getBadgeEmoji(clientId);
 
   if (!client) return null;
 
@@ -69,7 +54,7 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
         }}
         title={client.name}
       >
-        {client.emoji}
+        {emoji}
       </span>
 
       {/* Tooltip */}
@@ -96,7 +81,7 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 2 }}>
-            {client.emoji} {client.name}
+            {emoji} {client.name}
           </div>
           <div style={{ opacity: 0.7, fontSize: '0.6rem' }}>{client.description}</div>
           {client.url && (
@@ -123,5 +108,5 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
 };
 
 export default ClientBadge;
-export { getClientInfo, CLIENT_REGISTRY };
+export { getClientInfo, CLIENT_REGISTRY, getClientFaviconUrl };
 export type { ClientInfo };
