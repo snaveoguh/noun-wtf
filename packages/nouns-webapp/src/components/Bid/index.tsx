@@ -170,7 +170,9 @@ const Bid: React.FC<BidProps> = props => {
   const isDisabled = isPlacingBid || isSettlingAuction || !activeAccount;
 
   const crytalBallBtnOnClickHandler = () => {
-    window.open('https://www.nouns.game/crystal-ball', '_blank', 'noopener,noreferrer')?.focus();
+    // Internal crystal-ball page (App.tsx route /crystal-ball) — used to
+    // link externally to nouns.game but noun.wtf now hosts its own version.
+    window.open('/crystal-ball', '_self')?.focus();
   };
 
   const isWalletConnected = activeAccount !== undefined;
@@ -220,7 +222,7 @@ const Bid: React.FC<BidProps> = props => {
         <>
           <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
             <Button className={classes.bidBtnAuctionEnded} onClick={crytalBallBtnOnClickHandler}>
-              <Trans>Pick the next Noun</Trans> ⌐◧-◧
+              <Trans>Pick the next Noun</Trans> 🥽
             </Button>
           </Col>
           {isWalletConnected && (

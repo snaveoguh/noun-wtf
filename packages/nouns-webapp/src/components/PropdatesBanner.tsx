@@ -250,7 +250,7 @@ const PropdateModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span style={{ color: '#d4a843' }}>⌐◨-◨</span> <span>propdates</span>
+          <span>🦎</span> <span>propdates</span>
         </div>
       </div>
     </div>
@@ -355,7 +355,7 @@ const PropdatesBanner: FC = () => {
             whiteSpace: 'nowrap' as const,
           }}
         >
-          <span style={{ color: '#22c55e' }}>⌐◨-◨</span>
+          <span>✍️</span>
           <span style={{ color: '#4a7c4a', marginLeft: '6px' }}>PROPDATES</span>
         </div>
 
@@ -448,7 +448,7 @@ const PropdatesBanner: FC = () => {
                     opacity: 0.3,
                   }}
                 >
-                  ⌐◨-◨
+                  🐸
                 </div>
               )}
 

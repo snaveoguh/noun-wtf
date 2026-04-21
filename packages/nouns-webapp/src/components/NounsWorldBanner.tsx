@@ -57,7 +57,7 @@ const STORIES: NounsWorldStory[] = [
       'French street artist John Hamon was funded through Proposal 126 to bring Nouns into the streets through guerrilla-style public art. The collaboration resulted in 1,000 posters of Hamon wearing Noggles across Paris, Lyon, Marseille, Madrid, and Berlin.',
   },
   {
-    title: 'NounsWatch: ⌐◨-◨ on Your Wrist',
+    title: 'NounsWatch: 🧿 on Your Wrist',
     image:
       'https://explore.nouns.world/wp-content/uploads/2025/06/nouns-watch-header-image-4-1024x540.png',
     url: 'https://explore.nouns.world/time-well-spent-nounswatch-brings-%E2%8C%90%E2%97%A8-%E2%97%A8-to-your-wrist/',
@@ -303,7 +303,7 @@ const StoryModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span style={{ color: '#d4a843' }}>⌐◨-◨</span>{' '}
+          <span>🪩</span>{' '}
           <span>nouns.world</span>
         </div>
       </div>
@@ -399,7 +399,7 @@ const NounsWorldBanner: FC = () => {
             whiteSpace: 'nowrap' as const,
           }}
         >
-          <span style={{ color: '#d4a843' }}>⌐◨-◨</span>
+          <span>🌐</span>
           <span style={{ color: '#8b7355', marginLeft: '6px' }}>NOUNS WORLD</span>
         </div>
 

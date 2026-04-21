@@ -520,10 +520,10 @@ const VoteCount: FC<{ label: string; value: number; color: string }> = ({
 
 // ─── Cast vote panel ────────────────────────────────────────────────────────
 
-const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; color: string }[] = [
-  { value: 1, label: 'For', color: '#43b369' },
-  { value: 0, label: 'Against', color: '#e40536' },
-  { value: 2, label: 'Abstain', color: '#8c8d92' },
+const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; emoji: string; color: string }[] = [
+  { value: 1, label: 'For', emoji: '👍', color: '#43b369' },
+  { value: 0, label: 'Against', emoji: '👎', color: '#e40536' },
+  { value: 2, label: 'Abstain', emoji: '🤷', color: '#8c8d92' },
 ];
 
 /**
@@ -685,19 +685,18 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
             key={o.value}
             type="button"
             onClick={() => setSelected(o.value)}
+            title={o.label}
             style={{
               flex: 1,
               padding: '8px 10px',
               borderRadius: 8,
               border: selected === o.value ? `2px solid ${o.color}` : '1px solid #e0e0e0',
               background: selected === o.value ? `${o.color}1a` : '#fff',
-              color: selected === o.value ? o.color : '#14141f',
-              fontSize: '0.85rem',
-              fontWeight: 700,
+              fontSize: '1.2rem',
               cursor: 'pointer',
             }}
           >
-            {o.label}
+            {o.emoji}
           </button>
         ))}
       </div>

@@ -16,6 +16,7 @@
 // frame to toggle manual bullet-time. Tap = quick push; hold = slomo.
 
 import type { Direction, MoveType } from './types';
+import type { WeaponType } from './weapons';
 
 export interface InputState {
   keys: Set<string>;
@@ -158,6 +159,24 @@ export function directionFromDelta(dx: number, dy: number): Direction {
   // Single axis -> cardinal
   if (dx !== 0) return dx > 0 ? 'right' : 'left';
   return dy > 0 ? 'down' : 'up';
+}
+
+/** Digit-to-weapon mapping for desktop weapon swap (1/2/3/4). */
+export const WEAPON_SLOT_KEYS: Record<string, WeaponType> = {
+  '1': 'spray_can',
+  '2': 'pistol',
+  '3': 'shotgun',
+  '4': 'uzi',
+};
+
+/** Returns the weapon type the player wants to switch to this frame, or null. */
+export function resolveWeaponSwitch(input: InputState): WeaponType | null {
+  for (const key of Object.keys(WEAPON_SLOT_KEYS)) {
+    if (input.justPressed.has(key)) {
+      return WEAPON_SLOT_KEYS[key];
+    }
+  }
+  return null;
 }
 
 /** Resolve combat move from keyboard (no mouse) */

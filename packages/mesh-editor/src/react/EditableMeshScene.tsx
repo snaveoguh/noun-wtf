@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { type ThreeEvent, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import { buildAdjacencyGraph, expandBrush } from '../meshGraph';
 import {
@@ -407,7 +408,7 @@ export default function EditableMeshScene({
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
           }
 
-          // Ensure index exists (needed for adjacency graph)
+          // Ensure index exists (needed for adjacency graph + mergeVertices)
           if (!geo.index) {
             // Non-indexed geometry — create trivial index
             const count = geo.attributes.position.count;
@@ -416,11 +417,23 @@ export default function EditableMeshScene({
             geo.setIndex(new THREE.BufferAttribute(indices, 1));
           }
 
-          // Build adjacency graph
-          const adjacency = buildAdjacencyGraph(geo);
+          // Weld coincident vertices so adjacency (and therefore paint-bucket
+          // flood fill) can traverse across UV seams. Many GLBs split vertices
+          // at seams for hard edges / separate texture islands, which leaves
+          // the adjacency graph disconnected — floodFillMesh stops at the
+          // start face and the bucket appears to "do nothing." Merging here
+          // keeps position+normal+uv+color attributes, tolerates tiny float
+          // noise between "same" positions, and gives a unified graph.
+          const welded = mergeVertices(geo, 1e-4);
+          (headMesh as THREE.Mesh).geometry = welded;
 
-          // Initialize edit state
-          const state = initEditState(geo, adjacency);
+          // Build adjacency graph on the welded geometry.
+          const adjacency = buildAdjacencyGraph(welded);
+
+          // Initialize edit state on the WELDED geometry — state.geometry
+          // is what paintFaces/floodFillMesh mutate, so it must match the
+          // adjacency graph above.
+          const state = initEditState(welded, adjacency);
 
           // Load saved deltas
           if (persistenceKey) {
@@ -430,13 +443,13 @@ export default function EditableMeshScene({
             }
           }
 
-          // Add per-vertex visibility attribute (for face deletion)
-          const visArr = new Float32Array(geo.attributes.position.count);
+          // Add per-vertex visibility attribute (for face deletion) on welded.
+          const visArr = new Float32Array(welded.attributes.position.count);
           visArr.fill(1.0);
-          geo.setAttribute('visible', new THREE.BufferAttribute(visArr, 1));
+          welded.setAttribute('visible', new THREE.BufferAttribute(visArr, 1));
 
           editStateRef.current = state;
-          setEditableGeometry(geo);
+          setEditableGeometry(welded);
 
           // Switch material to meshLambertMaterial with vertex colors + visibility discard
           const editMat = new THREE.MeshLambertMaterial({ vertexColors: true });

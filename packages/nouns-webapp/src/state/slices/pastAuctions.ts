@@ -26,6 +26,7 @@ interface PonderAuction {
     items: Array<{
       value: string;
       bidder: string;
+      clientId?: number | null;
       createdAtBlock: string;
       createdAt: string;
       createdAtTransaction: string;
@@ -55,6 +56,7 @@ const reduxSafePastAuctions = (auctions: PonderAuction[]): AuctionState[] => {
           transactionHash: bid.createdAtTransaction ?? '',
           transactionIndex: 0,
           timestamp: BigInt(bid.createdAt ?? 0).toString(),
+          clientId: bid.clientId ?? null,
         };
       }),
     };
@@ -65,12 +67,43 @@ const pastAuctionsSlice = createSlice({
   name: 'pastAuctions',
   initialState: initialState,
   reducers: {
+    // Merge the bulk latestAuctionsQuery result into existing state rather
+    // than replacing it. Replacing would wipe any on-demand single-auction
+    // fetches (see upsertPastAuction) that land before or after the bulk
+    // query re-fires (e.g. TanStack Query's refetchOnWindowFocus).
     addPastAuctions: (state, action: PayloadAction<PonderAuction[]>) => {
-      state.pastAuctions = reduxSafePastAuctions(action.payload);
+      const incoming = reduxSafePastAuctions(action.payload);
+      const byId = new Map<string, AuctionState>();
+      for (const entry of state.pastAuctions) {
+        const id = entry.activeAuction?.nounId;
+        if (id != null) byId.set(String(id), entry);
+      }
+      for (const entry of incoming) {
+        const id = entry.activeAuction?.nounId;
+        if (id != null) byId.set(String(id), entry);
+      }
+      state.pastAuctions = [...byId.values()];
+    },
+    // Merge a single on-demand fetched auction into the cache. Used when the
+    // user navigates to an old noun (e.g. #1) that falls outside the initial
+    // latestAuctionsQuery window.
+    upsertPastAuction: (state, action: PayloadAction<PonderAuction>) => {
+      const [transformed] = reduxSafePastAuctions([action.payload]);
+      if (!transformed) return;
+      const targetNounId = transformed.activeAuction?.nounId;
+      if (!targetNounId) return;
+      const idx = state.pastAuctions.findIndex(
+        a => a.activeAuction?.nounId === targetNounId,
+      );
+      if (idx === -1) {
+        state.pastAuctions.push(transformed);
+      } else {
+        state.pastAuctions[idx] = transformed;
+      }
     },
   },
 });
 
-export const { addPastAuctions } = pastAuctionsSlice.actions;
+export const { addPastAuctions, upsertPastAuction } = pastAuctionsSlice.actions;
 
 export default pastAuctionsSlice.reducer;
