@@ -217,18 +217,20 @@ const Pip3Page: React.FC = () => {
 
       {/* Masonry grid */}
       <style>{`
-        @media (max-width: 1200px) { .pip3-grid { column-count: 3 !important; } }
-        @media (max-width: 768px)  { .pip3-grid { column-count: 2 !important; } }
-        @media (max-width: 480px)  { .pip3-grid { column-count: 2 !important; column-gap: 3px !important; padding: 0 3px !important; } }
+        @media (max-width: 1600px) { .pip3-grid { column-count: 18 !important; } }
+        @media (max-width: 1200px) { .pip3-grid { column-count: 12 !important; } }
+        @media (max-width: 900px)  { .pip3-grid { column-count: 8 !important; } }
+        @media (max-width: 600px)  { .pip3-grid { column-count: 5 !important; column-gap: 3px !important; padding: 0 3px !important; } }
+        @media (max-width: 400px)  { .pip3-grid { column-count: 4 !important; } }
       `}</style>
       {gifs.length > 0 && (
         <div
           className="pip3-grid"
           style={{
-            columnCount: 4,
-            columnGap: 6,
+            columnCount: 25,
+            columnGap: 4,
             padding: '0 6px',
-            maxWidth: 1400,
+            maxWidth: '100%',
             margin: '0 auto',
           }}
         >
