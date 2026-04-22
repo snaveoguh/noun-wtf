@@ -11,19 +11,32 @@ interface GifItem {
   h: number;
 }
 
+const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
+  || 'https://spirited-flexibility-production-3c30.up.railway.app';
+
 async function fetchPage(offset: number): Promise<{ gifs: GifItem[]; hasNext: boolean }> {
   try {
     const res = await fetch(
-      `https://giphy.com/api/v4/channels/${CHANNEL_ID}/feed?offset=${offset}&limit=${PAGE_SIZE}`,
+      `${API_BASE}/api/pip3-gifs?channel=${CHANNEL_ID}&offset=${offset}&limit=${PAGE_SIZE}`,
     );
     if (!res.ok) return { gifs: [], hasNext: false };
     const data = await res.json();
     const results: GifItem[] = (data.results || []).map(
-      (item: { id: string; images?: { original?: { width?: string; height?: string } } }) => ({
-        id: item.id,
-        w: Number(item.images?.original?.width || 480),
-        h: Number(item.images?.original?.height || 480),
-      }),
+      (item: {
+        id: string;
+        images?: {
+          source?: { width?: string | number; height?: string | number };
+          original?: { width?: string | number; height?: string | number };
+          fixed_width?: { width?: string | number; height?: string | number };
+        };
+      }) => {
+        const dims = item.images?.source ?? item.images?.original ?? item.images?.fixed_width;
+        return {
+          id: item.id,
+          w: Number(dims?.width || 480),
+          h: Number(dims?.height || 480),
+        };
+      },
     );
     return { gifs: results, hasNext: !!data.next };
   } catch {
