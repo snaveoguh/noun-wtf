@@ -337,15 +337,57 @@ export const candidate = onchainTable(
     createdAtTransaction: t.text().notNull(),
     lastUpdatedAt: t.timestamp().notNull(),
     lastUpdatedAtBlock: t.bigint().notNull(),
+    // Cancel details (null until canceled)
+    canceledAtBlock: t.bigint(),
+    canceledAtTimestamp: t.timestamp(),
+    canceledAtTx: t.hex(),
+    // Promotion details (null until promoted to a live proposal)
+    promotedToProposalId: t.bigint(),
+    promotedAtBlock: t.bigint(),
+    promotedAtTimestamp: t.timestamp(),
+    promotedAtTx: t.hex(),
   }),
   t => ({
     proposerIndex: index().on(t.proposer),
     canceledIndex: index().on(t.canceled),
+    canceledAtBlockIndex: index().on(t.canceledAtBlock),
+    promotedAtBlockIndex: index().on(t.promotedAtBlock),
   }),
 );
 
 export const candidateRelations = relations(candidate, ({ many }) => ({
   candidateSignatures: many(candidateSignature),
+  candidateVersions: many(candidateVersion),
+}));
+
+// ── Candidate Versions ───────────────────────────────────────────────────────
+// One row per ProposalCandidateUpdated event (i.e. NOT the initial create).
+// Lets us emit CANDIDATE_UPDATED activity events per update.
+
+export const candidateVersion = onchainTable(
+  'candidate_version',
+  t => ({
+    candidateId: t.text().notNull(),
+    blockNumber: t.bigint().notNull(),
+    logIndex: t.integer().notNull(),
+    txHash: t.hex().notNull(),
+    blockTimestamp: t.timestamp().notNull(),
+    description: t.text().notNull(),
+    reason: t.text().notNull().default(''),
+    encodedProposalHash: t.hex(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.candidateId, t.blockNumber, t.logIndex] }),
+    candidateIdIndex: index().on(t.candidateId),
+    blockNumberIndex: index().on(t.blockNumber),
+  }),
+);
+
+export const candidateVersionRelations = relations(candidateVersion, ({ one }) => ({
+  candidate: one(candidate, {
+    fields: [candidateVersion.candidateId],
+    references: [candidate.id],
+  }),
 }));
 
 // ── Candidate Signatures ─────────────────────────────────────────────────────
