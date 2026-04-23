@@ -144,7 +144,7 @@ import { fileURLToPath } from 'node:url';
 
 // Agent NounIRL
 
-import { desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { graphql } from 'ponder';
@@ -2509,7 +2509,24 @@ async function parseCommand(
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const title = candidateTitle(c);
-      const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
+      const descText = (c.description ?? '').toString();
+      // encodedProp must match the candidate's on-chain hash; frontend uses it
+      // to reconstruct targets/values/sigs/calldatas/description for EIP-712.
+      const action = {
+        type: 'SPONSOR',
+        proposer: c.proposer,
+        slug: c.slug,
+        title,
+        encodedProp: c.targets
+          ? JSON.stringify({
+              targets: JSON.parse((c.targets as string) || '[]'),
+              values: JSON.parse((c.values as string) || '[]'),
+              signatures: JSON.parse((c.signatures as string) || '[]'),
+              calldatas: JSON.parse((c.calldatas as string) || '[]'),
+              description: descText,
+            })
+          : '{}',
+      };
       return {
         handled: true,
         response: `Sponsor prepared for "${title}" by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`,
@@ -6926,6 +6943,46 @@ app.get('/api/activity', async c => {
       want('LIL_TRANSFER');
     const wantSale = want('SALE');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchCanceledCandidates(): Promise<any[]> {
+      try {
+        const cond = before
+          ? and(
+              isNotNull(schema.candidate.canceledAtBlock),
+              lt(schema.candidate.canceledAtBlock, before),
+            )
+          : isNotNull(schema.candidate.canceledAtBlock);
+        return await db
+          .select()
+          .from(schema.candidate)
+          .where(cond)
+          .orderBy(desc(schema.candidate.canceledAtBlock))
+          .limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchPromotedCandidates(): Promise<any[]> {
+      try {
+        const cond = before
+          ? and(
+              isNotNull(schema.candidate.promotedAtBlock),
+              lt(schema.candidate.promotedAtBlock, before),
+            )
+          : isNotNull(schema.candidate.promotedAtBlock);
+        return await db
+          .select()
+          .from(schema.candidate)
+          .where(cond)
+          .orderBy(desc(schema.candidate.promotedAtBlock))
+          .limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
     const [
       bids,
       votes,
@@ -6936,6 +6993,9 @@ app.get('/api/activity', async c => {
       candSigs,
       propFB,
       candFB,
+      candVersions,
+      canceledCands,
+      promotedCands,
       streams,
       delegations,
       transfers,
@@ -6961,6 +7021,11 @@ app.get('/api/activity', async c => {
       want('CANDIDATE_FEEDBACK')
         ? fetchRows(schema.candidateFeedback, schema.candidateFeedback.createdAtBlock)
         : [],
+      want('CANDIDATE_UPDATED')
+        ? fetchRows(schema.candidateVersion, schema.candidateVersion.blockNumber)
+        : [],
+      want('CANDIDATE_CANCELED') ? fetchCanceledCandidates() : [],
+      want('CANDIDATE_PROMOTED') ? fetchPromotedCandidates() : [],
       want('STREAM_CREATED') ? fetchRows(schema.stream, schema.stream.createdAtBlock) : [],
       wantDelegation
         ? fetchRows(schema.delegationEvent, schema.delegationEvent.createdAtBlock)
@@ -7145,6 +7210,68 @@ app.get('/api/activity', async c => {
           candidateId: cf.candidateId,
           support: cf.support,
           reason: cf.reason || '',
+        },
+      });
+    }
+
+    // Normalize CANDIDATE_UPDATED (one per update event — initial create is not in candidateVersion)
+    for (const cv of candVersions) {
+      const descText = (cv.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      const parts = (cv.candidateId as string).split('-');
+      const proposer = parts[0] || '';
+      const slug = parts.slice(1).join('-');
+      events.push({
+        type: 'CANDIDATE_UPDATED',
+        blockNumber: Number(cv.blockNumber),
+        timestamp: tsToISO(cv.blockTimestamp),
+        txHash: cv.txHash || '',
+        data: {
+          candidateId: cv.candidateId,
+          slug,
+          proposer,
+          title,
+          description: descText.slice(0, 4000),
+          reason: cv.reason || '',
+        },
+      });
+    }
+
+    // Normalize CANDIDATE_CANCELED (keyed on canceledAtBlock so each cancel is an independent event)
+    for (const cd of canceledCands) {
+      if (cd.canceledAtBlock == null) continue;
+      const descText = (cd.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'CANDIDATE_CANCELED',
+        blockNumber: Number(cd.canceledAtBlock),
+        timestamp: tsToISO(cd.canceledAtTimestamp ?? cd.lastUpdatedAt ?? cd.createdAt),
+        txHash: cd.canceledAtTx || '',
+        data: {
+          candidateId: cd.id,
+          slug: cd.slug,
+          proposer: cd.proposer,
+          title,
+        },
+      });
+    }
+
+    // Normalize CANDIDATE_PROMOTED (keyed on promotedAtBlock)
+    for (const cd of promotedCands) {
+      if (cd.promotedAtBlock == null) continue;
+      const descText = (cd.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'CANDIDATE_PROMOTED',
+        blockNumber: Number(cd.promotedAtBlock),
+        timestamp: tsToISO(cd.promotedAtTimestamp ?? cd.lastUpdatedAt ?? cd.createdAt),
+        txHash: cd.promotedAtTx || '',
+        data: {
+          candidateId: cd.id,
+          slug: cd.slug,
+          proposer: cd.proposer,
+          title,
+          proposalId: cd.promotedToProposalId != null ? Number(cd.promotedToProposalId) : null,
         },
       });
     }

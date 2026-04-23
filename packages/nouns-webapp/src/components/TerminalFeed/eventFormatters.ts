@@ -14,6 +14,9 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED' },
   CANDIDATE_CREATED: { label: 'CAND', color: '#fb923c', filterKey: 'CANDIDATE_CREATED' },
   CANDIDATE_SPONSORED: { label: 'SPONSOR', color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED' },
+  CANDIDATE_UPDATED: { label: 'CAND-UPD', color: '#fdba74', filterKey: 'CANDIDATE_UPDATED' },
+  CANDIDATE_CANCELED: { label: 'CAND-CXL', color: '#f87171', filterKey: 'CANDIDATE_CANCELED' },
+  CANDIDATE_PROMOTED: { label: 'PROMOTED', color: '#fde047', filterKey: 'CANDIDATE_PROMOTED' },
   PROPOSAL_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK' },
   CANDIDATE_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK' },
   STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED' },
@@ -60,6 +63,28 @@ export const FILTER_TABS = [
 // ─── Address Formatting ────────────────────────────────────────────────────
 
 export type EnsLookup = (addr: string) => string | null;
+
+/** Look up a candidate's title by its candidateId (`${proposer}-${slug}`). */
+export type CandidateTitleLookup = (candidateId: string) => string | null;
+
+/** Pretty-print a candidate id / slug when no title is known. */
+export function prettifyCandidateId(candidateId: string): string {
+  // candidateId = `${proposer}-${slug}` where proposer is a 42-char 0x address.
+  const slug =
+    candidateId.startsWith('0x') && candidateId.length > 43 ? candidateId.slice(43) : candidateId;
+  // Slug is kebab-case, sometimes truncated. Humanize it.
+  return slug.replace(/-/g, ' ').slice(0, 60);
+}
+
+function resolveCandidateTitle(
+  candidateId: string | undefined,
+  lookup?: CandidateTitleLookup,
+): string {
+  if (!candidateId) return 'candidate';
+  const title = lookup?.(candidateId);
+  if (title) return title;
+  return prettifyCandidateId(candidateId);
+}
 
 function shortAddr(addr: string): string {
   if (!addr || addr.length < 10) return addr || '???';
@@ -129,8 +154,10 @@ export function formatEventDescription(
   type: string,
   data: Record<string, unknown>,
   ensLookup?: EnsLookup,
+  candidateTitleLookup?: CandidateTitleLookup,
 ): string {
   const addr = (a: string) => resolveAddr(a, ensLookup);
+  const candTitle = (id?: string) => resolveCandidateTitle(id, candidateTitleLookup);
 
   switch (type) {
     case 'BID':
@@ -160,10 +187,32 @@ export function formatEventDescription(
 
     case 'CANDIDATE_SPONSORED': {
       const reason = (data.reason as string) || '';
-      const base = `${addr(data.signer as string)} sponsored candidate`;
+      const title = candTitle(data.candidateId as string | undefined);
+      const base = `${addr(data.signer as string)} sponsored "${title}"`;
       return reason.length > 0
         ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
         : base;
+    }
+
+    case 'CANDIDATE_UPDATED': {
+      const reason = (data.reason as string) || '';
+      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
+      const base = `${addr(data.proposer as string)} updated candidate "${title}"`;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
+        : base;
+    }
+
+    case 'CANDIDATE_CANCELED': {
+      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
+      return `${addr(data.proposer as string)} canceled candidate "${title}"`;
+    }
+
+    case 'CANDIDATE_PROMOTED': {
+      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
+      const proposalId = data.proposalId;
+      const suffix = proposalId != null ? ` to Prop #${proposalId}` : '';
+      return `${addr(data.proposer as string)} promoted candidate "${title}"${suffix}`;
     }
 
     case 'PROPOSAL_FEEDBACK': {
@@ -176,7 +225,8 @@ export function formatEventDescription(
 
     case 'CANDIDATE_FEEDBACK': {
       const reason = (data.reason as string) || '';
-      const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on candidate`;
+      const title = candTitle(data.candidateId as string | undefined);
+      const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on "${title}"`;
       return reason.length > 0
         ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
         : base;
