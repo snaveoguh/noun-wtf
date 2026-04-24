@@ -230,6 +230,7 @@ const Bid: React.FC<BidProps> = props => {
               className={classes.bidInput}
               type="number"
               min="0"
+              step="any"
               onChange={bidInputHandler}
               ref={bidInputRef}
               value={bidInput}
