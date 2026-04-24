@@ -7,14 +7,15 @@ import { formatEther, parseEther } from 'viem';
 
 import SettleManuallyBtn from '@/components/SettleManuallyBtn';
 import { NOUN_WTF_CLIENT_ID } from '@/config';
-import {
-  useReadNounsAuctionHouseMinBidIncrementPercentage,
-  useReadNounsAuctionHouseReservePrice,
-  useWriteNounsAuctionHouseCreateBid,
-  useWriteNounsAuctionHouseSettleCurrentAndCreateNewAuction,
-} from '@/contracts';
+import useDaoContext from '@/hooks/useDaoContext';
 import { useAppSelector } from '@/hooks';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
+import {
+  useDaoCreateBidWriter,
+  useDaoMinBidIncrementPercentage,
+  useDaoReservePrice,
+  useDaoSettleWriter,
+} from '@/wrappers/daoAuctionHouse';
 import { Auction } from '@/wrappers/nounsAuction';
 
 import classes from './Bid.module.css';
@@ -67,18 +68,17 @@ const Bid: React.FC<BidProps> = props => {
 
   const { t } = useLingui();
 
-  const { data: minBidIncPercentage } = useReadNounsAuctionHouseMinBidIncrementPercentage();
+  const dao = useDaoContext();
+
+  const minBidIncPercentage = useDaoMinBidIncrementPercentage(dao);
   // Post-prop: reservePrice is 2.8 ETH on mainnet. The first bid on a fresh
   // auction (amount=0) must meet the reserve or the tx reverts. For
-  // subsequent bids the min increment rule takes over.
-  const { data: reservePriceRaw } = useReadNounsAuctionHouseReservePrice();
-  const reservePrice = reservePriceRaw !== undefined ? BigInt(reservePriceRaw.toString()) : 0n;
+  // subsequent bids the min increment rule takes over. v2 defaults to 0.
+  const reservePriceRaw = useDaoReservePrice(dao);
+  const reservePrice = reservePriceRaw ?? 0n;
   const currentBidAmount =
     auction.amount !== undefined ? BigInt(auction.amount.toString()) : 0n;
-  const incrementMin = computeMinimumNextBid(
-    currentBidAmount,
-    minBidIncPercentage !== undefined ? BigInt(minBidIncPercentage.toString()) : undefined,
-  );
+  const incrementMin = computeMinimumNextBid(currentBidAmount, minBidIncPercentage);
   // On a fresh auction (no qualifying bid yet) the effective floor is the
   // reserve price. Once someone bids, the increment rule kicks in. We take
   // whichever is larger so we never advertise a sub-reserve minimum.
@@ -89,7 +89,7 @@ const Bid: React.FC<BidProps> = props => {
     isPending: isPlacingBid,
     isError: didPlaceBidFail,
     isSuccess: placeBidSucceeded,
-  } = useWriteNounsAuctionHouseCreateBid();
+  } = useDaoCreateBidWriter(dao);
 
   const {
     writeContract: settleAuction,
@@ -98,7 +98,7 @@ const Bid: React.FC<BidProps> = props => {
     isError: didSettleFail,
     isIdle: isSettleIdle,
     error: settleAuctionError,
-  } = useWriteNounsAuctionHouseSettleCurrentAndCreateNewAuction();
+  } = useDaoSettleWriter(dao);
 
   const bidInputHandler = (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target.value;
@@ -140,14 +140,15 @@ const Bid: React.FC<BidProps> = props => {
     }
 
     const value = parseEther(bidInputRef.current.value);
-    placeBid({
-      args: [BigInt(auction.nounId), NOUN_WTF_CLIENT_ID],
-      value,
-    });
+    // v1 accepts (nounId, clientId); v2's createBid takes only nounId.
+    const args = dao.isV2
+      ? ([BigInt(auction.nounId)] as const)
+      : ([BigInt(auction.nounId), NOUN_WTF_CLIENT_ID] as const);
+    placeBid({ args, value });
   };
 
   const settleAuctionHandler = () => {
-    settleAuction({});
+    settleAuction();
   };
 
   const clearBidInput = () => {

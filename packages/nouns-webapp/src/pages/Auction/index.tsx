@@ -9,7 +9,6 @@ import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
 import NocTicker from '@/components/NocTicker';
-import NounV2AuctionHero from '@/components/NounV2AuctionHero';
 import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
 import NounsWorldBanner from '@/components/NounsWorldBanner';
@@ -22,26 +21,37 @@ import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 import { nounPath } from '@/utils/history';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
+import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
 
 type AuctionPageProps = object;
 
 const AuctionPage: React.FC<AuctionPageProps> = () => {
   const { id: auctionId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const onDisplayAuction = useOnDisplayAuction();
+  const mainnetAuction = useOnDisplayAuction();
+  const v2Auction = useV2OnDisplayAuction();
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
-  const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
   const { activeDao } = useActiveDao();
 
-  // Only show the DAO toggle on the root route — historical /noun/:id routes
-  // are always mainnet Nouns so the switcher would be misleading there.
+  // Only the root auction route honours the DAO toggle. `/noun/:id` is
+  // always the mainnet Nouns archive — the historical IDs don't map to
+  // the v2 fork, so we hide the switcher there and always use mainnet.
   const isRootAuctionRoute = auctionId === undefined;
-  const showNounV2Hero = isRootAuctionRoute && activeDao === 'nounv2';
+  const isV2Active = isRootAuctionRoute && activeDao === 'nounv2';
+
+  // Pick the auction shape for the active DAO. v2 has no past-auction
+  // archive yet so we only resolve when on the root route.
+  const onDisplayAuction = isV2Active ? v2Auction : mainnetAuction;
+  const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // The Redux-driven mainnet auction-id sync only makes sense for the
+    // mainnet archive. v2 has no Ponder indexer so there's nothing to
+    // mirror into Redux — skip the effect entirely when v2 is active.
+    if (isV2Active) return;
     if (lastAuctionNounId == null) return;
     if (auctionId === undefined) {
       if (onDisplayAuctionNounId === Number(lastAuctionNounId)) return;
@@ -61,7 +71,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     if (Number(auctionId) !== onDisplayAuctionNounId) {
       dispatch(setOnDisplayAuctionNounId(Number(auctionId)));
     }
-  }, [auctionId, lastAuctionNounId, dispatch, navigate, onDisplayAuctionNounId]);
+  }, [auctionId, lastAuctionNounId, dispatch, navigate, onDisplayAuctionNounId, isV2Active]);
 
   // Handle ?makeArt=1 from navbar on other pages
   useEffect(() => {
@@ -82,11 +92,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
       }}
     >
-      {showNounV2Hero ? (
-        <NounV2AuctionHero />
-      ) : (
-        <Auction auction={onDisplayAuction} />
-      )}
+      <Auction auction={onDisplayAuction} />
       <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
         <LilNounsGrid />
       </Suspense>
