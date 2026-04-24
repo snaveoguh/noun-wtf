@@ -31,10 +31,14 @@ export const Noun: FC<NounProps> = ({
 }) => {
   const [shouldShowFallback, setShouldShowFallback] = useState(false);
   const [fallbackStartTime, setFallbackStartTime] = useState<number | null>(null);
-  const { data: fetchedSeed } = useReadNounsTokenSeeds({
+  // `seeds(nounId)` reverts for burned nouns (reserve-not-met). `isError`
+  // lets us render a burned-state placeholder instead of spinning forever
+  // on the transparent pixel.
+  const { data: fetchedSeed, isError: seedReverted } = useReadNounsTokenSeeds({
     args: [nounId!],
     query: {
       enabled: nounId !== undefined && !providedSeed,
+      retry: 1,
       select: data => {
         if (!data) return null;
         return {
@@ -89,6 +93,13 @@ export const Noun: FC<NounProps> = ({
   }, [svg, loadingNounFallback, shouldShowFallback, fallbackStartTime, minFallbackDuration]);
 
   if (shouldShowFallback) return <img {...props} src={loadingNoun} />;
+
+  // Burned noun: seed-read reverted and no seed was provided. Use the
+  // skull-noun placeholder instead of letting the tanstack query hang on a
+  // transparent pixel forever.
+  if (seedReverted && !providedSeed) {
+    return <img {...props} src={loadingNoun} alt={props.alt ?? 'Burned noun'} />;
+  }
 
   const imgElement = (
     <img

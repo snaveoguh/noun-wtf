@@ -5,15 +5,25 @@ import { Address, Bid, BidEvent } from '@/utils/types';
 
 import { Auction } from './nounsAuction';
 
+const ZERO_ADDRESS_LC = '0x0000000000000000000000000000000000000000';
+
 const deserializeAuction = (reduxSafeAuction: Auction): Auction => {
+  // Zero-address winner can slip in from older cached rows; normalize here so
+  // the `bidder` on deserialized auctions is always either a real address or
+  // undefined — the rest of the wrapper uses `!bidder` as the burned signal.
+  const rawBidder = reduxSafeAuction.bidder;
+  const normalizedBidder =
+    rawBidder && rawBidder.toLowerCase() !== ZERO_ADDRESS_LC ? (rawBidder as Address) : undefined;
+
   return {
     amount: reduxSafeAuction.amount ? BigInt(reduxSafeAuction.amount) : undefined,
-    bidder: reduxSafeAuction.bidder ? (reduxSafeAuction.bidder as Address) : undefined,
+    bidder: normalizedBidder,
     startTime: BigInt(reduxSafeAuction.startTime),
     endTime: BigInt(reduxSafeAuction.endTime),
     nounId: BigInt(reduxSafeAuction.nounId),
     settled: false,
     clientId: reduxSafeAuction.clientId ?? null,
+    burned: reduxSafeAuction.burned ?? false,
   };
 };
 
