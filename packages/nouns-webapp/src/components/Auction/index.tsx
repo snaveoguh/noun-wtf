@@ -476,6 +476,19 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     }
   }, []);
 
+  // Stable callback so EditableScene's effect
+  //   useEffect(() => onVoxelMapChange?.(voxels), [voxels, onVoxelMapChange])
+  // only refires when voxels actually change. An inline arrow function would
+  // get a new reference every parent render, cause the effect to rerun, and
+  // bump voxelMapVersion — which re-renders the parent → new ref → infinite
+  // loop that silently drops the 3D autosave effect. With a stable callback
+  // the version counter only ticks on real voxel edits, so the autosave
+  // effect below reliably fires after every 3D change.
+  const handleVoxelMapChange = useCallback((map: VoxelMap) => {
+    voxelMapRef.current = map;
+    setVoxelMapVersion(version => version + 1);
+  }, []);
+
   // Close download menu on outside click
   useEffect(() => {
     if (!downloadMenuOpen) return;
@@ -1201,8 +1214,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // though they're minted, not burned.
   // NounV2 has no nounder reward schedule — every noun (including #0) is
   // auctioned. Skip the mainnet-Nouns mod-10 rule when on v2.
-  const isNounder =
-    hasAuctionBounds && !dao.isV2 && isNounderNoun(BigInt(currentAuction.nounId));
+  const isNounder = hasAuctionBounds && !dao.isV2 && isNounderNoun(BigInt(currentAuction.nounId));
   const showBurnedPanel = hasAuctionBounds && !isNounder && isBurned;
   const activityContent = hasAuctionBounds ? (
     isNounder ? (
@@ -1278,10 +1290,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                   visibilityMask: edit3dStartVoxelMap ? undefined : edit3dVisibilityMask,
                   displayPixels: edit3dStartVoxelMap ? undefined : edit3dVisiblePixels,
                   viewStateRef: edit3dViewStateRef,
-                  onVoxelMapChange: map => {
-                    voxelMapRef.current = map;
-                    setVoxelMapVersion(version => version + 1);
-                  },
+                  onVoxelMapChange: handleVoxelMapChange,
                   backgroundSeed: currentNounSeed ?? undefined,
                   backgroundVisibility: edit3dVisibility,
                   // Mesh editor config — when GLB available, render actual mesh instead of voxels
@@ -1615,9 +1624,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             lineHeight: 1.45,
           }}
         >
-          <strong style={{ fontWeight: 600 }}>NounV2 contracts not yet deployed.</strong>{' '}
-          Reads and writes are no-ops until{' '}
-          <code>VITE_NOUNV2_AUCTION_HOUSE_ADDRESS</code> and{' '}
+          <strong style={{ fontWeight: 600 }}>NounV2 contracts not yet deployed.</strong> Reads and
+          writes are no-ops until <code>VITE_NOUNV2_AUCTION_HOUSE_ADDRESS</code> and{' '}
           <code>VITE_NOUNV2_TOKEN_ADDRESS</code> are set in the environment.
         </div>
       )}
