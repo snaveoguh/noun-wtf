@@ -5,6 +5,7 @@ import { Trans } from '@lingui/react/macro';
 import ReactDOM from 'react-dom';
 
 import BidHistoryModalRow from '@/components/BidHistoryModalRow';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { Bid } from '@/utils/types';
 import { Auction } from '@/wrappers/nounsAuction';
 import { useAuctionBids } from '@/wrappers/onDisplayAuction';
@@ -61,6 +62,7 @@ const BidHistoryModal: React.FC<{
   onDismiss: () => void;
 }> = props => {
   const { onDismiss, auction } = props;
+  useModalBodyLock(true);
   return (
     <>
       {ReactDOM.createPortal(

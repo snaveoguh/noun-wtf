@@ -285,6 +285,17 @@ code {
   background: #050505 !important;
 }
 
+/* ─── Modal open — hide site chrome ─────────────────────────────────────────
+   Any modal/popup that calls useModalBodyLock() sets data-modal-open="true"
+   on <body>. Hide NavBar + NocTicker strip so the header doesn't bleed
+   through on dark-background pages. See src/hooks/useModalBodyLock.ts. */
+body[data-modal-open='true'] nav.navbar {
+  visibility: hidden !important;
+}
+body[data-modal-open='true'] [data-site-ticker='true'] {
+  visibility: hidden !important;
+}
+
 @layer utilities {
   .bg-checkerboard {
     background-image:

@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi';
 
 import { Trait } from '@/components/Trait';
 import { Button } from '@/components/ui/button';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { invalidateProbeDreamsCache } from '@/hooks/useProbeDreams';
 import { generateDreamId, type CustomTraitLayer, type SavedDream } from '@/lib/dreamStorage';
 import { syncDreamToProbe } from '@/lib/probeSync';
@@ -53,6 +54,7 @@ interface Props {
 type CreateMode = 'traits' | 'upload';
 
 const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
+  useModalBodyLock(true);
   const [mode, setMode] = useState<CreateMode>('traits');
   const [seed, setSeed] = useState<INounSeed>(randomSeed);
   const [title, setTitle] = useState('');
@@ -137,7 +139,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[1040] flex items-center justify-center bg-black/60"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}

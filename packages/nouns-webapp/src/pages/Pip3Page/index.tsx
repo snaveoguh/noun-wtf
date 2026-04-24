@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import useModalBodyLock from '@/hooks/useModalBodyLock';
+
 // ─── Giphy channel feed (no API key needed) ─────────────────────────────────
 
 const CHANNEL_ID = '19207767'; // 60r90
@@ -56,6 +58,7 @@ const Pip3Page: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  useModalBodyLock(expanded !== null);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;

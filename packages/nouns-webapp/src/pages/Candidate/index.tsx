@@ -22,6 +22,7 @@ import { NOUN_WTF_CLIENT_ID } from '@/config';
 import { nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
 import { useAppSelector } from '@/hooks';
 import { useCandidateVersionsFromLogs } from '@/hooks/useCandidatesFromLogs';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import Section from '@/layout/Section';
 import { checkHasActiveOrPendingProposalOrCandidate } from '@/utils/proposals';
 import {
@@ -55,6 +56,7 @@ const SponsorModal: React.FC<{
   onSubmit: (expirationTimestamp: number, reason: string) => void;
   isPending: boolean;
 }> = ({ onClose, onSubmit, isPending }) => {
+  useModalBodyLock(true);
   // Default expiration: 7 days from now
   const defaultDate = dayjs().add(7, 'day').format('YYYY-MM-DD');
   const [expirationDate, setExpirationDate] = useState(defaultDate);

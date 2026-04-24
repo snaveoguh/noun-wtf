@@ -9,6 +9,7 @@ import { ImageData } from '@noundry/nouns-assets';
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 // ─── Trait card data ─────────────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ function getTraitCards(): TraitCard[] {
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
 const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClose }) => {
+  useModalBodyLock(true);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

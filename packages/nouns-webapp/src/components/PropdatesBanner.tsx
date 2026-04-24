@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { type PropdateEntry, usePropdates } from '@/hooks/usePropdates';
 
 // ─── Propdate Modal ───────────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ const PropdateModal: FC<{
   entry: PropdateEntry;
   onClose: () => void;
 }> = ({ entry, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
