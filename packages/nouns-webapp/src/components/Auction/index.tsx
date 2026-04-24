@@ -1199,7 +1199,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // Nounder-noun detection must take precedence over burned detection because
   // Nounder nouns share the burned auction shape (amount=0, no bidder) even
   // though they're minted, not burned.
-  const isNounder = hasAuctionBounds && isNounderNoun(BigInt(currentAuction.nounId));
+  // NounV2 has no nounder reward schedule — every noun (including #0) is
+  // auctioned. Skip the mainnet-Nouns mod-10 rule when on v2.
+  const isNounder =
+    hasAuctionBounds && !dao.isV2 && isNounderNoun(BigInt(currentAuction.nounId));
   const showBurnedPanel = hasAuctionBounds && !isNounder && isBurned;
   const activityContent = hasAuctionBounds ? (
     isNounder ? (
