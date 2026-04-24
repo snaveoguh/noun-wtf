@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 interface NounsWorldStory {
   title: string;
@@ -110,6 +111,7 @@ const StoryModal: FC<{
   story: NounsWorldStory;
   onClose: () => void;
 }> = ({ story, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   // Animate in on mount

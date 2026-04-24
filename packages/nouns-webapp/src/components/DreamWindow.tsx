@@ -7,6 +7,7 @@ import { Dice5, Save, Sparkles, Upload, X } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
 import { ProbeButton } from '@/components/ProbeButton';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { invalidateProbeDreamsCache } from '@/hooks/useProbeDreams';
 import {
   type CustomTraitLayer,
@@ -42,6 +43,7 @@ interface DreamWindowProps {
 }
 
 const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
+  useModalBodyLock(open);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'published' | 'draft-only' | 'error'>(

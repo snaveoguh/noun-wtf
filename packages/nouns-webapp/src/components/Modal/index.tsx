@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 
 import xIcon from '@/assets/x-icon.png';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 import classes from './Modal.module.css';
 
@@ -29,6 +30,7 @@ const ModalOverlay: React.FC<ModalOverlayProps> = ({ content, onDismiss, title }
 };
 
 const Modal: React.FC<ModalOverlayProps> = ({ content, onDismiss, title }) => {
+  useModalBodyLock(true);
   return (
     <>
       {ReactDOM.createPortal(
