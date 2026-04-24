@@ -824,6 +824,150 @@ app.get('/api/nounv2-auctions', async c => {
   return c.json(items);
 });
 
+// ─── NounV2 Activity Feed ─────────────────────────────────────────────────
+// Unions recent rows from nounv2_bid, nounv2_auction (settled), nounv2_proposal,
+// and nounv2_vote. Sorted DESC by block, paginated via ?before=<block>.
+let nounV2FeedCache: {
+  data: { events: ActivityEvent[]; hasMore: boolean; oldestBlock: number };
+  fetchedAt: number;
+  key: string;
+} | null = null;
+const NOUNV2_FEED_TTL = 30_000;
+
+app.get('/api/nounv2-feed', async c => {
+  const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+  const beforeParam = c.req.query('before');
+  const before = beforeParam ? BigInt(beforeParam) : undefined;
+  const cacheKey = `${limit}:${before ?? 'latest'}`;
+
+  if (
+    nounV2FeedCache?.key === cacheKey &&
+    Date.now() - nounV2FeedCache.fetchedAt < NOUNV2_FEED_TTL
+  ) {
+    return c.json(nounV2FeedCache.data);
+  }
+
+  try {
+    const perTable = limit + 10;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchRows(tbl: any, blockCol: any): Promise<any[]> {
+      try {
+        if (before) {
+          return await db
+            .select()
+            .from(tbl)
+            .where(lt(blockCol, before))
+            .orderBy(desc(blockCol))
+            .limit(perTable);
+        }
+        return await db.select().from(tbl).orderBy(desc(blockCol)).limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
+    const [bids, auctions, proposals, votes] = await Promise.all([
+      fetchRows(schema.nounV2Bid, schema.nounV2Bid.createdAtBlock),
+      fetchRows(schema.nounV2Auction, schema.nounV2Auction.createdAtBlock),
+      fetchRows(schema.nounV2Proposal, schema.nounV2Proposal.createdAtBlock),
+      fetchRows(schema.nounV2Vote, schema.nounV2Vote.createdAtBlock),
+    ]);
+
+    const events: ActivityEvent[] = [];
+
+    for (const b of bids) {
+      events.push({
+        type: 'V2_BID',
+        blockNumber: Number(b.createdAtBlock),
+        timestamp: tsToISO(b.createdAt),
+        txHash: b.createdAtTransaction || '',
+        data: {
+          nounId: Number(b.nounId),
+          value: String(b.value),
+          bidder: b.bidder,
+          extended: b.extended,
+        },
+      });
+    }
+
+    for (const a of auctions) {
+      // Use SETTLED only for finalized auctions; show CREATED for fresh auctions.
+      if (a.settled) {
+        events.push({
+          type: 'V2_SETTLED',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            winner: a.winner || '',
+            amount: String(a.amount || '0'),
+          },
+        });
+      } else {
+        events.push({
+          type: 'V2_AUCTION',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            startTime: Math.floor(new Date(a.startTime).getTime() / 1000),
+            endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+          },
+        });
+      }
+    }
+
+    for (const p of proposals) {
+      const descText = (p.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'V2_PROP',
+        blockNumber: Number(p.createdAtBlock),
+        timestamp: tsToISO(p.createdAt),
+        txHash: p.createdAtTransaction || '',
+        data: {
+          proposalId: Number(p.id),
+          proposer: p.proposer,
+          title,
+          status: p.status,
+          description: descText.slice(0, 4000),
+        },
+      });
+    }
+
+    for (const v of votes) {
+      events.push({
+        type: 'V2_VOTE',
+        blockNumber: Number(v.createdAtBlock),
+        timestamp: tsToISO(v.createdAt),
+        txHash: v.createdAtTransaction || '',
+        data: {
+          voter: v.voter,
+          proposalId: Number(v.proposalId),
+          support: v.support,
+          votes: v.votes,
+          reason: v.reason || '',
+        },
+      });
+    }
+
+    events.sort((a, b) => b.blockNumber - a.blockNumber);
+    const sliced = events.slice(0, limit);
+    const hasMore = events.length > limit;
+    const oldestBlock = sliced.length > 0 ? sliced[sliced.length - 1]!.blockNumber : 0;
+
+    const result = { events: sliced, hasMore, oldestBlock };
+    nounV2FeedCache = { data: result, fetchedAt: Date.now(), key: cacheKey };
+    return c.json(result);
+  } catch (err) {
+    console.error('[NounV2Feed] Error:', err);
+    return c.json({ events: [], hasMore: false, oldestBlock: 0 }, 500);
+  }
+});
+
 /** Live NounV2 auction state — direct contract read, like /api/auction-stats. */
 app.get('/api/nounv2-auction/current', async c => {
   const now = Date.now();
