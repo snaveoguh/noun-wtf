@@ -360,19 +360,22 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
 }
 
 async function sendRawTx(signedTx: Hex, useFlashbots: boolean): Promise<Hex> {
+  const channel = useFlashbots ? 'Flashbots Protect' : 'public mempool';
   const client = useFlashbots ? flashbotsClient : publicClient;
-  if (!client) throw new Error('No client');
+  if (!client) throw new Error(`No client for ${channel}`);
 
-  const hash = await client.request({
-    method: 'eth_sendRawTransaction',
-    params: [signedTx],
-  });
-
-  if (useFlashbots) {
-    console.log('[NounIRL] Submitted via Flashbots Protect (MEV-safe)');
+  try {
+    const hash = await client.request({
+      method: 'eth_sendRawTransaction',
+      params: [signedTx],
+    });
+    console.log(`[NounIRL] ✅ Submitted via ${channel}: ${hash}`);
+    return hash as Hex;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[NounIRL] ❌ ${channel} submit failed: ${msg}`);
+    throw err;
   }
-
-  return hash as Hex;
 }
 
 // ─── Block Processing ───────────────────────────────────────────────────
