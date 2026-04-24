@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom';
 import { formatEther } from 'viem';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 interface FundedProp {
   id: string;
@@ -19,6 +20,7 @@ interface FundedProp {
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
 const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { XIcon } from '@heroicons/react/solid';
 import ReactDOM from 'react-dom';
 
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { cn } from '@/lib/utils';
 
 import ChangeDelegatePanel from '../ChangeDelegatePanel';
@@ -51,6 +52,7 @@ const DelegationModal: React.FC<{
   delegateTo?: string;
 }> = props => {
   const { onDismiss, delegateTo } = props;
+  useModalBodyLock(true);
   return (
     <>
       {ReactDOM.createPortal(
