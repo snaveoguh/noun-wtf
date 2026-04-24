@@ -1,313 +1,49 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  margin: 0;
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-transform: uppercase;
-  font-weight: bold;
-  font-size: 13px;
-  background: #ffffff;
+.graveyard-proposals {
+  background-color: #000;
+  background-image: linear-gradient(to bottom, #333, #000);
 }
 
-/* Global font shrink — Comic Sans bold runs large */
-h1 { font-size: 1.8rem !important; }
-h2 { font-size: 1.4rem !important; }
-h3 { font-size: 1.15rem !important; }
-h4 { font-size: 0.95rem !important; }
-h5 { font-size: 0.85rem !important; }
-h6 { font-size: 0.75rem !important; }
-
-/* Apply Comic Sans + bold to all elements */
-*, *::before, *::after {
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  font-weight: bold !important;
+.graveyard-proposal-card {
+  background-color: #666;
+  color: #fff;
+  padding: 10px;
+  border: 1px solid #333;
 }
 
-/* Uppercase for headings, labels, buttons, nav — NOT everything */
-h1, h2, h3, h4, h5, h6,
-a, button, label, th,
-nav, nav *,
-.btn, [class*="Button"],
-[class*="header"], [class*="Header"],
-[class*="title"], [class*="Title"],
-[class*="label"], [class*="Label"] {
-  text-transform: uppercase !important;
+.graveyard-proposal-card pre {
+  font-family: 'Courier New', monospace;
 }
 
-/* Paragraph/body text: uppercase on desktop, normal case on small mobile */
-p, span, div, li, td, dd, dt {
-  text-transform: uppercase;
+.cracked {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  font-size: 24px;
+  color: #f00;
 }
 
-@media (max-width: 480px) {
-  /* On very small screens, relax uppercase on body text to prevent overflow */
-  p, span, li, td, dd, dt,
-  .form-control, input, textarea, select,
-  [class*="description"], [class*="Description"],
-  [class*="content"], [class*="Content"],
-  [class*="copy"], [class*="Copy"],
-  [class*="body"], [class*="Body"] {
-    text-transform: none !important;
-  }
-
-  /* Slightly reduce font size on mobile for bold Comic Sans */
-  body {
-    font-size: 14px;
-  }
+.tilted {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 24px;
+  color: #0f0;
 }
 
-/* Form inputs should never be uppercased — breaks address/ENS input */
-input, textarea, select, .form-control {
-  text-transform: none !important;
+.ghost {
+  position: absolute;
+  font-size: 24px;
+  color: #fff;
 }
 
-/* Vote page — stack columns on mobile */
-@media (max-width: 768px) {
-  .vote-page-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .vote-page-grid > #inline-vote-panel {
-    position: static !important;
-    order: -1;
-  }
-  .vote-detail-wrapper {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-}
-
-code {
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-}
-
-.__react_component_tooltip.show {
-  opacity: 1 !important;
-}
-
-/* Override Londrina Solid to Comic Sans everywhere */
-@font-face {
-  font-family: 'Londrina Solid';
-  src: local('Comic Sans MS'), local('Comic Sans');
-}
-@font-face {
-  font-family: 'PT Root UI';
-  src:
-    url(./fonts/PT_Root_UI/PT-Root-UI_Regular.woff2) format('woff2'),
-    url(./fonts/PT_Root_UI/PT-Root-UI_Regular.woff) format('woff');
-}
-@font-face {
-  font-family: 'PT Root UI';
-  font-weight: 500;
-  src:
-    url(./fonts/PT_Root_UI/PT-Root-UI_Medium.woff2) format('woff2'),
-    url(./fonts/PT_Root_UI/PT-Root-UI_Medium.woff) format('woff');
-}
-
-@font-face {
-  font-family: 'PT Root UI';
-  font-weight: bold;
-  src:
-    url(./fonts/PT_Root_UI/PT-Root-UI_Bold.woff2) format('woff2'),
-    url(./fonts/PT_Root_UI/PT-Root-UI_Bold.woff) format('woff');
-}
-
-/*---break---*/
-
-/* Edge padding must live outside @layer so CSS modules can resolve the vars */
-:root {
-  --page-edge-padding-left: max(1rem, env(safe-area-inset-left));
-  --page-edge-padding-right: max(1rem, env(safe-area-inset-right));
-}
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --brand-bg-green: #edf2f0;
-    --brand-dark-red: #d63c5e;
-    --brand-light-green: #6da886;
-    --brand-black: #212529;
-    /* Colors from Figma  */
-    --brand-cool-background: #d5d7e1;
-    --brand-cool-border: rgb(189, 192, 207);
-    --brand-cool-dark-text: #151c3b;
-    --brand-cool-light-text: #79809c;
-    --brand-cool-accent: #e9ebf3;
-    --brand-warm-background: #e1d7d5;
-    --brand-warm-border: rgb(207, 189, 186);
-    --brand-warm-dark-text: #221b1a;
-    --brand-warm-light-text: #8f7e7c;
-    --brand-warm-accent: #f9f1f1;
-    --brand-gray-dark-text: #14161b;
-    --brand-gray-border: #e2e3eb;
-    --brand-gray-background: #f4f4f8;
-    --brand-gray-light-text: #8c8d92;
-    --brand-gray-light-text-translucent: rgb(140, 141, 146, 0.1);
-    --brand-gray-hover: #fafafb;
-    --brand-color-red: #e40536;
-    --brand-color-blue: #4965f0;
-    --brand-color-green: #43b369;
-    --brand-color-red-translucent: rgba(214, 60, 94, 0.1);
-    --brand-color-blue-translucent: rgba(73, 101, 240, 0.1);
-    --brand-color-green-translucent: rgba(67, 179, 105, 0.1);
-    --brand-color-blue-darker: #3a52c7;
-  }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-}
-
-/*---break---*/
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  ul {
-    @apply list-inside list-disc;
-  }
-
-  @media (min-width: 1400px) {
-    .container,
-    .container-lg,
-    .container-xl,
-    .container-xxl {
-      max-width: 1140px !important;
-    }
-  }
-
-  body {
-    overflow-x: hidden;
-  }
-  #root {
-    width: 100%;
-  }
-}
-
-/* ─── Terminal Mode — Vantablack Void ─────────────────────────────────────── */
-.terminal-mode,
-.terminal-mode *,
-.terminal-mode *::before,
-.terminal-mode *::after {
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
-  font-weight: normal !important;
-  text-transform: none !important;
-}
-
-.terminal-mode body {
-  background: #000000 !important;
-  overflow: hidden !important;
-}
-
-/* Near-invisible scrollbar for the void */
-.terminal-scrollbar::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-.terminal-scrollbar::-webkit-scrollbar-track {
-  background: #000;
-}
-.terminal-scrollbar::-webkit-scrollbar-thumb {
-  background: #222;
-  border-radius: 2px;
-}
-.terminal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #333;
-}
-
-/* Firefox scrollbar */
-.terminal-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #222 #000;
-}
-
-/* Pulse animation for loading indicator */
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-/* Terminal event hover */
-.terminal-event:hover {
-  background: #050505 !important;
-}
-
-/* ─── Modal open — hide site chrome ─────────────────────────────────────────
-   Any modal/popup that calls useModalBodyLock() sets data-modal-open="true"
-   on <body>. Hide NavBar + NocTicker strip so the header doesn't bleed
-   through on dark-background pages. See src/hooks/useModalBodyLock.ts. */
-body[data-modal-open='true'] nav.navbar {
-  visibility: hidden !important;
-}
-body[data-modal-open='true'] [data-site-ticker='true'] {
-  visibility: hidden !important;
-}
-
-@layer utilities {
-  .bg-checkerboard {
-    background-image:
-      linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
-      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
-      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
-    background-size: 3.125% 3.125%;
-    background-position:
-      0 0,
-      0 1.5625%,
-      1.5625% -1.5625%,
-      -1.5625% 0px;
-  }
+.fog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(to bottom, #666, #333);
+  opacity: 0.5;
 }
