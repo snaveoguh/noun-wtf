@@ -73,9 +73,10 @@ const GovernancePage = () => {
 
   return (
     <>
-      {/* NounV2 announcement — links to the fork's auction + governance page */}
+      {/* NounV2 announcement — deep-links to the main auction with the NounV2
+          toggle pre-selected, so the switcher state stays consistent. */}
       <Link
-        to="/nounv2"
+        to="/?dao=nounv2"
         className="block no-underline"
         style={{ textDecoration: 'none' }}
       >
