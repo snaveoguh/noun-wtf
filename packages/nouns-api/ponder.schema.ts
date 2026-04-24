@@ -186,6 +186,12 @@ export const auction = onchainTable('nounsAuctionHouseV2', t => ({
   // settler: t.hex(), // TODO: add after initial sync completes to avoid full resync
   winner: t.hex(),
   amount: t.bigint(), // winning bid amount
+  // Mainnet prop #XXX raised reservePrice to 2.8 ETH. Auctions that end with
+  // no bid meeting the reserve settle as AuctionSettled(winner=0x0, amount=0)
+  // and the noun is burned in _settleAuction. Flag those rows so the webapp
+  // can branch to a burned-placeholder renderer instead of showing a "won by
+  // 0x000..." row.
+  burned: t.boolean().notNull().default(false),
   clientId: t.integer(),
   createdAt: t.timestamp().notNull(),
   createdAtBlock: t.bigint().notNull(),

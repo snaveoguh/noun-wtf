@@ -9,6 +9,7 @@ import SettleManuallyBtn from '@/components/SettleManuallyBtn';
 import { NOUN_WTF_CLIENT_ID } from '@/config';
 import {
   useReadNounsAuctionHouseMinBidIncrementPercentage,
+  useReadNounsAuctionHouseReservePrice,
   useWriteNounsAuctionHouseCreateBid,
   useWriteNounsAuctionHouseSettleCurrentAndCreateNewAuction,
 } from '@/contracts';
@@ -67,10 +68,21 @@ const Bid: React.FC<BidProps> = props => {
   const { t } = useLingui();
 
   const { data: minBidIncPercentage } = useReadNounsAuctionHouseMinBidIncrementPercentage();
-  const minBid = computeMinimumNextBid(
-    auction.amount !== undefined ? BigInt(auction.amount.toString()) : 0n,
+  // Post-prop: reservePrice is 2.8 ETH on mainnet. The first bid on a fresh
+  // auction (amount=0) must meet the reserve or the tx reverts. For
+  // subsequent bids the min increment rule takes over.
+  const { data: reservePriceRaw } = useReadNounsAuctionHouseReservePrice();
+  const reservePrice = reservePriceRaw !== undefined ? BigInt(reservePriceRaw.toString()) : 0n;
+  const currentBidAmount =
+    auction.amount !== undefined ? BigInt(auction.amount.toString()) : 0n;
+  const incrementMin = computeMinimumNextBid(
+    currentBidAmount,
     minBidIncPercentage !== undefined ? BigInt(minBidIncPercentage.toString()) : undefined,
   );
+  // On a fresh auction (no qualifying bid yet) the effective floor is the
+  // reserve price. Once someone bids, the increment rule kicks in. We take
+  // whichever is larger so we never advertise a sub-reserve minimum.
+  const minBid = currentBidAmount === 0n && reservePrice > incrementMin ? reservePrice : incrementMin;
 
   const {
     writeContract: placeBid,
@@ -112,9 +124,17 @@ const Bid: React.FC<BidProps> = props => {
     }
 
     if (currentBid(bidInputRef) < minBid) {
-      toast.error(
-        t`Please place a bid higher than or equal to the minimum bid amount of ${minBidEth(minBid)} ETH`,
-      );
+      // If the floor is the reserve (fresh auction), tell the user why —
+      // otherwise they'll assume we rejected a legitimate opening bid.
+      if (currentBidAmount === 0n && reservePrice > 0n) {
+        toast.error(
+          t`Min bid: ${formatEther(reservePrice)} ETH reserve. Bids below this are rejected by the contract.`,
+        );
+      } else {
+        toast.error(
+          t`Please place a bid higher than or equal to the minimum bid amount of ${minBidEth(minBid)} ETH`,
+        );
+      }
       setBidInput(minBidEth(minBid));
       return;
     }

@@ -36,6 +36,33 @@ export interface INounSeed {
   head: number;
 }
 
+/**
+ * Sentinel seed returned by `useNounSeed` when the on-chain `seeds(nounId)`
+ * call reverts — which happens when the noun has been burned (reserve-not-met
+ * settlement). We use `-1` across all slots so consumers can detect the
+ * sentinel with a single equality check (`seed === BURNED_NOUN_SEED`) instead
+ * of sniffing for revert state everywhere.
+ *
+ * Any `<Noun>` / `<StandaloneNoun>` render must detect the sentinel and swap
+ * in a burned placeholder rather than passing it to the SVG builder (which
+ * would index into ImageData arrays with -1 and crash).
+ */
+export const BURNED_NOUN_SEED: INounSeed = {
+  accessory: -1,
+  background: -1,
+  body: -1,
+  glasses: -1,
+  head: -1,
+};
+
+export const isBurnedSeed = (seed: INounSeed | undefined | null): boolean =>
+  !!seed &&
+  seed.accessory === -1 &&
+  seed.background === -1 &&
+  seed.body === -1 &&
+  seed.glasses === -1 &&
+  seed.head === -1;
+
 const chainId = defaultChain.id;
 
 const seedCacheKey = cacheKey(cache.seed, CHAIN_ID, nounsTokenAddress[chainId].toLowerCase());
@@ -144,9 +171,18 @@ export const useNounSeed = (nounId: bigint): INounSeed | undefined => {
   const seeds = useNounSeeds();
   const seed = seeds?.[Number(nounId)];
 
-  const { data: response } = useReadNounsTokenSeeds({
+  // Post-reservePrice raise: burned nouns have no seed on-chain, so this
+  // call reverts with "ERC721: invalid token ID". Capture `isError` and
+  // return the burned sentinel so <Noun> components can render a
+  // placeholder instead of spinning forever or crashing on undefined.
+  const { data: response, isError: seedsCallFailed } = useReadNounsTokenSeeds({
     args: [nounId],
-    query: { enabled: !seed },
+    query: {
+      enabled: !seed,
+      // One retry is enough to distinguish a transient RPC hiccup from
+      // a deterministic revert. Revert errors never succeed on retry.
+      retry: 1,
+    },
   });
 
   if (response) {
@@ -168,15 +204,18 @@ export const useNounSeed = (nounId: bigint): INounSeed | undefined => {
     }
     return seedData;
   }
-  return seed !== undefined
-    ? {
-        accessory: Number(seed.accessory),
-        background: Number(seed.background),
-        body: Number(seed.body),
-        glasses: Number(seed.glasses),
-        head: Number(seed.head),
-      }
-    : undefined;
+  if (seed !== undefined) {
+    return {
+      accessory: Number(seed.accessory),
+      background: Number(seed.background),
+      body: Number(seed.body),
+      glasses: Number(seed.glasses),
+      head: Number(seed.head),
+    };
+  }
+  // No cached seed AND the on-chain read reverted — treat as burned.
+  if (seedsCallFailed) return BURNED_NOUN_SEED;
+  return undefined;
 };
 
 export const useUserVotes = (): number | undefined => {
