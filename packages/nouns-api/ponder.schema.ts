@@ -507,3 +507,156 @@ export const grantStatusChange = onchainTable(
     createdAtBlockIndex: index().on(t.createdAtBlock),
   }),
 );
+
+// ── NounV2 ───────────────────────────────────────────────────────────────────
+// Standalone fork tables. Kept separate from main Nouns schema so neither
+// depends on the other and existing UI/queries are unaffected.
+
+const nounV2ProposalStatusValues = [
+  'ACTIVE',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXECUTED',
+  'CANCELED',
+  'EXPIRED',
+] as const;
+export type NounV2ProposalStatus = (typeof nounV2ProposalStatusValues)[number];
+export const nounV2ProposalStatus = onchainEnum(
+  'nounV2ProposalStatus',
+  nounV2ProposalStatusValues,
+);
+
+export const nounV2Proposal = onchainTable(
+  'nounv2_proposal',
+  t => ({
+    id: t.bigint().primaryKey(),
+    proposer: t.hex().notNull(),
+    description: t.text().notNull(),
+    status: nounV2ProposalStatus().notNull().default('ACTIVE'),
+    forVotes: t.integer().notNull().default(0),
+    againstVotes: t.integer().notNull().default(0),
+    abstainVotes: t.integer().notNull().default(0),
+    startBlock: t.bigint().notNull(),
+    endBlock: t.bigint().notNull(),
+    executionETA: t.bigint(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    statusIndex: index().on(t.status),
+  }),
+);
+
+export const nounV2ProposalRelations = relations(nounV2Proposal, ({ many }) => ({
+  transactions: many(nounV2ProposalTransaction),
+  votes: many(nounV2Vote),
+}));
+
+export const nounV2ProposalTransaction = onchainTable(
+  'nounv2_proposal_transaction',
+  t => ({
+    index: t.integer(),
+    proposalId: t.bigint().notNull(),
+    target: t.hex().notNull(),
+    value: t.bigint().notNull(),
+    signature: t.text().notNull(),
+    calldata: t.hex().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.index, t.proposalId] }),
+  }),
+);
+
+export const nounV2ProposalTransactionRelations = relations(
+  nounV2ProposalTransaction,
+  ({ one }) => ({
+    proposal: one(nounV2Proposal, {
+      fields: [nounV2ProposalTransaction.proposalId],
+      references: [nounV2Proposal.id],
+    }),
+  }),
+);
+
+export const nounV2Vote = onchainTable(
+  'nounv2_vote',
+  t => ({
+    voter: t.hex().notNull(),
+    proposalId: t.bigint().notNull(),
+    support: t.integer().notNull(), // 0=against, 1=for, 2=abstain
+    votes: t.integer().notNull(),
+    reason: t.text(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
+    proposalIdIndex: index().on(t.proposalId),
+  }),
+);
+
+export const nounV2VoteRelations = relations(nounV2Vote, ({ one }) => ({
+  proposal: one(nounV2Proposal, {
+    fields: [nounV2Vote.proposalId],
+    references: [nounV2Proposal.id],
+  }),
+}));
+
+export const nounV2ProposalStatusChange = onchainTable(
+  'nounv2_proposal_status_change',
+  t => ({
+    proposalId: t.bigint().notNull(),
+    status: nounV2ProposalStatus().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.proposalId, t.status] }),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── NounV2 Auctions ─────────────────────────────────────────────────────────
+
+export const nounV2Auction = onchainTable('nounv2_auction', t => ({
+  nounId: t.bigint().primaryKey(),
+  startTime: t.timestamp().notNull(),
+  endTime: t.timestamp().notNull(),
+  settled: t.boolean().notNull().default(false),
+  winner: t.hex(),
+  amount: t.bigint(),
+  createdAt: t.timestamp().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  createdAtTransaction: t.text().notNull(),
+}));
+
+export const nounV2AuctionRelations = relations(nounV2Auction, ({ many }) => ({
+  bids: many(nounV2Bid),
+}));
+
+export const nounV2Bid = onchainTable(
+  'nounv2_bid',
+  t => ({
+    nounId: t.bigint().notNull(),
+    value: t.bigint().notNull(),
+    bidder: t.hex().notNull(),
+    extended: t.boolean().notNull().default(false),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.nounId, t.value] }),
+    nounIdIndex: index().on(t.nounId),
+  }),
+);
+
+export const nounV2BidRelations = relations(nounV2Bid, ({ one }) => ({
+  auction: one(nounV2Auction, {
+    fields: [nounV2Bid.nounId],
+    references: [nounV2Auction.nounId],
+  }),
+}));
