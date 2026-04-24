@@ -8,7 +8,7 @@ import {
 } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { Col, Row } from 'react-bootstrap';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { formatEther, formatUnits } from 'viem';
 
 import Proposals from '@/components/Proposals';
@@ -73,6 +73,27 @@ const GovernancePage = () => {
 
   return (
     <>
+      {/* NounV2 announcement — links to the fork's auction + governance page */}
+      <Link
+        to="/nounv2"
+        className="block no-underline"
+        style={{ textDecoration: 'none' }}
+      >
+        <div className="mx-4 mt-3 mb-1 flex items-center justify-between gap-3 rounded-md bg-red-600 px-4 py-3 text-white shadow-sm transition-colors hover:bg-red-700 sm:mx-6">
+          <div className="flex items-center gap-3">
+            <span className="rounded bg-white/20 px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.1em]">
+              New
+            </span>
+            <span className="text-sm font-bold sm:text-base">
+              NounV2 — no-reserve auctions live
+            </span>
+          </div>
+          <span className="text-sm font-extrabold" aria-hidden>
+            &rarr;
+          </span>
+        </div>
+      </Link>
+
       {/* DAO Tab Bar */}
       <div
         style={{
