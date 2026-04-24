@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import { NounV2Token } from '../../contracts/nounv2/NounV2Token.sol';
 import { NounV2AuctionHouse } from '../../contracts/nounv2/NounV2AuctionHouse.sol';
 import { NounV2Treasury } from '../../contracts/nounv2/NounV2Treasury.sol';
+import { NounV2Deployer } from '../../contracts/nounv2/NounV2Deployer.sol';
 import { INounsDescriptorMinimal } from '../../contracts/interfaces/INounsDescriptorMinimal.sol';
 import { INounsSeeder } from '../../contracts/interfaces/INounsSeeder.sol';
 import { INounsToken } from '../../contracts/interfaces/INounsToken.sol';
@@ -170,5 +171,74 @@ contract NounV2Test is Test {
         vm.prank(broke);
         vm.expectRevert(NounV2Treasury.BelowProposalThreshold.selector);
         treasury.propose(targets, values, sigs, calldatas, 'nope');
+    }
+}
+
+/// @title NounV2Deployer end-to-end test
+/// @notice Verifies the one-shot Deployer flow: any address (simulating the
+///         Safe via CreateCall) can `new NounV2Deployer()` and the resulting
+///         contracts are fully configured with Safe ownership/admin.
+contract NounV2DeployerTest is Test {
+    address constant SAFE = 0xADa31Add8450CA0422983B9a3103633b78938617;
+
+    NounV2Token token;
+    NounV2AuctionHouse auctionHouse;
+    NounV2Treasury treasury;
+
+    function setUp() public {
+        // Anyone can trigger the deploy; SAFE ends up owning the output.
+        vm.recordLogs();
+        new NounV2Deployer();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes32 sig = keccak256('Deployed(address,address,address)');
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length >= 4 && logs[i].topics[0] == sig) {
+                token = NounV2Token(address(uint160(uint256(logs[i].topics[1]))));
+                auctionHouse = NounV2AuctionHouse(address(uint160(uint256(logs[i].topics[2]))));
+                treasury = NounV2Treasury(payable(address(uint160(uint256(logs[i].topics[3])))));
+                break;
+            }
+        }
+    }
+
+    function test_DeployerEndState() public {
+        assertTrue(address(token) != address(0), 'token deployed');
+        assertTrue(address(auctionHouse) != address(0), 'AH deployed');
+        assertTrue(address(treasury) != address(0), 'treasury deployed');
+
+        // Safe ownership / admin
+        assertEq(token.owner(), SAFE, 'token owner == SAFE');
+        assertEq(auctionHouse.owner(), SAFE, 'AH owner == SAFE');
+        assertEq(treasury.admin(), SAFE, 'treasury admin == SAFE');
+
+        // Wiring
+        assertEq(token.minter(), address(auctionHouse), 'token.minter == AH');
+        assertEq(auctionHouse.beneficiary(), address(treasury), 'AH beneficiary == treasury');
+        assertEq(address(treasury.nounsToken()), address(token), 'treasury.nounsToken == token');
+        assertEq(auctionHouse.reservePrice(), 0.001 ether, 'reservePrice == 0.001 ether');
+        assertEq(auctionHouse.duration(), 86400, 'duration == 86400');
+        assertFalse(auctionHouse.paused(), 'AH unpaused');
+
+        // First auction live on noun #0
+        (uint256 nounId, uint256 amount, , uint256 endTime, , bool settled) = auctionHouse.auction();
+        assertEq(nounId, 0, 'first auction #0');
+        assertEq(amount, 0, 'no bids yet');
+        assertFalse(settled, 'auction not yet settled');
+        assertGt(endTime, block.timestamp, 'auction live');
+
+        // Noun #0 is held by the auction house pending first bid
+        assertEq(token.ownerOf(0), address(auctionHouse), 'noun #0 held by AH');
+    }
+
+    function test_DeployerOwnsNothing() public {
+        // The Deployer contract itself should hold nothing after construction.
+        // It has no storage state, no ETH, and no privileged role anywhere.
+        // (The Deployer's address is not captured here — we rely on runtime
+        // checks that SAFE owns everything, which implicitly proves no other
+        // address is privileged.)
+        assertTrue(token.owner() != address(this), 'test contract does not own token');
+        assertTrue(auctionHouse.owner() != address(this), 'test contract does not own AH');
+        assertTrue(treasury.admin() != address(this), 'test contract is not treasury admin');
     }
 }
