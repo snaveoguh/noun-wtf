@@ -54,12 +54,19 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
           NODE_OPTIONS: --max-old-space-size=4096
-          VITE_CHAIN_ID: ${{ github.ref_name == 'staging' && '11155111' || '1' }}
+          # Both staging and main run on mainnet now — sepolia testing was
+          # too flaky. NounV2 contracts are mainnet-only, so staging has to
+          # be mainnet to exercise them.
+          VITE_CHAIN_ID: '1'
           VITE_MAINNET_JSONRPC: "https://ethereum-rpc.publicnode.com"
           VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
           VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}
           VITE_ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
           VITE_DASHBOARD_API_KEY: ${{ secrets.VITE_DASHBOARD_API_KEY }}
+          # NounV2 mainnet contract addresses (public, safe to hardcode)
+          VITE_NOUNV2_TOKEN_ADDRESS: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9'
+          VITE_NOUNV2_AUCTION_HOUSE_ADDRESS: '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc'
+          VITE_NOUNV2_TREASURY_ADDRESS: '0x2cdeb0d251674710840d9fa990d1de138dfe7c00'
         run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify
