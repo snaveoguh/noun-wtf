@@ -239,13 +239,36 @@ interface CrystalBallProps {
   size?: number; // px, default 180
   interactive?: boolean; // enable drag-rotate + zoom (default false)
   onPredict?: (prediction: PredictResponse) => void; // callback with prediction data
+  /**
+   * When provided, the component treats this as the authoritative prediction
+   * and skips its own /api/agent/predict polling. Used by callers (e.g. the
+   * DAO-switched crystal ball page) that need to drive the orb from a
+   * different data source such as an on-chain v2 auction read.
+   */
+  predictionOverride?: PredictResponse | null;
 }
 
-const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, onPredict }) => {
-  const [prediction, setPrediction] = useState<PredictResponse | null>(null);
+const CrystalBall: FC<CrystalBallProps> = ({
+  size = 180,
+  interactive = false,
+  onPredict,
+  predictionOverride,
+}) => {
+  const [prediction, setPrediction] = useState<PredictResponse | null>(predictionOverride ?? null);
   const [, setTick] = useState(0); // force re-render for countdown
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const countdownRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  // When the parent drives the prediction externally, skip the internal
+  // polling entirely and just mirror the override into local state so the
+  // existing render pipeline keeps working.
+  const externallyControlled = predictionOverride !== undefined;
+
+  useEffect(() => {
+    if (externallyControlled) {
+      setPrediction(predictionOverride ?? null);
+    }
+  }, [externallyControlled, predictionOverride]);
 
   // Poll the fast predict endpoint
   const fetchPrediction = useCallback(async () => {
@@ -268,10 +291,11 @@ const CrystalBall: FC<CrystalBallProps> = ({ size = 180, interactive = false, on
   const pollInterval = 3_000;
 
   useEffect(() => {
+    if (externallyControlled) return;
     fetchPrediction();
     pollRef.current = setInterval(fetchPrediction, pollInterval);
     return () => clearInterval(pollRef.current);
-  }, [fetchPrediction, pollInterval]);
+  }, [externallyControlled, fetchPrediction, pollInterval]);
 
   // Update countdown every second
   useEffect(() => {
