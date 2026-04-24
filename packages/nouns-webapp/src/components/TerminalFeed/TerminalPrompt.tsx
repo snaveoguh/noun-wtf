@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAccount } from 'wagmi';
 
+import useActiveDao from '@/hooks/useActiveDao';
+
 import { normalizeTerminalErrorMessage } from './errorMessages';
 import GovernanceActionConfirm from './GovernanceActionConfirm';
 
@@ -27,6 +29,7 @@ const API_BASE =
 
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
   const { address } = useAccount();
+  const { activeDao } = useActiveDao();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
@@ -89,6 +92,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             wallet: address ?? null,
             history: apiHistory,
             agent_mode: 'nounirl',
+            view_context: { dao: activeDao },
           }),
         });
 
@@ -126,7 +130,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         setIsLoading(false);
       }
     },
-    [address, isLoading, history, onNewMessages, onError],
+    [activeDao, address, isLoading, history, onNewMessages, onError],
   );
 
   const handleActionSuccess = useCallback(

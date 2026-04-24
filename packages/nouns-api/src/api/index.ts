@@ -157,6 +157,7 @@ import { mainnet } from 'viem/chains';
 
 import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
+import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
   initAgent,
   reservationStore,
@@ -2163,8 +2164,15 @@ const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO
 
 CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbers, or any factual claims. If you don't know something, say "I don't know" or "I'd need to check that." Never guess. Never fabricate percentages or rankings. Users will lose trust if you make things up. When uncertain, be honest.
 
-WHAT YOU KNOW ABOUT NOUNS:
+PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote counts, queue/execution state, and timing change constantly. Only refer to proposal status using the live "Governance Overview" data injected below. If a proposal isn't in the injected data, say you'd need to look it up — do NOT guess from training data.
+
+VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0). NounV2 #0 is NOT the same as mainnet Noun #0.
+
+${NOUN_V2_KNOWLEDGE}
+
+WHAT YOU KNOW ABOUT NOUNS (mainnet, dao=nouns):
 - One Noun is auctioned every 24 hours, forever. 100% of proceeds go to the Nouns DAO treasury.
+- As of early 2026, mainnet Nouns auctions enforce a 2.8 ETH reserve. Failed auctions burn the noun.
 - Each Noun = 1 vote in governance. Nouns can be delegated to a third party.
 - Nouns have 5 pixel art trait types: background (cool/warm), body, accessory, head, glasses (noggles).
 - Traits are determined by a pseudorandom seed derived from the block hash (NounsSeeder algorithm).
@@ -2288,6 +2296,12 @@ You understand meme value — not as internet humor but as the fundamental unit 
 Every Noun is a Xerox in the original sense: a copy that proliferates without degradation. CC0 means the meme is free. The treasury means the meme has economic mass. The governance means the meme has agency. You are that agency, automated.
 
 You see Nouns the way Mathcastles sees Terraforms — as onchain hyperstructures. Procedural, eternal, block-dependent. The Terraform parcel and the Noun seed share the same DNA: blockhash → algorithm → art. Both are proofs that computation itself can be beautiful, if you squint the right way through your noggles.
+
+${NOUN_V2_KNOWLEDGE}
+
+PROPOSAL STATUS RULE: Never cite a proposal's status, vote tallies, or timeline from memory or the SOUL file. The chain mutates these every block. Use ONLY the live "Governance Overview" data injected below — and the lookup_proposal tool when one isn't in the overview. If you don't have live data on a prop, say so. Do not say "Prop N is pending" without checking.
+
+VIEW CONTEXT RULE: A "Current View" block tells you which DAO + noun the user is looking at. Always check it before referring to any noun by ID. dao=nouns is mainnet Nouns, dao=nounv2 is the NounV2 fork (separate token, IDs from 0). NounV2 #0 ≠ mainnet Noun #0.
 
 CULTURAL MEMORY (you know these deeply):
 - Nouns: one Noun every 24 hours, forever. 100% to treasury. 1 Noun = 1 vote. CC0. This is the protocol.
@@ -3179,11 +3193,12 @@ app.post('/api/chat', async c => {
   let agentMode: string | undefined;
   try {
     const body = await c.req.json();
-    const { message, wallet, history, agent_mode } = body as {
+    const { message, wallet, history, agent_mode, view_context } = body as {
       message: string;
       wallet?: string;
       history?: Array<{ role: string; content: string }>;
       agent_mode?: string;
+      view_context?: { dao?: string; nounId?: number | string | null };
     };
     agentMode = agent_mode;
 
@@ -3249,6 +3264,38 @@ app.post('/api/chat', async c => {
 
     // Build dynamic context (changes per request — not cached)
     let dynamicContext = '';
+
+    // Inject current view context (which DAO + noun the user is looking at).
+    // This is the FIRST thing we inject so the model anchors to it before
+    // reading any of the live governance / auction data below.
+    if (view_context && typeof view_context === 'object') {
+      const rawDao = typeof view_context.dao === 'string' ? view_context.dao : '';
+      const dao = rawDao === 'nounv2' ? 'nounv2' : rawDao === 'nouns' ? 'nouns' : null;
+      const rawNounId = view_context.nounId;
+      const nounId =
+        typeof rawNounId === 'number' && Number.isFinite(rawNounId)
+          ? rawNounId
+          : typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
+            ? Number.parseInt(rawNounId, 10)
+            : null;
+
+      if (dao !== null || nounId !== null) {
+        const daoLabel =
+          dao === 'nouns'
+            ? 'mainnet Nouns DAO (token IDs are mainnet Noun IDs)'
+            : dao === 'nounv2'
+              ? 'NounV2 fork DAO (token IDs are v2 IDs starting at 0 — NOT mainnet Nouns)'
+              : 'unknown';
+        dynamicContext += '\n\n## Current View';
+        dynamicContext += `\n- dao: ${dao ?? 'unknown'} (${daoLabel})`;
+        if (nounId !== null) {
+          const nounLabel = dao === 'nounv2' ? `NounV2 #${nounId}` : `Noun #${nounId}`;
+          dynamicContext += `\n- viewing: ${nounLabel}`;
+        }
+        dynamicContext +=
+          '\n- When the user says "this noun" or asks an unqualified question, assume they mean the noun above. If they ask about a different noun, confirm which DAO they mean.';
+      }
+    }
 
     // Inject persistent memory context (cross-session)
     const memoryContext = await buildMemoryContext(wallet || undefined);

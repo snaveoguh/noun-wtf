@@ -9,6 +9,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
+import useActiveDao from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
 import { nounPath } from '@/utils/history';
 import type { INounSeed } from '@/wrappers/nounToken';
@@ -65,6 +66,7 @@ function generateIntrigue(nounId: number, seed: INounSeed): string {
 
 const HomePrompt: FC<Props> = ({ nounId, seed }) => {
   const { address } = useAccount();
+  const { activeDao } = useActiveDao();
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -99,6 +101,10 @@ const HomePrompt: FC<Props> = ({ nounId, seed }) => {
             message: text,
             wallet: address ?? null,
             history: messages.slice(-8),
+            view_context: {
+              dao: activeDao,
+              nounId: nounId ?? null,
+            },
           }),
         });
 
@@ -118,7 +124,7 @@ const HomePrompt: FC<Props> = ({ nounId, seed }) => {
         setIsLoading(false);
       }
     },
-    [address, isLoading, messages],
+    [activeDao, address, isLoading, messages, nounId],
   );
 
   const handleSubmit = useCallback(
