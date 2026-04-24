@@ -35,7 +35,8 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
-import { useReadNounsAuctionHouseReservePrice } from '@/contracts';
+import useDaoContext from '@/hooks/useDaoContext';
+import { useDaoNounSeed, useDaoReservePrice } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
 import { isBurnedAuction } from '@/utils/burnedAuction';
@@ -254,17 +255,43 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const stateBgColor = useAppSelector((state: RootState) => state.application.stateBackgroundColor);
-  const lastNounId = useAppSelector((state: RootState) => state.onDisplayAuction.lastAuctionNounId);
+  const lastNounIdMainnet = useAppSelector(
+    (state: RootState) => state.onDisplayAuction.lastAuctionNounId,
+  );
   const currentNounSeed = useAppSelector((state: RootState) => state.application.currentNounSeed);
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
 
-  // Pull the NounsAuctionHouse reservePrice. Post the recent governance prop
-  // this is 2.8 ETH on mainnet — we surface it as context on the bid UI and
-  // on burned-auction placeholder rows ("X ETH reserve · 0 qualifying bids").
-  // The hook runs against the active chain; returns undefined while loading.
-  const { data: reservePriceWei } = useReadNounsAuctionHouseReservePrice();
+  // The DAO context resolves contract addresses/abis for the active DAO
+  // (`?dao=` toggle). Pass it through to every auction-house / token read
+  // or write so v1 and v2 share the same big <Auction> rendering pipeline.
+  const dao = useDaoContext();
+
+  // Pull the active DAO's AuctionHouse reservePrice. Post the recent
+  // governance prop mainnet Nouns is 2.8 ETH; v2 defaults to 0. We
+  // surface it on the bid UI + on burned-auction placeholder rows.
+  // Returns undefined while loading.
+  const reservePriceWei = useDaoReservePrice(dao);
   const isBurned = isBurnedAuction(currentAuction);
+
+  // On v2 the mainnet `useNounSeed` path isn't usable — the seeds live on
+  // the NounV2 token contract. Read the seed directly and feed it into the
+  // same `loadedNounHandler` the mainnet loader invokes, so the rest of
+  // the hero (3D pipeline, background colour) sees a consistent seed.
+  const v2NounSeed = useDaoNounSeed(
+    dao,
+    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
+  );
+
+  // The "last auction" concept on v2 is always the current auction — we
+  // don't archive past v2 auctions yet, so prev/next navigation is
+  // effectively a single-page view. The mainnet Redux slice is indexer-
+  // driven, unusable on v2, so we collapse it to the live nounId.
+  const lastNounId = dao.isV2
+    ? currentAuction
+      ? Number(currentAuction.nounId)
+      : undefined
+    : lastNounIdMainnet;
 
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
   const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
@@ -961,6 +988,21 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [dispatch],
   );
 
+  // On v2 we bypass the StandaloneNounWithSeed loader (it uses the mainnet
+  // Ponder cache + mainnet token contract) — push the v2 seed we already
+  // read on-chain into the same handler. Same effect, different source.
+  useEffect(() => {
+    if (!dao.isV2 || !v2NounSeed) return;
+    const isBlankSeed =
+      v2NounSeed.background === 0 &&
+      v2NounSeed.body === 0 &&
+      v2NounSeed.accessory === 0 &&
+      v2NounSeed.head === 0 &&
+      v2NounSeed.glasses === 0;
+    if (isBlankSeed) return;
+    loadedNounHandler(v2NounSeed);
+  }, [dao.isV2, v2NounSeed, loadedNounHandler]);
+
   // Note on burned IDs: we intentionally do NOT skip over them here. Instead
   // the landing page renders BurnedNounContent + a burned-placeholder hero
   // image so history navigation stays linear. Skipping forward/back would
@@ -1157,7 +1199,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // Nounder-noun detection must take precedence over burned detection because
   // Nounder nouns share the burned auction shape (amount=0, no bidder) even
   // though they're minted, not burned.
-  const isNounder = hasAuctionBounds && isNounderNoun(BigInt(currentAuction.nounId));
+  // NounV2 has no nounder reward schedule — every noun (including #0) is
+  // auctioned. Skip the mainnet-Nouns mod-10 rule when on v2.
+  const isNounder =
+    hasAuctionBounds && !dao.isV2 && isNounderNoun(BigInt(currentAuction.nounId));
   const showBurnedPanel = hasAuctionBounds && !isNounder && isBurned;
   const activityContent = hasAuctionBounds ? (
     isNounder ? (
@@ -1175,7 +1220,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         nounId={BigInt(currentAuction.nounId)}
         isFirstAuction={currentAuction.nounId === 0n}
         isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
-        reservePriceWei={reservePriceWei !== undefined ? BigInt(reservePriceWei) : undefined}
+        reservePriceWei={reservePriceWei}
         onPrevAuctionClick={prevAuctionHandler}
         onNextAuctionClick={nextAuctionHandler}
       />
@@ -1556,9 +1601,29 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   return (
     <div style={{ backgroundColor: stateBgColor }}>
+      {dao.isV2 && !dao.isConfigured && (
+        <div
+          style={{
+            margin: '12px auto 0',
+            maxWidth: 880,
+            borderRadius: 6,
+            border: '1px solid #fecaca',
+            background: '#fef2f2',
+            color: '#7f1d1d',
+            padding: '12px 16px',
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          <strong style={{ fontWeight: 600 }}>NounV2 contracts not yet deployed.</strong>{' '}
+          Reads and writes are no-ops until{' '}
+          <code>VITE_NOUNV2_AUCTION_HOUSE_ADDRESS</code> and{' '}
+          <code>VITE_NOUNV2_TOKEN_ADDRESS</code> are set in the environment.
+        </div>
+      )}
       <div className={classes.heroWrapper}>
         <div className={classes.heroShell}>
-          {currentAuction && (
+          {currentAuction && !dao.isV2 && (
             <div className={classes.hiddenSeedLoader}>
               <StandaloneNounWithSeed
                 nounId={BigInt(currentAuction.nounId)}

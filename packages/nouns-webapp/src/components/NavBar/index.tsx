@@ -6,7 +6,7 @@ import { Trans } from '@lingui/react/macro';
 import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
-import { PencilLine } from 'lucide-react';
+import { PencilLine, Terminal } from 'lucide-react';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
@@ -54,7 +54,7 @@ const NavBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setMode: setSiteMode } = useSiteTheme();
-  const { activeDao } = useActiveDao();
+  const { activeDao, setActiveDao } = useActiveDao();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
       select: data => data.total,
@@ -287,6 +287,69 @@ const NavBar = () => {
             </NavDropdown>
             <div className={classes.navBarSecondary}>
               <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />
+              {/* Terminal icon — jump to classic text-feed view. Icon-first so
+                  it's tappable on mobile where text labels get truncated. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSiteMode('classic');
+                  navigate('/');
+                }}
+                title="Switch to Terminal Feed"
+                aria-label="Switch to Terminal Feed"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px 8px',
+                  lineHeight: 1,
+                  opacity: 0.7,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: '#00ff41',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.opacity = '0.7';
+                }}
+              >
+                <Terminal size={18} />
+              </button>
+              {/* V2 chip — flip the active DAO + route home. Compact icon-sized
+                  button so it always fits in mobile header slots. */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = activeDao === 'nounv2' ? 'nouns' : 'nounv2';
+                  setActiveDao(next);
+                  navigate(next === 'nounv2' ? '/?dao=nounv2' : '/');
+                }}
+                title={
+                  activeDao === 'nounv2'
+                    ? 'Switch to mainnet Nouns'
+                    : 'Switch to NounV2'
+                }
+                aria-label="Toggle DAO between Nouns and NounV2"
+                aria-pressed={activeDao === 'nounv2'}
+                style={{
+                  background: activeDao === 'nounv2' ? '#dc2626' : 'transparent',
+                  border: '1px solid #dc2626',
+                  color: activeDao === 'nounv2' ? 'white' : '#dc2626',
+                  cursor: 'pointer',
+                  padding: '3px 7px',
+                  lineHeight: 1,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  borderRadius: '4px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                V2
+              </button>
               <button
                 type="button"
                 onClick={() => navDispatch(setTorchMode(!torchMode))}
