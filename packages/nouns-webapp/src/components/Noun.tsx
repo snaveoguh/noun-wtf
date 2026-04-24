@@ -1,4 +1,4 @@
-import { FC, HTMLAttributes, useState, useEffect } from 'react';
+import { FC, ImgHTMLAttributes, useState, useEffect } from 'react';
 
 import { getNounData, ImageData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
@@ -9,7 +9,7 @@ import { NounHoverCard } from '@/components/NounHoverCard';
 import { useReadNounsTokenSeeds } from '@/contracts';
 import { INounSeed } from '@/wrappers/nounToken';
 
-export interface NounProps extends HTMLAttributes<HTMLImageElement> {
+export interface NounProps extends ImgHTMLAttributes<HTMLImageElement> {
   nounId?: bigint;
   seed?: INounSeed;
   loadingNounFallback?: boolean;
