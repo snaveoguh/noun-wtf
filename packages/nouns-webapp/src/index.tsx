@@ -239,6 +239,9 @@ const ChainSubscriber: React.FC = () => {
     onLogs: logs => {
       for (const log of logs) {
         const { amount, winner, nounId } = log.args;
+        // Reserve-not-met settlements emit winner=0x0000...0000 & amount=0.
+        // The slice reducer will normalize the zero-address winner to
+        // undefined so downstream renderers can branch on `!bidder`.
         dispatch(
           setAuctionSettled({
             nounId: Number(nounId),

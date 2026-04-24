@@ -29,9 +29,23 @@ export const reduxSafeNewAuction = (auction: AuctionCreateEvent): IAuction => ({
   settled: false,
 });
 
+const ZERO_ADDRESS_LC = '0x0000000000000000000000000000000000000000';
+
+/**
+ * Treat the zero address as "no bidder" — used for auctions that ended with
+ * no bid meeting the reserve price (the winner arg on AuctionSettled is
+ * `address(0)` and the noun is burned). Previously `auction.bidder ? … :
+ * undefined` let the zero address through because the string is truthy.
+ */
+const normalizeBidder = (bidder: Address | string | undefined): Address | undefined => {
+  if (!bidder) return undefined;
+  if (bidder.toLowerCase() === ZERO_ADDRESS_LC) return undefined;
+  return bidder as Address;
+};
+
 export const reduxSafeAuction = (auction: IAuction): IAuction => ({
   amount: auction.amount ? BigInt(auction.amount).toString() : undefined,
-  bidder: auction.bidder ? (auction.bidder as Address) : undefined,
+  bidder: normalizeBidder(auction.bidder),
   startTime: BigInt(auction.startTime).toString(),
   endTime: BigInt(auction.endTime).toString(),
   nounId: BigInt(auction.nounId).toString(),
@@ -91,7 +105,10 @@ export const auctionSlice = createSlice({
     setAuctionSettled: (state, action: PayloadAction<AuctionSettledEvent>) => {
       if (!(state.activeAuction && auctionsEqual(state.activeAuction, action.payload))) return;
       state.activeAuction.settled = true;
-      state.activeAuction.bidder = action.payload.winner;
+      // Zero-address winner = burned (reserve not met). Normalize to undefined
+      // so downstream renderers can branch on `!bidder` instead of matching
+      // the zero address string.
+      state.activeAuction.bidder = normalizeBidder(action.payload.winner);
       state.activeAuction.amount = BigInt(action.payload.amount).toString();
     },
     setAuctionExtended: (state, action: PayloadAction<AuctionExtendedEvent>) => {

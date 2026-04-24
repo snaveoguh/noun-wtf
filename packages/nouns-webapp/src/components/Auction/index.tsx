@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router';
 import AuctionActivity from '@/components/AuctionActivity';
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
 import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
+import BurnedNounContent from '@/components/BurnedNounContent';
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
@@ -34,8 +35,10 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
+import { useReadNounsAuctionHouseReservePrice } from '@/contracts';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
+import { isBurnedAuction } from '@/utils/burnedAuction';
 import { nounPath } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
 import { isNounderNoun } from '@/utils/nounderNoun';
@@ -255,6 +258,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const currentNounSeed = useAppSelector((state: RootState) => state.application.currentNounSeed);
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
+
+  // Pull the NounsAuctionHouse reservePrice. Post the recent governance prop
+  // this is 2.8 ETH on mainnet — we surface it as context on the bid UI and
+  // on burned-auction placeholder rows ("X ETH reserve · 0 qualifying bids").
+  // The hook runs against the active chain; returns undefined while loading.
+  const { data: reservePriceWei } = useReadNounsAuctionHouseReservePrice();
+  const isBurned = isBurnedAuction(currentAuction);
+
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
   const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
@@ -870,6 +881,12 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [dispatch],
   );
 
+  // Note on burned IDs: we intentionally do NOT skip over them here. Instead
+  // the landing page renders BurnedNounContent + a burned-placeholder hero
+  // image so history navigation stays linear. Skipping forward/back would
+  // risk traversing a long run of burns if the reserve stays unmet and
+  // feels disorienting; keeping users on the page with a clear "burned"
+  // state is more honest.
   const prevAuctionHandler = useCallback(() => {
     if (!currentAuction) return;
     navigate(nounPath(Number(currentAuction.nounId) - 1));
@@ -1057,13 +1074,28 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   );
 
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
+  // Nounder-noun detection must take precedence over burned detection because
+  // Nounder nouns share the burned auction shape (amount=0, no bidder) even
+  // though they're minted, not burned.
+  const isNounder = hasAuctionBounds && isNounderNoun(BigInt(currentAuction.nounId));
+  const showBurnedPanel = hasAuctionBounds && !isNounder && isBurned;
   const activityContent = hasAuctionBounds ? (
-    isNounderNoun(BigInt(currentAuction.nounId)) ? (
+    isNounder ? (
       <NounderNounContent
         mintTimestamp={BigInt(currentAuction.startTime)}
         nounId={BigInt(currentAuction.nounId)}
         isFirstAuction={currentAuction.nounId === 0n}
         isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        onPrevAuctionClick={prevAuctionHandler}
+        onNextAuctionClick={nextAuctionHandler}
+      />
+    ) : showBurnedPanel ? (
+      <BurnedNounContent
+        mintTimestamp={BigInt(currentAuction.startTime)}
+        nounId={BigInt(currentAuction.nounId)}
+        isFirstAuction={currentAuction.nounId === 0n}
+        isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        reservePriceWei={reservePriceWei !== undefined ? BigInt(reservePriceWei) : undefined}
         onPrevAuctionClick={prevAuctionHandler}
         onNextAuctionClick={nextAuctionHandler}
       />

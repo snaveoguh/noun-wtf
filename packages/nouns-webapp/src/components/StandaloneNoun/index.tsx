@@ -9,11 +9,17 @@ import { Link } from 'react-router';
 import LegacyNoun from '@/components/LegacyNoun';
 import { NounHoverCard } from '@/components/NounHoverCard';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
-import { INounSeed, useNounSeed } from '@/wrappers/nounToken';
+import burnedNounSvg from '@/assets/loading-skull-noun.gif';
+import { INounSeed, isBurnedSeed, useNounSeed } from '@/wrappers/nounToken';
 
 import classes from './StandaloneNoun.module.css';
 
 import nounClasses from '@/components/LegacyNoun/Noun.module.css';
+
+// Placeholder image for burned nouns. We reuse the existing skull-noun asset
+// (originally a loading state) because it already conveys "something's up"
+// without shipping a new asset. Consumers detect this via isBurnedSeed().
+const BURNED_NOUN_IMAGE = burnedNounSvg;
 
 interface StandaloneNounProps {
   nounId: bigint;
@@ -32,6 +38,16 @@ interface StandaloneNounWithSeedProps {
 export const getNoun = (nounId: string | bigint, seed: INounSeed) => {
   const id = nounId.toString();
   const name = `Noun ${id}`;
+  // Burned-seed sentinel (from useNounSeed on a revert). Short-circuit before
+  // calling getNounData(-1, -1, …) which would index into ImageData arrays
+  // and crash.
+  if (isBurnedSeed(seed)) {
+    return {
+      name,
+      description: `Noun ${id} was burned — reserve not met.`,
+      image: BURNED_NOUN_IMAGE,
+    };
+  }
   const description = `Noun ${id} is a member of the Nouns DAO`;
   const { parts, background } = getNounData(seed);
   const image = `data:image/svg+xml;base64,${btoa(buildSVG(parts, data.palette, background))}`;

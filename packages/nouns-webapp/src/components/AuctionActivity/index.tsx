@@ -14,7 +14,9 @@ import BidHistoryModal from '@/components/BidHistoryModal';
 import CurrentBid from '@/components/CurrentBid';
 import Holder from '@/components/Holder';
 import NounInfoCard from '@/components/NounInfoCard';
+import ReservePriceBadge from '@/components/ReservePriceBadge';
 import Winner from '@/components/Winner';
+import { useReadNounsAuctionHouseReservePrice } from '@/contracts';
 import { Auction } from '@/wrappers/nounsAuction';
 
 import classes from './AuctionActivity.module.css';
@@ -34,6 +36,13 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
 
   const [auctionEnded, setAuctionEnded] = useState(false);
   const [auctionTimer, setAuctionTimer] = useState(false);
+
+  // Reserve price from the NounsAuctionHouse contract. Mainnet is now 2.8 ETH
+  // post-governance prop. We render a ReservePriceBadge when the live auction
+  // is below reserve, so users don't assume their bid was silently rejected.
+  const { data: reservePriceRaw } = useReadNounsAuctionHouseReservePrice();
+  const reservePriceWei =
+    reservePriceRaw !== undefined ? BigInt(reservePriceRaw.toString()) : undefined;
 
   const [showBidHistoryModal, setShowBidHistoryModal] = useState(false);
   const showBidModalHandler = () => {
@@ -83,6 +92,16 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
           currentBid={BigInt(auction.amount?.toString() ?? '0')}
           auctionEnded={auctionEnded}
         />
+
+        {/* Reserve price — shown only while the auction is live. Bids below
+             this are rejected by the contract. Surfacing it up-front avoids
+             users getting a confusing "tx reverted" when they try 0.1 ETH. */}
+        {isLastAuction && !auctionEnded && (
+          <ReservePriceBadge
+            currentBidWei={BigInt(auction.amount?.toString() ?? '0')}
+            reservePriceWei={reservePriceWei}
+          />
+        )}
 
         {/* Timer */}
         <div className={classes.timerRow}>

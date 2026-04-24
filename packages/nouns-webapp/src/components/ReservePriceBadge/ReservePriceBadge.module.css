@@ -1,0 +1,32 @@
+.wrapper {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.3rem 0.55rem;
+  margin-top: 0.35rem;
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.04);
+  border: 1px dashed rgba(17, 17, 17, 0.18);
+  font-family: 'PT Root UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #555;
+}
+
+.value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111;
+}
+
+.suffix {
+  font-weight: 500;
+  color: #666;
+  font-size: 11px;
+  text-transform: lowercase;
+}

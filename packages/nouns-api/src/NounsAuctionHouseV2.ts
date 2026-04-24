@@ -50,12 +50,23 @@ ponder.on('NounsAuctionHouseV2:AuctionBidWithClientId', async ({ event, context 
   }
 });
 
+// Zero address as the winner + zero amount = reserve-price auction that
+// ended with no qualifying bid. The NounsAuctionHouse contract burns the
+// noun in _settleAuction when the bidder is the zero address. We persist
+// burned=true and winner=null so the webapp can render a burned placeholder
+// instead of a "won by 0x000..." row.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+
 ponder.on('NounsAuctionHouseV2:AuctionSettled', async ({ event, context }) => {
+  const winner = event.args.winner;
+  const amount = event.args.amount;
+  const isBurned = winner === ZERO_ADDRESS && amount === 0n;
   await context.db.update(auction, { nounId: event.args.nounId }).set({
     settled: true,
     // settler: event.transaction.from, // TODO: enable after initial sync
-    winner: event.args.winner,
-    amount: event.args.amount,
+    winner: isBurned ? null : winner,
+    amount,
+    burned: isBurned,
   });
 });
 
