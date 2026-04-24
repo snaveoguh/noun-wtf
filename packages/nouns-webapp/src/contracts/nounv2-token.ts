@@ -61,6 +61,19 @@ export const nounV2TokenAbi = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'seeds',
+    inputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    outputs: [
+      { name: 'background', type: 'uint48', internalType: 'uint48' },
+      { name: 'body', type: 'uint48', internalType: 'uint48' },
+      { name: 'accessory', type: 'uint48', internalType: 'uint48' },
+      { name: 'head', type: 'uint48', internalType: 'uint48' },
+      { name: 'glasses', type: 'uint48', internalType: 'uint48' },
+    ],
+    stateMutability: 'view',
+  },
 ] as const;
 
 // Injected via env after deploy — zero address is a safe no-op default.

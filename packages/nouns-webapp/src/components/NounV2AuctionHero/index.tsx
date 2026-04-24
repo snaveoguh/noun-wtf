@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react';
 
+import { getNounData, ImageData } from '@noundry/nouns-assets';
+import { buildSVG } from '@nouns/sdk';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
@@ -17,6 +20,7 @@ import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
+import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
 import { NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
@@ -83,6 +87,38 @@ export default function NounV2AuctionHero() {
     | undefined;
   const [nounId, bidAmount, _startTime, endTime, bidder, settled] = auction ?? [];
   void _startTime;
+
+  // Fetch seed + build SVG for the current noun — same pipeline as the main
+  // <Noun> component, but pointing at the NounV2 token.
+  const { data: seedData } = useReadContract({
+    address: NOUNV2_TOKEN_ADDRESS,
+    abi: nounV2TokenAbi,
+    functionName: 'seeds',
+    args: nounId != null ? [nounId] : undefined,
+    query: {
+      enabled: nounId != null && NOUNV2_TOKEN_ADDRESS !== ZERO_ADDRESS,
+    },
+  });
+
+  const seed = useMemo(() => {
+    if (!seedData) return null;
+    return {
+      background: Number(seedData[0]),
+      body: Number(seedData[1]),
+      accessory: Number(seedData[2]),
+      head: Number(seedData[3]),
+      glasses: Number(seedData[4]),
+    };
+  }, [seedData]);
+
+  const { data: nounSvg } = useQuery({
+    queryKey: ['nounv2-svg', seed],
+    queryFn: () => {
+      const { parts, background } = getNounData(seed!);
+      return buildSVG(parts, ImageData.palette, background);
+    },
+    enabled: !!seed,
+  });
 
   const now = Math.floor(Date.now() / 1000);
   const secondsLeft = endTime != null ? Number(endTime) - now : 0;
@@ -218,6 +254,22 @@ export default function NounV2AuctionHero() {
           <h2 className="mb-4 text-2xl font-extrabold tracking-tight text-neutral-900">
             NounV2 #{nounId != null ? nounId.toString() : '—'}
           </h2>
+
+          {/* 2D noun image — SVG rendered from on-chain seed */}
+          <div className="mb-5 flex justify-center">
+            {nounSvg ? (
+              <img
+                src={`data:image/svg+xml;base64,${btoa(nounSvg)}`}
+                alt={`NounV2 #${nounId?.toString() ?? ''}`}
+                className="h-auto w-full max-w-[320px] rounded-md border border-neutral-200 bg-neutral-50"
+                style={{ imageRendering: 'pixelated' }}
+              />
+            ) : (
+              <div className="flex h-[320px] w-[320px] items-center justify-center rounded-md border border-neutral-200 bg-neutral-100 text-xs text-neutral-400">
+                loading noun…
+              </div>
+            )}
+          </div>
 
           <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Current Bid" value={`${bidAmount != null ? formatEther(bidAmount) : '0'} ETH`} />
