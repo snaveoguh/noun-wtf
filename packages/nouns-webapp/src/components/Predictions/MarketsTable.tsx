@@ -136,21 +136,21 @@ export function MarketsTable() {
         </p>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <table className="min-w-[520px] border-collapse font-mono text-[9px] sm:w-full">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[520px] border-collapse font-mono text-[9px]">
           <thead>
             <tr className="border-b border-[var(--rule)] text-left text-[var(--ink-faint)]">
-              <th className="py-1 pr-2 sm:pr-3">Kind</th>
-              <th className="py-1 pr-2 sm:pr-3">Market</th>
-              <th className="py-1 pr-2 sm:pr-3">Pool</th>
-              <th className="py-1 pr-2 sm:pr-3">Status</th>
-              <th className="py-1">Action</th>
+              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Kind</th>
+              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Market</th>
+              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Pool</th>
+              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Status</th>
+              <th className="whitespace-nowrap py-1">Action</th>
             </tr>
           </thead>
           <tbody>
             {paged.map(entry => (
               <tr key={entry.id} className="border-b border-[var(--rule-light)]">
-                <td className="py-1.5 pr-2 sm:pr-3">
+                <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-3">
                   <span
                     className="border px-1 py-0.5 text-[8px] uppercase tracking-wider"
                     style={{
@@ -170,7 +170,7 @@ export function MarketsTable() {
                         : 'NOUNS'}
                   </span>
                 </td>
-                <td className="max-w-[240px] truncate py-1.5 pr-3 text-[var(--ink-light)]">
+                <td className="max-w-[160px] truncate py-1.5 pr-3 text-[var(--ink-light)] sm:max-w-[240px]">
                   {entry.link != null ? (
                     <a
                       href={entry.link}
@@ -184,10 +184,13 @@ export function MarketsTable() {
                     entry.title
                   )}
                 </td>
-                <td className="py-1.5 pr-3 text-[var(--ink-light)]">
+                <td className="whitespace-nowrap py-1.5 pr-3 text-[var(--ink-light)]">
                   {formatEth(BigInt(entry.totalPoolWei))}
                 </td>
-                <td className="py-1.5 pr-3 uppercase" style={{ color: statusColor(entry.status) }}>
+                <td
+                  className="whitespace-nowrap py-1.5 pr-3 uppercase"
+                  style={{ color: statusColor(entry.status) }}
+                >
                   {statusLabel(entry.status)}
                   {entry.status === 'resolved' && OUTCOME_LABEL[entry.outcome] != null && (
                     <span className="ml-1 text-[8px] text-[var(--ink-faint)]">
@@ -195,7 +198,7 @@ export function MarketsTable() {
                     </span>
                   )}
                 </td>
-                <td className="py-1.5">
+                <td className="whitespace-nowrap py-1.5">
                   {entry.status === 'needs-resolution' ? (
                     <ResolveActionButton entry={entry} />
                   ) : (
