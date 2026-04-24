@@ -34,6 +34,9 @@ import GrantsPage from '@/pages/Grants';
 import CreateGrantPage from '@/pages/Grants/CreateGrant';
 import GrantDetailPage from '@/pages/Grants/GrantDetail';
 import HackathonPage from '@/pages/Hackathon';
+import NounV2Page from '@/pages/NounV2';
+import NounV2DetailPage from '@/pages/NounV2/Detail';
+import CreateNounV2ProposalPage from '@/pages/NounV2/CreateProposal';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
@@ -160,6 +163,9 @@ function AppRouter() {
         <Route path="/grants" element={<GrantsPage />} />
         <Route path="/grants/create" element={<CreateGrantPage />} />
         <Route path="/grants/:id" element={<GrantDetailPage />} />
+        <Route path="/nounv2" element={<NounV2Page />} />
+        <Route path="/nounv2/create" element={<CreateNounV2ProposalPage />} />
+        <Route path="/nounv2/:id" element={<NounV2DetailPage />} />
         <Route path="/hackathons" element={<HackathonPage />} />
         <Route path="/underground" element={<UndergroundPage />} />
         <Route path="/delegate" element={<DelegatePage />} />
