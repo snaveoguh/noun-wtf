@@ -639,6 +639,239 @@ app.get('/api/grants/:id', async c => {
 });
 
 // ============================================================
+// NounV2 — fork endpoints. Same shape as /api/grants and /api/auction-stats
+// so the webapp can consume them without branching. Addresses come from env
+// vars and may be zero until the mainnet deploy lands.
+// ============================================================
+
+const NOUNV2_AUCTION_HOUSE_ADDRESS = (process.env.NOUNV2_AUCTION_HOUSE_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as `0x${string}`;
+
+const NOUNV2_AUCTION_ABI = [
+  {
+    type: 'function',
+    name: 'auction',
+    inputs: [],
+    outputs: [
+      { name: 'nounId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'startTime', type: 'uint256' },
+      { name: 'endTime', type: 'uint256' },
+      { name: 'bidder', type: 'address' },
+      { name: 'settled', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+const NOUNV2_CURRENT_AUCTION_CACHE_TTL_MS = 15_000;
+let nounV2CurrentAuctionCache: { at: number; payload: unknown } | null = null;
+
+/** Derived status for a NounV2 proposal (mirrors computeDerivedGrantStatus). */
+function computeDerivedNounV2ProposalStatus(
+  p: Record<string, unknown>,
+  latestBlock: bigint,
+): string {
+  const status = p.status as string;
+  if (['CANCELED', 'EXECUTED'].includes(status)) return status;
+
+  // Queued proposals expire after the grace period (7d on NounV2Treasury).
+  if (status === 'QUEUED') {
+    if (p.executionETA) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const GRACE_PERIOD = 7 * 86400;
+      if (nowSeconds >= Number(p.executionETA) + GRACE_PERIOD) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+
+  if (status === 'ACTIVE') {
+    const endBlock = BigInt(p.endBlock as string | number);
+    if (latestBlock > endBlock) {
+      const forVotes = Number(p.forVotes);
+      const againstVotes = Number(p.againstVotes ?? 0);
+      if (forVotes === 0 || forVotes <= againstVotes) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+  }
+
+  return status;
+}
+
+/** All NounV2 proposals — single JSON response with derived status. */
+app.get('/api/nounv2-proposals', async c => {
+  const proposals = await db
+    .select()
+    .from(schema.nounV2Proposal)
+    .orderBy(desc(schema.nounV2Proposal.id));
+  const latestBlock = await getLatestBlockCached();
+  const items = proposals.map(p => {
+    const item: Record<string, unknown> = {
+      ...p,
+      id: String(p.id),
+      startBlock: String(p.startBlock),
+      endBlock: String(p.endBlock),
+      createdAtBlock: String(p.createdAtBlock),
+      executionETA: p.executionETA != null ? String(p.executionETA) : null,
+      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
+    }
+    return item;
+  });
+  return c.json(items);
+});
+
+/** Single NounV2 proposal with votes, actions, status changes. */
+app.get('/api/nounv2-proposals/:id', async c => {
+  const idParam = c.req.param('id');
+  const allProposals = await db.select().from(schema.nounV2Proposal);
+  const p = allProposals.find(pr => String(pr.id) === idParam);
+  if (!p) return c.json({ error: 'not found' }, 404);
+
+  const allVotes = await db
+    .select()
+    .from(schema.nounV2Vote)
+    .orderBy(desc(schema.nounV2Vote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.proposalId) === idParam);
+
+  const allTxs = await db.select().from(schema.nounV2ProposalTransaction);
+  const txs = allTxs.filter(t => String(t.proposalId) === idParam);
+
+  const allChanges = await db
+    .select()
+    .from(schema.nounV2ProposalStatusChange)
+    .orderBy(schema.nounV2ProposalStatusChange.createdAtBlock);
+  const changes = allChanges.filter(sc => String(sc.proposalId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const item: Record<string, unknown> = {
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    createdAtBlock: String(p.createdAtBlock),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
+  }
+
+  return c.json({
+    proposal: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtBlock: String(v.createdAtBlock),
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+    actions: txs.map(t => ({
+      index: t.index,
+      proposalId: String(t.proposalId),
+      target: t.target,
+      value: String(t.value),
+      signature: t.signature,
+      calldata: t.calldata,
+    })),
+    statusChanges: changes.map(sc => ({
+      status: sc.status,
+      createdAtBlock: String(sc.createdAtBlock),
+      createdAtTransaction: sc.createdAtTransaction,
+    })),
+  });
+});
+
+/** All NounV2 auctions from the indexer, newest first. */
+app.get('/api/nounv2-auctions', async c => {
+  const auctions = await db
+    .select()
+    .from(schema.nounV2Auction)
+    .orderBy(desc(schema.nounV2Auction.nounId));
+  const allBids = await db
+    .select()
+    .from(schema.nounV2Bid)
+    .orderBy(desc(schema.nounV2Bid.createdAtBlock));
+
+  const bidsByNoun = new Map<string, typeof allBids>();
+  for (const b of allBids) {
+    const key = String(b.nounId);
+    if (!bidsByNoun.has(key)) bidsByNoun.set(key, []);
+    bidsByNoun.get(key)!.push(b);
+  }
+
+  const items = auctions.map(a => ({
+    nounId: String(a.nounId),
+    startTime: String(Math.floor(new Date(a.startTime).getTime() / 1000)),
+    endTime: String(Math.floor(new Date(a.endTime).getTime() / 1000)),
+    settled: a.settled,
+    winner: a.winner,
+    amount: a.amount != null ? String(a.amount) : null,
+    createdAtBlock: String(a.createdAtBlock),
+    createdAtTransaction: a.createdAtTransaction,
+    bids: (bidsByNoun.get(String(a.nounId)) ?? []).map(b => ({
+      bidder: b.bidder,
+      value: String(b.value),
+      extended: b.extended,
+      createdAtBlock: String(b.createdAtBlock),
+      createdAtTransaction: b.createdAtTransaction,
+    })),
+  }));
+  return c.json(items);
+});
+
+/** Live NounV2 auction state — direct contract read, like /api/auction-stats. */
+app.get('/api/nounv2-auction/current', async c => {
+  const now = Date.now();
+  if (
+    nounV2CurrentAuctionCache !== null &&
+    now - nounV2CurrentAuctionCache.at < NOUNV2_CURRENT_AUCTION_CACHE_TTL_MS
+  ) {
+    return c.json(nounV2CurrentAuctionCache.payload);
+  }
+
+  // If the address hasn't been set yet, return a structured "not deployed" response
+  // instead of 500'ing on a zero-address call.
+  if (NOUNV2_AUCTION_HOUSE_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    const payload = { deployed: false, current: null };
+    nounV2CurrentAuctionCache = { at: now, payload };
+    return c.json(payload);
+  }
+
+  try {
+    // viem returns a tuple for multiple named outputs; index access is stable.
+    const current = (await nounCheckClient.readContract({
+      address: NOUNV2_AUCTION_HOUSE_ADDRESS,
+      abi: NOUNV2_AUCTION_ABI,
+      functionName: 'auction',
+    })) as readonly [bigint, bigint, bigint, bigint, `0x${string}`, boolean];
+
+    const payload = {
+      deployed: true,
+      current: {
+        nounId: String(current[0]),
+        amount: String(current[1]),
+        startTime: Number(current[2]),
+        endTime: Number(current[3]),
+        bidder: current[4],
+        settled: current[5],
+      },
+    };
+    nounV2CurrentAuctionCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (nounV2CurrentAuctionCache !== null) {
+      return c.json(nounV2CurrentAuctionCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
 // Lil Nouns proposals proxy — fetches from Goldsky subgraph on the server,
 // caches briefly, serves in the same shape as /api/proposals so the
 // prediction-market UI can drop it in without branching.
@@ -1421,15 +1654,34 @@ app.get('/api/predictions/markets', async c => {
     const auctionNounIds = Array.from({ length: 50 }, (_, i) => currentNounId - i).filter(
       n => n >= 0,
     );
-    const auctionResults = await nounCheckClient.multicall({
-      allowFailure: true,
-      contracts: auctionNounIds.map(id => ({
-        address: AUCTION_PRICE_MARKET_ADDRESS,
-        abi: AUCTION_PRICE_MARKET_ABI,
-        functionName: 'getMarket' as const,
-        args: [BigInt(id)] as const,
-      })),
-    });
+    const [auctionResults, auctionRows] = await Promise.all([
+      nounCheckClient.multicall({
+        allowFailure: true,
+        contracts: auctionNounIds.map(id => ({
+          address: AUCTION_PRICE_MARKET_ADDRESS,
+          abi: AUCTION_PRICE_MARKET_ABI,
+          functionName: 'getMarket' as const,
+          args: [BigInt(id)] as const,
+        })),
+      }),
+      db
+        .select()
+        .from(schema.auction)
+        .where(inArray(schema.auction.nounId, auctionNounIds.map(id => BigInt(id)))),
+    ]);
+
+    const auctionByNounId = new Map<number, { endTime: number; settled: boolean }>();
+    for (const row of auctionRows as Array<Record<string, unknown>>) {
+      const rawEnd = row.endTime;
+      const endMs =
+        rawEnd instanceof Date
+          ? (rawEnd.getTime() < 946684800000 ? rawEnd.getTime() * 1000 : rawEnd.getTime())
+          : Number(rawEnd) * (Number(rawEnd) < 1e12 ? 1000 : 1);
+      auctionByNounId.set(Number(row.nounId), {
+        endTime: Math.floor(endMs / 1000),
+        settled: Boolean(row.settled),
+      });
+    }
 
     const auctionEntries: MarketEntry[] = [];
     for (let i = 0; i < auctionNounIds.length; i++) {
@@ -1457,10 +1709,15 @@ app.get('/api/predictions/markets', async c => {
       if (!exists) continue;
       const nounId = auctionNounIds[i]!;
       const settlement = settlementByNounId.get(nounId);
-      const closesAt = settlement?.endTime;
+      const indexed = auctionByNounId.get(nounId);
+      const closesAt = settlement?.endTime ?? indexed?.endTime;
       const isCurrent = nounId === currentNounId;
+      const nowSec = Math.floor(now / 1000);
       const auctionEnded =
-        !isCurrent && (closesAt != null ? closesAt <= Math.floor(now / 1000) : true);
+        !isCurrent &&
+        (settlement != null ||
+          indexed?.settled === true ||
+          (closesAt != null && closesAt <= nowSec));
       const outcomeNum = Number(outcome);
       let status: MarketEntry['status'];
       if (outcomeNum === 1 || outcomeNum === 2 || outcomeNum === 3) {
