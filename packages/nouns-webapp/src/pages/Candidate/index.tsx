@@ -18,6 +18,7 @@ import { CandidateVersionSlider } from '@/components/CandidateVersionSlider';
 import ProposalCandidateContent from '@/components/ProposalContent/ProposalCandidateContent';
 import CandidateHeader from '@/components/ProposalHeader/CandidateHeader';
 import VoteSignals from '@/components/VoteSignals/VoteSignals';
+import { NOUN_WTF_CLIENT_ID } from '@/config';
 import { nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
 import { useAppSelector } from '@/hooks';
 import { useCandidateVersionsFromLogs } from '@/hooks/useCandidatesFromLogs';
@@ -401,7 +402,7 @@ const CandidatePage = () => {
   const handlePromote = useCallback(() => {
     if (!candidate) return;
     const content = candidate.version.content;
-    const description = `# ${content.title}\n${content.description ?? ''}`;
+    const description = content.description ?? '';
     const callerHasEnoughVotes = (userVotes ?? 0) >= proposalThreshold;
 
     if (callerHasEnoughVotes) {
@@ -412,7 +413,7 @@ const CandidatePage = () => {
           content.signatures ?? [],
           (content.calldatas ?? []) as `0x${string}`[],
           description,
-          37,
+          NOUN_WTF_CLIENT_ID,
         ],
       });
     }
@@ -440,7 +441,7 @@ const CandidatePage = () => {
         content.signatures ?? [],
         (content.calldatas ?? []) as `0x${string}`[],
         description,
-        37,
+        NOUN_WTF_CLIENT_ID,
       ],
     });
   }, [candidate, proposeBySigs, propose, userVotes, proposalThreshold]);
@@ -451,7 +452,7 @@ const CandidatePage = () => {
     async (expirationTimestamp: number, reason: string) => {
       if (!candidate || !account) return;
       const content = candidate.version.content;
-      const description = `# ${content.title}\n${content.description ?? ''}`;
+      const description = content.description ?? '';
       const proposer = candidate.proposer as Hex;
       const targets = (content.targets ?? []) as Hex[];
       const values = (content.values ?? []).map(v => BigInt(v));
