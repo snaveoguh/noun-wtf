@@ -16,6 +16,7 @@ import { ImageData, getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ const DreamModal: FC<{
   dream: DreamCard;
   onClose: () => void;
 }> = ({ dream, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

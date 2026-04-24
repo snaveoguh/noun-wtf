@@ -365,6 +365,7 @@ export const auctionQuery = (id: string) => ({
         amount
         settled
         winner
+        burned
         startTime
         endTime
         clientId
@@ -453,6 +454,7 @@ export const latestAuctionsQuery = (first = 1000, _skip = 0) => {
             amount
             settled
             winner
+            burned
             startTime
             endTime
             clientId
@@ -492,6 +494,7 @@ export const singleAuctionQuery = (nounId: string) => ({
           amount
           settled
           winner
+          burned
           startTime
           endTime
           clientId

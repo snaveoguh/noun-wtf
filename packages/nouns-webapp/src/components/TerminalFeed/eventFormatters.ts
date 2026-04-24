@@ -174,8 +174,20 @@ export function formatEventDescription(
       return `New proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
     }
 
-    case 'AUCTION_SETTLED':
-      return `Noun ${data.nounId} won by ${addr(data.winner as string)} for ${ethFromWei(data.amount as string)} ETH`;
+    case 'AUCTION_SETTLED': {
+      // Reserve-not-met settle: winner=0x0 + amount=0 → noun is burned.
+      // Formatting as "won by 0x000..." confuses users and leaks the
+      // internal state of the event. Show the burn outcome instead.
+      const winner = (data.winner as string | undefined) || '';
+      const amountStr = (data.amount as string | undefined) || '0';
+      const isBurned =
+        winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
+        (amountStr === '0' || amountStr === '');
+      if (isBurned) {
+        return `Noun ${data.nounId} burned (reserve not met)`;
+      }
+      return `Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
+    }
 
     case 'NOUN_CREATED':
       return `Noun ${data.nounId} minted to ${addr(data.owner as string)}`;

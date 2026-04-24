@@ -20,13 +20,21 @@ import classes from './Governance.module.css';
 
 const YellowCollectiveProposals = lazy(() => import('./YellowCollectiveProposals'));
 const LilNounsProposals = lazy(() => import('./LilNounsProposals'));
+const NounV2Proposals = lazy(() => import('./NounV2Proposals'));
 
-type DaoTab = 'nouns' | 'yc' | 'lil';
+type DaoTab = 'nouns' | 'yc' | 'lil' | 'nounv2';
 
 const GovernancePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const daoParam = searchParams.get('dao');
-  const daoTab: DaoTab = daoParam === 'yc' ? 'yc' : daoParam === 'lil' ? 'lil' : 'nouns';
+  const daoTab: DaoTab =
+    daoParam === 'yc'
+      ? 'yc'
+      : daoParam === 'lil'
+        ? 'lil'
+        : daoParam === 'nounv2'
+          ? 'nounv2'
+          : 'nouns';
 
   const { data: proposals } = useAllProposals();
   const threshold = useProposalThreshold();
@@ -80,6 +88,7 @@ const GovernancePage = () => {
           gap: 8,
           justifyContent: 'center',
           padding: '16px 16px 0',
+          flexWrap: 'wrap',
         }}
       >
         <button
@@ -98,6 +107,39 @@ const GovernancePage = () => {
           }}
         >
           Nouns DAO
+        </button>
+        <button
+          onClick={() => setDao('nounv2')}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 20,
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            fontFamily: "'PT Root UI', sans-serif",
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            background: daoTab === 'nounv2' ? '#dc2626' : '#f4f4f8',
+            color: daoTab === 'nounv2' ? '#fff' : '#8c8d92',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          Nouns DAO V2
+          <span
+            style={{
+              fontSize: '0.6rem',
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: daoTab === 'nounv2' ? 'rgba(255,255,255,0.25)' : '#dc2626',
+              color: '#fff',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+            }}
+          >
+            NEW
+          </span>
         </button>
         <button
           onClick={() => setDao('yc')}
@@ -191,6 +233,10 @@ const GovernancePage = () => {
       ) : daoTab === 'yc' ? (
         <Suspense fallback={<GenericSkeleton />}>
           <YellowCollectiveProposals />
+        </Suspense>
+      ) : daoTab === 'nounv2' ? (
+        <Suspense fallback={<GenericSkeleton />}>
+          <NounV2Proposals />
         </Suspense>
       ) : (
         <Suspense fallback={<GenericSkeleton />}>

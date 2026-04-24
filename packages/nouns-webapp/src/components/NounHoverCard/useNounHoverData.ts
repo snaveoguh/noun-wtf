@@ -22,6 +22,8 @@ interface AuctionData {
   winner: string | null;
   bidCount: number;
   settled: boolean;
+  /** Reserve-not-met: noun burned by the auction house contract. */
+  burned: boolean;
 }
 
 interface ColorInfo {
@@ -45,6 +47,7 @@ interface AuctionQueryResult {
     amount: string | null;
     settled: boolean;
     winner: string | null;
+    burned?: boolean;
     noun: { owner: string };
     bids: { items: Array<{ value: string; bidder: string }> };
   } | null;
@@ -103,11 +106,18 @@ export function useNounHoverData(
   const auction = useMemo<AuctionData | null>(() => {
     if (!auctionData?.auction) return null;
     const a = auctionData.auction;
+    // Fall back on shape detection for auctions indexed before the burned
+    // column was added (winner=null + amount=0 on a settled auction).
+    const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
+    const amountIsZero = !a.amount || a.amount === '0';
+    const noWinner = !a.winner || a.winner.toLowerCase() === ZERO_ADDR;
+    const burnedFallback = !!a.settled && noWinner && amountIsZero;
     return {
       amount: a.amount ? BigInt(a.amount) : null,
       winner: a.winner,
       bidCount: a.bids?.items?.length ?? 0,
       settled: a.settled,
+      burned: a.burned ?? burnedFallback,
     };
   }, [auctionData]);
 

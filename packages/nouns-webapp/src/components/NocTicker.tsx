@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 // ─── Types (matches Neynar v2 response) ─────────────────────────────────────
 
@@ -233,6 +234,7 @@ const CastModal: FC<{
   cast: FarcasterCast;
   onClose: () => void;
 }> = ({ cast, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showReply, setShowReply] = useState(false);
@@ -257,19 +259,7 @@ const CastModal: FC<{
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  // Lock scroll + hide navbar
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const navbar = document.querySelector<HTMLElement>('nav.navbar');
-    if (navbar !== null) navbar.style.display = 'none';
-
-    return () => {
-      document.body.style.overflow = prev;
-      if (navbar !== null) navbar.style.display = '';
-    };
-  }, []);
+  // Body scroll lock + header hide are handled by useModalBodyLock above.
 
   const date = new Date(cast.timestamp);
   const dateStr = date.toLocaleDateString('en-US', {
@@ -761,6 +751,7 @@ const NocTicker: FC = () => {
   return (
     <>
       <div
+        data-site-ticker="true"
         style={{
           width: '100%',
           overflow: 'hidden',

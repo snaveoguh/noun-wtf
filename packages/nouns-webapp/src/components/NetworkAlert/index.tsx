@@ -1,6 +1,7 @@
 import { Modal } from 'react-bootstrap';
 
 import { CHAIN_ID } from '@/config';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 const networkName = () => {
   switch (Number(CHAIN_ID)) {
@@ -25,6 +26,7 @@ const metamaskNetworkName = () => {
 };
 
 const NetworkAlert = () => {
+  useModalBodyLock(true);
   return (
     <>
       <Modal show={true} backdrop="static" keyboard={false}>

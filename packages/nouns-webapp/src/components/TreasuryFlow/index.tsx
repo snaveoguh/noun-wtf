@@ -15,6 +15,8 @@ import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { ChevronDown, Lock, Pause, Play, Search, Unlock, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
+import useModalBodyLock from '@/hooks/useModalBodyLock';
+
 import TreasuryScene from './Scene';
 
 const SUBGRAPH_URL =
@@ -179,6 +181,7 @@ function useTreasuryFlows() {
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
 const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   // Slide-in animation
@@ -201,7 +204,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 10,
+        position: 'fixed', inset: 0, zIndex: 1040,
         background: 'rgba(0,0,0,0.5)',
         backdropFilter: 'blur(8px)',
         opacity: visible ? 1 : 0,
@@ -217,7 +220,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
       style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: Math.min(420, window.innerWidth * 0.9),
-        zIndex: 100,
+        zIndex: 1050,
         background: '#0f0f1a',
         boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
         transform: visible ? 'translateX(0)' : 'translateX(100%)',

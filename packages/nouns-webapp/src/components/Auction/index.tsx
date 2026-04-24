@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router';
 import AuctionActivity from '@/components/AuctionActivity';
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
 import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
+import BurnedNounContent from '@/components/BurnedNounContent';
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
@@ -34,8 +35,10 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
+import { useReadNounsAuctionHouseReservePrice } from '@/contracts';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
+import { isBurnedAuction } from '@/utils/burnedAuction';
 import { nounPath } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
 import { isNounderNoun } from '@/utils/nounderNoun';
@@ -255,6 +258,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const currentNounSeed = useAppSelector((state: RootState) => state.application.currentNounSeed);
 
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
+
+  // Pull the NounsAuctionHouse reservePrice. Post the recent governance prop
+  // this is 2.8 ETH on mainnet — we surface it as context on the bid UI and
+  // on burned-auction placeholder rows ("X ETH reserve · 0 qualifying bids").
+  // The hook runs against the active chain; returns undefined while loading.
+  const { data: reservePriceWei } = useReadNounsAuctionHouseReservePrice();
+  const isBurned = isBurnedAuction(currentAuction);
+
   const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
   const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
@@ -264,6 +275,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>('art');
+
+  // Single-trait override: when set, the 2D editor starts with only this one
+  // trait populated (a blank canvas around it). Cleared on exit.
+  // NOTE: dispatched from NoundryBanner's "Open in Editor" button.
+  const [singleTraitFilter, setSingleTraitFilter] = useState<{
+    layer: 'body' | 'accessory' | 'head' | 'glasses';
+    index: number;
+  } | null>(null);
 
   // Listen for "Make Art" from navbar hamburger menu
   useEffect(() => {
@@ -333,14 +352,52 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [linkSubmitting, setLinkSubmitting] = useState(false);
 
   const isEditing = editMode !== null;
+
+  // When `singleTraitFilter` is set, the editor works against a synthetic seed
+  // that picks up the selected trait's index. Unspecified layers fall back to
+  // `currentNounSeed` (or 0) — they're hidden via `editorLayerVisibility`, so
+  // the chosen values don't affect what's shown or editable.
+  const editorSeed: INounSeed | null = useMemo(() => {
+    if (!singleTraitFilter) return currentNounSeed ?? null;
+    const base: INounSeed = currentNounSeed ?? {
+      background: 0,
+      body: 0,
+      accessory: 0,
+      head: 0,
+      glasses: 0,
+    };
+    return { ...base, [singleTraitFilter.layer]: singleTraitFilter.index };
+  }, [currentNounSeed, singleTraitFilter]);
+
+  // Visibility for the 2D editor's pixel base — when filtering to a single
+  // trait, hide the other three layers so the canvas starts blank around it.
+  const editorLayerVisibility = useMemo(() => {
+    if (!singleTraitFilter) return DEFAULT_VISIBILITY;
+    return {
+      body: singleTraitFilter.layer === 'body',
+      accessory: singleTraitFilter.layer === 'accessory',
+      head: singleTraitFilter.layer === 'head',
+      glasses: singleTraitFilter.layer === 'glasses',
+    };
+  }, [singleTraitFilter]);
+
+  // `nounLayers` stays in sync with the real current noun — used by 3D rendering
+  // and anywhere the true noun data is needed.
   const nounLayers = useMemo(
     () => (currentNounSeed ? seedToPixelLayers(currentNounSeed) : null),
     [currentNounSeed],
   );
+  // Layers the 2D editor starts from — diverges from `nounLayers` only while a
+  // single-trait filter is active (the filter swaps in the clicked trait's
+  // index so merging produces a canvas with just that trait).
+  const editorLayers = useMemo(
+    () => (editorSeed ? seedToPixelLayers(editorSeed) : null),
+    [editorSeed],
+  );
   const baseGrid = useMemo(() => {
-    if (!nounLayers) return createEmptyGrid();
-    return mergeLayersToGrid(nounLayers, DEFAULT_VISIBILITY);
-  }, [nounLayers]);
+    if (!editorLayers) return createEmptyGrid();
+    return mergeLayersToGrid(editorLayers, editorLayerVisibility);
+  }, [editorLayers, editorLayerVisibility]);
 
   const activeDerivative = viewMode.startsWith('deriv-')
     ? derivatives.find(derivative => `deriv-${derivative.id}` === viewMode)
@@ -443,6 +500,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setLinkNameDraft('');
     setLinkUrlDraft('');
     setPlayIntroSpin(true);
+    setSingleTraitFilter(null);
   }, []);
 
   useEffect(() => {
@@ -479,7 +537,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const startEditing = useCallback(
     async (mode: Exclude<EditMode, null>) => {
       if (mode === '2d') {
-        const pixels = liveDrafts?.pixel?.pixels ?? baseGrid;
+        // When filtering to a single trait we ignore the community live draft so
+        // the user gets a clean canvas with just their chosen trait. `baseGrid`
+        // already reflects the filter via `editorLayerVisibility`.
+        const pixels = singleTraitFilter ? baseGrid : (liveDrafts?.pixel?.pixels ?? baseGrid);
         resetLive2dSignature(pixels);
         setViewMode('edit-2d');
       } else {
@@ -541,6 +602,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       currentNounSeed,
       resetLive2dSignature,
       resetLive3dSignature,
+      singleTraitFilter,
     ],
   );
 
@@ -569,16 +631,44 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     };
   }, [loadCuratedHeadIntoEditor]);
 
-  // Listen for Noundry trait clicks — open 2D editor
+  // Listen for Noundry trait clicks — open 2D editor with only the clicked
+  // trait populated, so the user can build a fresh noun around it.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { category: string; index: number } | undefined;
       if (!detail) return;
-      startEditing('2d');
+      const layer = detail.category;
+      if (layer !== 'body' && layer !== 'accessory' && layer !== 'head' && layer !== 'glasses') {
+        return;
+      }
+      // Hide the three non-selected layers so the editor shows only the picked trait.
+      setEdit2dVisibility({
+        body: layer === 'body',
+        accessory: layer === 'accessory',
+        head: layer === 'head',
+        glasses: layer === 'glasses',
+      });
+      // Setting the filter triggers a re-render; a follow-up effect watches the
+      // filter and invokes startEditing with the freshly derived baseGrid.
+      setSingleTraitFilter({ layer, index: detail.index });
     };
     window.addEventListener('noundry-trait-edit', handler);
     return () => window.removeEventListener('noundry-trait-edit', handler);
-  }, [startEditing]);
+  }, []);
+
+  // After a single-trait filter lands, open the 2D editor with the filtered
+  // baseGrid. Skips if already editing — the filter can only be set when idle.
+  const pendingEnterEditRef = useRef(false);
+  useEffect(() => {
+    if (!singleTraitFilter) {
+      pendingEnterEditRef.current = false;
+      return;
+    }
+    if (editMode !== null) return;
+    if (pendingEnterEditRef.current) return;
+    pendingEnterEditRef.current = true;
+    void startEditing('2d');
+  }, [singleTraitFilter, editMode, startEditing]);
 
   const persistLiveDraft = useCallback(
     async (
@@ -661,6 +751,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     voxelMapRef.current = null;
     edit3dViewStateRef.current = null;
     setInteractionMode('scroll');
+    setSingleTraitFilter(null);
   }, [edit2dHistory.present, edit3dHistory.present, editMode, meshGlbPath, persistLiveDraft]);
 
   useEffect(() => {
@@ -870,6 +961,12 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [dispatch],
   );
 
+  // Note on burned IDs: we intentionally do NOT skip over them here. Instead
+  // the landing page renders BurnedNounContent + a burned-placeholder hero
+  // image so history navigation stays linear. Skipping forward/back would
+  // risk traversing a long run of burns if the reserve stays unmet and
+  // feels disorienting; keeping users on the page with a clear "burned"
+  // state is more honest.
   const prevAuctionHandler = useCallback(() => {
     if (!currentAuction) return;
     navigate(nounPath(Number(currentAuction.nounId) - 1));
@@ -1057,13 +1154,28 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   );
 
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
+  // Nounder-noun detection must take precedence over burned detection because
+  // Nounder nouns share the burned auction shape (amount=0, no bidder) even
+  // though they're minted, not burned.
+  const isNounder = hasAuctionBounds && isNounderNoun(BigInt(currentAuction.nounId));
+  const showBurnedPanel = hasAuctionBounds && !isNounder && isBurned;
   const activityContent = hasAuctionBounds ? (
-    isNounderNoun(BigInt(currentAuction.nounId)) ? (
+    isNounder ? (
       <NounderNounContent
         mintTimestamp={BigInt(currentAuction.startTime)}
         nounId={BigInt(currentAuction.nounId)}
         isFirstAuction={currentAuction.nounId === 0n}
         isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        onPrevAuctionClick={prevAuctionHandler}
+        onNextAuctionClick={nextAuctionHandler}
+      />
+    ) : showBurnedPanel ? (
+      <BurnedNounContent
+        mintTimestamp={BigInt(currentAuction.startTime)}
+        nounId={BigInt(currentAuction.nounId)}
+        isFirstAuction={currentAuction.nounId === 0n}
+        isLastAuction={currentAuction.nounId === BigInt(lastNounId)}
+        reservePriceWei={reservePriceWei !== undefined ? BigInt(reservePriceWei) : undefined}
         onPrevAuctionClick={prevAuctionHandler}
         onNextAuctionClick={nextAuctionHandler}
       />
@@ -1666,10 +1778,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 </div>
               )}
 
-              {editMode === '2d' && currentNounSeed && (
+              {editMode === '2d' && editorSeed && (
                 <Suspense fallback={null}>
                   <InlineEditor
-                    seed={currentNounSeed}
+                    seed={editorSeed}
                     nounSvg={nounSvg}
                     onExit={stopEditing}
                     toolRef={editorToolRef}
