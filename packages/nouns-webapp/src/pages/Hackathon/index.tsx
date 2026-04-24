@@ -9,10 +9,40 @@ const TREASURY_ADDRESS = SMALL_GRANTS_TREASURY_ADDRESS;
 
 const CONTRACTS = [
   {
+    name: 'NounV2Token',
+    address: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
+    chain: 'Ethereum',
+    desc: 'ERC-721 for the NounV2 fork launched 2026-04-24. Starts at #0, no nounder reward, shares the mainnet Nouns art pipeline. seeds(), balanceOf(), getPriorVotes().',
+    caption: 'Build a physical device that mints, bids on, or just tracks NounV2 — the concurrent no-reserve auction alongside mainnet.',
+    tag: 'NOUNV2',
+    tagClass: 'tagTarget',
+    etherscan: 'https://etherscan.io/address/0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
+  },
+  {
+    name: 'NounV2AuctionHouse',
+    address: '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc',
+    chain: 'Ethereum',
+    desc: 'The NounV2 daily auction. 24hr, no reserve (0.001 ETH floor), 2% min bid increment. Proceeds route to NounV2Treasury. auction(), createBid(), settleCurrentAndCreateNewAuction().',
+    caption: 'Build a public bid buzzer that fires when NounV2 goes below mainnet reserve, or a settle bot racing for the perfect seed.',
+    tag: 'NOUNV2',
+    tagClass: 'tagTarget',
+    etherscan: 'https://etherscan.io/address/0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc',
+  },
+  {
+    name: 'NounV2Treasury',
+    address: '0x2cdeb0d251674710840d9fa990d1de138dfe7c00',
+    chain: 'Ethereum',
+    desc: 'Single-contract governor + treasury for NounV2. 1-noun proposal threshold, 12hr vote, 12hr timelock, admin veto. propose(), castVote(), queue(), execute().',
+    caption: 'Small DAO, small hack. Build a single-noun proposal bot or a real-time proposal-outcome display.',
+    tag: 'NOUNV2',
+    tagClass: 'tagTarget',
+    etherscan: 'https://etherscan.io/address/0x2cdeb0d251674710840d9fa990d1de138dfe7c00',
+  },
+  {
     name: 'SmallGrantsTreasury',
     address: '0xBAc9233725440c595b19d975309CC98cb259253a',
     chain: 'Ethereum',
-    desc: 'The target. 12hr vote, 12hr lock, no quorum. 1 Noun vote passes a prop. propose(), castVote(), queue(), execute().',
+    desc: 'The original grants target. 12hr vote, 12hr lock, no quorum. 1 Noun vote passes a prop. propose(), castVote(), queue(), execute().',
     caption: 'Build a physical device that submits proposals or casts votes. A one-button grant machine.',
     tag: 'TARGET',
     tagClass: 'tagTarget',
@@ -75,6 +105,16 @@ const APIS = [
     name: 'GraphQL API (Ponder)',
     url: 'https://spirited-flexibility-production-3c30.up.railway.app/graphql',
     desc: 'Nouns indexer. Auctions, proposals, grants, delegates, transfers. Full GraphQL.',
+  },
+  {
+    name: 'NounV2 Auctions (REST)',
+    url: 'https://spirited-flexibility-production-3c30.up.railway.app/api/nounv2-auctions',
+    desc: 'All NounV2 auctions since launch. Current auction + full bid history. JSON REST.',
+  },
+  {
+    name: 'NounV2 Proposals (REST)',
+    url: 'https://spirited-flexibility-production-3c30.up.railway.app/api/nounv2-proposals',
+    desc: 'NounV2 treasury proposals with vote tallies + execution status. JSON REST.',
   },
   {
     name: 'Governance Feed',
