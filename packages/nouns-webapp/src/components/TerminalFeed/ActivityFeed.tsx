@@ -1,6 +1,7 @@
+import type { ActivityEvent as ActivityEventType } from './useActivityFeed';
+
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import type { ActivityEvent as ActivityEventType } from './useActivityFeed';
 import ActivityEvent from './ActivityEvent';
 import { extractAddresses } from './eventFormatters';
 import { useEnsNames } from './useEnsNames';
@@ -29,6 +30,19 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
   }, [events]);
 
   const ensLookup = useEnsNames(addresses);
+
+  // Build a candidateId → title map from CANDIDATE_CREATED events already in the
+  // feed, so SPONSORED/FEEDBACK rows can show which candidate they reference.
+  const candidateTitleLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const event of events) {
+      if (event.type !== 'CANDIDATE_CREATED') continue;
+      const id = event.data.candidateId as string | undefined;
+      const title = event.data.title as string | undefined;
+      if (id && title && !map.has(id)) map.set(id, title);
+    }
+    return (candidateId: string): string | null => map.get(candidateId) ?? null;
+  }, [events]);
 
   // Infinite scroll via IntersectionObserver
   const handleIntersect = useCallback(
@@ -66,9 +80,7 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
       className="terminal-scrollbar"
     >
       {error && (
-        <div style={{ color: '#ef4444', padding: '16px 0', fontSize: '13px' }}>
-          {error}
-        </div>
+        <div style={{ color: '#ef4444', padding: '16px 0', fontSize: '13px' }}>{error}</div>
       )}
 
       {events.length === 0 && !loading && !error && (
@@ -82,6 +94,7 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
           key={`${event.type}-${event.blockNumber}-${i}`}
           event={event}
           ensLookup={ensLookup}
+          candidateTitleLookup={candidateTitleLookup}
         />
       ))}
 
