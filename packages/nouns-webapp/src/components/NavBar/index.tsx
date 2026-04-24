@@ -14,6 +14,7 @@ import { formatEther } from 'viem';
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
 import testnetNoun from '@/assets/testnet-noun.png';
 import LolLogo from '@/components/LolLogo';
+import HeaderDaoToggle from '@/components/HeaderDaoToggle';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import NavBarTreasury from '@/components/NavBarTreasury';
 import NavDropdown from '@/components/NavDropdown';
@@ -142,6 +143,12 @@ const NavBar = () => {
                   />
                 </Nav.Link>
               ) : null}
+            </Nav.Item>
+            <Nav.Item
+              className="d-flex"
+              style={{ alignItems: 'center', marginLeft: '8px' }}
+            >
+              <HeaderDaoToggle />
             </Nav.Item>
             {currentNounSeed && (
               <Nav.Item

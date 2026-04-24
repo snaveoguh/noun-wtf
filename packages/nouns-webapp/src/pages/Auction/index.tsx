@@ -5,7 +5,6 @@ import { isNumber } from 'remeda';
 
 import Auction from '@/components/Auction';
 import CurrentPropsBanner from '@/components/CurrentPropsBanner';
-import DaoToggle from '@/components/DaoToggle';
 import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
@@ -83,7 +82,6 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
       }}
     >
-      {isRootAuctionRoute && <DaoToggle />}
       {showNounV2Hero ? (
         <NounV2AuctionHero />
       ) : (
