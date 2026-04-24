@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount } from 'wagmi';
 
 import { normalizeTerminalErrorMessage } from '@/components/TerminalFeed/errorMessages';
+import useActiveDao from '@/hooks/useActiveDao';
 
 const CrystalBall = lazy(() => import('@/components/CrystalBall'));
 
@@ -96,6 +97,7 @@ const speakText = (text: string) => {
 
 const TerminalPage: React.FC = () => {
   const { address } = useAccount();
+  const { activeDao } = useActiveDao();
   const [agentMode, setAgentMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'system', content: TERMINAL_GREETING, timestamp: Date.now() },
@@ -230,6 +232,7 @@ const TerminalPage: React.FC = () => {
             wallet: address ?? null,
             history: messages.filter(m => m.role !== 'system').slice(-10),
             agent_mode: agentMode ? 'nounirl' : undefined,
+            view_context: { dao: activeDao },
           }),
         });
 
@@ -264,7 +267,7 @@ const TerminalPage: React.FC = () => {
         setIsLoading(false);
       }
     },
-    [address, isLoading, messages, agentMode, speakBack],
+    [activeDao, address, isLoading, messages, agentMode, speakBack],
   );
 
   // Colors based on mode
