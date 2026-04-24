@@ -31,11 +31,15 @@ contract DeployNounV2 is Script {
     // Match mainnet Nouns launch, except reservePrice.
 
     uint256 constant TIME_BUFFER = 300;             // 5 min anti-snipe
-    uint256 constant RESERVE_PRICE = 1;             // 1 wei — effectively no reserve
+    uint256 constant RESERVE_PRICE = 0.001 ether;   // ~$3, keeps 2% minBidIncrement meaningful
     uint8 constant MIN_BID_INCREMENT_PCT = 2;       // 2%
     uint256 constant DURATION = 86400;              // 24 hours
 
     function run() external {
+        // Hard chain-id guard. Every address constant above is mainnet-only;
+        // running this script against any other chain would brick the deploy.
+        require(block.chainid == 1, "DeployNounV2: not mainnet");
+
         address deployer = msg.sender;
 
         vm.startBroadcast();
@@ -50,15 +54,13 @@ contract DeployNounV2 is Script {
             IProxyRegistry(OPENSEA_PROXY_REGISTRY)
         );
 
-        // 2. Deploy the auction house implementation. Upgradeable pattern is retained
-        //    but we use it as a non-proxied singleton — initialize() runs once.
-        NounV2AuctionHouse auctionHouse = new NounV2AuctionHouse();
-
-        // 3. Deploy treasury with deployer as admin (can cancel bad proposals).
+        // 2. Deploy treasury first so the auction house can take its address as
+        //    the immutable beneficiary in the constructor (atomic config, no
+        //    front-run window vs a separate initialize()).
         NounV2Treasury treasury = new NounV2Treasury(address(token), deployer);
 
-        // 4. Initialize auction house (paused by initialize) with treasury as beneficiary.
-        auctionHouse.initialize(
+        // 3. Deploy auction house with full config in the constructor. Paused on deploy.
+        NounV2AuctionHouse auctionHouse = new NounV2AuctionHouse(
             INounsToken(address(token)),
             WETH,
             TIME_BUFFER,
@@ -68,10 +70,10 @@ contract DeployNounV2 is Script {
             address(treasury)
         );
 
-        // 5. Hand minter control to the auction house.
+        // 4. Hand minter control to the auction house.
         token.setMinter(address(auctionHouse));
 
-        // 6. Unpause → mints NounV2 #0 and opens the first 24hr auction.
+        // 5. Unpause → mints NounV2 #0 and opens the first 24hr auction.
         auctionHouse.unpause();
 
         vm.stopBroadcast();
@@ -81,6 +83,6 @@ contract DeployNounV2 is Script {
         console.log("AuctionHouse:", address(auctionHouse));
         console.log("Treasury:   ", address(treasury));
         console.log("Deployer:   ", deployer);
-        console.log("First noun: #0 - auction live for 24h, reservePrice = 1 wei");
+        console.log("First noun: #0 - auction live for 24h, reservePrice = 0.001 ether");
     }
 }
