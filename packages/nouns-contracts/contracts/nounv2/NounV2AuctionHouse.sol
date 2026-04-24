@@ -3,21 +3,21 @@
 /// @title NounV2 auction house — fork of NounsAuctionHouse.
 /// @notice Differs from mainnet NounsAuctionHouse in two ways:
 ///         1. Proceeds route to `beneficiary` (set independently of ownership).
-///         2. Intended to run with reservePrice = 1 wei (effectively no reserve).
-/// @dev Based on Zora AuctionHouse via Nounders DAO. Upgradeable pattern retained
-///      so `initialize` is used instead of a constructor.
+///         2. Intended to run with a tiny reservePrice (effectively no reserve).
+/// @dev Non-upgradeable. All configuration is set in the constructor atomically
+///      with deployment, closing the initialize() front-run window.
 
 pragma solidity ^0.8.6;
 
-import { PausableUpgradeable } from '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
-import { ReentrancyGuardUpgradeable } from '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
-import { OwnableUpgradeable } from '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
+import { Pausable } from '@openzeppelin/contracts/security/Pausable.sol';
+import { ReentrancyGuard } from '@openzeppelin/contracts/security/ReentrancyGuard.sol';
+import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
 import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import { INounsAuctionHouse } from '../interfaces/INounsAuctionHouse.sol';
 import { INounsToken } from '../interfaces/INounsToken.sol';
 import { IWETH } from '../interfaces/IWETH.sol';
 
-contract NounV2AuctionHouse is INounsAuctionHouse, PausableUpgradeable, ReentrancyGuardUpgradeable, OwnableUpgradeable {
+contract NounV2AuctionHouse is INounsAuctionHouse, Pausable, ReentrancyGuard, Ownable {
     INounsToken public nouns;
     address public weth;
     uint256 public timeBuffer;
@@ -31,7 +31,7 @@ contract NounV2AuctionHouse is INounsAuctionHouse, PausableUpgradeable, Reentran
 
     event BeneficiaryUpdated(address indexed newBeneficiary);
 
-    function initialize(
+    constructor(
         INounsToken _nouns,
         address _weth,
         uint256 _timeBuffer,
@@ -39,12 +39,9 @@ contract NounV2AuctionHouse is INounsAuctionHouse, PausableUpgradeable, Reentran
         uint8 _minBidIncrementPercentage,
         uint256 _duration,
         address _beneficiary
-    ) external initializer {
-        __Pausable_init();
-        __ReentrancyGuard_init();
-        __Ownable_init();
-
-        _pause();
+    ) {
+        require(_weth != address(0), 'Zero WETH');
+        require(_beneficiary != address(0), 'Zero beneficiary');
 
         nouns = _nouns;
         weth = _weth;
@@ -53,6 +50,8 @@ contract NounV2AuctionHouse is INounsAuctionHouse, PausableUpgradeable, Reentran
         minBidIncrementPercentage = _minBidIncrementPercentage;
         duration = _duration;
         beneficiary = _beneficiary;
+
+        _pause();
     }
 
     function settleCurrentAndCreateNewAuction() external override nonReentrant whenNotPaused {
