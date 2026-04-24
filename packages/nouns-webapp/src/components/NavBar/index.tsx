@@ -10,11 +10,12 @@ import { PencilLine } from 'lucide-react';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
+import { useBalance } from 'wagmi';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
 import testnetNoun from '@/assets/testnet-noun.png';
-import LolLogo from '@/components/LolLogo';
 import HeaderDaoToggle from '@/components/HeaderDaoToggle';
+import LolLogo from '@/components/LolLogo';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
 import NavBarTreasury from '@/components/NavBarTreasury';
 import NavDropdown from '@/components/NavDropdown';
@@ -25,7 +26,9 @@ import SubgraphSettings from '@/components/SubgraphSettings';
 import config, { CHAIN_ID } from '@/config';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { nounsTreasuryAddress } from '@/contracts';
+import { NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 import { useAppDispatch, useAppSelector } from '@/hooks';
+import { useActiveDao } from '@/hooks/useActiveDao';
 import { setTorchMode } from '@/state/slices/application';
 import { usePickByState } from '@/utils/colorResponsiveUIUtils';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
@@ -35,6 +38,8 @@ import { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './NavBar.module.css';
 import navDropdownClasses from './NavBarDropdown.module.css';
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
 const NavBar = () => {
   const chainId = defaultChain.id;
@@ -49,12 +54,21 @@ const NavBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setMode: setSiteMode } = useSiteTheme();
+  const { activeDao } = useActiveDao();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
       select: data => data.total,
     },
   }).data;
-  const daoEtherscanLink = buildEtherscanAddressLink(nounsTreasuryAddress[chainId]);
+  const nounV2TreasuryConfigured = NOUNV2_TREASURY_ADDRESS !== ZERO_ADDRESS;
+  const { data: nounV2TreasuryBalance } = useBalance({
+    address: NOUNV2_TREASURY_ADDRESS,
+    query: { enabled: nounV2TreasuryConfigured },
+  });
+  const isNounV2 = activeDao === 'nounv2';
+  const daoEtherscanLink = buildEtherscanAddressLink(
+    isNounV2 && nounV2TreasuryConfigured ? NOUNV2_TREASURY_ADDRESS : nounsTreasuryAddress[chainId],
+  );
 
   const useStateBg =
     location.pathname === '/' ||
@@ -130,24 +144,44 @@ const NavBar = () => {
               </Nav.Item>
             )}
             <Nav.Item className="d-none d-sm-block">
-              {treasuryBalance !== undefined ? (
-                <Nav.Link
-                  href={daoEtherscanLink}
-                  className={classes.nounsNavLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <NavBarTreasury
-                    treasuryBalance={Number(formatEther(treasuryBalance)).toFixed(0)}
-                    treasuryStyle={nonWalletButtonStyle}
-                  />
-                </Nav.Link>
-              ) : null}
+              {(() => {
+                if (isNounV2) {
+                  // Hide the nav item entirely when the v2 treasury address isn't configured —
+                  // rendering "0 ETH" with a zero-address etherscan link would just look broken.
+                  if (!nounV2TreasuryConfigured || nounV2TreasuryBalance === undefined) return null;
+                  return (
+                    <Nav.Link
+                      href={daoEtherscanLink}
+                      className={classes.nounsNavLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <NavBarTreasury
+                        treasuryBalance={Number(formatEther(nounV2TreasuryBalance.value)).toFixed(
+                          0,
+                        )}
+                        treasuryStyle={nonWalletButtonStyle}
+                      />
+                    </Nav.Link>
+                  );
+                }
+                if (treasuryBalance === undefined) return null;
+                return (
+                  <Nav.Link
+                    href={daoEtherscanLink}
+                    className={classes.nounsNavLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <NavBarTreasury
+                      treasuryBalance={Number(formatEther(treasuryBalance)).toFixed(0)}
+                      treasuryStyle={nonWalletButtonStyle}
+                    />
+                  </Nav.Link>
+                );
+              })()}
             </Nav.Item>
-            <Nav.Item
-              className="d-flex"
-              style={{ alignItems: 'center', marginLeft: '8px' }}
-            >
+            <Nav.Item className="d-flex" style={{ alignItems: 'center', marginLeft: '8px' }}>
               <HeaderDaoToggle />
             </Nav.Item>
             {currentNounSeed && (
