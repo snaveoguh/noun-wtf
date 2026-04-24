@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 type ComputedStatus = 'Upcoming' | 'Active' | 'Passed' | 'Failed' | 'Cancelled';
 
@@ -146,6 +147,7 @@ const PropModal: FC<{
   prop: CurrentProp;
   onClose: () => void;
 }> = ({ prop, onClose }) => {
+  useModalBodyLock(true);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

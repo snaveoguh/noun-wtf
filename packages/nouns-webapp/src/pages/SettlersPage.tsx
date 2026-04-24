@@ -14,6 +14,8 @@ interface AuctionData {
   amount: string | null;
   winner: string | null;
   settled: boolean;
+  /** Reserve-not-met settlement → noun was burned. Exclude from leaderboards. */
+  burned?: boolean;
   clientId: number | null;
   startTime: string;
   endTime: string;
@@ -72,6 +74,7 @@ const SettlersPage: FC = () => {
                 amount
                 winner
                 settled
+                burned
                 clientId
                 startTime
                 endTime
@@ -97,7 +100,9 @@ const SettlersPage: FC = () => {
   const leaderboard = useMemo(() => {
     const map = new Map<string, WinnerStats>();
     for (const a of auctions) {
-      if (!a.winner || !a.settled) continue;
+      // Skip burned auctions even if a stale row still has a 0x0 winner set —
+      // they didn't produce a real settler and shouldn't appear on any board.
+      if (a.burned || !a.winner || !a.settled) continue;
       const addr = a.winner.toLowerCase();
       const existing = map.get(addr) || { address: a.winner, nouns: [], totalEth: 0n, count: 0 };
       existing.nouns.push(a.nounId);
@@ -108,8 +113,12 @@ const SettlersPage: FC = () => {
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [auctions]);
 
-  const totalSettled = auctions.filter(a => a.settled).length;
-  const totalEth = auctions.reduce((sum, a) => sum + BigInt(a.amount ?? '0'), 0n);
+  // Count only successfully-settled (non-burned) auctions for headline stats.
+  const totalSettled = auctions.filter(a => a.settled && !a.burned).length;
+  const totalEth = auctions.reduce(
+    (sum, a) => (a.burned ? sum : sum + BigInt(a.amount ?? '0')),
+    0n,
+  );
   const uniqueWinners = leaderboard.length;
 
   const clientBreakdown = useMemo(() => {

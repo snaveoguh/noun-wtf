@@ -7,6 +7,8 @@ import { nounsDataAbi } from '@nouns/sdk/data';
 import { nounsStreamFactoryAbi } from '@nouns/sdk/stream-factory';
 import { nounsStreamAbi } from '@nouns/sdk/stream';
 import { smallGrantsTreasuryAbi } from './src/abi/SmallGrantsTreasury';
+import { nounV2AuctionHouseAbi } from './src/abi/NounV2AuctionHouse';
+import { nounV2TreasuryAbi } from './src/abi/NounV2Treasury';
 import { createConfig, factory } from 'ponder';
 import { getAbiItem } from 'viem';
 import dotenv from 'dotenv';
@@ -17,6 +19,22 @@ dotenv.config();
 // NOTE: Do NOT add free public RPCs — they reject multi-address eth_getLogs
 // (Stream factory creates 38+ addresses which publicnode/llamarpc can't handle)
 const rpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+
+// ── NounV2 addresses / startBlock ──────────────────────────────────────────
+// Placeholder zero addresses are a no-op until deploy; then flip the env vars.
+// startBlock default "latest" tells Ponder to index only future blocks.
+const NOUNV2_AUCTION_HOUSE_ADDRESS =
+  (process.env.NOUNV2_AUCTION_HOUSE_ADDRESS as `0x${string}` | undefined) ??
+  '0x0000000000000000000000000000000000000000';
+const NOUNV2_TREASURY_ADDRESS =
+  (process.env.NOUNV2_TREASURY_ADDRESS as `0x${string}` | undefined) ??
+  '0x0000000000000000000000000000000000000000';
+
+// Ponder accepts a block number or the literal "latest". Coerce numeric strings
+// to number; leave "latest" as-is.
+const nounV2StartBlockRaw = process.env.NOUNV2_START_BLOCK ?? 'latest';
+const nounV2StartBlock: number | 'latest' =
+  nounV2StartBlockRaw === 'latest' ? 'latest' : Number(nounV2StartBlockRaw);
 
 const mainnetConfig = createConfig({
   chains: {
@@ -77,6 +95,20 @@ const mainnetConfig = createConfig({
       address: '0xBAc9233725440c595b19d975309CC98cb259253a',
       abi: smallGrantsTreasuryAbi,
       startBlock: 24650190,
+    },
+
+    // NounV2 fork — addresses come from env vars (placeholders until mainnet deploy)
+    NounV2AuctionHouse: {
+      chain: 'mainnet',
+      address: NOUNV2_AUCTION_HOUSE_ADDRESS,
+      abi: nounV2AuctionHouseAbi,
+      startBlock: nounV2StartBlock,
+    },
+    NounV2Treasury: {
+      chain: 'mainnet',
+      address: NOUNV2_TREASURY_ADDRESS,
+      abi: nounV2TreasuryAbi,
+      startBlock: nounV2StartBlock,
     },
   },
 });

@@ -4,6 +4,7 @@ import { XIcon } from '@heroicons/react/solid';
 import ReactDOM from 'react-dom';
 
 import NounsTransition from '@/components/NounsTransition';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import {
   basicFadeInOut,
   desktopModalSlideInFromTopAndGrow,
@@ -87,6 +88,7 @@ const SolidColorBackgroundModal: React.FC<{
   show: boolean;
 }> = props => {
   const { onDismiss, content, show } = props;
+  useModalBodyLock(show);
 
   return (
     <>

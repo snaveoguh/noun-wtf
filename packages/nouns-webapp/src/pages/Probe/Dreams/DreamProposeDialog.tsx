@@ -7,6 +7,7 @@ import { type Address } from 'viem';
 import { useAccount } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { buildDreamSlug, embedArtworkInDescription } from '@/lib/dreamConstants';
 import { type SavedDream, updateDream } from '@/lib/dreamStorage';
 import { useCreateProposalCandidate, useGetCreateCandidateCost } from '@/wrappers/nounsData';
@@ -15,6 +16,7 @@ import { useUserVotes } from '@/wrappers/nounToken';
 interface Props { dream: SavedDream; onClose: () => void; onProposed: () => void; }
 
 const DreamProposeDialog: FC<Props> = ({ dream, onClose, onProposed }) => {
+  useModalBodyLock(true);
   const { address } = useAccount();
   const availableVotes = useUserVotes();
   const hasVotes = availableVotes && availableVotes > 0;
@@ -51,7 +53,7 @@ const DreamProposeDialog: FC<Props> = ({ dream, onClose, onProposed }) => {
   }, [address, title, description, svgDataUri, slug, dream.id, createProposalCandidate, createCandidateCost, hasVotes, onClose, onProposed]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[1040] flex items-center justify-center bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="mx-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-xl font-bold">Propose Dream On-Chain</h2>

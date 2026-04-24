@@ -68,26 +68,41 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
       {/* ── Auction Result ── */}
       {auction && auction.settled && (
         <div className="border-b border-gray-200 px-3 py-2">
-          <div className="flex items-center justify-between text-xs">
-            <div>
-              <span className="font-mono text-[8px] uppercase text-gray-400">
-                Winning Bid
+          {/* Burned = reserve-not-met settlement. Show BURNED banner instead
+               of "Winning Bid: 0.00 ETH / Bids: 0" which would be technically
+               correct but misleading — the noun no longer exists. */}
+          {auction.burned ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-600">
+                Burned
               </span>
-              <br />
-              <span className="font-bold">
-                {auction.amount
-                  ? `${parseFloat(formatEther(auction.amount)).toFixed(2)} ETH`
-                  : '--'}
+              <span className="text-xs font-semibold text-gray-700">Reserve not met</span>
+              <span className="text-[10px] text-gray-500">
+                No bid reached the minimum reserve price.
               </span>
             </div>
-            <div className="text-right">
-              <span className="font-mono text-[8px] uppercase text-gray-400">
-                Bids
-              </span>
-              <br />
-              <span className="font-semibold">{auction.bidCount}</span>
+          ) : (
+            <div className="flex items-center justify-between text-xs">
+              <div>
+                <span className="font-mono text-[8px] uppercase text-gray-400">
+                  Winning Bid
+                </span>
+                <br />
+                <span className="font-bold">
+                  {auction.amount
+                    ? `${parseFloat(formatEther(auction.amount)).toFixed(2)} ETH`
+                    : '--'}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-[8px] uppercase text-gray-400">
+                  Bids
+                </span>
+                <br />
+                <span className="font-semibold">{auction.bidCount}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

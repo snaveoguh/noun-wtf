@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAccount, useSignTypedData } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
+import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { buildSponsorTypedData } from '@/lib/dreamCandidate';
 import { useAddSignature } from '@/wrappers/nounsData';
 import { useUserVotes } from '@/wrappers/nounToken';
@@ -13,6 +14,7 @@ import { type ProposalCandidate } from '@/wrappers/nounsData';
 interface Props { candidate: ProposalCandidate; onClose: () => void; onSigned: () => void; }
 
 const DreamSignDialog: FC<Props> = ({ candidate, onClose, onSigned }) => {
+  useModalBodyLock(true);
   const { address } = useAccount();
   const availableVotes = useUserVotes();
   const hasVotes = availableVotes && availableVotes > 0;
@@ -38,7 +40,7 @@ const DreamSignDialog: FC<Props> = ({ candidate, onClose, onSigned }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[1040] flex items-center justify-center bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="mx-4 w-full max-w-md rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-xl font-bold">Sponsor Dream</h2>

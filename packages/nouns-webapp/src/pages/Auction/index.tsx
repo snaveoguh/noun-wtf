@@ -9,6 +9,7 @@ import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
 import NocTicker from '@/components/NocTicker';
+import NounV2AuctionHero from '@/components/NounV2AuctionHero';
 import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
 import NounsWorldBanner from '@/components/NounsWorldBanner';
@@ -17,6 +18,7 @@ import { Bone } from '@/components/Skeleton';
 
 const LilNounsGrid = React.lazy(() => import('@/components/LilNounsGrid'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
+import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 import { nounPath } from '@/utils/history';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
@@ -29,6 +31,12 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   const onDisplayAuction = useOnDisplayAuction();
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
   const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
+  const { activeDao } = useActiveDao();
+
+  // Only show the DAO toggle on the root route — historical /noun/:id routes
+  // are always mainnet Nouns so the switcher would be misleading there.
+  const isRootAuctionRoute = auctionId === undefined;
+  const showNounV2Hero = isRootAuctionRoute && activeDao === 'nounv2';
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -59,7 +67,12 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   useEffect(() => {
     if (searchParams.get('makeArt')) {
       window.dispatchEvent(new CustomEvent('noun-make-art'));
-      setSearchParams({}, { replace: true });
+      // Clear `makeArt` but preserve other params (e.g. `dao=nounv2` from the
+      // DAO toggle — wiping all params here used to blow the toggle back to
+      // the default Nouns view on any makeArt navigation).
+      const next = new URLSearchParams(searchParams);
+      next.delete('makeArt');
+      setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
@@ -69,7 +82,11 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
       }}
     >
-      <Auction auction={onDisplayAuction} />
+      {showNounV2Hero ? (
+        <NounV2AuctionHero />
+      ) : (
+        <Auction auction={onDisplayAuction} />
+      )}
       <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
         <LilNounsGrid />
       </Suspense>

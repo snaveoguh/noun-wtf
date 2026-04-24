@@ -18,6 +18,8 @@ interface PonderAuction {
   amount: string;
   settled: boolean;
   winner: string | null;
+  /** Reserve-not-met settlement — emitted with winner=0x0, amount=0. */
+  burned?: boolean;
   startTime: string;
   endTime: string;
   clientId?: number | null;
@@ -34,17 +36,32 @@ interface PonderAuction {
   };
 }
 
+const ZERO_ADDRESS_LC = '0x0000000000000000000000000000000000000000';
+
+/**
+ * Treat the zero-address winner as "no bidder" (reserve-not-met burns).
+ * Prior to the mainnet reservePrice raise this couldn't happen — now it can,
+ * and the indexer may emit winner='0x000...' for historical rows before we
+ * started writing null explicitly.
+ */
+const normalizeWinner = (winner: string | null): Address | undefined => {
+  if (!winner) return undefined;
+  if (winner.toLowerCase() === ZERO_ADDRESS_LC) return undefined;
+  return winner as Address;
+};
+
 const reduxSafePastAuctions = (auctions: PonderAuction[]): AuctionState[] => {
   if (!auctions) return [];
   return auctions.map(auction => {
     return {
       activeAuction: {
         amount: auction.amount ? BigInt(auction.amount).toString() : undefined,
-        bidder: auction.winner ? (auction.winner as Address) : undefined,
+        bidder: normalizeWinner(auction.winner),
         startTime: BigInt(auction.startTime).toString(),
         endTime: BigInt(auction.endTime).toString(),
         nounId: BigInt(auction.nounId).toString(),
         settled: auction.settled ?? false,
+        burned: auction.burned ?? false,
         clientId: auction.clientId ?? null,
       },
       bids: (auction.bids?.items ?? []).map(bid => {
