@@ -7,7 +7,9 @@
  * Two user-controlled toggles at the top:
  *   • View mode — 2D / 3D / ASCII (swap the primary renderer for the current
  *     seed). ASCII keeps the original orb; 2D renders the SVG noun; 3D drops
- *     in the full NounParallax voxel scene.
+ *     in MorphingNounVoxels — a Tetris-style voxel-reshuffle scene that
+ *     keeps the canvas mounted between seed changes and animates per-voxel
+ *     transitions instead of cross-fading the wrapper.
  *   • DAO — v1 Nouns / v2 Nouns (persisted via useActiveDao). For v1 we keep
  *     the existing /api/agent/predict polling. For v2 we read the live v2
  *     auction's `nounId` from the NounV2 auction house, then predict the
@@ -39,7 +41,7 @@ import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
 
 const CrystalBall = lazy(() => import('@/components/CrystalBall'));
-const NounParallax = lazy(() => import('@/components/NounParallax'));
+const MorphingNounVoxels = lazy(() => import('@/components/MorphingNounVoxels'));
 
 const TRAIT_KEYS = ['head', 'glasses', 'body', 'accessory', 'background'] as const;
 
@@ -333,15 +335,11 @@ function seedKey(seed: NounSeed): string {
 
 // ─── Primary visualisation for 2D / 3D modes ───────────────────────────
 //
-// When the seed changes (e.g. flipping between the predicted seed and its
-// nearest twin in the carousel), we fade the previous render out and the new
-// one in across ~800ms, plus a small rotation wobble + colour-tinted halo
-// pulse so the swap feels like a morph instead of a jarring cut.
-//
-// Note: this is the "minimum" form of the morph — voxel-position interpolation
-// would require restructuring NounParallax internals, which is more invasive
-// than this work warrants. The lerp here is on the wrapper, not the voxels,
-// but at the size the orb renders at it reads convincingly.
+// 2D mode keeps the cross-fade morph (rotate + opacity wobble between two
+// stacked SVG layers). 3D mode delegates to MorphingNounVoxels which keeps
+// a single Canvas mounted across seed changes and reshuffles voxels in-place
+// — voxels shared between seeds stay put, voxels only in the old seed fall
+// out, voxels only in the new seed drop in (Tetris-style cascade).
 function SeedVisual({
   seed,
   mode,
@@ -496,20 +494,16 @@ function SeedVisual({
     );
   }
 
-  // 3D voxel mode — wrap NounParallax in the same fade frame. We use `key` on
-  // the outer wrapper so React mounts a fresh canvas per seed change; the
-  // outgoing canvas is rendered at decreasing opacity until the morph completes.
+  // 3D voxel mode — instead of cross-fading the wrapper, we hand the seed to
+  // MorphingNounVoxels which keeps the same Canvas instance across seed
+  // changes and reshuffles voxels in-place (Tetris-style cascade). The outer
+  // halo + ring still react to the variant (predicted vs. match) but the
+  // voxels themselves do all the morphing work.
   return (
     <div style={frameStyle}>
-      <div
-        style={{
-          ...layerStyle(t, wobble, 1 - (1 - t) * 0.03),
-          pointerEvents: 'auto',
-        }}
-        key={`current-${currentKey}`}
-      >
+      <div style={layerStyle(1, 0, 1)}>
         <Suspense fallback={null}>
-          <NounParallax seed={seed} autoRotate interactive lightingPreset="storefront" />
+          <MorphingNounVoxels seed={seed} autoRotate />
         </Suspense>
       </div>
     </div>
