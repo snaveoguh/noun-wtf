@@ -108,30 +108,29 @@ export default function TerminalFeedShell() {
             )}
           </ConnectKitButton.Custom>
 
-          {/* Theme toggle — exits terminal/classic and lands on the graphical site */}
+          {/* Theme toggle — exits terminal/classic and lands on the graphical site.
+              Symmetric to the NavBar's >_ button: same two ASCII chars in green. */}
           {!isEmbedded && (
             <button
               onClick={() => {
                 setMode('new');
                 window.location.replace('/');
               }}
+              title="Exit terminal"
+              aria-label="Exit terminal"
               style={{
                 background: 'transparent',
-                border: '1px solid #222',
-                color: '#444',
+                border: 'none',
+                color: '#00ff41',
                 cursor: 'pointer',
-                fontSize: '11px',
-                padding: '4px 8px',
-                borderRadius: '2px',
-              }}
-              onMouseEnter={e => {
-                (e.target as HTMLElement).style.color = '#666';
-              }}
-              onMouseLeave={e => {
-                (e.target as HTMLElement).style.color = '#444';
+                fontSize: '14px',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontWeight: 700,
+                padding: '2px 4px',
+                lineHeight: 1,
               }}
             >
-              new
+              &gt;_
             </button>
           )}
         </div>
