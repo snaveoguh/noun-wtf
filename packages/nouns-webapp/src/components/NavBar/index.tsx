@@ -137,9 +137,9 @@ const NavBar = () => {
             <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
               <LolLogo className={classes.navBarLogo} />
             </Navbar.Brand>
-            {/* Tiny terminal-feed entry point — squashed next to the fries logo
-                so it's always reachable from mobile where the secondary nav
-                icons get truncated. Green pill, matches the terminal palette. */}
+            {/* Terminal-feed entry point — squashed next to the fries logo
+                so it's always reachable from mobile. Just two green ASCII
+                characters, no border, slightly larger so it's tappable. */}
             <button
               type="button"
               onClick={() => {
@@ -150,16 +150,15 @@ const NavBar = () => {
               aria-label="Switch to Terminal Feed"
               style={{
                 background: 'transparent',
-                border: '1px solid rgba(0,255,65,0.5)',
+                border: 'none',
                 color: '#00ff41',
                 cursor: 'pointer',
-                padding: '2px 5px',
+                padding: '2px 4px',
                 marginLeft: '4px',
                 lineHeight: 1,
-                fontSize: '0.65rem',
+                fontSize: '1rem',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 fontWeight: 700,
-                borderRadius: '3px',
                 flexShrink: 0,
               }}
             >
