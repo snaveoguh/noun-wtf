@@ -5,8 +5,10 @@ import { Trans } from '@lingui/react/macro';
 import ReactDOM from 'react-dom';
 
 import BidHistoryModalRow from '@/components/BidHistoryModalRow';
+import useActiveDao from '@/hooks/useActiveDao';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
 import { Bid } from '@/utils/types';
+import { useV2AuctionBids } from '@/wrappers/nounV2Bids';
 import { Auction } from '@/wrappers/nounsAuction';
 import { useAuctionBids } from '@/wrappers/onDisplayAuction';
 
@@ -26,7 +28,13 @@ interface BidHistoryModalOverlayProps {
 }
 
 const BidHistoryModalOverlay: React.FC<BidHistoryModalOverlayProps> = ({ auction, onDismiss }) => {
-  const bids = useAuctionBids(BigInt(auction.nounId));
+  const { activeDao } = useActiveDao();
+  // Both hooks always run (React hook rules). The DAO toggle picks which
+  // one's result drives the list. v2 reads AuctionBid logs directly from
+  // the v2 contract since no Ponder index is wired for v2 yet.
+  const v1Bids = useAuctionBids(BigInt(auction.nounId));
+  const v2Bids = useV2AuctionBids(BigInt(auction.nounId));
+  const bids = activeDao === 'nounv2' ? v2Bids : v1Bids;
 
   return (
     <>
