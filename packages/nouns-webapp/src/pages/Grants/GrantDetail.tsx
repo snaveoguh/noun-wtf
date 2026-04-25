@@ -130,15 +130,18 @@ export default function GrantDetailPage() {
 
   // Fetch grant data from REST endpoint (bypasses GraphQL truncation, status pre-computed)
   // Falls back to reading SmallGrantsTreasury directly via wagmi/viem when
-  // the REST endpoint is 502'ing (Railway flap post-NounV2 launch). The
-  // fallback can't resolve `votes` or `statusChanges` (those need the
-  // indexer), but the page still shows the proposal + lets you vote.
+  // the REST endpoint is 502'ing (Railway flap post-NounV2 launch). 6s
+  // timeout so a hanging Railway doesn't leave the user staring at a
+  // spinner before the chain fallback kicks in. Votes/statusChanges
+  // require the indexer, so those arrays stay empty in the chain path.
   useEffect(() => {
     if (!grantId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/grants/${grantId}`);
+        const ac = new AbortController();
+        setTimeout(() => ac.abort(), 6_000);
+        const res = await fetch(`${API_BASE}/api/grants/${grantId}`, { signal: ac.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const d = await res.json();
         if (cancelled) return;
@@ -316,9 +319,15 @@ export default function GrantDetailPage() {
       </div>
     );
 
-  const title =
-    (grant.description.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120) || 'Untitled';
-  const body = grant.description.split('\n').slice(1).join('\n').trim();
+  // Strip NounIRL `<!-- SIGNER:0x... -->` hints + leading whitespace so
+  // the first meaningful line is the title and the body doesn't echo
+  // the comment back at the user.
+  const cleanDescription = grant.description
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^[\s\r\n]+/, '');
+  const descLines = cleanDescription.split('\n');
+  const title = (descLines[0] || '').replace(/^#+\s*/, '').slice(0, 120) || 'Untitled';
+  const body = descLines.slice(1).join('\n').trim();
   const totalVotes = grant.forVotes + grant.againstVotes;
   const forPct = totalVotes > 0 ? (grant.forVotes / totalVotes) * 100 : 50;
   // Status is computed server-side (DEFEATED/SUCCEEDED derived from endBlock + vote tallies)
