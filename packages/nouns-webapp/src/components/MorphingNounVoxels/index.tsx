@@ -38,6 +38,8 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { useNounHead3D } from '@/hooks/useNounHead3D';
+import { HEAD_TRANSFORMS } from '@/lib/headAssets';
 import { INounSeed } from '@/wrappers/nounToken';
 
 // ─── Tunables ───────────────────────────────────────────────────────────────
@@ -157,10 +159,7 @@ interface BuildResult {
   totalDurationMs: number;
 }
 
-function buildAnimVoxels(
-  oldVoxels: FlatVoxel[] | null,
-  newVoxels: FlatVoxel[],
-): BuildResult {
+function buildAnimVoxels(oldVoxels: FlatVoxel[] | null, newVoxels: FlatVoxel[]): BuildResult {
   const oldMap = new Map<string, FlatVoxel>();
   if (oldVoxels) for (const v of oldVoxels) oldMap.set(voxelKey(v), v);
 
@@ -517,9 +516,26 @@ interface MorphingSceneProps {
 function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
+  // Curated 3D head GLB — falls through to voxel head when none is mapped
+  // for this trait. We mask out the head + glasses voxel layers when a GLB
+  // is in play so the morph only reshuffles body / bling / glasses voxels
+  // and the GLB head sits on top of them. Mirrors the NounVoxel3D pattern.
+  const { headObject, source: headSource } = useNounHead3D(seed);
+  const hasCuratedHead = headSource !== 'voxel' && headObject != null;
+
+  const effectiveVisibility: LayerVisibility | undefined = useMemo(() => {
+    if (!hasCuratedHead) return layerVisibility;
+    return {
+      body: layerVisibility?.body ?? true,
+      accessory: layerVisibility?.accessory ?? true,
+      head: false,
+      glasses: false,
+    };
+  }, [hasCuratedHead, layerVisibility]);
+
   const currentVoxels = useMemo(
-    () => seedToFlatVoxels(seed, layerVisibility),
-    [seedKey, layerVisibility],
+    () => seedToFlatVoxels(seed, effectiveVisibility),
+    [seedKey, effectiveVisibility],
   );
 
   const prevSeedKeyRef = useRef<string | null>(null);
@@ -546,8 +562,16 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
     prevVoxelsRef.current = currentVoxels;
   }, [seedKey, currentVoxels]);
 
+  const headTransform = hasCuratedHead ? HEAD_TRANSFORMS[headSource] : null;
+  // Render the GLB primitive only when both the loaded object and its
+  // associated transform are available. The strict-boolean rule needs the
+  // explicit null compares so it doesn't flag the THREE.Object3D as
+  // unconditionally-truthy.
+  const showCuratedHead = hasCuratedHead && headObject != null && headTransform != null;
+
   return (
     <>
+      {/* eslint-disable react/no-unknown-property */}
       <ambientLight intensity={2.5} color="#ffffff" />
       <directionalLight position={[0, 5, 15]} intensity={1.0} color="#ffffff" />
 
@@ -562,6 +586,20 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
       ) : (
         <StaticVoxelScene voxels={currentVoxels} autoRotate={autoRotate} />
       )}
+
+      {/* Curated GLB head — sits in front of the voxel body. The morph swap
+          unmounts/remounts the GLB on seed change (rebuilding meshes per
+          voxel for the GLB would explode the scope of this work), so the
+          head visibly snaps while the body voxels Tetris-cascade. */}
+      {showCuratedHead && (
+        <primitive
+          object={headObject}
+          scale={headTransform.scale}
+          position={headTransform.position}
+          rotation={headTransform.rotation}
+        />
+      )}
+      {/* eslint-enable react/no-unknown-property */}
     </>
   );
 }
