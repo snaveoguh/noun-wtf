@@ -108,29 +108,30 @@ export default function TerminalFeedShell() {
             )}
           </ConnectKitButton.Custom>
 
-          {/* Theme toggle — exits terminal/classic and lands on the graphical site.
-              Symmetric to the NavBar's >_ button: same two ASCII chars in green. */}
+          {/* Exit terminal — short text label so it fits on mobile alongside
+              the connect button. 'classic' is the graphical noun.wtf mode in
+              this codebase (App.tsx renders TerminalFeedShell when mode === 'new'). */}
           {!isEmbedded && (
             <button
               onClick={() => {
-                setMode('new');
+                setMode('classic');
                 window.location.replace('/');
               }}
-              title="Exit terminal"
-              aria-label="Exit terminal"
+              title="Exit to classic noun.wtf"
+              aria-label="Exit to classic noun.wtf"
               style={{
                 background: 'transparent',
                 border: 'none',
                 color: '#00ff41',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 fontWeight: 700,
-                padding: '2px 4px',
+                padding: '2px 6px',
                 lineHeight: 1,
               }}
             >
-              &gt;_
+              classic
             </button>
           )}
         </div>
