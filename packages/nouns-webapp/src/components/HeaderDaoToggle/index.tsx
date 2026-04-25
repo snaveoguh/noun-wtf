@@ -33,7 +33,6 @@ export default function HeaderDaoToggle() {
         label="V2"
         active={activeDao === 'nounv2'}
         accent="red"
-        showNewBadge={activeDao !== 'nounv2'}
         onClick={() => onPick('nounv2')}
       />
     </div>
