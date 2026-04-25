@@ -4,9 +4,22 @@ import {
   nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
 } from '@/contracts/nouns-auction-house.gen';
+import {
+  nounsGovernorAbi,
+  nounsGovernorAddress,
+} from '@/contracts/nouns-governor.gen';
 import { config as wagmiConfig, defaultChain } from '@/wagmi';
 
 import type { ActivityEvent } from './useActivityFeed';
+
+/** Pull a clean title from a markdown-ish proposal description (drops
+ *  HTML comments + leading whitespace, then takes the first line). */
+function descriptionToTitle(desc: string | undefined): string {
+  if (!desc) return 'Untitled';
+  const stripped = desc.replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\r\n]+/, '');
+  const first = stripped.split('\n')[0] ?? '';
+  return first.replace(/^#+\s*/, '').slice(0, 120) || 'Untitled';
+}
 
 const MAX_EVENTS = 50;
 // publicnode (the default fallback RPC in src/wagmi.ts) caps eth_getLogs
@@ -58,7 +71,11 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
   // which we don't have here, and every AuctionCreated is paired with an
   // AuctionSettled in the same tx anyway, so SETTLED rows already cover
   // the boundary visually.
-  const [bids, settles] = await Promise.all([
+  // Governor address may be missing on chains we don't have bindings for
+  // (sepolia variants, local hardhat). Skip governor reads in that case.
+  const governorAddress = nounsGovernorAddress[chainId];
+
+  const [bids, settles, votes, props] = await Promise.all([
     client.getContractEvents({
       address,
       abi: nounsAuctionHouseAbi,
@@ -73,6 +90,24 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       fromBlock,
       toBlock: 'latest',
     }),
+    governorAddress != null
+      ? client.getContractEvents({
+          address: governorAddress,
+          abi: nounsGovernorAbi,
+          eventName: 'VoteCast',
+          fromBlock,
+          toBlock: 'latest',
+        })
+      : Promise.resolve([]),
+    governorAddress != null
+      ? client.getContractEvents({
+          address: governorAddress,
+          abi: nounsGovernorAbi,
+          eventName: 'ProposalCreated',
+          fromBlock,
+          toBlock: 'latest',
+        })
+      : Promise.resolve([]),
   ]);
 
   const events: ActivityEvent[] = [];
@@ -103,6 +138,49 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
         nounId: String(args.nounId ?? 0n),
         winner: args.winner ?? '',
         amount: String(args.amount ?? 0n),
+      },
+    });
+  }
+
+  for (const ev of votes) {
+    const args = ev.args as {
+      voter?: string;
+      proposalId?: bigint;
+      support?: number;
+      votes?: bigint;
+      reason?: string;
+    };
+    events.push({
+      type: 'VOTE',
+      blockNumber: Number(ev.blockNumber),
+      timestamp: tsForBlock(ev.blockNumber),
+      txHash: ev.transactionHash ?? '',
+      data: {
+        voter: args.voter ?? '',
+        proposalId: String(args.proposalId ?? 0n),
+        support: Number(args.support ?? 0),
+        votes: String(args.votes ?? 0n),
+        reason: args.reason ?? '',
+      },
+    });
+  }
+
+  for (const ev of props) {
+    const args = ev.args as {
+      id?: bigint;
+      proposer?: string;
+      description?: string;
+    };
+    events.push({
+      type: 'PROPOSAL_CREATED',
+      blockNumber: Number(ev.blockNumber),
+      timestamp: tsForBlock(ev.blockNumber),
+      txHash: ev.transactionHash ?? '',
+      data: {
+        proposalId: String(args.id ?? 0n),
+        proposer: args.proposer ?? '',
+        title: descriptionToTitle(args.description),
+        description: args.description ?? '',
       },
     });
   }
