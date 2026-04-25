@@ -39,6 +39,12 @@ const minBidEth = (minBid: bigint): string => {
 
   const eth = formatEther(minBid);
   const ethNum = parseFloat(eth);
+  // NounV2 reserve is 0.001 ETH; 2-decimal rounding inflated that to 0.01 (10x).
+  // Use 4-decimal ceil for tiny mins so the displayed floor matches the onchain
+  // minimum; keep 2-decimal legacy behavior for mainnet Nouns-sized bids.
+  if (ethNum < 0.01) {
+    return (Math.ceil(ethNum * 10000) / 10000).toFixed(4);
+  }
   return (Math.ceil(ethNum * 100) / 100).toFixed(2);
 };
 
@@ -224,6 +230,7 @@ const Bid: React.FC<BidProps> = props => {
               className={classes.bidInput}
               type="number"
               min="0"
+              step="any"
               onChange={bidInputHandler}
               ref={bidInputRef}
               value={bidInput}

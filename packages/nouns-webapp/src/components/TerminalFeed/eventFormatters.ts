@@ -38,6 +38,12 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   LIL_PROPOSAL_CREATED: { label: 'L-PROP', color: '#fde047', filterKey: 'LIL_PROPOSAL_CREATED' },
   LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER' },
   SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE' },
+  // NounV2 (fork) — all use red shades to make v2 activity visually distinct.
+  V2_BID: { label: 'V2-BID', color: '#ef4444', filterKey: 'V2_BID' },
+  V2_SETTLED: { label: 'V2-SETTLED', color: '#dc2626', filterKey: 'V2_SETTLED' },
+  V2_AUCTION: { label: 'V2-AUCTION', color: '#f87171', filterKey: 'V2_AUCTION' },
+  V2_PROP: { label: 'V2-PROP', color: '#b91c1c', filterKey: 'V2_PROP' },
+  V2_VOTE: { label: 'V2-VOTE', color: '#fca5a5', filterKey: 'V2_VOTE' },
 };
 
 // Filter tabs shown in the UI
@@ -57,6 +63,7 @@ export const FILTER_TABS = [
     label: 'LIL',
   },
   { key: 'SALE', label: 'SALES' },
+  { key: '_V2', label: 'V2' },
   { key: '_CHAT', label: 'CHAT' },
 ];
 
@@ -322,6 +329,37 @@ export function formatEventDescription(
 
     case 'LIL_TRANSFER':
       return `Lil Noun ${data.nounId} transferred ${addr(data.from as string)} → ${addr(data.to as string)}`;
+
+    case 'V2_BID':
+      return `${addr(data.bidder as string)} bid ${ethFromWei(data.value as string)} ETH on V2 Noun ${data.nounId}`;
+
+    case 'V2_SETTLED': {
+      const winner = (data.winner as string | undefined) || '';
+      const amountStr = (data.amount as string | undefined) || '0';
+      const isBurned =
+        winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
+        (amountStr === '0' || amountStr === '');
+      if (isBurned) {
+        return `V2 Noun ${data.nounId} burned (reserve not met)`;
+      }
+      return `V2 Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
+    }
+
+    case 'V2_AUCTION':
+      return `V2 Noun ${data.nounId} auction started`;
+
+    case 'V2_PROP': {
+      const propTitle = (data.title as string) || 'untitled';
+      return `New V2 proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
+    }
+
+    case 'V2_VOTE': {
+      const reason = (data.reason as string) || '';
+      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on V2 Prop ${data.proposalId}`;
+      return reason.length > 0
+        ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"`
+        : base;
+    }
 
     case 'SALE': {
       const name = (data.collectionName as string) || (data.collection as string) || 'Item';
