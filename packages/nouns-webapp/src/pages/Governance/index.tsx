@@ -110,36 +110,28 @@ const GovernancePage = () => {
         </button>
         <button
           onClick={() => setDao('nounv2')}
+          aria-label="NounV2"
+          title="NounV2"
           style={{
-            padding: '8px 20px',
-            borderRadius: 20,
-            fontSize: '0.85rem',
-            fontWeight: 700,
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            fontSize: '0.75rem',
+            fontWeight: 800,
             fontFamily: "'PT Root UI', sans-serif",
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s',
             background: daoTab === 'nounv2' ? '#dc2626' : '#f4f4f8',
-            color: daoTab === 'nounv2' ? '#fff' : '#8c8d92',
+            color: daoTab === 'nounv2' ? '#fff' : '#dc2626',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
+            padding: 0,
+            flexShrink: 0,
           }}
         >
-          Nouns DAO V2
-          <span
-            style={{
-              fontSize: '0.6rem',
-              padding: '1px 6px',
-              borderRadius: 4,
-              background: daoTab === 'nounv2' ? 'rgba(255,255,255,0.25)' : '#dc2626',
-              color: '#fff',
-              fontWeight: 800,
-              letterSpacing: '0.05em',
-            }}
-          >
-            NEW
-          </span>
+          V2
         </button>
         <button
           onClick={() => setDao('yc')}
