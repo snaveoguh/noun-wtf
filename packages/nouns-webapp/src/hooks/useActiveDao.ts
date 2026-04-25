@@ -61,14 +61,14 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
 
   const setActiveDao = useCallback(
     (next: ActiveDao) => {
-      // Update the URL so the state is shareable + survives reloads.
+      // Always set the dao param explicitly so every click triggers a URL
+      // change. Previously we deleted the param when flipping back to 'nouns'
+      // for cleaner URLs — but if localStorage already had 'nounv2' as the
+      // default and the URL had no ?dao=, deleting produced the same URL we
+      // started with, so the activeDao memo (keyed on queryDao) never
+      // recomputed and the pill click looked dead. Correctness wins.
       const nextParams = new URLSearchParams(searchParams);
-      if (next === 'nouns') {
-        // 'nouns' is the default — keep URLs clean when flipping back to it.
-        nextParams.delete('dao');
-      } else {
-        nextParams.set('dao', next);
-      }
+      nextParams.set('dao', next);
       setSearchParams(nextParams, { replace: true });
 
       // localStorage write is handled by the effect above once the URL updates,
