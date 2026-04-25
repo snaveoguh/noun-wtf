@@ -11,6 +11,11 @@ import type { ActivityEvent } from './useActivityFeed';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const V2_DEPLOY_BLOCK = 24951808n;
 const MAX_EVENTS = 50;
+// publicnode (the default fallback RPC in src/wagmi.ts) caps eth_getLogs
+// at 50_000 blocks. v2 currently lives within that window from deploy →
+// head, but in ~3.5 days the range will exceed 50k and the fallback would
+// silently 502. Trail the head with a max window so this keeps working.
+const LOOKBACK_BLOCKS = 49_000n;
 
 /**
  * Fallback: read v2 AuctionHouse events directly from chain when the
@@ -20,28 +25,34 @@ const MAX_EVENTS = 50;
 export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
   if (NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS) return [];
   const client = getPublicClient(wagmiConfig);
-  if (!client) return [];
+  if (client == null) return [];
+
+  // Lower bound = max(deploy_block, head - 49_000) so we never exceed the
+  // RPC's 50k-block window even as v2 ages past launch.
+  const head = await client.getBlockNumber();
+  const lookbackFloor = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+  const fromBlock = lookbackFloor > V2_DEPLOY_BLOCK ? lookbackFloor : V2_DEPLOY_BLOCK;
 
   const [bids, settles, creates] = await Promise.all([
     client.getContractEvents({
       address: NOUNV2_AUCTION_HOUSE_ADDRESS,
       abi: nounV2AuctionHouseAbi,
       eventName: 'AuctionBid',
-      fromBlock: V2_DEPLOY_BLOCK,
+      fromBlock,
       toBlock: 'latest',
     }),
     client.getContractEvents({
       address: NOUNV2_AUCTION_HOUSE_ADDRESS,
       abi: nounV2AuctionHouseAbi,
       eventName: 'AuctionSettled',
-      fromBlock: V2_DEPLOY_BLOCK,
+      fromBlock,
       toBlock: 'latest',
     }),
     client.getContractEvents({
       address: NOUNV2_AUCTION_HOUSE_ADDRESS,
       abi: nounV2AuctionHouseAbi,
       eventName: 'AuctionCreated',
-      fromBlock: V2_DEPLOY_BLOCK,
+      fromBlock,
       toBlock: 'latest',
     }),
   ]);
