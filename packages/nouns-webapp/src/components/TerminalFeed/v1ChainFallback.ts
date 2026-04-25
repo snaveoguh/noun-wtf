@@ -35,10 +35,30 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
   const client = getPublicClient(wagmiConfig);
   if (client == null) return [];
 
-  const head = await client.getBlockNumber();
-  const fromBlock = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+  // Pull head info once. We derive each event's timestamp from the head
+  // block's timestamp + (event_block - head_block) * 12s instead of doing
+  // one getBlock per event (which made the fallback take ~10s on a feed
+  // of 50 events). The 12s assumption is the post-merge target — accurate
+  // to within a few seconds, which is plenty for "X mins ago" display.
+  const headBlock = await client.getBlock({ blockTag: 'latest' });
+  const headNumber = headBlock.number;
+  const headTs = headBlock.timestamp;
+  // The feed renderer parses `timestamp` via `new Date(timestamp)`, so we
+  // emit ISO strings instead of unix seconds — `new Date("1714066800")`
+  // is invalid and produces "NaNmo" labels.
+  const tsForBlock = (b: bigint): string => {
+    const seconds = Number(headTs - (headNumber - b) * 12n);
+    return new Date(seconds * 1000).toISOString();
+  };
 
-  const [bids, settles, creates] = await Promise.all([
+  const fromBlock = headNumber > LOOKBACK_BLOCKS ? headNumber - LOOKBACK_BLOCKS : 0n;
+
+  // Skip AuctionCreated — the renderer's NOUN_CREATED case wants
+  // `data.owner` (sourced from a separate NounsToken Transfer mint event)
+  // which we don't have here, and every AuctionCreated is paired with an
+  // AuctionSettled in the same tx anyway, so SETTLED rows already cover
+  // the boundary visually.
+  const [bids, settles] = await Promise.all([
     client.getContractEvents({
       address,
       abi: nounsAuctionHouseAbi,
@@ -53,37 +73,16 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       fromBlock,
       toBlock: 'latest',
     }),
-    client.getContractEvents({
-      address,
-      abi: nounsAuctionHouseAbi,
-      eventName: 'AuctionCreated',
-      fromBlock,
-      toBlock: 'latest',
-    }),
   ]);
-
-  // One getBlock call per unique block — auctions are sparse so this is
-  // bounded to ~tens of calls per fallback fetch.
-  const tsCache = new Map<bigint, bigint>();
-  const lookupTs = async (blockNumber: bigint): Promise<bigint> => {
-    let ts = tsCache.get(blockNumber);
-    if (ts === undefined) {
-      const blk = await client.getBlock({ blockNumber });
-      ts = blk.timestamp;
-      tsCache.set(blockNumber, ts);
-    }
-    return ts;
-  };
 
   const events: ActivityEvent[] = [];
 
   for (const ev of bids) {
     const args = ev.args as { nounId?: bigint; sender?: string; value?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
     events.push({
       type: 'BID',
       blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
+      timestamp: tsForBlock(ev.blockNumber),
       txHash: ev.transactionHash ?? '',
       data: {
         nounId: String(args.nounId ?? 0n),
@@ -95,30 +94,15 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
 
   for (const ev of settles) {
     const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
     events.push({
       type: 'AUCTION_SETTLED',
       blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
+      timestamp: tsForBlock(ev.blockNumber),
       txHash: ev.transactionHash ?? '',
       data: {
         nounId: String(args.nounId ?? 0n),
         winner: args.winner ?? '',
         amount: String(args.amount ?? 0n),
-      },
-    });
-  }
-
-  for (const ev of creates) {
-    const args = ev.args as { nounId?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
-    events.push({
-      type: 'NOUN_CREATED',
-      blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
-      txHash: ev.transactionHash ?? '',
-      data: {
-        nounId: String(args.nounId ?? 0n),
       },
     });
   }

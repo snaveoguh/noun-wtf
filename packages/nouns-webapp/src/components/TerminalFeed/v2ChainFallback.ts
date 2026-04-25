@@ -27,11 +27,23 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
   const client = getPublicClient(wagmiConfig);
   if (client == null) return [];
 
-  // Lower bound = max(deploy_block, head - 49_000) so we never exceed the
-  // RPC's 50k-block window even as v2 ages past launch.
-  const head = await client.getBlockNumber();
-  const lookbackFloor = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+  // Pull head once (number + timestamp). Lower bound = max(deploy_block,
+  // head - 49_000) so we never exceed the RPC's 50k-block window even as
+  // v2 ages past launch. We also use the head timestamp to derive each
+  // event's timestamp without a per-event getBlock call (used to be ~10s
+  // for a 50-event feed) — accurate within ~12s for "X mins ago" display.
+  const headBlock = await client.getBlock({ blockTag: 'latest' });
+  const headNumber = headBlock.number;
+  const headTs = headBlock.timestamp;
+  const lookbackFloor = headNumber > LOOKBACK_BLOCKS ? headNumber - LOOKBACK_BLOCKS : 0n;
   const fromBlock = lookbackFloor > V2_DEPLOY_BLOCK ? lookbackFloor : V2_DEPLOY_BLOCK;
+  // The feed renderer parses `timestamp` via `new Date(timestamp)`, so we
+  // emit ISO strings instead of unix seconds — `new Date("1714066800")`
+  // is invalid and produces "NaNmo" labels.
+  const tsForBlock = (b: bigint): string => {
+    const seconds = Number(headTs - (headNumber - b) * 12n);
+    return new Date(seconds * 1000).toISOString();
+  };
 
   const [bids, settles, creates] = await Promise.all([
     client.getContractEvents({
@@ -57,26 +69,14 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
     }),
   ]);
 
-  const tsCache = new Map<bigint, bigint>();
-  const lookupTs = async (blockNumber: bigint): Promise<bigint> => {
-    let ts = tsCache.get(blockNumber);
-    if (ts === undefined) {
-      const blk = await client.getBlock({ blockNumber });
-      ts = blk.timestamp;
-      tsCache.set(blockNumber, ts);
-    }
-    return ts;
-  };
-
   const events: ActivityEvent[] = [];
 
   for (const ev of bids) {
     const args = ev.args as { nounId?: bigint; sender?: string; value?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
     events.push({
       type: 'V2_BID',
       blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
+      timestamp: tsForBlock(ev.blockNumber),
       txHash: ev.transactionHash ?? '',
       data: {
         nounId: String(args.nounId ?? 0n),
@@ -88,11 +88,10 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
 
   for (const ev of settles) {
     const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
     events.push({
       type: 'V2_SETTLED',
       blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
+      timestamp: tsForBlock(ev.blockNumber),
       txHash: ev.transactionHash ?? '',
       data: {
         nounId: String(args.nounId ?? 0n),
@@ -104,11 +103,10 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
 
   for (const ev of creates) {
     const args = ev.args as { nounId?: bigint };
-    const ts = await lookupTs(ev.blockNumber);
     events.push({
       type: 'V2_AUCTION',
       blockNumber: Number(ev.blockNumber),
-      timestamp: String(ts),
+      timestamp: tsForBlock(ev.blockNumber),
       txHash: ev.transactionHash ?? '',
       data: {
         nounId: String(args.nounId ?? 0n),
