@@ -34,7 +34,12 @@ const BidHistoryModalOverlay: React.FC<BidHistoryModalOverlayProps> = ({ auction
   // the v2 contract since no Ponder index is wired for v2 yet.
   const v1Bids = useAuctionBids(BigInt(auction.nounId));
   const v2Bids = useV2AuctionBids(BigInt(auction.nounId));
-  const bids = activeDao === 'nounv2' ? v2Bids : v1Bids;
+  // Prefer v2 only if the user is in v2 mode AND v2 actually has events for
+  // this nounId. Otherwise fall back to mainnet bids — fixes the case where
+  // the user toggled to v2 but is viewing a /noun/<mainnet-id> route, where
+  // v2's contract logs are empty and the modal would show "no bids".
+  const useV2 = activeDao === 'nounv2' && v2Bids != null && v2Bids.length > 0;
+  const bids = useV2 ? v2Bids : v1Bids;
 
   return (
     <>
