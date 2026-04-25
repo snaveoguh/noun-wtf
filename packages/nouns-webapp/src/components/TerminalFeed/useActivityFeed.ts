@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { fetchV2ChainEvents } from './v2ChainFallback';
+
 export interface ActivityEvent {
   type: string;
   blockNumber: number;
@@ -89,11 +91,30 @@ export function useActivityFeed(activeFilter: string) {
         if (before) params.set('before', String(before));
         const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
+        const apiData = await res.json();
+        if (apiData?.events?.length > 0) return apiData;
+        // API returned 0 events — fall back to direct chain reads. The
+        // /api/nounv2-feed endpoint isn't always live (Railway redeploy
+        // issues post-NounV2 launch).
+        const chainEvents = await fetchV2ChainEvents();
+        return {
+          events: chainEvents,
+          hasMore: false,
+          oldestBlock: chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+        };
       } catch (err) {
-        // Don't break the mainnet feed if v2 endpoint is unavailable.
-        console.warn('[ActivityFeed] V2 fetch error:', err);
-        return { events: [], hasMore: false, oldestBlock: 0 };
+        console.warn('[ActivityFeed] V2 endpoint unavailable, trying chain fallback:', err);
+        try {
+          const chainEvents = await fetchV2ChainEvents();
+          return {
+            events: chainEvents,
+            hasMore: false,
+            oldestBlock: chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+          };
+        } catch (chainErr) {
+          console.warn('[ActivityFeed] V2 chain fallback also failed:', chainErr);
+          return { events: [], hasMore: false, oldestBlock: 0 };
+        }
       }
     };
 
