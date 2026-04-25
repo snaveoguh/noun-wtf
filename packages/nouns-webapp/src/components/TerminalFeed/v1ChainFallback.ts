@@ -9,11 +9,11 @@ import { config as wagmiConfig, defaultChain } from '@/wagmi';
 import type { ActivityEvent } from './useActivityFeed';
 
 const MAX_EVENTS = 50;
-// ~7 days @ 12s blocks. The mainnet AH log history goes back to 2021 — we
-// can't query the full range from a public RPC (most cap log queries at
-// 10k blocks), so we trail the head. Bumping the window changes the depth
-// of the chain-fallback feed; one auction/day means ~7 settlements visible.
-const LOOKBACK_BLOCKS = 50_400n;
+// publicnode (the default fallback RPC in src/wagmi.ts) caps eth_getLogs
+// at 50_000 blocks. Querying any wider returns -32701 and the whole
+// fallback returns []. 49_000 keeps a safe margin while still covering
+// ~6.8 days @ 12s blocks (one auction/day → ~6 settlements visible).
+const LOOKBACK_BLOCKS = 49_000n;
 
 /**
  * Fallback: read v1 AuctionHouse events directly from chain when the
