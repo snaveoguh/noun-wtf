@@ -29,6 +29,7 @@ import { encodePacked, keccak256, type Hex } from 'viem';
 import { useAccount, useBlock, useReadContract, useWriteContract } from 'wagmi';
 
 import {
+  nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
   useWriteNounsAuctionHouseSettleCurrentAndCreateNewAuction,
 } from '@/contracts';
@@ -216,6 +217,72 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     };
     return payload;
   }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime]);
+}
+
+/**
+ * v1 mirror of useNounV2Prediction. The v1 path used to depend on Railway's
+ * `/api/agent/predict`, but that endpoint went 502 after the v2 launch
+ * triggered a Railway redeploy and never recovered. Reading auction.nounId
+ * + parent block hash directly from the mainnet AH replaces the Railway
+ * dependency with on-chain truth — same shape as the v2 version, so the
+ * downstream pipeline (twin matching, settle button) stays unchanged.
+ *
+ * The mainnet auction tuple has the same layout as v2 because v2 forks
+ * AuctionHouseV1 1:1: (nounId, amount, startTime, endTime, bidder, settled).
+ */
+function useNounV1Prediction(enabled: boolean): PredictResponse | null {
+  const v1Address =
+    nounsAuctionHouseAddress[defaultChain.id as keyof typeof nounsAuctionHouseAddress];
+
+  const { data: auctionData } = useReadContract({
+    address: v1Address,
+    abi: nounsAuctionHouseAbi,
+    functionName: 'auction',
+    query: {
+      enabled: enabled && v1Address != null,
+      refetchInterval: 12_000,
+    },
+  });
+
+  const auction = auctionData as
+    | readonly [bigint, bigint, bigint, bigint, `0x${string}`, boolean]
+    | undefined;
+  const currentNounId = auction?.[0];
+  const endTime = auction?.[3];
+
+  const { data: blockData } = useBlock({
+    watch: true,
+    query: { enabled: enabled && v1Address != null },
+  });
+
+  return useMemo(() => {
+    if (!enabled) return null;
+    if (!auction || currentNounId == null) return null;
+    if (!blockData?.hash) return null;
+
+    // Mainnet skips noun #N where N % 10 === 0 (nounder reward). When the
+    // current auction is for #N, the *next* auctioned id is N+1 unless N+1
+    // is a multiple of 10 — in which case the seeder mints two nouns
+    // (N+1 nounder + N+2 auction) in the same tx. We surface N+2 in that
+    // case so the orb shows the *auctioned* prediction.
+    let nextNounId = Number(currentNounId) + 1;
+    if (nextNounId % 10 === 0) nextNounId += 1;
+
+    const seed = predictSeed(blockData.hash, nextNounId);
+    const auctionEnd = endTime != null ? Number(endTime) : 0;
+    const now = Math.floor(Date.now() / 1000);
+    const payload: PredictResponse = {
+      block: Number(blockData.number ?? 0n),
+      nextNounId,
+      seed,
+      traits: null,
+      auctionEnd,
+      auctionEnded: auctionEnd > 0 && auctionEnd <= now,
+      running: true,
+      checkedAt: new Date().toISOString(),
+    };
+    return payload;
+  }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime, v1Address]);
 }
 
 // ─── 2D SVG rendering ──────────────────────────────────────────────────
@@ -677,30 +744,23 @@ export default function CrystalBallPage() {
     }
   }, [viewMode]);
 
-  const [prediction, setPrediction] = useState<PredictResponse | null>(null);
   const [settling, setSettling] = useState(false);
   const [settleTx, setSettleTx] = useState<string | null>(null);
   const ballSize = useBallSize();
   const allSeeds = useNounSeeds();
 
   const nounV2Prediction = useNounV2Prediction(activeDao === 'nounv2');
+  const nounV1ChainPrediction = useNounV1Prediction(activeDao === 'nouns');
 
-  // Track the active prediction from whichever data source is driving the
-  // page so 2D / 3D modes and the twin matcher can all read one shape.
-  const effectivePrediction = activeDao === 'nounv2' ? nounV2Prediction : prediction;
+  // Both DAOs now drive from on-chain reads. The v1 path used to poll
+  // Railway's `/api/agent/predict`, but that endpoint went 502 after the
+  // v2 launch retriggered a Railway redeploy and never recovered. Reading
+  // the auction tuple directly from the AH contract is more reliable and
+  // means the orb keeps working through Railway outages.
+  const effectivePrediction = activeDao === 'nounv2' ? nounV2Prediction : nounV1ChainPrediction;
 
   const { isConnected } = useAccount();
   const userSettle = useUserSettle(activeDao, effectivePrediction);
-
-  const handlePredict = useCallback((data: PredictResponse) => {
-    setPrediction(data);
-  }, []);
-
-  // Reset prediction state when DAO flips so a stale v1 seed doesn't briefly
-  // show through while the v2 read is in flight.
-  useEffect(() => {
-    if (activeDao === 'nounv2') setPrediction(null);
-  }, [activeDao]);
 
   const traits = effectivePrediction?.seed
     ? TRAIT_KEYS.map(key => ({
@@ -890,12 +950,7 @@ export default function CrystalBallPage() {
               </div>
             }
           >
-            <CrystalBall
-              size={ballSize}
-              interactive
-              onPredict={activeDao === 'nouns' ? handlePredict : undefined}
-              predictionOverride={activeDao === 'nounv2' ? nounV2Prediction : undefined}
-            />
+            <CrystalBall size={ballSize} interactive predictionOverride={effectivePrediction} />
           </Suspense>
         ) : (
           <Suspense
@@ -1013,25 +1068,9 @@ export default function CrystalBallPage() {
                   </>
                 )}
               </div>
-              {/* Keep the seed-pulling CrystalBall mounted invisibly on v1
-                  so the prediction pipeline stays live when the user picks
-                  2D or 3D. On v2 the on-chain hook supplies the seed, so we
-                  skip this shadow instance. */}
-              {activeDao === 'nouns' && (
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    width: 0,
-                    height: 0,
-                    overflow: 'hidden',
-                    pointerEvents: 'none',
-                    opacity: 0,
-                  }}
-                >
-                  <CrystalBall size={32} interactive={false} onPredict={handlePredict} />
-                </div>
-              )}
+              {/* Both DAOs are now driven by on-chain prediction hooks
+                  (`useNounV1Prediction` / `useNounV2Prediction`), so the
+                  shadow Railway-poller used to live here is gone. */}
               {/* Info line under the visual when not showing the orb */}
               {effectivePrediction && (
                 <div

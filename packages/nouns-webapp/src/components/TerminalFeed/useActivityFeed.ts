@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { fetchV1ChainEvents } from './v1ChainFallback';
 import { fetchV2ChainEvents } from './v2ChainFallback';
 
 export interface ActivityEvent {
@@ -18,8 +19,9 @@ interface FeedState {
   error: string | null;
 }
 
-const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
+const API_BASE =
+  import.meta.env.VITE_MAINNET_SUBGRAPH ||
+  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const POLL_INTERVAL = 12_000; // 12 seconds (1 Ethereum block)
 const PAGE_SIZE = 50;
@@ -57,90 +59,122 @@ export function useActivityFeed(activeFilter: string) {
   const newestBlockRef = useRef<number>(0);
 
   // Fetch events from both mainnet and v2 endpoints, merging into one stream.
-  const fetchEvents = useCallback(async (before?: number): Promise<{
-    events: ActivityEvent[];
-    hasMore: boolean;
-    oldestBlock: number;
-  } | null> => {
-    const v2Only = isV2OnlyFilter(activeFilter);
-    const v2Excluded = isV2Excluded(activeFilter);
-
-    const fetchMainnet = async (): Promise<{
-      events: ActivityEvent[]; hasMore: boolean; oldestBlock: number;
+  const fetchEvents = useCallback(
+    async (
+      before?: number,
+    ): Promise<{
+      events: ActivityEvent[];
+      hasMore: boolean;
+      oldestBlock: number;
     } | null> => {
-      if (v2Only) return { events: [], hasMore: false, oldestBlock: 0 };
-      try {
-        const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-        if (before) params.set('before', String(before));
-        if (activeFilter && activeFilter !== V2_ALL_FILTER) params.set('type', activeFilter);
-        const res = await fetch(`${API_BASE}/api/activity?${params}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
-      } catch (err) {
-        console.error('[ActivityFeed] Mainnet fetch error:', err);
-        return null;
-      }
-    };
+      const v2Only = isV2OnlyFilter(activeFilter);
+      const v2Excluded = isV2Excluded(activeFilter);
 
-    const fetchV2 = async (): Promise<{
-      events: ActivityEvent[]; hasMore: boolean; oldestBlock: number;
-    } | null> => {
-      if (v2Excluded) return { events: [], hasMore: false, oldestBlock: 0 };
-      try {
-        const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-        if (before) params.set('before', String(before));
-        const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const apiData = await res.json();
-        if (apiData?.events?.length > 0) return apiData;
-        // API returned 0 events — fall back to direct chain reads. The
-        // /api/nounv2-feed endpoint isn't always live (Railway redeploy
-        // issues post-NounV2 launch).
-        const chainEvents = await fetchV2ChainEvents();
-        return {
-          events: chainEvents,
-          hasMore: false,
-          oldestBlock: chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
-        };
-      } catch (err) {
-        console.warn('[ActivityFeed] V2 endpoint unavailable, trying chain fallback:', err);
+      const fetchMainnet = async (): Promise<{
+        events: ActivityEvent[];
+        hasMore: boolean;
+        oldestBlock: number;
+      } | null> => {
+        if (v2Only) return { events: [], hasMore: false, oldestBlock: 0 };
         try {
+          const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+          if (before) params.set('before', String(before));
+          if (activeFilter && activeFilter !== V2_ALL_FILTER) params.set('type', activeFilter);
+          const res = await fetch(`${API_BASE}/api/activity?${params}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const apiData = await res.json();
+          if (apiData?.events?.length > 0) return apiData;
+          // API returned 0 events — fall back to direct chain reads. The
+          // /api/activity endpoint went 502 after the v2 launch retriggered
+          // a Railway redeploy, so the existing v1 path can't depend on it.
+          const chainEvents = await fetchV1ChainEvents();
+          return {
+            events: chainEvents,
+            hasMore: false,
+            oldestBlock:
+              chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+          };
+        } catch (err) {
+          console.warn('[ActivityFeed] Mainnet endpoint unavailable, trying chain fallback:', err);
+          try {
+            const chainEvents = await fetchV1ChainEvents();
+            return {
+              events: chainEvents,
+              hasMore: false,
+              oldestBlock:
+                chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+            };
+          } catch (chainErr) {
+            console.warn('[ActivityFeed] V1 chain fallback also failed:', chainErr);
+            return null;
+          }
+        }
+      };
+
+      const fetchV2 = async (): Promise<{
+        events: ActivityEvent[];
+        hasMore: boolean;
+        oldestBlock: number;
+      } | null> => {
+        if (v2Excluded) return { events: [], hasMore: false, oldestBlock: 0 };
+        try {
+          const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+          if (before) params.set('before', String(before));
+          const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const apiData = await res.json();
+          if (apiData?.events?.length > 0) return apiData;
+          // API returned 0 events — fall back to direct chain reads. The
+          // /api/nounv2-feed endpoint isn't always live (Railway redeploy
+          // issues post-NounV2 launch).
           const chainEvents = await fetchV2ChainEvents();
           return {
             events: chainEvents,
             hasMore: false,
-            oldestBlock: chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+            oldestBlock:
+              chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
           };
-        } catch (chainErr) {
-          console.warn('[ActivityFeed] V2 chain fallback also failed:', chainErr);
-          return { events: [], hasMore: false, oldestBlock: 0 };
+        } catch (err) {
+          console.warn('[ActivityFeed] V2 endpoint unavailable, trying chain fallback:', err);
+          try {
+            const chainEvents = await fetchV2ChainEvents();
+            return {
+              events: chainEvents,
+              hasMore: false,
+              oldestBlock:
+                chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
+            };
+          } catch (chainErr) {
+            console.warn('[ActivityFeed] V2 chain fallback also failed:', chainErr);
+            return { events: [], hasMore: false, oldestBlock: 0 };
+          }
         }
+      };
+
+      const [mainnet, v2] = await Promise.all([fetchMainnet(), fetchV2()]);
+      if (!mainnet && !v2) return null;
+      const mainnetData = mainnet ?? { events: [], hasMore: false, oldestBlock: 0 };
+      const v2Data = v2 ?? { events: [], hasMore: false, oldestBlock: 0 };
+
+      // If a specific v2 type filter is active, narrow v2 events to those types.
+      let v2Filtered = v2Data.events;
+      if (activeFilter && activeFilter !== V2_ALL_FILTER && v2Only) {
+        const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
+        v2Filtered = v2Filtered.filter(e => wanted.has(e.type));
       }
-    };
 
-    const [mainnet, v2] = await Promise.all([fetchMainnet(), fetchV2()]);
-    if (!mainnet && !v2) return null;
-    const mainnetData = mainnet ?? { events: [], hasMore: false, oldestBlock: 0 };
-    const v2Data = v2 ?? { events: [], hasMore: false, oldestBlock: 0 };
+      const merged = [...mainnetData.events, ...v2Filtered].sort(
+        (a, b) => b.blockNumber - a.blockNumber,
+      );
 
-    // If a specific v2 type filter is active, narrow v2 events to those types.
-    let v2Filtered = v2Data.events;
-    if (activeFilter && activeFilter !== V2_ALL_FILTER && v2Only) {
-      const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
-      v2Filtered = v2Filtered.filter(e => wanted.has(e.type));
-    }
-
-    const merged = [...mainnetData.events, ...v2Filtered].sort(
-      (a, b) => b.blockNumber - a.blockNumber,
-    );
-
-    return {
-      events: merged,
-      hasMore: mainnetData.hasMore || v2Data.hasMore,
-      oldestBlock:
-        merged.length > 0 ? merged[merged.length - 1]!.blockNumber : 0,
-    };
-  }, [activeFilter]);
+      return {
+        events: merged,
+        hasMore: mainnetData.hasMore || v2Data.hasMore,
+        oldestBlock: merged.length > 0 ? merged[merged.length - 1]!.blockNumber : 0,
+      };
+    },
+    [activeFilter],
+  );
 
   // Initial load + filter change
   useEffect(() => {
@@ -150,7 +184,8 @@ export function useActivityFeed(activeFilter: string) {
 
     fetchEvents().then(result => {
       if (cancelled || !result) {
-        if (!cancelled) setState(prev => ({ ...prev, loading: false, error: 'Failed to load activity' }));
+        if (!cancelled)
+          setState(prev => ({ ...prev, loading: false, error: 'Failed to load activity' }));
         return;
       }
       // Track newest block for polling
@@ -166,7 +201,9 @@ export function useActivityFeed(activeFilter: string) {
       });
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeFilter, fetchEvents]);
 
   // Polling for new events
@@ -183,10 +220,14 @@ export function useActivityFeed(activeFilter: string) {
         const [mainnetRes, v2Res] = await Promise.all([
           v2Only
             ? Promise.resolve(null)
-            : fetch(`${API_BASE}/api/activity?${params}`).then(r => (r.ok ? r.json() : null)).catch(() => null),
+            : fetch(`${API_BASE}/api/activity?${params}`)
+                .then(r => (r.ok ? r.json() : null))
+                .catch(() => null),
           v2Excluded
             ? Promise.resolve(null)
-            : fetch(`${API_BASE}/api/nounv2-feed?limit=20`).then(r => (r.ok ? r.json() : null)).catch(() => null),
+            : fetch(`${API_BASE}/api/nounv2-feed?limit=20`)
+                .then(r => (r.ok ? r.json() : null))
+                .catch(() => null),
         ]);
 
         const incoming: ActivityEvent[] = [
@@ -199,9 +240,7 @@ export function useActivityFeed(activeFilter: string) {
         let filtered = incoming;
         if (v2Only && activeFilter !== V2_ALL_FILTER) {
           const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
-          filtered = filtered.filter(e =>
-            V2_EVENT_TYPES.has(e.type) ? wanted.has(e.type) : true,
-          );
+          filtered = filtered.filter(e => (V2_EVENT_TYPES.has(e.type) ? wanted.has(e.type) : true));
         }
 
         const newEvents = filtered
@@ -215,7 +254,9 @@ export function useActivityFeed(activeFilter: string) {
             events: [...newEvents, ...prev.events],
           }));
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }, POLL_INTERVAL);
 
     return () => {
