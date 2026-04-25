@@ -18,6 +18,7 @@ import {
   buildProposalsAndGrantsContext,
 } from './governanceContext.js';
 import { learnFromUrl, batchLearn, getKnowledgeStats, buildKnowledgeContext } from './knowledge.js';
+import { NOUN_V2_KNOWLEDGE } from './nounV2Knowledge.js';
 import { remember, recall, forget, recallAll, buildMemoryContext, countByScope } from './memory.js';
 import {
   buildPeopleDb,
@@ -108,6 +109,9 @@ export {
   batchLearn,
   getKnowledgeStats,
   buildKnowledgeContext,
+
+  // NounV2 static knowledge block
+  NOUN_V2_KNOWLEDGE,
 
   // Self-learning from noun.wtf
   runSelfLearn,

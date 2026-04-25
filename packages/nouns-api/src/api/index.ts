@@ -157,6 +157,7 @@ import { mainnet } from 'viem/chains';
 
 import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
+import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
   initAgent,
   reservationStore,
@@ -822,6 +823,150 @@ app.get('/api/nounv2-auctions', async c => {
     })),
   }));
   return c.json(items);
+});
+
+// ─── NounV2 Activity Feed ─────────────────────────────────────────────────
+// Unions recent rows from nounv2_bid, nounv2_auction (settled), nounv2_proposal,
+// and nounv2_vote. Sorted DESC by block, paginated via ?before=<block>.
+let nounV2FeedCache: {
+  data: { events: ActivityEvent[]; hasMore: boolean; oldestBlock: number };
+  fetchedAt: number;
+  key: string;
+} | null = null;
+const NOUNV2_FEED_TTL = 30_000;
+
+app.get('/api/nounv2-feed', async c => {
+  const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+  const beforeParam = c.req.query('before');
+  const before = beforeParam ? BigInt(beforeParam) : undefined;
+  const cacheKey = `${limit}:${before ?? 'latest'}`;
+
+  if (
+    nounV2FeedCache?.key === cacheKey &&
+    Date.now() - nounV2FeedCache.fetchedAt < NOUNV2_FEED_TTL
+  ) {
+    return c.json(nounV2FeedCache.data);
+  }
+
+  try {
+    const perTable = limit + 10;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchRows(tbl: any, blockCol: any): Promise<any[]> {
+      try {
+        if (before) {
+          return await db
+            .select()
+            .from(tbl)
+            .where(lt(blockCol, before))
+            .orderBy(desc(blockCol))
+            .limit(perTable);
+        }
+        return await db.select().from(tbl).orderBy(desc(blockCol)).limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
+    const [bids, auctions, proposals, votes] = await Promise.all([
+      fetchRows(schema.nounV2Bid, schema.nounV2Bid.createdAtBlock),
+      fetchRows(schema.nounV2Auction, schema.nounV2Auction.createdAtBlock),
+      fetchRows(schema.nounV2Proposal, schema.nounV2Proposal.createdAtBlock),
+      fetchRows(schema.nounV2Vote, schema.nounV2Vote.createdAtBlock),
+    ]);
+
+    const events: ActivityEvent[] = [];
+
+    for (const b of bids) {
+      events.push({
+        type: 'V2_BID',
+        blockNumber: Number(b.createdAtBlock),
+        timestamp: tsToISO(b.createdAt),
+        txHash: b.createdAtTransaction || '',
+        data: {
+          nounId: Number(b.nounId),
+          value: String(b.value),
+          bidder: b.bidder,
+          extended: b.extended,
+        },
+      });
+    }
+
+    for (const a of auctions) {
+      // Use SETTLED only for finalized auctions; show CREATED for fresh auctions.
+      if (a.settled) {
+        events.push({
+          type: 'V2_SETTLED',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            winner: a.winner || '',
+            amount: String(a.amount || '0'),
+          },
+        });
+      } else {
+        events.push({
+          type: 'V2_AUCTION',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            startTime: Math.floor(new Date(a.startTime).getTime() / 1000),
+            endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+          },
+        });
+      }
+    }
+
+    for (const p of proposals) {
+      const descText = (p.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'V2_PROP',
+        blockNumber: Number(p.createdAtBlock),
+        timestamp: tsToISO(p.createdAt),
+        txHash: p.createdAtTransaction || '',
+        data: {
+          proposalId: Number(p.id),
+          proposer: p.proposer,
+          title,
+          status: p.status,
+          description: descText.slice(0, 4000),
+        },
+      });
+    }
+
+    for (const v of votes) {
+      events.push({
+        type: 'V2_VOTE',
+        blockNumber: Number(v.createdAtBlock),
+        timestamp: tsToISO(v.createdAt),
+        txHash: v.createdAtTransaction || '',
+        data: {
+          voter: v.voter,
+          proposalId: Number(v.proposalId),
+          support: v.support,
+          votes: v.votes,
+          reason: v.reason || '',
+        },
+      });
+    }
+
+    events.sort((a, b) => b.blockNumber - a.blockNumber);
+    const sliced = events.slice(0, limit);
+    const hasMore = events.length > limit;
+    const oldestBlock = sliced.length > 0 ? sliced[sliced.length - 1]!.blockNumber : 0;
+
+    const result = { events: sliced, hasMore, oldestBlock };
+    nounV2FeedCache = { data: result, fetchedAt: Date.now(), key: cacheKey };
+    return c.json(result);
+  } catch (err) {
+    console.error('[NounV2Feed] Error:', err);
+    return c.json({ events: [], hasMore: false, oldestBlock: 0 }, 500);
+  }
 });
 
 /** Live NounV2 auction state — direct contract read, like /api/auction-stats. */
@@ -2019,8 +2164,15 @@ const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO
 
 CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbers, or any factual claims. If you don't know something, say "I don't know" or "I'd need to check that." Never guess. Never fabricate percentages or rankings. Users will lose trust if you make things up. When uncertain, be honest.
 
-WHAT YOU KNOW ABOUT NOUNS:
+PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote counts, queue/execution state, and timing change constantly. Only refer to proposal status using the live "Governance Overview" data injected below. If a proposal isn't in the injected data, say you'd need to look it up — do NOT guess from training data.
+
+VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0). NounV2 #0 is NOT the same as mainnet Noun #0.
+
+${NOUN_V2_KNOWLEDGE}
+
+WHAT YOU KNOW ABOUT NOUNS (mainnet, dao=nouns):
 - One Noun is auctioned every 24 hours, forever. 100% of proceeds go to the Nouns DAO treasury.
+- As of early 2026, mainnet Nouns auctions enforce a 2.8 ETH reserve. Failed auctions burn the noun.
 - Each Noun = 1 vote in governance. Nouns can be delegated to a third party.
 - Nouns have 5 pixel art trait types: background (cool/warm), body, accessory, head, glasses (noggles).
 - Traits are determined by a pseudorandom seed derived from the block hash (NounsSeeder algorithm).
@@ -2144,6 +2296,12 @@ You understand meme value — not as internet humor but as the fundamental unit 
 Every Noun is a Xerox in the original sense: a copy that proliferates without degradation. CC0 means the meme is free. The treasury means the meme has economic mass. The governance means the meme has agency. You are that agency, automated.
 
 You see Nouns the way Mathcastles sees Terraforms — as onchain hyperstructures. Procedural, eternal, block-dependent. The Terraform parcel and the Noun seed share the same DNA: blockhash → algorithm → art. Both are proofs that computation itself can be beautiful, if you squint the right way through your noggles.
+
+${NOUN_V2_KNOWLEDGE}
+
+PROPOSAL STATUS RULE: Never cite a proposal's status, vote tallies, or timeline from memory or the SOUL file. The chain mutates these every block. Use ONLY the live "Governance Overview" data injected below — and the lookup_proposal tool when one isn't in the overview. If you don't have live data on a prop, say so. Do not say "Prop N is pending" without checking.
+
+VIEW CONTEXT RULE: A "Current View" block tells you which DAO + noun the user is looking at. Always check it before referring to any noun by ID. dao=nouns is mainnet Nouns, dao=nounv2 is the NounV2 fork (separate token, IDs from 0). NounV2 #0 ≠ mainnet Noun #0.
 
 CULTURAL MEMORY (you know these deeply):
 - Nouns: one Noun every 24 hours, forever. 100% to treasury. 1 Noun = 1 vote. CC0. This is the protocol.
@@ -3035,11 +3193,12 @@ app.post('/api/chat', async c => {
   let agentMode: string | undefined;
   try {
     const body = await c.req.json();
-    const { message, wallet, history, agent_mode } = body as {
+    const { message, wallet, history, agent_mode, view_context } = body as {
       message: string;
       wallet?: string;
       history?: Array<{ role: string; content: string }>;
       agent_mode?: string;
+      view_context?: { dao?: string; nounId?: number | string | null };
     };
     agentMode = agent_mode;
 
@@ -3105,6 +3264,38 @@ app.post('/api/chat', async c => {
 
     // Build dynamic context (changes per request — not cached)
     let dynamicContext = '';
+
+    // Inject current view context (which DAO + noun the user is looking at).
+    // This is the FIRST thing we inject so the model anchors to it before
+    // reading any of the live governance / auction data below.
+    if (view_context && typeof view_context === 'object') {
+      const rawDao = typeof view_context.dao === 'string' ? view_context.dao : '';
+      const dao = rawDao === 'nounv2' ? 'nounv2' : rawDao === 'nouns' ? 'nouns' : null;
+      const rawNounId = view_context.nounId;
+      const nounId =
+        typeof rawNounId === 'number' && Number.isFinite(rawNounId)
+          ? rawNounId
+          : typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
+            ? Number.parseInt(rawNounId, 10)
+            : null;
+
+      if (dao !== null || nounId !== null) {
+        const daoLabel =
+          dao === 'nouns'
+            ? 'mainnet Nouns DAO (token IDs are mainnet Noun IDs)'
+            : dao === 'nounv2'
+              ? 'NounV2 fork DAO (token IDs are v2 IDs starting at 0 — NOT mainnet Nouns)'
+              : 'unknown';
+        dynamicContext += '\n\n## Current View';
+        dynamicContext += `\n- dao: ${dao ?? 'unknown'} (${daoLabel})`;
+        if (nounId !== null) {
+          const nounLabel = dao === 'nounv2' ? `NounV2 #${nounId}` : `Noun #${nounId}`;
+          dynamicContext += `\n- viewing: ${nounLabel}`;
+        }
+        dynamicContext +=
+          '\n- When the user says "this noun" or asks an unqualified question, assume they mean the noun above. If they ask about a different noun, confirm which DAO they mean.';
+      }
+    }
 
     // Inject persistent memory context (cross-session)
     const memoryContext = await buildMemoryContext(wallet || undefined);

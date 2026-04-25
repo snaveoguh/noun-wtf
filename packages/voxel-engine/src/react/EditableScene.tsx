@@ -14,14 +14,7 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { DEFAULT_VOXEL_DEPTH } from '../types';
-import {
-  flattenTo2D,
-  floodFill3D,
-  getAdjacentPos,
-  parseKey,
-  pixelsToSolidBlock,
-  voxelKey,
-} from '../voxelMap';
+import { flattenTo2D, getAdjacentPos, parseKey, pixelsToSolidBlock, voxelKey } from '../voxelMap';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -33,13 +26,72 @@ type MeshMouseEvent = {
   face?: THREE.Face | null;
   object: THREE.Object3D;
   stopPropagation: () => void;
+  /** R3F also surfaces the ray and full intersection list — we use these to
+   *  filter out raycaster hits that punched through the front and landed on
+   *  the back face of an occluded voxel. */
+  ray?: THREE.Ray;
+  intersections?: ReadonlyArray<{ object: THREE.Object3D }>;
 };
 
 type MeshPointerEvent = {
   face?: THREE.Face | null;
   object: THREE.Object3D;
   stopPropagation: () => void;
+  ray?: THREE.Ray;
+  intersections?: ReadonlyArray<{ object: THREE.Object3D }>;
 };
+
+/** True when the ray hit the BACK side of the face — i.e. the face normal
+ *  points roughly along the ray direction (positive dot product). Filtering
+ *  these out prevents "click on the front, paint behind" when raycasting
+ *  punches through transparent ghost voxels or near-zero-area front faces. */
+function isBackFaceHit(
+  ray: THREE.Ray | undefined,
+  worldNormal: { x: number; y: number; z: number } | null,
+): boolean {
+  if (!ray || !worldNormal) return false;
+  const d = ray.direction;
+  const dot = d.x * worldNormal.x + d.y * worldNormal.y + d.z * worldNormal.z;
+  return dot > 0;
+}
+
+/** 6-connected flood fill that targets voxels whose DISPLAYED color matches
+ *  the clicked voxel (not just the stored color). When layer visibility
+ *  overrides the underlying data, this keeps the bucket behaviour aligned
+ *  with what the user clicked. Falls back to stored-color comparison when
+ *  no display mapping is given. */
+function floodFillByDisplayedColor(
+  voxels: VoxelMap,
+  startKey: string,
+  fillColor: string,
+  targetDisplay: string,
+  getDisplay: (key: string) => string,
+): Map<string, string> {
+  if (!targetDisplay) return new Map();
+  if (targetDisplay === fillColor) return new Map();
+  const changes = new Map<string, string>();
+  const visited = new Set<string>();
+  const queue: string[] = [startKey];
+  while (queue.length > 0) {
+    const key = queue.shift()!;
+    if (visited.has(key)) continue;
+    if (!voxels.has(key)) continue;
+    const currentDisplay = getDisplay(key);
+    if (currentDisplay !== targetDisplay) continue;
+    visited.add(key);
+    changes.set(key, fillColor);
+    const [x, y, z] = parseKey(key);
+    queue.push(
+      voxelKey(x - 1, y, z),
+      voxelKey(x + 1, y, z),
+      voxelKey(x, y - 1, z),
+      voxelKey(x, y + 1, z),
+      voxelKey(x, y, z - 1),
+      voxelKey(x, y, z + 1),
+    );
+  }
+  return changes;
+}
 
 type BrushAxis = 'x' | 'y' | 'z';
 
@@ -257,8 +309,9 @@ function Voxel({
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
     >
-      {}
-      <meshBasicMaterial color={isHovered ? highlightCol : col} />
+      {/* Lambert + scene lighting gives recessed faces visible shading so
+       *  erased holes read as actual depth instead of a flat sticker. */}
+      <meshLambertMaterial color={isHovered ? highlightCol : col} />
     </mesh>
   );
 }
@@ -427,6 +480,19 @@ export default function EditableScene({
   const handleVoxelClick = useCallback(
     (key: string, e: MeshMouseEvent) => {
       if (interactionMode !== 'sculpt') return;
+      // Only act on the closest intersection. R3F dispatches per-mesh in
+      // distance order; ignoring later events prevents the same click from
+      // falling through to a voxel behind the front-most one if the front
+      // mesh's hit is somehow not the first to receive the event.
+      if (e.intersections && e.intersections.length > 0 && e.intersections[0].object !== e.object) {
+        return;
+      }
+      const worldNormalRaw = getWorldFaceNormal(e.face?.normal, e.object);
+      if (isBackFaceHit(e.ray, worldNormalRaw)) {
+        // Hit the back face of a voxel — ignore so paint doesn't land behind
+        // the model (classic raycast-through-mesh artefact).
+        return;
+      }
       e.stopPropagation();
       if (isDrag(e)) return;
 
@@ -435,7 +501,7 @@ export default function EditableScene({
       const color = colorRef.current;
 
       const pos = parseKey(key);
-      const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
+      const faceNormal = getDominantFaceNormal(worldNormalRaw);
 
       switch (tool) {
         case 'pencil': {
@@ -467,7 +533,17 @@ export default function EditableScene({
           break;
         }
         case 'fill': {
-          const changes = floodFill3D(voxels, key, color);
+          // When displayPixels is overriding the rendered color (layer
+          // visibility), flood-fill against what the user SEES, not the
+          // underlying voxel data. Keeps fill matching the clicked swatch.
+          const displayedTarget = getDisplayColor(key);
+          const changes = floodFillByDisplayedColor(
+            voxels,
+            key,
+            color,
+            displayedTarget,
+            getDisplayColor,
+          );
           if (changes.size > 0) {
             const next = new Map(voxels);
             for (const [k, v] of changes) next.set(k, v);
@@ -498,11 +574,18 @@ export default function EditableScene({
   const handleVoxelHover = useCallback(
     (key: string, e: MeshPointerEvent) => {
       if (interactionMode !== 'sculpt') return;
+      // Match the click handler's filtering so the ghost preview tracks the
+      // same voxel that will actually be painted.
+      if (e.intersections && e.intersections.length > 0 && e.intersections[0].object !== e.object) {
+        return;
+      }
+      const worldNormalRaw = getWorldFaceNormal(e.face?.normal, e.object);
+      if (isBackFaceHit(e.ray, worldNormalRaw)) return;
       e.stopPropagation();
       setHoveredKey(key);
       if (toolRef.current === 'pencil' && colorRef.current) {
         const pos = parseKey(key);
-        const faceNormal = getDominantFaceNormal(getWorldFaceNormal(e.face?.normal, e.object));
+        const faceNormal = getDominantFaceNormal(worldNormalRaw);
         const adjacent = getAdjacentPos(
           { x: faceNormal.vector[0], y: faceNormal.vector[1], z: faceNormal.vector[2] },
           pos,
@@ -525,8 +608,12 @@ export default function EditableScene({
 
   return (
     <>
-      {}
-      {/* No lights needed — meshBasicMaterial renders true hex colors */}
+      {/* Lambert voxels need a touch of light so erased cells read as holes
+       *  with depth. Ambient = ~unlit base; key directional adds enough
+       *  shading on side faces to perceive recesses without crushing color. */}
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[8, 14, 18]} intensity={0.6} />
+      <directionalLight position={[-12, -6, 8]} intensity={0.18} />
 
       {voxelEntries.map(([key]) => {
         const [x, y, z] = parseKey(key);

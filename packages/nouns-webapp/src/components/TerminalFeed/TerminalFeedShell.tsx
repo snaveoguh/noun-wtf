@@ -108,11 +108,11 @@ export default function TerminalFeedShell() {
             )}
           </ConnectKitButton.Custom>
 
-          {/* Theme toggle */}
+          {/* Theme toggle — exits terminal/classic and lands on the graphical site */}
           {!isEmbedded && (
             <button
               onClick={() => {
-                setMode('classic');
+                setMode('new');
                 window.location.replace('/');
               }}
               style={{
@@ -131,7 +131,7 @@ export default function TerminalFeedShell() {
                 (e.target as HTMLElement).style.color = '#444';
               }}
             >
-              classic
+              new
             </button>
           )}
         </div>
