@@ -9,6 +9,7 @@ import ShortAddress from '@/components/ShortAddress';
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
+import { fetchGrantsFromChain } from './grantsChainFallback';
 
 const API_BASE = (
   (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
@@ -71,29 +72,58 @@ export default function GrantsPage() {
   }, []);
 
   useEffect(() => {
-    // REST endpoint — single request, bypasses Fastly chunked-encoding truncation
-    fetch(`${API_BASE}/api/grants`)
-      .then(r => r.json())
-      .then((items: Grant[]) => {
-        setGrants(
-          items.map(g => ({
-            id: Number(g.id),
-            proposer: g.proposer ?? '',
-            signer: (g as Grant & { signer?: string }).signer ?? null,
-            description: g.description ?? '',
-            status: g.status ?? 'ACTIVE',
-            forVotes: Number(g.forVotes ?? 0),
-            againstVotes: Number(g.againstVotes ?? 0),
-            abstainVotes: Number(g.abstainVotes ?? 0),
-            startBlock: String(g.startBlock ?? '0'),
-            endBlock: String(g.endBlock ?? '0'),
-            executionETA: g.executionETA != null ? String(g.executionETA) : null,
-            createdAt: String(g.createdAt ?? ''),
-          })),
-        );
-      })
-      .catch((e: unknown) => console.error('[Grants] Fetch failed:', e))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const normalize = (items: Grant[]): Grant[] =>
+      items.map(g => ({
+        id: Number(g.id),
+        proposer: g.proposer ?? '',
+        signer: (g as Grant & { signer?: string }).signer ?? null,
+        description: g.description ?? '',
+        status: g.status ?? 'ACTIVE',
+        forVotes: Number(g.forVotes ?? 0),
+        againstVotes: Number(g.againstVotes ?? 0),
+        abstainVotes: Number(g.abstainVotes ?? 0),
+        startBlock: String(g.startBlock ?? '0'),
+        endBlock: String(g.endBlock ?? '0'),
+        executionETA: g.executionETA != null ? String(g.executionETA) : null,
+        createdAt: String(g.createdAt ?? ''),
+      }));
+
+    // Try the REST endpoint first (single request, bypasses Fastly
+    // chunked-encoding truncation). If it 502s — Railway is currently
+    // stuck post-NounV2 launch — fall back to reading the
+    // SmallGrantsTreasury contract directly via wagmi/viem multicall.
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/grants`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const items: Grant[] = await res.json();
+        if (cancelled) return;
+        if (items.length > 0) {
+          setGrants(normalize(items));
+          setLoading(false);
+          return;
+        }
+        // 200 + empty list → still try the chain in case the API is
+        // running but the indexer is behind.
+        const chain = await fetchGrantsFromChain();
+        if (!cancelled) setGrants(normalize(chain));
+      } catch (e) {
+        console.warn('[Grants] /api/grants unavailable, trying chain fallback:', e);
+        try {
+          const chain = await fetchGrantsFromChain();
+          if (!cancelled) setGrants(normalize(chain));
+        } catch (chainErr) {
+          console.error('[Grants] Chain fallback also failed:', chainErr);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const treasuryEth = balance ? formatEther(balance.value) : '0';
