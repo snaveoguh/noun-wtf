@@ -143,7 +143,10 @@ const NavBar = () => {
             <button
               type="button"
               onClick={() => {
-                setSiteMode('classic');
+                // SiteMode naming is backwards — 'new' is the terminal feed,
+                // 'classic' is the graphical site. App.tsx:88 confirms:
+                // isTerminalHome = mode === 'new' && pathname === '/'.
+                setSiteMode('new');
                 navigate('/');
               }}
               title="Switch to Terminal Feed"

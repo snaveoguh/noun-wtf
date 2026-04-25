@@ -113,7 +113,9 @@ export default function TerminalFeedShell() {
           {!isEmbedded && (
             <button
               onClick={() => {
-                setMode('new');
+                // 'classic' is graphical noun.wtf in this codebase
+                // (App.tsx renders TerminalFeedShell when mode === 'new').
+                setMode('classic');
                 window.location.replace('/');
               }}
               title="Exit terminal"
