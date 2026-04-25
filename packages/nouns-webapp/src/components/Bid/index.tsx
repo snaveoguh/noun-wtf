@@ -109,12 +109,14 @@ const Bid: React.FC<BidProps> = props => {
   const bidInputHandler = (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target.value;
 
-    // disable more than 2 digits after the decimal point
-    if (input.includes('.') && event.target.value.split('.')[1].length > 2) {
+    // Cap at 18 decimal places (max ETH precision). NounV2 reserve is 50 wei
+    // so users may legitimately want sub-0.01 ETH bids; the prior 2-decimal
+    // cap inflated that to a 0.01 minimum.
+    if (input.includes('.') && input.split('.')[1].length > 18) {
       return;
     }
 
-    setBidInput(event.target.value);
+    setBidInput(input);
   };
 
   useEffect(() => {
