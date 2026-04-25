@@ -31,8 +31,21 @@ interface Grant {
   createdAt: string;
 }
 
+/**
+ * Pick a human-readable title from a markdown-ish description. We strip
+ * HTML comments first because the NounIRL gasless flow embeds a
+ * `<!-- SIGNER:0x... -->` hint as the first line — without this the
+ * card just shows the comment instead of the actual proposal title.
+ */
 function getTitle(desc: string) {
-  return (desc.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 80) || 'Untitled';
+  const stripped = desc
+    // Drop HTML comments wherever they appear (multiline-aware).
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // Strip leading whitespace + blank lines so the first *meaningful*
+    // line wins regardless of how many blank lines the comment left.
+    .replace(/^[\s\r\n]+/, '');
+  const firstLine = stripped.split('\n')[0] ?? '';
+  return firstLine.replace(/^#+\s*/, '').slice(0, 80) || 'Untitled';
 }
 
 const RELAYER_ADDRESS = '0xacc74b39976d50522621f54c18dc85e2822ec22c';

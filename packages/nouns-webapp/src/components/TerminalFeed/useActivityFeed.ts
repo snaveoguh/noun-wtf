@@ -70,85 +70,100 @@ export function useActivityFeed(activeFilter: string) {
       const v2Only = isV2OnlyFilter(activeFilter);
       const v2Excluded = isV2Excluded(activeFilter);
 
-      const fetchMainnet = async (): Promise<{
-        events: ActivityEvent[];
-        hasMore: boolean;
-        oldestBlock: number;
-      } | null> => {
-        if (v2Only) return { events: [], hasMore: false, oldestBlock: 0 };
-        try {
-          const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-          if (before) params.set('before', String(before));
-          if (activeFilter && activeFilter !== V2_ALL_FILTER) params.set('type', activeFilter);
-          const res = await fetch(`${API_BASE}/api/activity?${params}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const apiData = await res.json();
-          if (apiData?.events?.length > 0) return apiData;
-          // API returned 0 events — fall back to direct chain reads. The
-          // /api/activity endpoint went 502 after the v2 launch retriggered
-          // a Railway redeploy, so the existing v1 path can't depend on it.
-          const chainEvents = await fetchV1ChainEvents();
-          return {
-            events: chainEvents,
-            hasMore: false,
-            oldestBlock:
-              chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
-          };
-        } catch (err) {
-          console.warn('[ActivityFeed] Mainnet endpoint unavailable, trying chain fallback:', err);
-          try {
-            const chainEvents = await fetchV1ChainEvents();
-            return {
-              events: chainEvents,
-              hasMore: false,
-              oldestBlock:
-                chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
-            };
-          } catch (chainErr) {
-            console.warn('[ActivityFeed] V1 chain fallback also failed:', chainErr);
-            return null;
-          }
-        }
+      // Race the API against the chain so a flaky Railway (502 with 15s
+      // hangs) doesn't leave the UI stuck on "loading…". Whichever finishes
+      // first with a non-empty result wins; if both come back empty we
+      // surface whatever we got (or null if everything failed).
+      const API_TIMEOUT_MS = 6_000;
+      const armTimeout = (ac: AbortController): void => {
+        setTimeout(() => ac.abort(), API_TIMEOUT_MS);
       };
 
-      const fetchV2 = async (): Promise<{
-        events: ActivityEvent[];
-        hasMore: boolean;
-        oldestBlock: number;
-      } | null> => {
-        if (v2Excluded) return { events: [], hasMore: false, oldestBlock: 0 };
-        try {
-          const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-          if (before) params.set('before', String(before));
-          const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const apiData = await res.json();
-          if (apiData?.events?.length > 0) return apiData;
-          // API returned 0 events — fall back to direct chain reads. The
-          // /api/nounv2-feed endpoint isn't always live (Railway redeploy
-          // issues post-NounV2 launch).
-          const chainEvents = await fetchV2ChainEvents();
-          return {
-            events: chainEvents,
-            hasMore: false,
-            oldestBlock:
-              chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
-          };
-        } catch (err) {
-          console.warn('[ActivityFeed] V2 endpoint unavailable, trying chain fallback:', err);
+      type FetchResult = { events: ActivityEvent[]; hasMore: boolean; oldestBlock: number };
+
+      const fetchMainnet = async (): Promise<FetchResult | null> => {
+        if (v2Only) return { events: [], hasMore: false, oldestBlock: 0 };
+
+        const apiPromise = (async (): Promise<FetchResult | null> => {
           try {
-            const chainEvents = await fetchV2ChainEvents();
-            return {
-              events: chainEvents,
-              hasMore: false,
-              oldestBlock:
-                chainEvents.length > 0 ? chainEvents[chainEvents.length - 1]!.blockNumber : 0,
-            };
-          } catch (chainErr) {
-            console.warn('[ActivityFeed] V2 chain fallback also failed:', chainErr);
-            return { events: [], hasMore: false, oldestBlock: 0 };
+            const ac = new AbortController();
+            armTimeout(ac);
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (before) params.set('before', String(before));
+            if (activeFilter && activeFilter !== V2_ALL_FILTER) params.set('type', activeFilter);
+            const res = await fetch(`${API_BASE}/api/activity?${params}`, { signal: ac.signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const apiData = await res.json();
+            if (apiData?.events?.length > 0) return apiData;
+            return null; // 200 but empty → let chain win
+          } catch {
+            return null;
           }
-        }
+        })();
+
+        const chainPromise = (async (): Promise<FetchResult | null> => {
+          try {
+            const events = await fetchV1ChainEvents();
+            if (events.length === 0) return null;
+            return {
+              events,
+              hasMore: false,
+              oldestBlock: events[events.length - 1]!.blockNumber,
+            };
+          } catch {
+            return null;
+          }
+        })();
+
+        // Resolve as soon as either path returns something. Promise.any
+        // throws if both reject — we treat that as "no data" (null).
+        const winner = await Promise.any([
+          apiPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
+          chainPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
+        ]).catch(() => null);
+
+        return winner;
+      };
+
+      const fetchV2 = async (): Promise<FetchResult | null> => {
+        if (v2Excluded) return { events: [], hasMore: false, oldestBlock: 0 };
+
+        const apiPromise = (async (): Promise<FetchResult | null> => {
+          try {
+            const ac = new AbortController();
+            armTimeout(ac);
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (before) params.set('before', String(before));
+            const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`, { signal: ac.signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const apiData = await res.json();
+            if (apiData?.events?.length > 0) return apiData;
+            return null;
+          } catch {
+            return null;
+          }
+        })();
+
+        const chainPromise = (async (): Promise<FetchResult | null> => {
+          try {
+            const events = await fetchV2ChainEvents();
+            if (events.length === 0) return null;
+            return {
+              events,
+              hasMore: false,
+              oldestBlock: events[events.length - 1]!.blockNumber,
+            };
+          } catch {
+            return null;
+          }
+        })();
+
+        const winner = await Promise.any([
+          apiPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
+          chainPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
+        ]).catch(() => null);
+
+        return winner ?? { events: [], hasMore: false, oldestBlock: 0 };
       };
 
       const [mainnet, v2] = await Promise.all([fetchMainnet(), fetchV2()]);

@@ -19,6 +19,7 @@ import {
 } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
+import { fetchGrantsFromChain } from './grantsChainFallback';
 
 const RELAYER_ADDRESS = '0xacc74b39976d50522621f54c18dc85e2822ec22c';
 
@@ -128,11 +129,19 @@ export default function GrantDetailPage() {
   }, []);
 
   // Fetch grant data from REST endpoint (bypasses GraphQL truncation, status pre-computed)
+  // Falls back to reading SmallGrantsTreasury directly via wagmi/viem when
+  // the REST endpoint is 502'ing (Railway flap post-NounV2 launch). The
+  // fallback can't resolve `votes` or `statusChanges` (those need the
+  // indexer), but the page still shows the proposal + lets you vote.
   useEffect(() => {
     if (!grantId) return;
-    fetch(`${API_BASE}/api/grants/${grantId}`)
-      .then(r => r.json())
-      .then(d => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/grants/${grantId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+        if (cancelled) return;
         if (d.grant) {
           const g = d.grant;
           setGrant({
@@ -151,15 +160,27 @@ export default function GrantDetailPage() {
             createdAtTransaction: g.createdAtTransaction || '',
           });
         }
-        if (d.votes) {
-          setVotes(d.votes);
+        if (d.votes) setVotes(d.votes);
+        if (d.statusChanges) setStatusChanges(d.statusChanges);
+      } catch (e) {
+        console.warn('[GrantDetail] /api/grants/{id} unavailable, trying chain fallback:', e);
+        try {
+          const chainGrants = await fetchGrantsFromChain();
+          if (cancelled) return;
+          const found = chainGrants.find(g => g.id === grantId);
+          if (found) {
+            setGrant({ ...found, createdAtTransaction: '' });
+          }
+        } catch (chainErr) {
+          console.error('[GrantDetail] chain fallback also failed:', chainErr);
         }
-        if (d.statusChanges) {
-          setStatusChanges(d.statusChanges);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [grantId, txConfirmed]);
 
   async function handleVote() {
