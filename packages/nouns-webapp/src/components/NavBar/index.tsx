@@ -137,6 +137,34 @@ const NavBar = () => {
             <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
               <LolLogo className={classes.navBarLogo} />
             </Navbar.Brand>
+            {/* Tiny terminal-feed entry point — squashed next to the fries logo
+                so it's always reachable from mobile where the secondary nav
+                icons get truncated. Green pill, matches the terminal palette. */}
+            <button
+              type="button"
+              onClick={() => {
+                setSiteMode('classic');
+                navigate('/');
+              }}
+              title="Switch to Terminal Feed"
+              aria-label="Switch to Terminal Feed"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(0,255,65,0.5)',
+                color: '#00ff41',
+                cursor: 'pointer',
+                padding: '2px 5px',
+                marginLeft: '4px',
+                lineHeight: 1,
+                fontSize: '0.65rem',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontWeight: 700,
+                borderRadius: '3px',
+                flexShrink: 0,
+              }}
+            >
+              &gt;_
+            </button>
             {Number(CHAIN_ID) !== 1 && (
               <Nav.Item>
                 <img className={classes.testnetImg} src={testnetNoun} alt="testnet noun" />
