@@ -136,7 +136,73 @@ export function MarketsTable() {
         </p>
       </div>
 
-      <div className="w-full overflow-x-auto">
+      {/* Mobile: stacked cards. Desktop (md+): legacy table layout. */}
+      <div className="block space-y-2 md:hidden">
+        {paged.map(entry => (
+          <div
+            key={entry.id}
+            className="rounded border border-[var(--rule)] p-3 font-mono text-[10px]"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span
+                className="border px-1.5 py-0.5 text-[9px] uppercase tracking-wider"
+                style={{
+                  borderColor: 'var(--rule)',
+                  color:
+                    entry.kind === 'auction'
+                      ? 'var(--accent-red)'
+                      : entry.daoKey === 'lil-nouns'
+                        ? '#ec4899'
+                        : 'var(--ink)',
+                }}
+              >
+                {entry.kind === 'auction'
+                  ? 'AUCTION'
+                  : entry.daoKey === 'lil-nouns'
+                    ? 'LIL'
+                    : 'NOUNS'}
+              </span>
+              <span
+                className="text-[9px] uppercase"
+                style={{ color: statusColor(entry.status) }}
+              >
+                {statusLabel(entry.status)}
+                {entry.status === 'resolved' && OUTCOME_LABEL[entry.outcome] != null && (
+                  <span className="ml-1 text-[8px] text-[var(--ink-faint)]">
+                    {OUTCOME_LABEL[entry.outcome]}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="mb-2 text-[var(--ink-light)]">
+              {entry.link != null ? (
+                <a
+                  href={entry.link}
+                  target={entry.link.startsWith('/') ? undefined : '_blank'}
+                  rel="noreferrer"
+                  className="block break-words hover:text-[var(--ink)]"
+                >
+                  {entry.title}
+                </a>
+              ) : (
+                <span className="block break-words">{entry.title}</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[var(--ink-light)]">
+                Pool: {formatEth(BigInt(entry.totalPoolWei))}
+              </span>
+              {entry.status === 'needs-resolution' ? (
+                <ResolveActionButton entry={entry} />
+              ) : (
+                <span className="text-[var(--ink-faint)]">—</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden w-full overflow-x-auto md:block">
         <table className="w-full min-w-[520px] border-collapse font-mono text-[9px]">
           <thead>
             <tr className="border-b border-[var(--rule)] text-left text-[var(--ink-faint)]">
