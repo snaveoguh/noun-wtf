@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import AmbientMusic from '@/components/AmbientMusic';
@@ -81,6 +81,7 @@ const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 function AppRouter() {
   const { mode } = useSiteTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
   const [dreamOpen, setDreamOpen] = useState(false);
   const [saberMode, setSaberMode] = useState(false);
@@ -92,6 +93,20 @@ function AppRouter() {
     window.addEventListener('open-dream-window', handler);
     return () => window.removeEventListener('open-dream-window', handler);
   }, []);
+
+  // Backwards-compat: rewrite legacy `?dao=nounv2` URLs to the new `/v2`
+  // namespace before any route-level rendering. Sits at the router level
+  // so it fires even when terminal mode preempts AuctionPage on `/`.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('dao') !== 'nounv2') return;
+    const isAuctionRoute =
+      location.pathname === '/' || location.pathname.startsWith('/noun/');
+    if (!isAuctionRoute) return;
+    const idMatch = location.pathname.match(/^\/noun\/(.+)$/);
+    const nextPath = idMatch ? `/v2/noun/${idMatch[1]}` : '/v2';
+    navigate(nextPath, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
@@ -132,6 +147,11 @@ function AppRouter() {
         <Route path="/" element={<AuctionPage />} />
         <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
         <Route path="/noun/:id" element={<AuctionPage />} />
+        {/* V2 auction routes — split namespace so URL alone owns DAO context.
+             The Auction page detects `/v2*` via useActiveDao and swaps in the
+             V2 contracts/seed loader/holder reads. */}
+        <Route path="/v2" element={<AuctionPage />} />
+        <Route path="/v2/noun/:id" element={<AuctionPage />} />
         <Route path="/nounders" element={<NoundersPage />} />
         <Route path="/create-proposal" element={<CreateProposalPage />} />
         <Route path="/create-candidate" element={<CreateCandidatePage />} />

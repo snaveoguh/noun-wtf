@@ -1,88 +1,45 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback } from 'react';
 
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 /**
- * Which DAO the auction hero + home view is currently showing.
+ * Which DAO the current page is showing.
  *
  * - `'nouns'`  → the traditional mainnet Nouns auction (default).
  * - `'nounv2'` → the NounV2 fork (no-reserve auctions, shared webapp).
  *
- * Source of truth, in order:
- *   1. `?dao=` query param on the current URL.
- *   2. `localStorage['noun.wtf:activeDao']` from a previous visit.
- *   3. Fallback to `'nouns'`.
+ * Source of truth is the URL pathname:
+ *   - `/v2`, `/v2/...`        → `'nounv2'`
+ *   - everything else         → `'nouns'`
+ *
+ * This used to be a `?dao=` query param + `localStorage` fallback. That model
+ * leaked: a stale `'nounv2'` in storage made `/noun/:id` and `/probe` think
+ * they were V2 even though those pages always render mainnet content. The
+ * URL is the only source of truth now.
  */
 export type ActiveDao = 'nouns' | 'nounv2';
 
-const STORAGE_KEY = 'noun.wtf:activeDao';
-const VALID_DAOS: readonly ActiveDao[] = ['nouns', 'nounv2'] as const;
-
-function isValidDao(value: unknown): value is ActiveDao {
-  return typeof value === 'string' && VALID_DAOS.includes(value as ActiveDao);
+function pathnameToDao(pathname: string): ActiveDao {
+  if (pathname === '/v2' || pathname.startsWith('/v2/')) return 'nounv2';
+  // The legacy `/nounv2` governance routes also live in V2 context — keep
+  // the toggle showing V2 when the user is reading proposals there.
+  if (pathname === '/nounv2' || pathname.startsWith('/nounv2/')) return 'nounv2';
+  return 'nouns';
 }
 
-function readStoredDao(): ActiveDao | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return isValidDao(raw) ? raw : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Returns the active DAO plus a setter that updates both the URL query
- * param and localStorage. Setter uses `replace` so the back-button still
- * navigates page-by-page rather than toggle-by-toggle.
- */
 export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: ActiveDao) => void } {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const queryDao = searchParams.get('dao');
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const activeDao: ActiveDao = useMemo(() => {
-    if (isValidDao(queryDao)) return queryDao;
-    const stored = readStoredDao();
-    if (stored) return stored;
-    return 'nouns';
-  }, [queryDao]);
-
-  // Whenever the effective DAO changes (URL or fallback), persist to localStorage
-  // so a fresh visit without a `?dao=` param remembers the last choice.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, activeDao);
-    } catch {
-      // storage may be disabled (private mode, quota) — silent fail is fine.
-    }
-  }, [activeDao]);
+  const activeDao = pathnameToDao(location.pathname);
 
   const setActiveDao = useCallback(
     (next: ActiveDao) => {
-      // Always set the dao param explicitly so every click triggers a URL
-      // change. Previously we deleted the param when flipping back to 'nouns'
-      // for cleaner URLs — but if localStorage already had 'nounv2' as the
-      // default and the URL had no ?dao=, deleting produced the same URL we
-      // started with, so the activeDao memo (keyed on queryDao) never
-      // recomputed and the pill click looked dead. Correctness wins.
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('dao', next);
-      setSearchParams(nextParams, { replace: true });
-
-      // localStorage write is handled by the effect above once the URL updates,
-      // but we also write eagerly so the value is available on the same tick
-      // for any non-hook consumer that reads storage directly.
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(STORAGE_KEY, next);
-        } catch {
-          // ignore
-        }
-      }
+      // Navigating to the DAO root replaces the current entry so the
+      // back-button steps page-by-page rather than toggle-by-toggle.
+      navigate(next === 'nounv2' ? '/v2' : '/', { replace: true });
     },
-    [searchParams, setSearchParams],
+    [navigate],
   );
 
   return { activeDao, setActiveDao };
