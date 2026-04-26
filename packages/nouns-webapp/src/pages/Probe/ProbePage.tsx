@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 
 import { GenericSkeleton } from '@/components/Skeleton';
-import { useActiveDao } from '@/hooks/useActiveDao';
 
 import ExploreTab from './ExploreTab';
 
@@ -27,7 +26,6 @@ const TAB_CONFIG: { key: ProbeTab; label: string }[] = [
 const ProbePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setActiveDao } = useActiveDao();
   const initialTab = (searchParams.get('tab') as ProbeTab) || 'explore';
   const [tab, setTab] = useState<ProbeTab>(
     TAB_CONFIG.some(t => t.key === initialTab) ? initialTab : 'explore',
@@ -41,8 +39,7 @@ const ProbePage: React.FC = () => {
   }, [tab, searchParams, setSearchParams]);
 
   const onJumpToV2 = () => {
-    setActiveDao('nounv2');
-    navigate('/?dao=nounv2');
+    navigate('/v2');
   };
 
   return (
