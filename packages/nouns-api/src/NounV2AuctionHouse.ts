@@ -24,9 +24,25 @@ ponder.on('NounV2AuctionHouse:AuctionCreated', async ({ event, context }) => {
 });
 
 ponder.on('NounV2AuctionHouse:AuctionExtended', async ({ event, context }) => {
+  // Same defensive pattern as AuctionSettled — if the original
+  // AuctionCreated row is missing (startBlock skew), insert a stub so the
+  // indexer doesn't crash. startTime is approximate (we don't have it
+  // from the Extended event); the API surfaces show it as the extension
+  // block which is acceptable until a re-sync from earlier blocks.
   await context.db
-    .update(nounV2Auction, { nounId: event.args.nounId })
-    .set({ endTime: new Date(Number(event.args.endTime)) });
+    .insert(nounV2Auction)
+    .values({
+      nounId: event.args.nounId,
+      startTime: new Date(Number(event.block.timestamp)),
+      endTime: new Date(Number(event.args.endTime)),
+      settled: false,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoUpdate({
+      endTime: new Date(Number(event.args.endTime)),
+    });
 });
 
 ponder.on('NounV2AuctionHouse:AuctionBid', async ({ event, context }) => {
@@ -53,9 +69,28 @@ ponder.on('NounV2AuctionHouse:AuctionBid', async ({ event, context }) => {
 });
 
 ponder.on('NounV2AuctionHouse:AuctionSettled', async ({ event, context }) => {
-  await context.db.update(nounV2Auction, { nounId: event.args.nounId }).set({
-    settled: true,
-    winner: event.args.winner,
-    amount: event.args.amount,
-  });
+  // Use insert + onConflictDoUpdate so a missing AuctionCreated row (e.g.
+  // when the indexer's startBlock lands AFTER the original AuctionCreated
+  // for nounId=0) doesn't crash the entire indexer in a loop. We can
+  // backfill the timestamps from the settle event itself — they aren't
+  // perfectly accurate (settle is the *end* not the start) but the row
+  // exists and downstream API queries don't blow up.
+  await context.db
+    .insert(nounV2Auction)
+    .values({
+      nounId: event.args.nounId,
+      startTime: new Date(Number(event.block.timestamp)),
+      endTime: new Date(Number(event.block.timestamp)),
+      settled: true,
+      winner: event.args.winner,
+      amount: event.args.amount,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoUpdate({
+      settled: true,
+      winner: event.args.winner,
+      amount: event.args.amount,
+    });
 });
