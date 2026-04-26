@@ -2422,9 +2422,9 @@ type CandidateRow = typeof schema.candidate.$inferSelect;
 
 async function findCandidates(
   keyword: string,
-  opts: { includeCanceled?: boolean; limit?: number } = {},
+  opts: { includeCanceled?: boolean; includePromoted?: boolean; limit?: number } = {},
 ): Promise<CandidateRow[]> {
-  const { includeCanceled = false, limit = 5 } = opts;
+  const { includeCanceled = false, includePromoted = false, limit = 5 } = opts;
   // Fetch a large pool — candidates are small rows
   const allCands = await db
     .select()
@@ -2448,6 +2448,13 @@ async function findCandidates(
 
   for (const c of allCands) {
     if (!includeCanceled && c.canceled) continue;
+    // Skip already-promoted candidates by default. Without this filter, a
+    // resubmitted candidate that shares the original's slug stem (e.g.
+    // `nouns-x-501c3-study` already-promoted vs the new `…-mog6ls68`) can
+    // win the fuzzy match on exact-slug score 100 vs the new candidate's
+    // 80 substring score, sending the dead row's targets/calldatas to
+    // proposeBySigs and creating a duplicate proposal.
+    if (!includePromoted && c.promotedToProposalId != null) continue;
 
     const slug = (c.slug ?? '').toString();
     const slugNorm = normalize(slug);
@@ -2968,11 +2975,15 @@ async function parseCommand(
       const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
 
-      // Fetch valid sponsor signatures
+      // Fetch valid sponsor signatures.
+      // candidateSignature.candidateId is the candidate's primary key
+      // (`${proposer}-${slug}`) — there's no `candidateSlug` column. The old
+      // code referenced a non-existent property which Drizzle stringified
+      // into broken SQL ("syntax error at or near '='" from postgres).
       const sigs = await db
         .select()
         .from(schema.candidateSignature)
-        .where(eq(schema.candidateSignature.candidateSlug, c.slug))
+        .where(eq(schema.candidateSignature.candidateId, c.id as string))
         .limit(100);
       const nowSec = Math.floor(Date.now() / 1000);
       const validSigs = sigs.filter(s => !s.canceled && Number(s.expirationTimestamp) > nowSec);
@@ -5198,11 +5209,13 @@ CRITICAL RULES:
                           ?.replace(/^#+\s*/, '')
                           .trim() || 'Untitled';
 
-                      // Fetch signatures for this candidate
+                      // Fetch signatures for this candidate.
+                      // Match on candidateId (`${proposer}-${slug}` PK), not
+                      // a non-existent candidateSlug column.
                       const sigs = await db
                         .select()
                         .from(schema.candidateSignature)
-                        .where(eq(schema.candidateSignature.candidateSlug, input.slug))
+                        .where(eq(schema.candidateSignature.candidateId, c.id as string))
                         .limit(100);
 
                       const nowSec = Math.floor(Date.now() / 1000);

@@ -40,11 +40,12 @@ import { useDaoNounSeed, useDaoReservePrice } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
 import { isBurnedAuction } from '@/utils/burnedAuction';
-import { nounPath } from '@/utils/history';
+import { nounPath, nounV2Path } from '@/utils/history';
 import { beige, grey } from '@/utils/nounBgColors';
 import { isNounderNoun } from '@/utils/nounderNoun';
 import { hasDerivativesContract, useCreateDerivative } from '@/wrappers/nounDerivatives';
 import type { Auction as IAuction } from '@/wrappers/nounsAuction';
+import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './Auction.module.css';
@@ -103,6 +104,26 @@ type HeroViewMode =
   | 'sprite'
   | `deriv-${string}`
   | `link-${string}`;
+
+const VIEW_MODE_STORAGE_KEY = 'noun.wtf:viewMode';
+const PERSISTED_VIEW_MODES: ReadonlySet<HeroViewMode> = new Set([
+  'real',
+  '3d',
+  'ascii',
+]);
+
+function readPersistedViewMode(): HeroViewMode {
+  if (typeof window === 'undefined') return '3d';
+  try {
+    const raw = window.sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    if (raw && PERSISTED_VIEW_MODES.has(raw as HeroViewMode)) {
+      return raw as HeroViewMode;
+    }
+  } catch {
+    // sessionStorage may be disabled — fall through to default.
+  }
+  return '3d';
+}
 
 type InteractionMode = 'scroll' | 'grab' | 'twist';
 type EditMode = '2d' | '3d' | null;
@@ -263,9 +284,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const currentNounId = currentAuction ? Number(currentAuction.nounId) : 0;
 
   // The DAO context resolves contract addresses/abis for the active DAO
-  // (`?dao=` toggle). Pass it through to every auction-house / token read
-  // or write so v1 and v2 share the same big <Auction> rendering pipeline.
+  // (now derived from the `/v2*` URL prefix). Pass it through to every
+  // auction-house / token read or write so v1 and v2 share the same big
+  // <Auction> rendering pipeline.
   const dao = useDaoContext();
+
+  // Live V2 auction — independent of `currentAuction` so /v2/noun/:id
+  // pages still know the upper bound for prev/next navigation.
+  const v2LiveAuction = useV2OnDisplayAuction();
 
   // Pull the active DAO's AuctionHouse reservePrice. Post the recent
   // governance prop mainnet Nouns is 2.8 ETH; v2 defaults to 0. We
@@ -283,17 +309,40 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
   );
 
-  // The "last auction" concept on v2 is always the current auction — we
-  // don't archive past v2 auctions yet, so prev/next navigation is
-  // effectively a single-page view. The mainnet Redux slice is indexer-
-  // driven, unusable on v2, so we collapse it to the live nounId.
+  // For v2 the "last" nounId is whichever noun is currently being
+  // auctioned on chain — read it independently of `currentAuction` so the
+  // /v2/noun/:id pages know the upper navigation bound. We can't archive
+  // past v2 auctions yet (no Ponder indexer) but at least prev/next can
+  // walk back through the on-chain ownerOf data.
   const lastNounId = dao.isV2
-    ? currentAuction
-      ? Number(currentAuction.nounId)
-      : undefined
+    ? v2LiveAuction
+      ? Number(v2LiveAuction.nounId)
+      : currentAuction
+        ? Number(currentAuction.nounId)
+        : undefined
     : lastNounIdMainnet;
 
-  const [viewMode, setViewMode] = useState<HeroViewMode>('3d');
+  const [viewMode, setViewMode] = useState<HeroViewMode>(() => readPersistedViewMode());
+
+  // Persist the current "main" view (real / 3d / ascii) across noun
+  // navigations so prev/next doesn't kick the user back to 3D every time.
+  // Editing + transient modes (edit-*, sprite, deriv-*, link-*) deliberately
+  // skip persistence — those don't carry over meaningfully to a different
+  // noun (a derivative on noun N doesn't exist on noun N±1).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (
+      viewMode === 'real' ||
+      viewMode === '3d' ||
+      viewMode === 'ascii'
+    ) {
+      try {
+        window.sessionStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+      } catch {
+        // sessionStorage may be disabled — silent fail is fine.
+      }
+    }
+  }, [viewMode]);
   const [lightingPreset, setLightingPreset] = useState<LightingPreset>('storefront');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('scroll');
   const [editMode, setEditMode] = useState<EditMode>(null);
@@ -523,7 +572,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   }, [currentAuction, currentNounId, fetchLiveDraftsForNoun, isEditing]);
 
   const resetHeroState = useCallback(() => {
-    setViewMode('3d');
+    // Preserve the user's chosen primary view (real / 3d / ascii) across
+    // noun navigations — they shouldn't lose their 2D Real selection just
+    // because they paged forward. Transient/per-noun modes (edit-*, sprite,
+    // deriv-X, link-Y) DO get reset since they don't carry to a new noun.
+    setViewMode(prev => (PERSISTED_VIEW_MODES.has(prev) ? prev : '3d'));
     setInteractionMode('scroll');
     setEditMode(null);
     setShowHelp(false);
@@ -1022,15 +1075,20 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // risk traversing a long run of burns if the reserve stays unmet and
   // feels disorienting; keeping users on the page with a clear "burned"
   // state is more honest.
+  // prev/next navigation must stay within the active DAO's namespace —
+  // mainnet → /noun/:id, v2 → /v2/noun/:id. Crossing namespaces was the
+  // root cause of the "v2 noun 0 says owned by nounders" confusion.
   const prevAuctionHandler = useCallback(() => {
     if (!currentAuction) return;
-    navigate(nounPath(Number(currentAuction.nounId) - 1));
-  }, [currentAuction, navigate]);
+    const path = dao.isV2 ? nounV2Path : nounPath;
+    navigate(path(Number(currentAuction.nounId) - 1));
+  }, [currentAuction, dao.isV2, navigate]);
 
   const nextAuctionHandler = useCallback(() => {
     if (!currentAuction) return;
-    navigate(nounPath(Number(currentAuction.nounId) + 1));
-  }, [currentAuction, navigate]);
+    const path = dao.isV2 ? nounV2Path : nounPath;
+    navigate(path(Number(currentAuction.nounId) + 1));
+  }, [currentAuction, dao.isV2, navigate]);
 
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;

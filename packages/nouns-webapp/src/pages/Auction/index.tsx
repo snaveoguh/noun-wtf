@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useMemo } from 'react';
 
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { isNumber } from 'remeda';
@@ -19,7 +19,8 @@ const LilNounsGrid = React.lazy(() => import('@/components/LilNounsGrid'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
-import { nounPath } from '@/utils/history';
+import { nounPath, nounV2Path } from '@/utils/history';
+import type { Auction as IAuction } from '@/wrappers/nounsAuction';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
 import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
 
@@ -29,29 +30,51 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   const { id: auctionId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const mainnetAuction = useOnDisplayAuction();
-  const v2Auction = useV2OnDisplayAuction();
+  const v2LiveAuction = useV2OnDisplayAuction();
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
   const { activeDao } = useActiveDao();
-
-  // Only the root auction route honours the DAO toggle. `/noun/:id` is
-  // always the mainnet Nouns archive — the historical IDs don't map to
-  // the v2 fork, so we hide the switcher there and always use mainnet.
-  const isRootAuctionRoute = auctionId === undefined;
-  const isV2Active = isRootAuctionRoute && activeDao === 'nounv2';
-
-  // Pick the auction shape for the active DAO. v2 has no past-auction
-  // archive yet so we only resolve when on the root route.
-  const onDisplayAuction = isV2Active ? v2Auction : mainnetAuction;
-  const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
+  const isV2 = activeDao === 'nounv2';
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
+  // Build the auction object for the active route. V2 lacks an indexer so
+  // for "/v2/noun/:id" with id != live we synthesise a settled stub — the
+  // hero still renders (seed + ownerOf load on-chain inside Auction) and
+  // bid history just falls back gracefully.
+  const onDisplayAuction: IAuction | undefined = useMemo(() => {
+    if (!isV2) return mainnetAuction;
+    if (auctionId === undefined) return v2LiveAuction;
+
+    const requestedId = Number(auctionId);
+    if (!Number.isFinite(requestedId) || requestedId < 0) return v2LiveAuction;
+
+    if (
+      v2LiveAuction !== undefined &&
+      Number(v2LiveAuction.nounId) === requestedId
+    ) {
+      return v2LiveAuction;
+    }
+
+    return {
+      nounId: BigInt(requestedId),
+      amount: 0n,
+      startTime: 0n,
+      endTime: 0n,
+      bidder: undefined,
+      settled: true,
+      clientId: null,
+      burned: false,
+    };
+  }, [isV2, auctionId, mainnetAuction, v2LiveAuction]);
+
+  const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
 
   useEffect(() => {
     // The Redux-driven mainnet auction-id sync only makes sense for the
     // mainnet archive. v2 has no Ponder indexer so there's nothing to
     // mirror into Redux — skip the effect entirely when v2 is active.
-    if (isV2Active) return;
+    if (isV2) return;
     if (lastAuctionNounId == null) return;
     if (auctionId === undefined) {
       if (onDisplayAuctionNounId === Number(lastAuctionNounId)) return;
@@ -71,7 +94,19 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     if (Number(auctionId) !== onDisplayAuctionNounId) {
       dispatch(setOnDisplayAuctionNounId(Number(auctionId)));
     }
-  }, [auctionId, lastAuctionNounId, dispatch, navigate, onDisplayAuctionNounId, isV2Active]);
+  }, [auctionId, lastAuctionNounId, dispatch, navigate, onDisplayAuctionNounId, isV2]);
+
+  // Bound-check the V2 noun id against the live auction. Out-of-range ids
+  // (e.g. `/v2/noun/9999`) snap back to the live auction so the page never
+  // renders an empty noun.
+  useEffect(() => {
+    if (!isV2 || auctionId === undefined || v2LiveAuction === undefined) return;
+    const requestedId = Number(auctionId);
+    const liveId = Number(v2LiveAuction.nounId);
+    if (!Number.isFinite(requestedId) || requestedId < 0 || requestedId > liveId) {
+      navigate(nounV2Path(liveId), { replace: true });
+    }
+  }, [isV2, auctionId, v2LiveAuction, navigate]);
 
   // Handle ?makeArt=1 from navbar on other pages
   useEffect(() => {

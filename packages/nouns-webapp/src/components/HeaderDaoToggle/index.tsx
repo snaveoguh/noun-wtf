@@ -1,20 +1,14 @@
-import { useLocation, useNavigate } from 'react-router';
-
 import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
 
 /// Compact sitewide DAO toggle for the top navbar.
-/// Click flips the active DAO + (if not already on `/`) routes home so the
-/// user sees the chosen auction immediately.
+/// Click navigates to the DAO root so the user sees the chosen auction
+/// immediately. The route itself owns the DAO context (no `?dao=` param,
+/// no localStorage), so flipping is just a `navigate()`.
 export default function HeaderDaoToggle() {
   const { activeDao, setActiveDao } = useActiveDao();
-  const location = useLocation();
-  const navigate = useNavigate();
 
   function onPick(next: ActiveDao) {
     setActiveDao(next);
-    if (location.pathname !== '/') {
-      navigate(next === 'nouns' ? '/' : '/?dao=nounv2');
-    }
   }
 
   return (
