@@ -151,7 +151,7 @@ import { graphql } from 'ponder';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import sharp from 'sharp';
-import { createPublicClient, createWalletClient, http, type Hex, verifyTypedData } from 'viem';
+import { createPublicClient, createWalletClient, decodeAbiParameters, http, type Hex, verifyTypedData } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
@@ -3861,7 +3861,7 @@ CRITICAL RULES:
               transactions: {
                 type: 'array',
                 description:
-                  'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args.',
+                  'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args. CRITICAL DECIMAL RULES: USDC has 6 decimals — 20000 USDC = 20000 * 10^6 = 20000000000 (0x4a817c800). DO NOT use 18-decimal scaling for USDC. ETH/WETH have 18 decimals. stETH has 18 decimals. Always double-check your scaling: for USDC, the on-chain uint256 should never exceed 10^15 unless you genuinely mean a billion+ USDC. If you mess up scaling, the proposal will register absurd debt and be rejected by the validator.',
                 items: {
                   type: 'object',
                   properties: {
@@ -4884,6 +4884,53 @@ CRITICAL RULES:
 
                 // Build transaction arrays (empty if no transactions provided)
                 const txs = input.transactions || [];
+
+                // Sanity-check token transfer amounts. The LLM hand-encodes
+                // hex calldata for `transfer(address,uint256)` /
+                // `sendOrRegisterDebt(address,uint256)` — a class of error
+                // that's hard to spot until the proposal is on-chain.
+                // This prop owner once shipped 6.85e76 USDC (proposer added
+                // a Payer.sendOrRegisterDebt call where the amount was
+                // off by ~71 orders of magnitude). Reject anything where
+                // the decoded amount, scaled down by 6 decimals (USDC) AND
+                // 18 decimals (ETH-style), is still nonsense.
+                const sanityFail = (() => {
+                  for (let i = 0; i < txs.length; i++) {
+                    const t = txs[i];
+                    const sig = (t.signature || '').trim();
+                    if (
+                      sig !== 'transfer(address,uint256)' &&
+                      sig !== 'sendOrRegisterDebt(address,uint256)'
+                    ) {
+                      continue;
+                    }
+                    const cd = t.calldata || '0x';
+                    if (!cd.startsWith('0x') || cd.length < 130) continue;
+                    try {
+                      const decoded = decodeAbiParameters(
+                        [{ type: 'address' }, { type: 'uint256' }],
+                        ('0x' + cd.replace(/^0x/, '').padStart(128, '0')) as Hex,
+                      );
+                      const amount = decoded[1] as bigint;
+                      // Cap raw amount at 10^30. Even at 18 decimals
+                      // that's 10^12 ETH — well past any plausible request.
+                      // USDC at 6 decimals would be 10^24 USDC. Anything
+                      // larger is almost certainly an encoding bug.
+                      const ABSURD = 10n ** 30n;
+                      if (amount > ABSURD) {
+                        return `tx[${i}] (${sig}) has decoded amount ${amount.toString()} which is impossibly large — likely an encoding error. For USDC use 6-decimal scaling (e.g. 20000 USDC = 20000_000000 = 0x4a817c800).`;
+                      }
+                    } catch {
+                      // bad hex shape — let the chain catch it later
+                    }
+                  }
+                  return null;
+                })();
+                if (sanityFail) {
+                  result = { error: sanityFail };
+                  break;
+                }
+
                 const targets = txs.map(t => t.target);
                 const values = txs.map(t => t.value || '0');
                 const sigs = txs.map(t => t.signature || '');
