@@ -2,6 +2,7 @@ import type { GovernanceAction } from './GovernanceActionConfirm';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ConnectKitButton } from 'connectkit';
 import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
@@ -27,15 +28,36 @@ const API_BASE =
     ? apiBaseEnv
     : 'https://spirited-flexibility-production-3c30.up.railway.app';
 
+// Tailwind `md` breakpoint is 768px; treat anything below as mobile so we can
+// use a fixed-position overlay anchored above the on-screen keyboard.
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+}
+
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { activeDao } = useActiveDao();
+  const isMobile = useIsMobile();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<GovernanceAction | null>(null);
+  const [requiresWallet, setRequiresWallet] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const actionCardRef = useRef<HTMLDivElement>(null);
 
   // Focus input on mount
   useEffect(() => {
@@ -49,12 +71,24 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
     }
   }, [response]);
 
+  // Scroll the action card into view when it mounts (mobile keyboard can hide it).
+  useEffect(() => {
+    if (pendingAction !== null) {
+      // Defer one frame so the card is mounted before we scroll.
+      const id = window.requestAnimationFrame(() => {
+        actionCardRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+  }, [pendingAction]);
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && (response !== null || pendingAction !== null)) {
         setResponse(null);
         setPendingAction(null);
+        setRequiresWallet(false);
         inputRef.current?.focus();
       }
     };
@@ -65,6 +99,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
   const dismiss = useCallback(() => {
     setResponse(null);
     setPendingAction(null);
+    setRequiresWallet(false);
     inputRef.current?.focus();
   }, []);
 
@@ -76,6 +111,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
       setIsLoading(true);
       setResponse(null);
       setPendingAction(null);
+      setRequiresWallet(false);
 
       const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
       // Build API history from last 10 messages
@@ -98,11 +134,23 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
 
         if (!res.ok) {
           let errText: string;
+          let needsWallet = false;
           try {
-            const errData = (await res.json()) as { error?: string };
+            const errData = (await res.json()) as { error?: string; requiresWallet?: boolean };
             errText = errData.error ?? `HTTP ${res.status}`;
+            needsWallet = errData.requiresWallet === true;
           } catch {
             errText = (await res.text()) || `HTTP ${res.status}`;
+          }
+          // 401 with requiresWallet means the user needs to connect — surface a CTA
+          // instead of a bare error string. Most common cause of "no green button on
+          // mobile": wagmi's useAccount() returns no address yet (WalletConnect race).
+          if (res.status === 401 || needsWallet) {
+            setRequiresWallet(true);
+            const friendly = `wallet not connected — connect to run governance commands.\n\n(server said: ${errText})`;
+            onError(userMsg, errText);
+            setResponse(friendly);
+            return;
           }
           throw new Error(errText);
         }
@@ -119,6 +167,17 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
 
         // Check for governance action
         if (data.action !== undefined && data.action.type !== undefined) {
+          // Debug log so we can confirm in mobile devtools whether the API
+          // returned an action even when the green button isn't visible.
+          if (import.meta.env.DEV || (typeof window !== 'undefined' && window.localStorage?.getItem('nounwtf:debug') === '1')) {
+            // eslint-disable-next-line no-console
+            console.log('[TerminalPrompt] action received', {
+              type: data.action.type,
+              isConnected,
+              hasAddress: !!address,
+              isMobile,
+            });
+          }
           setPendingAction(data.action as GovernanceAction);
         }
       } catch (err) {
@@ -130,7 +189,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         setIsLoading(false);
       }
     },
-    [activeDao, address, isLoading, history, onNewMessages, onError],
+    [activeDao, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
   );
 
   const handleActionSuccess = useCallback(
@@ -156,24 +215,41 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
 
   const showOverlay = response !== null || pendingAction !== null;
 
+  // Mobile: pin the overlay to viewport bottom (above the input bar) using
+  // fixed positioning + safe-area padding so the iOS keyboard can't clip it.
+  // Desktop: keep the existing absolute-positioned panel inside the prompt
+  // wrapper (unchanged visual behavior).
+  const overlayStyle: React.CSSProperties = isMobile
+    ? {
+        position: 'fixed',
+        bottom: 'calc(48px + env(safe-area-inset-bottom, 0px))',
+        left: 0,
+        right: 0,
+        maxHeight: '70vh',
+        background: '#000',
+        borderTop: '1px solid #111',
+        zIndex: 1100,
+        display: 'flex',
+        flexDirection: 'column',
+      }
+    : {
+        position: 'absolute',
+        bottom: '48px',
+        left: 0,
+        right: 0,
+        maxHeight: '60vh',
+        background: '#000',
+        borderTop: '1px solid #111',
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+      };
+
   return (
     <>
       {/* Response overlay */}
       {showOverlay && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '48px',
-            left: 0,
-            right: 0,
-            maxHeight: '60vh',
-            background: '#000',
-            borderTop: '1px solid #111',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        <div ref={overlayRef} style={overlayStyle}>
           <div
             style={{
               display: 'flex',
@@ -216,13 +292,42 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             {/* Agent text response */}
             {response !== null && <div>{response}</div>}
 
+            {/* Wallet-required CTA — shown when /api/chat returns 401 +
+                requiresWallet. Without this, the user just sees error text
+                and has no obvious next step on mobile. */}
+            {requiresWallet && (
+              <div style={{ marginTop: '12px' }}>
+                <ConnectKitButton.Custom>
+                  {({ show }) => (
+                    <button
+                      type="button"
+                      onClick={() => show?.()}
+                      style={{
+                        background: '#111',
+                        border: '1px solid #00ff41',
+                        color: '#00ff41',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '6px 16px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      connect wallet
+                    </button>
+                  )}
+                </ConnectKitButton.Custom>
+              </div>
+            )}
+
             {/* Governance action confirmation */}
             {pendingAction !== null && (
-              <GovernanceActionConfirm
-                action={pendingAction}
-                onSuccess={handleActionSuccess}
-                onCancel={handleActionCancel}
-              />
+              <div ref={actionCardRef}>
+                <GovernanceActionConfirm
+                  action={pendingAction}
+                  onSuccess={handleActionSuccess}
+                  onCancel={handleActionCancel}
+                />
+              </div>
             )}
           </div>
         </div>
