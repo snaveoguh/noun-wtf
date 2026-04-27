@@ -4,8 +4,9 @@
  * All color values are in linear color space (0-1 range) matching Three.js internals.
  * The geometry's color attribute is mutated in-place and flagged for GPU upload.
  */
-import type { FaceAdjacencyGraph, MeshEditState } from './types';
-import type * as THREE from 'three';
+import type { FaceAdjacencyGraph, MeshEditState, VoxelMap } from './types';
+
+import * as THREE from 'three';
 
 import { expandBrush, getFaceVertices } from './meshGraph';
 import { FILL_EPSILON } from './types';
@@ -60,11 +61,15 @@ function writeColor(
 }
 
 /** Check if two colors match within epsilon */
-function colorsMatch(a: [number, number, number], b: [number, number, number]): boolean {
+function colorsMatch(
+  a: [number, number, number],
+  b: [number, number, number],
+  epsilon: number = FILL_EPSILON,
+): boolean {
   return (
-    Math.abs(a[0] - b[0]) < FILL_EPSILON &&
-    Math.abs(a[1] - b[1]) < FILL_EPSILON &&
-    Math.abs(a[2] - b[2]) < FILL_EPSILON
+    Math.abs(a[0] - b[0]) < epsilon &&
+    Math.abs(a[1] - b[1]) < epsilon &&
+    Math.abs(a[2] - b[2]) < epsilon
   );
 }
 
@@ -153,18 +158,27 @@ export function eraseBrush(
  * Flood fill on the mesh surface.
  *
  * Starting from `startFace`, BFS along adjacent faces whose dominant color
- * matches the start face's color (within FILL_EPSILON). Paint all visited
+ * matches the start face's color (within `epsilon`). Paint all visited
  * faces with the fill color.
+ *
+ * The default tolerance is intentionally generous (0.12 in linear space,
+ * roughly 30 sRGB levels) — GLB textures bake per-vertex colors that vary
+ * subtly across what looks like a single flat region, and the previous
+ * tight 0.02 epsilon caused the bucket to halt at the start face on most
+ * GLB-rendered heads.
  */
+const DEFAULT_FLOOD_EPSILON = 0.12;
+
 export function floodFillMesh(
   state: MeshEditState,
   startFace: number,
   fillColor: [number, number, number],
+  epsilon: number = DEFAULT_FLOOD_EPSILON,
 ): Set<number> {
   const startColor = getFaceColor(state, startFace);
 
   // Don't fill if the target color matches the start color
-  if (colorsMatch(startColor, fillColor)) {
+  if (colorsMatch(startColor, fillColor, epsilon)) {
     return new Set();
   }
 
@@ -180,7 +194,7 @@ export function floodFillMesh(
     for (const neighbor of neighbors) {
       if (visited.has(neighbor)) continue;
       const nColor = getFaceColor(state, neighbor);
-      if (colorsMatch(nColor, startColor)) {
+      if (colorsMatch(nColor, startColor, epsilon)) {
         visited.add(neighbor);
         queue.push(neighbor);
       }
@@ -233,6 +247,8 @@ export function initEditState(
     faceCount,
     vertexCount,
     buildVoxels: new Map(),
+    interiorVoxels: null,
+    revealedVoxels: new Map(),
   };
 }
 
@@ -257,9 +273,15 @@ export function syncVisibilityToGeometry(state: MeshEditState): void {
 
 /**
  * Delete faces — set their vertices' visibility to 0 (invisible).
+ *
+ * If the mesh has been voxelized (state.interiorVoxels), also reveal any
+ * interior voxels lying behind the deleted face so erasing exposes the
+ * solid-filled volume rather than a hollow gap.
  */
 export function deleteFaces(state: MeshEditState, faceIndices: Iterable<number>): Set<number> {
   const modified = new Set<number>();
+  const positions = state.geometry.attributes.position;
+
   for (const fi of faceIndices) {
     const [v0, v1, v2] = getFaceVertices(state.geometry, fi);
     state.visibility[v0] = 0;
@@ -268,6 +290,29 @@ export function deleteFaces(state: MeshEditState, faceIndices: Iterable<number>)
     modified.add(v0);
     modified.add(v1);
     modified.add(v2);
+
+    // Reveal interior voxel(s) sitting directly behind this face.
+    if (state.interiorVoxels && positions) {
+      const cx = (positions.getX(v0) + positions.getX(v1) + positions.getX(v2)) / 3;
+      const cy = (positions.getY(v0) + positions.getY(v1) + positions.getY(v2)) / 3;
+      const cz = (positions.getZ(v0) + positions.getZ(v1) + positions.getZ(v2)) / 3;
+      // Search the 27-cell neighborhood around the face centroid for any
+      // interior voxels (the centroid may not align exactly to the grid).
+      const bx = Math.round(cx);
+      const by = Math.round(cy);
+      const bz = Math.round(cz);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            const key = `${bx + dx},${by + dy},${bz + dz}`;
+            const color = state.interiorVoxels.get(key);
+            if (color && !state.revealedVoxels.has(key)) {
+              state.revealedVoxels.set(key, color);
+            }
+          }
+        }
+      }
+    }
   }
   syncVisibilityToGeometry(state);
   return modified;
@@ -382,4 +427,130 @@ export function applyDeltas(
     writeColor(state.currentColors, vi, r, g, b);
   }
   syncColorsToGeometry(state);
+}
+
+// ─── Mesh Voxelization ──────────────────────────────────────────────────────
+
+/**
+ * Voxelize a mesh into a solid-filled grid.
+ *
+ * For every integer cell inside the mesh's bounding box, casts a ray along
+ * +X and counts triangle intersections. Odd count → cell is inside the
+ * surface and gets a voxel; sampled color is taken from the nearest
+ * vertex's current color (linear → sRGB hex).
+ *
+ * Returns null if the mesh is too small or lacks geometry data.
+ *
+ * Performance budget: keeps the grid under MAX_GRID_VOXELS by adapting cell
+ * size when bounding boxes are large. For typical Noun head GLBs (~30³
+ * units) this lands at a few thousand cells with sub-100ms cost.
+ */
+const MAX_GRID_VOXELS = 60_000;
+
+export function voxelizeMeshInterior(
+  geometry: THREE.BufferGeometry,
+  currentColors: Float32Array,
+): VoxelMap | null {
+  const posAttr = geometry.attributes.position;
+  const index = geometry.index;
+  if (!posAttr || !index) return null;
+
+  // Build a Mesh wrapping the geometry — Raycaster needs an Object3D.
+  // The material is irrelevant (raycaster reads geometry, not material).
+  const tmpMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const tmpMesh = new THREE.Mesh(geometry, tmpMat);
+
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  if (!bb) {
+    tmpMat.dispose();
+    return null;
+  }
+
+  // Adaptive grid step: aim for ~MAX_GRID_VOXELS interior cells.
+  const sx = Math.ceil(bb.max.x - bb.min.x);
+  const sy = Math.ceil(bb.max.y - bb.min.y);
+  const sz = Math.ceil(bb.max.z - bb.min.z);
+  if (sx < 2 || sy < 2 || sz < 2) {
+    tmpMat.dispose();
+    return null;
+  }
+
+  let step = 1;
+  while ((sx / step) * (sy / step) * (sz / step) > MAX_GRID_VOXELS) {
+    step++;
+  }
+
+  const ix0 = Math.floor(bb.min.x);
+  const iy0 = Math.floor(bb.min.y);
+  const iz0 = Math.floor(bb.min.z);
+  const ix1 = Math.ceil(bb.max.x);
+  const iy1 = Math.ceil(bb.max.y);
+  const iz1 = Math.ceil(bb.max.z);
+
+  const raycaster = new THREE.Raycaster();
+  const rayDir = new THREE.Vector3(1, 0, 0);
+  const origin = new THREE.Vector3();
+
+  const out: VoxelMap = new Map();
+
+  // Push the ray origin slightly outside the bounding box so we don't
+  // start inside a triangle (which can cause flickery parity counts).
+  const rayStartX = bb.min.x - 1;
+
+  for (let z = iz0; z <= iz1; z += step) {
+    for (let y = iy0; y <= iy1; y += step) {
+      origin.set(rayStartX, y, z);
+      raycaster.set(origin, rayDir);
+
+      const hits = raycaster.intersectObject(tmpMesh, false);
+      if (hits.length === 0) continue;
+
+      // Sort hits by X (they should already be, but be defensive).
+      hits.sort((a, b) => a.point.x - b.point.x);
+
+      // Walk through cells along X — toggle inside/outside at each hit.
+      // Color sampling: each interior segment lies between two hits; we
+      // color the cell using whichever hit (entry/exit) is closer.
+      let inside = false;
+      let hitIdx = 0;
+      let lastEntryHit: THREE.Intersection | null = null;
+      for (let x = ix0; x <= ix1; x += step) {
+        while (hitIdx < hits.length && hits[hitIdx].point.x <= x) {
+          inside = !inside;
+          if (inside) lastEntryHit = hits[hitIdx];
+          hitIdx++;
+        }
+        if (!inside) continue;
+
+        // Choose closer hit (the entry we're past, or the next exit ahead).
+        const entry = lastEntryHit;
+        const exit = hits[hitIdx]; // next hit, must be exit since we're inside
+        let chosen: THREE.Intersection | null = entry;
+        if (exit && entry) {
+          const dEntry = Math.abs(x - entry.point.x);
+          const dExit = Math.abs(exit.point.x - x);
+          if (dExit < dEntry) chosen = exit;
+        } else if (exit && !entry) {
+          chosen = exit;
+        }
+
+        if (!chosen || chosen.face == null) continue;
+        const f = chosen.face;
+        // Average the 3 vertex colors of the hit triangle (linear → hex).
+        const r = (currentColors[f.a * 3] + currentColors[f.b * 3] + currentColors[f.c * 3]) / 3;
+        const g =
+          (currentColors[f.a * 3 + 1] + currentColors[f.b * 3 + 1] + currentColors[f.c * 3 + 1]) /
+          3;
+        const b =
+          (currentColors[f.a * 3 + 2] + currentColors[f.b * 3 + 2] + currentColors[f.c * 3 + 2]) /
+          3;
+        const hex = linearToHex(r, g, b);
+        out.set(`${x},${y},${z}`, hex);
+      }
+    }
+  }
+
+  tmpMat.dispose();
+  return out.size > 0 ? out : null;
 }

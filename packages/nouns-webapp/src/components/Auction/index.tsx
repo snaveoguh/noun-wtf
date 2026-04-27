@@ -571,12 +571,24 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     return () => window.clearInterval(interval);
   }, [currentAuction, currentNounId, fetchLiveDraftsForNoun, isEditing]);
 
+  // Ref mirror of viewMode so resetHeroState (a stable useCallback with []
+  // deps) can branch on the user's current choice without re-creating the
+  // callback on every viewMode change. Mirrors are cheap and avoid the
+  // dependency-array churn that would otherwise re-fire the
+  // `[currentNounId, resetHeroState]` effect on every tab click.
+  const viewModeRef = useRef(viewMode);
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
   const resetHeroState = useCallback(() => {
     // Preserve the user's chosen primary view (real / 3d / ascii) across
     // noun navigations — they shouldn't lose their 2D Real selection just
     // because they paged forward. Transient/per-noun modes (edit-*, sprite,
     // deriv-X, link-Y) DO get reset since they don't carry to a new noun.
-    setViewMode(prev => (PERSISTED_VIEW_MODES.has(prev) ? prev : '3d'));
+    const prev = viewModeRef.current;
+    const nextView: HeroViewMode = PERSISTED_VIEW_MODES.has(prev) ? prev : '3d';
+    setViewMode(nextView);
     setInteractionMode('scroll');
     setEditMode(null);
     setShowHelp(false);
@@ -592,12 +604,23 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     setEdit3dVisibility({ ...DEFAULT_VISIBILITY });
     setLinkNameDraft('');
     setLinkUrlDraft('');
-    setPlayIntroSpin(true);
+    // Intro spin is a 3D-only flourish. If the user has already chosen
+    // 'real' or 'ascii' the spin has nothing to render against, but the
+    // surrounding effect (the 2.6s setTimeout that flips it back off)
+    // would still cause a re-render that briefly remounted the hero
+    // artwork — the path Goldy hit as "scrolling switches back to 3D".
+    // Only restart the spin when the upcoming view is actually 3D.
+    setPlayIntroSpin(nextView === '3d');
     setSingleTraitFilter(null);
   }, []);
 
   useEffect(() => {
     resetHeroState();
+    // Only schedule the auto-disable timer when the spin is actually
+    // running (user is in '3d'). For 'real' / 'ascii' the spin was never
+    // turned on, so there's no need to schedule a disable that would
+    // trigger an extra render.
+    if (viewModeRef.current !== '3d') return;
     const timer = window.setTimeout(() => setPlayIntroSpin(false), 2600);
     return () => window.clearTimeout(timer);
   }, [currentNounId, resetHeroState]);

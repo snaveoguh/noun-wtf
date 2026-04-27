@@ -343,6 +343,30 @@ const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed }) => {
   const [isSplit, setIsSplit] = useState(false);
   const [splitAmount, setSplitAmount] = useState(0);
 
+  // r3f's <Canvas> uses ResizeObserver via react-use-measure to size its
+  // internal canvas. When this component mounts inside an absolutely-
+  // positioned parent that just appeared (e.g. switching from 3D to ASCII
+  // tab), the observer sometimes never fires its initial measurement and
+  // the canvas stays at the HTML default 300x150 — rendering a blank
+  // hero. Forcing a window resize after mount nudges r3f to re-measure
+  // the parent and size the canvas correctly. Cheap and idempotent.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const fire = () => window.dispatchEvent(new Event('resize'));
+    let r2 = 0;
+    // Two ticks: the first catches the layout-settled paint, the second
+    // covers cases where the parent's size changed between paints (e.g.
+    // tab-bar reflow on first ASCII activation).
+    const r1 = requestAnimationFrame(() => {
+      fire();
+      r2 = requestAnimationFrame(fire);
+    });
+    return () => {
+      cancelAnimationFrame(r1);
+      if (r2) cancelAnimationFrame(r2);
+    };
+  }, []);
+
   // Smooth animate split amount
   useEffect(() => {
     const target = isSplit ? 1 : 0;
@@ -368,6 +392,9 @@ const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed }) => {
         camera={{ position: [0, 28, 30], fov: 50 }}
         style={{ width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: true }}
+        // Fire resize observer immediately so the canvas sizes to parent
+        // on first paint instead of staying at 300x150.
+        resize={{ debounce: 0 }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
         }}
@@ -416,6 +443,11 @@ const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed }) => {
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           zIndex: 10,
+          // The auction hero wrapper sets pointer-events: none in scroll
+          // mode (so the page scrolls through the canvas). The SPLIT button
+          // is a UI control, not the canvas — opt back in so users can
+          // toggle gene split without first switching to grab mode.
+          pointerEvents: 'auto',
         }}
         onMouseEnter={e => {
           e.currentTarget.style.background = isSplit
