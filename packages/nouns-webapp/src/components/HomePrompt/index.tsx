@@ -11,7 +11,7 @@ import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
-import { nounPath } from '@/utils/history';
+import { nounPath, nounV2Path } from '@/utils/history';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './HomePrompt.module.css';
@@ -133,17 +133,18 @@ const HomePrompt: FC<Props> = ({ nounId, seed }) => {
       const text = input.trim();
       if (!text || isLoading) return;
 
-      // Noun # navigation: "123" or "#123"
+      // Noun # navigation: "123" or "#123" — stay within the active DAO's namespace
       const nounMatch = text.match(/^#?(\d+)$/);
       if (nounMatch) {
-        navigate(nounPath(parseInt(nounMatch[1], 10)));
+        const path = activeDao === 'nounv2' ? nounV2Path : nounPath;
+        navigate(path(parseInt(nounMatch[1], 10)));
         setInput('');
         return;
       }
 
       sendMessage(text);
     },
-    [input, isLoading, navigate, sendMessage],
+    [activeDao, input, isLoading, navigate, sendMessage],
   );
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

@@ -3,6 +3,8 @@ import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useAppSelector } from '@/hooks';
+import useDaoContext from '@/hooks/useDaoContext';
+import { nounPath, nounV2Path } from '@/utils/history';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
 
 import classes from './AuctionNavigation.module.css';
@@ -18,6 +20,7 @@ const AuctionNavigation: React.FC<AuctionNavigationProps> = props => {
   const { isFirstAuction, isLastAuction, onPrevAuctionClick, onNextAuctionClick } = props;
   const isCool = useAppSelector(state => state.application.stateBackgroundColor) === '#d5d7e1';
   const navigate = useNavigate();
+  const dao = useDaoContext();
   const onDisplayAuction = useOnDisplayAuction();
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
   const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
@@ -31,8 +34,14 @@ const AuctionNavigation: React.FC<AuctionNavigationProps> = props => {
         // If we don't put this, the first keystore
         // from the noun at / doesn't work (i.e.,
         // to go from current noun to current noun - 1 would take two arrow presses)
+        // Stay within the active DAO's namespace — without this,
+        // pressing ◀ on /v2/noun/0 (which renders BurnedNounContent
+        // → AuctionNavigation) was yanking the user back to mainnet
+        // /noun/${id}, which then showed mainnet noun data while the
+        // DAO toggle still read V2.
         if (onDisplayAuctionNounId === lastAuctionNounId) {
-          navigate(`/noun/${lastAuctionNounId}`);
+          const path = dao.isV2 ? nounV2Path : nounPath;
+          navigate(path(Number(lastAuctionNounId)));
         }
 
         if (!isFirstAuction) {
@@ -46,6 +55,7 @@ const AuctionNavigation: React.FC<AuctionNavigationProps> = props => {
       }
     },
     [
+      dao.isV2,
       isFirstAuction,
       isLastAuction,
       lastAuctionNounId,
