@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 
 import { faUsers } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Trans } from '@lingui/react/macro';
 import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
@@ -40,6 +39,20 @@ import classes from './NavBar.module.css';
 import navDropdownClasses from './NavBarDropdown.module.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+
+// Strip vowels from label (a/e/i/o/u, case-insensitive) but keep the first
+// character so the word still reads. Used only for the mobile-compact label.
+const devowel = (label: string): string =>
+  label.length === 0 ? label : label[0] + label.slice(1).replace(/[aeiou]/gi, '');
+
+// Render a nav-link label with full text on md+ and devoweled text on mobile.
+// CSS-driven so we don't need a useMediaQuery hook.
+const ResponsiveLabel = ({ text }: { text: string }) => (
+  <>
+    <span className="d-none d-md-inline">{text}</span>
+    <span className="d-inline d-md-none">{devowel(text)}</span>
+  </>
+);
 
 const NavBar = () => {
   const chainId = defaultChain.id;
@@ -86,7 +99,7 @@ const NavBar = () => {
   );
   const candidatesNavItem = config.featureToggles.candidates ? (
     <Dropdown.Item className={buttonClasses} href="/candidates">
-      <Trans>Candidates</Trans>
+      <ResponsiveLabel text="Candidates" />
     </Dropdown.Item>
   ) : null;
 
@@ -106,10 +119,12 @@ const NavBar = () => {
         )}
         href="/vote"
       >
-        <Trans>Proposals</Trans>
+        <ResponsiveLabel text="Proposals" />
       </Dropdown.Item>
       {candidatesNavItem}
-      <Dropdown.Item href="/grants">Grants</Dropdown.Item>
+      <Dropdown.Item href="/grants">
+        <ResponsiveLabel text="Grants" />
+      </Dropdown.Item>
     </NavDropdown>
   );
 
@@ -134,7 +149,7 @@ const NavBar = () => {
       <Navbar expand style={{ backgroundColor: 'transparent' }} className={classes.navBarCustom}>
         <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
-            <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
+            <Navbar.Brand as={Link} to="/" className={clsx(classes.navBarBrand, 'd-none d-md-block')}>
               <LolLogo className={classes.navBarLogo} />
             </Navbar.Brand>
             {/* Terminal-feed entry point — squashed next to the fries logo
@@ -275,7 +290,7 @@ const NavBar = () => {
                 )}
                 href="/probe"
               >
-                Probe
+                <ResponsiveLabel text="Probe" />
               </Dropdown.Item>
               <Dropdown.Item
                 className={clsx(
@@ -287,7 +302,7 @@ const NavBar = () => {
                 )}
                 href="/traits"
               >
-                <Trans>Traits</Trans>
+                <ResponsiveLabel text="Traits" />
               </Dropdown.Item>
               <Dropdown.Item
                 className={clsx(
@@ -299,21 +314,41 @@ const NavBar = () => {
                 )}
                 href="/playground"
               >
-                Playground
+                <ResponsiveLabel text="Playground" />
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item href="/marketplace">Marketplace</Dropdown.Item>
-              <Dropdown.Item href="/predictions">Predictions</Dropdown.Item>
+              <Dropdown.Item href="/marketplace">
+                <ResponsiveLabel text="Marketplace" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/predictions">
+                <ResponsiveLabel text="Predictions" />
+              </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item href="/dashboard">Dashboard</Dropdown.Item>
-              <Dropdown.Item href="/gas">Gas</Dropdown.Item>
-              <Dropdown.Item href="/terminal">Terminal</Dropdown.Item>
-              <Dropdown.Item href="/crystal-ball">Crystal Ball</Dropdown.Item>
-              <Dropdown.Item href="/feed">Feed</Dropdown.Item>
+              <Dropdown.Item href="/dashboard">
+                <ResponsiveLabel text="Dashboard" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/gas">
+                <ResponsiveLabel text="Gas" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/terminal">
+                <ResponsiveLabel text="Terminal" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/crystal-ball">
+                <ResponsiveLabel text="Crystal Ball" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/feed">
+                <ResponsiveLabel text="Feed" />
+              </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item href="/hackathons">Hack</Dropdown.Item>
-              <Dropdown.Item href="/world">World</Dropdown.Item>
-              <Dropdown.Item href="/nonsense">Nonsense</Dropdown.Item>
+              <Dropdown.Item href="/hackathons">
+                <ResponsiveLabel text="Hack" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/world">
+                <ResponsiveLabel text="World" />
+              </Dropdown.Item>
+              <Dropdown.Item href="/nonsense">
+                <ResponsiveLabel text="Nonsense" />
+              </Dropdown.Item>
             </NavDropdown>
             <div className={classes.navBarSecondary}>
               <NavLocaleSwitcher buttonStyle={nonWalletButtonStyle} />

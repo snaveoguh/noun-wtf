@@ -7541,6 +7541,7 @@ app.get('/api/activity', async c => {
           support: v.support,
           votes: v.votes,
           reason: v.reason || '',
+          clientId: v.clientId,
         },
       });
     }
@@ -7566,6 +7567,7 @@ app.get('/api/activity', async c => {
           status: p.status,
           description: descText.slice(0, 4000),
           imageUrl,
+          clientId: p.clientId,
         },
       });
     }

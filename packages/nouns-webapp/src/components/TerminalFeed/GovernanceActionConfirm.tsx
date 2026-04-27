@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 
+import { ConnectKitButton } from 'connectkit';
 import { useAccount } from 'wagmi';
 
 import { useGovernanceAction } from './useGovernanceAction';
@@ -114,9 +115,20 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
     return (
       <div style={containerStyle}>
         <div style={{ color: '#ef4444', fontSize: '13px' }}>
-          wallet not connected. click &quot;connect&quot; in the header to proceed.
+          wallet not connected — connect to sign this transaction.
         </div>
-        <div style={{ marginTop: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+          <ConnectKitButton.Custom>
+            {({ show }) => (
+              <button
+                type="button"
+                onClick={() => show?.()}
+                style={confirmBtnStyle}
+              >
+                connect wallet
+              </button>
+            )}
+          </ConnectKitButton.Custom>
           <button type="button" onClick={onCancel} style={cancelBtnStyle}>
             dismiss
           </button>

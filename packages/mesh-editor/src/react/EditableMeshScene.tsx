@@ -34,6 +34,7 @@ import {
   placeVoxelBlock,
   removeVoxel,
   parseVoxelKey,
+  voxelizeMeshInterior,
 } from '../meshOps';
 import { loadFromLocalStorage, saveToLocalStorage } from '../meshPersistence';
 import { HEAD_OFFSET } from '../types';
@@ -443,6 +444,24 @@ export default function EditableMeshScene({
             }
           }
 
+          // Solid-fill voxelize the mesh interior. This populates
+          // state.interiorVoxels with one voxel per integer cell inside
+          // the closed surface — sampled with the matching face's
+          // current vertex color. Erasing an outer face will reveal
+          // these voxels (via deleteFaces in meshOps), so carving the
+          // GLB looks like carving through a solid volume rather than
+          // exposing a hollow shell.
+          //
+          // Skipped silently if voxelization can't run (degenerate
+          // geometry / open mesh) — falls back to the old hollow
+          // behavior.
+          try {
+            const interior = voxelizeMeshInterior(welded, state.currentColors);
+            state.interiorVoxels = interior;
+          } catch (err) {
+            console.warn('[EditableMeshScene] voxelization failed:', err);
+          }
+
           // Add per-vertex visibility attribute (for face deletion) on welded.
           const visArr = new Float32Array(welded.attributes.position.count);
           visArr.fill(1.0);
@@ -597,6 +616,11 @@ export default function EditableMeshScene({
         case 'eraser': {
           deleteBrush(state, faceIndex, size);
           state.geometry.attributes.visible.needsUpdate = true;
+          // deleteBrush may have populated state.revealedVoxels — bump
+          // buildVersion so the BuildVoxelsMesh re-renders with them.
+          if (state.interiorVoxels) {
+            setBuildVersion(v => v + 1);
+          }
           break;
         }
         case 'fill': {
@@ -704,8 +728,15 @@ export default function EditableMeshScene({
 
   const buildVoxelEntries = useMemo(() => {
     const state = editStateRef.current;
-    if (!state || state.buildVoxels.size === 0) return [];
-    return Array.from(state.buildVoxels.entries()).map(([key, hex]) => {
+    if (!state) return [];
+    if (state.buildVoxels.size === 0 && state.revealedVoxels.size === 0) return [];
+
+    // Merge user-placed build voxels with voxels exposed by face deletions.
+    // build voxels win on key conflicts (the user explicitly placed them).
+    const merged = new Map<string, string>(state.revealedVoxels);
+    for (const [k, v] of state.buildVoxels) merged.set(k, v);
+
+    return Array.from(merged.entries()).map(([key, hex]) => {
       const [x, y, z] = parseVoxelKey(key);
       const linear = hexToLinear(hex);
       return { x, y, z, r: linear[0], g: linear[1], b: linear[2] };

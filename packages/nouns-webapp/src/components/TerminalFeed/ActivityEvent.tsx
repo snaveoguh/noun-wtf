@@ -5,6 +5,8 @@ import { useState } from 'react';
 
 import { Link } from 'react-router';
 
+import ClientBadge from '@/components/ClientBadge';
+
 import AsciiImage from './AsciiImage';
 import { EVENT_TYPES, formatEventDescription, timeAgo } from './eventFormatters';
 
@@ -77,6 +79,14 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
   );
   const age = timeAgo(event.timestamp);
   const expandable = hasExpandableContent(event.type, event.data);
+  const rawClientId = event.data.clientId as number | string | null | undefined;
+  const clientId =
+    rawClientId == null || rawClientId === ''
+      ? null
+      : typeof rawClientId === 'number'
+        ? rawClientId
+        : Number(rawClientId);
+  const showClientBadge = clientId != null && Number.isFinite(clientId);
 
   // Internal link target (react-router) shown as `view` alongside the `tx` link.
   let viewHref: string | null = null;
@@ -166,6 +176,18 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           }}
         >
           {description}
+          {showClientBadge && (
+            <span
+              style={{
+                display: 'inline-flex',
+                verticalAlign: 'middle',
+                marginLeft: 2,
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <ClientBadge clientId={clientId} size={13} />
+            </span>
+          )}
           {expandable && (
             <span style={{ color: '#444', fontSize: '11px', marginLeft: '6px' }}>
               {expanded ? '▾' : '▸'}
