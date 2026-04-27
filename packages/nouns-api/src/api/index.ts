@@ -2129,9 +2129,30 @@ app.post('/api/grants/propose', async c => {
   // Embed original signer in description so we can attribute correctly
   const taggedDescription = `<!-- signer:${proposer} -->\n${description}`;
 
-  // Submit proposal on-chain via relayer wallet
+  // Submit proposal on-chain via relayer wallet.
+  // We MUST wait for the receipt before declaring success — RPC load balancers
+  // (dRPC) can accept eth_sendRawTransaction and return a hash but fail to
+  // propagate, leaving the tx unbroadcast. Without confirmation, the user
+  // sees a fake success page with a dead etherscan link. We also set explicit
+  // gas params because viem's auto-fee selection through dRPC has produced
+  // underpriced txs that get dropped from the mempool.
+  let txHash: Hex | undefined;
   try {
-    const txHash = await relayerWallet.writeContract({
+    const fees = await nounCheckClient.estimateFeesPerGas();
+    // Floor priority fee at 1.5 gwei; if the network is busier, viem's
+    // estimate already accounts for it.
+    const minPriority = 1_500_000_000n;
+    const maxPriorityFeePerGas =
+      fees.maxPriorityFeePerGas && fees.maxPriorityFeePerGas > minPriority
+        ? fees.maxPriorityFeePerGas
+        : minPriority;
+    // maxFee = base*2 + tip, with a sane floor.
+    const baseGuess = fees.maxFeePerGas
+      ? fees.maxFeePerGas - (fees.maxPriorityFeePerGas ?? 0n)
+      : 5_000_000_000n;
+    const maxFeePerGas = baseGuess * 2n + maxPriorityFeePerGas;
+
+    txHash = await relayerWallet.writeContract({
       address: SMALL_GRANTS_ADDRESS,
       abi: smallGrantsTreasuryAbi,
       functionName: 'propose',
@@ -2142,17 +2163,47 @@ app.post('/api/grants/propose', async c => {
         calldatas as Hex[],
         taggedDescription,
       ],
+      maxPriorityFeePerGas,
+      maxFeePerGas,
     });
 
-    // Update rate limit
+    console.log(
+      `[Relayer] Grant tx broadcast by ${proposer} — hash: ${txHash}, awaiting receipt...`,
+    );
+
+    // Block until mined (or timeout). If the tx never lands we return an
+    // error so the frontend can show it and the user can retry.
+    const receipt = await nounCheckClient.waitForTransactionReceipt({
+      hash: txHash,
+      timeout: 120_000,
+      pollingInterval: 4_000,
+    });
+
+    if (receipt.status !== 'success') {
+      console.error(`[Relayer] Grant tx reverted: ${txHash}`);
+      return c.json(
+        { error: 'Transaction reverted on-chain', txHash, details: 'Status: reverted' },
+        500,
+      );
+    }
+
+    // Only commit rate limit after confirmation so failed attempts don't lock
+    // the user out for an hour.
     proposalRateLimit.set(addr, Date.now());
 
-    console.log(`[Relayer] Grant proposal submitted by ${proposer} — tx: ${txHash}`);
+    console.log(`[Relayer] Grant proposal confirmed by ${proposer} — tx: ${txHash}`);
     return c.json({ txHash, relayer: relayerAccount.address });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    console.error(`[Relayer] Grant proposal failed:`, msg);
-    return c.json({ error: 'Transaction failed', details: msg }, 500);
+    console.error(`[Relayer] Grant proposal failed (txHash=${txHash ?? 'none'}):`, msg);
+    return c.json(
+      {
+        error: 'Transaction failed',
+        details: msg,
+        ...(txHash ? { txHash } : {}),
+      },
+      500,
+    );
   }
 });
 
