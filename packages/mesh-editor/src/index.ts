@@ -35,6 +35,7 @@ export {
   restoreFaces,
   syncColorsToGeometry,
   syncVisibilityToGeometry,
+  voxelizeMeshInterior,
   voxelKey,
 } from './meshOps';
 

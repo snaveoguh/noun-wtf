@@ -29,6 +29,23 @@ export interface MeshEditState {
   vertexCount: number;
   /** Voxel cubes placed on the mesh surface */
   buildVoxels: VoxelMap;
+  /**
+   * Solid-fill interior voxel grid sampled at GLB import time.
+   *
+   * Each entry is a "x,y,z" voxel key → "#rrggbb" sampled from the closest
+   * surface point. These voxels are NOT rendered until a face is deleted
+   * nearby — at which point the corresponding voxels are revealed via
+   * `revealedVoxels`, producing the appearance of carving through a solid.
+   *
+   * `null` means voxelization wasn't run (small grids or insufficient mesh
+   * data) — eraser falls back to the old behavior in that case.
+   */
+  interiorVoxels: VoxelMap | null;
+  /**
+   * Subset of `interiorVoxels` that has been exposed by face deletions.
+   * Rendered as instanced cubes alongside `buildVoxels`.
+   */
+  revealedVoxels: VoxelMap;
 }
 
 export type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'build';
