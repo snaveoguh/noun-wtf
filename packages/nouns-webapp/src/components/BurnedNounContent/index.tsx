@@ -70,7 +70,7 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
         style={{
           position: 'absolute',
           top: '0.75rem',
-          right: '1.75rem',
+          right: '2.5rem',
           zIndex: 2,
           display: 'flex',
           gap: '0.4rem',
@@ -111,11 +111,16 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
               <div className={classes.subline}>
                 {reserveEth ? (
                   <>
-                    <span className={classes.sublineStrong}>{reserveEth} ETH</span> reserve · 0
-                    qualifying bids
+                    <div>
+                      <span className={classes.sublineStrong}>{reserveEth} ETH</span> reserve
+                    </div>
+                    <div>0 qualifying bids</div>
                   </>
                 ) : (
-                  'Reserve price not met · 0 qualifying bids'
+                  <>
+                    <div>Reserve price not met</div>
+                    <div>0 qualifying bids</div>
+                  </>
                 )}
               </div>
               <div className={classes.infoRow}>
