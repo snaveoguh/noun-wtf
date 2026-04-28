@@ -41,13 +41,25 @@ ponder.on('NounsAuctionHouseV2:AuctionBid', async ({ event, context }) => {
 });
 
 ponder.on('NounsAuctionHouseV2:AuctionBidWithClientId', async ({ event, context }) => {
-  // Guard: bid record may not exist yet if AuctionBid hasn't been processed
-  const existing = await context.db.find(bid, { nounId: event.args.nounId, value: event.args.value });
-  if (existing) {
-    await context.db.update(bid, { nounId: event.args.nounId, value: event.args.value }).set({
+  // Per-tx event ordering can fire AuctionBidWithClientId before AuctionBid, so
+  // a guarded `update` would silently drop the clientId. Upsert instead: insert
+  // a placeholder bid row carrying the clientId, or set clientId on the
+  // existing row. AuctionBid's own onConflictDoUpdate will overwrite the
+  // placeholder bidder/timestamps when it fires later in the same tx.
+  await context.db
+    .insert(bid)
+    .values({
+      nounId: event.args.nounId,
+      value: event.args.value,
+      bidder: event.transaction.from,
+      clientId: event.args.clientId,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoUpdate({
       clientId: event.args.clientId,
     });
-  }
 });
 
 // Zero address as the winner + zero amount = reserve-price auction that
