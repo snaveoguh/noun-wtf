@@ -235,10 +235,12 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     },
   });
 
+  // Hydrate from cache instantly — same pattern as V1.
+  const cached = useMemo(() => (enabled ? readCachedPrediction('nounv2') : null), [enabled]);
+
   return useMemo(() => {
     if (!enabled) return null;
-    if (!auction || currentNounId == null) return null;
-    if (!blockData?.hash) return null;
+    if (!auction || currentNounId == null || !blockData?.hash) return cached;
 
     const nextNounId = Number(currentNounId) + 1;
     const seed = predictSeed(blockData.hash, nextNounId);
@@ -254,8 +256,9 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
       running: true,
       checkedAt: new Date().toISOString(),
     };
+    writeCachedPrediction('nounv2', payload);
     return payload;
-  }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime]);
+  }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime, cached]);
 }
 
 /**
@@ -269,6 +272,33 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
  * The mainnet auction tuple has the same layout as v2 because v2 forks
  * AuctionHouseV1 1:1: (nounId, amount, startTime, endTime, bidder, settled).
  */
+// localStorage key for the last-good prediction. We rehydrate this on
+// every page load so the orb populates instantly with the previous
+// prediction while wagmi fetches a fresh one in the background.
+const PRED_CACHE_PREFIX = 'crystal-ball:last-prediction:';
+
+function readCachedPrediction(dao: 'nouns' | 'nounv2'): PredictResponse | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PRED_CACHE_PREFIX + dao);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && parsed.seed) return parsed as PredictResponse;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeCachedPrediction(dao: 'nouns' | 'nounv2', payload: PredictResponse): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PRED_CACHE_PREFIX + dao, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
 function useNounV1Prediction(enabled: boolean): PredictResponse | null {
   const v1Address =
     nounsAuctionHouseAddress[defaultChain.id as keyof typeof nounsAuctionHouseAddress];
@@ -309,10 +339,15 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     },
   });
 
+  // Hydrate the orb instantly from the last-good prediction in
+  // localStorage. The cache is overwritten as soon as fresh wagmi data
+  // resolves, so the user sees a noun immediately on every page load
+  // and just gets a seamless update if the prediction changed.
+  const cached = useMemo(() => (enabled ? readCachedPrediction('nouns') : null), [enabled]);
+
   return useMemo(() => {
     if (!enabled) return null;
-    if (!auction || currentNounId == null) return null;
-    if (!blockData?.hash) return null;
+    if (!auction || currentNounId == null || !blockData?.hash) return cached;
 
     // Mainnet skips noun #N where N % 10 === 0 (nounder reward). When the
     // current auction is for #N, the *next* auctioned id is N+1 unless N+1
@@ -335,8 +370,18 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
       running: true,
       checkedAt: new Date().toISOString(),
     };
+    writeCachedPrediction('nouns', payload);
     return payload;
-  }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime, v1Address]);
+  }, [
+    enabled,
+    auction,
+    currentNounId,
+    blockData?.hash,
+    blockData?.number,
+    endTime,
+    v1Address,
+    cached,
+  ]);
 }
 
 // ─── 2D SVG rendering ──────────────────────────────────────────────────
