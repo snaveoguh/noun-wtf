@@ -72,10 +72,12 @@ export function useActivityFeed(activeFilter: string) {
 
       // Prefer the API over the chain reader: the API enriches events with
       // `clientId` (used for ClientBadge emojis) which the chain fallback
-      // can't provide. Only fall back to the chain if the API errors or
-      // doesn't resolve within API_PREFER_MS. The chain reader is still
-      // armed in parallel so a hard API outage doesn't stall the UI past
-      // API_TIMEOUT_MS (the abort cap on the fetch itself).
+      // can't provide cleanly. The chain fallback is HEAVY — it fires 7
+      // parallel getContractEvents calls — so we only run it sequentially
+      // after the API has failed/timed out, never in parallel. Otherwise
+      // it saturates the RPC budget and starves other on-page wagmi reads
+      // (most visibly: the crystal-ball orb's auction() + getBlock()
+      // calls, which then hang on RPC backpressure).
       const API_PREFER_MS = 4_000;
       const API_TIMEOUT_MS = 6_000;
       const armTimeout = (ac: AbortController): void => {
@@ -104,23 +106,7 @@ export function useActivityFeed(activeFilter: string) {
           }
         })();
 
-        const chainPromise = (async (): Promise<FetchResult | null> => {
-          try {
-            const events = await fetchV1ChainEvents();
-            if (events.length === 0) return null;
-            return {
-              events,
-              hasMore: false,
-              oldestBlock: events[events.length - 1]!.blockNumber,
-            };
-          } catch {
-            return null;
-          }
-        })();
-
-        // Wait up to API_PREFER_MS for the API. If it resolves with data,
-        // use it (preserving clientId). Otherwise fall back to whatever the
-        // chain reader produced (or is still producing).
+        // Wait up to API_PREFER_MS for the API.
         const apiWithDeadline = Promise.race([
           apiPromise,
           new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
@@ -128,9 +114,19 @@ export function useActivityFeed(activeFilter: string) {
         const apiResult = await apiWithDeadline;
         if (apiResult && apiResult.events.length > 0) return apiResult;
 
-        // API was empty/slow/errored — wait on the chain fallback.
-        const chainResult = await chainPromise;
-        if (chainResult) return chainResult;
+        // API was empty/slow/errored — only NOW kick off the chain fallback.
+        try {
+          const events = await fetchV1ChainEvents();
+          if (events.length > 0) {
+            return {
+              events,
+              hasMore: false,
+              oldestBlock: events[events.length - 1]!.blockNumber,
+            };
+          }
+        } catch {
+          // fall through
+        }
 
         // Chain didn't produce anything either; give the API one last chance
         // in case it's still in flight (between API_PREFER_MS and API_TIMEOUT_MS).
@@ -156,20 +152,6 @@ export function useActivityFeed(activeFilter: string) {
           }
         })();
 
-        const chainPromise = (async (): Promise<FetchResult | null> => {
-          try {
-            const events = await fetchV2ChainEvents();
-            if (events.length === 0) return null;
-            return {
-              events,
-              hasMore: false,
-              oldestBlock: events[events.length - 1]!.blockNumber,
-            };
-          } catch {
-            return null;
-          }
-        })();
-
         const apiWithDeadline = Promise.race([
           apiPromise,
           new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
@@ -177,8 +159,20 @@ export function useActivityFeed(activeFilter: string) {
         const apiResult = await apiWithDeadline;
         if (apiResult && apiResult.events.length > 0) return apiResult;
 
-        const chainResult = await chainPromise;
-        if (chainResult) return chainResult;
+        // Only run the V2 chain fallback after the API gives up — it
+        // saturates the RPC budget if fired in parallel.
+        try {
+          const events = await fetchV2ChainEvents();
+          if (events.length > 0) {
+            return {
+              events,
+              hasMore: false,
+              oldestBlock: events[events.length - 1]!.blockNumber,
+            };
+          }
+        } catch {
+          // fall through
+        }
 
         const apiLate = await apiPromise;
         return apiLate ?? { events: [], hasMore: false, oldestBlock: 0 };
