@@ -36,14 +36,15 @@ const V2_NOUN_ID_RE = /^\/v2\/noun\/(\d+)\/?$/;
  * Whether the global V1/V2 toggle should be visible — and toggling it
  * has a meaningful destination — for this pathname.
  *
- * Only the four DAO-namespaced auction routes qualify: `/`, `/noun/:id`,
- * `/v2`, `/v2/noun/:id`. Everything else (governance, probe, crystal-ball,
+ * The DAO-namespaced routes are: `/`, `/noun/:id`, `/v2`, `/v2/noun/:id`,
+ * `/crystal-ball`, `/v2/crystal-ball`. Everything else (governance, probe,
  * etc.) is rendered DAO-agnostic and the global toggle is a no-op there.
  */
 export function routeHasDaoToggle(pathname: string): boolean {
   if (pathname === '/' || pathname === '/v2') return true;
   if (V1_NOUN_ID_RE.test(pathname)) return true;
   if (V2_NOUN_ID_RE.test(pathname)) return true;
+  if (pathname === '/crystal-ball' || pathname === '/v2/crystal-ball') return true;
   return false;
 }
 
@@ -57,16 +58,18 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
     (next: ActiveDao) => {
       const pathname = location.pathname;
 
-      // Determine the destination based on the current path. Only the four
-      // namespaced auction paths participate; everything else is a no-op so
-      // the user doesn't get yanked off the page they're on. (The global
-      // toggle is also hidden on those pages, but we defend the navigation
-      // here too in case someone calls `setActiveDao` programmatically.)
+      // Determine the destination based on the current path. Only the
+      // namespaced routes participate; everything else is a no-op so the
+      // user doesn't get yanked off the page they're on. (The global toggle
+      // is also hidden on those pages, but we defend the navigation here
+      // too in case someone calls `setActiveDao` programmatically.)
       let target: string | null = null;
 
       if (next === 'nounv2') {
         if (pathname === '/') {
           target = '/v2';
+        } else if (pathname === '/crystal-ball') {
+          target = '/v2/crystal-ball';
         } else {
           const m = V1_NOUN_ID_RE.exec(pathname);
           if (m) target = `/v2/noun/${m[1]}`;
@@ -74,6 +77,8 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
       } else {
         if (pathname === '/v2') {
           target = '/';
+        } else if (pathname === '/v2/crystal-ball') {
+          target = '/crystal-ball';
         } else {
           const m = V2_NOUN_ID_RE.exec(pathname);
           if (m) target = `/noun/${m[1]}`;

@@ -227,6 +227,14 @@ function AppRouter() {
           }
         />
         <Route
+          path="/v2/crystal-ball"
+          element={
+            <Suspense fallback={<GenericSkeleton />}>
+              <CrystalBallPage />
+            </Suspense>
+          }
+        />
+        <Route
           path="/feed"
           element={
             <Suspense fallback={<FeedSkeleton />}>

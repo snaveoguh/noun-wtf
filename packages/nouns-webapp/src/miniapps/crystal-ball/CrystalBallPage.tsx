@@ -37,7 +37,7 @@ import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
-import { type ActiveDao } from '@/hooks/useActiveDao';
+import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
 
@@ -360,37 +360,6 @@ function ViewModeToggle({ mode, setMode }: { mode: ViewMode; setMode: (m: ViewMo
           accent="purple"
         />
       ))}
-    </div>
-  );
-}
-
-function DaoToggle({
-  activeDao,
-  setActiveDao,
-}: {
-  activeDao: ActiveDao;
-  setActiveDao: (d: ActiveDao) => void;
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Select DAO"
-      className="inline-flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/70 p-0.5 shadow-sm backdrop-blur-sm"
-    >
-      <Pill
-        label="Nouns"
-        value={'nouns' as ActiveDao}
-        active={activeDao === 'nouns'}
-        onSelect={setActiveDao}
-        accent="neutral"
-      />
-      <Pill
-        label="V2"
-        value={'nounv2' as ActiveDao}
-        active={activeDao === 'nounv2'}
-        onSelect={setActiveDao}
-        accent="red"
-      />
     </div>
   );
 }
@@ -734,12 +703,10 @@ export default function CrystalBallPage() {
     if (saved === '2d' || saved === '3d' || saved === 'ascii') return saved;
     return 'ascii';
   });
-  // Local prediction-mode toggle. Used to be wired to the global
-  // `useActiveDao` hook, but flipping it would navigate the user away from
-  // /crystal-ball onto the V2 auction page. Crystal Ball is a DAO-agnostic
-  // page that just runs prediction logic against either chain — the toggle
-  // here only changes which chain it reads from.
-  const [activeDao, setActiveDao] = useState<ActiveDao>('nouns');
+  // DAO context comes from the URL: `/crystal-ball` is V1, `/v2/crystal-ball`
+  // is V2. The global header toggle (HeaderDaoToggle) flips between the two
+  // routes — same component, different prediction chain.
+  const { activeDao } = useActiveDao();
 
   useEffect(() => {
     try {
@@ -885,44 +852,30 @@ export default function CrystalBallPage() {
         </a>
       )}
 
-      {/* Toggles — view mode on top row, DAO on second row (mirrors HeaderDaoToggle aesthetic). */}
+      {/* View-mode toggle. The DAO toggle lives in the global header now
+          (HeaderDaoToggle) — flipping it navigates between /crystal-ball
+          and /v2/crystal-ball. */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: 8,
+          justifyContent: 'center',
+          gap: 10,
           paddingTop: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.2em',
-              color: '#555',
-              fontWeight: 700,
-              minWidth: 36,
-            }}
-          >
-            VIEW
-          </span>
-          <ViewModeToggle mode={viewMode} setMode={setViewMode} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.2em',
-              color: '#555',
-              fontWeight: 700,
-              minWidth: 36,
-            }}
-          >
-            DAO
-          </span>
-          <DaoToggle activeDao={activeDao} setActiveDao={setActiveDao} />
-        </div>
+        <span
+          style={{
+            fontSize: 9,
+            letterSpacing: '0.2em',
+            color: '#555',
+            fontWeight: 700,
+            minWidth: 36,
+          }}
+        >
+          VIEW
+        </span>
+        <ViewModeToggle mode={viewMode} setMode={setViewMode} />
       </div>
 
       {/* Orb + match panel side by side on desktop, stacked on mobile */}
