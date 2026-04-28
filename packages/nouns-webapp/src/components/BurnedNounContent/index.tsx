@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
 
-import { Trans } from '@lingui/react/macro';
 import { Col, Row } from 'react-bootstrap';
 import { formatEther } from 'viem';
 
@@ -81,24 +80,46 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
         <Row className={auctionActivityClasses.activityRow}>
           <Col lg={12}>
             <div className={classes.wrapper}>
-              <div className={classes.banner}>
-                <Trans>Burned — Reserve not met</Trans>
+              <div
+                aria-hidden
+                style={{
+                  fontSize: '1.4rem',
+                  letterSpacing: '0.15em',
+                  textAlign: 'center',
+                  marginBottom: '0.4rem',
+                  filter: 'saturate(1.2)',
+                }}
+              >
+                {'\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25'}
               </div>
+              <div className={classes.banner}>BURNED — RESERVE NOT MET</div>
               <div className={classes.subline}>
                 {reserveEth ? (
-                  <Trans>
+                  <>
                     <span className={classes.sublineStrong}>{reserveEth} ETH</span> reserve · 0
                     qualifying bids
-                  </Trans>
+                  </>
                 ) : (
-                  <Trans>Reserve price not met · 0 qualifying bids</Trans>
+                  'Reserve price not met · 0 qualifying bids'
                 )}
               </div>
               <div className={classes.infoRow}>
-                <Trans>
-                  This Noun was burned by the auction house contract because no bid reached the
-                  minimum reserve price. The auction number is retired — no one owns this Noun.
-                </Trans>
+                {'\uD83E\uDEA6 '}
+                This Noun was burned by the auction house contract because no bid reached the
+                minimum reserve price. The auction number is retired — no one owns this Noun.
+                {' \uD83D\uDD25'}
+              </div>
+              <div
+                aria-hidden
+                style={{
+                  fontSize: '1.4rem',
+                  letterSpacing: '0.15em',
+                  textAlign: 'center',
+                  marginTop: '0.4rem',
+                  filter: 'saturate(1.2)',
+                }}
+              >
+                {'\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25'}
               </div>
             </div>
           </Col>
