@@ -107,7 +107,7 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
               >
                 {'\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25'}
               </div>
-              <div className={classes.banner}>BURNED — RESERVE NOT MET</div>
+              <div className={classes.banner}>RESERVE NOT MET</div>
               <div className={classes.subline}>
                 {reserveEth ? (
                   <>
@@ -121,7 +121,7 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
               <div className={classes.infoRow}>
                 {'\uD83E\uDEA6 '}
                 This Noun was burned by the auction house contract because no bid reached the
-                minimum reserve price. The auction number is retired — no one owns this Noun.
+                minimum reserve price. The auction number is retired. No one owns this Noun.
                 {' \uD83D\uDD25'}
               </div>
               <div
