@@ -97,15 +97,18 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
         </span>
       )}
 
-      {/* Tooltip */}
+      {/* Tooltip — anchored to the right of the badge with a left-pointing
+          arrow. Activity-feed badges sit flush at the page's left margin,
+          so the previous "above + centered" anchor was clipping the
+          tooltip off the viewport. */}
       {showTooltip && (
         <div
           style={{
             position: 'absolute',
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: 6,
+            top: '50%',
+            left: '100%',
+            transform: 'translateY(-50%)',
+            marginLeft: 10,
             padding: '8px 12px',
             borderRadius: 10,
             background: 'rgba(20, 20, 31, 0.92)',
@@ -139,18 +142,18 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
           {client.url && (
             <div style={{ opacity: 0.5, fontSize: '0.55rem', marginTop: 2 }}>{client.url}</div>
           )}
-          {/* Arrow */}
+          {/* Arrow — pointing left, toward the badge */}
           <div
             style={{
               position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              top: '50%',
+              right: '100%',
+              transform: 'translateY(-50%)',
               width: 0,
               height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid rgba(20, 20, 31, 0.92)',
+              borderTop: '5px solid transparent',
+              borderBottom: '5px solid transparent',
+              borderRight: '5px solid rgba(20, 20, 31, 0.92)',
             }}
           />
         </div>
