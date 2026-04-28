@@ -62,15 +62,30 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
 
   return (
     <AuctionActivityWrapper>
+      {/* Prev/next noun nav — pinned to the top-right corner of the card so
+          it never overlaps the date / title / banner block. The wrapper
+          AuctionActivityWrapper is `position: relative` already; if not,
+          this still degrades to inline. */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '0.75rem',
+          right: '1.75rem',
+          zIndex: 2,
+          display: 'flex',
+          gap: '0.4rem',
+        }}
+      >
+        <AuctionNavigation
+          isFirstAuction={isFirstAuction}
+          isLastAuction={isLastAuction}
+          onNextAuctionClick={onNextAuctionClick}
+          onPrevAuctionClick={onPrevAuctionClick}
+        />
+      </div>
       <div className={auctionActivityClasses.informationRow}>
         <Row className={auctionActivityClasses.activityRow}>
           <AuctionTitleAndNavWrapper>
-            <AuctionNavigation
-              isFirstAuction={isFirstAuction}
-              isLastAuction={isLastAuction}
-              onNextAuctionClick={onNextAuctionClick}
-              onPrevAuctionClick={onPrevAuctionClick}
-            />
             <AuctionActivityDateHeadline startTime={mintTimestamp} />
           </AuctionTitleAndNavWrapper>
           <Col lg={12}>
