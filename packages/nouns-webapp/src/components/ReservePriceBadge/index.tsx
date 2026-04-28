@@ -1,6 +1,5 @@
 import React from 'react';
 
-import { Trans } from '@lingui/react/macro';
 import { formatEther } from 'viem';
 
 import classes from './ReservePriceBadge.module.css';
@@ -30,9 +29,7 @@ const ReservePriceBadge: React.FC<ReservePriceBadgeProps> = ({
 
   return (
     <div className={classes.wrapper} data-testid="reserve-price-badge">
-      <span className={classes.label}>
-        <Trans>Bid reserve</Trans>
-      </span>
+      <span className={classes.label}>RESERVE</span>
       <span className={classes.value}>{reserveEth} ETH</span>
     </div>
   );
