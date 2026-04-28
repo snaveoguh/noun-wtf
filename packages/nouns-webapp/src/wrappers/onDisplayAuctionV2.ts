@@ -64,6 +64,11 @@ export default function useV2OnDisplayAuction(): Auction | undefined {
     // setInterval in `<Auction>` so we don't need sub-second polling.
     refetchInterval: 12_000,
     staleTime: 6_000,
+    gcTime: 60_000,
+    // Cap retries so a hung publicnode WS / HTTP transport can't keep the
+    // hero panel stuck in skeleton state — TanStack's default 3+exp-backoff
+    // would otherwise queue ~30s of retry latency before surfacing data.
+    retry: 2,
   });
 
   return data;
