@@ -23,33 +23,45 @@ const activeChain =
 // HTTP transports respond on the first request, so we put them first and
 // keep WebSocket as a secondary option (still useful for `watch: true`
 // subscriptions once the page has settled).
-// Multiple HTTP fallbacks — wagmi rotates to the next one on
-// timeout/rate-limit (429). Single-endpoint fallbacks (the previous setup)
-// meant a slow publicnode = stuck crystal-ball orb. llamarpc + cloudflare
-// are both unauthenticated, generally faster + more permissive than
-// publicnode; we keep publicnode as the third option to preserve any
-// existing rate-limit budget instead of hammering one host.
+// Multiple HTTP fallbacks with explicit per-transport timeouts.
+//
+// wagmi's `fallback` waits for each transport to fail before rotating to
+// the next. The default per-transport timeout is 60s (!), so a single
+// stalled publicnode call would lock the crystal-ball orb for a full
+// minute before falling through to llamarpc. 5s is plenty for an
+// `eth_call` / `eth_getBlockByNumber` on a healthy RPC; if it doesn't
+// respond in 5s, treat it as failed and try the next transport.
+//
+// `rank: true` lets wagmi periodically reorder transports by latency so
+// the fastest one floats to the top automatically.
+const HTTP_TIMEOUT = 5_000;
 const transports = {
-  [mainnet.id]: fallback([
-    ...(import.meta.env.VITE_MAINNET_JSONRPC !== undefined
-      ? [http(import.meta.env.VITE_MAINNET_JSONRPC)]
-      : []),
-    http('https://eth.llamarpc.com'),
-    http('https://cloudflare-eth.com'),
-    http('https://ethereum-rpc.publicnode.com'),
-    ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
-      ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
-      : []),
-  ]),
-  [sepolia.id]: fallback([
-    ...(import.meta.env.VITE_SEPOLIA_JSONRPC !== undefined
-      ? [http(import.meta.env.VITE_SEPOLIA_JSONRPC)]
-      : []),
-    http('https://ethereum-sepolia-rpc.publicnode.com'),
-    ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
-      ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
-      : []),
-  ]),
+  [mainnet.id]: fallback(
+    [
+      ...(import.meta.env.VITE_MAINNET_JSONRPC !== undefined
+        ? [http(import.meta.env.VITE_MAINNET_JSONRPC, { timeout: HTTP_TIMEOUT })]
+        : []),
+      http('https://eth.llamarpc.com', { timeout: HTTP_TIMEOUT }),
+      http('https://cloudflare-eth.com', { timeout: HTTP_TIMEOUT }),
+      http('https://ethereum-rpc.publicnode.com', { timeout: HTTP_TIMEOUT }),
+      ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
+        ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
+        : []),
+    ],
+    { rank: true },
+  ),
+  [sepolia.id]: fallback(
+    [
+      ...(import.meta.env.VITE_SEPOLIA_JSONRPC !== undefined
+        ? [http(import.meta.env.VITE_SEPOLIA_JSONRPC, { timeout: HTTP_TIMEOUT })]
+        : []),
+      http('https://ethereum-sepolia-rpc.publicnode.com', { timeout: HTTP_TIMEOUT }),
+      ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
+        ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
+        : []),
+    ],
+    { rank: true },
+  ),
 };
 
 export const config = createConfig({
