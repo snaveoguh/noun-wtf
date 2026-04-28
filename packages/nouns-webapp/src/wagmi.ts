@@ -23,24 +23,32 @@ const activeChain =
 // HTTP transports respond on the first request, so we put them first and
 // keep WebSocket as a secondary option (still useful for `watch: true`
 // subscriptions once the page has settled).
+// Multiple HTTP fallbacks — wagmi rotates to the next one on
+// timeout/rate-limit (429). Single-endpoint fallbacks (the previous setup)
+// meant a slow publicnode = stuck crystal-ball orb. llamarpc + cloudflare
+// are both unauthenticated, generally faster + more permissive than
+// publicnode; we keep publicnode as the third option to preserve any
+// existing rate-limit budget instead of hammering one host.
 const transports = {
   [mainnet.id]: fallback([
     ...(import.meta.env.VITE_MAINNET_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_MAINNET_JSONRPC)]
       : []),
+    http('https://eth.llamarpc.com'),
+    http('https://cloudflare-eth.com'),
+    http('https://ethereum-rpc.publicnode.com'),
     ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
       ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
       : []),
-    http('https://ethereum-rpc.publicnode.com'),
   ]),
   [sepolia.id]: fallback([
     ...(import.meta.env.VITE_SEPOLIA_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_SEPOLIA_JSONRPC)]
       : []),
+    http('https://ethereum-sepolia-rpc.publicnode.com'),
     ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
       ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
       : []),
-    http('https://ethereum-sepolia-rpc.publicnode.com'),
   ]),
 };
 
