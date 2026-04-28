@@ -569,6 +569,32 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
   // unconditionally-truthy.
   const showCuratedHead = hasCuratedHead && headObject != null && headTransform != null;
 
+  // GLBs from different sources don't share a common origin convention —
+  // some have their pivot at the bottom-front corner, some at the geometric
+  // center, some shifted by an arbitrary author offset. The HEAD_TRANSFORMS
+  // position alone can't compensate without per-asset nudges (NounParallax
+  // does that explicitly). For the crystal-ball orb we just want the head
+  // sitting where the voxel head would have been — so we measure the loaded
+  // object's bounding box and shift the primitive so the head's center
+  // lands at the intended position. Result: head sits dead-centre on the
+  // voxel body across noundry / 3dnouns / future sources, no per-asset
+  // tuning required.
+  const headPosition = useMemo<[number, number, number] | null>(() => {
+    if (!showCuratedHead || !headTransform || headObject == null) return null;
+    const box = new THREE.Box3().setFromObject(headObject);
+    if (box.isEmpty()) return headTransform.position;
+    const center = box.getCenter(new THREE.Vector3());
+    const scale = headTransform.scale;
+    // Translate the primitive so the scaled bbox center lands on the
+    // configured anchor (HEAD_TRANSFORMS.position is the *target* anchor in
+    // world coords; subtract the scaled native center to reach it).
+    return [
+      headTransform.position[0] - center.x * scale,
+      headTransform.position[1] - center.y * scale + 4, // lift onto body
+      headTransform.position[2] - center.z * scale,
+    ];
+  }, [showCuratedHead, headObject, headTransform]);
+
   return (
     <>
       {/* eslint-disable react/no-unknown-property */}
@@ -591,11 +617,11 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
           unmounts/remounts the GLB on seed change (rebuilding meshes per
           voxel for the GLB would explode the scope of this work), so the
           head visibly snaps while the body voxels Tetris-cascade. */}
-      {showCuratedHead && (
+      {showCuratedHead && headPosition && (
         <primitive
           object={headObject}
           scale={headTransform.scale}
-          position={headTransform.position}
+          position={headPosition}
           rotation={headTransform.rotation}
         />
       )}
