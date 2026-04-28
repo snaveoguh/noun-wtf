@@ -4,34 +4,11 @@ import { CopyIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
-import { useAccount, useSignTypedData, useWriteContract } from 'wagmi';
+import { useAccount, useWriteContract } from 'wagmi';
 
 import { smallGrantsTreasuryAbi, SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
-
-// EIP-712 domain and types — must match the API relayer
-const GRANT_PROPOSAL_DOMAIN = {
-  name: 'NounGrants',
-  version: '1',
-  chainId: 1,
-  verifyingContract: SMALL_GRANTS_TREASURY_ADDRESS,
-} as const;
-
-const GRANT_PROPOSAL_TYPES = {
-  Proposal: [
-    { name: 'targets', type: 'address[]' },
-    { name: 'values', type: 'uint256[]' },
-    { name: 'signatures', type: 'string[]' },
-    { name: 'calldatas', type: 'bytes[]' },
-    { name: 'description', type: 'string' },
-  ],
-} as const;
 
 interface GrantTx {
   target: string;
@@ -63,7 +40,6 @@ export default function CreateGrantPage() {
     }
   }, [address]);
 
-  const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useWriteContract();
 
   function updateTx(idx: number, field: keyof GrantTx, val: string) {
@@ -132,44 +108,6 @@ export default function CreateGrantPage() {
       calldatas: ['0x'],
       description: `# ${title.trim()}\n\n${body.trim()}`,
     };
-  }
-
-  async function handleGasless() {
-    const proposal = buildProposal();
-    if (!proposal) return;
-
-    setSubmitting(true);
-    try {
-      const signature = await signTypedDataAsync({
-        domain: GRANT_PROPOSAL_DOMAIN,
-        types: GRANT_PROPOSAL_TYPES,
-        primaryType: 'Proposal',
-        message: proposal,
-      });
-
-      const res = await fetch(`${API_BASE}/api/grants/propose`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proposer: address,
-          targets: proposal.targets,
-          values: proposal.values.map(v => v.toString()),
-          signatures: proposal.signatures,
-          calldatas: proposal.calldatas,
-          description: proposal.description,
-          signature,
-        }),
-      });
-
-      const data = (await res.json()) as { error?: string; txHash?: string };
-      if (!res.ok) throw new Error(data.error ?? 'Relay failed');
-      setSubmittedTx(data.txHash ?? '');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to create grant';
-      if (!msg.includes('User rejected')) toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function handleWithGas() {
@@ -259,8 +197,6 @@ export default function CreateGrantPage() {
     <div className={classes.container}>
       <h1 className={classes.title}>Create Grant Proposal</h1>
       <p className={classes.subtitle}>
-        Submit gasless (we pay the gas) or pay gas yourself.
-        <br />
         The proposal enters a 12-hour voting period immediately.
       </p>
 
@@ -450,30 +386,15 @@ export default function CreateGrantPage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
+        <div style={{ marginTop: '2rem' }}>
           <button
             type="button"
             className={classes.submitBtn}
-            style={{ flex: 1, marginTop: 0 }}
-            disabled={submitting || !address}
-            onClick={handleGasless}
-          >
-            {submitting ? 'Submitting...' : !address ? 'Connect Wallet' : 'Submit Gasless'}
-          </button>
-          <button
-            type="button"
-            className={classes.submitBtn}
-            style={{
-              flex: 1,
-              marginTop: 0,
-              background: 'transparent',
-              border: '2px solid #22d3ee',
-              color: '#0891b2',
-            }}
+            style={{ width: '100%', marginTop: 0 }}
             disabled={submitting || !address}
             onClick={handleWithGas}
           >
-            {submitting ? 'Submitting...' : 'Pay Gas'}
+            {submitting ? 'Submitting...' : !address ? 'Connect Wallet' : 'Submit'}
           </button>
         </div>
       </div>
