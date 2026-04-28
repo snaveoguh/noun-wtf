@@ -13,22 +13,32 @@ const activeChain =
     find(chain => chain.id === activeChainId),
   ) ?? sepolia;
 
+// Transport order matters for cold-start latency. wagmi's `fallback` waits
+// for each transport to fail (or hang past its timeout) before trying the
+// next, so the first entry needs to resolve fast. WebSocket setup to
+// publicnode regularly takes 5–15s on first connect, which would block every
+// `useReadContract` / `useBlock` call on the page until the WS handshake
+// completes — manifesting as the crystal-ball orb stuck on "SCRYING…".
+//
+// HTTP transports respond on the first request, so we put them first and
+// keep WebSocket as a secondary option (still useful for `watch: true`
+// subscriptions once the page has settled).
 const transports = {
   [mainnet.id]: fallback([
-    ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
-      ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
-      : []),
     ...(import.meta.env.VITE_MAINNET_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_MAINNET_JSONRPC)]
+      : []),
+    ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
+      ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
       : []),
     http('https://ethereum-rpc.publicnode.com'),
   ]),
   [sepolia.id]: fallback([
-    ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
-      ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
-      : []),
     ...(import.meta.env.VITE_SEPOLIA_JSONRPC !== undefined
       ? [http(import.meta.env.VITE_SEPOLIA_JSONRPC)]
+      : []),
+    ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
+      ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
       : []),
     http('https://ethereum-sepolia-rpc.publicnode.com'),
   ]),

@@ -8,18 +8,36 @@ import {
 } from '@/utils/clientRegistry';
 
 /**
- * Emoji fallback for the small "Winner" badge. The onchain client registry
- * doesn't define emojis — so we map a couple of the clients we care about
- * to emoji. Everything else falls through to a link-chain.
+ * Visual badge per client. Each entry is either:
+ *   - A unicode emoji string (rendered as text)
+ *   - An image asset path starting with `/` (rendered as <img> at the same
+ *     box size as text emojis — used when no single unicode glyph fits the
+ *     client's brand, e.g. animated GIFs)
+ * Unknown clients fall through to a link-chain placeholder. Keep these in
+ * sync with CLIENT_REGISTRY in `@/utils/clientRegistry`.
  */
-const BADGE_EMOJI: Record<number, string> = {
-  0: '\u2310\u25E8-\u25E8',
-  37: '\uD83C\uDF46',
+const BADGE_VISUAL: Record<number, string> = {
+  0: '\u2310\u25E8-\u25E8', // nouns.wtf — noggles
+  1: '\u26FA', // nouns.camp — tent
+  2: '\uD83C\uDFE0', // Prop House — house
+  3: '\uD83C\uDFDB\uFE0F', // Agora — classical building
+  4: '\uD83D\uDD04', // NounSwap — swap arrows
+  5: '\uD83C\uDF05', // Nouns.com — sunrise/sunset
+  6: '\uD83D\uDD79\uFE0F', // nouns.game — joystick
+  7: '\uD83D\uDCBB', // Nouns Terminal (nouns.sh) — laptop
+  9: '/clients/probe.gif', // Probe — custom ET gif
+  11: '\uD83E\uDED0', // Berry OS (berryos.wtf) — blueberries
+  12: '\uD83D\uDE39', // Prop Launchpad — joycat
+  37: '\uD83C\uDF46', // noun.wtf — eggplant
 };
 
-function getBadgeEmoji(clientId: number | null | undefined): string {
+function isImagePath(v: string): boolean {
+  return v.startsWith('/');
+}
+
+function getBadgeVisual(clientId: number | null | undefined): string {
   if (clientId == null) return '';
-  return BADGE_EMOJI[clientId] ?? '\uD83D\uDD17';
+  return BADGE_VISUAL[clientId] ?? '\uD83D\uDD17';
 }
 
 interface ClientBadgeProps {
@@ -34,7 +52,8 @@ interface ClientBadgeProps {
 const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const client = getClientInfo(clientId);
-  const emoji = getBadgeEmoji(clientId);
+  const visual = getBadgeVisual(clientId);
+  const isImage = isImagePath(visual);
 
   if (!client) return null;
 
@@ -44,18 +63,37 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      <span
-        style={{
-          fontSize: size * 0.75,
-          lineHeight: 1,
-          cursor: 'default',
-          userSelect: 'none',
-          marginLeft: 4,
-        }}
-        title={client.name}
-      >
-        {emoji}
-      </span>
+      {isImage ? (
+        <img
+          src={visual}
+          alt={client.name}
+          title={client.name}
+          style={{
+            width: size * 0.85,
+            height: size * 0.85,
+            objectFit: 'cover',
+            borderRadius: 3,
+            marginLeft: 4,
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            userSelect: 'none',
+          }}
+          draggable={false}
+        />
+      ) : (
+        <span
+          style={{
+            fontSize: size * 0.75,
+            lineHeight: 1,
+            cursor: 'default',
+            userSelect: 'none',
+            marginLeft: 4,
+          }}
+          title={client.name}
+        >
+          {visual}
+        </span>
+      )}
 
       {/* Tooltip */}
       {showTooltip && (
@@ -80,8 +118,20 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 2 }}>
-            {emoji} {client.name}
+          <div
+            style={{ fontWeight: 700, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            {isImage ? (
+              <img
+                src={visual}
+                alt=""
+                style={{ width: 14, height: 14, objectFit: 'cover', borderRadius: 2 }}
+                draggable={false}
+              />
+            ) : (
+              <span>{visual}</span>
+            )}
+            {client.name}
           </div>
           <div style={{ opacity: 0.7, fontSize: '0.6rem' }}>{client.description}</div>
           {client.url && (

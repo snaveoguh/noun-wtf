@@ -116,7 +116,7 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
       {/* ── Actions ── */}
       <div className="flex gap-2 px-3 py-2">
         <Link
-          to={`/terminal?topic=noun:${nounId}`}
+          to={`/?topic=noun:${nounId}`}
           className="flex flex-1 items-center justify-center gap-1.5 rounded border-2 border-black bg-yellow-200 px-2 py-1.5 text-xs font-bold no-underline transition-colors hover:bg-yellow-300"
         >
           <MessageCircle className="size-3.5" />

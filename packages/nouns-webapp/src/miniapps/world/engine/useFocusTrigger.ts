@@ -37,26 +37,35 @@ export function useFocusTrigger(
     let heldLocal = false;
 
     const tick = () => {
-      const input = inputRef.current;
-      if (!input) return;
-      const pressed = input.keys.has(key);
+      // Defensive try/catch — this interval polls input + mutates the
+      // shared slomo state. If anything inside throws (e.g. a stale
+      // ref during teardown), we don't want the freeze symptom of the
+      // tick blowing up to halt downstream consumers; just skip the
+      // poll and try again next interval.
+      try {
+        const input = inputRef.current;
+        if (!input) return;
+        const pressed = input.keys.has(key);
 
-      if (pressed && !heldLocal) {
-        // Edge: start of hold.
-        if (getFocusMeter() > 0.01) {
-          heldLocal = triggerFocus('manual');
+        if (pressed && !heldLocal) {
+          // Edge: start of hold.
+          if (getFocusMeter() > 0.01) {
+            heldLocal = triggerFocus('manual');
+          }
+        } else if (!pressed && heldLocal) {
+          // Edge: release.
+          heldLocal = false;
+          releaseManualFocus();
+        } else if (pressed && heldLocal && getFocusMeter() <= 0) {
+          // Meter exhausted while still holding — force release so we
+          // don't stall at near-zero factor. timeControl also auto-
+          // releases internally, but do it here for symmetry of the
+          // heldLocal flag so a re-press after refill works cleanly.
+          heldLocal = false;
+          releaseManualFocus();
         }
-      } else if (!pressed && heldLocal) {
-        // Edge: release.
-        heldLocal = false;
-        releaseManualFocus();
-      } else if (pressed && heldLocal && getFocusMeter() <= 0) {
-        // Meter exhausted while still holding — force release so we
-        // don't stall at near-zero factor. timeControl also auto-
-        // releases internally, but do it here for symmetry of the
-        // heldLocal flag so a re-press after refill works cleanly.
-        heldLocal = false;
-        releaseManualFocus();
+      } catch (err) {
+        console.error('[useFocusTrigger] poll skipped:', err);
       }
     };
 

@@ -20,14 +20,23 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
  * flag so it's a no-op on the network.
  */
 export function useDaoReservePrice(dao: DaoContext): bigint | undefined {
+  // Reserve price changes only via governance, so a 30s staleTime is plenty
+  // and lets the UI hydrate from cache on tab focus without re-querying RPC.
+  // `retry: 2` keeps a hung publicnode call from blocking the bid form via
+  // TanStack's default 3-retry exponential backoff.
   const v1 = useReadNounsAuctionHouseReservePrice({
-    query: { enabled: !dao.isV2 },
+    query: { enabled: !dao.isV2, retry: 2, staleTime: 30_000, gcTime: 5 * 60_000 },
   });
   const v2 = useReadContract({
     address: dao.auctionHouseAddress,
     abi: dao.auctionHouseAbi,
     functionName: 'reservePrice',
-    query: { enabled: dao.isV2 && dao.isConfigured },
+    query: {
+      enabled: dao.isV2 && dao.isConfigured,
+      retry: 2,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    },
   });
 
   const raw = dao.isV2 ? v2.data : v1.data;
@@ -41,14 +50,21 @@ export function useDaoReservePrice(dao: DaoContext): bigint | undefined {
  * formula without mixing types.
  */
 export function useDaoMinBidIncrementPercentage(dao: DaoContext): bigint | undefined {
+  // Same stability profile as reservePrice — only governance changes it. Cap
+  // retries so a slow transport doesn't gate the bid form's increment math.
   const v1 = useReadNounsAuctionHouseMinBidIncrementPercentage({
-    query: { enabled: !dao.isV2 },
+    query: { enabled: !dao.isV2, retry: 2, staleTime: 30_000, gcTime: 5 * 60_000 },
   });
   const v2 = useReadContract({
     address: dao.auctionHouseAddress,
     abi: dao.auctionHouseAbi,
     functionName: 'minBidIncrementPercentage',
-    query: { enabled: dao.isV2 && dao.isConfigured },
+    query: {
+      enabled: dao.isV2 && dao.isConfigured,
+      retry: 2,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    },
   });
 
   const raw = dao.isV2 ? v2.data : v1.data;
@@ -129,6 +145,10 @@ export function useDaoSettleWriter(dao: DaoContext) {
   return dao.isV2
     ? {
         writeContract,
+        // The hash exposed here is the submitted tx — callers pair this with
+        // `useWaitForTransactionReceipt` to flip a success toast on receipt
+        // confirmation rather than on submission.
+        data: v2.data,
         isPending: v2.isPending,
         isIdle: v2.isIdle,
         isError: v2.isError,
@@ -137,6 +157,7 @@ export function useDaoSettleWriter(dao: DaoContext) {
       }
     : {
         writeContract,
+        data: v1.data,
         isPending: v1.isPending,
         isIdle: v1.isIdle,
         isError: v1.isError,
@@ -159,16 +180,29 @@ export function useDaoNounSeed(
 ): INounSeed | undefined {
   const enabledCommon = nounId !== undefined && dao.tokenAddress !== ZERO_ADDRESS;
 
+  // Seeds are immutable once a noun is minted — cache aggressively. retry
+  // bumped to 2 (was 1) so a single transport blip doesn't wipe the hero
+  // image; the data never changes so a generous 5min staleTime is safe.
   const v1 = useReadNounsTokenSeeds({
     args: nounId !== undefined ? [nounId] : undefined,
-    query: { enabled: !dao.isV2 && enabledCommon, retry: 1 },
+    query: {
+      enabled: !dao.isV2 && enabledCommon,
+      retry: 2,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+    },
   });
   const v2 = useReadContract({
     address: dao.tokenAddress,
     abi: dao.tokenAbi,
     functionName: 'seeds',
     args: nounId !== undefined ? [nounId] : undefined,
-    query: { enabled: dao.isV2 && enabledCommon, retry: 1 },
+    query: {
+      enabled: dao.isV2 && enabledCommon,
+      retry: 2,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+    },
   });
 
   const data = dao.isV2 ? v2.data : v1.data;

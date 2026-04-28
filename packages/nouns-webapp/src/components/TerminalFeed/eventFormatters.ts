@@ -52,6 +52,10 @@ export const FILTER_TABS = [
   { key: 'BID', label: 'BIDS' },
   { key: 'VOTE', label: 'VOTES' },
   { key: 'PROPOSAL_CREATED', label: 'PROPS' },
+  {
+    key: 'CANDIDATE_CREATED,CANDIDATE_SPONSORED,CANDIDATE_PROMOTED,CANDIDATE_UPDATED,CANDIDATE_FEEDBACK,CANDIDATE_CANCELED',
+    label: 'CAND',
+  },
   { key: 'AUCTION_SETTLED', label: 'AUCTIONS' },
   { key: 'DELEGATION', label: 'DELEGATIONS' },
   { key: 'TRANSFER', label: 'TRANSFERS' },

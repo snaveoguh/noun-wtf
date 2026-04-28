@@ -141,8 +141,8 @@ const APIS = [
 const TOOLS = [
   {
     name: 'Terminal',
-    path: '/terminal',
-    desc: 'AI chat with governance tool access. Vote, propose, bid, delegate — all through natural language.',
+    path: '/',
+    desc: 'AI chat with governance tool access (now on the homepage feed). Vote, propose, bid, delegate — all through natural language.',
     art: `$ noun-terminal v1.0
 > vote for prop 948
 preparing your vote...

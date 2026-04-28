@@ -3026,499 +3026,507 @@ export default function WorldPage() {
     // camera reads the fresh player position each frame — otherwise during a
     // jump the camera lags by one tick and "can't keep up."
     useFrame((_, delta) => {
-      const player = playerRef.current;
-      const input = inputRef.current;
-      const combat = combatRef.current;
-      const ocean = oceanRef.current;
-      const mp = mpRef.current;
-      if (!player) return;
-      // Real (unscaled) delta, clamped so a tab-blur resume doesn't
-      // advance the focus meter / slomo state machine by seconds.
-      const dt = Math.min(delta, 1 / 20);
+      // Wrap the whole tick so a thrown exception (e.g. a stray null
+      // deref triggered by an input edge like Q-tap forcePush) doesn't
+      // kill R3F's render loop and freeze the game. Better to drop one
+      // frame's logic than halt every subsequent frame forever.
+      try {
+        const player = playerRef.current;
+        const input = inputRef.current;
+        const combat = combatRef.current;
+        const ocean = oceanRef.current;
+        const mp = mpRef.current;
+        if (!player) return;
+        // Real (unscaled) delta, clamped so a tab-blur resume doesn't
+        // advance the focus meter / slomo state machine by seconds.
+        const dt = Math.min(delta, 1 / 20);
 
-      // Sync camera-target Object3D with the target Vector3 so CameraRig
-      // can read the player position via Object3D.position.
-      if (cameraTargetObjRef.current) {
-        cameraTargetObjRef.current.position.copy(playerTargetRef.current);
-      }
-
-      // Publish the authoritative body to dojoState so GravityZones /
-      // TrainingDummies can read it for proximity + impulse effects.
-      const playerBody = getPlayerBody(player);
-      setPlayerBodyForDojo(playerBody);
-
-      // Double-tap dash detection (edge-triggered on WASD just-pressed).
-      // Writes into the authoritative body so locomotion.ts picks up
-      // lastDirTapTime/Vec and triggers the actual dash state.
-      {
-        const jp = input.justPressed;
-        const body = playerBody ?? dashTapBodyRef.current;
-        const nowMs = performance.now();
-        // Camera-relative: W = forward, S = back, A = left, D = right.
-        const ca = input.cameraAngle ?? 0;
-        const forwardX = -Math.sin(ca);
-        const forwardY = -Math.cos(ca);
-        const rightX = Math.cos(ca);
-        const rightY = -Math.sin(ca);
-        const tryTap = (dx: number, dy: number) => {
-          // Consume the tap. When a double-tap closes, registerDirTap
-          // returns true — locomotion owns the actual dash + focus
-          // trigger inside combat.ts via its authoritative body, so we
-          // just record the edge here for the shared double-tap window.
-          registerDirTap(body, dx, dy, nowMs);
-        };
-        if (jp.has('w')) tryTap(forwardX, forwardY);
-        if (jp.has('s')) tryTap(-forwardX, -forwardY);
-        if (jp.has('a')) tryTap(-rightX, -rightY);
-        if (jp.has('d')) tryTap(rightX, rightY);
-      }
-
-      // ── FEATURE 2: Poll gamepad each frame ──
-      pollGamepad(input);
-
-      frameRef.current++;
-      const frame = frameRef.current;
-
-      // Ocean death — only if actually at water level (not on ramp/buildings above water tiles)
-      const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
-      const sk = skateRef.current;
-      const terrainAtPlayer = getTerrainHeight(player.x * WORLD_SCALE, player.y * WORLD_SCALE);
-      const actuallySubmerged = inWater && terrainAtPlayer < 0.3;
-      tickOceanDeath(ocean, actuallySubmerged && !sk.isSkating);
-      if (ocean.phase === 'respawning' && ocean.timer === 59) {
-        player.x = SPAWN_X;
-        player.y = SPAWN_Y;
-        player.vx = 0;
-        player.vy = 0;
-        player.hp = player.maxHp;
-      }
-
-      // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
-      // Only for real guns — spray can is a paint tool, no crosshair lock.
-      const wEq = weaponRef.current.equipped;
-      const isGun = !!wEq && !WEAPON_DEFS[wEq].isPaintTool;
-      if (isGun && frame % 3 === 0) {
-        const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
-          lockRange: 140,
-          lockCone: Math.PI / 10,
-          enableLockOn: true,
-        });
-        aimSlotRef.current.lockedId = passiveAim.lockedId;
-        aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
-      } else if (!isGun) {
-        aimSlotRef.current.lockedId = null;
-        aimSlotRef.current.lockDistance = null;
-      }
-
-      // ── Weapon pickup check (GTA style — auto on walk-over) ──
-      const weapon = weaponRef.current;
-      if (frame % 120 === 0) {
-        const pickups = getActivePickups();
-        if (pickups.length > 0) {
-          const nearest = pickups.reduce(
-            (best, p) => {
-              const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
-              return d < best.d ? { d, p } : best;
-            },
-            { d: Infinity, p: pickups[0] },
-          );
-          console.log(
-            `[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`,
-          );
+        // Sync camera-target Object3D with the target Vector3 so CameraRig
+        // can read the player position via Object3D.position.
+        if (cameraTargetObjRef.current) {
+          cameraTargetObjRef.current.position.copy(playerTargetRef.current);
         }
-      }
-      const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
-      if (pickedUp) {
-        playPickupSound();
-        setWeaponPickups([...getActivePickups()]);
-      }
-      tickReload(weapon);
-      tickMuzzleFlash(weapon);
 
-      // ── Hoverboard physics ──
-      if (sk.isSkating) {
-        const wx = player.x * WORLD_SCALE;
-        const wz = player.y * WORLD_SCALE;
-        const terrainY = getTerrainHeight(wx, wz);
-        const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
-        const dir: [number, number] = [
-          input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
-          input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
-        ];
-        const move = tickSkating(sk, dir, 1 / 60, terrainY, rampData);
-        player.x += move.dx / WORLD_SCALE;
-        player.y += move.dz / WORLD_SCALE;
-      }
+        // Publish the authoritative body to dojoState so GravityZones /
+        // TrainingDummies can read it for proximity + impulse effects.
+        const playerBody = getPlayerBody(player);
+        setPlayerBodyForDojo(playerBody);
 
-      // ── Paint can pickup check (auto on walk-over) ──
-      const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
-      if (paintPickedUp) {
-        playPickupSound();
-        setPaintCans([...getActivePaintCans()]);
-        console.log(`[Graffiti] Picked up ${paintPickedUp.color} paint can!`);
-      }
+        // Double-tap dash detection (edge-triggered on WASD just-pressed).
+        // Writes into the authoritative body so locomotion.ts picks up
+        // lastDirTapTime/Vec and triggers the actual dash state.
+        {
+          const jp = input.justPressed;
+          const body = playerBody ?? dashTapBodyRef.current;
+          const nowMs = performance.now();
+          // Camera-relative: W = forward, S = back, A = left, D = right.
+          const ca = input.cameraAngle ?? 0;
+          const forwardX = -Math.sin(ca);
+          const forwardY = -Math.cos(ca);
+          const rightX = Math.cos(ca);
+          const rightY = -Math.sin(ca);
+          const tryTap = (dx: number, dy: number) => {
+            // Consume the tap. When a double-tap closes, registerDirTap
+            // returns true — locomotion owns the actual dash + focus
+            // trigger inside combat.ts via its authoritative body, so we
+            // just record the edge here for the shared double-tap window.
+            registerDirTap(body, dx, dy, nowMs);
+          };
+          if (jp.has('w')) tryTap(forwardX, forwardY);
+          if (jp.has('s')) tryTap(-forwardX, -forwardY);
+          if (jp.has('a')) tryTap(-rightX, -rightY);
+          if (jp.has('d')) tryTap(rightX, rightY);
+        }
 
-      // Footsteps disabled — too noisy
+        // ── FEATURE 2: Poll gamepad each frame ──
+        pollGamepad(input);
 
-      // Combat input — disabled when skating (board handles its own controls)
-      if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
-        let intendedMove = resolveIntendedMove(input);
+        frameRef.current++;
+        const frame = frameRef.current;
 
-        // If F pressed and weapon equipped, handle it.
-        // Paint tools (spray_can) open the graffiti UI instead of firing
-        // a bullet. Regular guns fire + play a sound.
-        if (intendedMove === 'gunshot' && weapon.equipped) {
-          const def = WEAPON_DEFS[weapon.equipped];
-          if (def.isPaintTool) {
-            openGraffitiForNearestWall();
-            intendedMove = null; // don't treat as combat hit
-          } else {
-            const result = fireWeapon(weapon);
-            if (result.fired) {
-              if (weapon.equipped === 'shotgun') playShotgunSound();
-              else playGunshot();
+        // Ocean death — only if actually at water level (not on ramp/buildings above water tiles)
+        const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
+        const sk = skateRef.current;
+        const terrainAtPlayer = getTerrainHeight(player.x * WORLD_SCALE, player.y * WORLD_SCALE);
+        const actuallySubmerged = inWater && terrainAtPlayer < 0.3;
+        tickOceanDeath(ocean, actuallySubmerged && !sk.isSkating);
+        if (ocean.phase === 'respawning' && ocean.timer === 59) {
+          player.x = SPAWN_X;
+          player.y = SPAWN_Y;
+          player.vx = 0;
+          player.vy = 0;
+          player.hp = player.maxHp;
+        }
+
+        // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
+        // Only for real guns — spray can is a paint tool, no crosshair lock.
+        const wEq = weaponRef.current.equipped;
+        const isGun = !!wEq && !WEAPON_DEFS[wEq].isPaintTool;
+        if (isGun && frame % 3 === 0) {
+          const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+            lockRange: 140,
+            lockCone: Math.PI / 10,
+            enableLockOn: true,
+          });
+          aimSlotRef.current.lockedId = passiveAim.lockedId;
+          aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
+        } else if (!isGun) {
+          aimSlotRef.current.lockedId = null;
+          aimSlotRef.current.lockDistance = null;
+        }
+
+        // ── Weapon pickup check (GTA style — auto on walk-over) ──
+        const weapon = weaponRef.current;
+        if (frame % 120 === 0) {
+          const pickups = getActivePickups();
+          if (pickups.length > 0) {
+            const nearest = pickups.reduce(
+              (best, p) => {
+                const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
+                return d < best.d ? { d, p } : best;
+              },
+              { d: Infinity, p: pickups[0] },
+            );
+            console.log(
+              `[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`,
+            );
+          }
+        }
+        const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
+        if (pickedUp) {
+          playPickupSound();
+          setWeaponPickups([...getActivePickups()]);
+        }
+        tickReload(weapon);
+        tickMuzzleFlash(weapon);
+
+        // ── Hoverboard physics ──
+        if (sk.isSkating) {
+          const wx = player.x * WORLD_SCALE;
+          const wz = player.y * WORLD_SCALE;
+          const terrainY = getTerrainHeight(wx, wz);
+          const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
+          const dir: [number, number] = [
+            input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
+            input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
+          ];
+          const move = tickSkating(sk, dir, 1 / 60, terrainY, rampData);
+          player.x += move.dx / WORLD_SCALE;
+          player.y += move.dz / WORLD_SCALE;
+        }
+
+        // ── Paint can pickup check (auto on walk-over) ──
+        const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
+        if (paintPickedUp) {
+          playPickupSound();
+          setPaintCans([...getActivePaintCans()]);
+          console.log(`[Graffiti] Picked up ${paintPickedUp.color} paint can!`);
+        }
+
+        // Footsteps disabled — too noisy
+
+        // Combat input — disabled when skating (board handles its own controls)
+        if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
+          let intendedMove = resolveIntendedMove(input);
+
+          // If F pressed and weapon equipped, handle it.
+          // Paint tools (spray_can) open the graffiti UI instead of firing
+          // a bullet. Regular guns fire + play a sound.
+          if (intendedMove === 'gunshot' && weapon.equipped) {
+            const def = WEAPON_DEFS[weapon.equipped];
+            if (def.isPaintTool) {
+              openGraffitiForNearestWall();
+              intendedMove = null; // don't treat as combat hit
             } else {
-              intendedMove = null; // can't fire (cooldown/no ammo/reloading)
+              const result = fireWeapon(weapon);
+              if (result.fired) {
+                if (weapon.equipped === 'shotgun') playShotgunSound();
+                else playGunshot();
+              } else {
+                intendedMove = null; // can't fire (cooldown/no ammo/reloading)
+              }
             }
-          }
-        } else if (intendedMove === 'gunshot' && !weapon.equipped) {
-          intendedMove = null; // no weapon
-        }
-
-        if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
-          // Play attack sound
-          if (intendedMove === 'punch') playPunchSound();
-          else if (intendedMove === 'kick') playKickSound();
-          else if (intendedMove === 'headbutt') playHeadbuttSound();
-          else if (intendedMove === 'backflip') playJumpSound();
-          // block is silent — no annoying clang on shift
-
-          // Aim resolution:
-          //   - Ranged moves use camera-ray aim + soft lock-on (continuous angle)
-          //   - Melee falls back to 8-way facing (keeps close-combat feel snappy)
-          const isRanged = intendedMove === 'gunshot' || intendedMove === 'forcePush';
-          let angle: number;
-          if (isRanged) {
-            const aim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
-              lockRange: intendedMove === 'gunshot' ? 140 : 80,
-              lockCone: intendedMove === 'gunshot' ? Math.PI / 10 : Math.PI / 7,
-              enableLockOn: true,
-            });
-            angle = aim.angle;
-            aimSlotRef.current.lockedId = aim.lockedId;
-            aimSlotRef.current.lockDistance = aim.lockDistance ?? null;
-          } else {
-            angle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
-          }
-          const mouseWorldX = player.x + Math.cos(angle) * 50;
-          const mouseWorldY = player.y + Math.sin(angle) * 50;
-
-          const hits = executeMove(
-            player,
-            intendedMove,
-            mouseWorldX,
-            mouseWorldY,
-            mp.remotePlayers,
-            combat,
-          );
-
-          if (intendedMove !== 'block') {
-            sendAttack(mp, intendedMove, player.x, player.y, angle);
-          }
-          if (intendedMove === 'forcePush') {
-            sendForcePush(mp, player.x, player.y, angle, '#4488ff');
+          } else if (intendedMove === 'gunshot' && !weapon.equipped) {
+            intendedMove = null; // no weapon
           }
 
-          // Sound on hit
-          for (const hit of hits) {
-            if (hit.combo >= 3) playComboSound();
-            sendHit(mp, hit.targetId, hit.damage, hit.knockX, hit.knockY, hit.move, hit.combo);
-            const target = mp.remotePlayers.get(hit.targetId);
-            if (target && target.hp <= 0) {
-              playDeathSound();
-              combat.killFeed.push({
-                killer: `Noun #${player.nounId}`,
-                victim: `Noun #${target.nounId}`,
-                move: hit.move,
-                timestamp: Date.now(),
+          if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
+            // Play attack sound
+            if (intendedMove === 'punch') playPunchSound();
+            else if (intendedMove === 'kick') playKickSound();
+            else if (intendedMove === 'headbutt') playHeadbuttSound();
+            else if (intendedMove === 'backflip') playJumpSound();
+            // block is silent — no annoying clang on shift
+
+            // Aim resolution:
+            //   - Ranged moves use camera-ray aim + soft lock-on (continuous angle)
+            //   - Melee falls back to 8-way facing (keeps close-combat feel snappy)
+            const isRanged = intendedMove === 'gunshot' || intendedMove === 'forcePush';
+            let angle: number;
+            if (isRanged) {
+              const aim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+                lockRange: intendedMove === 'gunshot' ? 140 : 80,
+                lockCone: intendedMove === 'gunshot' ? Math.PI / 10 : Math.PI / 7,
+                enableLockOn: true,
               });
-              // Persist kill to K/D stats
-              if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
-                mp.ws.send(
-                  JSON.stringify({
-                    type: 'world:kd:save',
-                    wallet: connectedWallet,
-                    addKills: 1,
-                    addDeaths: 0,
-                  }),
-                );
+              angle = aim.angle;
+              aimSlotRef.current.lockedId = aim.lockedId;
+              aimSlotRef.current.lockDistance = aim.lockDistance ?? null;
+            } else {
+              angle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
+            }
+            const mouseWorldX = player.x + Math.cos(angle) * 50;
+            const mouseWorldY = player.y + Math.sin(angle) * 50;
+
+            const hits = executeMove(
+              player,
+              intendedMove,
+              mouseWorldX,
+              mouseWorldY,
+              mp.remotePlayers,
+              combat,
+            );
+
+            if (intendedMove !== 'block') {
+              sendAttack(mp, intendedMove, player.x, player.y, angle);
+            }
+            if (intendedMove === 'forcePush') {
+              sendForcePush(mp, player.x, player.y, angle, '#4488ff');
+            }
+
+            // Sound on hit
+            for (const hit of hits) {
+              if (hit.combo >= 3) playComboSound();
+              sendHit(mp, hit.targetId, hit.damage, hit.knockX, hit.knockY, hit.move, hit.combo);
+              const target = mp.remotePlayers.get(hit.targetId);
+              if (target && target.hp <= 0) {
+                playDeathSound();
+                combat.killFeed.push({
+                  killer: `Noun #${player.nounId}`,
+                  victim: `Noun #${target.nounId}`,
+                  move: hit.move,
+                  timestamp: Date.now(),
+                });
+                // Persist kill to K/D stats
+                if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
+                  mp.ws.send(
+                    JSON.stringify({
+                      type: 'world:kd:save',
+                      wallet: connectedWallet,
+                      addKills: 1,
+                      addDeaths: 0,
+                    }),
+                  );
+                }
               }
             }
           }
         }
-      }
 
-      // ── Settlement window check (every ~15 seconds) ──
-      if (frame % 900 === 0) {
-        getAuctionState().then(auction => {
-          voipRef.current.settlementWindow = auction.isSettlementWindow;
-        });
-      }
+        // ── Settlement window check (every ~15 seconds) ──
+        if (frame % 900 === 0) {
+          getAuctionState().then(auction => {
+            voipRef.current.settlementWindow = auction.isSettlementWindow;
+          });
+        }
 
-      // ── VOIP tick ──
-      const voip = voipRef.current;
-      if (voip.localStream && frame % 6 === 0) {
-        const wasSpeaking = voip.isSpeaking;
-        checkVoiceActivity(voip);
-        // Broadcast speaking state + transcript
-        if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
-          if (voip.isSpeaking !== wasSpeaking) {
-            mp.ws.send(
-              JSON.stringify({
-                type: 'world:voip:speaking',
-                speaking: voip.isSpeaking,
-              }),
-            );
+        // ── VOIP tick ──
+        const voip = voipRef.current;
+        if (voip.localStream && frame % 6 === 0) {
+          const wasSpeaking = voip.isSpeaking;
+          checkVoiceActivity(voip);
+          // Broadcast speaking state + transcript
+          if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
+            if (voip.isSpeaking !== wasSpeaking) {
+              mp.ws.send(
+                JSON.stringify({
+                  type: 'world:voip:speaking',
+                  speaking: voip.isSpeaking,
+                }),
+              );
+            }
+            // Broadcast transcript to other players
+            const transcript = getCurrentTranscript();
+            if (transcript) {
+              mp.ws.send(
+                JSON.stringify({
+                  type: 'world:voip:transcript',
+                  text: transcript,
+                }),
+              );
+            }
           }
-          // Broadcast transcript to other players
-          const transcript = getCurrentTranscript();
-          if (transcript) {
-            mp.ws.send(
-              JSON.stringify({
-                type: 'world:voip:transcript',
-                text: transcript,
-              }),
-            );
+          // Update crowd settle
+          const shouldSettle = updateCrowdSettle(voip);
+          if (shouldSettle) {
+            // TODO: trigger sewerpipe.eth settlement via agent hub API
+            console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
+          }
+          // Update spatial audio listener position
+          const rot = DIRECTION_ROTATION[player.direction] ?? 0;
+          updateListenerPosition(
+            voip,
+            player.x * WORLD_SCALE,
+            0,
+            player.y * WORLD_SCALE,
+            Math.sin(rot),
+            Math.cos(rot),
+          );
+          // Update spatial positions for remote players
+          for (const [id, rp] of mp.remotePlayers) {
+            updateSpatialPosition(voip, id, rp.x * WORLD_SCALE, 0, rp.y * WORLD_SCALE);
           }
         }
-        // Update crowd settle
-        const shouldSettle = updateCrowdSettle(voip);
-        if (shouldSettle) {
-          // TODO: trigger sewerpipe.eth settlement via agent hub API
-          console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
-        }
-        // Update spatial audio listener position
-        const rot = DIRECTION_ROTATION[player.direction] ?? 0;
-        updateListenerPosition(
-          voip,
-          player.x * WORLD_SCALE,
-          0,
-          player.y * WORLD_SCALE,
-          Math.sin(rot),
-          Math.cos(rot),
-        );
-        // Update spatial positions for remote players
-        for (const [id, rp] of mp.remotePlayers) {
-          updateSpatialPosition(voip, id, rp.x * WORLD_SCALE, 0, rp.y * WORLD_SCALE);
-        }
-      }
 
-      // Tick player — always run, but board overrides movement after
-      tickPlayer(player, input, combat);
+        // Tick player — always run, but board overrides movement after
+        tickPlayer(player, input, combat);
 
-      // Hoverboard — no extra velocity boost needed, sprint key (R) handles speed
+        // Hoverboard — no extra velocity boost needed, sprint key (R) handles speed
 
-      // Update camera target + character state ref
-      const wx = player.x * WORLD_SCALE;
-      const wz = player.y * WORLD_SCALE;
-      let terrainY = getTerrainHeight(wx, wz);
-      // Hoverboard hovers OVER water, not under
-      if (sk.isSkating && terrainY < 0.1) terrainY = 0.1;
-      // Jump height offset — airborneY is negative when up
-      const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
-      const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
-      const totalYOffset = jumpOffset + skateOffset;
+        // Update camera target + character state ref
+        const wx = player.x * WORLD_SCALE;
+        const wz = player.y * WORLD_SCALE;
+        let terrainY = getTerrainHeight(wx, wz);
+        // Hoverboard hovers OVER water, not under
+        if (sk.isSkating && terrainY < 0.1) terrainY = 0.1;
+        // Jump height offset — airborneY is negative when up
+        const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
+        const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
+        const totalYOffset = jumpOffset + skateOffset;
 
-      // Smooth Y interpolation — prevents jolty terrain transitions
-      const targetY = terrainY + totalYOffset;
-      const prevY = playerTargetRef.current.y;
-      const smoothY = prevY + (targetY - prevY) * 0.15; // lerp factor
+        // Smooth Y interpolation — prevents jolty terrain transitions
+        const targetY = terrainY + totalYOffset;
+        const prevY = playerTargetRef.current.y;
+        const smoothY = prevY + (targetY - prevY) * 0.15; // lerp factor
 
-      // Camera follows the smoothed height
-      playerTargetRef.current.set(wx, smoothY, wz);
+        // Camera follows the smoothed height
+        playerTargetRef.current.set(wx, smoothY, wz);
 
-      const pcs = playerCharState.current;
-      pcs.x = wx;
-      pcs.z = wz;
-      pcs.y = smoothY;
-      pcs.direction = player.direction;
-      pcs.state = player.state;
-      pcs.attackType = player.attackType;
-      pcs.hitFlash = player.hitFlash;
-      pcs.hp = player.hp;
+        const pcs = playerCharState.current;
+        pcs.x = wx;
+        pcs.z = wz;
+        pcs.y = smoothY;
+        pcs.direction = player.direction;
+        pcs.state = player.state;
+        pcs.attackType = player.attackType;
+        pcs.hitFlash = player.hitFlash;
+        pcs.hp = player.hp;
 
-      // Fine-grained locomotion substate + landing juice + wall-run tilt
-      // read directly from the authoritative body so Character3D animations
-      // match the exact movement state.
-      if (playerBody) {
-        pcs.locoSubstate = playerBody.loco;
-        pcs.landingImpact = playerBody.landingImpact;
-        pcs.wallRunSide = playerBody.wallRun
-          ? playerBody.wallRun.normalX > 0
-            ? 'right'
-            : 'left'
-          : undefined;
-      } else {
-        pcs.locoSubstate = 'grounded';
-        pcs.landingImpact = 0;
-        pcs.wallRunSide = undefined;
-      }
-
-      // Update NPC character state refs
-      for (let i = 0; i < npcsRef.current.length; i++) {
-        const npc = npcsRef.current[i];
-        const ncs = npcCharStates.current[i];
-        if (!ncs) continue;
-        ncs.x = npc.x * WORLD_SCALE;
-        ncs.z = npc.y * WORLD_SCALE;
-        ncs.y = getTerrainHeight(ncs.x, ncs.z);
-        ncs.direction = npc.direction;
-        ncs.state =
-          npc.state === 'chase'
-            ? 'walking'
-            : npc.state === 'attack'
-              ? 'attacking'
-              : npc.state === 'dead'
-                ? 'dead'
-                : npc.state === 'stunned'
-                  ? 'stunned'
-                  : npc.state === 'patrol'
-                    ? npc.patrolWaitTimer > 0
-                      ? 'idle'
-                      : 'walking'
-                    : 'idle';
-        ncs.hitFlash = npc.hitFlash;
-        ncs.hp = npc.hp;
-      }
-
-      // Multiplayer
-      tickRemotePlayers(mp);
-      if (frame % SEND_INTERVAL === 0) {
-        sendPlayerUpdate(mp, player);
-      }
-
-      // Effects
-      updateParticles(combat.particles);
-      updateFloatingTexts(combat.floatingTexts);
-      updateForcePushes(combat.forcePushes);
-      combat.shake = updateScreenShake(combat.shake);
-      // Bullet-time state machine (ramped entry / hold / exit).
-      // updateSlomo tolerates legacy {factor, timer} objects created by
-      // combat.ts hitstops, so this coexists with createSlowMo callers.
-      combat.slowMo = updateSlomo(combat.slowMo, dt);
-      updateFocusMeter(dt);
-      applySlomoAudio(combat.slowMo?.factor ?? 1);
-
-      // Prune old kills
-      const now = Date.now();
-      combat.killFeed = combat.killFeed.filter(k => now - k.timestamp < 10000);
-
-      // ── FEATURE 3: Wanted level from mic volume ──
-      const voipForWanted = voipRef.current;
-      if (voipForWanted.analyser && voipForWanted.localStream && !voipForWanted.isMuted) {
-        const wantedData = new Uint8Array(voipForWanted.analyser.frequencyBinCount);
-        voipForWanted.analyser.getByteFrequencyData(wantedData);
-        let wantedSum = 0;
-        for (let i = 0; i < wantedData.length; i++) wantedSum += wantedData[i];
-        const vol = wantedSum / wantedData.length / 255; // normalize to 0-1
-        let targetStars = 0;
-        if (vol > 0.9) targetStars = 5;
-        else if (vol > 0.7) targetStars = 4;
-        else if (vol > 0.5) targetStars = 3;
-        else if (vol > 0.3) targetStars = 2;
-        else if (vol > 0.1) targetStars = 1;
-        // Instant ramp up, slow decay
-        if (targetStars > wantedRef.current) {
-          wantedRef.current = targetStars;
+        // Fine-grained locomotion substate + landing juice + wall-run tilt
+        // read directly from the authoritative body so Character3D animations
+        // match the exact movement state.
+        if (playerBody) {
+          pcs.locoSubstate = playerBody.loco;
+          pcs.landingImpact = playerBody.landingImpact;
+          pcs.wallRunSide = playerBody.wallRun
+            ? playerBody.wallRun.normalX > 0
+              ? 'right'
+              : 'left'
+            : undefined;
         } else {
+          pcs.locoSubstate = 'grounded';
+          pcs.landingImpact = 0;
+          pcs.wallRunSide = undefined;
+        }
+
+        // Update NPC character state refs
+        for (let i = 0; i < npcsRef.current.length; i++) {
+          const npc = npcsRef.current[i];
+          const ncs = npcCharStates.current[i];
+          if (!ncs) continue;
+          ncs.x = npc.x * WORLD_SCALE;
+          ncs.z = npc.y * WORLD_SCALE;
+          ncs.y = getTerrainHeight(ncs.x, ncs.z);
+          ncs.direction = npc.direction;
+          ncs.state =
+            npc.state === 'chase'
+              ? 'walking'
+              : npc.state === 'attack'
+                ? 'attacking'
+                : npc.state === 'dead'
+                  ? 'dead'
+                  : npc.state === 'stunned'
+                    ? 'stunned'
+                    : npc.state === 'patrol'
+                      ? npc.patrolWaitTimer > 0
+                        ? 'idle'
+                        : 'walking'
+                      : 'idle';
+          ncs.hitFlash = npc.hitFlash;
+          ncs.hp = npc.hp;
+        }
+
+        // Multiplayer
+        tickRemotePlayers(mp);
+        if (frame % SEND_INTERVAL === 0) {
+          sendPlayerUpdate(mp, player);
+        }
+
+        // Effects
+        updateParticles(combat.particles);
+        updateFloatingTexts(combat.floatingTexts);
+        updateForcePushes(combat.forcePushes);
+        combat.shake = updateScreenShake(combat.shake);
+        // Bullet-time state machine (ramped entry / hold / exit).
+        // updateSlomo tolerates legacy {factor, timer} objects created by
+        // combat.ts hitstops, so this coexists with createSlowMo callers.
+        combat.slowMo = updateSlomo(combat.slowMo, dt);
+        updateFocusMeter(dt);
+        applySlomoAudio(combat.slowMo?.factor ?? 1);
+
+        // Prune old kills
+        const now = Date.now();
+        combat.killFeed = combat.killFeed.filter(k => now - k.timestamp < 10000);
+
+        // ── FEATURE 3: Wanted level from mic volume ──
+        const voipForWanted = voipRef.current;
+        if (voipForWanted.analyser && voipForWanted.localStream && !voipForWanted.isMuted) {
+          const wantedData = new Uint8Array(voipForWanted.analyser.frequencyBinCount);
+          voipForWanted.analyser.getByteFrequencyData(wantedData);
+          let wantedSum = 0;
+          for (let i = 0; i < wantedData.length; i++) wantedSum += wantedData[i];
+          const vol = wantedSum / wantedData.length / 255; // normalize to 0-1
+          let targetStars = 0;
+          if (vol > 0.9) targetStars = 5;
+          else if (vol > 0.7) targetStars = 4;
+          else if (vol > 0.5) targetStars = 3;
+          else if (vol > 0.3) targetStars = 2;
+          else if (vol > 0.1) targetStars = 1;
+          // Instant ramp up, slow decay
+          if (targetStars > wantedRef.current) {
+            wantedRef.current = targetStars;
+          } else {
+            wantedRef.current = Math.max(0, wantedRef.current - 0.02);
+          }
+        } else {
+          // Decay when mic off
           wantedRef.current = Math.max(0, wantedRef.current - 0.02);
         }
-      } else {
-        // Decay when mic off
-        wantedRef.current = Math.max(0, wantedRef.current - 0.02);
-      }
-      // Update React state every ~15 frames to avoid excessive re-renders
-      if (frame % 15 === 0) {
-        const rounded = Math.ceil(wantedRef.current);
-        setWantedLevel(prev => (prev !== rounded ? rounded : prev));
-      }
+        // Update React state every ~15 frames to avoid excessive re-renders
+        if (frame % 15 === 0) {
+          const rounded = Math.ceil(wantedRef.current);
+          setWantedLevel(prev => (prev !== rounded ? rounded : prev));
+        }
 
-      // Clear input
-      clearFrameFlags(input);
+        // Clear input
+        clearFrameFlags(input);
 
-      // Update HUD via ref (no React re-renders)
-      hudRef.current.hp = player.hp;
-      hudRef.current.maxHp = player.maxHp;
-      hudRef.current.playerCount = mp.playerCount;
-      hudRef.current.comboHits = player.comboHits;
-      hudRef.current.controlsVisible = frame < 300;
-      hudRef.current.oceanPhase = ocean.phase;
-      hudRef.current.oceanAlpha = getOceanOverlayAlpha(ocean);
-      hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
-      hudRef.current.respawnTimer = player.respawnTimer;
-      hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
-      // Update VOIP debug info every 30 frames (~0.5s)
-      if (showVoipDebug && frame % 30 === 0) {
-        setVoipDebugLines(getVoipDebugInfo(voipRef.current));
+        // Update HUD via ref (no React re-renders)
+        hudRef.current.hp = player.hp;
+        hudRef.current.maxHp = player.maxHp;
+        hudRef.current.playerCount = mp.playerCount;
+        hudRef.current.comboHits = player.comboHits;
+        hudRef.current.controlsVisible = frame < 300;
+        hudRef.current.oceanPhase = ocean.phase;
+        hudRef.current.oceanAlpha = getOceanOverlayAlpha(ocean);
+        hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
+        hudRef.current.respawnTimer = player.respawnTimer;
+        hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
+        // Update VOIP debug info every 30 frames (~0.5s)
+        if (showVoipDebug && frame % 30 === 0) {
+          setVoipDebugLines(getVoipDebugInfo(voipRef.current));
+        }
+        // Track death for K/D (only on transition to dead, not every frame)
+        if (
+          player.state === 'dead' &&
+          player.deathTimer === 59 &&
+          connectedWallet &&
+          mp.ws?.readyState === WebSocket.OPEN
+        ) {
+          mp.ws.send(
+            JSON.stringify({
+              type: 'world:kd:save',
+              wallet: connectedWallet,
+              addKills: 0,
+              addDeaths: 1,
+            }),
+          );
+        }
+        // VOIP HUD
+        hudRef.current.micEnabled = !!voipRef.current.localStream;
+        hudRef.current.isMuted = voipRef.current.isMuted;
+        hudRef.current.isSpeaking = voipRef.current.isSpeaking;
+        hudRef.current.activeSpeakers =
+          voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
+        hudRef.current.crowdMeter = voipRef.current.crowdMeter;
+        hudRef.current.settlementWindow = voipRef.current.settlementWindow;
+        hudRef.current.settleTriggered = voipRef.current.settleTriggered;
+        hudRef.current.transcript = getCurrentTranscript();
+        // Weapon HUD
+        hudRef.current.weaponEquipped = weaponRef.current.equipped;
+        hudRef.current.weaponAmmo = weaponRef.current.ammo;
+        hudRef.current.wantedLevel = Math.ceil(wantedRef.current);
+        // Skating HUD
+        hudRef.current.isSkating = sk.isSkating;
+        hudRef.current.skateSpeed = sk.speed;
+        hudRef.current.trickScore = sk.trickScore;
+        hudRef.current.currentTrick = sk.currentTrick;
+        hudRef.current.comboMultiplier = sk.comboMultiplier;
+        hudRef.current.comboScore = sk.comboScore;
+        hudRef.current.balanceMeter = sk.balanceMeter;
+        hudRef.current.grindActive = sk.grindActive;
+        hudRef.current.manualActive = sk.manualActive;
+        // Write weapon state to character for gun rendering
+        pcs.weaponEquipped = weaponRef.current.equipped;
+        pcs.muzzleFlash = weaponRef.current.muzzleFlash;
+        pcs.isSkating = skateRef.current.isSkating;
+        pcs.trickName = skateRef.current.currentTrick || null;
+        pcs.trickTimer =
+          skateRef.current.trickTimer > 0
+            ? 1 - skateRef.current.trickTimer / 0.8 // normalize to 0-1 progress (0.8s trick duration)
+            : 0;
+        player.isSkating = skateRef.current.isSkating;
+        player.trickName = skateRef.current.currentTrick || null;
+        (player as any).weaponEquipped = weaponRef.current.equipped;
+        (player as any).paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
+        pcs.airborneVy = player.airborneVy;
+        pcs.vx = player.vx;
+        pcs.vy = player.vy;
+        pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
+        pcs.swordEquipped = false; // TODO: wire sword pickup
+      } catch (err) {
+        console.error('[GameLogic] frame skipped due to error:', err);
       }
-      // Track death for K/D (only on transition to dead, not every frame)
-      if (
-        player.state === 'dead' &&
-        player.deathTimer === 59 &&
-        connectedWallet &&
-        mp.ws?.readyState === WebSocket.OPEN
-      ) {
-        mp.ws.send(
-          JSON.stringify({
-            type: 'world:kd:save',
-            wallet: connectedWallet,
-            addKills: 0,
-            addDeaths: 1,
-          }),
-        );
-      }
-      // VOIP HUD
-      hudRef.current.micEnabled = !!voipRef.current.localStream;
-      hudRef.current.isMuted = voipRef.current.isMuted;
-      hudRef.current.isSpeaking = voipRef.current.isSpeaking;
-      hudRef.current.activeSpeakers =
-        voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
-      hudRef.current.crowdMeter = voipRef.current.crowdMeter;
-      hudRef.current.settlementWindow = voipRef.current.settlementWindow;
-      hudRef.current.settleTriggered = voipRef.current.settleTriggered;
-      hudRef.current.transcript = getCurrentTranscript();
-      // Weapon HUD
-      hudRef.current.weaponEquipped = weaponRef.current.equipped;
-      hudRef.current.weaponAmmo = weaponRef.current.ammo;
-      hudRef.current.wantedLevel = Math.ceil(wantedRef.current);
-      // Skating HUD
-      hudRef.current.isSkating = sk.isSkating;
-      hudRef.current.skateSpeed = sk.speed;
-      hudRef.current.trickScore = sk.trickScore;
-      hudRef.current.currentTrick = sk.currentTrick;
-      hudRef.current.comboMultiplier = sk.comboMultiplier;
-      hudRef.current.comboScore = sk.comboScore;
-      hudRef.current.balanceMeter = sk.balanceMeter;
-      hudRef.current.grindActive = sk.grindActive;
-      hudRef.current.manualActive = sk.manualActive;
-      // Write weapon state to character for gun rendering
-      pcs.weaponEquipped = weaponRef.current.equipped;
-      pcs.muzzleFlash = weaponRef.current.muzzleFlash;
-      pcs.isSkating = skateRef.current.isSkating;
-      pcs.trickName = skateRef.current.currentTrick || null;
-      pcs.trickTimer =
-        skateRef.current.trickTimer > 0
-          ? 1 - skateRef.current.trickTimer / 0.8 // normalize to 0-1 progress (0.8s trick duration)
-          : 0;
-      player.isSkating = skateRef.current.isSkating;
-      player.trickName = skateRef.current.currentTrick || null;
-      (player as any).weaponEquipped = weaponRef.current.equipped;
-      (player as any).paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
-      pcs.airborneVy = player.airborneVy;
-      pcs.vx = player.vx;
-      pcs.vy = player.vy;
-      pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
-      pcs.swordEquipped = false; // TODO: wire sword pickup
     }, -10);
 
     return null;
