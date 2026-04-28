@@ -37,7 +37,7 @@ import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
-import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
+import { type ActiveDao } from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
 
@@ -734,7 +734,12 @@ export default function CrystalBallPage() {
     if (saved === '2d' || saved === '3d' || saved === 'ascii') return saved;
     return 'ascii';
   });
-  const { activeDao, setActiveDao } = useActiveDao();
+  // Local prediction-mode toggle. Used to be wired to the global
+  // `useActiveDao` hook, but flipping it would navigate the user away from
+  // /crystal-ball onto the V2 auction page. Crystal Ball is a DAO-agnostic
+  // page that just runs prediction logic against either chain — the toggle
+  // here only changes which chain it reads from.
+  const [activeDao, setActiveDao] = useState<ActiveDao>('nouns');
 
   useEffect(() => {
     try {

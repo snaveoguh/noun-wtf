@@ -129,6 +129,10 @@ export function useDaoSettleWriter(dao: DaoContext) {
   return dao.isV2
     ? {
         writeContract,
+        // The hash exposed here is the submitted tx — callers pair this with
+        // `useWaitForTransactionReceipt` to flip a success toast on receipt
+        // confirmation rather than on submission.
+        data: v2.data,
         isPending: v2.isPending,
         isIdle: v2.isIdle,
         isError: v2.isError,
@@ -137,6 +141,7 @@ export function useDaoSettleWriter(dao: DaoContext) {
       }
     : {
         writeContract,
+        data: v1.data,
         isPending: v1.isPending,
         isIdle: v1.isIdle,
         isError: v1.isError,

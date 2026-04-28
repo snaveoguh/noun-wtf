@@ -285,6 +285,23 @@ code {
   background: #050505 !important;
 }
 
+/* Expand animation for the terminal-feed row drawer */
+@keyframes terminalRowExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-row-expanded {
+    animation: none !important;
+  }
+}
+
 /* ─── Modal open — hide site chrome ─────────────────────────────────────────
    Any modal/popup that calls useModalBodyLock() sets data-modal-open="true"
    on <body>. Hide NavBar + NocTicker strip so the header doesn't bleed

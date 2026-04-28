@@ -113,7 +113,7 @@ const PERSISTED_VIEW_MODES: ReadonlySet<HeroViewMode> = new Set([
 ]);
 
 function readPersistedViewMode(): HeroViewMode {
-  if (typeof window === 'undefined') return '3d';
+  if (typeof window === 'undefined') return 'real';
   try {
     const raw = window.sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
     if (raw && PERSISTED_VIEW_MODES.has(raw as HeroViewMode)) {
@@ -122,7 +122,7 @@ function readPersistedViewMode(): HeroViewMode {
   } catch {
     // sessionStorage may be disabled — fall through to default.
   }
-  return '3d';
+  return 'real';
 }
 
 type InteractionMode = 'scroll' | 'grab' | 'twist';

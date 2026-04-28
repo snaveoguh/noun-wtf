@@ -27,6 +27,26 @@ function pathnameToDao(pathname: string): ActiveDao {
   return 'nouns';
 }
 
+// Matches `/noun/:id`, `/v2/noun/:id` (id is a positive integer). The capture
+// group is the noun id when present.
+const V1_NOUN_ID_RE = /^\/noun\/(\d+)\/?$/;
+const V2_NOUN_ID_RE = /^\/v2\/noun\/(\d+)\/?$/;
+
+/**
+ * Whether the global V1/V2 toggle should be visible — and toggling it
+ * has a meaningful destination — for this pathname.
+ *
+ * Only the four DAO-namespaced auction routes qualify: `/`, `/noun/:id`,
+ * `/v2`, `/v2/noun/:id`. Everything else (governance, probe, crystal-ball,
+ * etc.) is rendered DAO-agnostic and the global toggle is a no-op there.
+ */
+export function routeHasDaoToggle(pathname: string): boolean {
+  if (pathname === '/' || pathname === '/v2') return true;
+  if (V1_NOUN_ID_RE.test(pathname)) return true;
+  if (V2_NOUN_ID_RE.test(pathname)) return true;
+  return false;
+}
+
 export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: ActiveDao) => void } {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,11 +55,38 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
 
   const setActiveDao = useCallback(
     (next: ActiveDao) => {
+      const pathname = location.pathname;
+
+      // Determine the destination based on the current path. Only the four
+      // namespaced auction paths participate; everything else is a no-op so
+      // the user doesn't get yanked off the page they're on. (The global
+      // toggle is also hidden on those pages, but we defend the navigation
+      // here too in case someone calls `setActiveDao` programmatically.)
+      let target: string | null = null;
+
+      if (next === 'nounv2') {
+        if (pathname === '/') {
+          target = '/v2';
+        } else {
+          const m = V1_NOUN_ID_RE.exec(pathname);
+          if (m) target = `/v2/noun/${m[1]}`;
+        }
+      } else {
+        if (pathname === '/v2') {
+          target = '/';
+        } else {
+          const m = V2_NOUN_ID_RE.exec(pathname);
+          if (m) target = `/noun/${m[1]}`;
+        }
+      }
+
+      if (target === null) return;
+
       // Navigating to the DAO root replaces the current entry so the
       // back-button steps page-by-page rather than toggle-by-toggle.
-      navigate(next === 'nounv2' ? '/v2' : '/', { replace: true });
+      navigate(target, { replace: true });
     },
-    [navigate],
+    [location.pathname, navigate],
   );
 
   return { activeDao, setActiveDao };
