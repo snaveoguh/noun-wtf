@@ -5,6 +5,9 @@ interface AuctionActivityWrapperProps {
 }
 
 const AuctionActivityWrapper: React.FC<AuctionActivityWrapperProps> = ({ children }) => {
-  return <div className="max-lg:mx-4">{children}</div>;
+  // `position: relative` lets descendants (e.g. BurnedNounContent's
+  // top-right nav arrows) anchor against the card edge instead of the
+  // page viewport.
+  return <div className="max-lg:mx-4 relative">{children}</div>;
 };
 export default AuctionActivityWrapper;

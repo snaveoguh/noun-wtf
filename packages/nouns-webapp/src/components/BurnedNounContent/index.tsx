@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
 
-import { Trans } from '@lingui/react/macro';
 import { Col, Row } from 'react-bootstrap';
 import { formatEther } from 'viem';
 
@@ -63,15 +62,30 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
 
   return (
     <AuctionActivityWrapper>
+      {/* Prev/next noun nav — pinned to the top-right corner of the card so
+          it never overlaps the date / title / banner block. The wrapper
+          AuctionActivityWrapper is `position: relative` already; if not,
+          this still degrades to inline. */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '0.75rem',
+          right: '2.5rem',
+          zIndex: 2,
+          display: 'flex',
+          gap: '0.4rem',
+        }}
+      >
+        <AuctionNavigation
+          isFirstAuction={isFirstAuction}
+          isLastAuction={isLastAuction}
+          onNextAuctionClick={onNextAuctionClick}
+          onPrevAuctionClick={onPrevAuctionClick}
+        />
+      </div>
       <div className={auctionActivityClasses.informationRow}>
         <Row className={auctionActivityClasses.activityRow}>
           <AuctionTitleAndNavWrapper>
-            <AuctionNavigation
-              isFirstAuction={isFirstAuction}
-              isLastAuction={isLastAuction}
-              onNextAuctionClick={onNextAuctionClick}
-              onPrevAuctionClick={onPrevAuctionClick}
-            />
             <AuctionActivityDateHeadline startTime={mintTimestamp} />
           </AuctionTitleAndNavWrapper>
           <Col lg={12}>
@@ -81,24 +95,51 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
         <Row className={auctionActivityClasses.activityRow}>
           <Col lg={12}>
             <div className={classes.wrapper}>
-              <div className={classes.banner}>
-                <Trans>Burned — Reserve not met</Trans>
+              <div
+                aria-hidden
+                style={{
+                  fontSize: '1.4rem',
+                  letterSpacing: '0.15em',
+                  textAlign: 'center',
+                  marginBottom: '0.4rem',
+                  filter: 'saturate(1.2)',
+                }}
+              >
+                {'\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25'}
               </div>
+              <div className={classes.banner}>RESERVE NOT MET</div>
               <div className={classes.subline}>
                 {reserveEth ? (
-                  <Trans>
-                    <span className={classes.sublineStrong}>{reserveEth} ETH</span> reserve · 0
-                    qualifying bids
-                  </Trans>
+                  <>
+                    <div>
+                      <span className={classes.sublineStrong}>{reserveEth} ETH</span> reserve
+                    </div>
+                    <div>0 qualifying bids</div>
+                  </>
                 ) : (
-                  <Trans>Reserve price not met · 0 qualifying bids</Trans>
+                  <>
+                    <div>Reserve price not met</div>
+                    <div>0 qualifying bids</div>
+                  </>
                 )}
               </div>
               <div className={classes.infoRow}>
-                <Trans>
-                  This Noun was burned by the auction house contract because no bid reached the
-                  minimum reserve price. The auction number is retired — no one owns this Noun.
-                </Trans>
+                {'\uD83E\uDEA6 '}
+                This Noun was burned by the auction house contract because no bid reached the
+                minimum reserve price. The auction number is retired. No one owns this Noun.
+                {' \uD83D\uDD25'}
+              </div>
+              <div
+                aria-hidden
+                style={{
+                  fontSize: '1.4rem',
+                  letterSpacing: '0.15em',
+                  textAlign: 'center',
+                  marginTop: '0.4rem',
+                  filter: 'saturate(1.2)',
+                }}
+              >
+                {'\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25\uD83E\uDEA6\uD83D\uDD25'}
               </div>
             </div>
           </Col>
