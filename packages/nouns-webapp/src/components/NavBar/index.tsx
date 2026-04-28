@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { ConnectKitButton } from 'connectkit';
-import { PencilLine } from 'lucide-react';
+import { PencilLine, Wallet } from 'lucide-react';
 import { Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { formatEther } from 'viem';
@@ -40,17 +40,14 @@ import navDropdownClasses from './NavBarDropdown.module.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
-// Strip vowels from label (a/e/i/o/u, case-insensitive) but keep the first
-// character so the word still reads. Used only for the mobile-compact label.
-const devowel = (label: string): string =>
-  label.length === 0 ? label : label[0] + label.slice(1).replace(/[aeiou]/gi, '');
-
-// Render a nav-link label with full text on md+ and devoweled text on mobile.
-// CSS-driven so we don't need a useMediaQuery hook.
+// Render a nav-link label with normal-case text on md+ and ALL-CAPS on
+// mobile. CSS-driven so we don't need a useMediaQuery hook. Mobile keeps
+// the full word (no devoweling) — readability beats compactness here since
+// the dropdown is the only place the user sees these labels.
 const ResponsiveLabel = ({ text }: { text: string }) => (
   <>
     <span className="d-none d-md-inline">{text}</span>
-    <span className="d-inline d-md-none">{devowel(text)}</span>
+    <span className="d-inline d-md-none">{text.toUpperCase()}</span>
   </>
 );
 
@@ -264,22 +261,41 @@ const NavBar = () => {
             <PencilLine size={18} />
           </button>
           <div className={clsx('justify-content-end', classes.navBarItems)}>
-            {isDaoGteV3 ? (
-              v3DaoNavItem
-            ) : (
-              <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink}>
-                <NavBarButton
-                  buttonText=""
-                  buttonIcon={<FontAwesomeIcon icon={faUsers} />}
-                  buttonStyle={nonWalletButtonStyle}
-                />
-              </Nav.Link>
-            )}
+            {/* People dropdown (Proposals/Candidates/Grants) — desktop only.
+                On mobile its items render at the top of the Noggles dropdown
+                so the user only sees a single menu trigger in the header. */}
+            <div className="d-none d-md-flex">
+              {isDaoGteV3 ? (
+                v3DaoNavItem
+              ) : (
+                <Nav.Link as={Link} to="/vote" className={classes.nounsNavLink}>
+                  <NavBarButton
+                    buttonText=""
+                    buttonIcon={<FontAwesomeIcon icon={faUsers} />}
+                    buttonStyle={nonWalletButtonStyle}
+                  />
+                </Nav.Link>
+              )}
+            </div>
             <NavDropdown
               buttonText=""
               buttonIcon={<NogglesIcon />}
               buttonStyle={nonWalletButtonStyle}
             >
+              {/* Mobile-only: governance items merged in from the people
+                  dropdown so mobile has a single menu. */}
+              <Dropdown.Item href="/vote" className="d-md-none">
+                <ResponsiveLabel text="Proposals" />
+              </Dropdown.Item>
+              {config.featureToggles.candidates && (
+                <Dropdown.Item href="/candidates" className="d-md-none">
+                  <ResponsiveLabel text="Candidates" />
+                </Dropdown.Item>
+              )}
+              <Dropdown.Item href="/grants" className="d-md-none">
+                <ResponsiveLabel text="Grants" />
+              </Dropdown.Item>
+              <Dropdown.Divider className="d-md-none" />
               <Dropdown.Item
                 className={clsx(
                   usePickByState(
@@ -330,9 +346,6 @@ const NavBar = () => {
               <Dropdown.Item href="/gas">
                 <ResponsiveLabel text="Gas" />
               </Dropdown.Item>
-              <Dropdown.Item href="/terminal">
-                <ResponsiveLabel text="Terminal" />
-              </Dropdown.Item>
               <Dropdown.Item href="/crystal-ball">
                 <ResponsiveLabel text="Crystal Ball" />
               </Dropdown.Item>
@@ -382,7 +395,22 @@ const NavBar = () => {
                 if (!isConnected)
                   return (
                     <NavBarButton
-                      buttonText="Connect"
+                      // Mobile shows a wallet icon to save horizontal space
+                      // (the V1/V2 toggle + two action icon buttons + connect
+                      // were previously overflowing the mobile header). Desktop
+                      // keeps the original "Connect" text label.
+                      buttonText={
+                        <>
+                          <span className="d-none d-md-inline">Connect</span>
+                          <span
+                            className="d-inline-flex d-md-none"
+                            style={{ alignItems: 'center' }}
+                            aria-label="Connect wallet"
+                          >
+                            <Wallet size={16} />
+                          </span>
+                        </>
+                      }
                       buttonStyle={nonWalletButtonStyle}
                       onClick={show}
                     />

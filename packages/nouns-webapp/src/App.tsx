@@ -62,13 +62,11 @@ import {
   FeedSkeleton,
   GenericSkeleton,
   GovernanceSkeleton,
-  TerminalSkeleton,
 } from '@/components/Skeleton';
 
 import classes from './App.module.css';
 
 // Lazy-loaded miniapp pages
-const TerminalPage = lazy(() => import('@/miniapps/terminal/TerminalPage'));
 const FeedPage = lazy(() => import('@/miniapps/feed/FeedPage'));
 const HighwayPage = lazy(() => import('@/miniapps/highway/HighwayPage'));
 const CandidatesListPage = lazy(() => import('@/miniapps/candidates/CandidatesPage'));
@@ -216,16 +214,20 @@ function AppRouter() {
         <Route path="/dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
         <Route path="/dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
         {/* Miniapp routes (lazy loaded) */}
+        {/* /terminal sunset 2026-04-27 — consolidated into homepage TerminalFeed
+            (see TerminalFeedShell on `/` when site mode === 'new'). Keep redirect
+            so old links/CTAs land on the merged feed. */}
+        <Route path="/terminal" element={<Navigate to="/" replace />} />
         <Route
-          path="/terminal"
+          path="/crystal-ball"
           element={
-            <Suspense fallback={<TerminalSkeleton />}>
-              <TerminalPage />
+            <Suspense fallback={<GenericSkeleton />}>
+              <CrystalBallPage />
             </Suspense>
           }
         />
         <Route
-          path="/crystal-ball"
+          path="/v2/crystal-ball"
           element={
             <Suspense fallback={<GenericSkeleton />}>
               <CrystalBallPage />

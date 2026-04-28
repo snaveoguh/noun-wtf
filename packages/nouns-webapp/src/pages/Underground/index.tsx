@@ -370,7 +370,7 @@ state(proposalId) -> ProposalState`}</Code>
         <Heading s="TERMINAL" isOpen={isOpen} toggle={toggle} />
         {isOpen('TERMINAL') && (
           <div className={styles.section}>
-            <p>The terminal (<Link to="/terminal" className={styles.link}>/terminal</Link>) provides AI chat backed by Claude with governance tool access.</p>
+            <p>The terminal (now consolidated into the homepage feed at <Link to="/" className={styles.link}>noun.wtf</Link> in terminal mode) provides AI chat backed by Claude with governance tool access.</p>
 
             <h4>POST /api/chat</h4>
             <Code>{`{

@@ -132,6 +132,27 @@ function findBestMatch(predicted: NounSeed, allNouns: NounSeedWithId[]): MatchRe
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
+
+/**
+ * After `delayMs` of `pending === true`, flip to `true` so the UI can swap a
+ * "SCRYING…" placeholder for an "RPC slow, retrying…" hint. Resets to false
+ * the moment pending clears. Keeps the perma-spin scenario from feeling
+ * silent — publicnode hangs are a fact of life so we surface them instead
+ * of pretending the page is just loading.
+ */
+function useSlowPending(pending: boolean, delayMs = 10_000): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) {
+      setSlow(false);
+      return;
+    }
+    const id = window.setTimeout(() => setSlow(true), delayMs);
+    return () => window.clearTimeout(id);
+  }, [pending, delayMs]);
+  return slow;
+}
+
 function useBallSize() {
   const [size, setSize] = useState(() =>
     Math.min(420, window.innerWidth - 60, window.innerHeight * 0.45),
@@ -178,6 +199,13 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     query: {
       enabled: enabled && NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS,
       refetchInterval: 12_000,
+      // Cap retries — publicnode hangs occasionally and TanStack's default
+      // (3 + exponential backoff) keeps the orb on "SCRYING…" indefinitely.
+      retry: 2,
+      // Live auction data; treat anything older than 5s as stale so the page
+      // refetches on focus instead of serving a cached pre-settlement tuple.
+      staleTime: 5_000,
+      gcTime: 60_000,
     },
   });
 
@@ -191,9 +219,20 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
   // NounsSeeder.sol uses blockhash(block.number - 1); when our settlement tx
   // lands in block N+1 the seeder hashes block N, which is the latest block
   // visible to us right now.
+  //
+  // We *don't* `watch: true` here — that opens a WebSocket / filter
+  // subscription which adds cold-start latency (and forces the wagmi
+  // fallback to wait for the slowest transport). Polling at the L1 block
+  // time (~12s) is plenty: the next-noun seed only needs to be re-rolled
+  // when a new parent block is mined.
   const { data: blockData } = useBlock({
-    watch: true,
-    query: { enabled: enabled && NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS },
+    query: {
+      enabled: enabled && NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS,
+      refetchInterval: 12_000,
+      retry: 2,
+      staleTime: 5_000,
+      gcTime: 60_000,
+    },
   });
 
   return useMemo(() => {
@@ -241,6 +280,12 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     query: {
       enabled: enabled && v1Address != null,
       refetchInterval: 12_000,
+      // See note on retry/staleTime in `useNounV2Prediction` — same
+      // reasoning: publicnode can stall, so cap retries and treat the
+      // tuple as stale after 5s.
+      retry: 2,
+      staleTime: 5_000,
+      gcTime: 60_000,
     },
   });
 
@@ -250,9 +295,18 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
   const currentNounId = auction?.[0];
   const endTime = auction?.[3];
 
+  // See note on `useBlock` in `useNounV2Prediction` — `watch: true` would
+  // pin the wagmi fallback to a WebSocket transport on cold load. Polling
+  // at the block time keeps the seed prediction fresh without blocking the
+  // initial render on a WS handshake.
   const { data: blockData } = useBlock({
-    watch: true,
-    query: { enabled: enabled && v1Address != null },
+    query: {
+      enabled: enabled && v1Address != null,
+      refetchInterval: 12_000,
+      retry: 2,
+      staleTime: 5_000,
+      gcTime: 60_000,
+    },
   });
 
   return useMemo(() => {
@@ -360,37 +414,6 @@ function ViewModeToggle({ mode, setMode }: { mode: ViewMode; setMode: (m: ViewMo
           accent="purple"
         />
       ))}
-    </div>
-  );
-}
-
-function DaoToggle({
-  activeDao,
-  setActiveDao,
-}: {
-  activeDao: ActiveDao;
-  setActiveDao: (d: ActiveDao) => void;
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Select DAO"
-      className="inline-flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/70 p-0.5 shadow-sm backdrop-blur-sm"
-    >
-      <Pill
-        label="Nouns"
-        value={'nouns' as ActiveDao}
-        active={activeDao === 'nouns'}
-        onSelect={setActiveDao}
-        accent="neutral"
-      />
-      <Pill
-        label="V2"
-        value={'nounv2' as ActiveDao}
-        active={activeDao === 'nounv2'}
-        onSelect={setActiveDao}
-        accent="red"
-      />
     </div>
   );
 }
@@ -734,7 +757,10 @@ export default function CrystalBallPage() {
     if (saved === '2d' || saved === '3d' || saved === 'ascii') return saved;
     return 'ascii';
   });
-  const { activeDao, setActiveDao } = useActiveDao();
+  // DAO context comes from the URL: `/crystal-ball` is V1, `/v2/crystal-ball`
+  // is V2. The global header toggle (HeaderDaoToggle) flips between the two
+  // routes — same component, different prediction chain.
+  const { activeDao } = useActiveDao();
 
   useEffect(() => {
     try {
@@ -758,6 +784,21 @@ export default function CrystalBallPage() {
   // the auction tuple directly from the AH contract is more reliable and
   // means the orb keeps working through Railway outages.
   const effectivePrediction = activeDao === 'nounv2' ? nounV2Prediction : nounV1ChainPrediction;
+
+  // If V2 hasn't been wired to a real auction house address yet, the
+  // prediction hook intentionally short-circuits — without a guard here we'd
+  // sit on "SCRYING…" forever. Surface the deployment state instead so the
+  // page degrades gracefully when the env var is missing.
+  const v2NotDeployed =
+    activeDao === 'nounv2' && NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS;
+
+  // Track how long we've been waiting for the on-chain prediction. After
+  // ~10s we surface an "RPC slow, retrying…" hint so users on a hung
+  // publicnode connection know something is happening rather than staring
+  // at a perma-SCRYING orb. Excludes the v2-not-deployed branch — that's a
+  // config issue, not an RPC stall, and has its own dedicated message.
+  const predictionPending = !v2NotDeployed && effectivePrediction == null;
+  const rpcSlow = useSlowPending(predictionPending);
 
   const { isConnected } = useAccount();
   const userSettle = useUserSettle(activeDao, effectivePrediction);
@@ -880,44 +921,30 @@ export default function CrystalBallPage() {
         </a>
       )}
 
-      {/* Toggles — view mode on top row, DAO on second row (mirrors HeaderDaoToggle aesthetic). */}
+      {/* View-mode toggle. The DAO toggle lives in the global header now
+          (HeaderDaoToggle) — flipping it navigates between /crystal-ball
+          and /v2/crystal-ball. */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: 8,
+          justifyContent: 'center',
+          gap: 10,
           paddingTop: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.2em',
-              color: '#555',
-              fontWeight: 700,
-              minWidth: 36,
-            }}
-          >
-            VIEW
-          </span>
-          <ViewModeToggle mode={viewMode} setMode={setViewMode} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.2em',
-              color: '#555',
-              fontWeight: 700,
-              minWidth: 36,
-            }}
-          >
-            DAO
-          </span>
-          <DaoToggle activeDao={activeDao} setActiveDao={setActiveDao} />
-        </div>
+        <span
+          style={{
+            fontSize: 9,
+            letterSpacing: '0.2em',
+            color: '#555',
+            fontWeight: 700,
+            minWidth: 36,
+          }}
+        >
+          VIEW
+        </span>
+        <ViewModeToggle mode={viewMode} setMode={setViewMode} />
       </div>
 
       {/* Orb + match panel side by side on desktop, stacked on mobile */}
@@ -931,7 +958,51 @@ export default function CrystalBallPage() {
           marginTop: 8,
         }}
       >
-        {viewMode === 'ascii' ? (
+        {v2NotDeployed ? (
+          <div
+            style={{
+              width: ballSize,
+              height: ballSize,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              borderRadius: '50%',
+              border: '1px solid rgba(139,92,246,0.25)',
+              background:
+                'radial-gradient(circle at 35% 35%, rgba(40,40,60,0.9), rgba(5,5,15,0.95))',
+              boxShadow: `0 0 20px ${CRYSTAL_PURPLE}22, inset 0 0 28px ${CRYSTAL_PURPLE}11`,
+              color: '#aaccff',
+              fontFamily: '"Courier New", monospace',
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                letterSpacing: '0.2em',
+                color: CRYSTAL_PURPLE,
+                fontWeight: 700,
+              }}
+            >
+              NOUNV2 NOT DEPLOYED
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                color: '#666',
+                letterSpacing: '0.1em',
+                lineHeight: 1.6,
+                maxWidth: ballSize * 0.7,
+              }}
+            >
+              No auction house address configured. Prediction unavailable until the
+              VITE_NOUNV2_AUCTION_HOUSE_ADDRESS env var points at a live contract.
+            </span>
+          </div>
+        ) : viewMode === 'ascii' ? (
           <Suspense
             fallback={
               <div
@@ -1232,6 +1303,26 @@ export default function CrystalBallPage() {
           </div>
         )}
       </div>
+
+      {/* Slow-RPC hint — surfaces after ~10s of pending state so users on a
+          hung publicnode connection know we're retrying instead of staring
+          at a perma-SCRYING orb. Disappears the moment a prediction lands. */}
+      {rpcSlow && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.2em',
+            color: '#eab308',
+            fontFamily: '"Courier New", monospace',
+            textAlign: 'center',
+            opacity: 0.9,
+          }}
+        >
+          RPC SLOW — RETRYING&hellip;
+        </div>
+      )}
 
       {/* Trait display */}
       {traits && (

@@ -4,8 +4,8 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { Button, Col, FormControl, Spinner } from 'react-bootstrap';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
+import { useWaitForTransactionReceipt } from 'wagmi';
 
-import SettleManuallyBtn from '@/components/SettleManuallyBtn';
 import { NOUN_WTF_CLIENT_ID } from '@/config';
 import useDaoContext from '@/hooks/useDaoContext';
 import { useAppSelector } from '@/hooks';
@@ -100,11 +100,17 @@ const Bid: React.FC<BidProps> = props => {
   const {
     writeContract: settleAuction,
     isPending: isSettlingAuction,
-    isSuccess: didSettleAuction,
     isError: didSettleFail,
-    isIdle: isSettleIdle,
+    data: settleTxHash,
     error: settleAuctionError,
   } = useDaoSettleWriter(dao);
+
+  // Wait for the settle tx receipt before declaring success — `isSuccess` on
+  // useWriteContract fires on submission, but we want the toast to land when
+  // the new noun is actually minted onchain.
+  const { isSuccess: didSettleConfirm } = useWaitForTransactionReceipt({
+    hash: settleTxHash,
+  });
 
   const bidInputHandler = (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target.value;
@@ -178,7 +184,7 @@ const Bid: React.FC<BidProps> = props => {
   }, [auction, account, t, isPlacingBid]);
 
   useEffect(() => {
-    if (auctionEnded && didSettleAuction) {
+    if (auctionEnded && didSettleConfirm) {
       toast.success(t`Settled auction successfully!`);
     }
     if (auctionEnded && didSettleFail) {
@@ -186,9 +192,8 @@ const Bid: React.FC<BidProps> = props => {
     }
   }, [
     auctionEnded,
-    isSettleIdle,
     isSettlingAuction,
-    didSettleAuction,
+    didSettleConfirm,
     didSettleFail,
     settleAuctionError?.message,
     t,
@@ -255,9 +260,23 @@ const Bid: React.FC<BidProps> = props => {
               <Trans>Pick the next Noun</Trans> 🥽
             </Button>
           </Col>
-          {isWalletConnected && (
-            <Col lg={12}>
-              <SettleManuallyBtn settleAuctionHandler={settleAuctionHandler} auction={auction} />
+          {/* User-driven settle: visible only while the auction is ended-but-
+              unsettled. Reuses `useDaoSettleWriter` so the same primary button
+              works for both V1 (mainnet Nouns) and V2 (NounV2 fork) routes —
+              the underlying hook picks the right contract from `useDaoContext`. */}
+          {isWalletConnected && !auction.settled && (
+            <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
+              <Button
+                className={classes.bidBtnAuctionEnded}
+                onClick={settleAuctionHandler}
+                disabled={isSettlingAuction}
+              >
+                {isSettlingAuction ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <Trans>Settle auction</Trans>
+                )}
+              </Button>
             </Col>
           )}
         </>

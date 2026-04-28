@@ -59,19 +59,34 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
     description: 'Swap your Noun for another Noun',
   },
   5: {
-    name: 'Noundry',
-    url: 'https://noundry.wtf',
-    description: 'Community-generated Noun traits',
+    name: 'Nouns.com',
+    url: 'https://nouns.com',
+    description: 'Nouns-powered tools and utilities',
   },
   6: {
     name: 'nouns.game',
     url: 'https://nouns.game',
     description: 'Nouns trait explorer and fun-fact generator',
   },
+  7: {
+    name: 'Nouns Terminal',
+    url: 'https://nouns.sh',
+    description: 'Terminal-style Nouns auction & governance client',
+  },
+  9: {
+    name: 'Probe',
+    url: 'https://probe.wtf',
+    description: 'Probe — Nouns explorer client by mshrm',
+  },
   11: {
-    name: 'nouns.com',
-    url: 'https://nouns.com',
-    description: 'Nouns-powered tools and utilities',
+    name: 'Berry OS',
+    url: 'https://berryos.wtf',
+    description: 'Berry OS — desktop-style Nouns client (formerly Nouns 95)',
+  },
+  12: {
+    name: 'Prop Launchpad',
+    url: 'https://proplaunchpad.com',
+    description: 'Tooling for launching Nouns DAO proposals',
   },
   37: {
     name: 'noun.wtf',
