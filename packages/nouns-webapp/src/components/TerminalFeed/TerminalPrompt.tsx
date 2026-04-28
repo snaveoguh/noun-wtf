@@ -1,8 +1,9 @@
 import type { GovernanceAction } from './GovernanceActionConfirm';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
+import { useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
@@ -61,9 +62,31 @@ function useIsMobile() {
   return isMobile;
 }
 
+// Pull the noun id out of `/noun/:id` or `/v2/noun/:id`. Mirrors the regexes
+// in `useActiveDao` so the chat sees the same id the URL is rendering. We
+// don't try to disambiguate other routes — the API only needs the id when the
+// user is on a noun-detail page.
+const NOUN_ID_RE = /^\/(?:v2\/)?noun\/(\d+)\/?$/;
+
+function pathnameToNounId(pathname: string): number | null {
+  const m = NOUN_ID_RE.exec(pathname);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
   const { address, isConnected } = useAccount();
   const { activeDao } = useActiveDao();
+  const location = useLocation();
+  const viewContext = useMemo(
+    () => ({
+      dao: activeDao,
+      pathname: location.pathname,
+      nounId: pathnameToNounId(location.pathname),
+    }),
+    [activeDao, location.pathname],
+  );
   const isMobile = useIsMobile();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -169,7 +192,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             wallet: address ?? null,
             history: apiHistory,
             agent_mode: 'nounirl',
-            view_context: { dao: activeDao },
+            view_context: viewContext,
           }),
         });
 
@@ -230,7 +253,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         setIsLoading(false);
       }
     },
-    [activeDao, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
+    [viewContext, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
   );
 
   const handleActionSuccess = useCallback(
