@@ -18,14 +18,16 @@ import {
  */
 const BADGE_VISUAL: Record<number, string> = {
   0: '\u2310\u25E8-\u25E8', // nouns.wtf — noggles
-  1: '\u26FA', // nouns.camp — tent
-  2: '\uD83C\uDFE0', // Prop House — house
-  3: '\uD83C\uDFDB\uFE0F', // Agora — classical building
-  4: '\uD83D\uDD04', // NounSwap — swap arrows
+  1: '\uD83D\uDEE0\uFE0F', // Noundry — hammer & wrench (foundry vibe)
+  2: '\uD83C\uDFE0', // House of Nouns — house (literal name)
+  3: '\u26FA', // nouns.camp — tent
+  4: '\uD83D\uDCBC', // Nouns.biz — briefcase
   5: '\uD83C\uDF05', // Nouns.com — sunrise/sunset
   6: '\uD83D\uDD79\uFE0F', // nouns.game — joystick
   7: '\uD83D\uDCBB', // Nouns Terminal (nouns.sh) — laptop
+  8: '\uD83C\uDFAE', // Nouns GG — game controller
   9: '/clients/probe.gif', // Probe — custom ET gif
+  10: '\uD83C\uDFDB\uFE0F', // Agora — classical building
   11: '\uD83E\uDED0', // Berry OS (berryos.wtf) — blueberries
   12: '\uD83D\uDE39', // Prop Launchpad — joycat
   37: '\uD83C\uDF46', // noun.wtf — eggplant

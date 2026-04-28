@@ -127,9 +127,9 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
     <div
       className="terminal-event"
       style={{
-        padding: '6px 0',
+        padding: '3px 0',
         borderBottom: '1px solid #111111',
-        lineHeight: 1.4,
+        lineHeight: 1.35,
       }}
     >
       {/* Main row */}
@@ -137,7 +137,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
         style={{
           display: 'flex',
           alignItems: 'flex-start',
-          gap: '12px',
+          gap: '6px',
           cursor: expandable ? 'pointer' : 'default',
         }}
         onClick={() => {
