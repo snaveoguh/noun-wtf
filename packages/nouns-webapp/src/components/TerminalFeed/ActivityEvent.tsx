@@ -127,9 +127,9 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
     <div
       className="terminal-event"
       style={{
-        padding: '6px 0',
+        padding: '3px 0',
         borderBottom: '1px solid #111111',
-        lineHeight: 1.4,
+        lineHeight: 1.35,
       }}
     >
       {/* Main row */}
@@ -137,13 +137,30 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
         style={{
           display: 'flex',
           alignItems: 'flex-start',
-          gap: '12px',
+          gap: '6px',
           cursor: expandable ? 'pointer' : 'default',
         }}
         onClick={() => {
           if (expandable) setExpanded(!expanded);
         }}
       >
+        {/* Client emoji — fixed slot at the far left of the row so the
+            following columns stay vertically aligned across rows even when
+            an event has no clientId. */}
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '16px',
+            flexShrink: 0,
+            paddingTop: '1px',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {showClientBadge && <ClientBadge clientId={clientId} size={13} />}
+        </span>
+
         {/* Timestamp */}
         <span
           style={{
@@ -182,18 +199,6 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           }}
         >
           {description}
-          {showClientBadge && (
-            <span
-              style={{
-                display: 'inline-flex',
-                verticalAlign: 'middle',
-                marginLeft: 2,
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <ClientBadge clientId={clientId} size={13} />
-            </span>
-          )}
           {expandable && (
             <span style={{ color: '#444', fontSize: '11px', marginLeft: '6px' }}>
               {expanded ? '▾' : '▸'}

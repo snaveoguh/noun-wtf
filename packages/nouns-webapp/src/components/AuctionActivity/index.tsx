@@ -94,10 +94,12 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
           auctionEnded={auctionEnded}
         />
 
-        {/* Reserve price — shown only while the auction is live. Bids below
-             this are rejected by the contract. Surfacing it up-front avoids
-             users getting a confusing "tx reverted" when they try 0.1 ETH. */}
-        {isLastAuction && !auctionEnded && (
+        {/* Reserve price — shown only on V1 while the auction is live.
+             V1 enforces a 2.8 ETH reserve so surfacing it up-front avoids
+             users getting a confusing "tx reverted" when they try 0.1 ETH.
+             V2's reserve is 50 wei (effectively zero), so the badge is
+             noise — hide it. */}
+        {isLastAuction && !auctionEnded && !dao.isV2 && (
           <ReservePriceBadge
             currentBidWei={BigInt(auction.amount?.toString() ?? '0')}
             reservePriceWei={reservePriceWei}

@@ -191,6 +191,10 @@ const NavBar = () => {
                   // Hide the nav item entirely when the v2 treasury address isn't configured —
                   // rendering "0 ETH" with a zero-address etherscan link would just look broken.
                   if (!nounV2TreasuryConfigured || nounV2TreasuryBalance === undefined) return null;
+                  // Adaptive precision: V2 treasury starts sub-1-ETH so .toFixed(0) reads as "0".
+                  // Scale precision down as the balance grows so the format stays readable.
+                  const v2EthValue = Number(formatEther(nounV2TreasuryBalance.value));
+                  const v2Decimals = v2EthValue >= 100 ? 0 : v2EthValue >= 1 ? 2 : 3;
                   return (
                     <Nav.Link
                       href={daoEtherscanLink}
@@ -199,9 +203,7 @@ const NavBar = () => {
                       rel="noreferrer"
                     >
                       <NavBarTreasury
-                        treasuryBalance={Number(formatEther(nounV2TreasuryBalance.value)).toFixed(
-                          0,
-                        )}
+                        treasuryBalance={v2EthValue.toFixed(v2Decimals)}
                         treasuryStyle={nonWalletButtonStyle}
                       />
                     </Nav.Link>
