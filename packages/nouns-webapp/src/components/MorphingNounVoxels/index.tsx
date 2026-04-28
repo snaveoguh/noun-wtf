@@ -38,8 +38,6 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { useNounHead3D } from '@/hooks/useNounHead3D';
-import { HEAD_TRANSFORMS } from '@/lib/headAssets';
 import { INounSeed } from '@/wrappers/nounToken';
 
 // ─── Tunables ───────────────────────────────────────────────────────────────
@@ -516,26 +514,17 @@ interface MorphingSceneProps {
 function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
-  // Curated 3D head GLB — falls through to voxel head when none is mapped
-  // for this trait. We mask out the head + glasses voxel layers when a GLB
-  // is in play so the morph only reshuffles body / bling / glasses voxels
-  // and the GLB head sits on top of them. Mirrors the NounVoxel3D pattern.
-  const { headObject, source: headSource } = useNounHead3D(seed);
-  const hasCuratedHead = headSource !== 'voxel' && headObject != null;
-
-  const effectiveVisibility: LayerVisibility | undefined = useMemo(() => {
-    if (!hasCuratedHead) return layerVisibility;
-    return {
-      body: layerVisibility?.body ?? true,
-      accessory: layerVisibility?.accessory ?? true,
-      head: false,
-      glasses: false,
-    };
-  }, [hasCuratedHead, layerVisibility]);
-
+  // Curated 3D head GLBs are intentionally NOT used here. NounParallax
+  // requires per-trait HEAD_X/Y/Z_NUDGE tables + matrix4 baking to land
+  // each GLB on the voxel body's neck (see NounParallax/index.tsx ~230).
+  // The orb is a much simpler renderer and doesn't have that
+  // infrastructure — without the nudges, GLBs floated in the upper-left
+  // of the orb instead of on the body. Voxel heads look great in the
+  // orb and match the rest of the voxel body, so we just always use
+  // them here.
   const currentVoxels = useMemo(
-    () => seedToFlatVoxels(seed, effectiveVisibility),
-    [seedKey, effectiveVisibility],
+    () => seedToFlatVoxels(seed, layerVisibility),
+    [seedKey, layerVisibility],
   );
 
   const prevSeedKeyRef = useRef<string | null>(null);
@@ -562,38 +551,6 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
     prevVoxelsRef.current = currentVoxels;
   }, [seedKey, currentVoxels]);
 
-  const headTransform = hasCuratedHead ? HEAD_TRANSFORMS[headSource] : null;
-  // Render the GLB primitive only when both the loaded object and its
-  // associated transform are available. The strict-boolean rule needs the
-  // explicit null compares so it doesn't flag the THREE.Object3D as
-  // unconditionally-truthy.
-  const showCuratedHead = hasCuratedHead && headObject != null && headTransform != null;
-
-  // GLBs from different sources don't share a common origin convention —
-  // some have their pivot at the bottom-front corner, some at the geometric
-  // center, some shifted by an arbitrary author offset. The HEAD_TRANSFORMS
-  // position alone can't compensate without per-asset nudges (NounParallax
-  // does that explicitly). For the crystal-ball orb we just want the head
-  // sitting where the voxel head would have been — so we measure the loaded
-  // object's bounding box and shift the primitive so the head's center
-  // lands at the intended position. Result: head sits dead-centre on the
-  // voxel body across noundry / 3dnouns / future sources, no per-asset
-  // tuning required.
-  const headPosition = useMemo<[number, number, number] | null>(() => {
-    if (!showCuratedHead || !headTransform || headObject == null) return null;
-    const box = new THREE.Box3().setFromObject(headObject);
-    if (box.isEmpty()) return headTransform.position;
-    const center = box.getCenter(new THREE.Vector3());
-    const scale = headTransform.scale;
-    // Translate the primitive so the scaled bbox center lands on the
-    // configured anchor (HEAD_TRANSFORMS.position is the *target* anchor in
-    // world coords; subtract the scaled native center to reach it).
-    return [
-      headTransform.position[0] - center.x * scale,
-      headTransform.position[1] - center.y * scale + 4, // lift onto body
-      headTransform.position[2] - center.z * scale,
-    ];
-  }, [showCuratedHead, headObject, headTransform]);
 
   return (
     <>
@@ -613,18 +570,6 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
         <StaticVoxelScene voxels={currentVoxels} autoRotate={autoRotate} />
       )}
 
-      {/* Curated GLB head — sits in front of the voxel body. The morph swap
-          unmounts/remounts the GLB on seed change (rebuilding meshes per
-          voxel for the GLB would explode the scope of this work), so the
-          head visibly snaps while the body voxels Tetris-cascade. */}
-      {showCuratedHead && headPosition && (
-        <primitive
-          object={headObject}
-          scale={headTransform.scale}
-          position={headPosition}
-          rotation={headTransform.rotation}
-        />
-      )}
       {/* eslint-enable react/no-unknown-property */}
     </>
   );

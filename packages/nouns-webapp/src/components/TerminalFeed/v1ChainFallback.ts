@@ -28,6 +28,24 @@ const MAX_EVENTS = 50;
 // ~6.8 days @ 12s blocks (one auction/day → ~6 settlements visible).
 const LOOKBACK_BLOCKS = 49_000n;
 
+// V1 governor's `ProposalCreatedWithRequirements` is overloaded — two ABI
+// items share the name. The post-clients variant (the one with `clientId`)
+// lives in the governor ABI but viem's `eventName` lookup picks the first
+// match, so we pass the ABI item inline to disambiguate.
+const PROPOSAL_CREATED_WITH_CLIENT_ID_EVENT = {
+  type: 'event',
+  anonymous: false,
+  name: 'ProposalCreatedWithRequirements',
+  inputs: [
+    { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+    { name: 'signers', internalType: 'address[]', type: 'address[]', indexed: false },
+    { name: 'updatePeriodEndBlock', internalType: 'uint256', type: 'uint256', indexed: false },
+    { name: 'proposalThreshold', internalType: 'uint256', type: 'uint256', indexed: false },
+    { name: 'quorumVotes', internalType: 'uint256', type: 'uint256', indexed: false },
+    { name: 'clientId', internalType: 'uint32', type: 'uint32', indexed: true },
+  ],
+} as const;
+
 /**
  * Fallback: read v1 AuctionHouse events directly from chain when the
  * `/api/activity` endpoint isn't available (Railway redeploy issues post-
@@ -75,45 +93,98 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
   // (sepolia variants, local hardhat). Skip governor reads in that case.
   const governorAddress = nounsGovernorAddress[chainId];
 
-  const [bids, settles, votes, props] = await Promise.all([
-    client.getContractEvents({
-      address,
-      abi: nounsAuctionHouseAbi,
-      eventName: 'AuctionBid',
-      fromBlock,
-      toBlock: 'latest',
-    }),
-    client.getContractEvents({
-      address,
-      abi: nounsAuctionHouseAbi,
-      eventName: 'AuctionSettled',
-      fromBlock,
-      toBlock: 'latest',
-    }),
-    governorAddress != null
-      ? client.getContractEvents({
-          address: governorAddress,
-          abi: nounsGovernorAbi,
-          eventName: 'VoteCast',
-          fromBlock,
-          toBlock: 'latest',
-        })
-      : Promise.resolve([]),
-    governorAddress != null
-      ? client.getContractEvents({
-          address: governorAddress,
-          abi: nounsGovernorAbi,
-          eventName: 'ProposalCreated',
-          fromBlock,
-          toBlock: 'latest',
-        })
-      : Promise.resolve([]),
-  ]);
+  const [bids, bidsWithClientId, settles, votes, votesWithClientId, props, propsWithClientId] =
+    await Promise.all([
+      client.getContractEvents({
+        address,
+        abi: nounsAuctionHouseAbi,
+        eventName: 'AuctionBid',
+        fromBlock,
+        toBlock: 'latest',
+      }),
+      client.getContractEvents({
+        address,
+        abi: nounsAuctionHouseAbi,
+        eventName: 'AuctionBidWithClientId',
+        fromBlock,
+        toBlock: 'latest',
+      }),
+      client.getContractEvents({
+        address,
+        abi: nounsAuctionHouseAbi,
+        eventName: 'AuctionSettled',
+        fromBlock,
+        toBlock: 'latest',
+      }),
+      governorAddress != null
+        ? client.getContractEvents({
+            address: governorAddress,
+            abi: nounsGovernorAbi,
+            eventName: 'VoteCast',
+            fromBlock,
+            toBlock: 'latest',
+          })
+        : Promise.resolve([]),
+      governorAddress != null
+        ? client.getContractEvents({
+            address: governorAddress,
+            abi: nounsGovernorAbi,
+            eventName: 'VoteCastWithClientId',
+            fromBlock,
+            toBlock: 'latest',
+          })
+        : Promise.resolve([]),
+      governorAddress != null
+        ? client.getContractEvents({
+            address: governorAddress,
+            abi: nounsGovernorAbi,
+            eventName: 'ProposalCreated',
+            fromBlock,
+            toBlock: 'latest',
+          })
+        : Promise.resolve([]),
+      governorAddress != null
+        ? client.getContractEvents({
+            address: governorAddress,
+            abi: [PROPOSAL_CREATED_WITH_CLIENT_ID_EVENT],
+            eventName: 'ProposalCreatedWithRequirements',
+            fromBlock,
+            toBlock: 'latest',
+          })
+        : Promise.resolve([]),
+    ]);
+
+  // Build clientId lookup tables from the *WithClientId companion events
+  // emitted alongside the canonical ones in the same tx. We key by txHash
+  // since each user action (bid/vote/propose) is one tx and only fires
+  // one of each event pair.
+  const bidClientByTx = new Map<string, number>();
+  for (const ev of bidsWithClientId) {
+    const args = ev.args as { clientId?: number };
+    if (ev.transactionHash != null && args.clientId != null) {
+      bidClientByTx.set(ev.transactionHash, Number(args.clientId));
+    }
+  }
+  const voteClientByTx = new Map<string, number>();
+  for (const ev of votesWithClientId) {
+    const args = ev.args as { clientId?: number };
+    if (ev.transactionHash != null && args.clientId != null) {
+      voteClientByTx.set(ev.transactionHash, Number(args.clientId));
+    }
+  }
+  const propClientByTx = new Map<string, number>();
+  for (const ev of propsWithClientId) {
+    const args = ev.args as { clientId?: number };
+    if (ev.transactionHash != null && args.clientId != null) {
+      propClientByTx.set(ev.transactionHash, Number(args.clientId));
+    }
+  }
 
   const events: ActivityEvent[] = [];
 
   for (const ev of bids) {
     const args = ev.args as { nounId?: bigint; sender?: string; value?: bigint };
+    const clientId = ev.transactionHash != null ? bidClientByTx.get(ev.transactionHash) : undefined;
     events.push({
       type: 'BID',
       blockNumber: Number(ev.blockNumber),
@@ -123,6 +194,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
         nounId: String(args.nounId ?? 0n),
         bidder: args.sender ?? '',
         value: String(args.value ?? 0n),
+        ...(clientId != null ? { clientId } : {}),
       },
     });
   }
@@ -150,6 +222,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       votes?: bigint;
       reason?: string;
     };
+    const clientId = ev.transactionHash != null ? voteClientByTx.get(ev.transactionHash) : undefined;
     events.push({
       type: 'VOTE',
       blockNumber: Number(ev.blockNumber),
@@ -161,6 +234,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
         support: Number(args.support ?? 0),
         votes: String(args.votes ?? 0n),
         reason: args.reason ?? '',
+        ...(clientId != null ? { clientId } : {}),
       },
     });
   }
@@ -171,6 +245,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       proposer?: string;
       description?: string;
     };
+    const clientId = ev.transactionHash != null ? propClientByTx.get(ev.transactionHash) : undefined;
     events.push({
       type: 'PROPOSAL_CREATED',
       blockNumber: Number(ev.blockNumber),
@@ -181,6 +256,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
         proposer: args.proposer ?? '',
         title: descriptionToTitle(args.description),
         description: args.description ?? '',
+        ...(clientId != null ? { clientId } : {}),
       },
     });
   }
