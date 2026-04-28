@@ -70,10 +70,15 @@ export function useActivityFeed(activeFilter: string) {
       const v2Only = isV2OnlyFilter(activeFilter);
       const v2Excluded = isV2Excluded(activeFilter);
 
-      // Race the API against the chain so a flaky Railway (502 with 15s
-      // hangs) doesn't leave the UI stuck on "loading…". Whichever finishes
-      // first with a non-empty result wins; if both come back empty we
-      // surface whatever we got (or null if everything failed).
+      // Prefer the API over the chain reader: the API enriches events with
+      // `clientId` (used for ClientBadge emojis) which the chain fallback
+      // can't provide cleanly. The chain fallback is HEAVY — it fires 7
+      // parallel getContractEvents calls — so we only run it sequentially
+      // after the API has failed/timed out, never in parallel. Otherwise
+      // it saturates the RPC budget and starves other on-page wagmi reads
+      // (most visibly: the crystal-ball orb's auction() + getBlock()
+      // calls, which then hang on RPC backpressure).
+      const API_PREFER_MS = 4_000;
       const API_TIMEOUT_MS = 6_000;
       const armTimeout = (ac: AbortController): void => {
         setTimeout(() => ac.abort(), API_TIMEOUT_MS);
@@ -101,28 +106,31 @@ export function useActivityFeed(activeFilter: string) {
           }
         })();
 
-        const chainPromise = (async (): Promise<FetchResult | null> => {
-          try {
-            const events = await fetchV1ChainEvents();
-            if (events.length === 0) return null;
+        // Wait up to API_PREFER_MS for the API.
+        const apiWithDeadline = Promise.race([
+          apiPromise,
+          new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
+        ]);
+        const apiResult = await apiWithDeadline;
+        if (apiResult && apiResult.events.length > 0) return apiResult;
+
+        // API was empty/slow/errored — only NOW kick off the chain fallback.
+        try {
+          const events = await fetchV1ChainEvents();
+          if (events.length > 0) {
             return {
               events,
               hasMore: false,
               oldestBlock: events[events.length - 1]!.blockNumber,
             };
-          } catch {
-            return null;
           }
-        })();
+        } catch {
+          // fall through
+        }
 
-        // Resolve as soon as either path returns something. Promise.any
-        // throws if both reject — we treat that as "no data" (null).
-        const winner = await Promise.any([
-          apiPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
-          chainPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
-        ]).catch(() => null);
-
-        return winner;
+        // Chain didn't produce anything either; give the API one last chance
+        // in case it's still in flight (between API_PREFER_MS and API_TIMEOUT_MS).
+        return apiPromise;
       };
 
       const fetchV2 = async (): Promise<FetchResult | null> => {
@@ -144,26 +152,30 @@ export function useActivityFeed(activeFilter: string) {
           }
         })();
 
-        const chainPromise = (async (): Promise<FetchResult | null> => {
-          try {
-            const events = await fetchV2ChainEvents();
-            if (events.length === 0) return null;
+        const apiWithDeadline = Promise.race([
+          apiPromise,
+          new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
+        ]);
+        const apiResult = await apiWithDeadline;
+        if (apiResult && apiResult.events.length > 0) return apiResult;
+
+        // Only run the V2 chain fallback after the API gives up — it
+        // saturates the RPC budget if fired in parallel.
+        try {
+          const events = await fetchV2ChainEvents();
+          if (events.length > 0) {
             return {
               events,
               hasMore: false,
               oldestBlock: events[events.length - 1]!.blockNumber,
             };
-          } catch {
-            return null;
           }
-        })();
+        } catch {
+          // fall through
+        }
 
-        const winner = await Promise.any([
-          apiPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
-          chainPromise.then(r => (r != null ? r : Promise.reject(new Error('empty')))),
-        ]).catch(() => null);
-
-        return winner ?? { events: [], hasMore: false, oldestBlock: 0 };
+        const apiLate = await apiPromise;
+        return apiLate ?? { events: [], hasMore: false, oldestBlock: 0 };
       };
 
       const [mainnet, v2] = await Promise.all([fetchMainnet(), fetchV2()]);

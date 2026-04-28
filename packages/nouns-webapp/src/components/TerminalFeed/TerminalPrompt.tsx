@@ -1,8 +1,9 @@
 import type { GovernanceAction } from './GovernanceActionConfirm';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
+import { useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
@@ -32,6 +33,22 @@ const API_BASE =
 // use a fixed-position overlay anchored above the on-screen keyboard.
 const MOBILE_BREAKPOINT = 768;
 
+// Single source of truth for example agent prompts. Used by both the rotating
+// idle placeholder and the "while you wait" loading hints strip. Replaces the
+// old /terminal ASCII greeting box now that we've sunset that route.
+const AGENT_HINTS: readonly string[] = [
+  'watch for ice cream',
+  'what proposals are active?',
+  'my reservations',
+  'tell me about the treasury',
+  'status',
+  'traits head',
+  'how does the auction work?',
+  'tip nounirl.eth on any chain to reserve',
+];
+
+const HINT_ROTATE_MS = 3500;
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT,
@@ -45,15 +62,39 @@ function useIsMobile() {
   return isMobile;
 }
 
+// Pull the noun id out of `/noun/:id` or `/v2/noun/:id`. Mirrors the regexes
+// in `useActiveDao` so the chat sees the same id the URL is rendering. We
+// don't try to disambiguate other routes — the API only needs the id when the
+// user is on a noun-detail page.
+const NOUN_ID_RE = /^\/(?:v2\/)?noun\/(\d+)\/?$/;
+
+function pathnameToNounId(pathname: string): number | null {
+  const m = NOUN_ID_RE.exec(pathname);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
   const { address, isConnected } = useAccount();
   const { activeDao } = useActiveDao();
+  const location = useLocation();
+  const viewContext = useMemo(
+    () => ({
+      dao: activeDao,
+      pathname: location.pathname,
+      nounId: pathnameToNounId(location.pathname),
+    }),
+    [activeDao, location.pathname],
+  );
   const isMobile = useIsMobile();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<GovernanceAction | null>(null);
   const [requiresWallet, setRequiresWallet] = useState(false);
+  const [hintIndex, setHintIndex] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -63,6 +104,29 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Rotate the placeholder/hints array. Pause while the user is interacting
+  // (focused or typing) so we never yank text out from under them, and pause
+  // during loading because the input switches to a 'thinking...' placeholder.
+  // The same index drives the inline pending-state hints strip below the input.
+  useEffect(() => {
+    const paused = isLoading || isFocused || input.length > 0;
+    if (paused) return;
+    const id = window.setInterval(() => {
+      setHintIndex(i => (i + 1) % AGENT_HINTS.length);
+    }, HINT_ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [isLoading, isFocused, input]);
+
+  // While the agent is thinking, advance the loading hints faster so the
+  // strip feels alive and gives the user something to read.
+  useEffect(() => {
+    if (!isLoading) return;
+    const id = window.setInterval(() => {
+      setHintIndex(i => (i + 1) % AGENT_HINTS.length);
+    }, 1800);
+    return () => window.clearInterval(id);
+  }, [isLoading]);
 
   // Scroll response panel
   useEffect(() => {
@@ -128,7 +192,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             wallet: address ?? null,
             history: apiHistory,
             agent_mode: 'nounirl',
-            view_context: { dao: activeDao },
+            view_context: viewContext,
           }),
         });
 
@@ -189,7 +253,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         setIsLoading(false);
       }
     },
-    [activeDao, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
+    [viewContext, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
   );
 
   const handleActionSuccess = useCallback(
@@ -350,10 +414,12 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={e => {
             if (e.key === 'Enter') sendMessage(input);
           }}
-          placeholder={isLoading ? 'thinking...' : 'vote, propose, ask nounirl anything...'}
+          placeholder={isLoading ? 'thinking...' : `try: ${AGENT_HINTS[hintIndex]}`}
           disabled={isLoading}
           style={{
             flex: 1,
@@ -378,6 +444,41 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           </span>
         )}
       </div>
+
+      {/* Pending-state hints strip — only visible while the agent is thinking.
+          Replaces the old /terminal ASCII greeting box for command discovery.
+          Renders inside the same column as the input so layout doesn't shift;
+          uses fixed positioning on mobile to sit just above the input bar
+          (matching the response overlay anchoring). */}
+      {isLoading && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: isMobile ? 'fixed' : 'absolute',
+            bottom: isMobile
+              ? 'calc(48px + env(safe-area-inset-bottom, 0px))'
+              : '48px',
+            left: 0,
+            right: 0,
+            padding: '4px 16px 6px',
+            background: '#000',
+            borderTop: '1px solid #0a0a0a',
+            color: '#444',
+            fontSize: '11px',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            animation: 'pulse 2.4s infinite',
+            zIndex: isMobile ? 1099 : 9,
+            pointerEvents: 'none',
+          }}
+        >
+          while you wait, try: <span style={{ color: '#6a6a6a' }}>{AGENT_HINTS[hintIndex]}</span>
+        </div>
+      )}
     </>
   );
 }
