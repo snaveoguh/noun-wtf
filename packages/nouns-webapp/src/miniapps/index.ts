@@ -9,11 +9,10 @@ import { highwayMiniapp } from './highway';
 import { registerMiniapp } from './registry';
 import { saberMiniapp } from './saber';
 import { terraformsMiniapp } from './terraforms';
-import { terminalMiniapp } from './terminal';
 import { worldMiniapp } from './world';
 
 // Register all built-in miniapps
-registerMiniapp(terminalMiniapp);
+// (terminal miniapp removed 2026-04-27 — merged into homepage TerminalFeed)
 registerMiniapp(crystalBallMiniapp);
 registerMiniapp(feedMiniapp);
 registerMiniapp(highwayMiniapp);

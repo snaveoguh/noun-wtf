@@ -3,7 +3,9 @@ import type { ActivityEvent as ActivityEventType } from './useActivityFeed';
 
 import { useState } from 'react';
 
+import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router';
+import remarkBreaks from 'remark-breaks';
 
 import ClientBadge from '@/components/ClientBadge';
 
@@ -27,43 +29,53 @@ const CANDIDATE_EVENT_TYPES = new Set([
   'CANDIDATE_PROMOTED',
 ]);
 
-/** Event types that have expandable description content */
-const EXPANDABLE_TYPES = new Set([
+/** Event types whose payload may contain a long-form description field. */
+const DESCRIPTION_TYPES = new Set([
   'PROPOSAL_CREATED',
   'CANDIDATE_CREATED',
   'CANDIDATE_UPDATED',
+  'LIL_PROPOSAL_CREATED',
+  'V2_PROP',
+  'GRANT_CREATED',
+]);
+
+/** Event types whose payload may contain a long-form `reason` (or comment) field. */
+const REASON_TYPES = new Set([
   'VOTE',
   'PROPOSAL_FEEDBACK',
   'CANDIDATE_FEEDBACK',
   'CANDIDATE_SPONSORED',
+  'LIL_VOTE',
+  'LIL_BID',
+  'V2_VOTE',
+  'GRANT_VOTE',
 ]);
 
-function hasExpandableContent(type: string, data: Record<string, unknown>): boolean {
-  if (!EXPANDABLE_TYPES.has(type)) return false;
-  if (type === 'PROPOSAL_CREATED' || type === 'CANDIDATE_CREATED' || type === 'CANDIDATE_UPDATED') {
-    return typeof data.description === 'string' && data.description.length > 0;
+/** Pull whichever long-form text a given event carries, if any. */
+function getExpandableText(type: string, data: Record<string, unknown>): string | null {
+  if (DESCRIPTION_TYPES.has(type)) {
+    const desc = data.description;
+    if (typeof desc === 'string' && desc.trim().length > 0) return desc;
   }
-  // Votes/feedback with reasons
-  if (
-    type === 'VOTE' ||
-    type === 'PROPOSAL_FEEDBACK' ||
-    type === 'CANDIDATE_FEEDBACK' ||
-    type === 'CANDIDATE_SPONSORED'
-  ) {
-    return typeof data.reason === 'string' && data.reason.length > 80;
+  if (REASON_TYPES.has(type)) {
+    // LIL_BID stores the bidder's note under `comment` (or sometimes `reason`).
+    const candidates = [data.reason, data.comment];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim().length > 0) return c;
+    }
   }
-  return false;
+  return null;
 }
 
-/** Simple markdown-ish rendering: strip markdown but preserve line breaks */
-function renderDescription(text: string): string {
-  return text
-    .replace(/^#+\s*/gm, '') // strip heading markers
-    .replace(/\*\*(.*?)\*\*/g, '$1') // strip bold
-    .replace(/\*(.*?)\*/g, '$1') // strip italic
-    .replace(/\[([^\]]+)]\([^)]+\)/g, '$1') // links → text only
-    .replace(/^[*-]\s/gm, '  • ') // bullets
-    .trim();
+/** Treat `https:` URLs as the only safe transport for embedded media. */
+function isSafeHttpsUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url, 'https://noun.wtf');
+    return u.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }: Props) {
@@ -78,7 +90,9 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
     candidateTitleLookup,
   );
   const age = timeAgo(event.timestamp);
-  const expandable = hasExpandableContent(event.type, event.data);
+  const expandableText = getExpandableText(event.type, event.data);
+  const expandable = expandableText !== null;
+  const isMarkdown = DESCRIPTION_TYPES.has(event.type);
   const rawClientId = event.data.clientId as number | string | null | undefined;
   const clientId =
     rawClientId == null || rawClientId === ''
@@ -105,14 +119,6 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
     const proposalId = event.data.proposalId;
     if (proposalId != null) viewHref = `/vote/${proposalId}`;
   }
-
-  const expandedContent = expanded
-    ? event.type === 'PROPOSAL_CREATED' ||
-      event.type === 'CANDIDATE_CREATED' ||
-      event.type === 'CANDIDATE_UPDATED'
-      ? renderDescription(event.data.description as string)
-      : (event.data.reason as string)
-    : null;
 
   // Check if this event has an image (proposals/candidates)
   const imageUrl = expanded ? (event.data.imageUrl as string | undefined) : undefined;
@@ -246,7 +252,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
       </div>
 
       {/* Expanded content */}
-      {expanded && expandedContent && (
+      {expanded && expandableText && (
         <div
           style={{
             marginTop: '8px',
@@ -255,20 +261,131 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             padding: '10px 12px',
             background: '#050505',
             borderLeft: `2px solid ${color}`,
-            color: '#999',
+            color: '#bbb',
             fontSize: '12px',
             lineHeight: 1.7,
-            whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
             maxHeight: '600px',
             overflowY: 'auto',
+            overflowX: 'hidden',
+            animation: 'terminalRowExpand 140ms ease-out',
           }}
-          className="terminal-scrollbar"
+          className="terminal-scrollbar terminal-row-expanded"
         >
           {/* ASCII art of proposal image */}
           {imageUrl && <AsciiImage imageUrl={imageUrl} cols={70} />}
 
-          {expandedContent}
+          {isMarkdown ? (
+            <ReactMarkdown
+              // No rehype-raw → raw HTML in the markdown is rendered as text,
+              // not parsed. This is the safe-by-default react-markdown config.
+              remarkPlugins={[remarkBreaks]}
+              components={{
+                p: ({ ...props }) => <p {...props} style={{ margin: '0 0 8px' }} />,
+                h1: ({ ...props }) => (
+                  <h1
+                    {...props}
+                    style={{ fontSize: '14px', margin: '8px 0 6px', color: '#ddd' }}
+                  />
+                ),
+                h2: ({ ...props }) => (
+                  <h2
+                    {...props}
+                    style={{ fontSize: '13px', margin: '8px 0 6px', color: '#ddd' }}
+                  />
+                ),
+                h3: ({ ...props }) => (
+                  <h3
+                    {...props}
+                    style={{ fontSize: '12px', margin: '6px 0 4px', color: '#ddd' }}
+                  />
+                ),
+                strong: ({ ...props }) => <strong {...props} style={{ color: '#eee' }} />,
+                em: ({ ...props }) => <em {...props} style={{ color: '#ddd' }} />,
+                code: ({ ...props }) => (
+                  <code
+                    {...props}
+                    style={{
+                      background: '#0e0e0e',
+                      padding: '1px 4px',
+                      borderRadius: 3,
+                      fontSize: '11px',
+                    }}
+                  />
+                ),
+                pre: ({ ...props }) => (
+                  <pre
+                    {...props}
+                    style={{
+                      background: '#0e0e0e',
+                      padding: '8px 10px',
+                      borderRadius: 4,
+                      overflowX: 'auto',
+                      fontSize: '11px',
+                      margin: '6px 0',
+                    }}
+                  />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} style={{ paddingLeft: 18, margin: '4px 0' }} />
+                ),
+                ol: ({ ...props }) => (
+                  <ol {...props} style={{ paddingLeft: 18, margin: '4px 0' }} />
+                ),
+                blockquote: ({ ...props }) => (
+                  <blockquote
+                    {...props}
+                    style={{
+                      borderLeft: '2px solid #222',
+                      paddingLeft: 8,
+                      margin: '6px 0',
+                      color: '#888',
+                    }}
+                  />
+                ),
+                a: ({ href, ...props }) => {
+                  if (!isSafeHttpsUrl(href)) {
+                    return <span {...props} style={{ color: '#888' }} />;
+                  }
+                  return (
+                    <a
+                      {...props}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      style={{ color: '#7dd3fc', textDecoration: 'underline' }}
+                    />
+                  );
+                },
+                img: ({ src, alt }) => {
+                  if (!isSafeHttpsUrl(src)) return null;
+                  return (
+                    <img
+                      src={src}
+                      alt={alt || ''}
+                      loading="lazy"
+                      style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                        borderRadius: 6,
+                        margin: '6px 0',
+                        display: 'block',
+                      }}
+                      onError={e => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  );
+                },
+              }}
+            >
+              {expandableText}
+            </ReactMarkdown>
+          ) : (
+            <div style={{ whiteSpace: 'pre-wrap' }}>{expandableText}</div>
+          )}
         </div>
       )}
     </div>
