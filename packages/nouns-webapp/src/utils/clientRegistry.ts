@@ -32,6 +32,9 @@ export interface ClientInfo {
  * Some IDs were taken from <https://nouns.camp/> and the Nouns DAO client
  * rewards dashboards. Fill in more as you verify them.
  */
+// Source of truth: NounsClientToken (0x88386...) `clientMetadata(uint32)`.
+// Verified onchain via publicnode 2026-04-28. If this looks off, query
+// the contract directly — the human-friendly description there is canonical.
 export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
   0: {
     name: 'nouns.wtf',
@@ -39,24 +42,24 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
     description: 'The official Nouns DAO frontend',
   },
   1: {
+    name: 'Noundry',
+    url: 'https://noundry.wtf',
+    description: 'Community-generated Noun traits',
+  },
+  2: {
+    name: 'House of Nouns',
+    url: '',
+    description: 'House of Nouns — community client',
+  },
+  3: {
     name: 'nouns.camp',
     url: 'https://nouns.camp',
     description: 'Governance-focused Nouns client by Federation',
   },
-  2: {
-    name: 'Prop House',
-    url: 'https://prop.house',
-    description: 'Noun-funded grant rounds via Prop House',
-  },
-  3: {
-    name: 'Agora',
-    url: 'https://nounsagora.com',
-    description: 'Agora governance dashboard for Nouns DAO',
-  },
   4: {
-    name: 'NounSwap',
-    url: 'https://nounswap.wtf',
-    description: 'Swap your Noun for another Noun',
+    name: 'Nouns.biz',
+    url: 'https://nouns.biz',
+    description: 'Nouns.biz client',
   },
   5: {
     name: 'Nouns.com',
@@ -73,10 +76,20 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
     url: 'https://nouns.sh',
     description: 'Terminal-style Nouns auction & governance client',
   },
+  8: {
+    name: 'Nouns GG',
+    url: '',
+    description: 'Nouns GG — community client',
+  },
   9: {
     name: 'Probe',
     url: 'https://probe.wtf',
     description: 'Probe — Nouns explorer client by mshrm',
+  },
+  10: {
+    name: 'Agora',
+    url: 'https://nounsagora.com',
+    description: 'Agora governance dashboard for Nouns DAO',
   },
   11: {
     name: 'Berry OS',
