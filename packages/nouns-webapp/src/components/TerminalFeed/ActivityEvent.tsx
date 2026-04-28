@@ -144,6 +144,23 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           if (expandable) setExpanded(!expanded);
         }}
       >
+        {/* Client emoji — fixed slot at the far left of the row so the
+            following columns stay vertically aligned across rows even when
+            an event has no clientId. */}
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '16px',
+            flexShrink: 0,
+            paddingTop: '1px',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {showClientBadge && <ClientBadge clientId={clientId} size={13} />}
+        </span>
+
         {/* Timestamp */}
         <span
           style={{
@@ -182,18 +199,6 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           }}
         >
           {description}
-          {showClientBadge && (
-            <span
-              style={{
-                display: 'inline-flex',
-                verticalAlign: 'middle',
-                marginLeft: 2,
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <ClientBadge clientId={clientId} size={13} />
-            </span>
-          )}
           {expandable && (
             <span style={{ color: '#444', fontSize: '11px', marginLeft: '6px' }}>
               {expanded ? '▾' : '▸'}
