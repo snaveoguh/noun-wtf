@@ -26,6 +26,7 @@ import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
 } from '@/contracts/small-grants-treasury';
+import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 
 // ─── Compute encodedProp for addSignature (mirrors CandidatePage logic) ───
 
@@ -91,7 +92,31 @@ export function useGovernanceAction() {
             if (action.proposalId === undefined || action.support === undefined) {
               throw new Error('Missing proposalId or support');
             }
-            if (action.reason) {
+            const isLilNouns =
+              action.dao === 'lil-nouns' ||
+              action.dao === 'lilnouns' ||
+              action.dao === 'lil';
+            if (isLilNouns) {
+              // Lil Nouns governor doesn't support gas-refund variants and has
+              // no client-id arg — use plain castVote / castVoteWithReason
+              // (mirrors LilNounsVotePage). See:
+              // packages/nouns-webapp/src/pages/Vote/LilNounsVotePage.tsx
+              if (action.reason) {
+                hash = await writeContractAsync({
+                  abi: LIL_NOUNS_GOVERNOR_ABI,
+                  address: LIL_NOUNS_GOVERNOR,
+                  functionName: 'castVoteWithReason',
+                  args: [BigInt(action.proposalId), action.support, action.reason],
+                });
+              } else {
+                hash = await writeContractAsync({
+                  abi: LIL_NOUNS_GOVERNOR_ABI,
+                  address: LIL_NOUNS_GOVERNOR,
+                  functionName: 'castVote',
+                  args: [BigInt(action.proposalId), action.support],
+                });
+              }
+            } else if (action.reason) {
               hash = await writeContractAsync({
                 abi: nounsGovernorAbi,
                 address: nounsGovernorAddress[1] as Address,

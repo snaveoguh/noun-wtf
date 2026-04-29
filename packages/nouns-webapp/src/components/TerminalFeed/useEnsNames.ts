@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
+
 const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
   || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
@@ -26,7 +28,9 @@ async function resolveBatch() {
     const { names } = await res.json() as { names: Record<string, string | null> };
 
     for (const [addr, name] of Object.entries(names)) {
-      ensNameCache.set(addr.toLowerCase(), name);
+      // Strip `.noggles` namespace so the terminal feed never surfaces it.
+      const cleaned = name ? stripNoggles(name) || null : null;
+      ensNameCache.set(addr.toLowerCase(), cleaned);
     }
     notifySubscribers();
   } catch {

@@ -1,10 +1,14 @@
 import { parseAbiItem, PublicClient } from 'viem';
 
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { Address } from '@/utils/types';
 
 /**
  * Look up ENS name for an address.
  * Uses the ENS reverse resolver contract directly.
+ *
+ * Strips the `.noggles` suffix before returning so the UI never surfaces the
+ * namespace (see `stripNoggles`).
  */
 export async function lookupNNSOrENS(
   client: PublicClient,
@@ -17,7 +21,9 @@ export async function lookupNNSOrENS(
       functionName: 'resolve',
       args: [target],
     });
-    return name || null;
+    if (!name) return null;
+    const stripped = stripNoggles(name);
+    return stripped || null;
   } catch {
     return null;
   }

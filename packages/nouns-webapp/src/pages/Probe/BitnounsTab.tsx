@@ -16,6 +16,7 @@ import {
   orderTraitsForDisplay,
   parseBuilderTraitsFromImage,
 } from '@/lib/builderTraits';
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 
 // ─── ENS resolution ────────────────────────────────────────────────────────
 
@@ -152,7 +153,11 @@ function shortenAddress(addr: string): string {
 function displayName(addr: string, names: Map<string, string>): string {
   if (addr === '') return '';
   const ens = names.get(addr.toLowerCase());
-  return ens !== undefined && ens !== '' ? ens : shortenAddress(addr);
+  if (ens !== undefined && ens !== '') {
+    const stripped = stripNoggles(ens);
+    if (stripped !== '') return stripped;
+  }
+  return shortenAddress(addr);
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
