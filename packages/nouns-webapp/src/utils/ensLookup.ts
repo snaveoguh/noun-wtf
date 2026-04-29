@@ -4,6 +4,7 @@ import { usePublicClient } from 'wagmi';
 
 import { cache, cacheKey, CHAIN_ID } from '@/config';
 
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { Address } from '@/utils/types';
 import { lookupNNSOrENS } from './lookupNNSOrENS';
 
@@ -18,12 +19,14 @@ export const useReverseENSLookUp = (address: Address) => {
   useEffect(() => {
     let mounted = true;
     if (address && publicClient) {
-      // Look for resolved ENS in local storage (result of pre-fetching)
+      // Look for resolved ENS in local storage (result of pre-fetching).
+      // Cached names from before the `.noggles` strip was added may still
+      // contain the suffix — strip on read so old caches are clean too.
       const maybeCachedENSResultRaw = localStorage.getItem(ensCacheKey(address));
       if (maybeCachedENSResultRaw) {
         const maybeCachedENSResult = JSON.parse(maybeCachedENSResultRaw);
         if (Number(maybeCachedENSResult.expires) > Date.now() / 1000) {
-          setEns(maybeCachedENSResult.name);
+          setEns(stripNoggles(maybeCachedENSResult.name) || undefined);
         } else {
           localStorage.removeItem(ensCacheKey(address));
         }

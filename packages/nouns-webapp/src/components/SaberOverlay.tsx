@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import PartySocket from 'partysocket';
 import { useAccount, useEnsName } from 'wagmi';
 
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 interface Vec2 { x: number; y: number }
@@ -291,8 +293,9 @@ const SaberOverlay: React.FC<SaberOverlayProps> = ({ active, onClose }) => {
   // Player identity from wallet (use ref so it doesn't restart the game loop)
   const { address } = useAccount();
   const { data: ensName } = useEnsName({ address });
+  const displayEnsName = ensName ? stripNoggles(ensName) : null;
   const playerNameRef = useRef('Anon');
-  playerNameRef.current = ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Anon');
+  playerNameRef.current = displayEnsName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Anon');
 
   // Force Push state
   const forcePushesRef = useRef<ForcePush[]>([]);

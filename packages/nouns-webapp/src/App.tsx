@@ -20,6 +20,7 @@ import '@/index.css';
 // Register all miniapps
 import '@/miniapps';
 
+import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -302,6 +303,7 @@ function AppRouter() {
       </Routes>
       <Footer />
       {/* <HeliosStatusBar /> — disabled: a16z consensus endpoints are down, causes infinite 502 retry loop */}
+      <ChainNotificationsMount />
       <Toaster
         expand
         closeButton

@@ -44,29 +44,36 @@ const LilNounsProposals: FC = () => {
     let cancelled = false;
     // Proxy first (full titles + abstain votes + timestamps). Fall back to
     // direct on-chain multicall if the proxy is down.
-    (async () => {
+    const load = async () => {
       try {
         const list = await fetchLilNounsProposalsFromProxy();
         if (cancelled) return;
         // Sort newest first and cap at 25 to match the prior on-chain UX.
         const top = list.sort((a, b) => b.id - a.id).slice(0, 25);
         setProposals(top);
-        if (top.length === 0) setError('No proposals found.');
+        setError(top.length === 0 ? 'No proposals found.' : null);
       } catch {
         try {
           const list = await fetchLilNounsProposalsOnchain(25);
           if (cancelled) return;
           setProposals(list);
-          if (list.length === 0) setError('No proposals found on-chain.');
+          setError(list.length === 0 ? 'No proposals found on-chain.' : null);
         } catch {
           if (!cancelled) setError('Failed to load Lil Nouns proposals.');
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    })().finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    };
+
+    load();
+    // Poll every 30s so newly-created Lil Nouns proposals show up without
+    // requiring a manual reload. Subgraph queries are cheap; 30s keeps load
+    // off the proxy while still feeling fresh on this slow-moving DAO.
+    const intervalId = window.setInterval(load, 30_000);
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, []);
 

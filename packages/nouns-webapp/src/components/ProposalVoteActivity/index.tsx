@@ -5,6 +5,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, RefreshCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { usePublicClient } from 'wagmi';
 
+import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
 import { ensCacheKey } from '@/utils/ensLookup';
 import { lookupNNSOrENS } from '@/utils/lookupNNSOrENS';
@@ -42,13 +43,14 @@ const VoteActivityItem: FC<{
   useEffect(() => {
     if (!publicClient || !vote.voter) return;
 
-    // Check cache first
+    // Check cache first. Cached names from before the `.noggles` strip
+    // shipped may still contain the suffix — strip on read.
     const cached = localStorage.getItem(ensCacheKey(vote.voter as `0x${string}`));
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         if (parsed.expires > Date.now() / 1000) {
-          setEnsName(parsed.name);
+          setEnsName(stripNoggles(parsed.name) || null);
           return;
         }
       } catch {}

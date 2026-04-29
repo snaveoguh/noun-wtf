@@ -319,11 +319,15 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     },
   });
 
-  const auction = auctionData as
-    | readonly [bigint, bigint, bigint, bigint, `0x${string}`, boolean]
-    | undefined;
-  const currentNounId = auction?.[0];
-  const endTime = auction?.[3];
+  // Mainnet's `auction()` (INounsAuctionHouseV3.AuctionV2View) is a single
+  // tuple-struct output — viem decodes that as an OBJECT keyed by field
+  // name, not a flat array. The earlier `[0]…[3]` cast always yielded
+  // `undefined`, so the `currentNounId == null` early-return below kicked
+  // in on every render and the orb stayed on "SCRYING…" forever for users
+  // without a cached prediction. V2's ABI uses flat outputs (no struct
+  // wrapper), which is why the v2 hook above works untouched.
+  const currentNounId = auctionData?.nounId;
+  const endTime = auctionData?.endTime;
 
   // See note on `useBlock` in `useNounV2Prediction` — `watch: true` would
   // pin the wagmi fallback to a WebSocket transport on cold load. Polling
@@ -347,7 +351,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
 
   return useMemo(() => {
     if (!enabled) return null;
-    if (!auction || currentNounId == null || !blockData?.hash) return cached;
+    if (!auctionData || currentNounId == null || !blockData?.hash) return cached;
 
     // Mainnet skips noun #N where N % 10 === 0 (nounder reward). When the
     // current auction is for #N, the *next* auctioned id is N+1 unless N+1
@@ -374,7 +378,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     return payload;
   }, [
     enabled,
-    auction,
+    auctionData,
     currentNounId,
     blockData?.hash,
     blockData?.number,

@@ -3,7 +3,7 @@ import React from 'react';
 import { blo } from 'blo';
 import { useEnsAvatar, useEnsName } from 'wagmi';
 
-import { formatShortAddress } from '@/utils/addressAndENSDisplayUtils';
+import { formatShortAddress, stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { containsBlockedText } from '@/utils/moderation/containsBlockedText';
 import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
 import { Address } from '@/utils/types';
@@ -22,10 +22,16 @@ const ShortAddress: React.FC<ShortAddressProps> = ({
   size = 24,
 }) => {
   const { data: ensName } = useEnsName({ address });
-  const resolvedName = ensName ?? resolveNounContractAddress(address);
+  // ENS name with `.noggles` namespace stripped for display only — the raw
+  // `ensName` is still passed to `useEnsAvatar` so avatar resolution keeps
+  // working for `.noggles` names.
+  const displayEnsName = ensName ? stripNoggles(ensName) : null;
+  const resolvedName = displayEnsName || resolveNounContractAddress(address);
   const isBlocklisted = resolvedName ? containsBlockedText(resolvedName, 'en') : false;
   const shortAddress = formatShortAddress(address);
-  const { data: ensAvatar } = useEnsAvatar({ name: resolvedName });
+  const { data: ensAvatar } = useEnsAvatar({
+    name: ensName ?? resolveNounContractAddress(address),
+  });
 
   // Guard: address may be undefined during loading / when Ponder hasn't indexed
   if (!address) {
