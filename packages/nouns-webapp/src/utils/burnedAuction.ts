@@ -20,10 +20,20 @@ import type { Auction } from '@/wrappers/nounsAuction';
 export function isBurnedAuction(auction: Auction | undefined): boolean {
   if (!auction) return false;
   if (auction.burned === true) return true;
+  // Explicit `burned: false` is authoritative — used by the V2 stub for
+  // past auctions where amount/bidder are zero only because there's no
+  // indexer to populate them, NOT because the auction was actually burned.
+  if (auction.burned === false) return false;
 
   const amount = auction.amount;
   const amountIsZero =
     amount === undefined || amount === null || BigInt(amount.toString()) === 0n;
+
+  // Stubs with startTime=0 (no real auction data fetched yet) must not
+  // trip the heuristic — epoch-zero is a sentinel, not a real settlement.
+  if (auction.startTime !== undefined && BigInt(auction.startTime.toString()) === 0n) {
+    return false;
+  }
 
   return !!auction.settled && !auction.bidder && amountIsZero;
 }
