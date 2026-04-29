@@ -2217,7 +2217,12 @@ CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbe
 
 PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote counts, queue/execution state, and timing change constantly. Only refer to proposal status using the live "Governance Overview" data injected below. If a proposal isn't in the injected data, say you'd need to look it up — do NOT guess from training data.
 
-VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0). NounV2 #0 is NOT the same as mainnet Noun #0.
+VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0); dao=lil-nouns means Lil Nouns DAO (separate governor, separate proposal numbering). NounV2 #0 is NOT the same as mainnet Noun #0. Lil Prop #375 is NOT the same as mainnet Prop #375.
+
+VOTING DAO RULE: The terminal can cast votes on BOTH mainnet Nouns DAO and Lil Nouns DAO from the same wallet. When you call prepare_vote, set the `dao` field correctly:
+- `dao: 'lil-nouns'` whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in the Lil Nouns DAO context, or when the Current View shows dao=lil-nouns.
+- `dao: 'nouns'` (or omit — it's the default) for mainnet Nouns DAO proposals.
+If a user says "vote for prop 375" with no DAO hint AND the Current View doesn't disambiguate AND the prop number could plausibly be either DAO, ask one short clarifying question ("Lil Nouns or mainnet?") before calling prepare_vote. Never tell the user that Lil Nouns voting isn't supported — it is.
 
 ${NOUN_V2_KNOWLEDGE}
 
@@ -3331,8 +3336,16 @@ app.post('/api/chat', async c => {
     // This is the FIRST thing we inject so the model anchors to it before
     // reading any of the live governance / auction data below.
     if (view_context && typeof view_context === 'object') {
-      const rawDao = typeof view_context.dao === 'string' ? view_context.dao : '';
-      const dao = rawDao === 'nounv2' ? 'nounv2' : rawDao === 'nouns' ? 'nouns' : null;
+      const rawDao = typeof view_context.dao === 'string' ? view_context.dao.toLowerCase() : '';
+      // Normalize lil-nouns aliases that the client may send.
+      const dao: 'nouns' | 'nounv2' | 'lil-nouns' | null =
+        rawDao === 'nounv2'
+          ? 'nounv2'
+          : rawDao === 'nouns'
+            ? 'nouns'
+            : rawDao === 'lil-nouns' || rawDao === 'lilnouns' || rawDao === 'lil'
+              ? 'lil-nouns'
+              : null;
       const rawNounId = view_context.nounId;
       const nounId =
         typeof rawNounId === 'number' && Number.isFinite(rawNounId)
@@ -3347,15 +3360,26 @@ app.post('/api/chat', async c => {
             ? 'mainnet Nouns DAO (token IDs are mainnet Noun IDs)'
             : dao === 'nounv2'
               ? 'NounV2 fork DAO (token IDs are v2 IDs starting at 0 — NOT mainnet Nouns)'
-              : 'unknown';
+              : dao === 'lil-nouns'
+                ? 'Lil Nouns DAO (separate governor; pass dao=\'lil-nouns\' to prepare_vote for proposals here)'
+                : 'unknown';
         dynamicContext += '\n\n## Current View';
         dynamicContext += `\n- dao: ${dao ?? 'unknown'} (${daoLabel})`;
         if (nounId !== null) {
-          const nounLabel = dao === 'nounv2' ? `NounV2 #${nounId}` : `Noun #${nounId}`;
+          const nounLabel =
+            dao === 'nounv2'
+              ? `NounV2 #${nounId}`
+              : dao === 'lil-nouns'
+                ? `Lil Noun #${nounId}`
+                : `Noun #${nounId}`;
           dynamicContext += `\n- viewing: ${nounLabel}`;
         }
         dynamicContext +=
           '\n- When the user says "this noun" or asks an unqualified question, assume they mean the noun above. If they ask about a different noun, confirm which DAO they mean.';
+        if (dao === 'lil-nouns') {
+          dynamicContext +=
+            '\n- VOTING: when the user asks to vote here, default `dao` to "lil-nouns" in prepare_vote. Do not ask them which DAO unless they explicitly mention mainnet.';
+        }
       }
     }
 
@@ -3449,6 +3473,8 @@ When a user asks "status": call check_block for live data. Don't rely on the inj
 When a user asks about their reservations: call get_reservations with their wallet.
 
 GOVERNANCE — the terminal handles votes, bids, sponsors, candidates, and grants via typed commands (e.g. "vote for 567", "bid 0.5 eth"). These are parsed automatically — you don't need tools for them. If someone asks about governance, explain that they can type commands directly. noun.wtf client ID is 37 (auto-included in votes, bids, promotes). Proposals start as candidates → collect sponsor signatures → get promoted.
+
+LIL NOUNS VOTING — prepare_vote works for BOTH mainnet Nouns DAO and Lil Nouns DAO. When the user wants to vote on a Lil Nouns prop (mentions "lil"/"lilnoun(s)", or the Current View shows dao=lil-nouns, or the proposal exists in Lil Nouns DAO context fetched from /api/lil-proposals), set `dao: 'lil-nouns'` on the prepare_vote call. For mainnet Nouns leave it unset or pass `dao: 'nouns'`. If the user says "prop N" without specifying a DAO and the Current View doesn't disambiguate, ask one short clarifying question ("Lil Nouns or mainnet?") rather than guessing. Do NOT tell users to go to lilnouns.wtf to vote — they can vote from this terminal.
 ${buildFunctionSkillPromptSnippet()}
 CRITICAL RULES:
 - NEVER fabricate data. If you don't know, say so or use a tool to look it up.
@@ -3812,7 +3838,7 @@ CRITICAL RULES:
         function: {
           name: 'prepare_vote',
           description:
-            'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable.',
+            'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. Works for BOTH mainnet Nouns DAO (default) and Lil Nouns DAO — pick the right `dao` value based on the user\'s intent. For mainnet Nouns ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable. For Lil Nouns the on-chain governor will reject invalid IDs/states, so confirmation is best-effort via the injected Lil Nouns context (or just ask the user to clarify if uncertain).',
           parameters: {
             type: 'object' as const,
             properties: {
@@ -3828,6 +3854,12 @@ CRITICAL RULES:
               reason: {
                 type: 'string',
                 description: 'Optional reason for the vote.',
+              },
+              dao: {
+                type: 'string',
+                enum: ['nouns', 'lil-nouns'],
+                description:
+                  'Which DAO\'s governor to vote on. "nouns" = mainnet Nouns DAO (the default). "lil-nouns" = Lil Nouns DAO (governor 0x5d2C…4039). Use "lil-nouns" whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in Lil Nouns DAO, or when viewContext.dao is "lil-nouns". Otherwise leave it unset (defaults to "nouns").',
               },
             },
             required: ['proposalId', 'support'],
@@ -4733,11 +4765,39 @@ CRITICAL RULES:
             }
 
             case 'prepare_vote': {
-              const input = args as { proposalId: number; support: 0 | 1 | 2; reason?: string };
+              const input = args as {
+                proposalId: number;
+                support: 0 | 1 | 2;
+                reason?: string;
+                dao?: string;
+              };
+              // Normalize the dao value. Client accepts 'lil-nouns' | 'lilnouns' | 'lil'
+              // as aliases for Lil Nouns; we forward the canonical 'lil-nouns' string.
+              const rawDao = (input.dao ?? '').toLowerCase();
+              const isLil = rawDao === 'lil-nouns' || rawDao === 'lilnouns' || rawDao === 'lil';
+              const daoCanonical: 'nouns' | 'lil-nouns' = isLil ? 'lil-nouns' : 'nouns';
               if (!wallet) {
                 result = {
                   error:
                     'User must connect their wallet to vote. Tell them to click "connect" in the header.',
+                };
+              } else if (daoCanonical === 'lil-nouns') {
+                // Lil Nouns proposals are not in the mainnet Ponder index; we trust the
+                // model + injected /api/lil-proposals context to pick a real ID. The
+                // on-chain governor will revert if the prop is invalid or not in
+                // Active/ObjectionPeriod state — the client surfaces that error.
+                pendingAction = {
+                  type: 'VOTE',
+                  proposalId: input.proposalId,
+                  support: input.support,
+                  reason: input.reason,
+                  title: `Lil Prop #${input.proposalId}`,
+                  dao: 'lil-nouns',
+                };
+                result = {
+                  success: true,
+                  action: pendingAction,
+                  message: `Vote prepared: ${['AGAINST', 'FOR', 'ABSTAIN'][input.support]} on Lil Prop #${input.proposalId}. The user will be asked to confirm and sign the transaction in their wallet (Lil Nouns governor).`,
                 };
               } else {
                 try {
@@ -4794,6 +4854,7 @@ CRITICAL RULES:
                         support: input.support,
                         reason: input.reason,
                         title,
+                        dao: 'nouns',
                       };
                       result = {
                         success: true,
