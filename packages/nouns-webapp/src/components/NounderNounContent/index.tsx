@@ -7,7 +7,6 @@ import { Link } from 'react-router';
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
 import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
 import AuctionActivityWrapper from '@/components/AuctionActivityWrapper';
-import AuctionNavigation from '@/components/AuctionNavigation';
 import AuctionTitleAndNavWrapper from '@/components/AuctionTitleAndNavWrapper';
 import CurrentBid, { BID_N_A } from '@/components/CurrentBid';
 import Winner from '@/components/Winner';
@@ -29,14 +28,7 @@ interface NounderNounContentProps {
 }
 
 const NounderNounContent: React.FC<NounderNounContentProps> = props => {
-  const {
-    mintTimestamp,
-    nounId,
-    isFirstAuction,
-    isLastAuction,
-    onPrevAuctionClick,
-    onNextAuctionClick,
-  } = props;
+  const { mintTimestamp, nounId, onPrevAuctionClick, onNextAuctionClick } = props;
 
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
@@ -69,12 +61,6 @@ const NounderNounContent: React.FC<NounderNounContentProps> = props => {
       <div className={auctionActivityClasses.informationRow}>
         <Row className={auctionActivityClasses.activityRow}>
           <AuctionTitleAndNavWrapper>
-            <AuctionNavigation
-              isFirstAuction={isFirstAuction}
-              isLastAuction={isLastAuction}
-              onNextAuctionClick={onNextAuctionClick}
-              onPrevAuctionClick={onPrevAuctionClick}
-            />
             <AuctionActivityDateHeadline startTime={mintTimestamp} />
           </AuctionTitleAndNavWrapper>
           <Col lg={12}>

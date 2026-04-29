@@ -62,16 +62,21 @@ const DreamsPage: FC = () => {
   const [dreams, setDreams] = useState<SavedDream[]>([]);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
 
-  // Load from localStorage on mount + listen for updates
+  // Load from localStorage on mount + listen for updates + poll for cross-tab
+  // / out-of-band changes (the storage event only fires on OTHER tabs, so the
+  // 15s interval picks up dreams created elsewhere on this same tab without
+  // a hard reload).
   useEffect(() => {
     setDreams(loadDreams());
 
     const handler = () => setDreams(loadDreams());
     window.addEventListener('storage', handler);
     window.addEventListener('dreams-updated', handler);
+    const intervalId = window.setInterval(handler, 15_000);
     return () => {
       window.removeEventListener('storage', handler);
       window.removeEventListener('dreams-updated', handler);
+      window.clearInterval(intervalId);
     };
   }, []);
 

@@ -45,6 +45,8 @@ const AGENT_HINTS: readonly string[] = [
   'traits head',
   'how does the auction work?',
   'tip nounirl.eth on any chain to reserve',
+  'ask about noun 10000',
+  'ask about missingnoun',
 ];
 
 const HINT_ROTATE_MS = 3500;
