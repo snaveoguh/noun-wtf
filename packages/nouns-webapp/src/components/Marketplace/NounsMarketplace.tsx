@@ -17,22 +17,32 @@ export function NounsMarketplace() {
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState('price-asc');
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ sort });
-      const res = await fetch(`/api/nouns/listings?${params}`);
-      const data = await res.json();
-      setItems((data.items ?? []) as NounMarketItem[]);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [sort]);
+  const fetchItems = useCallback(
+    async (showSpinner: boolean) => {
+      if (showSpinner) setLoading(true);
+      try {
+        const params = new URLSearchParams({ sort });
+        const res = await fetch(`/api/nouns/listings?${params}`);
+        const data = await res.json();
+        setItems((data.items ?? []) as NounMarketItem[]);
+      } catch {
+        if (showSpinner) setItems([]);
+      } finally {
+        if (showSpinner) setLoading(false);
+      }
+    },
+    [sort],
+  );
 
+  // Initial / sort-change load shows the spinner. Background polling at 30s
+  // keeps new listings + cancellations fresh without flicker — peer-to-peer
+  // marketplace state changes whenever someone lists or fills an order.
   useEffect(() => {
-    fetchItems();
+    fetchItems(true);
+    const intervalId = window.setInterval(() => {
+      fetchItems(false);
+    }, 30_000);
+    return () => window.clearInterval(intervalId);
   }, [fetchItems]);
 
   return (

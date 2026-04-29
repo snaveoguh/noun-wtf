@@ -19,8 +19,20 @@ type SortMode = 'recent' | 'sponsors' | 'oldest';
 const PAGE_SIZE = 50;
 
 const CandidatesPage: React.FC = () => {
-  const { data: blockNumber } = useBlockNumber();
-  const { loading: isLoading, data: candidates, error } = useCandidateProposals(blockNumber);
+  // Block-watch so the candidates list re-fetches as new blocks arrive —
+  // newly-created candidates appear without a manual reload. The wrapper's
+  // Apollo query isn't keyed on blockNumber, so we explicitly call refetch
+  // when the block advances.
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+  const { loading: isLoading, data: candidates, error, refetch } = useCandidateProposals(blockNumber);
+
+  useEffect(() => {
+    if (blockNumber == null) return;
+    refetch?.();
+    // Only the block-number tick should retrigger; refetch identity is
+    // stable enough that depending on it would just cause double-fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockNumber]);
   const threshold = (useProposalThreshold() ?? 0) + 1;
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [searchQuery, setSearchQuery] = useState('');

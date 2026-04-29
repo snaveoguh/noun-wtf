@@ -31,6 +31,12 @@ export interface GovernanceAction {
   reason?: string;
   title?: string;
   proposer?: string;
+  /**
+   * DAO identifier for actions that can target multiple DAOs (e.g. VOTE).
+   * The agent server populates this so the dispatcher can route to the
+   * correct governor contract. Defaults to mainnet Nouns when omitted.
+   */
+  dao?: 'nouns' | 'lil-nouns' | 'lilnouns' | 'lil';
   slug?: string;
   description?: string;
   encodedProp?: string;
@@ -286,7 +292,11 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         )}
         {action.type === 'VOTE' && (
           <div style={{ color: '#444', fontSize: '11px', marginTop: '4px' }}>
-            gas refunded by nouns dao — client id 37 (noun.wtf)
+            {action.dao === 'lil-nouns' ||
+            action.dao === 'lilnouns' ||
+            action.dao === 'lil'
+              ? 'lil nouns dao — no gas refund'
+              : 'gas refunded by nouns dao — client id 37 (noun.wtf)'}
           </div>
         )}
         {action.type === 'GRANT_VOTE' && (
