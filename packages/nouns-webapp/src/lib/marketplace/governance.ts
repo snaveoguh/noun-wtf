@@ -117,6 +117,27 @@ export const LIL_NOUNS_GOVERNOR_ABI = [
     outputs: [{ name: '', type: 'uint96' }],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'castRefundableVote',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'uint8' },
+    ],
+    outputs: [{ name: '', type: 'uint96' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'castRefundableVoteWithReason',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'uint8' },
+      { name: 'reason', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'uint96' }],
+    stateMutability: 'nonpayable',
+  },
 ] as const;
 
 /** Back-compat internal alias for the existing on-chain fetcher below. */
