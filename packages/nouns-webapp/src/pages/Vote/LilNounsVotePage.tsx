@@ -608,7 +608,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
       writeContract({
         address: LIL_NOUNS_GOVERNOR,
         abi: LIL_NOUNS_GOVERNOR_ABI,
-        functionName: 'castVoteWithReason',
+        functionName: 'castRefundableVoteWithReason',
         args: [proposalId, selected, reason.trim()],
         chainId: mainnet.id,
       });
@@ -616,7 +616,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
       writeContract({
         address: LIL_NOUNS_GOVERNOR,
         abi: LIL_NOUNS_GOVERNOR_ABI,
-        functionName: 'castVote',
+        functionName: 'castRefundableVote',
         args: [proposalId, selected],
         chainId: mainnet.id,
       });
