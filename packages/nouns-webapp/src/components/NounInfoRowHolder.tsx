@@ -6,6 +6,7 @@ import { ExternalLinkIcon } from 'lucide-react';
 
 import ShortAddress from '@/components/ShortAddress';
 import { nounsAuctionHouseAddress } from '@/contracts';
+import useDaoContext from '@/hooks/useDaoContext';
 import { cn } from '@/lib/utils';
 import { execute } from '@/subgraphs/execute';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
@@ -20,7 +21,19 @@ interface NounInfoRowHolderProps {
 
 const NounInfoRowHolder: React.FC<NounInfoRowHolderProps> = props => {
   const { nounId, className } = props;
+  const dao = useDaoContext();
 
+  // V2 has no Ponder indexer for AuctionSettled events yet, so the only
+  // reliable source for the winning bidder is the on-chain `auction()`
+  // tuple — and that's already overwritten with the next noun once the
+  // current auction settles. Querying the mainnet subgraph would happily
+  // return the V1 auction with the same numeric id, so the "WINNER" line
+  // would surface a totally different person (or, if they happen to also
+  // hold the V2 noun now, look misleadingly like the current holder is
+  // the auction winner).
+  //
+  // Until the V2 indexer ships, skip the row entirely on V2 — the
+  // "Held by" row in <AuctionActivity> already shows current ownership.
   const { isLoading, error, data } = useQuery({
     queryKey: ['auction', nounId],
     queryFn: () => {
@@ -32,7 +45,12 @@ const NounInfoRowHolder: React.FC<NounInfoRowHolderProps> = props => {
         } | null;
       }>(query, variables);
     },
+    enabled: !dao.isV2,
   });
+
+  if (dao.isV2) {
+    return <></>;
+  }
 
   const winner = data?.auction?.winner;
 
