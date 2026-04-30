@@ -2876,6 +2876,27 @@ async function parseCommand(
     }
   }
 
+  // ─── Lil Nouns Vote ───────────────────────────────────────
+  // Matches: "vote for lil prop 375", "vote against lil nouns proposal 375 because xyz"
+  const lilVoteMatch = m.match(
+    /^vote\s+(for|against|abstain)\s+lil(?:\s*nouns?)?\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(?:because\s+|reason:?\s*)?(.+))?$/,
+  );
+  if (lilVoteMatch) {
+    if (!wallet) return { handled: true, response: 'Connect your wallet to vote.' };
+    let support = 2;
+    if (lilVoteMatch[1] === 'for') support = 1;
+    else if (lilVoteMatch[1] === 'against') support = 0;
+    const proposalId = parseInt(lilVoteMatch[2]);
+    const reason = lilVoteMatch[3]?.trim();
+    // Lil Nouns proposals aren't in Ponder — let the on-chain governor reject invalid IDs
+    const action = { type: 'VOTE', proposalId, support, reason, title: `Lil Proposal #${proposalId}`, dao: 'lil-nouns' };
+    return {
+      handled: true,
+      response: `Vote prepared: ${['AGAINST', 'FOR', 'ABSTAIN'][support]} on Lil Prop #${proposalId}. Confirm in your wallet.`,
+      action,
+    };
+  }
+
   // ─── Vote on Proposal ─────────────────────────────────────
   const voteMatch = m.match(
     /^vote\s+(for|against|abstain)\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(?:because\s+|reason:?\s*)?(.+))?$/,
@@ -3916,17 +3937,54 @@ CRITICAL RULES:
           },
         },
       },
-      // ── Governance + Trading tools removed from LLM prompt (~5,000 tokens saved) ──
-      // parseCommand() handles all governance actions (vote, bid, sponsor, etc.) via
+      // ── Governance + Trading tools mostly removed from LLM prompt (~5,000 tokens saved) ──
+      // parseCommand() handles most governance actions (bid, sponsor, etc.) via
       // pattern matching BEFORE the LLM is called. Tool handlers in the switch/case
       // below are kept intact so they still execute if somehow invoked.
       //
-      // Removed: lookup_proposal, lookup_candidate, prepare_vote, prepare_proposal_feedback,
+      // KEPT: prepare_vote (needed for natural-language Lil Nouns voting — parseCommand
+      // handles "vote for lil prop 375" but the LLM handles free-form requests like
+      // "can you vote on lil nouns proposal 375 for me?").
+      //
+      // Removed: lookup_proposal, lookup_candidate, prepare_proposal_feedback,
       // prepare_candidate_feedback, prepare_candidate, prepare_update_candidate,
       // prepare_update_proposal, prepare_sponsor, prepare_bid, prepare_promote,
       // lookup_grant, prepare_grant_vote, prepare_grant_proposal, prepare_queue_proposal,
       // prepare_queue_grant, prepare_execute_proposal, prepare_execute_grant,
       // get_trading_positions, get_trading_performance, get_trading_signals
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_vote',
+          description:
+            'Prepare a vote action for the user to sign. Works for BOTH mainnet Nouns DAO and Lil Nouns DAO. Set dao to "lil-nouns" for Lil Nouns votes.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to vote on.',
+              },
+              support: {
+                type: 'number',
+                enum: [0, 1, 2],
+                description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the vote.',
+              },
+              dao: {
+                type: 'string',
+                enum: ['nouns', 'lil-nouns'],
+                description:
+                  'Which DAO to vote on. "lil-nouns" for Lil Nouns DAO. Defaults to "nouns" (mainnet).',
+              },
+            },
+            required: ['proposalId', 'support'],
+          },
+        },
+      },
     ];
 
     // Preserve original tool definitions in dead code so handlers aren't orphaned.
