@@ -44,6 +44,7 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   V2_AUCTION: { label: 'V2-AUCTION', color: '#f87171', filterKey: 'V2_AUCTION' },
   V2_PROP: { label: 'V2-PROP', color: '#b91c1c', filterKey: 'V2_PROP' },
   V2_VOTE: { label: 'V2-VOTE', color: '#fca5a5', filterKey: 'V2_VOTE' },
+  V2_SALE: { label: 'V2-SALE', color: '#fb7185', filterKey: 'V2_SALE' },
 };
 
 // Filter tabs shown in the UI
@@ -66,7 +67,7 @@ export const FILTER_TABS = [
     key: 'LIL_BID,LIL_AUCTION_SETTLED,LIL_NOUN_CREATED,LIL_VOTE,LIL_PROPOSAL_CREATED,LIL_TRANSFER',
     label: 'LIL',
   },
-  { key: 'SALE', label: 'SALES' },
+  { key: 'SALE,V2_SALE', label: 'SALES' },
   { key: '_V2', label: 'V2' },
   { key: '_CHAT', label: 'CHAT' },
 ];
@@ -157,6 +158,30 @@ function supportLabel(support: number): string {
   if (support === 1) return 'FOR';
   if (support === 2) return 'ABSTAIN';
   return '?';
+}
+
+// Reservoir returns marketplace source as host strings like "opensea.io",
+// "blur.io", "looksrare.org", "x2y2.io", "sudoswap.xyz". Pretty-print them.
+const MARKETPLACE_DISPLAY: Record<string, string> = {
+  'opensea.io': 'OpenSea',
+  'blur.io': 'Blur',
+  'looksrare.org': 'LooksRare',
+  'x2y2.io': 'X2Y2',
+  'sudoswap.xyz': 'Sudoswap',
+  'reservoir.tools': 'Reservoir',
+  'rarible.com': 'Rarible',
+  'magiceden.io': 'Magic Eden',
+};
+
+function formatMarketplace(raw: string): string {
+  if (!raw) return '';
+  const lower = raw.toLowerCase();
+  if (MARKETPLACE_DISPLAY[lower]) return MARKETPLACE_DISPLAY[lower];
+  // Strip a single trailing TLD segment (.io / .xyz / .org / .com / .tools).
+  const stripped = lower.replace(/\.(io|xyz|org|com|tools|app|wtf|dev)$/i, '');
+  if (!stripped) return raw;
+  // Capitalize first letter for display.
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
 // ─── Event Description Formatter ───────────────────────────────────────────
@@ -365,7 +390,8 @@ export function formatEventDescription(
         : base;
     }
 
-    case 'SALE': {
+    case 'SALE':
+    case 'V2_SALE': {
       const name = (data.collectionName as string) || (data.collection as string) || 'Item';
       const tokenId = data.tokenId != null && data.tokenId !== '' ? ` ${data.tokenId}` : '';
       const priceEth =
@@ -373,9 +399,21 @@ export function formatEventDescription(
       const priceStr =
         priceEth === 0 ? '0' : priceEth < 0.001 ? '<0.001' : priceEth.toFixed(priceEth < 1 ? 4 : 2);
       const currency = (data.currency as string) || 'ETH';
-      const market = (data.marketplace as string) || '';
+      const market = formatMarketplace((data.marketplace as string) || '');
       const marketSuffix = market ? ` on ${market}` : '';
-      return `${name}${tokenId} sold for ${priceStr} ${currency} — ${addr(data.from as string)} → ${addr(data.to as string)}${marketSuffix}`;
+      const fromAddr = (data.from as string) || '';
+      const toAddr = (data.to as string) || '';
+      const seller = fromAddr ? addr(fromAddr) : '';
+      const buyer = toAddr ? addr(toAddr) : '';
+      const partySuffix =
+        seller && buyer
+          ? ` — sold by ${seller} to ${buyer}`
+          : buyer
+            ? ` to ${buyer}`
+            : seller
+              ? ` from ${seller}`
+              : '';
+      return `${name}${tokenId} sold for ${priceStr} ${currency}${marketSuffix}${partySuffix}`;
     }
 
     default:
