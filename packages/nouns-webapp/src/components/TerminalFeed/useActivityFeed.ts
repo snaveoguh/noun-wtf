@@ -28,7 +28,14 @@ const PAGE_SIZE = 50;
 
 // V2 event types — when activeFilter equals one of these (or contains them as a CSV),
 // only the v2 endpoint is queried. The "_V2" sentinel is the all-v2 filter pill.
-const V2_EVENT_TYPES = new Set(['V2_BID', 'V2_SETTLED', 'V2_AUCTION', 'V2_PROP', 'V2_VOTE']);
+const V2_EVENT_TYPES = new Set([
+  'V2_BID',
+  'V2_SETTLED',
+  'V2_AUCTION',
+  'V2_PROP',
+  'V2_VOTE',
+  'V2_SALE',
+]);
 const V2_ALL_FILTER = '_V2';
 
 function isV2OnlyFilter(filter: string): boolean {
@@ -39,11 +46,13 @@ function isV2OnlyFilter(filter: string): boolean {
 }
 
 function isV2Excluded(filter: string): boolean {
-  // If a non-v2 filter is active (e.g. BID, VOTE), skip v2 entirely.
+  // V2 endpoint is skipped only when EVERY filter part is a non-v2 type.
+  // Mixed filters (e.g. SALE,V2_SALE for the SALES tab) keep V2 included so
+  // both feeds contribute their share of matching events.
   if (!filter) return false;
   if (filter === V2_ALL_FILTER) return false;
   const parts = filter.split(',').map(p => p.trim());
-  return parts.some(p => !V2_EVENT_TYPES.has(p));
+  return parts.length > 0 && parts.every(p => !V2_EVENT_TYPES.has(p));
 }
 
 export function useActivityFeed(activeFilter: string) {
@@ -183,9 +192,11 @@ export function useActivityFeed(activeFilter: string) {
       const mainnetData = mainnet ?? { events: [], hasMore: false, oldestBlock: 0 };
       const v2Data = v2 ?? { events: [], hasMore: false, oldestBlock: 0 };
 
-      // If a specific v2 type filter is active, narrow v2 events to those types.
+      // If a specific filter is active, narrow v2 events to V2 types listed in
+      // the filter. (For mixed filters like "SALE,V2_SALE" we keep V2_SALE only
+      // so the SALES tab doesn't leak unrelated V2 events.)
       let v2Filtered = v2Data.events;
-      if (activeFilter && activeFilter !== V2_ALL_FILTER && v2Only) {
+      if (activeFilter && activeFilter !== V2_ALL_FILTER) {
         const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
         v2Filtered = v2Filtered.filter(e => wanted.has(e.type));
       }
@@ -263,9 +274,12 @@ export function useActivityFeed(activeFilter: string) {
         ];
         if (!incoming.length) return;
 
-        // If a specific v2 type filter is active, narrow v2 events.
+        // If a specific filter is active, narrow v2 events to listed V2 types.
+        // V1 events still get filtered server-side by /api/activity, so we only
+        // need to mask v2 events that aren't in the active filter (e.g. drop
+        // V2_BID when filter is "SALE,V2_SALE").
         let filtered = incoming;
-        if (v2Only && activeFilter !== V2_ALL_FILTER) {
+        if (activeFilter && activeFilter !== V2_ALL_FILTER) {
           const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
           filtered = filtered.filter(e => (V2_EVENT_TYPES.has(e.type) ? wanted.has(e.type) : true));
         }
