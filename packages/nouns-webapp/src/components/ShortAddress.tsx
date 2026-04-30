@@ -3,7 +3,11 @@ import React from 'react';
 import { blo } from 'blo';
 import { useEnsAvatar, useEnsName } from 'wagmi';
 
-import { formatShortAddress, stripNoggles } from '@/utils/addressAndENSDisplayUtils';
+import {
+  formatShortAddress,
+  isNogglesName,
+  stripNoggles,
+} from '@/utils/addressAndENSDisplayUtils';
 import { containsBlockedText } from '@/utils/moderation/containsBlockedText';
 import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
 import { Address } from '@/utils/types';
@@ -22,15 +26,19 @@ const ShortAddress: React.FC<ShortAddressProps> = ({
   size = 24,
 }) => {
   const { data: ensName } = useEnsName({ address });
-  // ENS name with `.noggles` namespace stripped for display only — the raw
-  // `ensName` is still passed to `useEnsAvatar` so avatar resolution keeps
-  // working for `.noggles` names.
-  const displayEnsName = ensName ? stripNoggles(ensName) : null;
+  // The noggles namespace is rugged — never surface those names or fetch
+  // their avatars. `stripNoggles` returns '' for noggles-namespace results,
+  // so the fallback chain below collapses to short address (or noun-contract
+  // resolved name where applicable).
+  const displayEnsName = stripNoggles(ensName) || null;
   const resolvedName = displayEnsName || resolveNounContractAddress(address);
   const isBlocklisted = resolvedName ? containsBlockedText(resolvedName, 'en') : false;
   const shortAddress = formatShortAddress(address);
+  const avatarLookupName = isNogglesName(ensName)
+    ? resolveNounContractAddress(address)
+    : (ensName ?? resolveNounContractAddress(address));
   const { data: ensAvatar } = useEnsAvatar({
-    name: ensName ?? resolveNounContractAddress(address),
+    name: avatarLookupName,
   });
 
   // Guard: address may be undefined during loading / when Ponder hasn't indexed

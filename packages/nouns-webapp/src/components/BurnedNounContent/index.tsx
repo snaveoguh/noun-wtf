@@ -6,7 +6,6 @@ import { formatEther } from 'viem';
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
 import AuctionActivityNounTitle from '@/components/AuctionActivityNounTitle';
 import AuctionActivityWrapper from '@/components/AuctionActivityWrapper';
-import AuctionNavigation from '@/components/AuctionNavigation';
 import AuctionTitleAndNavWrapper from '@/components/AuctionTitleAndNavWrapper';
 
 import classes from './BurnedNounContent.module.css';
@@ -35,8 +34,6 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
   const {
     mintTimestamp,
     nounId,
-    isFirstAuction,
-    isLastAuction,
     reservePriceWei,
     onPrevAuctionClick,
     onNextAuctionClick,
@@ -62,27 +59,6 @@ const BurnedNounContent: React.FC<BurnedNounContentProps> = props => {
 
   return (
     <AuctionActivityWrapper>
-      {/* Prev/next noun nav — pinned to the top-right corner of the card so
-          it never overlaps the date / title / banner block. The wrapper
-          AuctionActivityWrapper is `position: relative` already; if not,
-          this still degrades to inline. */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '0.75rem',
-          right: '2.5rem',
-          zIndex: 2,
-          display: 'flex',
-          gap: '0.4rem',
-        }}
-      >
-        <AuctionNavigation
-          isFirstAuction={isFirstAuction}
-          isLastAuction={isLastAuction}
-          onNextAuctionClick={onNextAuctionClick}
-          onPrevAuctionClick={onPrevAuctionClick}
-        />
-      </div>
       <div className={auctionActivityClasses.informationRow}>
         <Row className={auctionActivityClasses.activityRow}>
           <AuctionTitleAndNavWrapper>

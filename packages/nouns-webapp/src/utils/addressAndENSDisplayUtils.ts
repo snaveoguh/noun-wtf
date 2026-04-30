@@ -1,19 +1,31 @@
 import { Address } from '@/utils/types';
 
 /**
- * Strip the `.noggles` suffix from an ENS-style name. The user does not want
- * the `.noggles` namespace surfaced anywhere in the UI — `vitalik.noggles`
- * should render as `vitalik`. Real `.eth` (and any other) names are returned
- * unchanged. Case-insensitive on the suffix in case anything ever comes
- * through capitalized.
+ * The noggles namespace was rugged. Real reverse-resolution returns names
+ * suffixed with the ASCII noggles glyph `.⌐◨-◨` (rare legacy entries may
+ * use the literal `.noggles` token). We treat any name in this namespace as
+ * if there were no ENS at all — callers should fall back to short address
+ * (or noun-contract resolved name where applicable).
+ */
+const NOGGLES_SUFFIX = /\.(noggles|⌐◨-◨)$/i;
+
+export const isNogglesName = (name?: string | null): boolean =>
+  !!name && NOGGLES_SUFFIX.test(name);
+
+/**
+ * Returns an empty string for noggles-namespace names (so callers that already
+ * coerce empty → fallback do the right thing automatically). Returns the name
+ * unchanged for any other ENS / NNS result. The `.eth` namespace is unaffected.
  */
 export const stripNoggles = (name: string | null | undefined): string => {
   if (!name) return '';
-  return name.replace(/\.noggles$/i, '');
+  if (isNogglesName(name)) return '';
+  return name;
 };
 
 export const veryShortENS = (ens: string) => {
   const stripped = stripNoggles(ens);
+  if (!stripped) return '';
   return [stripped.substring(0, 1), stripped.substring(stripped.length - 3)].join('...');
 };
 
@@ -24,6 +36,7 @@ export const veryShortAddress = (address?: Address) => {
 
 export const shortENS = (ens: string) => {
   const stripped = stripNoggles(ens);
+  if (!stripped) return '';
   if (stripped.length < 15 || window.innerWidth > 480) {
     return stripped;
   }
