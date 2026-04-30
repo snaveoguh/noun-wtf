@@ -37,6 +37,7 @@ import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
+import { NOUNV2_TOKEN_ADDRESS } from '@/contracts/nounv2-token';
 import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
@@ -85,10 +86,17 @@ interface MatchResult {
 }
 
 // ─── Trait counts ───────────────────────────────────────────────────────
-// These mirror the on-chain NounsDescriptorV2 counts. Both Nouns and NounV2
-// share the same descriptor so the same counts apply for seed prediction.
-// Source: packages/nouns-api/src/agent/constants.ts
-const TRAIT_COUNTS = {
+// V1 (mainnet Nouns) and NounV2 use *different* descriptor contracts with
+// different trait counts (V1 = NounsDescriptorV2 @ 0x33A9c445…, V2 ships a
+// separate descriptor @ 0x6229c811…). Trait counts grow over time as new
+// art is added on-chain via `addBodies`/`addHeads`/etc. admin calls, so
+// hardcoding them here goes stale silently and yields wrong seeds. We read
+// the counts directly from each chain's descriptor instead.
+//
+// Fallback values match the on-chain descriptors at 2026-04-29; they're
+// only used during the initial RPC roundtrip so the orb has *something*
+// to render before the live counts arrive.
+const V1_TRAIT_COUNTS_FALLBACK = {
   background: 2,
   body: 31,
   accessory: 144,
@@ -96,23 +104,149 @@ const TRAIT_COUNTS = {
   glasses: 24,
 } as const;
 
+const V2_TRAIT_COUNTS_FALLBACK = {
+  background: 2,
+  body: 30,
+  accessory: 142,
+  head: 252,
+  glasses: 23,
+} as const;
+
+interface TraitCounts {
+  background: number;
+  body: number;
+  accessory: number;
+  head: number;
+  glasses: number;
+}
+
 // ─── Seed Prediction ────────────────────────────────────────────────────
 // Mirrors NounsSeeder.sol — see packages/nouns-api/src/agent/traitPredictor.ts.
 //   pseudorandomness = keccak256(abi.encodePacked(blockhash(block.number - 1), nounId))
 // Reused here so the v2 path can compute the next-noun prediction client-side
 // without needing a v2-aware /api/agent/predict endpoint yet.
-function predictSeed(blockHash: Hex, nounId: number): NounSeed {
+function predictSeed(blockHash: Hex, nounId: number, counts: TraitCounts): NounSeed {
   const pseudorandomness = BigInt(
     keccak256(encodePacked(['bytes32', 'uint256'], [blockHash, BigInt(nounId)])),
   );
   const mask48 = (1n << 48n) - 1n;
   return {
-    background: Number((pseudorandomness & mask48) % BigInt(TRAIT_COUNTS.background)),
-    body: Number(((pseudorandomness >> 48n) & mask48) % BigInt(TRAIT_COUNTS.body)),
-    accessory: Number(((pseudorandomness >> 96n) & mask48) % BigInt(TRAIT_COUNTS.accessory)),
-    head: Number(((pseudorandomness >> 144n) & mask48) % BigInt(TRAIT_COUNTS.head)),
-    glasses: Number(((pseudorandomness >> 192n) & mask48) % BigInt(TRAIT_COUNTS.glasses)),
+    background: Number((pseudorandomness & mask48) % BigInt(counts.background)),
+    body: Number(((pseudorandomness >> 48n) & mask48) % BigInt(counts.body)),
+    accessory: Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory)),
+    head: Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head)),
+    glasses: Number(((pseudorandomness >> 192n) & mask48) % BigInt(counts.glasses)),
   };
+}
+
+// Minimal descriptor ABI — only the count getters used for seed prediction.
+const descriptorCountsAbi = [
+  {
+    type: 'function',
+    name: 'backgroundCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'bodyCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'accessoryCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'headCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'glassesCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// Minimal token ABI — used to read each token's `descriptor()` so we don't
+// have to hardcode the V1/V2 descriptor addresses (the V2 descriptor was
+// deployed alongside the V2 token and isn't the same instance as V1's).
+const tokenDescriptorAbi = [
+  {
+    type: 'function',
+    name: 'descriptor',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+const NOUNS_TOKEN_MAINNET = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
+
+/**
+ * Fetch the live trait counts from the descriptor used by the given token
+ * contract. Used by both V1 and V2 prediction hooks so trait counts stay
+ * in sync as new art is added on-chain (otherwise predictions silently
+ * drift the moment a single new head/body/accessory is uploaded).
+ */
+function useDescriptorTraitCounts(
+  tokenAddress: `0x${string}` | undefined,
+  fallback: TraitCounts,
+  enabled: boolean,
+): TraitCounts {
+  const { data: descriptorAddress } = useReadContract({
+    address: tokenAddress,
+    abi: tokenDescriptorAbi,
+    functionName: 'descriptor',
+    query: {
+      enabled: enabled && tokenAddress != null && tokenAddress !== ZERO_ADDRESS,
+      // Descriptor address is essentially immutable in practice. Cache hard.
+      staleTime: 60 * 60_000,
+      gcTime: 24 * 60 * 60_000,
+      retry: 2,
+    },
+  });
+
+  const countsQuery = {
+    address: descriptorAddress,
+    abi: descriptorCountsAbi,
+    query: {
+      enabled: enabled && descriptorAddress != null && descriptorAddress !== ZERO_ADDRESS,
+      // Counts only change when admin uploads new art (rare). 5 min is
+      // fresh enough; we still hash the latest count into the prediction
+      // every render via useMemo so any change shows up next refetch.
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+      retry: 2,
+    },
+  } as const;
+
+  const { data: bg } = useReadContract({ ...countsQuery, functionName: 'backgroundCount' });
+  const { data: body } = useReadContract({ ...countsQuery, functionName: 'bodyCount' });
+  const { data: accessory } = useReadContract({ ...countsQuery, functionName: 'accessoryCount' });
+  const { data: head } = useReadContract({ ...countsQuery, functionName: 'headCount' });
+  const { data: glasses } = useReadContract({ ...countsQuery, functionName: 'glassesCount' });
+
+  return useMemo(
+    () => ({
+      background: bg != null ? Number(bg) : fallback.background,
+      body: body != null ? Number(body) : fallback.body,
+      accessory: accessory != null ? Number(accessory) : fallback.accessory,
+      head: head != null ? Number(head) : fallback.head,
+      glasses: glasses != null ? Number(glasses) : fallback.glasses,
+    }),
+    [bg, body, accessory, head, glasses, fallback],
+  );
 }
 
 // ─── Match logic ────────────────────────────────────────────────────────
@@ -235,6 +369,17 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     },
   });
 
+  // Trait counts read live from the V2 token's descriptor. V2's descriptor
+  // is a *different* deployment from V1's (V1 = 0x33A9c445…, V2 = 0x6229c811…
+  // at launch) with smaller counts (e.g. 252 heads vs. 258), so we can't
+  // just reuse V1's counts — doing so silently produces seeds that don't
+  // match what actually mints. See `useDescriptorTraitCounts` for details.
+  const traitCounts = useDescriptorTraitCounts(
+    NOUNV2_TOKEN_ADDRESS !== ZERO_ADDRESS ? NOUNV2_TOKEN_ADDRESS : undefined,
+    V2_TRAIT_COUNTS_FALLBACK,
+    enabled,
+  );
+
   // Hydrate from cache instantly — same pattern as V1.
   const cached = useMemo(() => (enabled ? readCachedPrediction('nounv2') : null), [enabled]);
 
@@ -243,7 +388,7 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     if (!auction || currentNounId == null || !blockData?.hash) return cached;
 
     const nextNounId = Number(currentNounId) + 1;
-    const seed = predictSeed(blockData.hash, nextNounId);
+    const seed = predictSeed(blockData.hash, nextNounId, traitCounts);
     const auctionEnd = endTime != null ? Number(endTime) : 0;
     const now = Math.floor(Date.now() / 1000);
     const payload: PredictResponse = {
@@ -258,7 +403,16 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     };
     writeCachedPrediction('nounv2', payload);
     return payload;
-  }, [enabled, auction, currentNounId, blockData?.hash, blockData?.number, endTime, cached]);
+  }, [
+    enabled,
+    auction,
+    currentNounId,
+    blockData?.hash,
+    blockData?.number,
+    endTime,
+    cached,
+    traitCounts,
+  ]);
 }
 
 /**
@@ -343,6 +497,15 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     },
   });
 
+  // V1 trait counts read live from mainnet's NounsToken descriptor. New
+  // heads/bodies/etc. get added on-chain over time so a hardcoded count is
+  // correct on the day it's authored and silently wrong forever after.
+  const v1TraitCounts = useDescriptorTraitCounts(
+    NOUNS_TOKEN_MAINNET,
+    V1_TRAIT_COUNTS_FALLBACK,
+    enabled,
+  );
+
   // Hydrate the orb instantly from the last-good prediction in
   // localStorage. The cache is overwritten as soon as fresh wagmi data
   // resolves, so the user sees a noun immediately on every page load
@@ -361,7 +524,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     let nextNounId = Number(currentNounId) + 1;
     if (nextNounId % 10 === 0) nextNounId += 1;
 
-    const seed = predictSeed(blockData.hash, nextNounId);
+    const seed = predictSeed(blockData.hash, nextNounId, v1TraitCounts);
     const auctionEnd = endTime != null ? Number(endTime) : 0;
     const now = Math.floor(Date.now() / 1000);
     const payload: PredictResponse = {
@@ -385,6 +548,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     endTime,
     v1Address,
     cached,
+    v1TraitCounts,
   ]);
 }
 
