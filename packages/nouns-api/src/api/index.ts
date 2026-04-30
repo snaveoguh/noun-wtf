@@ -2219,9 +2219,9 @@ PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote c
 
 VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0); dao=lil-nouns means Lil Nouns DAO (separate governor, separate proposal numbering). NounV2 #0 is NOT the same as mainnet Noun #0. Lil Prop #375 is NOT the same as mainnet Prop #375.
 
-VOTING DAO RULE: The terminal can cast votes on BOTH mainnet Nouns DAO and Lil Nouns DAO from the same wallet. When you call prepare_vote, set the `dao` field correctly:
-- `dao: 'lil-nouns'` whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in the Lil Nouns DAO context, or when the Current View shows dao=lil-nouns.
-- `dao: 'nouns'` (or omit — it's the default) for mainnet Nouns DAO proposals.
+VOTING DAO RULE: The terminal can cast votes on BOTH mainnet Nouns DAO and Lil Nouns DAO from the same wallet. When you call prepare_vote, set the dao field correctly:
+- dao: 'lil-nouns' whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in the Lil Nouns DAO context, or when the Current View shows dao=lil-nouns.
+- dao: 'nouns' (or omit — it's the default) for mainnet Nouns DAO proposals.
 If a user says "vote for prop 375" with no DAO hint AND the Current View doesn't disambiguate AND the prop number could plausibly be either DAO, ask one short clarifying question ("Lil Nouns or mainnet?") before calling prepare_vote. Never tell the user that Lil Nouns voting isn't supported — it is.
 
 ${NOUN_V2_KNOWLEDGE}
@@ -3474,7 +3474,7 @@ When a user asks about their reservations: call get_reservations with their wall
 
 GOVERNANCE — the terminal handles votes, bids, sponsors, candidates, and grants via typed commands (e.g. "vote for 567", "bid 0.5 eth"). These are parsed automatically — you don't need tools for them. If someone asks about governance, explain that they can type commands directly. noun.wtf client ID is 37 (auto-included in votes, bids, promotes). Proposals start as candidates → collect sponsor signatures → get promoted.
 
-LIL NOUNS VOTING — prepare_vote works for BOTH mainnet Nouns DAO and Lil Nouns DAO. When the user wants to vote on a Lil Nouns prop (mentions "lil"/"lilnoun(s)", or the Current View shows dao=lil-nouns, or the proposal exists in Lil Nouns DAO context fetched from /api/lil-proposals), set `dao: 'lil-nouns'` on the prepare_vote call. For mainnet Nouns leave it unset or pass `dao: 'nouns'`. If the user says "prop N" without specifying a DAO and the Current View doesn't disambiguate, ask one short clarifying question ("Lil Nouns or mainnet?") rather than guessing. Do NOT tell users to go to lilnouns.wtf to vote — they can vote from this terminal.
+LIL NOUNS VOTING — prepare_vote works for BOTH mainnet Nouns DAO and Lil Nouns DAO. When the user wants to vote on a Lil Nouns prop (mentions "lil"/"lilnoun(s)", or the Current View shows dao=lil-nouns, or the proposal exists in Lil Nouns DAO context fetched from /api/lil-proposals), set dao: 'lil-nouns' on the prepare_vote call. For mainnet Nouns leave it unset or pass dao: 'nouns'. If the user says "prop N" without specifying a DAO and the Current View doesn't disambiguate, ask one short clarifying question ("Lil Nouns or mainnet?") rather than guessing. Do NOT tell users to go to lilnouns.wtf to vote — they can vote from this terminal.
 ${buildFunctionSkillPromptSnippet()}
 CRITICAL RULES:
 - NEVER fabricate data. If you don't know, say so or use a tool to look it up.
