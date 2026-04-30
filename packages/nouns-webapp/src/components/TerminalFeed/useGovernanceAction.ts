@@ -97,22 +97,20 @@ export function useGovernanceAction() {
               action.dao === 'lilnouns' ||
               action.dao === 'lil';
             if (isLilNouns) {
-              // Lil Nouns governor doesn't support gas-refund variants and has
-              // no client-id arg — use plain castVote / castVoteWithReason
-              // (mirrors LilNounsVotePage). See:
-              // packages/nouns-webapp/src/pages/Vote/LilNounsVotePage.tsx
+              // Lil Nouns governor (V3) supports castRefundableVote / castRefundableVoteWithReason
+              // No client-id arg unlike mainnet Nouns governor.
               if (action.reason) {
                 hash = await writeContractAsync({
                   abi: LIL_NOUNS_GOVERNOR_ABI,
                   address: LIL_NOUNS_GOVERNOR,
-                  functionName: 'castVoteWithReason',
+                  functionName: 'castRefundableVoteWithReason',
                   args: [BigInt(action.proposalId), action.support, action.reason],
                 });
               } else {
                 hash = await writeContractAsync({
                   abi: LIL_NOUNS_GOVERNOR_ABI,
                   address: LIL_NOUNS_GOVERNOR,
-                  functionName: 'castVote',
+                  functionName: 'castRefundableVote',
                   args: [BigInt(action.proposalId), action.support],
                 });
               }
