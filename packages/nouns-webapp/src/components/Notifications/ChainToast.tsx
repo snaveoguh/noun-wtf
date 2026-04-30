@@ -4,7 +4,11 @@ import { blo } from 'blo';
 import { useEnsAvatar, useEnsName } from 'wagmi';
 
 import { getNoun } from '@/components/StandaloneNoun';
-import { formatShortAddress, stripNoggles } from '@/utils/addressAndENSDisplayUtils';
+import {
+  formatShortAddress,
+  isNogglesName,
+  stripNoggles,
+} from '@/utils/addressAndENSDisplayUtils';
 import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
 import { Address } from '@/utils/types';
 import { type INounSeed, useNounSeed } from '@/wrappers/nounToken';
@@ -18,14 +22,15 @@ const AVATAR_SIZE = 36;
  */
 const useActorAvatar = (address: Address | undefined) => {
   const { data: ensName } = useEnsName({ address });
-  // Pass the original (unstripped) ENS name to `useEnsAvatar` so `.noggles`
-  // names still resolve their avatar — the strip is display-only.
-  const avatarLookupName =
-    ensName ?? (address ? resolveNounContractAddress(address) : undefined);
+  // Noggles namespace is rugged — skip avatar lookup for those names and fall
+  // back to the noun-contract resolved name (or `blo()` pixelblock).
+  const avatarLookupName = isNogglesName(ensName)
+    ? (address ? resolveNounContractAddress(address) : undefined)
+    : (ensName ?? (address ? resolveNounContractAddress(address) : undefined));
   const { data: ensAvatar } = useEnsAvatar({ name: avatarLookupName ?? undefined });
   const fallback = address ? blo(address) : undefined;
   const resolvedName =
-    (ensName ? stripNoggles(ensName) : undefined) ||
+    stripNoggles(ensName) ||
     (address ? resolveNounContractAddress(address) : undefined);
   const displayName = resolvedName ?? (address ? formatShortAddress(address) : '');
   return { src: ensAvatar ?? fallback, displayName };
