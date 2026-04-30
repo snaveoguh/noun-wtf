@@ -868,11 +868,18 @@ app.get('/api/nounv2-feed', async c => {
       }
     }
 
-    const [bids, auctions, proposals, votes] = await Promise.all([
+    const [bids, auctions, proposals, votes, v2Sales] = await Promise.all([
       fetchRows(schema.nounV2Bid, schema.nounV2Bid.createdAtBlock),
       fetchRows(schema.nounV2Auction, schema.nounV2Auction.createdAtBlock),
       fetchRows(schema.nounV2Proposal, schema.nounV2Proposal.createdAtBlock),
       fetchRows(schema.nounV2Vote, schema.nounV2Vote.createdAtBlock),
+      fetchReservoirSalesForContract(
+        RESERVOIR_CONTRACT_BY_LABEL.NOUN_V2,
+        Math.max(limit, 50),
+      ).catch(err => {
+        console.warn('[nounv2-feed] reservoir V2 fetch failed:', err);
+        return [] as ReservoirSaleData[];
+      }),
     ]);
 
     const events: ActivityEvent[] = [];
@@ -951,6 +958,33 @@ app.get('/api/nounv2-feed', async c => {
           support: v.support,
           votes: v.votes,
           reason: v.reason || '',
+        },
+      });
+    }
+
+    // Marketplace sales (OpenSea / Blur / etc) for the NounV2 token contract.
+    // V2 has no transfer indexing yet, so these surface as standalone V2_SALE
+    // events rather than enrichment of an existing TRANSFER row.
+    for (const s of v2Sales) {
+      if (before && BigInt(s.block) >= before) continue;
+      events.push({
+        type: 'V2_SALE',
+        blockNumber: s.block,
+        timestamp: s.timestamp,
+        txHash: s.txHash,
+        data: {
+          collection: 'NOUN_V2',
+          collectionName: 'NounV2',
+          nounId: s.tokenId ? Number(s.tokenId) : null,
+          tokenId: s.tokenId,
+          tokenName: s.tokenName,
+          from: s.from,
+          to: s.to,
+          priceEth: s.priceEth,
+          priceWei: s.priceWei,
+          priceUsd: s.priceUsd,
+          currency: s.currency,
+          marketplace: s.marketplace,
         },
       });
     }
@@ -1455,15 +1489,146 @@ async function fetchLilNounsActivity(
 const SALES_ACTIVITY_TTL = 60_000;
 let salesActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
 
+// Reservoir API key (env-only; helper still works keyless on low volumes).
+const RESERVOIR_API_KEY = process.env.RESERVOIR_API_KEY || '';
+
+type ReservoirCollectionLabel = 'NOUN' | 'NOUN_V2' | 'LIL' | 'TERRAFORM';
+
 const RESERVOIR_COLLECTIONS: Array<{
   addr: string;
-  label: 'NOUN' | 'LIL' | 'TERRAFORM';
+  label: ReservoirCollectionLabel;
   name: string;
+  saleType: string; // event type for surfaced sales
 }> = [
-  { addr: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03', label: 'NOUN', name: 'Noun' },
-  { addr: '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B', label: 'LIL', name: 'Lil Noun' },
-  { addr: '0x4E1f41613c9084FdB9E34E11fAE9412427480e56', label: 'TERRAFORM', name: 'Terraform' },
+  {
+    addr: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
+    label: 'NOUN',
+    name: 'Noun',
+    saleType: 'SALE',
+  },
+  {
+    addr: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
+    label: 'NOUN_V2',
+    name: 'NounV2',
+    saleType: 'V2_SALE',
+  },
+  {
+    addr: '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B',
+    label: 'LIL',
+    name: 'Lil Noun',
+    saleType: 'SALE',
+  },
+  {
+    addr: '0x4E1f41613c9084FdB9E34E11fAE9412427480e56',
+    label: 'TERRAFORM',
+    name: 'Terraform',
+    saleType: 'SALE',
+  },
 ];
+
+const RESERVOIR_CONTRACT_BY_LABEL: Record<ReservoirCollectionLabel, string> = (() => {
+  const out = {} as Record<ReservoirCollectionLabel, string>;
+  for (const c of RESERVOIR_COLLECTIONS) out[c.label] = c.addr.toLowerCase();
+  return out;
+})();
+
+interface ReservoirSaleData {
+  collection: ReservoirCollectionLabel;
+  collectionName: string;
+  tokenId: string;
+  tokenName: string;
+  from: string;
+  to: string;
+  priceEth: number;
+  priceWei: string;
+  priceUsd: number | null;
+  currency: string;
+  marketplace: string;
+  txHash: string;
+  block: number;
+  timestamp: string;
+}
+
+// Per-contract cache of recent sales, keyed by lowercase contract addr.
+const reservoirSalesByContractCache = new Map<
+  string,
+  { at: number; sales: ReservoirSaleData[] }
+>();
+const RESERVOIR_PER_CONTRACT_TTL = 300_000; // 5 min
+
+async function fetchReservoirSalesForContract(
+  contract: string,
+  limit: number,
+): Promise<ReservoirSaleData[]> {
+  const key = contract.toLowerCase();
+  const cached = reservoirSalesByContractCache.get(key);
+  const now = Date.now();
+  if (cached && now - cached.at < RESERVOIR_PER_CONTRACT_TTL) {
+    return cached.sales;
+  }
+
+  const per = Math.max(20, Math.min(limit + 10, 100));
+  const collection = RESERVOIR_COLLECTIONS.find(c => c.addr.toLowerCase() === key);
+  const collectionName = collection?.name || 'Item';
+  const collectionLabel = (collection?.label || 'NOUN') as ReservoirCollectionLabel;
+
+  try {
+    const url = `https://api.reservoir.tools/sales/v6?contract=${contract}&limit=${per}&includeTokenMetadata=true&sortBy=time`;
+    const headers: Record<string, string> = { accept: '*/*' };
+    if (RESERVOIR_API_KEY) headers['x-api-key'] = RESERVOIR_API_KEY;
+    const res = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`reservoir ${collectionLabel} ${res.status}`);
+    const json = (await res.json()) as { sales?: Array<Record<string, unknown>> };
+    const out: ReservoirSaleData[] = [];
+    for (const s of json.sales ?? []) {
+      const token = (s.token as Record<string, unknown>) || {};
+      const price = (s.price as Record<string, unknown>) || {};
+      const amount = (price.amount as Record<string, unknown>) || {};
+      const currency = (price.currency as Record<string, unknown>) || {};
+      const block = Number(s.block);
+      const ts = Number(s.timestamp);
+      if (!block || !ts) continue;
+      const txHash = ((s.txHash as string) || '').toLowerCase();
+      if (!txHash) continue;
+      out.push({
+        collection: collectionLabel,
+        collectionName,
+        tokenId: String(token.tokenId ?? ''),
+        tokenName: (token.name as string) || `${collectionName} ${token.tokenId ?? ''}`.trim(),
+        from: (s.from as string) || '',
+        to: (s.to as string) || '',
+        priceEth:
+          typeof amount.decimal === 'number' ? amount.decimal : Number(amount.decimal ?? 0),
+        priceWei: String(amount.raw ?? '0'),
+        priceUsd: typeof amount.usd === 'number' ? amount.usd : null,
+        currency: (currency.symbol as string) || 'ETH',
+        marketplace: (s.fillSource as string) || (s.orderSource as string) || '',
+        txHash,
+        block,
+        timestamp: new Date(ts * 1000).toISOString(),
+      });
+    }
+    reservoirSalesByContractCache.set(key, { at: now, sales: out });
+    return out;
+  } catch (err) {
+    console.warn(`[activity/sales] ${collectionLabel} fetch failed:`, err);
+    // Cache an empty result briefly to prevent hot-loop retries on outage.
+    reservoirSalesByContractCache.set(key, { at: now, sales: [] });
+    return [];
+  }
+}
+
+/** Build map keyed by lowercase txHash for quick enrichment lookup. */
+function indexSalesByTxHash(sales: ReservoirSaleData[]): Map<string, ReservoirSaleData> {
+  const map = new Map<string, ReservoirSaleData>();
+  for (const s of sales) {
+    if (s.txHash) map.set(s.txHash, s);
+  }
+  return map;
+}
 
 async function fetchReservoirSales(
   before: bigint | undefined,
@@ -1479,55 +1644,35 @@ async function fetchReservoirSales(
     return salesActivityCache.events;
   }
 
-  const per = Math.max(20, Math.min(limit + 10, 50));
   const all: FeedEvent[] = [];
 
   const results = await Promise.all(
-    RESERVOIR_COLLECTIONS.map(async ({ addr, label, name }) => {
-      try {
-        const url = `https://api.reservoir.tools/sales/v6?contract=${addr}&limit=${per}&includeTokenMetadata=true&sortBy=time`;
-        const res = await fetch(url, {
-          headers: { accept: '*/*' },
-          signal: AbortSignal.timeout(10_000),
+    RESERVOIR_COLLECTIONS.map(async ({ addr, label, name, saleType }) => {
+      const sales = await fetchReservoirSalesForContract(addr, limit);
+      const out: FeedEvent[] = [];
+      for (const s of sales) {
+        if (before && BigInt(s.block) >= before) continue;
+        out.push({
+          type: saleType,
+          blockNumber: s.block,
+          timestamp: s.timestamp,
+          txHash: s.txHash,
+          data: {
+            collection: label,
+            collectionName: name,
+            tokenId: s.tokenId,
+            tokenName: s.tokenName,
+            from: s.from,
+            to: s.to,
+            priceEth: s.priceEth,
+            priceWei: s.priceWei,
+            priceUsd: s.priceUsd,
+            currency: s.currency,
+            marketplace: s.marketplace,
+          },
         });
-        if (!res.ok) throw new Error(`reservoir ${label} ${res.status}`);
-        const json = (await res.json()) as { sales?: Array<Record<string, unknown>> };
-        const out: FeedEvent[] = [];
-        for (const s of json.sales ?? []) {
-          const token = (s.token as Record<string, unknown>) || {};
-          const price = (s.price as Record<string, unknown>) || {};
-          const amount = (price.amount as Record<string, unknown>) || {};
-          const currency = (price.currency as Record<string, unknown>) || {};
-          const block = Number(s.block);
-          const ts = Number(s.timestamp);
-          if (!block || !ts) continue;
-          if (before && BigInt(block) >= before) continue;
-          out.push({
-            type: 'SALE',
-            blockNumber: block,
-            timestamp: new Date(ts * 1000).toISOString(),
-            txHash: (s.txHash as string) || '',
-            data: {
-              collection: label,
-              collectionName: name,
-              tokenId: String(token.tokenId ?? ''),
-              tokenName: (token.name as string) || `${name} ${token.tokenId ?? ''}`.trim(),
-              from: (s.from as string) || '',
-              to: (s.to as string) || '',
-              priceEth:
-                typeof amount.decimal === 'number' ? amount.decimal : Number(amount.decimal ?? 0),
-              priceWei: String(amount.raw ?? '0'),
-              priceUsd: typeof amount.usd === 'number' ? amount.usd : null,
-              currency: (currency.symbol as string) || 'ETH',
-              marketplace: (s.fillSource as string) || (s.orderSource as string) || '',
-            },
-          });
-        }
-        return out;
-      } catch (err) {
-        console.warn(`[activity/sales] ${label} fetch failed:`, err);
-        return [];
       }
+      return out;
     }),
   );
   for (const chunk of results) all.push(...chunk);
@@ -7927,8 +8072,48 @@ app.get('/api/activity', async c => {
       });
     }
 
-    // Normalize TRANSFER
+    // Normalize TRANSFER — enrich with Reservoir sale data when the txHash matches
+    // a marketplace sale, re-typing the event to SALE so it renders with price +
+    // marketplace info. Tracks claimed txHashes to dedupe the standalone SALE pass below.
+    const claimedSaleTxs = new Set<string>();
+    let v1SaleMap: Map<string, ReservoirSaleData> = new Map();
+    if (transfers.length > 0 && wantTransfer) {
+      const v1Sales = await fetchReservoirSalesForContract(
+        RESERVOIR_CONTRACT_BY_LABEL.NOUN,
+        Math.max(limit, 50),
+      ).catch(err => {
+        console.warn('[activity] reservoir V1 enrich failed:', err);
+        return [] as ReservoirSaleData[];
+      });
+      v1SaleMap = indexSalesByTxHash(v1Sales);
+    }
     for (const t of transfers) {
+      const txHash = (t.createdAtTransaction || '').toLowerCase();
+      const sale = txHash ? v1SaleMap.get(txHash) : undefined;
+      if (sale) {
+        claimedSaleTxs.add(txHash);
+        events.push({
+          type: 'SALE',
+          blockNumber: Number(t.createdAtBlock),
+          timestamp: tsToISO(t.createdAt),
+          txHash: t.createdAtTransaction || '',
+          data: {
+            collection: 'NOUN',
+            collectionName: 'Noun',
+            nounId: Number(t.nounId),
+            tokenId: String(t.nounId),
+            tokenName: `Noun ${t.nounId}`,
+            from: t.from,
+            to: t.to,
+            priceEth: sale.priceEth,
+            priceWei: sale.priceWei,
+            priceUsd: sale.priceUsd,
+            currency: sale.currency,
+            marketplace: sale.marketplace,
+          },
+        });
+        continue;
+      }
       events.push({
         type: 'TRANSFER',
         blockNumber: Number(t.createdAtBlock),
@@ -8001,7 +8186,10 @@ app.get('/api/activity', async c => {
       if (want(e.type)) events.push(e);
     }
     for (const e of saleEvents) {
-      if (want(e.type)) events.push(e);
+      if (!want(e.type)) continue;
+      // Already emitted as a re-typed TRANSFER → SALE above; skip the duplicate.
+      if (claimedSaleTxs.has((e.txHash || '').toLowerCase())) continue;
+      events.push(e);
     }
 
     // Sort by blockNumber DESC
