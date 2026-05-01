@@ -36,7 +36,11 @@ import {
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
 import useDaoContext from '@/hooks/useDaoContext';
-import { useDaoNounSeed, useDaoReservePrice } from '@/wrappers/daoAuctionHouse';
+import {
+  useDaoNounSeed,
+  useDaoReservePrice,
+  useV2NounBurnedStatus,
+} from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
 import { isBurnedAuction } from '@/utils/burnedAuction';
@@ -298,7 +302,15 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // surface it on the bid UI + on burned-auction placeholder rows.
   // Returns undefined while loading.
   const reservePriceWei = useDaoReservePrice(dao);
-  const isBurned = isBurnedAuction(currentAuction);
+
+  // For V2, detect burned nouns on-chain via ownerOf. The V2 auction stubs
+  // have `burned: false` by default (no Ponder indexer), so we need a live
+  // check. ownerOf reverts for burned tokens (ERC721 nonexistent token).
+  const v2BurnedStatus = useV2NounBurnedStatus(
+    dao,
+    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
+  );
+  const isBurned = dao.isV2 ? v2BurnedStatus === true : isBurnedAuction(currentAuction);
 
   // On v2 the mainnet `useNounSeed` path isn't usable — the seeds live on
   // the NounV2 token contract. Read the seed directly and feed it into the
