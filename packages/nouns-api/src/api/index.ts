@@ -868,18 +868,13 @@ app.get('/api/nounv2-feed', async c => {
       }
     }
 
-    const [bids, auctions, proposals, votes, v2Sales] = await Promise.all([
+    const [bids, auctions, proposals, votes] = await Promise.all([
       fetchRows(schema.nounV2Bid, schema.nounV2Bid.createdAtBlock),
       fetchRows(schema.nounV2Auction, schema.nounV2Auction.createdAtBlock),
       fetchRows(schema.nounV2Proposal, schema.nounV2Proposal.createdAtBlock),
       fetchRows(schema.nounV2Vote, schema.nounV2Vote.createdAtBlock),
-      fetchReservoirSalesForContract(
-        RESERVOIR_CONTRACT_BY_LABEL.NOUN_V2,
-        Math.max(limit, 50),
-      ).catch(err => {
-        console.warn('[nounv2-feed] reservoir V2 fetch failed:', err);
-        return [] as ReservoirSaleData[];
-      }),
+      // V2 sales: Reservoir API is dead (Oct 2025). V2 sales will be detected
+      // via on-chain enrichment once V2 transfer indexing ships.
     ]);
 
     const events: ActivityEvent[] = [];
@@ -962,31 +957,9 @@ app.get('/api/nounv2-feed', async c => {
       });
     }
 
-    // Marketplace sales (OpenSea / Blur / etc) for the NounV2 token contract.
-    // V2 has no transfer indexing yet, so these surface as standalone V2_SALE
-    // events rather than enrichment of an existing TRANSFER row.
-    for (const s of v2Sales) {
-      if (before && BigInt(s.block) >= before) continue;
-      events.push({
-        type: 'V2_SALE',
-        blockNumber: s.block,
-        timestamp: s.timestamp,
-        txHash: s.txHash,
-        data: {
-          collection: 'NOUN_V2',
-          collectionName: 'NounV2',
-          nounId: s.tokenId ? Number(s.tokenId) : null,
-          tokenId: s.tokenId,
-          tokenName: s.tokenName,
-          from: s.from,
-          to: s.to,
-          priceEth: s.priceEth,
-          priceWei: s.priceWei,
-          priceUsd: s.priceUsd,
-          currency: s.currency,
-          marketplace: s.marketplace,
-        },
-      });
+    // V2 sales: disabled — Reservoir API shut down Oct 2025. V2 sale detection
+    // will land once V2 transfer indexing ships (same on-chain approach as V1).
+    if (false) {
     }
 
     events.sort((a, b) => b.blockNumber - a.blockNumber);
@@ -1486,199 +1459,217 @@ async function fetchLilNounsActivity(
   return events;
 }
 
+// ── On-chain sale detection ──────────────────────────────────────────────────
+// Reservoir API shut down Oct 2025. Detect marketplace sales on-chain by
+// checking if a NounsToken Transfer tx targeted a known marketplace router.
+// When it did, convert the TRANSFER → SALE and extract price from tx.value
+// (direct ETH) or WETH Transfer log (wrapped ETH sales).
+
 const SALES_ACTIVITY_TTL = 60_000;
 let salesActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
 
-// Reservoir API key (env-only; helper still works keyless on low volumes).
-const RESERVOIR_API_KEY = process.env.RESERVOIR_API_KEY || '';
+const MAINNET_RPC = process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com';
 
-type ReservoirCollectionLabel = 'NOUN' | 'NOUN_V2' | 'LIL' | 'TERRAFORM';
+/** Known NFT marketplace router contracts (lowercased). */
+const MARKETPLACE_ROUTERS: Record<string, string> = {
+  // Seaport 1.5 + 1.6
+  '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'OpenSea',
+  '0x0000000000000068f116a894984e2db1123eb395': 'OpenSea',
+  // Blur
+  '0x39da41747a83aee658334415666f3ef92dd0d541': 'Blur',
+  '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5': 'Blur',
+  '0x29469395eaf6f95920e59f858042f0e28d98a20b': 'Blur',
+  // LooksRare
+  '0x0000000000e655fae4d56241588680f86e3b2377': 'LooksRare',
+  // X2Y2
+  '0x74312363e45dcaba76c59ec49a7aa8a65a67eed3': 'X2Y2',
+  // Sudoswap
+  '0x2b2e8cda09bba9660dca5cb6233787738ad68329': 'Sudoswap',
+  // Magic Eden
+  '0x9a1d00bed7cd04bcda516d721a596eb22aac6834': 'Magic Eden',
+};
 
-const RESERVOIR_COLLECTIONS: Array<{
-  addr: string;
-  label: ReservoirCollectionLabel;
-  name: string;
-  saleType: string; // event type for surfaced sales
-}> = [
-  {
-    addr: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
-    label: 'NOUN',
-    name: 'Noun',
-    saleType: 'SALE',
-  },
-  {
-    addr: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
-    label: 'NOUN_V2',
-    name: 'NounV2',
-    saleType: 'V2_SALE',
-  },
-  {
-    addr: '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B',
-    label: 'LIL',
-    name: 'Lil Noun',
-    saleType: 'SALE',
-  },
-  {
-    addr: '0x4E1f41613c9084FdB9E34E11fAE9412427480e56',
-    label: 'TERRAFORM',
-    name: 'Terraform',
-    saleType: 'SALE',
-  },
-];
+/** WETH Transfer event topic (Transfer(address,address,uint256)). */
+const WETH_CONTRACT = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-const RESERVOIR_CONTRACT_BY_LABEL: Record<ReservoirCollectionLabel, string> = (() => {
-  const out = {} as Record<ReservoirCollectionLabel, string>;
-  for (const c of RESERVOIR_COLLECTIONS) out[c.label] = c.addr.toLowerCase();
-  return out;
-})();
+/** Cache tx sale lookups: txHash → { marketplace, priceWei } | null. */
+const txSaleCache = new Map<string, { marketplace: string; priceWei: bigint } | null>();
+const TX_SALE_CACHE_MAX = 500;
 
-interface ReservoirSaleData {
-  collection: ReservoirCollectionLabel;
-  collectionName: string;
-  tokenId: string;
-  tokenName: string;
-  from: string;
-  to: string;
-  priceEth: number;
-  priceWei: string;
-  priceUsd: number | null;
-  currency: string;
-  marketplace: string;
-  txHash: string;
-  block: number;
-  timestamp: string;
-}
-
-// Per-contract cache of recent sales, keyed by lowercase contract addr.
-const reservoirSalesByContractCache = new Map<
-  string,
-  { at: number; sales: ReservoirSaleData[] }
->();
-const RESERVOIR_PER_CONTRACT_TTL = 300_000; // 5 min
-
-async function fetchReservoirSalesForContract(
-  contract: string,
-  limit: number,
-): Promise<ReservoirSaleData[]> {
-  const key = contract.toLowerCase();
-  const cached = reservoirSalesByContractCache.get(key);
-  const now = Date.now();
-  if (cached && now - cached.at < RESERVOIR_PER_CONTRACT_TTL) {
-    return cached.sales;
-  }
-
-  const per = Math.max(20, Math.min(limit + 10, 100));
-  const collection = RESERVOIR_COLLECTIONS.find(c => c.addr.toLowerCase() === key);
-  const collectionName = collection?.name || 'Item';
-  const collectionLabel = (collection?.label || 'NOUN') as ReservoirCollectionLabel;
+async function checkTxForSale(
+  txHash: string,
+): Promise<{ marketplace: string; priceWei: bigint } | null> {
+  const key = txHash.toLowerCase();
+  if (txSaleCache.has(key)) return txSaleCache.get(key)!;
 
   try {
-    const url = `https://api.reservoir.tools/sales/v6?contract=${contract}&limit=${per}&includeTokenMetadata=true&sortBy=time`;
-    const headers: Record<string, string> = { accept: '*/*' };
-    if (RESERVOIR_API_KEY) headers['x-api-key'] = RESERVOIR_API_KEY;
-    const res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
+    // Fetch the transaction to check tx.to
+    const txRes = await fetch(MAINNET_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getTransactionByHash',
+        params: [txHash],
+      }),
+      signal: AbortSignal.timeout(5_000),
     });
-    if (!res.ok) throw new Error(`reservoir ${collectionLabel} ${res.status}`);
-    const json = (await res.json()) as { sales?: Array<Record<string, unknown>> };
-    const out: ReservoirSaleData[] = [];
-    for (const s of json.sales ?? []) {
-      const token = (s.token as Record<string, unknown>) || {};
-      const price = (s.price as Record<string, unknown>) || {};
-      const amount = (price.amount as Record<string, unknown>) || {};
-      const currency = (price.currency as Record<string, unknown>) || {};
-      const block = Number(s.block);
-      const ts = Number(s.timestamp);
-      if (!block || !ts) continue;
-      const txHash = ((s.txHash as string) || '').toLowerCase();
-      if (!txHash) continue;
-      out.push({
-        collection: collectionLabel,
-        collectionName,
-        tokenId: String(token.tokenId ?? ''),
-        tokenName: (token.name as string) || `${collectionName} ${token.tokenId ?? ''}`.trim(),
-        from: (s.from as string) || '',
-        to: (s.to as string) || '',
-        priceEth:
-          typeof amount.decimal === 'number' ? amount.decimal : Number(amount.decimal ?? 0),
-        priceWei: String(amount.raw ?? '0'),
-        priceUsd: typeof amount.usd === 'number' ? amount.usd : null,
-        currency: (currency.symbol as string) || 'ETH',
-        marketplace: (s.fillSource as string) || (s.orderSource as string) || '',
-        txHash,
-        block,
-        timestamp: new Date(ts * 1000).toISOString(),
-      });
+    const txJson = (await txRes.json()) as { result?: { to?: string; value?: string } };
+    const tx = txJson.result;
+    if (!tx?.to) {
+      txSaleCache.set(key, null);
+      return null;
     }
-    reservoirSalesByContractCache.set(key, { at: now, sales: out });
-    return out;
+
+    const toAddr = tx.to.toLowerCase();
+    const marketplace = MARKETPLACE_ROUTERS[toAddr];
+    if (!marketplace) {
+      txSaleCache.set(key, null);
+      return null;
+    }
+
+    // Direct ETH payment: tx.value > 0
+    const txValue = BigInt(tx.value || '0');
+    if (txValue > 0n) {
+      const result = { marketplace, priceWei: txValue };
+      if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+      txSaleCache.set(key, result);
+      return result;
+    }
+
+    // WETH sale: check receipt logs for WETH Transfer to the seller
+    const receiptRes = await fetch(MAINNET_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const receiptJson = (await receiptRes.json()) as {
+      result?: { logs?: Array<{ address: string; topics: string[]; data: string }> };
+    };
+    const logs = receiptJson.result?.logs ?? [];
+
+    // Find the largest WETH transfer in this tx — that's the sale price
+    let maxWethWei = 0n;
+    for (const log of logs) {
+      if (
+        log.address.toLowerCase() === WETH_CONTRACT &&
+        log.topics[0] === ERC20_TRANSFER_TOPIC &&
+        log.data
+      ) {
+        const amount = BigInt(log.data);
+        if (amount > maxWethWei) maxWethWei = amount;
+      }
+    }
+    if (maxWethWei > 0n) {
+      const result = { marketplace, priceWei: maxWethWei };
+      if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+      txSaleCache.set(key, result);
+      return result;
+    }
+
+    // Marketplace tx but couldn't extract price — still mark as sale with 0
+    const result = { marketplace, priceWei: 0n };
+    if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+    txSaleCache.set(key, result);
+    return result;
   } catch (err) {
-    console.warn(`[activity/sales] ${collectionLabel} fetch failed:`, err);
-    // Cache an empty result briefly to prevent hot-loop retries on outage.
-    reservoirSalesByContractCache.set(key, { at: now, sales: [] });
-    return [];
+    console.warn('[sales] tx lookup failed:', txHash, err);
+    txSaleCache.set(key, null);
+    return null;
   }
 }
 
-/** Build map keyed by lowercase txHash for quick enrichment lookup. */
-function indexSalesByTxHash(sales: ReservoirSaleData[]): Map<string, ReservoirSaleData> {
-  const map = new Map<string, ReservoirSaleData>();
-  for (const s of sales) {
-    if (s.txHash) map.set(s.txHash, s);
-  }
-  return map;
-}
-
-async function fetchReservoirSales(
+/** Fetch recent Nouns transfers from Ponder and detect which are marketplace sales. */
+async function fetchOnchainSales(
   before: bigint | undefined,
   limit: number,
 ): Promise<FeedEvent[]> {
-  const key = `${before ?? 'latest'}:${limit}`;
+  const cacheKey = `${before ?? 'latest'}:${limit}`;
   const now = Date.now();
-  if (
-    salesActivityCache &&
-    salesActivityCache.key === key &&
-    now - salesActivityCache.at < SALES_ACTIVITY_TTL
-  ) {
+  if (salesActivityCache?.key === cacheKey && now - salesActivityCache.at < SALES_ACTIVITY_TTL) {
     return salesActivityCache.events;
   }
 
-  const all: FeedEvent[] = [];
+  try {
+    // Fetch recent transfers from Ponder
+    const perTable = Math.max(50, limit * 3); // fetch more, many won't be sales
+    let transfers;
+    if (before) {
+      transfers = await db
+        .select()
+        .from(schema.nounTransfer)
+        .where(lt(schema.nounTransfer.createdAtBlock, before))
+        .orderBy(desc(schema.nounTransfer.createdAtBlock))
+        .limit(perTable);
+    } else {
+      transfers = await db
+        .select()
+        .from(schema.nounTransfer)
+        .orderBy(desc(schema.nounTransfer.createdAtBlock))
+        .limit(perTable);
+    }
 
-  const results = await Promise.all(
-    RESERVOIR_COLLECTIONS.map(async ({ addr, label, name, saleType }) => {
-      const sales = await fetchReservoirSalesForContract(addr, limit);
-      const out: FeedEvent[] = [];
-      for (const s of sales) {
-        if (before && BigInt(s.block) >= before) continue;
-        out.push({
-          type: saleType,
-          blockNumber: s.block,
-          timestamp: s.timestamp,
-          txHash: s.txHash,
-          data: {
-            collection: label,
-            collectionName: name,
-            tokenId: s.tokenId,
-            tokenName: s.tokenName,
-            from: s.from,
-            to: s.to,
-            priceEth: s.priceEth,
-            priceWei: s.priceWei,
-            priceUsd: s.priceUsd,
-            currency: s.currency,
-            marketplace: s.marketplace,
-          },
-        });
-      }
-      return out;
-    }),
-  );
-  for (const chunk of results) all.push(...chunk);
+    // Filter out mint/burn transfers (from or to zero address)
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const candidates = transfers.filter(
+      t =>
+        t.from.toLowerCase() !== ZERO &&
+        t.to.toLowerCase() !== ZERO &&
+        t.to.toLowerCase() !== '0x830bd73e4184cef73443c15111a1df14e495c706', // auction house
+    );
 
-  salesActivityCache = { at: now, key, events: all };
-  return all;
+    // Batch-check tx hashes (dedupe first)
+    const uniqueTxs = [...new Set(candidates.map(t => t.createdAtTransaction))];
+    const saleChecks = await Promise.all(
+      uniqueTxs.slice(0, 30).map(async txHash => ({
+        txHash,
+        sale: await checkTxForSale(txHash),
+      })),
+    );
+    const saleMap = new Map(saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]));
+
+    const events: FeedEvent[] = [];
+    for (const t of candidates) {
+      const sale = saleMap.get(t.createdAtTransaction);
+      if (!sale) continue;
+
+      const priceEth = Number(sale.priceWei) / 1e18;
+      events.push({
+        type: 'SALE',
+        blockNumber: Number(t.createdAtBlock),
+        timestamp: t.createdAt ? new Date(Number(t.createdAt) * 1000).toISOString() : '',
+        txHash: t.createdAtTransaction,
+        data: {
+          collection: 'NOUN',
+          collectionName: 'Noun',
+          tokenId: String(t.nounId),
+          tokenName: `Noun ${t.nounId}`,
+          from: t.from,
+          to: t.to,
+          priceEth,
+          priceWei: sale.priceWei.toString(),
+          priceUsd: null,
+          currency: 'ETH',
+          marketplace: sale.marketplace,
+        },
+      });
+      if (events.length >= limit) break;
+    }
+
+    salesActivityCache = { at: now, key: cacheKey, events };
+    return events;
+  } catch (err) {
+    console.warn('[activity/sales] on-chain detection failed:', err);
+    return [];
+  }
 }
 
 /**
@@ -7867,7 +7858,7 @@ app.get('/api/activity', async c => {
           })
         : Promise.resolve([] as FeedEvent[]),
       wantSale
-        ? fetchReservoirSales(before, limit).catch(err => {
+        ? fetchOnchainSales(before, limit).catch(err => {
             console.warn('[activity] sales fetch failed:', err);
             return [] as FeedEvent[];
           })
@@ -8130,26 +8121,41 @@ app.get('/api/activity', async c => {
       });
     }
 
-    // Normalize TRANSFER — enrich with Reservoir sale data when the txHash matches
-    // a marketplace sale, re-typing the event to SALE so it renders with price +
-    // marketplace info. Tracks claimed txHashes to dedupe the standalone SALE pass below.
+    // Normalize TRANSFER — enrich with on-chain sale detection. If the transfer's
+    // tx targeted a known marketplace router (Seaport, Blur, etc.), convert it to
+    // a SALE event with the extracted price. Tracks claimed txHashes to dedupe the
+    // standalone SALE pass below.
     const claimedSaleTxs = new Set<string>();
-    let v1SaleMap: Map<string, ReservoirSaleData> = new Map();
-    if (transfers.length > 0 && wantTransfer) {
-      const v1Sales = await fetchReservoirSalesForContract(
-        RESERVOIR_CONTRACT_BY_LABEL.NOUN,
-        Math.max(limit, 50),
-      ).catch(err => {
-        console.warn('[activity] reservoir V1 enrich failed:', err);
-        return [] as ReservoirSaleData[];
-      });
-      v1SaleMap = indexSalesByTxHash(v1Sales);
-    }
+
+    // Batch-check unique tx hashes for marketplace interactions
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const transferTxHashes = [
+      ...new Set(
+        transfers
+          .filter(
+            t =>
+              t.from.toLowerCase() !== ZERO &&
+              t.to.toLowerCase() !== ZERO &&
+              t.createdAtTransaction,
+          )
+          .map(t => t.createdAtTransaction),
+      ),
+    ];
+    const saleChecks = await Promise.all(
+      transferTxHashes.slice(0, 30).map(async txHash => ({
+        txHash,
+        sale: await checkTxForSale(txHash),
+      })),
+    );
+    const transferSaleMap = new Map(
+      saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]),
+    );
+
     for (const t of transfers) {
-      const txHash = (t.createdAtTransaction || '').toLowerCase();
-      const sale = txHash ? v1SaleMap.get(txHash) : undefined;
+      const sale = transferSaleMap.get(t.createdAtTransaction);
       if (sale) {
-        claimedSaleTxs.add(txHash);
+        claimedSaleTxs.add(t.createdAtTransaction.toLowerCase());
+        const priceEth = Number(sale.priceWei) / 1e18;
         events.push({
           type: 'SALE',
           blockNumber: Number(t.createdAtBlock),
@@ -8163,10 +8169,10 @@ app.get('/api/activity', async c => {
             tokenName: `Noun ${t.nounId}`,
             from: t.from,
             to: t.to,
-            priceEth: sale.priceEth,
-            priceWei: sale.priceWei,
-            priceUsd: sale.priceUsd,
-            currency: sale.currency,
+            priceEth,
+            priceWei: sale.priceWei.toString(),
+            priceUsd: null,
+            currency: 'ETH',
             marketplace: sale.marketplace,
           },
         });
