@@ -192,16 +192,18 @@ export function useActivityFeed(activeFilter: string) {
       const mainnetData = mainnet ?? { events: [], hasMore: false, oldestBlock: 0 };
       const v2Data = v2 ?? { events: [], hasMore: false, oldestBlock: 0 };
 
-      // If a specific filter is active, narrow v2 events to V2 types listed in
-      // the filter. (For mixed filters like "SALE,V2_SALE" we keep V2_SALE only
-      // so the SALES tab doesn't leak unrelated V2 events.)
+      // If a specific filter is active, narrow BOTH mainnet and v2 events to
+      // only the wanted types. Without this, the chain fallback (which returns
+      // all event types) leaks unrelated events into filtered tabs like SALES.
+      let mainnetFiltered = mainnetData.events;
       let v2Filtered = v2Data.events;
       if (activeFilter && activeFilter !== V2_ALL_FILTER) {
         const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
+        mainnetFiltered = mainnetFiltered.filter(e => wanted.has(e.type));
         v2Filtered = v2Filtered.filter(e => wanted.has(e.type));
       }
 
-      const merged = [...mainnetData.events, ...v2Filtered].sort(
+      const merged = [...mainnetFiltered, ...v2Filtered].sort(
         (a, b) => b.blockNumber - a.blockNumber,
       );
 
@@ -274,14 +276,13 @@ export function useActivityFeed(activeFilter: string) {
         ];
         if (!incoming.length) return;
 
-        // If a specific filter is active, narrow v2 events to listed V2 types.
-        // V1 events still get filtered server-side by /api/activity, so we only
-        // need to mask v2 events that aren't in the active filter (e.g. drop
-        // V2_BID when filter is "SALE,V2_SALE").
+        // If a specific filter is active, narrow ALL events to listed types.
+        // Both V1 and V2 events must match — the chain fallback can return
+        // unrelated event types when the API is unavailable.
         let filtered = incoming;
         if (activeFilter && activeFilter !== V2_ALL_FILTER) {
           const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
-          filtered = filtered.filter(e => (V2_EVENT_TYPES.has(e.type) ? wanted.has(e.type) : true));
+          filtered = filtered.filter(e => wanted.has(e.type));
         }
 
         const newEvents = filtered
