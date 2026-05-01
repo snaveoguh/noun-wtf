@@ -218,5 +218,47 @@ export function useDaoNounSeed(
   };
 }
 
+/**
+ * Detect whether a V2 noun has been burned by calling `ownerOf(nounId)`.
+ *
+ * Burned nouns revert on `ownerOf` (ERC721 standard: "query for nonexistent
+ * token"). When the call errors we interpret it as burned. Returns:
+ *   - `true` if ownerOf reverted (burned)
+ *   - `false` if ownerOf returned a valid address (not burned)
+ *   - `undefined` while the query is still loading
+ *
+ * Only enabled for V2 past nouns (where `nounId` is provided). For mainnet
+ * Nouns the Ponder indexer sets the `burned` flag on the auction object, so
+ * this hook is a no-op.
+ */
+export function useV2NounBurnedStatus(
+  dao: DaoContext,
+  nounId: bigint | undefined,
+): boolean | undefined {
+  const enabled =
+    dao.isV2 && dao.isConfigured && nounId !== undefined && dao.tokenAddress !== ZERO_ADDRESS;
+
+  const { error, isLoading, data } = useReadContract({
+    address: dao.tokenAddress,
+    abi: dao.tokenAbi,
+    functionName: 'ownerOf',
+    args: nounId !== undefined ? [nounId] : undefined,
+    query: {
+      enabled,
+      retry: 1,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+    },
+  });
+
+  if (!enabled) return undefined;
+  if (isLoading) return undefined;
+  // If ownerOf reverted, the noun doesn't exist (burned)
+  if (error != null) return true;
+  // ownerOf returned successfully — noun exists
+  if (data !== undefined && data !== null) return false;
+  return undefined;
+}
+
 // Re-export so downstream consumers don't need to import wagmi directly.
 export { useReadContracts };
