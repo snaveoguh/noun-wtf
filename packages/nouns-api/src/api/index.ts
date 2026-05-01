@@ -1489,8 +1489,11 @@ const MARKETPLACE_ROUTERS: Record<string, string> = {
   '0x9a1d00bed7cd04bcda516d721a596eb22aac6834': 'Magic Eden',
 };
 
-/** WETH Transfer event topic (Transfer(address,address,uint256)). */
-const WETH_CONTRACT = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+/** Payment token contracts whose Transfer logs indicate sale price. */
+const PAYMENT_TOKENS = new Set([
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
+  '0x0000000000a39bb272e79075ade125fd351887ac', // Blur Pool
+]);
 const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
 /** Cache tx sale lookups: txHash → { marketplace, priceWei } | null. */
@@ -1556,20 +1559,21 @@ async function checkTxForSale(
     };
     const logs = receiptJson.result?.logs ?? [];
 
-    // Find the largest WETH transfer in this tx — that's the sale price
-    let maxWethWei = 0n;
+    // Find the largest payment-token transfer in this tx — that's the sale price.
+    // Covers WETH (OpenSea/LooksRare) and Blur Pool (Blur).
+    let maxPaymentWei = 0n;
     for (const log of logs) {
       if (
-        log.address.toLowerCase() === WETH_CONTRACT &&
+        PAYMENT_TOKENS.has(log.address.toLowerCase()) &&
         log.topics[0] === ERC20_TRANSFER_TOPIC &&
         log.data
       ) {
         const amount = BigInt(log.data);
-        if (amount > maxWethWei) maxWethWei = amount;
+        if (amount > maxPaymentWei) maxPaymentWei = amount;
       }
     }
-    if (maxWethWei > 0n) {
-      const result = { marketplace, priceWei: maxWethWei };
+    if (maxPaymentWei > 0n) {
+      const result = { marketplace, priceWei: maxPaymentWei };
       if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
       txSaleCache.set(key, result);
       return result;
