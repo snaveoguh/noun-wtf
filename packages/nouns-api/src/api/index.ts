@@ -1640,12 +1640,22 @@ async function fetchOnchainSales(
     );
     const saleMap = new Map(saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]));
 
+    // Count how many nouns were sold in the same tx so we can split the
+    // total price evenly across them (Blur sweeps, Seaport batch buys, etc.)
+    const nounsPerTx = new Map<string, number>();
+    for (const t of candidates) {
+      if (saleMap.has(t.createdAtTransaction)) {
+        nounsPerTx.set(t.createdAtTransaction, (nounsPerTx.get(t.createdAtTransaction) || 0) + 1);
+      }
+    }
+
     const events: FeedEvent[] = [];
     for (const t of candidates) {
       const sale = saleMap.get(t.createdAtTransaction);
       if (!sale) continue;
 
-      const priceEth = Number(sale.priceWei) / 1e18;
+      const count = nounsPerTx.get(t.createdAtTransaction) || 1;
+      const priceEth = Number(sale.priceWei) / 1e18 / count;
       events.push({
         type: 'SALE',
         blockNumber: Number(t.createdAtBlock),
@@ -8155,11 +8165,23 @@ app.get('/api/activity', async c => {
       saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]),
     );
 
+    // Count nouns per sale tx to split bulk/sweep prices evenly
+    const nounsPerSaleTx = new Map<string, number>();
+    for (const t of transfers) {
+      if (transferSaleMap.has(t.createdAtTransaction)) {
+        nounsPerSaleTx.set(
+          t.createdAtTransaction,
+          (nounsPerSaleTx.get(t.createdAtTransaction) || 0) + 1,
+        );
+      }
+    }
+
     for (const t of transfers) {
       const sale = transferSaleMap.get(t.createdAtTransaction);
       if (sale) {
         claimedSaleTxs.add(t.createdAtTransaction.toLowerCase());
-        const priceEth = Number(sale.priceWei) / 1e18;
+        const count = nounsPerSaleTx.get(t.createdAtTransaction) || 1;
+        const priceEth = Number(sale.priceWei) / 1e18 / count;
         events.push({
           type: 'SALE',
           blockNumber: Number(t.createdAtBlock),
