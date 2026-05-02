@@ -220,7 +220,7 @@ export function formatEventDescription(
         winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
         (amountStr === '0' || amountStr === '');
       if (isBurned) {
-        return `Noun ${data.nounId} burned (reserve not met)`;
+        return `Noun ${data.nounId} burned 🔥`;
       }
       return `Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
     }
@@ -369,7 +369,7 @@ export function formatEventDescription(
         winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
         (amountStr === '0' || amountStr === '');
       if (isBurned) {
-        return `V2 Noun ${data.nounId} burned (reserve not met)`;
+        return `V2 Noun ${data.nounId} burned 🔥`;
       }
       return `V2 Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
     }

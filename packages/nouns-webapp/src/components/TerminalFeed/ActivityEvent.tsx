@@ -81,8 +81,16 @@ function isSafeHttpsUrl(url: string | undefined): boolean {
 export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }: Props) {
   const [expanded, setExpanded] = useState(false);
   const config = EVENT_TYPES[event.type];
-  const color = config?.color || '#666';
-  const label = config?.label || event.type;
+  // Override badge for burned auctions (winner = 0x0, amount = 0)
+  const isBurnedAuction =
+    (event.type === 'AUCTION_SETTLED' ||
+      event.type === 'V2_SETTLED' ||
+      event.type === 'LIL_AUCTION_SETTLED') &&
+    ((event.data.winner as string) || '').toLowerCase() ===
+      '0x0000000000000000000000000000000000000000' &&
+    ((event.data.amount as string) || '0') === '0';
+  const color = isBurnedAuction ? '#f97316' : config?.color || '#666';
+  const label = isBurnedAuction ? 'BURNED' : config?.label || event.type;
   const description = formatEventDescription(
     event.type,
     event.data,
