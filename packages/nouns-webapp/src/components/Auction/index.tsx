@@ -31,6 +31,8 @@ import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts
 import {
   DEFAULT_VISIBILITY,
   mergeLayersToGrid,
+  pixelGridToCanvas,
+  pixelGridToSvg,
   resolveEditableVisibility,
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
@@ -404,6 +406,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [edit2dHistory, edit2dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit3dHistory, edit3dDispatch] = useReducer(historyReducer, createInitialHistory());
   const [edit2dVisibility, setEdit2dVisibility] = useState({ ...DEFAULT_VISIBILITY });
+  // Background visibility — separate from the 4-layer trait toggles. Lets users
+  // export single-trait downloads (head only, transparent everywhere else) by
+  // hiding the bg. Default true so normal exports still include the bg color.
+  const [edit2dBgVisible, setEdit2dBgVisible] = useState(true);
   const [edit3dVisibility, setEdit3dVisibility] = useState({ ...DEFAULT_VISIBILITY });
   const [edit3dTool, setEdit3dTool] = useState<Tool | 'build'>('pencil');
   const [edit3dColor, setEdit3dColor] = useState('#000000');
@@ -1160,24 +1166,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       }
     },
     onSaveScreenshot: () => {
-      const canvas = document.querySelector(
-        '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
-      ) as HTMLCanvasElement | null;
-      if (canvas) {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = `noun-${currentNounId}.png`;
-        link.click();
-        return;
-      }
-
-      const imageSource =
-        activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
-      if (!imageSource) return;
-      const link = document.createElement('a');
-      link.href = imageSource;
-      link.download = `noun-${currentNounId}.png`;
-      link.click();
+      // Reuse the same export pipeline the Save dropdown uses so the keyboard
+      // shortcut honors live edits + layer visibility too.
+      void downloadAs('png');
     },
     onToggleHelp: () => setShowHelp(value => !value),
     onSetTool: tool => {
@@ -1203,13 +1194,95 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     },
   });
 
-  // Download mesh from the editor scene ref (noun only, no environment)
+  // Download the 3D editor's content as a 3D model.
+  //
+  // Two modes:
+  //   - mesh mode (GLB head editor): exports the live scene via three.js exporters
+  //   - voxel mode (curated voxel editor): exports the current VoxelMap via voxel-engine
+  //
+  // In both modes, only the noun is exported (no scene environment / orbs).
+  // Layer visibility toggles are honored — hidden traits are not included so
+  // single-trait downloads work the same way the 2D pixel export does.
   const downloadMesh = useCallback(
     async (format: 'glb' | 'stl' | 'obj') => {
-      const obj = meshSceneRef.current;
-      if (!obj) return;
-
       const filename = `noun-${currentNounId}.${format}`;
+
+      // ── Voxel mode: serialize the live VoxelMap to OBJ/STL/GLB ──
+      if (!meshSceneRef.current) {
+        const map = voxelMapRef.current;
+        if (!map || map.size === 0) return;
+
+        // Honor layer-visibility toggles when present. The voxel editor's
+        // visibilityMask culls voxels that should be hidden — apply the same
+        // filter to the export so users can grab a single trait cleanly.
+        const filtered: VoxelMap = new Map();
+        for (const [key, color] of map) {
+          const [vx, vy3d] = key.split(',').map(Number);
+          const gridY = 31 - vy3d;
+          // edit3dVisibility hides whole layers; for the merged voxel map we
+          // approximate by checking the visibility mask we built for rendering.
+          // When no mask (curated head + all layers visible), include everything.
+          if (!edit3dVisibilityMask) {
+            filtered.set(key, color);
+            continue;
+          }
+          if (edit3dVisibilityMask[gridY]?.[vx]) filtered.set(key, color);
+        }
+        if (filtered.size === 0) {
+          // visibility mask hid everything — fall back to the full map
+          for (const [k, v] of map) filtered.set(k, v);
+        }
+
+        const { toOBJ, toSTL, downloadBlob } = await import('@nouns/voxel-engine');
+        if (format === 'obj') {
+          downloadBlob(toOBJ(filtered), filename, 'text/plain');
+          return;
+        }
+        if (format === 'stl') {
+          downloadBlob(toSTL(filtered), filename, 'model/stl');
+          return;
+        }
+        // GLB from voxels — build a merged geometry and export via GLTFExporter.
+        const { buildGeometryFromVoxelMap } = await import('@nouns/voxel-engine');
+        const geo = buildGeometryFromVoxelMap(filtered);
+        if (!geo) return;
+        // Lazy-load three to avoid bundling cost outside this path.
+        const THREE_NS = await import('three');
+        const mat = new THREE_NS.MeshStandardMaterial({ vertexColors: true });
+        const mesh = new THREE_NS.Mesh(geo, mat);
+        // @ts-expect-error — types at three/examples/jsm, runtime at three/addons
+        const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+        const exporter = new GLTFExporter();
+        exporter.parse(
+          mesh,
+          (result: ArrayBuffer) => {
+            const blob = new Blob([result], { type: 'model/gltf-binary' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            geo.dispose();
+            mat.dispose();
+          },
+          (err: unknown) => console.error('GLB export failed:', err),
+          { binary: true },
+        );
+        return;
+      }
+
+      // ── Mesh mode: export the live GLB scene ──
+      // Clone the scene so we can prune invisible meshes (layer toggles)
+      // without mutating the live render.
+      const liveScene = meshSceneRef.current;
+      const obj = liveScene.clone(true);
+      const toRemove: THREE.Object3D[] = [];
+      obj.traverse((child: THREE.Object3D) => {
+        if (!child.visible) toRemove.push(child);
+      });
+      for (const child of toRemove) {
+        child.parent?.remove(child);
+      }
       if (format === 'glb') {
         // @ts-expect-error — types at three/examples/jsm, runtime at three/addons
         const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
@@ -1249,56 +1322,150 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
         URL.revokeObjectURL(a.href);
       }
     },
-    [currentNounId],
+    [currentNounId, edit3dVisibilityMask],
   );
 
   const downloadAs = useCallback(
     async (format: 'png' | 'svg' | 'webp' | 'glb' | 'stl' | 'obj') => {
       setDownloadMenuOpen(false);
-      const canvas = document.querySelector(
-        '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
-      ) as HTMLCanvasElement | null;
 
       if (format === 'glb' || format === 'stl' || format === 'obj') {
-        // 3D export uses the mesh scene ref directly (noun only, no environment)
-        if (meshSceneRef.current) {
-          await downloadMesh(format as 'glb' | 'stl' | 'obj');
-        }
+        // 3D export — downloadMesh handles both mesh-mode (GLB scene) and
+        // voxel-mode (VoxelMap → toOBJ/toSTL/GLB).
+        await downloadMesh(format as 'glb' | 'stl' | 'obj');
         return;
       }
 
+      const triggerDownload = (href: string, ext: string) => {
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = `noun-${currentNounId}.${ext}`;
+        link.click();
+      };
+
+      // Resolve the 2D pixel grid + bg color we want to export. Honors:
+      //  • live edits in the 2D editor (`edit2dHistory.present`)
+      //  • layer visibility toggles (head/glasses/body/accessory)
+      //  • bg visibility toggle (transparent when off)
+      // Falls back to seed-derived layers when not editing so plain "save the
+      // current noun" works even without ever opening the editor.
+      const buildExport2d = (): { pixels: string[][]; bg?: string } | null => {
+        // 2D edit mode — export the live pixel state
+        if (editMode === '2d' && editorLayers) {
+          const filtered = resolveEditableVisibility(
+            edit2dHistory.present,
+            editorLayers,
+            edit2dVisibility,
+          );
+          const allVisible =
+            edit2dVisibility.body &&
+            edit2dVisibility.accessory &&
+            edit2dVisibility.head &&
+            edit2dVisibility.glasses;
+          // Drop the bg whenever ANY layer is hidden — clean transparent
+          // output is what people want when they hide other traits to grab
+          // a single one.
+          const bg = edit2dBgVisible && allVisible ? editorLayers.background : undefined;
+          return { pixels: filtered, bg };
+        }
+        // Live 2D draft viewMode (reading someone's saved live edit)
+        if (viewMode === 'edit-2d' && liveDrafts?.pixel?.pixels) {
+          return {
+            pixels: liveDrafts.pixel.pixels,
+            bg: nounLayers?.background,
+          };
+        }
+        // Default — pristine current noun, honoring any visibility toggles
+        // the user changed before opening this menu.
+        if (nounLayers) {
+          const merged = mergeLayersToGrid(nounLayers, edit2dVisibility);
+          const allVisible =
+            edit2dVisibility.body &&
+            edit2dVisibility.accessory &&
+            edit2dVisibility.head &&
+            edit2dVisibility.glasses;
+          const bg = edit2dBgVisible && allVisible ? nounLayers.background : undefined;
+          return { pixels: merged, bg };
+        }
+        return null;
+      };
+
+      const exportData = buildExport2d();
+
+      // 3D view: prefer the live r3f canvas if present (captures lighting,
+      // environment, voxel sculpts that aren't representable in a 32×32 grid).
+      const r3fCanvas = is3dView
+        ? (document.querySelector(
+            '[data-hero-artwork-root="true"] [data-noun-parallax-root="true"] canvas',
+          ) as HTMLCanvasElement | null)
+        : null;
+
       if (format === 'svg') {
-        // SVG: use the raw noun SVG data
+        // 3D mode → fall back to seed SVG (the r3f canvas isn't vector data).
+        if (is3dView) {
+          const svgSource = nounSvg ?? '';
+          if (!svgSource) return;
+          const href = svgSource.startsWith('data:')
+            ? svgSource
+            : `data:image/svg+xml;base64,${btoa(svgSource)}`;
+          triggerDownload(href, 'svg');
+          return;
+        }
+        if (exportData) {
+          const svg = pixelGridToSvg(exportData.pixels, exportData.bg);
+          triggerDownload(`data:image/svg+xml;base64,${btoa(svg)}`, 'svg');
+          return;
+        }
+        // Final fallback: the current seed-derived SVG
         const svgSource = nounSvg ?? '';
         if (!svgSource) return;
-        const link = document.createElement('a');
-        link.href = svgSource.startsWith('data:')
+        const href = svgSource.startsWith('data:')
           ? svgSource
           : `data:image/svg+xml;base64,${btoa(svgSource)}`;
-        link.download = `noun-${currentNounId}.svg`;
-        link.click();
+        triggerDownload(href, 'svg');
         return;
       }
 
       const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
-      if (canvas) {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL(mimeType);
-        link.download = `noun-${currentNounId}.${format}`;
-        link.click();
+
+      // 3D view → grab the WebGL canvas directly (preserves lighting/3D look).
+      if (r3fCanvas) {
+        triggerDownload(r3fCanvas.toDataURL(mimeType), format);
         return;
       }
 
-      // Fallback: derivative/link/draft image
+      // 2D / default → render the pixel grid into a 320×320 canvas. Honors
+      // edits + layer visibility + bg toggle.
+      if (exportData) {
+        const canvas = pixelGridToCanvas(exportData.pixels, exportData.bg);
+        if (canvas) {
+          triggerDownload(canvas.toDataURL(mimeType), format);
+          return;
+        }
+      }
+
+      // Last-resort fallback: derivative/link/draft image (raw, can't honor edits)
       const imageSource =
         activeDerivative?.image ?? activeLink?.ogImage ?? liveDrafts?.pixel?.image ?? nounSvg ?? '';
       if (!imageSource) return;
-      const link = document.createElement('a');
-      link.href = imageSource;
-      link.download = `noun-${currentNounId}.${format}`;
-      link.click();
+      triggerDownload(imageSource, format);
     },
-    [currentNounId, nounSvg, activeDerivative, activeLink, liveDrafts, downloadMesh],
+    [
+      currentNounId,
+      nounSvg,
+      activeDerivative,
+      activeLink,
+      liveDrafts,
+      downloadMesh,
+      editMode,
+      editorLayers,
+      edit2dHistory.present,
+      edit2dVisibility,
+      edit2dBgVisible,
+      viewMode,
+      nounLayers,
+      is3dView,
+    ],
   );
 
   const hasAuctionBounds = currentAuction !== undefined && lastNounId !== undefined;
@@ -1835,71 +2002,81 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 {renderHeroArtwork()}
               </div>
 
-              {!isEditing && (
-                <div className={classes.heroControlRail}>
-                  <button
-                    type="button"
-                    className={`${classes.railBtn} ${interactionMode === 'scroll' ? classes.railBtnActive : ''}`}
-                    onClick={() => {
-                      setInteractionMode('scroll');
-                      setPlayIntroSpin(false);
-                    }}
-                    title="Default scroll mode"
-                  >
-                    <span className={classes.railIcon}>📱</span>
-                    <span className={classes.railLabel}>Scroll</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${classes.railBtn} ${interactionMode === 'grab' ? classes.railBtnActive : ''}`}
-                    onClick={() => setInteractionMode('grab')}
-                    title="Grab and inspect"
-                  >
-                    <span className={classes.railIcon}>🖐</span>
-                    <span className={classes.railLabel}>Grab</span>
-                  </button>
-                  {is3dView && (
+              <div
+                className={`${classes.heroControlRail} ${isEditing ? classes.heroControlRailEditing : ''}`}
+              >
+                {/* Interaction-mode buttons only make sense while viewing —
+                    hide them during edit (the editor has its own tool panel). */}
+                {!isEditing && (
+                  <>
                     <button
                       type="button"
-                      className={`${classes.railBtn} ${interactionMode === 'twist' ? classes.railBtnActive : ''}`}
-                      onClick={() => setInteractionMode('twist')}
-                      title="Rotate the 3D noun"
+                      className={`${classes.railBtn} ${interactionMode === 'scroll' ? classes.railBtnActive : ''}`}
+                      onClick={() => {
+                        setInteractionMode('scroll');
+                        setPlayIntroSpin(false);
+                      }}
+                      title="Default scroll mode"
                     >
-                      <span className={classes.railIcon}>🌀</span>
-                      <span className={classes.railLabel}>Twist</span>
+                      <span className={classes.railIcon}>📱</span>
+                      <span className={classes.railLabel}>Scroll</span>
                     </button>
-                  )}
-                  <div className={classes.downloadWrap}>
                     <button
                       type="button"
-                      className={classes.railBtn}
-                      onClick={() => setDownloadMenuOpen(v => !v)}
-                      title="Download artwork (S)"
+                      className={`${classes.railBtn} ${interactionMode === 'grab' ? classes.railBtnActive : ''}`}
+                      onClick={() => setInteractionMode('grab')}
+                      title="Grab and inspect"
                     >
-                      <span className={classes.railIcon}>💾</span>
-                      <span className={classes.railLabel}>Save</span>
+                      <span className={classes.railIcon}>🖐</span>
+                      <span className={classes.railLabel}>Grab</span>
                     </button>
-                    {downloadMenuOpen && (
-                      <div className={classes.downloadMenu}>
-                        <button type="button" onClick={() => downloadAs('png')}>
-                          PNG
-                        </button>
-                        <button type="button" onClick={() => downloadAs('svg')}>
-                          SVG
-                        </button>
-                        <button type="button" onClick={() => downloadAs('webp')}>
-                          WebP
-                        </button>
-                        {is3dView && (
-                          <button type="button" onClick={() => downloadAs('glb')}>
-                            GLB
-                          </button>
-                        )}
-                      </div>
+                    {is3dView && (
+                      <button
+                        type="button"
+                        className={`${classes.railBtn} ${interactionMode === 'twist' ? classes.railBtnActive : ''}`}
+                        onClick={() => setInteractionMode('twist')}
+                        title="Rotate the 3D noun"
+                      >
+                        <span className={classes.railIcon}>🌀</span>
+                        <span className={classes.railLabel}>Twist</span>
+                      </button>
                     )}
-                  </div>
+                  </>
+                )}
+                {/* Save dropdown — always present (viewing AND editing).
+                    During 2D edit it grabs the live pixel grid + visibility
+                    toggles so single-trait downloads work; during 3D edit
+                    it grabs the r3f canvas. */}
+                <div className={classes.downloadWrap}>
+                  <button
+                    type="button"
+                    className={classes.railBtn}
+                    onClick={() => setDownloadMenuOpen(v => !v)}
+                    title="Download artwork (S)"
+                  >
+                    <span className={classes.railIcon}>💾</span>
+                    <span className={classes.railLabel}>Save</span>
+                  </button>
+                  {downloadMenuOpen && (
+                    <div className={classes.downloadMenu}>
+                      <button type="button" onClick={() => downloadAs('png')}>
+                        PNG
+                      </button>
+                      <button type="button" onClick={() => downloadAs('svg')}>
+                        SVG
+                      </button>
+                      <button type="button" onClick={() => downloadAs('webp')}>
+                        WebP
+                      </button>
+                      {is3dView && (
+                        <button type="button" onClick={() => downloadAs('glb')}>
+                          GLB
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {!isEditing && is3dView && (
                 <LightingPicker preset={lightingPreset} onChange={setLightingPreset} />
@@ -1957,6 +2134,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     externalFuture={edit2dHistory.future}
                     visibility={edit2dVisibility}
                     onVisibilityChange={setEdit2dVisibility}
+                    bgVisible={edit2dBgVisible}
+                    onBgVisibilityChange={setEdit2dBgVisible}
                   />
                 </Suspense>
               )}
@@ -1980,9 +2159,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     activeColor={edit3dColor}
                     onToolChange={setEdit3dTool}
                     onColorChange={setEdit3dColor}
-                    onDownload={
-                      meshGlbPath ? (fmt: 'glb' | 'stl' | 'obj') => downloadMesh(fmt) : undefined
-                    }
+                    // Always provide downloads in 3D edit mode — voxel mode
+                    // exports the live VoxelMap, mesh mode exports the GLB scene.
+                    onDownload={(fmt: 'glb' | 'stl' | 'obj') => downloadMesh(fmt)}
                     onExit={stopEditing}
                     visibility={edit3dVisibility}
                     onVisibilityChange={setEdit3dVisibility}
