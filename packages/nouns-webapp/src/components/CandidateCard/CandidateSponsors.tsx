@@ -1,51 +1,25 @@
-import { useState } from 'react';
-
-import { useQuery } from '@apollo/client';
 import clsx from 'clsx';
 
 import { CandidateSignature } from '@/wrappers/nounsData';
-import { delegateNounsAtBlockQuery } from '@/wrappers/subgraph';
 
 import CandidateSponsorImage from './CandidateSponsorImage';
 import classes from './CandidateSponsors.module.css';
 
 type CandidateSponsorsProps = {
   signers: CandidateSignature[];
+  nounIds: string[];
   nounsRequired: number;
-  currentBlock?: bigint;
   isThresholdMetByProposer?: boolean;
 };
 
 const CandidateSponsors = ({
   signers,
+  nounIds,
   nounsRequired,
-  currentBlock,
   isThresholdMetByProposer,
 }: CandidateSponsorsProps) => {
   const maxVisibleSpots = 5;
-  const [signerCountOverflow, setSignerCountOverflow] = useState(0);
-  const activeSigners =
-    signers?.filter(s => s.signer.activeOrPendingProposal === false && s.signer.id) ?? [];
-  const signerIds = activeSigners?.map(s => s.signer.id) ?? [];
-  const { query, variables } = delegateNounsAtBlockQuery(signerIds ?? [], currentBlock ?? 0n);
-  const { data: delegateSnapshotRaw } = useQuery<{
-    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
-  }>(query, { variables });
-  // Adapt Ponder response: synthesize nounsRepresented from delegatedVotes count
-  const delegates = delegateSnapshotRaw?.delegates?.items?.map(d => ({
-    id: d.id,
-    nounsRepresented: Array.from({ length: Number(d.delegatedVotes) }, (_, i) => ({
-      id: String(i),
-    })),
-  }));
-  const delegateToNounIds = delegates?.reduce<Record<string, string[]>>((acc, curr) => {
-    acc[curr.id] = curr?.nounsRepresented?.map(nr => nr.id) ?? [];
-    return acc;
-  }, {});
-  const nounIds = Object.values(delegateToNounIds ?? {}).flat();
-  if (signers.length > maxVisibleSpots) {
-    setSignerCountOverflow(signers.length - maxVisibleSpots);
-  }
+  const signerCountOverflow = signers.length > maxVisibleSpots ? signers.length - maxVisibleSpots : 0;
   const placeholderCount =
     isThresholdMetByProposer && nounIds.length === 0 ? 1 : nounsRequired - nounIds.length;
   const placeholderArray = Array(placeholderCount >= 1 ? placeholderCount : 0).fill(0);
@@ -61,7 +35,7 @@ const CandidateSponsors = ({
         <div className={classes.sponsors}>
           {nounIds.map((nounId, i) => {
             if (i >= maxVisibleSpots) return null;
-            return <CandidateSponsorImage nounId={BigInt(+nounId)} key={i * +nounId} />;
+            return <CandidateSponsorImage nounId={BigInt(+nounId)} key={`${i}-${nounId}`} />;
           })}
         </div>
       )}

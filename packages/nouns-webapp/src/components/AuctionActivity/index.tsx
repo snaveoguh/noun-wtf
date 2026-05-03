@@ -84,7 +84,11 @@ const AuctionActivity: React.FC<AuctionActivityProps> = (props: AuctionActivityP
   return (
     <>
       {showBidHistoryModal && (
-        <BidHistoryModal onDismiss={dismissBidModalHandler} auction={auction} />
+        <BidHistoryModal
+          onDismiss={dismissBidModalHandler}
+          auction={auction}
+          forceDao={dao.isV2 ? 'nounv2' : 'nouns'}
+        />
       )}
 
       <AuctionActivityWrapper>

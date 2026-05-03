@@ -1,4 +1,6 @@
-import { FC, useState } from 'react';
+import { FC, useRef, useState } from 'react';
+
+import { createPortal } from 'react-dom';
 
 import {
   CLIENT_REGISTRY,
@@ -30,6 +32,8 @@ const BADGE_VISUAL: Record<number, string> = {
   10: '\uD83C\uDFDB\uFE0F', // Agora — classical building
   11: '\uD83E\uDED0', // Berry OS (berryos.wtf) — blueberries
   12: '\uD83D\uDE39', // Prop Launchpad — joycat
+  18: '\uD83D\uDD75\uFE0F', // Anouns — detective (sus)
+  22: '\uD83D\uDDF3\uFE0F', // Nouncil — ballot box
   37: '\uD83C\uDF46', // noun.wtf — eggplant
 };
 
@@ -52,18 +56,27 @@ interface ClientBadgeProps {
  * Renders the client's emoji favicon with a hover tooltip.
  */
 const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const client = getClientInfo(clientId);
   const visual = getBadgeVisual(clientId);
   const isImage = isImagePath(visual);
 
   if (!client) return null;
 
+  const handleEnter = () => {
+    if (!anchorRef.current) return;
+    const r = anchorRef.current.getBoundingClientRect();
+    setTooltipPos({ top: r.top + r.height / 2, left: r.right + 10 });
+  };
+  const handleLeave = () => setTooltipPos(null);
+
   return (
     <span
+      ref={anchorRef}
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
     >
       {isImage ? (
         <img
@@ -97,18 +110,17 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
         </span>
       )}
 
-      {/* Tooltip — anchored to the right of the badge with a left-pointing
-          arrow. Activity-feed badges sit flush at the page's left margin,
-          so the previous "above + centered" anchor was clipping the
-          tooltip off the viewport. */}
-      {showTooltip && (
+      {/* Tooltip — portaled to body so any sticky header / overflow:hidden
+          parent can't clip it, and it sits above all in-shell stacking
+          contexts. Anchored to the right of the badge using viewport coords
+          captured on hover. */}
+      {tooltipPos && createPortal(
         <div
           style={{
-            position: 'absolute',
-            top: '50%',
-            left: '100%',
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
             transform: 'translateY(-50%)',
-            marginLeft: 10,
             padding: '8px 12px',
             borderRadius: 10,
             background: 'rgba(20, 20, 31, 0.92)',
@@ -118,7 +130,7 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
             fontSize: '0.7rem',
             lineHeight: 1.4,
             whiteSpace: 'nowrap',
-            zIndex: 50,
+            zIndex: 99999,
             pointerEvents: 'none',
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
           }}
@@ -156,7 +168,8 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
               borderRight: '5px solid rgba(20, 20, 31, 0.92)',
             }}
           />
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   );

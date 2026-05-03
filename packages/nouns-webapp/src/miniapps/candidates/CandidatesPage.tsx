@@ -5,6 +5,7 @@
  */
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 
+import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
 import { useBlockNumber } from 'wagmi';
 
@@ -13,6 +14,7 @@ import { relativeTimestamp } from '@/utils/timeUtils';
 import { useProposalThreshold } from '@/wrappers/nounsDao';
 import { useCandidateProposals } from '@/wrappers/nounsData';
 import type { ProposalCandidate } from '@/wrappers/nounsData';
+import { delegateNounsAtBlockQuery } from '@/wrappers/subgraph';
 
 type SortMode = 'recent' | 'sponsors' | 'oldest';
 
@@ -205,10 +207,40 @@ const CandidateCardMini: React.FC<{
   candidate: ProposalCandidate;
   threshold: number;
   currentBlock?: bigint;
-}> = ({ candidate, threshold }) => {
-  const sigCount = candidate.version.content.contentSignatures?.length ?? 0;
+}> = ({ candidate, threshold, currentBlock }) => {
+  const signers = candidate.version.content.contentSignatures ?? [];
   const requiredVotes = candidate.requiredVotes || threshold;
-  const progress = Math.min(sigCount / Math.max(requiredVotes, 1), 1);
+
+  // Sum the delegated noun voting weight of (proposer + valid signers) — this is the real
+  // metric vs. the proposal threshold, not the count of distinct signer addresses.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const activeSignerIds = signers
+    .filter(
+      s =>
+        s.signer?.id &&
+        s.canceled !== true &&
+        Number(s.expirationTimestamp ?? 0) > nowSec,
+    )
+    .map(s => s.signer.id.toLowerCase());
+  const proposerLower = candidate.proposer?.toLowerCase() ?? '';
+  const queryAddresses = Array.from(
+    new Set([proposerLower, ...activeSignerIds].filter(Boolean)),
+  );
+  const { query, variables } = delegateNounsAtBlockQuery(
+    queryAddresses,
+    currentBlock ? currentBlock - 1n : 0n,
+  );
+  const { data: delegateData } = useQuery<{
+    delegates: { items: Array<{ id: string; delegatedVotes: number }> };
+  }>(query, { variables, skip: queryAddresses.length === 0 });
+
+  const totalSupport =
+    delegateData?.delegates?.items?.reduce(
+      (sum, d) => sum + Number(d.delegatedVotes ?? 0),
+      0,
+    ) ?? 0;
+  const progress = Math.min(totalSupport / Math.max(requiredVotes, 1), 1);
+  const isOver = totalSupport >= requiredVotes;
 
   return (
     <Link to={`/candidates/${candidate.id}`} style={styles.card}>
@@ -230,8 +262,13 @@ const CandidateCardMini: React.FC<{
 
       {/* Sponsor count + timestamp */}
       <div style={styles.cardFooter}>
-        <span style={styles.sponsorCount}>
-          {sigCount} / {requiredVotes} sponsors
+        <span
+          style={{
+            ...styles.sponsorCount,
+            ...(isOver ? { color: '#43b369', fontWeight: 700 } : {}),
+          }}
+        >
+          {totalSupport} / {requiredVotes} noun votes
         </span>
         <span style={styles.timestamp}>
           {relativeTimestamp(Number(candidate.lastUpdatedTimestamp))}

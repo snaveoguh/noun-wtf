@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" shape-rendering="crispEdges">
+  <!-- Pixel noggles cursor — Nouns DAO iconic glasses
+       Hotspot at 12,12 (center, between the two lenses) -->
+  <!-- Red bridge / accent strip behind glasses -->
+  <rect x="0" y="8" width="24" height="2" fill="#d22209"/>
+  <!-- Left lens frame (black) -->
+  <rect x="3" y="6" width="8" height="8" fill="#000"/>
+  <!-- Right lens frame (black) -->
+  <rect x="13" y="6" width="8" height="8" fill="#000"/>
+  <!-- Left pupil (white) -->
+  <rect x="5" y="8" width="4" height="4" fill="#fff"/>
+  <!-- Right pupil (white) -->
+  <rect x="15" y="8" width="4" height="4" fill="#fff"/>
+  <!-- Left pupil black dot -->
+  <rect x="7" y="9" width="2" height="2" fill="#000"/>
+  <!-- Right pupil black dot -->
+  <rect x="17" y="9" width="2" height="2" fill="#000"/>
+</svg>

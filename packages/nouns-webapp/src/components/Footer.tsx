@@ -78,12 +78,16 @@ export const Footer = () => {
   ];
 
   return (
-    <footer className="mt-10 border-t px-6 py-10 sm:mt-20 sm:!p-10 lg:!p-12">
+    <footer
+      className="mt-10 border-t px-6 py-10 sm:mt-20 sm:!p-10 lg:!p-12"
+      style={{ borderTopColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-primary)' }}
+    >
       <div className="flex flex-wrap-reverse items-end justify-between gap-10">
         <section className="flex flex-grow items-center justify-center gap-4 sm:justify-normal">
           {socialItems.map(({ alt, url, icon }) => (
             <Link
-              className="text-black transition-opacity hover:opacity-70"
+              className="transition-opacity hover:opacity-70"
+              style={{ color: 'var(--theme-text-primary)' }}
               key={alt}
               aria-label={alt}
               to={url}
@@ -97,7 +101,12 @@ export const Footer = () => {
         <div className="mx-auto flex flex-wrap gap-12 sm:mx-0">
           {categories.map(({ category, items }) => (
             <section key={category}>
-              <h3 className="mb-2 text-base font-bold">{category}</h3>
+              <h3
+                className="mb-2 text-base font-bold"
+                style={{ color: 'var(--theme-text-primary)' }}
+              >
+                {category}
+              </h3>
               <ul className="list-none space-y-1 pl-0">
                 {items.map(({ label, url }) => (
                   <li key={label}>
@@ -105,7 +114,8 @@ export const Footer = () => {
                       reloadDocument
                       to={url}
                       target={url.startsWith('/') ? undefined : '_blank'}
-                      className="font-medium text-black no-underline hover:text-red-500"
+                      className="font-medium no-underline hover:text-red-500"
+                      style={{ color: 'var(--theme-text-primary)' }}
                     >
                       {label}
                     </Link>
@@ -117,7 +127,10 @@ export const Footer = () => {
         </div>
       </div>
 
-      <div className="mt-12 flex items-center justify-center text-base text-black sm:mt-16">
+      <div
+        className="mt-12 flex items-center justify-center text-base sm:mt-16"
+        style={{ color: 'var(--theme-text-primary)' }}
+      >
         <p className="m-0 p-1">{`${new Date().getFullYear()} Nouns DAO`}</p>·
         <p className="m-0 p-1">
           <Trans>

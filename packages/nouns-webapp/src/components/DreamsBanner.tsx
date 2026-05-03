@@ -35,7 +35,7 @@ interface DreamNoun {
   updated_at: string;
 }
 
-interface DreamCard {
+export interface DreamCard {
   id: number;
   dreamer: string;
   svgBase64: string | null;            // composed SVG (base64) — full noun or base layers only
@@ -148,7 +148,7 @@ function buildDreamCard(dream: DreamNoun): DreamCard | null {
 
 // ─── Data Hook ────────────────────────────────────────────────────────────────
 
-function useDreams() {
+export function useDreams() {
   return useReactQuery({
     queryKey: ['probeDreams'],
     queryFn: async (): Promise<DreamCard[]> => {

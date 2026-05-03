@@ -20,7 +20,7 @@
     max(1.5rem, var(--page-edge-padding-right, 1.5rem))
     0.45rem
     max(1.5rem, var(--page-edge-padding-left, 1.5rem)) !important;
-  background: #ffffff !important;
+  background: var(--theme-bg-primary) !important;
   position: relative;
   z-index: 70;
 }
@@ -223,7 +223,7 @@
   font-weight: bold;
   font-size: 0.75rem;
   padding: 0.2rem 0.2rem !important;
-  color: black !important;
+  color: var(--theme-text-primary) !important;
 }
 
 .nounsNavDropdownButton > button {

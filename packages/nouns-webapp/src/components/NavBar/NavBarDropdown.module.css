@@ -11,14 +11,14 @@
 }
 
 .whiteInfo {
-  background-color: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  color: rgb(95, 95, 95);
+  background-color: var(--theme-bg-primary);
+  border: 1px solid var(--theme-border);
+  color: var(--theme-text-secondary);
 }
 
 .whiteInfo:hover {
-  background-color: #e2e3e8;
-  color: black;
+  background-color: var(--theme-bg-hover);
+  color: var(--theme-text-primary);
 }
 
 .coolInfo {
@@ -27,8 +27,8 @@
 }
 
 .coolInfo:hover {
-  background-color: white;
-  color: black;
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
 }
 
 .warmInfo {
@@ -37,35 +37,35 @@
 }
 
 .warmInfo:hover {
-  background-color: white;
-  color: black;
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
 }
 
 .whiteInfoSelected {
-  background-color: #f4f4f8;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  color: #8c8d92;
+  background-color: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border);
+  color: var(--theme-text-secondary);
 }
 
 .whiteInfoSelectedTop {
-  background-color: #f4f4f8;
-  border-top: 1.5px solid #e2e3e8;
-  border-right: 1.5px solid #e2e3e8;
-  border-left: 1.5px solid #e2e3e8;
-  color: #8c8d92;
+  background-color: var(--theme-bg-secondary);
+  border-top: 1.5px solid var(--theme-border);
+  border-right: 1.5px solid var(--theme-border);
+  border-left: 1.5px solid var(--theme-border);
+  color: var(--theme-text-secondary);
 }
 
 .whiteInfoSelectedBottom {
-  background-color: #f4f4f8;
-  border-bottom: 1.5px solid #e2e3e8;
-  border-right: 1.5px solid #e2e3e8;
-  border-left: 1.5px solid #e2e3e8;
-  color: #8c8d92;
+  background-color: var(--theme-bg-secondary);
+  border-bottom: 1.5px solid var(--theme-border);
+  border-right: 1.5px solid var(--theme-border);
+  border-left: 1.5px solid var(--theme-border);
+  color: var(--theme-text-secondary);
 }
 
 .dropdownActive {
-  background-color: white;
-  color: black;
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
 }
 .coolInfoSelected {
   color: #79809c;
@@ -93,7 +93,7 @@
   text-overflow: ellipsis;
   min-height: 18px;
   line-height: 20px;
-  color: black !important;
+  color: var(--theme-text-primary) !important;
 }
 
 .dropdownBtnIcon {
@@ -131,7 +131,7 @@
 }
 
 .dropdownPrimaryText:hover {
-  background-color: white;
+  background-color: var(--theme-bg-primary);
   transition: all 0.125s ease-in-out;
   cursor: pointer;
 }

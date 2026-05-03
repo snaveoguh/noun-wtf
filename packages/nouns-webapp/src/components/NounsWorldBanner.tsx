@@ -6,14 +6,14 @@ import ReactDOM from 'react-dom';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
 
-interface NounsWorldStory {
+export interface NounsWorldStory {
   title: string;
   image: string;
   url: string;
   description: string;
 }
 
-const STORIES: NounsWorldStory[] = [
+export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
   {
     title: 'Nouns Funds Esports',
     image: 'https://explore.nouns.world/wp-content/uploads/2025/03/nouns-gg-landing-gif.gif',
@@ -365,7 +365,7 @@ const NounsWorldBanner: FC = () => {
   }, []);
 
   // Duplicate for seamless loop
-  const displayStories = useMemo(() => [...STORIES, ...STORIES], []);
+  const displayStories = useMemo(() => [...NOUNS_WORLD_STORIES, ...NOUNS_WORLD_STORIES], []);
 
   const handleClose = useCallback(() => setSelectedStory(null), []);
 

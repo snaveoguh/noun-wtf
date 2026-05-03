@@ -54,7 +54,7 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
   3: {
     name: 'nouns.camp',
     url: 'https://nouns.camp',
-    description: 'Governance-focused Nouns client by Federation',
+    description: 'Governance-focused Nouns client by Obvious Inc',
   },
   4: {
     name: 'Nouns.biz',
@@ -69,7 +69,7 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
   6: {
     name: 'nouns.game',
     url: 'https://nouns.game',
-    description: 'Nouns trait explorer and fun-fact generator',
+    description: 'A cool client by the DUNA Admin',
   },
   7: {
     name: 'Nouns Terminal',
@@ -99,7 +99,17 @@ export const CLIENT_REGISTRY: Record<number, ClientInfo> = {
   12: {
     name: 'Prop Launchpad',
     url: 'https://proplaunchpad.com',
-    description: 'Tooling for launching Nouns DAO proposals',
+    description: 'This client does not exist, they are farming rewards via etherscan',
+  },
+  18: {
+    name: 'Anouns',
+    url: '',
+    description: 'Anouns — anonymous Nouns client',
+  },
+  22: {
+    name: "Nouncil's client",
+    url: '',
+    description: "Nouncil's client",
   },
   37: {
     name: 'noun.wtf',

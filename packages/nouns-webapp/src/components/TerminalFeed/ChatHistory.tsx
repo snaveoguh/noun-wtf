@@ -63,13 +63,13 @@ function AgentStatusBar() {
         alignItems: 'center',
         gap: '12px',
         padding: '6px 16px',
-        borderBottom: '1px solid #0a0a0a',
+        borderBottom: '1px solid var(--theme-feed-row-border)',
         fontSize: '11px',
-        color: '#666',
+        color: 'var(--theme-text-muted)',
         flexShrink: 0,
       }}
     >
-      <span style={{ color: status.running ? '#00ff41' : '#ef4444' }}>
+      <span style={{ color: status.running ? 'var(--theme-positive)' : 'var(--theme-negative)' }}>
         {status.running ? 'agent active' : 'agent offline'}
       </span>
       <span>block {status.lastBlock}</span>
@@ -106,7 +106,7 @@ export default function ChatHistory({ messages }: Props) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#333',
+            color: 'var(--theme-text-muted)',
             fontSize: '13px',
           }}
         >
@@ -135,7 +135,7 @@ export default function ChatHistory({ messages }: Props) {
           style={{
             marginBottom: '16px',
             paddingBottom: '12px',
-            borderBottom: i < messages.length - 1 ? '1px solid #0a0a0a' : 'none',
+            borderBottom: i < messages.length - 1 ? '1px solid var(--theme-feed-row-border)' : 'none',
           }}
         >
           {/* Header: role + time */}
@@ -149,14 +149,14 @@ export default function ChatHistory({ messages }: Props) {
           >
             <span
               style={{
-                color: msg.role === 'user' ? '#60a5fa' : '#00ff41',
+                color: msg.role === 'user' ? '#60a5fa' : 'var(--theme-accent)',
                 fontSize: '11px',
                 letterSpacing: '0.5px',
               }}
             >
               {msg.role === 'user' ? 'you' : 'nounirl'}
             </span>
-            <span style={{ color: '#222', fontSize: '11px' }}>
+            <span style={{ color: 'var(--theme-text-muted)', fontSize: '11px' }}>
               {formatTime(msg.timestamp)}
             </span>
           </div>
@@ -164,7 +164,7 @@ export default function ChatHistory({ messages }: Props) {
           {/* Content */}
           <div
             style={{
-              color: msg.role === 'user' ? '#888' : '#aaa',
+              color: msg.role === 'user' ? 'var(--theme-text-muted)' : 'var(--theme-text-secondary)',
               fontSize: '13px',
               lineHeight: 1.6,
               whiteSpace: 'pre-wrap',

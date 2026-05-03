@@ -292,8 +292,8 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         left: 0,
         right: 0,
         maxHeight: '70vh',
-        background: '#000',
-        borderTop: '1px solid #111',
+        background: 'var(--theme-bg-primary)',
+        borderTop: '1px solid var(--theme-border)',
         zIndex: 1100,
         display: 'flex',
         flexDirection: 'column',
@@ -304,8 +304,8 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         left: 0,
         right: 0,
         maxHeight: '60vh',
-        background: '#000',
-        borderTop: '1px solid #111',
+        background: 'var(--theme-bg-primary)',
+        borderTop: '1px solid var(--theme-border)',
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
@@ -322,17 +322,17 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '6px 16px',
-              borderBottom: '1px solid #111',
+              borderBottom: '1px solid var(--theme-border)',
             }}
           >
-            <span style={{ color: '#00ff41', fontSize: '11px' }}>agent nounirl</span>
+            <span style={{ color: 'var(--theme-accent)', fontSize: '11px' }}>agent nounirl</span>
             <button
               type="button"
               onClick={dismiss}
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#333',
+                color: 'var(--theme-text-muted)',
                 cursor: 'pointer',
                 fontSize: '12px',
                 padding: '2px 6px',
@@ -347,7 +347,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
               flex: 1,
               overflowY: 'auto',
               padding: '12px 16px',
-              color: '#aaa',
+              color: 'var(--theme-text-secondary)',
               fontSize: '13px',
               lineHeight: 1.6,
               whiteSpace: 'pre-wrap',
@@ -369,13 +369,13 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
                       type="button"
                       onClick={() => show?.()}
                       style={{
-                        background: '#111',
-                        border: '1px solid #00ff41',
-                        color: '#00ff41',
+                        background: 'var(--theme-bg-tertiary)',
+                        border: '1px solid var(--theme-accent)',
+                        color: 'var(--theme-accent)',
                         cursor: 'pointer',
                         fontSize: '12px',
                         padding: '6px 16px',
-                        borderRadius: '2px',
+                        borderRadius: 'var(--theme-radius-sm)',
                       }}
                     >
                       connect wallet
@@ -406,12 +406,12 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           display: 'flex',
           alignItems: 'center',
           padding: '0 16px',
-          borderTop: '1px solid #111',
-          background: '#000',
+          borderTop: '1px solid var(--theme-border)',
+          background: 'var(--theme-bg-primary)',
           flexShrink: 0,
         }}
       >
-        <span style={{ color: '#00ff41', marginRight: '8px', fontSize: '14px' }}>&gt;</span>
+        <span style={{ color: 'var(--theme-accent)', marginRight: '8px', fontSize: '14px' }}>&gt;</span>
         <input
           ref={inputRef}
           value={input}
@@ -428,15 +428,15 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            color: '#ccc',
+            color: 'var(--theme-text-secondary)',
             fontSize: '14px',
-            caretColor: '#00ff41',
+            caretColor: 'var(--theme-accent)',
           }}
         />
         {isLoading && (
           <span
             style={{
-              color: '#00ff41',
+              color: 'var(--theme-accent)',
               fontSize: '12px',
               opacity: 0.6,
               animation: 'pulse 1.5s infinite',
@@ -463,12 +463,11 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             left: 0,
             right: 0,
             padding: '4px 16px 6px',
-            background: '#000',
-            borderTop: '1px solid #0a0a0a',
-            color: '#444',
+            background: 'var(--theme-bg-primary)',
+            borderTop: '1px solid var(--theme-feed-row-border)',
+            color: 'var(--theme-text-muted)',
             fontSize: '11px',
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily: 'var(--theme-font-body)',
             letterSpacing: '0.02em',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -478,7 +477,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             pointerEvents: 'none',
           }}
         >
-          while you wait, try: <span style={{ color: '#6a6a6a' }}>{AGENT_HINTS[hintIndex]}</span>
+          while you wait, try: <span style={{ color: 'var(--theme-text-secondary)' }}>{AGENT_HINTS[hintIndex]}</span>
         </div>
       )}
     </>
