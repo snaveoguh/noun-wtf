@@ -176,7 +176,7 @@ export interface PartialProposal {
   /** Proposer wallet address (lowercased). Surfaced for sidebar bylines. */
   proposer?: string;
   /** Unix seconds when the proposal was created on-chain (subgraph value). */
-  createdTimestamp?: number;
+  createdTimestamp?: bigint;
 }
 
 export interface Proposal extends PartialProposal {
@@ -836,9 +836,9 @@ const parsePartialSubgraphProposal = (
         ? proposal.proposer.toLowerCase()
         : ((proposal.proposer as unknown as { id?: string })?.id?.toLowerCase() ?? undefined),
     createdTimestamp: proposal.createdAt
-      ? Number(proposal.createdAt)
+      ? BigInt(proposal.createdAt)
       : proposal.createdTimestamp
-        ? Number(proposal.createdTimestamp)
+        ? BigInt(proposal.createdTimestamp)
         : undefined,
   };
 };
