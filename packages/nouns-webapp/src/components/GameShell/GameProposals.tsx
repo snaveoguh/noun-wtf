@@ -1,18 +1,21 @@
 import { Fragment, useMemo, useState } from 'react';
 
 import { useQuery } from '@apollo/client';
-import { useBlockNumber } from 'wagmi';
+import { useBlockNumber, useEnsAvatar, useEnsName } from 'wagmi';
 
 import { PropHoverCard } from '@/components/PropHoverCard';
 import { useEnsNames } from '@/components/TerminalFeed/useEnsNames';
 import { VoterHoverCard } from '@/components/VoterHoverCard';
-import { formatShortAddress } from '@/utils/addressAndENSDisplayUtils';
+import { formatShortAddress, isNogglesName, stripNoggles } from '@/utils/addressAndENSDisplayUtils';
+import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
 import type { Address } from '@/utils/types';
 import { ProposalState, useAllProposals, type PartialProposal } from '@/wrappers/nounsDao';
 import { useCandidateProposals, type ProposalCandidate } from '@/wrappers/nounsData';
 import { proposalVotesQuery } from '@/wrappers/subgraph';
 
 import classes from './GameShell.module.css';
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 type TabKey = 'proposals' | 'candidates' | 'topics';
 
@@ -95,6 +98,88 @@ function avatarGradient(addr: string): string {
   const a = parseInt(addr.slice(2, 8), 16) % 360;
   const b = parseInt(addr.slice(8, 14), 16) % 360;
   return `linear-gradient(135deg, hsl(${a}, 60%, 55%), hsl(${b}, 60%, 35%))`;
+}
+
+interface EnsAvatarProps {
+  address: string;
+  /** Render dimension in px. CSS classes set their own size; this only
+   *  affects the gradient backdrop fallback's apparent size — kept for
+   *  symmetry with the ShortAddress API. */
+  size?: number;
+  /** Style applied to the wrapper (used for stack overlap z-index/offset). */
+  style?: React.CSSProperties;
+  /** Element class — defaults to the `voterAvatar` row style. */
+  className?: string;
+  /** Optional native title attribute — used by the +N stack for hover tooltips. */
+  title?: string;
+}
+
+/**
+ * Avatar disc that resolves the address's ENS avatar via wagmi
+ * (`useEnsName` → `useEnsAvatar`) and falls back to the deterministic
+ * gradient when:
+ *   • address is missing / zero
+ *   • ENS name is unset (or noggles namespace, which we treat as no name)
+ *   • ENS avatar text record is empty / null
+ *   • image fetch fails (404, CORS, etc.)
+ *
+ * Wagmi caches name + avatar lookups per (chainId, address) so multiple
+ * cards / rows pointing at the same delegate share a single RPC call.
+ * The gradient renders immediately on every paint — the `<img>` only mounts
+ * once a URL resolves, so rows never blank during the lookup.
+ */
+function EnsAvatar({ address, style, className, title }: EnsAvatarProps) {
+  const enabled = !!address && address !== ZERO_ADDRESS && address.length === 42;
+
+  const { data: ensName } = useEnsName({
+    address: enabled ? (address as Address) : undefined,
+    query: { enabled },
+  });
+  // Skip noggles names — that namespace was rugged and we never resolve
+  // its avatars. Falls through to the noun-contract resolved name for the
+  // handful of well-known DAO contract addresses, then to nothing.
+  const avatarLookupName = isNogglesName(ensName)
+    ? resolveNounContractAddress(address)
+    : (ensName ?? resolveNounContractAddress(address));
+  const safeName = stripNoggles(avatarLookupName) || avatarLookupName || undefined;
+
+  const { data: ensAvatar } = useEnsAvatar({
+    name: safeName ?? undefined,
+    query: { enabled: enabled && !!safeName },
+  });
+
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImg = !!ensAvatar && !imgFailed;
+
+  // The wrapper always paints the gradient — `<img>` covers it once loaded.
+  // That way the row never blanks during the lookup or after a 404.
+  const wrapperStyle: React.CSSProperties = {
+    background: avatarGradient(address || '0x000000'),
+    cursor: 'default',
+    ...style,
+  };
+
+  return (
+    <span className={className} style={wrapperStyle} title={title} aria-hidden>
+      {showImg && (
+        <img
+          src={ensAvatar as string}
+          alt=""
+          onError={() => setImgFailed(true)}
+          // image-rendering: auto — most ENS avatars are pixel art but a
+          // sizeable minority are smooth photos; auto looks acceptable on
+          // both at the 16-18px sizes used here.
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            imageRendering: 'auto',
+          }}
+        />
+      )}
+    </span>
+  );
 }
 
 interface RawVote {
@@ -186,11 +271,7 @@ function VoterRow({ vote, ensLookup }: VoterRowProps) {
         onClick={hasReason ? stopAndToggle : undefined}
       >
         <VoterHoverCard address={vote.voter as Address} asChild>
-          <span
-            className={classes.voterAvatar}
-            style={{ background: avatarGradient(vote.voter), cursor: 'default' }}
-            aria-hidden
-          />
+          <EnsAvatar address={vote.voter} className={classes.voterAvatar} />
         </VoterHoverCard>
         <VoterHoverCard address={vote.voter as Address} asChild>
           <span className={classes.voterName} title={vote.voter} style={{ cursor: 'default' }}>
@@ -346,17 +427,14 @@ function ProposalCard({ proposal, currentBlock }: ProposalCardProps) {
                   aria-label={`${stackVoters.length} more voters`}
                 >
                   {stackVoters.map((v, i) => (
-                    <span
+                    <EnsAvatar
                       key={`${v.voter}-stack`}
+                      address={v.voter}
                       className={classes.voterAvatarStackItem}
-                      style={{
-                        background: avatarGradient(v.voter),
-                        // Leftmost on top reads cleanest — eye lands on the
-                        // first disc and the rest fan out behind it.
-                        zIndex: stackVoters.length - i,
-                      }}
+                      // Leftmost on top reads cleanest — eye lands on the
+                      // first disc and the rest fan out behind it.
+                      style={{ zIndex: stackVoters.length - i }}
                       title={ensLookup(v.voter) || v.voter}
-                      aria-hidden
                     />
                   ))}
                 </span>
