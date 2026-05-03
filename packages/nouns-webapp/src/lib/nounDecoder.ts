@@ -145,3 +145,105 @@ export const DEFAULT_VISIBILITY: LayerVisibility = {
 export function createEmptyGrid(): string[][] {
   return Array.from({ length: 32 }, () => Array(32).fill(''));
 }
+
+// ─── Export helpers (pixel grid → SVG / PNG) ─────────────────────────────────
+//
+// These let the Save dropdown export whatever is on the 2D canvas — including
+// edits AND layer-visibility toggles — instead of always falling back to the
+// raw seed SVG. When `bgColor` is omitted (or empty) the SVG/PNG has a
+// transparent background, so single-trait downloads (e.g. just the head with
+// other layers hidden) come out cleanly.
+
+const PIXEL_SCALE = 10;
+const GRID_SIZE = 32;
+const CANVAS_PX = GRID_SIZE * PIXEL_SCALE;
+
+/**
+ * Build an SVG string from a 32×32 pixel grid. Empty cells stay transparent.
+ * Adjacent same-color cells in a row are merged into a single rect to keep
+ * the file small (matches `buildSVG` from `@nouns/sdk`).
+ */
+export function pixelGridToSvg(pixels: string[][], bgColor?: string): string {
+  const rects: string[] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    let runStart = -1;
+    let runColor = '';
+    const flush = (endX: number) => {
+      if (runStart < 0 || !runColor) return;
+      const width = (endX - runStart) * PIXEL_SCALE;
+      rects.push(
+        `<rect width="${width}" height="${PIXEL_SCALE}" x="${runStart * PIXEL_SCALE}" y="${y * PIXEL_SCALE}" fill="${runColor}" />`,
+      );
+      runStart = -1;
+      runColor = '';
+    };
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const color = pixels[y]?.[x] ?? '';
+      if (!color) {
+        flush(x);
+        continue;
+      }
+      if (color !== runColor) {
+        flush(x);
+        runStart = x;
+        runColor = color;
+      }
+    }
+    flush(GRID_SIZE);
+  }
+
+  const bgRect = bgColor
+    ? `<rect width="100%" height="100%" fill="${bgColor}" />`
+    : '';
+  return (
+    `<svg width="${CANVAS_PX}" height="${CANVAS_PX}" viewBox="0 0 ${CANVAS_PX} ${CANVAS_PX}" ` +
+    `xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">` +
+    bgRect +
+    rects.join('') +
+    `</svg>`
+  );
+}
+
+/**
+ * Render a 32×32 pixel grid into a `HTMLCanvasElement` scaled up to 320×320
+ * (one source pixel = 10×10 output). Background cells stay transparent unless
+ * `bgColor` is provided. Returns `null` if document/canvas isn't available.
+ */
+export function pixelGridToCanvas(
+  pixels: string[][],
+  bgColor?: string,
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_PX;
+  canvas.height = CANVAS_PX;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
+  }
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const color = pixels[y]?.[x];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(x * PIXEL_SCALE, y * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
+    }
+  }
+  return canvas;
+}
+
+/**
+ * Convert a pixel grid to a data URL of the requested raster format. Returns
+ * an empty string when the canvas can't be created (SSR / no document).
+ */
+export function pixelGridToDataUrl(
+  pixels: string[][],
+  format: 'png' | 'webp' = 'png',
+  bgColor?: string,
+): string {
+  const canvas = pixelGridToCanvas(pixels, bgColor);
+  if (!canvas) return '';
+  return canvas.toDataURL(format === 'webp' ? 'image/webp' : 'image/png');
+}

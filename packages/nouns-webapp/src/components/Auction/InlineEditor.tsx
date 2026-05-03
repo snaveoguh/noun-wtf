@@ -93,6 +93,10 @@ interface InlineEditorProps {
   externalFuture?: string[][][];
   visibility?: LayerVisibility;
   onVisibilityChange?: (visibility: LayerVisibility) => void;
+  /** Background color visibility (2D only). When false, exports are transparent
+   *  behind the noun. Independent of the 4-layer trait toggles. */
+  bgVisible?: boolean;
+  onBgVisibilityChange?: (visible: boolean) => void;
   interactionMode?: 'sculpt' | 'grab' | 'twist';
   onInteractionModeChange?: (mode: 'sculpt' | 'grab' | 'twist') => void;
 }
@@ -119,6 +123,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
   externalFuture,
   visibility: controlledVisibility,
   onVisibilityChange,
+  bgVisible = true,
+  onBgVisibilityChange,
   interactionMode = 'sculpt',
   onInteractionModeChange,
   voxelDepth = 1,
@@ -465,6 +471,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
                   <span>{label}</span>
                 </button>
               ))}
+              {/* Background visibility (2D only — affects download bg) */}
+              {!panelsOnly && onBgVisibilityChange && (
+                <button
+                  type="button"
+                  className={`${classes.layerBtn} ${bgVisible ? classes.layerOn : classes.layerOff}`}
+                  onClick={() => onBgVisibilityChange(!bgVisible)}
+                  title="Toggle background (off = transparent download)"
+                >
+                  <span>🎨</span>
+                  <span>BG</span>
+                </button>
+              )}
             </div>
 
             {/* Brush size slider (3D mode) */}
