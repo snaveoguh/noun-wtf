@@ -17,6 +17,11 @@ import {
   useRunningAppIds,
   windowStore,
 } from './store/windowStore';
+import NotificationCenter from './system/NotificationCenter';
+import PermissionPrompt from './system/PermissionPrompt';
+import SpotlightSystem from './system/SpotlightSystem';
+import ToastStack from './system/ToastStack';
+import { bootBerrySystems } from './system/bootstrap';
 
 /**
  * Menu bar clock — updates once per 30s. Drops the day-of-week on narrow
@@ -118,6 +123,12 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
     const onResize = () => setCompact(window.innerWidth < 720);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Boot the permissions + services subsystem once on shell mount. Idempotent
+  // — safe to call again (e.g. from a future system:bootComplete trigger).
+  useEffect(() => {
+    bootBerrySystems();
   }, []);
 
   // Open Finder once on first mount so the desktop never starts empty.
@@ -465,6 +476,16 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
           );
         })}
       </nav>
+
+      {/* Spotlight + global hotkeys + cmd-hold cheat sheet — single mount */}
+      <SpotlightSystem />
+
+      {/* Permission prompt — modal that listens for permission:requested */}
+      <PermissionPrompt />
+
+      {/* Notification system — toast stack (top-right) + slide-out center */}
+      <ToastStack />
+      <NotificationCenter />
     </div>
   );
 }
