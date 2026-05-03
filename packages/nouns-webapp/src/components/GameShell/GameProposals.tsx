@@ -192,19 +192,64 @@ interface RawVote {
   createdAtTransaction?: string;
 }
 
-/** Render the segmented vote bar (one tick per vote, color by support). */
+/** Render the segmented vote bar.
+ *
+ * Two modes:
+ * - If `votes` is provided: render one segment per voter, width proportional
+ *   to that voter's weight (whale = wide chunk, 1-vote holder = thin sliver).
+ *   Reveals voting-power concentration at a glance.
+ * - Otherwise (e.g. candidate cards with synthetic totals): fall back to the
+ *   uniform-tick rendering keyed off the totals only.
+ */
 function SegmentedVoteBar({
   forCount,
   againstCount,
   abstainCount,
+  votes,
 }: {
   forCount: number;
   againstCount: number;
   abstainCount: number;
+  votes?: { voter: string; support: number; votes?: number }[];
 }) {
   const total = forCount + againstCount + abstainCount;
-  // Cap the number of ticks rendered so a 200-vote prop doesn't ship 200
-  // DOM nodes per card. Ticks remain visually proportional.
+
+  // Per-voter weight-proportional mode.
+  if (votes && votes.length > 0) {
+    // Sort whales-first within each support bucket so the bar reads
+    // FOR (largest → smallest) | AGAINST (largest → smallest) | ABSTAIN.
+    const bucket = (s: number) => (s === 1 ? 'for' : s === 0 ? 'against' : 'abstain');
+    const order: Record<string, number> = { for: 0, against: 1, abstain: 2 };
+    const sorted = [...votes].sort((a, b) => {
+      const ab = bucket(a.support);
+      const bb = bucket(b.support);
+      if (ab !== bb) return order[ab] - order[bb];
+      return (b.votes ?? 0) - (a.votes ?? 0);
+    });
+    return (
+      <div className={classes.voteBarSeg} aria-hidden>
+        {sorted.map((v, i) => {
+          const weight = Math.max(1, v.votes ?? 0);
+          const kind = bucket(v.support);
+          return (
+            <span
+              key={`${v.voter}-${i}`}
+              style={{ flex: weight }}
+              className={`${classes.voteTick} ${
+                kind === 'for'
+                  ? classes.voteTickFor
+                  : kind === 'against'
+                    ? classes.voteTickAgainst
+                    : classes.voteTickAbstain
+              }`}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Totals-only fallback (uniform ticks).
   const MAX_TICKS = 60;
   const targetTicks = total > 0 ? Math.min(total, MAX_TICKS) : MAX_TICKS;
   const ticks: ('for' | 'against' | 'abstain' | 'empty')[] = [];
@@ -387,6 +432,7 @@ function ProposalCard({ proposal, currentBlock }: ProposalCardProps) {
         forCount={proposal.forCount}
         againstCount={proposal.againstCount}
         abstainCount={proposal.abstainCount}
+        votes={allVotes}
       />
 
       <div className={classes.voteCounts}>
