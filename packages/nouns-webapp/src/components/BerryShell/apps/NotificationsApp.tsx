@@ -11,7 +11,7 @@
 
 import { useMemo, useState, type ComponentType } from 'react';
 
-import { GlassButton, GlassChip, GlassPanel, GlassToolbar } from '@/liquid-sand/glass';
+import { GlassButton, GlassChip, GlassToolbar } from '@/liquid-sand/glass';
 import { Bell, ChatBubble, Coin, Info, Megaphone, Sparkle } from '@/liquid-sand/icons';
 
 import {
@@ -149,8 +149,8 @@ export default function NotificationsApp() {
         color: 'var(--ls-fg-primary)',
       }}
     >
-      {/* Filter bar */}
-      <div className="p-2.5">
+      {/* Filter bar — 16pt content padding per HIG 8pt grid */}
+      <div style={{ padding: 16, paddingBottom: 8 }}>
         <GlassToolbar size="md" align="start" className="w-full flex-wrap">
           <FilterChip
             label="All"
@@ -181,14 +181,18 @@ export default function NotificationsApp() {
                   if (!e.target.value) setFilter({ kind: 'all' });
                   else setFilter({ kind: 'app', appId: e.target.value });
                 }}
+                aria-label="Filter by app"
                 style={{
-                  fontSize: 11,
+                  fontSize: 'var(--ls-text-xs)',
+                  lineHeight: 1.4,
                   fontFamily: 'inherit',
-                  padding: '2px 8px',
+                  padding: '6px 10px',
                   borderRadius: 'var(--ls-r-md)',
                   border: '1px solid var(--ls-border-glass)',
-                  background: 'var(--ls-glass-light-strong)',
+                  // Solid sand surface — no nested glass
+                  background: 'var(--ls-sand-100)',
                   color: 'var(--ls-fg-primary)',
+                  minHeight: 32,
                 }}
               >
                 <option value="">By app…</option>
@@ -212,18 +216,20 @@ export default function NotificationsApp() {
         </GlassToolbar>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto px-2.5 pb-2.5 flex flex-col gap-2">
+      {/* List — 16pt edge padding, 8pt item gap */}
+      <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: '0 16px 16px', gap: 8 }}>
         {filtered.length === 0 ? (
           <div
-            className="text-center"
+            className="text-center flex flex-col items-center"
             style={{
               padding: 32,
+              gap: 8,
               color: 'var(--ls-fg-muted)',
-              fontSize: 'var(--ls-text-sm)',
+              fontSize: 'var(--ls-text-md)',
+              lineHeight: 1.4,
             }}
           >
-            <Bell size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
+            <Bell size={28} style={{ opacity: 0.5 }} />
             <div>No notifications</div>
           </div>
         ) : (
@@ -231,16 +237,16 @@ export default function NotificationsApp() {
         )}
       </div>
 
-      {/* Dev tools */}
+      {/* Dev tools — solid sand band so the dev panel doesn't compose more glass */}
       {isDev() && (
         <div
-          className="p-2.5"
           style={{
+            padding: 16,
             borderTop: '1px solid var(--ls-border-glass)',
-            background: 'var(--ls-glass-tint)',
+            background: 'var(--ls-sand-100)',
           }}
         >
-          <div className="flex gap-2 items-center">
+          <div className="flex items-center" style={{ gap: 8 }}>
             <GlassChip tone="accent" size="xs">
               dev
             </GlassChip>
@@ -270,18 +276,22 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 select-none"
+      aria-pressed={active}
+      className="inline-flex items-center select-none"
       style={{
-        fontSize: 11,
+        fontSize: 'var(--ls-text-xs)',
+        lineHeight: 1.4,
         fontWeight: 600,
-        padding: '4px 10px',
+        padding: '6px 12px',
+        gap: 6,
         borderRadius: 'var(--ls-r-full)',
         border: '1px solid var(--ls-border-glass)',
-        background: active ? 'var(--ls-accent)' : 'transparent',
+        background: active ? 'var(--ls-accent)' : 'var(--ls-sand-100)',
         color: active ? 'var(--ls-fg-on-dark)' : 'var(--ls-fg-secondary)',
         cursor: 'pointer',
         textTransform: 'capitalize',
         fontFamily: 'inherit',
+        minHeight: 32,
         boxShadow: active
           ? 'var(--ls-shadow-inset-glass), var(--ls-shadow-glow)'
           : 'none',
@@ -328,50 +338,57 @@ function fallbackIcon(appId: string, level: NotificationLevel | undefined) {
 function Row({ notification }: { notification: BerryNotification }) {
   const accent = LEVEL_COLOR[notification.level ?? 'info'];
   return (
-    <GlassPanel
-      padded={false}
-      radius="md"
-      tone="auto"
-      className="flex gap-2.5 px-3 py-2.5"
+    // Solid sand surface — no nested glass over text
+    <div
+      className="flex"
       style={{
         opacity: notification.dismissed ? 0.6 : 1,
         borderLeft: `3px solid ${notification.dismissed ? 'var(--ls-border-glass)' : accent}`,
+        background: 'var(--ls-sand-50)',
+        borderRadius: 'var(--ls-r-md)',
+        border: '1px solid var(--ls-border-glass)',
+        borderLeftWidth: 3,
+        borderLeftColor: notification.dismissed ? 'var(--ls-border-glass)' : accent,
+        padding: 16,
+        gap: 12,
       }}
     >
       <div
         aria-hidden
         className="flex-shrink-0 flex items-center justify-center"
         style={{
-          width: 22,
-          height: 22,
-          marginTop: 1,
+          width: 24,
+          height: 24,
           color: accent,
         }}
       >
         {fallbackIcon(notification.appId, notification.level)}
       </div>
       <div className="flex-1 min-w-0">
-        <div style={{ fontSize: 'var(--ls-text-sm)', fontWeight: 600, lineHeight: 1.3 }}>
+        <div style={{ fontSize: 'var(--ls-text-md)', fontWeight: 600, lineHeight: 1.3 }}>
           {notification.title}
         </div>
         {notification.body && (
           <div
             style={{
-              fontSize: 'var(--ls-text-xs)',
+              fontSize: 'var(--ls-text-sm)',
               color: 'var(--ls-fg-secondary)',
-              lineHeight: 1.35,
+              lineHeight: 1.4,
               wordBreak: 'break-word',
-              marginTop: 1,
+              marginTop: 4,
             }}
           >
             {notification.body}
           </div>
         )}
         <div
-          className="flex gap-2 items-center mt-1.5"
+          className="flex items-center"
           style={{
-            fontSize: 10,
+            fontSize: 'var(--ls-text-xs)',
+            lineHeight: 1.4,
             color: 'var(--ls-fg-muted)',
+            marginTop: 8,
+            gap: 8,
           }}
         >
           <GlassChip
@@ -388,16 +405,17 @@ function Row({ notification }: { notification: BerryNotification }) {
               type="button"
               onClick={() => notification.action?.onClick()}
               style={{
-                fontSize: 10,
+                fontSize: 'var(--ls-text-xs)',
                 fontWeight: 700,
                 color: accent,
                 background: 'transparent',
                 border: 'none',
-                padding: 0,
+                padding: '4px 8px',
                 cursor: 'pointer',
                 textTransform: 'uppercase',
-                letterSpacing: 0.5,
+                letterSpacing: 0.6,
                 fontFamily: 'inherit',
+                minHeight: 32,
               }}
             >
               {notification.action.label}
@@ -407,15 +425,17 @@ function Row({ notification }: { notification: BerryNotification }) {
             <button
               type="button"
               onClick={() => dismiss(notification.id)}
+              aria-label={`Dismiss ${notification.title}`}
               style={{
-                fontSize: 10,
+                fontSize: 'var(--ls-text-xs)',
                 color: 'var(--ls-fg-muted)',
                 background: 'transparent',
                 border: 'none',
-                padding: 0,
+                padding: '4px 8px',
                 cursor: 'pointer',
                 marginLeft: 'auto',
                 fontFamily: 'inherit',
+                minHeight: 32,
               }}
             >
               Dismiss
@@ -423,7 +443,7 @@ function Row({ notification }: { notification: BerryNotification }) {
           )}
         </div>
       </div>
-    </GlassPanel>
+    </div>
   );
 }
 

@@ -4,6 +4,11 @@
  * Top OS-style menu bar. Sticky at the top of its containing block,
  * heavy blur so content scrolls cleanly underneath.
  *
+ * HIG (apple-hig platforms/macos.md): macOS menu bar is 24pt tall on
+ * current macOS Tahoe (was 22pt in Aqua era). Heavy blur (28pt+) is
+ * required for any glass surface that floats over arbitrary content
+ * (visionOS material rules in apple-hig platforms/visionos.md).
+ *
  * Slots: start (logo), center (menu items), end (status icons).
  */
 
@@ -27,7 +32,8 @@ export const GlassMenuBar = React.forwardRef<HTMLDivElement, GlassMenuBarProps>(
       center,
       end,
       sticky = true,
-      height = 28,
+      // HIG: macOS menu bar height — 24pt current (apple-hig platforms/macos.md)
+      height = 24,
       className,
       style,
       children,
@@ -55,26 +61,32 @@ export const GlassMenuBar = React.forwardRef<HTMLDivElement, GlassMenuBarProps>(
         ref={ref}
         role="menubar"
         data-ls-menubar=""
+        // HIG: menu items 13pt regular; status cluster gap 12pt (16pt icons)
+        // — apple-hig platforms/macos.md.
+        // Horizontal padding 8pt = --ls-s-2 to match the menu-item gap.
         className={cn(
-          'flex items-center px-3 text-xs font-medium select-none w-full',
+          'flex items-center px-2 text-[13px] font-medium select-none w-full',
           sticky && 'sticky top-0',
           className,
         )}
         style={barStyle}
         {...rest}
       >
-        {/* If structured slots were provided, render the 3-region layout. */}
+        {/* If structured slots were provided, render the 3-region layout.
+            HIG: items use 8pt horizontal padding between top-level entries
+            (start/center). Status icons cluster at the right with 12pt
+            gaps. apple-hig platforms/macos.md. */}
         {(start || center || end) && (
           <>
             <div
               data-ls-menubar-start=""
-              className="flex items-center gap-3 flex-1 min-w-0"
+              className="flex items-center gap-2 flex-1 min-w-0"
             >
               {start}
             </div>
             <div
               data-ls-menubar-center=""
-              className="flex items-center gap-3 justify-center"
+              className="flex items-center gap-2 justify-center"
             >
               {center}
             </div>

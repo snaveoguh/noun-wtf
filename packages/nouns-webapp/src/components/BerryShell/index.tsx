@@ -6,9 +6,6 @@ import {
   type ReactNode,
 } from 'react';
 
-import { ConnectKitButton } from 'connectkit';
-
-import ShortAddress from '@/components/ShortAddress';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { GlassDock, GlassMenuBar } from '@/liquid-sand/glass';
@@ -25,17 +22,16 @@ import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 
 import AppleMenu from './AppleMenu';
 import DraggableWindow from './DraggableWindow';
+import FloatyButton from './FloatyButton';
 import { APP_REGISTRY } from './apps/registry';
 import { PINNED_APPS } from './store/dockStore';
 import {
+  BERRY_MOBILE_BREAKPOINT,
   useBerryFocusedId,
   useBerryWindows,
   useRunningAppIds,
   windowStore,
 } from './store/windowStore';
-import MenuBarClock from './system/MenuBarClock';
-import MenuBarNotificationBell from './system/MenuBarNotificationBell';
-import MenuBarSpotlightTrigger from './system/MenuBarSpotlightTrigger';
 import NotificationCenter from './system/NotificationCenter';
 import PermissionPrompt from './system/PermissionPrompt';
 import SpotlightSystem from './system/SpotlightSystem';
@@ -46,13 +42,14 @@ interface BerryShellProps {
   children?: ReactNode;
 }
 
-const MENU_ITEMS = ['File', 'Edit', 'View', 'Go', 'Window', 'Help'] as const;
-
+// HIG (apple-hig platforms/macos.md): menu bar items use 13pt regular type
+// with 8pt horizontal padding between top-level items. Kept for the brand
+// button — file/edit/view items now live in the floaty popover.
 const menuItemStyle: React.CSSProperties = {
   fontFamily: 'var(--ls-font-sans)',
   fontSize: 13,
   color: 'var(--ls-fg-primary)',
-  padding: '0 8px',
+  padding: '0 8px', // HIG: 8pt horizontal between top-level items
   height: '100%',
   display: 'inline-flex',
   alignItems: 'center',
@@ -77,6 +74,27 @@ const APP_ICON: Record<string, ComponentType<{ size?: number | string }>> = {
 
 function appIconFor(appId: string): ComponentType<{ size?: number | string }> {
   return APP_ICON[appId] ?? Document;
+}
+
+/**
+ * Track viewport-as-mobile (≤ HIG mobile breakpoint) for chrome that
+ * needs to shrink — dock icon size, desktop bottom inset, etc.
+ */
+function useIsMobileShell(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= BERRY_MOBILE_BREAKPOINT : false,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth <= BERRY_MOBILE_BREAKPOINT);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+  return isMobile;
 }
 
 /**
@@ -109,17 +127,14 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
   const windows = useBerryWindows();
   const focusedId = useBerryFocusedId();
   const runningAppIds = useRunningAppIds();
-
-  // Compact mode: drop decorative menu items (File / Edit / …) on small
-  // viewports so the wallet + theme controls + clock keep room.
-  const [compact, setCompact] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 720 : false,
-  );
-  useEffect(() => {
-    const onResize = () => setCompact(window.innerWidth < 720);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  const isMobile = useIsMobileShell();
+  // HIG: 44pt is the iOS minimum touch target — keep that on mobile but
+  // tighten icon size + gap so 5+ apps fit a 375pt-wide dock pill.
+  const dockButtonSize = isMobile ? 40 : 44;
+  const dockIconSize = isMobile ? 22 : 24;
+  // Bottom inset for the desktop region — taller dock + 16pt floating gap
+  // on desktop, slightly tighter on mobile.
+  const desktopBottomInset = isMobile ? 64 : 76;
 
   // Boot the permissions + services subsystem once on shell mount. Idempotent.
   useEffect(() => {
@@ -127,10 +142,15 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
   }, []);
 
   // Open Finder once on first mount so the desktop never starts empty.
+  // On mobile (<=768pt) we open Finder ONLY — auction-on-top would obscure
+  // the entire viewport since each window already fills the available
+  // width tightly.
   const didOpenFinder = useRef(false);
   useEffect(() => {
     if (didOpenFinder.current) return;
     didOpenFinder.current = true;
+    const isMobileBoot =
+      typeof window !== 'undefined' && window.innerWidth <= 768;
     const finder = APP_REGISTRY.finder;
     windowStore.open({
       appId: finder.appId,
@@ -138,17 +158,20 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
       icon: finder.emoji,
       width: finder.width,
       height: finder.height,
-      x: 80,
-      y: 60,
+      // Skip the desktop cascade origin on mobile so the store's mobile
+      // gutter logic owns placement.
+      ...(isMobileBoot ? {} : { x: 80, y: 60 }),
     });
-    const auction = APP_REGISTRY.auction;
-    windowStore.open({
-      appId: auction.appId,
-      title: auction.title,
-      icon: auction.emoji,
-      width: auction.width,
-      height: auction.height,
-    });
+    if (!isMobileBoot) {
+      const auction = APP_REGISTRY.auction;
+      windowStore.open({
+        appId: auction.appId,
+        title: auction.title,
+        icon: auction.emoji,
+        width: auction.width,
+        height: auction.height,
+      });
+    }
   }, []);
 
   const [appleOpen, setAppleOpen] = useState(false);
@@ -192,156 +215,45 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
       {/* Wallpaper is painted by BerryDesktopBackground (mounted by
           LifecycleMount); this shell renders on top with a transparent bg. */}
 
-      {/* Top menu bar — Liquid Sand frosted glass */}
+      {/* Top menu bar — Liquid Sand frosted glass.
+          HIG: macOS Tahoe menu bar is 24pt tall. apple-hig platforms/macos.md */}
       <GlassMenuBar
-        height={28}
+        height={24}
         sticky
         style={{
           position: 'sticky',
           top: 0,
-          // Reserve a comfortable height so monoline icons + 13px text
-          // breathe in the bar.
         }}
         start={
-          <>
-            <button
-              data-apple-menu
-              type="button"
-              onClick={e => {
-                e.stopPropagation();
-                setAppleOpen(o => !o);
-              }}
-              aria-haspopup="menu"
-              aria-expanded={appleOpen}
-              aria-label="Berry menu"
-              style={{
-                ...menuItemStyle,
-                background: appleOpen ? 'var(--ls-glass-light-strong)' : 'transparent',
-                color: 'var(--ls-fg-primary)',
-                paddingLeft: 8,
-                paddingRight: 10,
-                border: 'none',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-              }}
-            >
-              <BlendIcon mode="difference">
-                <Sparkle size={16} />
-              </BlendIcon>
-            </button>
-            <span
-              style={{
-                ...menuItemStyle,
-                fontWeight: 600,
-                paddingLeft: 4,
-                paddingRight: 14,
-                color: 'var(--ls-fg-primary)',
-                maxWidth: 200,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-              aria-label="active app"
-              title={focusedTitle}
-            >
-              {focusedTitle}
-            </span>
-            {!compact &&
-              MENU_ITEMS.map(label => (
-                <span
-                  key={label}
-                  style={{
-                    ...menuItemStyle,
-                    color: 'var(--ls-fg-primary)',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--ls-glass-light-strong)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  {label}
-                </span>
-              ))}
-          </>
+          <button
+            data-apple-menu
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              setAppleOpen(o => !o);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={appleOpen}
+            aria-label="Berry menu"
+            title={focusedTitle}
+            style={{
+              ...menuItemStyle,
+              background: appleOpen ? 'var(--ls-glass-light-strong)' : 'transparent',
+              color: 'var(--ls-fg-primary)',
+              paddingLeft: 8,
+              paddingRight: 10,
+              border: 'none',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            <BlendIcon mode="difference">
+              <Sparkle size={16} />
+            </BlendIcon>
+          </button>
         }
-        end={
-          <>
-            <a
-              href="https://berryos.wtf"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open berryos.wtf in a new tab"
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--ls-glass-light-strong)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                height: 20,
-                padding: '0 10px',
-                borderRadius: 'var(--ls-r-full)',
-                background: 'transparent',
-                border: '1px solid var(--ls-border-glass)',
-                color: 'var(--ls-fg-primary)',
-                fontFamily: 'var(--ls-font-sans)',
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: 0.2,
-                textDecoration: 'none',
-                transition: 'background var(--ls-dur-fast) var(--ls-ease-soft)',
-                whiteSpace: 'nowrap',
-              }}
-              aria-label="Go to berryos.wtf"
-            >
-              <span>berryos.wtf</span>
-              <span
-                aria-hidden
-                style={{ fontSize: 11, lineHeight: 1, opacity: 0.7 }}
-              >
-                ↗
-              </span>
-            </a>
-            <ConnectKitButton.Custom>
-              {({ isConnected, show, address }) => (
-                <button
-                  onClick={show}
-                  style={{
-                    ...menuItemStyle,
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0 6px',
-                    fontSize: 12,
-                  }}
-                  aria-label={isConnected ? 'Wallet menu' : 'Connect wallet'}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--ls-glass-light-strong)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  {isConnected && address ? (
-                    <ShortAddress address={address} avatar={false} />
-                  ) : (
-                    <span>Connect</span>
-                  )}
-                </button>
-              )}
-            </ConnectKitButton.Custom>
-            <ThemeSwitcher variant="navbar" />
-            <MenuBarSpotlightTrigger />
-            <MenuBarNotificationBell />
-            <MenuBarClock />
-          </>
-        }
+        end={<ThemeSwitcher variant="navbar" />}
       />
 
       {/* Apple menu dropdown */}
@@ -355,11 +267,14 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
         />
       )}
 
-      {/* Desktop / window manager region */}
+      {/* Desktop / window manager region.
+          HIG: top inset = menu bar height (24pt). Bottom inset reserves
+          dock pill (44pt icons + 16pt padding + 16pt floating gap = 76pt
+          on desktop, slightly tighter on mobile). */}
       <div
         style={{
           position: 'absolute',
-          inset: '28px 0 76px 0',
+          inset: `24px 0 ${desktopBottomInset}px 0`,
           overflow: 'hidden',
         }}
       >
@@ -374,8 +289,22 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
         })}
       </div>
 
-      {/* Dock — Liquid Sand glass pill with monoline app icons */}
-      <GlassDock bottom={16} reflection>
+      {/* Dock — Liquid Sand glass pill with monoline app icons.
+          HIG (apple-hig SKILL.md "Key Numbers" + platforms/macos.md):
+            44pt min touch target; 24pt icon content with 10pt margin around;
+            4pt gap between icons; small 4pt active indicator beneath; no
+            dock reflection (Mojave+ removed it). */}
+      <GlassDock
+        bottom={isMobile ? 8 : 16}
+        reflection={false}
+        // Cap pill width so it can never overflow on mobile — iPhone
+        // viewport at 375pt fits 5 × 40pt + gap + padding comfortably,
+        // but a sixth app icon could overrun. The pill scrolls horizontally
+        // inside `maxWidth` rather than clipping.
+        style={{
+          maxWidth: 'calc(100vw - 16px)',
+        }}
+      >
         {PINNED_APPS.map(app => {
           const isRunning = runningAppIds.has(app.appId);
           const Icon = appIconFor(app.appId);
@@ -388,14 +317,19 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
               onClick={() => launchAppId(app.appId)}
               style={{
                 position: 'relative',
-                width: 40,
-                height: 40,
+                // HIG: 44pt minimum touch target on desktop, 40pt on mobile
+                // (still well above 32pt iOS minimum, with extra room from
+                // the 4pt inter-icon gap).
+                width: dockButtonSize,
+                height: dockButtonSize,
+                flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: 'transparent',
                 color: 'var(--ls-fg-primary)',
                 border: 'none',
+                // HIG: small graphic corners 10pt (--ls-r-md after retune).
                 borderRadius: 'var(--ls-r-md)',
                 transition:
                   'transform var(--ls-dur-base) var(--ls-ease-spring), background var(--ls-dur-fast) var(--ls-ease-soft)',
@@ -412,14 +346,17 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
               }}
             >
               <BlendIcon mode="difference">
-                <Icon size={22} />
+                {/* HIG: 24pt icon content within the 44pt target. */}
+                <Icon size={dockIconSize} />
               </BlendIcon>
               {isRunning && (
                 <span
                   aria-hidden="true"
+                  // HIG: 4pt active-app indicator dot, centered under icon
+                  // (current macOS dock convention).
                   style={{
                     position: 'absolute',
-                    bottom: -2,
+                    bottom: 2,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: 4,
@@ -444,6 +381,11 @@ export default function BerryShell({ children: _children }: BerryShellProps) {
       {/* Notification system — toast stack (top-right) + slide-out center */}
       <ToastStack />
       <NotificationCenter />
+
+      {/* Floaty utility puck (bottom-right) — wallet, theme, spotlight,
+          notifications, clock, berryos.wtf. Replaces what we stripped from
+          the menu bar. */}
+      <FloatyButton />
     </div>
   );
 }

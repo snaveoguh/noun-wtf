@@ -132,8 +132,11 @@ function ConsoleApp(): ReactElement {
         <span
           style={{
             color: search.trim() ? '#28cd41' : '#8e8e93',
-            fontSize: 10,
-            padding: '0 6px',
+            // HIG min caption: 11pt
+            fontSize: 11,
+            lineHeight: 1.4,
+            padding: '0 8px',
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {search.trim() ? `${searched.hits} hits` : `${filtered.length} lines`}
@@ -171,14 +174,15 @@ function ConsoleApp(): ReactElement {
         style={{
           flex: 1,
           overflow: 'auto',
-          padding: '4px 8px',
-          fontSize: 11.5,
-          lineHeight: 1.45,
+          padding: '8px 12px',
+          // HIG: 12pt monospace for terminal-style content (above 11pt floor)
+          fontSize: 12,
+          lineHeight: 1.5,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
         {searched.lines.length === 0 && (
-          <div style={{ color: '#8e8e93', padding: 8 }}>
+          <div style={{ color: '#8e8e93', padding: 16, fontSize: 12, lineHeight: 1.5 }}>
             -- no events captured -- open or close a window
           </div>
         )}

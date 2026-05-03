@@ -12,7 +12,7 @@ import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { ImageData, getNounData } from '@nouns/assets';
+import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
@@ -68,13 +68,24 @@ function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+// Clamp a seed index to the valid range for a given image array. Some dreams
+// reference indices that don't exist in our local trait library (e.g. very new
+// custom traits) — clamping prevents getNounData from throwing and lets us
+// render a partial preview instead of dropping the dream entirely.
+function clampIdx(idx: number | null | undefined, len: number): number {
+  if (idx == null) return 0;
+  if (idx < 0) return 0;
+  if (idx >= len) return idx % Math.max(1, len);
+  return idx;
+}
+
 function buildDreamCard(dream: DreamNoun): DreamCard | null {
   try {
     const bg = dream.background_seed_id ?? 0;
-    const body = dream.body_seed_id ?? 0;
-    const accessory = dream.accessory_seed_id ?? 0;
-    const head = dream.head_seed_id ?? 0;
-    const glasses = dream.glasses_seed_id ?? 0;
+    const body = clampIdx(dream.body_seed_id, images.bodies.length);
+    const accessory = clampIdx(dream.accessory_seed_id, images.accessories.length);
+    const head = clampIdx(dream.head_seed_id, images.heads.length);
+    const glasses = clampIdx(dream.glasses_seed_id, images.glasses.length);
 
     const bgColor = bgcolors[bg] || bgcolors[0];
 
@@ -94,26 +105,62 @@ function buildDreamCard(dream: DreamNoun): DreamCard | null {
       ? traitName(images.glasses[glasses].filename)
       : 'Unknown';
 
-    // Build SVG from standard seeds
-    // Layer order must be: background → body → accessory → head → glasses (top)
-    // For custom traits, we split into: base SVG + custom overlay + glasses SVG
+    // Build SVG from standard seeds.
+    // Layer order from buildSVG is: body → accessory → head → glasses.
+    // When a dream has a custom trait, the renderer needs to slot the custom
+    // PNG into the correct Z-position. We split into: base SVG (everything
+    // BELOW the custom layer) + custom overlay + topper SVG (everything ABOVE).
     let svgBase64: string | null = null;
-    let glassesSvgBase64: string | null = null;
+    let glassesSvgBase64: string | null = null; // misnamed for back-compat — really "topper layers"
     let customOverlayUrl: string | null = null;
 
-    const hasCustomTrait = dream.custom_trait_layer && dream.custom_trait_image_url;
+    const customLayer = dream.custom_trait_layer;
+    const hasCustomTrait = customLayer && dream.custom_trait_image_url;
 
     if (hasCustomTrait) {
-      // Build base SVG: background + body + accessory (NO head, NO glasses)
-      const nounData = getNounData({ background: bg, body, accessory, head: 0, glasses: 0 });
-      const baseParts = [nounData.parts[0], nounData.parts[1]]; // body + accessory
+      // partIdx for buildSVG: 0=body, 1=accessory, 2=head, 3=glasses
+      // Layers ordered top-to-bottom (visual): glasses > head > accessory > body
+      // For each layer slot, decide which standard parts go BELOW the custom
+      // PNG (`baseParts`) and which go ABOVE (`topParts`).
+      const fullSeed = { background: bg, body, accessory, head, glasses };
+      const nounData = getNounData(fullSeed);
+      const allParts = nounData.parts; // [body, accessory, head, glasses]
+
+      let basePartIndices: number[] = [];
+      let topPartIndices: number[] = [];
+
+      if (customLayer === 'body') {
+        basePartIndices = [];
+        topPartIndices = [1, 2, 3]; // accessory, head, glasses
+      } else if (customLayer === 'accessory') {
+        basePartIndices = [0]; // body
+        topPartIndices = [2, 3]; // head, glasses
+      } else if (customLayer === 'head') {
+        basePartIndices = [0, 1]; // body + accessory
+        topPartIndices = [3]; // glasses
+      } else if (customLayer === 'glasses') {
+        basePartIndices = [0, 1, 2]; // body + accessory + head
+        topPartIndices = [];
+      } else {
+        // Unknown custom layer — render full noun and skip the custom image.
+        basePartIndices = [0, 1, 2, 3];
+        topPartIndices = [];
+      }
+
+      const baseParts = basePartIndices
+        .map(i => allParts[i])
+        .filter(p => p && p.data);
       const baseSvg = buildSVG(baseParts, palette, bgColor);
       svgBase64 = btoa(baseSvg);
 
-      // Build glasses-only SVG on transparent background (glasses always on top)
-      const glassesNounData = getNounData({ background: 0, body: 0, accessory: 0, head: 0, glasses });
-      const glassesSvg = buildSVG([glassesNounData.parts[3]], palette); // no bg color → transparent
-      glassesSvgBase64 = btoa(glassesSvg);
+      const topParts = topPartIndices
+        .map(i => allParts[i])
+        .filter(p => p && p.data);
+      if (topParts.length > 0) {
+        // Render topper layers on transparent background
+        const topSvg = buildSVG(topParts, palette);
+        glassesSvgBase64 = btoa(topSvg);
+      }
 
       customOverlayUrl = dream.custom_trait_image_url;
     } else {

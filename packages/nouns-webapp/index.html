@@ -17,10 +17,16 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 
     <!-- Comic Neue — Comic Sans alternative for mobile (Comic Sans MS isn't available on iOS/Android)
-         Londrina Solid + JetBrains Mono + Silkscreen power Classic / Terminal / Game themes respectively. -->
+         Londrina Solid + JetBrains Mono + Silkscreen power Classic / Terminal / Game themes respectively.
+         Inter (variable optical-size + italic, weights 100–900) is the SF Pro stand-in for the Berry
+         (BerryOS / macOS-style) shell on non-Apple devices. We can't legally self-host SF Pro from
+         Netlify (Apple's font license forbids redistribution as a webfont — see Apple Developer Forums
+         thread 127350), so the strategy is: -apple-system renders real SF Pro on Apple devices, Inter
+         is the closest free substitute everywhere else. Inter ships an optical-sizing axis that mirrors
+         SF Pro's Text/Display split. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Londrina+Solid:wght@100;300;400;900&family=JetBrains+Mono:wght@400;500;700&family=Silkscreen:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Londrina+Solid:wght@100;300;400;900&family=JetBrains+Mono:wght@400;500;700&family=Silkscreen:wght@400;700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
 
     <!-- Anti-flash theme bootstrap — set data-theme on <html> before paint
          so CSS variable resolution doesn't visibly shift during hydration.

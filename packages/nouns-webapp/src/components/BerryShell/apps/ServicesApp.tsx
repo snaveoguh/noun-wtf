@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import { GlassButton, GlassChip } from '@/liquid-sand/glass';
 import { Boot, Restart, Settings, Shutdown } from '@/liquid-sand/icons';
 
 import { berryRegistry } from '../system/berryRegistry';
@@ -64,15 +64,26 @@ function StatusDot({ status }: { status: ServiceStatus }) {
 
 function ServiceRow({ rec }: { rec: ServiceRecord }) {
   return (
-    <GlassPanel padded radius="md" tone="auto" className="!p-3">
-      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto' }}>
+    // Solid sand surface — no nested glass over text
+    <div
+      style={{
+        background: 'var(--ls-sand-50)',
+        borderRadius: 'var(--ls-r-md)',
+        border: '1px solid var(--ls-border-glass)',
+        padding: 16,
+      }}
+    >
+      <div className="grid items-center" style={{ gridTemplateColumns: '1fr auto', gap: 12 }}>
         <div className="min-w-0">
           <div
-            className="flex items-center gap-1.5"
+            className="flex items-center"
             style={{
-              fontFamily: 'var(--ls-font-display)',
-              fontSize: 'var(--ls-text-sm)',
+              fontFamily: 'var(--ls-font-sans)',
+              fontSize: 'var(--ls-text-md)',
+              lineHeight: 1.3,
               color: 'var(--ls-fg-primary)',
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
             <StatusDot status={rec.status} />
@@ -83,8 +94,7 @@ function ServiceRow({ rec }: { rec: ServiceRecord }) {
             <span
               style={{
                 color: 'var(--ls-fg-muted)',
-                fontSize: 11,
-                marginLeft: 4,
+                fontSize: 'var(--ls-text-xs)',
                 fontFamily: 'var(--ls-font-mono)',
               }}
             >
@@ -93,8 +103,9 @@ function ServiceRow({ rec }: { rec: ServiceRecord }) {
           </div>
           <div
             style={{
-              marginTop: 2,
-              fontSize: 11,
+              marginTop: 4,
+              fontSize: 'var(--ls-text-sm)',
+              lineHeight: 1.4,
               color: 'var(--ls-fg-secondary)',
             }}
           >
@@ -103,8 +114,9 @@ function ServiceRow({ rec }: { rec: ServiceRecord }) {
           {rec.lastError && (
             <div
               style={{
-                marginTop: 4,
-                fontSize: 10,
+                marginTop: 8,
+                fontSize: 'var(--ls-text-xs)',
+                lineHeight: 1.4,
                 color: 'var(--ls-danger)',
                 fontFamily: 'var(--ls-font-mono)',
               }}
@@ -113,7 +125,7 @@ function ServiceRow({ rec }: { rec: ServiceRecord }) {
             </div>
           )}
         </div>
-        <div className="flex gap-1">
+        <div className="flex" style={{ gap: 4 }}>
           <GlassButton
             variant="default"
             size="sm"
@@ -142,7 +154,7 @@ function ServiceRow({ rec }: { rec: ServiceRecord }) {
           </GlassButton>
         </div>
       </div>
-    </GlassPanel>
+    </div>
   );
 }
 
@@ -196,27 +208,29 @@ function ServicesApp() {
         color: 'var(--ls-fg-primary)',
       }}
     >
+      {/* Header — solid sand, NOT nested glass */}
       <div
-        className="flex items-center gap-2 px-4 py-2.5"
+        className="flex items-center"
         style={{
-          background: 'var(--ls-glass-light)',
-          backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
-          WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          padding: '12px 16px',
+          gap: 8,
+          background: 'var(--ls-sand-100)',
           borderBottom: '1px solid var(--ls-border-glass)',
         }}
       >
-        <Settings size={14} />
+        <Settings size={16} />
         <span
           style={{
-            fontFamily: 'var(--ls-font-display)',
-            fontSize: 'var(--ls-text-md)',
+            fontFamily: 'var(--ls-font-sans)',
+            fontSize: 'var(--ls-text-lg)',
+            lineHeight: 1.3,
             fontWeight: 700,
           }}
         >
           Services
         </span>
       </div>
-      <div className="overflow-auto flex-1 p-3 flex flex-col gap-2">
+      <div className="overflow-auto flex-1 flex flex-col" style={{ padding: 16, gap: 8 }}>
         {services.length === 0 ? (
           <div
             className="text-center"
@@ -233,20 +247,22 @@ function ServicesApp() {
         )}
       </div>
 
+      {/* Recent events footer — solid sand, no nested glass */}
       <div
-        className="flex items-center gap-2 px-4 py-2"
+        className="flex items-center"
         style={{
-          background: 'var(--ls-glass-light)',
-          backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
-          WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          padding: '8px 16px',
+          gap: 8,
+          background: 'var(--ls-sand-100)',
           borderTop: '1px solid var(--ls-border-glass)',
           borderBottom: '1px solid var(--ls-border-glass)',
         }}
       >
         <span
           style={{
-            fontFamily: 'var(--ls-font-display)',
-            fontSize: 'var(--ls-text-sm)',
+            fontFamily: 'var(--ls-font-sans)',
+            fontSize: 'var(--ls-text-md)',
+            lineHeight: 1.3,
             fontWeight: 700,
           }}
         >
@@ -257,16 +273,18 @@ function ServicesApp() {
         style={{
           maxHeight: 160,
           overflow: 'auto',
-          background: 'var(--ls-glass-tint)',
-          padding: 4,
+          // Solid sand, not glass tint
+          background: 'var(--ls-sand-50)',
+          padding: 8,
         }}
       >
         {log.length === 0 ? (
           <div
             style={{
               fontFamily: 'var(--ls-font-mono)',
-              fontSize: 10,
-              padding: '4px 12px',
+              fontSize: 'var(--ls-text-xs)',
+              lineHeight: 1.4,
+              padding: '6px 12px',
               color: 'var(--ls-fg-muted)',
             }}
           >
@@ -281,8 +299,9 @@ function ServicesApp() {
                 key={entry.key}
                 style={{
                   fontFamily: 'var(--ls-font-mono)',
-                  fontSize: 10,
-                  padding: '3px 12px',
+                  fontSize: 'var(--ls-text-xs)',
+                  lineHeight: 1.5,
+                  padding: '4px 12px',
                   color: 'var(--ls-fg-secondary)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',

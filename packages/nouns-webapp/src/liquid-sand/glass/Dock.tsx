@@ -4,8 +4,14 @@
  * Floating bottom dock — a glass pill, centered horizontally, padded.
  * Children are dock items (the consumer renders apps / buttons).
  *
- * `reflection` toggles a subtle gradient swatch underneath that reads
- * as a soft glass reflection on whatever surface sits below the dock.
+ * HIG (apple-hig platforms/macos.md):
+ *  - Icons sit on a 44pt minimum touch target (accessibility rule
+ *    applies even on desktop; SKILL.md "Key Numbers").
+ *  - 4pt gap between icons (icons can sit close on a dock).
+ *  - Pill padding 8pt around icons.
+ *  - Modern Apple removed the dock reflection in Mojave — `reflection`
+ *    defaults to `false`. A subtle drop shadow underneath is fine, and
+ *    is provided by the inset-glass + lg drop in the box-shadow stack.
  */
 
 import * as React from 'react';
@@ -21,7 +27,8 @@ export interface GlassDockProps extends React.HTMLAttributes<HTMLDivElement> {
 export const GlassDock = React.forwardRef<HTMLDivElement, GlassDockProps>(
   function GlassDock(
     {
-      reflection = true,
+      // HIG: modern dock has no reflection (Mojave+). Default off.
+      reflection = false,
       position = 'fixed',
       bottom = 16,
       className,
@@ -46,7 +53,9 @@ export const GlassDock = React.forwardRef<HTMLDivElement, GlassDockProps>(
         'blur(var(--ls-blur-heavy)) saturate(var(--ls-saturate))',
       WebkitBackdropFilter:
         'blur(var(--ls-blur-heavy)) saturate(var(--ls-saturate))',
-      borderRadius: 'var(--ls-r-full)',
+      // HIG: dock corner radius — 20pt large container.
+      // (apple-hig SKILL.md "Key Numbers")
+      borderRadius: 'var(--ls-r-lg)',
       boxShadow:
         'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-lg)',
       color: 'var(--ls-fg-primary)',
@@ -64,7 +73,8 @@ export const GlassDock = React.forwardRef<HTMLDivElement, GlassDockProps>(
           data-ls-dock=""
           role="toolbar"
           aria-label="Application dock"
-          className="flex items-center gap-2 px-3 py-2"
+          // HIG: 4pt gap between dock icons, 8pt pill padding around.
+          className="flex items-center gap-1 px-2 py-2"
           style={dockStyle}
         >
           {children}

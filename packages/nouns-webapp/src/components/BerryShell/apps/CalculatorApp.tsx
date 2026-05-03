@@ -11,8 +11,6 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 
-import { GlassPanel } from '@/liquid-sand/glass';
-
 import { berryRegistry } from '../system/berryRegistry';
 import { useHotkey } from '../system/hotkeys';
 
@@ -184,21 +182,28 @@ const KEYS: KeyDef[][] = [
   ],
 ];
 
-/** Liquid Sand styled key — sand-tinted glass for fn, accent for op/eq. */
+/**
+ * Liquid Sand styled key — solid sand-tint for num/fn, accent for op/eq.
+ * HIG visionOS: no nested glass — calculator window already sits on glass,
+ * so buttons here are SOLID surfaces (sand fills, opaque accent), not
+ * additional backdrop-blur layers.
+ */
 function keyStyle(variant: KeyDef['variant']): React.CSSProperties {
   const base: React.CSSProperties = {
     border: 'none',
     borderRadius: 'var(--ls-r-md)',
-    fontFamily: 'var(--ls-font-display)',
-    fontSize: 18,
+    fontFamily: 'var(--ls-font-mono)',
+    // HIG: 17pt body for buttons (per-app spec calls for 17pt SF Mono w/ tabular-nums)
+    fontSize: 17,
+    lineHeight: 1.3,
     fontWeight: 600,
     cursor: 'pointer',
-    transition: 'all var(--ls-dur-fast) var(--ls-ease-spring)',
-    backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
-    WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+    transition: 'transform var(--ls-dur-fast) var(--ls-ease-spring), filter var(--ls-dur-fast) var(--ls-ease-soft)',
     boxShadow:
       'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-sm)',
     fontVariantNumeric: 'tabular-nums',
+    // HIG min touch target — 44pt minimum, even on mouse/trackpad surfaces
+    minHeight: 44,
   };
   if (variant === 'op' || variant === 'eq') {
     return {
@@ -212,14 +217,15 @@ function keyStyle(variant: KeyDef['variant']): React.CSSProperties {
   if (variant === 'fn') {
     return {
       ...base,
-      background: 'var(--ls-glass-light-strong)',
+      // Solid sand surface — no backdrop-blur since we're already on glass
+      background: 'var(--ls-sand-200)',
       color: 'var(--ls-fg-primary)',
     };
   }
   // num
   return {
     ...base,
-    background: 'var(--ls-glass-light)',
+    background: 'var(--ls-sand-100)',
     color: 'var(--ls-fg-primary)',
   };
 }
@@ -277,25 +283,29 @@ function CalculatorApp(): ReactElement {
   });
 
   // Display sizing — shrink font once we're past 9 chars so digits never clip.
-  const displaySize = state.display.length > 9 ? 26 : state.display.length > 6 ? 32 : 40;
+  // HIG: 28pt+ for headlines; baseline 34pt large-title for the display.
+  const displaySize = state.display.length > 9 ? 22 : state.display.length > 6 ? 28 : 34;
 
   return (
     <div
-      className="flex flex-col h-full w-full p-2 gap-1.5 box-border"
+      // HIG 8pt grid: 16pt content padding from window edges, 8pt section gaps
+      className="flex flex-col h-full w-full box-border"
       style={{
-        fontFamily: 'var(--ls-font-display)',
+        fontFamily: 'var(--ls-font-sans)',
+        padding: 16,
+        gap: 8,
       }}
     >
-      {/* Display */}
-      <GlassPanel
-        radius="md"
-        tone="auto"
+      {/* Display — solid surface (no nested glass over text per visionOS) */}
+      <div
         aria-label="Calculator display"
+        role="status"
+        aria-live="polite"
         style={{
           textAlign: 'right',
-          padding: '12px 14px',
+          padding: '12px 16px',
           fontSize: displaySize,
-          minHeight: 64,
+          minHeight: 60,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
@@ -306,17 +316,24 @@ function CalculatorApp(): ReactElement {
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           color: 'var(--ls-fg-primary)',
-          fontWeight: 600,
+          fontWeight: 700,
+          // Solid sand surface, no backdrop blur (glass over text rule)
+          background: 'var(--ls-sand-50)',
+          borderRadius: 'var(--ls-r-md)',
+          boxShadow:
+            'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass)',
+          lineHeight: 1.2,
         }}
       >
         {state.display}
-      </GlassPanel>
+      </div>
 
-      {/* Buttons grid */}
+      {/* Buttons grid — 8pt gap matches HIG spacing */}
       <div
-        className="grid flex-1 gap-1.5"
+        className="grid flex-1"
         style={{
           gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 8,
         }}
       >
         {KEYS.flat().map((k, i) => (
@@ -355,7 +372,7 @@ berryRegistry.register({
   name: 'Calculator',
   icon: '🧮',
   component: CalculatorApp,
-  defaultWindow: { w: 240, h: 320 },
+  defaultWindow: { w: 280, h: 380 },
   capabilities: [],
 });
 

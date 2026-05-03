@@ -169,7 +169,10 @@ export function SectionHeader({
           style={{
             margin: 0,
             fontFamily: 'var(--ls-font-display)',
-            fontSize: 'var(--ls-text-xl)',
+            // HIG: 28pt+ headlines
+            fontSize: 'var(--ls-text-2xl)',
+            lineHeight: 1.2,
+            fontWeight: 700,
             color: 'var(--ls-fg-primary)',
             letterSpacing: 0.4,
           }}
@@ -187,7 +190,8 @@ export function SectionHeader({
           style={{
             margin: 0,
             fontFamily: 'var(--ls-font-sans)',
-            fontSize: 'var(--ls-text-sm)',
+            // HIG body: 17pt
+            fontSize: 'var(--ls-text-lg)',
             color: 'var(--ls-fg-secondary)',
             lineHeight: 1.5,
             maxWidth: 640,

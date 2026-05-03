@@ -18,7 +18,6 @@ import {
   GlassButton,
   GlassChip,
   GlassInput,
-  GlassPanel,
   GlassToolbar,
 } from '@/liquid-sand/glass';
 import {
@@ -82,8 +81,19 @@ function ClipboardRow({ item, onPick, onRemove }: {
 }) {
   const meta = TYPE_META[item.type];
   return (
-    <GlassPanel padded={false} radius="md" tone="auto" className="!p-2 flex items-center gap-2">
-      <GlassChip tone={meta.tone} size="xs" style={{ minWidth: 56, justifyContent: 'center' }}>
+    // Solid sand surface — no nested glass over text per visionOS rule
+    <div
+      className="flex items-center"
+      style={{
+        background: 'var(--ls-sand-50)',
+        borderRadius: 'var(--ls-r-md)',
+        border: '1px solid var(--ls-border-glass)',
+        padding: 12,
+        gap: 12,
+        minHeight: 44,
+      }}
+    >
+      <GlassChip tone={meta.tone} size="xs" style={{ minWidth: 64, justifyContent: 'center' }}>
         {typeIcon(item.type)}
         {meta.label}
       </GlassChip>
@@ -91,10 +101,12 @@ function ClipboardRow({ item, onPick, onRemove }: {
         type="button"
         onClick={() => onPick(item.id)}
         title="Click to re-copy"
+        aria-label={`Re-copy ${meta.label} ${item.content.slice(0, 32)}`}
         className="flex-1 text-left bg-transparent border-0 cursor-pointer p-0"
         style={{
           fontFamily: 'var(--ls-font-mono)',
-          fontSize: 12,
+          fontSize: 'var(--ls-text-sm)',
+          lineHeight: 1.4,
           color: 'var(--ls-fg-primary)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -106,7 +118,8 @@ function ClipboardRow({ item, onPick, onRemove }: {
       <span
         style={{
           fontFamily: 'var(--ls-font-mono)',
-          fontSize: 10,
+          fontSize: 'var(--ls-text-xs)',
+          lineHeight: 1.4,
           color: 'var(--ls-fg-muted)',
           fontVariantNumeric: 'tabular-nums',
         }}
@@ -121,12 +134,15 @@ function ClipboardRow({ item, onPick, onRemove }: {
         className="bg-transparent border-0 cursor-pointer flex items-center justify-center"
         style={{
           color: 'var(--ls-fg-muted)',
-          padding: '2px 4px',
+          // 32pt min hit target for icon-only mouse control
+          width: 32,
+          height: 32,
+          borderRadius: 'var(--ls-r-md)',
         }}
       >
-        <Close size={12} />
+        <Close size={14} />
       </button>
-    </GlassPanel>
+    </div>
   );
 }
 
@@ -152,7 +168,7 @@ export default function ClipboardApp() {
         color: 'var(--ls-fg-primary)',
       }}
     >
-      <div className="p-2.5">
+      <div style={{ padding: 16, paddingBottom: 8 }}>
         <GlassToolbar size="md" className="w-full">
           <GlassInput
             type="search"
@@ -162,18 +178,23 @@ export default function ClipboardApp() {
             inputSize="sm"
             prefix={<MagnifyingGlass size={12} />}
             wrapperClassName="flex-1"
+            aria-label="Search clipboard"
           />
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value as BerryClipboardType | 'all')}
+            aria-label="Filter by type"
             style={{
-              padding: '4px 8px',
+              padding: '6px 10px',
               border: '1px solid var(--ls-border-glass)',
               borderRadius: 'var(--ls-r-md)',
-              fontSize: 11,
-              background: 'var(--ls-glass-light-strong)',
+              fontSize: 'var(--ls-text-xs)',
+              lineHeight: 1.4,
+              // Solid sand, no glass nesting
+              background: 'var(--ls-sand-100)',
               color: 'var(--ls-fg-primary)',
               fontFamily: 'inherit',
+              minHeight: 32,
             }}
           >
             <option value="all">All</option>
@@ -195,17 +216,19 @@ export default function ClipboardApp() {
           </GlassButton>
         </GlassToolbar>
       </div>
-      <div className="flex-1 overflow-y-auto px-2.5 pb-2.5 flex flex-col gap-1.5">
+      <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: '0 16px 16px', gap: 8 }}>
         {filtered.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center text-center"
             style={{
               padding: 32,
+              gap: 8,
               color: 'var(--ls-fg-muted)',
-              fontSize: 12,
+              fontSize: 'var(--ls-text-md)',
+              lineHeight: 1.4,
             }}
           >
-            <Clipboard size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
+            <Clipboard size={28} style={{ opacity: 0.5 }} />
             {items.length === 0
               ? 'Nothing copied yet. Anything you copy in BerryOS will land here.'
               : 'No matches.'}

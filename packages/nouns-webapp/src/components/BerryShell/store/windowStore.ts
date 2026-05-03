@@ -60,6 +60,68 @@ type Listener = () => void;
 const MENU_BAR = 24;
 const DOCK = 76;
 const CASCADE = 22;
+// HIG (apple-hig SKILL.md): mobile breakpoint = 768pt. Below this, windows
+// must collapse to viewport-tight cards rather than free-floating chrome.
+const MOBILE_BREAKPOINT = 768;
+// Mobile gutter — 8pt margin on each side leaves the window 16pt narrower
+// than the viewport. Matches `calc(100vw - 16px)` in the chrome layer.
+const MOBILE_GUTTER = 8;
+// Mobile-default opening height — 60% of viewport, capped to a sensible
+// minimum so the window still looks like a window, not a hairline strip.
+const MOBILE_HEIGHT_RATIO = 0.6;
+// Reserve for the top of the window on mobile — menu bar + 4pt breathing.
+const MOBILE_TOP_INSET = MENU_BAR + 4;
+
+function isMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+/**
+ * Resolve the opening geometry for a new window. On mobile (<= 768pt) we
+ * ignore the app's `defaultWindow` size entirely and lock the window to a
+ * tight viewport-cap card, so even a 640pt-wide app like Vote fits the
+ * iPhone width comfortably. Desktop keeps the registered defaults.
+ */
+function resolveOpeningGeometry(
+  cfgWidth: number,
+  cfgHeight: number,
+  cfgX: number | undefined,
+  cfgY: number | undefined,
+  lastX: number | null,
+  lastY: number | null,
+): { x: number; y: number; width: number; height: number } {
+  if (typeof window === 'undefined') {
+    return {
+      x: cfgX ?? 80,
+      y: cfgY ?? MENU_BAR + 36,
+      width: cfgWidth,
+      height: cfgHeight,
+    };
+  }
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (isMobileViewport()) {
+    const width = Math.max(0, vw - MOBILE_GUTTER * 2);
+    const height = Math.min(
+      Math.floor(vh * MOBILE_HEIGHT_RATIO),
+      Math.max(cfgHeight, 320),
+    );
+    // Center horizontally; cascade vertically a little so a second window
+    // doesn't bury the first.
+    const cascadeOffset = lastY != null ? Math.min(40, Math.max(0, lastY - MOBILE_TOP_INSET) + 24) : 0;
+    return {
+      x: MOBILE_GUTTER,
+      y: MOBILE_TOP_INSET + cascadeOffset,
+      width,
+      height,
+    };
+  }
+  const baseX = cfgX ?? (lastX != null ? lastX + CASCADE : Math.max(40, Math.floor((vw - cfgWidth) / 2)));
+  const baseY = cfgY ?? (lastY != null ? lastY + CASCADE : MENU_BAR + 36);
+  const c = clampPosition(baseX, baseY, cfgWidth);
+  return { x: c.x, y: c.y, width: cfgWidth, height: cfgHeight };
+}
 
 let state: State = {
   windows: [],
@@ -85,6 +147,18 @@ function genId(): string {
 function clampPosition(x: number, y: number, w: number) {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  // On mobile (<=768pt) windows are pinned to the gutter — no edge-bleed
+  // dragging allowed. Anything off-screen would be unrecoverable on touch.
+  if (vw <= MOBILE_BREAKPOINT) {
+    const minX = MOBILE_GUTTER;
+    const maxX = Math.max(minX, vw - w - MOBILE_GUTTER);
+    const minY = MENU_BAR;
+    const maxY = Math.max(minY, vh - DOCK - 40);
+    return {
+      x: Math.min(Math.max(x, minX), maxX),
+      y: Math.min(Math.max(y, minY), maxY),
+    };
+  }
   const minY = MENU_BAR;
   const maxY = Math.max(minY, vh - DOCK - 80);
   const maxX = Math.max(20, vw - 80);
@@ -113,17 +187,21 @@ export const windowStore = {
     }
 
     const id = genId();
-    const width = config.width ?? 640;
-    const height = config.height ?? 480;
+    const cfgWidth = config.width ?? 640;
+    const cfgHeight = config.height ?? 480;
 
     // Cascade from last window.
     const last = state.windows.length
       ? state.windows.reduce((a, b) => (a.zIndex > b.zIndex ? a : b))
       : null;
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const baseX = config.x ?? (last ? last.x + CASCADE : Math.max(40, Math.floor((vw - width) / 2)));
-    const baseY = config.y ?? (last ? last.y + CASCADE : MENU_BAR + 36);
-    const { x, y } = clampPosition(baseX, baseY, width);
+    const { x, y, width, height } = resolveOpeningGeometry(
+      cfgWidth,
+      cfgHeight,
+      config.x,
+      config.y,
+      last ? last.x : null,
+      last ? last.y : null,
+    );
 
     const prevFocusedId = state.focusedId ?? undefined;
 
@@ -274,8 +352,14 @@ export const windowStore = {
   resize(id: string, width: number, height: number) {
     const win = state.windows.find(w => w.id === id);
     if (!win) return;
-    const w = Math.max(win.minWidth, width);
-    const h = Math.max(win.minHeight, height);
+    let w = Math.max(win.minWidth, width);
+    let h = Math.max(win.minHeight, height);
+    // Cap to viewport on mobile so the resize handle (if ever shown) can't
+    // push the window past the gutter.
+    if (typeof window !== 'undefined' && isMobileViewport()) {
+      w = Math.min(w, window.innerWidth - MOBILE_GUTTER * 2);
+      h = Math.min(h, window.innerHeight - MENU_BAR - DOCK - 16);
+    }
     if (w === win.width && h === win.height) return; // no-op
     setState({
       ...state,
@@ -316,3 +400,8 @@ export function useRunningAppIds(): Set<string> {
   // since `s` is the same object until setState fires, this is safe.
   return new Set(s.windows.map(w => w.appId));
 }
+
+/** Mobile breakpoint used by the chrome (matches the windowStore internals). */
+export const BERRY_MOBILE_BREAKPOINT = MOBILE_BREAKPOINT;
+/** Gutter (px) reserved on the left and right of mobile windows. */
+export const BERRY_MOBILE_GUTTER = MOBILE_GUTTER;

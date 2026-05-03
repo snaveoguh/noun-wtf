@@ -48,13 +48,19 @@
      ETH-native flow apart from stable flow apart from LST flow. Hex matches
      each token's brand-canonical color where one exists; muted neutral for
      the long tail. Consumed by `.tokenChip` via `[data-token=…]` selectors. */
+  /* HIG (apple-hig universal/principles.md "Color and Contrast"): brand
+     hex values for WETH (#4a6cb8) and USDC (#2775ca) clock under
+     4.5:1 against the #0a0a0e backdrop, so the chip foreground colors
+     are lightened toward their lighter brand tints to clear WCAG AA.
+     Background and border still use the brand-canonical hex via
+     color-mix below, so the chip palette stays recognisable. */
   --gs-token-eth: #5c7ad6;
-  --gs-token-weth: #4a6cb8;
+  --gs-token-weth: #7d9ae0;
   --gs-token-steth: #00a3ff;
   --gs-token-reth: #ff8b3d;
-  --gs-token-usdc: #2775ca;
+  --gs-token-usdc: #5a9ae8;
   --gs-token-wsteth: #1a8acc;
-  --gs-token-other: rgba(255, 255, 255, 0.5);
+  --gs-token-other: rgba(255, 255, 255, 0.65);
 
   /* Voting palette — emerald/rose 700 for the "deep, serious" cast that
      nouns.game uses on its aggregate bars + counts. Lighter pulse variants
@@ -68,6 +74,14 @@
 
   --gs-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --gs-font-display: 'Silkscreen', system-ui, sans-serif;
+  /* HIG (apple-hig SKILL.md "Being Specific"): system stack with SF Pro
+     first so Apple devices render real San Francisco; Inter is the
+     screen-tuned fallback on non-Apple platforms (Rasmus Andersson designed
+     it explicitly as an SF alternative). Inter already loads in index.html
+     alongside JetBrains Mono + Silkscreen. */
+  --gs-font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Inter', 'PT Root UI', system-ui, sans-serif;
 
   /* Content sizing — keep main column narrower than the viewport on wide
      screens so the page has breathing room (matches nouns.game's framing).
@@ -79,8 +93,11 @@
   min-height: 100vh;
   background: var(--gs-body-bg);
   color: var(--gs-text);
-  font-family:
-    'Inter', 'PT Root UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--gs-font-sans);
+  /* HIG: caption-but-readable density. 13px sits above the 11pt caption
+     floor (apple-hig macos.md sidebar text spec) and matches macOS
+     Tahoe's labels at 13pt. Body bumps to 17pt only inside proposal
+     cards via `.propTitle`. */
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
@@ -118,6 +135,29 @@
   .pulseFor,
   .pulseAgainst {
     animation: none;
+  }
+  /* HIG (apple-hig SKILL.md "Reduce Motion"): zero out all decorative
+     transitions inside the shell when the user opts out of motion. The
+     pulse keyframes above are the only animations, but hover transforms
+     on `.brand` / `.fullUxPill` / etc. should also collapse to instant
+     state changes. */
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* HIG (apple-hig SKILL.md "Reduce Transparency"): when the user opts out
+   of transparency, swap the navbar's translucent surface for an opaque
+   one and drop the backdrop blur. Status pill tints stay (they're solid
+   tinted — not glass — so they remain readable). */
+@media (prefers-reduced-transparency: reduce) {
+  .nav {
+    background: var(--gs-body-bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }
 
@@ -175,7 +215,10 @@
   color: var(--gs-text);
   line-height: 1;
   border-radius: 6px;
-  padding: 2px;
+  /* HIG: 32x32pt minimum hit target on desktop (apple-hig macos.md min
+     touch target). Visual mark stays 26px; padding lifts the click area
+     to 34x34. */
+  padding: 4px;
   transition:
     transform 140ms ease,
     filter 140ms ease;
@@ -213,8 +256,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
-  font-size: 12px;
+  /* HIG (apple-hig macos.md "Toolbar"): 8pt vertical, 16pt horizontal
+     gap convention. Lift the hit target above the 32x32pt desktop floor
+     while keeping the visual feel of a quiet text link. */
+  padding: 8px 12px;
+  /* HIG caption — sits at 13px (above the 11pt floor) so links stay
+     readable on the dark navbar. */
+  font-size: 13px;
   font-weight: 500;
   color: var(--gs-muted);
   text-decoration: none;
@@ -284,8 +332,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  /* HIG: 32pt min hit target on desktop (apple-hig macos.md "Touch
+     Target"). Visual disc reads ~26pt via the icon glyph itself; the
+     32pt outer box gives forgiving aim without changing visual weight. */
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   background: transparent;
   color: var(--gs-muted);
@@ -303,12 +354,15 @@
 .searchBox {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 8px;
+  /* HIG (apple-hig macos.md "Toolbar"): 4pt vertical / 12pt horizontal
+     padding inside a control. Search bar still maintains a 32pt overall
+     height target. */
+  padding: 4px 12px;
   border-radius: 999px;
   background: var(--gs-card-bg);
   color: var(--gs-muted);
-  font-size: 12px;
+  font-size: 13px;
   min-width: 200px;
 }
 
@@ -317,7 +371,9 @@
   border: none;
   outline: none;
   color: var(--gs-text);
-  font-size: 12px;
+  /* HIG caption floor — 13pt on the input matches macOS Tahoe text
+     fields (apple-hig macos.md "Input Fields"). */
+  font-size: 13px;
   font-family: inherit;
   flex: 1;
 }
@@ -328,8 +384,14 @@
 .connectPill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 4px;
+  gap: 8px;
+  /* HIG: 4pt vertical / 12pt horizontal padding around the connect
+     control; left side hugs the avatar disc tighter to keep the pill
+     visually balanced. Font holds at 12pt because the pill height is
+     pegged at 26px to align with the rest of the nav cluster (treasury,
+     full-ux); bumping copy to 13pt would push the line above the 26px
+     box. */
+  padding: 4px 12px 4px 4px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -492,10 +554,13 @@
 }
 
 .pane {
-  /* Outer page padding is owned by `.body` (`--gs-page-pad-x`); panes only
-     add internal breathing room between their content and the centre
-     divider. Keep top padding generous for the section header. */
-  padding: 28px 24px;
+  /* HIG (apple-hig SKILL.md "8pt grid"): pane internal padding rides
+     the 8pt grid — 32pt vertical lifts the section header off the
+     navbar, 24pt horizontal matches the gutter to the centre divider.
+     Outer page padding is owned by `.body` (`--gs-page-pad-x`); panes
+     only add internal breathing room between their content and the
+     centre divider. */
+  padding: 32px 24px;
   /* Fill the viewport below the nav (40px). The auction strip used to take
      ~60px here too — now removed, so the panes own all remaining space. */
   min-height: calc(100vh - 40px);
@@ -515,13 +580,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  /* HIG: 24pt below a section title sits one notch up the 8pt grid
+     from the previous 20px — gives the headline more breathing room
+     before the dense feed/proposals stack. */
+  margin-bottom: 24px;
 }
 
 .paneTitle {
-  font-family:
-    'Inter', 'PT Root UI', -apple-system, sans-serif !important;
+  /* HIG (apple-hig SKILL.md "Being Specific"): SF Pro stack first,
+     Inter fallback for non-Apple platforms. */
+  font-family: var(--gs-font-sans) !important;
   font-weight: 700 !important;
+  /* HIG: 32pt sits between Headline (28pt) and Large Title (34pt) and
+     reads as the dominant focal point on the page. */
   font-size: 32px !important;
   letter-spacing: -0.02em !important;
   color: var(--gs-text);
@@ -544,7 +615,10 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 6px 0;
+  /* HIG (apple-hig SKILL.md "8pt grid"): bumped from 6px to 8pt so feed
+     row rhythm sits on the base unit. Density still reads as nouns.game
+     because line-height stays tight (1.4 below). */
+  padding: 8px 0;
   border-bottom: 1px solid var(--gs-divider);
   cursor: default;
 }
@@ -559,8 +633,12 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  /* HIG caption-but-readable — 13pt sits above the 11pt floor. */
   font-size: 13px;
-  line-height: 1.35;
+  /* HIG (apple-hig universal/principles.md "Line Height"): >=1.3x font
+     size for caption text. 1.4 keeps multi-line wraps comfortable
+     without breaking the dense, scannable feel. */
+  line-height: 1.4;
 }
 
 .feedIcon {
@@ -646,9 +724,12 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-eth) 35%, transparent);
 }
 .tokenChip[data-token='WETH'] {
-  background: color-mix(in srgb, var(--gs-token-weth) 18%, transparent);
+  /* Background + border use the brand-canonical WETH hex (#4a6cb8) so
+     the chip stays recognisable; foreground reads from the lightened
+     --gs-token-weth so the text passes WCAG AA on the dark backdrop. */
+  background: color-mix(in srgb, #4a6cb8 18%, transparent);
   color: var(--gs-token-weth);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-weth) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #4a6cb8 35%, transparent);
 }
 .tokenChip[data-token='stETH'] {
   background: color-mix(in srgb, var(--gs-token-steth) 18%, transparent);
@@ -666,16 +747,20 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-reth) 35%, transparent);
 }
 .tokenChip[data-token='USDC'] {
-  background: color-mix(in srgb, var(--gs-token-usdc) 18%, transparent);
+  /* Brand hex (#2775ca) drives the bg/border; foreground reads from the
+     lightened --gs-token-usdc so the chip text clears WCAG AA. */
+  background: color-mix(in srgb, #2775ca 18%, transparent);
   color: var(--gs-token-usdc);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-usdc) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #2775ca 35%, transparent);
 }
 
 .voteCount {
   color: var(--gs-muted-2);
   font-family: var(--gs-font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  /* HIG: 13pt caption (one notch above the 11pt floor) keeps the inline
+     vote-count parens readable next to the surrounding 13pt body. */
+  font-size: 13px;
 }
 
 .feedDim {
@@ -716,15 +801,22 @@
 }
 
 .feedExpand {
+  /* HIG: indent matches the inline icon column (16px icon + 8px gap)
+     so the expanded reason aligns under the description text. Padding
+     bumped to 8/12 (8pt grid). */
   margin-left: 24px;
   margin-top: 4px;
-  margin-bottom: 2px;
-  padding: 6px 10px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
   background: transparent;
   border-left: 2px solid var(--gs-divider);
   border-radius: 0;
-  font-size: 12px;
+  /* HIG: 13pt caption above the 11pt floor — proposal descriptions
+     and vote reasons read better at body-caption size than 12pt. */
+  font-size: 13px;
   color: var(--gs-muted);
+  /* HIG: 1.5x line height for prose blocks (apple-hig universal
+     /principles.md "Readability Rules"). */
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -763,14 +855,17 @@
 }
 
 .feedLoadMore {
-  margin-top: 12px;
-  padding: 10px;
+  /* HIG: 16pt above the button gives clear separation from the last
+     feed row; 12pt vertical padding lifts the hit target above the
+     32pt min (apple-hig macos.md). */
+  margin-top: 16px;
+  padding: 12px;
   width: 100%;
   background: transparent;
   border: 1px solid var(--gs-divider);
   border-radius: 3px;
   color: var(--gs-muted);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   font-family: inherit;
   font-weight: 500;
@@ -792,8 +887,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-  padding-bottom: 0;
+  /* HIG (apple-hig SKILL.md "8pt grid"): 16pt below the tab strip and
+     12pt below the underline — both round multiples that line up with
+     the surrounding pane padding. */
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--gs-divider);
   padding-bottom: 12px;
 }
@@ -808,10 +905,17 @@
   background: transparent;
   border: none;
   color: var(--gs-muted);
+  /* HIG (apple-hig macos.md "Toolbar"): 14pt control label sits between
+     caption (13pt) and body (17pt); fits the slash-separated tab strip
+     without making it heavier than the section title above. */
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
-  padding: 0 8px;
+  /* HIG: 32pt min hit target on desktop. Vertical padding of 8pt lifts
+     each tab above the floor (with line-height of 1.2 the tab clocks in
+     at ~17 + 16 = 33pt tall). 12pt horizontal sits on the 8pt grid +
+     gives the tab a real click region instead of just letter width. */
+  padding: 8px 12px;
   cursor: pointer;
   transition: color 120ms ease;
   letter-spacing: 0;
@@ -878,7 +982,9 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 10px;
+  /* HIG (apple-hig SKILL.md "8pt grid"): 12pt below the title row
+     before the segmented vote bar. */
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
@@ -891,7 +997,11 @@
 }
 
 .propTitle {
-  font-size: 15px;
+  /* HIG (apple-hig SKILL.md "Key Numbers"): 17pt = body. Proposal titles
+     are the primary content focus on the right pane, so they earn
+     full body size rather than sitting at caption (13pt) like the
+     surrounding metadata. Bumped from 15px to match the spec. */
+  font-size: 17px;
   font-weight: 700;
   color: var(--gs-text);
   letter-spacing: -0.005em;
@@ -899,7 +1009,9 @@
 }
 
 .propBy {
-  font-size: 12px;
+  /* HIG: 13pt caption — sits above the 11pt floor and matches the
+     stepped scale used elsewhere on the right pane. */
+  font-size: 13px;
   color: var(--gs-muted-1);
   font-weight: 500;
   white-space: nowrap;
@@ -1013,7 +1125,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  /* HIG caption: 13pt sits above the 11pt floor. Voter rows used to
+     run at 12pt, which read borderline at the muted color. */
+  font-size: 13px;
   line-height: 1.4;
   cursor: pointer;
   color: var(--gs-dim);
@@ -1075,9 +1189,13 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  /* HIG: indent matches the avatar (16) + gap (8) above so the
+     reason text aligns under the voter name. Padding lifted onto
+     the 4pt grid. */
   margin-left: 24px;
-  padding: 2px 0 4px;
-  font-size: 12px;
+  padding: 4px 0;
+  /* HIG: 13pt caption — same as voter row above. */
+  font-size: 13px;
   color: var(--gs-dim);
   line-height: 1.45;
   word-break: break-word;
@@ -1086,9 +1204,9 @@
 .voterReasonInline {
   color: var(--gs-dim);
   font-style: italic;
-  font-size: 12px;
+  font-size: 13px;
   margin-left: 24px;
-  padding: 0 0 2px;
+  padding: 0 0 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1141,7 +1259,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  /* HIG: 13pt caption — matches the voter row text size. */
+  font-size: 13px;
   color: var(--gs-muted);
   text-decoration: none;
   font-weight: 500;
@@ -1164,9 +1283,16 @@
    small enough that the pixel grain reads as a stamp, not body copy. */
 .propStatusPill {
   display: inline-block;
-  padding: 3px 7px 2px;
+  /* HIG: 4pt vertical / 8pt horizontal padding. The status pill is a
+     solid tinted tab (not glass), so it can sit over text without
+     violating the "no glass over text" Liquid-Glass rule (apple-hig
+     visionos.md "Glass Material"). */
+  padding: 4px 8px 3px;
   border-radius: 2px;
-  font-size: 10px;
+  /* HIG: 11pt is the caption floor (apple-hig SKILL.md "Key Numbers").
+     Silkscreen is a pixel font so 11pt grain still reads as a stamp,
+     not body copy — but anything below 11pt fails accessibility. */
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1216,17 +1342,24 @@
 
 @media (max-width: 768px) {
   .shell {
-    --gs-page-pad-x: 12px;
+    /* HIG (apple-hig SKILL.md "iPhone margins"): 16pt screen-edge
+       margin on phones. */
+    --gs-page-pad-x: 16px;
   }
   .pane {
-    padding: 20px 0;
+    /* HIG: 24pt vertical pane padding on mobile keeps the same rhythm
+       as desktop (32pt) but tighter for narrow screens. */
+    padding: 24px 0;
   }
   .paneLeft {
     border-right: none;
     border-bottom: 1px solid var(--gs-divider);
   }
   .paneTitle {
-    font-size: 24px !important;
+    /* HIG: 28pt = headline (apple-hig SKILL.md "Headlines"). Down from
+       desktop 32pt — keeps the title prominent without crowding a
+       phone screen. */
+    font-size: 28px !important;
   }
   .primary {
     display: none;
