@@ -15,10 +15,10 @@ interface VoterHoverCardContentProps {
   address: Address;
 }
 
-// 4 rows of 7 thumbs = 28 visible. Delegates often represent 30+ nouns; this
-// gives them a real visual sense of voting power instead of clipping at one
-// or two rows.
-const NOUN_GRID_VISIBLE = 27; // 27 + a "+N" overflow tile fills 4 rows neatly
+// Render every represented noun. Big delegates can carry 100+ tokens and the
+// user wants the full bag visible; a max-height + scroll on the grid keeps
+// extreme cases (whales, multisigs) from blowing the popover out of bounds.
+const NOUN_GRID_MAX_HEIGHT = 280;
 
 // Reusable inline-style snippets so the JSX stays scannable. All values
 // resolve to Liquid Sand tokens — no Tailwind color classes from here.
@@ -60,8 +60,6 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
     ...ownedNounIds.map(id => ({ id, kind: 'owned' as const })),
     ...delegatedNounIds.map(id => ({ id, kind: 'delegated' as const })),
   ];
-  const visibleNouns = allRepresented.slice(0, NOUN_GRID_VISIBLE);
-  const overflow = Math.max(0, allRepresented.length - NOUN_GRID_VISIBLE);
   // Indexer bug: delegate.delegatedVotes returns the correct aggregate but
   // delegateNoun.items is empty for most addresses, so we usually can't
   // enumerate delegated noun IDs. Surface the count visually with a sand-
@@ -118,56 +116,47 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
 
       {/* ── Owned + delegated nouns grid ── */}
       {(isLoading || allRepresented.length > 0 || phantomDelegated > 0) && (
-        <div className="grid grid-cols-7 gap-1.5">
-          {isLoading && allRepresented.length === 0
-            ? Array.from({ length: 7 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="aspect-square animate-pulse"
-                  style={{
-                    borderRadius: 'var(--ls-r-sm)',
-                    backgroundColor: 'rgba(255,250,240,0.06)',
-                  }}
-                />
-              ))
-            : visibleNouns.map(n => (
-                <NounThumb key={`${n.kind}-${n.id}`} nounId={n.id} kind={n.kind} />
-              ))}
-          {phantomDelegated > 0 && (
-            <div
-              className="flex aspect-square flex-col items-center justify-center font-semibold leading-none"
-              style={{
-                ...fontSans,
-                ...colorSecondary,
-                fontSize: 'var(--ls-text-xs)',
-                borderRadius: 'var(--ls-r-sm)',
-                backgroundColor: 'rgba(184,147,82,0.14)', // sand accent tint
-                boxShadow: 'inset 0 0 0 1px rgba(255,250,240,0.18)',
-              }}
-              title={`${phantomDelegated} nouns delegated to this address`}
-            >
-              <span className="tabular-nums" style={fontMono}>
-                +{phantomDelegated}
-              </span>
-              <span style={{ ...colorMuted, fontSize: '8px', marginTop: 2 }}>
-                deleg
-              </span>
-            </div>
-          )}
-          {overflow > 0 && (
-            <div
-              className="flex aspect-square items-center justify-center font-semibold"
-              style={{
-                ...fontSans,
-                ...colorSecondary,
-                fontSize: 'var(--ls-text-xs)',
-                borderRadius: 'var(--ls-r-sm)',
-                backgroundColor: 'rgba(255,250,240,0.08)',
-              }}
-            >
-              +{overflow}
-            </div>
-          )}
+        <div
+          className="overflow-y-auto pr-0.5"
+          style={{ maxHeight: NOUN_GRID_MAX_HEIGHT }}
+        >
+          <div className="grid grid-cols-7 gap-1.5">
+            {isLoading && allRepresented.length === 0
+              ? Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-square animate-pulse"
+                    style={{
+                      borderRadius: 'var(--ls-r-sm)',
+                      backgroundColor: 'rgba(255,250,240,0.06)',
+                    }}
+                  />
+                ))
+              : allRepresented.map(n => (
+                  <NounThumb key={`${n.kind}-${n.id}`} nounId={n.id} kind={n.kind} />
+                ))}
+            {phantomDelegated > 0 && (
+              <div
+                className="flex aspect-square flex-col items-center justify-center font-semibold leading-none"
+                style={{
+                  ...fontSans,
+                  ...colorSecondary,
+                  fontSize: 'var(--ls-text-xs)',
+                  borderRadius: 'var(--ls-r-sm)',
+                  backgroundColor: 'rgba(184,147,82,0.14)', // sand accent tint
+                  boxShadow: 'inset 0 0 0 1px rgba(255,250,240,0.18)',
+                }}
+                title={`${phantomDelegated} nouns delegated to this address`}
+              >
+                <span className="tabular-nums" style={fontMono}>
+                  +{phantomDelegated}
+                </span>
+                <span style={{ ...colorMuted, fontSize: '8px', marginTop: 2 }}>
+                  deleg
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
