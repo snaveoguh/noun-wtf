@@ -5,6 +5,9 @@ import CandidatesApp from './CandidatesApp';
 import FinderApp from './FinderApp';
 import SettingsApp from './SettingsApp';
 import VoteApp from './VoteApp';
+// Side-effect import — registers Activity Monitor + Console + EventInspector
+// hotkey via berryRegistry. See apps/devtoolsApps.ts for details.
+import './devtoolsApps';
 
 export interface BerryAppDef {
   appId: string;

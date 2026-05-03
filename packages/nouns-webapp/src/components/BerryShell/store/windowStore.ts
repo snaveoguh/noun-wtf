@@ -7,9 +7,15 @@
  *
  * State shape, action set, and naming intentionally mirror the original so a
  * later swap to zustand would be trivial.
+ *
+ * Lifecycle events (window:created, window:focused, etc.) are emitted via the
+ * BerryOS event bus AFTER state mutations land. No-op operations (focus on
+ * already-focused window, move to identical position) skip the emit.
  */
 
 import { useSyncExternalStore } from 'react';
+
+import { berryBus } from '../system/eventBus';
 
 export interface BerryWindowState {
   id: string;
@@ -119,6 +125,8 @@ export const windowStore = {
     const baseY = config.y ?? (last ? last.y + CASCADE : MENU_BAR + 36);
     const { x, y } = clampPosition(baseX, baseY, width);
 
+    const prevFocusedId = state.focusedId ?? undefined;
+
     const win: BerryWindowState = {
       id,
       appId: config.appId,
@@ -142,10 +150,16 @@ export const windowStore = {
       focusedId: id,
       nextZ: state.nextZ + 1,
     });
+
+    berryBus.emit('window:created', { id, appId: config.appId, x, y, w: width, h: height });
+    berryBus.emit('window:focused', { id, appId: config.appId, prevFocusedId });
+    berryBus.emit('app:focused', { appId: config.appId });
     return id;
   },
 
   close(id: string) {
+    const closing = state.windows.find(w => w.id === id);
+    if (!closing) return;
     const next = state.windows.filter(w => w.id !== id);
     let focusedId: string | null = null;
     if (next.length) {
@@ -157,10 +171,28 @@ export const windowStore = {
       windows: next.map(w => ({ ...w, isFocused: w.id === focusedId })),
       focusedId,
     });
+    berryBus.emit('window:closed', { id, appId: closing.appId });
+    // App is fully terminated when no windows for that appId remain.
+    const stillRunning = next.some(w => w.appId === closing.appId);
+    if (!stillRunning) {
+      berryBus.emit('app:terminating', { appId: closing.appId });
+      berryBus.emit('app:terminated', { appId: closing.appId });
+    }
+    if (focusedId) {
+      const newTop = next.find(w => w.id === focusedId);
+      if (newTop) {
+        berryBus.emit('window:focused', { id: focusedId, appId: newTop.appId, prevFocusedId: id });
+        berryBus.emit('app:focused', { appId: newTop.appId });
+      }
+    }
   },
 
   focus(id: string) {
     if (state.focusedId === id) return;
+    const target = state.windows.find(w => w.id === id);
+    if (!target) return;
+    const prevFocusedId = state.focusedId ?? undefined;
+    const prev = prevFocusedId ? state.windows.find(w => w.id === prevFocusedId) : undefined;
     setState({
       ...state,
       windows: state.windows.map(w =>
@@ -171,9 +203,16 @@ export const windowStore = {
       focusedId: id,
       nextZ: state.nextZ + 1,
     });
+    if (prev) berryBus.emit('window:blurred', { id: prev.id, appId: prev.appId });
+    berryBus.emit('window:focused', { id, appId: target.appId, prevFocusedId });
+    if (!prev || prev.appId !== target.appId) {
+      berryBus.emit('app:focused', { appId: target.appId });
+    }
   },
 
   minimize(id: string) {
+    const target = state.windows.find(w => w.id === id);
+    if (!target || target.isMinimized) return;
     setState({
       ...state,
       windows: state.windows.map(w =>
@@ -181,16 +220,30 @@ export const windowStore = {
       ),
       focusedId: state.focusedId === id ? null : state.focusedId,
     });
+    berryBus.emit('window:minimized', { id, appId: target.appId });
+    if (state.focusedId === id) berryBus.emit('window:blurred', { id, appId: target.appId });
   },
 
   maximize(id: string) {
+    const target = state.windows.find(w => w.id === id);
+    if (!target) return;
     setState({
       ...state,
       windows: state.windows.map(w => (w.id === id ? { ...w, isMaximized: !w.isMaximized } : w)),
     });
+    // Maximize toggling is a resize event in spirit; emit window:resized with the
+    // viewport-derived size so subscribers can react.
+    const vw = typeof window !== 'undefined' ? window.innerWidth : target.width;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : target.height;
+    const w = !target.isMaximized ? vw : target.width;
+    const h = !target.isMaximized ? vh - 24 - 76 : target.height;
+    berryBus.emit('window:resized', { id, w, h });
   },
 
   restore(id: string) {
+    const target = state.windows.find(w => w.id === id);
+    if (!target || !target.isMinimized) return;
+    const prevFocusedId = state.focusedId ?? undefined;
     setState({
       ...state,
       windows: state.windows.map(w =>
@@ -201,34 +254,46 @@ export const windowStore = {
       focusedId: id,
       nextZ: state.nextZ + 1,
     });
+    berryBus.emit('window:restored', { id, appId: target.appId });
+    berryBus.emit('window:focused', { id, appId: target.appId, prevFocusedId });
+    berryBus.emit('app:focused', { appId: target.appId });
   },
 
   move(id: string, x: number, y: number) {
     const win = state.windows.find(w => w.id === id);
     if (!win) return;
     const c = clampPosition(x, y, win.width);
+    if (c.x === win.x && c.y === win.y) return; // no-op
     setState({
       ...state,
       windows: state.windows.map(w => (w.id === id ? { ...w, x: c.x, y: c.y } : w)),
     });
+    berryBus.emit('window:moved', { id, x: c.x, y: c.y });
   },
 
   resize(id: string, width: number, height: number) {
+    const win = state.windows.find(w => w.id === id);
+    if (!win) return;
+    const w = Math.max(win.minWidth, width);
+    const h = Math.max(win.minHeight, height);
+    if (w === win.width && h === win.height) return; // no-op
     setState({
       ...state,
-      windows: state.windows.map(w => {
-        if (w.id !== id) return w;
-        return {
-          ...w,
-          width: Math.max(w.minWidth, width),
-          height: Math.max(w.minHeight, height),
-        };
+      windows: state.windows.map(x => {
+        if (x.id !== id) return x;
+        return { ...x, width: w, height: h };
       }),
     });
+    berryBus.emit('window:resized', { id, w, h });
   },
 
   closeAll() {
+    const closing = state.windows.slice();
     setState({ ...state, windows: [], focusedId: null });
+    closing.forEach(w => {
+      berryBus.emit('window:closed', { id: w.id, appId: w.appId });
+      berryBus.emit('app:terminated', { appId: w.appId });
+    });
   },
 };
 
