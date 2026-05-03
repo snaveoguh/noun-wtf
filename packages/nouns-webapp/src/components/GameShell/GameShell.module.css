@@ -1249,6 +1249,9 @@
   box-sizing: content-box;
   flex-shrink: 0;
   position: relative;
+  /* Clip the inner ENS-avatar <img> to the round disc. Stack discs are
+     content-box sized, so the image fills the 18×18 inner area cleanly. */
+  overflow: hidden;
 }
 .voterAvatarStackItem + .voterAvatarStackItem {
   /* ~55% overlap — tight enough to feel grouped but still shows each disc. */
