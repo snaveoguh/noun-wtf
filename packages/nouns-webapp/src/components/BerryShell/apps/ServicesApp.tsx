@@ -11,6 +11,9 @@
 
 import { useEffect, useState } from 'react';
 
+import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import { Boot, Restart, Settings, Shutdown } from '@/liquid-sand/icons';
+
 import { berryRegistry } from '../system/berryRegistry';
 import { extendedBus, useAllExtendedEvents } from '../system/extendedBus';
 import {
@@ -21,10 +24,10 @@ import {
 } from '../system/services';
 
 const STATUS_COLORS: Record<ServiceStatus, string> = {
-  running: '#3eb371',
-  starting: '#e8c43a',
-  failed: '#d24747',
-  stopped: '#888',
+  running: 'var(--ls-success)',
+  starting: 'var(--ls-sand-500)',
+  failed: 'var(--ls-danger)',
+  stopped: 'var(--ls-fg-muted)',
 };
 
 const STATUS_LABELS: Record<ServiceStatus, string> = {
@@ -34,49 +37,25 @@ const STATUS_LABELS: Record<ServiceStatus, string> = {
   stopped: 'Stopped',
 };
 
-const headerStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  fontFamily: 'var(--theme-font-display)',
-  fontSize: 12,
-  fontWeight: 700,
-  color: 'var(--theme-text-primary)',
-  borderBottom: '1px solid var(--theme-border, #999)',
-  background: 'var(--theme-bg-secondary, #efefef)',
-};
-
-const buttonStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-display)',
-  fontSize: 10,
-  padding: '2px 8px',
-  border: '1px solid var(--theme-border-strong, #888)',
-  background: 'var(--theme-bg-card, #fff)',
-  color: 'var(--theme-text-primary)',
-  cursor: 'pointer',
-  borderRadius: 4,
-};
-
-const eventRowStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-mono, ui-monospace, Menlo, monospace)',
-  fontSize: 10,
-  padding: '2px 12px',
-  color: 'var(--theme-text-secondary, #555)',
-  borderBottom: '1px dotted var(--theme-border, #ddd)',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+const STATUS_TONE: Record<ServiceStatus, 'success' | 'accent' | 'danger' | 'neutral'> = {
+  running: 'success',
+  starting: 'accent',
+  failed: 'danger',
+  stopped: 'neutral',
 };
 
 function StatusDot({ status }: { status: ServiceStatus }) {
   return (
     <span
       title={STATUS_LABELS[status]}
+      aria-hidden
       style={{
         display: 'inline-block',
         width: 8,
         height: 8,
-        borderRadius: '50%',
+        borderRadius: 'var(--ls-r-full)',
         background: STATUS_COLORS[status],
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 0 4px rgba(0,0,0,0.18)',
+        boxShadow: `0 0 8px ${STATUS_COLORS[status]}, var(--ls-shadow-inset-glass)`,
         marginRight: 6,
       }}
     />
@@ -85,72 +64,85 @@ function StatusDot({ status }: { status: ServiceStatus }) {
 
 function ServiceRow({ rec }: { rec: ServiceRecord }) {
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr auto',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 12px',
-        borderBottom: '1px dotted var(--theme-border, #ccc)',
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontFamily: 'var(--theme-font-display)',
-            fontSize: 12,
-            color: 'var(--theme-text-primary)',
-          }}
-        >
-          <StatusDot status={rec.status} />
-          <strong>{rec.service.name}</strong>{' '}
-          <span style={{ color: 'var(--theme-text-muted)', fontSize: 11 }}>
-            {rec.service.id}
-          </span>
-        </div>
-        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--theme-text-secondary)' }}>
-          {rec.service.description ?? STATUS_LABELS[rec.status]}
-        </div>
-        {rec.lastError && (
+    <GlassPanel padded radius="md" tone="auto" className="!p-3">
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto' }}>
+        <div className="min-w-0">
+          <div
+            className="flex items-center gap-1.5"
+            style={{
+              fontFamily: 'var(--ls-font-display)',
+              fontSize: 'var(--ls-text-sm)',
+              color: 'var(--ls-fg-primary)',
+            }}
+          >
+            <StatusDot status={rec.status} />
+            <strong>{rec.service.name}</strong>
+            <GlassChip tone={STATUS_TONE[rec.status]} size="xs">
+              {STATUS_LABELS[rec.status]}
+            </GlassChip>
+            <span
+              style={{
+                color: 'var(--ls-fg-muted)',
+                fontSize: 11,
+                marginLeft: 4,
+                fontFamily: 'var(--ls-font-mono)',
+              }}
+            >
+              {rec.service.id}
+            </span>
+          </div>
           <div
             style={{
               marginTop: 2,
-              fontSize: 10,
-              color: '#a83232',
-              fontFamily: 'var(--theme-font-mono, monospace)',
+              fontSize: 11,
+              color: 'var(--ls-fg-secondary)',
             }}
           >
-            error: {rec.lastError}
+            {rec.service.description ?? STATUS_LABELS[rec.status]}
           </div>
-        )}
+          {rec.lastError && (
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 10,
+                color: 'var(--ls-danger)',
+                fontFamily: 'var(--ls-font-mono)',
+              }}
+            >
+              error: {rec.lastError}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1">
+          <GlassButton
+            variant="default"
+            size="sm"
+            disabled={rec.status === 'running' || rec.status === 'starting'}
+            onClick={() => void serviceManager.start(rec.service.id)}
+          >
+            <Boot size={12} />
+            Start
+          </GlassButton>
+          <GlassButton
+            variant="default"
+            size="sm"
+            disabled={rec.status === 'stopped'}
+            onClick={() => void serviceManager.stop(rec.service.id)}
+          >
+            <Shutdown size={12} />
+            Stop
+          </GlassButton>
+          <GlassButton
+            variant="default"
+            size="sm"
+            onClick={() => void serviceManager.restart(rec.service.id)}
+          >
+            <Restart size={12} />
+            Restart
+          </GlassButton>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button
-          type="button"
-          style={buttonStyle}
-          disabled={rec.status === 'running' || rec.status === 'starting'}
-          onClick={() => void serviceManager.start(rec.service.id)}
-        >
-          Start
-        </button>
-        <button
-          type="button"
-          style={buttonStyle}
-          disabled={rec.status === 'stopped'}
-          onClick={() => void serviceManager.stop(rec.service.id)}
-        >
-          Stop
-        </button>
-        <button
-          type="button"
-          style={buttonStyle}
-          onClick={() => void serviceManager.restart(rec.service.id)}
-        >
-          Restart
-        </button>
-      </div>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -197,16 +189,41 @@ function ServicesApp() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={headerStyle}>Services</div>
-      <div style={{ overflow: 'auto', flex: 1 }}>
+    <div
+      className="flex flex-col h-full overflow-hidden"
+      style={{
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
+      }}
+    >
+      <div
+        className="flex items-center gap-2 px-4 py-2.5"
+        style={{
+          background: 'var(--ls-glass-light)',
+          backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          borderBottom: '1px solid var(--ls-border-glass)',
+        }}
+      >
+        <Settings size={14} />
+        <span
+          style={{
+            fontFamily: 'var(--ls-font-display)',
+            fontSize: 'var(--ls-text-md)',
+            fontWeight: 700,
+          }}
+        >
+          Services
+        </span>
+      </div>
+      <div className="overflow-auto flex-1 p-3 flex flex-col gap-2">
         {services.length === 0 ? (
           <div
+            className="text-center"
             style={{
               padding: 16,
               fontSize: 12,
-              color: 'var(--theme-text-muted)',
-              fontFamily: 'var(--theme-font-display)',
+              color: 'var(--ls-fg-muted)',
             }}
           >
             No services registered.
@@ -215,34 +232,68 @@ function ServicesApp() {
           services.map(rec => <ServiceRow key={rec.service.id} rec={rec} />)
         )}
       </div>
+
       <div
+        className="flex items-center gap-2 px-4 py-2"
         style={{
-          ...headerStyle,
-          borderTop: '1px solid var(--theme-border, #999)',
-          borderBottom: 'none',
+          background: 'var(--ls-glass-light)',
+          backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          borderTop: '1px solid var(--ls-border-glass)',
+          borderBottom: '1px solid var(--ls-border-glass)',
         }}
       >
-        Recent events
+        <span
+          style={{
+            fontFamily: 'var(--ls-font-display)',
+            fontSize: 'var(--ls-text-sm)',
+            fontWeight: 700,
+          }}
+        >
+          Recent events
+        </span>
       </div>
       <div
         style={{
-          maxHeight: 150,
+          maxHeight: 160,
           overflow: 'auto',
-          background: 'var(--theme-bg-tertiary, #fafafa)',
+          background: 'var(--ls-glass-tint)',
+          padding: 4,
         }}
       >
         {log.length === 0 ? (
-          <div style={eventRowStyle}>(no events yet)</div>
+          <div
+            style={{
+              fontFamily: 'var(--ls-font-mono)',
+              fontSize: 10,
+              padding: '4px 12px',
+              color: 'var(--ls-fg-muted)',
+            }}
+          >
+            (no events yet)
+          </div>
         ) : (
           log
             .slice()
             .reverse()
             .map(entry => (
-              <div key={entry.key} style={eventRowStyle}>
-                <span style={{ color: 'var(--theme-text-muted)' }}>
+              <div
+                key={entry.key}
+                style={{
+                  fontFamily: 'var(--ls-font-mono)',
+                  fontSize: 10,
+                  padding: '3px 12px',
+                  color: 'var(--ls-fg-secondary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                <span style={{ color: 'var(--ls-fg-muted)' }}>
                   {new Date(entry.timestamp).toLocaleTimeString()}
                 </span>{' '}
-                <strong>{entry.event}</strong>{' '}
+                <strong style={{ color: 'var(--ls-accent)' }}>{entry.event}</strong>{' '}
                 {entry.payload && typeof entry.payload === 'object'
                   ? JSON.stringify(entry.payload)
                   : String(entry.payload)}

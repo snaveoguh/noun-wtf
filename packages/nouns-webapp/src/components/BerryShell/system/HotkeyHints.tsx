@@ -11,6 +11,9 @@
 
 import { useEffect, useState } from 'react';
 
+import { GlassPanel } from '@/liquid-sand/glass';
+import { Key } from '@/liquid-sand/icons';
+
 import { hotkeyManager, type BerryHotkey } from './hotkeys';
 
 const HOLD_DELAY_MS = 1000;
@@ -108,42 +111,43 @@ export default function HotkeyHints() {
   if (!visible) return null;
 
   return (
-    <div
+    <GlassPanel
       role="region"
       aria-label="Keyboard shortcuts"
+      blur="heavy"
+      radius="md"
       style={{
         position: 'fixed',
         bottom: 90,
         right: 24,
         zIndex: 4500,
-        width: 280,
-        background: 'rgba(28, 28, 32, 0.82)',
-        color: '#f5f5f7',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderRadius: 10,
-        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45)',
+        width: 300,
         padding: '12px 14px',
-        fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+        fontFamily: 'var(--ls-font-sans)',
         fontSize: 12,
-        animation: 'berry-hk-fade-in 200ms ease-out',
+        color: 'var(--ls-fg-primary)',
+        animation: 'berry-hk-fade-in var(--ls-dur-base) var(--ls-ease-glide)',
       }}
     >
       <style>{`@keyframes berry-hk-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div
         style={{
-          fontSize: 11,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontFamily: 'var(--ls-font-mono)',
+          fontSize: 10,
           textTransform: 'uppercase',
-          letterSpacing: 0.6,
-          color: 'rgba(245, 245, 247, 0.55)',
-          marginBottom: 8,
+          letterSpacing: 0.8,
+          color: 'var(--ls-fg-muted)',
+          marginBottom: 10,
         }}
       >
-        Keyboard Shortcuts
+        <Key size={12} />
+        <span>Keyboard Shortcuts</span>
       </div>
       {hotkeys.length === 0 && (
-        <div style={{ color: 'rgba(245,245,247,0.55)' }}>No shortcuts registered.</div>
+        <div style={{ color: 'var(--ls-fg-muted)' }}>No shortcuts registered.</div>
       )}
       {hotkeys.map(h => (
         <div
@@ -156,22 +160,24 @@ export default function HotkeyHints() {
             gap: 12,
           }}
         >
-          <span style={{ flex: 1, color: 'rgba(245,245,247,0.85)' }}>{h.description}</span>
+          <span style={{ flex: 1, color: 'var(--ls-fg-secondary)' }}>{h.description}</span>
           <span
             style={{
-              fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+              fontFamily: 'var(--ls-font-mono)',
+              fontVariantNumeric: 'tabular-nums',
               fontSize: 11,
               padding: '2px 6px',
-              background: 'rgba(255,255,255,0.10)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              borderRadius: 4,
+              background: 'var(--ls-glass-tint)',
+              border: '1px solid var(--ls-border-glass)',
+              borderRadius: 'var(--ls-r-sm)',
               whiteSpace: 'nowrap',
+              color: 'var(--ls-fg-primary)',
             }}
           >
             {comboLabel(h.combo)}
           </span>
         </div>
       ))}
-    </div>
+    </GlassPanel>
   );
 }

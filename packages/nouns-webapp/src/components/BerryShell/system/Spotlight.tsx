@@ -22,7 +22,22 @@
  *                spotlight:toggle event the hotkey emits)
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { GlassInput, GlassModal } from '@/liquid-sand/glass';
+import {
+  Bell,
+  Calculator,
+  Coin,
+  Diamond,
+  Document,
+  Folder,
+  Globe,
+  Key,
+  MagnifyingGlass,
+  Settings as SettingsIcon,
+  Sparkle,
+} from '@/liquid-sand/icons';
 
 import { APP_REGISTRY, type BerryAppDef } from '../apps/registry';
 import { windowStore } from '../store/windowStore';
@@ -30,6 +45,36 @@ import { windowStore } from '../store/windowStore';
 import { berryBus } from './eventBus';
 import { fuzzySearch } from './fuzzy';
 import './spotlightEvents';
+
+// ---------------------------------------------------------------------------
+// Liquid Sand monoline icon resolution
+// ---------------------------------------------------------------------------
+
+type IconComp = ComponentType<{ size?: number | string }>;
+
+// Map appId / setting id → monoline icon. Anything we don't know about lands
+// on the generic <Sparkle>.
+const ICON_BY_APP: Record<string, IconComp> = {
+  finder: Folder,
+  auction: Coin,
+  vote: Diamond,
+  candidates: Document,
+  settings: SettingsIcon,
+};
+
+const ICON_BY_SETTING: Record<string, IconComp> = {
+  'settings:theme': Sparkle,
+  'settings:permissions': Key,
+  'settings:notifications': Bell,
+};
+
+function iconForResult(result: SpotlightResult): IconComp {
+  if (result.type === 'app') return ICON_BY_APP[result.id] ?? Sparkle;
+  if (result.type === 'setting') return ICON_BY_SETTING[result.id] ?? SettingsIcon;
+  if (result.type === 'web') return Globe;
+  if (result.type === 'calc') return Calculator;
+  return Sparkle;
+}
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -358,158 +403,142 @@ export default function Spotlight() {
     [closeSpot, flatResults, launch, selectedIndex],
   );
 
-  if (!open) return null;
-
   // ── render ──────────────────────────────────────────────────────────────
   let runningIdx = 0;
   return (
-    <div
-      role="dialog"
-      aria-label="Spotlight"
+    <GlassModal
+      open={open}
+      onScrimClick={closeSpot}
+      size="lg"
+      // Top-aligned spotlight position rather than centered.
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 5000,
+        marginTop: '15vh',
+        padding: 0,
+        maxWidth: 560,
         display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: '15vh',
-        background: 'rgba(0, 0, 0, 0.18)',
+        flexDirection: 'column',
+        maxHeight: '70vh',
+        overflow: 'hidden',
+        fontFamily: 'var(--ls-font-sans)',
       }}
-      onMouseDown={e => {
-        if (e.target === e.currentTarget) closeSpot();
-      }}
+      ref={containerRef}
+      aria-label="Spotlight"
+      data-spotlight=""
     >
-      <div
-        ref={containerRef}
-        data-spotlight
-        style={{
-          width: 520,
-          maxWidth: 'calc(100vw - 32px)',
-          maxHeight: '70vh',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'rgba(28, 28, 32, 0.78)',
-          color: '#f5f5f7',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-          borderRadius: 8,
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4)',
-          fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
-        }}
-      >
-        {/* Search input */}
+      {/* Search input — GlassInput with the magnifier prefix. */}
+      <div style={{ padding: 14 }}>
+        <GlassInput
+          ref={inputRef}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Spotlight Search"
+          aria-label="Spotlight search"
+          inputSize="lg"
+          prefix={<MagnifyingGlass size={16} />}
+        />
+      </div>
+
+      {/* Results */}
+      {flatResults.length > 0 && (
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '14px 18px',
-            borderBottom: flatResults.length ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            overflowY: 'auto',
+            padding: '0 6px 10px 6px',
+            borderTop: '1px solid var(--ls-border-glass)',
+            color: 'var(--ls-fg-primary)',
           }}
         >
-          <span aria-hidden style={{ fontSize: 20, opacity: 0.65 }}>
-            🔍
-          </span>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Spotlight Search"
-            aria-label="Spotlight search"
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: '#f5f5f7',
-              fontSize: 22,
-              fontFamily: 'inherit',
-              padding: 0,
-            }}
-          />
-        </div>
-
-        {/* Results */}
-        {flatResults.length > 0 && (
-          <div
-            style={{
-              overflowY: 'auto',
-              padding: '6px 0 8px 0',
-            }}
-          >
-            {groups.map(group => (
-              <div key={group.label} style={{ padding: '4px 0' }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                    color: 'rgba(245, 245, 247, 0.45)',
-                    padding: '4px 18px 6px',
-                  }}
-                >
-                  {group.label}
-                </div>
-                {group.items.map(item => {
-                  const idx = runningIdx++;
-                  const selected = idx === selectedIndex;
-                  return (
-                    <div
-                      key={item.id}
-                      role="option"
-                      aria-selected={selected}
-                      onMouseEnter={() => setSelectedIndex(idx)}
-                      onMouseDown={e => {
-                        e.preventDefault();
-                        launch(item);
-                      }}
+          {groups.map(group => (
+            <div key={group.label} style={{ padding: '4px 0' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--ls-font-mono)',
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.8,
+                  color: 'var(--ls-fg-muted)',
+                  padding: '8px 14px 4px',
+                }}
+              >
+                {group.label}
+              </div>
+              {group.items.map(item => {
+                const idx = runningIdx++;
+                const selected = idx === selectedIndex;
+                const Icon = iconForResult(item);
+                return (
+                  <div
+                    key={item.id}
+                    role="option"
+                    aria-selected={selected}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      launch(item);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '8px 12px',
+                      margin: '2px 4px',
+                      cursor: 'default',
+                      borderRadius: 'var(--ls-r-md)',
+                      background: selected
+                        ? 'var(--ls-glass-tint)'
+                        : 'transparent',
+                      transition:
+                        'background var(--ls-dur-fast) var(--ls-ease-soft)',
+                      color: 'var(--ls-fg-primary)',
+                    }}
+                  >
+                    <span
+                      aria-hidden
                       style={{
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 12,
-                        padding: '8px 18px',
-                        cursor: 'default',
-                        background: selected ? 'rgba(80, 130, 220, 0.65)' : 'transparent',
+                        justifyContent: 'center',
+                        width: 22,
+                        height: 22,
+                        color: selected
+                          ? 'var(--ls-accent)'
+                          : 'var(--ls-fg-secondary)',
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>
-                        {item.emoji}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {item.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: selected ? 'rgba(255,255,255,0.85)' : 'rgba(245,245,247,0.55)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {item.subtitle}
-                        </div>
+                      <Icon size={20} />
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--ls-fg-muted)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.subtitle}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </GlassModal>
   );
 }

@@ -21,6 +21,9 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { GlassButton, GlassPanel } from '@/liquid-sand/glass';
+import { Power, Sparkle } from '@/liquid-sand/icons';
+
 import { berryRegistry, type BerryAppDescriptor } from './berryRegistry';
 import { berryBus } from './eventBus';
 import { serviceManager } from './services';
@@ -167,7 +170,7 @@ const overlayBase: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontFamily: 'var(--theme-font-display, ui-monospace), monospace',
+  fontFamily: 'var(--ls-font-sans)',
 };
 
 export default function ShutdownSequence() {
@@ -274,33 +277,57 @@ export default function ShutdownSequence() {
         role="dialog"
         aria-modal="true"
         aria-label="Shut Down"
-        style={{ ...overlayBase, background: 'rgba(0, 0, 0, 0.45)' }}
+        style={{
+          ...overlayBase,
+          background: 'rgba(60, 45, 25, 0.32)',
+          backdropFilter: 'blur(var(--ls-blur-subtle))',
+          WebkitBackdropFilter: 'blur(var(--ls-blur-subtle))',
+        }}
         onClick={e => {
           if (e.target === e.currentTarget) setStage('hidden');
         }}
       >
-        <div
+        <GlassPanel
+          blur="extreme"
+          radius="lg"
           style={{
-            width: 360,
-            background: 'var(--theme-bg-card, #ececec)',
-            color: 'var(--theme-text-primary, #111)',
-            border: '1px solid var(--theme-border-strong, #888)',
-            borderRadius: 10,
-            padding: '20px 22px 16px',
-            boxShadow:
-              '0 22px 60px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.25)',
+            width: 380,
+            padding: '22px 24px 18px',
             fontSize: 13,
           }}
         >
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <div aria-hidden style={{ fontSize: 36, lineHeight: 1 }}>
-              ⏻
+            <div
+              aria-hidden
+              style={{
+                width: 44,
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--ls-sand-600)',
+              }}
+            >
+              <Power size={36} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: 14,
+                  marginBottom: 6,
+                  color: 'var(--ls-fg-primary)',
+                }}
+              >
                 Are you sure you want to shut down your computer?
               </div>
-              <div style={{ opacity: 0.75, fontSize: 12, lineHeight: 1.4 }}>
+              <div
+                style={{
+                  color: 'var(--ls-fg-secondary)',
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                }}
+              >
                 BerryOS will close all running apps and stop background services.
               </div>
               <label
@@ -310,6 +337,7 @@ export default function ShutdownSequence() {
                   gap: 6,
                   marginTop: 14,
                   fontSize: 12,
+                  color: 'var(--ls-fg-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -317,6 +345,7 @@ export default function ShutdownSequence() {
                   type="checkbox"
                   checked={reopen}
                   onChange={e => setReopen(e.target.checked)}
+                  style={{ accentColor: 'var(--ls-accent)' }}
                 />
                 Reopen windows when logging back in
               </label>
@@ -330,28 +359,28 @@ export default function ShutdownSequence() {
               marginTop: 18,
             }}
           >
-            <button
-              type="button"
+            <GlassButton
+              variant="ghost"
+              size="sm"
               onClick={() => setStage('hidden')}
-              style={dialogBtnSecondary}
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </GlassButton>
+            <GlassButton
+              variant="primary"
+              size="sm"
               onClick={() => void runShutdown(reopen)}
-              style={dialogBtnPrimary}
               autoFocus
             >
               Shut Down
-            </button>
+            </GlassButton>
           </div>
-        </div>
+        </GlassPanel>
       </div>
     );
   }
 
-  // shutting + goodbye stages
+  // shutting + goodbye stages — fade to sand-cream with monoline icon.
   return (
     <>
       <style>{shutdownKeyframes}</style>
@@ -359,22 +388,32 @@ export default function ShutdownSequence() {
         aria-live="polite"
         style={{
           ...overlayBase,
-          background: '#000',
-          color: '#f4f4f4',
+          background:
+            'linear-gradient(180deg, var(--ls-sand-50) 0%, var(--ls-sand-100) 50%, var(--ls-sand-200) 100%)',
+          color: 'var(--ls-fg-primary)',
           flexDirection: 'column',
-          gap: 14,
-          animation: 'berryShutdownIn 280ms ease both',
-          fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
+          gap: 16,
+          animation: 'berryShutdownIn var(--ls-dur-base) var(--ls-ease-glide) both',
         }}
       >
-        <div aria-hidden style={{ fontSize: 64, opacity: 0.85 }}>
-          {stage === 'goodbye' ? '🍓' : '⏻'}
+        <div
+          aria-hidden
+          style={{
+            color: 'var(--ls-sand-600)',
+            animation:
+              stage === 'goodbye'
+                ? 'berryShutdownShrink var(--ls-dur-slow) var(--ls-ease-glide) forwards'
+                : 'none',
+          }}
+        >
+          {stage === 'goodbye' ? <Sparkle size={64} /> : <Power size={64} />}
         </div>
         <div
           style={{
+            fontFamily: 'var(--ls-font-mono)',
             fontSize: 13,
             letterSpacing: 0.4,
-            opacity: 0.9,
+            color: 'var(--ls-fg-secondary)',
             minHeight: 18,
           }}
         >
@@ -385,35 +424,13 @@ export default function ShutdownSequence() {
   );
 }
 
-const dialogBtnPrimary: CSSProperties = {
-  padding: '6px 16px',
-  borderRadius: 6,
-  border: '1px solid #0a4a90',
-  background:
-    'linear-gradient(180deg, #b3d4ff 0%, #5fa3ee 38%, #2d7ad8 60%, #1c5fb0 100%)',
-  color: '#fff',
-  fontWeight: 700,
-  fontSize: 12,
-  cursor: 'pointer',
-  textShadow: '0 1px 0 rgba(0, 0, 0, 0.35)',
-  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.85)',
-};
-
-const dialogBtnSecondary: CSSProperties = {
-  padding: '6px 14px',
-  borderRadius: 6,
-  border: '1px solid #999',
-  background:
-    'linear-gradient(180deg, #fdfdfd 0%, #e6e6e6 60%, #d4d4d4 100%)',
-  color: '#111',
-  fontWeight: 600,
-  fontSize: 12,
-  cursor: 'pointer',
-};
-
 const shutdownKeyframes = `
 @keyframes berryShutdownIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+@keyframes berryShutdownShrink {
+  from { transform: scale(1); opacity: 0.85; }
+  to { transform: scale(0.6); opacity: 0; }
 }
 `;

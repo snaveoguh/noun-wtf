@@ -17,6 +17,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
+import { GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import { Close as CloseIcon, CpuChip } from '@/liquid-sand/icons';
+
 import { hotkeyManager } from './hotkeys';
 import { berryBus } from './eventBus';
 import {
@@ -238,9 +241,11 @@ export default function EventInspector(): ReactElement | null {
   if (!isVisible) return null;
 
   return (
-    <div
+    <GlassPanel
       role="dialog"
       aria-label="Event Inspector"
+      blur="heavy"
+      radius="md"
       style={{
         position: 'fixed',
         top: pos.y,
@@ -248,18 +253,16 @@ export default function EventInspector(): ReactElement | null {
         width: PANEL_W,
         maxHeight: PANEL_H,
         zIndex: 99999,
-        background: 'rgba(28, 28, 30, 0.96)',
-        backdropFilter: 'blur(20px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-        border: '1px solid rgba(255,255,255,0.18)',
-        borderRadius: 10,
-        boxShadow:
-          '0 12px 32px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
+        // Keep the inspector text-readable on the warm sand backdrop —
+        // override the default Liquid Sand foreground with the dense devtools
+        // greys so the existing event log styling reads as "system console".
         color: '#dcdce0',
+        backgroundColor: 'rgba(20, 14, 6, 0.78)',
         fontFamily: MONO_FONT,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        padding: 0,
       }}
     >
       <div
@@ -278,14 +281,15 @@ export default function EventInspector(): ReactElement | null {
           gap: 8,
           padding: '6px 10px',
           background:
-            'linear-gradient(180deg, rgba(60,60,67,0.75) 0%, rgba(44,44,46,0.75) 100%)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+            'linear-gradient(180deg, rgba(60,45,25,0.55) 0%, rgba(20,14,6,0.55) 100%)',
+          borderBottom: '1px solid var(--ls-border-glass)',
           cursor: 'grab',
           touchAction: 'none',
           userSelect: 'none',
+          color: 'var(--ls-fg-on-dark)',
         }}
       >
-        <span style={{ width: 8, height: 8, borderRadius: 4, background: '#28cd41' }} />
+        <CpuChip size={14} />
         <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3 }}>
           Event Inspector
         </span>
@@ -293,34 +297,30 @@ export default function EventInspector(): ReactElement | null {
           ⌘⇧I to toggle
         </span>
         <span style={{ flex: 1 }} />
-        <button
-          type="button"
+        <GlassChip
+          tone={sticky ? 'success' : 'neutral'}
+          size="xs"
           onClick={() => setSticky(s => !s)}
-          style={{
-            ...subtleButtonStyle,
-            background: sticky
-              ? 'linear-gradient(180deg, #2d7ad8 0%, #1c5fb0 100%)'
-              : 'linear-gradient(180deg, #48484a 0%, #3a3a3c 100%)',
-            color: '#fff',
-            borderColor: sticky ? '#0a4a90' : '#48484a',
-          }}
+          style={{ cursor: 'pointer' }}
           title="Pin to top of stream"
         >
-          {sticky ? '◉ Live' : '○ Paused'}
-        </button>
+          {sticky ? 'Live' : 'Paused'}
+        </GlassChip>
         <button
           type="button"
           onClick={() => eventInspector.hide()}
           style={{
             ...subtleButtonStyle,
-            background: 'linear-gradient(180deg, #48484a 0%, #3a3a3c 100%)',
-            color: '#fff',
-            borderColor: '#48484a',
+            background: 'transparent',
+            color: 'var(--ls-fg-on-dark)',
+            border: '1px solid var(--ls-border-glass)',
             padding: '2px 6px',
+            display: 'inline-flex',
+            alignItems: 'center',
           }}
           title="Hide (⌘⇧I)"
         >
-          ✕
+          <CloseIcon size={10} />
         </button>
       </div>
       <div
@@ -437,6 +437,6 @@ export default function EventInspector(): ReactElement | null {
           ping
         </button>
       </div>
-    </div>
+    </GlassPanel>
   );
 }

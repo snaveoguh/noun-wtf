@@ -1,0 +1,156 @@
+/**
+ * Liquid Sand UI — design tokens (CSS custom properties)
+ *
+ * CC0 design system. Y2K-modern, super-minimal, glass-frosted aesthetic
+ * with a slight warm sepia tone (the "sand").
+ *
+ * Defaults live on :root (light frost). [data-ls-theme="dark"] swaps the
+ * glass + foreground tokens for dark surface defaults.
+ *
+ * Companion TS exports live in ./tokens.ts — keep them in sync.
+ */
+
+:root {
+  /* ─── Color: warm sand sepia ladder ─────────────────────────────────── */
+  --ls-sand-50: #fbf6ee;
+  --ls-sand-100: #f4ead6;
+  --ls-sand-200: #e8d4ab;
+  --ls-sand-300: #d4b67a;
+  --ls-sand-400: #b89352;
+  --ls-sand-500: #9a7536;
+  --ls-sand-600: #7a5a26;
+  --ls-sand-700: #5a4218;
+  --ls-sand-800: #3d2c0f;
+  --ls-sand-900: #241906;
+
+  /* ─── Color: frost-glass surface tints (for backdrop-blur) ──────────── */
+  --ls-glass-light: rgba(255, 250, 240, 0.45);
+  --ls-glass-light-strong: rgba(255, 250, 240, 0.65);
+  --ls-glass-dark: rgba(60, 45, 25, 0.4);
+  --ls-glass-dark-strong: rgba(60, 45, 25, 0.65);
+  --ls-glass-tint: rgba(184, 147, 82, 0.1);
+
+  /* ─── Color: foreground (text/icons on glass) ───────────────────────── */
+  --ls-fg-primary: #1a1208;
+  --ls-fg-secondary: #5a4a35;
+  --ls-fg-muted: #8b7556;
+  --ls-fg-on-dark: #fbf6ee;
+
+  /* ─── Color: borders + accents ──────────────────────────────────────── */
+  --ls-border-glass: rgba(255, 250, 240, 0.18);
+  --ls-accent: #b89352;
+  --ls-danger: #c2492f;
+  --ls-success: #7a8b3c;
+
+  /* ─── Backdrop blur tiers ───────────────────────────────────────────── */
+  --ls-blur-subtle: 8px;
+  --ls-blur-medium: 16px;
+  --ls-blur-heavy: 28px;
+  --ls-blur-extreme: 48px;
+  --ls-saturate: 180%;
+
+  /* ─── Border radius ─────────────────────────────────────────────────── */
+  --ls-r-sm: 6px;
+  --ls-r-md: 12px;
+  --ls-r-lg: 18px;
+  --ls-r-xl: 24px;
+  --ls-r-full: 9999px;
+
+  /* ─── Shadows (soft sepia drops) ────────────────────────────────────── */
+  --ls-shadow-sm:
+    0 1px 2px rgba(60, 45, 25, 0.08), 0 1px 4px rgba(60, 45, 25, 0.04);
+  --ls-shadow-md:
+    0 4px 12px rgba(60, 45, 25, 0.1), 0 2px 6px rgba(60, 45, 25, 0.06);
+  --ls-shadow-lg:
+    0 12px 32px rgba(60, 45, 25, 0.14), 0 4px 12px rgba(60, 45, 25, 0.08);
+  --ls-shadow-glow: 0 0 32px rgba(184, 147, 82, 0.25);
+  --ls-shadow-inset-glass:
+    inset 0 1px 0 rgba(255, 250, 240, 0.35),
+    inset 0 -1px 0 rgba(60, 45, 25, 0.08);
+
+  /* ─── Spacing (4px base) ────────────────────────────────────────────── */
+  --ls-s-1: 4px;
+  --ls-s-2: 8px;
+  --ls-s-3: 12px;
+  --ls-s-4: 16px;
+  --ls-s-5: 20px;
+  --ls-s-6: 24px;
+  --ls-s-7: 28px;
+  --ls-s-8: 32px;
+  --ls-s-9: 36px;
+  --ls-s-10: 40px;
+  --ls-s-11: 44px;
+  --ls-s-12: 48px;
+
+  /* ─── Typography ────────────────────────────────────────────────────── */
+  --ls-font-display: 'Silkscreen', 'Berkeley Mono', monospace;
+  --ls-font-sans: 'Inter', system-ui, sans-serif;
+  --ls-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --ls-text-xs: 11px;
+  --ls-text-sm: 13px;
+  --ls-text-md: 15px;
+  --ls-text-lg: 18px;
+  --ls-text-xl: 22px;
+  --ls-text-2xl: 28px;
+  --ls-text-3xl: 36px;
+
+  /* ─── Motion ────────────────────────────────────────────────────────── */
+  --ls-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ls-ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+  --ls-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ls-dur-fast: 120ms;
+  --ls-dur-base: 220ms;
+  --ls-dur-slow: 380ms;
+
+  /* ─── Z-index layers ────────────────────────────────────────────────── */
+  --ls-z-base: 1;
+  --ls-z-window: 100;
+  --ls-z-window-active: 200;
+  --ls-z-menu: 1000;
+  --ls-z-modal: 2000;
+  --ls-z-toast: 3000;
+  --ls-z-spotlight: 4000;
+}
+
+/* ─── Dark theme — swap glass + foreground tokens ────────────────────────
+   Activate by setting `data-ls-theme="dark"` on <html> or any subtree. */
+[data-ls-theme='dark'] {
+  /* Glass: lean on the dark sepia tints by default so panels read as
+     "smoked glass" rather than chalky. The "light" aliases are remapped
+     so layout code that asks for `--ls-glass-light` still produces the
+     correct dark-mode surface without touching every call site. */
+  --ls-glass-light: rgba(60, 45, 25, 0.45);
+  --ls-glass-light-strong: rgba(60, 45, 25, 0.65);
+  --ls-glass-dark: rgba(20, 14, 6, 0.55);
+  --ls-glass-dark-strong: rgba(20, 14, 6, 0.78);
+  --ls-glass-tint: rgba(184, 147, 82, 0.14);
+
+  /* Foreground inverts: light sepia text on dark glass. */
+  --ls-fg-primary: #fbf6ee;
+  --ls-fg-secondary: #d4b67a;
+  --ls-fg-muted: #8b7556;
+  --ls-fg-on-dark: #fbf6ee;
+
+  /* Borders read brighter on dark surfaces. */
+  --ls-border-glass: rgba(255, 250, 240, 0.12);
+
+  /* Drops get heavier so windows lift off the dark backdrop. */
+  --ls-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.25);
+  --ls-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --ls-shadow-lg:
+    0 12px 32px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --ls-shadow-glow: 0 0 32px rgba(212, 182, 122, 0.3);
+  --ls-shadow-inset-glass:
+    inset 0 1px 0 rgba(255, 250, 240, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* ─── Reduced motion — zero out durations, keep easings as-is ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ls-dur-fast: 0ms;
+    --ls-dur-base: 0ms;
+    --ls-dur-slow: 0ms;
+  }
+}

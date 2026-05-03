@@ -12,7 +12,23 @@
  * `APP_REGISTRY` (or whatever shape lands) without touching this file.
  */
 
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
+
+import {
+  GlassButton,
+  GlassChip,
+  GlassInput,
+  GlassPanel,
+  GlassToolbar,
+} from '@/liquid-sand/glass';
+import {
+  Clipboard,
+  Close,
+  Globe,
+  MagnifyingGlass,
+  Trash,
+  Wallet,
+} from '@/liquid-sand/icons';
 
 import {
   clearAll,
@@ -25,20 +41,28 @@ import {
 
 const TYPE_ORDER: BerryClipboardType[] = ['address', 'url', 'noun-id', 'text'];
 
-const TYPE_COLORS: Record<BerryClipboardType, { bg: string; fg: string; label: string }> = {
-  address: { bg: '#1f6feb', fg: '#fff', label: 'ADDR' },
-  url: { bg: '#0f9b8e', fg: '#fff', label: 'URL' },
-  'noun-id': { bg: '#d6336c', fg: '#fff', label: 'NOUN' },
-  text: { bg: '#475569', fg: '#fff', label: 'TEXT' },
+const TYPE_META: Record<
+  BerryClipboardType,
+  { tone: 'accent' | 'success' | 'danger' | 'neutral'; label: string }
+> = {
+  address: { tone: 'accent', label: 'ADDR' },
+  url: { tone: 'success', label: 'URL' },
+  'noun-id': { tone: 'danger', label: 'NOUN' },
+  text: { tone: 'neutral', label: 'TEXT' },
 };
 
-const labelStyle: CSSProperties = {
-  fontFamily: 'var(--theme-font-display)',
-  fontSize: 11,
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-  color: 'var(--theme-text-muted)',
-};
+function typeIcon(t: BerryClipboardType) {
+  switch (t) {
+    case 'address':
+      return <Wallet size={12} />;
+    case 'url':
+      return <Globe size={12} />;
+    case 'noun-id':
+      return <Clipboard size={12} />;
+    default:
+      return <Clipboard size={12} />;
+  }
+}
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -56,72 +80,53 @@ function ClipboardRow({ item, onPick, onRemove }: {
   onPick: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
-  const colors = TYPE_COLORS[item.type];
+  const meta = TYPE_META[item.type];
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 8px',
-        borderBottom: '1px dotted var(--theme-feed-row-border)',
-      }}
-    >
-      <span
-        style={{
-          background: colors.bg,
-          color: colors.fg,
-          fontFamily: 'var(--theme-font-display)',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: 0.5,
-          padding: '2px 6px',
-          borderRadius: 4,
-          minWidth: 44,
-          textAlign: 'center',
-        }}
-      >
-        {colors.label}
-      </span>
+    <GlassPanel padded={false} radius="md" tone="auto" className="!p-2 flex items-center gap-2">
+      <GlassChip tone={meta.tone} size="xs" style={{ minWidth: 56, justifyContent: 'center' }}>
+        {typeIcon(item.type)}
+        {meta.label}
+      </GlassChip>
       <button
         type="button"
         onClick={() => onPick(item.id)}
         title="Click to re-copy"
+        className="flex-1 text-left bg-transparent border-0 cursor-pointer p-0"
         style={{
-          flex: 1,
-          textAlign: 'left',
-          background: 'transparent',
-          border: 'none',
-          fontFamily: 'var(--theme-font-mono, ui-monospace, monospace)',
+          fontFamily: 'var(--ls-font-mono)',
           fontSize: 12,
-          color: 'var(--theme-text-primary)',
-          cursor: 'pointer',
+          color: 'var(--ls-fg-primary)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          padding: 0,
         }}
       >
         {item.content}
       </button>
-      <span style={{ ...labelStyle, fontSize: 10 }}>{timeAgo(item.timestamp)}</span>
+      <span
+        style={{
+          fontFamily: 'var(--ls-font-mono)',
+          fontSize: 10,
+          color: 'var(--ls-fg-muted)',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {timeAgo(item.timestamp)}
+      </span>
       <button
         type="button"
         onClick={() => onRemove(item.id)}
         title="Remove from history"
         aria-label="Remove from history"
+        className="bg-transparent border-0 cursor-pointer flex items-center justify-center"
         style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--theme-text-muted)',
-          cursor: 'pointer',
-          padding: '0 4px',
-          fontSize: 12,
+          color: 'var(--ls-fg-muted)',
+          padding: '2px 4px',
         }}
       >
-        ×
+        <Close size={12} />
       </button>
-    </li>
+    </GlassPanel>
   );
 }
 
@@ -141,100 +146,79 @@ export default function ClipboardApp() {
 
   return (
     <div
+      className="flex flex-col h-full"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        fontFamily: 'var(--theme-font-display)',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: 8,
-          borderBottom: '1px solid var(--theme-border)',
-          background: 'var(--theme-bg-tertiary)',
-        }}
-      >
-        <input
-          type="search"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search clipboard…"
-          style={{
-            flex: 1,
-            padding: '4px 8px',
-            border: '1px solid var(--theme-border)',
-            borderRadius: 4,
-            fontSize: 12,
-            background: 'var(--theme-bg-primary)',
-            color: 'var(--theme-text-primary)',
-          }}
-        />
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value as BerryClipboardType | 'all')}
-          style={{
-            padding: '3px 6px',
-            border: '1px solid var(--theme-border)',
-            borderRadius: 4,
-            fontSize: 11,
-            background: 'var(--theme-bg-primary)',
-            color: 'var(--theme-text-primary)',
-          }}
-        >
-          <option value="all">All</option>
-          {TYPE_ORDER.map(t => (
-            <option key={t} value={t}>
-              {TYPE_COLORS[t].label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm('Clear clipboard history?')) clearAll();
-          }}
-          style={{
-            padding: '3px 8px',
-            border: '1px solid var(--theme-border)',
-            borderRadius: 4,
-            fontSize: 11,
-            background: 'var(--theme-bg-primary)',
-            color: 'var(--theme-text-primary)',
-            cursor: 'pointer',
-          }}
-        >
-          Clear
-        </button>
+      <div className="p-2.5">
+        <GlassToolbar size="md" className="w-full">
+          <GlassInput
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search clipboard…"
+            inputSize="sm"
+            prefix={<MagnifyingGlass size={12} />}
+            wrapperClassName="flex-1"
+          />
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value as BerryClipboardType | 'all')}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid var(--ls-border-glass)',
+              borderRadius: 'var(--ls-r-md)',
+              fontSize: 11,
+              background: 'var(--ls-glass-light-strong)',
+              color: 'var(--ls-fg-primary)',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="all">All</option>
+            {TYPE_ORDER.map(t => (
+              <option key={t} value={t}>
+                {TYPE_META[t].label}
+              </option>
+            ))}
+          </select>
+          <GlassButton
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (window.confirm('Clear clipboard history?')) clearAll();
+            }}
+          >
+            <Trash size={12} />
+            Clear
+          </GlassButton>
+        </GlassToolbar>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="flex-1 overflow-y-auto px-2.5 pb-2.5 flex flex-col gap-1.5">
         {filtered.length === 0 ? (
           <div
+            className="flex flex-col items-center justify-center text-center"
             style={{
-              padding: 24,
-              textAlign: 'center',
-              color: 'var(--theme-text-muted)',
+              padding: 32,
+              color: 'var(--ls-fg-muted)',
               fontSize: 12,
             }}
           >
+            <Clipboard size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
             {items.length === 0
               ? 'Nothing copied yet. Anything you copy in BerryOS will land here.'
               : 'No matches.'}
           </div>
         ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {filtered.map(item => (
-              <ClipboardRow
-                key={item.id}
-                item={item}
-                onPick={pickHistory}
-                onRemove={removeItem}
-              />
-            ))}
-          </ul>
+          filtered.map(item => (
+            <ClipboardRow
+              key={item.id}
+              item={item}
+              onPick={pickHistory}
+              onRemove={removeItem}
+            />
+          ))
         )}
       </div>
     </div>

@@ -10,6 +10,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 
+import {
+  GlassButton,
+  GlassInput,
+  GlassPanel,
+  GlassTabs,
+} from '@/liquid-sand/glass';
+import { Globe } from '@/liquid-sand/icons';
+
 import { ALL_BERRY_EVENT_NAMES, berryBus } from '../system/eventBus';
 import { berryRegistry } from '../system/berryRegistry';
 
@@ -40,7 +48,7 @@ type Tab = 'now' | 'world' | 'stopwatch' | 'timer';
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: 'now', label: 'Now' },
-  { id: 'world', label: 'World Clock' },
+  { id: 'world', label: 'World' },
   { id: 'stopwatch', label: 'Stopwatch' },
   { id: 'timer', label: 'Timer' },
 ];
@@ -78,25 +86,16 @@ function NowTab(): ReactElement {
   const date = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 24,
-        padding: 16,
-        height: '100%',
-        boxSizing: 'border-box',
-        alignItems: 'center',
-      }}
-    >
+    <div className="flex gap-6 p-4 h-full box-border items-center">
       {/* Analog */}
       <svg viewBox="-100 -100 200 200" width={160} height={160} aria-label="Analog clock">
         <defs>
           <radialGradient id="face" cx="0" cy="0" r="100" fx="-30" fy="-30" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#e5e5e5" />
+            <stop offset="0%" stopColor="var(--ls-sand-50)" />
+            <stop offset="100%" stopColor="var(--ls-sand-200)" />
           </radialGradient>
         </defs>
-        <circle cx="0" cy="0" r="98" fill="url(#face)" stroke="#222" strokeWidth="2" />
+        <circle cx="0" cy="0" r="98" fill="url(#face)" stroke="var(--ls-sand-700)" strokeWidth="2" />
         {/* Hour ticks */}
         {Array.from({ length: 12 }, (_, i) => {
           const a = (i * 30 * Math.PI) / 180;
@@ -104,7 +103,7 @@ function NowTab(): ReactElement {
           const y1 = -Math.cos(a) * 84;
           const x2 = Math.sin(a) * 92;
           const y2 = -Math.cos(a) * 92;
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#222" strokeWidth="2" />;
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--ls-sand-700)" strokeWidth="2" strokeLinecap="round" />;
         })}
         {/* Minute ticks */}
         {Array.from({ length: 60 }, (_, i) => {
@@ -114,7 +113,7 @@ function NowTab(): ReactElement {
           const y1 = -Math.cos(a) * 88;
           const x2 = Math.sin(a) * 92;
           const y2 = -Math.cos(a) * 92;
-          return <line key={`m-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#888" strokeWidth="0.6" />;
+          return <line key={`m-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--ls-sand-500)" strokeWidth="0.6" />;
         })}
         {/* Hour hand */}
         <line
@@ -122,7 +121,7 @@ function NowTab(): ReactElement {
           y1="0"
           x2="0"
           y2="-50"
-          stroke="#1a1a1a"
+          stroke="var(--ls-fg-primary)"
           strokeWidth="5"
           strokeLinecap="round"
           transform={`rotate(${hourAngle})`}
@@ -133,7 +132,7 @@ function NowTab(): ReactElement {
           y1="0"
           x2="0"
           y2="-72"
-          stroke="#1a1a1a"
+          stroke="var(--ls-fg-primary)"
           strokeWidth="3"
           strokeLinecap="round"
           transform={`rotate(${minAngle})`}
@@ -144,34 +143,35 @@ function NowTab(): ReactElement {
           y1="10"
           x2="0"
           y2="-80"
-          stroke="#d3553e"
+          stroke="var(--ls-accent)"
           strokeWidth="1.4"
           strokeLinecap="round"
           transform={`rotate(${secAngle})`}
         />
-        <circle cx="0" cy="0" r="4" fill="#1a1a1a" />
-        <circle cx="0" cy="0" r="2" fill="#d3553e" />
+        <circle cx="0" cy="0" r="4" fill="var(--ls-fg-primary)" />
+        <circle cx="0" cy="0" r="2" fill="var(--ls-accent)" />
       </svg>
 
       {/* Digital */}
-      <div style={{ flex: 1 }}>
+      <div className="flex-1">
         <div
           style={{
-            fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+            fontFamily: 'var(--ls-font-mono)',
             fontSize: 44,
             fontWeight: 700,
-            color: 'var(--theme-text-primary)',
+            color: 'var(--ls-fg-primary)',
             letterSpacing: 1,
             lineHeight: 1.1,
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {digital}
         </div>
         <div
           style={{
-            fontFamily: 'var(--theme-font-display)',
-            fontSize: 13,
-            color: 'var(--theme-text-muted)',
+            fontFamily: 'var(--ls-font-sans)',
+            fontSize: 'var(--ls-text-sm)',
+            color: 'var(--ls-fg-secondary)',
             marginTop: 6,
           }}
         >
@@ -186,77 +186,81 @@ function NowTab(): ReactElement {
 // World Clock
 // ---------------------------------------------------------------------------
 
-const CITIES: ReadonlyArray<{ name: string; tz: string; flag: string }> = [
-  { name: 'New York', tz: 'America/New_York', flag: '🇺🇸' },
-  { name: 'London', tz: 'Europe/London', flag: '🇬🇧' },
-  { name: 'Tokyo', tz: 'Asia/Tokyo', flag: '🇯🇵' },
-  { name: 'Singapore', tz: 'Asia/Singapore', flag: '🇸🇬' },
-  { name: 'Sydney', tz: 'Australia/Sydney', flag: '🇦🇺' },
+const CITIES: ReadonlyArray<{ name: string; tz: string }> = [
+  { name: 'New York', tz: 'America/New_York' },
+  { name: 'London', tz: 'Europe/London' },
+  { name: 'Tokyo', tz: 'Asia/Tokyo' },
+  { name: 'Singapore', tz: 'Asia/Singapore' },
+  { name: 'Sydney', tz: 'Australia/Sydney' },
 ];
 
 function WorldClockTab(): ReactElement {
   useSystemTick(1000);
   const now = new Date();
   return (
-    <div style={{ padding: 12 }}>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {CITIES.map(c => {
-          const time = now.toLocaleTimeString('en-US', {
-            timeZone: c.tz,
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          const date = now.toLocaleDateString('en-US', {
-            timeZone: c.tz,
-            weekday: 'short',
-          });
-          // Derive a tz offset string like "GMT+9" for the secondary line.
-          const offset = (() => {
-            try {
-              const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: c.tz,
-                timeZoneName: 'short',
-              }).formatToParts(now);
-              return parts.find(p => p.type === 'timeZoneName')?.value ?? '';
-            } catch {
-              return '';
-            }
-          })();
-          return (
-            <li
-              key={c.tz}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 8px',
-                borderBottom: '1px solid var(--theme-border)',
-                fontFamily: 'var(--theme-font-display)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18 }} aria-hidden>{c.flag}</span>
-                <div>
-                  <div style={{ fontSize: 14, color: 'var(--theme-text-primary)' }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--theme-text-muted)' }}>
+    <div className="p-3 flex flex-col gap-2">
+      {CITIES.map(c => {
+        const time = now.toLocaleTimeString('en-US', {
+          timeZone: c.tz,
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const date = now.toLocaleDateString('en-US', {
+          timeZone: c.tz,
+          weekday: 'short',
+        });
+        // Derive a tz offset string like "GMT+9" for the secondary line.
+        const offset = (() => {
+          try {
+            const parts = new Intl.DateTimeFormat('en-US', {
+              timeZone: c.tz,
+              timeZoneName: 'short',
+            }).formatToParts(now);
+            return parts.find(p => p.type === 'timeZoneName')?.value ?? '';
+          } catch {
+            return '';
+          }
+        })();
+        return (
+          <GlassPanel key={c.tz} padded radius="md" tone="auto">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Globe size={18} style={{ color: 'var(--ls-fg-secondary)' }} />
+                <div className="min-w-0">
+                  <div
+                    style={{
+                      fontSize: 'var(--ls-text-sm)',
+                      color: 'var(--ls-fg-primary)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {c.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--ls-text-xs)',
+                      color: 'var(--ls-fg-muted)',
+                    }}
+                  >
                     {date} · {offset}
                   </div>
                 </div>
               </div>
               <div
                 style={{
-                  fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+                  fontFamily: 'var(--ls-font-mono)',
                   fontSize: 22,
                   fontWeight: 600,
-                  color: 'var(--theme-text-primary)',
+                  color: 'var(--ls-fg-primary)',
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 {time}
               </div>
-            </li>
-          );
-        })}
-      </ul>
+            </div>
+          </GlassPanel>
+        );
+      })}
     </div>
   );
 }
@@ -325,62 +329,59 @@ function StopwatchTab(): ReactElement {
   }, [elapsed]);
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, height: '100%', boxSizing: 'border-box' }}>
+    <div className="p-4 flex flex-col gap-3 h-full box-border">
       <div
+        className="text-center py-2"
         style={{
-          fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+          fontFamily: 'var(--ls-font-mono)',
           fontSize: 42,
           fontWeight: 700,
-          color: 'var(--theme-text-primary)',
-          textAlign: 'center',
-          padding: '8px 0',
+          color: 'var(--ls-fg-primary)',
           letterSpacing: 1,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {fmtCS(elapsed)}
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+      <div className="flex gap-2 justify-center">
         {!running ? (
-          <button type="button" onClick={start} style={btnStyle('go')}>
+          <GlassButton variant="primary" size="md" onClick={start}>
             Start
-          </button>
+          </GlassButton>
         ) : (
-          <button type="button" onClick={stop} style={btnStyle('stop')}>
+          <GlassButton variant="danger" size="md" onClick={stop}>
             Stop
-          </button>
+          </GlassButton>
         )}
-        <button type="button" onClick={running ? lap : reset} style={btnStyle('neutral')}>
+        <GlassButton variant="default" size="md" onClick={running ? lap : reset}>
           {running ? 'Lap' : 'Reset'}
-        </button>
+        </GlassButton>
       </div>
       {laps.length > 0 && (
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            border: '1px solid var(--theme-border)',
-            borderRadius: 4,
-            padding: 4,
-          }}
+        <GlassPanel
+          padded={false}
+          radius="md"
+          tone="auto"
+          className="flex-1 overflow-auto p-1"
         >
           {laps.map((t, i) => (
             <div
               key={i}
+              className="flex justify-between px-3 py-1"
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 8px',
-                fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+                fontFamily: 'var(--ls-font-mono)',
                 fontSize: 12,
-                color: 'var(--theme-text-secondary)',
-                borderBottom: i === laps.length - 1 ? 'none' : '1px solid var(--theme-border)',
+                color: 'var(--ls-fg-secondary)',
+                borderBottom:
+                  i === laps.length - 1 ? 'none' : '1px solid var(--ls-border-glass)',
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
               <span>Lap {laps.length - i}</span>
               <span>{fmtCS(t)}</span>
             </div>
           ))}
-        </div>
+        </GlassPanel>
       )}
     </div>
   );
@@ -485,40 +486,41 @@ function TimerTab(): ReactElement {
   }, [remainingMs, hours, mins, secs]);
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center', height: '100%', boxSizing: 'border-box' }}>
+    <div className="p-4 flex flex-col gap-4 items-center h-full box-border">
       <div
         style={{
-          fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+          fontFamily: 'var(--ls-font-mono)',
           fontSize: 48,
           fontWeight: 700,
-          color: remainingMs === 0 ? 'var(--theme-accent)' : 'var(--theme-text-primary)',
+          color: remainingMs === 0 ? 'var(--ls-accent)' : 'var(--ls-fg-primary)',
           letterSpacing: 1,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {display}
       </div>
       {remainingMs == null ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="flex gap-2 items-center">
           <SpinInput label="hr" value={hours} onChange={setHours} max={23} />
-          <span>:</span>
+          <span style={{ color: 'var(--ls-fg-muted)' }}>:</span>
           <SpinInput label="min" value={mins} onChange={setMins} max={59} />
-          <span>:</span>
+          <span style={{ color: 'var(--ls-fg-muted)' }}>:</span>
           <SpinInput label="sec" value={secs} onChange={setSecs} max={59} />
         </div>
       ) : null}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div className="flex gap-2">
         {!running ? (
-          <button type="button" onClick={start} style={btnStyle('go')}>
+          <GlassButton variant="primary" size="md" onClick={start}>
             Start
-          </button>
+          </GlassButton>
         ) : (
-          <button type="button" onClick={stop} style={btnStyle('stop')}>
+          <GlassButton variant="danger" size="md" onClick={stop}>
             Pause
-          </button>
+          </GlassButton>
         )}
-        <button type="button" onClick={reset} style={btnStyle('neutral')}>
+        <GlassButton variant="default" size="md" onClick={reset}>
           Reset
-        </button>
+        </GlassButton>
       </div>
     </div>
   );
@@ -536,54 +538,27 @@ function SpinInput({
   max: number;
 }): ReactElement {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: 11, color: 'var(--theme-text-muted)' }}>
-      <input
+    <label className="flex flex-col items-center gap-1" style={{ fontSize: 11, color: 'var(--ls-fg-muted)' }}>
+      <GlassInput
         type="number"
         min={0}
         max={max}
-        value={value}
+        value={String(value)}
         onChange={e => {
           const n = Math.max(0, Math.min(max, parseInt(e.target.value || '0', 10)));
           onChange(Number.isNaN(n) ? 0 : n);
         }}
+        wrapperClassName="!w-14"
         style={{
-          width: 48,
           textAlign: 'center',
-          fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
-          fontSize: 20,
-          padding: 4,
-          border: '1px solid var(--theme-border-strong)',
-          borderRadius: 4,
-          background: 'var(--theme-bg-card)',
-          color: 'var(--theme-text-primary)',
+          fontFamily: 'var(--ls-font-mono)',
+          fontSize: 18,
+          fontVariantNumeric: 'tabular-nums',
         }}
       />
-      <span style={{ fontFamily: 'var(--theme-font-display)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--ls-font-display)' }}>{label}</span>
     </label>
   );
-}
-
-function btnStyle(kind: 'go' | 'stop' | 'neutral'): React.CSSProperties {
-  const bg =
-    kind === 'go'
-      ? 'linear-gradient(180deg, #4ec76b 0%, #2c9c4b 100%)'
-      : kind === 'stop'
-        ? 'linear-gradient(180deg, #e85a5a 0%, #c83333 100%)'
-        : 'linear-gradient(180deg, #f0f0f0 0%, #d8d8d8 100%)';
-  const color = kind === 'neutral' ? '#1a1a1a' : '#fff';
-  return {
-    background: bg,
-    color,
-    border: '1px solid rgba(0, 0, 0, 0.4)',
-    borderRadius: 6,
-    padding: '6px 18px',
-    fontFamily: 'var(--theme-font-display)',
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.2)',
-    minWidth: 80,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -595,58 +570,25 @@ function ClockApp(): ReactElement {
 
   return (
     <div
+      className="flex flex-col h-full"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: 'var(--theme-bg-card)',
-        fontFamily: 'var(--theme-font-display)',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
       {/* Tab bar */}
-      <div
-        role="tablist"
-        style={{
-          display: 'flex',
-          gap: 0,
-          padding: '6px 8px 0',
-          borderBottom: '1px solid var(--theme-border)',
-          background:
-            'linear-gradient(180deg, #f6f6f6 0%, #e6e6e6 100%)',
-        }}
-      >
-        {TABS.map(t => {
-          const active = t.id === tab;
-          return (
-            <button
-              key={t.id}
-              role="tab"
-              type="button"
-              aria-selected={active}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: '6px 14px',
-                fontSize: 12,
-                fontFamily: 'var(--theme-font-display)',
-                fontWeight: active ? 600 : 400,
-                background: active ? 'var(--theme-bg-card)' : 'transparent',
-                color: active ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
-                border: '1px solid var(--theme-border)',
-                borderBottom: active ? '1px solid var(--theme-bg-card)' : '1px solid var(--theme-border)',
-                borderRadius: '6px 6px 0 0',
-                marginRight: 2,
-                marginBottom: -1,
-                cursor: 'pointer',
-              }}
-            >
+      <div className="flex justify-center px-3 py-2.5">
+        <GlassTabs value={tab} onValueChange={v => setTab(v as Tab)} size="sm">
+          {TABS.map(t => (
+            <GlassTabs.Item key={t.id} value={t.id}>
               {t.label}
-            </button>
-          );
-        })}
+            </GlassTabs.Item>
+          ))}
+        </GlassTabs>
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div className="flex-1 overflow-auto">
         {tab === 'now' && <NowTab />}
         {tab === 'world' && <WorldClockTab />}
         {tab === 'stopwatch' && <StopwatchTab />}

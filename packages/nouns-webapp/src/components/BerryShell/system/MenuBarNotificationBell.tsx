@@ -1,12 +1,15 @@
 /**
  * Menu-bar bell — toggles the Notification Center, shows an unread badge,
- * pulses briefly when a new notification arrives.
+ * pulses with a subtle warm glow when a new notification arrives.
  *
- * This component is intentionally self-contained so it can be slotted into
- * the existing menu bar with a one-liner. See drop-in note at the bottom.
+ * Liquid Sand chrome: monoline `<Bell>` icon, sand-tone unread badge, glass
+ * hover surface.
  */
 
 import { useEffect, useState } from 'react';
+
+import { Bell } from '@/liquid-sand/icons';
+import { BlendIcon } from '@/liquid-sand/inversion';
 
 import { useBerryEvent } from './eventBus';
 import { useUnreadCount } from './notifications';
@@ -38,59 +41,70 @@ export default function MenuBarNotificationBell() {
     return () => window.clearTimeout(id);
   }, [pulse]);
 
+  // Glow when there are unread notifications, intensify briefly on pulse.
+  const hasUnread = unread > 0;
+  const filter = pulse
+    ? 'drop-shadow(0 0 8px rgba(184,147,82,0.85))'
+    : hasUnread
+      ? 'drop-shadow(0 0 4px rgba(184,147,82,0.6))'
+      : 'none';
+
   return (
     <button
       type="button"
       data-berry-bell
       aria-label={
-        unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'
+        hasUnread ? `Notifications (${unread} unread)` : 'Notifications'
       }
       aria-haspopup="dialog"
       aria-expanded={isOpen}
       onClick={() => notificationCenterStore.toggle()}
       style={{
         position: 'relative',
-        height: 18,
-        minWidth: 22,
+        height: 22,
+        minWidth: 26,
         padding: '0 5px',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: isOpen ? 'var(--theme-accent, #3478F6)' : 'transparent',
-        color: isOpen ? '#fff' : 'var(--theme-text-primary, #1d1d1f)',
+        background: isOpen ? 'var(--ls-glass-light-strong)' : 'transparent',
+        color: 'var(--ls-fg-primary)',
         border: 'none',
-        borderRadius: 4,
+        borderRadius: 'var(--ls-r-sm)',
         cursor: 'pointer',
-        fontFamily: 'var(--theme-font-display, -apple-system, sans-serif)',
+        fontFamily: 'var(--ls-font-sans)',
         fontSize: 13,
         lineHeight: 1,
         userSelect: 'none',
-        transition: 'background 120ms ease, color 120ms ease, transform 200ms ease',
-        transform: pulse ? 'scale(1.18)' : 'scale(1)',
+        transition:
+          'background var(--ls-dur-fast) var(--ls-ease-soft), transform var(--ls-dur-base) var(--ls-ease-spring), filter var(--ls-dur-base) var(--ls-ease-soft)',
+        transform: pulse ? 'scale(1.15)' : 'scale(1)',
+        filter,
       }}
     >
-      <span aria-hidden="true" style={{ fontSize: 13 }}>
-        🔔
-      </span>
-      {unread > 0 && (
+      <BlendIcon mode="difference">
+        <Bell size={16} />
+      </BlendIcon>
+      {hasUnread && (
         <span
           aria-hidden="true"
           style={{
             position: 'absolute',
-            top: -2,
-            right: -2,
+            top: -1,
+            right: -1,
             minWidth: 14,
             height: 14,
             padding: '0 3px',
             borderRadius: 7,
-            background: '#FF3B30',
-            color: '#fff',
+            background: 'var(--ls-danger)',
+            color: 'var(--ls-fg-on-dark)',
+            fontFamily: 'var(--ls-font-mono)',
             fontSize: 9,
             fontWeight: 700,
             lineHeight: '14px',
             textAlign: 'center',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.85)',
+            boxShadow:
+              'var(--ls-shadow-sm), 0 0 0 1px var(--ls-border-glass)',
           }}
         >
           {unread > 99 ? '99+' : unread}
@@ -99,20 +113,3 @@ export default function MenuBarNotificationBell() {
     </button>
   );
 }
-
-/*
- * Drop-in for BerryShell/index.tsx — render anywhere inside the right-hand
- * cluster of the menu bar (next to the ConnectKit button / ThemeSwitcher /
- * MenuBarClock). Single line, no other change needed:
- *
- *   import MenuBarNotificationBell from './system/MenuBarNotificationBell';
- *   ...
- *   <MenuBarNotificationBell />
- *
- * Recommended placement (BerryShell/index.tsx, between ThemeSwitcher (line
- * 358) and MenuBarClock (line 359) inside the right-hand cluster):
- *
- *   <ThemeSwitcher variant="navbar" />
- *   <MenuBarNotificationBell />     // ← add here
- *   <MenuBarClock />
- */

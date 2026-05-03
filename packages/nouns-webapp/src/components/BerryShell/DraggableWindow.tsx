@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { GlassWindow } from '@/liquid-sand/glass';
+import { Close, Maximize, Minimize } from '@/liquid-sand/icons';
+
 import { type BerryWindowState, windowStore } from './store/windowStore';
 
 interface DraggableWindowProps {
@@ -7,55 +10,86 @@ interface DraggableWindowProps {
   children: ReactNode;
 }
 
-// Aqua-era gel buttons: radial highlight on top, soft inner shadow, subtle ring.
-// Each light layers a base color with a top-left specular highlight.
-const trafficLightBase: React.CSSProperties = {
-  width: 13,
-  height: 13,
-  padding: 0,
-  borderRadius: 999,
-  border: '1px solid rgba(0, 0, 0, 0.45)',
-  boxShadow:
-    'inset 0 1px 0.5px rgba(255, 255, 255, 0.85), inset 0 -1px 1px rgba(0, 0, 0, 0.18), 0 0.5px 0 rgba(255, 255, 255, 0.4)',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 10,
-  lineHeight: 1,
-  fontWeight: 700,
-  color: 'rgba(0, 0, 0, 0.6)',
-  textShadow: '0 0.5px 0 rgba(255, 255, 255, 0.6)',
-};
-
-const trafficLightClose: React.CSSProperties = {
-  background:
-    'radial-gradient(circle at 35% 25%, #ff9a92 0%, #ff5f56 45%, #d92e26 100%)',
-};
-const trafficLightMin: React.CSSProperties = {
-  background:
-    'radial-gradient(circle at 35% 25%, #ffe187 0%, #ffbd2e 45%, #d99517 100%)',
-};
-const trafficLightMax: React.CSSProperties = {
-  background:
-    'radial-gradient(circle at 35% 25%, #8fefa0 0%, #27c93f 45%, #1aa12f 100%)',
-};
-
-// Pinstripe pattern for active titlebar — alternating 1px lines in the System
-// 7 / Platinum spirit, layered over the Aqua gradient for subtle depth.
-const PINSTRIPE_BG =
-  'repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 1px, transparent 1px, transparent 2px), linear-gradient(180deg, #f6f6f6 0%, #d6d6d6 50%, #c8c8c8 100%)';
-const PINSTRIPE_BG_INACTIVE =
-  'repeating-linear-gradient(0deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 1px, transparent 1px, transparent 2px), linear-gradient(180deg, #ececec 0%, #dadada 100%)';
+/**
+ * Liquid Sand traffic-light orb. A small frosted-glass disc in muted sepia
+ * with the monoline glyph on hover. Three tones (close/min/max) follow the
+ * same warm sepia palette — they read as "berry red, sand yellow, olive
+ * green" rather than the macOS primary trio.
+ */
+function MonolineOrb({
+  tone,
+  label,
+  Icon,
+  hover,
+  onClick,
+}: {
+  tone: 'close' | 'min' | 'max';
+  label: string;
+  Icon: typeof Close;
+  hover: boolean;
+  onClick: () => void;
+}) {
+  const colorByTone: Record<typeof tone, string> = {
+    close: '#c2492f', // var(--ls-danger), warm berry red
+    min: '#d4b67a', // var(--ls-sand-300), sand yellow
+    max: '#7a8b3c', // var(--ls-success), olive green
+  };
+  return (
+    <button
+      type="button"
+      data-role="traffic-light"
+      aria-label={label}
+      onClick={onClick}
+      style={{
+        width: 14,
+        height: 14,
+        padding: 0,
+        borderRadius: 999,
+        border: 'none',
+        background: colorByTone[tone],
+        boxShadow:
+          'inset 0 1px 0 rgba(255, 250, 240, 0.45), inset 0 -1px 0 rgba(60,45,25,0.18), 0 0 0 1px var(--ls-border-glass)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'rgba(60,45,25,0.85)',
+        transition: 'transform var(--ls-dur-fast) var(--ls-ease-spring)',
+      }}
+      onPointerDown={e => {
+        // Prevent the drag handler on the title bar from also firing.
+        e.stopPropagation();
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'scale(1.08)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'scale(1)';
+      }}
+    >
+      <span
+        data-role="traffic-light"
+        aria-hidden="true"
+        style={{
+          opacity: hover ? 1 : 0,
+          transition: 'opacity var(--ls-dur-fast) var(--ls-ease-soft)',
+          display: 'inline-flex',
+        }}
+      >
+        <Icon size={9} />
+      </span>
+    </button>
+  );
+}
 
 /**
  * DraggableWindow — drag by titlebar, focus on mousedown anywhere, traffic
  * lights act as close/minimize/maximize. Resizable from the SE corner.
  *
- * State is held in the BerryShell windowStore (see ./store/windowStore.ts).
- * This is a deep port of BerryCC0/berry's WindowManager + Window components,
- * compressed into one file and stripped of features we're not yet using
- * (snap zones, expose, mobile sheets, era theming).
+ * Liquid Sand chrome: wraps the inner content in <GlassWindow>, swaps the
+ * Aqua-era gel buttons for monoline orbs that show their glyph on hover, and
+ * uses the warm sand glow ring on the active window. All the original
+ * behavior (drag, resize, focus on click, double-click maximize) is preserved.
  */
 export default function DraggableWindow({ win, children }: DraggableWindowProps) {
   const [hoverLights, setHoverLights] = useState(false);
@@ -102,15 +136,98 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const displayX = win.isMaximized ? 0 : win.x;
-  const displayY = win.isMaximized ? 24 : win.y;
+  const displayY = win.isMaximized ? 28 : win.y;
   const displayW = win.isMaximized ? vw : win.width;
-  const displayH = win.isMaximized ? vh - 24 - 76 : win.height;
+  const displayH = win.isMaximized ? vh - 28 - 76 : win.height;
+
+  // Custom titlebar: monoline orbs on the left, centered title.
+  const titlebar = (
+    <div
+      onPointerDown={e => {
+        // Only the bar itself should start drag; traffic lights handle their own clicks.
+        if ((e.target as HTMLElement).dataset.role === 'traffic-light') return;
+        if (win.isMaximized) return; // don't drag a maximized window
+        e.preventDefault();
+        (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+        dragStateRef.current = {
+          pointerId: e.pointerId,
+          offsetX: e.clientX - win.x,
+          offsetY: e.clientY - win.y,
+        };
+        windowStore.focus(win.id);
+      }}
+      onDoubleClick={() => windowStore.maximize(win.id)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--ls-s-2)',
+        // GlassWindow gives us h-9 / 36px and the gradient — fill it.
+        height: '100%',
+        cursor: win.isMaximized ? 'default' : 'grab',
+        touchAction: 'none',
+        userSelect: 'none',
+        width: '100%',
+      }}
+    >
+      <div
+        style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+        onMouseEnter={() => setHoverLights(true)}
+        onMouseLeave={() => setHoverLights(false)}
+      >
+        <MonolineOrb
+          tone="close"
+          label="Close"
+          Icon={Close}
+          hover={hoverLights}
+          onClick={() => windowStore.close(win.id)}
+        />
+        <MonolineOrb
+          tone="min"
+          label="Minimize"
+          Icon={Minimize}
+          hover={hoverLights}
+          onClick={() => windowStore.minimize(win.id)}
+        />
+        <MonolineOrb
+          tone="max"
+          label="Maximize"
+          Icon={Maximize}
+          hover={hoverLights}
+          onClick={() => windowStore.maximize(win.id)}
+        />
+      </div>
+      <div
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          fontFamily: 'var(--ls-font-sans)',
+          fontSize: 12,
+          fontWeight: 500,
+          color: 'var(--ls-fg-primary)',
+          letterSpacing: 0.1,
+          // Compensate for the orb cluster on the left so the title sits visually centered.
+          paddingRight: 60,
+          opacity: win.isFocused ? 1 : 0.55,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {win.title}
+      </div>
+    </div>
+  );
 
   return (
-    <div
+    <GlassWindow
       role="dialog"
       aria-label={win.title}
       onPointerDown={() => windowStore.focus(win.id)}
+      active={win.isFocused}
+      showTrafficLights={false}
+      titlebar={titlebar}
+      titlebarClassName="px-2"
+      contentClassName="bg-transparent"
       style={{
         position: 'absolute',
         left: displayX,
@@ -118,156 +235,56 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
         width: displayW,
         height: displayH,
         zIndex: win.zIndex,
-        background: 'var(--theme-bg-card)',
-        border: '1px solid var(--theme-border-strong)',
-        // Aqua-style soft drop shadow when focused, lighter when not. Keep the
-        // 1px inner bevel for the System 7-era window outline so it doesn't
-        // look completely modern.
-        boxShadow: win.isFocused
-          ? 'inset 1px 1px 0 var(--theme-bevel-light), inset -1px -1px 0 var(--theme-bevel-dark), 0 8px 24px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.18)'
-          : 'inset 1px 1px 0 var(--theme-bevel-light), inset -1px -1px 0 var(--theme-bevel-dark), 0 4px 12px rgba(0, 0, 0, 0.18)',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        overflow: 'hidden',
-        fontFamily: 'var(--theme-font-display)',
+        // GlassWindow already handles backdrop-filter + the inset glass shadow;
+        // we only override what we need (geometry + zIndex).
+        fontFamily: 'var(--ls-font-sans)',
       }}
     >
-      {/* Title bar — drag handle */}
-      <div
-        onPointerDown={e => {
-          // Only the bar itself should start drag; traffic lights handle their own clicks.
-          if ((e.target as HTMLElement).dataset.role === 'traffic-light') return;
-          if (win.isMaximized) return; // don't drag a maximized window
-          e.preventDefault();
-          (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-          dragStateRef.current = {
-            pointerId: e.pointerId,
-            offsetX: e.clientX - win.x,
-            offsetY: e.clientY - win.y,
-          };
-          windowStore.focus(win.id);
-        }}
-        onDoubleClick={() => windowStore.maximize(win.id)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '4px 8px',
-          background: win.isFocused ? PINSTRIPE_BG : PINSTRIPE_BG_INACTIVE,
-          borderBottom: '1px solid var(--theme-border-strong)',
-          boxShadow: win.isFocused
-            ? 'inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(0,0,0,0.08)'
-            : 'inset 0 1px 0 rgba(255,255,255,0.6)',
-          minHeight: 22,
-          userSelect: 'none',
-          cursor: win.isMaximized ? 'default' : 'grab',
-          touchAction: 'none',
-        }}
-      >
-        <div
-          style={{ display: 'flex', gap: 6, alignItems: 'center' }}
-          onMouseEnter={() => setHoverLights(true)}
-          onMouseLeave={() => setHoverLights(false)}
-        >
-          <button
-            type="button"
-            data-role="traffic-light"
-            aria-label="Close"
-            onClick={() => windowStore.close(win.id)}
-            style={{ ...trafficLightBase, ...trafficLightClose }}
-          >
-            <span data-role="traffic-light" aria-hidden="true">
-              {hoverLights ? '×' : ''}
-            </span>
-          </button>
-          <button
-            type="button"
-            data-role="traffic-light"
-            aria-label="Minimize"
-            onClick={() => windowStore.minimize(win.id)}
-            style={{ ...trafficLightBase, ...trafficLightMin }}
-          >
-            <span data-role="traffic-light" aria-hidden="true">
-              {hoverLights ? '−' : ''}
-            </span>
-          </button>
-          <button
-            type="button"
-            data-role="traffic-light"
-            aria-label="Maximize"
-            onClick={() => windowStore.maximize(win.id)}
-            style={{ ...trafficLightBase, ...trafficLightMax }}
-          >
-            <span data-role="traffic-light" aria-hidden="true">
-              {hoverLights ? '+' : ''}
-            </span>
-          </button>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            fontSize: 12,
-            fontWeight: 700,
-            color: 'var(--theme-text-primary)',
-            letterSpacing: 0.3,
-            // Compensate for the stoplight cluster on the left so the title
-            // sits visually centered in the bar.
-            paddingRight: 61,
-            opacity: win.isFocused ? 1 : 0.55,
-            textShadow: win.isFocused ? '0 1px 0 rgba(255,255,255,0.7)' : 'none',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {win.title}
-        </div>
-      </div>
-
-      {/* Content well */}
       <div
         style={{
-          flex: 1,
+          position: 'relative',
+          height: '100%',
           minHeight: 0,
           overflow: 'auto',
-          background: 'var(--theme-bg-tertiary)',
         }}
       >
         {children}
+        {/* Resize handle (SE) — kept inside the content well so it doesn't
+            clip against the rounded glass shell. */}
+        {!win.isMaximized && (
+          <div
+            onPointerDown={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+              resizeStateRef.current = {
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                startW: win.width,
+                startH: win.height,
+              };
+              windowStore.focus(win.id);
+            }}
+            aria-hidden="true"
+            style={{
+              position: 'sticky',
+              float: 'right',
+              right: 0,
+              bottom: 0,
+              width: 14,
+              height: 14,
+              marginLeft: 'auto',
+              marginTop: -14,
+              cursor: 'nwse-resize',
+              background:
+                'linear-gradient(135deg, transparent 0%, transparent 45%, var(--ls-fg-muted) 45%, var(--ls-fg-muted) 55%, transparent 55%, transparent 75%, var(--ls-fg-muted) 75%, var(--ls-fg-muted) 85%, transparent 85%)',
+              opacity: 0.5,
+              touchAction: 'none',
+            }}
+          />
+        )}
       </div>
-
-      {/* Resize handle (SE) */}
-      {!win.isMaximized && (
-        <div
-          onPointerDown={e => {
-            e.preventDefault();
-            e.stopPropagation();
-            (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-            resizeStateRef.current = {
-              pointerId: e.pointerId,
-              startX: e.clientX,
-              startY: e.clientY,
-              startW: win.width,
-              startH: win.height,
-            };
-            windowStore.focus(win.id);
-          }}
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            right: 0,
-            bottom: 0,
-            width: 14,
-            height: 14,
-            cursor: 'nwse-resize',
-            background:
-              'linear-gradient(135deg, transparent 0%, transparent 45%, var(--theme-border-strong) 45%, var(--theme-border-strong) 55%, transparent 55%, transparent 75%, var(--theme-border-strong) 75%, var(--theme-border-strong) 85%, transparent 85%)',
-            touchAction: 'none',
-          }}
-        />
-      )}
-    </div>
+    </GlassWindow>
   );
 }
