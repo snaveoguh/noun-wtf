@@ -55,6 +55,19 @@ export const delegateNounRelations = relations(delegateNoun, ({ one }) => ({
   }),
 }));
 
+// Tracks the current delegate for each address. Defaults to self when no row
+// exists (matches NounsToken's ERC721Checkpointable behavior where `delegates(holder)`
+// returns `holder` itself when `_delegates[holder] == address(0)`).
+//
+// Maintained on `DelegateChanged` and read by the `Transfer` handler to know
+// which `delegateNoun` row to delete (old owner's delegate) and insert (new
+// owner's delegate). Without this we'd need an RPC call to `delegates(addr)`
+// per transfer, which is wasteful during historical sync.
+export const accountDelegate = onchainTable('account_delegate', t => ({
+  account: t.hex().primaryKey(),
+  delegate: t.hex().notNull(),
+}));
+
 // ── Proposals ──────────────────────────────────────────────────────────────────
 
 const proposalStatusValues = [
@@ -462,7 +475,15 @@ export const candidateFeedback = onchainTable(
 
 // ── Small Grants ─────────────────────────────────────────────────────────────
 
-const grantStatusValues = ['ACTIVE', 'DEFEATED', 'SUCCEEDED', 'QUEUED', 'EXECUTED', 'CANCELED', 'EXPIRED'] as const;
+const grantStatusValues = [
+  'ACTIVE',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXECUTED',
+  'CANCELED',
+  'EXPIRED',
+] as const;
 export type GrantStatus = (typeof grantStatusValues)[number];
 export const grantStatus = onchainEnum('grantStatus', grantStatusValues);
 
@@ -570,10 +591,7 @@ const nounV2ProposalStatusValues = [
   'EXPIRED',
 ] as const;
 export type NounV2ProposalStatus = (typeof nounV2ProposalStatusValues)[number];
-export const nounV2ProposalStatus = onchainEnum(
-  'nounV2ProposalStatus',
-  nounV2ProposalStatusValues,
-);
+export const nounV2ProposalStatus = onchainEnum('nounV2ProposalStatus', nounV2ProposalStatusValues);
 
 export const nounV2Proposal = onchainTable(
   'nounv2_proposal',
