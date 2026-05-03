@@ -825,6 +825,56 @@ app.get('/api/nounv2-auctions', async c => {
   return c.json(items);
 });
 
+/**
+ * Single NounV2 auction with its full bid history. Powers the webapp's
+ * `useV2AuctionBids` hook so the bid history modal works for any past
+ * auction (not just the last ~8k blocks an eth_getLogs scan can cover).
+ *
+ * Bid rows include `timestamp` (chain seconds) so the row formatter can
+ * show "X minutes ago" without an extra block lookup.
+ */
+app.get('/api/nounv2-auctions/:nounId', async c => {
+  const idParam = c.req.param('nounId');
+  let nounIdBig: bigint;
+  try {
+    nounIdBig = BigInt(idParam);
+  } catch {
+    return c.json({ error: 'invalid nounId' }, 400);
+  }
+
+  const auctionRows = await db
+    .select()
+    .from(schema.nounV2Auction)
+    .where(eq(schema.nounV2Auction.nounId, nounIdBig));
+  if (auctionRows.length === 0) return c.json({ error: 'not found' }, 404);
+  const a = auctionRows[0]!;
+
+  const bidRows = await db
+    .select()
+    .from(schema.nounV2Bid)
+    .where(eq(schema.nounV2Bid.nounId, nounIdBig))
+    .orderBy(desc(schema.nounV2Bid.value));
+
+  return c.json({
+    nounId: String(a.nounId),
+    startTime: String(Math.floor(new Date(a.startTime).getTime() / 1000)),
+    endTime: String(Math.floor(new Date(a.endTime).getTime() / 1000)),
+    settled: a.settled,
+    winner: a.winner,
+    amount: a.amount != null ? String(a.amount) : null,
+    createdAtBlock: String(a.createdAtBlock),
+    createdAtTransaction: a.createdAtTransaction,
+    bids: bidRows.map(b => ({
+      bidder: b.bidder,
+      value: String(b.value),
+      extended: b.extended,
+      timestamp: String(Math.floor(new Date(b.createdAt).getTime() / 1000)),
+      transactionHash: b.createdAtTransaction,
+      createdAtBlock: String(b.createdAtBlock),
+    })),
+  });
+});
+
 // ─── NounV2 Activity Feed ─────────────────────────────────────────────────
 // Unions recent rows from nounv2_bid, nounv2_auction (settled), nounv2_proposal,
 // and nounv2_vote. Sorted DESC by block, paginated via ?before=<block>.
