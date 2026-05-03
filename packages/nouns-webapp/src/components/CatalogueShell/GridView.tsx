@@ -24,7 +24,7 @@ export default function GridView({ items, onActivate }: Props) {
               src={a.image}
               alt={a.title}
               loading="lazy"
-              className={`${classes.gridImg} ${a.media === 'pixel' ? classes.gridImgPixel : ''}`}
+              className={`${classes.gridImg} ${a.isPixel ? classes.gridImgPixel : ''}`}
               onError={e => {
                 (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
               }}

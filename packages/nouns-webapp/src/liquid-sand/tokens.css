@@ -42,6 +42,16 @@
   --ls-danger: #c2492f;
   --ls-success: #7a8b3c;
 
+  /* ─── Vote semantics ──────────────────────────────────────────────────
+     For/against tokens for governance UIs. HIG-aligned emerald (system
+     green) and rose (system red); kept distinct from --ls-success/danger
+     because vote tally bars sit on dark surfaces and need brighter values
+     to read against frosted dark glass. */
+  --ls-for: #34d399; /* emerald-400 — strong on dark glass */
+  --ls-for-strong: #6ee7b7; /* emerald-300 — for inline numbers */
+  --ls-against: #fb7185; /* rose-400 */
+  --ls-against-strong: #fda4af; /* rose-300 */
+
   /* ─── Backdrop blur tiers ───────────────────────────────────────────── */
   --ls-blur-subtle: 8px;
   --ls-blur-medium: 16px;

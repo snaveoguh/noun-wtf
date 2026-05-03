@@ -51,10 +51,22 @@ export interface CatalogueAsset {
   fileUrl?: string;
   /** External link — opens in new tab. Internal noun.wtf links are inert per shell lockdown. */
   href: string;
+  /** Canonical, clickable source page for this asset (where it lives on the web). */
+  sourceUrl?: string;
+  /** Human-readable label for the source location ("noun.pics", "lilnouns.wtf", etc.). */
+  sourceLabel?: string;
   /** Source collection bucket (used for filters). */
   collection: AssetCollection;
   /** Media type bucket (used for filters). */
   media: AssetMediaType;
+  /**
+   * Render hint: true if the source asset is pixel-art (Noun trait, Lil Noun,
+   * Probe custom, dream, sketch, rendered noun) and should be displayed with
+   * `image-rendering: pixelated`. False for photographic / continuous-tone
+   * assets (Propdates, NounsWorld stories, most cc0-lib items) so the browser
+   * uses bilinear scaling.
+   */
+  isPixel: boolean;
   /** Sub-category like trait category, file extension, or cc0-lib tag. */
   category: string;
   /** Tags for fuzzy search. */
@@ -144,8 +156,11 @@ function buildTraitAssets(): CatalogueAsset[] {
         subtitle: `Nouns Trait · ${label}`,
         image: pixelsToSvg(grid, bg),
         href: NOUNDRY_GALLERY,
+        sourceUrl: NOUNDRY_GALLERY,
+        sourceLabel: 'gallery.noundry.wtf',
         collection: 'nouns-trait',
         media: 'pixel',
+        isPixel: true,
         category: label,
         tags: ['nouns', 'trait', label.toLowerCase(), 'cc0', 'pixel'],
         bgColor: `#${bg}`,
@@ -263,8 +278,11 @@ function useLilTraitAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
           subtitle: `Lil Nouns Trait · ${label}`,
           image: pixelsToSvg(grid, bg),
           href: 'https://lilnouns.wtf',
+          sourceUrl: 'https://lilnouns.wtf',
+          sourceLabel: 'lilnouns.wtf',
           collection: 'lil-trait',
           media: 'pixel',
+          isPixel: true,
           category: label,
           tags: ['lil-nouns', 'trait', label.toLowerCase(), 'cc0', 'pixel'],
           bgColor: `#${bg}`,
@@ -295,8 +313,11 @@ function buildLilNounAssets(): CatalogueAsset[] {
       subtitle: 'Lil Nouns',
       image: `/probe-dreams/rendered/${id}.svg`,
       href: `https://lilnouns.wtf/lilnoun/${id}`,
+      sourceUrl: `https://lilnouns.wtf/lilnoun/${id}`,
+      sourceLabel: 'lilnouns.wtf',
       collection: 'lil-noun',
       media: 'svg',
+      isPixel: true,
       category: 'Lil Noun',
       tags: ['lil-nouns', 'noun', 'pixel', `lil-${id}`],
       bgColor: '#d5d7e1',
@@ -413,8 +434,11 @@ function buildProbeTraitAssets(): CatalogueAsset[] {
       image: `/probe-dreams/traits/${file}`,
       fileUrl: `${PROBE_TRAIT_BASE}/${layer}/${file.split('_').slice(1).join('_')}`,
       href: `https://probe.wtf/en-US/nouns/dreams`,
+      sourceUrl: `https://probe.wtf/en-US/nouns/dreams`,
+      sourceLabel: 'probe.wtf',
       collection: 'probe-trait',
       media: 'image',
+      isPixel: true,
       category: layer.charAt(0).toUpperCase() + layer.slice(1),
       tags: ['probe', 'custom-trait', 'dream', layer, 'cc0', 'pixel'],
       meta: { dreamId: id, layer, filename: file },
@@ -440,8 +464,11 @@ function buildPastNounAssets(): CatalogueAsset[] {
       subtitle: 'Auctioned Noun',
       image: `https://noun.pics/${id}`,
       href: `https://noun.wtf/noun/${id}`,
+      sourceUrl: `https://noun.pics/${id}`,
+      sourceLabel: 'noun.pics',
       collection: 'past-noun',
       media: 'svg',
+      isPixel: true,
       category: 'Past Noun',
       tags: ['nouns', 'auction', 'past', `noun-${id}`, 'pixel'],
       meta: { nounId: id },
@@ -463,8 +490,11 @@ function buildSketchAssets(): CatalogueAsset[] {
       subtitle: 'Noun Sketch',
       image: `/sketches/${file}`,
       href: `https://noun.wtf/noun/${id}`,
+      sourceUrl: `https://noun.wtf/noun/${id}`,
+      sourceLabel: 'noun.wtf',
       collection: 'sketch',
       media: 'image',
+      isPixel: true,
       category: 'Sketch',
       tags: ['sketch', 'animation', 'gif', `noun-${id}`],
       meta: { sketchId: id },
@@ -508,15 +538,27 @@ function cc0ToAsset(it: CC0Item): CatalogueAsset | null {
   const thumb = it.Thumbnails?.[0]?.url || file;
   if (!thumb) return null;
   const ft = (it.Filetype || '').toLowerCase();
+  const tagList = (it.Tags ?? []).map(t => t.toLowerCase());
+  // cc0-lib is mixed media — default to non-pixel (photographic) and only opt
+  // into pixelated rendering if the item explicitly self-tags as pixel-art.
+  const isPixel =
+    tagList.includes('pixel') ||
+    tagList.includes('pixel-art') ||
+    tagList.includes('pixelart') ||
+    (it.Type ?? '').toLowerCase() === 'pixel';
+  const src = it.Source || file || 'https://cc0-lib.wtf';
   return {
     id: `cc0-${it.ID ?? it.Title ?? Math.random().toString(36).slice(2)}`,
     title: it.Title || 'Untitled',
     subtitle: it.ENS ? `cc0-lib · ${it.ENS}` : 'cc0-lib',
     image: thumb,
     fileUrl: file,
-    href: it.Source || file || 'https://cc0-lib.wtf',
+    href: src,
+    sourceUrl: src,
+    sourceLabel: 'cc0-lib.wtf',
     collection: 'cc0-lib',
     media: inferMedia(ft),
+    isPixel,
     category: it.Type || 'asset',
     tags: ['cc0', ...(it.Tags ?? []), it.Type, ft].filter(Boolean) as string[],
     meta: { filetype: ft, ens: it.ENS, description: it.Description },
@@ -596,8 +638,11 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
         subtitle: 'Live auction',
         image: `https://noun.pics/${nid}`,
         href: 'https://noun.wtf',
+        sourceUrl: `https://noun.pics/${nid}`,
+        sourceLabel: 'noun.pics',
         collection: 'auction',
         media: 'image',
+        isPixel: true,
         category: 'Auction',
         tags: ['nouns', 'auction', 'live', `noun-${nid}`],
         timestamp: Number(activeAuction.startTime) * 1000,
@@ -614,8 +659,13 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
           subtitle: `Propdate · Prop ${p.propId}`,
           image: p.imageUrl,
           href: `${PROPDATES_BASE}${p.propId}`,
+          sourceUrl: `${PROPDATES_BASE}${p.propId}`,
+          sourceLabel: 'propdates.nouns.wtf',
           collection: 'propdate',
           media: 'image',
+          // Propdate images are screenshots / photos — keep browser default
+          // bilinear scaling so they don't get blocky.
+          isPixel: false,
           category: 'Propdate',
           tags: ['propdate', 'governance', `prop-${p.propId}`],
           timestamp: Number(p.blockNumber) * 12_000, // rough block-number ordering
@@ -667,8 +717,11 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
           subtitle: `Dreamed by ${d.dreamer.slice(0, 6)}…${d.dreamer.slice(-4)}`,
           image: img,
           href: PROBE_DREAMS,
+          sourceUrl: `${PROBE_DREAMS}/${d.id}`,
+          sourceLabel: 'probe.wtf',
           collection: 'dream',
           media: 'svg',
+          isPixel: true,
           category: 'Dream',
           tags: ['dream', 'probe', `dream-${d.id}`],
           bgColor: `#${d.bgColor}`,
@@ -692,8 +745,12 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
         subtitle: 'Nouns World',
         image: s.image,
         href: s.url,
+        sourceUrl: s.url,
+        sourceLabel: 'nouns.world',
         collection: 'nouns-world',
         media: 'image',
+        // NounsWorld stories are photographic — keep bilinear scaling.
+        isPixel: false,
         category: 'Story',
         tags: ['nouns-world', 'story'],
       });

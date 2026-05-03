@@ -6,6 +6,7 @@ import {
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
+import { GlassPanel } from '@/liquid-sand/glass';
 import { Address } from '@/utils/types';
 
 import { VoterHoverCardContent } from './VoterHoverCardContent';
@@ -32,6 +33,9 @@ interface VoterHoverCardProps {
  *   • collision-aware positioning (auto-flip)
  *   • configurable open / close delays
  *   • touch-tap fallback on mobile
+ *
+ * Surface uses Liquid Sand <GlassPanel tone="dark"> so the card matches
+ * the rest of the design system rather than the legacy zinc-950 sheet.
  *
  * Open/close delays are tuned to match the spec (200ms hover, brief grace
  * period for moving into the card). Data fetching only kicks off once the
@@ -64,15 +68,30 @@ export const VoterHoverCard: FC<VoterHoverCardProps> = ({
         align="start"
         sideOffset={6}
         collisionPadding={12}
+        // Strip the shadcn defaults — GlassPanel below provides the surface
+        // (frosted dark glass, hairline border, lg drop shadow) so the wrapper
+        // shouldn't paint any of its own background or border.
         className={cn(
-          // Override the shadcn defaults (white card with hard black border)
-          // — voter cards on nouns.game are dark, compact, and have a soft
-          // shadow. Width range matches the spec (~280-320px).
-          'w-[300px] rounded-lg border border-zinc-700/80 bg-zinc-950 p-0 text-zinc-100 shadow-xl shadow-black/40',
+          'w-[300px] border-0 bg-transparent p-0 shadow-none',
           contentClassName,
         )}
       >
-        <VoterHoverCardContent address={address as Address} />
+        <GlassPanel
+          blur="medium"
+          tone="dark"
+          bordered
+          radius="md"
+          // Override the default shadow stack with the heavier `lg` drop
+          // — hover cards float above the surface so they need more lift
+          // than a flush panel. Inset glass highlight + hairline border are
+          // re-applied here so we don't lose the glass read-out.
+          style={{
+            boxShadow:
+              'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-lg)',
+          }}
+        >
+          <VoterHoverCardContent address={address as Address} />
+        </GlassPanel>
       </HoverCardContent>
     </HoverCard>
   );

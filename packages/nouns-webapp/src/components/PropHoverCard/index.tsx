@@ -2,6 +2,7 @@ import { FC, ReactNode } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
+import { GlassPanel } from '@/liquid-sand/glass';
 
 import { PropHoverCardContent } from './PropHoverCardContent';
 
@@ -34,7 +35,7 @@ export type PropHoverCardProps = ProposalProps | CandidateProps;
  * Wraps a proposal/candidate title (or the `#963` token) with a rich tooltip
  * matching nouns.game's depth-on-hover. Mirrors the API shape of
  * `VoterHoverCard` — same shadcn HoverCard primitive, same `asChild` opt-in,
- * same dark zinc-950 surface, ~300px wide.
+ * same Liquid Sand <GlassPanel tone="dark"> surface, ~300px wide.
  *
  * The card is purely informational: the only navigation it offers is the
  * external "View on nouns.game" deep link, since the Game shell is read-only.
@@ -62,19 +63,34 @@ export const PropHoverCard: FC<PropHoverCardProps> = props => {
         align="start"
         sideOffset={6}
         collisionPadding={12}
+        // Strip the shadcn defaults — GlassPanel below paints the surface
+        // (frosted dark glass, hairline border, lg drop shadow). Keeping the
+        // wrapper transparent lets the glass blur the page underneath.
         className={cn(
-          // Dark surface matches VoterHoverCard for consistency across all
-          // depth-on-hover surfaces in the Game shell. ~300px lines up with
-          // the spec's 280-320px range.
-          'w-[300px] rounded-lg border border-zinc-700/80 bg-zinc-950 p-0 text-zinc-100 shadow-xl shadow-black/40',
+          'w-[300px] border-0 bg-transparent p-0 shadow-none',
           contentClassName,
         )}
       >
-        {props.type === 'proposal' ? (
-          <PropHoverCardContent type="proposal" proposalId={String(props.proposalId)} />
-        ) : (
-          <PropHoverCardContent type="candidate" candidateSlug={props.candidateSlug} />
-        )}
+        <GlassPanel
+          blur="medium"
+          tone="dark"
+          bordered
+          radius="md"
+          // Override the default shadow stack with the heavier `lg` drop —
+          // hover cards float above the surface so they need more lift than
+          // a flush panel. Inset glass highlight + hairline border are
+          // re-applied so we don't lose the glass read-out.
+          style={{
+            boxShadow:
+              'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-lg)',
+          }}
+        >
+          {props.type === 'proposal' ? (
+            <PropHoverCardContent type="proposal" proposalId={String(props.proposalId)} />
+          ) : (
+            <PropHoverCardContent type="candidate" candidateSlug={props.candidateSlug} />
+          )}
+        </GlassPanel>
       </HoverCardContent>
     </HoverCard>
   );

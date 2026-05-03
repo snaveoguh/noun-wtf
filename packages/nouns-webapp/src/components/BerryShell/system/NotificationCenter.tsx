@@ -9,7 +9,7 @@
  * (collapsible sections), newest first. "Clear all" button at the top.
  */
 
-import { useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 
 import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
 import {
@@ -82,6 +82,19 @@ export default function NotificationCenter() {
   const notifications = useNotifications();
   const groups = useMemo(() => groupByApp(notifications), [notifications]);
 
+  // ESC closes the panel — matches HIG slide-out dismissal behaviour.
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        notificationCenterStore.close();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen]);
+
   return (
     <>
       {/* Click-out scrim — sand-tone veil. */}
@@ -140,12 +153,13 @@ export default function NotificationCenter() {
             justifyContent: 'space-between',
           }}
         >
+          {/* HIG: panel headers sit at body size (17pt) for clear scan. */}
           <h2
             style={{
-              fontSize: 14,
+              fontSize: 'var(--ls-text-lg)' /* 17pt */,
               fontWeight: 600,
               margin: 0,
-              letterSpacing: 0.2,
+              letterSpacing: 0.1,
               color: 'var(--ls-fg-primary)',
             }}
           >
@@ -189,18 +203,24 @@ function EmptyState() {
     <div
       style={{
         margin: 'auto',
-        padding: 24,
+        padding: 32,
         textAlign: 'center',
         color: 'var(--ls-fg-muted)',
-        fontSize: 13,
+        fontSize: 'var(--ls-text-sm)' /* 13pt */,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
+        opacity: 0.85,
       }}
     >
-      <Bell size={28} />
-      No new notifications
+      <Bell size={32} />
+      <div style={{ fontSize: 'var(--ls-text-lg)', fontWeight: 500, color: 'var(--ls-fg-secondary)' }}>
+        No new notifications
+      </div>
+      <div style={{ fontSize: 'var(--ls-text-xs)', color: 'var(--ls-fg-muted)' }}>
+        You're all caught up.
+      </div>
     </div>
   );
 }
@@ -309,9 +329,10 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* HIG: notification title at 13pt label size, body at 11pt caption. */}
         <div
           style={{
-            fontSize: 12,
+            fontSize: 'var(--ls-text-sm)' /* 13pt */,
             fontWeight: 600,
             lineHeight: 1.3,
             color: 'var(--ls-fg-primary)',
@@ -322,10 +343,10 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
         {notification.body && (
           <div
             style={{
-              fontSize: 11,
+              fontSize: 'var(--ls-text-xs)' /* 11pt caption */,
               color: 'var(--ls-fg-secondary)',
               lineHeight: 1.4,
-              marginTop: 1,
+              marginTop: 2,
               wordBreak: 'break-word',
             }}
           >

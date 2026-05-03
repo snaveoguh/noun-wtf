@@ -179,6 +179,9 @@
 .gridImgPixel {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  /* Disable any inherited filters that would re-introduce smoothing. */
+  filter: none;
   object-fit: contain;
   background: var(--cell-bg, #27272a);
 }
@@ -272,6 +275,9 @@
 }
 .listThumb img.pixel {
   image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: none;
   object-fit: contain;
 }
 .listTitle {
@@ -345,6 +351,9 @@
 }
 .masonryImgPixel {
   image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: none;
   background: var(--cell-bg, #27272a);
 }
 .masonryCaption {

@@ -24,7 +24,7 @@ export default function ListView({ items, onActivate }: Props) {
               src={a.image}
               alt=""
               loading="lazy"
-              className={a.media === 'pixel' ? 'pixel' : ''}
+              className={a.isPixel ? 'pixel' : ''}
               onError={e => {
                 (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
               }}

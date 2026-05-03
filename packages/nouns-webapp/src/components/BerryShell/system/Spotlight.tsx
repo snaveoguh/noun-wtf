@@ -481,15 +481,21 @@ export default function Spotlight() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
-                      padding: '8px 12px',
+                      padding: '10px 12px',
                       margin: '2px 4px',
                       cursor: 'default',
                       borderRadius: 'var(--ls-r-md)',
                       background: selected
-                        ? 'var(--ls-glass-tint)'
+                        ? 'rgba(184, 147, 82, 0.18)'
                         : 'transparent',
+                      // HIG: keyboard-selected row needs a visible focus indicator;
+                      // the accent ring also works when reduced-transparency strips
+                      // backdrop blur entirely.
+                      boxShadow: selected
+                        ? '0 0 0 1.5px var(--ls-accent)'
+                        : 'none',
                       transition:
-                        'background var(--ls-dur-fast) var(--ls-ease-soft)',
+                        'background var(--ls-dur-fast) var(--ls-ease-soft), box-shadow var(--ls-dur-fast) var(--ls-ease-soft)',
                       color: 'var(--ls-fg-primary)',
                     }}
                   >
@@ -509,10 +515,12 @@ export default function Spotlight() {
                       <Icon size={20} />
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* HIG: command-palette row title at body size (15-17pt). */}
                       <div
                         style={{
-                          fontSize: 14,
+                          fontSize: 'var(--ls-text-md)' /* 15pt — HIG dense list body */,
                           fontWeight: 500,
+                          lineHeight: 1.25,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -522,11 +530,12 @@ export default function Spotlight() {
                       </div>
                       <div
                         style={{
-                          fontSize: 11,
+                          fontSize: 'var(--ls-text-xs)' /* 11pt caption */,
                           color: 'var(--ls-fg-muted)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
+                          marginTop: 1,
                         }}
                       >
                         {item.subtitle}

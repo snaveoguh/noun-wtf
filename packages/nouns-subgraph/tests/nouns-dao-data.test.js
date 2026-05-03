@@ -1,0 +1,121 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const graph_ts_1 = require("@graphprotocol/graph-ts");
+const index_1 = require("matchstick-as/assembly/index");
+const nouns_dao_data_1 = require("../src/nouns-dao-data");
+const schema_1 = require("../src/types/schema");
+const constants_1 = require("../src/utils/constants");
+const helpers_1 = require("../src/utils/helpers");
+const utils_1 = require("./utils");
+const SOME_ADDRESS = '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266';
+const proposerWithDelegate = graph_ts_1.Address.fromString('0x0000000000000000000000000000000000000001');
+const candidateProposer = graph_ts_1.Address.fromString('0x0000000000000000000000000000000000000002');
+const signerWithDelegate = graph_ts_1.Address.fromString('0x0000000000000000000000000000000000000003');
+const txHash = graph_ts_1.Bytes.fromI32(11);
+const logIndex = graph_ts_1.BigInt.fromI32(2);
+const blockTimestamp = graph_ts_1.BigInt.fromI32(946684800);
+const blockNumber = graph_ts_1.BigInt.fromI32(15537394);
+const targets = [graph_ts_1.Address.fromString(SOME_ADDRESS)];
+const values = [graph_ts_1.BigInt.fromI32(123)];
+const signatures = ['some signature'];
+const calldatas = [graph_ts_1.Bytes.fromI32(312)];
+const description = '# Original Title\nOriginal body';
+const title = 'Original Title';
+const slug = 'some slug';
+const encodedProposalHash = graph_ts_1.Bytes.fromI32(1234);
+(0, index_1.describe)('nouns-dao-data', () => {
+    (0, index_1.beforeEach)(() => {
+        const proposerDelegate = (0, helpers_1.getOrCreateDelegate)(proposerWithDelegate.toHexString());
+        proposerDelegate.tokenHoldersRepresentedAmount = 1;
+        proposerDelegate.delegatedVotes = constants_1.BIGINT_ONE;
+        proposerDelegate.delegatedVotesRaw = constants_1.BIGINT_ONE;
+        proposerDelegate.save();
+        const signerDelegate = (0, helpers_1.getOrCreateDelegate)(signerWithDelegate.toHexString());
+        signerDelegate.tokenHoldersRepresentedAmount = 1;
+        signerDelegate.delegatedVotes = constants_1.BIGINT_ONE;
+        signerDelegate.delegatedVotesRaw = constants_1.BIGINT_ONE;
+        signerDelegate.save();
+    });
+    (0, index_1.afterEach)(() => {
+        (0, index_1.clearStore)();
+    });
+    (0, index_1.describe)('handleProposalCandidateCreated', () => {
+        (0, index_1.beforeEach)(() => {
+            const event = (0, utils_1.createProposalCandidateCreatedEvent)(txHash, logIndex, blockTimestamp, blockNumber, candidateProposer, targets, values, signatures, calldatas, description, slug, encodedProposalHash);
+            (0, nouns_dao_data_1.handleProposalCandidateCreated)(event);
+        });
+        (0, index_1.test)('happy flow saves a proposal candidate and a candidate version', () => {
+            const candidate = schema_1.ProposalCandidate.load(candidateProposer.toHexString().concat('-').concat(slug));
+            index_1.assert.stringEquals(candidateProposer.toHexString(), candidate.proposer.toHexString());
+            index_1.assert.stringEquals(slug, candidate.slug);
+            index_1.assert.bytesEquals(txHash, candidate.createdTransactionHash);
+            index_1.assert.bigIntEquals(blockTimestamp, candidate.createdTimestamp);
+            index_1.assert.bigIntEquals(blockNumber, candidate.createdBlock);
+            index_1.assert.bigIntEquals(graph_ts_1.BigInt.fromI32(1), candidate.number);
+            const version = schema_1.ProposalCandidateVersion.load(candidate.latestVersion);
+            index_1.assert.stringEquals(candidate.id, version.proposal);
+            index_1.assert.bigIntEquals(blockTimestamp, version.createdTimestamp);
+            index_1.assert.bigIntEquals(blockNumber, version.createdBlock);
+            index_1.assert.stringEquals('', version.updateMessage);
+            const content = schema_1.ProposalCandidateContent.load(version.content);
+            index_1.assert.bytesEquals(targets[0], content.targets[0]);
+            index_1.assert.bigIntEquals(values[0], content.values[0]);
+            index_1.assert.stringEquals(signatures[0], content.signatures[0]);
+            index_1.assert.bytesEquals(calldatas[0], content.calldatas[0]);
+            index_1.assert.stringEquals(description, content.description);
+            index_1.assert.stringEquals(title, content.title);
+            index_1.assert.bytesEquals(encodedProposalHash, content.encodedProposalHash);
+        });
+        (0, index_1.test)('add signature', () => {
+            const sig = graph_ts_1.Bytes.fromHexString('0xdeadbeef');
+            const expiry = graph_ts_1.BigInt.fromI32(1234);
+            const reason = 'some reason';
+            const sigDigest = graph_ts_1.Bytes.fromHexString('0xdeadbeefdeadbeef');
+            const event = (0, utils_1.createSignatureAddedEvent)(signerWithDelegate, sig, expiry, candidateProposer, slug, encodedProposalHash, sigDigest, reason, blockNumber, blockTimestamp);
+            (0, nouns_dao_data_1.handleSignatureAdded)(event);
+            const candidate = schema_1.ProposalCandidate.load(candidateProposer.toHexString().concat('-').concat(slug));
+            const version = schema_1.ProposalCandidateVersion.load(candidate.latestVersion);
+            const content = schema_1.ProposalCandidateContent.load(version.content);
+            index_1.assert.i32Equals(content.contentSignatures.load().length, 1);
+            index_1.assert.stringEquals(content.contentSignatures.load()[0].id, signerWithDelegate.toHexString().concat('-').concat(sig.toHexString()));
+            const signature = schema_1.ProposalCandidateSignature.load(content.contentSignatures.load()[0].id);
+            index_1.assert.stringEquals(signature.signer, signerWithDelegate.toHexString());
+            index_1.assert.bytesEquals(signature.sig, sig);
+            index_1.assert.bigIntEquals(signature.expirationTimestamp, expiry);
+            index_1.assert.bytesEquals(signature.encodedProposalHash, encodedProposalHash);
+            index_1.assert.bytesEquals(signature.sigDigest, sigDigest);
+            index_1.assert.stringEquals(signature.reason, reason);
+            index_1.assert.booleanEquals(signature.canceled, false);
+            index_1.assert.bigIntEquals(signature.createdBlock, blockNumber);
+            index_1.assert.bigIntEquals(signature.createdTimestamp, blockTimestamp);
+        });
+        (0, index_1.test)('skips signature if encodedProposalHash does not match latest version', () => {
+            const sig = graph_ts_1.Bytes.fromHexString('0xdeadbeef');
+            const expiry = graph_ts_1.BigInt.fromI32(1234);
+            const reason = 'some reason';
+            const sigDigest = graph_ts_1.Bytes.fromHexString('0xdeadbeefdeadbeef');
+            const differentEncodedProposalHash = graph_ts_1.Bytes.fromI32(12345);
+            const event = (0, utils_1.createSignatureAddedEvent)(signerWithDelegate, sig, expiry, candidateProposer, slug, differentEncodedProposalHash, sigDigest, reason, blockNumber, blockTimestamp);
+            (0, nouns_dao_data_1.handleSignatureAdded)(event);
+            const candidate = schema_1.ProposalCandidate.load(candidateProposer.toHexString().concat('-').concat(slug));
+            // check no signature was saved
+            const signature = schema_1.ProposalCandidateSignature.load(event.transaction.hash.toHexString().concat('-').concat(event.logIndex.toString()));
+            index_1.assert.assertNull(signature);
+        });
+        (0, index_1.test)('save a proposal candidade includes candidate index', () => {
+            const candidate = schema_1.ProposalCandidate.load(candidateProposer.toHexString().concat('-').concat(slug));
+            index_1.assert.stringEquals(candidateProposer.toHexString(), candidate.proposer.toHexString());
+            index_1.assert.stringEquals(slug, candidate.slug);
+            index_1.assert.bytesEquals(txHash, candidate.createdTransactionHash);
+            index_1.assert.bigIntEquals(blockTimestamp, candidate.createdTimestamp);
+            index_1.assert.bigIntEquals(blockNumber, candidate.createdBlock);
+            index_1.assert.bigIntEquals(graph_ts_1.BigInt.fromI32(1), candidate.number);
+            const newSlug = 'new slug';
+            // save new one
+            const event = (0, utils_1.createProposalCandidateCreatedEvent)(txHash, logIndex, blockTimestamp, blockNumber, candidateProposer, targets, values, signatures, calldatas, description, newSlug, encodedProposalHash);
+            (0, nouns_dao_data_1.handleProposalCandidateCreated)(event);
+            const candidate2 = schema_1.ProposalCandidate.load(candidateProposer.toHexString().concat('-').concat(newSlug));
+            index_1.assert.bigIntEquals(graph_ts_1.BigInt.fromI32(2), candidate2.number);
+        });
+    });
+});

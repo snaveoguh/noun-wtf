@@ -3,6 +3,15 @@
  * Center. Adds filters (All / Unread / By App / By Level) and, in dev mode,
  * a "Test notifications" button that fires one of each level.
  *
+ * HIG / Liquid Sand notes:
+ *   - Filter strip lives in a single <GlassToolbar>. The level filters and
+ *     "All / Unread" are in <GlassTabs> for the segmented pill feel.
+ *   - The "By app" select is a sand-tone control (no nested glass over
+ *     the toolbar's glass surface — that would fail HIG glass-stacking).
+ *   - Notification rows are SOLID sand panels with a colored leading border
+ *     so the body stays readable. Glass over text is a HIG no-go.
+ *   - Empty state: centered Bell + "All caught up" copy in muted-1.
+ *
  * Self-registers with `berryRegistry` if it exists at import time. The
  * registry is being built by another agent; if it isn't there yet, we
  * silently skip — the app can still be opened by adding it to the
@@ -11,7 +20,7 @@
 
 import { useMemo, useState, type ComponentType } from 'react';
 
-import { GlassButton, GlassChip, GlassToolbar } from '@/liquid-sand/glass';
+import { GlassButton, GlassChip, GlassTabs, GlassToolbar } from '@/liquid-sand/glass';
 import { Bell, ChatBubble, Coin, Info, Megaphone, Sparkle } from '@/liquid-sand/icons';
 
 import {
@@ -134,12 +143,28 @@ function fireSamples() {
 // App component
 // ---------------------------------------------------------------------------
 
+/** Encode the current filter as a single string for <GlassTabs value=...>. */
+function encodeFilter(f: Filter): string {
+  if (f.kind === 'all') return 'all';
+  if (f.kind === 'unread') return 'unread';
+  if (f.kind === 'level') return `level:${f.level}`;
+  return `app:${f.appId}`;
+}
+
 export default function NotificationsApp() {
   const all = useNotifications();
   const [filter, setFilter] = useState<Filter>({ kind: 'all' });
 
   const filtered = useMemo(() => all.filter(n => matches(n, filter)), [all, filter]);
   const apps = useMemo(() => uniqueAppIds(all), [all]);
+
+  const onTabsChange = (value: string) => {
+    if (value === 'all') return setFilter({ kind: 'all' });
+    if (value === 'unread') return setFilter({ kind: 'unread' });
+    if (value.startsWith('level:')) {
+      return setFilter({ kind: 'level', level: value.slice(6) as NotificationLevel });
+    }
+  };
 
   return (
     <div
@@ -149,32 +174,42 @@ export default function NotificationsApp() {
         color: 'var(--ls-fg-primary)',
       }}
     >
-      {/* Filter bar — 16pt content padding per HIG 8pt grid */}
+      {/* Filter bar — 16pt content padding per HIG 8pt grid. The toolbar is
+          the ONE glass surface here; chips/tabs ride on top without nesting. */}
       <div style={{ padding: 16, paddingBottom: 8 }}>
         <GlassToolbar size="md" align="start" className="w-full flex-wrap">
-          <FilterChip
-            label="All"
-            active={filter.kind === 'all'}
-            onClick={() => setFilter({ kind: 'all' })}
-          />
-          <FilterChip
-            label="Unread"
-            active={filter.kind === 'unread'}
-            onClick={() => setFilter({ kind: 'unread' })}
-          />
-          <span className="mx-1" style={{ width: 1, height: 16, background: 'var(--ls-border-glass)' }} />
-          {LEVELS.map(level => (
-            <FilterChip
-              key={level}
-              label={level}
-              dot={LEVEL_COLOR[level]}
-              active={filter.kind === 'level' && filter.level === level}
-              onClick={() => setFilter({ kind: 'level', level })}
-            />
-          ))}
+          <GlassTabs
+            size="sm"
+            value={encodeFilter(filter)}
+            onValueChange={onTabsChange}
+            aria-label="Notification filter"
+          >
+            <GlassTabs.Item value="all">All</GlassTabs.Item>
+            <GlassTabs.Item value="unread">Unread</GlassTabs.Item>
+            {LEVELS.map(level => (
+              <GlassTabs.Item key={level} value={`level:${level}`}>
+                <span
+                  aria-hidden
+                  style={{
+                    display: 'inline-block',
+                    width: 6,
+                    height: 6,
+                    borderRadius: 'var(--ls-r-full)',
+                    background: LEVEL_COLOR[level],
+                    marginRight: 6,
+                  }}
+                />
+                <span style={{ textTransform: 'capitalize' }}>{level}</span>
+              </GlassTabs.Item>
+            ))}
+          </GlassTabs>
           {apps.length > 0 && (
             <>
-              <span className="mx-1" style={{ width: 1, height: 16, background: 'var(--ls-border-glass)' }} />
+              <span
+                aria-hidden
+                style={{ width: 1, height: 16, background: 'var(--ls-border-glass)', margin: '0 4px' }}
+              />
+              {/* Solid sand control — no nested glass over the toolbar surface. */}
               <select
                 value={filter.kind === 'app' ? filter.appId : ''}
                 onChange={e => {
@@ -189,10 +224,10 @@ export default function NotificationsApp() {
                   padding: '6px 10px',
                   borderRadius: 'var(--ls-r-md)',
                   border: '1px solid var(--ls-border-glass)',
-                  // Solid sand surface — no nested glass
                   background: 'var(--ls-sand-100)',
                   color: 'var(--ls-fg-primary)',
                   minHeight: 32,
+                  cursor: 'pointer',
                 }}
               >
                 <option value="">By app…</option>
@@ -219,25 +254,13 @@ export default function NotificationsApp() {
       {/* List — 16pt edge padding, 8pt item gap */}
       <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: '0 16px 16px', gap: 8 }}>
         {filtered.length === 0 ? (
-          <div
-            className="text-center flex flex-col items-center"
-            style={{
-              padding: 32,
-              gap: 8,
-              color: 'var(--ls-fg-muted)',
-              fontSize: 'var(--ls-text-md)',
-              lineHeight: 1.4,
-            }}
-          >
-            <Bell size={28} style={{ opacity: 0.5 }} />
-            <div>No notifications</div>
-          </div>
+          <EmptyState filter={filter} />
         ) : (
           filtered.map(n => <Row key={n.id} notification={n} />)
         )}
       </div>
 
-      {/* Dev tools — solid sand band so the dev panel doesn't compose more glass */}
+      {/* Dev tools — solid sand band so the dev panel doesn't nest more glass */}
       {isDev() && (
         <div
           style={{
@@ -261,58 +284,57 @@ export default function NotificationsApp() {
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-  dot,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  dot?: string;
-}) {
+function EmptyState({ filter }: { filter: Filter }) {
+  // Tailor copy slightly to the filter so an empty unread bucket reads as
+  // "all caught up" rather than implying nothing ever arrived.
+  const copy =
+    filter.kind === 'unread' || filter.kind === 'all'
+      ? 'All caught up'
+      : 'No notifications match this filter';
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className="inline-flex items-center select-none"
+    <div
+      role="status"
+      className="flex-1 flex flex-col items-center justify-center text-center"
       style={{
-        fontSize: 'var(--ls-text-xs)',
-        lineHeight: 1.4,
-        fontWeight: 600,
-        padding: '6px 12px',
-        gap: 6,
-        borderRadius: 'var(--ls-r-full)',
-        border: '1px solid var(--ls-border-glass)',
-        background: active ? 'var(--ls-accent)' : 'var(--ls-sand-100)',
-        color: active ? 'var(--ls-fg-on-dark)' : 'var(--ls-fg-secondary)',
-        cursor: 'pointer',
-        textTransform: 'capitalize',
-        fontFamily: 'inherit',
-        minHeight: 32,
-        boxShadow: active
-          ? 'var(--ls-shadow-inset-glass), var(--ls-shadow-glow)'
-          : 'none',
-        transition:
-          'background-color var(--ls-dur-base) var(--ls-ease-soft), color var(--ls-dur-base) var(--ls-ease-soft)',
+        padding: 32,
+        gap: 12,
+        color: 'var(--ls-fg-muted)',
       }}
     >
-      {dot && (
-        <span
-          aria-hidden
-          style={{
-            display: 'inline-block',
-            width: 6,
-            height: 6,
-            borderRadius: 'var(--ls-r-full)',
-            background: dot,
-          }}
-        />
-      )}
-      {label}
-    </button>
+      <div
+        aria-hidden
+        className="inline-flex items-center justify-center"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 'var(--ls-r-full)',
+          background: 'var(--ls-sand-100)',
+          color: 'var(--ls-fg-muted)',
+          boxShadow: 'inset 0 1px 0 rgba(255,250,240,0.8), 0 0 0 1px var(--ls-border-glass)',
+        }}
+      >
+        <Bell size={26} />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--ls-font-sans)',
+          fontSize: 'var(--ls-text-lg)',
+          lineHeight: 1.3,
+          fontWeight: 600,
+          color: 'var(--ls-fg-secondary)',
+        }}
+      >
+        {copy}
+      </div>
+      <div
+        style={{
+          fontSize: 'var(--ls-text-sm)',
+          lineHeight: 1.4,
+        }}
+      >
+        New activity will land here as it happens.
+      </div>
+    </div>
   );
 }
 
@@ -338,12 +360,12 @@ function fallbackIcon(appId: string, level: NotificationLevel | undefined) {
 function Row({ notification }: { notification: BerryNotification }) {
   const accent = LEVEL_COLOR[notification.level ?? 'info'];
   return (
-    // Solid sand surface — no nested glass over text
+    // Solid sand surface — no nested glass over text. A colored leading
+    // border carries the level signal without competing with the body type.
     <div
       className="flex"
       style={{
         opacity: notification.dismissed ? 0.6 : 1,
-        borderLeft: `3px solid ${notification.dismissed ? 'var(--ls-border-glass)' : accent}`,
         background: 'var(--ls-sand-50)',
         borderRadius: 'var(--ls-r-md)',
         border: '1px solid var(--ls-border-glass)',
@@ -400,47 +422,28 @@ function Row({ notification }: { notification: BerryNotification }) {
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(notification.timestamp)}
           </span>
-          {notification.action && (
-            <button
-              type="button"
-              onClick={() => notification.action?.onClick()}
-              style={{
-                fontSize: 'var(--ls-text-xs)',
-                fontWeight: 700,
-                color: accent,
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: 0.6,
-                fontFamily: 'inherit',
-                minHeight: 32,
-              }}
-            >
-              {notification.action.label}
-            </button>
-          )}
-          {!notification.dismissed && (
-            <button
-              type="button"
-              onClick={() => dismiss(notification.id)}
-              aria-label={`Dismiss ${notification.title}`}
-              style={{
-                fontSize: 'var(--ls-text-xs)',
-                color: 'var(--ls-fg-muted)',
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                marginLeft: 'auto',
-                fontFamily: 'inherit',
-                minHeight: 32,
-              }}
-            >
-              Dismiss
-            </button>
-          )}
+          <span className="ml-auto inline-flex" style={{ gap: 4 }}>
+            {notification.action && (
+              <GlassButton
+                variant="ghost"
+                size="sm"
+                onClick={() => notification.action?.onClick()}
+                style={{ color: accent }}
+              >
+                {notification.action.label}
+              </GlassButton>
+            )}
+            {!notification.dismissed && (
+              <GlassButton
+                variant="ghost"
+                size="sm"
+                onClick={() => dismiss(notification.id)}
+                aria-label={`Dismiss ${notification.title}`}
+              >
+                Dismiss
+              </GlassButton>
+            )}
+          </span>
         </div>
       </div>
     </div>

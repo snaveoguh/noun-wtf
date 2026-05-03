@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 
+import AssetDetailModal from './AssetDetailModal';
 import CoverFlowView from './CoverFlowView';
 import GridView from './GridView';
 import ListView from './ListView';
@@ -76,6 +77,7 @@ export default function CatalogueHome() {
   const [media, setMedia] = useState<string>('all');
   const [sort, setSort] = useState<SortMode>('random');
   const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 1e6));
+  const [activeAsset, setActiveAsset] = useState<CatalogueAsset | null>(null);
 
   // Re-roll the shuffle seed any time we re-enter random mode
   useEffect(() => {
@@ -109,11 +111,11 @@ export default function CatalogueHome() {
     return out;
   }, [items, collection, media, query, sort, shuffleSeed]);
 
+  // Clicking an asset opens the in-shell detail modal. The "View source"
+  // button inside the modal is what handles external navigation — clicking
+  // a tile no longer escapes the shell.
   const handleActivate = (a: CatalogueAsset) => {
-    // Shell lockdown: only http(s) URLs open externally, never internal navigation.
-    if (a.href && /^https?:/i.test(a.href)) {
-      window.open(a.href, '_blank', 'noopener,noreferrer');
-    }
+    setActiveAsset(a);
   };
 
   return (
@@ -206,6 +208,7 @@ export default function CatalogueHome() {
           )}
         </div>
       </div>
+      <AssetDetailModal asset={activeAsset} onClose={() => setActiveAsset(null)} />
     </CatalogueShell>
   );
 }

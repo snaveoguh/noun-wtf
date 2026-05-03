@@ -29,6 +29,13 @@ import {
   type ReactElement,
 } from 'react';
 
+import {
+  GlassButton,
+  GlassChip,
+  GlassInput,
+  GlassTabs,
+} from '@/liquid-sand/glass';
+
 import { berryRegistry } from '../system/berryRegistry';
 import {
   clearHistory,
@@ -45,21 +52,15 @@ import {
   categoryFor,
   chipStyle,
   compactJson,
-  dangerButtonStyle,
   formatDuration,
   formatTime,
-  inputStyle,
   MONO_FONT,
-  subtleButtonStyle,
   tableBodyStyle,
   tableCellStyle,
   tableHeaderCellStyle,
   tableHeaderRowStyle,
   tableRowStyle,
   tableShellStyle,
-  tabBarStyle,
-  tabButtonStyle,
-  toolbarStyle,
   type EventCategory,
 } from '../system/devtoolsStyles';
 import { windowStore, type BerryWindowState } from '../store/windowStore';
@@ -221,14 +222,14 @@ function AppsTab() {
                 )}
               </div>
               <div style={{ ...tableCellStyle, borderRight: 'none', textAlign: 'right' }}>
-                <button
-                  type="button"
-                  style={dangerButtonStyle}
+                <GlassButton
+                  variant="danger"
+                  size="sm"
                   onClick={() => forceQuit(r.appId, windows)}
                   title={`Force quit ${r.name}`}
                 >
                   Force Quit
-                </button>
+                </GlassButton>
               </div>
             </div>
           );
@@ -317,26 +318,52 @@ function EventsTab() {
 
   const cols = '90px 200px 1fr 130px 90px';
 
+  const selectStyle: CSSProperties = {
+    appearance: 'none',
+    border: '1px solid var(--ls-border-glass)',
+    borderRadius: 'var(--ls-r-md)',
+    background: 'var(--ls-glass-light-strong)',
+    color: 'var(--ls-fg-primary)',
+    padding: '0 8px',
+    height: 28,
+    fontSize: 12,
+    lineHeight: 1.3,
+    fontFamily: 'var(--ls-font-sans)',
+    cursor: 'pointer',
+    fontVariantNumeric: 'tabular-nums',
+  };
+
   return (
     <div style={tableShellStyle}>
-      <div style={toolbarStyle}>
-        <input
-          style={inputStyle}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 12px',
+          background: 'var(--ls-sand-100)',
+          borderBottom: '1px solid var(--ls-border-glass)',
+        }}
+      >
+        <GlassInput
+          inputSize="sm"
           placeholder="Filter — substring or appId:foo"
           value={filter}
           onChange={e => setFilter(e.target.value)}
+          wrapperClassName="flex-1"
+          aria-label="Filter events"
         />
-        <button
-          type="button"
-          style={subtleButtonStyle}
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={() => setPaused(p => !p)}
           title={paused ? 'Resume live updates' : 'Pause live updates'}
         >
           {paused ? '▶ Resume' : '⏸ Pause'}
-        </button>
-        <button
-          type="button"
-          style={subtleButtonStyle}
+        </GlassButton>
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={() => {
             clearHistory();
             setExpanded(new Set());
@@ -344,38 +371,46 @@ function EventsTab() {
           }}
         >
           Clear
-        </button>
-        <span style={{ width: 1, alignSelf: 'stretch', background: '#c0c0c0' }} />
-        <button
-          type="button"
-          style={subtleButtonStyle}
+        </GlassButton>
+        <span
+          aria-hidden
+          style={{
+            width: 1,
+            alignSelf: 'stretch',
+            background: 'var(--ls-border-glass)',
+          }}
+        />
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={replayOne}
           disabled={selected == null}
           title="Re-emit the selected event onto the live bus"
         >
           ↻ Replay
-        </button>
-        <button
-          type="button"
-          style={subtleButtonStyle}
+        </GlassButton>
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={step}
           title="Step through filtered events one at a time"
         >
           ⏭ Step
-        </button>
-        <button
-          type="button"
-          style={subtleButtonStyle}
+        </GlassButton>
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={playRange}
           title="Replay the filtered range at original timing × speed"
         >
           ▶ Play
-        </button>
+        </GlassButton>
         <select
           value={replaySpeed}
           onChange={e => setReplaySpeed(Number(e.target.value))}
-          style={{ ...subtleButtonStyle, padding: '2px 4px' }}
+          style={selectStyle}
           title="Replay speed multiplier"
+          aria-label="Replay speed"
         >
           <option value={0.5}>0.5×</option>
           <option value={1}>1×</option>
@@ -384,20 +419,28 @@ function EventsTab() {
           <option value={10}>10×</option>
         </select>
         {activeReplay && (
-          <button
-            type="button"
-            style={dangerButtonStyle}
+          <GlassButton
+            variant="danger"
+            size="sm"
             onClick={() => {
               activeReplay.cancel();
               setActiveReplay(null);
             }}
           >
             Stop
-          </button>
+          </GlassButton>
         )}
-        <span style={{ marginLeft: 'auto', color: '#8e8e93', fontSize: 11 }}>
+        <GlassChip
+          tone="neutral"
+          size="xs"
+          style={{
+            marginLeft: 'auto',
+            fontFamily: 'var(--ls-font-mono)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
           {filtered.length} / {entries.length}
-        </span>
+        </GlassChip>
       </div>
       <div style={{ ...tableHeaderRowStyle, gridTemplateColumns: cols }}>
         <div style={tableHeaderCellStyle}>Time</div>
@@ -615,7 +658,12 @@ function Sparkline(props: {
       width={w}
       height={h}
       viewBox={`0 0 ${w} ${h}`}
-      style={{ display: 'block', background: '#fff', border: '1px solid #d4d4d4', borderRadius: 4 }}
+      style={{
+        display: 'block',
+        background: 'var(--ls-sand-100)',
+        border: '1px solid var(--ls-border-glass)',
+        borderRadius: 'var(--ls-r-md)',
+      }}
     >
       <polygon points={area} fill={fill} />
       <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
@@ -632,17 +680,17 @@ function PerformanceTab() {
 
   const stat: CSSProperties = {
     fontVariantNumeric: 'tabular-nums',
-    fontFamily: MONO_FONT,
+    fontFamily: 'var(--ls-font-mono)',
     // HIG: 28pt+ headline
     fontSize: 28,
     lineHeight: 1.2,
     fontWeight: 700,
-    color: '#1d1d1f',
+    color: 'var(--ls-fg-primary)',
   };
   const label: CSSProperties = {
-    fontSize: 11,
+    fontSize: 'var(--ls-text-xs)',
     lineHeight: 1.4,
-    color: '#8e8e93',
+    color: 'var(--ls-fg-muted)',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     fontWeight: 600,
@@ -650,7 +698,7 @@ function PerformanceTab() {
 
   return (
     // HIG 8pt grid: 16pt content padding
-    <div style={{ flex: 1, padding: 16, overflow: 'auto', background: '#f4f4f6' }}>
+    <div style={{ flex: 1, padding: 16, overflow: 'auto', background: 'var(--ls-sand-50)' }}>
       <div
         style={{
           display: 'grid',
@@ -674,12 +722,12 @@ function PerformanceTab() {
         </Card>
         <div style={{ gridColumn: '1 / -1' }}>
           <Card title="Window Count" sub="Last 60s">
-            <Sparkline samples={windows} color="#007aff" fill="rgba(0,122,255,0.18)" />
+            <Sparkline samples={windows} color="var(--ls-accent)" fill="rgba(60, 100, 200, 0.18)" />
           </Card>
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <Card title="Event Rate" sub="Events / sec, last 60s">
-            <Sparkline samples={rate} color="#28cd41" fill="rgba(40,205,65,0.18)" />
+            <Sparkline samples={rate} color="var(--ls-success)" fill="rgba(122, 139, 60, 0.18)" />
           </Card>
         </div>
       </div>
@@ -691,18 +739,18 @@ function Card(props: { title: string; sub?: string; children: React.ReactNode })
   return (
     <div
       style={{
-        background: '#fff',
-        border: '1px solid #d4d4d4',
-        borderRadius: 8,
+        background: 'var(--ls-sand-50)',
+        border: '1px solid var(--ls-border-glass)',
+        borderRadius: 'var(--ls-r-lg)',
         padding: 16,
-        boxShadow: '0 1px 0 rgba(0,0,0,0.03)',
+        boxShadow: 'var(--ls-shadow-sm)',
       }}
     >
       <div
         style={{
-          fontSize: 11,
+          fontSize: 'var(--ls-text-xs)',
           lineHeight: 1.4,
-          color: '#8e8e93',
+          color: 'var(--ls-fg-muted)',
           textTransform: 'uppercase',
           letterSpacing: 0.6,
           fontWeight: 600,
@@ -711,7 +759,15 @@ function Card(props: { title: string; sub?: string; children: React.ReactNode })
       >
         {props.title}
         {props.sub && (
-          <span style={{ color: '#aeaeae', marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
+          <span
+            style={{
+              color: 'var(--ls-fg-muted)',
+              opacity: 0.7,
+              marginLeft: 8,
+              textTransform: 'none',
+              letterSpacing: 0,
+            }}
+          >
             — {props.sub}
           </span>
         )}
@@ -767,31 +823,42 @@ function ActivityMonitorApp(): ReactElement {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        background: '#ececec',
-        fontFamily: 'var(--theme-font-display)',
-        color: '#1d1d1f',
+        background: 'var(--ls-sand-50)',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
-      <div style={tabBarStyle}>
-        {TAB_ORDER.map(t => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            style={tabButtonStyle(tab === t)}
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 16px',
+          background: 'var(--ls-sand-100)',
+          borderBottom: '1px solid var(--ls-border-glass)',
+        }}
+      >
+        <GlassTabs
+          size="sm"
+          value={tab}
+          onValueChange={v => setTab(v as Tab)}
+        >
+          {TAB_ORDER.map(t => (
+            <GlassTabs.Item key={t} value={t}>
+              {TAB_LABELS[t]}
+            </GlassTabs.Item>
+          ))}
+        </GlassTabs>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 4,
             marginLeft: 'auto',
-            padding: '0 6px 4px 0',
             fontSize: 10,
-            color: '#3c3c43',
+            color: 'var(--ls-fg-secondary)',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
           }}
         >
           {(Object.keys(counts) as EventCategory[])

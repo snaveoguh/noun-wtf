@@ -311,12 +311,14 @@ export default function ShutdownSequence() {
               <Power size={36} />
             </div>
             <div style={{ flex: 1 }}>
+              {/* HIG: alert title sits in the headline range; body text is 13pt. */}
               <div
                 style={{
                   fontWeight: 600,
-                  fontSize: 14,
+                  fontSize: 'var(--ls-text-lg)' /* 17pt body — alert headline */,
                   marginBottom: 6,
                   color: 'var(--ls-fg-primary)',
+                  lineHeight: 1.3,
                 }}
               >
                 Are you sure you want to shut down your computer?
@@ -324,7 +326,7 @@ export default function ShutdownSequence() {
               <div
                 style={{
                   color: 'var(--ls-fg-secondary)',
-                  fontSize: 12,
+                  fontSize: 'var(--ls-text-sm)' /* 13pt label/body */,
                   lineHeight: 1.45,
                 }}
               >
@@ -359,16 +361,17 @@ export default function ShutdownSequence() {
               marginTop: 18,
             }}
           >
+            {/* HIG: alert primary actions need a comfortable hit area (>=34pt). */}
             <GlassButton
               variant="ghost"
-              size="sm"
+              size="md"
               onClick={() => setStage('hidden')}
             >
               Cancel
             </GlassButton>
             <GlassButton
               variant="primary"
-              size="sm"
+              size="md"
               onClick={() => void runShutdown(reopen)}
               autoFocus
             >
@@ -432,5 +435,9 @@ const shutdownKeyframes = `
 @keyframes berryShutdownShrink {
   from { transform: scale(1); opacity: 0.85; }
   to { transform: scale(0.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes berryShutdownIn { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes berryShutdownShrink { from { opacity: 1; transform: none; } to { opacity: 0; transform: none; } }
 }
 `;

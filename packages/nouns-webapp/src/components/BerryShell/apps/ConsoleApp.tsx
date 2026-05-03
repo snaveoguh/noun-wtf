@@ -15,6 +15,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 
+import { GlassButton, GlassChip } from '@/liquid-sand/glass';
+
 import { berryRegistry } from '../system/berryRegistry';
 import {
   getHistory,
@@ -27,10 +29,7 @@ import {
   categoryFor,
   compactJson,
   formatTime,
-  inputStyle,
   MONO_FONT,
-  subtleButtonStyle,
-  toolbarStyle,
 } from '../system/devtoolsStyles';
 
 const MAX_LINES = 1000;
@@ -94,6 +93,25 @@ function ConsoleApp(): ReactElement {
     el.scrollTop = el.scrollHeight;
   }, [searched.lines, autoScroll]);
 
+  // Dark terminal-input style — Console keeps its monospace dark surface
+  // (intentional: terminal aesthetic) but the toolbar controls now use Glass
+  // primitives so they read as part of BerryOS instead of as raw HTML.
+  const darkInputStyle = {
+    appearance: 'none' as const,
+    border: '1px solid #3a3a3c',
+    borderRadius: 'var(--ls-r-md)',
+    background: '#1d1d1f',
+    color: '#dcdce0',
+    padding: '6px 10px',
+    fontSize: 13,
+    lineHeight: 1.4,
+    fontFamily: MONO_FONT,
+    flex: 1,
+    minWidth: 0,
+    outline: 'none',
+    minHeight: 28,
+  };
+
   return (
     <div
       style={{
@@ -105,69 +123,55 @@ function ConsoleApp(): ReactElement {
         color: '#dcdce0',
       }}
     >
-      <div style={{ ...toolbarStyle, background: '#2c2c2e', borderBottomColor: '#3a3a3c' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 12px',
+          background: '#2c2c2e',
+          borderBottom: '1px solid #3a3a3c',
+        }}
+      >
         <input
-          style={{
-            ...inputStyle,
-            background: '#1d1d1f',
-            border: '1px solid #3a3a3c',
-            color: '#dcdce0',
-          }}
+          style={darkInputStyle}
           placeholder="Filter — text, prefix:, or appId:foo"
           value={filter}
           onChange={e => setFilter(e.target.value)}
+          aria-label="Filter console"
         />
         <input
-          style={{
-            ...inputStyle,
-            background: '#1d1d1f',
-            border: '1px solid #3a3a3c',
-            color: '#dcdce0',
-            maxWidth: 200,
-          }}
+          style={{ ...darkInputStyle, maxWidth: 200 }}
           placeholder="Search…"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          aria-label="Search console"
         />
-        <span
+        <GlassChip
+          tone={search.trim() ? 'success' : 'neutral'}
+          size="xs"
           style={{
-            color: search.trim() ? '#28cd41' : '#8e8e93',
-            // HIG min caption: 11pt
-            fontSize: 11,
-            lineHeight: 1.4,
-            padding: '0 8px',
+            fontFamily: MONO_FONT,
             fontVariantNumeric: 'tabular-nums',
           }}
         >
           {search.trim() ? `${searched.hits} hits` : `${filtered.length} lines`}
-        </span>
-        <button
-          type="button"
-          style={{
-            ...subtleButtonStyle,
-            background: autoScroll
-              ? 'linear-gradient(180deg, #2d7ad8 0%, #1c5fb0 100%)'
-              : subtleButtonStyle.background,
-            color: autoScroll ? '#fff' : subtleButtonStyle.color,
-            borderColor: autoScroll ? '#0a4a90' : '#3a3a3c',
-          }}
+        </GlassChip>
+        <GlassButton
+          variant={autoScroll ? 'primary' : 'default'}
+          size="sm"
           onClick={() => setAutoScroll(s => !s)}
           title="Toggle auto-scroll to bottom"
         >
           {autoScroll ? '↓ Tail' : '↓ Tail (off)'}
-        </button>
-        <button
-          type="button"
-          style={{
-            ...subtleButtonStyle,
-            background: 'linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)',
-            color: '#dcdce0',
-            borderColor: '#48484a',
-          }}
+        </GlassButton>
+        <GlassButton
+          variant="default"
+          size="sm"
           onClick={() => setEntries([])}
         >
           Clear
-        </button>
+        </GlassButton>
       </div>
       <div
         ref={scrollRef}

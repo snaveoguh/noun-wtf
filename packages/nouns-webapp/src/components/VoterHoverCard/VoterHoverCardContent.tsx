@@ -1,11 +1,11 @@
 import { FC, memo } from 'react';
 
 import { blo } from 'blo';
-import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { StandaloneNounImage } from '@/components/StandaloneNoun';
 import { cn } from '@/lib/utils';
+import { Sparkle } from '@/liquid-sand/icons';
 import { formatShortAddress } from '@/utils/addressAndENSDisplayUtils';
 import { Address } from '@/utils/types';
 
@@ -16,6 +16,14 @@ interface VoterHoverCardContentProps {
 }
 
 const NOUN_GRID_VISIBLE = 14;
+
+// Reusable inline-style snippets so the JSX stays scannable. All values
+// resolve to Liquid Sand tokens — no Tailwind color classes from here.
+const fontSans: React.CSSProperties = { fontFamily: 'var(--ls-font-sans)' };
+const fontMono: React.CSSProperties = { fontFamily: 'var(--ls-font-mono)' };
+const colorOnDark: React.CSSProperties = { color: 'var(--ls-fg-on-dark)' };
+const colorSecondary: React.CSSProperties = { color: 'var(--ls-fg-secondary)' };
+const colorMuted: React.CSSProperties = { color: 'var(--ls-fg-muted)' };
 
 export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ address }) => {
   const data = useVoterHoverData(address);
@@ -45,7 +53,10 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
   const overflow = Math.max(0, ownedCount - NOUN_GRID_VISIBLE);
 
   return (
-    <div className="flex flex-col gap-2.5 p-3 text-[12px] leading-tight text-zinc-100">
+    <div
+      className="flex flex-col gap-2.5 p-3 leading-tight"
+      style={{ ...fontSans, ...colorOnDark, fontSize: 'var(--ls-text-sm)' }}
+    >
       {/* ── Header row ── */}
       <Link
         to={profileHref}
@@ -55,17 +66,33 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
         <img
           src={ensAvatar ?? blo(address)}
           alt=""
-          className="size-6 shrink-0 rounded-full bg-zinc-800 object-cover"
-          style={{ backgroundImage: `url(${blo(address)})` }}
+          className="size-6 shrink-0 object-cover"
+          style={{
+            // Avatar uses the smaller chip radius so it reads as a token,
+            // not a window. Background falls back to the blockie data URL.
+            borderRadius: 'var(--ls-r-full)',
+            backgroundImage: `url(${blo(address)})`,
+            backgroundColor: 'rgba(255,250,240,0.06)',
+          }}
         />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-white">
+        <span
+          className="min-w-0 flex-1 truncate font-bold"
+          style={{ ...fontSans, ...colorOnDark, fontSize: 'var(--ls-text-md)' }}
+        >
           {ensName ?? shortAddr}
         </span>
         {ensName && (
-          <span className="font-mono text-[11px] text-zinc-500">{shortAddr}</span>
+          <span
+            className="tabular-nums"
+            style={{ ...fontMono, ...colorMuted, fontSize: 'var(--ls-text-xs)' }}
+          >
+            {shortAddr}
+          </span>
         )}
-        <ArrowRight
-          className="size-3.5 shrink-0 text-zinc-500 transition-colors group-hover:text-white"
+        <Sparkle
+          className="shrink-0 transition-colors group-hover:[color:var(--ls-fg-on-dark)]"
+          size={14}
+          style={colorMuted}
           aria-hidden
         />
       </Link>
@@ -77,14 +104,25 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
             ? Array.from({ length: 7 }).map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-square animate-pulse rounded bg-zinc-800/70"
+                  className="aspect-square animate-pulse"
+                  style={{
+                    borderRadius: 'var(--ls-r-sm)',
+                    backgroundColor: 'rgba(255,250,240,0.06)',
+                  }}
                 />
               ))
-            : visibleNouns.map(id => (
-                <NounThumb key={id} nounId={id} />
-              ))}
+            : visibleNouns.map(id => <NounThumb key={id} nounId={id} />)}
           {overflow > 0 && (
-            <div className="flex aspect-square items-center justify-center rounded bg-zinc-800 text-[10px] font-semibold text-zinc-300">
+            <div
+              className="flex aspect-square items-center justify-center font-semibold"
+              style={{
+                ...fontSans,
+                ...colorSecondary,
+                fontSize: 'var(--ls-text-xs)',
+                borderRadius: 'var(--ls-r-sm)',
+                backgroundColor: 'rgba(255,250,240,0.08)',
+              }}
+            >
               +{overflow}
             </div>
           )}
@@ -92,17 +130,41 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
       )}
 
       {/* ── Stats line 1 ── */}
-      <div className={cn('text-[11px] text-zinc-400', isLoading && 'animate-pulse')}>
+      <div
+        className={cn(isLoading && 'animate-pulse')}
+        style={{ ...fontSans, ...colorMuted, fontSize: 'var(--ls-text-sm)' }}
+      >
         {isLoading ? (
-          <span className="inline-block h-3 w-44 rounded bg-zinc-800" />
+          <span
+            className="inline-block h-3 w-44"
+            style={{
+              backgroundColor: 'rgba(255,250,240,0.08)',
+              borderRadius: 'var(--ls-r-sm)',
+            }}
+          />
         ) : (
           <>
-            Owns {ownedCount} noun{ownedCount === 1 ? '' : 's'}
+            Owns{' '}
+            <span className="tabular-nums" style={{ ...fontMono, ...colorOnDark }}>
+              {ownedCount}
+            </span>{' '}
+            noun{ownedCount === 1 ? '' : 's'}
             {delegatedFromOthers > 0 && (
               <>
-                , {delegatedFromOthers} delegated
+                ,{' '}
+                <span className="tabular-nums" style={{ ...fontMono, ...colorOnDark }}>
+                  {delegatedFromOthers}
+                </span>{' '}
+                delegated
                 {delegatorCount > 0 && (
-                  <> from {delegatorCount} address{delegatorCount === 1 ? '' : 'es'}</>
+                  <>
+                    {' '}
+                    from{' '}
+                    <span className="tabular-nums" style={{ ...fontMono, ...colorOnDark }}>
+                      {delegatorCount}
+                    </span>{' '}
+                    address{delegatorCount === 1 ? '' : 'es'}
+                  </>
                 )}
               </>
             )}
@@ -111,9 +173,18 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
       </div>
 
       {/* ── Stats line 2 ── */}
-      <div className={cn('text-[11px] text-zinc-400', isLoading && 'animate-pulse')}>
+      <div
+        className={cn(isLoading && 'animate-pulse')}
+        style={{ ...fontSans, ...colorMuted, fontSize: 'var(--ls-text-sm)' }}
+      >
         {isLoading ? (
-          <span className="inline-block h-3 w-56 rounded bg-zinc-800" />
+          <span
+            className="inline-block h-3 w-56"
+            style={{
+              backgroundColor: 'rgba(255,250,240,0.08)',
+              borderRadius: 'var(--ls-r-sm)',
+            }}
+          />
         ) : (
           <StatList
             entries={[
@@ -129,16 +200,35 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
 
       {/* ── Multisig section ── */}
       {multisig && multisig.owners.length > 0 && (
-        <div className="border-t border-zinc-800 pt-2 text-[11px] text-zinc-500">
-          {multisig.threshold} of {multisig.owners.length} multisig:{' '}
+        <div
+          className="pt-2"
+          style={{
+            // Hairline divider — same border token as the panel itself so
+            // it disappears against the glass when scrolled past.
+            borderTop: '1px solid var(--ls-border-glass)',
+            ...fontSans,
+            ...colorMuted,
+            fontSize: 'var(--ls-text-xs)',
+          }}
+        >
+          <span className="tabular-nums" style={fontMono}>
+            {multisig.threshold}
+          </span>{' '}
+          of{' '}
+          <span className="tabular-nums" style={fontMono}>
+            {multisig.owners.length}
+          </span>{' '}
+          multisig:{' '}
           {multisig.owners.slice(0, 6).map((owner, i) => (
             <span key={owner}>
               {i > 0 && ', '}
-              <span className="text-zinc-400">{formatShortAddress(owner)}</span>
+              <span className="tabular-nums" style={{ ...fontMono, ...colorSecondary }}>
+                {formatShortAddress(owner)}
+              </span>
             </span>
           ))}
           {multisig.owners.length > 6 && (
-            <span className="text-zinc-500">, +{multisig.owners.length - 6}</span>
+            <span style={colorMuted}>, +{multisig.owners.length - 6}</span>
           )}
         </div>
       )}
@@ -150,10 +240,18 @@ VoterHoverCardContent.displayName = 'VoterHoverCardContent';
 
 const NounThumb: FC<{ nounId: number }> = memo(({ nounId }) => (
   <div className="flex flex-col items-center gap-0.5">
-    <div className="size-full overflow-hidden rounded">
+    <div
+      className="size-full overflow-hidden"
+      style={{ borderRadius: 'var(--ls-r-sm)' }}
+    >
       <StandaloneNounImage nounId={BigInt(nounId)} />
     </div>
-    <span className="text-[9px] leading-none text-zinc-500">{nounId}</span>
+    <span
+      className="leading-none tabular-nums"
+      style={{ ...fontMono, ...colorMuted, fontSize: '9px' }}
+    >
+      {nounId}
+    </span>
   </div>
 ));
 NounThumb.displayName = 'NounThumb';
@@ -170,7 +268,9 @@ const StatList: FC<StatListProps> = ({ entries }) => {
       {filled.map(([n, singular, plural], i) => (
         <span key={singular}>
           {i > 0 && ', '}
-          <span className="text-zinc-200">{n}</span>{' '}
+          <span className="tabular-nums" style={{ ...fontMono, ...colorOnDark }}>
+            {n}
+          </span>{' '}
           {n === 1 ? singular : (plural ?? singular)}
         </span>
       ))}
