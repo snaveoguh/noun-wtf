@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e8e2dc;
+  background: var(--theme-bg-secondary);
   animation: editorFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -33,8 +33,8 @@
 .canvasWrap {
   position: relative;
   z-index: 1;
-  background: #ffffff;
-  border-radius: 4px;
+  background: var(--theme-bg-card);
+  border-radius: var(--theme-radius-sm);
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
   animation: canvasReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -279,8 +279,8 @@
 }
 
 .modeBtnActive {
-  background: #14141f;
-  color: #fff;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
 }
 
 /* ── Palette (left, below tools + layers) ───────── */
@@ -340,8 +340,8 @@
 }
 
 .paletteActive {
-  border: 2px solid #000 !important;
-  box-shadow: 0 0 0 1px #fff;
+  border: 2px solid var(--theme-text-primary) !important;
+  box-shadow: 0 0 0 1px var(--theme-bg-primary);
 }
 
 .showMoreBtn {
@@ -372,14 +372,14 @@
 
 .actionBtn {
   border: none;
-  border-radius: 8px;
+  border-radius: var(--theme-radius-md);
   padding: 6px 14px;
   font-family: 'PT Root UI', sans-serif;
   font-size: 0.65rem;
   font-weight: 700;
   cursor: pointer;
-  background: #14141f;
-  color: #fff;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
   transition: opacity 0.15s;
 }
 

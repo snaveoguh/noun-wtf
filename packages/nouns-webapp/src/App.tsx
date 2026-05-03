@@ -8,6 +8,12 @@ import { useAccount } from 'wagmi';
 import AmbientMusic from '@/components/AmbientMusic';
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
+import BerryShell from '@/components/BerryShell';
+import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
+import ClassicHome from '@/components/ClassicShell/ClassicHome';
+import GameCreateProposal from '@/components/GameShell/GameCreateProposal';
+import GameEditProposal from '@/components/GameShell/GameEditProposal';
+import GameHome from '@/components/GameShell/GameHome';
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
 import NetworkAlert from '@/components/NetworkAlert';
@@ -27,6 +33,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
+import EditCandidatePage from '@/pages/EditCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
 import EditProposalPage from '@/pages/EditProposal';
@@ -76,9 +83,174 @@ const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPa
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 
+/**
+ * The full set of <Route> definitions extracted into a component so the same
+ * routing tree can render either inside the default chrome (NavBar + Footer)
+ * or wrapped by a theme shell that owns its own chrome (e.g. BerryShell's
+ * Mac window so internal nav stays inside Berry's desktop instead of
+ * navigating away to the default site chrome).
+ */
+function SiteRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<AuctionPage />} />
+      <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
+      <Route path="/noun/:id" element={<AuctionPage />} />
+      <Route path="/v2" element={<AuctionPage />} />
+      <Route path="/v2/noun/:id" element={<AuctionPage />} />
+      <Route path="/nounders" element={<NoundersPage />} />
+      <Route path="/create-proposal" element={<CreateProposalPage />} />
+      <Route path="/create-candidate" element={<CreateCandidatePage />} />
+      <Route path="/vote" element={<GovernancePage />} />
+      <Route
+        path="/vote/:id"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <VotePageRouter />
+          </Suspense>
+        }
+      />
+      <Route path="/vote/:id/history" element={<ProposalHistory />} />
+      <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
+      <Route
+        path="/vote/:id/edit"
+        element={<EditProposalPage match={{ params: { id: ':id' } }} />}
+      />
+      <Route
+        path="/candidates"
+        element={
+          <Suspense fallback={<GovernanceSkeleton />}>
+            <CandidatesListPage />
+          </Suspense>
+        }
+      />
+      <Route path="/candidates/:id" element={<CandidatePage />} />
+      <Route path="/candidates/:id/edit" element={<EditCandidatePage />} />
+      <Route path="/playground" element={<Playground />} />
+      <Route path="/grants" element={<GrantsPage />} />
+      <Route path="/grants/create" element={<CreateGrantPage />} />
+      <Route path="/grants/:id" element={<GrantDetailPage />} />
+      <Route path="/nounv2" element={<NounV2Page />} />
+      <Route path="/nounv2/create" element={<CreateNounV2ProposalPage />} />
+      <Route path="/nounv2/:id" element={<NounV2DetailPage />} />
+      <Route path="/hackathons" element={<HackathonPage />} />
+      <Route path="/underground" element={<UndergroundPage />} />
+      <Route path="/delegate" element={<DelegatePage />} />
+      <Route path="/traits" element={<TraitsPage />} />
+      <Route path="/explore" element={<Navigate to="/probe" replace />} />
+      <Route path="/nouns" element={<Navigate to="/probe" replace />} />
+      <Route
+        path="/probe"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <ProbePage />
+          </Suspense>
+        }
+      />
+      <Route path="/studio" element={<StudioPage />} />
+      <Route path="/settlers" element={<SettlersPage />} />
+      <Route path="/gas" element={<GasLeaderboardPage />} />
+      <Route path="/stats" element={<StatsPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <DashboardPage />
+          </Suspense>
+        }
+      />
+      <Route path="/nonsense" element={<NonsensePage />} />
+      <Route path="/dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
+      <Route path="/dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
+      <Route path="/terminal" element={<Navigate to="/" replace />} />
+      <Route
+        path="/crystal-ball"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <CrystalBallPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/v2/crystal-ball"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <CrystalBallPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/feed"
+        element={
+          <Suspense fallback={<FeedSkeleton />}>
+            <FeedPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/highway"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <HighwayPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/terraforms"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <TerraformsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/terraforms/:id"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <TerraformsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/pip3"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <Pip3Page />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/predictions"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <PredictionsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/marketplace"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <MarketplacePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/marketplace/:nounId"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <NounDetailPage />
+          </Suspense>
+        }
+      />
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
+}
+
 /** Inner router — uses useLocation to conditionally show chrome vs terminal */
 function AppRouter() {
-  const { mode } = useSiteTheme();
+  const { mode, theme } = useSiteTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
@@ -86,6 +258,20 @@ function AppRouter() {
   const [saberMode, setSaberMode] = useState(false);
 
   const isTerminalHome = mode === 'new' && location.pathname === '/';
+  // Edit-proposal route — handles both the canonical `/vote/:id/edit` path and
+  // the legacy `/edit-proposal/:id` shape. Themes that own a bespoke editor
+  // (currently just Game) reuse this match.
+  const editProposalMatch = location.pathname.match(
+    /^(?:\/vote\/([^/]+)\/edit|\/edit-proposal\/([^/]+))$/,
+  );
+  const isGameHome = theme === 'game' && location.pathname === '/';
+  const isGameCreateProposal =
+    theme === 'game' && location.pathname === '/create-proposal';
+  const isGameEditProposal = theme === 'game' && editProposalMatch != null;
+  const gameEditProposalId =
+    (editProposalMatch?.[1] || editProposalMatch?.[2]) ?? '';
+  const isClassicHome = theme === 'classic' && location.pathname === '/';
+  const isCatalogueHome = theme === 'catalogue' && location.pathname === '/';
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -110,6 +296,33 @@ function AppRouter() {
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
     return <TerminalFeedShell />;
+  }
+
+  // Game / Classic themes get bespoke home layouts; internal routes currently
+  // fall through to the default NavBar chrome (themed via CSS vars). Berry is
+  // the exception — its desktop metaphor needs the menu bar + dock visible
+  // across all routes, so internal routes render inside its Window.
+  if (isGameHome) {
+    return <GameHome />;
+  }
+  // Game's bespoke proposal creator/editor — owns its own GameShell chrome,
+  // so we early-return before the default NavBar branch.
+  if (isGameCreateProposal) {
+    return <GameCreateProposal />;
+  }
+  if (isGameEditProposal) {
+    return <GameEditProposal proposalId={gameEditProposalId} />;
+  }
+  if (isClassicHome) {
+    return <ClassicHome />;
+  }
+  if (isCatalogueHome) {
+    return <CatalogueHome />;
+  }
+  if (theme === 'berry') {
+    // Berry is a static homepage emulation — never render real noun.wtf
+    // routes inside the desktop chrome, no matter the current path.
+    return <BerryShell />;
   }
 
   // World — full-screen canvas, no chrome
@@ -142,165 +355,7 @@ function AppRouter() {
         <NocTicker />
       </div>
       <NavBar />
-      <Routes>
-        <Route path="/" element={<AuctionPage />} />
-        <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
-        <Route path="/noun/:id" element={<AuctionPage />} />
-        {/* V2 auction routes — split namespace so URL alone owns DAO context.
-             The Auction page detects `/v2*` via useActiveDao and swaps in the
-             V2 contracts/seed loader/holder reads. */}
-        <Route path="/v2" element={<AuctionPage />} />
-        <Route path="/v2/noun/:id" element={<AuctionPage />} />
-        <Route path="/nounders" element={<NoundersPage />} />
-        <Route path="/create-proposal" element={<CreateProposalPage />} />
-        <Route path="/create-candidate" element={<CreateCandidatePage />} />
-        <Route path="/vote" element={<GovernancePage />} />
-        <Route
-          path="/vote/:id"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <VotePageRouter />
-            </Suspense>
-          }
-        />
-        <Route path="/vote/:id/history" element={<ProposalHistory />} />
-        <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
-        <Route
-          path="/vote/:id/edit"
-          element={<EditProposalPage match={{ params: { id: ':id' } }} />}
-        />
-        <Route
-          path="/candidates"
-          element={
-            <Suspense fallback={<GovernanceSkeleton />}>
-              <CandidatesListPage />
-            </Suspense>
-          }
-        />
-        <Route path="/candidates/:id" element={<CandidatePage />} />
-        <Route path="/playground" element={<Playground />} />
-        <Route path="/grants" element={<GrantsPage />} />
-        <Route path="/grants/create" element={<CreateGrantPage />} />
-        <Route path="/grants/:id" element={<GrantDetailPage />} />
-        <Route path="/nounv2" element={<NounV2Page />} />
-        <Route path="/nounv2/create" element={<CreateNounV2ProposalPage />} />
-        <Route path="/nounv2/:id" element={<NounV2DetailPage />} />
-        <Route path="/hackathons" element={<HackathonPage />} />
-        <Route path="/underground" element={<UndergroundPage />} />
-        <Route path="/delegate" element={<DelegatePage />} />
-        <Route path="/traits" element={<TraitsPage />} />
-        <Route path="/explore" element={<Navigate to="/probe" replace />} />
-        <Route path="/nouns" element={<Navigate to="/probe" replace />} />
-        <Route
-          path="/probe"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <ProbePage />
-            </Suspense>
-          }
-        />
-        <Route path="/studio" element={<StudioPage />} />
-        <Route path="/settlers" element={<SettlersPage />} />
-        <Route path="/gas" element={<GasLeaderboardPage />} />
-        <Route path="/stats" element={<StatsPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <DashboardPage />
-            </Suspense>
-          }
-        />
-        <Route path="/nonsense" element={<NonsensePage />} />
-        <Route path="/dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
-        <Route path="/dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
-        {/* Miniapp routes (lazy loaded) */}
-        {/* /terminal sunset 2026-04-27 — consolidated into homepage TerminalFeed
-            (see TerminalFeedShell on `/` when site mode === 'new'). Keep redirect
-            so old links/CTAs land on the merged feed. */}
-        <Route path="/terminal" element={<Navigate to="/" replace />} />
-        <Route
-          path="/crystal-ball"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <CrystalBallPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/v2/crystal-ball"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <CrystalBallPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/feed"
-          element={
-            <Suspense fallback={<FeedSkeleton />}>
-              <FeedPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/highway"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <HighwayPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/terraforms"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <TerraformsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/terraforms/:id"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <TerraformsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/pip3"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <Pip3Page />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/predictions"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <PredictionsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/marketplace"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <MarketplacePage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/marketplace/:nounId"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <NounDetailPage />
-            </Suspense>
-          }
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <SiteRoutes />
       <Footer />
       {/* <HeliosStatusBar /> — disabled: a16z consensus endpoints are down, causes infinite 502 retry loop */}
       <ChainNotificationsMount />

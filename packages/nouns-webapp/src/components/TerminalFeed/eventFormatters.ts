@@ -4,47 +4,49 @@ export interface EventTypeConfig {
   label: string;
   color: string;
   filterKey: string;
+  /** Single-glyph icon shown to the left of the row in dense feed mode. */
+  icon?: string;
 }
 
 export const EVENT_TYPES: Record<string, EventTypeConfig> = {
-  BID: { label: 'BID', color: '#60a5fa', filterKey: 'BID' },
-  VOTE: { label: 'VOTE', color: '#c084fc', filterKey: 'VOTE' },
-  PROPOSAL_CREATED: { label: 'PROP', color: '#facc15', filterKey: 'PROPOSAL_CREATED' },
-  AUCTION_SETTLED: { label: 'SETTLED', color: '#4ade80', filterKey: 'AUCTION_SETTLED' },
-  NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED' },
-  CANDIDATE_CREATED: { label: 'CAND', color: '#fb923c', filterKey: 'CANDIDATE_CREATED' },
-  CANDIDATE_SPONSORED: { label: 'SPONSOR', color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED' },
-  CANDIDATE_UPDATED: { label: 'CAND-UPD', color: '#fdba74', filterKey: 'CANDIDATE_UPDATED' },
-  CANDIDATE_CANCELED: { label: 'CAND-CXL', color: '#f87171', filterKey: 'CANDIDATE_CANCELED' },
-  CANDIDATE_PROMOTED: { label: 'PROMOTED', color: '#fde047', filterKey: 'CANDIDATE_PROMOTED' },
-  PROPOSAL_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK' },
-  CANDIDATE_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK' },
-  STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED' },
-  DELEGATION: { label: 'DELEG', color: '#e879f9', filterKey: 'DELEGATION' },
-  TRANSFER: { label: 'XFER', color: '#f9a8d4', filterKey: 'TRANSFER' },
-  PROPOSAL_QUEUED: { label: 'QUEUED', color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED' },
-  PROPOSAL_EXECUTED: { label: 'EXEC', color: '#34d399', filterKey: 'PROPOSAL_EXECUTED' },
-  PROPOSAL_CANCELLED: { label: 'CANCEL', color: '#f87171', filterKey: 'PROPOSAL_CANCELLED' },
-  PROPOSAL_VETOED: { label: 'VETOED', color: '#fb923c', filterKey: 'PROPOSAL_VETOED' },
-  GRANT_CREATED: { label: 'GRANT', color: '#22d3ee', filterKey: 'GRANT_CREATED' },
-  GRANT_VOTE: { label: 'GVOTE', color: '#67e8f9', filterKey: 'GRANT_VOTE' },
-  GRANT_QUEUED: { label: 'GQUEUE', color: '#a5f3fc', filterKey: 'GRANT_QUEUED' },
-  GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED' },
-  GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED' },
-  LIL_BID: { label: 'L-BID', color: '#93c5fd', filterKey: 'LIL_BID' },
-  LIL_AUCTION_SETTLED: { label: 'L-SETTLED', color: '#86efac', filterKey: 'LIL_AUCTION_SETTLED' },
-  LIL_NOUN_CREATED: { label: 'L-NOUN', color: '#86efac', filterKey: 'LIL_NOUN_CREATED' },
-  LIL_VOTE: { label: 'L-VOTE', color: '#d8b4fe', filterKey: 'LIL_VOTE' },
-  LIL_PROPOSAL_CREATED: { label: 'L-PROP', color: '#fde047', filterKey: 'LIL_PROPOSAL_CREATED' },
-  LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER' },
-  SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE' },
+  BID: { label: 'BID', color: '#60a5fa', filterKey: 'BID', icon: '💰' },
+  VOTE: { label: 'VOTE', color: '#c084fc', filterKey: 'VOTE', icon: '🗳' },
+  PROPOSAL_CREATED: { label: 'PROP', color: '#facc15', filterKey: 'PROPOSAL_CREATED', icon: '📜' },
+  AUCTION_SETTLED: { label: 'SETTLED', color: '#4ade80', filterKey: 'AUCTION_SETTLED', icon: '🔥' },
+  NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED', icon: '🔔' },
+  CANDIDATE_CREATED: { label: 'CAND', color: '#fb923c', filterKey: 'CANDIDATE_CREATED', icon: '📝' },
+  CANDIDATE_SPONSORED: { label: 'SPONSOR', color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED', icon: '✍️' },
+  CANDIDATE_UPDATED: { label: 'CAND-UPD', color: '#fdba74', filterKey: 'CANDIDATE_UPDATED', icon: '✏️' },
+  CANDIDATE_CANCELED: { label: 'CAND-CXL', color: '#f87171', filterKey: 'CANDIDATE_CANCELED', icon: '🗑' },
+  CANDIDATE_PROMOTED: { label: 'PROMOTED', color: '#fde047', filterKey: 'CANDIDATE_PROMOTED', icon: '⬆️' },
+  PROPOSAL_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK', icon: '💬' },
+  CANDIDATE_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK', icon: '💬' },
+  STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED', icon: '🌊' },
+  DELEGATION: { label: 'DELEG', color: '#e879f9', filterKey: 'DELEGATION', icon: '🤝' },
+  TRANSFER: { label: 'XFER', color: '#f9a8d4', filterKey: 'TRANSFER', icon: '↔️' },
+  PROPOSAL_QUEUED: { label: 'QUEUED', color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED', icon: '⏳' },
+  PROPOSAL_EXECUTED: { label: 'EXEC', color: '#34d399', filterKey: 'PROPOSAL_EXECUTED', icon: '✅' },
+  PROPOSAL_CANCELLED: { label: 'CANCEL', color: '#f87171', filterKey: 'PROPOSAL_CANCELLED', icon: '🚫' },
+  PROPOSAL_VETOED: { label: 'VETOED', color: '#fb923c', filterKey: 'PROPOSAL_VETOED', icon: '⛔' },
+  GRANT_CREATED: { label: 'GRANT', color: '#22d3ee', filterKey: 'GRANT_CREATED', icon: '🎁' },
+  GRANT_VOTE: { label: 'GVOTE', color: '#67e8f9', filterKey: 'GRANT_VOTE', icon: '🗳' },
+  GRANT_QUEUED: { label: 'GQUEUE', color: '#a5f3fc', filterKey: 'GRANT_QUEUED', icon: '⏳' },
+  GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED', icon: '✅' },
+  GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED', icon: '🚫' },
+  LIL_BID: { label: 'L-BID', color: '#93c5fd', filterKey: 'LIL_BID', icon: '💰' },
+  LIL_AUCTION_SETTLED: { label: 'L-SETTLED', color: '#86efac', filterKey: 'LIL_AUCTION_SETTLED', icon: '🔥' },
+  LIL_NOUN_CREATED: { label: 'L-NOUN', color: '#86efac', filterKey: 'LIL_NOUN_CREATED', icon: '🔔' },
+  LIL_VOTE: { label: 'L-VOTE', color: '#d8b4fe', filterKey: 'LIL_VOTE', icon: '🗳' },
+  LIL_PROPOSAL_CREATED: { label: 'L-PROP', color: '#fde047', filterKey: 'LIL_PROPOSAL_CREATED', icon: '📜' },
+  LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER', icon: '↔️' },
+  SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE', icon: '🏷' },
   // NounV2 (fork) — all use red shades to make v2 activity visually distinct.
-  V2_BID: { label: 'V2-BID', color: '#ef4444', filterKey: 'V2_BID' },
-  V2_SETTLED: { label: 'V2-SETTLED', color: '#dc2626', filterKey: 'V2_SETTLED' },
-  V2_AUCTION: { label: 'V2-AUCTION', color: '#f87171', filterKey: 'V2_AUCTION' },
-  V2_PROP: { label: 'V2-PROP', color: '#b91c1c', filterKey: 'V2_PROP' },
-  V2_VOTE: { label: 'V2-VOTE', color: '#fca5a5', filterKey: 'V2_VOTE' },
-  V2_SALE: { label: 'V2-SALE', color: '#fb7185', filterKey: 'V2_SALE' },
+  V2_BID: { label: 'V2-BID', color: '#ef4444', filterKey: 'V2_BID', icon: '💰' },
+  V2_SETTLED: { label: 'V2-SETTLED', color: '#dc2626', filterKey: 'V2_SETTLED', icon: '🔥' },
+  V2_AUCTION: { label: 'V2-AUCTION', color: '#f87171', filterKey: 'V2_AUCTION', icon: '🔔' },
+  V2_PROP: { label: 'V2-PROP', color: '#b91c1c', filterKey: 'V2_PROP', icon: '📜' },
+  V2_VOTE: { label: 'V2-VOTE', color: '#fca5a5', filterKey: 'V2_VOTE', icon: '🗳' },
+  V2_SALE: { label: 'V2-SALE', color: '#fb7185', filterKey: 'V2_SALE', icon: '🏷' },
 };
 
 // Filter tabs shown in the UI
@@ -78,6 +80,9 @@ export type EnsLookup = (addr: string) => string | null;
 
 /** Look up a candidate's title by its candidateId (`${proposer}-${slug}`). */
 export type CandidateTitleLookup = (candidateId: string) => string | null;
+
+/** Look up a proposal's title by its numeric proposalId. */
+export type ProposalTitleLookup = (proposalId: number | string) => string | null;
 
 /** Pretty-print a candidate id / slug when no title is known. */
 export function prettifyCandidateId(candidateId: string): string {

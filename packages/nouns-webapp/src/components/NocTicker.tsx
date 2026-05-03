@@ -755,9 +755,9 @@ const NocTicker: FC = () => {
         style={{
           width: '100%',
           overflow: 'hidden',
-          borderTop: '1px solid rgba(0,0,0,0.06)',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
-          background: '#fff',
+          borderTop: '1px solid var(--theme-border)',
+          borderBottom: '1px solid var(--theme-border)',
+          background: 'var(--theme-bg-primary)',
           padding: '6px 0',
           position: 'relative',
         }}
@@ -774,12 +774,13 @@ const NocTicker: FC = () => {
             alignItems: 'center',
             paddingLeft: '12px',
             paddingRight: '16px',
-            background: 'linear-gradient(90deg, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%)',
+            background:
+              'linear-gradient(90deg, var(--theme-bg-primary) 70%, rgba(255,255,255,0) 100%)',
             fontWeight: 800,
             fontSize: '0.6rem',
             letterSpacing: '0.1em',
             textTransform: 'uppercase' as const,
-            color: '#7c3aed',
+            color: 'var(--theme-accent)',
             whiteSpace: 'nowrap' as const,
             gap: '6px',
           }}
@@ -819,12 +820,12 @@ const NocTicker: FC = () => {
                 flexShrink: 0,
                 textDecoration: 'none',
                 color: 'inherit',
-                borderRight: '1px solid rgba(0,0,0,0.06)',
+                borderRight: '1px solid var(--theme-border)',
                 transition: 'background 0.15s',
                 cursor: 'pointer',
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+                (e.currentTarget as HTMLElement).style.background = 'var(--theme-bg-hover)';
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -847,7 +848,7 @@ const NocTicker: FC = () => {
                 style={{
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  color: '#333',
+                  color: 'var(--theme-text-primary)',
                   whiteSpace: 'nowrap' as const,
                   maxWidth: '300px',
                   overflow: 'hidden',
@@ -861,7 +862,7 @@ const NocTicker: FC = () => {
               <span
                 style={{
                   fontSize: '0.6rem',
-                  color: '#999',
+                  color: 'var(--theme-text-secondary)',
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,
                 }}
@@ -871,7 +872,7 @@ const NocTicker: FC = () => {
               <span
                 style={{
                   fontSize: '0.6rem',
-                  color: '#aaa',
+                  color: 'var(--theme-text-muted)',
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,
                 }}

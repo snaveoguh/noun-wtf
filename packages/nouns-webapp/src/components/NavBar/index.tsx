@@ -22,6 +22,7 @@ import NavLocaleSwitcher from '@/components/NavLocaleSwitcher';
 import NounPalette from '@/components/NounPalette';
 import ShortAddress from '@/components/ShortAddress';
 import SubgraphSettings from '@/components/SubgraphSettings';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import config, { CHAIN_ID } from '@/config';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { nounsTreasuryAddress } from '@/contracts';
@@ -63,7 +64,7 @@ const NavBar = () => {
   const navDispatch = useAppDispatch();
   const location = useLocation();
   const navigate = useNavigate();
-  const { setMode: setSiteMode } = useSiteTheme();
+  const { setTheme: setSiteThemeName } = useSiteTheme();
   const { activeDao } = useActiveDao();
   const treasuryBalance = useReadNounsTreasuryBalancesInEth({
     query: {
@@ -155,10 +156,9 @@ const NavBar = () => {
             <button
               type="button"
               onClick={() => {
-                // SiteMode naming is backwards — 'new' is the terminal feed,
-                // 'classic' is the graphical site. App.tsx:88 confirms:
-                // isTerminalHome = mode === 'new' && pathname === '/'.
-                setSiteMode('new');
+                // Quick-jump to Terminal theme — equivalent to picking 🍆 in the
+                // theme dropdown on the right.
+                setSiteThemeName('terminal');
                 navigate('/');
               }}
               title="Switch to Terminal Feed"
@@ -428,6 +428,19 @@ const NavBar = () => {
                 );
               }}
             </ConnectKitButton.Custom>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+              <ThemeSwitcher
+                variant="navbar"
+                onChange={next => {
+                  // Picking Terminal needs a navigate('/') so AppRouter swaps in
+                  // TerminalFeedShell on the next render. Other themes already
+                  // render through the standard chrome.
+                  if (next === 'terminal') {
+                    navigate('/');
+                  }
+                }}
+              />
+            </div>
           </div>
         </Container>
       </Navbar>

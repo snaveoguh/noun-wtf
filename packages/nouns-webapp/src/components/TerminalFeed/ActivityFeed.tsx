@@ -80,11 +80,11 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
       className="terminal-scrollbar"
     >
       {error && (
-        <div style={{ color: '#ef4444', padding: '16px 0', fontSize: '13px' }}>{error}</div>
+        <div style={{ color: 'var(--theme-negative)', padding: '16px 0', fontSize: '13px' }}>{error}</div>
       )}
 
       {events.length === 0 && !loading && !error && (
-        <div style={{ color: '#333', padding: '40px 0', textAlign: 'center', fontSize: '13px' }}>
+        <div style={{ color: 'var(--theme-text-muted)', padding: '40px 0', textAlign: 'center', fontSize: '13px' }}>
           no events found. the void stares back.
         </div>
       )}
@@ -102,13 +102,13 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
       <div ref={sentinelRef} style={{ height: 1 }} />
 
       {loading && (
-        <div style={{ color: '#00ff41', padding: '12px 0', fontSize: '12px', opacity: 0.6 }}>
+        <div style={{ color: 'var(--theme-accent)', padding: '12px 0', fontSize: '12px', opacity: 0.6 }}>
           loading...
         </div>
       )}
 
       {!hasMore && events.length > 0 && (
-        <div style={{ color: '#222', padding: '16px 0', fontSize: '11px', textAlign: 'center' }}>
+        <div style={{ color: 'var(--theme-text-muted)', padding: '16px 0', fontSize: '11px', textAlign: 'center' }}>
           end of indexed history
         </div>
       )}

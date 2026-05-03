@@ -1,0 +1,138 @@
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1400px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.stage:active {
+  cursor: grabbing;
+}
+
+.track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--card-size, 360px);
+  height: var(--card-size, 360px);
+  margin-left: calc(var(--card-size, 360px) / -2);
+  margin-top: calc(var(--card-size, 360px) / -2);
+  border-radius: 8px;
+  background: transparent;
+  transition:
+    transform 380ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    opacity 380ms ease;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  cursor: pointer;
+}
+
+.cardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  background: #111;
+  border-radius: 8px;
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.45),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.cardImgPixel {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+}
+
+.caption {
+  position: absolute;
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--theme-text-primary, #f5f5f5);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.captionTitle {
+  font-family: 'PT Root UI', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.captionSubtitle {
+  font-family: 'PT Root UI', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  opacity: 0.6;
+  margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.controls {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  color: var(--theme-text-primary, #f5f5f5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.arrow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.counter {
+  font-family: 'PT Root UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--theme-text-primary, #f5f5f5);
+  opacity: 0.55;
+  letter-spacing: 0.08em;
+  min-width: 60px;
+  text-align: center;
+}
