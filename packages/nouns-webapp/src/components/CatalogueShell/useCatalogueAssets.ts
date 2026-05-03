@@ -35,7 +35,7 @@ export type AssetCollection =
   | 'dream'
   | 'nouns-world'
   | 'cc0-lib'
-  | 'lil-noun'
+  | 'probe-dream'
   | 'lil-trait'
   | 'probe-trait'
   | 'past-noun'
@@ -296,32 +296,35 @@ function useLilTraitAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
   return { items, isLoading };
 }
 
-// ─── Lil Nouns pre-rendered art (public/probe-dreams/rendered) ──────────────
-// The renderer folder ships ~721 pre-built SVGs, indexed by Lil Noun id.
+// ─── Probe Dream pre-rendered art (public/probe-dreams/rendered) ────────────
+// The renderer folder ships ~721 pre-built dream SVGs from probe.wtf.
 // We sample a spread for variety.
 
-const LIL_RENDERED_COUNT = 721;
-const LIL_SAMPLE_SIZE = 80;
+const PROBE_DREAM_RENDERED_COUNT = 721;
+const PROBE_DREAM_SAMPLE_SIZE = 80;
 
-function buildLilNounAssets(): CatalogueAsset[] {
+function buildProbeDreamAssets(): CatalogueAsset[] {
   const out: CatalogueAsset[] = [];
-  const step = Math.max(1, Math.floor(LIL_RENDERED_COUNT / LIL_SAMPLE_SIZE));
-  for (let id = 1; id < LIL_RENDERED_COUNT; id += step) {
+  const step = Math.max(
+    1,
+    Math.floor(PROBE_DREAM_RENDERED_COUNT / PROBE_DREAM_SAMPLE_SIZE),
+  );
+  for (let id = 1; id < PROBE_DREAM_RENDERED_COUNT; id += step) {
     out.push({
-      id: `lil-noun-${id}`,
-      title: `Lil Noun ${id}`,
-      subtitle: 'Lil Nouns',
+      id: `probe-dream-${id}`,
+      title: `Probe Dream ${id}`,
+      subtitle: 'Probe Dreams',
       image: `/probe-dreams/rendered/${id}.svg`,
-      href: `https://lilnouns.wtf/lilnoun/${id}`,
-      sourceUrl: `https://lilnouns.wtf/lilnoun/${id}`,
-      sourceLabel: 'lilnouns.wtf',
-      collection: 'lil-noun',
+      href: `https://probe.wtf/en-US/nouns/dreams/${id}`,
+      sourceUrl: `https://probe.wtf/en-US/nouns/dreams/${id}`,
+      sourceLabel: 'probe.wtf',
+      collection: 'probe-dream',
       media: 'svg',
       isPixel: true,
-      category: 'Lil Noun',
-      tags: ['lil-nouns', 'noun', 'pixel', `lil-${id}`],
+      category: 'Probe Dream',
+      tags: ['probe-dreams', 'dream', 'noun', 'pixel', `dream-${id}`],
       bgColor: '#d5d7e1',
-      meta: { lilId: id },
+      meta: { dreamId: id },
     });
   }
   return out;
@@ -620,7 +623,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
   const cc0 = useCC0LibAssets();
   const lilTraits = useLilTraitAssets();
   const traits = useMemo(buildTraitAssets, []);
-  const lilNouns = useMemo(buildLilNounAssets, []);
+  const probeDreams = useMemo(buildProbeDreamAssets, []);
   const probeTraits = useMemo(buildProbeTraitAssets, []);
   const pastNouns = useMemo(buildPastNounAssets, []);
   const sketches = useMemo(buildSketchAssets, []);
@@ -732,7 +735,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
 
     for (const t of traits) all.push(t);
     for (const t of lilTraits.items) all.push(t);
-    for (const n of lilNouns) all.push(n);
+    for (const n of probeDreams) all.push(n);
     for (const t of probeTraits) all.push(t);
     for (const n of pastNouns) all.push(n);
     for (const s of sketches) all.push(s);
@@ -764,7 +767,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
     dreams.data,
     traits,
     lilTraits.items,
-    lilNouns,
+    probeDreams,
     probeTraits,
     pastNouns,
     sketches,

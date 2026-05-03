@@ -34,7 +34,7 @@ const COLLECTION_OPTIONS = [
   { value: 'all', label: 'All collections' },
   { value: 'nouns-trait', label: 'Nouns Traits' },
   { value: 'lil-trait', label: 'Lil Nouns Traits' },
-  { value: 'lil-noun', label: 'Lil Nouns' },
+  { value: 'probe-dream', label: 'Probe Dreams' },
   { value: 'past-noun', label: 'Past Nouns' },
   { value: 'sketch', label: 'Sketches' },
   { value: 'probe-trait', label: 'Custom Traits' },
