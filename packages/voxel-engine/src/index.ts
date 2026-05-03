@@ -24,6 +24,7 @@ export {
   pixelsToFlat,
   pixelsToSolidBlock,
   floodFill3D,
+  fillVoxelMapInterior,
   getAdjacentPos,
   serialize,
   deserialize,

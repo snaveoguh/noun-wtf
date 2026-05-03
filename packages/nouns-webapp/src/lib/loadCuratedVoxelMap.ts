@@ -11,7 +11,7 @@
  *   X: x + 16, Y: 31 - (y - 21), Z: z + 5
  */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-explicit-any */
-import type { VoxelMap } from '@nouns/voxel-engine';
+import { fillVoxelMapInterior, type VoxelMap } from '@nouns/voxel-engine';
 
 interface CuratedVoxelData {
   head: Record<string, string>; // "x,y,z" -> "#rrggbb"
@@ -76,7 +76,11 @@ export async function loadCuratedVoxelMap(headIndex: number): Promise<VoxelMap |
       if (editorKey) voxelMap.set(editorKey, color);
     }
 
-    return voxelMap;
+    // Curated voxeldata captures only the SURFACE of each head — erasing a
+    // voxel reveals empty space, not material. Fill the interior with
+    // nearest-neighbor color so chipping into the head reveals the layer
+    // underneath.
+    return fillVoxelMapInterior(voxelMap);
   } catch {
     return null;
   }

@@ -106,6 +106,108 @@ export function deserialize(obj: Record<string, string>): VoxelMap {
 
 // ─── Flatten to 2D ──────────────────────────────────────────────────────────
 
+// ─── Fill interior (make hollow shell into solid block) ─────────────────────
+
+/**
+ * Fill the interior of a voxel map so that erasing surface voxels reveals
+ * material underneath instead of empty space.
+ *
+ * Strategy: for each axis, scan along rows. Find the min and max coordinate
+ * with voxels along that row, and fill any gaps between them with the
+ * nearest-neighbor color. Apply across all 3 axes so the result is solid
+ * regardless of which face the user chips into.
+ *
+ * Returns a NEW map — does not mutate the input.
+ *
+ * No-op for empty maps.
+ */
+export function fillVoxelMapInterior(map: VoxelMap): VoxelMap {
+  if (map.size === 0) return new Map(map);
+
+  // Compute bounding range for grouping
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
+  for (const key of map.keys()) {
+    const [x, y, z] = parseKey(key);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  }
+
+  const out: VoxelMap = new Map(map);
+
+  // Helper: scan a row of cells, find min/max with voxels, fill gaps between
+  // them with the closest existing voxel's color.
+  const fillRow = (cells: { coord: number; key: string }[]) => {
+    const have: { coord: number; color: string }[] = [];
+    for (const { coord, key } of cells) {
+      const c = out.get(key);
+      if (c) have.push({ coord, color: c });
+    }
+    if (have.length < 2) return;
+    have.sort((a, b) => a.coord - b.coord);
+    const lo = have[0].coord;
+    const hi = have[have.length - 1].coord;
+    for (const { coord, key } of cells) {
+      if (coord <= lo || coord >= hi) continue;
+      if (out.has(key)) continue;
+      // Pick nearest existing voxel's color (linear scan; row is small).
+      let bestColor = have[0].color;
+      let bestDist = Infinity;
+      for (const h of have) {
+        const d = Math.abs(h.coord - coord);
+        if (d < bestDist) {
+          bestDist = d;
+          bestColor = h.color;
+        }
+      }
+      out.set(key, bestColor);
+    }
+  };
+
+  // Pass 1: scan along X for each (y, z)
+  for (let y = minY; y <= maxY; y++) {
+    for (let z = minZ; z <= maxZ; z++) {
+      const cells: { coord: number; key: string }[] = [];
+      for (let x = minX; x <= maxX; x++) {
+        cells.push({ coord: x, key: voxelKey(x, y, z) });
+      }
+      fillRow(cells);
+    }
+  }
+  // Pass 2: scan along Y for each (x, z)
+  for (let x = minX; x <= maxX; x++) {
+    for (let z = minZ; z <= maxZ; z++) {
+      const cells: { coord: number; key: string }[] = [];
+      for (let y = minY; y <= maxY; y++) {
+        cells.push({ coord: y, key: voxelKey(x, y, z) });
+      }
+      fillRow(cells);
+    }
+  }
+  // Pass 3: scan along Z for each (x, y)
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      const cells: { coord: number; key: string }[] = [];
+      for (let z = minZ; z <= maxZ; z++) {
+        cells.push({ coord: z, key: voxelKey(x, y, z) });
+      }
+      fillRow(cells);
+    }
+  }
+
+  return out;
+}
+
+// ─── Flatten to 2D ──────────────────────────────────────────────────────────
+
 /** Project voxels onto a 32x32 2D grid (keeps frontmost z per x,y). */
 export function flattenTo2D(map: VoxelMap): string[][] {
   const grid: string[][] = Array.from({ length: 32 }, () => Array(32).fill(''));
