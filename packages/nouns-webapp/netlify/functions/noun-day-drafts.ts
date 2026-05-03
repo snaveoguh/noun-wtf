@@ -119,8 +119,12 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       if (!Array.isArray(body.pixels) || body.pixels.length !== 32) {
         return json({ error: '32x32 pixels grid required' }, 400);
       }
-      if (body.mode === '3d' && (!body.voxelData || typeof body.voxelData !== 'string')) {
-        return json({ error: 'voxelData required for 3d drafts' }, 400);
+      // 3D drafts may omit voxelData when the editor is in mesh mode
+      // (vertex-color edits don't have a voxel grid representation — the
+      // image snapshot is the canonical render the community sees). Accept
+      // an empty string in that case so the snapshot still persists.
+      if (body.mode === '3d' && body.voxelData != null && typeof body.voxelData !== 'string') {
+        return json({ error: 'voxelData must be a string when provided' }, 400);
       }
 
       const drafts = await readDrafts(store);
@@ -140,7 +144,9 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
           image: body.image,
           pixels: body.pixels,
           updatedAt,
-          voxelData: body.voxelData,
+          // voxelData is optional for mesh-mode edits — store empty string
+          // so the field is still present (the type's contract).
+          voxelData: body.voxelData ?? '',
         };
       }
 
