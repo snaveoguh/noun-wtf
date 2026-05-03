@@ -54,12 +54,33 @@ function isThemeName(value: unknown): value is ThemeName {
   return typeof value === 'string' && (THEME_NAMES as readonly string[]).includes(value);
 }
 
+/**
+ * Read a `/<theme>/...` prefix from the current pathname. Returns the theme
+ * name when the first path segment is a known theme, otherwise null. Used by
+ * `getInitialState` so a hard-load of `/game` boots straight into the game
+ * theme — without this the page would briefly render the localStorage theme
+ * before the route-level effect kicks in and switches.
+ */
+function readThemeFromPath(pathname: string): ThemeName | null {
+  const segment = pathname.split('/').filter(Boolean)[0];
+  if (!segment) return null;
+  return isThemeName(segment) ? segment : null;
+}
+
 function getInitialState(): { theme: ThemeName; isEmbedded: boolean } {
   if (typeof window === 'undefined') {
     return { theme: 'terminal', isEmbedded: false };
   }
 
-  // Query params first — for miniapp / embedded contexts. Honour both `?theme=`
+  // URL path takes precedence over everything else. Visiting `/berry` should
+  // boot in the berry theme regardless of localStorage / query params, so
+  // share links Just Work.
+  const pathTheme = readThemeFromPath(window.location.pathname);
+  if (pathTheme) {
+    return { theme: pathTheme, isEmbedded: false };
+  }
+
+  // Query params next — for miniapp / embedded contexts. Honour both `?theme=`
   // (new) and `?mode=` (legacy) so existing share links keep working.
   const params = new URLSearchParams(window.location.search);
   const themeParam = params.get('theme');

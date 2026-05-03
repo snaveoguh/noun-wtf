@@ -31,7 +31,7 @@ export default function VoteApp() {
 
   if (loading && !sorted.length) {
     return (
-      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 12 }}>
+      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4 }}>
         loading proposals…
       </div>
     );
@@ -39,13 +39,14 @@ export default function VoteApp() {
 
   if (!sorted.length) {
     return (
-      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 12 }}>
+      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4 }}>
         no proposals.
       </div>
     );
   }
 
   return (
+    // HIG: 8pt edge gutter for list app, 44pt min row height
     <div style={{ padding: 8 }}>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {sorted.slice(0, 60).map(p => {
@@ -56,20 +57,23 @@ export default function VoteApp() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 10px',
+                  gap: 12,
+                  padding: '12px 12px',
+                  minHeight: 44,
                   textDecoration: 'none',
                   color: 'var(--theme-text-primary)',
-                  fontFamily: 'var(--theme-font-display)',
+                  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
                   fontSize: 13,
+                  lineHeight: 1.4,
                   cursor: 'default',
                 }}
               >
                 <span
                   style={{
                     fontWeight: 700,
-                    minWidth: 36,
+                    minWidth: 40,
                     color: 'var(--theme-text-muted)',
+                    fontVariantNumeric: 'tabular-nums',
                   }}
                 >
                   {p.id ?? '—'}
@@ -79,15 +83,16 @@ export default function VoteApp() {
                 </span>
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
+                    lineHeight: 1.4,
                     fontWeight: 700,
                     background: status.bg,
                     color: status.fg,
-                    padding: '2px 6px',
-                    borderRadius: 0,
+                    padding: '4px 8px',
+                    borderRadius: 4,
                     border: '1px solid rgba(0,0,0,0.2)',
                     textTransform: 'uppercase',
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.6,
                   }}
                 >
                   {status.label}

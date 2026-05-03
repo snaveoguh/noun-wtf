@@ -188,20 +188,22 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
       }}
       onPointerDown={onFocus}
     >
-      {/* Header — drag handle + close + color */}
+      {/* Header — drag handle + close + color.
+          Visual dots are small (Mac convention) but each has a 32pt
+          invisible hit-area pad below to satisfy HIG min touch target. */}
       <div
         onPointerDown={onHeaderPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{
-          height: 22,
+          height: 28,
           background: c.head,
           borderBottom: `1px solid ${c.border}`,
           display: 'flex',
           alignItems: 'center',
-          padding: '0 6px',
-          gap: 6,
+          padding: '0 8px',
+          gap: 8,
           cursor: 'grab',
           userSelect: 'none',
           touchAction: 'none',
@@ -211,30 +213,32 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
           type="button"
           data-sticky-action
           aria-label="Close sticky"
+          title="Close sticky"
           onClick={onClose}
           className="inline-flex items-center justify-center"
           style={{
-            width: 14,
-            height: 14,
+            width: 24,
+            height: 24,
             borderRadius: 'var(--ls-r-full)',
             background: 'rgba(255, 95, 86, 0.9)',
             border: '1px solid rgba(183, 60, 51, 0.6)',
             padding: 0,
             cursor: 'pointer',
-            color: 'rgba(255,255,255,0.9)',
+            color: 'rgba(255,255,255,0.95)',
           }}
         >
-          <Close size={9} strokeWidth={2.5} />
+          <Close size={12} strokeWidth={2.5} />
         </button>
         <button
           type="button"
           data-sticky-action
           aria-label="Cycle color"
+          title="Cycle color"
           onClick={onCycleColor}
           className="inline-flex items-center justify-center"
           style={{
-            width: 14,
-            height: 14,
+            width: 24,
+            height: 24,
             borderRadius: 'var(--ls-r-full)',
             background: 'rgba(255, 189, 46, 0.9)',
             border: '1px solid rgba(184, 128, 28, 0.6)',
@@ -243,12 +247,12 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
             color: 'rgba(60,45,25,0.85)',
           }}
         >
-          <Brush size={8} strokeWidth={2.5} />
+          <Brush size={11} strokeWidth={2.5} />
         </button>
         <span style={{ flex: 1 }} />
       </div>
 
-      {/* Editable text */}
+      {/* Editable text — HIG body: 17pt with ≥1.3 line-height */}
       <textarea
         value={sticky.text}
         onChange={e => onUpdate({ ...sticky, text: e.target.value })}
@@ -258,13 +262,13 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
           width: '100%',
           background: 'transparent',
           border: 'none',
-          padding: 8,
+          padding: 12,
           resize: 'none',
           outline: 'none',
           fontFamily: 'var(--ls-font-sans)',
-          fontSize: 12,
+          fontSize: 'var(--ls-text-lg)',
           color: 'var(--ls-sand-900)',
-          lineHeight: 1.4,
+          lineHeight: 1.35,
           boxSizing: 'border-box',
         }}
       />
@@ -326,8 +330,8 @@ function StickiesApp(): ReactElement {
 
   const addSticky = useCallback(() => {
     const parent = parentRef.current;
-    const w = 160;
-    const h = 130;
+    const w = 200;
+    const h = 180;
     // Cascade — offset 16px from the last sticky if any, else center-ish.
     const last = stickies.length ? stickies[stickies.length - 1] : null;
     const baseX = last ? last.x + 18 : 16;

@@ -189,7 +189,7 @@ function AppsTab() {
       </div>
       <div style={tableBodyStyle}>
         {rows.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: '#8e8e93' }}>
+          <div style={{ padding: 24, textAlign: 'center', color: '#8e8e93', fontSize: 13, lineHeight: 1.4 }}>
             No apps running.
           </div>
         )}
@@ -203,8 +203,9 @@ function AppsTab() {
             >
               <div style={{ ...tableCellStyle, textAlign: 'center' }}>{r.icon}</div>
               <div style={tableCellStyle}>
-                <span style={{ fontWeight: 600 }}>{r.name}</span>
-                <span style={{ color: '#8e8e93', marginLeft: 6, fontSize: 10 }}>
+                {/* HIG: 17pt body text for app name */}
+                <span style={{ fontWeight: 600, fontSize: 15, fontFamily: 'var(--ls-font-sans, -apple-system, system-ui, sans-serif)' }}>{r.name}</span>
+                <span style={{ color: '#8e8e93', marginLeft: 8, fontSize: 11, fontFamily: MONO_FONT }}>
                   {r.appId}
                 </span>
               </div>
@@ -407,7 +408,7 @@ function EventsTab() {
       </div>
       <div style={tableBodyStyle}>
         {filtered.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: '#8e8e93' }}>
+          <div style={{ padding: 24, textAlign: 'center', color: '#8e8e93', fontSize: 13, lineHeight: 1.4 }}>
             {paused ? 'Paused.' : 'No events captured yet — open a window.'}
           </div>
         )}
@@ -452,9 +453,10 @@ function EventsTab() {
                   style={{
                     background: '#1d1d1f',
                     color: '#f4f4f4',
-                    padding: '6px 12px',
+                    padding: '12px 16px',
                     fontFamily: MONO_FONT,
-                    fontSize: 11,
+                    fontSize: 12,
+                    lineHeight: 1.5,
                     whiteSpace: 'pre-wrap',
                     borderBottom: '1px solid #efefef',
                   }}
@@ -500,7 +502,7 @@ function ServicesTab() {
       </div>
       <div style={tableBodyStyle}>
         {apps.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: '#8e8e93' }}>
+          <div style={{ padding: 24, textAlign: 'center', color: '#8e8e93', fontSize: 13, lineHeight: 1.4 }}>
             No services registered.
           </div>
         )}
@@ -631,25 +633,29 @@ function PerformanceTab() {
   const stat: CSSProperties = {
     fontVariantNumeric: 'tabular-nums',
     fontFamily: MONO_FONT,
-    fontSize: 22,
-    fontWeight: 600,
+    // HIG: 28pt+ headline
+    fontSize: 28,
+    lineHeight: 1.2,
+    fontWeight: 700,
     color: '#1d1d1f',
   };
   const label: CSSProperties = {
     fontSize: 11,
+    lineHeight: 1.4,
     color: '#8e8e93',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
     fontWeight: 600,
   };
 
   return (
-    <div style={{ flex: 1, padding: 14, overflow: 'auto', background: '#f4f4f6' }}>
+    // HIG 8pt grid: 16pt content padding
+    <div style={{ flex: 1, padding: 16, overflow: 'auto', background: '#f4f4f6' }}>
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 12,
+          gap: 16,
           maxWidth: 720,
         }}
       >
@@ -687,24 +693,25 @@ function Card(props: { title: string; sub?: string; children: React.ReactNode })
       style={{
         background: '#fff',
         border: '1px solid #d4d4d4',
-        borderRadius: 6,
-        padding: 12,
+        borderRadius: 8,
+        padding: 16,
         boxShadow: '0 1px 0 rgba(0,0,0,0.03)',
       }}
     >
       <div
         style={{
           fontSize: 11,
+          lineHeight: 1.4,
           color: '#8e8e93',
           textTransform: 'uppercase',
-          letterSpacing: 0.4,
+          letterSpacing: 0.6,
           fontWeight: 600,
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
         {props.title}
         {props.sub && (
-          <span style={{ color: '#aeaeae', marginLeft: 6, textTransform: 'none', letterSpacing: 0 }}>
+          <span style={{ color: '#aeaeae', marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
             — {props.sub}
           </span>
         )}

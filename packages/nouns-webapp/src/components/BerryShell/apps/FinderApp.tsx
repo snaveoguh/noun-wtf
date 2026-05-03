@@ -2,13 +2,16 @@ import { useMemo } from 'react';
 
 import { useActivityFeed } from '@/components/TerminalFeed/useActivityFeed';
 
+// HIG 8pt grid: 16pt content padding, 11pt label, 13pt body
 const labelStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-display)',
+  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
   fontSize: 11,
+  lineHeight: 1.4,
   textTransform: 'uppercase',
-  letterSpacing: 1,
+  letterSpacing: 0.6,
+  fontWeight: 600,
   color: 'var(--theme-text-muted)',
-  marginBottom: 6,
+  marginBottom: 8,
 };
 
 /**
@@ -22,14 +25,14 @@ export default function FinderApp() {
   const recent = useMemo(() => events.slice(0, 12), [events]);
 
   return (
-    <div style={{ padding: 12, fontFamily: 'var(--theme-font-display)' }}>
+    <div style={{ padding: 16, fontFamily: 'var(--ls-font-sans, var(--theme-font-display))' }}>
       <div style={labelStyle}>Recent Activity</div>
       {loading && recent.length === 0 ? (
-        <div style={{ color: 'var(--theme-text-muted)', fontSize: 12, padding: 8 }}>
+        <div style={{ color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4, padding: 16 }}>
           loading feed…
         </div>
       ) : recent.length === 0 ? (
-        <div style={{ color: 'var(--theme-text-muted)', fontSize: 12, padding: 8 }}>
+        <div style={{ color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4, padding: 16 }}>
           no activity yet.
         </div>
       ) : (
@@ -41,22 +44,26 @@ export default function FinderApp() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '6px 4px',
+                padding: '12px 8px',
+                gap: 12,
+                minHeight: 44,
                 borderBottom:
                   i === recent.length - 1 ? 'none' : '1px dotted var(--theme-feed-row-border)',
-                fontFamily: 'var(--theme-font-body)',
+                fontFamily: 'var(--ls-font-sans, var(--theme-font-body))',
                 fontSize: 13,
+                lineHeight: 1.4,
               }}
             >
               <span
                 style={{
-                  fontFamily: 'var(--theme-font-display)',
+                  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
                   fontSize: 11,
+                  lineHeight: 1.4,
                   fontWeight: 700,
                   color: 'var(--theme-accent-text)',
-                  minWidth: 90,
+                  minWidth: 96,
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.6,
                 }}
               >
                 {event.type.replace(/_/g, ' ')}
@@ -68,12 +75,12 @@ export default function FinderApp() {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  paddingLeft: 8,
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 block {event.blockNumber.toLocaleString()}
               </span>
-              <span style={{ color: 'var(--theme-text-muted)', fontSize: 11 }}>
+              <span style={{ color: 'var(--theme-text-muted)', fontSize: 11, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums' }}>
                 {new Date(event.timestamp).toLocaleTimeString()}
               </span>
             </li>

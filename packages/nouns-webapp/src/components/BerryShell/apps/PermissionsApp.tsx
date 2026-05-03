@@ -11,7 +11,7 @@
 
 import { useMemo } from 'react';
 
-import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import { GlassButton, GlassChip } from '@/liquid-sand/glass';
 import { Key, Lock } from '@/liquid-sand/icons';
 
 import { berryRegistry } from '../system/berryRegistry';
@@ -93,21 +93,22 @@ function PermissionsApp() {
         color: 'var(--ls-fg-primary)',
       }}
     >
-      {/* Sticky header */}
+      {/* Sticky header — solid sand, NOT glass (window already has glass) */}
       <div
-        className="sticky top-0 z-10 px-4 py-2.5 flex items-center gap-2"
+        className="sticky top-0 z-10 flex items-center"
         style={{
-          background: 'var(--ls-glass-light)',
-          backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
-          WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+          padding: '12px 16px',
+          gap: 8,
+          background: 'var(--ls-sand-100)',
           borderBottom: '1px solid var(--ls-border-glass)',
         }}
       >
-        <Lock size={14} />
+        <Lock size={16} />
         <span
           style={{
-            fontFamily: 'var(--ls-font-display)',
-            fontSize: 'var(--ls-text-md)',
+            fontFamily: 'var(--ls-font-sans)',
+            fontSize: 'var(--ls-text-lg)',
+            lineHeight: 1.3,
             fontWeight: 700,
           }}
         >
@@ -115,19 +116,29 @@ function PermissionsApp() {
         </span>
       </div>
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="flex flex-col" style={{ padding: 16, gap: 16 }}>
         {apps.map(app => (
-          <GlassPanel key={app.appId} padded radius="lg" tone="auto">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="flex items-center gap-2">
-                <span aria-hidden style={{ fontSize: 18 }}>
+          // Solid sand surface — no nested glass
+          <div
+            key={app.appId}
+            style={{
+              background: 'var(--ls-sand-50)',
+              borderRadius: 'var(--ls-r-lg)',
+              border: '1px solid var(--ls-border-glass)',
+              padding: 16,
+            }}
+          >
+            <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 8 }}>
+              <div className="flex items-center" style={{ gap: 12 }}>
+                <span aria-hidden style={{ fontSize: 22 }}>
                   {app.icon}
                 </span>
                 <div className="flex flex-col">
                   <span
                     style={{
-                      fontFamily: 'var(--ls-font-display)',
-                      fontSize: 'var(--ls-text-sm)',
+                      fontFamily: 'var(--ls-font-sans)',
+                      fontSize: 'var(--ls-text-lg)',
+                      lineHeight: 1.3,
                       fontWeight: 700,
                       color: 'var(--ls-fg-primary)',
                     }}
@@ -137,9 +148,11 @@ function PermissionsApp() {
                   <span
                     style={{
                       fontFamily: 'var(--ls-font-mono)',
-                      fontSize: 10,
+                      fontSize: 'var(--ls-text-xs)',
+                      lineHeight: 1.4,
                       color: 'var(--ls-fg-muted)',
                       letterSpacing: 0.4,
+                      marginTop: 2,
                     }}
                   >
                     {app.appId}
@@ -162,19 +175,23 @@ function PermissionsApp() {
                 return (
                   <div
                     key={cap.id}
-                    className="grid items-center gap-3 py-2"
+                    className="grid items-center"
                     style={{
                       gridTemplateColumns: '1fr auto',
+                      gap: 16,
+                      padding: '12px 0',
+                      minHeight: 44,
                       borderTop: '1px solid var(--ls-border-glass)',
                     }}
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <Key size={12} style={{ color: 'var(--ls-fg-secondary)' }} />
+                      <div className="flex items-center" style={{ gap: 8 }}>
+                        <Key size={14} style={{ color: 'var(--ls-fg-secondary)' }} />
                         <span
                           style={{
                             fontWeight: 600,
-                            fontSize: 'var(--ls-text-sm)',
+                            fontSize: 'var(--ls-text-md)',
+                            lineHeight: 1.3,
                             color: 'var(--ls-fg-primary)',
                           }}
                         >
@@ -189,15 +206,16 @@ function PermissionsApp() {
                       <div
                         style={{
                           fontSize: 'var(--ls-text-xs)',
+                          lineHeight: 1.4,
                           color: 'var(--ls-fg-muted)',
-                          marginTop: 2,
-                          paddingLeft: 18,
+                          marginTop: 4,
+                          paddingLeft: 22,
                         }}
                       >
                         {describeCapability(cap.id).description}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 justify-end">
+                    <div className="flex items-center justify-end" style={{ gap: 8 }}>
                       <StatusPill status={status} />
                       {status === 'granted' ? (
                         <GlassButton
@@ -221,7 +239,7 @@ function PermissionsApp() {
                 );
               })}
             </div>
-          </GlassPanel>
+          </div>
         ))}
       </div>
     </div>

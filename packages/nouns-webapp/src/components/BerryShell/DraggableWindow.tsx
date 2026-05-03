@@ -3,7 +3,33 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { GlassWindow } from '@/liquid-sand/glass';
 import { Close, Maximize, Minimize } from '@/liquid-sand/icons';
 
-import { type BerryWindowState, windowStore } from './store/windowStore';
+import {
+  BERRY_MOBILE_BREAKPOINT,
+  BERRY_MOBILE_GUTTER,
+  type BerryWindowState,
+  windowStore,
+} from './store/windowStore';
+
+/**
+ * Subscribe to the viewport's mobile state. Returns true on viewports
+ * <= 768pt (matches HIG mobile breakpoint).
+ */
+function useIsMobileViewport(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= BERRY_MOBILE_BREAKPOINT : false,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth <= BERRY_MOBILE_BREAKPOINT);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+  return isMobile;
+}
 
 interface DraggableWindowProps {
   win: BerryWindowState;
@@ -21,19 +47,29 @@ function MonolineOrb({
   label,
   Icon,
   hover,
+  active,
   onClick,
 }: {
   tone: 'close' | 'min' | 'max';
   label: string;
   Icon: typeof Close;
   hover: boolean;
+  active: boolean;
   onClick: () => void;
 }) {
+  // HIG: traffic-light buttons render in COLOR only when (a) the window
+  // is focused and (b) the cursor is over the cluster — otherwise they
+  // dim to neutral grey. Symbols (×, −, +) reveal on hover.
+  // (apple-hig eras/mac-os-x-through-current.md "Aqua window decorations")
   const colorByTone: Record<typeof tone, string> = {
     close: '#c2492f', // var(--ls-danger), warm berry red
     min: '#d4b67a', // var(--ls-sand-300), sand yellow
     max: '#7a8b3c', // var(--ls-success), olive green
   };
+  // When the window is unfocused, all three orbs flatten to a muted
+  // sepia. When focused, the saturated tone reveals — Apple-HIG-style.
+  const dimmed = !active;
+  const fill = dimmed ? 'rgba(60, 45, 25, 0.22)' : colorByTone[tone];
   return (
     <button
       type="button"
@@ -41,20 +77,24 @@ function MonolineOrb({
       aria-label={label}
       onClick={onClick}
       style={{
-        width: 14,
-        height: 14,
+        // HIG: 12pt dot diameter, 8pt center-to-center spacing.
+        // (apple-hig platforms/macos.md)
+        width: 12,
+        height: 12,
         padding: 0,
         borderRadius: 999,
         border: 'none',
-        background: colorByTone[tone],
-        boxShadow:
-          'inset 0 1px 0 rgba(255, 250, 240, 0.45), inset 0 -1px 0 rgba(60,45,25,0.18), 0 0 0 1px var(--ls-border-glass)',
+        background: fill,
+        boxShadow: dimmed
+          ? '0 0 0 1px var(--ls-border-glass)'
+          : 'inset 0 1px 0 rgba(255, 250, 240, 0.45), inset 0 -1px 0 rgba(60,45,25,0.18), 0 0 0 1px var(--ls-border-glass)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: 'rgba(60,45,25,0.85)',
-        transition: 'transform var(--ls-dur-fast) var(--ls-ease-spring)',
+        transition:
+          'transform var(--ls-dur-fast) var(--ls-ease-spring), background var(--ls-dur-fast) var(--ls-ease-soft)',
       }}
       onPointerDown={e => {
         // Prevent the drag handler on the title bar from also firing.
@@ -71,12 +111,13 @@ function MonolineOrb({
         data-role="traffic-light"
         aria-hidden="true"
         style={{
-          opacity: hover ? 1 : 0,
+          // HIG: glyph (×, −, +) shows ONLY on cluster hover.
+          opacity: hover && active ? 1 : 0,
           transition: 'opacity var(--ls-dur-fast) var(--ls-ease-soft)',
           display: 'inline-flex',
         }}
       >
-        <Icon size={9} />
+        <Icon size={8} />
       </span>
     </button>
   );
@@ -93,6 +134,7 @@ function MonolineOrb({
  */
 export default function DraggableWindow({ win, children }: DraggableWindowProps) {
   const [hoverLights, setHoverLights] = useState(false);
+  const isMobile = useIsMobileViewport();
   const dragStateRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(
     null,
   );
@@ -133,12 +175,46 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
   if (win.isMinimized) return null;
 
   // Compute display geometry — maximize fills viewport between menu bar + dock.
+  // HIG: menu bar is 24pt, dock pill ~76pt tall (44pt icons + 8pt padding +
+  // 16pt floating gap). Reserve those rails when maximizing.
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const displayX = win.isMaximized ? 0 : win.x;
-  const displayY = win.isMaximized ? 28 : win.y;
-  const displayW = win.isMaximized ? vw : win.width;
-  const displayH = win.isMaximized ? vh - 28 - 76 : win.height;
+  const MENU_BAR_HEIGHT = 24; // HIG: macOS menu bar 24pt
+  const DOCK_RAIL = 76;
+  // On mobile (<=768pt) every window collapses to a viewport-tight card.
+  // We ignore the stored x/y/width and pin the window to the gutter so it
+  // can never extend past the viewport, regardless of an old desktop
+  // geometry that survived a resize.
+  let displayX: number;
+  let displayY: number;
+  let displayW: number;
+  let displayH: number;
+  if (isMobile) {
+    const tightWidth = Math.max(0, vw - BERRY_MOBILE_GUTTER * 2);
+    const tightHeightCap = Math.max(0, vh - MENU_BAR_HEIGHT - DOCK_RAIL - 8);
+    if (win.isMaximized) {
+      displayX = BERRY_MOBILE_GUTTER;
+      displayY = MENU_BAR_HEIGHT + 4;
+      displayW = tightWidth;
+      displayH = tightHeightCap;
+    } else {
+      // Clamp the stored window into the mobile gutter — even if a desktop
+      // session left x=120, w=640 in state, we redraw it tight.
+      displayW = Math.min(win.width, tightWidth);
+      displayH = Math.min(win.height, tightHeightCap);
+      const minX = BERRY_MOBILE_GUTTER;
+      const maxX = Math.max(minX, vw - displayW - BERRY_MOBILE_GUTTER);
+      displayX = Math.min(Math.max(win.x, minX), maxX);
+      const minY = MENU_BAR_HEIGHT;
+      const maxY = Math.max(minY, vh - DOCK_RAIL - 40);
+      displayY = Math.min(Math.max(win.y, minY), maxY);
+    }
+  } else {
+    displayX = win.isMaximized ? 0 : win.x;
+    displayY = win.isMaximized ? MENU_BAR_HEIGHT : win.y;
+    displayW = win.isMaximized ? vw : win.width;
+    displayH = win.isMaximized ? vh - MENU_BAR_HEIGHT - DOCK_RAIL : win.height;
+  }
 
   // Custom titlebar: monoline orbs on the left, centered title.
   const titlebar = (
@@ -170,7 +246,9 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
       }}
     >
       <div
-        style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+        // HIG: 12pt orbs with ~4pt gap (8pt center-to-center).
+        // (apple-hig platforms/macos.md)
+        style={{ display: 'flex', gap: 4, alignItems: 'center' }}
         onMouseEnter={() => setHoverLights(true)}
         onMouseLeave={() => setHoverLights(false)}
       >
@@ -179,6 +257,7 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
           label="Close"
           Icon={Close}
           hover={hoverLights}
+          active={win.isFocused}
           onClick={() => windowStore.close(win.id)}
         />
         <MonolineOrb
@@ -186,6 +265,7 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
           label="Minimize"
           Icon={Minimize}
           hover={hoverLights}
+          active={win.isFocused}
           onClick={() => windowStore.minimize(win.id)}
         />
         <MonolineOrb
@@ -193,20 +273,25 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
           label="Maximize"
           Icon={Maximize}
           hover={hoverLights}
+          active={win.isFocused}
           onClick={() => windowStore.maximize(win.id)}
         />
       </div>
       <div
+        // HIG: window title — 13pt regular for current macOS chromeless
+        // windows. Inactive titles desaturate. Tabular numerals are
+        // cosmetic only here; SF system stack handles it.
         style={{
           flex: 1,
           textAlign: 'center',
           fontFamily: 'var(--ls-font-sans)',
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 500,
           color: 'var(--ls-fg-primary)',
           letterSpacing: 0.1,
-          // Compensate for the orb cluster on the left so the title sits visually centered.
-          paddingRight: 60,
+          // Compensate for the orb cluster on the left so the title sits
+          // visually centered. 3 * 12px orbs + 2 * 4px gaps = 44px.
+          paddingRight: 44,
           opacity: win.isFocused ? 1 : 0.55,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -234,6 +319,16 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
         top: displayY,
         width: displayW,
         height: displayH,
+        // Hard CSS caps — `calc(100vw - 16px)` etc — so the window can't
+        // ever paint outside the viewport even mid-resize, before the React
+        // state catches up. On mobile (<=768pt) we apply the tight gutter.
+        maxWidth: isMobile
+          ? `calc(100vw - ${BERRY_MOBILE_GUTTER * 2}px)`
+          : '100vw',
+        maxHeight: isMobile
+          ? `calc(100vh - ${MENU_BAR_HEIGHT + DOCK_RAIL + 8}px)`
+          : `calc(100vh - ${MENU_BAR_HEIGHT}px)`,
+        minWidth: 280,
         zIndex: win.zIndex,
         // GlassWindow already handles backdrop-filter + the inset glass shadow;
         // we only override what we need (geometry + zIndex).
@@ -249,9 +344,13 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
         }}
       >
         {children}
-        {/* Resize handle (SE) — kept inside the content well so it doesn't
-            clip against the rounded glass shell. */}
-        {!win.isMaximized && (
+        {/* Resize handle (SE corner). HIG (Liquid Glass): glass windows
+            should NOT show a visible diagonal-lines grip — it's an
+            invisible drag region in the corner. The cursor changes to
+            nwse-resize, that's the only affordance. We keep a 16pt
+            invisible hit target (HIG min touch target rule applied even
+            on desktop). apple-hig SKILL.md "Key Numbers". */}
+        {!win.isMaximized && !isMobile && (
           <div
             onPointerDown={e => {
               e.preventDefault();
@@ -272,14 +371,12 @@ export default function DraggableWindow({ win, children }: DraggableWindowProps)
               float: 'right',
               right: 0,
               bottom: 0,
-              width: 14,
-              height: 14,
+              width: 16,
+              height: 16,
               marginLeft: 'auto',
-              marginTop: -14,
+              marginTop: -16,
               cursor: 'nwse-resize',
-              background:
-                'linear-gradient(135deg, transparent 0%, transparent 45%, var(--ls-fg-muted) 45%, var(--ls-fg-muted) 55%, transparent 55%, transparent 75%, var(--ls-fg-muted) 75%, var(--ls-fg-muted) 85%, transparent 85%)',
-              opacity: 0.5,
+              background: 'transparent',
               touchAction: 'none',
             }}
           />

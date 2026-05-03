@@ -83,7 +83,10 @@ export function useCatalogueItems(): { items: CatalogueItem[]; isLoading: boolea
 
     if (dreams.data) {
       for (const d of dreams.data) {
-        const img = d.svgBase64 || d.customOverlayUrl;
+        // svgBase64 is RAW base64, must be wrapped in a data URL for <img src>.
+        const img = d.svgBase64
+          ? `data:image/svg+xml;base64,${d.svgBase64}`
+          : d.customOverlayUrl;
         if (!img) continue;
         all.push({
           type: 'dream',

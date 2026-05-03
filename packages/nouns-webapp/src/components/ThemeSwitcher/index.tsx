@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useNavigate } from 'react-router';
+
 import { THEME_NAMES, useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
 
 interface ThemeMeta {
@@ -35,6 +37,7 @@ interface ThemeSwitcherProps {
 
 export default function ThemeSwitcher({ variant = 'navbar', onChange }: ThemeSwitcherProps) {
   const { theme, setTheme } = useSiteTheme();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -151,9 +154,12 @@ export default function ThemeSwitcher({ variant = 'navbar', onChange }: ThemeSwi
                   setTheme(t.id);
                   onChange?.(t.id);
                   setOpen(false);
-                  if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-                    window.history.pushState({}, '', '/');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  // Sync URL to the new theme so the address bar always
+                  // reflects a shareable link. Preserve query string so
+                  // miniapp/embed flags survive the switch.
+                  if (typeof window !== 'undefined') {
+                    const search = window.location.search ?? '';
+                    navigate(`/${t.id}${search}`);
                   }
                 }}
                 style={{

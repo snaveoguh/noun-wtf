@@ -25,7 +25,7 @@ export default function CandidatesApp() {
 
   if (loading && !sorted.length) {
     return (
-      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 12 }}>
+      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4 }}>
         loading candidates…
       </div>
     );
@@ -33,13 +33,14 @@ export default function CandidatesApp() {
 
   if (!sorted.length) {
     return (
-      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 12 }}>
+      <div style={{ padding: 16, color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4 }}>
         no candidates.
       </div>
     );
   }
 
   return (
+    // HIG: 8pt edge gutter, 44pt min row height
     <div style={{ padding: 8 }}>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {sorted.map((c, i) => {
@@ -48,12 +49,15 @@ export default function CandidatesApp() {
             <li key={String(c.id ?? i)} style={{ borderBottom: '1px dotted var(--theme-feed-row-border)' }}>
               <div
                 style={{
-                  display: 'block',
-                  padding: '8px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 12px',
+                  minHeight: 44,
                   textDecoration: 'none',
                   color: 'var(--theme-text-primary)',
-                  fontFamily: 'var(--theme-font-display)',
+                  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
                   fontSize: 13,
+                  lineHeight: 1.4,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',

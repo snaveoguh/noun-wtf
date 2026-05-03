@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import {
   GlassButton,
   GlassInput,
-  GlassPanel,
   GlassTabs,
 } from '@/liquid-sand/glass';
 import { Globe } from '@/liquid-sand/icons';
@@ -86,7 +85,8 @@ function NowTab(): ReactElement {
   const date = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="flex gap-6 p-4 h-full box-border items-center">
+    // HIG 8pt grid: 16pt content padding, 16pt section gap
+    <div className="flex h-full box-border items-center" style={{ padding: 16, gap: 16 }}>
       {/* Analog */}
       <svg viewBox="-100 -100 200 200" width={160} height={160} aria-label="Analog clock">
         <defs>
@@ -152,16 +152,16 @@ function NowTab(): ReactElement {
         <circle cx="0" cy="0" r="2" fill="var(--ls-accent)" />
       </svg>
 
-      {/* Digital */}
-      <div className="flex-1">
+      {/* Digital — HIG: 34pt large title with tabular-nums, 13pt date below */}
+      <div className="flex-1 min-w-0">
         <div
           style={{
             fontFamily: 'var(--ls-font-mono)',
-            fontSize: 44,
+            fontSize: 'var(--ls-text-3xl)',
             fontWeight: 700,
             color: 'var(--ls-fg-primary)',
-            letterSpacing: 1,
-            lineHeight: 1.1,
+            letterSpacing: 0.5,
+            lineHeight: 1.15,
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -171,8 +171,9 @@ function NowTab(): ReactElement {
           style={{
             fontFamily: 'var(--ls-font-sans)',
             fontSize: 'var(--ls-text-sm)',
+            lineHeight: 1.4,
             color: 'var(--ls-fg-secondary)',
-            marginTop: 6,
+            marginTop: 8,
           }}
         >
           {date}
@@ -198,7 +199,8 @@ function WorldClockTab(): ReactElement {
   useSystemTick(1000);
   const now = new Date();
   return (
-    <div className="p-3 flex flex-col gap-2">
+    // HIG 8pt grid: 16pt content padding, 8pt item gap
+    <div className="flex flex-col" style={{ padding: 16, gap: 8 }}>
       {CITIES.map(c => {
         const time = now.toLocaleTimeString('en-US', {
           timeZone: c.tz,
@@ -222,14 +224,25 @@ function WorldClockTab(): ReactElement {
           }
         })();
         return (
-          <GlassPanel key={c.tz} padded radius="md" tone="auto">
+          // Solid sand surface, not nested glass — HIG visionOS rule
+          <div
+            key={c.tz}
+            style={{
+              background: 'var(--ls-sand-50)',
+              borderRadius: 'var(--ls-r-md)',
+              border: '1px solid var(--ls-border-glass)',
+              padding: 16,
+              minHeight: 44,
+            }}
+          >
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Globe size={18} style={{ color: 'var(--ls-fg-secondary)' }} />
+              <div className="flex items-center gap-3 min-w-0">
+                <Globe size={20} style={{ color: 'var(--ls-fg-secondary)', flexShrink: 0 }} />
                 <div className="min-w-0">
                   <div
                     style={{
-                      fontSize: 'var(--ls-text-sm)',
+                      fontSize: 'var(--ls-text-lg)',
+                      lineHeight: 1.3,
                       color: 'var(--ls-fg-primary)',
                       fontWeight: 600,
                     }}
@@ -239,7 +252,9 @@ function WorldClockTab(): ReactElement {
                   <div
                     style={{
                       fontSize: 'var(--ls-text-xs)',
+                      lineHeight: 1.4,
                       color: 'var(--ls-fg-muted)',
+                      marginTop: 2,
                     }}
                   >
                     {date} · {offset}
@@ -249,7 +264,8 @@ function WorldClockTab(): ReactElement {
               <div
                 style={{
                   fontFamily: 'var(--ls-font-mono)',
-                  fontSize: 22,
+                  fontSize: 'var(--ls-text-xl)',
+                  lineHeight: 1.2,
                   fontWeight: 600,
                   color: 'var(--ls-fg-primary)',
                   fontVariantNumeric: 'tabular-nums',
@@ -258,7 +274,7 @@ function WorldClockTab(): ReactElement {
                 {time}
               </div>
             </div>
-          </GlassPanel>
+          </div>
         );
       })}
     </div>
@@ -329,21 +345,24 @@ function StopwatchTab(): ReactElement {
   }, [elapsed]);
 
   return (
-    <div className="p-4 flex flex-col gap-3 h-full box-border">
+    // HIG 8pt grid: 16pt content padding, 16pt section gap
+    <div className="flex flex-col h-full box-border" style={{ padding: 16, gap: 16 }}>
+      {/* Stopwatch display — 34pt large title */}
       <div
-        className="text-center py-2"
+        className="text-center"
         style={{
           fontFamily: 'var(--ls-font-mono)',
-          fontSize: 42,
+          fontSize: 'var(--ls-text-3xl)',
           fontWeight: 700,
           color: 'var(--ls-fg-primary)',
-          letterSpacing: 1,
+          letterSpacing: 0.5,
+          lineHeight: 1.2,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
         {fmtCS(elapsed)}
       </div>
-      <div className="flex gap-2 justify-center">
+      <div className="flex justify-center" style={{ gap: 8 }}>
         {!running ? (
           <GlassButton variant="primary" size="md" onClick={start}>
             Start
@@ -358,30 +377,37 @@ function StopwatchTab(): ReactElement {
         </GlassButton>
       </div>
       {laps.length > 0 && (
-        <GlassPanel
-          padded={false}
-          radius="md"
-          tone="auto"
-          className="flex-1 overflow-auto p-1"
+        // Solid surface — no nested glass over text
+        <div
+          className="flex-1 overflow-auto"
+          style={{
+            background: 'var(--ls-sand-50)',
+            borderRadius: 'var(--ls-r-md)',
+            border: '1px solid var(--ls-border-glass)',
+          }}
         >
           {laps.map((t, i) => (
             <div
               key={i}
-              className="flex justify-between px-3 py-1"
+              className="flex justify-between"
               style={{
                 fontFamily: 'var(--ls-font-mono)',
-                fontSize: 12,
+                fontSize: 'var(--ls-text-sm)',
+                lineHeight: 1.4,
                 color: 'var(--ls-fg-secondary)',
+                padding: '8px 16px',
                 borderBottom:
                   i === laps.length - 1 ? 'none' : '1px solid var(--ls-border-glass)',
                 fontVariantNumeric: 'tabular-nums',
+                minHeight: 32,
+                alignItems: 'center',
               }}
             >
               <span>Lap {laps.length - i}</span>
               <span>{fmtCS(t)}</span>
             </div>
           ))}
-        </GlassPanel>
+        </div>
       )}
     </div>
   );
@@ -486,29 +512,30 @@ function TimerTab(): ReactElement {
   }, [remainingMs, hours, mins, secs]);
 
   return (
-    <div className="p-4 flex flex-col gap-4 items-center h-full box-border">
+    <div className="flex flex-col items-center h-full box-border" style={{ padding: 16, gap: 16 }}>
       <div
         style={{
           fontFamily: 'var(--ls-font-mono)',
-          fontSize: 48,
+          fontSize: 'var(--ls-text-3xl)',
           fontWeight: 700,
           color: remainingMs === 0 ? 'var(--ls-accent)' : 'var(--ls-fg-primary)',
-          letterSpacing: 1,
+          letterSpacing: 0.5,
+          lineHeight: 1.2,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
         {display}
       </div>
       {remainingMs == null ? (
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center" style={{ gap: 8 }}>
           <SpinInput label="hr" value={hours} onChange={setHours} max={23} />
-          <span style={{ color: 'var(--ls-fg-muted)' }}>:</span>
+          <span style={{ color: 'var(--ls-fg-muted)', fontSize: 'var(--ls-text-lg)' }}>:</span>
           <SpinInput label="min" value={mins} onChange={setMins} max={59} />
-          <span style={{ color: 'var(--ls-fg-muted)' }}>:</span>
+          <span style={{ color: 'var(--ls-fg-muted)', fontSize: 'var(--ls-text-lg)' }}>:</span>
           <SpinInput label="sec" value={secs} onChange={setSecs} max={59} />
         </div>
       ) : null}
-      <div className="flex gap-2">
+      <div className="flex" style={{ gap: 8 }}>
         {!running ? (
           <GlassButton variant="primary" size="md" onClick={start}>
             Start
@@ -538,7 +565,7 @@ function SpinInput({
   max: number;
 }): ReactElement {
   return (
-    <label className="flex flex-col items-center gap-1" style={{ fontSize: 11, color: 'var(--ls-fg-muted)' }}>
+    <label className="flex flex-col items-center" style={{ fontSize: 'var(--ls-text-xs)', lineHeight: 1.4, color: 'var(--ls-fg-muted)', gap: 4 }}>
       <GlassInput
         type="number"
         min={0}
@@ -548,15 +575,16 @@ function SpinInput({
           const n = Math.max(0, Math.min(max, parseInt(e.target.value || '0', 10)));
           onChange(Number.isNaN(n) ? 0 : n);
         }}
-        wrapperClassName="!w-14"
+        wrapperClassName="!w-16"
         style={{
           textAlign: 'center',
           fontFamily: 'var(--ls-font-mono)',
-          fontSize: 18,
+          fontSize: 'var(--ls-text-lg)',
           fontVariantNumeric: 'tabular-nums',
+          minHeight: 32,
         }}
       />
-      <span style={{ fontFamily: 'var(--ls-font-display)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--ls-font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
     </label>
   );
 }

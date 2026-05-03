@@ -50,9 +50,11 @@
   --ls-saturate: 180%;
 
   /* ─── Border radius ─────────────────────────────────────────────────── */
+  /* HIG: small graphic corners 10pt, large card corners 20pt
+     (apple-hig SKILL.md "Key Numbers Quick Reference") */
   --ls-r-sm: 6px;
-  --ls-r-md: 12px;
-  --ls-r-lg: 18px;
+  --ls-r-md: 10px; /* HIG: small inputs/buttons (8–10pt range) */
+  --ls-r-lg: 20px; /* HIG: large card / window corner radius */
   --ls-r-xl: 24px;
   --ls-r-full: 9999px;
 
@@ -83,17 +85,36 @@
   --ls-s-12: 48px;
 
   /* ─── Typography ────────────────────────────────────────────────────── */
+  /* HIG: system stack — `-apple-system, BlinkMacSystemFont, 'SF Pro Text',
+     'SF Pro Display', system-ui, sans-serif` (apple-hig SKILL.md "Being
+     Specific").
+     Apple devices render real SF Pro via `-apple-system`. Apple's font
+     license forbids redistributing SF Pro as a webfont from third-party
+     origins (see Apple Developer Forums thread 127350), so we cannot
+     self-host it from Netlify. On non-Apple platforms the stack falls
+     through to Inter — Rasmus Andersson designed Inter explicitly as a
+     screen-tuned SF alternative and it ships an optical-sizing axis that
+     mirrors SF Pro's Text/Display split. Inter is loaded as a webfont in
+     index.html (variable opsz + italic, weights 100–900). */
   --ls-font-display: 'Silkscreen', 'Berkeley Mono', monospace;
-  --ls-font-sans: 'Inter', system-ui, sans-serif;
+  --ls-font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Inter', system-ui, sans-serif;
   --ls-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
+  /* HIG sizes:
+       11pt = caption / status (apple-hig macos.md menu-bar text in Aqua)
+       13pt = menu / control labels (current macOS standard)
+       17pt = body (apple-hig SKILL.md "Key Numbers")
+       28pt = headline / large title (apple-hig SKILL.md "Key Numbers")
+     Line-height defaults to >=1.3x font-size per HIG. */
   --ls-text-xs: 11px;
   --ls-text-sm: 13px;
   --ls-text-md: 15px;
-  --ls-text-lg: 18px;
+  --ls-text-lg: 17px; /* HIG: body text */
   --ls-text-xl: 22px;
-  --ls-text-2xl: 28px;
-  --ls-text-3xl: 36px;
+  --ls-text-2xl: 28px; /* HIG: headlines >=28pt */
+  --ls-text-3xl: 34px; /* HIG: large title 34pt+ */
 
   /* ─── Motion ────────────────────────────────────────────────────────── */
   --ls-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -152,5 +173,52 @@
     --ls-dur-fast: 0ms;
     --ls-dur-base: 0ms;
     --ls-dur-slow: 0ms;
+  }
+}
+
+/* ─── Reduced transparency — solid fallbacks for glass surfaces ─────────
+   HIG (visionOS / macOS Liquid Glass): when the user sets "Reduce
+   Transparency", glass materials must collapse to a solid color so
+   underlying content can't reduce contrast. We swap the translucent
+   tokens for opaque sepia/sand surfaces while preserving the same
+   foreground tokens, so anything reading from --ls-glass-* keeps working
+   without per-component branches. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --ls-glass-light: #fbf6ee; /* opaque ls-sand-50 */
+    --ls-glass-light-strong: #f4ead6; /* opaque ls-sand-100 */
+    --ls-glass-dark: #3d2c0f; /* opaque ls-sand-800 */
+    --ls-glass-dark-strong: #241906; /* opaque ls-sand-900 */
+    --ls-glass-tint: rgba(184, 147, 82, 0.18);
+    /* Drop blur to a no-op so backdrop-filter stops compositing the
+       background-through layer entirely (it's invisible anyway). */
+    --ls-blur-subtle: 0px;
+    --ls-blur-medium: 0px;
+    --ls-blur-heavy: 0px;
+    --ls-blur-extreme: 0px;
+    --ls-saturate: 100%;
+  }
+  [data-ls-theme='dark'] {
+    --ls-glass-light: #3d2c0f;
+    --ls-glass-light-strong: #241906;
+    --ls-glass-dark: #241906;
+    --ls-glass-dark-strong: #140e06;
+  }
+}
+
+/* ─── High contrast — beef up borders and text contrast ─────────────────
+   HIG: when "Increase Contrast" is set, replace hairline borders with
+   visible 1.5pt outlines and force foreground text to maximum contrast
+   so the chrome remains readable for low-vision users. */
+@media (prefers-contrast: more) {
+  :root {
+    --ls-border-glass: rgba(60, 45, 25, 0.85);
+    --ls-fg-secondary: #1a1208;
+    --ls-fg-muted: #3d2c0f;
+  }
+  [data-ls-theme='dark'] {
+    --ls-border-glass: rgba(255, 250, 240, 0.85);
+    --ls-fg-secondary: #fbf6ee;
+    --ls-fg-muted: #d4b67a;
   }
 }

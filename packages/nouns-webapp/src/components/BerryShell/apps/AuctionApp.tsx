@@ -41,19 +41,24 @@ function formatEth(
   }
 }
 
+// HIG: 11pt label, 22pt value (sub-headline)
 const labelStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-display)',
+  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
   fontSize: 11,
+  lineHeight: 1.4,
   textTransform: 'uppercase',
-  letterSpacing: 1,
+  letterSpacing: 0.6,
+  fontWeight: 600,
   color: 'var(--theme-text-muted)',
-  marginBottom: 2,
+  marginBottom: 4,
 };
 const valueStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-display)',
-  fontSize: 18,
+  fontFamily: 'var(--ls-font-sans, var(--theme-font-display))',
+  fontSize: 22,
+  lineHeight: 1.3,
   fontWeight: 700,
   color: 'var(--theme-text-primary)',
+  fontVariantNumeric: 'tabular-nums',
 };
 
 /**
@@ -74,6 +79,7 @@ export default function AuctionApp() {
   }, [auction?.nounId]);
 
   return (
+    // HIG 8pt grid: 16pt content padding, 16pt section gaps
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 220px) 1fr', gap: 16 }}>
         <div
@@ -92,10 +98,10 @@ export default function AuctionApp() {
           {nounIdBig !== undefined ? (
             <StandaloneNounImage nounId={nounIdBig} />
           ) : (
-            <span style={{ color: 'var(--theme-text-muted)', fontSize: 12 }}>loading…</span>
+            <span style={{ color: 'var(--theme-text-muted)', fontSize: 13, lineHeight: 1.4 }}>loading…</span>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <div style={labelStyle}>Noun</div>
             <div style={valueStyle}>
@@ -112,7 +118,7 @@ export default function AuctionApp() {
           </div>
           <div>
             <div style={labelStyle}>High Bidder</div>
-            <div style={{ ...valueStyle, fontSize: 14 }}>
+            <div style={{ ...valueStyle, fontSize: 15, fontFamily: 'var(--ls-font-mono, monospace)' }}>
               {auction?.bidder ? (
                 <ShortAddress address={auction.bidder} avatar={false} />
               ) : (
@@ -120,7 +126,7 @@ export default function AuctionApp() {
               )}
             </div>
           </div>
-          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--theme-text-muted)', fontFamily: 'var(--theme-font-display)' }}>
+          <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.4, color: 'var(--theme-text-muted)', fontFamily: 'var(--ls-font-sans, var(--theme-font-display))' }}>
             Berry desktop emulation — switch theme to view the full auction.
           </div>
         </div>

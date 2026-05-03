@@ -32,6 +32,11 @@ const VIEW_LABELS: Record<ViewMode, string> = {
 const COLLECTION_OPTIONS = [
   { value: 'all', label: 'All collections' },
   { value: 'nouns-trait', label: 'Nouns Traits' },
+  { value: 'lil-trait', label: 'Lil Nouns Traits' },
+  { value: 'lil-noun', label: 'Lil Nouns' },
+  { value: 'past-noun', label: 'Past Nouns' },
+  { value: 'sketch', label: 'Sketches' },
+  { value: 'probe-trait', label: 'Custom Traits' },
   { value: 'cc0-lib', label: 'cc0-lib.wtf' },
   { value: 'auction', label: 'Auction' },
   { value: 'propdate', label: 'Propdates' },

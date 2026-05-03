@@ -5,6 +5,15 @@ import CandidatesApp from './CandidatesApp';
 import FinderApp from './FinderApp';
 import SettingsApp from './SettingsApp';
 import VoteApp from './VoteApp';
+// Side-effect imports — these self-register on `berryRegistry`. Pulling
+// them in here ensures every app shows up via `__berryDev.open` and the
+// Apple menu / Spotlight launcher even if no other module imports them
+// first.
+import './AboutApp';
+import './CalculatorApp';
+import './ClockApp';
+import './NotificationsApp';
+import './StickiesApp';
 // Side-effect import — registers Activity Monitor + Console + EventInspector
 // hotkey via berryRegistry. See apps/devtoolsApps.ts for details.
 import './devtoolsApps';

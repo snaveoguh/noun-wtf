@@ -78,10 +78,10 @@ export const tabBarStyle: CSSProperties = {
   background:
     'linear-gradient(180deg, #f6f6f6 0%, #ebebeb 50%, #dedede 100%)',
   borderBottom: '1px solid #b9b9b9',
-  padding: '4px 6px 0 6px',
-  gap: 1,
-  fontFamily: 'var(--theme-font-display)',
-  fontSize: 12,
+  padding: '8px 8px 0 8px',
+  gap: 2,
+  fontFamily: 'var(--ls-font-sans, -apple-system, system-ui, sans-serif)',
+  fontSize: 13,
 };
 
 export function tabButtonStyle(active: boolean): CSSProperties {
@@ -89,17 +89,19 @@ export function tabButtonStyle(active: boolean): CSSProperties {
     appearance: 'none',
     border: '1px solid #aeaeae',
     borderBottom: active ? '1px solid transparent' : '1px solid #aeaeae',
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
-    padding: '4px 12px',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    padding: '8px 16px',
     marginBottom: -1,
+    minHeight: 32,
     background: active
       ? 'linear-gradient(180deg, #fcfcfc 0%, #ececec 100%)'
       : 'linear-gradient(180deg, #ececec 0%, #d2d2d2 100%)',
     color: active ? '#1d1d1f' : '#3c3c43',
-    fontWeight: active ? 600 : 400,
+    fontWeight: active ? 600 : 500,
     cursor: 'pointer',
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 1.3,
     letterSpacing: 0.1,
   };
 }
@@ -120,16 +122,18 @@ export const tableHeaderRowStyle: CSSProperties = {
   background:
     'linear-gradient(180deg, #f0f0f0 0%, #e3e3e3 100%)',
   borderBottom: '1px solid #c4c4c4',
+  // HIG min caption: 11pt
   fontSize: 11,
+  lineHeight: 1.4,
   fontWeight: 600,
   color: '#3c3c43',
   textTransform: 'uppercase',
-  letterSpacing: 0.4,
+  letterSpacing: 0.6,
   userSelect: 'none',
 };
 
 export const tableHeaderCellStyle: CSSProperties = {
-  padding: '5px 8px',
+  padding: '8px 12px',
   borderRight: '1px solid #d4d4d4',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
@@ -140,7 +144,9 @@ export const tableBodyStyle: CSSProperties = {
   flex: 1,
   overflow: 'auto',
   fontFamily: MONO_FONT,
-  fontSize: 11,
+  // HIG: 13pt mono for stats
+  fontSize: 13,
+  lineHeight: 1.4,
   fontVariantNumeric: 'tabular-nums',
 };
 
@@ -150,29 +156,36 @@ export function tableRowStyle(zebra: boolean, highlight?: string): CSSProperties
     background: highlight ?? (zebra ? '#fafbfc' : '#ffffff'),
     borderBottom: '1px solid #efefef',
     color: '#1d1d1f',
+    // HIG min row height for click target
+    minHeight: 32,
+    alignItems: 'center',
   };
 }
 
 export const tableCellStyle: CSSProperties = {
-  padding: '4px 8px',
+  padding: '8px 12px',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1.4,
 };
 
 export const subtleButtonStyle: CSSProperties = {
   appearance: 'none',
   border: '1px solid #b8b8b8',
-  borderRadius: 4,
+  borderRadius: 6,
   background:
     'linear-gradient(180deg, #ffffff 0%, #ececec 100%)',
   color: '#1d1d1f',
-  padding: '2px 8px',
-  fontSize: 11,
-  fontFamily: 'var(--theme-font-display)',
+  padding: '6px 12px',
+  fontSize: 12,
+  lineHeight: 1.3,
+  fontFamily: 'var(--ls-font-sans, -apple-system, system-ui, sans-serif)',
   cursor: 'pointer',
   boxShadow: '0 1px 0 rgba(0,0,0,0.05)',
+  // HIG: 32pt min mouse target
+  minHeight: 32,
 };
 
 export const dangerButtonStyle: CSSProperties = {
@@ -187,22 +200,24 @@ export const dangerButtonStyle: CSSProperties = {
 export const inputStyle: CSSProperties = {
   appearance: 'none',
   border: '1px solid #c0c0c0',
-  borderRadius: 4,
+  borderRadius: 6,
   background: '#fff',
   color: '#1d1d1f',
-  padding: '3px 8px',
-  fontSize: 11,
+  padding: '6px 10px',
+  fontSize: 13,
+  lineHeight: 1.4,
   fontFamily: MONO_FONT,
   flex: 1,
   minWidth: 0,
   outline: 'none',
+  minHeight: 32,
 };
 
 export const toolbarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
-  padding: '6px 8px',
+  gap: 8,
+  padding: '8px 12px',
   background:
     'linear-gradient(180deg, #f4f4f4 0%, #e6e6e6 100%)',
   borderBottom: '1px solid #c4c4c4',
@@ -217,13 +232,15 @@ export const chipStyle = (cat: EventCategory): CSSProperties => {
     background: c.bg,
     color: c.fg,
     border: `1px solid ${c.dot}33`,
-    borderRadius: 9,
-    padding: '0 6px',
-    height: 16,
-    fontSize: 10,
+    borderRadius: 10,
+    padding: '2px 8px',
+    height: 20,
+    // HIG min caption: 11pt
+    fontSize: 11,
+    lineHeight: 1.4,
     fontWeight: 600,
     fontFamily: MONO_FONT,
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   };
 };
 

@@ -85,14 +85,19 @@ export default function AppleMenu({ onLaunch, onClose }: AppleMenuProps) {
     <GlassPanel
       data-apple-menu
       role="menu"
+      // HIG: menu surfaces over arbitrary content require heavy blur
+      // (apple-hig platforms/visionos.md "glass over arbitrary content").
+      // Radius 10pt small graphic corners (apple-hig SKILL.md).
       blur="heavy"
       radius="md"
       style={{
         position: 'absolute',
-        top: 32,
+        // Drop the menu just below the 24pt menu bar.
+        top: 26,
         left: 6,
         minWidth: 220,
-        padding: '6px 0',
+        // HIG: 4pt vertical inset around menu items.
+        padding: '4px 0',
         zIndex: 1100,
       }}
       onClick={e => e.stopPropagation()}

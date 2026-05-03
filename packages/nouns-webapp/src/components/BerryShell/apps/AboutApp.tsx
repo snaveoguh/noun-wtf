@@ -123,14 +123,14 @@ function AboutApp(): ReactElement {
         color: 'var(--ls-fg-primary)',
       }}
     >
-      {/* Hero */}
+      {/* Hero — HIG: 34pt large title, 17pt body, 11pt caption */}
       <GlassPanel padded radius="lg" tone="auto">
         <div className="flex items-center gap-4">
           <div
             className="flex items-center justify-center"
             style={{
-              width: 72,
-              height: 72,
+              width: 80,
+              height: 80,
               borderRadius: 'var(--ls-r-lg)',
               background:
                 'linear-gradient(180deg, var(--ls-sand-100) 0%, var(--ls-sand-300) 100%)',
@@ -139,15 +139,15 @@ function AboutApp(): ReactElement {
             }}
             aria-hidden
           >
-            <Info size={36} style={{ color: 'var(--ls-fg-primary)' }} />
+            <Info size={40} style={{ color: 'var(--ls-fg-primary)' }} />
           </div>
           <div className="min-w-0">
             <div
               style={{
                 fontFamily: 'var(--ls-font-display)',
-                fontSize: 'var(--ls-text-xl)',
+                fontSize: 'var(--ls-text-3xl)',
                 fontWeight: 700,
-                lineHeight: 1.1,
+                lineHeight: 1.15,
                 color: 'var(--ls-fg-primary)',
               }}
             >
@@ -155,9 +155,10 @@ function AboutApp(): ReactElement {
             </div>
             <div
               style={{
-                fontSize: 'var(--ls-text-sm)',
+                fontSize: 'var(--ls-text-lg)',
+                lineHeight: 1.4,
                 color: 'var(--ls-fg-secondary)',
-                marginTop: 2,
+                marginTop: 4,
               }}
             >
               {VERSION}
@@ -165,6 +166,7 @@ function AboutApp(): ReactElement {
             <div
               style={{
                 fontSize: 'var(--ls-text-xs)',
+                lineHeight: 1.4,
                 color: 'var(--ls-fg-muted)',
                 marginTop: 4,
               }}
@@ -253,20 +255,23 @@ function Row({
 }): ReactElement {
   return (
     <div>
-      <div className="flex justify-between items-baseline">
+      <div className="flex justify-between items-baseline gap-3">
         <span
           style={{
             fontSize: 'var(--ls-text-xs)',
+            lineHeight: 1.4,
             color: 'var(--ls-fg-muted)',
             textTransform: 'uppercase',
             letterSpacing: 0.6,
+            fontWeight: 600,
           }}
         >
           {label}
         </span>
         <span
           style={{
-            fontSize: 'var(--ls-text-sm)',
+            fontSize: 'var(--ls-text-md)',
+            lineHeight: 1.4,
             fontWeight: 600,
             color: 'var(--ls-fg-primary)',
             fontVariantNumeric: 'tabular-nums',
@@ -277,7 +282,7 @@ function Row({
         </span>
       </div>
       {hint && (
-        <div style={{ fontSize: 'var(--ls-text-xs)', color: 'var(--ls-fg-muted)', marginTop: 2 }}>
+        <div style={{ fontSize: 'var(--ls-text-xs)', lineHeight: 1.4, color: 'var(--ls-fg-muted)', marginTop: 4 }}>
           {hint}
         </div>
       )}

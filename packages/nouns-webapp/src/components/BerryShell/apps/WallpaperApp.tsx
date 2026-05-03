@@ -36,20 +36,23 @@ export default function WallpaperApp() {
   useEffect(() => undefined, []);
 
   return (
+    // HIG 8pt grid: 16pt content padding, 16pt gap between sections
     <div
-      className="flex flex-col h-full p-4 gap-3 box-border"
+      className="flex flex-col h-full box-border"
       style={{
         fontFamily: 'var(--ls-font-sans)',
         color: 'var(--ls-fg-primary)',
+        padding: 16,
+        gap: 16,
       }}
     >
       <div>
         <div
           style={{
-            fontFamily: 'var(--ls-font-display)',
-            fontSize: 'var(--ls-text-md)',
+            fontFamily: 'var(--ls-font-sans)',
+            fontSize: 'var(--ls-text-xl)',
             fontWeight: 700,
-            marginBottom: 2,
+            lineHeight: 1.2,
             color: 'var(--ls-fg-primary)',
           }}
         >
@@ -57,8 +60,10 @@ export default function WallpaperApp() {
         </div>
         <div
           style={{
-            fontSize: 'var(--ls-text-xs)',
+            fontSize: 'var(--ls-text-sm)',
+            lineHeight: 1.4,
             color: 'var(--ls-fg-muted)',
+            marginTop: 4,
           }}
         >
           Pick a wallpaper. The desktop updates live.
@@ -67,9 +72,10 @@ export default function WallpaperApp() {
       <div
         role="radiogroup"
         aria-label="Wallpapers"
-        className="grid gap-2.5 overflow-y-auto pr-1 flex-1"
+        className="grid overflow-y-auto pr-1 flex-1"
         style={{
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+          gap: 16,
         }}
       >
         {list.map(w => (
@@ -141,8 +147,9 @@ function WallpaperTile({ wallpaper, selected, onSelect }: TileProps) {
       </GlassPanel>
       <div
         style={{
-          marginTop: 6,
-          fontSize: 'var(--ls-text-xs)',
+          marginTop: 8,
+          fontSize: 'var(--ls-text-sm)',
+          lineHeight: 1.4,
           fontWeight: 600,
           textAlign: 'center',
           color: selected ? 'var(--ls-accent)' : 'var(--ls-fg-secondary)',
@@ -158,13 +165,15 @@ function tileStyle(selected: boolean): CSSProperties {
   return {
     display: 'flex',
     flexDirection: 'column',
-    padding: 4,
+    padding: 8,
     background: 'transparent',
     border: 'none',
     borderRadius: 'var(--ls-r-md)',
     cursor: 'pointer',
     outline: selected ? '2px solid var(--ls-accent)' : 'none',
     outlineOffset: 2,
+    // HIG: 44pt min touch target for tile click
+    minHeight: 44,
     transition:
       'transform var(--ls-dur-base) var(--ls-ease-spring), outline-color var(--ls-dur-base) var(--ls-ease-soft)',
   };
