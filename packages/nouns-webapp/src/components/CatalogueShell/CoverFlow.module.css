@@ -57,6 +57,12 @@
 .cardImgPixel {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: none;
+  /* Fit pixel-art so the entire frame is visible (a 32×32 head shouldn't be
+     cropped); avoid bilinear smoothing as we scale up. */
+  object-fit: contain;
+  background: #1a1a1a;
 }
 
 .caption {

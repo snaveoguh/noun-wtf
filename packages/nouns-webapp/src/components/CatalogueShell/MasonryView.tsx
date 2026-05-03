@@ -28,7 +28,7 @@ export default function MasonryView({ items, onActivate }: Props) {
               src={a.image}
               alt={a.title}
               loading="lazy"
-              className={`${classes.masonryImg} ${a.media === 'pixel' ? classes.masonryImgPixel : ''}`}
+              className={`${classes.masonryImg} ${a.isPixel ? classes.masonryImgPixel : ''}`}
               onError={e => {
                 (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
               }}

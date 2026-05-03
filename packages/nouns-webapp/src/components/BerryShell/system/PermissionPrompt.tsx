@@ -87,30 +87,32 @@ export default function PermissionPrompt() {
       }}
     >
       <div style={{ padding: '20px 22px 12px' }}>
+        {/* HIG alert title at body size (17pt) for legibility on the modal. */}
         <div
           id="berry-perm-title"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            fontSize: 13,
+            gap: 10,
+            fontSize: 'var(--ls-text-lg)' /* 17pt */,
             fontWeight: 600,
             color: 'var(--ls-fg-primary)',
-            marginBottom: 8,
+            marginBottom: 10,
+            lineHeight: 1.25,
           }}
         >
-          <Key size={18} />
+          <Key size={20} />
           <span>"{current.appId}" wants permission</span>
         </div>
         <div
           style={{
-            fontSize: 12,
+            fontSize: 'var(--ls-text-sm)' /* 13pt label/body */,
             color: 'var(--ls-fg-secondary)',
             lineHeight: 1.5,
           }}
         >
           The app <strong>{current.appId}</strong> wants to {meta.description}.
-          <div style={{ marginTop: 8, color: 'var(--ls-fg-muted)', fontSize: 11 }}>
+          <div style={{ marginTop: 8, color: 'var(--ls-fg-muted)', fontSize: 'var(--ls-text-xs)' }}>
             Capability:{' '}
             <code
               style={{
@@ -124,7 +126,7 @@ export default function PermissionPrompt() {
             </code>
           </div>
           {queue.length > 1 && (
-            <div style={{ marginTop: 6, color: 'var(--ls-fg-muted)', fontSize: 11 }}>
+            <div style={{ marginTop: 6, color: 'var(--ls-fg-muted)', fontSize: 'var(--ls-text-xs)' }}>
               {queue.length - 1} more request{queue.length - 1 === 1 ? '' : 's'} queued
             </div>
           )}
@@ -139,13 +141,14 @@ export default function PermissionPrompt() {
           gap: 8,
         }}
       >
-        <GlassButton variant="ghost" size="sm" onClick={deny}>
+        {/* HIG: comfortable hit area on the primary action — md min-h is ~34px. */}
+        <GlassButton variant="ghost" size="md" onClick={deny}>
           Don't Allow
         </GlassButton>
-        <GlassButton variant="default" size="sm" onClick={allowOnce}>
+        <GlassButton variant="default" size="md" onClick={allowOnce}>
           Allow Once
         </GlassButton>
-        <GlassButton variant="primary" size="sm" onClick={allowAlways}>
+        <GlassButton variant="primary" size="md" onClick={allowAlways} autoFocus>
           Always Allow
         </GlassButton>
       </div>

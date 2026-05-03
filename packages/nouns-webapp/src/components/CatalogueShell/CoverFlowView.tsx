@@ -17,8 +17,10 @@ interface Props {
 export default function CoverFlowView({ items, onActivate }: Props) {
   const mapped = useMemo<CatalogueItem[]>(() => {
     return items.map(a => ({
-      // Drive CoverFlow's pixel-art treatment when the source is a Nouns trait.
-      type: a.media === 'pixel' ? 'trait' : 'story',
+      // Drive CoverFlow's pixel-art treatment for ANY pixel-art source
+      // (Noun traits, Lil Nouns, dreams, sketches, rendered nouns), not just
+      // the strict 'trait' media bucket.
+      type: a.isPixel ? 'trait' : 'story',
       id: a.id,
       image: a.image,
       title: a.title,

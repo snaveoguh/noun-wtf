@@ -162,6 +162,19 @@ export default function LockScreen() {
     return () => window.clearTimeout(id);
   }, [locked]);
 
+  // ESC unlocks (matches HIG dismissal expectations for full-screen modals).
+  useEffect(() => {
+    if (!locked) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        unlock('key');
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [locked, unlock]);
+
   const now = useNow(1000);
 
   if (!locked) return null;
@@ -185,14 +198,14 @@ export default function LockScreen() {
         onClick={() => unlock('click')}
         style={lockOverlayStyle}
       >
-        {/* Blurred wallpaper layer */}
+        {/* Blurred wallpaper layer — uses token blur so reduced-transparency drops the blur. */}
         <div
           aria-hidden
           style={{
             position: 'absolute',
             inset: 0,
             background: wallpaper.src,
-            filter: 'blur(28px) brightness(0.85) saturate(0.95)',
+            filter: 'blur(var(--ls-blur-extreme)) brightness(0.85) saturate(0.95)',
             transform: 'scale(1.08)', // hide blur edges
           }}
         />
@@ -249,7 +262,7 @@ export default function LockScreen() {
               style={{
                 marginTop: 8,
                 fontFamily: 'var(--ls-font-sans)',
-                fontSize: 14,
+                fontSize: 'var(--ls-text-lg)' /* HIG body 17pt */,
                 fontWeight: 400,
                 opacity: 0.85,
                 letterSpacing: 0.3,
@@ -286,7 +299,7 @@ export default function LockScreen() {
           </GlassPanel>
           <div
             style={{
-              fontSize: 13,
+              fontSize: 'var(--ls-text-sm)' /* HIG label 13pt */,
               fontWeight: 500,
               color: 'var(--ls-fg-on-dark)',
               opacity: 0.9,
@@ -341,5 +354,8 @@ const lockKeyframes = `
 @keyframes berryLockIn {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes berryLockIn { from { opacity: 1; transform: none; } to { opacity: 1; transform: none; } }
 }
 `;

@@ -24,6 +24,19 @@ import { windowStore } from '../store/windowStore';
 // Side-effect imports — each calls `berryRegistry.register(...)` at top level.
 import './ActivityMonitorApp';
 import './ConsoleApp';
+// ClipboardApp doesn't self-register (it ships a `clipboardAppEntry` for the
+// future drag/drop installer). Mirror it onto berryRegistry here so dev/QA
+// can launch it with `__berryDev.open('clipboard')` and the Spotlight launcher
+// can find it. Keeps the launch surface uniform without changing ClipboardApp.
+import ClipboardApp, { clipboardAppEntry } from './ClipboardApp';
+berryRegistry.register({
+  id: clipboardAppEntry.appId,
+  name: clipboardAppEntry.title,
+  icon: clipboardAppEntry.emoji,
+  component: ClipboardApp,
+  defaultWindow: { w: clipboardAppEntry.width, h: clipboardAppEntry.height },
+  capabilities: clipboardAppEntry.capabilities as readonly string[],
+});
 
 // Boot the high-capacity history wrapper as early as possible so notifications
 // etc. fired during BerryShell mount land in the buffer, not just after a

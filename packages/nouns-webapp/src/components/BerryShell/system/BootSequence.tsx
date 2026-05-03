@@ -498,12 +498,12 @@ export default function BootSequence({ children, skip }: BootSequenceProps) {
             radius="lg"
             glow
             style={{
-              padding: '32px 36px',
+              padding: '32px 40px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 22,
-              minWidth: 260,
+              gap: 20,
+              minWidth: 280,
               animation:
                 'berryBootIn var(--ls-dur-slow) var(--ls-ease-glide) both',
             }}
@@ -522,7 +522,39 @@ export default function BootSequence({ children, skip }: BootSequenceProps) {
             >
               <Sandglass size={48} />
             </div>
+            {/* HIG large title (34pt) — anchors the splash visually. */}
             <div
+              style={{
+                fontFamily: 'var(--ls-font-sans)',
+                fontSize: 'var(--ls-text-3xl)',
+                fontWeight: 600,
+                letterSpacing: -0.5,
+                color: 'var(--ls-fg-primary)',
+                lineHeight: 1.05,
+                textAlign: 'center',
+              }}
+            >
+              BerryOS
+            </div>
+            {/* HIG subhead caption (13pt). */}
+            <div
+              style={{
+                fontFamily: 'var(--ls-font-sans)',
+                fontSize: 'var(--ls-text-sm)',
+                color: 'var(--ls-fg-secondary)',
+                marginTop: -8,
+                letterSpacing: 0.2,
+                textAlign: 'center',
+              }}
+            >
+              a desktop for crypto misfits
+            </div>
+            <div
+              role="progressbar"
+              aria-label={currentPhase?.label ?? 'Booting'}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progressInPhase * 100)}
               style={{
                 width: 220,
                 height: 4,
@@ -570,5 +602,10 @@ const splashKeyframes = `
 @keyframes berryBootIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* HIG: respect Reduce Motion — collapse all splash animation to a static fade. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes berryBootPulse { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes berryBootIn { from { opacity: 1; transform: none; } to { opacity: 1; transform: none; } }
 }
 `;

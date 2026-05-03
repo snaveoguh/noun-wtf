@@ -1,11 +1,11 @@
 import { FC, memo, useMemo } from 'react';
 
-import { ExternalLinkIcon } from 'lucide-react';
 import { useBlockNumber } from 'wagmi';
 
 import { useEnsNames } from '@/components/TerminalFeed/useEnsNames';
 import { VoterHoverCard } from '@/components/VoterHoverCard';
-import { cn } from '@/lib/utils';
+import { GlassButton, GlassChip, type GlassChipTone } from '@/liquid-sand/glass';
+import { Sparkle } from '@/liquid-sand/icons';
 import { formatShortAddress } from '@/utils/addressAndENSDisplayUtils';
 import { ProposalState } from '@/wrappers/nounsDao';
 
@@ -26,6 +26,8 @@ function externalLink(type: 'proposal' | 'candidate', id: string): string {
   return `${NOUNS_GAME_BASE}/vote`;
 }
 
+type StatusTone = 'active' | 'positive' | 'negative' | 'neutral';
+
 const STATUS_DISPLAY: Record<string, { label: string; tone: StatusTone }> = {
   [ProposalState.PENDING]: { label: 'PENDING', tone: 'neutral' },
   [ProposalState.ACTIVE]: { label: 'VOTING', tone: 'active' },
@@ -43,17 +45,25 @@ const STATUS_DISPLAY: Record<string, { label: string; tone: StatusTone }> = {
   CANDIDATE_PROMOTED: { label: 'PROMOTED', tone: 'positive' },
 };
 
-type StatusTone = 'active' | 'positive' | 'negative' | 'neutral';
-
-const TONE_CLASSES: Record<StatusTone, string> = {
-  // Same emerald/rose palette already used by GameProposals' .status* classes.
-  active: 'bg-emerald-700/20 text-emerald-300 ring-1 ring-inset ring-emerald-700/55',
-  positive: 'bg-emerald-700/15 text-emerald-200 ring-1 ring-inset ring-emerald-700/40',
-  negative: 'bg-rose-700/18 text-rose-300 ring-1 ring-inset ring-rose-700/50',
-  neutral: 'bg-white/6 text-zinc-400',
+// Map our internal status tone vocabulary onto GlassChip's tone enum.
+// "active" → "accent" so the gold sand-tone signals in-progress; outcomes
+// (positive/negative) map to success/danger; everything else stays neutral.
+const CHIP_TONE: Record<StatusTone, GlassChipTone> = {
+  active: 'accent',
+  positive: 'success',
+  negative: 'danger',
+  neutral: 'neutral',
 };
 
 const AVG_BLOCK_TIME_S = 12;
+
+// Reusable inline-style snippets so the JSX stays scannable. Tokens-only,
+// no Tailwind colour classes.
+const fontSans: React.CSSProperties = { fontFamily: 'var(--ls-font-sans)' };
+const fontMono: React.CSSProperties = { fontFamily: 'var(--ls-font-mono)' };
+const colorOnDark: React.CSSProperties = { color: 'var(--ls-fg-on-dark)' };
+const colorSecondary: React.CSSProperties = { color: 'var(--ls-fg-secondary)' };
+const colorMuted: React.CSSProperties = { color: 'var(--ls-fg-muted)' };
 
 /** Format a remaining duration as "Nh Nm" / "Nd Nh" / "Nm". */
 function formatTimeLeft(secondsLeft: number): string {
@@ -85,7 +95,8 @@ function votingTimerLabel(
 
 /**
  * Compact segmented vote bar — same idea as GameProposals' bar but slimmer
- * (~150px max, 6px tall) so the card stays dense.
+ * (~150px max, 6px tall) so the card stays dense. Colour comes from the
+ * Liquid Sand for/against tokens (HIG-aligned emerald/rose).
  */
 function CompactVoteBar({
   forCount,
@@ -97,17 +108,34 @@ function CompactVoteBar({
   abstainCount: number;
 }) {
   const total = forCount + againstCount + abstainCount;
+  const trackBg = 'rgba(255,250,240,0.06)';
   if (total === 0) {
-    return <div className="h-[6px] w-full rounded-sm bg-white/[0.06]" aria-hidden />;
+    return (
+      <div
+        className="h-[6px] w-full"
+        style={{ borderRadius: 'var(--ls-r-sm)', backgroundColor: trackBg }}
+        aria-hidden
+      />
+    );
   }
   const forPct = (forCount / total) * 100;
   const againstPct = (againstCount / total) * 100;
   const abstainPct = Math.max(0, 100 - forPct - againstPct);
   return (
-    <div className="flex h-[6px] w-full overflow-hidden rounded-sm bg-white/[0.04]" aria-hidden>
-      {forPct > 0 && <span className="bg-emerald-700" style={{ width: `${forPct}%` }} />}
-      {againstPct > 0 && <span className="bg-rose-700" style={{ width: `${againstPct}%` }} />}
-      {abstainPct > 0 && <span className="bg-white/30" style={{ width: `${abstainPct}%` }} />}
+    <div
+      className="flex h-[6px] w-full overflow-hidden"
+      style={{ borderRadius: 'var(--ls-r-sm)', backgroundColor: trackBg }}
+      aria-hidden
+    >
+      {forPct > 0 && (
+        <span style={{ width: `${forPct}%`, backgroundColor: 'var(--ls-for)' }} />
+      )}
+      {againstPct > 0 && (
+        <span style={{ width: `${againstPct}%`, backgroundColor: 'var(--ls-against)' }} />
+      )}
+      {abstainPct > 0 && (
+        <span style={{ width: `${abstainPct}%`, backgroundColor: 'rgba(255,250,240,0.32)' }} />
+      )}
     </div>
   );
 }
@@ -149,68 +177,85 @@ export const PropHoverCardContent: FC<PropHoverCardContentProps> = memo(
     // still renders its frame so the card height is roughly stable when
     // content lands. Error case: degrade gracefully (just the header).
     if (data.isLoading) {
+      const skBg = 'rgba(255,250,240,0.08)';
+      const skR = { borderRadius: 'var(--ls-r-sm)' };
       return (
-        <div className="flex flex-col gap-2.5 p-3 text-[12px] leading-tight text-zinc-100">
+        <div
+          className="flex flex-col gap-2.5 p-3 leading-tight"
+          style={{ ...fontSans, ...colorOnDark, fontSize: 'var(--ls-text-sm)' }}
+        >
           <div className="flex items-start gap-2">
-            <div className="h-3.5 flex-1 animate-pulse rounded bg-zinc-800/80" />
-            <div className="h-4 w-14 animate-pulse rounded bg-zinc-800/80" />
+            <div className="h-3.5 flex-1 animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
+            <div className="h-4 w-14 animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
           </div>
-          <div className="h-2.5 w-32 animate-pulse rounded bg-zinc-800/60" />
+          <div className="h-2.5 w-32 animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
           <div className="space-y-1.5">
-            <div className="h-2 w-full animate-pulse rounded bg-zinc-800/60" />
-            <div className="h-2 w-11/12 animate-pulse rounded bg-zinc-800/60" />
-            <div className="h-2 w-3/4 animate-pulse rounded bg-zinc-800/60" />
+            <div className="h-2 w-full animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
+            <div className="h-2 w-11/12 animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
+            <div className="h-2 w-3/4 animate-pulse" style={{ ...skR, backgroundColor: skBg }} />
           </div>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-col gap-2.5 p-3 text-[12px] leading-tight text-zinc-100">
+      <div
+        className="flex flex-col gap-2.5 p-3 leading-tight"
+        style={{ ...fontSans, ...colorOnDark, fontSize: 'var(--ls-text-sm)' }}
+      >
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
               {type === 'proposal' && (
-                <span className="font-mono text-[11px] font-semibold tabular-nums text-zinc-500">
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{ ...fontMono, ...colorMuted, fontSize: 'var(--ls-text-xs)' }}
+                >
                   {data.id}
                 </span>
               )}
-              <span className="line-clamp-2 text-[12.5px] font-bold leading-snug text-white">
+              <span
+                className="line-clamp-2 font-bold leading-snug"
+                style={{ ...fontSans, ...colorOnDark, fontSize: 'var(--ls-text-md)' }}
+              >
                 {data.title}
               </span>
             </div>
             {proposerDisplay && (
-              <div className="mt-1 text-[11px] text-zinc-500">
+              <div
+                className="mt-1"
+                style={{ ...fontSans, ...colorMuted, fontSize: 'var(--ls-text-xs)' }}
+              >
                 by{' '}
                 {data.proposer ? (
                   <VoterHoverCard address={data.proposer} asChild>
-                    <span className="cursor-default text-zinc-300 hover:text-white">
+                    <span
+                      className="cursor-default transition-colors hover:[color:var(--ls-fg-on-dark)]"
+                      style={colorSecondary}
+                    >
                       {proposerDisplay}
                     </span>
                   </VoterHoverCard>
                 ) : (
-                  <span className="text-zinc-300">{proposerDisplay}</span>
+                  <span style={colorSecondary}>{proposerDisplay}</span>
                 )}
               </div>
             )}
           </div>
-          <span
-            className={cn(
-              // Match GameProposals' status pill (Silkscreen pixel font,
-              // sharp 2px tab) so the hover card visually echoes the parent.
-              'shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] uppercase leading-none tracking-wider',
-              '[font-family:var(--gs-font-display)]',
-              TONE_CLASSES[statusDisplay.tone],
-            )}
-          >
+          <GlassChip tone={CHIP_TONE[statusDisplay.tone]} size="xs" className="shrink-0">
             {statusDisplay.label}
-          </span>
+          </GlassChip>
         </div>
 
         {/* ── Excerpt ───────────────────────────────────────────── */}
         {data.excerpt && (
-          <p className="line-clamp-3 text-[11.5px] leading-snug text-zinc-400">{data.excerpt}</p>
+          <p
+            className="line-clamp-3 leading-snug"
+            style={{ ...fontSans, ...colorMuted, fontSize: 'var(--ls-text-sm)' }}
+          >
+            {data.excerpt}
+          </p>
         )}
 
         {/* ── Tally bar (proposals only) ────────────────────────── */}
@@ -223,16 +268,28 @@ export const PropHoverCardContent: FC<PropHoverCardContentProps> = memo(
                 abstainCount={data.abstainCount}
               />
             </div>
-            <div className="flex items-center justify-between font-mono text-[10.5px] tabular-nums tracking-wider text-zinc-400">
+            <div
+              className="flex items-center justify-between tabular-nums tracking-wider"
+              style={{ ...fontMono, ...colorMuted, fontSize: 'var(--ls-text-xs)' }}
+            >
               <span className="inline-flex items-center gap-2.5">
-                <span className="text-emerald-500">
-                  FOR <strong className="font-bold text-emerald-300">{data.forCount}</strong>
+                <span style={{ color: 'var(--ls-for)' }}>
+                  FOR{' '}
+                  <strong className="font-bold" style={{ color: 'var(--ls-for-strong)' }}>
+                    {data.forCount}
+                  </strong>
                 </span>
-                <span className="text-rose-500">
-                  AGAINST <strong className="font-bold text-rose-300">{data.againstCount}</strong>
+                <span style={{ color: 'var(--ls-against)' }}>
+                  AGAINST{' '}
+                  <strong className="font-bold" style={{ color: 'var(--ls-against-strong)' }}>
+                    {data.againstCount}
+                  </strong>
                 </span>
-                <span className="text-zinc-500">
-                  ABSTAIN <strong className="font-bold text-zinc-300">{data.abstainCount}</strong>
+                <span style={colorMuted}>
+                  ABSTAIN{' '}
+                  <strong className="font-bold" style={colorSecondary}>
+                    {data.abstainCount}
+                  </strong>
                 </span>
               </span>
             </div>
@@ -241,22 +298,37 @@ export const PropHoverCardContent: FC<PropHoverCardContentProps> = memo(
 
         {/* ── Timer ─────────────────────────────────────────────── */}
         {timerLabel && (
-          <div className="font-mono text-[10.5px] uppercase tracking-wider text-zinc-500">
+          <div
+            className="uppercase tracking-wider"
+            style={{ ...fontMono, ...colorMuted, fontSize: 'var(--ls-text-xs)' }}
+          >
             {timerLabel}
           </div>
         )}
 
         {/* ── External link ─────────────────────────────────────── */}
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1 inline-flex items-center gap-1.5 self-start text-[10.5px] uppercase tracking-wider text-zinc-500 no-underline transition-colors hover:text-white"
-          onClick={e => e.stopPropagation()}
-        >
-          View on nouns.game
-          <ExternalLinkIcon className="size-3" aria-hidden />
-        </a>
+        <div className="mt-1 self-start">
+          <GlassButton
+            variant="ghost"
+            size="sm"
+            onClick={e => {
+              e.stopPropagation();
+              window.open(href, '_blank', 'noopener,noreferrer');
+            }}
+            style={{
+              // Ghost variant defaults to fg-primary which is dark-on-light.
+              // Force the muted-on-dark colour so the button reads against
+              // the smoked glass; hover state lifts to full on-dark.
+              color: 'var(--ls-fg-muted)',
+              fontFamily: 'var(--ls-font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+            }}
+          >
+            View on nouns.game
+            <Sparkle size={12} aria-hidden />
+          </GlassButton>
+        </div>
       </div>
     );
   },

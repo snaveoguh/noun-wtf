@@ -1,10 +1,18 @@
 /**
- * StickiesApp — yellow post-it notes that live inside the Stickies window.
+ * StickiesApp — sand-tone post-it notes that live inside the Stickies window.
  *
  * Each sticky is a draggable + resizable mini-window inside the parent
  * BerryOS window. We don't piggy-back on `windowStore` because stickies are
  * scoped to this app's surface (they shouldn't show up in the focus stack
  * alongside Calculator, etc.).
+ *
+ * HIG / Liquid Sand notes:
+ *   - The note paper is intentionally SOLID (no glass / no backdrop blur).
+ *     Glass over text fails 4.5:1 contrast and HIG flags it as a no-go.
+ *   - Title bar uses Silkscreen 11pt for the date pill — keeps the chrome
+ *     readable at small sizes and matches the rest of BerryOS chrome.
+ *   - Body uses 17pt SF (system stack) at line-height 1.35 — HIG body size
+ *     for editing comfort.
  *
  * Persistence:
  *   localStorage key `berry.stickies` — full sticky array.
@@ -32,33 +40,62 @@ interface Sticky {
   /** Index into COLORS — colour cycle on click. */
   color: number;
   z: number;
+  /** Creation timestamp (ms). Drives the title-bar date pill. */
+  createdAt: number;
 }
 
 const STORAGE_KEY = 'berry.stickies';
 
-// Sand-tinted sticky palette — warm pastels reading well on the sand backdrop.
-const COLORS: ReadonlyArray<{ bg: string; head: string; border: string }> = [
-  { bg: 'rgba(255, 245, 168, 0.92)', head: 'rgba(255, 227, 90, 0.95)', border: 'rgba(212, 190, 62, 0.65)' }, // canary
-  { bg: 'rgba(255, 209, 209, 0.92)', head: 'rgba(255, 155, 155, 0.95)', border: 'rgba(212, 115, 115, 0.65)' }, // pink
-  { bg: 'rgba(209, 240, 255, 0.92)', head: 'rgba(155, 217, 255, 0.95)', border: 'rgba(115, 169, 212, 0.65)' }, // blue
-  { bg: 'rgba(212, 255, 212, 0.92)', head: 'rgba(155, 240, 155, 0.95)', border: 'rgba(115, 196, 115, 0.65)' }, // green
-  { bg: 'rgba(232, 209, 255, 0.92)', head: 'rgba(200, 155, 255, 0.95)', border: 'rgba(156, 115, 212, 0.65)' }, // purple
+// SAND-TONE sticky palette — solid (no alpha tricks) so the note paper stays
+// on the right side of the contrast line. Each entry has a `paper` body, a
+// `head` title strip, and a `border` hairline. Tones drift through the warm
+// sand spectrum so cycling colours doesn't feel like jumping shells.
+const COLORS: ReadonlyArray<{ paper: string; head: string; border: string; ink: string }> = [
+  // canary sand
+  { paper: '#fdf3b2', head: '#f4e389', border: '#c8b14a', ink: '#3d3110' },
+  // dusty rose
+  { paper: '#f8d4d4', head: '#efb6b6', border: '#c47a7a', ink: '#3a1a1a' },
+  // pale sky
+  { paper: '#d4ebf8', head: '#b6d6ef', border: '#7a9bc4', ink: '#0f2a3d' },
+  // mint
+  { paper: '#d6f0d6', head: '#b6e0b6', border: '#7ab07a', ink: '#143a14' },
+  // lavender
+  { paper: '#e6d6f0', head: '#cab6e0', border: '#9c7ab0', ink: '#26143a' },
 ];
 
 function readStickies(): Sticky[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (raw === null || raw === '') return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (s): s is Sticky =>
-        !!s &&
-        typeof s === 'object' &&
-        typeof (s as Sticky).id === 'string' &&
-        typeof (s as Sticky).text === 'string',
-    );
+    // Migration: old stickies (pre date-pill) lack `createdAt`. We type the
+    // raw record as `Partial<Sticky>` while validating, then backfill the
+    // missing field in a single explicit construction below — no spread +
+    // override, so there's no duplicate-key shadowing.
+    return parsed
+      .filter(
+        (s): s is Partial<Sticky> & Pick<Sticky, 'id' | 'text'> =>
+          s !== null &&
+          typeof s === 'object' &&
+          typeof (s as Partial<Sticky>).id === 'string' &&
+          typeof (s as Partial<Sticky>).text === 'string',
+      )
+      .map(
+        (s): Sticky => ({
+          id: s.id,
+          text: s.text,
+          x: typeof s.x === 'number' ? s.x : 16,
+          y: typeof s.y === 'number' ? s.y : 36,
+          w: typeof s.w === 'number' ? s.w : 220,
+          h: typeof s.h === 'number' ? s.h : 200,
+          color: typeof s.color === 'number' ? s.color : 0,
+          z: typeof s.z === 'number' ? s.z : 1,
+          // Backfill `createdAt` for stickies persisted before the field existed.
+          createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
+        }),
+      );
   } catch {
     return [];
   }
@@ -77,6 +114,18 @@ function genId(): string {
   return `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Format a sticky's createdAt timestamp into a tiny date pill (e.g. "MAY 03"). */
+function formatStickyDate(ts: number): string {
+  try {
+    const d = new Date(ts);
+    const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${month} ${day}`;
+  } catch {
+    return '';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Single sticky note — draggable header, resize handle in bottom-right.
 // ---------------------------------------------------------------------------
@@ -90,7 +139,14 @@ interface StickyNoteProps {
   parentRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRef }: StickyNoteProps): ReactElement {
+function StickyNoteCard({
+  sticky,
+  onUpdate,
+  onClose,
+  onCycleColor,
+  onFocus,
+  parentRef,
+}: StickyNoteProps): ReactElement {
   const c = COLORS[sticky.color % COLORS.length];
 
   // Drag state — track a single pointer. Pointer capture keeps us receiving
@@ -155,13 +211,13 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
     } else if (d.mode === 'resize') {
       onUpdate({
         ...sticky,
-        w: Math.max(110, d.startW + dx),
-        h: Math.max(80, d.startH + dy),
+        w: Math.max(140, d.startW + dx),
+        h: Math.max(120, d.startH + dy),
       });
     }
   };
 
-  const onPointerUp = (_e: React.PointerEvent) => {
+  const onPointerUp = () => {
     dragRef.current = null;
   };
 
@@ -173,24 +229,22 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
         top: sticky.y,
         width: sticky.w,
         height: sticky.h,
-        background: c.bg,
+        // Solid sand-tone paper — NO glass / NO backdrop blur. Text contrast
+        // and edit comfort win over translucent prettiness here.
+        background: c.paper,
         border: `1px solid ${c.border}`,
         borderRadius: 'var(--ls-r-md)',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow:
-          'var(--ls-shadow-inset-glass), 0 6px 14px rgba(60,45,25,0.18), 0 1px 3px rgba(60,45,25,0.12)',
+        boxShadow: '0 1px 2px rgba(60,45,25,0.10), 0 6px 14px rgba(60,45,25,0.18)',
         zIndex: sticky.z,
         overflow: 'hidden',
         fontFamily: 'var(--ls-font-sans)',
-        backdropFilter: 'blur(var(--ls-blur-subtle))',
-        WebkitBackdropFilter: 'blur(var(--ls-blur-subtle))',
       }}
       onPointerDown={onFocus}
     >
-      {/* Header — drag handle + close + color.
-          Visual dots are small (Mac convention) but each has a 32pt
-          invisible hit-area pad below to satisfy HIG min touch target. */}
+      {/* Title bar — Silkscreen 11pt date pill on a slightly darker tone of
+          the paper. Drag handle. Buttons are HIG 28pt min hit-area. */}
       <div
         onPointerDown={onHeaderPointerDown}
         onPointerMove={onPointerMove}
@@ -217,17 +271,17 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
           onClick={onClose}
           className="inline-flex items-center justify-center"
           style={{
-            width: 24,
-            height: 24,
+            width: 18,
+            height: 18,
             borderRadius: 'var(--ls-r-full)',
-            background: 'rgba(255, 95, 86, 0.9)',
+            background: 'rgba(255, 95, 86, 0.92)',
             border: '1px solid rgba(183, 60, 51, 0.6)',
             padding: 0,
             cursor: 'pointer',
             color: 'rgba(255,255,255,0.95)',
           }}
         >
-          <Close size={12} strokeWidth={2.5} />
+          <Close size={10} strokeWidth={2.5} />
         </button>
         <button
           type="button"
@@ -237,22 +291,38 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
           onClick={onCycleColor}
           className="inline-flex items-center justify-center"
           style={{
-            width: 24,
-            height: 24,
+            width: 18,
+            height: 18,
             borderRadius: 'var(--ls-r-full)',
-            background: 'rgba(255, 189, 46, 0.9)',
+            background: 'rgba(255, 189, 46, 0.92)',
             border: '1px solid rgba(184, 128, 28, 0.6)',
             padding: 0,
             cursor: 'pointer',
             color: 'rgba(60,45,25,0.85)',
           }}
         >
-          <Brush size={11} strokeWidth={2.5} />
+          <Brush size={10} strokeWidth={2.5} />
         </button>
         <span style={{ flex: 1 }} />
+        {/* Date pill — Silkscreen 11pt per app brief. */}
+        <span
+          aria-hidden
+          style={{
+            fontFamily: 'var(--ls-font-display)',
+            fontSize: 11,
+            lineHeight: 1,
+            letterSpacing: 0.6,
+            color: c.ink,
+            opacity: 0.7,
+            fontVariantNumeric: 'tabular-nums',
+            userSelect: 'none',
+          }}
+        >
+          {formatStickyDate(sticky.createdAt)}
+        </span>
       </div>
 
-      {/* Editable text — HIG body: 17pt with ≥1.3 line-height */}
+      {/* Body — HIG body 17pt SF, line-height 1.35 for editing comfort. */}
       <textarea
         value={sticky.text}
         onChange={e => onUpdate({ ...sticky, text: e.target.value })}
@@ -267,7 +337,7 @@ function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, pare
           outline: 'none',
           fontFamily: 'var(--ls-font-sans)',
           fontSize: 'var(--ls-text-lg)',
-          color: 'var(--ls-sand-900)',
+          color: c.ink,
           lineHeight: 1.35,
           boxSizing: 'border-box',
         }}
@@ -330,9 +400,9 @@ function StickiesApp(): ReactElement {
 
   const addSticky = useCallback(() => {
     const parent = parentRef.current;
-    const w = 200;
-    const h = 180;
-    // Cascade — offset 16px from the last sticky if any, else center-ish.
+    const w = 220;
+    const h = 200;
+    // Cascade — offset 18px from the last sticky if any, else center-ish.
     const last = stickies.length ? stickies[stickies.length - 1] : null;
     const baseX = last ? last.x + 18 : 16;
     const baseY = last ? last.y + 18 : 36;
@@ -349,6 +419,7 @@ function StickiesApp(): ReactElement {
         h,
         color: (last?.color ?? -1) + 1,
         z: nextZ.current++,
+        createdAt: Date.now(),
       },
     ]);
   }, [stickies]);
@@ -371,13 +442,13 @@ function StickiesApp(): ReactElement {
         position: 'relative',
         height: '100%',
         width: '100%',
-        // Soft sand cross-hatch backdrop — readable behind translucent stickies.
+        // Soft sand cross-hatch backdrop — readable behind solid stickies.
         background:
           'repeating-linear-gradient(45deg, var(--ls-sand-50) 0 8px, var(--ls-sand-100) 8px 16px)',
         overflow: 'hidden',
       }}
     >
-      {/* New sticky button — floating glass action */}
+      {/* New sticky button — floating GlassButton action */}
       <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 100000 }}>
         <GlassButton
           variant="default"
@@ -411,7 +482,7 @@ berryRegistry.register({
   name: 'Stickies',
   icon: '📝',
   component: StickiesApp,
-  defaultWindow: { w: 200, h: 200 },
+  defaultWindow: { w: 320, h: 320 },
   capabilities: [],
 });
 

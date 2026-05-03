@@ -121,15 +121,15 @@ export default function HotkeyHints() {
         bottom: 90,
         right: 24,
         zIndex: 4500,
-        width: 300,
-        padding: '12px 14px',
+        width: 320,
+        padding: '14px 16px',
         fontFamily: 'var(--ls-font-sans)',
-        fontSize: 12,
+        fontSize: 'var(--ls-text-sm)' /* 13pt label */,
         color: 'var(--ls-fg-primary)',
         animation: 'berry-hk-fade-in var(--ls-dur-base) var(--ls-ease-glide)',
       }}
     >
-      <style>{`@keyframes berry-hk-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      <style>{`@keyframes berry-hk-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } } @media (prefers-reduced-motion: reduce) { @keyframes berry-hk-fade-in { from { opacity: 1; transform: none; } to { opacity: 1; transform: none; } } }`}</style>
       <div
         style={{
           display: 'flex',
