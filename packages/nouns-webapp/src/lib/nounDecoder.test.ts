@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyVisibilityMask,
   buildVisibilityMask,
+  pixelGridToSvg,
   resolveEditableVisibility,
   type NounPixelLayers,
 } from '@/lib/nounDecoder';
@@ -86,6 +87,39 @@ describe('nounDecoder visibility helpers', () => {
     });
 
     expect(visible[8][8]).toBe('#body');
+  });
+
+  it('builds an SVG with a background rect when bgColor is provided', () => {
+    const pixels = createGrid();
+    pixels[0][0] = '#ff0000';
+    const svg = pixelGridToSvg(pixels, '#abcdef');
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('width="320"');
+    expect(svg).toContain('height="320"');
+    expect(svg).toContain('fill="#abcdef"'); // bg
+    expect(svg).toContain('fill="#ff0000"'); // pixel
+  });
+
+  it('builds an SVG with no background rect when bgColor is omitted', () => {
+    const pixels = createGrid();
+    pixels[1][1] = '#00ff00';
+    const svg = pixelGridToSvg(pixels);
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('fill="#00ff00"');
+    // The "100%" width rect (the background) shouldn't be present
+    expect(svg).not.toContain('width="100%"');
+  });
+
+  it('merges adjacent same-color pixels into a single rect', () => {
+    const pixels = createGrid();
+    pixels[0][0] = '#abcdef';
+    pixels[0][1] = '#abcdef';
+    pixels[0][2] = '#abcdef';
+    const svg = pixelGridToSvg(pixels);
+    // Three contiguous pixels → one rect, width 30 (3 × 10)
+    expect(svg).toContain('width="30"');
+    expect(svg).toContain('x="0"');
+    expect(svg).toContain('y="0"');
   });
 
   it('drops edited top-layer color when that layer gets hidden', () => {

@@ -166,6 +166,13 @@
   max-width: min(100% - 2rem, 19rem);
 }
 
+/* While editing, lift the rail above the editor overlay (z-index 60 in 2D /
+   `panelsOverlay` z-index 200 in 3D) so the Save dropdown stays reachable.
+   Sits above the floating glass tool panels (z 70) too. */
+.heroControlRailEditing {
+  z-index: 250;
+}
+
 .railBtn {
   border: 0;
   border-radius: 50%;
