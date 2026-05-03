@@ -39,3 +39,5 @@ packages/nouns-webapp/vite.config.js
 packages/nouns-webapp/wagmi.config.js
 packages/nouns-webapp/vitest.config.js
 packages/nouns-webapp/codegen.config.js
+packages/nouns-webapp/netlify/functions/**/*.js
+packages/nouns-webapp/netlify/functions/**/*.d.ts
