@@ -13,6 +13,9 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 
+import { GlassButton } from '@/liquid-sand/glass';
+import { Brush, Close, StickyNote } from '@/liquid-sand/icons';
+
 import { berryRegistry } from '../system/berryRegistry';
 
 // ---------------------------------------------------------------------------
@@ -33,12 +36,13 @@ interface Sticky {
 
 const STORAGE_KEY = 'berry.stickies';
 
+// Sand-tinted sticky palette — warm pastels reading well on the sand backdrop.
 const COLORS: ReadonlyArray<{ bg: string; head: string; border: string }> = [
-  { bg: '#fff5a8', head: '#ffe35a', border: '#d4be3e' }, // canary yellow
-  { bg: '#ffd1d1', head: '#ff9b9b', border: '#d47373' }, // pink
-  { bg: '#d1f0ff', head: '#9bd9ff', border: '#73a9d4' }, // blue
-  { bg: '#d4ffd4', head: '#9bf09b', border: '#73c473' }, // green
-  { bg: '#e8d1ff', head: '#c89bff', border: '#9c73d4' }, // purple
+  { bg: 'rgba(255, 245, 168, 0.92)', head: 'rgba(255, 227, 90, 0.95)', border: 'rgba(212, 190, 62, 0.65)' }, // canary
+  { bg: 'rgba(255, 209, 209, 0.92)', head: 'rgba(255, 155, 155, 0.95)', border: 'rgba(212, 115, 115, 0.65)' }, // pink
+  { bg: 'rgba(209, 240, 255, 0.92)', head: 'rgba(155, 217, 255, 0.95)', border: 'rgba(115, 169, 212, 0.65)' }, // blue
+  { bg: 'rgba(212, 255, 212, 0.92)', head: 'rgba(155, 240, 155, 0.95)', border: 'rgba(115, 196, 115, 0.65)' }, // green
+  { bg: 'rgba(232, 209, 255, 0.92)', head: 'rgba(200, 155, 255, 0.95)', border: 'rgba(156, 115, 212, 0.65)' }, // purple
 ];
 
 function readStickies(): Sticky[] {
@@ -86,7 +90,7 @@ interface StickyNoteProps {
   parentRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRef }: StickyNoteProps): ReactElement {
+function StickyNoteCard({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRef }: StickyNoteProps): ReactElement {
   const c = COLORS[sticky.color % COLORS.length];
 
   // Drag state — track a single pointer. Pointer capture keeps us receiving
@@ -171,14 +175,16 @@ function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRe
         height: sticky.h,
         background: c.bg,
         border: `1px solid ${c.border}`,
-        borderRadius: 2,
+        borderRadius: 'var(--ls-r-md)',
         display: 'flex',
         flexDirection: 'column',
         boxShadow:
-          '0 6px 12px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+          'var(--ls-shadow-inset-glass), 0 6px 14px rgba(60,45,25,0.18), 0 1px 3px rgba(60,45,25,0.12)',
         zIndex: sticky.z,
         overflow: 'hidden',
-        fontFamily: 'var(--theme-font-display)',
+        fontFamily: 'var(--ls-font-sans)',
+        backdropFilter: 'blur(var(--ls-blur-subtle))',
+        WebkitBackdropFilter: 'blur(var(--ls-blur-subtle))',
       }}
       onPointerDown={onFocus}
     >
@@ -189,13 +195,13 @@ function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRe
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{
-          height: 18,
+          height: 22,
           background: c.head,
           borderBottom: `1px solid ${c.border}`,
           display: 'flex',
           alignItems: 'center',
-          padding: '0 4px',
-          gap: 4,
+          padding: '0 6px',
+          gap: 6,
           cursor: 'grab',
           userSelect: 'none',
           touchAction: 'none',
@@ -206,31 +212,39 @@ function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRe
           data-sticky-action
           aria-label="Close sticky"
           onClick={onClose}
+          className="inline-flex items-center justify-center"
           style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: '#ff5f56',
-            border: '1px solid #b73c33',
+            width: 14,
+            height: 14,
+            borderRadius: 'var(--ls-r-full)',
+            background: 'rgba(255, 95, 86, 0.9)',
+            border: '1px solid rgba(183, 60, 51, 0.6)',
             padding: 0,
             cursor: 'pointer',
+            color: 'rgba(255,255,255,0.9)',
           }}
-        />
+        >
+          <Close size={9} strokeWidth={2.5} />
+        </button>
         <button
           type="button"
           data-sticky-action
           aria-label="Cycle color"
           onClick={onCycleColor}
+          className="inline-flex items-center justify-center"
           style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: '#ffbd2e',
-            border: '1px solid #b8801c',
+            width: 14,
+            height: 14,
+            borderRadius: 'var(--ls-r-full)',
+            background: 'rgba(255, 189, 46, 0.9)',
+            border: '1px solid rgba(184, 128, 28, 0.6)',
             padding: 0,
             cursor: 'pointer',
+            color: 'rgba(60,45,25,0.85)',
           }}
-        />
+        >
+          <Brush size={8} strokeWidth={2.5} />
+        </button>
         <span style={{ flex: 1 }} />
       </div>
 
@@ -247,10 +261,10 @@ function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRe
           padding: 8,
           resize: 'none',
           outline: 'none',
-          fontFamily: 'var(--theme-font-display)',
+          fontFamily: 'var(--ls-font-sans)',
           fontSize: 12,
-          color: '#222',
-          lineHeight: 1.35,
+          color: 'var(--ls-sand-900)',
+          lineHeight: 1.4,
           boxSizing: 'border-box',
         }}
       />
@@ -269,7 +283,7 @@ function StickyNote({ sticky, onUpdate, onClose, onCycleColor, onFocus, parentRe
           height: 14,
           cursor: 'nwse-resize',
           background:
-            'linear-gradient(135deg, transparent 0 50%, rgba(0,0,0,0.18) 50% 60%, transparent 60% 70%, rgba(0,0,0,0.18) 70% 80%, transparent 80%)',
+            'linear-gradient(135deg, transparent 0 50%, rgba(60,45,25,0.18) 50% 60%, transparent 60% 70%, rgba(60,45,25,0.18) 70% 80%, transparent 80%)',
           touchAction: 'none',
         }}
         aria-label="Resize sticky"
@@ -353,37 +367,28 @@ function StickiesApp(): ReactElement {
         position: 'relative',
         height: '100%',
         width: '100%',
-        background: 'repeating-linear-gradient(45deg, #f4eee2 0 8px, #ede6d4 8px 16px)',
+        // Soft sand cross-hatch backdrop — readable behind translucent stickies.
+        background:
+          'repeating-linear-gradient(45deg, var(--ls-sand-50) 0 8px, var(--ls-sand-100) 8px 16px)',
         overflow: 'hidden',
       }}
     >
-      {/* New sticky button */}
-      <button
-        type="button"
-        onClick={addSticky}
-        title="New sticky"
-        style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
-          zIndex: 100000,
-          width: 26,
-          height: 26,
-          borderRadius: 4,
-          background: 'rgba(255, 255, 255, 0.7)',
-          border: '1px solid rgba(0, 0, 0, 0.3)',
-          fontSize: 16,
-          fontFamily: 'var(--theme-font-display)',
-          cursor: 'pointer',
-          padding: 0,
-          lineHeight: 1,
-        }}
-      >
-        +
-      </button>
+      {/* New sticky button — floating glass action */}
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 100000 }}>
+        <GlassButton
+          variant="default"
+          size="sm"
+          onClick={addSticky}
+          title="New sticky"
+          aria-label="New sticky"
+        >
+          <StickyNote size={14} />
+          New
+        </GlassButton>
+      </div>
 
       {stickies.map(s => (
-        <StickyNote
+        <StickyNoteCard
           key={s.id}
           sticky={s}
           parentRef={parentRef}

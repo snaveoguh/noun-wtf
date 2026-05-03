@@ -8,6 +8,9 @@ import VoteApp from './VoteApp';
 // Side-effect import — registers Activity Monitor + Console + EventInspector
 // hotkey via berryRegistry. See apps/devtoolsApps.ts for details.
 import './devtoolsApps';
+// Side-effect import — registers the Liquid Sand UI showcase app via
+// berryRegistry. See apps/LiquidSandApp.tsx for the registration call.
+import './LiquidSandApp';
 
 export interface BerryAppDef {
   appId: string;

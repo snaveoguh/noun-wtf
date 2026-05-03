@@ -1,0 +1,58 @@
+{
+  "name": "liquid-sand-ui",
+  "version": "0.1.0",
+  "description": "Y2K-modern, super-minimal, frosted-glass design system with a warm sepia tone. CC0 / public domain.",
+  "license": "CC0-1.0",
+  "author": "noun.wtf",
+  "main": "./index.ts",
+  "module": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./tokens": "./tokens.ts",
+    "./tokens.css": "./tokens.css",
+    "./glass": "./glass/index.ts",
+    "./icons": "./icons/index.ts",
+    "./inversion": "./inversion/index.ts"
+  },
+  "files": [
+    "index.ts",
+    "tokens.ts",
+    "tokens.css",
+    "glass",
+    "icons",
+    "inversion",
+    "LICENSE",
+    "README.md",
+    "MANIFEST.md",
+    "EXTRACTING.md"
+  ],
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "keywords": [
+    "design-system",
+    "glass",
+    "frosted",
+    "y2k",
+    "cc0",
+    "public-domain",
+    "icons",
+    "monoline",
+    "sepia",
+    "backdrop-filter",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snaveoguh/noun-wtf",
+    "directory": "packages/nouns-webapp/src/liquid-sand"
+  },
+  "homepage": "https://noun.wtf",
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": true,
+  "_comment": "STUB — not yet publishable. `private: true` keeps `pnpm publish` from firing accidentally. Flip to `false` when this folder is extracted to its own repo, swap `main`/`exports` to point at compiled `dist/` output, and remove this comment field."
+}

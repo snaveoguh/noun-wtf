@@ -11,6 +11,9 @@
 
 import { useMemo, useState, type ComponentType } from 'react';
 
+import { GlassButton, GlassChip, GlassPanel, GlassToolbar } from '@/liquid-sand/glass';
+import { Bell, ChatBubble, Coin, Info, Megaphone, Sparkle } from '@/liquid-sand/icons';
+
 import {
   clearAll,
   dismiss,
@@ -30,11 +33,18 @@ type Filter =
   | { kind: 'app'; appId: string }
   | { kind: 'level'; level: NotificationLevel };
 
-const LEVEL_COLORS: Record<NotificationLevel, string> = {
-  info: '#3478F6',
-  success: '#34C759',
-  warning: '#FF9F0A',
-  error: '#FF3B30',
+const LEVEL_TONE: Record<NotificationLevel, 'accent' | 'success' | 'danger' | 'neutral'> = {
+  info: 'accent',
+  success: 'success',
+  warning: 'neutral',
+  error: 'danger',
+};
+
+const LEVEL_COLOR: Record<NotificationLevel, string> = {
+  info: 'var(--ls-accent)',
+  success: 'var(--ls-success)',
+  warning: 'var(--ls-sand-500)',
+  error: 'var(--ls-danger)',
 };
 
 const LEVELS: NotificationLevel[] = ['info', 'success', 'warning', 'error'];
@@ -133,107 +143,88 @@ export default function NotificationsApp() {
 
   return (
     <div
+      className="flex flex-col h-full"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        fontFamily: 'var(--theme-font-display, -apple-system, sans-serif)',
-        color: 'var(--theme-text-primary, #1d1d1f)',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
       {/* Filter bar */}
-      <div
-        style={{
-          padding: '8px 10px',
-          borderBottom: '1px solid var(--theme-border, rgba(0,0,0,0.08))',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 4,
-          alignItems: 'center',
-        }}
-      >
-        <FilterChip
-          label="All"
-          active={filter.kind === 'all'}
-          onClick={() => setFilter({ kind: 'all' })}
-        />
-        <FilterChip
-          label="Unread"
-          active={filter.kind === 'unread'}
-          onClick={() => setFilter({ kind: 'unread' })}
-        />
-        <span style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
-        {LEVELS.map(level => (
+      <div className="p-2.5">
+        <GlassToolbar size="md" align="start" className="w-full flex-wrap">
           <FilterChip
-            key={level}
-            label={level}
-            color={LEVEL_COLORS[level]}
-            active={filter.kind === 'level' && filter.level === level}
-            onClick={() => setFilter({ kind: 'level', level })}
+            label="All"
+            active={filter.kind === 'all'}
+            onClick={() => setFilter({ kind: 'all' })}
           />
-        ))}
-        {apps.length > 0 && (
-          <>
-            <span
-              style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.1)', margin: '0 4px' }}
+          <FilterChip
+            label="Unread"
+            active={filter.kind === 'unread'}
+            onClick={() => setFilter({ kind: 'unread' })}
+          />
+          <span className="mx-1" style={{ width: 1, height: 16, background: 'var(--ls-border-glass)' }} />
+          {LEVELS.map(level => (
+            <FilterChip
+              key={level}
+              label={level}
+              dot={LEVEL_COLOR[level]}
+              active={filter.kind === 'level' && filter.level === level}
+              onClick={() => setFilter({ kind: 'level', level })}
             />
-            <select
-              value={filter.kind === 'app' ? filter.appId : ''}
-              onChange={e => {
-                if (!e.target.value) setFilter({ kind: 'all' });
-                else setFilter({ kind: 'app', appId: e.target.value });
-              }}
-              style={{
-                fontSize: 11,
-                fontFamily: 'inherit',
-                padding: '2px 6px',
-                borderRadius: 4,
-                border: '1px solid rgba(0,0,0,0.15)',
-                background: '#fff',
-              }}
-            >
-              <option value="">By app…</option>
-              {apps.map(a => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          disabled={all.length === 0}
-          onClick={() => clearAll()}
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '2px 8px',
-            borderRadius: 5,
-            border: '1px solid rgba(0,0,0,0.12)',
-            background: all.length === 0 ? 'transparent' : 'rgba(0,0,0,0.04)',
-            cursor: all.length === 0 ? 'default' : 'pointer',
-            color: all.length === 0 ? 'var(--theme-text-muted, #999)' : 'inherit',
-            fontFamily: 'inherit',
-          }}
-        >
-          Clear all
-        </button>
+          ))}
+          {apps.length > 0 && (
+            <>
+              <span className="mx-1" style={{ width: 1, height: 16, background: 'var(--ls-border-glass)' }} />
+              <select
+                value={filter.kind === 'app' ? filter.appId : ''}
+                onChange={e => {
+                  if (!e.target.value) setFilter({ kind: 'all' });
+                  else setFilter({ kind: 'app', appId: e.target.value });
+                }}
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'inherit',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--ls-r-md)',
+                  border: '1px solid var(--ls-border-glass)',
+                  background: 'var(--ls-glass-light-strong)',
+                  color: 'var(--ls-fg-primary)',
+                }}
+              >
+                <option value="">By app…</option>
+                {apps.map(a => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <span className="flex-1 min-w-0" />
+          <GlassButton
+            variant="ghost"
+            size="sm"
+            disabled={all.length === 0}
+            onClick={() => clearAll()}
+          >
+            Clear all
+          </GlassButton>
+        </GlassToolbar>
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+      <div className="flex-1 overflow-y-auto px-2.5 pb-2.5 flex flex-col gap-2">
         {filtered.length === 0 ? (
           <div
+            className="text-center"
             style={{
-              textAlign: 'center',
               padding: 32,
-              color: 'var(--theme-text-muted, #888)',
-              fontSize: 12,
+              color: 'var(--ls-fg-muted)',
+              fontSize: 'var(--ls-text-sm)',
             }}
           >
-            No notifications
+            <Bell size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
+            <div>No notifications</div>
           </div>
         ) : (
           filtered.map(n => <Row key={n.id} notification={n} />)
@@ -243,33 +234,21 @@ export default function NotificationsApp() {
       {/* Dev tools */}
       {isDev() && (
         <div
+          className="p-2.5"
           style={{
-            padding: '8px 10px',
-            borderTop: '1px solid var(--theme-border, rgba(0,0,0,0.08))',
-            display: 'flex',
-            gap: 6,
-            alignItems: 'center',
-            background: 'rgba(0,0,0,0.02)',
-            fontSize: 11,
+            borderTop: '1px solid var(--ls-border-glass)',
+            background: 'var(--ls-glass-tint)',
           }}
         >
-          <span style={{ color: 'var(--theme-text-muted, #888)' }}>dev</span>
-          <button
-            type="button"
-            onClick={fireSamples}
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              padding: '3px 10px',
-              borderRadius: 5,
-              border: '1px solid rgba(0,0,0,0.15)',
-              background: '#fff',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Fire test notifications
-          </button>
+          <div className="flex gap-2 items-center">
+            <GlassChip tone="accent" size="xs">
+              dev
+            </GlassChip>
+            <GlassButton variant="default" size="sm" onClick={fireSamples}>
+              <Sparkle size={12} />
+              Fire test notifications
+            </GlassButton>
+          </div>
         </div>
       )}
     </div>
@@ -280,65 +259,106 @@ function FilterChip({
   label,
   active,
   onClick,
-  color,
+  dot,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
-  color?: string;
+  dot?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      className="inline-flex items-center gap-1.5 select-none"
       style={{
         fontSize: 11,
         fontWeight: 600,
-        padding: '3px 8px',
-        borderRadius: 5,
-        border: '1px solid rgba(0,0,0,0.12)',
-        background: active ? color ?? 'var(--theme-accent, #3478F6)' : 'transparent',
-        color: active ? '#fff' : 'inherit',
+        padding: '4px 10px',
+        borderRadius: 'var(--ls-r-full)',
+        border: '1px solid var(--ls-border-glass)',
+        background: active ? 'var(--ls-accent)' : 'transparent',
+        color: active ? 'var(--ls-fg-on-dark)' : 'var(--ls-fg-secondary)',
         cursor: 'pointer',
         textTransform: 'capitalize',
         fontFamily: 'inherit',
-        lineHeight: 1.2,
+        boxShadow: active
+          ? 'var(--ls-shadow-inset-glass), var(--ls-shadow-glow)'
+          : 'none',
+        transition:
+          'background-color var(--ls-dur-base) var(--ls-ease-soft), color var(--ls-dur-base) var(--ls-ease-soft)',
       }}
     >
+      {dot && (
+        <span
+          aria-hidden
+          style={{
+            display: 'inline-block',
+            width: 6,
+            height: 6,
+            borderRadius: 'var(--ls-r-full)',
+            background: dot,
+          }}
+        />
+      )}
       {label}
     </button>
   );
 }
 
+function levelIcon(level: NotificationLevel | undefined) {
+  switch (level) {
+    case 'success':
+      return <Sparkle size={16} />;
+    case 'warning':
+    case 'error':
+      return <Megaphone size={16} />;
+    case 'info':
+    default:
+      return <Info size={16} />;
+  }
+}
+
+function fallbackIcon(appId: string, level: NotificationLevel | undefined) {
+  if (appId === 'auction') return <Coin size={16} />;
+  if (appId === 'notifications') return <ChatBubble size={16} />;
+  return levelIcon(level);
+}
+
 function Row({ notification }: { notification: BerryNotification }) {
-  const accent = LEVEL_COLORS[notification.level ?? 'info'];
+  const accent = LEVEL_COLOR[notification.level ?? 'info'];
   return (
-    <div
+    <GlassPanel
+      padded={false}
+      radius="md"
+      tone="auto"
+      className="flex gap-2.5 px-3 py-2.5"
       style={{
-        display: 'flex',
-        gap: 8,
-        padding: '8px 10px',
-        marginBottom: 4,
-        background: '#fff',
-        border: '1px solid rgba(0,0,0,0.06)',
-        borderLeft: `3px solid ${notification.dismissed ? 'rgba(0,0,0,0.12)' : accent}`,
-        borderRadius: 6,
-        opacity: notification.dismissed ? 0.65 : 1,
+        opacity: notification.dismissed ? 0.6 : 1,
+        borderLeft: `3px solid ${notification.dismissed ? 'var(--ls-border-glass)' : accent}`,
       }}
     >
       <div
         aria-hidden
-        style={{ fontSize: 16, lineHeight: 1, marginTop: 1, width: 18, textAlign: 'center' }}
+        className="flex-shrink-0 flex items-center justify-center"
+        style={{
+          width: 22,
+          height: 22,
+          marginTop: 1,
+          color: accent,
+        }}
       >
-        {typeof notification.icon === 'string' ? notification.icon : '🔔'}
+        {fallbackIcon(notification.appId, notification.level)}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{notification.title}</div>
+      <div className="flex-1 min-w-0">
+        <div style={{ fontSize: 'var(--ls-text-sm)', fontWeight: 600, lineHeight: 1.3 }}>
+          {notification.title}
+        </div>
         {notification.body && (
           <div
             style={{
-              fontSize: 11,
-              color: 'var(--theme-text-secondary, #5a5a5f)',
+              fontSize: 'var(--ls-text-xs)',
+              color: 'var(--ls-fg-secondary)',
               lineHeight: 1.35,
               wordBreak: 'break-word',
               marginTop: 1,
@@ -348,18 +368,21 @@ function Row({ notification }: { notification: BerryNotification }) {
           </div>
         )}
         <div
+          className="flex gap-2 items-center mt-1.5"
           style={{
             fontSize: 10,
-            color: 'var(--theme-text-muted, #999)',
-            marginTop: 4,
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center',
+            color: 'var(--ls-fg-muted)',
           }}
         >
-          <span>{notification.appId}</span>
-          <span>·</span>
-          <span>{formatTime(notification.timestamp)}</span>
+          <GlassChip
+            tone={LEVEL_TONE[notification.level ?? 'info']}
+            size="xs"
+          >
+            {notification.appId}
+          </GlassChip>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {formatTime(notification.timestamp)}
+          </span>
           {notification.action && (
             <button
               type="button"
@@ -373,7 +396,7 @@ function Row({ notification }: { notification: BerryNotification }) {
                 padding: 0,
                 cursor: 'pointer',
                 textTransform: 'uppercase',
-                letterSpacing: 0.3,
+                letterSpacing: 0.5,
                 fontFamily: 'inherit',
               }}
             >
@@ -386,7 +409,7 @@ function Row({ notification }: { notification: BerryNotification }) {
               onClick={() => dismiss(notification.id)}
               style={{
                 fontSize: 10,
-                color: 'var(--theme-text-muted, #999)',
+                color: 'var(--ls-fg-muted)',
                 background: 'transparent',
                 border: 'none',
                 padding: 0,
@@ -400,7 +423,7 @@ function Row({ notification }: { notification: BerryNotification }) {
           )}
         </div>
       </div>
-    </div>
+    </GlassPanel>
   );
 }
 

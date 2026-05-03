@@ -1,11 +1,9 @@
 /**
  * MenuBarClock — live HH:MM clock widget for the BerryOS menu bar.
  *
- * Subscribes to `system:tick` when available; falls back to a 30s setInterval
- * (close enough to the minute boundary, cheap). Click to open the Clock app.
- *
- * Drop-in: import and render between the existing menu-bar widgets in
- * `BerryShell/index.tsx` (replacement for the local MenuBarClock there).
+ * Liquid Sand chrome: tabular-nums in the JetBrains Mono token font, glass
+ * hover lift on the menu bar surface. Subscribes to `system:tick` when
+ * available; falls back to a 30s setInterval. Click to open the Clock app.
  */
 import { useEffect, useState, type ReactElement } from 'react';
 
@@ -58,24 +56,26 @@ export default function MenuBarClock(): ReactElement {
       aria-label={`Clock — ${time}`}
       title="Open Clock"
       style={{
-        fontFamily: 'var(--theme-font-display)',
+        // Mono + tabular-nums so the time slot doesn't shimmy on each tick.
+        fontFamily: 'var(--ls-font-mono)',
+        fontVariantNumeric: 'tabular-nums',
         fontSize: 12,
         padding: '0 8px',
         height: '100%',
-        color: 'var(--theme-text-primary)',
+        color: 'var(--ls-fg-primary)',
         background: 'transparent',
         border: 'none',
         cursor: 'pointer',
         userSelect: 'none',
         whiteSpace: 'nowrap',
+        borderRadius: 'var(--ls-r-sm)',
+        transition: 'background var(--ls-dur-fast) var(--ls-ease-soft)',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.background = 'var(--theme-accent)';
-        e.currentTarget.style.color = '#fff';
+        e.currentTarget.style.background = 'var(--ls-glass-light-strong)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--theme-text-primary)';
       }}
     >
       {compact ? time : `${day} ${time}`}

@@ -1,32 +1,22 @@
 /**
- * BerryDesktopBackground — full-viewport painted layer that reflects the
- * currently-selected wallpaper.
+ * BerryDesktopBackground — Liquid Sand sand-tone gradient under the shell.
  *
- * BerryShell's existing implementation paints its own aqua gradient on the
- * outer wrapper. This component sits as a fixed-position layer behind it so
- * non-aqua wallpapers (Strawberry, Sunset, Space) can show through when the
- * shell's own background is overridden — and so the lock-screen blur layer
- * has something deterministic to read from.
+ * Default: a soft warm gradient running from `--ls-sand-50` at top to
+ * `--ls-sand-200` at bottom — readable cream-to-sepia field that gives
+ * frost-glass surfaces something warm to bend behind. Wallpaper switching
+ * still works via the wallpaper.ts module — picking anything other than the
+ * default (id `aqua`) overrides this paint with the wallpaper CSS string.
  *
- * The shell wrapper currently has its own opaque gradient, so to keep the
- * wallpaper visible we set `data-berry-wallpaper` on `<html>`. CSS in
- * `LifecycleMount` (and any consumer) can use:
- *
- *   html[data-berry-wallpaper] body { background: transparent !important; }
- *
- * If the shell author wants to honour the wallpaper directly, they can read
- * `useCurrentWallpaper()` and apply it themselves — this component remains
- * authoritative for the persisted choice.
- *
- * Even without those overrides this component is useful: the lock screen
- * reads the same `useCurrentWallpaper()` hook, so picking a wallpaper
- * immediately changes the lock-screen background without touching anything
- * shell-side.
+ * The lock screen also reads `useCurrentWallpaper()`, so picking a wallpaper
+ * immediately changes the lock-screen background.
  */
 
 import { useEffect } from 'react';
 
 import { useCurrentWallpaper } from './wallpaper';
+
+const SAND_GRADIENT =
+  'linear-gradient(180deg, var(--ls-sand-50) 0%, var(--ls-sand-100) 45%, var(--ls-sand-200) 100%)';
 
 export default function BerryDesktopBackground() {
   const wallpaper = useCurrentWallpaper();
@@ -43,6 +33,11 @@ export default function BerryDesktopBackground() {
     };
   }, [wallpaper.src, wallpaper.id]);
 
+  // The legacy "aqua" id is the default in the catalogue; in Liquid Sand we
+  // re-skin that default to the warm sand gradient. Anything else (Strawberry,
+  // Sunset, Space, future user uploads) paints as supplied.
+  const background = wallpaper.id === 'aqua' ? SAND_GRADIENT : wallpaper.src;
+
   return (
     <div
       aria-hidden
@@ -51,10 +46,10 @@ export default function BerryDesktopBackground() {
         position: 'fixed',
         inset: 0,
         zIndex: 0,
-        background: wallpaper.src,
+        background,
         pointerEvents: 'none',
-        // Animate gradient changes smoothly — 320ms feels live without dragging.
-        transition: 'background 320ms ease',
+        // Animate gradient changes smoothly with the Liquid Sand glide easing.
+        transition: 'background var(--ls-dur-slow) var(--ls-ease-glide)',
       }}
     />
   );

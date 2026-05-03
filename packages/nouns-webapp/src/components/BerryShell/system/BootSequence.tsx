@@ -27,6 +27,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { GlassPanel } from '@/liquid-sand/glass';
+import { Sandglass } from '@/liquid-sand/icons';
+
 import { berryRegistry } from './berryRegistry';
 import { berryBus } from './eventBus';
 import { extendedBus } from './extendedBus';
@@ -473,62 +476,86 @@ export default function BootSequence({ children, skip }: BootSequenceProps) {
             position: 'fixed',
             inset: 0,
             zIndex: 5000,
-            background: '#000',
-            color: '#f4f4f4',
+            // Soft sand gradient — same family as the desktop backdrop so the
+            // splash → desktop fade reads as one continuous surface.
+            background:
+              'linear-gradient(180deg, var(--ls-sand-50) 0%, var(--ls-sand-100) 50%, var(--ls-sand-200) 100%)',
+            color: 'var(--ls-fg-primary)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 22,
+            gap: 24,
             opacity: stage === 'fading' ? 0 : 1,
-            transition: 'opacity 420ms ease',
+            // Glide easing matches Liquid Sand transitions used elsewhere.
+            transition: 'opacity var(--ls-dur-slow) var(--ls-ease-glide)',
             pointerEvents: stage === 'fading' ? 'none' : 'auto',
-            fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
+            fontFamily: 'var(--ls-font-sans)',
           }}
         >
-          <div
-            aria-hidden
+          <GlassPanel
+            blur="extreme"
+            radius="lg"
+            glow
             style={{
-              fontSize: 96,
-              lineHeight: 1,
-              animation: 'berryBootPulse 2.4s ease-in-out infinite',
-              filter: 'drop-shadow(0 6px 18px rgba(255, 80, 130, 0.45))',
-            }}
-          >
-            🍓
-          </div>
-          <div
-            style={{
-              width: 240,
-              height: 6,
-              borderRadius: 3,
-              background: 'rgba(255, 255, 255, 0.12)',
-              overflow: 'hidden',
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              padding: '32px 36px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 22,
+              minWidth: 260,
+              animation:
+                'berryBootIn var(--ls-dur-slow) var(--ls-ease-glide) both',
             }}
           >
             <div
+              aria-hidden
               style={{
-                height: '100%',
-                width: `${Math.round(progressInPhase * 100)}%`,
-                background:
-                  'linear-gradient(90deg, #ff5577 0%, #ffb37a 100%)',
-                transition: 'width 80ms linear',
-                boxShadow: '0 0 8px rgba(255, 100, 130, 0.6)',
+                width: 64,
+                height: 64,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--ls-sand-600)',
+                animation: 'berryBootPulse 2.4s ease-in-out infinite',
               }}
-            />
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              letterSpacing: 0.4,
-              opacity: 0.85,
-              minHeight: 16,
-              textAlign: 'center',
-            }}
-          >
-            {currentPhase?.label ?? ''}
-          </div>
+            >
+              <Sandglass size={48} />
+            </div>
+            <div
+              style={{
+                width: 220,
+                height: 4,
+                borderRadius: 'var(--ls-r-full)',
+                background: 'var(--ls-glass-tint)',
+                overflow: 'hidden',
+                boxShadow: 'inset 0 1px 1px rgba(60,45,25,0.10)',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${Math.round(progressInPhase * 100)}%`,
+                  background:
+                    'linear-gradient(90deg, var(--ls-sand-300) 0%, var(--ls-sand-500) 100%)',
+                  transition: 'width 80ms linear',
+                  boxShadow: '0 0 8px rgba(184,147,82,0.55)',
+                }}
+              />
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--ls-font-mono)',
+                fontSize: 12,
+                letterSpacing: 0.4,
+                color: 'var(--ls-fg-secondary)',
+                minHeight: 16,
+                textAlign: 'center',
+              }}
+            >
+              {currentPhase?.label ?? ''}
+            </div>
+          </GlassPanel>
         </div>
       )}
     </>
@@ -538,6 +565,10 @@ export default function BootSequence({ children, skip }: BootSequenceProps) {
 const splashKeyframes = `
 @keyframes berryBootPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.04); opacity: 0.92; }
+  50% { transform: scale(1.04); opacity: 0.85; }
+}
+@keyframes berryBootIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 `;

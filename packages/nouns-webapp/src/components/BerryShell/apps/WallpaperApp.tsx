@@ -12,6 +12,9 @@
 
 import { useEffect, type CSSProperties } from 'react';
 
+import { GlassPanel } from '@/liquid-sand/glass';
+import { Sparkle } from '@/liquid-sand/icons';
+
 import { berryRegistry } from '../system/berryRegistry';
 import {
   useCurrentWallpaperId,
@@ -34,36 +37,39 @@ export default function WallpaperApp() {
 
   return (
     <div
+      className="flex flex-col h-full p-4 gap-3 box-border"
       style={{
-        padding: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        height: '100%',
-        boxSizing: 'border-box',
-        fontFamily: 'var(--theme-font-display, system-ui)',
-        color: 'var(--theme-text-primary, #111)',
-        background: 'var(--theme-bg-card, #f4f4f4)',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>
+        <div
+          style={{
+            fontFamily: 'var(--ls-font-display)',
+            fontSize: 'var(--ls-text-md)',
+            fontWeight: 700,
+            marginBottom: 2,
+            color: 'var(--ls-fg-primary)',
+          }}
+        >
           Desktop &amp; Screensaver
         </div>
-        <div style={{ fontSize: 11, opacity: 0.7 }}>
+        <div
+          style={{
+            fontSize: 'var(--ls-text-xs)',
+            color: 'var(--ls-fg-muted)',
+          }}
+        >
           Pick a wallpaper. The desktop updates live.
         </div>
       </div>
       <div
         role="radiogroup"
         aria-label="Wallpapers"
+        className="grid gap-2.5 overflow-y-auto pr-1 flex-1"
         style={{
-          display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: 10,
-          overflowY: 'auto',
-          paddingRight: 4,
-          flex: 1,
         }}
       >
         {list.map(w => (
@@ -101,24 +107,45 @@ function WallpaperTile({ wallpaper, selected, onSelect }: TileProps) {
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      <div
-        aria-hidden
+      <GlassPanel
+        as="div"
+        radius="md"
+        tone="auto"
+        padded={false}
+        bordered
         style={{
           width: '100%',
           paddingTop: '60%',
           background: wallpaper.thumb ?? wallpaper.src,
-          borderRadius: 6,
-          border: '1px solid rgba(0, 0, 0, 0.18)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative',
         }}
-      />
+      >
+        {selected && (
+          <div
+            className="absolute top-1 right-1 inline-flex items-center justify-center"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 'var(--ls-r-full)',
+              background: 'var(--ls-accent)',
+              color: 'var(--ls-fg-on-dark)',
+              boxShadow: 'var(--ls-shadow-glow), 0 0 0 1px var(--ls-border-glass)',
+            }}
+            aria-hidden
+          >
+            <Sparkle size={12} />
+          </div>
+        )}
+      </GlassPanel>
       <div
         style={{
           marginTop: 6,
-          fontSize: 11,
+          fontSize: 'var(--ls-text-xs)',
           fontWeight: 600,
           textAlign: 'center',
-          color: 'inherit',
+          color: selected ? 'var(--ls-accent)' : 'var(--ls-fg-secondary)',
         }}
       >
         {wallpaper.name}
@@ -131,15 +158,15 @@ function tileStyle(selected: boolean): CSSProperties {
   return {
     display: 'flex',
     flexDirection: 'column',
-    padding: 6,
-    background: selected ? 'var(--theme-accent, #2d7ad8)' : 'transparent',
-    color: selected ? '#fff' : 'inherit',
-    border: selected
-      ? '1px solid var(--theme-accent, #2d7ad8)'
-      : '1px solid transparent',
-    borderRadius: 8,
+    padding: 4,
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 'var(--ls-r-md)',
     cursor: 'pointer',
-    transition: 'background 120ms ease, border-color 120ms ease, transform 120ms ease',
+    outline: selected ? '2px solid var(--ls-accent)' : 'none',
+    outlineOffset: 2,
+    transition:
+      'transform var(--ls-dur-base) var(--ls-ease-spring), outline-color var(--ls-dur-base) var(--ls-ease-soft)',
   };
 }
 

@@ -19,6 +19,8 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useAccount } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
+import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import { CpuChip, Info, Wallet } from '@/liquid-sand/icons';
 
 import { APP_REGISTRY } from './registry';
 import { berryRegistry } from '../system/berryRegistry';
@@ -115,117 +117,124 @@ function AboutApp(): ReactElement {
 
   return (
     <div
+      className="flex flex-col h-full p-4 gap-4 box-border"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: 'linear-gradient(180deg, #f8f8f8 0%, #ececec 100%)',
-        fontFamily: 'var(--theme-font-display)',
-        color: 'var(--theme-text-primary)',
-        boxSizing: 'border-box',
+        fontFamily: 'var(--ls-font-sans)',
+        color: 'var(--ls-fg-primary)',
       }}
     >
       {/* Hero */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 18,
-          padding: '20px 22px 14px',
-        }}
-      >
-        <div
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: 16,
-            background: 'linear-gradient(180deg, #ffe9ee 0%, #fbb1c1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 44,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 12px rgba(0,0,0,0.18)',
-          }}
-          aria-hidden
-        >
-          🍓
-        </div>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>BerryOS</div>
-          <div style={{ fontSize: 13, color: 'var(--theme-text-muted)', marginTop: 2 }}>{VERSION}</div>
-          <div style={{ fontSize: 11, color: 'var(--theme-text-muted)', marginTop: 4 }}>
-            noun.wtf desktop emulator
+      <GlassPanel padded radius="lg" tone="auto">
+        <div className="flex items-center gap-4">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 'var(--ls-r-lg)',
+              background:
+                'linear-gradient(180deg, var(--ls-sand-100) 0%, var(--ls-sand-300) 100%)',
+              boxShadow:
+                'var(--ls-shadow-inset-glass), 0 4px 12px rgba(60,45,25,0.18)',
+            }}
+            aria-hidden
+          >
+            <Info size={36} style={{ color: 'var(--ls-fg-primary)' }} />
+          </div>
+          <div className="min-w-0">
+            <div
+              style={{
+                fontFamily: 'var(--ls-font-display)',
+                fontSize: 'var(--ls-text-xl)',
+                fontWeight: 700,
+                lineHeight: 1.1,
+                color: 'var(--ls-fg-primary)',
+              }}
+            >
+              BerryOS
+            </div>
+            <div
+              style={{
+                fontSize: 'var(--ls-text-sm)',
+                color: 'var(--ls-fg-secondary)',
+                marginTop: 2,
+              }}
+            >
+              {VERSION}
+            </div>
+            <div
+              style={{
+                fontSize: 'var(--ls-text-xs)',
+                color: 'var(--ls-fg-muted)',
+                marginTop: 4,
+              }}
+            >
+              noun.wtf desktop emulator
+            </div>
           </div>
         </div>
-      </div>
+      </GlassPanel>
 
       {/* Stats */}
-      <div style={{ padding: '0 22px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <Row label="Memory" value={`${memoryMB} MB`} hint={`${windows.length} window${windows.length === 1 ? '' : 's'} open`} />
-        <Row
-          label="Storage"
-          value={fmtBytes(storage.used)}
-          hint={`of ${fmtBytes(storage.quota)} quota`}
-        >
-          <div
-            style={{
-              height: 6,
-              borderRadius: 3,
-              background: 'rgba(0,0,0,0.08)',
-              overflow: 'hidden',
-              marginTop: 6,
-            }}
-            aria-label={`Storage ${storagePct.toFixed(1)}%`}
+      <GlassPanel padded radius="lg" tone="auto">
+        <div className="flex flex-col gap-3">
+          <Row
+            label="Memory"
+            value={`${memoryMB} MB`}
+            hint={`${windows.length} window${windows.length === 1 ? '' : 's'} open`}
+          />
+          <Row
+            label="Storage"
+            value={fmtBytes(storage.used)}
+            hint={`of ${fmtBytes(storage.quota)} quota`}
           >
             <div
               style={{
-                height: '100%',
-                width: `${storagePct}%`,
-                background: storagePct > 80 ? '#e85a5a' : 'var(--theme-accent, #2b6cb0)',
+                height: 6,
+                borderRadius: 'var(--ls-r-full)',
+                background: 'rgba(60,45,25,0.10)',
+                overflow: 'hidden',
+                marginTop: 6,
+                boxShadow: 'inset 0 1px 2px rgba(60,45,25,0.10)',
               }}
-            />
-          </div>
-        </Row>
-        <Row label="Uptime" value={fmtUptime(uptimeMs)} hint="since boot" />
-        <Row
-          label="Wallet"
-          value={
-            account.isConnected && account.address ? (
-              <ShortAddress address={account.address} avatar={false} />
-            ) : (
-              <span style={{ color: 'var(--theme-text-muted)' }}>Not connected</span>
-            )
-          }
-        />
-      </div>
+              aria-label={`Storage ${storagePct.toFixed(1)}%`}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${storagePct}%`,
+                  background: storagePct > 80 ? 'var(--ls-danger)' : 'var(--ls-accent)',
+                  boxShadow: storagePct > 80 ? 'none' : 'var(--ls-shadow-glow)',
+                  transition: 'width var(--ls-dur-base) var(--ls-ease-soft)',
+                }}
+              />
+            </div>
+          </Row>
+          <Row label="Uptime" value={fmtUptime(uptimeMs)} hint="since boot" />
+          <Row
+            label="Wallet"
+            value={
+              account.isConnected && account.address ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Wallet size={14} />
+                  <ShortAddress address={account.address} avatar={false} />
+                </span>
+              ) : (
+                <GlassChip tone="neutral" size="sm">
+                  Not connected
+                </GlassChip>
+              )
+            }
+          />
+        </div>
+      </GlassPanel>
 
       {/* Footer button */}
-      <div
-        style={{
-          marginTop: 'auto',
-          padding: '12px 22px 16px',
-          borderTop: '1px solid var(--theme-border)',
-          display: 'flex',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <button
-          type="button"
-          onClick={openActivityMonitor}
-          style={{
-            padding: '6px 14px',
-            fontFamily: 'var(--theme-font-display)',
-            fontSize: 12,
-            background: 'linear-gradient(180deg, #ffffff 0%, #e0e0e0 100%)',
-            color: 'var(--theme-text-primary)',
-            border: '1px solid var(--theme-border-strong)',
-            borderRadius: 6,
-            cursor: 'pointer',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), 0 1px 2px rgba(0,0,0,0.15)',
-          }}
-        >
-          System Report…
-        </button>
+      <div className="mt-auto flex justify-end">
+        <GlassButton variant="default" size="md" onClick={openActivityMonitor}>
+          <CpuChip size={14} />
+          System Report
+        </GlassButton>
       </div>
     </div>
   );
@@ -244,12 +253,33 @@ function Row({
 }): ReactElement {
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: 12, color: 'var(--theme-text-muted)' }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>{value}</span>
+      <div className="flex justify-between items-baseline">
+        <span
+          style={{
+            fontSize: 'var(--ls-text-xs)',
+            color: 'var(--ls-fg-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: 0.6,
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontSize: 'var(--ls-text-sm)',
+            fontWeight: 600,
+            color: 'var(--ls-fg-primary)',
+            fontVariantNumeric: 'tabular-nums',
+            fontFamily: 'var(--ls-font-mono)',
+          }}
+        >
+          {value}
+        </span>
       </div>
       {hint && (
-        <div style={{ fontSize: 11, color: 'var(--theme-text-muted)' }}>{hint}</div>
+        <div style={{ fontSize: 'var(--ls-text-xs)', color: 'var(--ls-fg-muted)', marginTop: 2 }}>
+          {hint}
+        </div>
       )}
       {children}
     </div>

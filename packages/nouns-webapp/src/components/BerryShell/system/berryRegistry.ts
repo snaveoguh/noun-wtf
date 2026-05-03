@@ -18,9 +18,29 @@
 
 import type { ComponentType } from 'react';
 
-import { APP_REGISTRY, type BerryAppDef } from '../apps/registry';
+import type { BerryAppDef } from '../apps/registry';
 
 import { berryBus } from './eventBus';
+
+/* ------------------------------------------------------------------------- *
+ * Circular-import dance:                                                    *
+ *                                                                           *
+ *   apps/registry.tsx → side-effect-imports app modules (which call         *
+ *     berryRegistry.register at top level) → those need APP_REGISTRY.       *
+ *                                                                           *
+ * If we import APP_REGISTRY directly at the top of this file, ES module     *
+ * evaluation hits the bindings *before* the `export const APP_REGISTRY`     *
+ * line has run, so accessing it throws "Cannot access 'APP_REGISTRY' before *
+ * initialization". We use a lazy dynamic-import inside register() — by the  *
+ * time any consumer reads APP_REGISTRY (Spotlight, BerryShell launcher),    *
+ * the microtask resolving this import has fired and the mirror is live.    *
+ * ------------------------------------------------------------------------- */
+async function getAppRegistry(): Promise<Record<string, BerryAppDef>> {
+  const mod = (await import('../apps/registry')) as {
+    APP_REGISTRY: Record<string, BerryAppDef>;
+  };
+  return mod.APP_REGISTRY;
+}
 
 export interface BerryAppDescriptor {
   /** Stable id used for window dedup and menu lookups. */
@@ -56,8 +76,12 @@ export const berryRegistry = {
   register(descriptor: BerryAppDescriptor): void {
     descriptors.set(descriptor.id, descriptor);
     // Mirror into the legacy registry so the existing launcher works without
-    // edits. The launcher reads `APP_REGISTRY[appId]` directly.
-    APP_REGISTRY[descriptor.id] = toAppDef(descriptor);
+    // edits. The launcher reads `APP_REGISTRY[appId]` directly. Done via a
+    // lazy dynamic import to dodge the TDZ at registry-module load time —
+    // see comment at top of this file.
+    void getAppRegistry().then(reg => {
+      reg[descriptor.id] = toAppDef(descriptor);
+    });
     // Boot-time signal — useful for the bus history wrapper to capture which
     // apps came online during the session (visible in Console / Inspector).
     try {

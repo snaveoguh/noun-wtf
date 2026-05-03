@@ -1,15 +1,26 @@
 /**
  * Notification Center — Mac Mission Control style slide-out panel.
  *
+ * Liquid Sand chrome: slides in from the right as a `<GlassPanel>`. Each
+ * notification row is rendered with the same warm sepia tone family as the
+ * <GlassToast> floating cards, grouped by app.
+ *
  * Toggles via the menu bar bell. Lists notifications grouped by app
  * (collapsible sections), newest first. "Clear all" button at the top.
- *
- * Mount once in BerryShell/index.tsx (see drop-in note at the bottom of this
- * file). The panel renders in-flow (not portal'd) so it inherits the shell's
- * theme variables.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType } from 'react';
+
+import { GlassButton, GlassChip, GlassPanel } from '@/liquid-sand/glass';
+import {
+  Bell,
+  Coin,
+  CpuChip,
+  Diamond,
+  Document,
+  Folder,
+  Settings as SettingsIcon,
+} from '@/liquid-sand/icons';
 
 import {
   clearAll,
@@ -24,14 +35,16 @@ import {
 
 const PANEL_WIDTH = 340;
 
-const APP_EMOJI: Record<string, string> = {
-  finder: '🍓',
-  auction: '🪙',
-  vote: '🗳️',
-  candidates: '📜',
-  settings: '⚙️',
-  notifications: '🔔',
-  system: '🖥️',
+type IconComp = ComponentType<{ size?: number | string }>;
+
+const APP_ICON: Record<string, IconComp> = {
+  finder: Folder,
+  auction: Coin,
+  vote: Diamond,
+  candidates: Document,
+  settings: SettingsIcon,
+  notifications: Bell,
+  system: CpuChip,
 };
 
 interface AppGroup {
@@ -41,13 +54,15 @@ interface AppGroup {
 
 function groupByApp(items: BerryNotification[]): AppGroup[] {
   const map = new Map<string, BerryNotification[]>();
-  // `useNotifications` returns newest-first; preserve that order.
   for (const n of items) {
     const list = map.get(n.appId);
     if (list) list.push(n);
     else map.set(n.appId, [n]);
   }
-  return Array.from(map.entries()).map(([appId, notifications]) => ({ appId, notifications }));
+  return Array.from(map.entries()).map(([appId, notifications]) => ({
+    appId,
+    notifications,
+  }));
 }
 
 function formatTime(ts: number): string {
@@ -69,47 +84,57 @@ export default function NotificationCenter() {
 
   return (
     <>
-      {/* Click-out scrim */}
+      {/* Click-out scrim — sand-tone veil. */}
       <div
         aria-hidden={!isOpen}
         onClick={() => notificationCenterStore.close()}
         style={{
           position: 'fixed',
           inset: 0,
-          background: isOpen ? 'rgba(0, 0, 0, 0.18)' : 'transparent',
+          background: isOpen ? 'rgba(60, 45, 25, 0.18)' : 'transparent',
           opacity: isOpen ? 1 : 0,
-          transition: 'opacity 200ms ease, background 200ms ease',
+          transition:
+            'opacity var(--ls-dur-base) var(--ls-ease-soft), background var(--ls-dur-base) var(--ls-ease-soft)',
           pointerEvents: isOpen ? 'auto' : 'none',
           zIndex: 9990,
         }}
       />
-      <aside
+      <GlassPanel
+        as="aside"
+        blur="extreme"
+        radius="md"
+        bordered={false}
         aria-label="Notification Center"
         aria-hidden={!isOpen}
         style={{
           position: 'fixed',
-          top: 24,
+          top: 28,
           right: 0,
           bottom: 0,
           width: PANEL_WIDTH,
-          background: 'rgba(248, 246, 240, 0.96)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-          borderLeft: '1px solid rgba(0, 0, 0, 0.10)',
-          boxShadow: '-8px 0 24px rgba(0, 0, 0, 0.18)',
-          transform: isOpen ? 'translateX(0)' : `translateX(${PANEL_WIDTH + 12}px)`,
-          transition: 'transform 260ms cubic-bezier(0.32, 0.72, 0, 1)',
+          borderTopLeftRadius: 'var(--ls-r-lg)',
+          borderBottomLeftRadius: 'var(--ls-r-lg)',
+          borderTopRightRadius: 0,
+          borderBottomRightRadius: 0,
+          borderLeft: '1px solid var(--ls-border-glass)',
+          boxShadow:
+            'var(--ls-shadow-inset-glass), -8px 0 32px rgba(60, 45, 25, 0.18)',
+          transform: isOpen
+            ? 'translateX(0)'
+            : `translateX(${PANEL_WIDTH + 12}px)`,
+          transition:
+            'transform var(--ls-dur-slow) var(--ls-ease-glide)',
           zIndex: 9995,
           display: 'flex',
           flexDirection: 'column',
-          fontFamily: 'var(--theme-font-display, -apple-system, BlinkMacSystemFont, sans-serif)',
-          color: 'var(--theme-text-primary, #1d1d1f)',
+          fontFamily: 'var(--ls-font-sans)',
+          color: 'var(--ls-fg-primary)',
         }}
       >
         <header
           style={{
-            padding: '12px 14px',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+            padding: '14px 16px',
+            borderBottom: '1px solid var(--ls-border-glass)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -118,34 +143,22 @@ export default function NotificationCenter() {
           <h2
             style={{
               fontSize: 14,
-              fontWeight: 700,
+              fontWeight: 600,
               margin: 0,
               letterSpacing: 0.2,
+              color: 'var(--ls-fg-primary)',
             }}
           >
             Notifications
           </h2>
-          <button
-            type="button"
+          <GlassButton
+            variant="ghost"
+            size="sm"
             disabled={notifications.length === 0}
             onClick={() => clearAll()}
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              padding: '3px 8px',
-              borderRadius: 6,
-              border: '1px solid rgba(0, 0, 0, 0.12)',
-              background: notifications.length === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.04)',
-              color:
-                notifications.length === 0
-                  ? 'var(--theme-text-muted, #999)'
-                  : 'var(--theme-text-primary, #1d1d1f)',
-              cursor: notifications.length === 0 ? 'default' : 'pointer',
-              fontFamily: 'inherit',
-            }}
           >
             Clear all
-          </button>
+          </GlassButton>
         </header>
 
         <div
@@ -161,10 +174,12 @@ export default function NotificationCenter() {
           {groups.length === 0 ? (
             <EmptyState />
           ) : (
-            groups.map(group => <AppGroupSection key={group.appId} group={group} />)
+            groups.map(group => (
+              <AppGroupSection key={group.appId} group={group} />
+            ))
           )}
         </div>
-      </aside>
+      </GlassPanel>
     </>
   );
 }
@@ -176,13 +191,15 @@ function EmptyState() {
         margin: 'auto',
         padding: 24,
         textAlign: 'center',
-        color: 'var(--theme-text-muted, #888)',
+        color: 'var(--ls-fg-muted)',
         fontSize: 13,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
       }}
     >
-      <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.6 }} aria-hidden="true">
-        🔔
-      </div>
+      <Bell size={28} />
       No new notifications
     </div>
   );
@@ -190,16 +207,18 @@ function EmptyState() {
 
 function AppGroupSection({ group }: { group: AppGroup }) {
   const [collapsed, setCollapsed] = useState(false);
-  const emoji = APP_EMOJI[group.appId] ?? '•';
+  const Icon = APP_ICON[group.appId] ?? Document;
   const undismissed = group.notifications.filter(n => !n.dismissed).length;
 
   return (
-    <section
+    <GlassPanel
+      as="section"
+      blur="medium"
+      radius="md"
+      bordered
       style={{
-        background: 'rgba(255, 255, 255, 0.7)',
-        border: '1px solid rgba(0, 0, 0, 0.06)',
-        borderRadius: 10,
         overflow: 'hidden',
+        padding: 0,
       }}
     >
       <button
@@ -216,39 +235,33 @@ function AppGroupSection({ group }: { group: AppGroup }) {
           border: 'none',
           cursor: 'pointer',
           fontFamily: 'inherit',
-          color: 'inherit',
+          color: 'var(--ls-fg-primary)',
           textAlign: 'left',
         }}
       >
-        <span aria-hidden="true" style={{ fontSize: 14 }}>
-          {emoji}
-        </span>
-        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, textTransform: 'capitalize' }}>
+        <Icon size={14} />
+        <span
+          style={{
+            flex: 1,
+            fontSize: 12,
+            fontWeight: 600,
+            textTransform: 'capitalize',
+          }}
+        >
           {group.appId}
         </span>
         {undismissed > 0 && (
-          <span
-            style={{
-              background: '#FF3B30',
-              color: '#fff',
-              fontSize: 10,
-              fontWeight: 700,
-              padding: '1px 6px',
-              borderRadius: 8,
-              minWidth: 16,
-              textAlign: 'center',
-            }}
-          >
+          <GlassChip tone="danger" size="xs">
             {undismissed}
-          </span>
+          </GlassChip>
         )}
         <span
           aria-hidden
           style={{
             fontSize: 10,
-            color: 'var(--theme-text-muted, #888)',
+            color: 'var(--ls-fg-muted)',
             transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-            transition: 'transform 160ms ease',
+            transition: 'transform var(--ls-dur-fast) var(--ls-ease-soft)',
           }}
         >
           ▾
@@ -261,24 +274,24 @@ function AppGroupSection({ group }: { group: AppGroup }) {
           ))}
         </div>
       )}
-    </section>
+    </GlassPanel>
   );
 }
 
 function NotificationRow({ notification }: { notification: BerryNotification }) {
   const accent =
     notification.level === 'error'
-      ? '#FF3B30'
+      ? 'var(--ls-danger)'
       : notification.level === 'warning'
-        ? '#FF9F0A'
+        ? 'var(--ls-sand-500)'
         : notification.level === 'success'
-          ? '#34C759'
-          : '#3478F6';
+          ? 'var(--ls-success)'
+          : 'var(--ls-accent)';
   return (
     <div
       style={{
         padding: '8px 10px',
-        borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+        borderTop: '1px solid var(--ls-border-glass)',
         display: 'flex',
         gap: 8,
         alignItems: 'flex-start',
@@ -288,7 +301,7 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
       <div
         aria-hidden
         style={{
-          width: 4,
+          width: 3,
           alignSelf: 'stretch',
           background: notification.dismissed ? 'transparent' : accent,
           borderRadius: 2,
@@ -296,13 +309,22 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{notification.title}</div>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            lineHeight: 1.3,
+            color: 'var(--ls-fg-primary)',
+          }}
+        >
+          {notification.title}
+        </div>
         {notification.body && (
           <div
             style={{
               fontSize: 11,
-              color: 'var(--theme-text-secondary, #5a5a5f)',
-              lineHeight: 1.35,
+              color: 'var(--ls-fg-secondary)',
+              lineHeight: 1.4,
               marginTop: 1,
               wordBreak: 'break-word',
             }}
@@ -313,8 +335,8 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
         <div
           style={{
             fontSize: 10,
-            color: 'var(--theme-text-muted, #999)',
-            marginTop: 3,
+            color: 'var(--ls-fg-muted)',
+            marginTop: 4,
             display: 'flex',
             gap: 8,
             alignItems: 'center',
@@ -347,7 +369,7 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
               onClick={() => dismiss(notification.id)}
               style={{
                 fontSize: 10,
-                color: 'var(--theme-text-muted, #999)',
+                color: 'var(--ls-fg-muted)',
                 background: 'transparent',
                 border: 'none',
                 padding: 0,
@@ -364,11 +386,3 @@ function NotificationRow({ notification }: { notification: BerryNotification }) 
     </div>
   );
 }
-
-/*
- * Drop-in for BerryShell/index.tsx:
- *
- *   import NotificationCenter from './system/NotificationCenter';
- *   ...
- *   <NotificationCenter />   // mount once inside the root <div>.
- */

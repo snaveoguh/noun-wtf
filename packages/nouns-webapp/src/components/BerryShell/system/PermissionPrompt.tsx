@@ -1,16 +1,20 @@
 /**
  * Permission prompt — Mac-style alert sheet.
  *
- * Listens for `permission:requested` and queues prompts (one at a time so
- * stacked apps don't drown the user). User picks Allow / Deny / Always
- * Allow; the choice is persisted via `permissionsStore.set` which also
- * emits `permission:granted` / `permission:denied` to resolve the awaiting
- * `requestPermission` promise.
+ * Liquid Sand chrome: rendered inside `<GlassModal>` with `<GlassButton>`
+ * actions and a monoline `<Key>` icon. Listens for `permission:requested` and
+ * queues prompts (one at a time so stacked apps don't drown the user). User
+ * picks Allow / Deny / Always Allow; the choice is persisted via
+ * `permissionsStore.set` which also emits `permission:granted` /
+ * `permission:denied` to resolve the awaiting `requestPermission` promise.
  *
  * Mounted once at the BerryShell root.
  */
 
 import { useEffect, useState } from 'react';
+
+import { GlassButton, GlassModal } from '@/liquid-sand/glass';
+import { Key } from '@/liquid-sand/icons';
 
 import { extendedBus } from './extendedBus';
 import {
@@ -24,82 +28,15 @@ interface PendingPrompt {
   capability: BerryCapability;
 }
 
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 5000,
-  background: 'rgba(20, 20, 30, 0.35)',
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'center',
-  paddingTop: 80,
-};
-
-const sheetStyle: React.CSSProperties = {
-  width: 420,
-  background: '#fff',
-  border: '1px solid #888',
-  borderRadius: 6,
-  boxShadow:
-    '0 12px 40px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
-  fontFamily: 'var(--theme-font-display, -apple-system, BlinkMacSystemFont, sans-serif)',
-  color: '#1a1a1a',
-  overflow: 'hidden',
-};
-
-const headerStyle: React.CSSProperties = {
-  padding: '14px 16px 8px 16px',
-  fontSize: 13,
-  fontWeight: 700,
-};
-
-const bodyStyle: React.CSSProperties = {
-  padding: '0 16px 14px 16px',
-  fontSize: 12,
-  color: '#333',
-  lineHeight: 1.45,
-};
-
-const footerStyle: React.CSSProperties = {
-  borderTop: '1px solid #ddd',
-  background: '#f6f6f6',
-  padding: '10px 12px',
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-};
-
-const baseButtonStyle: React.CSSProperties = {
-  fontFamily: 'var(--theme-font-display, -apple-system, BlinkMacSystemFont, sans-serif)',
-  fontSize: 12,
-  padding: '5px 14px',
-  borderRadius: 6,
-  border: '1px solid #888',
-  cursor: 'pointer',
-  background: '#fff',
-  color: '#222',
-  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.95)',
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  ...baseButtonStyle,
-  background: 'linear-gradient(180deg, #6ea8e8 0%, #2e74c8 100%)',
-  borderColor: '#1a4f8a',
-  color: '#fff',
-  fontWeight: 700,
-  textShadow: '0 1px 0 rgba(0, 0, 0, 0.35)',
-};
-
 export default function PermissionPrompt() {
   const [queue, setQueue] = useState<PendingPrompt[]>([]);
 
   useEffect(() => {
     return extendedBus.on('permission:requested', payload => {
       setQueue(prev => {
-        // Dedupe: if the same appId+capability is already queued, don't add
-        // another. Multiple call sites for the same permission share a
-        // single pending promise (see permissions.ts), so this just keeps
-        // the UI clean.
+        // Dedupe: same appId+capability, don't add another. Multiple call
+        // sites for the same permission share a single pending promise (see
+        // permissions.ts), so this just keeps the UI clean.
         const exists = prev.some(
           p => p.appId === payload.appId && p.capability === payload.capability,
         );
@@ -122,15 +59,9 @@ export default function PermissionPrompt() {
   }
 
   function allowOnce() {
-    // Allow once = grant, but also queue an immediate reset so the next
-    // time the app asks it prompts again. We schedule the reset for the
-    // next event-loop tick so the awaiting `requestPermission` promise
-    // resolves true first; otherwise the reset would race the resolve.
     permissionsStore.set(current.appId, current.capability, 'granted');
     const { appId, capability } = current;
     setTimeout(() => {
-      // Only reset back to prompt if it's still 'granted' — the user
-      // might have toggled it via the Permissions app in the meantime.
       if (permissionsStore.status(appId, capability) === 'granted') {
         permissionsStore.set(appId, capability, 'prompt');
       }
@@ -144,37 +75,80 @@ export default function PermissionPrompt() {
   }
 
   return (
-    <div style={overlayStyle} role="dialog" aria-modal="true" aria-labelledby="berry-perm-title">
-      <div style={sheetStyle}>
-        <div style={headerStyle} id="berry-perm-title">
-          <span style={{ fontSize: 16, marginRight: 6 }} aria-hidden>
-            🔐
-          </span>
-          "{current.appId}" wants permission
+    <GlassModal
+      open
+      onScrimClick={deny}
+      size="md"
+      aria-labelledby="berry-perm-title"
+      style={{
+        marginTop: 80,
+        padding: 0,
+        fontFamily: 'var(--ls-font-sans)',
+      }}
+    >
+      <div style={{ padding: '20px 22px 12px' }}>
+        <div
+          id="berry-perm-title"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--ls-fg-primary)',
+            marginBottom: 8,
+          }}
+        >
+          <Key size={18} />
+          <span>"{current.appId}" wants permission</span>
         </div>
-        <div style={bodyStyle}>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--ls-fg-secondary)',
+            lineHeight: 1.5,
+          }}
+        >
           The app <strong>{current.appId}</strong> wants to {meta.description}.
-          <div style={{ marginTop: 8, color: '#666', fontSize: 11 }}>
-            Capability: <code>{current.capability}</code>
+          <div style={{ marginTop: 8, color: 'var(--ls-fg-muted)', fontSize: 11 }}>
+            Capability:{' '}
+            <code
+              style={{
+                fontFamily: 'var(--ls-font-mono)',
+                background: 'var(--ls-glass-tint)',
+                padding: '1px 6px',
+                borderRadius: 'var(--ls-r-sm)',
+              }}
+            >
+              {current.capability}
+            </code>
           </div>
           {queue.length > 1 && (
-            <div style={{ marginTop: 6, color: '#888', fontSize: 11 }}>
+            <div style={{ marginTop: 6, color: 'var(--ls-fg-muted)', fontSize: 11 }}>
               {queue.length - 1} more request{queue.length - 1 === 1 ? '' : 's'} queued
             </div>
           )}
         </div>
-        <div style={footerStyle}>
-          <button type="button" onClick={deny} style={baseButtonStyle}>
-            Don't Allow
-          </button>
-          <button type="button" onClick={allowOnce} style={baseButtonStyle}>
-            Allow Once
-          </button>
-          <button type="button" onClick={allowAlways} style={primaryButtonStyle}>
-            Always Allow
-          </button>
-        </div>
       </div>
-    </div>
+      <div
+        style={{
+          borderTop: '1px solid var(--ls-border-glass)',
+          padding: '12px 14px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 8,
+        }}
+      >
+        <GlassButton variant="ghost" size="sm" onClick={deny}>
+          Don't Allow
+        </GlassButton>
+        <GlassButton variant="default" size="sm" onClick={allowOnce}>
+          Allow Once
+        </GlassButton>
+        <GlassButton variant="primary" size="sm" onClick={allowAlways}>
+          Always Allow
+        </GlassButton>
+      </div>
+    </GlassModal>
   );
 }

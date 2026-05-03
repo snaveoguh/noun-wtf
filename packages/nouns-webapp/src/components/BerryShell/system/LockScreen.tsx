@@ -20,6 +20,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { useAccount, useEnsAvatar, useEnsName } from 'wagmi';
 import { mainnet } from 'wagmi/chains';
 
+import { GlassChip, GlassInput, GlassPanel } from '@/liquid-sand/glass';
+import { Lock, Sparkle } from '@/liquid-sand/icons';
+
 import { playLoginChime } from './loginChime';
 import { useCurrentWallpaper } from './wallpaper';
 
@@ -189,18 +192,20 @@ export default function LockScreen() {
             position: 'absolute',
             inset: 0,
             background: wallpaper.src,
-            filter: 'blur(28px) brightness(0.55) saturate(0.8)',
+            filter: 'blur(28px) brightness(0.85) saturate(0.95)',
             transform: 'scale(1.08)', // hide blur edges
           }}
         />
-        {/* Subtle dark vignette */}
+        {/* Sand-tone overlay — warms the blurred wallpaper toward the
+            Liquid Sand palette so the giant glass clock reads cleanly. */}
         <div
           aria-hidden
           style={{
             position: 'absolute',
             inset: 0,
             background:
-              'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%)',
+              'radial-gradient(ellipse at center, rgba(251,246,238,0.15) 0%, rgba(60,45,25,0.55) 100%)',
+            mixBlendMode: 'normal',
           }}
         />
 
@@ -210,53 +215,63 @@ export default function LockScreen() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 22,
-            color: '#fff',
+            gap: 18,
             textAlign: 'center',
-            animation: 'berryLockIn 380ms ease both',
-            fontFamily:
-              'var(--theme-font-display, "Helvetica Neue", system-ui), sans-serif',
+            animation: 'berryLockIn var(--ls-dur-slow) var(--ls-ease-glide) both',
+            fontFamily: 'var(--ls-font-sans)',
           }}
           onClick={e => e.stopPropagation() /* clicks inside the panel don't unlock; input/keys do */}
         >
-          <div
+          {/* Giant glass clock — central showpiece. */}
+          <GlassPanel
+            blur="extreme"
+            radius="xl"
+            glow
             style={{
-              fontSize: 86,
-              fontWeight: 200,
-              letterSpacing: -1,
-              lineHeight: 1,
-              textShadow: '0 4px 24px rgba(0, 0, 0, 0.45)',
+              padding: '28px 56px',
+              color: 'var(--ls-fg-on-dark)',
+              minWidth: 360,
             }}
           >
-            {time}
-          </div>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 300,
-              opacity: 0.9,
-              textShadow: '0 2px 10px rgba(0, 0, 0, 0.4)',
-            }}
-          >
-            {date}
-          </div>
+            <div
+              style={{
+                fontFamily: 'var(--ls-font-mono)',
+                fontVariantNumeric: 'tabular-nums',
+                fontSize: 86,
+                fontWeight: 300,
+                letterSpacing: -2,
+                lineHeight: 1,
+              }}
+            >
+              {time}
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                fontFamily: 'var(--ls-font-sans)',
+                fontSize: 14,
+                fontWeight: 400,
+                opacity: 0.85,
+                letterSpacing: 0.3,
+              }}
+            >
+              {date}
+            </div>
+          </GlassPanel>
 
-          <div
+          {/* Avatar in a small frosted disc. */}
+          <GlassPanel
+            blur="medium"
+            radius="full"
             style={{
-              marginTop: 16,
               width: 96,
               height: 96,
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
+              padding: 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 56,
               overflow: 'hidden',
-              boxShadow: '0 4px 18px rgba(0, 0, 0, 0.45)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
+              color: 'var(--ls-fg-on-dark)',
             }}
           >
             {ensAvatar ? (
@@ -266,39 +281,45 @@ export default function LockScreen() {
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
-              <span aria-hidden>🍓</span>
+              <Sparkle size={40} />
             )}
+          </GlassPanel>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--ls-fg-on-dark)',
+              opacity: 0.9,
+            }}
+          >
+            {userLabel}
           </div>
-          <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 500 }}>{userLabel}</div>
 
-          <input
-            ref={inputRef}
-            type="password"
-            placeholder="Enter password"
-            aria-label="Enter password to unlock (any input unlocks)"
+          {/* Password field — a small glass input pill. */}
+          <div
+            style={{ width: 240 }}
+            onClick={e => e.stopPropagation()}
             onKeyDown={e => {
               if (e.key === 'Enter') unlock('input');
             }}
-            onClick={e => e.stopPropagation()}
-            style={{
-              marginTop: 6,
-              width: 220,
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              background: 'rgba(255, 255, 255, 0.12)',
-              color: '#fff',
-              fontFamily: 'inherit',
-              fontSize: 13,
-              outline: 'none',
-              textAlign: 'center',
-              backdropFilter: 'blur(6px)',
-              WebkitBackdropFilter: 'blur(6px)',
-            }}
-          />
-          <div style={{ fontSize: 11, opacity: 0.65 }}>
-            Click anywhere or press Return to unlock
+          >
+            <GlassInput
+              ref={inputRef}
+              type="password"
+              placeholder="Enter password"
+              aria-label="Enter password to unlock (any input unlocks)"
+              style={{ textAlign: 'center' }}
+            />
           </div>
+
+          {/* Unlock chip — clarifies that any keypress dismisses. */}
+          <GlassChip
+            tone="accent"
+            style={{ marginTop: 4, fontFamily: 'var(--ls-font-sans)' }}
+          >
+            <Lock size={11} />
+            <span>Click anywhere or press Return to unlock</span>
+          </GlassChip>
         </div>
       </div>
     </>
@@ -318,7 +339,7 @@ const lockOverlayStyle: CSSProperties = {
 
 const lockKeyframes = `
 @keyframes berryLockIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 `;

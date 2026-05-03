@@ -11,6 +11,8 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 
+import { GlassPanel } from '@/liquid-sand/glass';
+
 import { berryRegistry } from '../system/berryRegistry';
 import { useHotkey } from '../system/hotkeys';
 
@@ -182,19 +184,45 @@ const KEYS: KeyDef[][] = [
   ],
 ];
 
-const VARIANT_BG: Record<KeyDef['variant'], string> = {
-  fn: 'linear-gradient(180deg, #d6d6d6 0%, #b8b8b8 100%)',
-  op: 'linear-gradient(180deg, #ffaf3f 0%, #ee8a16 100%)',
-  num: 'linear-gradient(180deg, #6c6c6c 0%, #555 100%)',
-  eq: 'linear-gradient(180deg, #ffaf3f 0%, #ee8a16 100%)',
-};
-
-const VARIANT_COLOR: Record<KeyDef['variant'], string> = {
-  fn: '#1a1a1a',
-  op: '#ffffff',
-  num: '#ffffff',
-  eq: '#ffffff',
-};
+/** Liquid Sand styled key — sand-tinted glass for fn, accent for op/eq. */
+function keyStyle(variant: KeyDef['variant']): React.CSSProperties {
+  const base: React.CSSProperties = {
+    border: 'none',
+    borderRadius: 'var(--ls-r-md)',
+    fontFamily: 'var(--ls-font-display)',
+    fontSize: 18,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all var(--ls-dur-fast) var(--ls-ease-spring)',
+    backdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+    WebkitBackdropFilter: 'blur(var(--ls-blur-medium)) saturate(var(--ls-saturate))',
+    boxShadow:
+      'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-sm)',
+    fontVariantNumeric: 'tabular-nums',
+  };
+  if (variant === 'op' || variant === 'eq') {
+    return {
+      ...base,
+      background: 'var(--ls-accent)',
+      color: 'var(--ls-fg-on-dark)',
+      boxShadow:
+        'var(--ls-shadow-inset-glass), 0 0 0 1px var(--ls-border-glass), var(--ls-shadow-sm), var(--ls-shadow-glow)',
+    };
+  }
+  if (variant === 'fn') {
+    return {
+      ...base,
+      background: 'var(--ls-glass-light-strong)',
+      color: 'var(--ls-fg-primary)',
+    };
+  }
+  // num
+  return {
+    ...base,
+    background: 'var(--ls-glass-light)',
+    color: 'var(--ls-fg-primary)',
+  };
+}
 
 function CalculatorApp(): ReactElement {
   const [state, setState] = useState<CalcState>(INITIAL);
@@ -253,49 +281,42 @@ function CalculatorApp(): ReactElement {
 
   return (
     <div
+      className="flex flex-col h-full w-full p-2 gap-1.5 box-border"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        background: '#1c1c1c',
-        padding: 8,
-        gap: 6,
-        boxSizing: 'border-box',
-        fontFamily: 'var(--theme-font-display)',
+        fontFamily: 'var(--ls-font-display)',
       }}
     >
       {/* Display */}
-      <div
+      <GlassPanel
+        radius="md"
+        tone="auto"
         aria-label="Calculator display"
         style={{
-          background: '#000',
-          color: '#fff',
           textAlign: 'right',
-          padding: '8px 12px',
+          padding: '12px 14px',
           fontSize: displaySize,
-          minHeight: 56,
+          minHeight: 64,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          fontFamily: 'var(--theme-font-mono, "SFMono-Regular", Menlo, monospace)',
+          fontFamily: 'var(--ls-font-mono)',
+          fontVariantNumeric: 'tabular-nums',
           letterSpacing: 0.5,
-          borderRadius: 4,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
+          color: 'var(--ls-fg-primary)',
+          fontWeight: 600,
         }}
       >
         {state.display}
-      </div>
+      </GlassPanel>
 
       {/* Buttons grid */}
       <div
+        className="grid flex-1 gap-1.5"
         style={{
-          display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 4,
-          flex: 1,
         }}
       >
         {KEYS.flat().map((k, i) => (
@@ -304,30 +325,20 @@ function CalculatorApp(): ReactElement {
             type="button"
             onClick={() => dispatch(k.action)}
             style={{
+              ...keyStyle(k.variant),
               gridColumn: k.span === 2 ? 'span 2' : undefined,
-              background: VARIANT_BG[k.variant],
-              color: VARIANT_COLOR[k.variant],
-              border: '1px solid rgba(0, 0, 0, 0.4)',
-              borderRadius: 6,
-              fontFamily: 'var(--theme-font-display)',
-              fontSize: 18,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow:
-                'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.4)',
-              transition: 'filter 80ms ease, transform 80ms ease',
             }}
             onMouseDown={e => {
-              e.currentTarget.style.filter = 'brightness(0.85)';
-              e.currentTarget.style.transform = 'translateY(1px)';
+              e.currentTarget.style.transform = 'scale(0.96)';
+              e.currentTarget.style.filter = 'brightness(0.94)';
             }}
             onMouseUp={e => {
-              e.currentTarget.style.filter = '';
               e.currentTarget.style.transform = '';
+              e.currentTarget.style.filter = '';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.filter = '';
               e.currentTarget.style.transform = '';
+              e.currentTarget.style.filter = '';
             }}
             aria-label={k.action}
           >
