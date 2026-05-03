@@ -62,6 +62,14 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
   ];
   const visibleNouns = allRepresented.slice(0, NOUN_GRID_VISIBLE);
   const overflow = Math.max(0, allRepresented.length - NOUN_GRID_VISIBLE);
+  // Indexer bug: delegate.delegatedVotes returns the correct aggregate but
+  // delegateNoun.items is empty for most addresses, so we usually can't
+  // enumerate delegated noun IDs. Surface the count visually with a sand-
+  // tinted placeholder tile so the user still senses the voting power.
+  const phantomDelegated =
+    delegatedNounIds.length === 0 && delegatedFromOthers > 0
+      ? delegatedFromOthers
+      : 0;
 
   return (
     <div
@@ -109,7 +117,7 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
       </Link>
 
       {/* ── Owned + delegated nouns grid ── */}
-      {(isLoading || allRepresented.length > 0) && (
+      {(isLoading || allRepresented.length > 0 || phantomDelegated > 0) && (
         <div className="grid grid-cols-7 gap-1.5">
           {isLoading && allRepresented.length === 0
             ? Array.from({ length: 7 }).map((_, i) => (
@@ -125,6 +133,27 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
             : visibleNouns.map(n => (
                 <NounThumb key={`${n.kind}-${n.id}`} nounId={n.id} kind={n.kind} />
               ))}
+          {phantomDelegated > 0 && (
+            <div
+              className="flex aspect-square flex-col items-center justify-center font-semibold leading-none"
+              style={{
+                ...fontSans,
+                ...colorSecondary,
+                fontSize: 'var(--ls-text-xs)',
+                borderRadius: 'var(--ls-r-sm)',
+                backgroundColor: 'rgba(184,147,82,0.14)', // sand accent tint
+                boxShadow: 'inset 0 0 0 1px rgba(255,250,240,0.18)',
+              }}
+              title={`${phantomDelegated} nouns delegated to this address`}
+            >
+              <span className="tabular-nums" style={fontMono}>
+                +{phantomDelegated}
+              </span>
+              <span style={{ ...colorMuted, fontSize: '8px', marginTop: 2 }}>
+                deleg
+              </span>
+            </div>
+          )}
           {overflow > 0 && (
             <div
               className="flex aspect-square items-center justify-center font-semibold"
