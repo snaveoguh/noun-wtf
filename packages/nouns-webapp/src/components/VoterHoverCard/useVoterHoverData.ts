@@ -33,6 +33,8 @@ export interface VoterHoverData {
   ensName: string | null;
   ensAvatar: string | null;
   ownedNounIds: number[];
+  /** Noun ids delegated TO this address by other holders (excludes own). */
+  delegatedNounIds: number[];
   /** Total nouns this delegate represents (sum of own + delegated). */
   delegatedVotes: number;
   /** Number of distinct token holders that delegate to this address. */
@@ -116,6 +118,7 @@ const EMPTY: Omit<VoterHoverData, 'isLoading' | 'hasError'> = {
   ensName: null,
   ensAvatar: null,
   ownedNounIds: [],
+  delegatedNounIds: [],
   delegatedVotes: 0,
   delegatorCount: 0,
   proposalCount: 0,
@@ -218,10 +221,19 @@ export function useVoterHoverData(address: Address | undefined): VoterHoverData 
   // delegated-to-this-address nouns, minus the delegate itself.
   const representedItems = data?.representedNouns?.items ?? [];
   const distinctOwners = new Set<string>();
+  const ownedSet = new Set(ownedNounIds);
+  const delegatedNounIds: number[] = [];
   for (const it of representedItems) {
     const owner = it.noun?.owner?.toLowerCase();
     if (owner && owner !== lower) distinctOwners.add(owner);
+    // Collect noun ids that aren't already in the owned set (avoid dupes
+    // when the delegate also holds the noun directly).
+    const nid = Number(it.nounId);
+    if (Number.isFinite(nid) && !ownedSet.has(nid)) {
+      delegatedNounIds.push(nid);
+    }
   }
+  delegatedNounIds.sort((a, b) => a - b);
   const delegatorCount = distinctOwners.size;
 
   // Total represented count is authoritative from the delegate row when
@@ -237,6 +249,7 @@ export function useVoterHoverData(address: Address | undefined): VoterHoverData 
     ensName: safeEnsName,
     ensAvatar: ensAvatar ?? null,
     ownedNounIds,
+    delegatedNounIds,
     delegatedVotes: totalRepresented,
     delegatorCount,
     proposalCount: data?.proposerProposals?.totalCount ?? 0,

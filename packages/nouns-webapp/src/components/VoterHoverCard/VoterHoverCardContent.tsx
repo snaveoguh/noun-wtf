@@ -15,7 +15,10 @@ interface VoterHoverCardContentProps {
   address: Address;
 }
 
-const NOUN_GRID_VISIBLE = 14;
+// 4 rows of 7 thumbs = 28 visible. Delegates often represent 30+ nouns; this
+// gives them a real visual sense of voting power instead of clipping at one
+// or two rows.
+const NOUN_GRID_VISIBLE = 27; // 27 + a "+N" overflow tile fills 4 rows neatly
 
 // Reusable inline-style snippets so the JSX stays scannable. All values
 // resolve to Liquid Sand tokens — no Tailwind color classes from here.
@@ -32,6 +35,7 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
     ensName,
     ensAvatar,
     ownedNounIds,
+    delegatedNounIds,
     delegatedVotes,
     delegatorCount,
     proposalCount,
@@ -49,8 +53,15 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
   // "Delegated from N other addresses" reads better than the raw sum, so
   // subtract own holdings to get the truly-delegated count.
   const delegatedFromOthers = Math.max(0, delegatedVotes - ownedCount);
-  const visibleNouns = ownedNounIds.slice(0, NOUN_GRID_VISIBLE);
-  const overflow = Math.max(0, ownedCount - NOUN_GRID_VISIBLE);
+  // Show owned first (the delegate's own bag), then delegated-to (their
+  // proxied voting power). Each thumb is tagged so we can render a subtle
+  // visual distinction between the two.
+  const allRepresented: { id: number; kind: 'owned' | 'delegated' }[] = [
+    ...ownedNounIds.map(id => ({ id, kind: 'owned' as const })),
+    ...delegatedNounIds.map(id => ({ id, kind: 'delegated' as const })),
+  ];
+  const visibleNouns = allRepresented.slice(0, NOUN_GRID_VISIBLE);
+  const overflow = Math.max(0, allRepresented.length - NOUN_GRID_VISIBLE);
 
   return (
     <div
@@ -97,10 +108,10 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
         />
       </Link>
 
-      {/* ── Owned nouns grid ── */}
-      {(isLoading || ownedCount > 0) && (
+      {/* ── Owned + delegated nouns grid ── */}
+      {(isLoading || allRepresented.length > 0) && (
         <div className="grid grid-cols-7 gap-1.5">
-          {isLoading && ownedCount === 0
+          {isLoading && allRepresented.length === 0
             ? Array.from({ length: 7 }).map((_, i) => (
                 <div
                   key={i}
@@ -111,7 +122,9 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
                   }}
                 />
               ))
-            : visibleNouns.map(id => <NounThumb key={id} nounId={id} />)}
+            : visibleNouns.map(n => (
+                <NounThumb key={`${n.kind}-${n.id}`} nounId={n.id} kind={n.kind} />
+              ))}
           {overflow > 0 && (
             <div
               className="flex aspect-square items-center justify-center font-semibold"
@@ -238,22 +251,34 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
 
 VoterHoverCardContent.displayName = 'VoterHoverCardContent';
 
-const NounThumb: FC<{ nounId: number }> = memo(({ nounId }) => (
-  <div className="flex flex-col items-center gap-0.5">
-    <div
-      className="size-full overflow-hidden"
-      style={{ borderRadius: 'var(--ls-r-sm)' }}
-    >
-      <StandaloneNounImage nounId={BigInt(nounId)} />
+// Delegated nouns get a subtle dim + ring so it's clear which voting power
+// is the delegate's own vs proxied to them. Hover the card to read the count
+// label for the precise breakdown.
+const NounThumb: FC<{ nounId: number; kind: 'owned' | 'delegated' }> = memo(
+  ({ nounId, kind }) => (
+    <div className="flex flex-col items-center gap-0.5" title={kind}>
+      <div
+        className="size-full overflow-hidden"
+        style={{
+          borderRadius: 'var(--ls-r-sm)',
+          opacity: kind === 'delegated' ? 0.75 : 1,
+          boxShadow:
+            kind === 'delegated'
+              ? 'inset 0 0 0 1px rgba(255,250,240,0.18)'
+              : 'none',
+        }}
+      >
+        <StandaloneNounImage nounId={BigInt(nounId)} />
+      </div>
+      <span
+        className="leading-none tabular-nums"
+        style={{ ...fontMono, ...colorMuted, fontSize: '9px' }}
+      >
+        {nounId}
+      </span>
     </div>
-    <span
-      className="leading-none tabular-nums"
-      style={{ ...fontMono, ...colorMuted, fontSize: '9px' }}
-    >
-      {nounId}
-    </span>
-  </div>
-));
+  ),
+);
 NounThumb.displayName = 'NounThumb';
 
 interface StatListProps {
