@@ -381,8 +381,18 @@ function AppRouter() {
  * — so a hard-coded check like `logicalPath === '/'` matches both `/` (when
  * theme='game') AND `/game` (which strips to `/`).
  */
+/**
+ * Routes whose pages aren't visually designed for non-pro themes. Hitting one
+ * of these from any other theme silently switches the user to `pro` so the
+ * page doesn't render with broken/empty themed chrome. The user can still
+ * switch themes manually after landing — that's how you find the cool UI
+ * glitches on undesigned pages — but the default click-through experience is
+ * a sane render. Add new routes here as more pages are stubbed out.
+ */
+const PRO_REQUIRED_PATH_PREFIXES: readonly string[] = ['/grants'];
+
 function ThemedAppContent() {
-  const { mode, theme } = useSiteTheme();
+  const { mode, theme, setTheme } = useSiteTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
@@ -435,6 +445,19 @@ function ThemedAppContent() {
     const nextPath = idMatch ? `/v2/noun/${idMatch[1]}` : '/v2';
     navigate(nextPath, { replace: true });
   }, [logicalPath, location.search, navigate]);
+
+  // Force pro on undesigned routes (see PRO_REQUIRED_PATH_PREFIXES). Skipped
+  // when the user explicitly asked for a theme via `/<theme>/...` prefix —
+  // that's the escape hatch for finding the cool UI glitches.
+  useEffect(() => {
+    if (themePrefix) return;
+    const requiresPro = PRO_REQUIRED_PATH_PREFIXES.some(
+      p => logicalPath === p || logicalPath.startsWith(`${p}/`),
+    );
+    if (requiresPro && theme !== 'pro') {
+      setTheme('pro');
+    }
+  }, [logicalPath, themePrefix, theme, setTheme]);
 
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
