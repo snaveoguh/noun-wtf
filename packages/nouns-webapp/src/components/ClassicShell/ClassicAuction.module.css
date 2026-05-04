@@ -1,0 +1,189 @@
+.classicAuctionWrapper {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 2.5rem;
+  width: 100%;
+  min-height: 0;
+  align-items: end;
+  padding: 0 max(1.5rem, var(--page-edge-padding-left, 1.5rem));
+}
+
+.nounCol {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding-right: 1rem;
+}
+
+.nounImg {
+  height: 100%;
+  width: auto;
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: bottom right;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  display: block;
+}
+
+.infoCol {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1.25rem;
+  min-width: 0;
+  height: 100%;
+  padding: 12vh 0 1rem;
+  max-width: 560px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.dateText {
+  font-family: 'PT Root UI', sans-serif;
+  font-weight: bold;
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: nowrap;
+  letter-spacing: 0;
+  margin-left: 0.25rem;
+}
+
+.arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--brand-warm-dark-text, #221b1a);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.15s ease;
+}
+
+.arrow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.title {
+  font-family: 'Londrina Solid', cursive;
+  font-weight: normal;
+  font-size: clamp(56px, 7.5vw, 96px);
+  line-height: 0.95;
+  margin: 0;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.bidStrip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+.bidStripCell {
+  min-width: 0;
+}
+
+.bidStripDivider {
+  width: 1px;
+  height: 70px;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+.bidRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.bidRow :global([class*='bidGroup']) {
+  flex: 1;
+  flex-direction: row !important;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.bidRow :global([class*='bidInputWrapper']) {
+  flex: 1;
+}
+
+.bidRow :global([class*='bidActionRow']) {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* Bootstrap's .btn defaults (6px 12px padding, 16px font) override the
+   .bidBtn module class. Re-pin the OG green pill dimensions here. */
+.bidRow :global([class*='bidBtn']) {
+  padding: 10px 32px !important;
+  font-size: 20px !important;
+  height: 3rem !important;
+  min-width: 90px;
+}
+
+.skeleton {
+  width: 100%;
+  height: 60vh;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  margin: 2rem auto;
+  max-width: 1200px;
+}
+
+@media (max-width: 768px) {
+  .classicAuctionWrapper {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: stretch;
+    padding: 0 1rem;
+  }
+
+  .nounCol {
+    height: auto;
+    padding-top: 1rem;
+    padding-right: 0;
+    justify-content: center;
+  }
+
+  .nounImg {
+    max-height: 50vh;
+    width: 100%;
+    height: auto;
+  }
+
+  .infoCol {
+    padding: 0.5rem 0 1.5rem;
+    gap: 0.75rem;
+  }
+
+  .title {
+    font-size: clamp(48px, 14vw, 72px);
+  }
+
+  .bidStripDivider {
+    height: 50px;
+  }
+}

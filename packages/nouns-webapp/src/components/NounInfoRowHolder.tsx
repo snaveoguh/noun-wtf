@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLinkIcon } from 'lucide-react';
 
 import ShortAddress from '@/components/ShortAddress';
+import { VoterHoverCard } from '@/components/VoterHoverCard';
 import { nounsAuctionHouseAddress } from '@/contracts';
 import useDaoContext from '@/hooks/useDaoContext';
 import { cn } from '@/lib/utils';
@@ -69,18 +70,34 @@ const NounInfoRowHolder: React.FC<NounInfoRowHolderProps> = props => {
   const etherscanURL = buildEtherscanAddressLink(winner);
   const shortAddressComponent = <ShortAddress address={winner as Address} />;
   const chainId = defaultChain.id;
+  const isAuctionHouse =
+    winner?.toLowerCase() === nounsAuctionHouseAddress[chainId]?.toLowerCase();
 
   return (
     <span className={cn('text-muted-foreground block', className)}>
       <Trans>Winner</Trans>{' '}
-      <a className="text-muted-foreground" href={etherscanURL} target={'_blank'} rel="noreferrer">
-        {winner?.toLowerCase() === nounsAuctionHouseAddress[chainId]?.toLowerCase() ? (
+      {isAuctionHouse ? (
+        <a className="text-muted-foreground" href={etherscanURL} target={'_blank'} rel="noreferrer">
           <Trans>Nouns Auction House</Trans>
-        ) : (
-          shortAddressComponent
-        )}
-        <ExternalLinkIcon className="text-muted-foreground ml-0.5 inline-block size-3" />
-      </a>
+          <ExternalLinkIcon className="text-muted-foreground ml-0.5 inline-block size-3" />
+        </a>
+      ) : (
+        // VoterHoverCard wraps the rendered name with a rich tooltip on hover
+        // (avatar, owned nouns, vote / proposal counts, multisig signers).
+        // `asChild` makes Radix reuse the etherscan anchor as the trigger so
+        // we don't end up with nested <a> elements.
+        <VoterHoverCard address={winner as Address} asChild>
+          <a
+            className="text-muted-foreground"
+            href={etherscanURL}
+            target={'_blank'}
+            rel="noreferrer"
+          >
+            {shortAddressComponent}
+            <ExternalLinkIcon className="text-muted-foreground ml-0.5 inline-block size-3" />
+          </a>
+        </VoterHoverCard>
+      )}
     </span>
   );
 };

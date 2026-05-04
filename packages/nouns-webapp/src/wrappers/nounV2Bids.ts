@@ -1,74 +1,59 @@
 import { useQuery } from '@tanstack/react-query';
-import { getPublicClient } from '@wagmi/core';
 
-import {
-  NOUNV2_AUCTION_HOUSE_ADDRESS,
-  nounV2AuctionHouseAbi,
-} from '@/contracts/nounv2-auction-house';
+import config from '@/config';
+import { NOUNV2_AUCTION_HOUSE_ADDRESS } from '@/contracts/nounv2-auction-house';
 import { Address, Bid } from '@/utils/types';
-import { config as wagmiConfig } from '@/wagmi';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-// V2 was deployed at this block. Filtering from here keeps log scans cheap.
-const V2_DEPLOY_BLOCK = 24951808n;
+const PONDER_BASE =
+  config.app.subgraphApiUri || 'https://spirited-flexibility-production-3c30.up.railway.app';
+
+interface PonderBid {
+  bidder: Address;
+  value: string;
+  extended: boolean;
+  timestamp: string;
+  transactionHash: string;
+  createdAtBlock: string;
+}
+
+interface PonderAuctionResponse {
+  nounId: string;
+  bids: PonderBid[];
+}
 
 /**
- * Read AuctionBid events from the NounV2 auction house and synthesize the
- * mainnet `Bid[]` shape so `<BidHistoryModal>` can render v2 bids without
- * any code changes downstream.
+ * Read the full bid history for a NounV2 auction from the Ponder indexer
+ * REST endpoint (`/api/nounv2-auctions/:nounId`). Returns rows in the
+ * mainnet `Bid[]` shape so `<BidHistoryModal>` can render v2 bids with no
+ * downstream code changes.
  *
- * Uses @wagmi/core directly via TanStack useQuery — same pattern as
- * useV2OnDisplayAuction, which sidesteps the WagmiProvider context
- * fragility we hit on a previous attempt.
+ * Replaces the previous `getContractEvents` scan, which capped coverage
+ * at the last ~8k blocks because public RPCs reject larger ranges. Using
+ * the indexer means every historical V2 auction is queryable.
  */
 export function useV2AuctionBids(nounId: bigint): Bid[] | undefined {
   const isConfigured = NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS;
 
   const { data } = useQuery({
-    queryKey: ['nounv2-bids', NOUNV2_AUCTION_HOUSE_ADDRESS, nounId.toString()],
+    queryKey: ['nounv2-bids', String(nounId)],
     queryFn: async (): Promise<Bid[]> => {
-      const client = getPublicClient(wagmiConfig);
-      if (!client) return [];
-      const events = await client.getContractEvents({
-        address: NOUNV2_AUCTION_HOUSE_ADDRESS,
-        abi: nounV2AuctionHouseAbi,
-        eventName: 'AuctionBid',
-        args: { nounId },
-        fromBlock: V2_DEPLOY_BLOCK,
-        toBlock: 'latest',
-      });
-      // Cache block timestamps per blockNumber so multiple bids in the same
-      // block don't trigger N getBlock calls.
-      const tsCache = new Map<bigint, bigint>();
-      const out: Bid[] = [];
-      for (const ev of events) {
-        let ts = tsCache.get(ev.blockNumber);
-        if (ts === undefined) {
-          const blk = await client.getBlock({ blockNumber: ev.blockNumber });
-          ts = blk.timestamp;
-          tsCache.set(ev.blockNumber, ts);
-        }
-        const args = ev.args as {
-          nounId?: bigint;
-          sender?: Address;
-          value?: bigint;
-          extended?: boolean;
-        };
-        if (args.sender == null || args.value == null) continue;
-        out.push({
-          nounId,
-          sender: args.sender,
-          value: args.value,
-          extended: args.extended ?? false,
-          transactionHash: ev.transactionHash ?? '0x',
-          transactionIndex: ev.transactionIndex ?? 0,
-          timestamp: ts,
-          clientId: null,
-        });
-      }
-      // Highest bids first
-      return out.sort((a, b) => (b.value > a.value ? 1 : b.value < a.value ? -1 : 0));
+      const res = await fetch(`${PONDER_BASE}/api/nounv2-auctions/${String(nounId)}`);
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error(`ponder returned ${res.status}`);
+      const payload = (await res.json()) as PonderAuctionResponse;
+      const bids: Bid[] = (payload.bids ?? []).map(b => ({
+        nounId,
+        sender: b.bidder,
+        value: BigInt(b.value),
+        extended: !!b.extended,
+        transactionHash: b.transactionHash,
+        transactionIndex: 0,
+        timestamp: BigInt(b.timestamp),
+        clientId: null,
+      }));
+      return bids.sort((a, b) => (b.value > a.value ? 1 : b.value < a.value ? -1 : 0));
     },
     enabled: isConfigured,
     refetchInterval: 12_000,

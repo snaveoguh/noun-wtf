@@ -201,7 +201,7 @@ import { useNounSeed, type INounSeed } from '@/wrappers/nounToken';
 import { useWorldStore } from './shared/useWorldStore';
 import { GlitchEntry } from './shared/GlitchEntry';
 import { TransitionOverlay } from './shared/TransitionOverlay';
-import { WhiteRoom, monolithPositions } from './worlds/WhiteRoom';
+import { WhiteRoom, monolithPositions, whiteRoomFloorTileIds } from './worlds/WhiteRoom';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -2671,11 +2671,27 @@ export default function WorldPage() {
         } catch {}
       });
 
-      // Request existing graffiti for all walls once connected
-      mp.ws.addEventListener('open', () => {
+      // Request existing graffiti for all walls + white-room surfaces once
+      // connected. White-room monoliths AND the paintable floor grid both
+      // round-trip through the same `world:graffiti:load` channel — server
+      // returns a `world:graffiti:tags` payload per surface which the
+      // @nouns/graffiti `handleIncoming` promotes into a snapshot baseline.
+      // PartySocket satisfies the `{ readyState; send }` shape that
+      // loadGraffitiTags uses, but isn't structurally a `WebSocket` to ts.
+      // The existing call sites pass PartySocket directly, so we mirror that.
+      const loadAllPersistentSurfaces = (ws: NonNullable<typeof mp.ws>) => {
         for (const wall of GRAFFITI_WALLS) {
-          loadGraffitiTags(mp.ws!, wall.id);
+          loadGraffitiTags(ws, wall.id);
         }
+        for (const m of monolithPositions(SPAWN_X, SPAWN_Y)) {
+          loadGraffitiTags(ws, m.id);
+        }
+        for (const tileId of whiteRoomFloorTileIds()) {
+          loadGraffitiTags(ws, tileId);
+        }
+      };
+      mp.ws.addEventListener('open', () => {
+        loadAllPersistentSurfaces(mp.ws!);
         // Load K/D stats for connected wallet
         if (connectedWallet && !kdLoadedRef.current) {
           mp.ws!.send(JSON.stringify({ type: 'world:kd:load', wallet: connectedWallet }));
@@ -2684,9 +2700,7 @@ export default function WorldPage() {
       });
       // If already open, request immediately
       if (mp.ws.readyState === WebSocket.OPEN) {
-        for (const wall of GRAFFITI_WALLS) {
-          loadGraffitiTags(mp.ws, wall.id);
-        }
+        loadAllPersistentSurfaces(mp.ws);
       }
     }
 

@@ -8,9 +8,16 @@ import { Link } from 'react-router';
 import remarkBreaks from 'remark-breaks';
 
 import ClientBadge from '@/components/ClientBadge';
+import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import AsciiImage from './AsciiImage';
 import { EVENT_TYPES, formatEventDescription, timeAgo } from './eventFormatters';
+
+// Themes that should NOT navigate users off the bespoke homepage emulation.
+// Pro / terminal keep full interactivity; everything else (including Game,
+// which mirrors nouns.game read-only) hides the "view" link so the feed
+// reads as a static homepage display.
+const READ_ONLY_THEMES = new Set(['classic', 'berry', 'catalogue', 'game']);
 
 interface Props {
   event: ActivityEventType;
@@ -80,6 +87,8 @@ function isSafeHttpsUrl(url: string | undefined): boolean {
 
 export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const { theme } = useSiteTheme();
+  const isReadOnly = READ_ONLY_THEMES.has(theme);
   const config = EVENT_TYPES[event.type];
   // Override badge for burned auctions (winner = 0x0, amount = 0)
   const isBurnedAuction =
@@ -136,7 +145,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
       className="terminal-event"
       style={{
         padding: '3px 0',
-        borderBottom: '1px solid #111111',
+        borderBottom: '1px solid var(--theme-feed-row-border)',
         lineHeight: 1.35,
       }}
     >
@@ -172,7 +181,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
         {/* Timestamp */}
         <span
           style={{
-            color: '#444',
+            color: 'var(--theme-text-muted)',
             fontSize: '12px',
             minWidth: '36px',
             textAlign: 'right',
@@ -200,7 +209,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
         {/* Description */}
         <span
           style={{
-            color: '#ccc',
+            color: 'var(--theme-text-secondary)',
             fontSize: '13px',
             flex: 1,
             wordBreak: 'break-word',
@@ -208,28 +217,30 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
         >
           {description}
           {expandable && (
-            <span style={{ color: '#444', fontSize: '11px', marginLeft: '6px' }}>
+            <span style={{ color: 'var(--theme-text-muted)', fontSize: '11px', marginLeft: '6px' }}>
               {expanded ? '▾' : '▸'}
             </span>
           )}
         </span>
 
-        {/* View link (internal, e.g. candidate / proposal page) */}
-        {viewHref && (
+        {/* View link (internal, e.g. candidate / proposal page).
+            Suppressed in read-only homepage-emulation themes so users don't
+            get kicked into the default chrome from a bespoke shell. */}
+        {viewHref && !isReadOnly && (
           <Link
             to={viewHref}
             style={{
-              color: '#333',
+              color: 'var(--theme-text-muted)',
               fontSize: '11px',
               flexShrink: 0,
               textDecoration: 'none',
               paddingTop: '2px',
             }}
             onMouseEnter={e => {
-              (e.target as HTMLElement).style.color = '#666';
+              (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
             }}
             onMouseLeave={e => {
-              (e.target as HTMLElement).style.color = '#333';
+              (e.target as HTMLElement).style.color = 'var(--theme-text-muted)';
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -244,17 +255,17 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: '#333',
+              color: 'var(--theme-text-muted)',
               fontSize: '11px',
               flexShrink: 0,
               textDecoration: 'none',
               paddingTop: '2px',
             }}
             onMouseEnter={e => {
-              (e.target as HTMLElement).style.color = '#666';
+              (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
             }}
             onMouseLeave={e => {
-              (e.target as HTMLElement).style.color = '#333';
+              (e.target as HTMLElement).style.color = 'var(--theme-text-muted)';
             }}
             onClick={e => e.stopPropagation()}
             title={event.txHash}
@@ -272,9 +283,9 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             marginLeft: '112px', // align with description column (36 + 12 + 64)
             marginRight: '24px',
             padding: '10px 12px',
-            background: '#050505',
+            background: 'var(--theme-bg-card)',
             borderLeft: `2px solid ${color}`,
-            color: '#bbb',
+            color: 'var(--theme-text-secondary)',
             fontSize: '12px',
             lineHeight: 1.7,
             wordBreak: 'break-word',
@@ -299,30 +310,30 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
                 h1: ({ ...props }) => (
                   <h1
                     {...props}
-                    style={{ fontSize: '14px', margin: '8px 0 6px', color: '#ddd' }}
+                    style={{ fontSize: '14px', margin: '8px 0 6px', color: 'var(--theme-text-primary)' }}
                   />
                 ),
                 h2: ({ ...props }) => (
                   <h2
                     {...props}
-                    style={{ fontSize: '13px', margin: '8px 0 6px', color: '#ddd' }}
+                    style={{ fontSize: '13px', margin: '8px 0 6px', color: 'var(--theme-text-primary)' }}
                   />
                 ),
                 h3: ({ ...props }) => (
                   <h3
                     {...props}
-                    style={{ fontSize: '12px', margin: '6px 0 4px', color: '#ddd' }}
+                    style={{ fontSize: '12px', margin: '6px 0 4px', color: 'var(--theme-text-primary)' }}
                   />
                 ),
-                strong: ({ ...props }) => <strong {...props} style={{ color: '#eee' }} />,
-                em: ({ ...props }) => <em {...props} style={{ color: '#ddd' }} />,
+                strong: ({ ...props }) => <strong {...props} style={{ color: 'var(--theme-text-primary)' }} />,
+                em: ({ ...props }) => <em {...props} style={{ color: 'var(--theme-text-primary)' }} />,
                 code: ({ ...props }) => (
                   <code
                     {...props}
                     style={{
-                      background: '#0e0e0e',
+                      background: 'var(--theme-bg-tertiary)',
                       padding: '1px 4px',
-                      borderRadius: 3,
+                      borderRadius: 'var(--theme-radius-sm)',
                       fontSize: '11px',
                     }}
                   />
@@ -331,9 +342,9 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
                   <pre
                     {...props}
                     style={{
-                      background: '#0e0e0e',
+                      background: 'var(--theme-bg-tertiary)',
                       padding: '8px 10px',
-                      borderRadius: 4,
+                      borderRadius: 'var(--theme-radius-sm)',
                       overflowX: 'auto',
                       fontSize: '11px',
                       margin: '6px 0',
@@ -350,16 +361,16 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
                   <blockquote
                     {...props}
                     style={{
-                      borderLeft: '2px solid #222',
+                      borderLeft: '2px solid var(--theme-border)',
                       paddingLeft: 8,
                       margin: '6px 0',
-                      color: '#888',
+                      color: 'var(--theme-text-muted)',
                     }}
                   />
                 ),
                 a: ({ href, ...props }) => {
                   if (!isSafeHttpsUrl(href)) {
-                    return <span {...props} style={{ color: '#888' }} />;
+                    return <span {...props} style={{ color: 'var(--theme-text-muted)' }} />;
                   }
                   return (
                     <a
@@ -368,7 +379,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
-                      style={{ color: '#7dd3fc', textDecoration: 'underline' }}
+                      style={{ color: 'var(--theme-text-link)', textDecoration: 'underline' }}
                     />
                   );
                 },

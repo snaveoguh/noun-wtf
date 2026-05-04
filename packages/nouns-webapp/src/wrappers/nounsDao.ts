@@ -173,6 +173,10 @@ export interface PartialProposal {
   quorumVotes: number;
   objectionPeriodEndBlock: bigint;
   updatePeriodEndBlock: bigint;
+  /** Proposer wallet address (lowercased). Surfaced for sidebar bylines. */
+  proposer?: string;
+  /** Unix seconds when the proposal was created on-chain (subgraph value). */
+  createdTimestamp?: bigint;
 }
 
 export interface Proposal extends PartialProposal {
@@ -827,6 +831,15 @@ const parsePartialSubgraphProposal = (
     quorumVotes: Number(proposal?.quorumVotes ?? 0),
     eta: proposal.executionETA != null ? new Date(Number(proposal.executionETA) * 1000) : undefined,
     objectionPeriodEndBlock: BigInt(proposal?.objectionPeriodEndBlock ?? 0),
+    proposer:
+      typeof proposal.proposer === 'string'
+        ? proposal.proposer.toLowerCase()
+        : ((proposal.proposer as unknown as { id?: string })?.id?.toLowerCase() ?? undefined),
+    createdTimestamp: proposal.createdAt
+      ? BigInt(proposal.createdAt)
+      : proposal.createdTimestamp
+        ? BigInt(proposal.createdTimestamp)
+        : undefined,
   };
 };
 

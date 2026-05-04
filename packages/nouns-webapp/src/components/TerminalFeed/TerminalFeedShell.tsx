@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
 
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import ActivityFeed from './ActivityFeed';
@@ -14,7 +15,7 @@ import TerminalPrompt from './TerminalPrompt';
 import { useActivityFeed } from './useActivityFeed';
 
 export default function TerminalFeedShell() {
-  const { setMode, isEmbedded } = useSiteTheme();
+  const { isEmbedded } = useSiteTheme();
   const [activeFilter, setActiveFilter] = useState('');
   const isChatTab = activeFilter === '_CHAT';
   // Only pass filter to activity feed when not in chat mode
@@ -61,8 +62,8 @@ export default function TerminalFeedShell() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: '#000000',
-        color: '#ccc',
+        background: 'var(--theme-bg-primary)',
+        color: 'var(--theme-text-secondary)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -77,12 +78,12 @@ export default function TerminalFeedShell() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 16px',
-          borderBottom: '1px solid #111',
+          borderBottom: '1px solid var(--theme-border)',
           flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#00ff41', fontSize: '14px', letterSpacing: '1px' }}>NOUN.WTF</span>
+          <span style={{ color: 'var(--theme-accent)', fontSize: '14px', letterSpacing: '1px' }}>NOUN.WTF</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -93,12 +94,12 @@ export default function TerminalFeedShell() {
                 onClick={show}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #222',
-                  color: isConnected ? '#00ff41' : '#444',
+                  border: '1px solid var(--theme-border)',
+                  color: isConnected ? 'var(--theme-accent)' : 'var(--theme-text-muted)',
                   cursor: 'pointer',
                   fontSize: '11px',
                   padding: '4px 8px',
-                  borderRadius: '2px',
+                  borderRadius: 'var(--theme-radius-sm)',
                 }}
               >
                 {isConnected && address
@@ -108,31 +109,17 @@ export default function TerminalFeedShell() {
             )}
           </ConnectKitButton.Custom>
 
-          {/* Exit terminal — short text label so it fits on mobile alongside
-              the connect button. 'classic' is the graphical noun.wtf mode in
-              this codebase (App.tsx renders TerminalFeedShell when mode === 'new'). */}
+          {/* Theme switcher — picking anything other than 'terminal' navigates
+              back to '/' so the chosen theme's home layout takes over. */}
           {!isEmbedded && (
-            <button
-              onClick={() => {
-                setMode('classic');
-                window.location.replace('/');
+            <ThemeSwitcher
+              variant="terminal"
+              onChange={next => {
+                if (next !== 'terminal') {
+                  window.location.replace('/');
+                }
               }}
-              title="Exit to classic noun.wtf"
-              aria-label="Exit to classic noun.wtf"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#00ff41',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                fontWeight: 700,
-                padding: '2px 6px',
-                lineHeight: 1,
-              }}
-            >
-              classic
-            </button>
+            />
           )}
         </div>
       </div>
@@ -145,7 +132,7 @@ export default function TerminalFeedShell() {
           alignItems: 'center',
           gap: '4px',
           padding: '0 16px',
-          borderBottom: '1px solid #111',
+          borderBottom: '1px solid var(--theme-border)',
           flexShrink: 0,
           overflowX: 'auto',
           overflowY: 'hidden',
@@ -160,31 +147,31 @@ export default function TerminalFeedShell() {
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
               style={{
-                background: isActive ? '#111' : 'transparent',
+                background: isActive ? 'var(--theme-bg-tertiary)' : 'transparent',
                 border: 'none',
                 color: isActive
                   ? isChatButton
-                    ? '#00ff41'
-                    : '#00ff41'
+                    ? 'var(--theme-accent)'
+                    : 'var(--theme-accent)'
                   : isChatButton && chatHistory.length > 0
-                    ? '#00ff41'
-                    : '#444',
+                    ? 'var(--theme-accent)'
+                    : 'var(--theme-text-muted)',
                 cursor: 'pointer',
                 fontSize: '11px',
                 padding: '4px 10px',
-                borderRadius: '2px',
+                borderRadius: 'var(--theme-radius-sm)',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 transition: 'color 0.15s',
                 opacity: isChatButton && chatHistory.length > 0 && !isActive ? 0.6 : 1,
               }}
               onMouseEnter={e => {
-                if (!isActive) (e.target as HTMLElement).style.color = '#666';
+                if (!isActive) (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
               }}
               onMouseLeave={e => {
                 if (!isActive) {
                   (e.target as HTMLElement).style.color =
-                    isChatButton && chatHistory.length > 0 ? '#00ff41' : '#444';
+                    isChatButton && chatHistory.length > 0 ? 'var(--theme-accent)' : 'var(--theme-text-muted)';
                   (e.target as HTMLElement).style.opacity =
                     isChatButton && chatHistory.length > 0 ? '0.6' : '1';
                 }

@@ -67,7 +67,7 @@ const KeyboardShortcutsHelp: FC<Props> = ({ onClose }) => {
             fontWeight: 700,
             letterSpacing: '0.06em',
             textTransform: 'uppercase',
-            color: 'rgba(0,0,0,0.5)',
+            color: 'var(--theme-text-secondary)',
             marginBottom: 12,
             textAlign: 'center',
           }}
@@ -85,14 +85,14 @@ const KeyboardShortcutsHelp: FC<Props> = ({ onClose }) => {
             onClick={onClose}
             style={{
               border: 'none',
-              background: 'rgba(0,0,0,0.08)',
-              borderRadius: 8,
+              background: 'var(--theme-bg-tertiary)',
+              borderRadius: 'var(--theme-radius-md)',
               padding: '6px 20px',
               fontSize: '0.65rem',
               fontWeight: 700,
               fontFamily: "'PT Root UI', sans-serif",
               cursor: 'pointer',
-              color: 'rgba(0,0,0,0.5)',
+              color: 'var(--theme-text-secondary)',
             }}
           >
             Close
@@ -112,7 +112,7 @@ const Column: FC<{ title: string; shortcuts: string[][] }> = ({ title, shortcuts
         fontWeight: 800,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
-        color: 'rgba(0,0,0,0.35)',
+        color: 'var(--theme-text-muted)',
         marginBottom: 6,
       }}
     >
@@ -132,20 +132,20 @@ const Column: FC<{ title: string; shortcuts: string[][] }> = ({ title, shortcuts
       >
         <kbd
           style={{
-            background: 'rgba(0,0,0,0.06)',
-            borderRadius: 4,
+            background: 'var(--theme-bg-tertiary)',
+            borderRadius: 'var(--theme-radius-sm)',
             padding: '2px 6px',
             fontFamily: "'Courier New', monospace",
             fontSize: '0.6rem',
             fontWeight: 700,
-            color: 'rgba(0,0,0,0.6)',
+            color: 'var(--theme-text-primary)',
             minWidth: 60,
             textAlign: 'center',
           }}
         >
           {key}
         </kbd>
-        <span style={{ color: 'rgba(0,0,0,0.55)', marginLeft: 12 }}>{desc}</span>
+        <span style={{ color: 'var(--theme-text-secondary)', marginLeft: 12 }}>{desc}</span>
       </div>
     ))}
   </div>
