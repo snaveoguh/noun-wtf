@@ -387,9 +387,30 @@ function AppRouter() {
  * page doesn't render with broken/empty themed chrome. The user can still
  * switch themes manually after landing — that's how you find the cool UI
  * glitches on undesigned pages — but the default click-through experience is
- * a sane render. Add new routes here as more pages are stubbed out.
+ * a sane render.
+ *
+ * NOTE: do NOT add routes that have theme-specific bespoke handlers (e.g.
+ * `/create-proposal` is intercepted by `isGameCreateProposal` for the game
+ * theme — pro-forcing it would make the game's bespoke editor unreachable).
+ * Add new prefixes here as more pages get flagged.
  */
-const PRO_REQUIRED_PATH_PREFIXES: readonly string[] = ['/grants'];
+const PRO_REQUIRED_PATH_PREFIXES: readonly string[] = [
+  '/create-candidate',
+  '/dashboard',
+  '/feed',
+  '/gas',
+  '/grants',
+  '/hackathons',
+  '/marketplace',
+  '/nonsense',
+  '/predictions',
+  '/settlers',
+  '/stats',
+  '/studio',
+  '/traits',
+  '/underground',
+  '/world',
+];
 
 function ThemedAppContent() {
   const { mode, theme, setTheme } = useSiteTheme();
