@@ -807,8 +807,11 @@ app.get('/api/nounv2-auctions', async c => {
 
   const items = auctions.map(a => ({
     nounId: String(a.nounId),
-    startTime: String(Math.floor(new Date(a.startTime).getTime() / 1000)),
-    endTime: String(Math.floor(new Date(a.endTime).getTime() / 1000)),
+    // Date.getTime() on the indexer's "seconds-as-ms" stored Date numerically equals
+    // the original Unix-seconds chain timestamp — output it directly. Do NOT divide
+    // by 1000; the consumer (e.g. webapp's BidHistoryModalRow) does `new Date(value * 1000)`.
+    startTime: String(new Date(a.startTime).getTime()),
+    endTime: String(new Date(a.endTime).getTime()),
     settled: a.settled,
     winner: a.winner,
     amount: a.amount != null ? String(a.amount) : null,
@@ -857,8 +860,9 @@ app.get('/api/nounv2-auctions/:nounId', async c => {
 
   return c.json({
     nounId: String(a.nounId),
-    startTime: String(Math.floor(new Date(a.startTime).getTime() / 1000)),
-    endTime: String(Math.floor(new Date(a.endTime).getTime() / 1000)),
+    // See note above: stored Date.getTime() == original Unix seconds value.
+    startTime: String(new Date(a.startTime).getTime()),
+    endTime: String(new Date(a.endTime).getTime()),
     settled: a.settled,
     winner: a.winner,
     amount: a.amount != null ? String(a.amount) : null,
@@ -868,7 +872,7 @@ app.get('/api/nounv2-auctions/:nounId', async c => {
       bidder: b.bidder,
       value: String(b.value),
       extended: b.extended,
-      timestamp: String(Math.floor(new Date(b.createdAt).getTime() / 1000)),
+      timestamp: String(new Date(b.createdAt).getTime()),
       transactionHash: b.createdAtTransaction,
       createdAtBlock: String(b.createdAtBlock),
     })),
