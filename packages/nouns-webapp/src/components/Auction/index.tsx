@@ -14,6 +14,8 @@ import React, {
 } from 'react';
 
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import { useAccount } from 'wagmi';
 
 import AuctionActivity from '@/components/AuctionActivity';
 import AuctionActivityDateHeadline from '@/components/AuctionActivityDateHeadline';
@@ -35,6 +37,15 @@ import {
   seedToPixelLayers,
 } from '@/lib/nounDecoder';
 import { createEmptyGrid, createInitialHistory, historyReducer } from '@/lib/pixelHistory';
+import {
+  type CustomTraitLayer,
+  type SavedDream,
+  generateDreamId,
+  saveDreamToStorage,
+} from '@/lib/dreamStorage';
+import { invalidateProbeDreamsCache } from '@/hooks/useProbeDreams';
+import { syncDreamToProbe } from '@/lib/probeSync';
+import { encodeImageToRLE } from '@/lib/rleEncode';
 import useDaoContext from '@/hooks/useDaoContext';
 import {
   useDaoNounSeed,
@@ -384,6 +395,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   const [liveDrafts, setLiveDrafts] = useState<NounDayDrafts | null>(null);
   const [liveSaveMode, setLiveSaveMode] = useState<EditMode>(null);
   const [voxelMapVersion, setVoxelMapVersion] = useState(0);
+  const [saveDreamStatus, setSaveDreamStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  );
+
+  const { address: walletAddress } = useAccount();
 
   const editorToolRef = useRef<{
     setTool: (tool: Tool) => void;
@@ -839,6 +855,88 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
       }
     },
     [currentAuction, currentNounId],
+  );
+
+  const handleSaveDream = useCallback(
+    async (pixels: string[][], thumbnail: string) => {
+      if (!editorSeed) return;
+      setSaveDreamStatus('saving');
+
+      // Encode the painted 32x32 grid as a custom trait. If the user opened
+      // the editor on a single trait (Noundry banner), use that layer; for
+      // a full-noun edit, default to head — heads are the dominant layer
+      // visually so it gives the painting the most surface area on the
+      // probe-side renderer.
+      const customLayer: CustomTraitLayer = singleTraitFilter?.layer ?? 'head';
+
+      let encodedData: string | undefined;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          for (let y = 0; y < 32; y++) {
+            for (let x = 0; x < 32; x++) {
+              const c = pixels[y]?.[x];
+              if (c) {
+                ctx.fillStyle = c;
+                ctx.fillRect(x, y, 1, 1);
+              }
+            }
+          }
+          const imgData = ctx.getImageData(0, 0, 32, 32);
+          encodedData = encodeImageToRLE(imgData, `noun-${currentNounId}-livedream`).data;
+        }
+      } catch {
+        // RLE encoding is best-effort — the dream still saves with the PNG preview.
+      }
+
+      const dream: SavedDream = {
+        id: generateDreamId(),
+        title: `2D Edit · Noun #${currentNounId}`,
+        description: '',
+        seed: editorSeed,
+        createdAt: Date.now(),
+        status: walletAddress ? 'published' : 'draft',
+        customTraitLayer: customLayer,
+        customTraitPreview: thumbnail,
+        ...(encodedData ? { customTraitData: encodedData } : {}),
+      };
+
+      saveDreamToStorage(dream);
+
+      // Mirror to the noun's live 2D draft so the noun page reflects it too.
+      void persistLiveDraft('2d', pixels, undefined, { imageOverride: thumbnail });
+
+      if (!walletAddress) {
+        setSaveDreamStatus('saved');
+        toast.success('Dream saved locally', {
+          description: 'Connect a wallet to publish to probe.wtf',
+        });
+        setTimeout(() => setSaveDreamStatus('idle'), 2500);
+        return;
+      }
+
+      try {
+        const blob = await (await fetch(thumbnail)).blob();
+        const file = new File([blob], `noun-${currentNounId}-livedream.png`, {
+          type: 'image/png',
+        });
+        await syncDreamToProbe(dream, walletAddress, file);
+        invalidateProbeDreamsCache();
+        setSaveDreamStatus('saved');
+        toast.success('Dream published to probe.wtf');
+        setTimeout(() => setSaveDreamStatus('idle'), 2500);
+      } catch (err) {
+        setSaveDreamStatus('error');
+        toast.error('Failed to publish dream', {
+          description: err instanceof Error ? err.message : 'Unknown error',
+        });
+        setTimeout(() => setSaveDreamStatus('idle'), 4000);
+      }
+    },
+    [editorSeed, singleTraitFilter, currentNounId, walletAddress, persistLiveDraft],
   );
 
   const stopEditing = useCallback(() => {
@@ -1957,6 +2055,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                     externalFuture={edit2dHistory.future}
                     visibility={edit2dVisibility}
                     onVisibilityChange={setEdit2dVisibility}
+                    onSaveDream={handleSaveDream}
+                    saveDreamStatus={saveDreamStatus}
                   />
                 </Suspense>
               )}
