@@ -22,6 +22,7 @@ import {
   BoxIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CloudUploadIcon,
   DownloadIcon,
   EraserIcon,
   GripHorizontalIcon,
@@ -86,6 +87,10 @@ interface InlineEditorProps {
   onColorChange?: (color: string) => void;
   /** Download/export handler (mesh mode) — receives format string */
   onDownload?: (format: 'glb' | 'stl' | 'obj') => void;
+  /** Save current grid as a Dream (publishes to probe.wtf + noun.wtf dream feed) */
+  onSaveDream?: (pixels: string[][], thumbnail: string) => void | Promise<void>;
+  /** Status of an in-flight Save Dream call — drives the button label */
+  saveDreamStatus?: 'idle' | 'saving' | 'saved' | 'error';
   /** External pixel state from parent (for 3D mode sync). If provided, editor uses this instead of own reducer. */
   externalPixels?: string[][];
   externalDispatch?: React.Dispatch<import('@/lib/pixelHistory').HistoryAction>;
@@ -131,6 +136,8 @@ const InlineEditor: FC<InlineEditorProps> = ({
   onToolChange,
   onColorChange,
   onDownload,
+  onSaveDream,
+  saveDreamStatus = 'idle',
 }) => {
   void _nounSvg;
   // Decode seed into per-layer pixel grids
@@ -281,8 +288,7 @@ const InlineEditor: FC<InlineEditorProps> = ({
     [controlledVisibility, onVisibilityChange, visibility],
   );
 
-  const handleSave = useCallback(() => {
-    if (!onSave) return;
+  const renderThumbnail = useCallback(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
@@ -296,8 +302,18 @@ const InlineEditor: FC<InlineEditorProps> = ({
         }
       }
     }
-    onSave(pixels, canvas.toDataURL('image/png'));
-  }, [pixels, onSave]);
+    return canvas.toDataURL('image/png');
+  }, [pixels]);
+
+  const handleSave = useCallback(() => {
+    if (!onSave) return;
+    onSave(pixels, renderThumbnail());
+  }, [pixels, onSave, renderThumbnail]);
+
+  const handleSaveDream = useCallback(() => {
+    if (!onSaveDream) return;
+    void onSaveDream(pixels, renderThumbnail());
+  }, [pixels, onSaveDream, renderThumbnail]);
 
   const hasChanges = pastLen > 0;
 
@@ -621,6 +637,28 @@ const InlineEditor: FC<InlineEditorProps> = ({
             {hasChanges && onSave && (
               <button type="button" className={classes.actionBtn} onClick={handleSave}>
                 Save
+              </button>
+            )}
+            {hasChanges && onSaveDream && (
+              <button
+                type="button"
+                className={classes.actionBtn}
+                onClick={handleSaveDream}
+                disabled={saveDreamStatus === 'saving'}
+                title="Publish this 2D edit as a Dream on probe.wtf + noun.wtf"
+              >
+                <CloudUploadIcon
+                  size={14}
+                  strokeWidth={2}
+                  style={{ marginRight: 3, verticalAlign: -2 }}
+                />
+                {saveDreamStatus === 'saving'
+                  ? 'Saving…'
+                  : saveDreamStatus === 'saved'
+                    ? 'Saved!'
+                    : saveDreamStatus === 'error'
+                      ? 'Retry Dream'
+                      : 'Save Dream'}
               </button>
             )}
             {onDownload && (
