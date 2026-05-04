@@ -5,11 +5,24 @@ import { nounV2Auction, nounV2Bid } from 'ponder:schema';
 // Events on NounV2AuctionHouse: AuctionCreated, AuctionBid, AuctionExtended,
 // AuctionSettled, BeneficiaryUpdated (ignored — governance-only).
 //
-// NOTE: Date fields follow the repo convention of `new Date(Number(timestampSecs))`
-// without multiplying by 1000. The rest of the codebase (NounsAuctionHouseV2,
-// SmallGrantsTreasury, etc.) treats chain seconds as ms when building Date objects;
-// downstream REST endpoints divide the stored Date by 1000 on the way out, so
-// matching that convention keeps all tables consistent.
+// NOTE on dates: this file follows the repo's legacy convention of
+// `new Date(Number(timestampSecs))` — i.e. it stores chain seconds in the
+// Date as if they were milliseconds, so the persisted Date represents some
+// time in Jan 1970, BUT its `.getTime()` numerically equals the original
+// Unix-seconds value. NounsAuctionHouseV2, SmallGrantsTreasury, NounsDAOV4,
+// etc. all do the same.
+//
+// To round-trip safely, downstream REST handlers must output `.getTime()`
+// directly (which equals chain seconds) — DO NOT also divide by 1000, or the
+// consumer's `new Date(value * 1000)` reconstruction lands in 1970. The V2
+// bid history popover bug (see api/index.ts `/api/nounv2-auctions/:nounId`)
+// was caused by the extra `/1000`. Prefer the correct pattern in new code:
+//
+//   indexer:  createdAt: new Date(Number(secs) * 1000)   ← stores real date
+//   REST:     timestamp: String(Math.floor(d.getTime()/1000))   ← real seconds
+//
+// but only when nothing else is reading the table (a schema/data migration
+// is required to switch a table over).
 
 ponder.on('NounV2AuctionHouse:AuctionCreated', async ({ event, context }) => {
   await context.db.insert(nounV2Auction).values({
