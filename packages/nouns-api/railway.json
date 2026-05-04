@@ -6,7 +6,7 @@
   },
   "deploy": {
     "startCommand": "pnpm --filter @nouns/api -- start --schema nouns-prod",
-    "healthcheckPath": "/health",
-    "healthcheckTimeout": 300
+    "healthcheckPath": "/ready",
+    "healthcheckTimeout": 600
   }
 }
