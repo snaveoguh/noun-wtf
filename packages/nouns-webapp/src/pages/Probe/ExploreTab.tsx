@@ -158,8 +158,9 @@ const ExploreTab: React.FC = () => {
   const seeds = useNounSeeds();
   const { ownerAddress, setOwnerAddress, ownedNounIds } = useOwnerFilter();
 
-  // 3D view mode
-  const [view3D, setView3D] = useState(true);
+  // 3D view mode — defaults off because the voxel grid doesn't always finish
+  // loading reliably on first paint; user opts in via the toggle.
+  const [view3D, setView3D] = useState(false);
   const [hoveredNounId, setHoveredNounId] = useState<bigint | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
