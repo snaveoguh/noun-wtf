@@ -80,12 +80,12 @@
 
 .tabBtn:hover {
   transform: translateY(-1px);
-  color: #1f1a17;
+  color: var(--theme-text-primary);
 }
 
 .tabActive {
-  background: #1f1a17;
-  color: #fff8f0;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
 }
 
 .derivativeTab {
@@ -179,7 +179,7 @@
   justify-content: center;
   gap: 0.08rem;
   background: rgba(255, 255, 255, 0.82);
-  color: #201814;
+  color: var(--theme-text-primary);
   box-shadow: 0 12px 24px rgba(58, 37, 16, 0.12);
   cursor: pointer;
   transition:
@@ -193,8 +193,8 @@
 }
 
 .railBtnActive {
-  background: #111827;
-  color: #fff7ed;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
 }
 
 .railIcon {
@@ -239,7 +239,7 @@
   font-family: 'PT Root UI', sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #201814;
+  color: var(--theme-text-primary);
   cursor: pointer;
   text-align: center;
   transition: background 0.12s ease;
@@ -273,7 +273,7 @@
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
-  color: #251b15;
+  color: var(--theme-text-primary);
   font-size: 1.6rem;
   cursor: pointer;
   transform: translateY(-50%);
@@ -355,7 +355,7 @@
 
 .metaTitle {
   margin: 0.2rem 0 0;
-  color: #231913;
+  color: var(--theme-text-primary);
   font-family: 'PT Root UI', sans-serif;
   font-size: clamp(1.1rem, 2vw, 1.45rem);
   font-weight: 800;
@@ -395,14 +395,14 @@
 
 .metaPrimaryBtn {
   padding: 0.75rem 1rem;
-  background: #111827;
-  color: #fff7ed;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
 }
 
 .metaAccentBtn {
   padding: 0.75rem 1rem;
-  background: #f59e0b;
-  color: #2b1900;
+  background: var(--theme-accent);
+  color: var(--theme-accent-text);
 }
 
 .metaGhostBtn {
@@ -439,7 +439,7 @@
   border-radius: 0.9rem;
   padding: 0.8rem 0.95rem;
   background: rgba(255, 255, 255, 0.88);
-  color: #211913;
+  color: var(--theme-text-primary);
   font-family: 'PT Root UI', sans-serif;
   font-size: 0.78rem;
   outline: none;
@@ -503,8 +503,8 @@
 }
 
 .composerTabActive {
-  background: #111827;
-  color: #fff7ed;
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
 }
 
 .linkComposer {
@@ -660,3 +660,19 @@
     opacity: 0;
   }
 }
+
+/* ─── Classic theme strip ────────────────────────────────────────────────
+   Classic is a port of OG nouns.wtf, which had none of noun.wtf's editor
+   tools, mode tabs, or chat composer. Hide those surfaces when the
+   user is in the Classic theme so the auction page reads as the original.
+   The Pro/Camp/Berry/Game/Terminal themes all keep the full chrome. */
+:global([data-theme='classic']) .heroTabs,
+:global([data-theme='classic']) .heroControlRail,
+:global([data-theme='classic']) .stageStatus,
+:global([data-theme='classic']) .composerInput,
+:global([data-theme='classic']) .composerOverlay,
+:global([data-theme='classic']) .composerTabs,
+:global([data-theme='classic']) .composerActions {
+  display: none !important;
+}
+

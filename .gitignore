@@ -10,6 +10,7 @@ dist
 *.tsbuildinfo
 *.log
 .claude
+.grapevine
 
 # Local Netlify folder
 .netlify
@@ -19,3 +20,24 @@ dist
 i18n.cache
 packages/nouns-contracts/broadcast/
 packages/nouns-contracts/foundry-cache/
+
+# Build artifacts that shadow TS sources (from accidental tsc -b without --noEmit)
+packages/nouns-assets/src/**/*.js
+packages/nouns-assets/src/**/*.d.ts
+packages/nouns-api/src/**/*.js
+packages/nouns-api/src/**/*.d.ts
+packages/nouns-party/src/**/*.js
+packages/nouns-party/src/**/*.d.ts
+packages/nouns-world-engine/src/**/*.js
+packages/nouns-world-engine/src/**/*.d.ts
+packages/nouns-world-visionos/src/**/*.js
+packages/nouns-world-visionos/src/**/*.d.ts
+packages/nouns-webapp/src/**/*.js
+packages/nouns-webapp/src/**/*.d.ts
+packages/nouns-webapp/tailwind.config.js
+packages/nouns-webapp/vite.config.js
+packages/nouns-webapp/wagmi.config.js
+packages/nouns-webapp/vitest.config.js
+packages/nouns-webapp/codegen.config.js
+packages/nouns-webapp/netlify/functions/**/*.js
+packages/nouns-webapp/netlify/functions/**/*.d.ts

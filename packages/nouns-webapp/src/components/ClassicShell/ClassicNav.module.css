@@ -1,0 +1,222 @@
+/* Root container — locks Classic to viewport height on desktop so the
+   home view fits above the fold. Mobile gets normal scroll. */
+.classicShellRoot {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .classicShellRoot {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+}
+
+/* ClassicShell — minimal port of the OG nouns.wtf NavBar.
+   Strips out V1/V2 toggle, MakeArt, NocTicker, NounPalette, torch, dream,
+   saber, SubgraphSettings — anything noun-wtf added on top of the original.
+
+   The class names mirror NavBar.module.css so the visual rhythm (logo size,
+   gutters, dropdown menu z-index) stays consistent with the OG. */
+
+.navBarCustom {
+  padding:
+    max(0.95rem, env(safe-area-inset-top))
+    max(1.5rem, var(--page-edge-padding-right, 1.5rem))
+    0.45rem
+    max(1.5rem, var(--page-edge-padding-left, 1.5rem)) !important;
+  background: transparent !important;
+  position: relative;
+  z-index: 70;
+  border-bottom: 1px solid transparent;
+}
+
+.navBarInner {
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
+  gap: 1rem;
+  position: relative;
+  flex-wrap: nowrap !important;
+}
+
+.navBarBrand {
+  position: relative;
+  z-index: 2;
+  padding: 0.3rem 0;
+  margin-top: 1px;
+  transition: transform 0.15s ease-in-out;
+}
+
+.navBarBrand:hover {
+  transform: scale(0.95);
+}
+
+.navBarLogo {
+  width: 60px;
+  height: 60px;
+}
+
+.brandAndTreasuryWrapper {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 1;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.navBarItems {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.navBarSecondary {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+}
+
+.nounsNavLink {
+  font-family: var(--theme-font-body, 'PT Root UI');
+  font-weight: bold;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.2rem !important;
+  color: var(--theme-text-primary) !important;
+}
+
+/* Full-UX button — classic Nouns red on cream */
+.fullUxBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 12px;
+  background: #e40536;
+  color: #fff !important;
+  font-family: var(--theme-font-body, 'PT Root UI'), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-decoration: none !important;
+  border: 2px solid #c40b35;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  transition:
+    background 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+  white-space: nowrap;
+}
+.fullUxBtn:hover {
+  background: #c40b35;
+  color: #fff !important;
+  text-decoration: none !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px -2px rgba(196, 11, 53, 0.4);
+}
+.fullUxBtn .fullUxArrow {
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+.fullUxBtn:hover .fullUxArrow {
+  transform: translateX(2px);
+}
+
+@media (max-width: 768px) {
+  .fullUxBtn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.72rem;
+  }
+}
+
+/* Mobile shrink — match the OG behaviour of compacting buttons but keep
+   them visible (no hide-the-locale-switcher hack). */
+@media (max-width: 992px) {
+  .navBarLogo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .navBarCustom {
+    padding:
+      max(0.7rem, env(safe-area-inset-top))
+      var(--page-edge-padding-right, 1rem)
+      0.15rem
+      var(--page-edge-padding-left, 1rem) !important;
+  }
+
+  .navBarInner {
+    gap: 0.75rem;
+  }
+
+  .navBarItems {
+    gap: 0.3rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .navBarSecondary {
+    /* Hide locale + theme switcher on tightest mobile so DAO/Explore/Connect
+       stay reachable. Same compromise the OG made. */
+    display: none;
+  }
+
+  .navBarItems {
+    gap: 0.25rem;
+  }
+
+  /* Strip pill outlines on mobile so the header reads as icons. */
+  .navBarItems :global([class*='NavBarButton_button']) {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+}
+
+.navBarCustom :global(.dropdown-menu) {
+  position: absolute !important;
+  z-index: 1050;
+}
+
+/* OG hero wrapper — wide centred container under the auction. */
+.heroBlock {
+  background: var(--theme-bg-primary, #ffffff);
+  padding: 4rem 1.5rem 5rem;
+  text-align: center;
+  border-top: 1px solid var(--theme-border, #dee2e6);
+}
+
+.heroTitle {
+  font-family: var(--theme-font-display, 'Londrina Solid'), cursive;
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  line-height: 1.05;
+  margin: 0 0 1rem;
+  color: var(--theme-text-primary, #212529);
+  letter-spacing: 0;
+}
+
+.heroLede {
+  max-width: 720px;
+  margin: 0 auto 1rem;
+  font-family: var(--theme-font-body, 'PT Root UI'), sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--theme-text-secondary, #6c757d);
+}
+
+.heroSubhead {
+  font-family: var(--theme-font-display, 'Londrina Solid'), cursive;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  margin: 2.5rem 0 0.75rem;
+  color: var(--theme-text-primary, #212529);
+}

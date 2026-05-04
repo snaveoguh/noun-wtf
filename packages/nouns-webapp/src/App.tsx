@@ -2,17 +2,30 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router';
 import { useAccount } from 'wagmi';
 
 import AmbientMusic from '@/components/AmbientMusic';
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
+import BerryShell from '@/components/BerryShell';
+import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
+import ClassicHome from '@/components/ClassicShell/ClassicHome';
+import GameCreateProposal from '@/components/GameShell/GameCreateProposal';
+import GameEditProposal from '@/components/GameShell/GameEditProposal';
+import GameHome from '@/components/GameShell/GameHome';
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
 import NetworkAlert from '@/components/NetworkAlert';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
-import { useSiteTheme } from '@/contexts/SiteThemeContext';
+import { THEME_NAMES, useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/index.css';
@@ -27,6 +40,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
+import EditCandidatePage from '@/pages/EditCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
 import EditProposalPage from '@/pages/EditProposal';
@@ -76,16 +90,331 @@ const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPa
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 
+/**
+ * The full set of <Route> definitions extracted into a component so the same
+ * routing tree can render either inside the default chrome (NavBar + Footer)
+ * or wrapped by a theme shell that owns its own chrome (e.g. BerryShell's
+ * Mac window so internal nav stays inside Berry's desktop instead of
+ * navigating away to the default site chrome).
+ */
+/**
+ * The main site route table. Paths are written **relative** so the same
+ * `<Routes>` tree can be mounted at the site root (`/vote/123`) AND under a
+ * theme prefix (`/pro/vote/123`) without duplicating definitions. The parent
+ * `<Route>` consumes the prefix, react-router's descendant `<Routes>` then
+ * matches against what's left.
+ */
+function SiteRoutes() {
+  return (
+    <Routes>
+      <Route index element={<AuctionPage />} />
+      <Route path="auction/:id" element={<Navigate to="/noun/:id" replace />} />
+      <Route path="noun/:id" element={<AuctionPage />} />
+      <Route path="v2" element={<AuctionPage />} />
+      <Route path="v2/noun/:id" element={<AuctionPage />} />
+      <Route path="nounders" element={<NoundersPage />} />
+      <Route path="create-proposal" element={<CreateProposalPage />} />
+      <Route path="create-candidate" element={<CreateCandidatePage />} />
+      <Route path="vote" element={<GovernancePage />} />
+      <Route
+        path="vote/:id"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <VotePageRouter />
+          </Suspense>
+        }
+      />
+      <Route path="vote/:id/history" element={<ProposalHistory />} />
+      <Route path="vote/:id/history/:versionNumber" element={<ProposalHistory />} />
+      <Route
+        path="vote/:id/edit"
+        element={<EditProposalPage match={{ params: { id: ':id' } }} />}
+      />
+      <Route
+        path="candidates"
+        element={
+          <Suspense fallback={<GovernanceSkeleton />}>
+            <CandidatesListPage />
+          </Suspense>
+        }
+      />
+      <Route path="candidates/:id" element={<CandidatePage />} />
+      <Route path="candidates/:id/edit" element={<EditCandidatePage />} />
+      <Route path="playground" element={<Playground />} />
+      <Route path="grants" element={<GrantsPage />} />
+      <Route path="grants/create" element={<CreateGrantPage />} />
+      <Route path="grants/:id" element={<GrantDetailPage />} />
+      <Route path="nounv2" element={<NounV2Page />} />
+      <Route path="nounv2/create" element={<CreateNounV2ProposalPage />} />
+      <Route path="nounv2/:id" element={<NounV2DetailPage />} />
+      <Route path="hackathons" element={<HackathonPage />} />
+      <Route path="underground" element={<UndergroundPage />} />
+      <Route path="delegate" element={<DelegatePage />} />
+      <Route path="traits" element={<TraitsPage />} />
+      <Route path="explore" element={<Navigate to="/probe" replace />} />
+      <Route path="nouns" element={<Navigate to="/probe" replace />} />
+      <Route
+        path="probe"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <ProbePage />
+          </Suspense>
+        }
+      />
+      <Route path="studio" element={<StudioPage />} />
+      <Route path="settlers" element={<SettlersPage />} />
+      <Route path="gas" element={<GasLeaderboardPage />} />
+      <Route path="stats" element={<StatsPage />} />
+      <Route
+        path="dashboard"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <DashboardPage />
+          </Suspense>
+        }
+      />
+      <Route path="nonsense" element={<NonsensePage />} />
+      <Route path="dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
+      <Route path="dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
+      <Route
+        path="crystal-ball"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <CrystalBallPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="v2/crystal-ball"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <CrystalBallPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="feed"
+        element={
+          <Suspense fallback={<FeedSkeleton />}>
+            <FeedPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="highway"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <HighwayPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="terraforms"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <TerraformsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="terraforms/:id"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <TerraformsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="pip3"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <Pip3Page />
+          </Suspense>
+        }
+      />
+      <Route
+        path="predictions"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <PredictionsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="marketplace"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <MarketplacePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="marketplace/:nounId"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <NounDetailPage />
+          </Suspense>
+        }
+      />
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
+}
+
+/**
+ * Themes whose shells are read-only (no URL-driven internal routing). Hitting
+ * any deep path under their prefix (e.g. `/game/foo`) redirects back to the
+ * shell root since these UIs are either static homepages (Berry, Catalogue,
+ * Classic) or own their own bespoke internal nav (Game).
+ *
+ * Themes NOT in this list (`pro`, `terminal`) pass through to the full
+ * SiteRoutes tree under their prefix — `/pro/vote/123` and
+ * `/terminal/candidates` both work because `logicalPath` strips the prefix
+ * before downstream routing.
+ */
+const READ_ONLY_SHELL_THEMES: readonly ThemeName[] = ['game', 'berry', 'catalogue', 'classic'];
+
+function isReadOnlyShellTheme(t: ThemeName): boolean {
+  return (READ_ONLY_SHELL_THEMES as readonly string[]).includes(t);
+}
+
+/**
+ * Wrapper for `/<theme>/*` routes — sets the active theme based on the URL
+ * param, then renders the appropriate shell. Read-only shells redirect any
+ * deep path back to `/<theme>` (since they have no internal routing). The
+ * Pro and Terminal shells fall through to the default chrome by rendering
+ * `null` here and letting the parent AppRouter handle them via `theme`
+ * state — they need the same logic as the no-prefix path.
+ */
+function ThemePrefixRoute() {
+  const { theme: currentTheme, setTheme } = useSiteTheme();
+  const location = useLocation();
+
+  // Detect which theme prefix is in the URL — we mount one of these per
+  // theme above, so the first segment is guaranteed to be a real theme name
+  // by the time we render here.
+  const firstSegment = location.pathname.split('/').filter(Boolean)[0] ?? '';
+  const targetTheme = (THEME_NAMES as readonly string[]).includes(firstSegment)
+    ? (firstSegment as ThemeName)
+    : null;
+
+  // Sync URL → theme state. Persists to localStorage via setTheme so reloads
+  // and ?theme= fallbacks both work.
+  useEffect(() => {
+    if (targetTheme && targetTheme !== currentTheme) {
+      setTheme(targetTheme);
+    }
+  }, [targetTheme, currentTheme, setTheme]);
+
+  if (!targetTheme) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Read-only shells: any sub-path under `/<theme>/...` redirects to the
+  // shell root, since these UIs have no URL-driven internal navigation.
+  // The deep-path detection accounts for trailing slashes — `/game/` is the
+  // same as `/game` and should NOT redirect.
+  if (isReadOnlyShellTheme(targetTheme)) {
+    const rest = location.pathname.slice(`/${targetTheme}`.length);
+    const hasDeepPath = rest.length > 0 && rest !== '/';
+    if (hasDeepPath) {
+      return <Navigate to={`/${targetTheme}${location.search}`} replace />;
+    }
+  }
+
+  // Once theme is set, defer to `ThemedAppContent`, which handles the actual
+  // shell dispatch and is a single source of truth for which UI renders for
+  // a given (theme, path) pair.
+  if (targetTheme !== currentTheme) {
+    // Brief flash protection: theme effect hasn't run yet, render nothing.
+    return null;
+  }
+  return <ThemedAppContent />;
+}
+
 /** Inner router — uses useLocation to conditionally show chrome vs terminal */
 function AppRouter() {
-  const { mode } = useSiteTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Backwards-compat: legacy share links of the form `/?theme=foo` redirect
+    // to the new `/foo` URL prefix. We do this once on mount per location so
+    // share links keep working without growing the URL state.
+    const params = new URLSearchParams(location.search);
+    const themeParam = params.get('theme');
+    const isThemePrefixed = THEME_NAMES.some(
+      t => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`),
+    );
+    if (
+      themeParam &&
+      (THEME_NAMES as readonly string[]).includes(themeParam) &&
+      !isThemePrefixed
+    ) {
+      params.delete('theme');
+      const remaining = params.toString();
+      navigate(
+        `/${themeParam}${remaining ? `?${remaining}` : ''}`,
+        { replace: true },
+      );
+    }
+  }, [location.pathname, location.search, navigate]);
+
+  return (
+    <Routes>
+      {/* Theme-prefixed routes — one per known theme so we don't shadow other
+          top-level routes like `/vote` or `/probe` with a wildcard
+          `:themeName` that would also greedily match them. */}
+      {THEME_NAMES.map(t => (
+        <Route key={t} path={`/${t}/*`} element={<ThemePrefixRoute />} />
+      ))}
+      {/* Default route — renders whichever theme is currently active. */}
+      <Route path="*" element={<ThemedAppContent />} />
+    </Routes>
+  );
+}
+
+/**
+ * The original AppRouter body, factored out so it can render either at the
+ * site root or beneath a `/<theme>` prefix. All path checks are normalised
+ * against `logicalPath` — the pathname with any active theme prefix stripped
+ * — so a hard-coded check like `logicalPath === '/'` matches both `/` (when
+ * theme='game') AND `/game` (which strips to `/`).
+ */
+function ThemedAppContent() {
+  const { mode, theme } = useSiteTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
   const [dreamOpen, setDreamOpen] = useState(false);
   const [saberMode, setSaberMode] = useState(false);
 
-  const isTerminalHome = mode === 'new' && location.pathname === '/';
+  // Strip any `/<theme>` prefix from the pathname for downstream checks. The
+  // checks below all compare against canonical `/`, `/create-proposal` etc;
+  // we want them to match regardless of whether the URL has a theme prefix.
+  const themePrefix =
+    THEME_NAMES.find(
+      t => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`),
+    ) ?? null;
+  const logicalPath = themePrefix
+    ? location.pathname.slice(`/${themePrefix}`.length) || '/'
+    : location.pathname;
+
+  const isTerminalHome = mode === 'new' && logicalPath === '/';
+  // Edit-proposal route — handles both the canonical `/vote/:id/edit` path and
+  // the legacy `/edit-proposal/:id` shape. Themes that own a bespoke editor
+  // (currently just Game) reuse this match.
+  const editProposalMatch = logicalPath.match(
+    /^(?:\/vote\/([^/]+)\/edit|\/edit-proposal\/([^/]+))$/,
+  );
+  const isGameHome = theme === 'game' && logicalPath === '/';
+  const isGameCreateProposal =
+    theme === 'game' && logicalPath === '/create-proposal';
+  const isGameEditProposal = theme === 'game' && editProposalMatch != null;
+  const gameEditProposalId =
+    (editProposalMatch?.[1] || editProposalMatch?.[2]) ?? '';
+  const isClassicHome = theme === 'classic' && logicalPath === '/';
+  const isCatalogueHome = theme === 'catalogue' && logicalPath === '/';
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -100,16 +429,43 @@ function AppRouter() {
     const params = new URLSearchParams(location.search);
     if (params.get('dao') !== 'nounv2') return;
     const isAuctionRoute =
-      location.pathname === '/' || location.pathname.startsWith('/noun/');
+      logicalPath === '/' || logicalPath.startsWith('/noun/');
     if (!isAuctionRoute) return;
-    const idMatch = location.pathname.match(/^\/noun\/(.+)$/);
+    const idMatch = logicalPath.match(/^\/noun\/(.+)$/);
     const nextPath = idMatch ? `/v2/noun/${idMatch[1]}` : '/v2';
     navigate(nextPath, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  }, [logicalPath, location.search, navigate]);
 
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
     return <TerminalFeedShell />;
+  }
+
+  // Game / Classic themes get bespoke home layouts; internal routes currently
+  // fall through to the default NavBar chrome (themed via CSS vars). Berry is
+  // the exception — its desktop metaphor needs the menu bar + dock visible
+  // across all routes, so internal routes render inside its Window.
+  if (isGameHome) {
+    return <GameHome />;
+  }
+  // Game's bespoke proposal creator/editor — owns its own GameShell chrome,
+  // so we early-return before the default NavBar branch.
+  if (isGameCreateProposal) {
+    return <GameCreateProposal />;
+  }
+  if (isGameEditProposal) {
+    return <GameEditProposal proposalId={gameEditProposalId} />;
+  }
+  if (isClassicHome) {
+    return <ClassicHome />;
+  }
+  if (isCatalogueHome) {
+    return <CatalogueHome />;
+  }
+  if (theme === 'berry') {
+    // Berry is a static homepage emulation — never render real noun.wtf
+    // routes inside the desktop chrome, no matter the current path.
+    return <BerryShell />;
   }
 
   // World — full-screen canvas, no chrome
@@ -142,165 +498,7 @@ function AppRouter() {
         <NocTicker />
       </div>
       <NavBar />
-      <Routes>
-        <Route path="/" element={<AuctionPage />} />
-        <Route path="/auction/:id" element={<Navigate to="/noun/:id" replace />} />
-        <Route path="/noun/:id" element={<AuctionPage />} />
-        {/* V2 auction routes — split namespace so URL alone owns DAO context.
-             The Auction page detects `/v2*` via useActiveDao and swaps in the
-             V2 contracts/seed loader/holder reads. */}
-        <Route path="/v2" element={<AuctionPage />} />
-        <Route path="/v2/noun/:id" element={<AuctionPage />} />
-        <Route path="/nounders" element={<NoundersPage />} />
-        <Route path="/create-proposal" element={<CreateProposalPage />} />
-        <Route path="/create-candidate" element={<CreateCandidatePage />} />
-        <Route path="/vote" element={<GovernancePage />} />
-        <Route
-          path="/vote/:id"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <VotePageRouter />
-            </Suspense>
-          }
-        />
-        <Route path="/vote/:id/history" element={<ProposalHistory />} />
-        <Route path="/vote/:id/history/:versionNumber" element={<ProposalHistory />} />
-        <Route
-          path="/vote/:id/edit"
-          element={<EditProposalPage match={{ params: { id: ':id' } }} />}
-        />
-        <Route
-          path="/candidates"
-          element={
-            <Suspense fallback={<GovernanceSkeleton />}>
-              <CandidatesListPage />
-            </Suspense>
-          }
-        />
-        <Route path="/candidates/:id" element={<CandidatePage />} />
-        <Route path="/playground" element={<Playground />} />
-        <Route path="/grants" element={<GrantsPage />} />
-        <Route path="/grants/create" element={<CreateGrantPage />} />
-        <Route path="/grants/:id" element={<GrantDetailPage />} />
-        <Route path="/nounv2" element={<NounV2Page />} />
-        <Route path="/nounv2/create" element={<CreateNounV2ProposalPage />} />
-        <Route path="/nounv2/:id" element={<NounV2DetailPage />} />
-        <Route path="/hackathons" element={<HackathonPage />} />
-        <Route path="/underground" element={<UndergroundPage />} />
-        <Route path="/delegate" element={<DelegatePage />} />
-        <Route path="/traits" element={<TraitsPage />} />
-        <Route path="/explore" element={<Navigate to="/probe" replace />} />
-        <Route path="/nouns" element={<Navigate to="/probe" replace />} />
-        <Route
-          path="/probe"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <ProbePage />
-            </Suspense>
-          }
-        />
-        <Route path="/studio" element={<StudioPage />} />
-        <Route path="/settlers" element={<SettlersPage />} />
-        <Route path="/gas" element={<GasLeaderboardPage />} />
-        <Route path="/stats" element={<StatsPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <DashboardPage />
-            </Suspense>
-          }
-        />
-        <Route path="/nonsense" element={<NonsensePage />} />
-        <Route path="/dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
-        <Route path="/dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
-        {/* Miniapp routes (lazy loaded) */}
-        {/* /terminal sunset 2026-04-27 — consolidated into homepage TerminalFeed
-            (see TerminalFeedShell on `/` when site mode === 'new'). Keep redirect
-            so old links/CTAs land on the merged feed. */}
-        <Route path="/terminal" element={<Navigate to="/" replace />} />
-        <Route
-          path="/crystal-ball"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <CrystalBallPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/v2/crystal-ball"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <CrystalBallPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/feed"
-          element={
-            <Suspense fallback={<FeedSkeleton />}>
-              <FeedPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/highway"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <HighwayPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/terraforms"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <TerraformsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/terraforms/:id"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <TerraformsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/pip3"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <Pip3Page />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/predictions"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <PredictionsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/marketplace"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <MarketplacePage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/marketplace/:nounId"
-          element={
-            <Suspense fallback={<GenericSkeleton />}>
-              <NounDetailPage />
-            </Suspense>
-          }
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <SiteRoutes />
       <Footer />
       {/* <HeliosStatusBar /> — disabled: a16z consensus endpoints are down, causes infinite 502 retry loop */}
       <ChainNotificationsMount />

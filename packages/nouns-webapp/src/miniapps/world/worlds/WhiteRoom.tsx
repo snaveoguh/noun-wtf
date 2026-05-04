@@ -15,6 +15,7 @@
 
 import { Paintable } from '@nouns/graffiti/r3f';
 import { Html } from '@react-three/drei';
+import * as THREE from 'three';
 
 import { TerraformsHorizon } from '../engine/TerraformsHorizon';
 import { FriesPortal } from './FriesPortal';
@@ -24,6 +25,28 @@ import { TargetGallery } from './dojo/TargetGallery';
 import { TrainingDummies } from './dojo/TrainingDummies';
 
 const SCALE = 0.1;
+
+// ── White-room paintable floor ────────────────────────────────────────
+//
+// 8×8 grid of paintable tiles centered on spawn — each ~3u square — so
+// the entire ground around the player is sprayable. Each tile is keyed
+// by a stable `surfaceId` (`wr-floor-{ix}-{iz}`) and round-trips through
+// the same partykit storage layer that powers the monoliths and the
+// open-world walls. Strokes live in `room.storage` and rehydrate on
+// reload via `loadGraffitiTags`.
+export const WHITE_ROOM_FLOOR_TILES = 8; // per axis
+export const WHITE_ROOM_FLOOR_TILE_SIZE = 3; // world units
+
+/** Stable list of all white-room floor surface ids (used for cold-load on connect). */
+export function whiteRoomFloorTileIds(): string[] {
+  const ids: string[] = [];
+  for (let iz = 0; iz < WHITE_ROOM_FLOOR_TILES; iz++) {
+    for (let ix = 0; ix < WHITE_ROOM_FLOOR_TILES; ix++) {
+      ids.push(`wr-floor-${ix}-${iz}`);
+    }
+  }
+  return ids;
+}
 
 export interface WhiteRoomProps {
   /** Tile-space player ref; used for the mirror's proximity prompt. */
@@ -61,6 +84,22 @@ export function WhiteRoom({
   const monos = monolithPositions(spawnX, spawnY);
   const mirrorPos: [number, number, number] = [spawnX * SCALE, 2, spawnY * SCALE + 5];
 
+  // Paintable floor — a grid of Paintable planes, one per tile, each backed
+  // by its own surface in the partykit registry. Centered on the spawn so
+  // the playable area is fully covered (8×3u = 24u square).
+  const floorOriginX = spawnX * SCALE - (WHITE_ROOM_FLOOR_TILES * WHITE_ROOM_FLOOR_TILE_SIZE) / 2;
+  const floorOriginZ = spawnY * SCALE - (WHITE_ROOM_FLOOR_TILES * WHITE_ROOM_FLOOR_TILE_SIZE) / 2;
+  const floorTiles: { id: string; x: number; z: number }[] = [];
+  for (let iz = 0; iz < WHITE_ROOM_FLOOR_TILES; iz++) {
+    for (let ix = 0; ix < WHITE_ROOM_FLOOR_TILES; ix++) {
+      floorTiles.push({
+        id: `wr-floor-${ix}-${iz}`,
+        x: floorOriginX + (ix + 0.5) * WHITE_ROOM_FLOOR_TILE_SIZE,
+        z: floorOriginZ + (iz + 0.5) * WHITE_ROOM_FLOOR_TILE_SIZE,
+      });
+    }
+  }
+
   // Dojo layouts are authored spawn-relative: the spec uses
   //   ObstacleCourse  [0, 0, 15]   (north, +Z)
   //   TrainingDummies [10, 0, 0]   (east, +X)
@@ -89,11 +128,39 @@ export function WhiteRoom({
       <hemisphereLight args={['#ffffff', '#ffffff', 1.2]} />
 
       {/* Infinite UNLIT pure-white plane — meshBasicMaterial ignores
-          lighting so it's locked to the scene white no matter what. */}
+          lighting so it's locked to the scene white no matter what. Sits
+          BELOW the paintable floor tiles so any unsprayed area outside
+          the grid (and any cracks between tiles) still reads pure white. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[spawnX * SCALE, 0, spawnY * SCALE]}>
         <planeGeometry args={[400, 400]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
+
+      {/* Paintable floor grid — each tile is its own persistent Surface.
+          Strokes commit through `onStrokeEnd` → sendSnapshot in WorldPage
+          and rehydrate on reload via loadGraffitiTags(WHITE_ROOM_FLOOR_TILE_IDS). */}
+      <group>
+        {floorTiles.map(tile => (
+          <Paintable
+            key={tile.id}
+            surfaceId={tile.id}
+            width={WHITE_ROOM_FLOOR_TILE_SIZE}
+            height={WHITE_ROOM_FLOOR_TILE_SIZE}
+            // Sit a hair above the white plane to avoid z-fighting.
+            position={[tile.x, 0.012, tile.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            resolutionWidth={384}
+            resolutionHeight={384}
+            baseFill="#ffffff"
+            // Floor painting is always on in the white room — no proximity gate.
+            enabled={true}
+            authorId={authorId}
+            onStrokeEnd={() => onStrokeEnd?.(tile.id)}
+            frameColor={null}
+            side={THREE.DoubleSide}
+          />
+        ))}
+      </group>
 
       {/* Three paintable monoliths in a triangle around spawn */}
       {monos.map(m => {

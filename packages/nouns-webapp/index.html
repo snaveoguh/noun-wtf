@@ -16,10 +16,59 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 
-    <!-- Comic Neue — Comic Sans alternative for mobile (Comic Sans MS isn't available on iOS/Android) -->
+    <!-- Comic Neue — Comic Sans alternative for mobile (Comic Sans MS isn't available on iOS/Android)
+         Londrina Solid + JetBrains Mono + Silkscreen power Classic / Terminal / Game themes respectively.
+         Inter (variable optical-size + italic, weights 100–900) is the SF Pro stand-in for the Berry
+         (BerryOS / macOS-style) shell on non-Apple devices. We can't legally self-host SF Pro from
+         Netlify (Apple's font license forbids redistribution as a webfont — see Apple Developer Forums
+         thread 127350), so the strategy is: -apple-system renders real SF Pro on Apple devices, Inter
+         is the closest free substitute everywhere else. Inter ships an optical-sizing axis that mirrors
+         SF Pro's Text/Display split. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Londrina+Solid:wght@100;300;400;900&family=JetBrains+Mono:wght@400;500;700&family=Silkscreen:wght@400;700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
+
+    <!-- Anti-flash theme bootstrap — set data-theme on <html> before paint
+         so CSS variable resolution doesn't visibly shift during hydration.
+         Mirrors SiteThemeContext.getInitialState; keep them in sync. -->
+    <script>
+      (function () {
+        try {
+          var THEMES = ['pro', 'terminal', 'classic', 'camp', 'game', 'berry'];
+          var params = new URLSearchParams(window.location.search);
+          var themeParam = params.get('theme');
+          var modeParam = params.get('mode');
+          var theme = null;
+          if (themeParam && THEMES.indexOf(themeParam) !== -1) {
+            theme = themeParam;
+          } else if (themeParam === 'hectic') {
+            theme = 'pro';
+          } else if (modeParam === 'terminal' || modeParam === 'new') {
+            theme = 'terminal';
+          } else if (modeParam === 'classic') {
+            theme = 'pro';
+          } else if (window.Telegram && window.Telegram.WebApp) {
+            theme = 'terminal';
+          } else if (window.farcaster) {
+            theme = 'terminal';
+          } else {
+            var stored = localStorage.getItem('noun-wtf-theme');
+            if (stored === 'hectic') {
+              theme = 'pro';
+            } else if (stored && THEMES.indexOf(stored) !== -1) {
+              theme = stored;
+            } else {
+              var legacy = localStorage.getItem('noun-wtf-site-mode');
+              if (legacy === 'classic') theme = 'pro';
+              else if (legacy === 'new') theme = 'terminal';
+            }
+          }
+          document.documentElement.setAttribute('data-theme', theme || 'terminal');
+        } catch (_) {
+          document.documentElement.setAttribute('data-theme', 'terminal');
+        }
+      })();
+    </script>
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#e04639" />
     <meta name="msapplication-TileColor" content="#2b5797" />
     <meta name="theme-color" content="#ffffff" />

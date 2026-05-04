@@ -15,7 +15,9 @@ import {
   useWriteContract,
 } from 'wagmi';
 
+import BidHistoryModal from '@/components/BidHistoryModal';
 import ShortAddress from '@/components/ShortAddress';
+import type { Auction as IAuction } from '@/wrappers/nounsAuction';
 import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
@@ -47,6 +49,7 @@ function formatSecondsLeft(sec: number): string {
  */
 export default function NounV2AuctionHero() {
   const { address: userAddr } = useAccount();
+  const [bidsModalOpen, setBidsModalOpen] = useState(false);
 
   const addressesMissing =
     NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS ||
@@ -289,6 +292,37 @@ export default function NounV2AuctionHero() {
             />
             <Stat label="Min Next Bid" value={`${formatEther(minNextBid)} ETH`} />
           </div>
+
+          {nounId != null && (
+            <div className="mb-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setBidsModalOpen(true)}
+                className="text-xs font-semibold uppercase tracking-wider text-neutral-500 underline-offset-4 transition-colors hover:text-neutral-900 hover:underline"
+              >
+                View all bids
+              </button>
+            </div>
+          )}
+
+          {bidsModalOpen && nounId != null && (
+            <BidHistoryModal
+              onDismiss={() => setBidsModalOpen(false)}
+              forceDao="nounv2"
+              auction={
+                {
+                  nounId: BigInt(nounId),
+                  amount: bidAmount ?? 0n,
+                  startTime: BigInt(_startTime ?? 0n),
+                  endTime: BigInt(endTime ?? 0n),
+                  bidder: bidder && bidder !== ZERO_ADDRESS ? (bidder as `0x${string}`) : undefined,
+                  settled: settled === true,
+                  clientId: null,
+                  burned: false,
+                } satisfies IAuction
+              }
+            />
+          )}
 
           {!auctionEnded && settled !== true && (
             <>

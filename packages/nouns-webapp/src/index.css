@@ -1,98 +1,10 @@
+@import './liquid-sand/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-transform: uppercase;
-  font-weight: bold;
-  font-size: 13px;
-  background: #ffffff;
-}
-
-/* Global font shrink — Comic Sans bold runs large */
-h1 { font-size: 1.8rem !important; }
-h2 { font-size: 1.4rem !important; }
-h3 { font-size: 1.15rem !important; }
-h4 { font-size: 0.95rem !important; }
-h5 { font-size: 0.85rem !important; }
-h6 { font-size: 0.75rem !important; }
-
-/* Apply Comic Sans + bold to all elements */
-*, *::before, *::after {
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  font-weight: bold !important;
-}
-
-/* Uppercase for headings, labels, buttons, nav — NOT everything */
-h1, h2, h3, h4, h5, h6,
-a, button, label, th,
-nav, nav *,
-.btn, [class*="Button"],
-[class*="header"], [class*="Header"],
-[class*="title"], [class*="Title"],
-[class*="label"], [class*="Label"] {
-  text-transform: uppercase !important;
-}
-
-/* Paragraph/body text: uppercase on desktop, normal case on small mobile */
-p, span, div, li, td, dd, dt {
-  text-transform: uppercase;
-}
-
-@media (max-width: 480px) {
-  /* On very small screens, relax uppercase on body text to prevent overflow */
-  p, span, li, td, dd, dt,
-  .form-control, input, textarea, select,
-  [class*="description"], [class*="Description"],
-  [class*="content"], [class*="Content"],
-  [class*="copy"], [class*="Copy"],
-  [class*="body"], [class*="Body"] {
-    text-transform: none !important;
-  }
-
-  /* Slightly reduce font size on mobile for bold Comic Sans */
-  body {
-    font-size: 14px;
-  }
-}
-
-/* Form inputs should never be uppercased — breaks address/ENS input */
-input, textarea, select, .form-control {
-  text-transform: none !important;
-}
-
-/* Vote page — stack columns on mobile */
-@media (max-width: 768px) {
-  .vote-page-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .vote-page-grid > #inline-vote-panel {
-    position: static !important;
-    order: -1;
-  }
-  .vote-detail-wrapper {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-}
-
-code {
-  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-}
-
-.__react_component_tooltip.show {
-  opacity: 1 !important;
-}
-
-/* Override Londrina Solid to Comic Sans everywhere */
-@font-face {
-  font-family: 'Londrina Solid';
-  src: local('Comic Sans MS'), local('Comic Sans');
-}
+/* ─── Local font-faces (PT Root UI is bundled — Comic Neue/Londrina/JetBrains/Silkscreen come in via index.html) */
 @font-face {
   font-family: 'PT Root UI';
   src:
@@ -106,7 +18,6 @@ code {
     url(./fonts/PT_Root_UI/PT-Root-UI_Medium.woff2) format('woff2'),
     url(./fonts/PT_Root_UI/PT-Root-UI_Medium.woff) format('woff');
 }
-
 @font-face {
   font-family: 'PT Root UI';
   font-weight: bold;
@@ -115,16 +26,25 @@ code {
     url(./fonts/PT_Root_UI/PT-Root-UI_Bold.woff) format('woff');
 }
 
-/*---break---*/
-
-/* Edge padding must live outside @layer so CSS modules can resolve the vars */
+/* Edge padding lives outside @layer so CSS modules can resolve the vars. */
 :root {
   --page-edge-padding-left: max(1rem, env(safe-area-inset-left));
   --page-edge-padding-right: max(1rem, env(safe-area-inset-right));
 }
 
+/* ─── Theme variable system ──────────────────────────────────────────────────
+   Each theme defines:
+     1. shadcn HSL vars (--background, --foreground, --primary, …) so
+        existing UI primitives auto-retheme.
+     2. --theme-* tokens that bespoke noun.wtf components reference directly.
+     3. Brand vars used by the legacy noun-wtf chrome (warm/cool palettes).
+   The anti-flash bootstrap in index.html always sets data-theme on <html>
+   before paint, so these blocks always have a single active match. */
+
 @layer base {
-  :root {
+  /* ============ HECTIC — current noun.wtf wild classic-mode look ============ */
+  [data-theme='pro'] {
+    /* shadcn HSL */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -150,11 +70,12 @@ code {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    /* Brand (legacy nouns palettes — kept intact for Pro) */
     --brand-bg-green: #edf2f0;
     --brand-dark-red: #d63c5e;
     --brand-light-green: #6da886;
     --brand-black: #212529;
-    /* Colors from Figma  */
     --brand-cool-background: #d5d7e1;
     --brand-cool-border: rgb(189, 192, 207);
     --brand-cool-dark-text: #151c3b;
@@ -178,48 +99,527 @@ code {
     --brand-color-blue-translucent: rgba(73, 101, 240, 0.1);
     --brand-color-green-translucent: rgba(67, 179, 105, 0.1);
     --brand-color-blue-darker: #3a52c7;
+
+    /* --theme-* tokens */
+    --theme-bg-primary: #ffffff;
+    --theme-bg-secondary: #f4f4f8;
+    --theme-bg-tertiary: #e2e3eb;
+    --theme-bg-card: #ffffff;
+    --theme-bg-hover: #fafafb;
+    --theme-bg-input: #ffffff;
+    --theme-text-primary: #14161b;
+    --theme-text-secondary: #4a4d57;
+    --theme-text-muted: #8c8d92;
+    --theme-text-accent: #000000;
+    --theme-text-link: #4965f0;
+    --theme-border: #e2e3eb;
+    --theme-border-light: #f0f0f4;
+    --theme-border-strong: #c4c5cc;
+    --theme-accent: #facc15;
+    --theme-accent-hover: #fbbf24;
+    --theme-accent-text: #14161b;
+    --theme-positive: #43b369;
+    --theme-negative: #e40536;
+    --theme-feed-bg: #ffffff;
+    --theme-feed-row-border: #e2e3eb;
+    --theme-feed-badge-bg: #f4f4f8;
+    --theme-orb-glow: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+    --theme-font-body: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
+    --theme-font-display: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
+    --theme-font-size-base: 13px;
+    --theme-letter-spacing: 0;
+    --theme-radius-sm: 4px;
+    --theme-radius-md: 8px;
+    --theme-radius-lg: 12px;
+    --theme-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --theme-transition: 150ms ease;
+    color-scheme: light;
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+  /* ============ TERMINAL — clean dark hacker terminal ============ */
+  [data-theme='terminal'] {
+    --background: 0 0% 0%;
+    --foreground: 120 100% 50%;
+    --card: 0 0% 2%;
+    --card-foreground: 120 100% 50%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 120 100% 50%;
+    --primary: 120 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 6%;
+    --secondary-foreground: 120 100% 50%;
+    --muted: 0 0% 6%;
+    --muted-foreground: 120 50% 40%;
+    --accent: 120 100% 25%;
+    --accent-foreground: 120 100% 70%;
+    --destructive: 0 100% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --border: 120 100% 10%;
+    --input: 0 0% 4%;
+    --ring: 120 100% 50%;
+    --radius: 0px;
+
+    --brand-bg-green: #001a00;
+    --brand-dark-red: #ff0033;
+    --brand-light-green: #00ff00;
+    --brand-black: #000000;
+    --brand-cool-background: #050505;
+    --brand-cool-border: #003300;
+    --brand-cool-dark-text: #00ff00;
+    --brand-cool-light-text: #00cc00;
+    --brand-cool-accent: #001a00;
+    --brand-warm-background: #050505;
+    --brand-warm-border: #003300;
+    --brand-warm-dark-text: #00ff00;
+    --brand-warm-light-text: #00cc00;
+    --brand-warm-accent: #001a00;
+    --brand-gray-dark-text: #00ff00;
+    --brand-gray-border: #003300;
+    --brand-gray-background: #050505;
+    --brand-gray-light-text: #008800;
+    --brand-gray-light-text-translucent: rgba(0, 136, 0, 0.1);
+    --brand-gray-hover: #0a0a0a;
+    --brand-color-red: #ff0033;
+    --brand-color-blue: #00ffaa;
+    --brand-color-green: #00ff00;
+    --brand-color-red-translucent: rgba(255, 0, 51, 0.1);
+    --brand-color-blue-translucent: rgba(0, 255, 170, 0.1);
+    --brand-color-green-translucent: rgba(0, 255, 0, 0.1);
+    --brand-color-blue-darker: #00cc88;
+
+    --theme-bg-primary: #000000;
+    --theme-bg-secondary: #0a0a0a;
+    --theme-bg-tertiary: #111111;
+    --theme-bg-card: #050505;
+    --theme-bg-hover: #1a1a1a;
+    --theme-bg-input: #0a0a0a;
+    --theme-text-primary: #00ff41;
+    --theme-text-secondary: #00cc00;
+    --theme-text-muted: #008800;
+    --theme-text-accent: #33ff33;
+    --theme-text-link: #00ffaa;
+    --theme-border: #003300;
+    --theme-border-light: #002200;
+    --theme-border-strong: #005500;
+    --theme-accent: #00ff41;
+    --theme-accent-hover: #33ff33;
+    --theme-accent-text: #00ff41;
+    --theme-positive: #00ff00;
+    --theme-negative: #ff0033;
+    --theme-feed-bg: #000000;
+    --theme-feed-row-border: #0a1a0a;
+    --theme-feed-badge-bg: #001a00;
+    --theme-orb-glow: radial-gradient(circle, rgba(0, 255, 65, 0.12) 0%, transparent 70%);
+    --theme-font-body: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    --theme-font-display: 'JetBrains Mono', 'Fira Code', monospace;
+    --theme-font-size-base: 13px;
+    --theme-letter-spacing: 0.3px;
+    --theme-radius-sm: 0px;
+    --theme-radius-md: 0px;
+    --theme-radius-lg: 0px;
+    --theme-shadow: none;
+    --theme-transition: 0s;
+    color-scheme: dark;
+  }
+
+  /* ============ CLASSIC — OG nouns.wtf (Bootstrap white, Londrina) ============ */
+  [data-theme='classic'] {
+    --background: 0 0% 100%;
+    --foreground: 210 11% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+    --primary: 217 91% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 14% 97%;
+    --secondary-foreground: 210 11% 15%;
+    --muted: 210 14% 97%;
+    --muted-foreground: 210 11% 45%;
+    --accent: 210 14% 97%;
+    --accent-foreground: 217 91% 53%;
+    --destructive: 354 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 14% 89%;
+    --input: 210 14% 89%;
+    --ring: 217 91% 53%;
+    --radius: 0.375rem;
+
+    --brand-bg-green: #edf2f0;
+    --brand-dark-red: #d63c5e;
+    --brand-light-green: #6da886;
+    --brand-black: #212529;
+    --brand-cool-background: #d5d7e1;
+    --brand-cool-border: rgb(189, 192, 207);
+    --brand-cool-dark-text: #151c3b;
+    --brand-cool-light-text: #79809c;
+    --brand-cool-accent: #e9ebf3;
+    --brand-warm-background: #e1d7d5;
+    --brand-warm-border: rgb(207, 189, 186);
+    --brand-warm-dark-text: #221b1a;
+    --brand-warm-light-text: #8f7e7c;
+    --brand-warm-accent: #f9f1f1;
+    --brand-gray-dark-text: #14161b;
+    --brand-gray-border: #dee2e6;
+    --brand-gray-background: #f8f9fa;
+    --brand-gray-light-text: #6c757d;
+    --brand-gray-light-text-translucent: rgba(108, 117, 125, 0.1);
+    --brand-gray-hover: #f1f3f5;
+    --brand-color-red: #e04639;
+    --brand-color-blue: #4965e0;
+    --brand-color-green: #43b369;
+    --brand-color-red-translucent: rgba(224, 70, 57, 0.1);
+    --brand-color-blue-translucent: rgba(73, 101, 224, 0.1);
+    --brand-color-green-translucent: rgba(67, 179, 105, 0.1);
+    --brand-color-blue-darker: #3a52c7;
+
+    --theme-bg-primary: #ffffff;
+    --theme-bg-secondary: #f8f9fa;
+    --theme-bg-tertiary: #e9ecef;
+    --theme-bg-card: #ffffff;
+    --theme-bg-hover: #f8f9fa;
+    --theme-bg-input: #ffffff;
+    --theme-text-primary: #212529;
+    --theme-text-secondary: #6c757d;
+    --theme-text-muted: #adb5bd;
+    --theme-text-accent: #000000;
+    --theme-text-link: #0d6efd;
+    --theme-border: #dee2e6;
+    --theme-border-light: #e9ecef;
+    --theme-border-strong: #ced4da;
+    --theme-accent: #0d6efd;
+    --theme-accent-hover: #0a58ca;
+    --theme-accent-text: #0d6efd;
+    --theme-positive: #198754;
+    --theme-negative: #dc3545;
+    --theme-feed-bg: #ffffff;
+    --theme-feed-row-border: #e9ecef;
+    --theme-feed-badge-bg: #f8f9fa;
+    --theme-orb-glow: radial-gradient(circle, rgba(224, 70, 57, 0.08) 0%, transparent 70%);
+    --theme-font-body: 'PT Root UI', system-ui, -apple-system, sans-serif;
+    --theme-font-display: 'Londrina Solid', cursive;
+    --theme-font-size-base: 16px;
+    --theme-letter-spacing: 0;
+    --theme-radius-sm: 4px;
+    --theme-radius-md: 6px;
+    --theme-radius-lg: 8px;
+    --theme-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --theme-transition: 150ms ease-in-out;
+    color-scheme: light;
+  }
+
+  /* ============ CAMP — nouns.camp dark governance UI ============ */
+  [data-theme='camp'] {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 96%;
+    --card: 240 8% 7%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 8% 8%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 210 90% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 11%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 6% 11%;
+    --muted-foreground: 240 4% 60%;
+    --accent: 240 6% 13%;
+    --accent-foreground: 210 90% 65%;
+    --destructive: 354 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.08;
+    --input: 240 6% 11%;
+    --ring: 210 90% 60%;
+    --radius: 0.375rem;
+
+    --brand-bg-green: #0a1f15;
+    --brand-dark-red: #f43f5e;
+    --brand-light-green: #22c55e;
+    --brand-black: hsl(0 0% 96%);
+    --brand-cool-background: hsl(240 6% 11%);
+    --brand-cool-border: hsl(0 0% 100% / 0.08);
+    --brand-cool-dark-text: hsl(0 0% 96%);
+    --brand-cool-light-text: hsl(240 4% 60%);
+    --brand-cool-accent: hsl(240 6% 13%);
+    --brand-warm-background: hsl(240 6% 11%);
+    --brand-warm-border: hsl(0 0% 100% / 0.08);
+    --brand-warm-dark-text: hsl(0 0% 96%);
+    --brand-warm-light-text: hsl(240 4% 60%);
+    --brand-warm-accent: hsl(240 6% 13%);
+    --brand-gray-dark-text: hsl(0 0% 96%);
+    --brand-gray-border: hsl(0 0% 100% / 0.08);
+    --brand-gray-background: hsl(240 6% 11%);
+    --brand-gray-light-text: hsl(240 4% 60%);
+    --brand-gray-light-text-translucent: hsla(240, 4%, 60%, 0.1);
+    --brand-gray-hover: hsla(0, 0%, 100%, 0.04);
+    --brand-color-red: #f43f5e;
+    --brand-color-blue: hsl(210 90% 60%);
+    --brand-color-green: #22c55e;
+    --brand-color-red-translucent: rgba(244, 63, 94, 0.12);
+    --brand-color-blue-translucent: hsla(210, 90%, 60%, 0.12);
+    --brand-color-green-translucent: rgba(34, 197, 94, 0.12);
+    --brand-color-blue-darker: hsl(210 90% 50%);
+
+    --theme-bg-primary: #0a0a0e;
+    --theme-bg-secondary: #11111a;
+    --theme-bg-tertiary: #161620;
+    --theme-bg-card: #0d0d14;
+    --theme-bg-hover: rgba(255, 255, 255, 0.04);
+    --theme-bg-input: #11111a;
+    --theme-text-primary: #f5f5f5;
+    --theme-text-secondary: #a0a0a8;
+    --theme-text-muted: #6b6b75;
+    --theme-text-accent: #ffffff;
+    --theme-text-link: hsl(210 90% 65%);
+    --theme-border: rgba(255, 255, 255, 0.08);
+    --theme-border-light: rgba(255, 255, 255, 0.06);
+    --theme-border-strong: rgba(255, 255, 255, 0.16);
+    --theme-accent: hsl(210 90% 60%);
+    --theme-accent-hover: hsl(210 90% 70%);
+    --theme-accent-text: hsl(210 90% 70%);
+    --theme-positive: #22c55e;
+    --theme-negative: #f43f5e;
+    --theme-feed-bg: #0a0a0e;
+    --theme-feed-row-border: rgba(255, 255, 255, 0.06);
+    --theme-feed-badge-bg: #161620;
+    --theme-orb-glow: radial-gradient(circle, rgba(96, 165, 250, 0.15) 0%, transparent 70%);
+    --theme-font-body: 'PT Root UI', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --theme-font-display: 'PT Root UI', system-ui, -apple-system, sans-serif;
+    --theme-font-size-base: 14px;
+    --theme-letter-spacing: 0;
+    --theme-radius-sm: 4px;
+    --theme-radius-md: 6px;
+    --theme-radius-lg: 10px;
+    --theme-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.4);
+    --theme-transition: 150ms ease;
+    color-scheme: dark;
+  }
+
+  /* ============ GAME — nouns.game purple/violet pixel-art ============ */
+  [data-theme='game'] {
+    --background: 240 7% 11%;
+    --foreground: 220 13% 95%;
+    --card: 240 7% 14%;
+    --card-foreground: 220 13% 95%;
+    --popover: 240 6% 16%;
+    --popover-foreground: 220 13% 95%;
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 16%;
+    --secondary-foreground: 220 13% 95%;
+    --muted: 240 6% 18%;
+    --muted-foreground: 220 9% 67%;
+    --accent: 258 90% 66%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 351 95% 71%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 25%;
+    --input: 240 6% 18%;
+    --ring: 258 90% 66%;
+    --radius: 0.5rem;
+
+    --brand-bg-green: #0f1f17;
+    --brand-dark-red: rgb(251 113 133);
+    --brand-light-green: rgb(52 211 153);
+    --brand-black: #f0f2f5;
+    --brand-cool-background: #242428;
+    --brand-cool-border: rgba(255, 255, 255, 0.12);
+    --brand-cool-dark-text: #f0f2f5;
+    --brand-cool-light-text: #a0a0a8;
+    --brand-cool-accent: rgba(139, 92, 246, 0.2);
+    --brand-warm-background: #2c2c30;
+    --brand-warm-border: rgba(255, 255, 255, 0.12);
+    --brand-warm-dark-text: #f0f2f5;
+    --brand-warm-light-text: #a0a0a8;
+    --brand-warm-accent: rgba(139, 92, 246, 0.2);
+    --brand-gray-dark-text: #f0f2f5;
+    --brand-gray-border: rgba(255, 255, 255, 0.12);
+    --brand-gray-background: #1b1b1f;
+    --brand-gray-light-text: #888890;
+    --brand-gray-light-text-translucent: rgba(136, 136, 144, 0.1);
+    --brand-gray-hover: rgba(255, 255, 255, 0.06);
+    --brand-color-red: rgb(251 113 133);
+    --brand-color-blue: #8b5cf6;
+    --brand-color-green: rgb(52 211 153);
+    --brand-color-red-translucent: rgba(251, 113, 133, 0.1);
+    --brand-color-blue-translucent: rgba(139, 92, 246, 0.15);
+    --brand-color-green-translucent: rgba(52, 211, 153, 0.1);
+    --brand-color-blue-darker: #7c3aed;
+
+    --theme-bg-primary: #1b1b1f;
+    --theme-bg-secondary: #242428;
+    --theme-bg-tertiary: #2c2c30;
+    --theme-bg-card: rgba(255, 255, 255, 0.02);
+    --theme-bg-hover: rgba(255, 255, 255, 0.06);
+    --theme-bg-input: rgba(255, 255, 255, 0.04);
+    --theme-text-primary: #f0f2f5;
+    --theme-text-secondary: #a0a0a8;
+    --theme-text-muted: #888890;
+    --theme-text-accent: #f0f2f5;
+    --theme-text-link: #8b5cf6;
+    --theme-border: rgba(255, 255, 255, 0.12);
+    --theme-border-light: rgba(255, 255, 255, 0.08);
+    --theme-border-strong: rgba(255, 255, 255, 0.2);
+    --theme-accent: #8b5cf6;
+    --theme-accent-hover: #7c3aed;
+    --theme-accent-text: #a78bfa;
+    --theme-positive: rgb(52 211 153);
+    --theme-negative: rgb(251 113 133);
+    --theme-feed-bg: #1b1b1f;
+    --theme-feed-row-border: #2c2c30;
+    --theme-feed-badge-bg: rgba(139, 92, 246, 0.15);
+    --theme-orb-glow: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
+    /* HIG (apple-hig SKILL.md "Being Specific"): SF Pro stack first so
+       Apple devices render real San Francisco; Inter is the screen-tuned
+       fallback for non-Apple platforms (Rasmus Andersson designed Inter
+       explicitly as an SF alternative). Inter loads as a webfont in
+       index.html alongside JetBrains Mono + Silkscreen. */
+    --theme-font-body:
+      -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+      'Inter', 'PT Root UI', 'Segoe UI', system-ui, sans-serif;
+    --theme-font-display:
+      -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+      'Inter', system-ui, sans-serif;
+    --theme-font-size-base: 14px;
+    --theme-letter-spacing: 0;
+    --theme-radius-sm: 4px;
+    --theme-radius-md: 8px;
+    --theme-radius-lg: 12px;
+    --theme-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --theme-transition: 200ms ease;
+    color-scheme: dark;
+  }
+
+  /* ============ BERRY — berryos.wtf retro-Mac chrome ============ */
+  [data-theme='berry'] {
+    --background: 0 0% 88%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 94%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 358 80% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 88%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 88%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 358 80% 56%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 354 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 80%;
+    --input: 0 0% 100%;
+    --ring: 358 80% 56%;
+    --radius: 0px;
+
+    --brand-bg-green: #d4e8d4;
+    --brand-dark-red: #e93737;
+    --brand-light-green: #28a745;
+    --brand-black: #000000;
+    --brand-cool-background: #e0e0e0;
+    --brand-cool-border: #cccccc;
+    --brand-cool-dark-text: #000000;
+    --brand-cool-light-text: #666666;
+    --brand-cool-accent: #f0f0f0;
+    --brand-warm-background: #e0e0e0;
+    --brand-warm-border: #cccccc;
+    --brand-warm-dark-text: #000000;
+    --brand-warm-light-text: #666666;
+    --brand-warm-accent: #f0f0f0;
+    --brand-gray-dark-text: #000000;
+    --brand-gray-border: #cccccc;
+    --brand-gray-background: #e0e0e0;
+    --brand-gray-light-text: #666666;
+    --brand-gray-light-text-translucent: rgba(102, 102, 102, 0.1);
+    --brand-gray-hover: #d0d0d0;
+    --brand-color-red: #e93737;
+    --brand-color-blue: #0000ee;
+    --brand-color-green: #28a745;
+    --brand-color-red-translucent: rgba(233, 55, 55, 0.1);
+    --brand-color-blue-translucent: rgba(0, 0, 238, 0.1);
+    --brand-color-green-translucent: rgba(40, 167, 69, 0.1);
+    --brand-color-blue-darker: #0000aa;
+
+    --theme-bg-primary: #e0e0e0;
+    --theme-bg-secondary: #f0f0f0;
+    --theme-bg-tertiary: #ffffff;
+    --theme-bg-card: #f0f0f0;
+    --theme-bg-hover: #d0d0d0;
+    --theme-bg-input: #ffffff;
+    --theme-text-primary: #000000;
+    --theme-text-secondary: #333333;
+    --theme-text-muted: #666666;
+    --theme-text-accent: #000000;
+    --theme-text-link: #0000ee;
+    --theme-border: #cccccc;
+    --theme-border-light: #e0e0e0;
+    --theme-border-strong: #808080;
+    --theme-accent: #e93737;
+    --theme-accent-hover: #cc2f2f;
+    --theme-accent-text: #e93737;
+    --theme-positive: #28a745;
+    --theme-negative: #dc3545;
+    --theme-feed-bg: #f0f0f0;
+    --theme-feed-row-border: #cccccc;
+    --theme-feed-badge-bg: #e0e0e0;
+    --theme-orb-glow: radial-gradient(circle, rgba(0, 128, 128, 0.15) 0%, transparent 70%);
+    --theme-bevel-light: #f0f0f0;
+    --theme-bevel-dark: #808080;
+    /* Aqua-era desktop blue — used as a fallback when the gradient/pinstripe
+       layer in BerryShell can't render (e.g. printing). */
+    --theme-desktop-bg: #5a85b8;
+    /* Berry chrome aims for modern macOS (Sonoma/Sequoia) typography, not the
+       classic System 7 look. SF Pro is Apple's system face — `-apple-system`
+       and `BlinkMacSystemFont` resolve to it on Apple devices (the only place
+       it's installed). Apple's font license forbids serving SF Pro as a webfont
+       from third-party origins (see Apple Developer Forums thread 127350), so
+       on Linux/Windows/Android we fall through to Inter, the closest free
+       substitute (Rasmus Andersson designed it explicitly as a screen-tuned SF
+       alternative — it now ships an optical-sizing axis that mirrors SF Pro's
+       Text/Display split). Geneva/Lucida Grande remain in the tail purely as
+       a nostalgia hint for users with the legacy Mac fonts installed. */
+    --theme-font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+      'SF Pro Display', 'Inter', 'Helvetica Neue', 'Lucida Grande', 'Geneva',
+      system-ui, sans-serif;
+    --theme-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+      'SF Pro Text', 'Inter', 'Helvetica Neue', 'Lucida Grande', 'Geneva',
+      system-ui, sans-serif;
+    --theme-font-size-base: 14px;
+    --theme-letter-spacing: 0;
+    --theme-radius-sm: 0px;
+    --theme-radius-md: 0px;
+    --theme-radius-lg: 0px;
+    --theme-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+    --theme-transition: 0s;
+    color-scheme: light;
   }
 }
 
-/*---break---*/
-
+/* ─── Tailwind base — runs after the theme blocks above ──────────────────── */
 @layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--theme-font-body);
+    font-size: var(--theme-font-size-base);
+    letter-spacing: var(--theme-letter-spacing);
+    background: var(--theme-bg-primary);
+    color: var(--theme-text-primary);
   }
   ul {
     @apply list-inside list-disc;
   }
-
+  body {
+    overflow-x: hidden;
+  }
+  #root {
+    width: 100%;
+  }
   @media (min-width: 1400px) {
     .container,
     .container-lg,
@@ -228,16 +628,154 @@ code {
       max-width: 1140px !important;
     }
   }
-
-  body {
-    overflow-x: hidden;
-  }
-  #root {
-    width: 100%;
+  /* Form inputs should never inherit uppercase from theme overrides — breaks address/ENS input */
+  input,
+  textarea,
+  select,
+  .form-control {
+    text-transform: none !important;
   }
 }
 
-/* ─── Terminal Mode — Vantablack Void ─────────────────────────────────────── */
+/* ============================================================================
+   HECTIC — global Comic-Sans-bold-uppercase rules (the current site identity).
+   Scoped under [data-theme='pro'] so other themes don't inherit them.
+   ============================================================================ */
+[data-theme='pro'] body {
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+[data-theme='pro'] h1 { font-size: 1.8rem !important; }
+[data-theme='pro'] h2 { font-size: 1.4rem !important; }
+[data-theme='pro'] h3 { font-size: 1.15rem !important; }
+[data-theme='pro'] h4 { font-size: 0.95rem !important; }
+[data-theme='pro'] h5 { font-size: 0.85rem !important; }
+[data-theme='pro'] h6 { font-size: 0.75rem !important; }
+
+[data-theme='pro'] *,
+[data-theme='pro'] *::before,
+[data-theme='pro'] *::after {
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+  font-weight: bold !important;
+}
+
+[data-theme='pro'] h1,
+[data-theme='pro'] h2,
+[data-theme='pro'] h3,
+[data-theme='pro'] h4,
+[data-theme='pro'] h5,
+[data-theme='pro'] h6,
+[data-theme='pro'] a,
+[data-theme='pro'] button,
+[data-theme='pro'] label,
+[data-theme='pro'] th,
+[data-theme='pro'] nav,
+[data-theme='pro'] nav *,
+[data-theme='pro'] .btn,
+[data-theme='pro'] [class*='Button'],
+[data-theme='pro'] [class*='header'],
+[data-theme='pro'] [class*='Header'],
+[data-theme='pro'] [class*='title'],
+[data-theme='pro'] [class*='Title'],
+[data-theme='pro'] [class*='label'],
+[data-theme='pro'] [class*='Label'] {
+  text-transform: uppercase !important;
+}
+
+[data-theme='pro'] p,
+[data-theme='pro'] span,
+[data-theme='pro'] div,
+[data-theme='pro'] li,
+[data-theme='pro'] td,
+[data-theme='pro'] dd,
+[data-theme='pro'] dt {
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  [data-theme='pro'] p,
+  [data-theme='pro'] span,
+  [data-theme='pro'] li,
+  [data-theme='pro'] td,
+  [data-theme='pro'] dd,
+  [data-theme='pro'] dt,
+  [data-theme='pro'] .form-control,
+  [data-theme='pro'] input,
+  [data-theme='pro'] textarea,
+  [data-theme='pro'] [class*='description'],
+  [data-theme='pro'] [class*='Description'],
+  [data-theme='pro'] [class*='content'],
+  [data-theme='pro'] [class*='Content'],
+  [data-theme='pro'] [class*='copy'],
+  [data-theme='pro'] [class*='Copy'],
+  [data-theme='pro'] [class*='body'],
+  [data-theme='pro'] [class*='Body'] {
+    text-transform: none !important;
+  }
+  [data-theme='pro'] body {
+    font-size: 14px;
+  }
+}
+
+[data-theme='pro'] code {
+  font-family: 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+}
+
+/* Pro re-aliases Londrina to Comic Sans (current behaviour). Other themes
+   want real Londrina, so we redeclare the @font-face in those theme blocks
+   below using `local()` lookups for Comic Sans. */
+
+/* ─── Vote page — stack columns on mobile ──────────────────────────────── */
+@media (max-width: 768px) {
+  .vote-page-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .vote-page-grid > #inline-vote-panel {
+    position: static !important;
+    order: -1;
+  }
+  .vote-detail-wrapper {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
+
+.__react_component_tooltip.show {
+  opacity: 1 !important;
+}
+
+/* ============================================================================
+   TERMINAL — JetBrains Mono everywhere, vantablack, sharp corners
+   ============================================================================ */
+[data-theme='terminal'] body {
+  background: #000000 !important;
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-body) !important;
+  text-transform: none !important;
+  font-weight: normal !important;
+}
+
+[data-theme='terminal'] *,
+[data-theme='terminal'] *::before,
+[data-theme='terminal'] *::after {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
+  font-weight: normal !important;
+  text-transform: none !important;
+}
+
+[data-theme='terminal'] strong,
+[data-theme='terminal'] b {
+  font-weight: 600 !important;
+}
+
+/* Legacy class-based override (still applied by TerminalFeedShell) — alias to data-theme */
+.terminal-mode body {
+  background: #000000 !important;
+}
 .terminal-mode,
 .terminal-mode *,
 .terminal-mode *::before,
@@ -245,11 +783,6 @@ code {
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
   font-weight: normal !important;
   text-transform: none !important;
-}
-
-.terminal-mode body {
-  background: #000000 !important;
-  overflow: hidden !important;
 }
 
 /* Near-invisible scrollbar for the void */
@@ -267,25 +800,25 @@ code {
 .terminal-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #333;
 }
-
-/* Firefox scrollbar */
 .terminal-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #222 #000;
 }
 
-/* Pulse animation for loading indicator */
 @keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
-/* Terminal event hover */
 .terminal-event:hover {
   background: #050505 !important;
 }
 
-/* Expand animation for the terminal-feed row drawer */
 @keyframes terminalRowExpand {
   from {
     opacity: 0;
@@ -300,6 +833,312 @@ code {
   .terminal-row-expanded {
     animation: none !important;
   }
+}
+
+/* ============================================================================
+   CLASSIC — OG nouns.wtf typography
+   ============================================================================ */
+[data-theme='classic'] body {
+  color: #212529;
+  font-family: 'PT Root UI', system-ui, -apple-system, sans-serif !important;
+  font-size: 16px;
+  text-transform: none !important;
+}
+
+[data-theme='classic'] *,
+[data-theme='classic'] *::before,
+[data-theme='classic'] *::after {
+  font-family: 'PT Root UI', system-ui, -apple-system, sans-serif !important;
+  text-transform: none !important;
+}
+
+[data-theme='classic'] h1,
+[data-theme='classic'] h2,
+[data-theme='classic'] h3,
+[data-theme='classic'] h4,
+[data-theme='classic'] h5,
+[data-theme='classic'] h6,
+[data-theme='classic'] [class*='headline'],
+[data-theme='classic'] [class*='Headline'] {
+  font-family: 'Londrina Solid', 'PT Root UI', cursive !important;
+  font-weight: 400 !important;
+}
+
+[data-theme='classic'] strong,
+[data-theme='classic'] b {
+  font-weight: 600 !important;
+}
+
+[data-theme='classic'] code,
+[data-theme='classic'] pre {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ============================================================================
+   CAMP — PT Root UI body, dark surface, subtle blue accents (camp.wtf vibe)
+   ============================================================================ */
+[data-theme='camp'] body {
+  background: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-body) !important;
+  font-size: 14px;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+
+[data-theme='camp'] *,
+[data-theme='camp'] *::before,
+[data-theme='camp'] *::after {
+  font-family: var(--theme-font-body) !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+}
+
+[data-theme='camp'] strong,
+[data-theme='camp'] b {
+  font-weight: 600 !important;
+}
+
+[data-theme='camp'] h1,
+[data-theme='camp'] h2,
+[data-theme='camp'] h3,
+[data-theme='camp'] h4,
+[data-theme='camp'] h5,
+[data-theme='camp'] h6 {
+  font-weight: 700 !important;
+}
+
+[data-theme='camp'] code,
+[data-theme='camp'] pre {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Camp-specific component polish — the activity feed and digest panes use
+   var(--theme-feed-row-border) etc. but we want a tighter top-nav vibe. */
+[data-theme='camp'] .camp-shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-theme='camp'] .camp-shell ::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme='camp'] .camp-shell ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+[data-theme='camp'] .camp-shell ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Tighter activity-event rows in the camp shell — pulls the dense list look
+   from camp.wtf without changing the underlying ActivityEvent component. */
+[data-theme='camp'] .camp-shell .terminal-event {
+  padding: 8px 14px !important;
+  border-bottom: 1px solid var(--theme-feed-row-border);
+}
+[data-theme='camp'] .camp-shell .terminal-event:hover {
+  background: var(--theme-bg-hover) !important;
+}
+
+/* Camp tab look — thin underline accent only, no background fill */
+[data-theme='camp'] .camp-tab {
+  transition: color 120ms ease, border-color 120ms ease;
+}
+[data-theme='camp'] .camp-tab:hover {
+  color: var(--theme-text-primary) !important;
+}
+
+/* Camp filter chip — small dropdown-style toggle above the feed */
+[data-theme='camp'] .camp-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--theme-text-secondary);
+  background: var(--theme-bg-tertiary);
+  border: 1px solid var(--theme-border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+[data-theme='camp'] .camp-filter-chip:hover {
+  color: var(--theme-text-primary);
+  border-color: var(--theme-border-strong);
+}
+
+/* ============================================================================
+   GAME — system body, Silkscreen for display
+   ============================================================================ */
+[data-theme='game'] body {
+  background: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-body) !important;
+  font-size: 14px;
+  text-transform: none !important;
+}
+
+[data-theme='game'] *,
+[data-theme='game'] *::before,
+[data-theme='game'] *::after {
+  font-family: var(--theme-font-body) !important;
+  text-transform: none !important;
+}
+
+[data-theme='game'] code,
+[data-theme='game'] pre,
+[data-theme='game'] [class*='mono'],
+[data-theme='game'] [class*='Mono'] {
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+}
+
+[data-theme='game'] strong,
+[data-theme='game'] b {
+  font-weight: 600 !important;
+}
+
+[data-theme='game'] code,
+[data-theme='game'] pre {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* GameShell typography overrides — the universal `[data-theme='game'] *`
+   rule above sets every element to Inter, which collides with the GameShell
+   module's mono/Silkscreen ladder (vote counts, timestamps, status badges,
+   addresses, proposal IDs). Re-assert those fonts here using attribute
+   substring matchers, which match the CSS-Module-hashed class names while
+   surviving the universal-selector cascade. Mirrors the var ladder defined
+   in GameShell.module.css (--gs-font-mono / --gs-font-display). */
+[data-theme='game'] [class*='voteCounts'],
+[data-theme='game'] [class*='voteCounts'] *,
+[data-theme='game'] [class*='voteCountItem'],
+[data-theme='game'] [class*='voteCountItem'] *,
+[data-theme='game'] [class*='votingTimer'],
+[data-theme='game'] [class*='voteTag'],
+[data-theme='game'] [class*='voteCount'],
+[data-theme='game'] [class*='feedTime'],
+[data-theme='game'] [class*='feedMark'],
+[data-theme='game'] [class*='voterTime'],
+[data-theme='game'] [class*='propIdToken'],
+[data-theme='game'] [class*='propStatusRow'],
+[data-theme='game'] [class*='propStatusRow'] *,
+[data-theme='game'] [class*='propV'],
+[data-theme='game'] [class*='treasuryPill'],
+[data-theme='game'] [class*='treasuryPill'] span:not([class*='treasuryLabel']) {
+  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Treasury label runs in body sans even though it lives inside the mono
+   pill — only the numeric portion gets the mono treatment. */
+[data-theme='game'] [class*='treasuryLabel'] {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Status badge — Silkscreen pixel display font. Constrained to the badge
+   so the rest of the body stays Inter. */
+[data-theme='game'] [class*='propStatusPill'] {
+  font-family: 'Silkscreen', system-ui, sans-serif !important;
+}
+
+/* Wallet pill renders truncated 0x… addresses + ENS handles — read better
+   in mono. */
+[data-theme='game'] [class*='connectPill']:not([class*='Avatar']):not([class*='Chevron']) {
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Game theme: pixel noggles cursor easter egg ──────────────────────────────
+   Replaces the system arrow with a 24×24 pixel noggles (the iconic Nouns DAO
+   glasses) — black frames, white pupils, red bridge. Hotspot at 12,12 (center)
+   so the gaze sits on what you're pointing at. Interactive elements get a
+   variant with red pupils to read as a "click target".
+   - Inputs/textareas keep the native text caret (legibility > novelty).
+   - `, auto` fallback covers browsers that reject SVG cursors.
+   - Scoped to [data-theme='game'] only; other themes are unaffected. */
+[data-theme='game'],
+[data-theme='game'] body {
+  cursor: url('/cursor-noggles.svg') 12 12, auto;
+}
+
+[data-theme='game'] a,
+[data-theme='game'] button,
+[data-theme='game'] [role='button'],
+[data-theme='game'] [role='link'],
+[data-theme='game'] summary,
+[data-theme='game'] label,
+[data-theme='game'] select,
+[data-theme='game'] [data-radix-collection-item],
+[data-theme='game'] [class*='hover'],
+[data-theme='game'] [class*='clickable'] {
+  cursor: url('/cursor-noggles-pointer.svg') 12 12, pointer;
+}
+
+[data-theme='game'] input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not([type='radio']),
+[data-theme='game'] textarea,
+[data-theme='game'] [contenteditable='true'] {
+  cursor: text;
+}
+
+[data-theme='game'] input[disabled],
+[data-theme='game'] button[disabled],
+[data-theme='game'] [aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   BERRY — Geneva body, Chicago display, beveled chrome, Aqua-blue desktop
+   ============================================================================ */
+[data-theme='berry'] body {
+  background: var(--theme-desktop-bg);
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-body) !important;
+  font-size: 14px;
+  font-weight: normal !important;
+  text-transform: none !important;
+}
+
+[data-theme='berry'] #root {
+  background: var(--theme-bg-primary);
+  min-height: 100vh;
+}
+
+[data-theme='berry'] *,
+[data-theme='berry'] *::before,
+[data-theme='berry'] *::after {
+  font-family: var(--theme-font-body) !important;
+  text-transform: none !important;
+  font-weight: normal !important;
+}
+
+[data-theme='berry'] h1,
+[data-theme='berry'] h2,
+[data-theme='berry'] h3,
+[data-theme='berry'] h4,
+[data-theme='berry'] h5,
+[data-theme='berry'] h6 {
+  font-family: var(--theme-font-display) !important;
+  font-weight: 700 !important;
+}
+
+[data-theme='berry'] button,
+[data-theme='berry'] .btn {
+  border-radius: 0 !important;
+  box-shadow:
+    inset 1px 1px 0 var(--theme-bevel-light),
+    inset -1px -1px 0 var(--theme-bevel-dark);
+}
+
+[data-theme='berry'] strong,
+[data-theme='berry'] b {
+  font-weight: 700 !important;
+}
+
+[data-theme='berry'] code,
+[data-theme='berry'] pre {
+  font-family: 'Monaco', 'Courier', monospace !important;
 }
 
 /* ─── Modal open — hide site chrome ─────────────────────────────────────────

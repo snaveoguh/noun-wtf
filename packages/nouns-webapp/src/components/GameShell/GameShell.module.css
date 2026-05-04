@@ -1,0 +1,1655 @@
+/* ============================================================================
+ * GameShell — nouns.game-style dashboard
+ *
+ * Dark two-pane body (Feed | Proposals) under a sticky top nav.
+ *
+ * Color palette (also referenced inline in components):
+ *   --gs-body-bg:    #0a0a0e
+ *   --gs-card-bg:    rgba(255, 255, 255, 0.03)
+ *   --gs-card-hover: rgba(255, 255, 255, 0.05)
+ *   --gs-text:       #f5f5f5
+ *   --gs-muted:      rgba(245, 245, 245, 0.45)
+ *   --gs-accent:     #ff00aa
+ *   --gs-for:        #047857  (emerald-700, deeper than stock green)
+ *   --gs-against:    #be123c  (rose-700, deeper than Nouns red)
+ *   --gs-abstain:    #666
+ *
+ * Typography ladder mirrors nouns.game:
+ *   --gs-font-mono:    JetBrains Mono — vote counts, timestamps, addresses,
+ *                      treasury number, proposal IDs. Stand-in for Berkeley
+ *                      Mono (paid). JetBrains Mono is already loaded in
+ *                      index.html alongside Silkscreen + Inter.
+ *   --gs-font-display: Silkscreen — punchy display moments only (status
+ *                      badges). Used sparingly so the pixel font stays
+ *                      special; the rest of the UI is body Inter.
+ * ============================================================================ */
+
+.shell {
+  --gs-body-bg: #0a0a0e;
+  --gs-card-bg: rgba(255, 255, 255, 0.03);
+  --gs-card-hover: rgba(255, 255, 255, 0.05);
+  --gs-text: #f5f5f5;
+
+  /* Stepped muted scale — gives hierarchy on a dark dense feed. Use mostly
+     muted-1 for bylines, muted-2 for secondary info, muted-3 for separators
+     ("/", "·") and the deepest dim. Legacy --gs-muted aliases muted-2 so
+     existing rules degrade gracefully. */
+  --gs-muted-1: rgba(245, 245, 245, 0.7);
+  --gs-muted-2: rgba(245, 245, 245, 0.5);
+  --gs-muted-3: rgba(245, 245, 245, 0.35);
+  --gs-muted: rgba(245, 245, 245, 0.5);
+  --gs-dim: rgba(245, 245, 245, 0.65);
+
+  --gs-accent: #ff00aa;
+  --gs-cyan: #00d4ff;
+
+  /* Token palette — color-codes amount tokens (ETH, USDC, stETH …) in the
+     feed so users can scan a row of bids/sales/streams and immediately tell
+     ETH-native flow apart from stable flow apart from LST flow. Hex matches
+     each token's brand-canonical color where one exists; muted neutral for
+     the long tail. Consumed by `.tokenChip` via `[data-token=…]` selectors. */
+  /* HIG (apple-hig universal/principles.md "Color and Contrast"): brand
+     hex values for WETH (#4a6cb8) and USDC (#2775ca) clock under
+     4.5:1 against the #0a0a0e backdrop, so the chip foreground colors
+     are lightened toward their lighter brand tints to clear WCAG AA.
+     Background and border still use the brand-canonical hex via
+     color-mix below, so the chip palette stays recognisable. */
+  --gs-token-eth: #5c7ad6;
+  --gs-token-weth: #7d9ae0;
+  --gs-token-steth: #00a3ff;
+  --gs-token-reth: #ff8b3d;
+  --gs-token-usdc: #5a9ae8;
+  --gs-token-wsteth: #1a8acc;
+  --gs-token-other: rgba(255, 255, 255, 0.65);
+
+  /* Voting palette — emerald/rose 700 for the "deep, serious" cast that
+     nouns.game uses on its aggregate bars + counts. Lighter pulse variants
+     drive the FOR/AGAINST count animation on actively-voting proposals. */
+  --gs-for: #047857;
+  --gs-against: #be123c;
+  --gs-for-pulse: #34d399;
+  --gs-against-pulse: #fb7185;
+  --gs-abstain: #666;
+  --gs-divider: rgba(255, 255, 255, 0.06);
+
+  --gs-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --gs-font-display: 'Silkscreen', system-ui, sans-serif;
+  /* HIG (apple-hig SKILL.md "Being Specific"): system stack with SF Pro
+     first so Apple devices render real San Francisco; Inter is the
+     screen-tuned fallback on non-Apple platforms (Rasmus Andersson designed
+     it explicitly as an SF alternative). Inter already loads in index.html
+     alongside JetBrains Mono + Silkscreen. */
+  --gs-font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Inter', 'PT Root UI', system-ui, sans-serif;
+
+  /* Content sizing — keep main column narrower than the viewport on wide
+     screens so the page has breathing room (matches nouns.game's framing).
+     Backgrounds (nav, body) stay full-bleed; only the inner content is
+     constrained via these vars. */
+  --gs-content-max: 1280px;
+  --gs-page-pad-x: 20px;
+
+  min-height: 100vh;
+  background: var(--gs-body-bg);
+  color: var(--gs-text);
+  font-family: var(--gs-font-sans);
+  /* HIG: caption-but-readable density. 13px sits above the 11pt caption
+     floor (apple-hig macos.md sidebar text spec) and matches macOS
+     Tahoe's labels at 13pt. Body bumps to 17pt only inside proposal
+     cards via `.propTitle`. */
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* ── Pulse keyframes for active voting ──────────────────────────────────────
+   Drives subtle 2s breathing on FOR / AGAINST counts when a proposal is
+   actively in voting. Keep amplitude small so it reads as "this is live"
+   rather than "this is broken". */
+@keyframes gs-pulse-for {
+  0%,
+  100% {
+    color: var(--gs-for);
+  }
+  50% {
+    color: var(--gs-for-pulse);
+  }
+}
+@keyframes gs-pulse-against {
+  0%,
+  100% {
+    color: var(--gs-against);
+  }
+  50% {
+    color: var(--gs-against-pulse);
+  }
+}
+.pulseFor {
+  animation: gs-pulse-for 2s ease-in-out infinite;
+}
+.pulseAgainst {
+  animation: gs-pulse-against 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulseFor,
+  .pulseAgainst {
+    animation: none;
+  }
+  /* HIG (apple-hig SKILL.md "Reduce Motion"): zero out all decorative
+     transitions inside the shell when the user opts out of motion. The
+     pulse keyframes above are the only animations, but hover transforms
+     on `.brand` / `.fullUxPill` / etc. should also collapse to instant
+     state changes. */
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* HIG (apple-hig SKILL.md "Reduce Transparency"): when the user opts out
+   of transparency, swap the navbar's translucent surface for an opaque
+   one and drop the backdrop blur. Status pill tints stay (they're solid
+   tinted — not glass — so they remain readable). */
+@media (prefers-reduced-transparency: reduce) {
+  .nav {
+    background: var(--gs-body-bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    --gs-page-pad-x: 36px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .shell {
+    --gs-page-pad-x: 40px;
+  }
+}
+
+.main {
+  width: 100%;
+}
+
+/* ============================================================================
+   Top nav — sits on dark body
+   ============================================================================ */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  background: rgba(10, 10, 14, 0.92);
+  backdrop-filter: saturate(140%) blur(8px);
+  -webkit-backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid var(--gs-divider);
+}
+
+.navInner {
+  width: 100%;
+  margin: 0 auto;
+  /* Match the body content column so the brand/links align with
+     the content beneath them. Background stays full-width via .nav. */
+  padding-inline: max(
+    var(--gs-page-pad-x),
+    calc((100% - var(--gs-content-max)) / 2)
+  );
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: var(--gs-text);
+  line-height: 1;
+  border-radius: 6px;
+  /* HIG: 32x32pt minimum hit target on desktop (apple-hig macos.md min
+     touch target). Visual mark stays 26px; padding lifts the click area
+     to 34x34. */
+  padding: 4px;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
+}
+.brand:hover {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px rgba(255, 0, 170, 0.45));
+}
+.brand:active {
+  transform: scale(0.96);
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 20px;
+  line-height: 1;
+  /* Native emoji rendering — system font fallback covers Apple/Win/Android. */
+  font-family:
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', sans-serif;
+}
+
+.primary {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.navLink,
+.navMenuTrigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* HIG (apple-hig macos.md "Toolbar"): 8pt vertical, 16pt horizontal
+     gap convention. Lift the hit target above the 32x32pt desktop floor
+     while keeping the visual feel of a quiet text link. */
+  padding: 8px 12px;
+  /* HIG caption — sits at 13px (above the 11pt floor) so links stay
+     readable on the dark navbar. */
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gs-muted);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0;
+  transition: color 120ms ease;
+}
+
+.navLink:hover,
+.navMenuTrigger:hover {
+  color: var(--gs-text);
+}
+
+.navLinkActive {
+  color: var(--gs-text) !important;
+}
+
+.navLinkActive::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gs-accent) 0%, var(--gs-cyan) 100%);
+  box-shadow: 0 0 10px rgba(255, 0, 170, 0.5);
+}
+
+.navMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #15151b;
+  border: 1px solid var(--gs-divider);
+  border-radius: 3px;
+  padding: 6px;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 51;
+}
+
+.navMenuItem {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--gs-dim);
+  text-decoration: none;
+  border-radius: 2px;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
+}
+.navMenuItem:hover {
+  background: var(--gs-card-hover);
+  color: var(--gs-text);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* HIG: 32pt min hit target on desktop (apple-hig macos.md "Touch
+     Target"). Visual disc reads ~26pt via the icon glyph itself; the
+     32pt outer box gives forgiving aim without changing visual weight. */
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gs-muted);
+  border: none;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+.iconBtn:hover {
+  background: var(--gs-card-hover);
+  color: var(--gs-text);
+}
+
+.searchBox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* HIG (apple-hig macos.md "Toolbar"): 4pt vertical / 12pt horizontal
+     padding inside a control. Search bar still maintains a 32pt overall
+     height target. */
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--gs-card-bg);
+  color: var(--gs-muted);
+  font-size: 13px;
+  min-width: 200px;
+}
+
+.searchInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--gs-text);
+  /* HIG caption floor — 13pt on the input matches macOS Tahoe text
+     fields (apple-hig macos.md "Input Fields"). */
+  font-size: 13px;
+  font-family: inherit;
+  flex: 1;
+}
+.searchInput::placeholder {
+  color: var(--gs-muted);
+}
+
+.connectPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* HIG: 4pt vertical / 12pt horizontal padding around the connect
+     control; left side hugs the avatar disc tighter to keep the pill
+     visually balanced. Font holds at 12pt because the pill height is
+     pegged at 26px to align with the rest of the nav cluster (treasury,
+     full-ux); bumping copy to 13pt would push the line above the 26px
+     box. */
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  /* Mono on the wallet pill so 0x… addresses + ENS handles read as identifiers
+     rather than body copy. Keeps the truncated address visually distinct. */
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+  background: var(--gs-card-bg);
+  color: var(--gs-text);
+  border: 1px solid var(--gs-divider);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+  letter-spacing: 0;
+  height: 26px;
+}
+
+.connectPillAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gs-accent), var(--gs-cyan));
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.connectPillAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.connectPillChevron {
+  opacity: 0.5;
+  margin-left: 2px;
+}
+
+.connectPill:hover {
+  background: var(--gs-card-hover);
+}
+
+.connectPillCta {
+  background: var(--gs-accent);
+  color: #fff;
+  border-color: transparent;
+  padding: 3px 12px;
+}
+.connectPillCta:hover {
+  filter: brightness(1.1);
+  background: var(--gs-accent);
+}
+
+.connectPillConnected {
+  background: var(--gs-card-bg);
+  color: var(--gs-text);
+}
+
+.treasuryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--gs-card-bg);
+  color: var(--gs-text);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  border: 1px solid var(--gs-divider);
+  height: 26px;
+}
+.treasuryPill:hover {
+  background: var(--gs-card-hover);
+}
+
+.treasuryLabel {
+  color: var(--gs-muted);
+  font-weight: 500;
+  /* Label sits in body sans, not mono — only the numeric portion runs the
+     full mono+tabular treatment so columns line up. */
+  font-family:
+    'Inter', 'PT Root UI', -apple-system, sans-serif;
+}
+
+/* Full-UX pill — magenta→cyan gradient, pixel-arcade vibe */
+.fullUxPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gs-accent) 0%, var(--gs-cyan) 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.25) inset,
+    0 6px 16px -6px rgba(255, 0, 170, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+  white-space: nowrap;
+}
+.fullUxPill:hover {
+  color: #fff;
+  text-decoration: none;
+  filter: brightness(1.08) saturate(1.05);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.25) inset,
+    0 8px 22px -6px rgba(0, 212, 255, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.35);
+}
+.fullUxPill .fullUxArrow {
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+.fullUxPill:hover .fullUxArrow {
+  transform: translate(2px, -2px);
+}
+
+/* ============================================================================
+   Body two-pane: Feed (left) + Proposals (right)
+   ============================================================================ */
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+  gap: 0;
+  width: 100%;
+  /* Match the nav centering: full-bleed box, but content padded so it sits
+     inside `--gs-content-max` once the viewport exceeds it. */
+  padding-inline: max(
+    var(--gs-page-pad-x),
+    calc((100% - var(--gs-content-max)) / 2)
+  );
+}
+
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pane {
+  /* HIG (apple-hig SKILL.md "8pt grid"): pane internal padding rides
+     the 8pt grid — 32pt vertical lifts the section header off the
+     navbar, 24pt horizontal matches the gutter to the centre divider.
+     Outer page padding is owned by `.body` (`--gs-page-pad-x`); panes
+     only add internal breathing room between their content and the
+     centre divider. */
+  padding: 32px 24px;
+  /* Fill the viewport below the nav (40px). The auction strip used to take
+     ~60px here too — now removed, so the panes own all remaining space. */
+  min-height: calc(100vh - 40px);
+  min-width: 0;
+}
+
+.paneLeft {
+  padding-left: 0;
+  border-right: 1px solid var(--gs-divider);
+}
+
+.body > .pane:last-child {
+  padding-right: 0;
+}
+
+.paneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* HIG: 24pt below a section title sits one notch up the 8pt grid
+     from the previous 20px — gives the headline more breathing room
+     before the dense feed/proposals stack. */
+  margin-bottom: 24px;
+}
+
+.paneTitle {
+  /* HIG (apple-hig SKILL.md "Being Specific"): SF Pro stack first,
+     Inter fallback for non-Apple platforms. */
+  font-family: var(--gs-font-sans) !important;
+  font-weight: 700 !important;
+  /* HIG: 32pt sits between Headline (28pt) and Large Title (34pt) and
+     reads as the dominant focal point on the page. */
+  font-size: 32px !important;
+  letter-spacing: -0.02em !important;
+  color: var(--gs-text);
+  margin: 0;
+  text-transform: none !important;
+  line-height: 1;
+}
+
+/* ============================================================================
+   Feed (left)
+   ============================================================================ */
+
+.feedList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.feedRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* HIG (apple-hig SKILL.md "8pt grid"): bumped from 6px to 8pt so feed
+     row rhythm sits on the base unit. Density still reads as nouns.game
+     because line-height stays tight (1.4 below). */
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gs-divider);
+  cursor: default;
+}
+/* Subtler row separators in the dense layout — every other row gets the
+   border, the rest just spacing. Avoids the "lined notebook" look at high
+   density while still visually grouping items. */
+.feedRow:last-child {
+  border-bottom: 0;
+}
+
+.feedRowMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* HIG caption-but-readable — 13pt sits above the 11pt floor. */
+  font-size: 13px;
+  /* HIG (apple-hig universal/principles.md "Line Height"): >=1.3x font
+     size for caption text. 1.4 keeps multi-line wraps comfortable
+     without breaking the dense, scannable feel. */
+  line-height: 1.4;
+}
+
+.feedIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--gs-muted);
+  font-family:
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', sans-serif;
+  line-height: 1;
+}
+
+.feedDescription {
+  flex: 1;
+  color: var(--gs-dim);
+  word-break: break-word;
+  min-width: 0;
+}
+
+.feedDescription strong {
+  color: var(--gs-text);
+  font-weight: 600;
+}
+
+.feedName {
+  color: var(--gs-text);
+  font-weight: 500;
+}
+
+.nounRef {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--gs-text);
+}
+
+.propRef {
+  color: var(--gs-text);
+  font-weight: 500;
+  /* Proposal ID prefix ("#963") gets the mono treatment so the running list
+     of mentions in the feed has a visible numeric column. The trailing
+     title runs in body sans via .propTitle. */
+  font-variant-numeric: tabular-nums;
+}
+
+.propTitle {
+  color: var(--gs-text);
+  font-weight: 500;
+}
+
+.feedMark {
+  color: var(--gs-text);
+  font-weight: 500;
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Token chip — the colored "5.5 ETH" / "12,000 USDC" pill inside `.feedMark`.
+   Color is driven by `data-token` so JSX only needs to pass the symbol;
+   palette lives in the variables block above. Compact pill, mono digits,
+   tabular-nums so amounts in adjacent rows align vertically. */
+.tokenChip {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0;
+  /* Default: muted neutral for unknown tokens; overrides per data-token. */
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gs-token-other);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.tokenChip[data-token='ETH'] {
+  background: color-mix(in srgb, var(--gs-token-eth) 18%, transparent);
+  color: var(--gs-token-eth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-eth) 35%, transparent);
+}
+.tokenChip[data-token='WETH'] {
+  /* Background + border use the brand-canonical WETH hex (#4a6cb8) so
+     the chip stays recognisable; foreground reads from the lightened
+     --gs-token-weth so the text passes WCAG AA on the dark backdrop. */
+  background: color-mix(in srgb, #4a6cb8 18%, transparent);
+  color: var(--gs-token-weth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #4a6cb8 35%, transparent);
+}
+.tokenChip[data-token='stETH'] {
+  background: color-mix(in srgb, var(--gs-token-steth) 18%, transparent);
+  color: var(--gs-token-steth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-steth) 35%, transparent);
+}
+.tokenChip[data-token='wstETH'] {
+  background: color-mix(in srgb, var(--gs-token-wsteth) 18%, transparent);
+  color: var(--gs-token-wsteth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-wsteth) 35%, transparent);
+}
+.tokenChip[data-token='rETH'] {
+  background: color-mix(in srgb, var(--gs-token-reth) 18%, transparent);
+  color: var(--gs-token-reth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gs-token-reth) 35%, transparent);
+}
+.tokenChip[data-token='USDC'] {
+  /* Brand hex (#2775ca) drives the bg/border; foreground reads from the
+     lightened --gs-token-usdc so the chip text clears WCAG AA. */
+  background: color-mix(in srgb, #2775ca 18%, transparent);
+  color: var(--gs-token-usdc);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #2775ca 35%, transparent);
+}
+
+.voteCount {
+  color: var(--gs-muted-2);
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+  /* HIG: 13pt caption (one notch above the 11pt floor) keeps the inline
+     vote-count parens readable next to the surrounding 13pt body. */
+  font-size: 13px;
+}
+
+.feedDim {
+  color: var(--gs-muted-2);
+}
+
+.feedChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  background: transparent;
+  border: none;
+  color: var(--gs-muted);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  transition: color 120ms ease;
+}
+.feedChevron:hover {
+  color: var(--gs-text);
+  background: var(--gs-card-bg);
+}
+
+.feedTime {
+  color: var(--gs-muted-2);
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-top: 2px;
+  text-align: right;
+  min-width: 28px;
+}
+
+.feedExpand {
+  /* HIG: indent matches the inline icon column (16px icon + 8px gap)
+     so the expanded reason aligns under the description text. Padding
+     bumped to 8/12 (8pt grid). */
+  margin-left: 24px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  background: transparent;
+  border-left: 2px solid var(--gs-divider);
+  border-radius: 0;
+  /* HIG: 13pt caption above the 11pt floor — proposal descriptions
+     and vote reasons read better at body-caption size than 12pt. */
+  font-size: 13px;
+  color: var(--gs-muted);
+  /* HIG: 1.5x line height for prose blocks (apple-hig universal
+     /principles.md "Readability Rules"). */
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.feedExpandToggle {
+  display: none;
+}
+
+.voteTag {
+  display: inline-block;
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  margin: 0 1px;
+}
+.voteFor {
+  color: var(--gs-for);
+}
+.voteAgainst {
+  color: var(--gs-against);
+}
+.voteAbstain {
+  color: var(--gs-abstain);
+}
+
+.feedEmpty {
+  padding: 24px 0;
+  color: var(--gs-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.feedLoadMore {
+  /* HIG: 16pt above the button gives clear separation from the last
+     feed row; 12pt vertical padding lifts the hit target above the
+     32pt min (apple-hig macos.md). */
+  margin-top: 16px;
+  padding: 12px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--gs-divider);
+  border-radius: 3px;
+  color: var(--gs-muted);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+.feedLoadMore:hover {
+  color: var(--gs-text);
+  background: var(--gs-card-bg);
+}
+
+/* ============================================================================
+   Proposals (right) — nouns.game-style: slash-separated tabs, segmented vote
+   bar, byline + voter list with reasons.
+   ============================================================================ */
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* HIG (apple-hig SKILL.md "8pt grid"): 16pt below the tab strip and
+     12pt below the underline — both round multiples that line up with
+     the surrounding pane padding. */
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--gs-divider);
+  padding-bottom: 12px;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--gs-muted);
+  /* HIG (apple-hig macos.md "Toolbar"): 14pt control label sits between
+     caption (13pt) and body (17pt); fits the slash-separated tab strip
+     without making it heavier than the section title above. */
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  /* HIG: 32pt min hit target on desktop. Vertical padding of 8pt lifts
+     each tab above the floor (with line-height of 1.2 the tab clocks in
+     at ~17 + 16 = 33pt tall). 12pt horizontal sits on the 8pt grid +
+     gives the tab a real click region instead of just letter width. */
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: color 120ms ease;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.tab:first-child {
+  padding-left: 0;
+}
+.tab:hover {
+  color: var(--gs-text);
+}
+.tabActive {
+  color: var(--gs-text) !important;
+  font-weight: 700;
+}
+
+.tabSeparator {
+  color: var(--gs-muted-3);
+  font-size: 14px;
+  font-weight: 400;
+  user-select: none;
+  pointer-events: none;
+}
+
+.viewAll {
+  font-size: 13px;
+  color: var(--gs-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 120ms ease;
+}
+.viewAll:hover {
+  color: var(--gs-text);
+}
+
+.propStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.propCard {
+  display: block;
+  padding: 16px 0;
+  background: transparent;
+  text-decoration: none;
+  color: var(--gs-text);
+  border: none;
+  border-bottom: 1px solid var(--gs-divider);
+  transition: background 120ms ease;
+  min-width: 0;
+  overflow: hidden;
+}
+.propCard:last-child {
+  border-bottom: none;
+}
+.propCard:hover {
+  color: var(--gs-text);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.propCardHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  /* HIG (apple-hig SKILL.md "8pt grid"): 12pt below the title row
+     before the segmented vote bar. */
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.propTitleWrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.propTitle {
+  /* HIG (apple-hig SKILL.md "Key Numbers"): 17pt = body. Proposal titles
+     are the primary content focus on the right pane, so they earn
+     full body size rather than sitting at caption (13pt) like the
+     surrounding metadata. Bumped from 15px to match the spec. */
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gs-text);
+  letter-spacing: -0.005em;
+  line-height: 1.25;
+}
+
+.propBy {
+  /* HIG: 13pt caption — sits above the 11pt floor and matches the
+     stepped scale used elsewhere on the right pane. */
+  font-size: 13px;
+  color: var(--gs-muted-1);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* The numeric proposal ID ("963" / "#963") runs in mono so stacks of cards
+   and feed rows line up the IDs as a visual column even when titles vary in
+   length. Trailing space is added via CSS so the same token works inline in
+   the feed (where title text follows directly) and in card headers. */
+.propIdToken {
+  font-family: var(--gs-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--gs-muted-1);
+  margin-right: 6px;
+}
+.propIdToken + .propTitle {
+  margin-left: 0;
+}
+
+/* ── Segmented vote bar ────────────────────────────────────────────────────── */
+.voteBarSeg {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  gap: 1px;
+  margin-bottom: 8px;
+  align-items: stretch;
+}
+.voteTick {
+  flex: 1;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 1px;
+  min-width: 1px;
+}
+.voteTickFor {
+  background: var(--gs-for);
+}
+.voteTickAgainst {
+  background: var(--gs-against);
+}
+.voteTickAbstain {
+  background: rgba(245, 245, 245, 0.32);
+}
+
+.voteCounts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.voteCountGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  color: var(--gs-muted);
+}
+
+.voteCountItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+}
+.voteCountItem:first-child {
+  padding-left: 0;
+}
+.voteCountItem:not(:last-child) {
+  border-right: 1px solid var(--gs-divider);
+}
+.voteCountItem strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.votingTimer {
+  color: var(--gs-muted-1);
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Voter list ────────────────────────────────────────────────────────────── */
+.voterList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.voterRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.voterRowMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* HIG caption: 13pt sits above the 11pt floor. Voter rows used to
+     run at 12pt, which read borderline at the muted color. */
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  color: var(--gs-dim);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.voterRowMain.voterHasReason:hover .voterChevron {
+  color: var(--gs-text);
+}
+
+.voterAvatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #1a1a20;
+}
+.voterAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.voterName {
+  color: var(--gs-text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.voterText {
+  color: var(--gs-muted-1);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.voterTime {
+  margin-left: auto;
+  color: var(--gs-muted-2);
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.voterChevron {
+  color: var(--gs-muted);
+  font-size: 10px;
+  transition: color 120ms ease;
+}
+
+.voterReasonRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* HIG: indent matches the avatar (16) + gap (8) above so the
+     reason text aligns under the voter name. Padding lifted onto
+     the 4pt grid. */
+  margin-left: 24px;
+  padding: 4px 0;
+  /* HIG: 13pt caption — same as voter row above. */
+  font-size: 13px;
+  color: var(--gs-dim);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.voterReasonInline {
+  color: var(--gs-dim);
+  font-style: italic;
+  font-size: 13px;
+  margin-left: 24px;
+  padding: 0 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
+}
+
+/* Bottom row that pairs the overlapping avatar stack with the "+N more ›"
+   label. Centered horizontally so the stack reads as a focal element rather
+   than a list continuation. */
+.voterMoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 0 2px;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.voterMoreRow:hover {
+  opacity: 0.85;
+}
+.voterMoreRow:hover .voterMore {
+  color: var(--gs-text);
+}
+
+.voterAvatarStack {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+}
+.voterAvatarStackItem {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  /* Border matches the page body (the card itself is transparent) so each
+     disc reads as floating against the dark backdrop. */
+  border: 2px solid var(--gs-body-bg);
+  box-sizing: content-box;
+  flex-shrink: 0;
+  position: relative;
+  /* Clip the inner ENS-avatar <img> to the round disc. Stack discs are
+     content-box sized, so the image fills the 18×18 inner area cleanly. */
+  overflow: hidden;
+}
+.voterAvatarStackItem + .voterAvatarStackItem {
+  /* ~55% overlap — tight enough to feel grouped but still shows each disc. */
+  margin-left: -10px;
+}
+
+.voterMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* HIG: 13pt caption — matches the voter row text size. */
+  font-size: 13px;
+  color: var(--gs-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 120ms ease;
+}
+.voterMore:hover {
+  color: var(--gs-text);
+}
+
+.propEmpty {
+  padding: 24px 0;
+  color: var(--gs-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Status badges — sharp 2px tabs, Silkscreen pixel display font ──────────
+   Uppercase + letterspaced + tone background per state. Silkscreen lands
+   here (and only here) as the "punchy display" moment in the right pane —
+   small enough that the pixel grain reads as a stamp, not body copy. */
+.propStatusPill {
+  display: inline-block;
+  /* HIG: 4pt vertical / 8pt horizontal padding. The status pill is a
+     solid tinted tab (not glass), so it can sit over text without
+     violating the "no glass over text" Liquid-Glass rule (apple-hig
+     visionos.md "Glass Material"). */
+  padding: 4px 8px 3px;
+  border-radius: 2px;
+  /* HIG: 11pt is the caption floor (apple-hig SKILL.md "Key Numbers").
+     Silkscreen is a pixel font so 11pt grain still reads as a stamp,
+     not body copy — but anything below 11pt fails accessibility. */
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: var(--gs-font-display) !important;
+  line-height: 1;
+  /* Subtle inset border on every variant so the pill keeps definition even
+     when the tone background is faint (e.g. Queued). */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.statusActive {
+  background: rgba(4, 120, 87, 0.22);
+  color: #34d399;
+  box-shadow: inset 0 0 0 1px rgba(4, 120, 87, 0.55);
+}
+.statusPositive {
+  background: rgba(4, 120, 87, 0.14);
+  color: #6ee7b7;
+  box-shadow: inset 0 0 0 1px rgba(4, 120, 87, 0.4);
+}
+.statusNegative {
+  background: rgba(190, 18, 60, 0.18);
+  color: #fb7185;
+  box-shadow: inset 0 0 0 1px rgba(190, 18, 60, 0.5);
+}
+.statusNeutral {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gs-muted-1);
+}
+
+.comingSoon {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--gs-muted);
+  font-size: 14px;
+}
+.comingSoonTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gs-text);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================================
+   Tighten responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .shell {
+    /* HIG (apple-hig SKILL.md "iPhone margins"): 16pt screen-edge
+       margin on phones. */
+    --gs-page-pad-x: 16px;
+  }
+  .pane {
+    /* HIG: 24pt vertical pane padding on mobile keeps the same rhythm
+       as desktop (32pt) but tighter for narrow screens. */
+    padding: 24px 0;
+  }
+  .paneLeft {
+    border-right: none;
+    border-bottom: 1px solid var(--gs-divider);
+  }
+  .paneTitle {
+    /* HIG: 28pt = headline (apple-hig SKILL.md "Headlines"). Down from
+       desktop 32pt — keeps the title prominent without crowding a
+       phone screen. */
+    font-size: 28px !important;
+  }
+  .primary {
+    display: none;
+  }
+
+  /* Squeeze the right cluster on phones so it doesn't overflow.
+     Trim the "Treasury" label, tighten gaps, shave the nouns.game pill. */
+  .navInner {
+    gap: 6px;
+  }
+  .treasuryLabel {
+    display: none;
+  }
+  .treasuryPill {
+    padding: 3px 8px;
+  }
+  .fullUxPill {
+    padding: 0 10px;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* ============================================================================
+   Proposal create / edit pages
+   ----------------------------------------------------------------------------
+   Used by GameCreateProposal.tsx + GameEditProposal.tsx (both kept out of
+   the home-rebuild scope per the task brief). These classes match the
+   contract those files rely on — restyled here in the dark-only Game palette
+   so the proposal pages keep working without a beige strip.
+   ============================================================================ */
+
+.propPage {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  color: var(--gs-text);
+}
+
+.propBackBar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.propBackBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--gs-card-bg);
+  color: var(--gs-text);
+  text-decoration: none;
+  border: 1px solid var(--gs-divider);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.propBackBtn:hover {
+  background: var(--gs-card-hover);
+}
+
+.propHeading {
+  font-family: 'Inter', 'PT Root UI', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 28px !important;
+  letter-spacing: -0.02em !important;
+  color: var(--gs-text);
+  margin: 0 0 18px;
+  text-transform: none !important;
+}
+
+.propEditorWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+}
+@media (max-width: 1024px) {
+  .propEditorWrap {
+    grid-template-columns: 1fr;
+  }
+}
+
+.propMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.propRail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.propPanel {
+  background: var(--gs-card-bg);
+  border-radius: 3px;
+  padding: 18px;
+  border: 1px solid var(--gs-divider);
+}
+
+.propPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.propPanelTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gs-text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.propAddActionBtn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: var(--gs-card-bg);
+  color: var(--gs-text);
+  border: 1px dashed var(--gs-divider);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+.propAddActionBtn:hover {
+  background: var(--gs-card-hover);
+  border-color: var(--gs-accent);
+}
+
+.propTxEmpty {
+  padding: 14px;
+  color: var(--gs-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.propStatusList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.propStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--gs-dim);
+  font-family: var(--gs-font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.propStatusLabel {
+  color: var(--gs-muted);
+  letter-spacing: 0.04em;
+}
+
+.propStatusValue {
+  color: var(--gs-text);
+  font-weight: 600;
+}
+
+.propStatusOK {
+  color: var(--gs-for) !important;
+}
+
+.propStatusBad {
+  color: var(--gs-against) !important;
+}
+
+.propSubmitBtn {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gs-accent) 0%, var(--gs-cyan) 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0;
+  transition: filter 120ms ease;
+}
+.propSubmitBtn:hover {
+  filter: brightness(1.08);
+}
+.propSubmitBtn:disabled {
+  filter: grayscale(0.5) brightness(0.7);
+  cursor: not-allowed;
+}
+
+.propSubmitBtnDanger {
+  background: var(--gs-against) !important;
+}
+
+.propTip {
+  font-size: 12px;
+  color: var(--gs-muted);
+  line-height: 1.5;
+}
+
+.propTipNote {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--gs-muted);
+  font-style: italic;
+}
+
+.propInlineLink {
+  color: var(--gs-cyan);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gs-cyan);
+}
+.propInlineLink:hover {
+  color: var(--gs-text);
+}
+
+.propV {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: var(--gs-card-bg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gs-muted);
+  font-family: var(--gs-font-mono) !important;
+}
+
+.propSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--gs-text);
+  border-radius: 999px;
+  animation: gs-spin 600ms linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes gs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.propGate {
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--gs-card-bg);
+  border-radius: 3px;
+  border: 1px solid var(--gs-divider);
+  color: var(--gs-dim);
+}
+
+.propGateTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gs-text);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.propCommitInput {
+  width: 100%;
+  background: var(--gs-card-bg);
+  border: 1px solid var(--gs-divider);
+  border-radius: 3px;
+  padding: 10px 12px;
+  color: var(--gs-text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.propCommitInput:focus {
+  border-color: var(--gs-accent);
+}

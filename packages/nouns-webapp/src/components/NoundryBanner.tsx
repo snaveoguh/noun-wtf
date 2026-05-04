@@ -13,7 +13,7 @@ import useModalBodyLock from '@/hooks/useModalBodyLock';
 
 // ─── Trait card data ─────────────────────────────────────────────────────────
 
-interface TraitCard {
+export interface TraitCard {
   id: string;
   name: string;
   category: 'head' | 'body' | 'accessory' | 'glasses';
@@ -109,7 +109,7 @@ function buildTraitCards(): TraitCard[] {
 }
 
 let _cachedCards: TraitCard[] | null = null;
-function getTraitCards(): TraitCard[] {
+export function getTraitCards(): TraitCard[] {
   if (!_cachedCards) _cachedCards = buildTraitCards();
   return _cachedCards;
 }
