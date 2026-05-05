@@ -18,8 +18,6 @@ import DreamWindow from '@/components/DreamWindow';
 import BerryShell from '@/components/BerryShell';
 import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
 import ClassicHome from '@/components/ClassicShell/ClassicHome';
-import GameCreateProposal from '@/components/GameShell/GameCreateProposal';
-import GameEditProposal from '@/components/GameShell/GameEditProposal';
 import GameHome from '@/components/GameShell/GameHome';
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
@@ -382,7 +380,7 @@ function AppRouter() {
  * theme='game') AND `/game` (which strips to `/`).
  */
 function ThemedAppContent() {
-  const { mode, theme } = useSiteTheme();
+  const { mode, theme, setTheme } = useSiteTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
@@ -401,20 +399,10 @@ function ThemedAppContent() {
     : location.pathname;
 
   const isTerminalHome = mode === 'new' && logicalPath === '/';
-  // Edit-proposal route — handles both the canonical `/vote/:id/edit` path and
-  // the legacy `/edit-proposal/:id` shape. Themes that own a bespoke editor
-  // (currently just Game) reuse this match.
-  const editProposalMatch = logicalPath.match(
-    /^(?:\/vote\/([^/]+)\/edit|\/edit-proposal\/([^/]+))$/,
-  );
   const isGameHome = theme === 'game' && logicalPath === '/';
-  const isGameCreateProposal =
-    theme === 'game' && logicalPath === '/create-proposal';
-  const isGameEditProposal = theme === 'game' && editProposalMatch != null;
-  const gameEditProposalId =
-    (editProposalMatch?.[1] || editProposalMatch?.[2]) ?? '';
   const isClassicHome = theme === 'classic' && logicalPath === '/';
   const isCatalogueHome = theme === 'catalogue' && logicalPath === '/';
+  const isBerryHome = theme === 'berry' && logicalPath === '/';
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -436,25 +424,27 @@ function ThemedAppContent() {
     navigate(nextPath, { replace: true });
   }, [logicalPath, location.search, navigate]);
 
+  // Themes only own the home page (`/`). Any other route silently switches the
+  // user to `pro` so undesigned pages don't render with broken/empty themed
+  // chrome. Skipped when the URL explicitly carries a `/<theme>/...` prefix —
+  // that's the escape hatch for finding the cool UI glitches on purpose.
+  useEffect(() => {
+    if (themePrefix) return;
+    if (logicalPath === '/') return;
+    if (theme === 'pro') return;
+    setTheme('pro');
+  }, [logicalPath, themePrefix, theme, setTheme]);
+
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
     return <TerminalFeedShell />;
   }
 
-  // Game / Classic themes get bespoke home layouts; internal routes currently
-  // fall through to the default NavBar chrome (themed via CSS vars). Berry is
-  // the exception — its desktop metaphor needs the menu bar + dock visible
-  // across all routes, so internal routes render inside its Window.
+  // Themes own the home page only. Internal routes are pro-forced by the
+  // useEffect above, so we never reach the bespoke shell branch for non-home
+  // paths in non-pro themes.
   if (isGameHome) {
     return <GameHome />;
-  }
-  // Game's bespoke proposal creator/editor — owns its own GameShell chrome,
-  // so we early-return before the default NavBar branch.
-  if (isGameCreateProposal) {
-    return <GameCreateProposal />;
-  }
-  if (isGameEditProposal) {
-    return <GameEditProposal proposalId={gameEditProposalId} />;
   }
   if (isClassicHome) {
     return <ClassicHome />;
@@ -462,9 +452,7 @@ function ThemedAppContent() {
   if (isCatalogueHome) {
     return <CatalogueHome />;
   }
-  if (theme === 'berry') {
-    // Berry is a static homepage emulation — never render real noun.wtf
-    // routes inside the desktop chrome, no matter the current path.
+  if (isBerryHome) {
     return <BerryShell />;
   }
 
