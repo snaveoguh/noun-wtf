@@ -409,6 +409,7 @@ const PRO_REQUIRED_PATH_PREFIXES: readonly string[] = [
   '/studio',
   '/traits',
   '/underground',
+  '/v2',
   '/world',
 ];
 
