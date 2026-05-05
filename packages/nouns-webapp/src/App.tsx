@@ -18,8 +18,6 @@ import DreamWindow from '@/components/DreamWindow';
 import BerryShell from '@/components/BerryShell';
 import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
 import ClassicHome from '@/components/ClassicShell/ClassicHome';
-import GameCreateProposal from '@/components/GameShell/GameCreateProposal';
-import GameEditProposal from '@/components/GameShell/GameEditProposal';
 import GameHome from '@/components/GameShell/GameHome';
 import { Footer } from '@/components/Footer';
 import NavBar from '@/components/NavBar';
@@ -381,38 +379,6 @@ function AppRouter() {
  * — so a hard-coded check like `logicalPath === '/'` matches both `/` (when
  * theme='game') AND `/game` (which strips to `/`).
  */
-/**
- * Routes whose pages aren't visually designed for non-pro themes. Hitting one
- * of these from any other theme silently switches the user to `pro` so the
- * page doesn't render with broken/empty themed chrome. The user can still
- * switch themes manually after landing — that's how you find the cool UI
- * glitches on undesigned pages — but the default click-through experience is
- * a sane render.
- *
- * NOTE: do NOT add routes that have theme-specific bespoke handlers (e.g.
- * `/create-proposal` is intercepted by `isGameCreateProposal` for the game
- * theme — pro-forcing it would make the game's bespoke editor unreachable).
- * Add new prefixes here as more pages get flagged.
- */
-const PRO_REQUIRED_PATH_PREFIXES: readonly string[] = [
-  '/create-candidate',
-  '/dashboard',
-  '/feed',
-  '/gas',
-  '/grants',
-  '/hackathons',
-  '/marketplace',
-  '/nonsense',
-  '/predictions',
-  '/settlers',
-  '/stats',
-  '/studio',
-  '/traits',
-  '/underground',
-  '/v2',
-  '/world',
-];
-
 function ThemedAppContent() {
   const { mode, theme, setTheme } = useSiteTheme();
   const location = useLocation();
@@ -433,20 +399,10 @@ function ThemedAppContent() {
     : location.pathname;
 
   const isTerminalHome = mode === 'new' && logicalPath === '/';
-  // Edit-proposal route — handles both the canonical `/vote/:id/edit` path and
-  // the legacy `/edit-proposal/:id` shape. Themes that own a bespoke editor
-  // (currently just Game) reuse this match.
-  const editProposalMatch = logicalPath.match(
-    /^(?:\/vote\/([^/]+)\/edit|\/edit-proposal\/([^/]+))$/,
-  );
   const isGameHome = theme === 'game' && logicalPath === '/';
-  const isGameCreateProposal =
-    theme === 'game' && logicalPath === '/create-proposal';
-  const isGameEditProposal = theme === 'game' && editProposalMatch != null;
-  const gameEditProposalId =
-    (editProposalMatch?.[1] || editProposalMatch?.[2]) ?? '';
   const isClassicHome = theme === 'classic' && logicalPath === '/';
   const isCatalogueHome = theme === 'catalogue' && logicalPath === '/';
+  const isBerryHome = theme === 'berry' && logicalPath === '/';
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -468,17 +424,15 @@ function ThemedAppContent() {
     navigate(nextPath, { replace: true });
   }, [logicalPath, location.search, navigate]);
 
-  // Force pro on undesigned routes (see PRO_REQUIRED_PATH_PREFIXES). Skipped
-  // when the user explicitly asked for a theme via `/<theme>/...` prefix —
-  // that's the escape hatch for finding the cool UI glitches.
+  // Themes only own the home page (`/`). Any other route silently switches the
+  // user to `pro` so undesigned pages don't render with broken/empty themed
+  // chrome. Skipped when the URL explicitly carries a `/<theme>/...` prefix —
+  // that's the escape hatch for finding the cool UI glitches on purpose.
   useEffect(() => {
     if (themePrefix) return;
-    const requiresPro = PRO_REQUIRED_PATH_PREFIXES.some(
-      p => logicalPath === p || logicalPath.startsWith(`${p}/`),
-    );
-    if (requiresPro && theme !== 'pro') {
-      setTheme('pro');
-    }
+    if (logicalPath === '/') return;
+    if (theme === 'pro') return;
+    setTheme('pro');
   }, [logicalPath, themePrefix, theme, setTheme]);
 
   // Terminal mode on root — render only the terminal feed, nothing else
@@ -486,20 +440,11 @@ function ThemedAppContent() {
     return <TerminalFeedShell />;
   }
 
-  // Game / Classic themes get bespoke home layouts; internal routes currently
-  // fall through to the default NavBar chrome (themed via CSS vars). Berry is
-  // the exception — its desktop metaphor needs the menu bar + dock visible
-  // across all routes, so internal routes render inside its Window.
+  // Themes own the home page only. Internal routes are pro-forced by the
+  // useEffect above, so we never reach the bespoke shell branch for non-home
+  // paths in non-pro themes.
   if (isGameHome) {
     return <GameHome />;
-  }
-  // Game's bespoke proposal creator/editor — owns its own GameShell chrome,
-  // so we early-return before the default NavBar branch.
-  if (isGameCreateProposal) {
-    return <GameCreateProposal />;
-  }
-  if (isGameEditProposal) {
-    return <GameEditProposal proposalId={gameEditProposalId} />;
   }
   if (isClassicHome) {
     return <ClassicHome />;
@@ -507,9 +452,7 @@ function ThemedAppContent() {
   if (isCatalogueHome) {
     return <CatalogueHome />;
   }
-  if (theme === 'berry') {
-    // Berry is a static homepage emulation — never render real noun.wtf
-    // routes inside the desktop chrome, no matter the current path.
+  if (isBerryHome) {
     return <BerryShell />;
   }
 
