@@ -32,6 +32,8 @@ import '@/index.css';
 import '@/miniapps';
 
 import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
+import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
+import { MiniWindowHost } from '@/components/MiniWindow';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -610,12 +612,20 @@ function App() {
     dispatch(setActiveAccount(account));
   }, [account, dispatch]);
 
+  // Expose proposal-draft entrypoint for NounIRL + dev console invocation.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as unknown as { __openProposalDraft: typeof openProposalDraft }).__openProposalDraft =
+      openProposalDraft;
+  }, []);
+
   return (
     <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
       {chainId !== undefined && Number(CHAIN_ID) !== chainId && <NetworkAlert />}
       <BrowserRouter>
         <AppRouter />
       </BrowserRouter>
+      <MiniWindowHost />
     </div>
   );
 }
