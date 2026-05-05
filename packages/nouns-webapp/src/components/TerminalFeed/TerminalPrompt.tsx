@@ -6,6 +6,10 @@ import { ConnectKitButton } from 'connectkit';
 import { useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
+import {
+  openProposalDraft,
+  type ProposalDraftPrefill,
+} from '@/components/GameShell/openProposalDraft';
 import useActiveDao from '@/hooks/useActiveDao';
 
 import { normalizeTerminalErrorMessage } from './errorMessages';
@@ -75,6 +79,47 @@ function pathnameToNounId(pathname: string): number | null {
   if (!m) return null;
   const n = Number.parseInt(m[1], 10);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Detect when the user is asking to open the proposal draft window. Two
+ * shapes match:
+ *   1. Short triggers — "draft proposal", "/prop", "give me a proposal window"
+ *      → open an empty draft.
+ *   2. Long pasted proposal-shaped markdown — starts with `# title` and/or
+ *      contains a `## Summary` / `## Specification` heading → open with the
+ *      pasted text loaded into the body and (when present) the H1 lifted out
+ *      as the title.
+ *
+ * Returns a prefill payload to open with, or `null` to fall through to the
+ * normal chat flow.
+ */
+function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const lc = trimmed.toLowerCase();
+
+  const triggerPatterns: readonly RegExp[] = [
+    /^\/(?:draft|prop|proposal)\b/,
+    /^(?:give me|open|show)\s+(?:a |the )?(?:proposal|prop)(?:\s+(?:window|builder|draft))?\s*\.?$/,
+    /^(?:draft|create|new|start)\s+(?:a |the )?(?:proposal|prop)\s*\.?$/,
+    /^proposal\s+(?:window|builder|draft)\s*\.?$/,
+  ];
+  if (triggerPatterns.some(re => re.test(lc))) {
+    return {};
+  }
+
+  // Treat long markdown-shaped pastes as a proposal draft.
+  const looksLikeProposalMarkdown =
+    trimmed.length > 120 &&
+    (/^#\s+\S/.test(trimmed) ||
+      /##\s+(?:summary|specification|rationale|proposal action|risks?)\b/i.test(trimmed));
+  if (!looksLikeProposalMarkdown) return null;
+
+  const h1Match = trimmed.match(/^#\s+(.+?)\s*$/m);
+  const title = h1Match?.[1]?.trim();
+  const body = title ? trimmed.replace(/^#\s+.+?\n+/, '') : trimmed;
+  return title ? { title, body } : { body };
 }
 
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
@@ -180,6 +225,26 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
       setRequiresWallet(false);
 
       const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
+
+      // Short-circuit: if the user typed a draft-proposal trigger or pasted
+      // proposal-shaped markdown, open the draft window directly without a
+      // round-trip through the agent backend. Faster feedback + saves tokens.
+      const draftIntent = detectProposalDraftIntent(text);
+      if (draftIntent) {
+        openProposalDraft(draftIntent);
+        const confirmation: ChatMessage = {
+          role: 'assistant',
+          content: draftIntent.title
+            ? `opened a draft window with "${draftIntent.title}". add your action(s) and submit when ready.`
+            : 'opened a draft window. paste your prop text or use the editor + add actions, then submit.',
+          timestamp: Date.now(),
+        };
+        onNewMessages(userMsg, confirmation);
+        setResponse(confirmation.content);
+        setIsLoading(false);
+        return;
+      }
+
       // Build API history from last 10 messages
       const apiHistory = [...history, userMsg]
         .slice(-10)
@@ -221,7 +286,11 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           throw new Error(errText);
         }
 
-        const data = (await res.json()) as { action?: GovernanceAction; response?: string };
+        const data = (await res.json()) as {
+          action?: GovernanceAction;
+          response?: string;
+          proposalDraft?: ProposalDraftPrefill;
+        };
         const responseText = data.response ?? '';
         const assistantMsg: ChatMessage = {
           role: 'assistant',
@@ -230,6 +299,14 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         };
         onNewMessages(userMsg, assistantMsg);
         setResponse(responseText);
+
+        // Backend-driven draft hook: NounIRL can return a structured
+        // `proposalDraft` payload (extracted txs / title / body) which opens
+        // the draft window automatically. Same entry point as the local
+        // intent detector above.
+        if (data.proposalDraft) {
+          openProposalDraft(data.proposalDraft);
+        }
 
         // Check for governance action
         if (data.action !== undefined && data.action.type !== undefined) {
