@@ -1,4 +1,18 @@
 # Return proper 404 for missing static assets (prevents serving index.html as JS)
 /assets/*  /404.html  404
+
+# Route /vote/:id and /candidates/:id to the og-proposal function so
+# share-link crawlers (Twitter/Slack/Discord/Farcaster/etc.) see the
+# SPA shell with og:image / og:title / og:description spliced in.
+# The function returns the same /index.html the SPA would serve PLUS
+# the meta tags, so real browsers also work — they just take a Lambda
+# round-trip instead of static. Cache-Control is set to s-maxage=300
+# inside the function so most repeat visits hit the CDN.
+# Netlify _redirects User-Agent conditions don't actually filter (they
+# only run on Pro+ plans for some condition types), so we route every
+# request to the function and let it serve everyone.
+/vote/:id        /.netlify/functions/og-proposal  200
+/candidates/:id  /.netlify/functions/og-proposal  200
+
 # SPA fallback for client-side routing
 /*    /index.html   200
