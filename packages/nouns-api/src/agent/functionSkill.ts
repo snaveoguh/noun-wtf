@@ -276,7 +276,7 @@ export function detectFunction(rawMessage: string): DetectResult | null {
   );
   if (leaveFeedbackMatch) {
     const id = leaveFeedbackMatch[1];
-    const reason = leaveFeedbackMatch[2];
+    const reason = leaveFeedbackMatch[2] ?? '';
     return {
       canonical: `leave feedback on prop ${id} ${reason.trim()}`,
       function: byName('proposalFeedback'),
@@ -290,7 +290,7 @@ export function detectFunction(rawMessage: string): DetectResult | null {
   );
   if (feedbackCandMatch) {
     const support = feedbackCandMatch[1];
-    const keyword = feedbackCandMatch[2];
+    const keyword = feedbackCandMatch[2] ?? '';
     return {
       canonical: `feedback ${support} candidate ${keyword.trim()}`,
       function: byName('candidateFeedback'),
@@ -303,7 +303,7 @@ export function detectFunction(rawMessage: string): DetectResult | null {
     /\bsponsor\s+(?:the\s+)?(?:candidate\s+)?(.+?)(?:\s+candidate)?$/,
   );
   if (sponsorMatch && /\bsponsor\b/.test(lower)) {
-    const keyword = sponsorMatch[1]
+    const keyword = (sponsorMatch[1] ?? '')
       .replace(/\bcandidate\b/g, '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -320,7 +320,7 @@ export function detectFunction(rawMessage: string): DetectResult | null {
     /\bpromote\s+(?:the\s+)?(?:candidate\s+)?(.+?)(?:\s+candidate)?(?:\s+to\s+(?:a\s+)?prop)?$/,
   );
   if (promoteMatch && /\bpromote\b/.test(lower)) {
-    const keyword = promoteMatch[1]
+    const keyword = (promoteMatch[1] ?? '')
       .replace(/\bcandidate\b/g, '')
       .replace(/\bto a prop\b|\bto prop\b/g, '')
       .replace(/\s+/g, ' ')
@@ -340,8 +340,8 @@ export function detectFunction(rawMessage: string): DetectResult | null {
     /^(?:create\s+(?:candidate|proposal)|propose)\s*:\s*(.+?)\s*-\s*(.+)$/i,
   );
   if (origCreate) {
-    const title = origCreate[1].trim();
-    const desc = origCreate[2].trim();
+    const title = (origCreate[1] ?? '').trim();
+    const desc = (origCreate[2] ?? '').trim();
     return {
       canonical: `create candidate: ${title} - ${desc}`,
       function: byName('createCandidate'),
