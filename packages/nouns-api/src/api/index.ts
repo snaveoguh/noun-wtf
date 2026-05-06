@@ -902,8 +902,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   );
   if (candidateMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to create a candidate.' };
-    const title = candidateMatch[1].trim();
-    const description = candidateMatch[2].trim();
+    const title = (candidateMatch[1] ?? '').trim();
+    const description = (candidateMatch[2] ?? '').trim();
     const action = { type: 'CANDIDATE', title, description };
     return {
       handled: true,
@@ -916,7 +916,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   const sponsorMatch = m.match(/^sponsor\s+(?:candidate\s+)?(.+)$/);
   if (sponsorMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to sponsor.' };
-    const keyword = sponsorMatch[1].trim();
+    const keyword = (sponsorMatch[1] ?? '').trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
       const c = matches[0];
@@ -940,7 +940,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   const promoteMatch = m.match(/^promote\s+(?:candidate\s+)?(.+)$/);
   if (promoteMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to promote.' };
-    const keyword = promoteMatch[1].trim();
+    const keyword = (promoteMatch[1] ?? '').trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
       const c = matches[0];
@@ -991,7 +991,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (feedbackCandMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to give feedback.' };
     const support = feedbackCandMatch[1] === 'for' ? 1 : 0;
-    const keyword = feedbackCandMatch[2].trim();
+    const keyword = (feedbackCandMatch[2] ?? '').trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
       const c = matches[0];
@@ -1014,7 +1014,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   // ─── Show Candidate ───────────────────────────────────────
   const showCandMatch = m.match(/^(?:show|lookup|info)\s+candidate\s+(.+)$/);
   if (showCandMatch) {
-    const keyword = showCandMatch[1].trim();
+    const keyword = (showCandMatch[1] ?? '').trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1, includeCanceled: true });
       const c = matches[0];
@@ -1118,8 +1118,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   const grantMatch = raw.match(/^create\s+grant:\s*(.+?)\s*-\s*(.+)$/i);
   if (grantMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to create a grant.' };
-    const title = grantMatch[1].trim();
-    const description = grantMatch[2].trim();
+    const title = (grantMatch[1] ?? '').trim();
+    const description = (grantMatch[2] ?? '').trim();
     const action = { type: 'GRANT_PROPOSAL', title, description };
     return {
       handled: true,
@@ -2759,10 +2759,11 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, String(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const row0 = rows[0];
+                  if (!row0) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
-                    const descText = (rows[0].description ?? '').toString();
+                    const descText = (row0.description ?? '').toString();
                     const title =
                       descText
                         .split('\n')[0]
@@ -4571,7 +4572,7 @@ app.get('/api/treasury/flows', async c => {
         ensName,
         ensAvatar: ensName ? `https://metadata.ens.domains/mainnet/avatar/${ensName}` : null,
         nounIds: ownedNouns.map(n => n.id),
-        firstNounSeed: ownedNouns.length > 0 ? ownedNouns[0].seed : null,
+        firstNounSeed: ownedNouns[0]?.seed ?? null,
         delegatedVotes: delegatedVotesMap.get(addr) ?? 0,
       });
 
@@ -5768,7 +5769,7 @@ app.get('/api/og/proposal/:id', async c => {
         for (let y = 0; y < ascii.height; y++) {
           let line = '';
           for (let x = 0; x < ascii.width; x++) {
-            line += ascii.pixels[y * ascii.width + x].ch;
+            line += ascii.pixels[y * ascii.width + x]?.ch ?? '';
           }
           asciiLines.push(line);
         }
