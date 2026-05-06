@@ -1,4 +1,34 @@
 # Return proper 404 for missing static assets (prevents serving index.html as JS)
 /assets/*  /404.html  404
+
+# Route share-link crawlers (Twitter, Slack, Facebook, Discord, Farcaster,
+# WhatsApp, iMessage, LinkedIn, Telegram, Mastodon, etc.) to the
+# og-proposal function so they get an HTML response with og:image filled
+# in from the proposal body. Real browsers fall through to the SPA.
+# Multi-condition match: any UA whose name contains "bot" / one of the
+# specific crawler signatures gets the function instead of the static
+# shell. The 200! force is required to override Netlify's normal
+# precedence rules and serve the function instead of index.html.
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*Twitterbot*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*Slackbot*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*facebookexternalhit*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*Discordbot*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*WhatsApp*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*TelegramBot*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*LinkedInBot*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*Mastodon*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*farcaster*
+/vote/:id        /.netlify/functions/og-proposal  200!  User-Agent=*Warpcast*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*Twitterbot*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*Slackbot*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*facebookexternalhit*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*Discordbot*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*WhatsApp*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*TelegramBot*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*LinkedInBot*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*Mastodon*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*farcaster*
+/candidates/:id  /.netlify/functions/og-proposal  200!  User-Agent=*Warpcast*
+
 # SPA fallback for client-side routing
 /*    /index.html   200
