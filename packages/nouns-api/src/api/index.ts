@@ -3821,9 +3821,9 @@ app.get('/api/feed/:channel', async c => {
       return c.json({ error: `Neynar API error: ${res.status}` }, 502);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as unknown;
     feedCaches.set(channel, { data, fetchedAt: Date.now() });
-    return c.json(data);
+    return c.json(data as Record<string, unknown>);
   } catch (err) {
     console.error(`Feed fetch error (/${channel}):`, err);
     return c.json({ error: 'Failed to fetch feed' }, 500);
@@ -3846,7 +3846,7 @@ app.get('/api/sketch/latest', async c => {
 
   // Return cached if fresh
   if (sketchCache && Date.now() - sketchCache.fetchedAt < SKETCH_CACHE_TTL) {
-    return c.json(sketchCache.data);
+    return c.json(sketchCache.data as Record<string, unknown>);
   }
 
   try {
@@ -3864,7 +3864,7 @@ app.get('/api/sketch/latest', async c => {
       return c.json({ nounId: 0 });
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as { casts?: unknown[] };
     const casts = data?.casts ?? [];
 
     // Find the most recent cast with an image embed and a noun number
@@ -4249,7 +4249,7 @@ const TREASURY_FLOW_CACHE_TTL = 30 * 60_000;
 
 app.get('/api/treasury/flows', async c => {
   if (treasuryFlowCache && Date.now() - treasuryFlowCache.fetchedAt < TREASURY_FLOW_CACHE_TTL) {
-    return c.json(treasuryFlowCache.data);
+    return c.json(treasuryFlowCache.data as Record<string, unknown>);
   }
 
   try {
@@ -4276,6 +4276,7 @@ app.get('/api/treasury/flows', async c => {
       proposalId: bigint | null;
       status: string;
       streamAddress: string;
+      createdAt: Date;
     }[] = [];
     try {
       allStreams = (await db.select().from(schema.stream)) as typeof allStreams;
@@ -4440,7 +4441,7 @@ app.get('/api/treasury/flows', async c => {
       createdAt: number;
     }[] = [];
     try {
-      allNouns = (await db.select().from(schema.noun)) as typeof allNouns;
+      allNouns = (await db.select().from(schema.noun)) as unknown as typeof allNouns;
     } catch {
       /* noun table may not exist yet */
     }
@@ -5288,7 +5289,7 @@ app.get('/api/activity', async c => {
     activityFeedCache?.key === cacheKey &&
     Date.now() - activityFeedCache.fetchedAt < ACTIVITY_FEED_TTL
   ) {
-    return c.json(activityFeedCache.data);
+    return c.json(activityFeedCache.data as Record<string, unknown>);
   }
 
   try {
