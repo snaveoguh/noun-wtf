@@ -73,6 +73,7 @@ import { createPublicClient, http } from 'viem';
 import { mainnet } from 'viem/chains';
 
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
+import type { NounSeed } from '../agent/traitPredictor.js';
 import {
   initAgent,
   reservationStore,
@@ -518,8 +519,9 @@ async function findCandidates(
     // Single token: check if it appears anywhere
     else if (kwTokens.length === 1) {
       const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
-      if (haystack.includes(kwTokens[0])) {
-        score = slugNorm.includes(kwTokens[0]) ? 30 : (titleNorm.includes(kwTokens[0]) ? 25 : 15);
+      const tok = kwTokens[0] ?? '';
+      if (haystack.includes(tok)) {
+        score = slugNorm.includes(tok) ? 30 : (titleNorm.includes(tok) ? 25 : 15);
       }
     }
 
@@ -590,7 +592,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     /^(?:list|show)\s+traits?\s+(background|body|accessory|head|glasses)$/,
   );
   if (traitsMatch) {
-    const category = traitsMatch[1];
+    const category = traitsMatch[1] as keyof NounSeed;
     const traits = getAllTraitNames(category);
     return {
       handled: true,
@@ -688,7 +690,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     let support = 2; // ABSTAIN
     if (voteMatch[1] === 'for') support = 1;
     else if (voteMatch[1] === 'against') support = 0;
-    const proposalId = parseInt(voteMatch[2]);
+    const proposalId = parseInt(voteMatch[2] ?? '0');
     const reason = voteMatch[3]?.trim();
     try {
       const rows = await db
@@ -756,14 +758,14 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     let reason: string | undefined;
     if (feedbackPropMatch) {
       support = feedbackPropMatch[1] === 'for' ? 1 : 0;
-      proposalId = parseInt(feedbackPropMatch[2]);
+      proposalId = parseInt(feedbackPropMatch[2] ?? '0');
       reason = feedbackPropMatch[3]?.trim();
     } else if (leaveFeedbackMatch) {
-      proposalId = parseInt(leaveFeedbackMatch[1]);
+      proposalId = parseInt(leaveFeedbackMatch[1] ?? '0');
       reason = leaveFeedbackMatch[2]?.trim().replace(/^["']|["']$/g, '');
     } else {
       reason = leaveFeedbackAlt![1]?.trim();
-      proposalId = parseInt(leaveFeedbackAlt![2]);
+      proposalId = parseInt(leaveFeedbackAlt![2] ?? '0');
     }
     try {
       const rows = await db
@@ -796,7 +798,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   // ─── Show Proposal ────────────────────────────────────────
   const showPropMatch = m.match(/^(?:show|lookup|info|prop(?:osal)?)\s*#?(\d+)$/);
   if (showPropMatch) {
-    const proposalId = parseInt(showPropMatch[1]);
+    const proposalId = parseInt(showPropMatch[1] ?? '0');
     try {
       const rows = await db
         .select()
@@ -870,7 +872,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   const execPropMatch = m.match(/^execute\s+(?:prop(?:osal)?\s*)?#?(\d+)$/);
   if (execPropMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to execute.' };
-    const proposalId = parseInt(execPropMatch[1]);
+    const proposalId = parseInt(execPropMatch[1] ?? '0');
     const action = { type: 'EXECUTE_PROPOSAL', proposalId };
     return {
       handled: true,
@@ -1042,7 +1044,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   if (grantVoteMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to vote on grants.' };
     const support = grantVoteMatch[1] === 'for' ? 1 : 0;
-    const grantId = parseInt(grantVoteMatch[2]);
+    const grantId = parseInt(grantVoteMatch[2] ?? '0');
     const reason = grantVoteMatch[3]?.trim();
     const action = { type: 'GRANT_VOTE', grantId, support, reason };
     return {
@@ -1055,7 +1057,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   // ─── Show Grant ───────────────────────────────────────────
   const showGrantMatch = m.match(/^(?:show|lookup|info)\s+grant\s*#?(\d+)$/);
   if (showGrantMatch) {
-    const grantId = parseInt(showGrantMatch[1]);
+    const grantId = parseInt(showGrantMatch[1] ?? '0');
     try {
       const rows = await db
         .select()
@@ -1132,7 +1134,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   const execGrantMatch = m.match(/^execute\s+grant\s*#?(\d+)$/);
   if (execGrantMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to execute.' };
-    const grantId = parseInt(execGrantMatch[1]);
+    const grantId = parseInt(execGrantMatch[1] ?? '0');
     const action = { type: 'EXECUTE_GRANT', grantId };
     return {
       handled: true,
@@ -3864,7 +3866,13 @@ app.get('/api/sketch/latest', async c => {
       return c.json({ nounId: 0 });
     }
 
-    const data = (await res.json()) as { casts?: unknown[] };
+    type Cast = {
+      timestamp: string;
+      text?: string;
+      hash?: string;
+      embeds?: { url: string; metadata?: { image?: unknown; content_type?: string } }[];
+    };
+    const data = (await res.json()) as { casts?: Cast[] };
     const casts = data?.casts ?? [];
 
     // Find the most recent cast with an image embed and a noun number
@@ -3890,7 +3898,7 @@ app.get('/api/sketch/latest', async c => {
       if (!gifUrl) continue;
 
       const result = {
-        nounId: parseInt(numMatch[1], 10),
+        nounId: parseInt(numMatch[1] ?? '0', 10),
         gifUrl,
         artist: 'pip',
         mintPrice: '0.01',
@@ -5794,7 +5802,7 @@ app.get('/api/og/proposal/:id', async c => {
       const startY = PAD + 72;
       const maxLines = Math.min(asciiLines.length, Math.floor((H - startY - PAD) / LINE_H));
       for (let i = 0; i < maxLines; i++) {
-        svgContent += `<text x="${PAD}" y="${startY + i * LINE_H}" fill="#888888" font-family="monospace" font-size="10">${escapeXml(asciiLines[i])}</text>`;
+        svgContent += `<text x="${PAD}" y="${startY + i * LINE_H}" fill="#888888" font-family="monospace" font-size="10">${escapeXml(asciiLines[i] ?? '')}</text>`;
       }
     } else {
       svgContent += `<text x="${PAD}" y="${PAD + 80}" fill="#444" font-family="monospace" font-size="14">⌐◨-◨</text>`;
