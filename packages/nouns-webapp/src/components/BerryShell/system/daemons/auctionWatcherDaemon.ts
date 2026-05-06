@@ -10,17 +10,12 @@
  * Subscribing to Redux instead of trying to set up our own contract watchers
  * means zero duplication: we piggyback on the same single source of truth
  * the rest of the webapp uses, and we don't need RPC budget for our own
- * subscriptions.
- *
- * Requests `network` permission on start (informational — Redux is already
- * populated, but if a downstream consumer wants to know the daemon needs
- * network it shows up correctly in the permissions panel).
+ * subscriptions — and crucially, no network capability of our own.
  */
 
 import { store } from '@/store';
 
 import { extendedBus } from '../extendedBus';
-import { hasPermission, requestPermission } from '../permissions';
 import type { BerryService } from '../services';
 
 const APP_ID = 'auction-watcher';
@@ -47,7 +42,6 @@ function readSnapshot(): SnapshotShape | undefined {
 }
 
 function diffAndEmit(prev: SnapshotShape | undefined, next: SnapshotShape): void {
-  if (!hasPermission(APP_ID, 'network')) return;
   if (!next.nounId) return;
 
   // New auction or new high bid → bid event. We treat amount changes as bids,
@@ -86,8 +80,6 @@ export const auctionWatcherDaemon: BerryService = {
     'Watches the active Nouns auction and emits auction:newBid / auction:settled events.',
 
   async start() {
-    await requestPermission(APP_ID, 'network');
-
     if (unsubscribe) return;
     // Prime the snapshot but don't emit on initial load — apps that want
     // current state can read serviceManager.get('auction-watcher') or pull
