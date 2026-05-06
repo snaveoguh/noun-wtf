@@ -90,7 +90,7 @@ export const metricsMiddleware: MiddlewareHandler = async (c, next) => {
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   const idx = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, idx)];
+  return sorted[Math.max(0, idx)] ?? 0;
 }
 
 export function getMetrics(windowMinutes = 60): AggregatedMetrics {
@@ -127,7 +127,7 @@ export function getMetrics(windowMinutes = 60): AggregatedMetrics {
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 15)
     .map(([key, v]) => {
-      const [method, ...rest] = key.split(' ');
+      const [method = '', ...rest] = key.split(' ');
       return {
         path: rest.join(' '),
         method,
