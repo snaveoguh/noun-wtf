@@ -3131,10 +3131,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.auction)
                     .where(eq(schema.auction.nounId, String(input.nounId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const auction = rows[0];
+                  if (!auction) {
                     result = { error: `Auction for Noun ${input.nounId} not found in index.` };
                   } else {
-                    const auction = rows[0];
                     if (auction.settled) {
                       result = {
                         error: `Auction for Noun ${input.nounId} has already been settled.`,
@@ -3180,10 +3180,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.candidate)
                     .where(eq(schema.candidate.slug, input.slug))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const c = rows[0];
+                  if (!c) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
-                    const c = rows[0];
                     if (c.canceled) {
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
@@ -3327,10 +3327,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.grant)
                     .where(eq(schema.grant.id, String(input.grantId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const g = rows[0];
+                  if (!g) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
-                    const g = rows[0];
                     if (g.status !== 'ACTIVE') {
                       result = {
                         error: `Grant #${input.grantId} is "${g.status}" — can only vote on Active grants.`,
@@ -3425,10 +3425,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const p = rows[0];
+                  if (!p) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
-                    const p = rows[0];
                     const currentBlock = await getCurrentBlock();
                     const derived = computeDerivedStatus(
                       p as Parameters<typeof computeDerivedStatus>[0],
@@ -3480,10 +3480,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.grant)
                     .where(eq(schema.grant.id, BigInt(input.grantId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const g = rows[0];
+                  if (!g) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
-                    const g = rows[0];
                     // For grants, check if voting passed — status should still be ACTIVE but votes have passed
                     // In practice the indexer may or may not have a derived status helper for grants
                     // We'll check that it's not already QUEUED/EXECUTED/CANCELLED
@@ -3535,10 +3535,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const p = rows[0];
+                  if (!p) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
-                    const p = rows[0];
                     if (p.status !== 'QUEUED') {
                       result = {
                         error: `Proposal #${input.proposalId} is "${p.status}" — can only execute QUEUED proposals.`,
@@ -3600,10 +3600,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.grant)
                     .where(eq(schema.grant.id, BigInt(input.grantId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const g = rows[0];
+                  if (!g) {
                     result = { error: `Grant #${input.grantId} not found.` };
                   } else {
-                    const g = rows[0];
                     if (g.status !== 'QUEUED') {
                       result = {
                         error: `Grant #${input.grantId} is "${g.status}" — can only execute QUEUED grants.`,
@@ -5691,9 +5691,9 @@ async function imageToAscii(
     const numChars = ASCII_CHARS.length;
 
     for (let i = 0; i < info.width * info.height; i++) {
-      const r = raw[i * 3];
-      const g = raw[i * 3 + 1];
-      const b = raw[i * 3 + 2];
+      const r = raw[i * 3] ?? 0;
+      const g = raw[i * 3 + 1] ?? 0;
+      const b = raw[i * 3 + 2] ?? 0;
       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       const charIdx = Math.min(numChars - 1, Math.floor(luminance * numChars));
       pixels.push({ ch: ASCII_CHARS[charIdx], r, g, b });
@@ -5748,9 +5748,9 @@ app.get('/api/og/proposal/:id', async c => {
       .from(schema.proposal)
       .where(eq(schema.proposal.id, BigInt(proposalId)))
       .limit(1);
-    if (proposals.length === 0) return c.json({ error: 'not found' }, 404);
-
     const proposal = proposals[0];
+    if (!proposal) return c.json({ error: 'not found' }, 404);
+
     const descText = (proposal.description || '') as string;
     const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 80);
 
