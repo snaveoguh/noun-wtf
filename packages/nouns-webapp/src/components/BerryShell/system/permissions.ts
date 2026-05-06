@@ -142,6 +142,7 @@ const TRUSTED_APP_IDS: ReadonlyArray<string> = [
   'auction',
   'vote',
   'candidates',
+  'wallet',
 ];
 
 function isTrusted(appId: string): boolean {

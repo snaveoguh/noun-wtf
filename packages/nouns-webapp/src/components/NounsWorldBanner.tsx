@@ -91,7 +91,7 @@ export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
   {
     title: 'Mucho Love: Real-World Action',
     image:
-      'https://explore.nouns.world/wp-content/uploads/2025/04/pizza-dao-banner-1024x576.png',
+      'https://explore.nouns.world/wp-content/uploads/2025/06/mucho-love-group-banner-1024x572.png',
     url: 'https://explore.nouns.world/mucho-love-turning-nounish-values-into-real-world-action/',
     description:
       'Nouns backed Mucho, a Nounish experiment rooted in community service that has grown into a movement — from hospital visits and art workshops to medical missions, clothing drives, and viral storytelling.',
