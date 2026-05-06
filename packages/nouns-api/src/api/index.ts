@@ -696,9 +696,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         .from(schema.proposal)
         .where(eq(schema.proposal.id, String(proposalId)))
         .limit(1);
-      if (rows.length === 0)
-        return { handled: true, response: `Proposal #${proposalId} not found.` };
       const p = rows[0];
+      if (!p) return { handled: true, response: `Proposal #${proposalId} not found.` };
       const isFinal =
         p.status === 'CANCELLED' ||
         p.status === 'VETOED' ||
@@ -772,9 +771,9 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         .from(schema.proposal)
         .where(eq(schema.proposal.id, String(proposalId)))
         .limit(1);
-      if (rows.length === 0)
-        return { handled: true, response: `Proposal #${proposalId} not found.` };
-      const descText = (rows[0].description ?? '').toString();
+      const row = rows[0];
+      if (!row) return { handled: true, response: `Proposal #${proposalId} not found.` };
+      const descText = (row.description ?? '').toString();
       const title =
         descText
           .split('\n')[0]
@@ -804,9 +803,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         .from(schema.proposal)
         .where(eq(schema.proposal.id, String(proposalId)))
         .limit(1);
-      if (rows.length === 0)
-        return { handled: true, response: `Proposal #${proposalId} not found.` };
       const p = rows[0];
+      if (!p) return { handled: true, response: `Proposal #${proposalId} not found.` };
       const descText = (p.description ?? '').toString();
       const title =
         descText
@@ -921,9 +919,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const keyword = sponsorMatch[1].trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
-      if (matches.length === 0)
-        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      if (!c) return { handled: true, response: `No candidate found matching "${keyword}".` };
       const title = candidateTitle(c);
       const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
       return {
@@ -946,9 +943,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const keyword = promoteMatch[1].trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
-      if (matches.length === 0)
-        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      if (!c) return { handled: true, response: `No candidate found matching "${keyword}".` };
       const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
 
@@ -998,9 +994,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const keyword = feedbackCandMatch[2].trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1 });
-      if (matches.length === 0)
-        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      if (!c) return { handled: true, response: `No candidate found matching "${keyword}".` };
       const title = candidateTitle(c);
       const action = { type: 'CANDIDATE_FEEDBACK', proposer: c.proposer, slug: c.slug, support };
       return {
@@ -1022,9 +1017,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     const keyword = showCandMatch[1].trim();
     try {
       const matches = await findCandidates(keyword, { limit: 1, includeCanceled: true });
-      if (matches.length === 0)
-        return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
+      if (!c) return { handled: true, response: `No candidate found matching "${keyword}".` };
       const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
       return {
@@ -1068,8 +1062,8 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         .from(schema.grant)
         .where(eq(schema.grant.id, String(grantId)))
         .limit(1);
-      if (rows.length === 0) return { handled: true, response: `Grant #${grantId} not found.` };
       const g = rows[0];
+      if (!g) return { handled: true, response: `Grant #${grantId} not found.` };
       const descText = (g.description ?? '').toString();
       const title =
         descText
@@ -2541,10 +2535,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, String(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const p = rows[0];
+                  if (!p) {
                     result = { error: `Proposal #${input.proposalId} not found in index.` };
                   } else {
-                    const p = rows[0];
                     const descText = (p.description ?? '').toString();
                     const title =
                       descText
@@ -2629,10 +2623,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.candidate)
                     .where(eq(schema.candidate.slug, input.slug))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const c = rows[0];
+                  if (!c) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
-                    const c = rows[0];
                     const descText = (c.description ?? '').toString();
                     const title =
                       descText
@@ -2686,10 +2680,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, String(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const p = rows[0];
+                  if (!p) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
-                    const p = rows[0];
                     // Check votability using block timing instead of DB status,
                     // because the indexer may not have a handler that sets ACTIVE status.
                     // A proposal is votable if: cancelled/vetoed/executed = false, and current block is within voting window.
@@ -2815,10 +2809,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.candidate)
                     .where(eq(schema.candidate.slug, input.slug))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const c = rows[0];
+                  if (!c) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
-                    const c = rows[0];
                     const descText = (c.description ?? '').toString();
                     const title =
                       descText
@@ -2928,10 +2922,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.candidate)
                     .where(eq(schema.candidate.slug, input.slug))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const c = rows[0];
+                  if (!c) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
-                    const c = rows[0];
                     if (c.canceled) {
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else if ((c.proposer as string).toLowerCase() !== wallet.toLowerCase()) {
@@ -2997,10 +2991,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.proposal)
                     .where(eq(schema.proposal.id, String(input.proposalId)))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const p = rows[0];
+                  if (!p) {
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
-                    const p = rows[0];
                     if ((p.proposer as string).toLowerCase() !== wallet.toLowerCase()) {
                       result = {
                         error: `Only the original proposer can update this proposal. Connected wallet doesn't match.`,
@@ -3076,10 +3070,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     .from(schema.candidate)
                     .where(eq(schema.candidate.slug, input.slug))
                     .limit(1);
-                  if (rows.length === 0) {
+                  const c = rows[0];
+                  if (!c) {
                     result = { error: `Candidate "${input.slug}" not found.` };
                   } else {
-                    const c = rows[0];
                     if (c.canceled) {
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
