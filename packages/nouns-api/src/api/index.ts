@@ -5736,7 +5736,7 @@ app.get('/api/ascii-image', async c => {
   const cacheKey = `${url}:${cols}`;
   const cached = asciiImageCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < ASCII_CACHE_TTL) {
-    return c.json(cached.data);
+    return c.json(cached.data as Record<string, unknown>);
   }
 
   const result = await imageToAscii(url, cols);
@@ -5911,7 +5911,7 @@ app.get('/api/noun-holders', async c => {
       .where(
         inArray(
           schema.noun.owner,
-          addresses.map(a => a.toLowerCase()),
+          addresses.map(a => a.toLowerCase() as `0x${string}`),
         ),
       );
 
