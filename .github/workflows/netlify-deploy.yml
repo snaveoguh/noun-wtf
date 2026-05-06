@@ -49,7 +49,7 @@ jobs:
           pnpm --filter @nouns/sdk build
           pnpm --filter @nouns/assets build
 
-      - name: Build with Netlify context
+      - name: Build & deploy to Netlify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
@@ -67,31 +67,19 @@ jobs:
           VITE_NOUNV2_TOKEN_ADDRESS: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9'
           VITE_NOUNV2_AUCTION_HOUSE_ADDRESS: '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc'
           VITE_NOUNV2_TREASURY_ADDRESS: '0x2cdeb0d251674710840d9fa990d1de138dfe7c00'
-        run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
-
-      - name: Deploy to Netlify
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         shell: bash
+        # Combined build + deploy so the Netlify CLI processes edge functions
+        # in a single pipeline. The previous split (build then deploy
+        # --no-build) bundled edge functions but never shipped them — the
+        # deploy API came back with `edge_functions_present: null` despite
+        # the bundling step succeeding. Running `deploy --build` keeps
+        # everything in one CLI invocation so the edge function dist gets
+        # picked up correctly.
         run: |
-          if [ "${{ steps.site.outputs.prod }}" = "true" ]; then
-            npx netlify deploy \
-              --filter @nouns/webapp \
-              --site "${{ steps.site.outputs.site_id }}" \
-              --prod \
-              --dir packages/nouns-webapp/dist \
-              --functions netlify/functions \
-              --no-build \
-              --skip-functions-cache \
-              --message "GitHub Actions ${GITHUB_SHA}"
-          else
-            npx netlify deploy \
-              --filter @nouns/webapp \
-              --site "${{ steps.site.outputs.site_id }}" \
-              --prod \
-              --dir packages/nouns-webapp/dist \
-              --functions netlify/functions \
-              --no-build \
-              --skip-functions-cache \
-              --message "GitHub Actions ${GITHUB_SHA}"
-          fi
+          npx netlify deploy \
+            --filter @nouns/webapp \
+            --site "${{ steps.site.outputs.site_id }}" \
+            --prod \
+            --build \
+            --context "${{ steps.site.outputs.context }}" \
+            --message "GitHub Actions ${GITHUB_SHA}"
