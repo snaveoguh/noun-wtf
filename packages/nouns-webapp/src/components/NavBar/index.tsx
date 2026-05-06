@@ -147,12 +147,13 @@ const NavBar = () => {
       <Navbar expand style={{ backgroundColor: 'transparent' }} className={classes.navBarCustom}>
         <Container fluid className={classes.navBarInner}>
           <div className={classes.brandAndTreasuryWrapper}>
-            <Navbar.Brand as={Link} to="/" className={clsx(classes.navBarBrand, 'd-none d-md-block')}>
+            <Navbar.Brand as={Link} to="/" className={classes.navBarBrand}>
               <LolLogo className={classes.navBarLogo} />
             </Navbar.Brand>
-            {/* Terminal-feed entry point — squashed next to the fries logo
-                so it's always reachable from mobile. Just two green ASCII
-                characters, no border, slightly larger so it's tappable. */}
+            {/* Terminal-feed entry point — squashed next to the fries logo.
+                Hidden on mobile (the logo itself is the home tap target there
+                — adding a second green button next to it left no way back to
+                home from pro on mobile). */}
             <button
               type="button"
               onClick={() => {
@@ -163,6 +164,7 @@ const NavBar = () => {
               }}
               title="Switch to Terminal Feed"
               aria-label="Switch to Terminal Feed"
+              className="d-none d-md-inline-flex"
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -175,6 +177,7 @@ const NavBar = () => {
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 fontWeight: 700,
                 flexShrink: 0,
+                alignItems: 'center',
               }}
             >
               &gt;_
