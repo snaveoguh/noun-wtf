@@ -2,12 +2,14 @@
   base = "packages/nouns-webapp"
   command = "pnpm build"
   publish = "dist"
-  edge_functions = "netlify/edge-functions"
+  # `edge_functions` is resolved relative to the netlify.toml location
+  # (repo root), NOT to `base` — keep this in sync with where the source
+  # files actually live (packages/nouns-webapp/netlify/edge-functions).
+  edge_functions = "packages/nouns-webapp/netlify/edge-functions"
 
-# Explicit edge function declaration so the Netlify CLI ships them on
-# deploys that pass --no-build (the GitHub Actions workflow does this).
-# Without an explicit declaration the CLI's auto-discovery skips edge
-# functions during --no-build deploys, even when build bundled them.
+# Explicit edge function declarations — without these the CLI's auto
+# discovery doesn't ship the function on every deploy path (notably
+# `--no-build`).
 [[edge_functions]]
   function = "og-proposal"
   path = "/vote/:id"
