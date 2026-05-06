@@ -72,8 +72,8 @@ import sharp from 'sharp';
 import { createPublicClient, http } from 'viem';
 import { mainnet } from 'viem/chains';
 
-import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
 import type { NounSeed } from '../agent/traitPredictor.js';
+import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
 import {
   initAgent,
   reservationStore,
