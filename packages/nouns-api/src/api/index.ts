@@ -558,6 +558,53 @@ function extractSigner(desc: string): { signer: string | null; description: stri
   return { signer: null, description: desc };
 }
 
+/**
+ * Single candidate by id — used by the OG-image edge function so /candidates/:id
+ * unfurls can pull the first image from the body without hitting the subgraph.
+ * Candidate `id` is `${proposer}-${slug}` (matches the schema primary key).
+ * Slug-only fallback supports legacy share URLs that drop the proposer prefix.
+ */
+app.get('/api/candidates/:id', async c => {
+  const idParam = c.req.param('id');
+  if (!idParam) return c.json({ error: 'id required' }, 400);
+
+  // Try exact id match first.
+  const byId = await db
+    .select()
+    .from(schema.candidate)
+    .where(eq(schema.candidate.id, idParam))
+    .limit(1);
+
+  let candidate = byId[0];
+
+  // Fallback: lookup by slug if the id-prefixed form didn't hit. Picks the
+  // most recently created match — slug collisions across proposers are rare
+  // but possible.
+  if (!candidate) {
+    const bySlug = await db
+      .select()
+      .from(schema.candidate)
+      .where(eq(schema.candidate.slug, idParam))
+      .orderBy(desc(schema.candidate.createdAtBlock))
+      .limit(1);
+    candidate = bySlug[0];
+  }
+
+  if (!candidate) return c.json({ error: 'not found' }, 404);
+
+  return c.json({
+    id: candidate.id,
+    slug: candidate.slug,
+    proposer: candidate.proposer,
+    description: candidate.description,
+    canceled: candidate.canceled,
+    versionsCount: candidate.versionsCount,
+    promotedToProposalId:
+      candidate.promotedToProposalId != null ? String(candidate.promotedToProposalId) : null,
+    createdAt: String(Math.floor(new Date(candidate.createdAt).getTime() / 1000)),
+  });
+});
+
 /** All grants — single JSON response, with derived status (DEFEATED/SUCCEEDED) */
 app.get('/api/grants', async c => {
   const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
