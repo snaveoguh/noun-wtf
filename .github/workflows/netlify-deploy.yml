@@ -82,7 +82,6 @@ jobs:
               --dir packages/nouns-webapp/dist \
               --functions netlify/functions \
               --no-build \
-              --skip-functions-cache \
               --message "GitHub Actions ${GITHUB_SHA}"
           else
             npx netlify deploy \
@@ -92,6 +91,5 @@ jobs:
               --dir packages/nouns-webapp/dist \
               --functions netlify/functions \
               --no-build \
-              --skip-functions-cache \
               --message "GitHub Actions ${GITHUB_SHA}"
           fi
