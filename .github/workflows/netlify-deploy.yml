@@ -73,22 +73,28 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         shell: bash
+        # Run from the netlify base directory so the CLI picks up
+        # `netlify/edge-functions/` via auto-discovery (and the
+        # [[edge_functions]] declarations in the root netlify.toml).
+        # When the deploy step ran from repo root with `--filter`, edge
+        # functions were bundled but never made it into the deploy
+        # archive — `available_functions` came back empty in the deploy
+        # API response. Working from packages/nouns-webapp fixes that.
+        working-directory: packages/nouns-webapp
         run: |
           if [ "${{ steps.site.outputs.prod }}" = "true" ]; then
             npx netlify deploy \
-              --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --prod \
-              --dir packages/nouns-webapp/dist \
+              --dir dist \
               --functions netlify/functions \
               --no-build \
               --message "GitHub Actions ${GITHUB_SHA}"
           else
             npx netlify deploy \
-              --filter @nouns/webapp \
               --site "${{ steps.site.outputs.site_id }}" \
               --prod \
-              --dir packages/nouns-webapp/dist \
+              --dir dist \
               --functions netlify/functions \
               --no-build \
               --message "GitHub Actions ${GITHUB_SHA}"
