@@ -151,13 +151,23 @@ import { graphql } from 'ponder';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import sharp from 'sharp';
-import { createPublicClient, createWalletClient, decodeAbiParameters, http, type Hex, verifyTypedData } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  decodeAbiParameters,
+  encodeFunctionData,
+  getAddress,
+  http,
+  type Hex,
+  parseEther,
+  parseUnits,
+  verifyTypedData,
+} from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
 import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
-import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
   initAgent,
   reservationStore,
@@ -193,6 +203,7 @@ import {
   detectFunction,
   buildFunctionSkillPromptSnippet,
 } from '../agent/index.js';
+import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -204,6 +215,290 @@ const nounCheckClient = createPublicClient({
   chain: mainnet,
   transport: http(process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com'),
 });
+
+// ─── Proposal Transaction Primitives ───────────────────────────────────────
+// The LLM never hand-encodes hex calldata for token transfers anymore.
+// It picks a `kind` and gives human-readable amounts; the API does the math.
+// Falling back to raw {target,value,signature,calldata} is allowed but
+// guarded by a tight, address-aware sanity check.
+const TOKEN_ADDRESSES = {
+  USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+  STETH: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
+  PAYER: '0xd97Bcd9f47cEe35c0a9ec1dc40C1269afc9E8E1D',
+} as const;
+
+const TOKEN_DECIMALS: Record<string, number> = {
+  [TOKEN_ADDRESSES.USDC.toLowerCase()]: 6,
+  [TOKEN_ADDRESSES.WETH.toLowerCase()]: 18,
+  [TOKEN_ADDRESSES.STETH.toLowerCase()]: 18,
+};
+
+const ERC20_TRANSFER_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ type: 'bool' }],
+  },
+] as const;
+
+const PAYER_DEBT_ABI = [
+  {
+    type: 'function',
+    name: 'sendOrRegisterDebt',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+export type RawProposalTx = {
+  target: string;
+  value?: string;
+  signature?: string;
+  calldata?: string;
+};
+
+export type ProposalTxPrimitive =
+  | { kind: 'usdc_transfer'; recipient: string; amount: string }
+  | { kind: 'usdc_payer_debt'; recipient: string; amount: string }
+  | { kind: 'eth_transfer'; recipient: string; amountEth: string }
+  | { kind: 'weth_transfer'; recipient: string; amountEth: string }
+  | { kind: 'steth_transfer'; recipient: string; amountEth: string };
+
+export type ProposalTxInput = ProposalTxPrimitive | RawProposalTx;
+
+type CanonicalTx = {
+  target: string;
+  value: string;
+  signature: string;
+  calldata: string;
+};
+
+function isPrimitive(t: ProposalTxInput): t is ProposalTxPrimitive {
+  return typeof (t as { kind?: unknown }).kind === 'string';
+}
+
+function checkedAddress(
+  label: string,
+  raw: string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: getAddress(raw) };
+  } catch {
+    return { ok: false, error: `${label} is not a valid 0x-address: ${raw}` };
+  }
+}
+
+function expandPrimitive(
+  p: ProposalTxPrimitive,
+  idx: number,
+): { ok: true; tx: CanonicalTx } | { ok: false; error: string } {
+  switch (p.kind) {
+    case 'usdc_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let amount: bigint;
+      try {
+        amount = parseUnits(p.amount, 6);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] usdc_transfer: amount "${p.amount}" is not a valid USDC amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: TOKEN_ADDRESSES.USDC,
+          value: '0',
+          signature: 'transfer(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: ERC20_TRANSFER_ABI,
+            functionName: 'transfer',
+            args: [addr.value as `0x${string}`, amount],
+          }),
+        },
+      };
+    }
+    case 'usdc_payer_debt': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let amount: bigint;
+      try {
+        amount = parseUnits(p.amount, 6);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] usdc_payer_debt: amount "${p.amount}" is not a valid USDC amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: TOKEN_ADDRESSES.PAYER,
+          value: '0',
+          signature: 'sendOrRegisterDebt(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: PAYER_DEBT_ABI,
+            functionName: 'sendOrRegisterDebt',
+            args: [addr.value as `0x${string}`, amount],
+          }),
+        },
+      };
+    }
+    case 'eth_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let wei: bigint;
+      try {
+        wei = parseEther(p.amountEth);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] eth_transfer: amountEth "${p.amountEth}" is not a valid ETH amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: addr.value,
+          value: wei.toString(),
+          signature: '',
+          calldata: '0x',
+        },
+      };
+    }
+    case 'weth_transfer':
+    case 'steth_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let wei: bigint;
+      try {
+        wei = parseEther(p.amountEth);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] ${p.kind}: amountEth "${p.amountEth}" is not a valid amount.`,
+        };
+      }
+      const target = p.kind === 'weth_transfer' ? TOKEN_ADDRESSES.WETH : TOKEN_ADDRESSES.STETH;
+      return {
+        ok: true,
+        tx: {
+          target,
+          value: '0',
+          signature: 'transfer(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: ERC20_TRANSFER_ABI,
+            functionName: 'transfer',
+            args: [addr.value as `0x${string}`, wei],
+          }),
+        },
+      };
+    }
+    default: {
+      const exhaustive: never = p;
+      return { ok: false, error: `Unknown primitive kind: ${JSON.stringify(exhaustive)}` };
+    }
+  }
+}
+
+// Sanity-check raw transactions. Address-aware: if the target is a known
+// token contract, we know its decimals and apply a tight bound. Otherwise
+// fall back to a generic 10^30 ceiling (catches the worst LLM blow-ups).
+function checkRawTx(raw: RawProposalTx, idx: number): string | null {
+  const sig = (raw.signature || '').trim();
+  if (sig !== 'transfer(address,uint256)' && sig !== 'sendOrRegisterDebt(address,uint256)') {
+    return null;
+  }
+  const cd = raw.calldata || '0x';
+  if (!cd.startsWith('0x') || cd.length < 10) return null;
+  // Strip selector if present (transfer/sendOrRegisterDebt both have 4-byte selectors)
+  const body = cd.replace(/^0x/, '');
+  const argHex = body.length >= 136 ? body.slice(8) : body;
+  if (argHex.length < 128) return null;
+  let amount: bigint;
+  try {
+    const decoded = decodeAbiParameters(
+      [{ type: 'address' }, { type: 'uint256' }],
+      ('0x' + argHex.padStart(128, '0')) as Hex,
+    );
+    amount = decoded[1] as bigint;
+  } catch {
+    return null;
+  }
+
+  const targetLower = (raw.target || '').toLowerCase();
+  const knownDecimals = TOKEN_DECIMALS[targetLower];
+  // sendOrRegisterDebt is USDC-only by contract design.
+  const effectiveDecimals = sig === 'sendOrRegisterDebt(address,uint256)' ? 6 : knownDecimals;
+
+  if (effectiveDecimals !== undefined) {
+    // Whole-token cap: 10 billion of any single token. Anything above is
+    // essentially guaranteed to be a decimal-scaling mistake. (10B USDC at
+    // 6 decimals = 10^16; 10B ETH at 18 decimals = 10^28.)
+    const maxRaw = 10n ** BigInt(10 + effectiveDecimals);
+    if (amount > maxRaw) {
+      let tokenName: string;
+      if (targetLower === TOKEN_ADDRESSES.USDC.toLowerCase()) tokenName = 'USDC';
+      else if (targetLower === TOKEN_ADDRESSES.WETH.toLowerCase()) tokenName = 'WETH';
+      else if (targetLower === TOKEN_ADDRESSES.STETH.toLowerCase()) tokenName = 'stETH';
+      else if (sig === 'sendOrRegisterDebt(address,uint256)') tokenName = 'USDC (Payer)';
+      else tokenName = `token@${raw.target}`;
+      return `tx[${idx}] (${sig} → ${tokenName}) decoded amount ${amount.toString()} exceeds 10B at ${effectiveDecimals} decimals. Almost certainly a scaling mistake — use the typed primitive (e.g. {kind:"usdc_transfer", amount:"20000"}) instead of raw calldata.`;
+    }
+  } else {
+    // Unknown token. Apply generic 10^30 ceiling.
+    const ABSURD = 10n ** 30n;
+    if (amount > ABSURD) {
+      return `tx[${idx}] (${sig}) decoded amount ${amount.toString()} is impossibly large — likely an encoding error.`;
+    }
+  }
+  return null;
+}
+
+export function expandProposalTransactions(
+  inputs: ProposalTxInput[] | undefined,
+): { ok: true; txs: CanonicalTx[] } | { ok: false; error: string } {
+  if (!inputs || inputs.length === 0) return { ok: true, txs: [] };
+  const out: CanonicalTx[] = [];
+  for (let i = 0; i < inputs.length; i++) {
+    const t = inputs[i];
+    if (!t) return { ok: false, error: `tx[${i}] is missing.` };
+    if (isPrimitive(t)) {
+      const exp = expandPrimitive(t, i);
+      if (!exp.ok) return { ok: false, error: exp.error };
+      out.push(exp.tx);
+    } else {
+      const targetCheck = checkedAddress(`tx[${i}].target`, t.target);
+      if (!targetCheck.ok) return { ok: false, error: targetCheck.error };
+      const raw: RawProposalTx = {
+        target: targetCheck.value,
+        value: t.value || '0',
+        signature: t.signature || '',
+        calldata: t.calldata || '0x',
+      };
+      const failure = checkRawTx(raw, i);
+      if (failure) return { ok: false, error: failure };
+      out.push({
+        target: raw.target,
+        value: raw.value!,
+        signature: raw.signature!,
+        calldata: raw.calldata!,
+      });
+    }
+  }
+  return { ok: true, txs: out };
+}
 
 // ─── Block Timing Helpers ──────────────────────────────────────────────────
 const BLOCK_TIME_SECONDS = 12;
@@ -1693,10 +1988,7 @@ async function checkTxForSale(
 }
 
 /** Fetch recent Nouns transfers from Ponder and detect which are marketplace sales. */
-async function fetchOnchainSales(
-  before: bigint | undefined,
-  limit: number,
-): Promise<FeedEvent[]> {
+async function fetchOnchainSales(before: bigint | undefined, limit: number): Promise<FeedEvent[]> {
   const cacheKey = `${before ?? 'latest'}:${limit}`;
   const now = Date.now();
   if (salesActivityCache?.key === cacheKey && now - salesActivityCache.at < SALES_ACTIVITY_TTL) {
@@ -2063,7 +2355,12 @@ app.get('/api/predictions/markets', async c => {
       db
         .select()
         .from(schema.auction)
-        .where(inArray(schema.auction.nounId, auctionNounIds.map(id => BigInt(id)))),
+        .where(
+          inArray(
+            schema.auction.nounId,
+            auctionNounIds.map(id => BigInt(id)),
+          ),
+        ),
     ]);
 
     const auctionByNounId = new Map<number, { endTime: number; settled: boolean }>();
@@ -2071,7 +2368,9 @@ app.get('/api/predictions/markets', async c => {
       const rawEnd = row.endTime;
       const endMs =
         rawEnd instanceof Date
-          ? (rawEnd.getTime() < 946684800000 ? rawEnd.getTime() * 1000 : rawEnd.getTime())
+          ? rawEnd.getTime() < 946684800000
+            ? rawEnd.getTime() * 1000
+            : rawEnd.getTime()
           : Number(rawEnd) * (Number(rawEnd) < 1e12 ? 1000 : 1);
       auctionByNounId.set(Number(row.nounId), {
         endTime: Math.floor(endMs / 1000),
@@ -2995,7 +3294,14 @@ async function parseCommand(
     const proposalId = parseInt(lilVoteMatch[2]);
     const reason = lilVoteMatch[3]?.trim();
     // Lil Nouns proposals aren't in Ponder — let the on-chain governor reject invalid IDs
-    const action = { type: 'VOTE', proposalId, support, reason, title: `Lil Proposal #${proposalId}`, dao: 'lil-nouns' };
+    const action = {
+      type: 'VOTE',
+      proposalId,
+      support,
+      reason,
+      title: `Lil Proposal #${proposalId}`,
+      dao: 'lil-nouns',
+    };
     return {
       handled: true,
       response: `Vote prepared: ${['AGAINST', 'FOR', 'ABSTAIN'][support]} on Lil Prop #${proposalId}. Confirm in your wallet.`,
@@ -3622,9 +3928,9 @@ app.post('/api/chat', async c => {
       const nounId =
         typeof rawNounId === 'number' && Number.isFinite(rawNounId)
           ? rawNounId
-          : typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
+          : (typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
             ? Number.parseInt(rawNounId, 10)
-            : null;
+            : null);
 
       if (dao !== null || nounId !== null) {
         const daoLabel =
@@ -3633,7 +3939,7 @@ app.post('/api/chat', async c => {
             : dao === 'nounv2'
               ? 'NounV2 fork DAO (token IDs are v2 IDs starting at 0 — NOT mainnet Nouns)'
               : dao === 'lil-nouns'
-                ? 'Lil Nouns DAO (separate governor; pass dao=\'lil-nouns\' to prepare_vote for proposals here)'
+                ? "Lil Nouns DAO (separate governor; pass dao='lil-nouns' to prepare_vote for proposals here)"
                 : 'unknown';
         dynamicContext += '\n\n## Current View';
         dynamicContext += `\n- dao: ${dao ?? 'unknown'} (${daoLabel})`;
@@ -3641,9 +3947,9 @@ app.post('/api/chat', async c => {
           const nounLabel =
             dao === 'nounv2'
               ? `NounV2 #${nounId}`
-              : dao === 'lil-nouns'
+              : (dao === 'lil-nouns'
                 ? `Lil Noun #${nounId}`
-                : `Noun #${nounId}`;
+                : `Noun #${nounId}`);
           dynamicContext += `\n- viewing: ${nounLabel}`;
         }
         dynamicContext +=
@@ -4147,7 +4453,7 @@ CRITICAL RULES:
         function: {
           name: 'prepare_vote',
           description:
-            'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. Works for BOTH mainnet Nouns DAO (default) and Lil Nouns DAO — pick the right `dao` value based on the user\'s intent. For mainnet Nouns ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable. For Lil Nouns the on-chain governor will reject invalid IDs/states, so confirmation is best-effort via the injected Lil Nouns context (or just ask the user to clarify if uncertain).',
+            "Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. Works for BOTH mainnet Nouns DAO (default) and Lil Nouns DAO — pick the right `dao` value based on the user's intent. For mainnet Nouns ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable. For Lil Nouns the on-chain governor will reject invalid IDs/states, so confirmation is best-effort via the injected Lil Nouns context (or just ask the user to clarify if uncertain).",
           parameters: {
             type: 'object' as const,
             properties: {
@@ -4253,31 +4559,55 @@ CRITICAL RULES:
               transactions: {
                 type: 'array',
                 description:
-                  'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args. CRITICAL DECIMAL RULES: USDC has 6 decimals — 20000 USDC = 20000 * 10^6 = 20000000000 (0x4a817c800). DO NOT use 18-decimal scaling for USDC. ETH/WETH have 18 decimals. stETH has 18 decimals. Always double-check your scaling: for USDC, the on-chain uint256 should never exceed 10^15 unless you genuinely mean a billion+ USDC. If you mess up scaling, the proposal will register absurd debt and be rejected by the validator.',
+                  'Optional array of executable transactions. STRONGLY PREFER the typed primitives (kind:"usdc_transfer", "usdc_payer_debt", "eth_transfer", "weth_transfer", "steth_transfer") — these take human-readable amounts and the API encodes them correctly. Only fall back to raw {target,value,signature,calldata} for non-token contract calls (e.g. arbitrary onchain function invocations). NEVER hand-encode hex calldata for token transfers — the API will reject it if the amount is off.',
                 items: {
                   type: 'object',
+                  description:
+                    'Either a typed primitive (preferred) or a raw transaction. Primitive shape: {kind,recipient,amount} for usdc_*, {kind,recipient,amountEth} for eth/weth/steth. Examples: {"kind":"usdc_transfer","recipient":"0x...","amount":"20000"} sends 20,000 USDC. {"kind":"usdc_payer_debt","recipient":"0x...","amount":"5000"} registers 5,000 USDC of debt via the Nouns Payer. {"kind":"eth_transfer","recipient":"0x...","amountEth":"0.5"} sends 0.5 ETH. Raw shape (last resort): {"target":"0x...","value":"0","signature":"someFunc(uint256)","calldata":"0x..."}.',
                   properties: {
+                    kind: {
+                      type: 'string',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
+                      description:
+                        'Primitive kind. Omit for raw {target,value,signature,calldata}.',
+                    },
+                    recipient: {
+                      type: 'string',
+                      description: 'Recipient address (0x-prefixed). Used by primitives.',
+                    },
+                    amount: {
+                      type: 'string',
+                      description:
+                        'Human-readable USDC amount as a string (e.g. "20000" or "20000.5"). Used by usdc_* primitives.',
+                    },
+                    amountEth: {
+                      type: 'string',
+                      description:
+                        'Human-readable ETH amount as a string (e.g. "0.5", "1"). Used by eth_/weth_/steth_ primitives.',
+                    },
                     target: {
                       type: 'string',
-                      description: 'Target contract/recipient address (0x-prefixed).',
+                      description: 'Raw mode only: target contract/recipient address.',
                     },
                     value: {
                       type: 'string',
-                      description:
-                        'ETH value in wei as a string (e.g. "100000000000000000" for 0.1 ETH, "0" for non-payable calls).',
+                      description: 'Raw mode only: ETH value in wei as a string.',
                     },
                     signature: {
                       type: 'string',
-                      description:
-                        'Function signature (e.g. "transfer(address,uint256)"). Empty string for plain ETH transfers.',
+                      description: 'Raw mode only: function signature.',
                     },
                     calldata: {
                       type: 'string',
-                      description:
-                        'ABI-encoded function arguments as hex (0x-prefixed). Use "0x" for plain ETH transfers.',
+                      description: 'Raw mode only: ABI-encoded args as hex.',
                     },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -4313,22 +4643,28 @@ CRITICAL RULES:
               transactions: {
                 type: 'array',
                 description:
-                  'Updated transactions array. Same format as prepare_candidate. If omitted, keeps description-only.',
+                  'Updated transactions array. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw {target,value,signature,calldata} only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature. Empty for ETH transfers.',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -4361,22 +4697,28 @@ CRITICAL RULES:
               transactions: {
                 type: 'array',
                 description:
-                  'Updated transactions. Same format as prepare_candidate. If omitted, only description is updated.',
+                  'Updated transactions. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature. Empty for ETH transfers.',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -4521,22 +4863,29 @@ CRITICAL RULES:
               },
               transactions: {
                 type: 'array',
-                description: 'Optional executable transactions.',
+                description:
+                  'Optional executable transactions. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (e.g. recipient).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature (empty for ETH transfer).',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'Encoded calldata (0x for ETH transfer).',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -5282,12 +5631,7 @@ CRITICAL RULES:
               const input = args as {
                 title: string;
                 description: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -5303,69 +5647,22 @@ CRITICAL RULES:
                   .slice(0, 80);
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
 
-                // Build transaction arrays (empty if no transactions provided)
-                const txs = input.transactions || [];
-
-                // Sanity-check token transfer amounts. The LLM hand-encodes
-                // hex calldata for `transfer(address,uint256)` /
-                // `sendOrRegisterDebt(address,uint256)` — a class of error
-                // that's hard to spot until the proposal is on-chain.
-                // This prop owner once shipped 6.85e76 USDC (proposer added
-                // a Payer.sendOrRegisterDebt call where the amount was
-                // off by ~71 orders of magnitude). Reject anything where
-                // the decoded amount, scaled down by 6 decimals (USDC) AND
-                // 18 decimals (ETH-style), is still nonsense.
-                const sanityFail = (() => {
-                  for (let i = 0; i < txs.length; i++) {
-                    const t = txs[i];
-                    const sig = (t.signature || '').trim();
-                    if (
-                      sig !== 'transfer(address,uint256)' &&
-                      sig !== 'sendOrRegisterDebt(address,uint256)'
-                    ) {
-                      continue;
-                    }
-                    const cd = t.calldata || '0x';
-                    if (!cd.startsWith('0x') || cd.length < 130) continue;
-                    try {
-                      const decoded = decodeAbiParameters(
-                        [{ type: 'address' }, { type: 'uint256' }],
-                        ('0x' + cd.replace(/^0x/, '').padStart(128, '0')) as Hex,
-                      );
-                      const amount = decoded[1] as bigint;
-                      // Cap raw amount at 10^30. Even at 18 decimals
-                      // that's 10^12 ETH — well past any plausible request.
-                      // USDC at 6 decimals would be 10^24 USDC. Anything
-                      // larger is almost certainly an encoding bug.
-                      const ABSURD = 10n ** 30n;
-                      if (amount > ABSURD) {
-                        return `tx[${i}] (${sig}) has decoded amount ${amount.toString()} which is impossibly large — likely an encoding error. For USDC use 6-decimal scaling (e.g. 20000 USDC = 20000_000000 = 0x4a817c800).`;
-                      }
-                    } catch {
-                      // bad hex shape — let the chain catch it later
-                    }
-                  }
-                  return null;
-                })();
-                if (sanityFail) {
-                  result = { error: sanityFail };
+                const expanded = expandProposalTransactions(input.transactions);
+                if (!expanded.ok) {
+                  result = { error: expanded.error };
                   break;
                 }
-
-                const targets = txs.map(t => t.target);
-                const values = txs.map(t => t.value || '0');
-                const sigs = txs.map(t => t.signature || '');
-                const calldatas = txs.map(t => t.calldata || '0x');
+                const txs = expanded.txs;
 
                 pendingAction = {
                   type: 'CREATE_CANDIDATE',
                   slug,
                   description: fullDescription,
                   title: input.title,
-                  targets,
-                  values,
-                  signatures: sigs,
-                  calldatas,
+                  targets: txs.map(t => t.target),
+                  values: txs.map(t => t.value),
+                  signatures: txs.map(t => t.signature),
+                  calldatas: txs.map(t => t.calldata),
                 };
                 const txNote =
                   txs.length > 0
@@ -5386,12 +5683,7 @@ CRITICAL RULES:
                 title: string;
                 description: string;
                 reason?: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -5416,12 +5708,13 @@ CRITICAL RULES:
                         error: `Only the original proposer (${(c.proposer as string).slice(0, 6)}...${(c.proposer as string).slice(-4)}) can update this candidate. Connected wallet doesn't match.`,
                       };
                     } else {
+                      const expanded = expandProposalTransactions(input.transactions);
+                      if (!expanded.ok) {
+                        result = { error: expanded.error };
+                        break;
+                      }
+                      const txs = expanded.txs;
                       const fullDescription = `# ${input.title}\n\n${input.description}`;
-                      const txs = input.transactions || [];
-                      const targets = txs.map(t => t.target);
-                      const values = txs.map(t => t.value || '0');
-                      const sigs = txs.map(t => t.signature || '');
-                      const calldatas = txs.map(t => t.calldata || '0x');
 
                       pendingAction = {
                         type: 'UPDATE_CANDIDATE',
@@ -5429,10 +5722,10 @@ CRITICAL RULES:
                         description: fullDescription,
                         title: input.title,
                         reason: input.reason || '',
-                        targets,
-                        values,
-                        signatures: sigs,
-                        calldatas,
+                        targets: txs.map(t => t.target),
+                        values: txs.map(t => t.value),
+                        signatures: txs.map(t => t.signature),
+                        calldatas: txs.map(t => t.calldata),
                       };
                       result = {
                         success: true,
@@ -5455,12 +5748,7 @@ CRITICAL RULES:
                 proposalId: number;
                 description?: string;
                 updateMessage: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -5487,13 +5775,19 @@ CRITICAL RULES:
                         error: `Proposal #${input.proposalId} doesn't have an update period set. It may be too old or already past its update window.`,
                       };
                     } else {
+                      const expanded = expandProposalTransactions(input.transactions);
+                      if (!expanded.ok) {
+                        result = { error: expanded.error };
+                        break;
+                      }
+                      const txs = expanded.txs;
+
                       const descText = (p.description ?? '').toString();
                       const title =
                         descText
                           .split('\n')[0]
                           ?.replace(/^#+\s*/, '')
                           .trim() || 'Untitled';
-                      const txs = input.transactions || [];
 
                       // Determine update type: description-only, transactions-only, or both
                       const hasNewDesc = !!input.description;
@@ -5518,9 +5812,9 @@ CRITICAL RULES:
                         description: input.description || descText,
                         updateMessage: input.updateMessage,
                         targets: txs.map(t => t.target),
-                        values: txs.map(t => t.value || '0'),
-                        signatures: txs.map(t => t.signature || ''),
-                        calldatas: txs.map(t => t.calldata || '0x'),
+                        values: txs.map(t => t.value),
+                        signatures: txs.map(t => t.signature),
+                        calldatas: txs.map(t => t.calldata),
                         updatePeriodEndBlock: p.updatePeriodEndBlock?.toString(),
                       };
                       result = {
@@ -5854,12 +6148,7 @@ CRITICAL RULES:
               const input = args as {
                 title: string;
                 description: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -5867,21 +6156,22 @@ CRITICAL RULES:
                     'User must connect their wallet to create a grant proposal. Tell them to click "connect" in the header.',
                 };
               } else {
+                const expanded = expandProposalTransactions(input.transactions);
+                if (!expanded.ok) {
+                  result = { error: expanded.error };
+                  break;
+                }
+                const txs = expanded.txs;
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
-                const txs = input.transactions || [];
-                const targets = txs.map(t => t.target);
-                const values = txs.map(t => t.value || '0');
-                const sigs = txs.map(t => t.signature || '');
-                const calldatas = txs.map(t => t.calldata || '0x');
 
                 pendingAction = {
                   type: 'GRANT_PROPOSAL',
                   title: input.title,
                   description: fullDescription,
-                  targets,
-                  values,
-                  signatures: sigs,
-                  calldatas,
+                  targets: txs.map(t => t.target),
+                  values: txs.map(t => t.value),
+                  signatures: txs.map(t => t.signature),
+                  calldatas: txs.map(t => t.calldata),
                 };
                 const txNote =
                   txs.length > 0
@@ -8262,9 +8552,7 @@ app.get('/api/activity', async c => {
         sale: await checkTxForSale(txHash),
       })),
     );
-    const transferSaleMap = new Map(
-      saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]),
-    );
+    const transferSaleMap = new Map(saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]));
 
     // Count nouns per sale tx to split bulk/sweep prices evenly
     const nounsPerSaleTx = new Map<string, number>();
