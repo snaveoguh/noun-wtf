@@ -696,7 +696,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const rows = await db
         .select()
         .from(schema.proposal)
-        .where(eq(schema.proposal.id, String(proposalId)))
+        .where(eq(schema.proposal.id, BigInt(proposalId)))
         .limit(1);
       const p = rows[0];
       if (!p) return { handled: true, response: `Proposal #${proposalId} not found.` };
@@ -764,14 +764,15 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       proposalId = parseInt(leaveFeedbackMatch[1] ?? '0');
       reason = leaveFeedbackMatch[2]?.trim().replace(/^["']|["']$/g, '');
     } else {
-      reason = leaveFeedbackAlt![1]?.trim();
-      proposalId = parseInt(leaveFeedbackAlt![2] ?? '0');
+      const alt = leaveFeedbackAlt as RegExpMatchArray;
+      reason = alt[1]?.trim();
+      proposalId = parseInt(alt[2] ?? '0');
     }
     try {
       const rows = await db
         .select()
         .from(schema.proposal)
-        .where(eq(schema.proposal.id, String(proposalId)))
+        .where(eq(schema.proposal.id, BigInt(proposalId)))
         .limit(1);
       const row = rows[0];
       if (!row) return { handled: true, response: `Proposal #${proposalId} not found.` };
@@ -803,7 +804,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const rows = await db
         .select()
         .from(schema.proposal)
-        .where(eq(schema.proposal.id, String(proposalId)))
+        .where(eq(schema.proposal.id, BigInt(proposalId)))
         .limit(1);
       const p = rows[0];
       if (!p) return { handled: true, response: `Proposal #${proposalId} not found.` };
@@ -1062,7 +1063,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const rows = await db
         .select()
         .from(schema.grant)
-        .where(eq(schema.grant.id, String(grantId)))
+        .where(eq(schema.grant.id, BigInt(grantId)))
         .limit(1);
       const g = rows[0];
       if (!g) return { handled: true, response: `Grant #${grantId} not found.` };
@@ -2535,7 +2536,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.proposal)
-                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
                   const p = rows[0];
                   if (!p) {
@@ -2680,7 +2681,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.proposal)
-                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
                   const p = rows[0];
                   if (!p) {
@@ -2759,7 +2760,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.proposal)
-                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
                   const row0 = rows[0];
                   if (!row0) {
@@ -2992,7 +2993,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.proposal)
-                    .where(eq(schema.proposal.id, String(input.proposalId)))
+                    .where(eq(schema.proposal.id, BigInt(input.proposalId)))
                     .limit(1);
                   const p = rows[0];
                   if (!p) {
@@ -3132,7 +3133,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.auction)
-                    .where(eq(schema.auction.nounId, String(input.nounId)))
+                    .where(eq(schema.auction.nounId, BigInt(input.nounId)))
                     .limit(1);
                   const auction = rows[0];
                   if (!auction) {
@@ -3253,7 +3254,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   rows = await db
                     .select()
                     .from(schema.grant)
-                    .where(eq(schema.grant.id, String(input.grantId)))
+                    .where(eq(schema.grant.id, BigInt(input.grantId)))
                     .limit(1);
                 } else {
                   rows = await db
@@ -3328,7 +3329,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   const rows = await db
                     .select()
                     .from(schema.grant)
-                    .where(eq(schema.grant.id, String(input.grantId)))
+                    .where(eq(schema.grant.id, BigInt(input.grantId)))
                     .limit(1);
                   const g = rows[0];
                   if (!g) {
@@ -5706,7 +5707,7 @@ async function imageToAscii(
       const b = raw[i * 3 + 2] ?? 0;
       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       const charIdx = Math.min(numChars - 1, Math.floor(luminance * numChars));
-      pixels.push({ ch: ASCII_CHARS[charIdx], r, g, b });
+      pixels.push({ ch: ASCII_CHARS[charIdx] ?? '', r, g, b });
     }
 
     return { pixels, width: info.width, height: info.height };
