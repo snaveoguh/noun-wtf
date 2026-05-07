@@ -43,7 +43,7 @@ const mainnetConfig = createConfig({
       rpc: rpcUrls,
       ws: process.env.PONDER_WS_URL_1,
       ethGetLogsBlockRange: 500,
-      maxRpcRequestsPerSecond: 8,
+      maxRequestsPerSecond: 8,
     },
   },
   contracts: {
