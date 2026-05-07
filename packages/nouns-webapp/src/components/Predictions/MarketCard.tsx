@@ -110,14 +110,14 @@ export function MarketCard({
       : OUTCOME_LABELS[displayMarket.outcome];
 
   return (
-    <div className="border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
+    <div className="min-w-0 border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
             {dao} &bull; #{proposalId}
           </p>
-          <h3 className="font-headline mt-0.5 text-sm font-bold leading-snug text-[var(--ink)]">
+          <h3 className="font-headline mt-0.5 break-words text-sm font-bold leading-snug text-[var(--ink)]">
             {title.length > 80 ? title.slice(0, 77) + '...' : title}
           </h3>
         </div>
@@ -151,8 +151,8 @@ export function MarketCard({
 
       {/* Pool info + governance votes */}
       <div className="mb-3 space-y-1 font-mono text-[9px] text-[var(--ink-faint)]">
-        <div className="flex items-center justify-between">
-          <span>
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <span className="min-w-0">
             Pool: {formatEth(displayMarket.totalPool)} &bull;{' '}
             {displayMarket.forStakers + displayMarket.againstStakers} stakers
           </span>
@@ -161,7 +161,7 @@ export function MarketCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="uppercase tracking-wider transition-colors hover:text-[var(--ink)]"
+              className="shrink-0 uppercase tracking-wider transition-colors hover:text-[var(--ink)]"
             >
               View &rarr;
             </a>
