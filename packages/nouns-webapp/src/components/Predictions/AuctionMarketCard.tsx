@@ -170,7 +170,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         : 'var(--ink-faint)';
 
   return (
-    <div className="border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
+    <div className="min-w-0 border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
       <div className="mb-3 flex items-start gap-3">
         <div className="h-16 w-16 shrink-0 overflow-hidden border border-[var(--rule-light)]">
           <Noun nounId={nounId} className="h-full w-full" />
@@ -182,7 +182,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
           <h3 className="font-headline mt-0.5 text-sm font-bold leading-snug text-[var(--ink)]">
             Higher or Lower than 7-day avg?
           </h3>
-          <p className="mt-1 font-mono text-[9px] text-[var(--ink-faint)]">
+          <p className="mt-1 break-words font-mono text-[9px] text-[var(--ink-faint)]">
             Current bid: <span className="text-[var(--ink)]">{formatEthShort(currentBid)}</span>
             {'  ·  '}
             Avg ({sampleSize}): <span className="text-[var(--ink)]">{formatEthShort(avgWei)}</span>
