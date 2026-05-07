@@ -6266,7 +6266,7 @@ CRITICAL RULES:
                       result = { error: `Grant #${input.grantId} is already queued.` };
                     } else if (g.status === 'EXECUTED') {
                       result = { error: `Grant #${input.grantId} has already been executed.` };
-                    } else if (g.status === 'CANCELLED') {
+                    } else if (g.status === 'CANCELED') {
                       result = { error: `Grant #${input.grantId} was cancelled.` };
                     } else {
                       const descText = (g.description || '').toString();
