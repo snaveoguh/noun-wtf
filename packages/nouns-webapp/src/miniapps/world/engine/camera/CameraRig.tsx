@@ -136,6 +136,40 @@ function springVec3(
   vel.set(vx.v, vy.v, vz.v);
 }
 
+/**
+ * Whether a raycast hit should actually push the camera in. We deliberately
+ * EXCLUDE atmosphere / decoration / particle geometry so the player can walk
+ * past smog, rain, billboards, sprites etc. without the camera popping.
+ *
+ * Anything blocking the camera should be solid world geometry (terrain,
+ * trees, rocks, buildings). Everything else — transparent decals, sprites,
+ * points, lines, helpers — is invisible to the collision spherecast.
+ *
+ * Opt-out via `userData.cameraIgnore = true` is also honoured for cases
+ * where a solid material should be ignored anyway (e.g. a glass wall the
+ * player is meant to see through).
+ */
+function shouldBlockCamera(obj: THREE.Object3D): boolean {
+  if (obj.userData?.cameraIgnore === true) return false;
+  // Lines and helpers — never collide.
+  if (obj.type === 'Line' || obj.type === 'LineSegments' || obj.type === 'LineLoop') return false;
+  // Sprites and particle systems — atmosphere only, no collision.
+  if (obj.type === 'Sprite' || obj.type === 'Points') return false;
+
+  const mesh = obj as THREE.Mesh;
+  if (!mesh.isMesh) return true;
+
+  // Transparent materials = decoration (smog, rain, billboards, decals).
+  // Without this filter, the raycast catches their billboard quads and
+  // flickers the camera in/out as the player moves past — the hit isn't
+  // stable frame-to-frame because alpha-tested edges shift relative to
+  // the ray. Treat any transparent material as non-solid for the camera.
+  const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  if (mat && (mat as THREE.Material).transparent === true) return false;
+
+  return true;
+}
+
 // Module-level zoom index so the keydown listener (DOM) and the rig loop
 // (three) share a single source of truth without prop-threading through
 // WorldPage.tsx.
@@ -330,7 +364,7 @@ export function CameraRig({
         const children = sceneRoot.children ?? [];
         const hits = scratch.current.raycaster.intersectObjects(children, true);
 
-        // Find first hit that isn't the target itself
+        // Find first hit that isn't the target itself or non-solid decoration.
         for (const hit of hits) {
           let p: THREE.Object3D | null = hit.object;
           let isTargetChild = false;
@@ -342,8 +376,7 @@ export function CameraRig({
             p = p.parent;
           }
           if (isTargetChild) continue;
-          // Skip non-visible or non-solid objects (common: lines, helpers)
-          if (hit.object.type === 'Line' || hit.object.type === 'LineSegments') continue;
+          if (!shouldBlockCamera(hit.object)) continue;
 
           // Pull desired in to hit.point minus a small clearance along rayDir.
           const pullBack = COLLISION_CLEARANCE;
