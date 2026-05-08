@@ -19,16 +19,21 @@ import { useLocation, useNavigate } from 'react-router';
  */
 export type ActiveDao = 'nouns' | 'nounv2';
 
+// All pathname comparisons here are case-insensitive — react-router's route
+// matching is case-insensitive by default (so `<Route path="v2">` matches
+// both `/v2` and `/V2`), and we have to mirror that or a capital-V link
+// would render the V1 fallback while the URL bar still says `/V2`.
 function pathnameToDao(pathname: string): ActiveDao {
-  if (pathname === '/v2' || pathname.startsWith('/v2/')) return 'nounv2';
+  const p = pathname.toLowerCase();
+  if (p === '/v2' || p.startsWith('/v2/')) return 'nounv2';
   // The legacy `/nounv2` governance routes also live in V2 context — keep
   // the toggle showing V2 when the user is reading proposals there.
-  if (pathname === '/nounv2' || pathname.startsWith('/nounv2/')) return 'nounv2';
+  if (p === '/nounv2' || p.startsWith('/nounv2/')) return 'nounv2';
   return 'nouns';
 }
 
 // Matches `/noun/:id`, `/v2/noun/:id` (id is a positive integer). The capture
-// group is the noun id when present.
+// group is the noun id when present. Pathname is lowercased before matching.
 const V1_NOUN_ID_RE = /^\/noun\/(\d+)\/?$/;
 const V2_NOUN_ID_RE = /^\/v2\/noun\/(\d+)\/?$/;
 
@@ -41,10 +46,11 @@ const V2_NOUN_ID_RE = /^\/v2\/noun\/(\d+)\/?$/;
  * etc.) is rendered DAO-agnostic and the global toggle is a no-op there.
  */
 export function routeHasDaoToggle(pathname: string): boolean {
-  if (pathname === '/' || pathname === '/v2') return true;
-  if (V1_NOUN_ID_RE.test(pathname)) return true;
-  if (V2_NOUN_ID_RE.test(pathname)) return true;
-  if (pathname === '/crystal-ball' || pathname === '/v2/crystal-ball') return true;
+  const p = pathname.toLowerCase();
+  if (p === '/' || p === '/v2') return true;
+  if (V1_NOUN_ID_RE.test(p)) return true;
+  if (V2_NOUN_ID_RE.test(p)) return true;
+  if (p === '/crystal-ball' || p === '/v2/crystal-ball') return true;
   return false;
 }
 
@@ -56,7 +62,10 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
 
   const setActiveDao = useCallback(
     (next: ActiveDao) => {
-      const pathname = location.pathname;
+      // Match the source pathname case-insensitively so a capital-V link
+      // (`/V2`, `/V2/Noun/123`) still toggles cleanly. Targets we generate
+      // below are always canonical lowercase.
+      const pathname = location.pathname.toLowerCase();
 
       // Determine the destination based on the current path. Only the
       // namespaced routes participate; everything else is a no-op so the
