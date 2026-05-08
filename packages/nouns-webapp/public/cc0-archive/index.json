@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-06T23:00:54.928Z",
+  "creators": [
+    {
+      "id": "duckhead",
+      "name": "Duckhead",
+      "file": "creators/duckhead.json",
+      "assetCount": 0
+    },
+    {
+      "id": "hugo",
+      "name": "Hugo",
+      "file": "creators/hugo.json",
+      "assetCount": 0
+    },
+    {
+      "id": "nadiecito",
+      "name": "Nadiecito",
+      "file": "creators/nadiecito.json",
+      "assetCount": 0
+    },
+    {
+      "id": "sebastien",
+      "name": "Sebastien",
+      "file": "creators/sebastien.json",
+      "assetCount": 4231,
+      "inMemoriam": true
+    }
+  ]
+}
