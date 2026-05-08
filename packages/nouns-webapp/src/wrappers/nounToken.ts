@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { Address } from '@/utils/types';
 
 import { useEffect, useState } from 'react';
@@ -22,11 +23,7 @@ import { defaultChain } from '@/wagmi';
 
 import { cache, cacheKey, CHAIN_ID } from '../config';
 
-import {
-  accountEscrowedNounsQuery,
-  delegateNounsAtBlockQuery,
-  ownedNounsQuery,
-} from './subgraph';
+import { accountEscrowedNounsQuery, delegateNounsAtBlockQuery, ownedNounsQuery } from './subgraph';
 
 export interface INounSeed {
   accessory: number;
@@ -161,10 +158,68 @@ export const useNounSeeds = () => {
       if (!cancelled) setSeeds(seedObj);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [seeds]);
 
   return seeds;
+};
+
+// Ponder response shape for the burned-auction lookup
+interface BurnedAuctionsResponse {
+  auctions: { items: Array<{ nounId: string }> };
+}
+
+/**
+ * Returns the set of nounIds that were burned at settlement (reserve-not-met).
+ * Backed by Ponder's `auctions.burned` column. Used by gallery surfaces to
+ * desaturate burned nouns while keeping the seed-driven art intact.
+ */
+export const useBurnedNounIds = (): Set<bigint> | undefined => {
+  const [ids, setIds] = useState<Set<bigint> | undefined>(undefined);
+
+  useEffect(() => {
+    const url = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
+    if (!url) return;
+
+    let cancelled = false;
+    (async () => {
+      const all: string[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 5; page++) {
+        try {
+          const afterClause = cursor ? `, after: "${cursor}"` : '';
+          const q = `query { auctions(where: { burned: true }, limit: 1000${afterClause}) { items { nounId } pageInfo { hasNextPage endCursor } } }`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: q }),
+          });
+          const json = (await res.json()) as {
+            data: BurnedAuctionsResponse & {
+              auctions: { pageInfo?: { hasNextPage: boolean; endCursor: string } };
+            };
+          };
+          const items = json.data?.auctions?.items;
+          if (!items || items.length === 0) break;
+          all.push(...items.map(i => i.nounId));
+          const pageInfo = json.data?.auctions?.pageInfo;
+          if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+          cursor = pageInfo.endCursor;
+        } catch {
+          break;
+        }
+      }
+      if (!cancelled) setIds(new Set(all.map(id => BigInt(id))));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return ids;
 };
 
 export const useNounSeed = (nounId: bigint): INounSeed | undefined => {

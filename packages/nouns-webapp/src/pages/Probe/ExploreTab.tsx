@@ -25,7 +25,7 @@ import { type SortOption, type TraitFilter, useNounFilters } from '@/hooks/useNo
 import { useOwnerFilter } from '@/hooks/useOwnerFilter';
 import { traitName } from '@/lib/traitName';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
-import { useNounSeeds } from '@/wrappers/nounToken';
+import { useBurnedNounIds, useNounSeeds } from '@/wrappers/nounToken';
 
 const MIN_CELL = 72;
 const GAP = 6;
@@ -156,6 +156,7 @@ const ExploreTab: React.FC = () => {
   const nounsList = useMemo(() => range(0, nounCount).map(BigInt), [nounCount]);
 
   const seeds = useNounSeeds();
+  const burnedIds = useBurnedNounIds();
   const { ownerAddress, setOwnerAddress, ownedNounIds } = useOwnerFilter();
 
   // 3D view mode — defaults off because the voxel grid doesn't always finish
@@ -451,7 +452,12 @@ const ExploreTab: React.FC = () => {
 
                   const nounId = filteredAndSorted[itemIndex];
                   const hasSeed = seeds?.[nounId.toString()] != null;
-                  const show2D = !view3D || !hasSeed;
+                  const isBurned = burnedIds?.has(nounId) ?? false;
+                  // Burned nouns are rendered via the 2D SVG path so the
+                  // grayscale CSS filter on the cell wrapper applies — the
+                  // 3D voxel overlay lives outside the wrapper and wouldn't
+                  // pick it up.
+                  const show2D = !view3D || !hasSeed || isBurned;
 
                   return (
                     <div
@@ -464,7 +470,7 @@ const ExploreTab: React.FC = () => {
                       onMouseLeave={() =>
                         view3D && setHoveredNounId(prev => (prev === nounId ? null : prev))
                       }
-                      className={`group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg ${view3D ? 'bg-transparent' : ''}`}
+                      className={`group relative cursor-pointer overflow-clip rounded-xl transition-transform hover:scale-105 hover:shadow-lg ${view3D ? 'bg-transparent' : ''} ${isBurned ? 'grayscale' : ''}`}
                       style={{ width: layout.cellSize, height: layout.cellSize }}
                     >
                       {/* 2D SVG only renders as a fallback when 3D can't yet render
@@ -525,6 +531,9 @@ const ExploreTab: React.FC = () => {
                       const nounId = filteredAndSorted[itemIndex];
                       const seed = seeds?.[nounId.toString()];
                       if (!seed) continue;
+                      // Burned nouns render via 2D so the grayscale CSS
+                      // applies — skip them in the 3D overlay layer.
+                      if (burnedIds?.has(nounId)) continue;
                       const cx =
                         containerLeft + colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
                       const cy = rowViewportY + layout.cellSize / 2;
