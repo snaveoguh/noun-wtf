@@ -125,3 +125,50 @@ export const MIN_NOUNS_FOR_DEPLOY = 4;
 export const MAX_DEPLOYS_PER_HOUR = 1;
 export const DEPLOY_ALLOWED_PATHS = ['packages/nouns-webapp/src/'] as const;
 export const GITHUB_REPO = process.env.GITHUB_REPO || 'snaveoguh/noun-wtf';
+// Branch the agent bases its feature branches on. Pinned to `staging` so the
+// agent can never accidentally derive work from (or push toward) `main`/prod.
+// Hard-coded — no env override — to avoid a misconfigured deployment letting
+// the agent climb back onto main.
+export const DEPLOY_BASE_BRANCH = 'staging';
+
+// ─── Patch Safety ──────────────────────────────────────────────────────────
+//
+// Defence-in-depth against an LLM-generated (or prompt-injected) patch
+// shipping malware. A determined attacker can probably evade pattern-matching,
+// so the *primary* gate is the Netlify hook being opt-in (see
+// NOUNIRL_AUTO_DEPLOY in deployer.ts) — this list is the secondary filter.
+export const DEPLOY_MAX_PATCH_FILES = 5;
+export const DEPLOY_MAX_PATCH_BYTES = 50_000;
+
+// Files the agent must never touch — wallet/config/contract glue, top-level
+// app entry points, route tables. Anything that controls money flow, env, or
+// where the user lands. Suffix-match against the patch path.
+export const DEPLOY_DENY_PATH_SUFFIXES = [
+  '/config.ts',
+  '/wagmi.ts',
+  '/App.tsx',
+  '/main.tsx',
+  '/index.tsx',
+  '/store.ts',
+] as const;
+
+// Source-content patterns that almost never appear in legitimate edits and
+// are common in injection / exfiltration payloads. Each entry blocks the
+// patch with the given reason. Intentionally conservative — false positives
+// are recoverable (re-prompt the agent), false negatives ship malware.
+export const DEPLOY_DENY_SOURCE_PATTERNS: ReadonlyArray<{ re: RegExp; reason: string }> = [
+  { re: /\beval\s*\(/, reason: 'eval()' },
+  { re: /\bnew\s+Function\s*\(/, reason: 'new Function() constructor' },
+  { re: /\bdangerouslySetInnerHTML\b/, reason: 'dangerouslySetInnerHTML' },
+  { re: /<script\b[^>]*\bsrc\s*=/i, reason: 'remote <script src>' },
+  { re: /\bimport\s*\(\s*["'`]https?:\/\//, reason: 'dynamic import() of remote URL' },
+  { re: /\bfrom\s+["'`]https?:\/\//, reason: 'static import from remote URL' },
+  { re: /\bdata:text\/html/i, reason: 'data:text/html URI' },
+  { re: /["'`]\s*javascript:/i, reason: 'javascript: URL scheme' },
+  // Hardcoded external redirect — covers obvious phishing redirects. Internal
+  // route changes use react-router, not window.location.
+  {
+    re: /window\.location(?:\.[a-z]+)?\s*=\s*["'`]https?:\/\//i,
+    reason: 'hardcoded window.location external redirect',
+  },
+];
