@@ -1,0 +1,21 @@
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.timeRemaining {
+  transition: color 0.3s ease, font-weight 0.3s ease;
+}
+
+.timeRemaining.urgent {
+  animation: pulse 1s infinite;
+  color: #ff4444;
+  font-weight: bold;
+}
