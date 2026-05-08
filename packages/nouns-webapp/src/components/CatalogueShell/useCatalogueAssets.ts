@@ -20,6 +20,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ImageData } from '@noundry/nouns-assets';
 
+import {
+  loadAllArchive,
+  type ArchiveAsset,
+  type ArchiveManifest,
+  type ArchiveMediaType,
+} from '@/cc0-archive';
 import { useDreams } from '@/components/DreamsBanner';
 import { NOUNS_WORLD_STORIES } from '@/components/NounsWorldBanner';
 import { useAppSelector } from '@/hooks';
@@ -35,6 +41,7 @@ export type AssetCollection =
   | 'dream'
   | 'nouns-world'
   | 'cc0-lib'
+  | 'cc0-archive'
   | 'probe-dream'
   | 'lil-trait'
   | 'probe-trait'
@@ -266,7 +273,7 @@ function useLilTraitAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
       const step = Math.max(1, Math.floor(arr.length / cap));
       for (let i = 0; i < arr.length; i += step) {
         const img = arr[i];
-        if (!img) continue;
+        if (img == null) continue;
         const bg = bgColors[i % bgColors.length] || bgColors[0];
         const grid = decodeRLE(img.data, palette);
         const cleanName =
@@ -305,10 +312,7 @@ const PROBE_DREAM_SAMPLE_SIZE = 80;
 
 function buildProbeDreamAssets(): CatalogueAsset[] {
   const out: CatalogueAsset[] = [];
-  const step = Math.max(
-    1,
-    Math.floor(PROBE_DREAM_RENDERED_COUNT / PROBE_DREAM_SAMPLE_SIZE),
-  );
+  const step = Math.max(1, Math.floor(PROBE_DREAM_RENDERED_COUNT / PROBE_DREAM_SAMPLE_SIZE));
   for (let id = 1; id < PROBE_DREAM_RENDERED_COUNT; id += step) {
     out.push({
       id: `probe-dream-${id}`,
@@ -342,54 +346,189 @@ const PROBE_TRAIT_FILES = (() => {
   // NOTE: hard-coded list (sampled subset) is kept in sync via build script.
   // Falls back to a minimal stub list if globbing isn't available.
   return [
-    '215_Symbit-head-v11.png', '217_white-glyph.png', '222_tumbleweed.png', '223_glogs.png',
-    '224_skull-head-test.png', '225_raybans.png', '226_rainbow-road.png', '228_glitch.png',
-    '229_turnip.png', '230_marmite.png', '231_thicc.png', '232_wiiiiidez.png',
-    '234_noundry-studio-head_31.png', '235_thiccorange.png', '236_pipe.png', '242_gogs-white.png',
-    '243_deepfried-punk.png', '244_orca-deepfried.png', '245_spidey-suit.png', '246_mog.png',
-    '248_cool-car.png', '249_thiccored.png', '250_thiccoblack.png', '258_Hanounken.png',
-    '267_chad.png', '268_nounsgame.png', '276_lil_oversized.png', '277_Symbit-head-v16.png',
-    '281_lil_pipe_v289.png', '282_white_noogles-v2.png', '286_stretch-eye-strong.png',
-    '287_retro.png', '288_choose_rich.png', '289_pipe_v_497.png', '290_gogs-black-v8.png',
-    '291_spider.png', '292_L.png', '293_soyboy.png', '294_re-evaluating.png',
-    '295_still_re-evaluating.png', '296_pipe_v78.png', '298_pipe_v79.png', '300_Truck.png',
-    '309_pineal_moth.png', '310_lavender_moth.png', '311_white_noogles-v5.png',
-    '312_white_noogles-v6.png', '314_dog-dalmation.png', '316_dehydrated-dalmation.png',
-    '317_tetirs_vibe.png', '322_Hanounken-v6.png', '323_Coco.png', '325_Beans.png',
-    '326_Banana_split.png', '329_WOLF.png', '335_wolf.png', '337_punk-deepfried-v12.png',
-    '338_crystal_bowl.png', '341_sushi.png', '342_mayo.png', '343_Water.png',
-    '344_reevaluate.png', '348_lintprobe.png', '349_durag-lint.png', '356_durag.png',
-    '357_pipe_1446.png', '358_abacus.png', '362_noundry-studio-noun_-_2025-05-18T200453430.png',
-    '366_golfhead.png', '367_e-pipe.png', '368_hugebeardpipe.png', '375_colorful-mamba.png',
-    '376_benny-blanco.png', '377_fbh_ancient_cave_art.png', '378_mr_mole_black_and_white.png',
-    '379_mr_mole.png', '381_Q-anon.png', '385_pizza_day.png', '394_FREE.png',
-    '395_free-checker.png', '396_jumpsuit-p.png', '404_wolf2.png', '406_Hamster_v9.png',
-    '407_tarantula.png', '414_Elephant_v10.png', '416_bag_of_karots.png', '419_moneybag.png',
-    '420_bag_wif_pipe.png', '422_Turkey.png', '423_Hakuryu.png', '424_pigeon_wif_headfones.png',
-    '425_sunrise.png', '427_juice_box.png', '429_chocolate-melting.png', '431_ant-eater.png',
-    '432_dream_chocolate.png', '433_wolf3000.png', '435_windows.png', '436_doors-french.png',
-    '439_Quokka_v2.png', '440_dots.png', '444_golfer.png', '446_spaceship.png',
-    '447_founder_house.png', '448_Tube_paint_v6.png', '450_ladybug3.png', '451_splash.png',
-    '453_pirateflag.png', '455_mole.png', '456_tablelamp.png', '458_rook.png',
-    '459_blender.png', '460_dead_coral.png', '466_paper_cup.png', '467_door.png',
-    '468_polar_bear.png', '481_throne.png', '484_bludisc.png', '489_slug.png',
-    '490_Astronaut_helmet.png', '491_mantis.png', '492_doberman.png', '493_pinocho.png',
-    '498_hyrax.png', '503_guillotine.png', '504_Projector-head_1.png', '505_Foot-head.png',
-    '506_Giant-ape.png', '508_chicken_nuggets.png', '509_Abacus-head_1.png', '510_goostavo.png',
-    '513_oil-pastel-set.png', '514_eeyore-cc0.png', '515_vimana.png', '521_mold.png',
-    '525_bread.png', '530_bulbasaur.png', '546_rocktoshi.png', '548_canvas.png',
-    '549_Pablos_Palette.png', '556_Rhino-head.png', '557_Comb-head.png',
-    '562_ticket_for_the_train.png', '604_Doctor_Plague.png', '610_palette_head.png',
-    '611_Clock-rabbit-head_1.png', '623_mammmy.png', '628_Park-Bench-head.png',
-    '634_Fossil.png', '635_scarf.png', '638_chonky.png', '640_square_eyes.png',
-    '645_swaggy_frames.png', '646_pipes_bench.png', '649_slot_machine.png', '652_Pirate-Hook-head_1.png',
-    '653_Park_Bench.png', '656_golf_club.png', '657_wack.png', '658_noogles.png',
-    '665_DIRE_WOLF.png', '667_RHINO.png', '674_TOxic_Waste.png', '697_smelly_cat.png',
-    '698_yellow_cat.png', '699_collective_cat.png', '700_Emerald.png', '701_Banana_Split.png',
-    '702_Plaster_Cast.png', '704_fried_hot_dog_with_pool_cue.png', '705_CAP.png',
-    '707_1000023223.png', '708_Cap-head.png', '709_Matches-Box-head.png', '710_French-Fries-head.png',
-    '711_Trophy-head.png', '713_Urine_Test.png', '714_Stethoscope-head.png', '715_Urine-Test-head.png',
-    '717_mega-fried.png', '718_Humidifier-head.png', '719_Drums.png', '720_kewala_wip7.png',
+    '215_Symbit-head-v11.png',
+    '217_white-glyph.png',
+    '222_tumbleweed.png',
+    '223_glogs.png',
+    '224_skull-head-test.png',
+    '225_raybans.png',
+    '226_rainbow-road.png',
+    '228_glitch.png',
+    '229_turnip.png',
+    '230_marmite.png',
+    '231_thicc.png',
+    '232_wiiiiidez.png',
+    '234_noundry-studio-head_31.png',
+    '235_thiccorange.png',
+    '236_pipe.png',
+    '242_gogs-white.png',
+    '243_deepfried-punk.png',
+    '244_orca-deepfried.png',
+    '245_spidey-suit.png',
+    '246_mog.png',
+    '248_cool-car.png',
+    '249_thiccored.png',
+    '250_thiccoblack.png',
+    '258_Hanounken.png',
+    '267_chad.png',
+    '268_nounsgame.png',
+    '276_lil_oversized.png',
+    '277_Symbit-head-v16.png',
+    '281_lil_pipe_v289.png',
+    '282_white_noogles-v2.png',
+    '286_stretch-eye-strong.png',
+    '287_retro.png',
+    '288_choose_rich.png',
+    '289_pipe_v_497.png',
+    '290_gogs-black-v8.png',
+    '291_spider.png',
+    '292_L.png',
+    '293_soyboy.png',
+    '294_re-evaluating.png',
+    '295_still_re-evaluating.png',
+    '296_pipe_v78.png',
+    '298_pipe_v79.png',
+    '300_Truck.png',
+    '309_pineal_moth.png',
+    '310_lavender_moth.png',
+    '311_white_noogles-v5.png',
+    '312_white_noogles-v6.png',
+    '314_dog-dalmation.png',
+    '316_dehydrated-dalmation.png',
+    '317_tetirs_vibe.png',
+    '322_Hanounken-v6.png',
+    '323_Coco.png',
+    '325_Beans.png',
+    '326_Banana_split.png',
+    '329_WOLF.png',
+    '335_wolf.png',
+    '337_punk-deepfried-v12.png',
+    '338_crystal_bowl.png',
+    '341_sushi.png',
+    '342_mayo.png',
+    '343_Water.png',
+    '344_reevaluate.png',
+    '348_lintprobe.png',
+    '349_durag-lint.png',
+    '356_durag.png',
+    '357_pipe_1446.png',
+    '358_abacus.png',
+    '362_noundry-studio-noun_-_2025-05-18T200453430.png',
+    '366_golfhead.png',
+    '367_e-pipe.png',
+    '368_hugebeardpipe.png',
+    '375_colorful-mamba.png',
+    '376_benny-blanco.png',
+    '377_fbh_ancient_cave_art.png',
+    '378_mr_mole_black_and_white.png',
+    '379_mr_mole.png',
+    '381_Q-anon.png',
+    '385_pizza_day.png',
+    '394_FREE.png',
+    '395_free-checker.png',
+    '396_jumpsuit-p.png',
+    '404_wolf2.png',
+    '406_Hamster_v9.png',
+    '407_tarantula.png',
+    '414_Elephant_v10.png',
+    '416_bag_of_karots.png',
+    '419_moneybag.png',
+    '420_bag_wif_pipe.png',
+    '422_Turkey.png',
+    '423_Hakuryu.png',
+    '424_pigeon_wif_headfones.png',
+    '425_sunrise.png',
+    '427_juice_box.png',
+    '429_chocolate-melting.png',
+    '431_ant-eater.png',
+    '432_dream_chocolate.png',
+    '433_wolf3000.png',
+    '435_windows.png',
+    '436_doors-french.png',
+    '439_Quokka_v2.png',
+    '440_dots.png',
+    '444_golfer.png',
+    '446_spaceship.png',
+    '447_founder_house.png',
+    '448_Tube_paint_v6.png',
+    '450_ladybug3.png',
+    '451_splash.png',
+    '453_pirateflag.png',
+    '455_mole.png',
+    '456_tablelamp.png',
+    '458_rook.png',
+    '459_blender.png',
+    '460_dead_coral.png',
+    '466_paper_cup.png',
+    '467_door.png',
+    '468_polar_bear.png',
+    '481_throne.png',
+    '484_bludisc.png',
+    '489_slug.png',
+    '490_Astronaut_helmet.png',
+    '491_mantis.png',
+    '492_doberman.png',
+    '493_pinocho.png',
+    '498_hyrax.png',
+    '503_guillotine.png',
+    '504_Projector-head_1.png',
+    '505_Foot-head.png',
+    '506_Giant-ape.png',
+    '508_chicken_nuggets.png',
+    '509_Abacus-head_1.png',
+    '510_goostavo.png',
+    '513_oil-pastel-set.png',
+    '514_eeyore-cc0.png',
+    '515_vimana.png',
+    '521_mold.png',
+    '525_bread.png',
+    '530_bulbasaur.png',
+    '546_rocktoshi.png',
+    '548_canvas.png',
+    '549_Pablos_Palette.png',
+    '556_Rhino-head.png',
+    '557_Comb-head.png',
+    '562_ticket_for_the_train.png',
+    '604_Doctor_Plague.png',
+    '610_palette_head.png',
+    '611_Clock-rabbit-head_1.png',
+    '623_mammmy.png',
+    '628_Park-Bench-head.png',
+    '634_Fossil.png',
+    '635_scarf.png',
+    '638_chonky.png',
+    '640_square_eyes.png',
+    '645_swaggy_frames.png',
+    '646_pipes_bench.png',
+    '649_slot_machine.png',
+    '652_Pirate-Hook-head_1.png',
+    '653_Park_Bench.png',
+    '656_golf_club.png',
+    '657_wack.png',
+    '658_noogles.png',
+    '665_DIRE_WOLF.png',
+    '667_RHINO.png',
+    '674_TOxic_Waste.png',
+    '697_smelly_cat.png',
+    '698_yellow_cat.png',
+    '699_collective_cat.png',
+    '700_Emerald.png',
+    '701_Banana_Split.png',
+    '702_Plaster_Cast.png',
+    '704_fried_hot_dog_with_pool_cue.png',
+    '705_CAP.png',
+    '707_1000023223.png',
+    '708_Cap-head.png',
+    '709_Matches-Box-head.png',
+    '710_French-Fries-head.png',
+    '711_Trophy-head.png',
+    '713_Urine_Test.png',
+    '714_Stethoscope-head.png',
+    '715_Urine-Test-head.png',
+    '717_mega-fried.png',
+    '718_Humidifier-head.png',
+    '719_Drums.png',
+    '720_kewala_wip7.png',
     '721_ICE_CREAM_VAN_BY_SETH_6.png',
   ];
 })();
@@ -610,6 +749,93 @@ function useCC0LibAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
   return { items, isLoading };
 }
 
+// ─── cc0-archive (curated creators) ─────────────────────────────────────────
+
+function archiveMediaTo(media: ArchiveMediaType): {
+  bucket: AssetMediaType;
+  isPixel: boolean;
+} {
+  switch (media) {
+    case 'pixel':
+      return { bucket: 'pixel', isPixel: true };
+    case 'svg':
+      return { bucket: 'svg', isPixel: false };
+    case 'video':
+      return { bucket: 'video', isPixel: false };
+    case 'audio':
+      return { bucket: 'audio', isPixel: false };
+    case '3d':
+      return { bucket: '3d', isPixel: false };
+    case 'gif':
+    case 'image':
+      return { bucket: 'image', isPixel: false };
+    default:
+      return { bucket: 'other', isPixel: false };
+  }
+}
+
+function archiveAssetToCatalogue(
+  a: ArchiveAsset,
+  creatorById: Map<string, ArchiveManifest['creator']>,
+): CatalogueAsset {
+  const creator = creatorById.get(a.creatorId);
+  const creatorName = creator?.name || a.creatorId;
+  const memorial = creator?.inMemoriam === true ? ' · in memoriam' : '';
+  const { bucket, isPixel } = archiveMediaTo(a.mediaType);
+  const ts = a.createdAt ? Date.parse(a.createdAt) : Date.parse(a.ingestedAt);
+  return {
+    id: `archive-${a.id}`,
+    title: a.title,
+    subtitle: `${creatorName}${memorial}`,
+    image: a.mediaUrl,
+    fileUrl: a.mirrorUrl ?? a.mediaUrl,
+    href: a.sourceUrl,
+    sourceUrl: a.sourceUrl,
+    sourceLabel: a.source,
+    collection: 'cc0-archive',
+    media: bucket,
+    isPixel,
+    category: a.source,
+    tags: ['cc0', `creator-${a.creatorId}`, ...a.tags].filter((t, i, arr) => arr.indexOf(t) === i),
+    timestamp: Number.isFinite(ts) ? ts : undefined,
+    meta: { creatorId: a.creatorId, license: a.license, mimeType: a.mimeType },
+  };
+}
+
+/**
+ * Fetches the archive lazily — index.json then every creator manifest in
+ * parallel. The catalogue is the only consumer; if/when the manifests grow
+ * past a few MB we'll page-load by creator on demand instead of all at once.
+ */
+function useArchiveAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
+  const [items, setItems] = useState<CatalogueAsset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const manifests = await loadAllArchive();
+        if (cancelled) return;
+        const creatorById = new Map(manifests.map(m => [m.creator.id, m.creator]));
+        const all = manifests.flatMap(m =>
+          m.assets.map(a => archiveAssetToCatalogue(a, creatorById)),
+        );
+        setItems(all);
+      } catch {
+        // Best-effort — archive failure shouldn't break the catalogue.
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { items, isLoading };
+}
+
 // ─── Other source adapters ──────────────────────────────────────────────────
 
 const PROPDATES_BASE = 'https://propdates.nouns.wtf/prop/';
@@ -627,6 +853,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
   const probeTraits = useMemo(buildProbeTraitAssets, []);
   const pastNouns = useMemo(buildPastNounAssets, []);
   const sketches = useMemo(buildSketchAssets, []);
+  const archive = useArchiveAssets();
   const stories = NOUNS_WORLD_STORIES;
   const activeAuction = useAppSelector(s => s.auction.activeAuction);
 
@@ -653,7 +880,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
       });
     }
 
-    if (propdates.data) {
+    if (propdates.data != null) {
       for (const p of propdates.data) {
         if (!p.imageUrl) continue;
         all.push({
@@ -685,9 +912,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
         // bake all three into one composite SVG with foreignObject so the
         // catalogue card shows the full noun, not just the base layers.
         let img: string | null = null;
-        const baseSvgDataUrl = d.svgBase64
-          ? `data:image/svg+xml;base64,${d.svgBase64}`
-          : null;
+        const baseSvgDataUrl = d.svgBase64 ? `data:image/svg+xml;base64,${d.svgBase64}` : null;
         const topSvgDataUrl = d.glassesSvgBase64
           ? `data:image/svg+xml;base64,${d.glassesSvgBase64}`
           : null;
@@ -704,9 +929,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
             );
           }
           if (topSvgDataUrl) {
-            layers.push(
-              `<image href="${topSvgDataUrl}" x="0" y="0" width="320" height="320" />`,
-            );
+            layers.push(`<image href="${topSvgDataUrl}" x="0" y="0" width="320" height="320" />`);
           }
           const composite = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" shape-rendering="crispEdges">${layers.join('')}</svg>`;
           img = `data:image/svg+xml;utf8,${encodeURIComponent(composite)}`;
@@ -739,6 +962,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
     for (const t of probeTraits) all.push(t);
     for (const n of pastNouns) all.push(n);
     for (const s of sketches) all.push(s);
+    for (const a of archive.items) all.push(a);
 
     for (let i = 0; i < stories.length; i++) {
       const s = stories[i];
@@ -771,6 +995,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
     probeTraits,
     pastNouns,
     sketches,
+    archive.items,
     stories,
     activeAuction,
     cc0.items,
@@ -782,6 +1007,7 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
       propdates.isLoading ||
       dreams.isLoading ||
       cc0.isLoading ||
-      lilTraits.isLoading,
+      lilTraits.isLoading ||
+      archive.isLoading,
   };
 }
