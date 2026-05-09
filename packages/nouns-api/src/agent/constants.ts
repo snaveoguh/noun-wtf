@@ -125,11 +125,19 @@ export const MIN_NOUNS_FOR_DEPLOY = 4;
 export const MAX_DEPLOYS_PER_HOUR = 1;
 export const DEPLOY_ALLOWED_PATHS = ['packages/nouns-webapp/src/'] as const;
 export const GITHUB_REPO = process.env.GITHUB_REPO || 'snaveoguh/noun-wtf';
-// Branch the agent bases its feature branches on. Pinned to `staging` so the
-// agent can never accidentally derive work from (or push toward) `main`/prod.
-// Hard-coded — no env override — to avoid a misconfigured deployment letting
-// the agent climb back onto main.
-export const DEPLOY_BASE_BRANCH = 'staging';
+// The single mutable branch the agent ships every commit onto. Netlify
+// branch-deploys this to a fixed dev URL (DEV_NOUN_URL). Hard-coded — no env
+// override — so a misconfigured deployment can never redirect the agent's
+// pushes onto `main`/prod or any other branch. Each `applyAndDeploy` call
+// fast-forwards `dev-noun` to a new commit; pip merges `dev-noun` → `main`
+// manually after reviewing the live preview.
+export const DEPLOY_BASE_BRANCH = 'dev-noun';
+
+// Always-on Netlify URL that branch-deploys `dev-noun`. Reported back to the
+// terminal user after every deploy so they can preview the change live and
+// share the link with pip for review. Override via env when the Netlify
+// branch-deploy URL is finalized.
+export const DEV_NOUN_URL = process.env.DEV_NOUN_URL ?? 'https://dev-noun--noun-wtf.netlify.app';
 
 // ─── Patch Safety ──────────────────────────────────────────────────────────
 //
