@@ -1,12 +1,18 @@
 // ─── Agent NounIRL — Trait Prediction & Matching ────────────────────────────
 //
-// Mirrors NounsSeeder.sol:
+// Mirrors NounsSeeder.sol (V1):
 //   pseudorandomness = keccak256(abi.encodePacked(blockhash(block.number - 1), nounId))
 //   background = uint48(pseudorandomness) % backgroundCount
 //   body = uint48(pseudorandomness >> 48) % bodyCount
 //   accessory = uint48(pseudorandomness >> 96) % accessoryCount
 //   head = uint48(pseudorandomness >> 144) % headCount
 //   glasses = uint48(pseudorandomness >> 192) % glassesCount
+//
+// V2 (NounV2SlobberSeeder @ 0xd777E701506A86fE89f07f963aA6c08d6905cFF8) differs:
+//   1. accessory range is [0, accessoryCount - 1) with a +1 skip past SLOBBER_INDEX,
+//      so slobber is excluded from random rotation.
+//   2. If accessory == GREASE_INDEX (137) and head ∈ {RETAINER (173), INDEX_CARD (237)},
+//      bits 240..255 of the same pseudorandomness gate a 50/50 swap to SLOBBER_INDEX (143).
 
 import { keccak256, encodePacked, type Hex } from 'viem';
 import { ImageData } from '@noundry/nouns-assets';
@@ -30,6 +36,31 @@ export interface TraitNames {
   glasses: string;
 }
 
+export type SeederVariant = 'v1' | 'v2';
+
+export interface PredictSeedOptions {
+  /**
+   * Which on-chain seeder to mirror. Defaults to 'v1' (the standard
+   * NounsSeeder used by the original Nouns DAO). Use 'v2' to apply the
+   * NounV2SlobberSeeder rule on top of the standard pseudorandomness:
+   *   - accessory is sampled from [0, accessoryCount - 1) with a +1
+   *     skip past SLOBBER_INDEX, so slobber is never picked at random;
+   *   - if accessory lands on grease and head is retainer or index-card,
+   *     bits 240..255 of the same pseudorandomness gate a 50/50 swap to
+   *     slobber.
+   */
+  dao?: SeederVariant;
+}
+
+// ─── Slobber Rule Constants ────────────────────────────────────────────────
+// Mirror NounV2SlobberSeeder.sol. Hardcoded indices for the V2 descriptor at
+// deploy time — change here only if the on-chain seeder is redeployed with
+// different indices.
+export const V2_GREASE_INDEX = 137;
+export const V2_RETAINER_INDEX = 173;
+export const V2_INDEX_CARD_INDEX = 237;
+export const V2_SLOBBER_INDEX = 143;
+
 // ─── Seed Prediction ───────────────────────────────────────────────────────
 
 /**
@@ -37,8 +68,15 @@ export interface TraitNames {
  *
  * @param blockHash - The parent block's hash (blockhash(block.number - 1))
  * @param nounId - The noun ID that would be minted
+ * @param options - Optional seeder variant ('v1' default, 'v2' for slobber rule)
  */
-export function predictSeed(blockHash: Hex, nounId: number): NounSeed {
+export function predictSeed(
+  blockHash: Hex,
+  nounId: number,
+  options: PredictSeedOptions = {},
+): NounSeed {
+  const variant: SeederVariant = options.dao ?? 'v1';
+
   // Replicate Solidity: keccak256(abi.encodePacked(blockhash, nounId))
   const pseudorandomness = BigInt(
     keccak256(encodePacked(['bytes32', 'uint256'], [blockHash, BigInt(nounId)])),
@@ -47,13 +85,39 @@ export function predictSeed(blockHash: Hex, nounId: number): NounSeed {
   // Extract 48-bit chunks via right shift + mask
   const mask48 = (1n << 48n) - 1n;
 
-  return {
-    background: Number((pseudorandomness & mask48) % BigInt(TRAIT_COUNTS.background)),
-    body: Number(((pseudorandomness >> 48n) & mask48) % BigInt(TRAIT_COUNTS.body)),
-    accessory: Number(((pseudorandomness >> 96n) & mask48) % BigInt(TRAIT_COUNTS.accessory)),
-    head: Number(((pseudorandomness >> 144n) & mask48) % BigInt(TRAIT_COUNTS.head)),
-    glasses: Number(((pseudorandomness >> 192n) & mask48) % BigInt(TRAIT_COUNTS.glasses)),
-  };
+  const background = Number((pseudorandomness & mask48) % BigInt(TRAIT_COUNTS.background));
+  const body = Number(((pseudorandomness >> 48n) & mask48) % BigInt(TRAIT_COUNTS.body));
+  const head = Number(((pseudorandomness >> 144n) & mask48) % BigInt(TRAIT_COUNTS.head));
+  const glasses = Number(((pseudorandomness >> 192n) & mask48) % BigInt(TRAIT_COUNTS.glasses));
+
+  let accessory: number;
+  if (variant === 'v2') {
+    // V2: skip-mapping excludes SLOBBER_INDEX from random rotation.
+    // Sample from [0, accessoryCount - 1), then shift any pick at-or-above
+    // SLOBBER_INDEX up by one. Effective range:
+    //   [0, SLOBBER_INDEX) ∪ (SLOBBER_INDEX, accessoryCount)
+    const accessoryRange = BigInt(TRAIT_COUNTS.accessory - 1);
+    let acc = Number(((pseudorandomness >> 96n) & mask48) % accessoryRange);
+    if (acc >= V2_SLOBBER_INDEX) acc += 1;
+
+    // Slobber rule: head ∈ {retainer, index-card} && accessory == grease
+    // → bits 240..255 of pseudorandomness gate a 50/50 swap to slobber.
+    // Solidity uses `(pseudorandomness >> 240) & 1`, which keeps the LSB of
+    // the top 16 bits — replicated here for parity.
+    if (
+      acc === V2_GREASE_INDEX &&
+      (head === V2_RETAINER_INDEX || head === V2_INDEX_CARD_INDEX)
+    ) {
+      const coin = (pseudorandomness >> 240n) & 1n;
+      if (coin === 1n) acc = V2_SLOBBER_INDEX;
+    }
+
+    accessory = acc;
+  } else {
+    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(TRAIT_COUNTS.accessory));
+  }
+
+  return { background, body, accessory, head, glasses };
 }
 
 // ─── Trait Name Resolution ─────────────────────────────────────────────────

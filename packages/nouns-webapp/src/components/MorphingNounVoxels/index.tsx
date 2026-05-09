@@ -24,7 +24,6 @@
  */
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
 import {
   seedToLayers,
   BODY_DEPTH,
@@ -34,6 +33,7 @@ import {
   type LayerVisibility,
   type NounLayers,
 } from '@nouns/voxel-engine';
+import { pickNounAssets } from '@/lib/nounAssets';
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -87,7 +87,15 @@ function layersToFlatVoxels(layers: NounLayers): FlatVoxel[] {
   return result;
 }
 
-function seedToFlatVoxels(seed: INounSeed, layerVisibility?: LayerVisibility): FlatVoxel[] {
+function seedToFlatVoxels(
+  seed: INounSeed,
+  layerVisibility?: LayerVisibility,
+  isV2: boolean = false,
+): FlatVoxel[] {
+  // V2-aware: pick V1 ImageData (npm `@noundry/nouns-assets`) or V2 ImageData
+  // (workspace `@nouns/assets`) so V2-only founder traits (slobber,
+  // missingnoun, white/black bodies) decode against the right palette.
+  const { ImageData, getNounData } = pickNounAssets(isV2);
   const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
   return layersToFlatVoxels(layers);
 }
@@ -321,8 +329,12 @@ function MorphScene({ oldVoxels, newVoxels, onComplete, autoRotate }: MorphScene
     // legible from multiple angles. autoRotate drives the steady-state
     // rotation in the static path; while morphing we add a small tween.
     if (groupRef.current && autoRotate) {
-      // Constant slow spin — matches OrbitControls autoRotate cadence.
-      groupRef.current.rotation.y += 0.004;
+      // Display-case float — gentle sine tilt around Y axis (±20°) plus tiny
+      // vertical bob, instead of full 360 rotation. Reads as "noun floating
+      // in a shop window" rather than "spinning artifact".
+      const tSec = performance.now() / 1000;
+      groupRef.current.rotation.y = Math.sin(tSec * 0.4) * 0.35;
+      groupRef.current.position.y = Math.sin(tSec * 0.6) * 0.08;
     }
 
     if (elapsed >= totalDurationMs && !doneRef.current) {
@@ -509,9 +521,10 @@ interface MorphingSceneProps {
   seed: INounSeed;
   autoRotate: boolean;
   layerVisibility?: LayerVisibility;
+  isV2?: boolean;
 }
 
-function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps) {
+function MorphingScene({ seed, autoRotate, layerVisibility, isV2 = false }: MorphingSceneProps) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
   // Curated 3D head GLBs are intentionally NOT used here. NounParallax
@@ -523,8 +536,8 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
   // orb and match the rest of the voxel body, so we just always use
   // them here.
   const currentVoxels = useMemo(
-    () => seedToFlatVoxels(seed, layerVisibility),
-    [seedKey, layerVisibility],
+    () => seedToFlatVoxels(seed, layerVisibility, isV2),
+    [seedKey, layerVisibility, isV2],
   );
 
   const prevSeedKeyRef = useRef<string | null>(null);
@@ -579,11 +592,14 @@ function MorphingScene({ seed, autoRotate, layerVisibility }: MorphingSceneProps
 
 export interface MorphingNounVoxelsProps {
   seed: INounSeed;
-  /** Auto-rotate the noun once the morph settles. */
+  /** Auto-rotate the noun once the morph settles (now a gentle display-case float, not 360 spin). */
   autoRotate?: boolean;
   /** Allow OrbitControls drag/zoom — disabled by default (matches the orb framing). */
   interactive?: boolean;
   layerVisibility?: LayerVisibility;
+  /** True when rendering a NounV2 noun — uses ImageDataV2 from the workspace
+   *  `@nouns/assets` so V2-only founder traits render correctly. Default false. */
+  isV2?: boolean;
 }
 
 const MorphingNounVoxels: React.FC<MorphingNounVoxelsProps> = ({
@@ -591,6 +607,7 @@ const MorphingNounVoxels: React.FC<MorphingNounVoxelsProps> = ({
   autoRotate = true,
   interactive = false,
   layerVisibility,
+  isV2 = false,
 }) => {
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -607,7 +624,7 @@ const MorphingNounVoxels: React.FC<MorphingNounVoxelsProps> = ({
         dpr={[1, 1.5]}
       >
         <Suspense fallback={null}>
-          <MorphingScene seed={seed} autoRotate={autoRotate} layerVisibility={layerVisibility} />
+          <MorphingScene seed={seed} autoRotate={autoRotate} layerVisibility={layerVisibility} isV2={isV2} />
           {interactive && (
             <OrbitControls
               enablePan={false}
