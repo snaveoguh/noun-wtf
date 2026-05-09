@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 
-import { ImageDataV2 as ImageData } from '@nouns/assets';
+import { ImageData } from '@noundry/nouns-assets';
 
 interface ColorPaletteProps {
   activeColor: string;

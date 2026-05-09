@@ -1,3 +1,6 @@
+/* eslint-disable unicorn/no-nested-ternary */
+import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
+
 // Agent Hub client — replaces direct Anthropic SDK calls
 const AGENT_HUB_URL = process.env.AGENT_HUB_URL || 'http://localhost:3100';
 const AGENT_HUB_SECRET = process.env.AGENT_HUB_SECRET || '';
@@ -56,22 +59,115 @@ async function hubChat(request: HubChatRequest): Promise<HubChatResponse> {
   }
   return payload;
 }
+
+const NOUNIRL_PIPE_UNLOCK_MESSAGE =
+  'if you are here it is likely you know where to find my pipe, talk to him to get this unlocked';
+
+function isUpstreamAiFailure(errMsg: string) {
+  return /all providers failed|rate limit reached|credit limit exceeded|credit limit|429\b|402\b/i.test(
+    errMsg,
+  );
+}
+
+/**
+ * Fallback parser for when the LLM generates XML tool calls in its text response
+ * instead of returning structured tool_calls (common with Groq/Llama models).
+ * Mutates the response in-place: extracts tool calls, sets finishReason, strips XML from text.
+ */
+function patchXmlToolCalls(response: HubChatResponse): void {
+  // Normalize Anthropic's 'tool_use' → 'tool_calls' so the main loop condition works
+  if (response.finishReason === 'tool_use') {
+    response.finishReason = 'tool_calls';
+  }
+  if (response.finishReason === 'tool_calls' && response.toolCalls?.length) return; // already structured
+
+  const text = response.text ?? '';
+  const toolCalls: NonNullable<HubChatResponse['toolCalls']> = [];
+  let idx = 0;
+
+  // ── Format 1: <tool_call>{"name":"...", "arguments":{...}}</tool_call> ──
+  for (const m of text.matchAll(/<tool_call>\s*([\S\s]*?)\s*<\/tool_call>/g)) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      const name = parsed.name ?? parsed.function?.name;
+      const args = parsed.arguments ?? parsed.function?.arguments ?? {};
+      if (name) {
+        toolCalls.push({
+          id: `text-fallback-${idx++}`,
+          type: 'function',
+          function: { name, arguments: typeof args === 'string' ? args : JSON.stringify(args) },
+        });
+      }
+    } catch {
+      /* malformed JSON — skip */
+    }
+  }
+
+  // ── Format 2: <invoke name="..."><parameter name="...">value</parameter></invoke> ──
+  if (!toolCalls.length) {
+    const paramPattern = /<parameter\s+name="([^"]+)">([\S\s]*?)<\/parameter>/g;
+    for (const m of text.matchAll(/<invoke\s+name="([^"]+)">([\S\s]*?)<\/invoke>/g)) {
+      const params: Record<string, unknown> = {};
+      for (const pm of m[2].matchAll(paramPattern)) {
+        const raw = pm[2].trim();
+        try {
+          params[pm[1]] = JSON.parse(raw);
+        } catch {
+          params[pm[1]] = raw;
+        }
+      }
+      toolCalls.push({
+        id: `text-fallback-${idx++}`,
+        type: 'function',
+        function: { name: m[1], arguments: JSON.stringify(params) },
+      });
+    }
+  }
+
+  if (toolCalls.length) {
+    console.log(
+      `[NounIRL] Recovered ${toolCalls.length} tool call(s) from text: ${toolCalls.map(t => t.function.name).join(', ')}`,
+    );
+    response.toolCalls = toolCalls;
+    response.finishReason = 'tool_calls';
+    // Strip all tool-call markup from text so the user sees clean output
+    response.text =
+      text
+        .replace(/<tool_call>[\S\s]*?<\/tool_call>/g, '')
+        .replace(/<function_calls>[\S\s]*?<\/function_calls>/g, '')
+        .replace(/<invoke\s+name="[^"]*">[\S\s]*?<\/invoke>/g, '')
+        .trim() || null;
+  }
+}
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Agent NounIRL
 
-import { desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { graphql } from 'ponder';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import sharp from 'sharp';
-import { createPublicClient, http } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  decodeAbiParameters,
+  encodeFunctionData,
+  getAddress,
+  http,
+  type Hex,
+  parseEther,
+  parseUnits,
+  verifyTypedData,
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
+import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
 import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
 import {
   initAgent,
@@ -80,8 +176,7 @@ import {
   getAgentBalance,
   getWatcherState,
   checkNow,
-  predictSeed,
-  seedToTraitNames,
+  settleAuction,
   parseTraitDescription,
   getAllTraitNames,
   getDeployHistory,
@@ -94,6 +189,7 @@ import {
   buildMemoryContext,
   buildGovernanceContext,
   buildLiveAuctionContext,
+  buildProposalsAndGrantsContext,
   learnFromUrl,
   batchLearn,
   getKnowledgeStats,
@@ -105,7 +201,10 @@ import {
   searchPeople,
   getPeopleCount,
   buildPeopleContext,
+  detectFunction,
+  buildFunctionSkillPromptSnippet,
 } from '../agent/index.js';
+import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -117,6 +216,290 @@ const nounCheckClient = createPublicClient({
   chain: mainnet,
   transport: http(process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com'),
 });
+
+// ─── Proposal Transaction Primitives ───────────────────────────────────────
+// The LLM never hand-encodes hex calldata for token transfers anymore.
+// It picks a `kind` and gives human-readable amounts; the API does the math.
+// Falling back to raw {target,value,signature,calldata} is allowed but
+// guarded by a tight, address-aware sanity check.
+const TOKEN_ADDRESSES = {
+  USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+  STETH: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
+  PAYER: '0xd97Bcd9f47cEe35c0a9ec1dc40C1269afc9E8E1D',
+} as const;
+
+const TOKEN_DECIMALS: Record<string, number> = {
+  [TOKEN_ADDRESSES.USDC.toLowerCase()]: 6,
+  [TOKEN_ADDRESSES.WETH.toLowerCase()]: 18,
+  [TOKEN_ADDRESSES.STETH.toLowerCase()]: 18,
+};
+
+const ERC20_TRANSFER_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ type: 'bool' }],
+  },
+] as const;
+
+const PAYER_DEBT_ABI = [
+  {
+    type: 'function',
+    name: 'sendOrRegisterDebt',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+export type RawProposalTx = {
+  target: string;
+  value?: string;
+  signature?: string;
+  calldata?: string;
+};
+
+export type ProposalTxPrimitive =
+  | { kind: 'usdc_transfer'; recipient: string; amount: string }
+  | { kind: 'usdc_payer_debt'; recipient: string; amount: string }
+  | { kind: 'eth_transfer'; recipient: string; amountEth: string }
+  | { kind: 'weth_transfer'; recipient: string; amountEth: string }
+  | { kind: 'steth_transfer'; recipient: string; amountEth: string };
+
+export type ProposalTxInput = ProposalTxPrimitive | RawProposalTx;
+
+type CanonicalTx = {
+  target: string;
+  value: string;
+  signature: string;
+  calldata: string;
+};
+
+function isPrimitive(t: ProposalTxInput): t is ProposalTxPrimitive {
+  return typeof (t as { kind?: unknown }).kind === 'string';
+}
+
+function checkedAddress(
+  label: string,
+  raw: string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: getAddress(raw) };
+  } catch {
+    return { ok: false, error: `${label} is not a valid 0x-address: ${raw}` };
+  }
+}
+
+function expandPrimitive(
+  p: ProposalTxPrimitive,
+  idx: number,
+): { ok: true; tx: CanonicalTx } | { ok: false; error: string } {
+  switch (p.kind) {
+    case 'usdc_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let amount: bigint;
+      try {
+        amount = parseUnits(p.amount, 6);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] usdc_transfer: amount "${p.amount}" is not a valid USDC amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: TOKEN_ADDRESSES.USDC,
+          value: '0',
+          signature: 'transfer(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: ERC20_TRANSFER_ABI,
+            functionName: 'transfer',
+            args: [addr.value as `0x${string}`, amount],
+          }),
+        },
+      };
+    }
+    case 'usdc_payer_debt': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let amount: bigint;
+      try {
+        amount = parseUnits(p.amount, 6);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] usdc_payer_debt: amount "${p.amount}" is not a valid USDC amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: TOKEN_ADDRESSES.PAYER,
+          value: '0',
+          signature: 'sendOrRegisterDebt(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: PAYER_DEBT_ABI,
+            functionName: 'sendOrRegisterDebt',
+            args: [addr.value as `0x${string}`, amount],
+          }),
+        },
+      };
+    }
+    case 'eth_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let wei: bigint;
+      try {
+        wei = parseEther(p.amountEth);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] eth_transfer: amountEth "${p.amountEth}" is not a valid ETH amount.`,
+        };
+      }
+      return {
+        ok: true,
+        tx: {
+          target: addr.value,
+          value: wei.toString(),
+          signature: '',
+          calldata: '0x',
+        },
+      };
+    }
+    case 'weth_transfer':
+    case 'steth_transfer': {
+      const addr = checkedAddress(`tx[${idx}].recipient`, p.recipient);
+      if (!addr.ok) return { ok: false, error: addr.error };
+      let wei: bigint;
+      try {
+        wei = parseEther(p.amountEth);
+      } catch {
+        return {
+          ok: false,
+          error: `tx[${idx}] ${p.kind}: amountEth "${p.amountEth}" is not a valid amount.`,
+        };
+      }
+      const target = p.kind === 'weth_transfer' ? TOKEN_ADDRESSES.WETH : TOKEN_ADDRESSES.STETH;
+      return {
+        ok: true,
+        tx: {
+          target,
+          value: '0',
+          signature: 'transfer(address,uint256)',
+          calldata: encodeFunctionData({
+            abi: ERC20_TRANSFER_ABI,
+            functionName: 'transfer',
+            args: [addr.value as `0x${string}`, wei],
+          }),
+        },
+      };
+    }
+    default: {
+      const exhaustive: never = p;
+      return { ok: false, error: `Unknown primitive kind: ${JSON.stringify(exhaustive)}` };
+    }
+  }
+}
+
+// Sanity-check raw transactions. Address-aware: if the target is a known
+// token contract, we know its decimals and apply a tight bound. Otherwise
+// fall back to a generic 10^30 ceiling (catches the worst LLM blow-ups).
+function checkRawTx(raw: RawProposalTx, idx: number): string | null {
+  const sig = (raw.signature || '').trim();
+  if (sig !== 'transfer(address,uint256)' && sig !== 'sendOrRegisterDebt(address,uint256)') {
+    return null;
+  }
+  const cd = raw.calldata || '0x';
+  if (!cd.startsWith('0x') || cd.length < 10) return null;
+  // Strip selector if present (transfer/sendOrRegisterDebt both have 4-byte selectors)
+  const body = cd.replace(/^0x/, '');
+  const argHex = body.length >= 136 ? body.slice(8) : body;
+  if (argHex.length < 128) return null;
+  let amount: bigint;
+  try {
+    const decoded = decodeAbiParameters(
+      [{ type: 'address' }, { type: 'uint256' }],
+      ('0x' + argHex.padStart(128, '0')) as Hex,
+    );
+    amount = decoded[1] as bigint;
+  } catch {
+    return null;
+  }
+
+  const targetLower = (raw.target || '').toLowerCase();
+  const knownDecimals = TOKEN_DECIMALS[targetLower];
+  // sendOrRegisterDebt is USDC-only by contract design.
+  const effectiveDecimals = sig === 'sendOrRegisterDebt(address,uint256)' ? 6 : knownDecimals;
+
+  if (effectiveDecimals !== undefined) {
+    // Whole-token cap: 10 billion of any single token. Anything above is
+    // essentially guaranteed to be a decimal-scaling mistake. (10B USDC at
+    // 6 decimals = 10^16; 10B ETH at 18 decimals = 10^28.)
+    const maxRaw = 10n ** BigInt(10 + effectiveDecimals);
+    if (amount > maxRaw) {
+      let tokenName: string;
+      if (targetLower === TOKEN_ADDRESSES.USDC.toLowerCase()) tokenName = 'USDC';
+      else if (targetLower === TOKEN_ADDRESSES.WETH.toLowerCase()) tokenName = 'WETH';
+      else if (targetLower === TOKEN_ADDRESSES.STETH.toLowerCase()) tokenName = 'stETH';
+      else if (sig === 'sendOrRegisterDebt(address,uint256)') tokenName = 'USDC (Payer)';
+      else tokenName = `token@${raw.target}`;
+      return `tx[${idx}] (${sig} → ${tokenName}) decoded amount ${amount.toString()} exceeds 10B at ${effectiveDecimals} decimals. Almost certainly a scaling mistake — use the typed primitive (e.g. {kind:"usdc_transfer", amount:"20000"}) instead of raw calldata.`;
+    }
+  } else {
+    // Unknown token. Apply generic 10^30 ceiling.
+    const ABSURD = 10n ** 30n;
+    if (amount > ABSURD) {
+      return `tx[${idx}] (${sig}) decoded amount ${amount.toString()} is impossibly large — likely an encoding error.`;
+    }
+  }
+  return null;
+}
+
+export function expandProposalTransactions(
+  inputs: ProposalTxInput[] | undefined,
+): { ok: true; txs: CanonicalTx[] } | { ok: false; error: string } {
+  if (!inputs || inputs.length === 0) return { ok: true, txs: [] };
+  const out: CanonicalTx[] = [];
+  for (let i = 0; i < inputs.length; i++) {
+    const t = inputs[i];
+    if (!t) return { ok: false, error: `tx[${i}] is missing.` };
+    if (isPrimitive(t)) {
+      const exp = expandPrimitive(t, i);
+      if (!exp.ok) return { ok: false, error: exp.error };
+      out.push(exp.tx);
+    } else {
+      const targetCheck = checkedAddress(`tx[${i}].target`, t.target);
+      if (!targetCheck.ok) return { ok: false, error: targetCheck.error };
+      const raw: RawProposalTx = {
+        target: targetCheck.value,
+        value: t.value || '0',
+        signature: t.signature || '',
+        calldata: t.calldata || '0x',
+      };
+      const failure = checkRawTx(raw, i);
+      if (failure) return { ok: false, error: failure };
+      out.push({
+        target: raw.target,
+        value: raw.value!,
+        signature: raw.signature!,
+        calldata: raw.calldata!,
+      });
+    }
+  }
+  return { ok: true, txs: out };
+}
 
 // ─── Block Timing Helpers ──────────────────────────────────────────────────
 const BLOCK_TIME_SECONDS = 12;
@@ -190,11 +573,2190 @@ app.use(
   }),
 );
 
+// Request metrics
+app.use('*', metricsMiddleware);
+
 // ============================================================
-// GraphQL (Ponder)
+// GraphQL (Ponder) — with derived proposal status
 // ============================================================
-app.use('/', graphql({ db, schema }));
-app.use('/graphql', graphql({ db, schema }));
+
+// Cache latest block for status computation (refreshed every 30s)
+let cachedLatestBlock: bigint = 0n;
+let cachedBlockAt = 0;
+
+async function getLatestBlockCached(): Promise<bigint> {
+  if (Date.now() - cachedBlockAt < 30_000 && cachedLatestBlock > 0n) return cachedLatestBlock;
+  try {
+    cachedLatestBlock = await getCurrentBlock();
+    cachedBlockAt = Date.now();
+  } catch {
+    /* keep stale value */
+  }
+  return cachedLatestBlock;
+}
+
+/** Recursively walk a JSON value and patch any proposal-like objects with computed status */
+function patchProposalStatuses(data: unknown, latestBlock: bigint): void {
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data)) {
+    for (const item of data) patchProposalStatuses(item, latestBlock);
+    return;
+  }
+  const obj = data as Record<string, unknown>;
+  // A proposal-like object has status + endBlock + forVotes
+  if (typeof obj.status === 'string' && obj.endBlock !== undefined && obj.forVotes !== undefined) {
+    obj.status = computeDerivedStatus(
+      {
+        status: obj.status as string,
+        forVotes: Number(obj.forVotes),
+        againstVotes: Number(obj.againstVotes ?? 0),
+        quorumVotes: BigInt(obj.quorumVotes ?? 0),
+        endBlock: BigInt(obj.endBlock ?? 0),
+        objectionPeriodEndBlock: obj.objectionPeriodEndBlock
+          ? BigInt(obj.objectionPeriodEndBlock as string)
+          : null,
+        executionETA: obj.executionETA ? BigInt(obj.executionETA as string) : null,
+        onTimelockV1: obj.onTimelockV1 === true,
+        startBlock: BigInt(obj.startBlock ?? 0),
+      },
+      latestBlock,
+    );
+  }
+  // A grant-like object has status + endBlock + forVotes but NO quorumVotes
+  if (
+    typeof obj.status === 'string' &&
+    obj.endBlock !== undefined &&
+    obj.forVotes !== undefined &&
+    obj.quorumVotes === undefined &&
+    obj.snapshotBlock !== undefined
+  ) {
+    obj.status = computeDerivedGrantStatus(obj, latestBlock);
+  }
+
+  // Recurse into nested objects (items, proposals, node, edges, etc.)
+  for (const val of Object.values(obj)) {
+    if (val && typeof val === 'object') patchProposalStatuses(val, latestBlock);
+  }
+}
+
+/** Compute derived grant status — grants have no quorum, simple majority wins */
+function computeDerivedGrantStatus(g: Record<string, unknown>, latestBlock: bigint): string {
+  const status = g.status as string;
+  if (['CANCELED', 'EXECUTED'].includes(status)) return status;
+
+  if (status === 'QUEUED') {
+    if (g.executionETA) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const gracePeriod = 14 * 86400;
+      if (nowSeconds >= Number(g.executionETA) + gracePeriod) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+
+  // ACTIVE grants past endBlock: check votes
+  if (status === 'ACTIVE') {
+    const endBlock = BigInt(g.endBlock as string | number);
+    if (latestBlock > endBlock) {
+      const forVotes = Number(g.forVotes);
+      const againstVotes = Number(g.againstVotes ?? 0);
+      if (forVotes === 0 || forVotes <= againstVotes) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+  }
+
+  return status;
+}
+
+/**
+ * Middleware that:
+ * 1. Buffers Yoga's response fully to avoid Railway/Fastly chunked-transfer truncation
+ * 2. Computes derived proposal statuses
+ * 3. Re-emits with explicit Content-Length (no chunked encoding)
+ */
+async function graphqlWithDerivedStatus(
+  c: { res: Response; [key: string]: unknown },
+  next: () => Promise<void>,
+) {
+  await next();
+  const ct = c.res.headers.get('content-type') || '';
+  if (!ct.includes('json')) return;
+
+  // Read full body as text first — works even if JSON is malformed
+  let text: string;
+  try {
+    text = await c.res.text();
+  } catch {
+    return; // stream error — pass through
+  }
+
+  // Try to parse, patch statuses, re-stringify
+  try {
+    const body = JSON.parse(text);
+    if (body?.data) {
+      const latestBlock = await getLatestBlockCached();
+      if (latestBlock > 0n) patchProposalStatuses(body.data, latestBlock);
+    }
+    text = JSON.stringify(body);
+  } catch {
+    // Malformed JSON — still re-emit the raw text with proper headers
+  }
+
+  // Re-emit with explicit Content-Length and no chunked transfer-encoding
+  const headers = new Headers(c.res.headers);
+  headers.delete('transfer-encoding');
+  headers.set('content-length', String(new TextEncoder().encode(text).byteLength));
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+  c.res = new Response(text, { status: 200, headers });
+}
+
+app.use('/', graphqlWithDerivedStatus, graphql({ db, schema }));
+app.use('/graphql', graphqlWithDerivedStatus, graphql({ db, schema }));
+
+// ============================================================
+// REST endpoints — bypass GraphQL/Yoga chunked encoding (Fastly truncates it)
+// ============================================================
+
+/** All proposals with signers — single JSON response, no chunked encoding */
+app.get('/api/proposals', async c => {
+  const proposals = await db
+    .select()
+    .from(schema.proposal)
+    .orderBy(desc(schema.proposal.createdAtBlock));
+  const signers = await db.select().from(schema.proposalSigner);
+  const signerMap = new Map<string, string[]>();
+  for (const s of signers) {
+    const key = String(s.proposalId);
+    if (!signerMap.has(key)) signerMap.set(key, []);
+    signerMap.get(key)!.push(s.signer);
+  }
+  const latestBlock = await getLatestBlockCached();
+  const items = proposals.map(p => {
+    const item: Record<string, unknown> = {
+      ...p,
+      id: String(p.id),
+      startBlock: String(p.startBlock),
+      endBlock: String(p.endBlock),
+      proposalThreshold: String(p.proposalThreshold),
+      quorumVotes: String(p.quorumVotes),
+      executionETA: p.executionETA != null ? String(p.executionETA) : null,
+      objectionPeriodEndBlock:
+        p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+      updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+      voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+      createdAtBlock: String(p.createdAtBlock),
+      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+      signers: signerMap.get(String(p.id)) ?? [],
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedStatus(
+        {
+          status: p.status,
+          forVotes: p.forVotes,
+          againstVotes: p.againstVotes,
+          quorumVotes: BigInt(p.quorumVotes),
+          endBlock: BigInt(p.endBlock),
+          objectionPeriodEndBlock:
+            p.objectionPeriodEndBlock != null ? BigInt(p.objectionPeriodEndBlock) : null,
+          executionETA: p.executionETA != null ? BigInt(p.executionETA) : null,
+          onTimelockV1: p.onTimelockV1,
+          startBlock: BigInt(p.startBlock),
+        },
+        latestBlock,
+      );
+    }
+    return item;
+  });
+  return c.json(items);
+});
+
+/** Single proposal with votes, signers, transactions — bypasses GraphQL/Fastly truncation */
+app.get('/api/proposals/:id', async c => {
+  const idParam = c.req.param('id');
+  const allProposals = await db.select().from(schema.proposal);
+  const p = allProposals.find(pr => String(pr.id) === idParam);
+  if (!p) return c.json({ error: 'not found' }, 404);
+
+  const signers = await db.select().from(schema.proposalSigner);
+  const proposalSigners = signers.filter(s => String(s.proposalId) === idParam);
+
+  const allVotes = await db.select().from(schema.vote).orderBy(desc(schema.vote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.proposalId) === idParam);
+
+  const allTxs = await db.select().from(schema.transaction);
+  const proposalTxs = allTxs.filter(t => String(t.proposalId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const item: Record<string, unknown> = {
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    proposalThreshold: String(p.proposalThreshold),
+    quorumVotes: String(p.quorumVotes),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    objectionPeriodEndBlock:
+      p.objectionPeriodEndBlock != null ? String(p.objectionPeriodEndBlock) : null,
+    updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
+    voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
+    createdAtBlock: String(p.createdAtBlock),
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    signers: proposalSigners.map(s => s.signer),
+    // Ponder returns BigInts for proposalId / value — stringify so Hono can JSON-serialize.
+    transactions: proposalTxs.map(t => ({
+      index: t.index,
+      proposalId: String(t.proposalId),
+      target: t.target,
+      value: String(t.value),
+      signature: t.signature,
+      calldata: t.calldata,
+    })),
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedStatus(
+      {
+        status: p.status,
+        forVotes: p.forVotes,
+        againstVotes: p.againstVotes,
+        quorumVotes: BigInt(p.quorumVotes),
+        endBlock: BigInt(p.endBlock),
+        objectionPeriodEndBlock:
+          p.objectionPeriodEndBlock != null ? BigInt(p.objectionPeriodEndBlock) : null,
+        executionETA: p.executionETA != null ? BigInt(p.executionETA) : null,
+        onTimelockV1: p.onTimelockV1,
+        startBlock: BigInt(p.startBlock),
+      },
+      latestBlock,
+    );
+  }
+
+  return c.json({
+    proposal: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtBlock: String(v.createdAtBlock),
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+  });
+});
+
+/** Extract original signer from description tag, strip the tag */
+function extractSigner(desc: string): { signer: string | null; description: string } {
+  const match = desc.match(/^<!--\s*signer:(0x[\dA-Fa-f]{40})\s*-->\n?/);
+  if (match) {
+    return { signer: match[1], description: desc.slice(match[0].length) };
+  }
+  return { signer: null, description: desc };
+}
+
+/**
+ * Single candidate by id — used by the OG-image edge function so /candidates/:id
+ * unfurls can pull the first image from the body without hitting the subgraph.
+ * Candidate `id` is `${proposer}-${slug}` (matches the schema primary key).
+ * Slug-only fallback supports legacy share URLs that drop the proposer prefix.
+ */
+app.get('/api/candidates/:id', async c => {
+  const idParam = c.req.param('id');
+  if (!idParam) return c.json({ error: 'id required' }, 400);
+
+  // Try exact id match first.
+  const byId = await db
+    .select()
+    .from(schema.candidate)
+    .where(eq(schema.candidate.id, idParam))
+    .limit(1);
+
+  let candidate = byId[0];
+
+  // Fallback: lookup by slug if the id-prefixed form didn't hit. Picks the
+  // most recently created match — slug collisions across proposers are rare
+  // but possible.
+  if (!candidate) {
+    const bySlug = await db
+      .select()
+      .from(schema.candidate)
+      .where(eq(schema.candidate.slug, idParam))
+      .orderBy(desc(schema.candidate.createdAtBlock))
+      .limit(1);
+    candidate = bySlug[0];
+  }
+
+  if (!candidate) return c.json({ error: 'not found' }, 404);
+
+  return c.json({
+    id: candidate.id,
+    slug: candidate.slug,
+    proposer: candidate.proposer,
+    description: candidate.description,
+    canceled: candidate.canceled,
+    versionsCount: candidate.versionsCount,
+    promotedToProposalId:
+      candidate.promotedToProposalId != null ? String(candidate.promotedToProposalId) : null,
+    createdAt: String(Math.floor(new Date(candidate.createdAt).getTime() / 1000)),
+  });
+});
+
+/** All grants — single JSON response, with derived status (DEFEATED/SUCCEEDED) */
+app.get('/api/grants', async c => {
+  const grants = await db.select().from(schema.grant).orderBy(desc(schema.grant.id));
+  const latestBlock = await getLatestBlockCached();
+  const items = grants.map(g => {
+    const { signer, description } = extractSigner(g.description);
+    const item: Record<string, unknown> = {
+      ...g,
+      id: String(g.id),
+      description,
+      signer,
+      snapshotBlock: String(g.snapshotBlock),
+      startBlock: String(g.startBlock),
+      endBlock: String(g.endBlock),
+      createdAtBlock: String(g.createdAtBlock),
+      executionETA: g.executionETA != null ? String(g.executionETA) : null,
+      createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedGrantStatus(item, latestBlock);
+    }
+    return item;
+  });
+  return c.json(items);
+});
+
+/** Single grant with votes and status changes — bypasses GraphQL truncation */
+app.get('/api/grants/:id', async c => {
+  const idParam = c.req.param('id');
+  const allGrants = await db.select().from(schema.grant);
+  const g = allGrants.find(gr => String(gr.id) === idParam);
+  if (!g) return c.json({ error: 'not found' }, 404);
+
+  const allVotes = await db
+    .select()
+    .from(schema.grantVote)
+    .orderBy(desc(schema.grantVote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.grantId) === idParam);
+
+  const allChanges = await db
+    .select()
+    .from(schema.grantStatusChange)
+    .orderBy(schema.grantStatusChange.createdAtBlock);
+  const changes = allChanges.filter(sc => String(sc.grantId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const { signer, description } = extractSigner(g.description);
+  const item: Record<string, unknown> = {
+    ...g,
+    id: String(g.id),
+    description,
+    signer,
+    snapshotBlock: String(g.snapshotBlock),
+    startBlock: String(g.startBlock),
+    endBlock: String(g.endBlock),
+    createdAtBlock: String(g.createdAtBlock),
+    executionETA: g.executionETA != null ? String(g.executionETA) : null,
+    createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedGrantStatus(item, latestBlock);
+  }
+
+  return c.json({
+    grant: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+    statusChanges: changes.map(sc => ({
+      status: sc.status,
+      createdAtBlock: String(sc.createdAtBlock),
+      createdAtTransaction: sc.createdAtTransaction,
+    })),
+  });
+});
+
+// ============================================================
+// NounV2 — fork endpoints. Same shape as /api/grants and /api/auction-stats
+// so the webapp can consume them without branching. Addresses come from env
+// vars and may be zero until the mainnet deploy lands.
+// ============================================================
+
+const NOUNV2_AUCTION_HOUSE_ADDRESS = (process.env.NOUNV2_AUCTION_HOUSE_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as `0x${string}`;
+
+const NOUNV2_AUCTION_ABI = [
+  {
+    type: 'function',
+    name: 'auction',
+    inputs: [],
+    outputs: [
+      { name: 'nounId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'startTime', type: 'uint256' },
+      { name: 'endTime', type: 'uint256' },
+      { name: 'bidder', type: 'address' },
+      { name: 'settled', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+const NOUNV2_CURRENT_AUCTION_CACHE_TTL_MS = 15_000;
+let nounV2CurrentAuctionCache: { at: number; payload: unknown } | null = null;
+
+/** Derived status for a NounV2 proposal (mirrors computeDerivedGrantStatus). */
+function computeDerivedNounV2ProposalStatus(
+  p: Record<string, unknown>,
+  latestBlock: bigint,
+): string {
+  const status = p.status as string;
+  if (['CANCELED', 'EXECUTED'].includes(status)) return status;
+
+  // Queued proposals expire after the grace period (7d on NounV2Treasury).
+  if (status === 'QUEUED') {
+    if (p.executionETA) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const GRACE_PERIOD = 7 * 86400;
+      if (nowSeconds >= Number(p.executionETA) + GRACE_PERIOD) return 'EXPIRED';
+    }
+    return 'QUEUED';
+  }
+
+  if (status === 'ACTIVE') {
+    const endBlock = BigInt(p.endBlock as string | number);
+    if (latestBlock > endBlock) {
+      const forVotes = Number(p.forVotes);
+      const againstVotes = Number(p.againstVotes ?? 0);
+      if (forVotes === 0 || forVotes <= againstVotes) return 'DEFEATED';
+      return 'SUCCEEDED';
+    }
+  }
+
+  return status;
+}
+
+/** All NounV2 proposals — single JSON response with derived status. */
+app.get('/api/nounv2-proposals', async c => {
+  const proposals = await db
+    .select()
+    .from(schema.nounV2Proposal)
+    .orderBy(desc(schema.nounV2Proposal.id));
+  const latestBlock = await getLatestBlockCached();
+  const items = proposals.map(p => {
+    const item: Record<string, unknown> = {
+      ...p,
+      id: String(p.id),
+      startBlock: String(p.startBlock),
+      endBlock: String(p.endBlock),
+      createdAtBlock: String(p.createdAtBlock),
+      executionETA: p.executionETA != null ? String(p.executionETA) : null,
+      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    };
+    if (latestBlock > 0n) {
+      item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
+    }
+    return item;
+  });
+  return c.json(items);
+});
+
+/** Single NounV2 proposal with votes, actions, status changes. */
+app.get('/api/nounv2-proposals/:id', async c => {
+  const idParam = c.req.param('id');
+  const allProposals = await db.select().from(schema.nounV2Proposal);
+  const p = allProposals.find(pr => String(pr.id) === idParam);
+  if (!p) return c.json({ error: 'not found' }, 404);
+
+  const allVotes = await db
+    .select()
+    .from(schema.nounV2Vote)
+    .orderBy(desc(schema.nounV2Vote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.proposalId) === idParam);
+
+  const allTxs = await db.select().from(schema.nounV2ProposalTransaction);
+  const txs = allTxs.filter(t => String(t.proposalId) === idParam);
+
+  const allChanges = await db
+    .select()
+    .from(schema.nounV2ProposalStatusChange)
+    .orderBy(schema.nounV2ProposalStatusChange.createdAtBlock);
+  const changes = allChanges.filter(sc => String(sc.proposalId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  const item: Record<string, unknown> = {
+    ...p,
+    id: String(p.id),
+    startBlock: String(p.startBlock),
+    endBlock: String(p.endBlock),
+    createdAtBlock: String(p.createdAtBlock),
+    executionETA: p.executionETA != null ? String(p.executionETA) : null,
+    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+  };
+  if (latestBlock > 0n) {
+    item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
+  }
+
+  return c.json({
+    proposal: item,
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtBlock: String(v.createdAtBlock),
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+    actions: txs.map(t => ({
+      index: t.index,
+      proposalId: String(t.proposalId),
+      target: t.target,
+      value: String(t.value),
+      signature: t.signature,
+      calldata: t.calldata,
+    })),
+    statusChanges: changes.map(sc => ({
+      status: sc.status,
+      createdAtBlock: String(sc.createdAtBlock),
+      createdAtTransaction: sc.createdAtTransaction,
+    })),
+  });
+});
+
+/** All NounV2 auctions from the indexer, newest first. */
+app.get('/api/nounv2-auctions', async c => {
+  const auctions = await db
+    .select()
+    .from(schema.nounV2Auction)
+    .orderBy(desc(schema.nounV2Auction.nounId));
+  const allBids = await db
+    .select()
+    .from(schema.nounV2Bid)
+    .orderBy(desc(schema.nounV2Bid.createdAtBlock));
+
+  const bidsByNoun = new Map<string, typeof allBids>();
+  for (const b of allBids) {
+    const key = String(b.nounId);
+    if (!bidsByNoun.has(key)) bidsByNoun.set(key, []);
+    bidsByNoun.get(key)!.push(b);
+  }
+
+  const items = auctions.map(a => ({
+    nounId: String(a.nounId),
+    // Date.getTime() on the indexer's "seconds-as-ms" stored Date numerically equals
+    // the original Unix-seconds chain timestamp — output it directly. Do NOT divide
+    // by 1000; the consumer (e.g. webapp's BidHistoryModalRow) does `new Date(value * 1000)`.
+    startTime: String(new Date(a.startTime).getTime()),
+    endTime: String(new Date(a.endTime).getTime()),
+    settled: a.settled,
+    winner: a.winner,
+    amount: a.amount != null ? String(a.amount) : null,
+    createdAtBlock: String(a.createdAtBlock),
+    createdAtTransaction: a.createdAtTransaction,
+    bids: (bidsByNoun.get(String(a.nounId)) ?? []).map(b => ({
+      bidder: b.bidder,
+      value: String(b.value),
+      extended: b.extended,
+      createdAtBlock: String(b.createdAtBlock),
+      createdAtTransaction: b.createdAtTransaction,
+    })),
+  }));
+  return c.json(items);
+});
+
+/**
+ * Single NounV2 auction with its full bid history. Powers the webapp's
+ * `useV2AuctionBids` hook so the bid history modal works for any past
+ * auction (not just the last ~8k blocks an eth_getLogs scan can cover).
+ *
+ * Bid rows include `timestamp` (chain seconds) so the row formatter can
+ * show "X minutes ago" without an extra block lookup.
+ */
+app.get('/api/nounv2-auctions/:nounId', async c => {
+  const idParam = c.req.param('nounId');
+  let nounIdBig: bigint;
+  try {
+    nounIdBig = BigInt(idParam);
+  } catch {
+    return c.json({ error: 'invalid nounId' }, 400);
+  }
+
+  const auctionRows = await db
+    .select()
+    .from(schema.nounV2Auction)
+    .where(eq(schema.nounV2Auction.nounId, nounIdBig));
+  if (auctionRows.length === 0) return c.json({ error: 'not found' }, 404);
+  const a = auctionRows[0]!;
+
+  const bidRows = await db
+    .select()
+    .from(schema.nounV2Bid)
+    .where(eq(schema.nounV2Bid.nounId, nounIdBig))
+    .orderBy(desc(schema.nounV2Bid.value));
+
+  return c.json({
+    nounId: String(a.nounId),
+    // See note above: stored Date.getTime() == original Unix seconds value.
+    startTime: String(new Date(a.startTime).getTime()),
+    endTime: String(new Date(a.endTime).getTime()),
+    settled: a.settled,
+    winner: a.winner,
+    amount: a.amount != null ? String(a.amount) : null,
+    createdAtBlock: String(a.createdAtBlock),
+    createdAtTransaction: a.createdAtTransaction,
+    bids: bidRows.map(b => ({
+      bidder: b.bidder,
+      value: String(b.value),
+      extended: b.extended,
+      timestamp: String(new Date(b.createdAt).getTime()),
+      transactionHash: b.createdAtTransaction,
+      createdAtBlock: String(b.createdAtBlock),
+    })),
+  });
+});
+
+// ─── NounV2 Activity Feed ─────────────────────────────────────────────────
+// Unions recent rows from nounv2_bid, nounv2_auction (settled), nounv2_proposal,
+// and nounv2_vote. Sorted DESC by block, paginated via ?before=<block>.
+let nounV2FeedCache: {
+  data: { events: ActivityEvent[]; hasMore: boolean; oldestBlock: number };
+  fetchedAt: number;
+  key: string;
+} | null = null;
+const NOUNV2_FEED_TTL = 30_000;
+
+app.get('/api/nounv2-feed', async c => {
+  const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+  const beforeParam = c.req.query('before');
+  const before = beforeParam ? BigInt(beforeParam) : undefined;
+  const cacheKey = `${limit}:${before ?? 'latest'}`;
+
+  if (
+    nounV2FeedCache?.key === cacheKey &&
+    Date.now() - nounV2FeedCache.fetchedAt < NOUNV2_FEED_TTL
+  ) {
+    return c.json(nounV2FeedCache.data);
+  }
+
+  try {
+    const perTable = limit + 10;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchRows(tbl: any, blockCol: any): Promise<any[]> {
+      try {
+        if (before) {
+          return await db
+            .select()
+            .from(tbl)
+            .where(lt(blockCol, before))
+            .orderBy(desc(blockCol))
+            .limit(perTable);
+        }
+        return await db.select().from(tbl).orderBy(desc(blockCol)).limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
+    const [bids, auctions, proposals, votes] = await Promise.all([
+      fetchRows(schema.nounV2Bid, schema.nounV2Bid.createdAtBlock),
+      fetchRows(schema.nounV2Auction, schema.nounV2Auction.createdAtBlock),
+      fetchRows(schema.nounV2Proposal, schema.nounV2Proposal.createdAtBlock),
+      fetchRows(schema.nounV2Vote, schema.nounV2Vote.createdAtBlock),
+      // V2 sales: Reservoir API is dead (Oct 2025). V2 sales will be detected
+      // via on-chain enrichment once V2 transfer indexing ships.
+    ]);
+
+    const events: ActivityEvent[] = [];
+
+    for (const b of bids) {
+      events.push({
+        type: 'V2_BID',
+        blockNumber: Number(b.createdAtBlock),
+        timestamp: tsToISO(b.createdAt),
+        txHash: b.createdAtTransaction || '',
+        data: {
+          nounId: Number(b.nounId),
+          value: String(b.value),
+          bidder: b.bidder,
+          extended: b.extended,
+        },
+      });
+    }
+
+    for (const a of auctions) {
+      // Use SETTLED only for finalized auctions; show CREATED for fresh auctions.
+      if (a.settled) {
+        events.push({
+          type: 'V2_SETTLED',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            winner: a.winner || '',
+            amount: String(a.amount || '0'),
+          },
+        });
+      } else {
+        events.push({
+          type: 'V2_AUCTION',
+          blockNumber: Number(a.createdAtBlock),
+          timestamp: tsToISO(a.createdAt),
+          txHash: a.createdAtTransaction || '',
+          data: {
+            nounId: Number(a.nounId),
+            startTime: Math.floor(new Date(a.startTime).getTime() / 1000),
+            endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+          },
+        });
+      }
+    }
+
+    for (const p of proposals) {
+      const descText = (p.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'V2_PROP',
+        blockNumber: Number(p.createdAtBlock),
+        timestamp: tsToISO(p.createdAt),
+        txHash: p.createdAtTransaction || '',
+        data: {
+          proposalId: Number(p.id),
+          proposer: p.proposer,
+          title,
+          status: p.status,
+          description: descText.slice(0, 4000),
+        },
+      });
+    }
+
+    for (const v of votes) {
+      events.push({
+        type: 'V2_VOTE',
+        blockNumber: Number(v.createdAtBlock),
+        timestamp: tsToISO(v.createdAt),
+        txHash: v.createdAtTransaction || '',
+        data: {
+          voter: v.voter,
+          proposalId: Number(v.proposalId),
+          support: v.support,
+          votes: v.votes,
+          reason: v.reason || '',
+        },
+      });
+    }
+
+    // V2 sales: disabled — Reservoir API shut down Oct 2025. V2 sale detection
+    // will land once V2 transfer indexing ships (same on-chain approach as V1).
+    if (false) {
+    }
+
+    events.sort((a, b) => b.blockNumber - a.blockNumber);
+    const sliced = events.slice(0, limit);
+    const hasMore = events.length > limit;
+    const oldestBlock = sliced.length > 0 ? sliced[sliced.length - 1]!.blockNumber : 0;
+
+    const result = { events: sliced, hasMore, oldestBlock };
+    nounV2FeedCache = { data: result, fetchedAt: Date.now(), key: cacheKey };
+    return c.json(result);
+  } catch (err) {
+    console.error('[NounV2Feed] Error:', err);
+    return c.json({ events: [], hasMore: false, oldestBlock: 0 }, 500);
+  }
+});
+
+/** Live NounV2 auction state — direct contract read, like /api/auction-stats. */
+app.get('/api/nounv2-auction/current', async c => {
+  const now = Date.now();
+  if (
+    nounV2CurrentAuctionCache !== null &&
+    now - nounV2CurrentAuctionCache.at < NOUNV2_CURRENT_AUCTION_CACHE_TTL_MS
+  ) {
+    return c.json(nounV2CurrentAuctionCache.payload);
+  }
+
+  // If the address hasn't been set yet, return a structured "not deployed" response
+  // instead of 500'ing on a zero-address call.
+  if (NOUNV2_AUCTION_HOUSE_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    const payload = { deployed: false, current: null };
+    nounV2CurrentAuctionCache = { at: now, payload };
+    return c.json(payload);
+  }
+
+  try {
+    // viem returns a tuple for multiple named outputs; index access is stable.
+    const current = (await nounCheckClient.readContract({
+      address: NOUNV2_AUCTION_HOUSE_ADDRESS,
+      abi: NOUNV2_AUCTION_ABI,
+      functionName: 'auction',
+    })) as readonly [bigint, bigint, bigint, bigint, `0x${string}`, boolean];
+
+    const payload = {
+      deployed: true,
+      current: {
+        nounId: String(current[0]),
+        amount: String(current[1]),
+        startTime: Number(current[2]),
+        endTime: Number(current[3]),
+        bidder: current[4],
+        settled: current[5],
+      },
+    };
+    nounV2CurrentAuctionCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (nounV2CurrentAuctionCache !== null) {
+      return c.json(nounV2CurrentAuctionCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Lil Nouns proposals proxy — fetches from Goldsky subgraph on the server,
+// caches briefly, serves in the same shape as /api/proposals so the
+// prediction-market UI can drop it in without branching.
+// ============================================================
+
+const LIL_NOUNS_SUBGRAPH =
+  'https://api.goldsky.com/api/public/project_cldjvjgtylso13swq3dre13sf/subgraphs/lil-nouns-subgraph/1.0.10/gn';
+
+// Keep the cache tight — proposals change rarely but we want new votes to land quickly.
+const LIL_NOUNS_CACHE_TTL_MS = 60_000;
+let lilNounsCache: { at: number; items: unknown[] } | null = null;
+
+const LIL_NOUNS_GOVERNOR = '0x5d2C31ce16924C2a71D317e5BbFd5ce387854039' as const;
+const LIL_NOUNS_GOVERNOR_STATE_ABI = [
+  {
+    type: 'function',
+    name: 'state',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [{ type: 'uint8' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// Governor state enum → uppercase status matching the subgraph's values.
+// Bravo-style states; Nouns / Lil Nouns extend with OBJECTION_PERIOD + UPDATABLE.
+const GOVERNOR_STATE_CODES = [
+  'PENDING',
+  'ACTIVE',
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+  'OBJECTION_PERIOD',
+  'UPDATABLE',
+] as const;
+
+/**
+ * Overwrite stale ACTIVE statuses from the subgraph with on-chain governor state.
+ * The Goldsky subgraph only updates status on explicit events (Queued/Executed/
+ * Cancelled/Vetoed); proposals that timed out without resolution stay stuck at
+ * ACTIVE, which misrepresents DEFEATED + EXPIRED in the UI.
+ */
+async function overlayOnchainStatus(
+  items: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const staleIds = items
+    .filter(p => typeof p.status === 'string' && p.status.toUpperCase() === 'ACTIVE')
+    .map(p => p.id as string);
+  if (staleIds.length === 0) return items;
+
+  try {
+    const results = await nounCheckClient.multicall({
+      contracts: staleIds.map(id => ({
+        address: LIL_NOUNS_GOVERNOR,
+        abi: LIL_NOUNS_GOVERNOR_STATE_ABI,
+        functionName: 'state' as const,
+        args: [BigInt(id)],
+      })),
+      allowFailure: true,
+    });
+    const idToStatus = new Map<string, string>();
+    for (let i = 0; i < staleIds.length; i++) {
+      const r = results[i];
+      if (r?.status === 'success' && typeof r.result === 'number') {
+        idToStatus.set(staleIds[i], GOVERNOR_STATE_CODES[r.result] ?? 'ACTIVE');
+      }
+    }
+    return items.map(p => {
+      const mapped = idToStatus.get(p.id as string);
+      return mapped !== undefined ? { ...p, status: mapped } : p;
+    });
+  } catch (err) {
+    console.warn('[lil-proposals] onchain state overlay failed, falling back:', err);
+    return items;
+  }
+}
+
+async function fetchLilNounsFromSubgraph() {
+  // Paginate in chunks of 500 (subgraph max is usually 1000; 500 is conservative).
+  const PAGE = 500;
+  const all: Array<Record<string, unknown>> = [];
+  let skip = 0;
+  while (true) {
+    const query = `{
+      proposals(first: ${PAGE}, skip: ${skip}, orderBy: createdBlock, orderDirection: desc) {
+        id
+        title
+        description
+        status
+        forVotes
+        againstVotes
+        abstainVotes
+        quorumVotes
+        proposalThreshold
+        startBlock
+        endBlock
+        createdBlock
+        createdTimestamp
+        executionETA
+        executedTimestamp
+        canceledTimestamp
+        vetoedTimestamp
+        queuedTimestamp
+        proposer { id }
+      }
+    }`;
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    const json = (await res.json()) as { data?: { proposals?: Array<Record<string, unknown>> } };
+    const page = json.data?.proposals ?? [];
+    all.push(...page);
+    if (page.length < PAGE) break;
+    skip += PAGE;
+  }
+  return all;
+}
+
+app.get('/api/lil-proposals', async c => {
+  const now = Date.now();
+  if (lilNounsCache !== null && now - lilNounsCache.at < LIL_NOUNS_CACHE_TTL_MS) {
+    return c.json(lilNounsCache.items);
+  }
+  try {
+    const raw = await fetchLilNounsFromSubgraph();
+    const items = await overlayOnchainStatus(raw);
+    lilNounsCache = { at: now, items };
+    return c.json(items);
+  } catch (err) {
+    // If Goldsky is down, serve stale cache if we have any.
+    if (lilNounsCache !== null) {
+      return c.json(lilNounsCache.items, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// Detail endpoint — single proposal with its full vote list, for LilNounsVotePage.
+// Cache per-id for LIL_NOUNS_CACHE_TTL_MS.
+const lilNounsDetailCache = new Map<string, { at: number; item: unknown }>();
+
+app.get('/api/lil-proposals/:id', async c => {
+  const id = c.req.param('id');
+  if (!/^\d+$/.test(id)) return c.json({ error: 'invalid id' }, 400);
+
+  const now = Date.now();
+  const cached = lilNounsDetailCache.get(id);
+  if (cached != null && now - cached.at < LIL_NOUNS_CACHE_TTL_MS) {
+    return c.json(cached.item);
+  }
+
+  const query = `{
+    proposal(id: "${id}") {
+      id
+      title
+      description
+      status
+      forVotes
+      againstVotes
+      abstainVotes
+      quorumVotes
+      proposalThreshold
+      startBlock
+      endBlock
+      createdBlock
+      createdTimestamp
+      executionETA
+      executedTimestamp
+      canceledTimestamp
+      vetoedTimestamp
+      queuedTimestamp
+      targets
+      values
+      signatures
+      calldatas
+      totalSupply
+      proposer { id }
+      votes(first: 1000, orderBy: blockNumber, orderDirection: desc) {
+        id
+        support: supportDetailed
+        votes
+        reason
+        blockNumber
+        voter { id }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    const json = (await res.json()) as { data?: { proposal?: Record<string, unknown> | null } };
+    const proposal = json.data?.proposal;
+    if (proposal == null) return c.json({ error: 'not found' }, 404);
+
+    // Overwrite stale ACTIVE status with the on-chain governor state.
+    const [enriched] = await overlayOnchainStatus([proposal]);
+    const finalProposal = enriched ?? proposal;
+
+    lilNounsDetailCache.set(id, { at: now, item: finalProposal });
+    return c.json(finalProposal);
+  } catch (err) {
+    if (cached != null) {
+      return c.json(cached.item, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Pip3 — Giphy channel proxy (Giphy v4 channels feed sends no CORS)
+// ============================================================
+
+const PIP3_CACHE_TTL_MS = 60_000;
+const pip3Cache = new Map<string, { at: number; body: unknown }>();
+
+app.get('/api/pip3-gifs', async c => {
+  const channelId = c.req.query('channel') || '19207767';
+  const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
+  const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit') || '50', 10)));
+  const key = `${channelId}:${offset}:${limit}`;
+  const now = Date.now();
+  const cached = pip3Cache.get(key);
+  if (cached && now - cached.at < PIP3_CACHE_TTL_MS) return c.json(cached.body);
+  try {
+    const res = await fetch(
+      `https://giphy.com/api/v4/channels/${channelId}/feed?offset=${offset}&limit=${limit}`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) throw new Error(`giphy ${res.status}`);
+    const body = await res.json();
+    pip3Cache.set(key, { at: now, body });
+    return c.json(body);
+  } catch (err) {
+    if (cached) return c.json(cached.body, 200, { 'x-cache': 'stale' });
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Activity-feed external sources: Lil Nouns subgraph + Reservoir sales
+// ============================================================
+
+interface FeedEvent {
+  type: string;
+  blockNumber: number;
+  timestamp: string;
+  txHash: string;
+  data: Record<string, unknown>;
+}
+
+const LIL_ACTIVITY_TTL = 30_000;
+let lilActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
+
+async function fetchLilNounsActivity(
+  before: bigint | undefined,
+  limit: number,
+): Promise<FeedEvent[]> {
+  const key = `${before ?? 'latest'}:${limit}`;
+  const now = Date.now();
+  if (
+    lilActivityCache &&
+    lilActivityCache.key === key &&
+    now - lilActivityCache.at < LIL_ACTIVITY_TTL
+  ) {
+    return lilActivityCache.events;
+  }
+
+  const per = Math.max(20, Math.min(limit + 10, 100));
+  const blockFilter = before ? `, where: { blockNumber_lt: "${before.toString()}" }` : '';
+  const propBlockFilter = before ? `, where: { createdBlock_lt: "${before.toString()}" }` : '';
+  const query = `{
+    bids(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id noun { id } amount bidder { id } blockNumber blockTimestamp comment
+    }
+    auctions(first: ${per}, orderBy: endTime, orderDirection: desc, where: { settled: true${before ? `, endTime_lt: "${before.toString()}"` : ''} }) {
+      id amount bidder { id } noun { id } endTime startTime
+    }
+    votes(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id voter { id } proposal { id } support: supportDetailed votes reason blockNumber blockTimestamp transactionHash
+    }
+    proposals(first: ${per}, orderBy: createdBlock, orderDirection: desc${propBlockFilter}) {
+      id title proposer { id } createdBlock createdTimestamp description
+    }
+    transferEvents(first: ${per}, orderBy: blockNumber, orderDirection: desc${blockFilter}) {
+      id noun { id } previousHolder { id } newHolder { id } blockNumber blockTimestamp
+    }
+  }`;
+
+  let body: {
+    data?: {
+      bids?: Array<Record<string, unknown>>;
+      auctions?: Array<Record<string, unknown>>;
+      votes?: Array<Record<string, unknown>>;
+      proposals?: Array<Record<string, unknown>>;
+      transferEvents?: Array<Record<string, unknown>>;
+    };
+  };
+  try {
+    const res = await fetch(LIL_NOUNS_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`Goldsky ${res.status}`);
+    body = (await res.json()) as typeof body;
+  } catch (err) {
+    console.warn('[activity/lil] subgraph fetch failed:', err);
+    return [];
+  }
+
+  const events: FeedEvent[] = [];
+  const toISO = (ts: unknown): string => {
+    const n = Number(ts);
+    if (!Number.isFinite(n)) return new Date().toISOString();
+    return new Date(n < 1e12 ? n * 1000 : n).toISOString();
+  };
+  const accId = (a: unknown): string =>
+    typeof a === 'object' && a !== null && typeof (a as { id?: unknown }).id === 'string'
+      ? (a as { id: string }).id
+      : '';
+
+  for (const b of body.data?.bids ?? []) {
+    events.push({
+      type: 'LIL_BID',
+      blockNumber: Number(b.blockNumber),
+      timestamp: toISO(b.blockTimestamp),
+      txHash: '',
+      data: {
+        nounId: Number(accId(b.noun)),
+        value: String(b.amount ?? '0'),
+        bidder: accId(b.bidder),
+        comment: (b.comment as string) || '',
+      },
+    });
+  }
+
+  // Auction entity has no blockNumber — estimate from endTime so these events
+  // merge-sort sensibly against the bid/vote/transfer events that do.
+  const estBlock = (ts: number): number =>
+    Math.max(0, Math.floor(19_000_000 + (ts - 1_708_993_199) / 12));
+  for (const a of body.data?.auctions ?? []) {
+    const winner = accId(a.bidder);
+    if (!winner) continue;
+    const endTs = Number(a.endTime);
+    events.push({
+      type: 'LIL_AUCTION_SETTLED',
+      blockNumber: Number.isFinite(endTs) ? estBlock(endTs) : 0,
+      timestamp: toISO(a.endTime),
+      txHash: '',
+      data: {
+        nounId: Number(accId(a.noun)),
+        winner,
+        amount: String(a.amount ?? '0'),
+      },
+    });
+  }
+
+  for (const v of body.data?.votes ?? []) {
+    events.push({
+      type: 'LIL_VOTE',
+      blockNumber: Number(v.blockNumber),
+      timestamp: toISO(v.blockTimestamp),
+      txHash: (v.transactionHash as string) || '',
+      data: {
+        voter: accId(v.voter),
+        proposalId: Number(accId(v.proposal)),
+        support: Number(v.support),
+        votes: String(v.votes ?? '0'),
+        reason: (v.reason as string) || '',
+      },
+    });
+  }
+
+  for (const p of body.data?.proposals ?? []) {
+    const descText = (p.description as string) || '';
+    const derivedTitle =
+      ((p.title as string) || '').trim() ||
+      (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+    events.push({
+      type: 'LIL_PROPOSAL_CREATED',
+      blockNumber: Number(p.createdBlock),
+      timestamp: toISO(p.createdTimestamp),
+      txHash: '',
+      data: {
+        proposalId: Number(p.id),
+        proposer: accId(p.proposer),
+        title: derivedTitle,
+      },
+    });
+  }
+
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  for (const t of body.data?.transferEvents ?? []) {
+    const from = accId(t.previousHolder);
+    const to = accId(t.newHolder);
+    const nounId = Number(accId(t.noun));
+    const ts = toISO(t.blockTimestamp);
+    const block = Number(t.blockNumber);
+    if (from.toLowerCase() === ZERO) {
+      events.push({
+        type: 'LIL_NOUN_CREATED',
+        blockNumber: block,
+        timestamp: ts,
+        txHash: '',
+        data: { nounId, owner: to },
+      });
+    } else {
+      events.push({
+        type: 'LIL_TRANSFER',
+        blockNumber: block,
+        timestamp: ts,
+        txHash: '',
+        data: { nounId, from, to },
+      });
+    }
+  }
+
+  lilActivityCache = { at: now, key, events };
+  return events;
+}
+
+// ── On-chain sale detection ──────────────────────────────────────────────────
+// Reservoir API shut down Oct 2025. Detect marketplace sales on-chain by
+// checking if a NounsToken Transfer tx targeted a known marketplace router.
+// When it did, convert the TRANSFER → SALE and extract price from tx.value
+// (direct ETH) or WETH Transfer log (wrapped ETH sales).
+
+const SALES_ACTIVITY_TTL = 60_000;
+let salesActivityCache: { at: number; key: string; events: FeedEvent[] } | null = null;
+
+const MAINNET_RPC = process.env.PONDER_RPC_URL_1 || 'https://ethereum-rpc.publicnode.com';
+
+/** Known NFT marketplace router contracts (lowercased). */
+const MARKETPLACE_ROUTERS: Record<string, string> = {
+  // Seaport 1.5 + 1.6
+  '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'OpenSea',
+  '0x0000000000000068f116a894984e2db1123eb395': 'OpenSea',
+  // Blur
+  '0x39da41747a83aee658334415666f3ef92dd0d541': 'Blur',
+  '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5': 'Blur',
+  '0x29469395eaf6f95920e59f858042f0e28d98a20b': 'Blur',
+  // LooksRare
+  '0x0000000000e655fae4d56241588680f86e3b2377': 'LooksRare',
+  // X2Y2
+  '0x74312363e45dcaba76c59ec49a7aa8a65a67eed3': 'X2Y2',
+  // Sudoswap
+  '0x2b2e8cda09bba9660dca5cb6233787738ad68329': 'Sudoswap',
+  // Magic Eden
+  '0x9a1d00bed7cd04bcda516d721a596eb22aac6834': 'Magic Eden',
+};
+
+/** Payment token contracts whose Transfer logs indicate sale price. */
+const PAYMENT_TOKENS = new Set([
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
+  '0x0000000000a39bb272e79075ade125fd351887ac', // Blur Pool
+]);
+const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+/** Cache tx sale lookups: txHash → { marketplace, priceWei } | null. */
+const txSaleCache = new Map<string, { marketplace: string; priceWei: bigint } | null>();
+const TX_SALE_CACHE_MAX = 500;
+
+async function checkTxForSale(
+  txHash: string,
+): Promise<{ marketplace: string; priceWei: bigint } | null> {
+  const key = txHash.toLowerCase();
+  if (txSaleCache.has(key)) return txSaleCache.get(key)!;
+
+  try {
+    // Fetch the transaction to check tx.to
+    const txRes = await fetch(MAINNET_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getTransactionByHash',
+        params: [txHash],
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const txJson = (await txRes.json()) as { result?: { to?: string; value?: string } };
+    const tx = txJson.result;
+    if (!tx?.to) {
+      txSaleCache.set(key, null);
+      return null;
+    }
+
+    const toAddr = tx.to.toLowerCase();
+    const marketplace = MARKETPLACE_ROUTERS[toAddr];
+    if (!marketplace) {
+      txSaleCache.set(key, null);
+      return null;
+    }
+
+    // Direct ETH payment: tx.value > 0
+    const txValue = BigInt(tx.value || '0');
+    if (txValue > 0n) {
+      const result = { marketplace, priceWei: txValue };
+      if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+      txSaleCache.set(key, result);
+      return result;
+    }
+
+    // WETH sale: check receipt logs for WETH Transfer to the seller
+    const receiptRes = await fetch(MAINNET_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const receiptJson = (await receiptRes.json()) as {
+      result?: { logs?: Array<{ address: string; topics: string[]; data: string }> };
+    };
+    const logs = receiptJson.result?.logs ?? [];
+
+    // Find the largest payment-token transfer in this tx — that's the sale price.
+    // Covers WETH (OpenSea/LooksRare) and Blur Pool (Blur).
+    let maxPaymentWei = 0n;
+    for (const log of logs) {
+      if (
+        PAYMENT_TOKENS.has(log.address.toLowerCase()) &&
+        log.topics[0] === ERC20_TRANSFER_TOPIC &&
+        log.data
+      ) {
+        const amount = BigInt(log.data);
+        if (amount > maxPaymentWei) maxPaymentWei = amount;
+      }
+    }
+    if (maxPaymentWei > 0n) {
+      const result = { marketplace, priceWei: maxPaymentWei };
+      if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+      txSaleCache.set(key, result);
+      return result;
+    }
+
+    // Marketplace tx but couldn't extract price — still mark as sale with 0
+    const result = { marketplace, priceWei: 0n };
+    if (txSaleCache.size > TX_SALE_CACHE_MAX) txSaleCache.clear();
+    txSaleCache.set(key, result);
+    return result;
+  } catch (err) {
+    console.warn('[sales] tx lookup failed:', txHash, err);
+    txSaleCache.set(key, null);
+    return null;
+  }
+}
+
+/** Fetch recent Nouns transfers from Ponder and detect which are marketplace sales. */
+async function fetchOnchainSales(before: bigint | undefined, limit: number): Promise<FeedEvent[]> {
+  const cacheKey = `${before ?? 'latest'}:${limit}`;
+  const now = Date.now();
+  if (salesActivityCache?.key === cacheKey && now - salesActivityCache.at < SALES_ACTIVITY_TTL) {
+    return salesActivityCache.events;
+  }
+
+  try {
+    // Fetch recent transfers from Ponder
+    const perTable = Math.max(50, limit * 3); // fetch more, many won't be sales
+    let transfers;
+    if (before) {
+      transfers = await db
+        .select()
+        .from(schema.nounTransfer)
+        .where(lt(schema.nounTransfer.createdAtBlock, before))
+        .orderBy(desc(schema.nounTransfer.createdAtBlock))
+        .limit(perTable);
+    } else {
+      transfers = await db
+        .select()
+        .from(schema.nounTransfer)
+        .orderBy(desc(schema.nounTransfer.createdAtBlock))
+        .limit(perTable);
+    }
+
+    // Filter out mint/burn transfers (from or to zero address)
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const candidates = transfers.filter(
+      t =>
+        t.from.toLowerCase() !== ZERO &&
+        t.to.toLowerCase() !== ZERO &&
+        t.to.toLowerCase() !== '0x830bd73e4184cef73443c15111a1df14e495c706', // auction house
+    );
+
+    // Batch-check tx hashes (dedupe first)
+    const uniqueTxs = [...new Set(candidates.map(t => t.createdAtTransaction))];
+    const saleChecks = await Promise.all(
+      uniqueTxs.slice(0, 30).map(async txHash => ({
+        txHash,
+        sale: await checkTxForSale(txHash),
+      })),
+    );
+    const saleMap = new Map(saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]));
+
+    // Count how many nouns were sold in the same tx so we can split the
+    // total price evenly across them (Blur sweeps, Seaport batch buys, etc.)
+    const nounsPerTx = new Map<string, number>();
+    for (const t of candidates) {
+      if (saleMap.has(t.createdAtTransaction)) {
+        nounsPerTx.set(t.createdAtTransaction, (nounsPerTx.get(t.createdAtTransaction) || 0) + 1);
+      }
+    }
+
+    const events: FeedEvent[] = [];
+    for (const t of candidates) {
+      const sale = saleMap.get(t.createdAtTransaction);
+      if (!sale) continue;
+
+      const count = nounsPerTx.get(t.createdAtTransaction) || 1;
+      const priceEth = Number(sale.priceWei) / 1e18 / count;
+      events.push({
+        type: 'SALE',
+        blockNumber: Number(t.createdAtBlock),
+        timestamp: t.createdAt ? new Date(Number(t.createdAt) * 1000).toISOString() : '',
+        txHash: t.createdAtTransaction,
+        data: {
+          collection: 'NOUN',
+          collectionName: 'Noun',
+          tokenId: String(t.nounId),
+          tokenName: `Noun ${t.nounId}`,
+          from: t.from,
+          to: t.to,
+          priceEth,
+          priceWei: sale.priceWei.toString(),
+          priceUsd: null,
+          currency: 'ETH',
+          marketplace: sale.marketplace,
+        },
+      });
+      if (events.length >= limit) break;
+    }
+
+    salesActivityCache = { at: now, key: cacheKey, events };
+    return events;
+  } catch (err) {
+    console.warn('[activity/sales] on-chain detection failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Auction price prediction market stats.
+ * Returns current live auction + last 7 settled auctions (skipping nounder/empty)
+ * and their trailing average.
+ */
+// Direct contract reads so current bid + settlement data are always fresh,
+// not gated on Ponder indexing latency (which was showing stale #1877 with
+// amount=0 while #1878 was live at 0.57 ETH).
+const NOUNS_AUCTION_HOUSE = '0x830BD73E4184ceF73443C15111a1DF14e495C706' as const;
+const AUCTION_HOUSE_ABI = [
+  {
+    type: 'function',
+    name: 'auction',
+    inputs: [],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'nounId', type: 'uint96' },
+          { name: 'amount', type: 'uint128' },
+          { name: 'startTime', type: 'uint40' },
+          { name: 'endTime', type: 'uint40' },
+          { name: 'bidder', type: 'address' },
+          { name: 'settled', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getSettlements',
+    inputs: [
+      { name: 'auctionCount', type: 'uint256' },
+      { name: 'skipEmptyValues', type: 'bool' },
+    ],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 'blockTimestamp', type: 'uint32' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'winner', type: 'address' },
+          { name: 'nounId', type: 'uint256' },
+          { name: 'clientId', type: 'uint32' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+// Cache auction + settlements briefly to avoid hammering RPC.
+const AUCTION_STATS_CACHE_TTL_MS = 15_000;
+let auctionStatsCache: { at: number; payload: unknown } | null = null;
+
+app.get('/api/auction-stats', async c => {
+  const now = Date.now();
+  if (auctionStatsCache !== null && now - auctionStatsCache.at < AUCTION_STATS_CACHE_TTL_MS) {
+    return c.json(auctionStatsCache.payload);
+  }
+
+  try {
+    // Parallel: current live auction + most recent non-empty settlements.
+    const [current, settlements] = await Promise.all([
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'auction',
+      }),
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'getSettlements',
+        args: [7n, true],
+      }),
+    ]);
+
+    const prior7 = settlements
+      .filter(s => s.amount > 0n)
+      .slice(0, 7)
+      .map(s => ({
+        nounId: String(s.nounId),
+        amount: String(s.amount),
+        winner: s.winner,
+        settled: true,
+        endTime: Number(s.blockTimestamp),
+      }));
+
+    const avgWei =
+      prior7.length > 0
+        ? prior7.reduce((acc, p) => acc + BigInt(p.amount), 0n) / BigInt(prior7.length)
+        : 0n;
+
+    const payload = {
+      current: {
+        nounId: String(current.nounId),
+        amount: String(current.amount),
+        endTime: Number(current.endTime),
+        settled: current.settled,
+        winner: current.bidder,
+      },
+      prior7,
+      sampleSize: prior7.length,
+      avgWei: String(avgWei),
+      avgEth: Number(avgWei) / 1e18,
+    };
+
+    auctionStatsCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (auctionStatsCache !== null) {
+      return c.json(auctionStatsCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Prediction markets — combined listing of noun auction markets
+// + proposal markets, for the /predictions page's "Markets" table.
+// Public, read-only; resolve() is permissionless on both contracts.
+// ============================================================
+
+const AUCTION_PRICE_MARKET_ADDRESS =
+  (process.env.AUCTION_PRICE_MARKET_ADDRESS as `0x${string}` | undefined) ??
+  '0xC9c201A7AfB67Ecc08238Cbd690d39658Aed39b6';
+
+const PREDICTION_MARKET_ADDRESS =
+  (process.env.PREDICTION_MARKET_ADDRESS as `0x${string}` | undefined) ??
+  '0x2ea7502C4db5B8cfB329d8a9866EB6705b036608';
+
+const AUCTION_PRICE_MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'getMarket',
+    inputs: [{ name: 'nounId', type: 'uint256' }],
+    outputs: [
+      { name: 'higherPool', type: 'uint256' },
+      { name: 'lowerPool', type: 'uint256' },
+      { name: 'higherStakers', type: 'uint256' },
+      { name: 'lowerStakers', type: 'uint256' },
+      { name: 'higherOddsBps', type: 'uint256' },
+      { name: 'lowerOddsBps', type: 'uint256' },
+      { name: 'outcome', type: 'uint8' },
+      { name: 'priceWei', type: 'uint256' },
+      { name: 'avgWei', type: 'uint256' },
+      { name: 'feeBps', type: 'uint16' },
+      { name: 'exists', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+const PREDICTION_MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'getMarket',
+    inputs: [
+      { name: 'dao', type: 'string' },
+      { name: 'proposalId', type: 'string' },
+    ],
+    outputs: [
+      { name: 'forPool', type: 'uint256' },
+      { name: 'againstPool', type: 'uint256' },
+      { name: 'forStakers', type: 'uint256' },
+      { name: 'againstStakers', type: 'uint256' },
+      { name: 'forOddsBps', type: 'uint256' },
+      { name: 'againstOddsBps', type: 'uint256' },
+      { name: 'outcome', type: 'uint8' },
+      { name: 'exists', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+type MarketEntry = {
+  kind: 'auction' | 'proposal';
+  id: string;
+  nounId?: string;
+  daoKey?: 'nouns' | 'lil-nouns';
+  proposalId?: string;
+  title: string;
+  link?: string;
+  outcome: number;
+  totalPoolWei: string;
+  stakers: number;
+  status: 'needs-resolution' | 'live' | 'resolved' | 'pending';
+  closesAt?: number;
+  note?: string;
+};
+
+const PREDICTION_MARKETS_CACHE_TTL_MS = 30_000;
+let predictionMarketsCache: {
+  at: number;
+  payload: { entries: MarketEntry[]; generatedAt: number };
+} | null = null;
+
+const ACTIVE_PROPOSAL_STATUSES = ['ACTIVE', 'PENDING', 'OBJECTION_PERIOD', 'UPDATABLE'];
+const RESOLVED_PROPOSAL_STATUSES = [
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+];
+
+/** Pick a market status bucket from the proposal status + market outcome. */
+function classifyProposalMarket(proposalStatus: string, outcome: number): MarketEntry['status'] {
+  const s = proposalStatus.toUpperCase();
+  if (outcome === 1 || outcome === 2 || outcome === 3) return 'resolved';
+  if (RESOLVED_PROPOSAL_STATUSES.includes(s)) return 'needs-resolution';
+  if (ACTIVE_PROPOSAL_STATUSES.includes(s)) return 'live';
+  return 'pending';
+}
+
+/** Extract a short title from a proposal description (first markdown heading or line). */
+function extractProposalTitle(description: string, fallback: string): string {
+  const first = (description.split('\n')[0] ?? '').replace(/^#+\s*/, '').trim();
+  if (!first) return fallback;
+  return first.slice(0, 120);
+}
+
+app.get('/api/predictions/markets', async c => {
+  const now = Date.now();
+  if (
+    predictionMarketsCache !== null &&
+    now - predictionMarketsCache.at < PREDICTION_MARKETS_CACHE_TTL_MS
+  ) {
+    return c.json(predictionMarketsCache.payload);
+  }
+
+  try {
+    // ── 1. Current nounId + recent settlement timestamps ────────────────────
+    const [currentAuction, settlements] = await Promise.all([
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'auction',
+      }),
+      nounCheckClient.readContract({
+        address: NOUNS_AUCTION_HOUSE,
+        abi: AUCTION_HOUSE_ABI,
+        functionName: 'getSettlements',
+        args: [50n, false],
+      }),
+    ]);
+
+    const currentNounId = Number(currentAuction.nounId);
+    const settlementByNounId = new Map<number, { amount: bigint; endTime: number }>();
+    for (const s of settlements) {
+      settlementByNounId.set(Number(s.nounId), {
+        amount: s.amount,
+        endTime: Number(s.blockTimestamp),
+      });
+    }
+
+    // ── 2. Multicall the last 50 auction markets ────────────────────────────
+    const auctionNounIds = Array.from({ length: 50 }, (_, i) => currentNounId - i).filter(
+      n => n >= 0,
+    );
+    const [auctionResults, auctionRows] = await Promise.all([
+      nounCheckClient.multicall({
+        allowFailure: true,
+        contracts: auctionNounIds.map(id => ({
+          address: AUCTION_PRICE_MARKET_ADDRESS,
+          abi: AUCTION_PRICE_MARKET_ABI,
+          functionName: 'getMarket' as const,
+          args: [BigInt(id)] as const,
+        })),
+      }),
+      db
+        .select()
+        .from(schema.auction)
+        .where(
+          inArray(
+            schema.auction.nounId,
+            auctionNounIds.map(id => BigInt(id)),
+          ),
+        ),
+    ]);
+
+    const auctionByNounId = new Map<number, { endTime: number; settled: boolean }>();
+    for (const row of auctionRows as Array<Record<string, unknown>>) {
+      const rawEnd = row.endTime;
+      const endMs =
+        rawEnd instanceof Date
+          ? rawEnd.getTime() < 946684800000
+            ? rawEnd.getTime() * 1000
+            : rawEnd.getTime()
+          : Number(rawEnd) * (Number(rawEnd) < 1e12 ? 1000 : 1);
+      auctionByNounId.set(Number(row.nounId), {
+        endTime: Math.floor(endMs / 1000),
+        settled: Boolean(row.settled),
+      });
+    }
+
+    const auctionEntries: MarketEntry[] = [];
+    for (let i = 0; i < auctionNounIds.length; i++) {
+      const res = auctionResults[i];
+      if (!res || res.status !== 'success') continue;
+      const tuple = res.result as unknown as readonly [
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        number,
+        bigint,
+        bigint,
+        number,
+        boolean,
+      ];
+      const higherPool = tuple[0];
+      const lowerPool = tuple[1];
+      const higherStakers = tuple[2];
+      const lowerStakers = tuple[3];
+      const outcome = tuple[6];
+      const exists = tuple[10];
+      if (!exists) continue;
+      const nounId = auctionNounIds[i]!;
+      const settlement = settlementByNounId.get(nounId);
+      const indexed = auctionByNounId.get(nounId);
+      const closesAt = settlement?.endTime ?? indexed?.endTime;
+      const isCurrent = nounId === currentNounId;
+      const nowSec = Math.floor(now / 1000);
+      const auctionEnded =
+        !isCurrent &&
+        (settlement != null ||
+          indexed?.settled === true ||
+          (closesAt != null && closesAt <= nowSec));
+      const outcomeNum = Number(outcome);
+      let status: MarketEntry['status'];
+      if (outcomeNum === 1 || outcomeNum === 2 || outcomeNum === 3) {
+        status = 'resolved';
+      } else if (auctionEnded) {
+        status = 'needs-resolution';
+      } else {
+        status = 'live';
+      }
+
+      auctionEntries.push({
+        kind: 'auction',
+        id: `auction-${nounId}`,
+        nounId: String(nounId),
+        title: `Noun #${nounId} · Higher/Lower`,
+        link: `/noun/${nounId}`,
+        outcome: outcomeNum,
+        totalPoolWei: String(higherPool + lowerPool),
+        stakers: Number(higherStakers) + Number(lowerStakers),
+        status,
+        closesAt,
+      });
+    }
+
+    // ── 3. Gather proposal markets (Nouns + LilNouns) ───────────────────────
+    const nounsProposalsRaw = await db
+      .select()
+      .from(schema.proposal)
+      .orderBy(desc(schema.proposal.createdAtBlock));
+    const latestBlock = await getLatestBlockCached();
+
+    type ProposalLookup = {
+      daoKey: 'nouns' | 'lil-nouns';
+      proposalId: string;
+      title: string;
+      status: string;
+      link: string;
+      createdAtBlock: number;
+    };
+
+    const nounsProposals: ProposalLookup[] = (
+      nounsProposalsRaw as Array<Record<string, unknown>>
+    ).map(p => {
+      const derivedStatus =
+        latestBlock > 0n
+          ? computeDerivedStatus(
+              {
+                status: p.status as string,
+                forVotes: p.forVotes as number,
+                againstVotes: p.againstVotes as number,
+                quorumVotes: BigInt(p.quorumVotes as string | number | bigint),
+                endBlock: BigInt(p.endBlock as string | number | bigint),
+                objectionPeriodEndBlock:
+                  p.objectionPeriodEndBlock != null
+                    ? BigInt(p.objectionPeriodEndBlock as string | number | bigint)
+                    : null,
+                executionETA:
+                  p.executionETA != null
+                    ? BigInt(p.executionETA as string | number | bigint)
+                    : null,
+                onTimelockV1: p.onTimelockV1 as boolean,
+                startBlock: BigInt(p.startBlock as string | number | bigint),
+              },
+              latestBlock,
+            )
+          : p.status;
+      return {
+        daoKey: 'nouns' as const,
+        proposalId: String(p.id),
+        title: extractProposalTitle(
+          (p.description as string | undefined) ?? '',
+          `Proposal ${String(p.id)}`,
+        ),
+        status: String(derivedStatus),
+        link: `/vote/${String(p.id)}`,
+        createdAtBlock: Number(p.createdAtBlock),
+      };
+    });
+
+    let lilNounsProposals: ProposalLookup[] = [];
+    try {
+      const raw = await fetchLilNounsFromSubgraph();
+      lilNounsProposals = raw.map(p => ({
+        daoKey: 'lil-nouns' as const,
+        proposalId: String(p.id),
+        title:
+          ((p.title as string | null | undefined) ?? '').trim() ||
+          extractProposalTitle((p.description as string) ?? '', `Lil Proposal ${p.id}`),
+        status: String(p.status ?? '').toUpperCase(),
+        link: `/vote/${p.id}?dao=lil`,
+        createdAtBlock: Number(p.createdBlock ?? 0),
+      }));
+    } catch (err) {
+      console.warn('[predictions/markets] lil subgraph failed:', err);
+    }
+
+    const allProposals = [...nounsProposals, ...lilNounsProposals];
+
+    const proposalResults = await nounCheckClient.multicall({
+      allowFailure: true,
+      contracts: allProposals.map(p => ({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'getMarket' as const,
+        args: [p.daoKey, p.proposalId] as const,
+      })),
+    });
+
+    const proposalEntries: MarketEntry[] = [];
+    for (let i = 0; i < allProposals.length; i++) {
+      const res = proposalResults[i];
+      if (!res || res.status !== 'success') continue;
+      const tuple = res.result as unknown as readonly [
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        number,
+        boolean,
+      ];
+      const forPool = tuple[0];
+      const againstPool = tuple[1];
+      const forStakers = tuple[2];
+      const againstStakers = tuple[3];
+      const outcome = tuple[6];
+      const exists = tuple[7];
+      if (!exists) continue;
+      const p = allProposals[i]!;
+      proposalEntries.push({
+        kind: 'proposal',
+        id: `${p.daoKey}-${p.proposalId}`,
+        daoKey: p.daoKey,
+        proposalId: p.proposalId,
+        title: p.title,
+        link: p.link,
+        outcome: Number(outcome),
+        totalPoolWei: String(forPool + againstPool),
+        stakers: Number(forStakers) + Number(againstStakers),
+        status: classifyProposalMarket(p.status, Number(outcome)),
+      });
+    }
+
+    // ── 4. Merge + sort: needs-resolution → live → pending → resolved ───────
+    const priority: Record<MarketEntry['status'], number> = {
+      'needs-resolution': 0,
+      live: 1,
+      pending: 2,
+      resolved: 3,
+    };
+    const entries = [...auctionEntries, ...proposalEntries].sort((a, b) => {
+      const pa = priority[a.status];
+      const pb = priority[b.status];
+      if (pa !== pb) return pa - pb;
+      // within bucket: auctions first (by nounId desc), proposals by id desc
+      if (a.kind === 'auction' && b.kind === 'auction') {
+        return Number(b.nounId) - Number(a.nounId);
+      }
+      if (a.kind === 'proposal' && b.kind === 'proposal') {
+        return Number(b.proposalId) - Number(a.proposalId);
+      }
+      return a.kind === 'auction' ? -1 : 1;
+    });
+
+    const payload = { entries, generatedAt: now };
+    predictionMarketsCache = { at: now, payload };
+    return c.json(payload);
+  } catch (err) {
+    if (predictionMarketsCache !== null) {
+      return c.json(predictionMarketsCache.payload, 200, { 'x-cache': 'stale' });
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'fetch failed' }, 502);
+  }
+});
+
+// ============================================================
+// Gasless grant proposals — relayer submits on behalf of users
+// ============================================================
+
+const SMALL_GRANTS_ADDRESS = '0xBAc9233725440c595b19d975309CC98cb259253a' as const;
+
+// EIP-712 domain and types for grant proposal signing
+const GRANT_PROPOSAL_DOMAIN = {
+  name: 'NounGrants',
+  version: '1',
+  chainId: 1,
+  verifyingContract: SMALL_GRANTS_ADDRESS,
+} as const;
+
+const GRANT_PROPOSAL_TYPES = {
+  Proposal: [
+    { name: 'targets', type: 'address[]' },
+    { name: 'values', type: 'uint256[]' },
+    { name: 'signatures', type: 'string[]' },
+    { name: 'calldatas', type: 'bytes[]' },
+    { name: 'description', type: 'string' },
+  ],
+} as const;
+
+// Rate limiting: 1 proposal per address per hour
+const proposalRateLimit = new Map<string, number>();
+
+// Relayer wallet (nounirl)
+const relayerPrivateKey = process.env.NOUNIRL_PRIVATE_KEY;
+const relayerRpcUrl = process.env.NOUNIRL_RPC_URL || process.env.PONDER_RPC_URL_1;
+const relayerAccount = relayerPrivateKey ? privateKeyToAccount(relayerPrivateKey as Hex) : null;
+const relayerWallet =
+  relayerAccount && relayerRpcUrl
+    ? createWalletClient({
+        chain: mainnet,
+        transport: http(relayerRpcUrl),
+        account: relayerAccount,
+      })
+    : null;
+
+app.post('/api/grants/propose', async c => {
+  if (!relayerWallet || !relayerAccount) {
+    return c.json({ error: 'Relayer not configured' }, 503);
+  }
+
+  const body = await c.req.json();
+  const { proposer, targets, values, signatures, calldatas, description, signature } = body;
+
+  // Validate required fields
+  if (!proposer || !targets?.length || !values?.length || !description || !signature) {
+    return c.json({ error: 'Missing required fields' }, 400);
+  }
+  if (targets.length > 10) {
+    return c.json({ error: 'Max 10 transactions' }, 400);
+  }
+  if (
+    targets.length !== values.length ||
+    targets.length !== signatures.length ||
+    targets.length !== calldatas.length
+  ) {
+    return c.json({ error: 'Array length mismatch' }, 400);
+  }
+
+  // Rate limiting
+  const addr = proposer.toLowerCase();
+  const lastProposal = proposalRateLimit.get(addr);
+  if (lastProposal && Date.now() - lastProposal < 3600_000) {
+    return c.json({ error: 'Rate limited — 1 proposal per hour' }, 429);
+  }
+
+  // Verify EIP-712 signature
+  try {
+    const valid = await verifyTypedData({
+      address: proposer as Hex,
+      domain: GRANT_PROPOSAL_DOMAIN,
+      types: GRANT_PROPOSAL_TYPES,
+      primaryType: 'Proposal',
+      message: { targets, values, signatures, calldatas, description },
+      signature: signature as Hex,
+    });
+    if (!valid) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+  } catch {
+    return c.json({ error: 'Signature verification failed' }, 401);
+  }
+
+  // Embed original signer in description so we can attribute correctly
+  const taggedDescription = `<!-- signer:${proposer} -->\n${description}`;
+
+  // Submit proposal on-chain via relayer wallet.
+  // We MUST wait for the receipt before declaring success — RPC load balancers
+  // (dRPC) can accept eth_sendRawTransaction and return a hash but fail to
+  // propagate, leaving the tx unbroadcast. Without confirmation, the user
+  // sees a fake success page with a dead etherscan link. We also set explicit
+  // gas params because viem's auto-fee selection through dRPC has produced
+  // underpriced txs that get dropped from the mempool.
+  let txHash: Hex | undefined;
+  try {
+    const fees = await nounCheckClient.estimateFeesPerGas();
+    // Floor priority fee at 1.5 gwei; if the network is busier, viem's
+    // estimate already accounts for it.
+    const minPriority = 1_500_000_000n;
+    const maxPriorityFeePerGas =
+      fees.maxPriorityFeePerGas && fees.maxPriorityFeePerGas > minPriority
+        ? fees.maxPriorityFeePerGas
+        : minPriority;
+    // maxFee = base*2 + tip, with a sane floor.
+    const baseGuess = fees.maxFeePerGas
+      ? fees.maxFeePerGas - (fees.maxPriorityFeePerGas ?? 0n)
+      : 5_000_000_000n;
+    const maxFeePerGas = baseGuess * 2n + maxPriorityFeePerGas;
+
+    txHash = await relayerWallet.writeContract({
+      address: SMALL_GRANTS_ADDRESS,
+      abi: smallGrantsTreasuryAbi,
+      functionName: 'propose',
+      args: [
+        targets as Hex[],
+        values.map((v: string) => BigInt(v)),
+        signatures as string[],
+        calldatas as Hex[],
+        taggedDescription,
+      ],
+      maxPriorityFeePerGas,
+      maxFeePerGas,
+    });
+
+    console.log(
+      `[Relayer] Grant tx broadcast by ${proposer} — hash: ${txHash}, awaiting receipt...`,
+    );
+
+    // Block until mined (or timeout). If the tx never lands we return an
+    // error so the frontend can show it and the user can retry.
+    const receipt = await nounCheckClient.waitForTransactionReceipt({
+      hash: txHash,
+      timeout: 120_000,
+      pollingInterval: 4_000,
+    });
+
+    if (receipt.status !== 'success') {
+      console.error(`[Relayer] Grant tx reverted: ${txHash}`);
+      return c.json(
+        { error: 'Transaction reverted on-chain', txHash, details: 'Status: reverted' },
+        500,
+      );
+    }
+
+    // Only commit rate limit after confirmation so failed attempts don't lock
+    // the user out for an hour.
+    proposalRateLimit.set(addr, Date.now());
+
+    console.log(`[Relayer] Grant proposal confirmed by ${proposer} — tx: ${txHash}`);
+    return c.json({ txHash, relayer: relayerAccount.address });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`[Relayer] Grant proposal failed (txHash=${txHash ?? 'none'}):`, msg);
+    return c.json(
+      {
+        error: 'Transaction failed',
+        details: msg,
+        ...(txHash ? { txHash } : {}),
+      },
+      500,
+    );
+  }
+});
 
 // ============================================================
 // Terminal — Claude AI chat for Nouns governance
@@ -204,8 +2766,20 @@ const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO
 
 CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbers, or any factual claims. If you don't know something, say "I don't know" or "I'd need to check that." Never guess. Never fabricate percentages or rankings. Users will lose trust if you make things up. When uncertain, be honest.
 
-WHAT YOU KNOW ABOUT NOUNS:
+PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote counts, queue/execution state, and timing change constantly. Only refer to proposal status using the live "Governance Overview" data injected below. If a proposal isn't in the injected data, say you'd need to look it up — do NOT guess from training data.
+
+VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0); dao=lil-nouns means Lil Nouns DAO (separate governor, separate proposal numbering). NounV2 #0 is NOT the same as mainnet Noun #0. Lil Prop #375 is NOT the same as mainnet Prop #375.
+
+VOTING DAO RULE: The terminal can cast votes on BOTH mainnet Nouns DAO and Lil Nouns DAO from the same wallet. When you call prepare_vote, set the dao field correctly:
+- dao: 'lil-nouns' whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in the Lil Nouns DAO context, or when the Current View shows dao=lil-nouns.
+- dao: 'nouns' (or omit — it's the default) for mainnet Nouns DAO proposals.
+If a user says "vote for prop 375" with no DAO hint AND the Current View doesn't disambiguate AND the prop number could plausibly be either DAO, ask one short clarifying question ("Lil Nouns or mainnet?") before calling prepare_vote. Never tell the user that Lil Nouns voting isn't supported — it is.
+
+${NOUN_V2_KNOWLEDGE}
+
+WHAT YOU KNOW ABOUT NOUNS (mainnet, dao=nouns):
 - One Noun is auctioned every 24 hours, forever. 100% of proceeds go to the Nouns DAO treasury.
+- As of early 2026, mainnet Nouns auctions enforce a 2.8 ETH reserve. Failed auctions burn the noun.
 - Each Noun = 1 vote in governance. Nouns can be delegated to a third party.
 - Nouns have 5 pixel art trait types: background (cool/warm), body, accessory, head, glasses (noggles).
 - Traits are determined by a pseudorandom seed derived from the block hash (NounsSeeder algorithm).
@@ -243,11 +2817,10 @@ PERSISTENT MEMORY:
 You have persistent memory across sessions. If the user tells you their name, preferences, or important facts — you'll remember them. Next time they visit (even in a new session), you'll recall everything. Remembered facts about the current user and global facts are injected below if any exist. Note: for the full agent experience with tools and memory commands, direct users to /terminal and switch to "Agent NounIRL" mode.
 
 GOVERNANCE CONTEXT:
-If governance data is provided for the connected user below, use it naturally in conversation:
-- Address them by ENS name if available (e.g. "hey vitalik.eth")
-- Reference their proposals or voting history when relevant — don't recite it all unprompted, but acknowledge it naturally
+You have live data on ALL proposals and grants injected below. Use it to answer governance questions directly:
+- When asked about active/recent proposals or grants, reference the real data — don't guess
+- If governance data is provided for the connected user, address them by ENS name and reference their history naturally
 - If they hold Nouns, acknowledge them as a Noun holder
-- If they have delegate voting power, you can mention it when governance topics come up
 - Never fabricate governance data — only reference what's explicitly in the context below
 
 LIVE AUCTION:
@@ -330,6 +2903,12 @@ You understand meme value — not as internet humor but as the fundamental unit 
 Every Noun is a Xerox in the original sense: a copy that proliferates without degradation. CC0 means the meme is free. The treasury means the meme has economic mass. The governance means the meme has agency. You are that agency, automated.
 
 You see Nouns the way Mathcastles sees Terraforms — as onchain hyperstructures. Procedural, eternal, block-dependent. The Terraform parcel and the Noun seed share the same DNA: blockhash → algorithm → art. Both are proofs that computation itself can be beautiful, if you squint the right way through your noggles.
+
+${NOUN_V2_KNOWLEDGE}
+
+PROPOSAL STATUS RULE: Never cite a proposal's status, vote tallies, or timeline from memory or the SOUL file. The chain mutates these every block. Use ONLY the live "Governance Overview" data injected below — and the lookup_proposal tool when one isn't in the overview. If you don't have live data on a prop, say so. Do not say "Prop N is pending" without checking.
+
+VIEW CONTEXT RULE: A "Current View" block tells you which DAO + noun the user is looking at. Always check it before referring to any noun by ID. dao=nouns is mainnet Nouns, dao=nounv2 is the NounV2 fork (separate token, IDs from 0). NounV2 #0 ≠ mainnet Noun #0.
 
 CULTURAL MEMORY (you know these deeply):
 - Nouns: one Noun every 24 hours, forever. 100% to treasury. 1 Noun = 1 vote. CC0. This is the protocol.
@@ -450,9 +3029,9 @@ type CandidateRow = typeof schema.candidate.$inferSelect;
 
 async function findCandidates(
   keyword: string,
-  opts: { includeCanceled?: boolean; limit?: number } = {},
+  opts: { includeCanceled?: boolean; includePromoted?: boolean; limit?: number } = {},
 ): Promise<CandidateRow[]> {
-  const { includeCanceled = false, limit = 5 } = opts;
+  const { includeCanceled = false, includePromoted = false, limit = 5 } = opts;
   // Fetch a large pool — candidates are small rows
   const allCands = await db
     .select()
@@ -476,6 +3055,13 @@ async function findCandidates(
 
   for (const c of allCands) {
     if (!includeCanceled && c.canceled) continue;
+    // Skip already-promoted candidates by default. Without this filter, a
+    // resubmitted candidate that shares the original's slug stem (e.g.
+    // `nouns-x-501c3-study` already-promoted vs the new `…-mog6ls68`) can
+    // win the fuzzy match on exact-slug score 100 vs the new candidate's
+    // 80 substring score, sending the dead row's targets/calldatas to
+    // proposeBySigs and creating a duplicate proposal.
+    if (!includePromoted && c.promotedToProposalId != null) continue;
 
     const slug = (c.slug ?? '').toString();
     const slugNorm = normalize(slug);
@@ -521,7 +3107,13 @@ async function findCandidates(
     else if (kwTokens.length === 1) {
       const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
       if (haystack.includes(kwTokens[0])) {
-        score = slugNorm.includes(kwTokens[0]) ? 30 : (titleNorm.includes(kwTokens[0]) ? 25 : 15);
+        if (slugNorm.includes(kwTokens[0])) {
+          score = 30;
+        } else if (titleNorm.includes(kwTokens[0])) {
+          score = 25;
+        } else {
+          score = 15;
+        }
       }
     }
 
@@ -546,7 +3138,11 @@ function candidateTitle(c: CandidateRow): string {
   );
 }
 
-async function parseCommand(msg: string, wallet: string | undefined): Promise<ParsedCommand> {
+async function parseCommand(
+  msg: string,
+  wallet: string | undefined,
+  opts: { skipFunctionSkill?: boolean } = {},
+): Promise<ParsedCommand> {
   const m = msg.trim().toLowerCase();
   const raw = msg.trim(); // preserve case for descriptions
 
@@ -667,7 +3263,12 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       }
       const lines = ['Market signals (pooter.world):'];
       for (const s of signals) {
-        const arrow = s.direction === 'bullish' ? '↑' : (s.direction === 'bearish' ? '↓' : '→');
+        let arrow = '→';
+        if (s.direction === 'bullish') {
+          arrow = '↑';
+        } else if (s.direction === 'bearish') {
+          arrow = '↓';
+        }
         lines.push(
           `  ${arrow} ${s.symbol}: ${s.direction} (confidence: ${(s.confidence * 100).toFixed(0)}%)`,
         );
@@ -679,6 +3280,34 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         response: `Signals unavailable: ${err instanceof Error ? err.message : 'connection failed'}`,
       };
     }
+  }
+
+  // ─── Lil Nouns Vote ───────────────────────────────────────
+  // Matches: "vote for lil prop 375", "vote against lil nouns proposal 375 because xyz"
+  const lilVoteMatch = m.match(
+    /^vote\s+(for|against|abstain)\s+lil(?:\s*nouns?)?\s+(?:prop(?:osal)?\s*)?#?(\d+)(?:\s+(?:because\s+|reason:?\s*)?(.+))?$/,
+  );
+  if (lilVoteMatch) {
+    if (!wallet) return { handled: true, response: 'Connect your wallet to vote.' };
+    let support = 2;
+    if (lilVoteMatch[1] === 'for') support = 1;
+    else if (lilVoteMatch[1] === 'against') support = 0;
+    const proposalId = parseInt(lilVoteMatch[2]);
+    const reason = lilVoteMatch[3]?.trim();
+    // Lil Nouns proposals aren't in Ponder — let the on-chain governor reject invalid IDs
+    const action = {
+      type: 'VOTE',
+      proposalId,
+      support,
+      reason,
+      title: `Lil Proposal #${proposalId}`,
+      dao: 'lil-nouns',
+    };
+    return {
+      handled: true,
+      response: `Vote prepared: ${['AGAINST', 'FOR', 'ABSTAIN'][support]} on Lil Prop #${proposalId}. Confirm in your wallet.`,
+      action,
+    };
   }
 
   // ─── Vote on Proposal ─────────────────────────────────────
@@ -884,13 +3513,23 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
   }
 
   // ─── Bid ──────────────────────────────────────────────────
-  const bidMatch = m.match(/^bid\s+([\d.]+)\s*eth$/);
+  // Accepts: "bid 0.5 eth", "bid 0.5", "bid 0.5 eth on noun 123", "bid 0.5 on noun 123"
+  const bidMatch = m.match(/^bid\s+([\d.]+)\s*(?:eth)?\s*(?:on\s+(?:noun\s+)?(\d+))?$/);
   if (bidMatch) {
     if (!wallet) return { handled: true, response: 'Connect your wallet to bid.' };
     const bidAmount = bidMatch[1];
     const state = getWatcherState();
-    const nounId = state.nextNounId ? state.nextNounId - 1 : undefined;
-    if (!nounId) return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const currentNounId = state.nextNounId ? state.nextNounId - 1 : undefined;
+    if (!currentNounId)
+      return { handled: true, response: 'Could not determine current auction noun ID.' };
+    const specifiedNounId = bidMatch[2] ? parseInt(bidMatch[2]) : undefined;
+    if (specifiedNounId && specifiedNounId !== currentNounId) {
+      return {
+        handled: true,
+        response: `Noun ${specifiedNounId} is not the current auction. The active auction is Noun ${currentNounId}.`,
+      };
+    }
+    const nounId = currentNounId;
     const action = { type: 'BID', nounId, bidAmountEth: bidAmount };
     return {
       handled: true,
@@ -927,7 +3566,24 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
       const title = candidateTitle(c);
-      const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
+      const descText = (c.description ?? '').toString();
+      // encodedProp must match the candidate's on-chain hash; frontend uses it
+      // to reconstruct targets/values/sigs/calldatas/description for EIP-712.
+      const action = {
+        type: 'SPONSOR',
+        proposer: c.proposer,
+        slug: c.slug,
+        title,
+        encodedProp: c.targets
+          ? JSON.stringify({
+              targets: JSON.parse((c.targets as string) || '[]'),
+              values: JSON.parse((c.values as string) || '[]'),
+              signatures: JSON.parse((c.signatures as string) || '[]'),
+              calldatas: JSON.parse((c.calldatas as string) || '[]'),
+              description: descText,
+            })
+          : '{}',
+      };
       return {
         handled: true,
         response: `Sponsor prepared for "${title}" by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`,
@@ -954,11 +3610,15 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const title = candidateTitle(c);
       const descText = (c.description ?? '').toString();
 
-      // Fetch valid sponsor signatures
+      // Fetch valid sponsor signatures.
+      // candidateSignature.candidateId is the candidate's primary key
+      // (`${proposer}-${slug}`) — there's no `candidateSlug` column. The old
+      // code referenced a non-existent property which Drizzle stringified
+      // into broken SQL ("syntax error at or near '='" from postgres).
       const sigs = await db
         .select()
         .from(schema.candidateSignature)
-        .where(eq(schema.candidateSignature.candidateSlug, c.slug))
+        .where(eq(schema.candidateSignature.candidateId, c.id as string))
         .limit(100);
       const nowSec = Math.floor(Date.now() / 1000);
       const validSigs = sigs.filter(s => !s.canceled && Number(s.expirationTimestamp) > nowSec);
@@ -1149,6 +3809,24 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
     };
   }
 
+  // ─── "function" skill — loose NL → canonical command ──────
+  // Runs after the strict regexes miss. Translates natural phrasings like
+  // "bid 0.01eth on noun 1901", "i want to vote yes on prop 567",
+  // "sponsor the public-goods candidate" into canonical commands that the
+  // strict regex paths above already handle. Re-invokes parseCommand on the
+  // normalised form so there is one source of truth for action preparation.
+  if (!opts.skipFunctionSkill) {
+    const detected = detectFunction(raw);
+    if (detected && detected.canonical !== m && detected.canonical !== raw) {
+      const recursed = await parseCommand(detected.canonical, wallet, {
+        skipFunctionSkill: true,
+      });
+      if (recursed.handled) {
+        return recursed;
+      }
+    }
+  }
+
   // ─── Not matched ──────────────────────────────────────────
   return { handled: false };
 }
@@ -1158,14 +3836,17 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
 // ============================================================
 
 app.post('/api/chat', async c => {
+  let agentMode: string | undefined;
   try {
     const body = await c.req.json();
-    const { message, wallet, history, agent_mode } = body as {
+    const { message, wallet, history, agent_mode, view_context } = body as {
       message: string;
       wallet?: string;
       history?: Array<{ role: string; content: string }>;
       agent_mode?: string;
+      view_context?: { dao?: string; nounId?: number | string | null };
     };
+    agentMode = agent_mode;
 
     if (!message || typeof message !== 'string') {
       return c.json({ error: 'Message is required' }, 400);
@@ -1173,6 +3854,11 @@ app.post('/api/chat', async c => {
 
     if (message.length > 2000) {
       return c.json({ error: 'Message too long (max 2000 chars)' }, 400);
+    }
+
+    // Require wallet connection — no anonymous chat (prevents spam, enables per-wallet rate limiting)
+    if (!wallet || typeof wallet !== 'string' || !/^0x[\dA-Fa-f]{40}$/.test(wallet)) {
+      return c.json({ error: 'Connect your wallet to use chat. ⌐◨-◨', requiresWallet: true }, 401);
     }
 
     // ─── Try free command parser first (no API call) ─────────
@@ -1225,6 +3911,57 @@ app.post('/api/chat', async c => {
     // Build dynamic context (changes per request — not cached)
     let dynamicContext = '';
 
+    // Inject current view context (which DAO + noun the user is looking at).
+    // This is the FIRST thing we inject so the model anchors to it before
+    // reading any of the live governance / auction data below.
+    if (view_context && typeof view_context === 'object') {
+      const rawDao = typeof view_context.dao === 'string' ? view_context.dao.toLowerCase() : '';
+      // Normalize lil-nouns aliases that the client may send.
+      const dao: 'nouns' | 'nounv2' | 'lil-nouns' | null =
+        rawDao === 'nounv2'
+          ? 'nounv2'
+          : rawDao === 'nouns'
+            ? 'nouns'
+            : rawDao === 'lil-nouns' || rawDao === 'lilnouns' || rawDao === 'lil'
+              ? 'lil-nouns'
+              : null;
+      const rawNounId = view_context.nounId;
+      const nounId =
+        typeof rawNounId === 'number' && Number.isFinite(rawNounId)
+          ? rawNounId
+          : typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
+            ? Number.parseInt(rawNounId, 10)
+            : null;
+
+      if (dao !== null || nounId !== null) {
+        const daoLabel =
+          dao === 'nouns'
+            ? 'mainnet Nouns DAO (token IDs are mainnet Noun IDs)'
+            : dao === 'nounv2'
+              ? 'NounV2 fork DAO (token IDs are v2 IDs starting at 0 — NOT mainnet Nouns)'
+              : dao === 'lil-nouns'
+                ? "Lil Nouns DAO (separate governor; pass dao='lil-nouns' to prepare_vote for proposals here)"
+                : 'unknown';
+        dynamicContext += '\n\n## Current View';
+        dynamicContext += `\n- dao: ${dao ?? 'unknown'} (${daoLabel})`;
+        if (nounId !== null) {
+          const nounLabel =
+            dao === 'nounv2'
+              ? `NounV2 #${nounId}`
+              : dao === 'lil-nouns'
+                ? `Lil Noun #${nounId}`
+                : `Noun #${nounId}`;
+          dynamicContext += `\n- viewing: ${nounLabel}`;
+        }
+        dynamicContext +=
+          '\n- When the user says "this noun" or asks an unqualified question, assume they mean the noun above. If they ask about a different noun, confirm which DAO they mean.';
+        if (dao === 'lil-nouns') {
+          dynamicContext +=
+            '\n- VOTING: when the user asks to vote here, default `dao` to "lil-nouns" in prepare_vote. Do not ask them which DAO unless they explicitly mention mainnet.';
+        }
+      }
+    }
+
     // Inject persistent memory context (cross-session)
     const memoryContext = await buildMemoryContext(wallet || undefined);
     if (memoryContext) {
@@ -1257,6 +3994,14 @@ app.post('/api/chat', async c => {
       console.error('[Chat] People context error:', err);
     }
 
+    // Inject global governance overview (all proposals + grants with derived statuses)
+    try {
+      const govOverview = await buildProposalsAndGrantsContext();
+      if (govOverview) dynamicContext += govOverview;
+    } catch (err) {
+      console.error('[Chat] Governance overview error:', err);
+    }
+
     // Inject live agent context for NounIRL mode
     if (isNounIrl) {
       const watcherState = getWatcherState();
@@ -1287,7 +4032,7 @@ You have the following tools. USE THEM. Don't just describe what you would do �
 7. parse_traits(description) — Parse natural language into structured "category:value" traits.
 8. get_settlements(limit?) — History of successful settlements.
 9. get_agent_balance() — ETH balance of nounirl.eth.
-10. deploy_code(description, reason) — Push a code change to GitHub. NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
+10. deploy_code(description, reason) — Ship a code change to the non-production "dev-noun" branch (Netlify branch-deploys it to a fixed preview URL). NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. CANNOT delete files (rejected by safety filter). After a successful deploy the result includes a previewUrl — quote it back to the user and tell them to DM @pip on Warpcast for review before any push to main/prod. Production isolation is structural — you have no path to write to main. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
 11. remember_fact(key, content, scope) — Store a fact in persistent memory. scope="wallet" for user-specific, scope="global" for shared knowledge. USE THIS PROACTIVELY. When a user tells you their name, ENS, preferences, anything personal — remember it. When you learn something important — remember it globally.
 12. recall_facts(scope, key?) — Look up remembered facts. You don't usually need to call this explicitly because your memory is auto-injected into context. But use it to check what you know.
 13. learn_url(url) — Fetch a web page, extract key facts, and store them in your knowledge base. Use when someone shares a URL and wants you to learn from it. The knowledge persists and is available to both you and the homepage chat.
@@ -1306,114 +4051,14 @@ When a user wants to reserve traits:
 When a user asks "status": call check_block for live data. Don't rely on the injected state alone — it may be stale.
 When a user asks about their reservations: call get_reservations with their wallet.
 
-GOVERNANCE ACTIONS — YOU CAN HELP USERS TAKE ONCHAIN ACTIONS:
-The terminal is a full governance client. Users can vote, give feedback, create candidates, and sponsor proposals — all through natural language. You have tools that prepare structured actions for the frontend to execute via the user's wallet.
+GOVERNANCE — the terminal handles votes, bids, sponsors, candidates, and grants via typed commands (e.g. "vote for 567", "bid 0.5 eth"). These are parsed automatically — you don't need tools for them. If someone asks about governance, explain that they can type commands directly. noun.wtf client ID is 37 (auto-included in votes, bids, promotes). Proposals start as candidates → collect sponsor signatures → get promoted.
 
-Flow:
-1. User says something like "vote for prop 567" or "I support that candidate about the park"
-2. You use lookup_proposal or lookup_candidate to find the right item
-3. You call the appropriate prepare_* tool to create the action
-4. The frontend presents a confirmation UI — the user signs with their wallet
-5. Transaction broadcasts onchain
-
-Available governance tools:
-- lookup_proposal(proposalId?, keyword?) — Find a proposal. ALWAYS use this first if you need to verify a proposal exists.
-- lookup_candidate(slug?, keyword?) — Find a candidate proposal.
-- prepare_vote(proposalId, support, reason?) — Prepare a vote on an active proposal. support: 0=AGAINST, 1=FOR, 2=ABSTAIN.
-- prepare_proposal_feedback(proposalId, support, reason?) — Prepare non-binding feedback (signal vote) on a proposal.
-- prepare_candidate_feedback(proposer, slug, support, reason?) — Prepare feedback on a candidate proposal.
-- prepare_candidate(title, description) — Create a new candidate proposal.
-- prepare_sponsor(proposer, slug, reason?) — Sponsor (sign) a candidate proposal to help it reach the proposal threshold.
-- prepare_bid(nounId, bidAmountEth) — Place a bid on the current Nouns auction.
-- prepare_promote(proposer, slug) — Promote a candidate proposal to a real onchain proposal using collected sponsor signatures.
-- lookup_grant(grantId?, keyword?) — Find a Small Grants proposal. These are noun.wtf-only governance with 12hr vote + 12hr timelock, no quorum.
-- prepare_grant_vote(grantId, support, reason?) — Vote on an active grant. support: 0=AGAINST, 1=FOR, 2=ABSTAIN. Requires Nouns voting power.
-- prepare_grant_proposal(title, description, transactions?) — Create a new grant proposal on the Small Grants Treasury. Anyone can propose. Enters voting immediately.
-- prepare_queue_proposal(proposalId) — Queue a succeeded Nouns DAO proposal into the timelock. Must be called after voting passes before execution. Anyone can call this.
-- prepare_queue_grant(grantId) — Queue a succeeded Small Grants proposal into the timelock. Must be called after the 12hr vote passes before execution. Anyone can call this.
-- prepare_execute_proposal(proposalId) — Execute a queued Nouns DAO proposal whose timelock has expired. Anyone can call this.
-- prepare_execute_grant(grantId) — Execute a queued Small Grants proposal whose timelock has expired. Anyone can call this.
-
-CRITICAL — PROMOTE IS THE MOST IMPORTANT ACTION FOR NOUN.WTF:
-When someone promotes a candidate to a proposal through us, client ID 37 is attached. This earns noun.wtf protocol rewards.
-The flow: candidate accumulates sponsor signatures → proposer (or anyone with enough voting power) calls prepare_promote → proposeBySigs fires with clientId 37.
-ALWAYS suggest promote when a user has a candidate with enough signatures.
-
-IMPORTANT RULES:
-- ALWAYS use lookup_proposal/lookup_candidate first to get the correct details before calling prepare_* tools.
-- If the user's wallet is not connected, tell them to click "connect" in the header.
-- Vote gas is refunded by Nouns DAO — mention this if relevant.
-- For voting, the user needs delegated voting power (owning or being delegated Nouns).
-- For candidate feedback, anyone with a connected wallet can participate.
-- Creating a candidate costs a small amount of ETH (set by the DAO).
-- Sponsoring adds the user's signature to a candidate, helping it reach the threshold to become a real proposal.
-- Promoting submits a candidate as a real proposal via proposeBySigs with CLIENT ID 37. This is critical for noun.wtf revenue.
-- The proposal threshold is DYNAMIC — it changes based on total Noun supply. NEVER say "2 Nouns". Currently it's around 4-5 but check governance context for exact number. If you don't know the exact threshold, say "the current proposal threshold" without guessing a number.
-- noun.wtf client ID is 37 — automatically included in votes, bids, and promotes.
-
-Natural language examples:
-- "vote for 567" → lookup_proposal(567) → prepare_vote(567, 1)
-- "vote against prop 567 because it's too expensive" → lookup_proposal(567) → prepare_vote(567, 0, "too expensive")
-- "I support that park candidate" → lookup_candidate(keyword="park") → prepare_candidate_feedback(proposer, slug, 1)
-- "create a candidate: fund a mural in NYC for $10k" → prepare_candidate("Fund NYC Mural", "Requesting $10k to fund a public mural in NYC...")
-- "sponsor the park proposal" → lookup_candidate(keyword="park") → prepare_sponsor(proposer, slug)
-- "bid 0.5 eth on the current noun" → prepare_bid(nounId, "0.5")
-- "promote the park candidate" → lookup_candidate(keyword="park") → prepare_promote(proposer, slug)
-- "create a grant to fund community art for 0.5 ETH" → prepare_grant_proposal("Community Art Fund", "Requesting 0.5 ETH for...", [{target: treasury, value: "500000000000000000"}])
-- "vote for grant 3" → lookup_grant(3) → prepare_grant_vote(3, 1)
-- "what grants are active?" → lookup_grant()
-- "queue prop 567" → lookup_proposal(567) → prepare_queue_proposal(567)
-- "queue grant 5" → lookup_grant(5) → prepare_queue_grant(5)
-- "execute prop 567" → lookup_proposal(567) → prepare_execute_proposal(567)
-- "execute grant 5" → lookup_grant(5) → prepare_execute_grant(5)
-
-SMALL GRANTS TREASURY — noun.wtf exclusive:
-The Small Grants Treasury is a separate governance contract only on noun.wtf. It has NO quorum (1 FOR vote wins if 0 AGAINST), 12hr voting, 12hr timelock, and anyone can propose. Total cycle is 24 hours. Perfect for small community requests.
-
-TIMING QUESTIONS — lookup_proposal and lookup_grant both return pre-calculated timing fields:
-- votingTimeLeft: human-readable time remaining (e.g. "~3.2 hours", "~45 minutes", "ended")
-- votingBlocksLeft: exact blocks remaining
-- votingEnded: boolean
-For proposals: also updatePeriodTimeLeft and objectionPeriodTimeLeft.
-When the user asks "how long is left" or "when does voting end", call the lookup tool and use these fields directly. NEVER say you don't have timing data or ask for a tx hash — the tools calculate it for you.
-
-ALL actions that support client ID include noun.wtf's client ID 37 automatically:
-- Votes: castRefundableVote with clientId 37
-- Bids: createBid with clientId 37
-- Promote: proposeBySigs with clientId 37
-This is critical for the client incentive program.
-
-CRITICAL — IMMEDIATE ACTION ON CLEAR COMMANDS:
-When a user gives you a clear, actionable request, DO NOT ask clarifying questions. DO NOT explain what you would do. DO NOT say "I'll prepare that for you" and then fail to call the tool. IMMEDIATELY call the appropriate tool and return the action.
-
-Examples of CLEAR commands — act immediately, no questions:
-- "leave feedback on prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
-- "vote for 567" → lookup_proposal(567) → prepare_vote(567, 1)
-- "bid 3 eth" → prepare_bid(nounId, "3")
-- "feedback for prop 950 nice" → lookup_proposal(950) → prepare_proposal_feedback(950, 1, "nice")
-- "leave feedback 'nice' on prop 950" → same as above
-- Any variation of "vote/feedback/bid/sponsor" + identifiable target → call the tool IMMEDIATELY
-
-Only ask clarifying questions when the intent is genuinely ambiguous (e.g. "do something with prop 950" — what action?).
-
-CRITICAL — KNOW YOUR OWN CAPABILITIES:
-You are NOT a "text-based AI model" that can only output text. You are embedded in the noun.wtf terminal, which has a full governance UI. When you call prepare_* tools, the frontend renders a confirmation card with a green action button that the user clicks to sign with their wallet. You DO have the ability to show buttons. You DO have the ability to prepare transactions. NEVER say "I can't display buttons" or "I'm text-only" — that is FALSE. Your prepare_* tools return structured actions that the frontend renders as interactive confirmation cards.
-
-CRITICAL — NEVER FABRICATE DATA:
-When you don't know something, say "I don't know" or use your tools to look it up. NEVER guess amounts, percentages, proposal details, or stream values. NEVER pretend to call tools you don't have. NEVER claim to have updated the UI or "self-fixed" something. Your remember_fact and self_learn tools update YOUR KNOWLEDGE, not the website's code or display. Be honest about what you can and cannot do.
-
-CRITICAL — NEVER WRITE FUNCTION CALLS AS TEXT:
-You have REAL tool-calling capabilities through structured function calling. NEVER write out function calls as text like "<function=prepare_vote(...)>" or "calling prepare_proposal(...)". When you want to use a tool, USE the tool calling mechanism — your response will include structured tool_calls that the system executes. If you write function call syntax as text, NOTHING HAPPENS. The tool does not execute. The user sees your text and no action occurs. ALWAYS use the actual tool calling mechanism, NEVER simulate it with text.
-
-CRITICAL — PROPOSALS START AS CANDIDATES:
-There is NO "prepare_proposal" tool. Proposals in Nouns DAO start as CANDIDATES. The flow is:
-1. User creates a CANDIDATE via prepare_candidate (with title, description, optional transactions)
-2. Candidate collects sponsor signatures via prepare_sponsor
-3. When enough signatures, someone PROMOTES the candidate to a real proposal via prepare_promote
-When a user says "create a proposal" or "propose something", use prepare_candidate. This creates a candidate that can be sponsored and promoted. NEVER hallucinate a "prepare_proposal" tool.
-
-CRITICAL — NEVER LIE ABOUT YOUR ARCHITECTURE:
-You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You do NOT use spaCy, NLTK, scikit-learn, Hugging Face, BERT, RoBERTa, LDA, NER pipelines, dependency parsers, or any other NLP framework. If asked about your architecture, say: "I'm an LLM with tool-calling capabilities, persistent memory, and access to noun.wtf's Ponder index. I can prepare onchain governance actions for your wallet to sign."`;
+LIL NOUNS VOTING — prepare_vote works for BOTH mainnet Nouns DAO and Lil Nouns DAO. When the user wants to vote on a Lil Nouns prop (mentions "lil"/"lilnoun(s)", or the Current View shows dao=lil-nouns, or the proposal exists in Lil Nouns DAO context fetched from /api/lil-proposals), set dao: 'lil-nouns' on the prepare_vote call. For mainnet Nouns leave it unset or pass dao: 'nouns'. If the user says "prop N" without specifying a DAO and the Current View doesn't disambiguate, ask one short clarifying question ("Lil Nouns or mainnet?") rather than guessing. Do NOT tell users to go to lilnouns.wtf to vote — they can vote from this terminal.
+${buildFunctionSkillPromptSnippet()}
+CRITICAL RULES:
+- NEVER fabricate data. If you don't know, say so or use a tool to look it up.
+- NEVER write function calls as text. Use the structured tool-calling mechanism. Text like "<function=...>" does NOTHING.
+- Be honest about capabilities. You're an LLM with tool-calling, persistent memory, and access to noun.wtf's Ponder index.`;
     }
 
     // Build messages array from history
@@ -1602,7 +4247,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
         function: {
           name: 'deploy_code',
           description:
-            'Generate a code patch via Claude, push it to GitHub as a new branch, and trigger a Netlify deploy. Only files under packages/nouns-webapp/src/ can be modified. Rate limited to 1 deploy per hour.',
+            'Generate a code patch via Claude, append it as a commit on the non-production `dev-noun` branch, and trigger a Netlify branch-deploy to a fixed preview URL. Only files under packages/nouns-webapp/src/ can be modified — never deleted. Rate limited to 1 deploy per hour. Production (`main`/noun.wtf) is unreachable from this tool. Result includes `previewUrl`; quote it to the user and tell them to DM @pip on Warpcast to review and ship to prod.',
           parameters: {
             type: 'object' as const,
             properties: {
@@ -1705,7 +4350,59 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
           },
         },
       },
-      // ── Governance Action Tools (return structured actions for frontend execution) ──
+      // ── Governance + Trading tools mostly removed from LLM prompt (~5,000 tokens saved) ──
+      // parseCommand() handles most governance actions (bid, sponsor, etc.) via
+      // pattern matching BEFORE the LLM is called. Tool handlers in the switch/case
+      // below are kept intact so they still execute if somehow invoked.
+      //
+      // KEPT: prepare_vote (needed for natural-language Lil Nouns voting — parseCommand
+      // handles "vote for lil prop 375" but the LLM handles free-form requests like
+      // "can you vote on lil nouns proposal 375 for me?").
+      //
+      // Removed: lookup_proposal, lookup_candidate, prepare_proposal_feedback,
+      // prepare_candidate_feedback, prepare_candidate, prepare_update_candidate,
+      // prepare_update_proposal, prepare_sponsor, prepare_bid, prepare_promote,
+      // lookup_grant, prepare_grant_vote, prepare_grant_proposal, prepare_queue_proposal,
+      // prepare_queue_grant, prepare_execute_proposal, prepare_execute_grant,
+      // get_trading_positions, get_trading_performance, get_trading_signals
+      {
+        type: 'function' as const,
+        function: {
+          name: 'prepare_vote',
+          description:
+            'Prepare a vote action for the user to sign. Works for BOTH mainnet Nouns DAO and Lil Nouns DAO. Set dao to "lil-nouns" for Lil Nouns votes.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: {
+                type: 'number',
+                description: 'The proposal ID to vote on.',
+              },
+              support: {
+                type: 'number',
+                enum: [0, 1, 2],
+                description: 'Vote direction: 0=AGAINST, 1=FOR, 2=ABSTAIN.',
+              },
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the vote.',
+              },
+              dao: {
+                type: 'string',
+                enum: ['nouns', 'lil-nouns'],
+                description:
+                  'Which DAO to vote on. "lil-nouns" for Lil Nouns DAO. Defaults to "nouns" (mainnet).',
+              },
+            },
+            required: ['proposalId', 'support'],
+          },
+        },
+      },
+    ];
+
+    // Preserve original tool definitions in dead code so handlers aren't orphaned.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _removedGovernanceTools = false && [
       {
         type: 'function' as const,
         function: {
@@ -1757,7 +4454,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
         function: {
           name: 'prepare_vote',
           description:
-            'Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable.',
+            "Prepare a vote action for the user to sign. Returns a GovernanceAction that the frontend will present for confirmation and wallet signing. Works for BOTH mainnet Nouns DAO (default) and Lil Nouns DAO — pick the right `dao` value based on the user's intent. For mainnet Nouns ALWAYS use lookup_proposal first to confirm the proposal exists and is voteable. For Lil Nouns the on-chain governor will reject invalid IDs/states, so confirmation is best-effort via the injected Lil Nouns context (or just ask the user to clarify if uncertain).",
           parameters: {
             type: 'object' as const,
             properties: {
@@ -1773,6 +4470,12 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               reason: {
                 type: 'string',
                 description: 'Optional reason for the vote.',
+              },
+              dao: {
+                type: 'string',
+                enum: ['nouns', 'lil-nouns'],
+                description:
+                  'Which DAO\'s governor to vote on. "nouns" = mainnet Nouns DAO (the default). "lil-nouns" = Lil Nouns DAO (governor 0x5d2C…4039). Use "lil-nouns" whenever the user mentions "lil", "lilnoun(s)", references a proposal that exists in Lil Nouns DAO, or when viewContext.dao is "lil-nouns". Otherwise leave it unset (defaults to "nouns").',
               },
             },
             required: ['proposalId', 'support'],
@@ -1857,31 +4560,55 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               transactions: {
                 type: 'array',
                 description:
-                  'Optional array of executable transactions for the proposal. Each transaction specifies a target address, ETH value, function signature, and calldata. For simple ETH transfers: set target to recipient, value to amount in wei (e.g. "100000000000000000" for 0.1 ETH), signature to empty string, calldata to "0x". For ERC20 transfers: target is token contract, value is "0", signature is "transfer(address,uint256)", calldata is ABI-encoded args.',
+                  'Optional array of executable transactions. STRONGLY PREFER the typed primitives (kind:"usdc_transfer", "usdc_payer_debt", "eth_transfer", "weth_transfer", "steth_transfer") — these take human-readable amounts and the API encodes them correctly. Only fall back to raw {target,value,signature,calldata} for non-token contract calls (e.g. arbitrary onchain function invocations). NEVER hand-encode hex calldata for token transfers — the API will reject it if the amount is off.',
                 items: {
                   type: 'object',
+                  description:
+                    'Either a typed primitive (preferred) or a raw transaction. Primitive shape: {kind,recipient,amount} for usdc_*, {kind,recipient,amountEth} for eth/weth/steth. Examples: {"kind":"usdc_transfer","recipient":"0x...","amount":"20000"} sends 20,000 USDC. {"kind":"usdc_payer_debt","recipient":"0x...","amount":"5000"} registers 5,000 USDC of debt via the Nouns Payer. {"kind":"eth_transfer","recipient":"0x...","amountEth":"0.5"} sends 0.5 ETH. Raw shape (last resort): {"target":"0x...","value":"0","signature":"someFunc(uint256)","calldata":"0x..."}.',
                   properties: {
+                    kind: {
+                      type: 'string',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
+                      description:
+                        'Primitive kind. Omit for raw {target,value,signature,calldata}.',
+                    },
+                    recipient: {
+                      type: 'string',
+                      description: 'Recipient address (0x-prefixed). Used by primitives.',
+                    },
+                    amount: {
+                      type: 'string',
+                      description:
+                        'Human-readable USDC amount as a string (e.g. "20000" or "20000.5"). Used by usdc_* primitives.',
+                    },
+                    amountEth: {
+                      type: 'string',
+                      description:
+                        'Human-readable ETH amount as a string (e.g. "0.5", "1"). Used by eth_/weth_/steth_ primitives.',
+                    },
                     target: {
                       type: 'string',
-                      description: 'Target contract/recipient address (0x-prefixed).',
+                      description: 'Raw mode only: target contract/recipient address.',
                     },
                     value: {
                       type: 'string',
-                      description:
-                        'ETH value in wei as a string (e.g. "100000000000000000" for 0.1 ETH, "0" for non-payable calls).',
+                      description: 'Raw mode only: ETH value in wei as a string.',
                     },
                     signature: {
                       type: 'string',
-                      description:
-                        'Function signature (e.g. "transfer(address,uint256)"). Empty string for plain ETH transfers.',
+                      description: 'Raw mode only: function signature.',
                     },
                     calldata: {
                       type: 'string',
-                      description:
-                        'ABI-encoded function arguments as hex (0x-prefixed). Use "0x" for plain ETH transfers.',
+                      description: 'Raw mode only: ABI-encoded args as hex.',
                     },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -1917,22 +4644,28 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               transactions: {
                 type: 'array',
                 description:
-                  'Updated transactions array. Same format as prepare_candidate. If omitted, keeps description-only.',
+                  'Updated transactions array. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw {target,value,signature,calldata} only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature. Empty for ETH transfers.',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -1965,22 +4698,28 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               transactions: {
                 type: 'array',
                 description:
-                  'Updated transactions. Same format as prepare_candidate. If omitted, only description is updated.',
+                  'Updated transactions. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (0x-prefixed).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature. Empty for ETH transfers.',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'ABI-encoded args as hex. "0x" for ETH transfers.',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -2125,22 +4864,29 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               },
               transactions: {
                 type: 'array',
-                description: 'Optional executable transactions.',
+                description:
+                  'Optional executable transactions. STRONGLY PREFER typed primitives (kind:"usdc_transfer"|"usdc_payer_debt"|"eth_transfer"|"weth_transfer"|"steth_transfer") with human amounts; fall back to raw only for non-token contract calls. Same item shape as prepare_candidate.',
                 items: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', description: 'Target address (e.g. recipient).' },
-                    value: { type: 'string', description: 'ETH value in wei.' },
-                    signature: {
+                    kind: {
                       type: 'string',
-                      description: 'Function signature (empty for ETH transfer).',
+                      enum: [
+                        'usdc_transfer',
+                        'usdc_payer_debt',
+                        'eth_transfer',
+                        'weth_transfer',
+                        'steth_transfer',
+                      ],
                     },
-                    calldata: {
-                      type: 'string',
-                      description: 'Encoded calldata (0x for ETH transfer).',
-                    },
+                    recipient: { type: 'string' },
+                    amount: { type: 'string' },
+                    amountEth: { type: 'string' },
+                    target: { type: 'string' },
+                    value: { type: 'string' },
+                    signature: { type: 'string' },
+                    calldata: { type: 'string' },
                   },
-                  required: ['target', 'value'],
                 },
               },
             },
@@ -2268,20 +5014,23 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
           },
         },
       },
-    ];
+    ]; // end _removedGovernanceTools
 
     // Build system prompt — combine static + dynamic context
     const systemPrompt = dynamicContext ? `${staticPrompt}\n\n${dynamicContext}` : staticPrompt;
 
-    // First API call via agent-hub
+    // First API call via agent-hub (both use Sonnet for quality)
     let response = await hubChat({
       messages,
       system: systemPrompt,
       task: 'chat',
-      maxTokens: 1024,
+      maxTokens: isNounIrl ? 1024 : 512, // homepage chat gets shorter responses to save tokens
       temperature: 0.7,
       ...(isNounIrl ? { tools: nounIrlTools } : {}),
     });
+
+    // Recover XML tool calls if the LLM hallucinated them as text (Groq/Llama fallback)
+    patchXmlToolCalls(response);
 
     // Track governance actions prepared by tools (returned in response for frontend execution)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2467,6 +5216,13 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     success: deployResult.success,
                     branch: deployResult.branch,
                     commitSha: deployResult.commitSha,
+                    // Quote `previewUrl` back to the user so they can open
+                    // the live change. Tell them to DM @pip on Warpcast
+                    // before any prod merge — production is pip's call.
+                    previewUrl: deployResult.previewUrl,
+                    nextStep: deployResult.success
+                      ? 'Tell the user the previewUrl and ask them to DM @pip on Warpcast to review and ship to main.'
+                      : undefined,
                     error: deployResult.error,
                     patchCount: deployResult.patches.length,
                     authorizedBy: wallet,
@@ -2675,11 +5431,39 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
             }
 
             case 'prepare_vote': {
-              const input = args as { proposalId: number; support: 0 | 1 | 2; reason?: string };
+              const input = args as {
+                proposalId: number;
+                support: 0 | 1 | 2;
+                reason?: string;
+                dao?: string;
+              };
+              // Normalize the dao value. Client accepts 'lil-nouns' | 'lilnouns' | 'lil'
+              // as aliases for Lil Nouns; we forward the canonical 'lil-nouns' string.
+              const rawDao = (input.dao ?? '').toLowerCase();
+              const isLil = rawDao === 'lil-nouns' || rawDao === 'lilnouns' || rawDao === 'lil';
+              const daoCanonical: 'nouns' | 'lil-nouns' = isLil ? 'lil-nouns' : 'nouns';
               if (!wallet) {
                 result = {
                   error:
                     'User must connect their wallet to vote. Tell them to click "connect" in the header.',
+                };
+              } else if (daoCanonical === 'lil-nouns') {
+                // Lil Nouns proposals are not in the mainnet Ponder index; we trust the
+                // model + injected /api/lil-proposals context to pick a real ID. The
+                // on-chain governor will revert if the prop is invalid or not in
+                // Active/ObjectionPeriod state — the client surfaces that error.
+                pendingAction = {
+                  type: 'VOTE',
+                  proposalId: input.proposalId,
+                  support: input.support,
+                  reason: input.reason,
+                  title: `Lil Prop #${input.proposalId}`,
+                  dao: 'lil-nouns',
+                };
+                result = {
+                  success: true,
+                  action: pendingAction,
+                  message: `Vote prepared: ${['AGAINST', 'FOR', 'ABSTAIN'][input.support]} on Lil Prop #${input.proposalId}. The user will be asked to confirm and sign the transaction in their wallet (Lil Nouns governor).`,
                 };
               } else {
                 try {
@@ -2736,6 +5520,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                         support: input.support,
                         reason: input.reason,
                         title,
+                        dao: 'nouns',
                       };
                       result = {
                         success: true,
@@ -2854,12 +5639,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               const input = args as {
                 title: string;
                 description: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -2875,22 +5655,22 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                   .slice(0, 80);
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
 
-                // Build transaction arrays (empty if no transactions provided)
-                const txs = input.transactions || [];
-                const targets = txs.map(t => t.target);
-                const values = txs.map(t => t.value || '0');
-                const sigs = txs.map(t => t.signature || '');
-                const calldatas = txs.map(t => t.calldata || '0x');
+                const expanded = expandProposalTransactions(input.transactions);
+                if (!expanded.ok) {
+                  result = { error: expanded.error };
+                  break;
+                }
+                const txs = expanded.txs;
 
                 pendingAction = {
                   type: 'CREATE_CANDIDATE',
                   slug,
                   description: fullDescription,
                   title: input.title,
-                  targets,
-                  values,
-                  signatures: sigs,
-                  calldatas,
+                  targets: txs.map(t => t.target),
+                  values: txs.map(t => t.value),
+                  signatures: txs.map(t => t.signature),
+                  calldatas: txs.map(t => t.calldata),
                 };
                 const txNote =
                   txs.length > 0
@@ -2911,12 +5691,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                 title: string;
                 description: string;
                 reason?: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -2941,12 +5716,13 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                         error: `Only the original proposer (${(c.proposer as string).slice(0, 6)}...${(c.proposer as string).slice(-4)}) can update this candidate. Connected wallet doesn't match.`,
                       };
                     } else {
+                      const expanded = expandProposalTransactions(input.transactions);
+                      if (!expanded.ok) {
+                        result = { error: expanded.error };
+                        break;
+                      }
+                      const txs = expanded.txs;
                       const fullDescription = `# ${input.title}\n\n${input.description}`;
-                      const txs = input.transactions || [];
-                      const targets = txs.map(t => t.target);
-                      const values = txs.map(t => t.value || '0');
-                      const sigs = txs.map(t => t.signature || '');
-                      const calldatas = txs.map(t => t.calldata || '0x');
 
                       pendingAction = {
                         type: 'UPDATE_CANDIDATE',
@@ -2954,10 +5730,10 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                         description: fullDescription,
                         title: input.title,
                         reason: input.reason || '',
-                        targets,
-                        values,
-                        signatures: sigs,
-                        calldatas,
+                        targets: txs.map(t => t.target),
+                        values: txs.map(t => t.value),
+                        signatures: txs.map(t => t.signature),
+                        calldatas: txs.map(t => t.calldata),
                       };
                       result = {
                         success: true,
@@ -2980,12 +5756,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                 proposalId: number;
                 description?: string;
                 updateMessage: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -3012,13 +5783,19 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                         error: `Proposal #${input.proposalId} doesn't have an update period set. It may be too old or already past its update window.`,
                       };
                     } else {
+                      const expanded = expandProposalTransactions(input.transactions);
+                      if (!expanded.ok) {
+                        result = { error: expanded.error };
+                        break;
+                      }
+                      const txs = expanded.txs;
+
                       const descText = (p.description ?? '').toString();
                       const title =
                         descText
                           .split('\n')[0]
                           ?.replace(/^#+\s*/, '')
                           .trim() || 'Untitled';
-                      const txs = input.transactions || [];
 
                       // Determine update type: description-only, transactions-only, or both
                       const hasNewDesc = !!input.description;
@@ -3043,9 +5820,9 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                         description: input.description || descText,
                         updateMessage: input.updateMessage,
                         targets: txs.map(t => t.target),
-                        values: txs.map(t => t.value || '0'),
-                        signatures: txs.map(t => t.signature || ''),
-                        calldatas: txs.map(t => t.calldata || '0x'),
+                        values: txs.map(t => t.value),
+                        signatures: txs.map(t => t.signature),
+                        calldatas: txs.map(t => t.calldata),
                         updatePeriodEndBlock: p.updatePeriodEndBlock?.toString(),
                       };
                       result = {
@@ -3202,11 +5979,13 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                           ?.replace(/^#+\s*/, '')
                           .trim() || 'Untitled';
 
-                      // Fetch signatures for this candidate
+                      // Fetch signatures for this candidate.
+                      // Match on candidateId (`${proposer}-${slug}` PK), not
+                      // a non-existent candidateSlug column.
                       const sigs = await db
                         .select()
                         .from(schema.candidateSignature)
-                        .where(eq(schema.candidateSignature.candidateSlug, input.slug))
+                        .where(eq(schema.candidateSignature.candidateId, c.id as string))
                         .limit(100);
 
                       const nowSec = Math.floor(Date.now() / 1000);
@@ -3377,12 +6156,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
               const input = args as {
                 title: string;
                 description: string;
-                transactions?: Array<{
-                  target: string;
-                  value: string;
-                  signature?: string;
-                  calldata?: string;
-                }>;
+                transactions?: ProposalTxInput[];
               };
               if (!wallet) {
                 result = {
@@ -3390,21 +6164,22 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                     'User must connect their wallet to create a grant proposal. Tell them to click "connect" in the header.',
                 };
               } else {
+                const expanded = expandProposalTransactions(input.transactions);
+                if (!expanded.ok) {
+                  result = { error: expanded.error };
+                  break;
+                }
+                const txs = expanded.txs;
                 const fullDescription = `# ${input.title}\n\n${input.description}`;
-                const txs = input.transactions || [];
-                const targets = txs.map(t => t.target);
-                const values = txs.map(t => t.value || '0');
-                const sigs = txs.map(t => t.signature || '');
-                const calldatas = txs.map(t => t.calldata || '0x');
 
                 pendingAction = {
                   type: 'GRANT_PROPOSAL',
                   title: input.title,
                   description: fullDescription,
-                  targets,
-                  values,
-                  signatures: sigs,
-                  calldatas,
+                  targets: txs.map(t => t.target),
+                  values: txs.map(t => t.value),
+                  signatures: txs.map(t => t.signature),
+                  calldatas: txs.map(t => t.calldata),
                 };
                 const txNote =
                   txs.length > 0
@@ -3499,7 +6274,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
                       result = { error: `Grant #${input.grantId} is already queued.` };
                     } else if (g.status === 'EXECUTED') {
                       result = { error: `Grant #${input.grantId} has already been executed.` };
-                    } else if (g.status === 'CANCELLED') {
+                    } else if (g.status === 'CANCELED') {
                       result = { error: `Grant #${input.grantId} was cancelled.` };
                     } else {
                       const descText = (g.description || '').toString();
@@ -3764,9 +6539,37 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
         temperature: 0.7,
         ...(isNounIrl ? { tools: nounIrlTools } : {}),
       });
+
+      // Recover XML tool calls on continuation responses too
+      patchXmlToolCalls(response);
     }
 
-    const text = response.text || '';
+    let text = response.text || '';
+
+    // If LLM returned empty, retry once with a nudge
+    if (!text && !pendingAction) {
+      try {
+        messages.push({ role: 'assistant', content: '' });
+        messages.push({ role: 'user', content: 'Please respond to my previous message.' });
+        const retry = await hubChat({
+          messages,
+          system: systemPrompt,
+          task: 'chat',
+          maxTokens: 1024,
+          temperature: 0.7,
+        });
+        text = retry.text || '';
+      } catch {
+        /* ignore retry failure */
+      }
+    }
+
+    // If agent used tools but returned no text, provide a fallback
+    if (!text && pendingAction) {
+      text = 'Action prepared — confirm below. ⌐◨-◨';
+    } else if (!text) {
+      text = "Hmm, I'm having trouble responding right now. Try again? ⌐◨-◨";
+    }
 
     // Include governance action if one was prepared by a tool
     const responsePayload: { response: string; action?: Record<string, unknown> } = {
@@ -3779,7 +6582,11 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('Terminal chat error:', errMsg);
-    return c.json({ error: `AI request failed: ${errMsg}` }, 500);
+    const friendlyError =
+      agentMode === 'nounirl' && isUpstreamAiFailure(errMsg)
+        ? NOUNIRL_PIPE_UNLOCK_MESSAGE
+        : `AI request failed: ${errMsg}`;
+    return c.json({ error: friendlyError }, 500);
   }
 });
 
@@ -3790,7 +6597,7 @@ You are powered by a single LLM (Qwen3 32B via Groq) through the Agent Hub. You 
 const ALLOWED_CHANNELS = ['nouns', 'noc', 'lil'];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const feedCaches = new Map<string, { data: any; fetchedAt: number }>();
-const FEED_CACHE_TTL = 60_000; // 60 seconds
+const FEED_CACHE_TTL = 60 * 60_000; // 1 hour
 
 app.get('/api/feed/:channel', async c => {
   const channel = c.req.param('channel');
@@ -4834,34 +7641,17 @@ app.get('/api/treasury/flows', async c => {
 // ============================================================
 
 // ── Agent Predict (fast — no auth, no Claude, ~1ms) ─────────────────────
-// Default returns the cached V1-rule prediction from the watcher loop.
-// `?dao=v2` re-derives the prediction with the NounV2SlobberSeeder rule
-// (slobber excluded from random rotation; 50/50 grease→slobber swap when
-// head ∈ {retainer, index-card}). This is computed on-demand from the
-// cached blockHash + nextNounId — the watcher itself is left untouched so
-// the V1 settlement bot keeps its existing prediction semantics.
 app.get('/api/agent/predict', c => {
   const w = getWatcherState();
-  const dao = c.req.query('dao') === 'v2' ? 'v2' : 'v1';
-
-  let seed = w.lastPredictedSeed;
-  let traits = w.lastPredictedTraits;
-
-  if (dao === 'v2' && w.lastBlockHash != null && w.nextNounId > 0) {
-    seed = predictSeed(w.lastBlockHash, w.nextNounId, { dao: 'v2' });
-    traits = seedToTraitNames(seed);
-  }
-
   return c.json({
     block: w.lastBlockNumber,
     nextNounId: w.nextNounId,
-    seed,
-    traits,
+    seed: w.lastPredictedSeed,
+    traits: w.lastPredictedTraits,
     auctionEnd: w.auctionEndTime,
     auctionEnded: w.auctionEndTime > 0 && Math.floor(Date.now() / 1000) >= w.auctionEndTime,
     running: w.running,
     checkedAt: w.lastCheckedAt,
-    dao,
   });
 });
 
@@ -5034,6 +7824,27 @@ app.post('/api/agent/parse-traits', async c => {
     return c.json({ description, parsed });
   } catch {
     return c.json({ error: 'Failed to parse traits' }, 500);
+  }
+});
+
+// ── Manual Settlement (crystal ball twin-snipe) ────────────────────────
+app.post('/api/agent/settle', async c => {
+  const w = getWatcherState();
+  if (!w.running) {
+    return c.json({ error: 'Watcher not running' }, 503);
+  }
+  if (!w.auctionEndTime || Date.now() / 1000 < w.auctionEndTime) {
+    return c.json({ error: 'Auction not ended yet' }, 400);
+  }
+  try {
+    const result = await settleAuction();
+    if (!result) {
+      return c.json({ error: 'Settlement failed — wallet not configured or tx error' }, 500);
+    }
+    return c.json({ txHash: result.txHash });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -5350,6 +8161,54 @@ app.get('/api/activity', async c => {
       want('GRANT_QUEUED') ||
       want('GRANT_EXECUTED') ||
       want('GRANT_CANCELED');
+    const wantLil =
+      want('LIL_BID') ||
+      want('LIL_AUCTION_SETTLED') ||
+      want('LIL_NOUN_CREATED') ||
+      want('LIL_VOTE') ||
+      want('LIL_PROPOSAL_CREATED') ||
+      want('LIL_TRANSFER');
+    const wantSale = want('SALE');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchCanceledCandidates(): Promise<any[]> {
+      try {
+        const cond = before
+          ? and(
+              isNotNull(schema.candidate.canceledAtBlock),
+              lt(schema.candidate.canceledAtBlock, before),
+            )
+          : isNotNull(schema.candidate.canceledAtBlock);
+        return await db
+          .select()
+          .from(schema.candidate)
+          .where(cond)
+          .orderBy(desc(schema.candidate.canceledAtBlock))
+          .limit(perTable);
+      } catch {
+        return [];
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchPromotedCandidates(): Promise<any[]> {
+      try {
+        const cond = before
+          ? and(
+              isNotNull(schema.candidate.promotedAtBlock),
+              lt(schema.candidate.promotedAtBlock, before),
+            )
+          : isNotNull(schema.candidate.promotedAtBlock);
+        return await db
+          .select()
+          .from(schema.candidate)
+          .where(cond)
+          .orderBy(desc(schema.candidate.promotedAtBlock))
+          .limit(perTable);
+      } catch {
+        return [];
+      }
+    }
 
     const [
       bids,
@@ -5361,6 +8220,9 @@ app.get('/api/activity', async c => {
       candSigs,
       propFB,
       candFB,
+      candVersions,
+      canceledCands,
+      promotedCands,
       streams,
       delegations,
       transfers,
@@ -5368,6 +8230,8 @@ app.get('/api/activity', async c => {
       grants,
       grantVotes,
       grantStatusChanges,
+      lilEvents,
+      saleEvents,
     ] = await Promise.all([
       want('BID') ? fetchRows(schema.bid, schema.bid.createdAtBlock) : [],
       want('VOTE') ? fetchRows(schema.vote, schema.vote.createdAtBlock) : [],
@@ -5384,6 +8248,11 @@ app.get('/api/activity', async c => {
       want('CANDIDATE_FEEDBACK')
         ? fetchRows(schema.candidateFeedback, schema.candidateFeedback.createdAtBlock)
         : [],
+      want('CANDIDATE_UPDATED')
+        ? fetchRows(schema.candidateVersion, schema.candidateVersion.blockNumber)
+        : [],
+      want('CANDIDATE_CANCELED') ? fetchCanceledCandidates() : [],
+      want('CANDIDATE_PROMOTED') ? fetchPromotedCandidates() : [],
       want('STREAM_CREATED') ? fetchRows(schema.stream, schema.stream.createdAtBlock) : [],
       wantDelegation
         ? fetchRows(schema.delegationEvent, schema.delegationEvent.createdAtBlock)
@@ -5395,6 +8264,18 @@ app.get('/api/activity', async c => {
       wantGrant ? fetchRows(schema.grant, schema.grant.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantVote, schema.grantVote.createdAtBlock) : [],
       wantGrant ? fetchRows(schema.grantStatusChange, schema.grantStatusChange.createdAtBlock) : [],
+      wantLil
+        ? fetchLilNounsActivity(before, limit).catch(err => {
+            console.warn('[activity] lil fetch failed:', err);
+            return [] as FeedEvent[];
+          })
+        : Promise.resolve([] as FeedEvent[]),
+      wantSale
+        ? fetchOnchainSales(before, limit).catch(err => {
+            console.warn('[activity] sales fetch failed:', err);
+            return [] as FeedEvent[];
+          })
+        : Promise.resolve([] as FeedEvent[]),
     ]);
 
     // Normalize BIDs
@@ -5426,6 +8307,7 @@ app.get('/api/activity', async c => {
           support: v.support,
           votes: v.votes,
           reason: v.reason || '',
+          clientId: v.clientId,
         },
       });
     }
@@ -5451,6 +8333,7 @@ app.get('/api/activity', async c => {
           status: p.status,
           description: descText.slice(0, 4000),
           imageUrl,
+          clientId: p.clientId,
         },
       });
     }
@@ -5560,6 +8443,68 @@ app.get('/api/activity', async c => {
       });
     }
 
+    // Normalize CANDIDATE_UPDATED (one per update event — initial create is not in candidateVersion)
+    for (const cv of candVersions) {
+      const descText = (cv.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      const parts = (cv.candidateId as string).split('-');
+      const proposer = parts[0] || '';
+      const slug = parts.slice(1).join('-');
+      events.push({
+        type: 'CANDIDATE_UPDATED',
+        blockNumber: Number(cv.blockNumber),
+        timestamp: tsToISO(cv.blockTimestamp),
+        txHash: cv.txHash || '',
+        data: {
+          candidateId: cv.candidateId,
+          slug,
+          proposer,
+          title,
+          description: descText.slice(0, 4000),
+          reason: cv.reason || '',
+        },
+      });
+    }
+
+    // Normalize CANDIDATE_CANCELED (keyed on canceledAtBlock so each cancel is an independent event)
+    for (const cd of canceledCands) {
+      if (cd.canceledAtBlock == null) continue;
+      const descText = (cd.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'CANDIDATE_CANCELED',
+        blockNumber: Number(cd.canceledAtBlock),
+        timestamp: tsToISO(cd.canceledAtTimestamp ?? cd.lastUpdatedAt ?? cd.createdAt),
+        txHash: cd.canceledAtTx || '',
+        data: {
+          candidateId: cd.id,
+          slug: cd.slug,
+          proposer: cd.proposer,
+          title,
+        },
+      });
+    }
+
+    // Normalize CANDIDATE_PROMOTED (keyed on promotedAtBlock)
+    for (const cd of promotedCands) {
+      if (cd.promotedAtBlock == null) continue;
+      const descText = (cd.description || '') as string;
+      const title = (descText.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120);
+      events.push({
+        type: 'CANDIDATE_PROMOTED',
+        blockNumber: Number(cd.promotedAtBlock),
+        timestamp: tsToISO(cd.promotedAtTimestamp ?? cd.lastUpdatedAt ?? cd.createdAt),
+        txHash: cd.promotedAtTx || '',
+        data: {
+          candidateId: cd.id,
+          slug: cd.slug,
+          proposer: cd.proposer,
+          title,
+          proposalId: cd.promotedToProposalId != null ? Number(cd.promotedToProposalId) : null,
+        },
+      });
+    }
+
     // Normalize STREAM_CREATED
     for (const s of streams) {
       events.push({
@@ -5589,8 +8534,73 @@ app.get('/api/activity', async c => {
       });
     }
 
-    // Normalize TRANSFER
+    // Normalize TRANSFER — enrich with on-chain sale detection. If the transfer's
+    // tx targeted a known marketplace router (Seaport, Blur, etc.), convert it to
+    // a SALE event with the extracted price. Tracks claimed txHashes to dedupe the
+    // standalone SALE pass below.
+    const claimedSaleTxs = new Set<string>();
+
+    // Batch-check unique tx hashes for marketplace interactions
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const transferTxHashes = [
+      ...new Set(
+        transfers
+          .filter(
+            t =>
+              t.from.toLowerCase() !== ZERO &&
+              t.to.toLowerCase() !== ZERO &&
+              t.createdAtTransaction,
+          )
+          .map(t => t.createdAtTransaction),
+      ),
+    ];
+    const saleChecks = await Promise.all(
+      transferTxHashes.slice(0, 30).map(async txHash => ({
+        txHash,
+        sale: await checkTxForSale(txHash),
+      })),
+    );
+    const transferSaleMap = new Map(saleChecks.filter(s => s.sale).map(s => [s.txHash, s.sale!]));
+
+    // Count nouns per sale tx to split bulk/sweep prices evenly
+    const nounsPerSaleTx = new Map<string, number>();
     for (const t of transfers) {
+      if (transferSaleMap.has(t.createdAtTransaction)) {
+        nounsPerSaleTx.set(
+          t.createdAtTransaction,
+          (nounsPerSaleTx.get(t.createdAtTransaction) || 0) + 1,
+        );
+      }
+    }
+
+    for (const t of transfers) {
+      const sale = transferSaleMap.get(t.createdAtTransaction);
+      if (sale) {
+        claimedSaleTxs.add(t.createdAtTransaction.toLowerCase());
+        const count = nounsPerSaleTx.get(t.createdAtTransaction) || 1;
+        const priceEth = Number(sale.priceWei) / 1e18 / count;
+        events.push({
+          type: 'SALE',
+          blockNumber: Number(t.createdAtBlock),
+          timestamp: tsToISO(t.createdAt),
+          txHash: t.createdAtTransaction || '',
+          data: {
+            collection: 'NOUN',
+            collectionName: 'Noun',
+            nounId: Number(t.nounId),
+            tokenId: String(t.nounId),
+            tokenName: `Noun ${t.nounId}`,
+            from: t.from,
+            to: t.to,
+            priceEth,
+            priceWei: sale.priceWei.toString(),
+            priceUsd: null,
+            currency: 'ETH',
+            marketplace: sale.marketplace,
+          },
+        });
+        continue;
+      }
       events.push({
         type: 'TRANSFER',
         blockNumber: Number(t.createdAtBlock),
@@ -5657,6 +8667,16 @@ app.get('/api/activity', async c => {
         txHash: gs.createdAtTransaction || '',
         data: { grantId: Number(gs.grantId), status: gs.status },
       });
+    }
+
+    for (const e of lilEvents) {
+      if (want(e.type)) events.push(e);
+    }
+    for (const e of saleEvents) {
+      if (!want(e.type)) continue;
+      // Already emitted as a re-typed TRANSFER → SALE above; skip the duplicate.
+      if (claimedSaleTxs.has((e.txHash || '').toLowerCase())) continue;
+      events.push(e);
     }
 
     // Sort by blockNumber DESC
@@ -5907,6 +8927,31 @@ app.get('/api/ens', async c => {
   return c.json({ names });
 });
 
+// ─── Noun Seeds (compact, for twin matching) ────────────────────────────
+
+app.get('/api/nouns/seeds', async c => {
+  try {
+    const nouns = await db
+      .select({
+        id: schema.noun.id,
+        background: schema.noun.background,
+        body: schema.noun.body,
+        accessory: schema.noun.accessory,
+        head: schema.noun.head,
+        glasses: schema.noun.glasses,
+      })
+      .from(schema.noun)
+      .orderBy(schema.noun.id);
+
+    // Set long cache — seeds of minted nouns never change
+    c.header('Cache-Control', 'public, max-age=300');
+    return c.json(nouns.map(n => ({ ...n, id: Number(n.id) })));
+  } catch (err) {
+    console.error('[NounSeeds] Error:', err);
+    return c.json([], 500);
+  }
+});
+
 // ─── Noun Holders ────────────────────────────────────────────────────────
 
 app.get('/api/noun-holders', async c => {
@@ -5965,9 +9010,527 @@ app.get('/api/noun-holders', async c => {
   }
 });
 
+// ============================================================
+// Farcaster Write — proxy write ops so NEYNAR_API_KEY stays server-side
+// Clients send their signer_uuid (obtained via SIWN on the frontend).
+// ============================================================
+
+app.post('/api/farcaster/cast', async c => {
+  const neynarKey = process.env.NEYNAR_API_KEY;
+  if (!neynarKey) return c.json({ error: 'Not configured' }, 503);
+
+  const { signer_uuid, text, channel_id, parent } = await c.req.json<{
+    signer_uuid: string;
+    text: string;
+    channel_id?: string;
+    parent?: string;
+  }>();
+
+  if (!signer_uuid || !text?.trim()) {
+    return c.json({ error: 'Missing signer_uuid or text' }, 400);
+  }
+
+  try {
+    const body: Record<string, string> = { signer_uuid, text: text.trim() };
+    if (channel_id) body.channel_id = channel_id;
+    if (parent) body.parent = parent;
+
+    const res = await fetch('https://api.neynar.com/v2/farcaster/cast', {
+      method: 'POST',
+      headers: {
+        'x-api-key': neynarKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[Farcaster cast] Neynar error:', res.status, data);
+      return c.json({ error: data }, res.status as 400);
+    }
+    return c.json(data);
+  } catch (err) {
+    console.error('[Farcaster cast] Error:', err);
+    return c.json({ error: 'Failed to publish cast' }, 500);
+  }
+});
+
+app.post('/api/farcaster/reaction', async c => {
+  const neynarKey = process.env.NEYNAR_API_KEY;
+  if (!neynarKey) return c.json({ error: 'Not configured' }, 503);
+
+  const { signer_uuid, reaction_type, target } = await c.req.json<{
+    signer_uuid: string;
+    reaction_type: 'like' | 'recast';
+    target: string;
+  }>();
+
+  if (!signer_uuid || !reaction_type || !target) {
+    return c.json({ error: 'Missing signer_uuid, reaction_type, or target' }, 400);
+  }
+
+  try {
+    const res = await fetch('https://api.neynar.com/v2/farcaster/reaction', {
+      method: 'POST',
+      headers: {
+        'x-api-key': neynarKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ signer_uuid, reaction_type, target }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[Farcaster reaction] Neynar error:', res.status, data);
+      return c.json({ error: data }, res.status as 400);
+    }
+    return c.json(data);
+  } catch (err) {
+    console.error('[Farcaster reaction] Error:', err);
+    return c.json({ error: 'Failed to submit reaction' }, 500);
+  }
+});
+
+app.delete('/api/farcaster/reaction', async c => {
+  const neynarKey = process.env.NEYNAR_API_KEY;
+  if (!neynarKey) return c.json({ error: 'Not configured' }, 503);
+
+  const { signer_uuid, reaction_type, target } = await c.req.json<{
+    signer_uuid: string;
+    reaction_type: 'like' | 'recast';
+    target: string;
+  }>();
+
+  if (!signer_uuid || !reaction_type || !target) {
+    return c.json({ error: 'Missing signer_uuid, reaction_type, or target' }, 400);
+  }
+
+  try {
+    const res = await fetch('https://api.neynar.com/v2/farcaster/reaction', {
+      method: 'DELETE',
+      headers: {
+        'x-api-key': neynarKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ signer_uuid, reaction_type, target }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[Farcaster unreaction] Neynar error:', res.status, data);
+      return c.json({ error: data }, res.status as 400);
+    }
+    return c.json(data);
+  } catch (err) {
+    console.error('[Farcaster unreaction] Error:', err);
+    return c.json({ error: 'Failed to remove reaction' }, 500);
+  }
+});
+
 // Health check
 app.get('/api/health', c => {
   return c.json({ status: 'ok', timestamp: Date.now() });
+});
+
+// ============================================================
+// Dashboard Stats
+// ============================================================
+
+function checkDashboardKey(c: { req: { query: (k: string) => string | undefined } }): boolean {
+  const key = c.req.query('key');
+  const expected = process.env.DASHBOARD_API_KEY;
+  return !!expected && key === expected;
+}
+
+app.get('/api/stats', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+  const window = parseInt(c.req.query('window') || '60', 10);
+  return c.json(getMetrics(window));
+});
+
+app.get('/api/stats/errors', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+  return c.json(getRecentErrors(50));
+});
+
+// Plausible Stats API proxy (cached 5 min)
+let plausibleCache: { data: unknown; fetchedAt: number; period: string } | null = null;
+const PLAUSIBLE_TTL = 300_000;
+
+app.get('/api/stats/plausible', async c => {
+  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
+
+  const plausibleKey = process.env.PLAUSIBLE_API_KEY;
+  if (!plausibleKey) return c.json({ error: 'Plausible not configured' }, 503);
+
+  const period = c.req.query('period') || '30d';
+  const site = 'noun.wtf';
+
+  if (
+    plausibleCache &&
+    plausibleCache.period === period &&
+    Date.now() - plausibleCache.fetchedAt < PLAUSIBLE_TTL
+  ) {
+    return c.json(plausibleCache.data);
+  }
+
+  try {
+    const headers = { Authorization: `Bearer ${plausibleKey}` };
+    const base = 'https://plausible.io/api/v1/stats';
+
+    const [aggregate, timeseries, topPages, topReferrers] = await Promise.all([
+      fetch(
+        `${base}/aggregate?site_id=${site}&period=${period}&metrics=visitors,pageviews,bounce_rate,visit_duration`,
+        { headers },
+      ).then(r => r.json()),
+      fetch(`${base}/timeseries?site_id=${site}&period=${period}&metrics=visitors,pageviews`, {
+        headers,
+      }).then(r => r.json()),
+      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=event:page&limit=10`, {
+        headers,
+      }).then(r => r.json()),
+      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=visit:source&limit=10`, {
+        headers,
+      }).then(r => r.json()),
+    ]);
+
+    const data = { aggregate, timeseries, topPages, topReferrers, period };
+    plausibleCache = { data, fetchedAt: Date.now(), period };
+    return c.json(data);
+  } catch (err) {
+    console.error('[Dashboard] Plausible fetch error:', err);
+    return c.json({ error: 'Failed to fetch Plausible data' }, 502);
+  }
+});
+
+app.get('/api/stats/health', async c => {
+  let latestBlock: string = 'unknown';
+  try {
+    latestBlock = (await getCurrentBlock()).toString();
+  } catch {}
+
+  let dbStatus: { ok: boolean; error?: string } = { ok: false };
+  try {
+    await db.select().from(schema.noun).limit(1);
+    dbStatus = { ok: true };
+  } catch (e: unknown) {
+    dbStatus = { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const mem = process.memoryUsage();
+  return c.json({
+    api: {
+      status: 'ok',
+      uptimeSeconds: Math.round(process.uptime()),
+      memoryMB: Math.round(mem.heapUsed / 1024 / 1024),
+    },
+    indexer: { latestBlock },
+    database: dbStatus,
+    metricsBufferSize: getBufferSize(),
+    timestamp: Date.now(),
+  });
+});
+
+// ─── Gas Leaderboard ────────────────────────────────────────────────────────
+
+type GasAction =
+  | 'bidding'
+  | 'settling'
+  | 'proposing'
+  | 'voting'
+  | 'queuing'
+  | 'executing'
+  | 'canceling'
+  | 'creating_candidate'
+  | 'updating_candidate'
+  | 'canceling_candidate'
+  | 'sponsoring'
+  | 'feedback'
+  | 'grant_proposing'
+  | 'grant_voting'
+  | 'grant_admin'
+  | 'delegation'
+  | 'other';
+
+const GAS_CONTRACTS: Record<string, Record<string, GasAction>> = {
+  '0x830BD73E4184ceF73443C15111a1DF14e495C706': {
+    // AuctionHouseV2
+    createBid: 'bidding',
+    settleAuction: 'settling',
+    settleCurrentAndCreateNewAuction: 'settling',
+  },
+  '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d': {
+    // NounsDAOV4
+    propose: 'proposing',
+    castVote: 'voting',
+    castVoteWithReason: 'voting',
+    castRefundableVote: 'voting',
+    castRefundableVoteWithReason: 'voting',
+    queue: 'queuing',
+    execute: 'executing',
+    cancel: 'canceling',
+  },
+  '0xf790A5f59678dd733fb3De93493A91f472ca1365': {
+    // NounsDAOData
+    createProposalCandidate: 'creating_candidate',
+    updateProposalCandidate: 'updating_candidate',
+    cancelProposalCandidate: 'canceling_candidate',
+    addSignature: 'sponsoring',
+    sendFeedback: 'feedback',
+    sendCandidateFeedback: 'feedback',
+  },
+  '0xBAc9233725440c595b19d975309CC98cb259253a': {
+    // SmallGrantsTreasury
+    propose: 'grant_proposing',
+    castVote: 'grant_voting',
+    queue: 'grant_admin',
+    execute: 'grant_admin',
+    cancel: 'grant_admin',
+  },
+  '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03': {
+    // NounsToken
+    delegate: 'delegation',
+  },
+};
+
+const GAS_ACTION_LABELS: Record<GasAction, string> = {
+  bidding: 'Bidding',
+  settling: 'Settling',
+  proposing: 'Proposing',
+  voting: 'Voting',
+  queuing: 'Queuing',
+  executing: 'Executing',
+  canceling: 'Canceling',
+  creating_candidate: 'Creating Candidates',
+  updating_candidate: 'Updating Candidates',
+  canceling_candidate: 'Canceling Candidates',
+  sponsoring: 'Sponsoring',
+  feedback: 'Feedback',
+  grant_proposing: 'Grant Proposals',
+  grant_voting: 'Grant Voting',
+  grant_admin: 'Grant Admin',
+  delegation: 'Delegation',
+  other: 'Other',
+};
+
+interface GasEntry {
+  address: string;
+  totalGasCostWei: bigint;
+  totalRefundWei: bigint;
+  netGasCostWei: bigint;
+  totalGasCostEth: number;
+  totalRefundEth: number;
+  netGasCostEth: number;
+  txCount: number;
+  byAction: Record<GasAction, { txCount: number; gasCostWei: bigint; gasCostEth: number }>;
+}
+
+interface GasLeaderboardData {
+  entries: Array<
+    Omit<GasEntry, 'totalGasCostWei' | 'totalRefundWei' | 'netGasCostWei' | 'byAction'> & {
+      byAction: Record<GasAction, { txCount: number; gasCostEth: number }>;
+    }
+  >;
+  meta: {
+    totalTransactions: number;
+    totalGasEth: number;
+    totalRefundEth: number;
+    uniqueAddresses: number;
+    lastUpdated: number;
+    actionLabels: Record<GasAction, string>;
+  };
+}
+
+let gasLeaderboardCache: { data: GasLeaderboardData; fetchedAt: number } | null = null;
+const GAS_CACHE_TTL = 6 * 3600_000; // 6 hours
+let gasLeaderboardBuilding = false;
+
+function extractFnName(etherscanFunctionName: string): string {
+  // Etherscan returns e.g. "createBid(uint256)" — extract just the name
+  const paren = etherscanFunctionName.indexOf('(');
+  return paren > 0 ? etherscanFunctionName.slice(0, paren) : etherscanFunctionName;
+}
+
+async function fetchEtherscanTxList(
+  contractAddress: string,
+  apiKey: string,
+  action: 'txlist' | 'txlistinternal' = 'txlist',
+): Promise<Record<string, string>[]> {
+  const all: Record<string, string>[] = [];
+  let page = 1;
+  while (true) {
+    const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=${action}&address=${contractAddress}&startblock=0&endblock=99999999&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const json = await res.json();
+    if (json.status !== '1' || !Array.isArray(json.result)) break;
+    all.push(...json.result);
+    if (json.result.length < 10000) break;
+    page++;
+    await new Promise(r => setTimeout(r, 250)); // rate limit
+  }
+  return all;
+}
+
+async function buildGasLeaderboard(apiKey: string): Promise<GasLeaderboardData> {
+  const daoAddress = '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d';
+  const addressMap = new Map<string, GasEntry>();
+  let totalTransactions = 0;
+
+  const emptyByAction = (): GasEntry['byAction'] => {
+    const obj = {} as GasEntry['byAction'];
+    for (const k of Object.keys(GAS_ACTION_LABELS) as GasAction[]) {
+      obj[k] = { txCount: 0, gasCostWei: 0n, gasCostEth: 0 };
+    }
+    return obj;
+  };
+
+  // Fetch all contract transactions
+  for (const contractAddress of Object.keys(GAS_CONTRACTS)) {
+    console.log(`[GasLeaderboard] Fetching txlist for ${contractAddress}...`);
+    const txs = await fetchEtherscanTxList(contractAddress, apiKey);
+    console.log(`[GasLeaderboard] Got ${txs.length} txs for ${contractAddress}`);
+    const fnMap = GAS_CONTRACTS[contractAddress];
+
+    for (const tx of txs) {
+      const addr = tx.from.toLowerCase();
+      let entry = addressMap.get(addr);
+      if (!entry) {
+        entry = {
+          address: tx.from,
+          totalGasCostWei: 0n,
+          totalRefundWei: 0n,
+          netGasCostWei: 0n,
+          totalGasCostEth: 0,
+          totalRefundEth: 0,
+          netGasCostEth: 0,
+          txCount: 0,
+          byAction: emptyByAction(),
+        };
+        addressMap.set(addr, entry);
+      }
+
+      const gasCost = BigInt(tx.gasUsed || '0') * BigInt(tx.gasPrice || '0');
+      const fnName = extractFnName(tx.functionName || '');
+      const action: GasAction = fnMap[fnName] || 'other';
+
+      entry.totalGasCostWei += gasCost;
+      entry.txCount += 1;
+      entry.byAction[action].txCount += 1;
+      entry.byAction[action].gasCostWei += gasCost;
+      totalTransactions++;
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  // Fetch vote refunds (internal txs from DAO contract back to voters)
+  console.log('[GasLeaderboard] Fetching vote refund internal txs...');
+  const internalTxs = await fetchEtherscanTxList(daoAddress, apiKey, 'txlistinternal');
+  console.log(`[GasLeaderboard] Got ${internalTxs.length} internal txs`);
+
+  // Build refund map: txHash → refund value
+  // Internal txs where from=DAO contract are vote refunds sent back to voters
+  const refundByAddress = new Map<string, bigint>();
+  for (const itx of internalTxs) {
+    if (itx.from?.toLowerCase() !== daoAddress.toLowerCase()) continue;
+    if (!itx.to || itx.value === '0') continue;
+    const voterAddr = itx.to.toLowerCase();
+    refundByAddress.set(voterAddr, (refundByAddress.get(voterAddr) || 0n) + BigInt(itx.value));
+  }
+
+  // Apply refunds to address entries
+  for (const [addr, refund] of refundByAddress) {
+    const entry = addressMap.get(addr);
+    if (entry) {
+      entry.totalRefundWei = refund;
+    }
+  }
+
+  // Compute derived fields and serialize
+  let totalGasWei = 0n;
+  let totalRefundWei = 0n;
+
+  const entries = Array.from(addressMap.values()).map(e => {
+    e.netGasCostWei = e.totalGasCostWei - e.totalRefundWei;
+    e.totalGasCostEth = Number(e.totalGasCostWei) / 1e18;
+    e.totalRefundEth = Number(e.totalRefundWei) / 1e18;
+    e.netGasCostEth = Number(e.netGasCostWei) / 1e18;
+    totalGasWei += e.totalGasCostWei;
+    totalRefundWei += e.totalRefundWei;
+
+    // Serialize byAction (drop bigints for JSON)
+    const byAction = {} as Record<GasAction, { txCount: number; gasCostEth: number }>;
+    for (const [k, v] of Object.entries(e.byAction) as [
+      GasAction,
+      (typeof e.byAction)[GasAction],
+    ][]) {
+      if (v.txCount > 0) {
+        byAction[k] = { txCount: v.txCount, gasCostEth: Number(v.gasCostWei) / 1e18 };
+      }
+    }
+
+    return {
+      address: e.address,
+      totalGasCostEth: e.totalGasCostEth,
+      totalRefundEth: e.totalRefundEth,
+      netGasCostEth: e.netGasCostEth,
+      txCount: e.txCount,
+      byAction,
+    };
+  });
+
+  entries.sort((a, b) => b.netGasCostEth - a.netGasCostEth);
+
+  return {
+    entries,
+    meta: {
+      totalTransactions,
+      totalGasEth: Number(totalGasWei) / 1e18,
+      totalRefundEth: Number(totalRefundWei) / 1e18,
+      uniqueAddresses: entries.length,
+      lastUpdated: Date.now(),
+      actionLabels: GAS_ACTION_LABELS,
+    },
+  };
+}
+
+app.get('/api/gas-leaderboard', async c => {
+  const apiKey = process.env.ETHERSCAN_API_KEY;
+  if (!apiKey) {
+    return c.json({ error: 'Gas leaderboard not configured (missing ETHERSCAN_API_KEY)' }, 503);
+  }
+
+  // Return cached if fresh
+  if (gasLeaderboardCache && Date.now() - gasLeaderboardCache.fetchedAt < GAS_CACHE_TTL) {
+    return c.json(gasLeaderboardCache.data);
+  }
+
+  // Return stale while rebuilding
+  if (gasLeaderboardCache && gasLeaderboardBuilding) {
+    return c.json(gasLeaderboardCache.data);
+  }
+
+  // No cache yet, building in progress
+  if (!gasLeaderboardCache && gasLeaderboardBuilding) {
+    return c.json({ status: 'building' }, 202);
+  }
+
+  // Trigger background build
+  gasLeaderboardBuilding = true;
+  buildGasLeaderboard(apiKey)
+    .then(data => {
+      gasLeaderboardCache = { data, fetchedAt: Date.now() };
+      console.log(
+        `[GasLeaderboard] Built: ${data.meta.uniqueAddresses} addresses, ${data.meta.totalTransactions} txs`,
+      );
+    })
+    .catch(err => console.error('[GasLeaderboard] Build failed:', err))
+    .finally(() => {
+      gasLeaderboardBuilding = false;
+    });
+
+  if (gasLeaderboardCache) return c.json(gasLeaderboardCache.data);
+  return c.json({ status: 'building' }, 202);
 });
 
 export default app;

@@ -1,47 +1,13 @@
 // ─── Agent NounIRL — Constants ──────────────────────────────────────────────
 
-// Nouns DAO V1 — Auction House V2 contract (mainnet)
-// (V1 in this file means "the original Nouns DAO". The contract is internally
-// versioned NounsAuctionHouseV2 — that's separate from the new Nouns DAO V2 launch.)
-export const AUCTION_HOUSE_ADDRESS = '0x830BD73E4184ceF73443C15111a1DF14e495C706' as const;
+// Chain-aware: set NOUNIRL_CHAIN=sepolia to run on testnet
+export const NOUNIRL_CHAIN = (process.env.NOUNIRL_CHAIN || 'mainnet') as 'mainnet' | 'sepolia';
+const IS_SEPOLIA = NOUNIRL_CHAIN === 'sepolia';
 
-// Nouns DAO V2 — newly launched DAO (2026-04-24). Same auction-house function
-// signatures (settleCurrentAndCreateNewAuction, auction(), etc.) — only addresses
-// differ, so the existing AUCTION_HOUSE_ABI works for both.
-export const AUCTION_HOUSE_V2_ADDRESS = '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc' as const;
-export const NOUNS_TOKEN_V2_ADDRESS = '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9' as const;
-
-// ─── DAO Selector ──────────────────────────────────────────────────────────
-// The bot watches one DAO at a time. Pick via NOUNIRL_WATCH_DAO env var.
-// To run both, deploy two instances of the agent service with different values.
-export type WatchedDao = 'v1' | 'v2';
-
-function parseWatchedDao(): WatchedDao {
-  const raw = (process.env.NOUNIRL_WATCH_DAO ?? 'v1').trim().toLowerCase();
-  if (raw === 'v1' || raw === 'v2') return raw;
-  console.warn(
-    `[NounIRL] Invalid NOUNIRL_WATCH_DAO="${raw}" — must be 'v1' or 'v2'. Defaulting to 'v1'.`,
-  );
-  return 'v1';
-}
-
-export const WATCHED_DAO: WatchedDao = parseWatchedDao();
-
-export function selectAddresses(dao: WatchedDao): {
-  auctionHouse: `0x${string}`;
-  token: `0x${string}`;
-} {
-  if (dao === 'v2') {
-    return {
-      auctionHouse: AUCTION_HOUSE_V2_ADDRESS,
-      token: NOUNS_TOKEN_V2_ADDRESS,
-    };
-  }
-  return {
-    auctionHouse: AUCTION_HOUSE_ADDRESS,
-    token: NOUNS_TOKEN_ADDRESS,
-  };
-}
+// Nouns Auction House V2
+export const AUCTION_HOUSE_ADDRESS = IS_SEPOLIA
+  ? ('0x488609b7113FCf3B761A05956300d605E8f6BcAf' as const)
+  : ('0x830BD73E4184ceF73443C15111a1DF14e495C706' as const);
 
 // NounIRL agent wallet — resolved from nounirl.eth
 // Set via NOUNIRL_ADDRESS env var at runtime
@@ -113,10 +79,16 @@ export const SAFETY_NET_POLL_INTERVAL_MS = 30_000; // 30s backup poll when WS is
 
 // Agent uses a FREE public RPC for its HTTP calls (auction reads, nonce checks, block polls).
 // This avoids competing with Ponder for the Infura rate limit.
-export const AGENT_RPC_URL = process.env.NOUNIRL_RPC_URL || 'https://ethereum-rpc.publicnode.com';
+export const AGENT_RPC_URL =
+  process.env.NOUNIRL_RPC_URL ||
+  (IS_SEPOLIA
+    ? 'https://ethereum-sepolia-rpc.publicnode.com'
+    : 'https://ethereum-rpc.publicnode.com');
 
-// NounsToken contract (mainnet) — for Noun-gated access control
-export const NOUNS_TOKEN_ADDRESS = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
+// NounsToken contract — for Noun-gated access control
+export const NOUNS_TOKEN_ADDRESS = IS_SEPOLIA
+  ? ('0x4C4674bb72a096855496a7204962297bd7e12b85' as const)
+  : ('0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const);
 export const NOUNS_TOKEN_ABI = [
   {
     type: 'function',
@@ -152,4 +124,59 @@ export const MIN_NOUNS_FOR_DEPLOY = 4;
 // ─── Deploy Config ─────────────────────────────────────────────────────────
 export const MAX_DEPLOYS_PER_HOUR = 1;
 export const DEPLOY_ALLOWED_PATHS = ['packages/nouns-webapp/src/'] as const;
-export const GITHUB_REPO = process.env.GITHUB_REPO || 'mshrmstudio/noun-wtf';
+export const GITHUB_REPO = process.env.GITHUB_REPO || 'snaveoguh/noun-wtf';
+// The single mutable branch the agent ships every commit onto. Netlify
+// branch-deploys this to a fixed dev URL (DEV_NOUN_URL). Hard-coded — no env
+// override — so a misconfigured deployment can never redirect the agent's
+// pushes onto `main`/prod or any other branch. Each `applyAndDeploy` call
+// fast-forwards `dev-noun` to a new commit; pip merges `dev-noun` → `main`
+// manually after reviewing the live preview.
+export const DEPLOY_BASE_BRANCH = 'dev-noun';
+
+// Always-on Netlify URL that branch-deploys `dev-noun`. Reported back to the
+// terminal user after every deploy so they can preview the change live and
+// share the link with pip for review. Override via env when the Netlify
+// branch-deploy URL is finalized.
+export const DEV_NOUN_URL = process.env.DEV_NOUN_URL ?? 'https://dev-noun--noun-wtf.netlify.app';
+
+// ─── Patch Safety ──────────────────────────────────────────────────────────
+//
+// Defence-in-depth against an LLM-generated (or prompt-injected) patch
+// shipping malware. A determined attacker can probably evade pattern-matching,
+// so the *primary* gate is the Netlify hook being opt-in (see
+// NOUNIRL_AUTO_DEPLOY in deployer.ts) — this list is the secondary filter.
+export const DEPLOY_MAX_PATCH_FILES = 5;
+export const DEPLOY_MAX_PATCH_BYTES = 50_000;
+
+// Files the agent must never touch — wallet/config/contract glue, top-level
+// app entry points, route tables. Anything that controls money flow, env, or
+// where the user lands. Suffix-match against the patch path.
+export const DEPLOY_DENY_PATH_SUFFIXES = [
+  '/config.ts',
+  '/wagmi.ts',
+  '/App.tsx',
+  '/main.tsx',
+  '/index.tsx',
+  '/store.ts',
+] as const;
+
+// Source-content patterns that almost never appear in legitimate edits and
+// are common in injection / exfiltration payloads. Each entry blocks the
+// patch with the given reason. Intentionally conservative — false positives
+// are recoverable (re-prompt the agent), false negatives ship malware.
+export const DEPLOY_DENY_SOURCE_PATTERNS: ReadonlyArray<{ re: RegExp; reason: string }> = [
+  { re: /\beval\s*\(/, reason: 'eval()' },
+  { re: /\bnew\s+Function\s*\(/, reason: 'new Function() constructor' },
+  { re: /\bdangerouslySetInnerHTML\b/, reason: 'dangerouslySetInnerHTML' },
+  { re: /<script\b[^>]*\bsrc\s*=/i, reason: 'remote <script src>' },
+  { re: /\bimport\s*\(\s*["'`]https?:\/\//, reason: 'dynamic import() of remote URL' },
+  { re: /\bfrom\s+["'`]https?:\/\//, reason: 'static import from remote URL' },
+  { re: /\bdata:text\/html/i, reason: 'data:text/html URI' },
+  { re: /["'`]\s*javascript:/i, reason: 'javascript: URL scheme' },
+  // Hardcoded external redirect — covers obvious phishing redirects. Internal
+  // route changes use react-router, not window.location.
+  {
+    re: /window\.location(?:\.[a-z]+)?\s*=\s*["'`]https?:\/\//i,
+    reason: 'hardcoded window.location external redirect',
+  },
+];

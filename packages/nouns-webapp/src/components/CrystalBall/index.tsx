@@ -8,7 +8,6 @@
 import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
-import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -94,12 +93,9 @@ function decodeRLE(data: string) {
 
 // ─── Seed → Voxels ──────────────────────────────────────────────────────────
 
-function seedToVoxels(seed: NounSeed, isV2: boolean = false): AsciiVoxel[] {
-  // For NounV2 nouns, use ImageDataV2 from the workspace `@nouns/assets` package
-  // which mirrors the on-chain V2 descriptor (founder traits + extended palette).
-  // V1 keeps using `@noundry/nouns-assets` from npm.
-  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
-  const palette = isV2 ? ImageDataV2.palette : ImageData.palette;
+function seedToVoxels(seed: NounSeed): AsciiVoxel[] {
+  const { parts, background } = getNounData(seed);
+  const palette = ImageData.palette;
 
   const colorGrid: string[][] = Array.from({ length: 32 }, () => Array(32).fill(background));
 
@@ -250,11 +246,6 @@ interface CrystalBallProps {
    * different data source such as an on-chain v2 auction read.
    */
   predictionOverride?: PredictResponse | null;
-  /**
-   * When true, decode seeds with V2 ImageData (workspace `@nouns/assets`)
-   * so V2-only founder traits render correctly. Default false → V1 behavior.
-   */
-  isV2?: boolean;
 }
 
 const CrystalBall: FC<CrystalBallProps> = ({
@@ -262,7 +253,6 @@ const CrystalBall: FC<CrystalBallProps> = ({
   interactive = false,
   onPredict,
   predictionOverride,
-  isV2 = false,
 }) => {
   const [prediction, setPrediction] = useState<PredictResponse | null>(predictionOverride ?? null);
   const [, setTick] = useState(0); // force re-render for countdown
@@ -315,8 +305,8 @@ const CrystalBall: FC<CrystalBallProps> = ({
 
   const voxels = useMemo(() => {
     if (!prediction?.seed) return null;
-    return seedToVoxels(prediction.seed, isV2);
-  }, [prediction?.seed, isV2]);
+    return seedToVoxels(prediction.seed);
+  }, [prediction?.seed]);
 
   const countdown =
     prediction?.auctionEnd != null && prediction.auctionEnd > 0
