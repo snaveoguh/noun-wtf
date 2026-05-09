@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useRef } from 'react';
 
-import { ImageData } from '@noundry/nouns-assets';
+import { ImageDataV2 as ImageData } from '@nouns/assets';
 import { buildSVG, EncodedImage } from '@nouns/sdk';
 
 import { INounSeed } from '@/wrappers/nounToken';
