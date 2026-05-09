@@ -1,6 +1,6 @@
 import { FC, useCallback, useMemo, useRef, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { ConnectKitButton } from 'connectkit';
 import { Dice5, Save, Sparkles, Upload, X } from 'lucide-react';
