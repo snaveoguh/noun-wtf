@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
