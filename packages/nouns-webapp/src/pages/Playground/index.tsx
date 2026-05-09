@@ -2,7 +2,7 @@ import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { i18n } from '@lingui/core';
 import { Trans } from '@lingui/react/macro';
-import { getNounData, getRandomNounSeed, ImageData } from '@noundry/nouns-assets';
+import { getNounDataV2 as getNounData, getRandomNounSeed, ImageDataV2 as ImageData } from '@nouns/assets';
 import { buildSVG, EncodedImage, PNGCollectionEncoder } from '@nouns/sdk';
 import { PNG } from 'pngjs';
 import {
