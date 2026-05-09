@@ -813,7 +813,7 @@ function SeedVisual({
     <div style={frameStyle}>
       <div style={layerStyle(1, 0, 1)}>
         <Suspense fallback={null}>
-          <MorphingNounVoxels seed={seed} autoRotate interactive />
+          <MorphingNounVoxels seed={seed} autoRotate interactive isV2={isV2} />
         </Suspense>
       </div>
     </div>
