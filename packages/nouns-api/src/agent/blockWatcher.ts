@@ -30,29 +30,22 @@ import {
   type WalletClient,
   type Hex,
 } from 'viem';
-
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
-import { mainnet } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 import { bridgePublish } from './bridge.js';
 import {
+  AUCTION_HOUSE_ADDRESS,
   AUCTION_HOUSE_ABI,
+  NOUNS_TOKEN_ADDRESS,
   NOUNS_TOKEN_ABI,
   BLOCK_POLL_INTERVAL_MS,
   SAFETY_NET_POLL_INTERVAL_MS,
   AGENT_RPC_URL,
-  WATCHED_DAO,
-  selectAddresses,
+  NOUNIRL_CHAIN,
 } from './constants.js';
 
-// Resolve the address pair once at module load — bot watches one DAO per process.
-// Override via NOUNIRL_WATCH_DAO env var ('v1' default | 'v2').
-const { auctionHouse: AUCTION_HOUSE_ADDRESS, token: NOUNS_TOKEN_ADDRESS } =
-  selectAddresses(WATCHED_DAO);
-
-console.log(
-  `[NounIRL] Watching DAO=${WATCHED_DAO.toUpperCase()} — auctionHouse=${AUCTION_HOUSE_ADDRESS} token=${NOUNS_TOKEN_ADDRESS}`,
-);
+const AGENT_CHAIN = NOUNIRL_CHAIN === 'sepolia' ? sepolia : mainnet;
 import { reservationStore } from './reservations.js';
 import {
   predictSeed,
@@ -76,7 +69,10 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
 
 // ─── Multi-Provider Config ───────────────────────────────────────────────
 // Free WebSocket endpoints — race them all, first block wins.
-const FREE_WS_ENDPOINTS = ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
+const FREE_WS_ENDPOINTS =
+  NOUNIRL_CHAIN === 'sepolia'
+    ? ['wss://ethereum-sepolia-rpc.publicnode.com']
+    : ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
 
 // Flashbots Protect RPC — free, MEV-safe submission
 const FLASHBOTS_RPC = 'https://rpc.flashbots.net';
@@ -141,21 +137,24 @@ function initClients(): boolean {
   const rpcUrl = AGENT_RPC_URL;
 
   publicClient = createPublicClient({
-    chain: mainnet,
+    chain: AGENT_CHAIN,
     transport: http(rpcUrl),
   });
 
-  flashbotsClient = createPublicClient({
-    chain: mainnet,
-    transport: http(FLASHBOTS_RPC),
-  });
+  // Flashbots Protect is mainnet-only — skip on testnet
+  if (NOUNIRL_CHAIN !== 'sepolia') {
+    flashbotsClient = createPublicClient({
+      chain: AGENT_CHAIN,
+      transport: http(FLASHBOTS_RPC),
+    });
+  }
 
   const privateKey = process.env.NOUNIRL_PRIVATE_KEY;
   if (privateKey) {
     try {
       agentAccount = privateKeyToAccount(privateKey as Hex);
       walletClient = createWalletClient({
-        chain: mainnet,
+        chain: AGENT_CHAIN,
         transport: http(rpcUrl),
         account: agentAccount,
       });
@@ -208,7 +207,7 @@ async function refreshPreSignedTx(): Promise<void> {
       maxFeePerGas: SETTLEMENT_MAX_FEE,
       maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
       nonce,
-      chainId: 1,
+      chainId: AGENT_CHAIN.id,
       type: 'eip1559' as const,
     };
 
@@ -286,7 +285,7 @@ async function getCurrentAuction(forceRefresh = false): Promise<AuctionState | n
 
 // ─── Settlement (ULTRA-FAST PATH) ───────────────────────────────────────
 
-async function settleAuction(): Promise<{ txHash: string } | null> {
+export async function settleAuction(): Promise<{ txHash: string } | null> {
   if (!walletClient || !publicClient || !agentAccount) {
     console.error('[NounIRL] Cannot settle — wallet not configured');
     return null;
@@ -308,13 +307,22 @@ async function settleAuction(): Promise<{ txHash: string } | null> {
     ) {
       console.log(`[NounIRL] Using pre-signed tx (nonce ${currentNonce})`);
 
-      // Try Flashbots first (MEV-safe, ~0 extra latency)
-      try {
-        hash = await sendRawTx(preSignedTx, true);
-      } catch {
-        // Fall back to public mempool
-        hash = await sendRawTx(preSignedTx, false);
-      }
+      // Submit to BOTH Flashbots AND public mempool simultaneously.
+      // Settlement is a public function (no MEV risk) — we just need inclusion speed.
+      // Flashbots Protect silently drops txs if builders don't pick them up,
+      // so public mempool is the reliability backstop.
+      const [flashbotsResult, mempoolResult] = await Promise.allSettled([
+        sendRawTx(preSignedTx, true),
+        sendRawTx(preSignedTx, false),
+      ]);
+      hash =
+        (mempoolResult.status === 'fulfilled' ? mempoolResult.value : null) ??
+        (flashbotsResult.status === 'fulfilled' ? flashbotsResult.value : null) ??
+        (() => {
+          throw new Error(
+            `Both paths failed: flashbots=${flashbotsResult.status === 'rejected' ? flashbotsResult.reason : '?'}, mempool=${mempoolResult.status === 'rejected' ? mempoolResult.reason : '?'}`,
+          );
+        })();
     } else {
       // FALLBACK: Fresh sign + send via walletClient
       console.log(
@@ -329,7 +337,7 @@ async function settleAuction(): Promise<{ txHash: string } | null> {
         gas: SETTLEMENT_GAS_LIMIT,
         maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         maxFeePerGas: SETTLEMENT_MAX_FEE,
-        chain: mainnet,
+        chain: AGENT_CHAIN,
       });
     }
 
@@ -352,19 +360,22 @@ async function settleAuction(): Promise<{ txHash: string } | null> {
 }
 
 async function sendRawTx(signedTx: Hex, useFlashbots: boolean): Promise<Hex> {
+  const channel = useFlashbots ? 'Flashbots Protect' : 'public mempool';
   const client = useFlashbots ? flashbotsClient : publicClient;
-  if (!client) throw new Error('No client');
+  if (!client) throw new Error(`No client for ${channel}`);
 
-  const hash = await client.request({
-    method: 'eth_sendRawTransaction',
-    params: [signedTx],
-  });
-
-  if (useFlashbots) {
-    console.log('[NounIRL] Submitted via Flashbots Protect (MEV-safe)');
+  try {
+    const hash = await client.request({
+      method: 'eth_sendRawTransaction',
+      params: [signedTx],
+    });
+    console.log(`[NounIRL] ✅ Submitted via ${channel}: ${hash}`);
+    return hash as Hex;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[NounIRL] ❌ ${channel} submit failed: ${msg}`);
+    throw err;
   }
-
-  return hash as Hex;
 }
 
 // ─── Block Processing ───────────────────────────────────────────────────
@@ -418,7 +429,8 @@ async function onNewBlock(
     for (const reservation of activeReservations) {
       const isMatch = matchesTraits(traits, reservation.traits);
 
-      if (isMatch && auctionEnded) {
+      const forceSettle = process.env.NOUNIRL_FORCE_SETTLE === 'true';
+      if (isMatch && (auctionEnded || forceSettle)) {
         const freshAuction = await getCurrentAuction(true);
         if (!freshAuction || freshAuction.settled) {
           console.log('[NounIRL] Match found but auction already settled — skipping');
@@ -597,7 +609,7 @@ async function poll(): Promise<void> {
 function subscribeWsProvider(wsUrl: string, label: string): (() => void) | null {
   try {
     const client = createPublicClient({
-      chain: mainnet,
+      chain: AGENT_CHAIN,
       transport: webSocket(wsUrl, {
         reconnect: { attempts: 20, delay: 3_000 },
       }),
@@ -673,7 +685,9 @@ export function startWatcher(): void {
 
   if (wsConnected > 0) {
     state.transportMode = 'websocket';
-    console.log(`[NounIRL] 🚀 Started — ${wsConnected} WebSocket providers racing`);
+    console.log(
+      `[NounIRL] 🚀 Started on ${NOUNIRL_CHAIN} (chain ${AGENT_CHAIN.id}) — ${wsConnected} WebSocket providers racing`,
+    );
   } else {
     state.transportMode = 'http-poll';
     pollTimer = setInterval(poll, BLOCK_POLL_INTERVAL_MS);

@@ -1,6 +1,6 @@
 import { FC, useCallback, useMemo, useState } from 'react';
 
-import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
+import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 import { useNavigate } from 'react-router';
 
