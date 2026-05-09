@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-nested-ternary */
 import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
 
 // Agent Hub client — replaces direct Anthropic SDK calls
@@ -3928,9 +3929,9 @@ app.post('/api/chat', async c => {
       const nounId =
         typeof rawNounId === 'number' && Number.isFinite(rawNounId)
           ? rawNounId
-          : (typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
+          : typeof rawNounId === 'string' && /^\d+$/.test(rawNounId)
             ? Number.parseInt(rawNounId, 10)
-            : null);
+            : null;
 
       if (dao !== null || nounId !== null) {
         const daoLabel =
@@ -3947,9 +3948,9 @@ app.post('/api/chat', async c => {
           const nounLabel =
             dao === 'nounv2'
               ? `NounV2 #${nounId}`
-              : (dao === 'lil-nouns'
+              : dao === 'lil-nouns'
                 ? `Lil Noun #${nounId}`
-                : `Noun #${nounId}`);
+                : `Noun #${nounId}`;
           dynamicContext += `\n- viewing: ${nounLabel}`;
         }
         dynamicContext +=
@@ -4031,7 +4032,7 @@ You have the following tools. USE THEM. Don't just describe what you would do �
 7. parse_traits(description) — Parse natural language into structured "category:value" traits.
 8. get_settlements(limit?) — History of successful settlements.
 9. get_agent_balance() — ETH balance of nounirl.eth.
-10. deploy_code(description, reason) — Push a code change to GitHub. NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
+10. deploy_code(description, reason) — Ship a code change to the non-production "dev-noun" branch (Netlify branch-deploys it to a fixed preview URL). NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. CANNOT delete files (rejected by safety filter). After a successful deploy the result includes a previewUrl — quote it back to the user and tell them to DM @pip on Warpcast for review before any push to main/prod. Production isolation is structural — you have no path to write to main. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
 11. remember_fact(key, content, scope) — Store a fact in persistent memory. scope="wallet" for user-specific, scope="global" for shared knowledge. USE THIS PROACTIVELY. When a user tells you their name, ENS, preferences, anything personal — remember it. When you learn something important — remember it globally.
 12. recall_facts(scope, key?) — Look up remembered facts. You don't usually need to call this explicitly because your memory is auto-injected into context. But use it to check what you know.
 13. learn_url(url) — Fetch a web page, extract key facts, and store them in your knowledge base. Use when someone shares a URL and wants you to learn from it. The knowledge persists and is available to both you and the homepage chat.
@@ -4246,7 +4247,7 @@ CRITICAL RULES:
         function: {
           name: 'deploy_code',
           description:
-            'Generate a code patch via Claude, push it to GitHub as a new branch, and trigger a Netlify deploy. Only files under packages/nouns-webapp/src/ can be modified. Rate limited to 1 deploy per hour.',
+            'Generate a code patch via Claude, append it as a commit on the non-production `dev-noun` branch, and trigger a Netlify branch-deploy to a fixed preview URL. Only files under packages/nouns-webapp/src/ can be modified — never deleted. Rate limited to 1 deploy per hour. Production (`main`/noun.wtf) is unreachable from this tool. Result includes `previewUrl`; quote it to the user and tell them to DM @pip on Warpcast to review and ship to prod.',
           parameters: {
             type: 'object' as const,
             properties: {
@@ -5215,6 +5216,13 @@ CRITICAL RULES:
                     success: deployResult.success,
                     branch: deployResult.branch,
                     commitSha: deployResult.commitSha,
+                    // Quote `previewUrl` back to the user so they can open
+                    // the live change. Tell them to DM @pip on Warpcast
+                    // before any prod merge — production is pip's call.
+                    previewUrl: deployResult.previewUrl,
+                    nextStep: deployResult.success
+                      ? 'Tell the user the previewUrl and ask them to DM @pip on Warpcast to review and ship to main.'
+                      : undefined,
                     error: deployResult.error,
                     patchCount: deployResult.patches.length,
                     authorizedBy: wallet,
