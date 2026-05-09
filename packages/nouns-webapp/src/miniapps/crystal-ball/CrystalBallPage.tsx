@@ -23,6 +23,7 @@ import type { CSSProperties } from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getNounData, ImageData as NounsImageData } from '@noundry/nouns-assets';
+import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { ConnectKitButton } from 'connectkit';
 import { encodePacked, keccak256, type Hex } from 'viem';
@@ -553,9 +554,10 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
 }
 
 // ─── 2D SVG rendering ──────────────────────────────────────────────────
-function seedToSvgDataUri(seed: NounSeed): string {
-  const { parts, background } = getNounData(seed);
-  const svg = buildSVG(parts, NounsImageData.palette, background);
+function seedToSvgDataUri(seed: NounSeed, isV2: boolean): string {
+  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
+  const palette = isV2 ? ImageDataV2.palette : NounsImageData.palette;
+  const svg = buildSVG(parts, palette, background);
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
@@ -649,6 +651,7 @@ function SeedVisual({
   size,
   isNounOClock,
   variant,
+  isV2 = false,
 }: {
   seed: NounSeed | null;
   mode: '2d' | '3d';
@@ -656,6 +659,10 @@ function SeedVisual({
   isNounOClock: boolean;
   /** Visual hint — the "match" variant tints the halo purple. */
   variant?: 'predicted' | 'match';
+  /** True when rendering a NounV2 noun — uses ImageDataV2 from the workspace
+   * `@nouns/assets` package so the V2-only founder traits render correctly.
+   * V1 path keeps using ImageData from `@noundry/nouns-assets`. */
+  isV2?: boolean;
 }) {
   const haloColor = variant === 'match' ? CRYSTAL_PURPLE : '#aaccff';
 
@@ -762,9 +769,9 @@ function SeedVisual({
   });
 
   if (mode === '2d') {
-    const src = seedToSvgDataUri(seed);
+    const src = seedToSvgDataUri(seed, isV2);
     const fromSeed = fadeRef.current.from;
-    const fromSrc = fromSeed && fromSeed !== seed ? seedToSvgDataUri(fromSeed) : null;
+    const fromSrc = fromSeed && fromSeed !== seed ? seedToSvgDataUri(fromSeed, isV2) : null;
     return (
       <div style={frameStyle}>
         {fromSrc && t < 1 && (
@@ -1234,7 +1241,12 @@ export default function CrystalBallPage() {
               </div>
             }
           >
-            <CrystalBall size={ballSize} interactive predictionOverride={effectivePrediction} />
+            <CrystalBall
+              size={ballSize}
+              interactive
+              predictionOverride={effectivePrediction}
+              isV2={activeDao === 'nounv2'}
+            />
           </Suspense>
         ) : (
           <Suspense
@@ -1270,6 +1282,7 @@ export default function CrystalBallPage() {
                   size={ballSize}
                   isNounOClock={isNounOClock}
                   variant={showingTwin ? 'match' : 'predicted'}
+                  isV2={activeDao === 'nounv2'}
                 />
                 {/* Carousel chevrons — only mounted when there's a twin to morph to. */}
                 {carouselHasTwin && (
