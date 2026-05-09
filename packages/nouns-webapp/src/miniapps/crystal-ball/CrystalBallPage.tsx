@@ -124,18 +124,60 @@ interface TraitCounts {
 // ─── Seed Prediction ────────────────────────────────────────────────────
 // Mirrors NounsSeeder.sol — see packages/nouns-api/src/agent/traitPredictor.ts.
 //   pseudorandomness = keccak256(abi.encodePacked(blockhash(block.number - 1), nounId))
-// Reused here so the v2 path can compute the next-noun prediction client-side
-// without needing a v2-aware /api/agent/predict endpoint yet.
-function predictSeed(blockHash: Hex, nounId: number, counts: TraitCounts): NounSeed {
+// V2 mode also mirrors NounV2SlobberSeeder (0xd777E701506A86fE89f07f963aA6c08d6905cFF8):
+//   - skip-mapping over SLOBBER_INDEX so it's excluded from random rotation
+//   - 50/50 slobber rule when accessory == grease and head ∈ {retainer, index-card},
+//     decided by bit 240 of the same pseudorandomness (untouched by standard
+//     trait slices at bits 0..239).
+// Constants below MUST match the on-chain seeder. If governance ever deploys
+// a different seeder, update here too.
+const SLOBBER_INDEX = 143;
+const GREASE_INDEX = 137;
+const RETAINER_INDEX = 173;
+const INDEX_CARD_INDEX = 237;
+
+function predictSeed(
+  blockHash: Hex,
+  nounId: number,
+  counts: TraitCounts,
+  dao: 'v1' | 'v2' = 'v1',
+): NounSeed {
   const pseudorandomness = BigInt(
     keccak256(encodePacked(['bytes32', 'uint256'], [blockHash, BigInt(nounId)])),
   );
   const mask48 = (1n << 48n) - 1n;
+
+  // Accessory: V2 excludes SLOBBER_INDEX from random rotation via skip-mapping.
+  // Pick from [0, accessoryCount - 1) then bump up by 1 if pick >= SLOBBER_INDEX.
+  // V1 uses the standard uniform pick.
+  let accessory: number;
+  if (dao === 'v2') {
+    accessory = Number(
+      ((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory - 1),
+    );
+    if (accessory >= SLOBBER_INDEX) accessory += 1;
+  } else {
+    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory));
+  }
+
+  const head = Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head));
+
+  // V2 slobber rule. Trigger combo + 50/50 coin flip on bit 240.
+  let finalAccessory = accessory;
+  if (
+    dao === 'v2' &&
+    accessory === GREASE_INDEX &&
+    (head === RETAINER_INDEX || head === INDEX_CARD_INDEX) &&
+    ((pseudorandomness >> 240n) & 1n) === 1n
+  ) {
+    finalAccessory = SLOBBER_INDEX;
+  }
+
   return {
     background: Number((pseudorandomness & mask48) % BigInt(counts.background)),
     body: Number(((pseudorandomness >> 48n) & mask48) % BigInt(counts.body)),
-    accessory: Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory)),
-    head: Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head)),
+    accessory: finalAccessory,
+    head,
     glasses: Number(((pseudorandomness >> 192n) & mask48) % BigInt(counts.glasses)),
   };
 }
@@ -389,7 +431,7 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     if (!auction || currentNounId == null || !blockData?.hash) return cached;
 
     const nextNounId = Number(currentNounId) + 1;
-    const seed = predictSeed(blockData.hash, nextNounId, traitCounts);
+    const seed = predictSeed(blockData.hash, nextNounId, traitCounts, 'v2');
     const auctionEnd = endTime != null ? Number(endTime) : 0;
     const now = Math.floor(Date.now() / 1000);
     const payload: PredictResponse = {
