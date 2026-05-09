@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react';
 
-import { getNounData, ImageData } from '@noundry/nouns-assets';
+// V2 rendering reads from the workspace `@nouns/assets` package, which
+// mirrors the on-chain V2-owned NounsDescriptorV2 exactly (founder traits
+// at the right indices, V2-only palette additions). V1 paths still use
+// `@noundry/nouns-assets` from npm.
+import { getNounDataV2 as getNounData, ImageDataV2 as ImageData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
