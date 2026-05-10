@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 
 import { useLocation, useNavigate } from 'react-router';
 
+import { THEME_NAMES } from '@/contexts/SiteThemeContext';
+
 /**
  * Which DAO the current page is showing.
  *
@@ -19,16 +21,31 @@ import { useLocation, useNavigate } from 'react-router';
  */
 export type ActiveDao = 'nouns' | 'nounv2';
 
+// Theme prefixes (`/pro`, `/game`, ...) are an orthogonal axis to DAO routing
+// — they only swap the chrome that wraps SiteRoutes — so we strip them before
+// any DAO-pathname matching. Without this, ThemeSwitcher's `navigate('/pro')`
+// would hide the toggle (no `/pro` in the whitelist), and the toggle would
+// stay gone until the user navigated to a different page.
+function splitThemePrefix(pathname: string): { prefix: string; logical: string } {
+  const lower = pathname.toLowerCase();
+  for (const t of THEME_NAMES) {
+    const p = `/${t}`;
+    if (lower === p) return { prefix: p, logical: '/' };
+    if (lower.startsWith(`${p}/`)) return { prefix: p, logical: lower.slice(p.length) };
+  }
+  return { prefix: '', logical: lower };
+}
+
 // All pathname comparisons here are case-insensitive — react-router's route
 // matching is case-insensitive by default (so `<Route path="v2">` matches
 // both `/v2` and `/V2`), and we have to mirror that or a capital-V link
 // would render the V1 fallback while the URL bar still says `/V2`.
 function pathnameToDao(pathname: string): ActiveDao {
-  const p = pathname.toLowerCase();
-  if (p === '/v2' || p.startsWith('/v2/')) return 'nounv2';
+  const { logical } = splitThemePrefix(pathname);
+  if (logical === '/v2' || logical.startsWith('/v2/')) return 'nounv2';
   // The legacy `/nounv2` governance routes also live in V2 context — keep
   // the toggle showing V2 when the user is reading proposals there.
-  if (p === '/nounv2' || p.startsWith('/nounv2/')) return 'nounv2';
+  if (logical === '/nounv2' || logical.startsWith('/nounv2/')) return 'nounv2';
   return 'nouns';
 }
 
@@ -44,13 +61,16 @@ const V2_NOUN_ID_RE = /^\/v2\/noun\/(\d+)\/?$/;
  * The DAO-namespaced routes are: `/`, `/noun/:id`, `/v2`, `/v2/noun/:id`,
  * `/crystal-ball`, `/v2/crystal-ball`. Everything else (governance, probe,
  * etc.) is rendered DAO-agnostic and the global toggle is a no-op there.
+ *
+ * A `/<theme>` prefix (e.g. `/pro`, `/pro/v2`) is treated as equivalent to
+ * the underlying logical route, since themes only swap chrome.
  */
 export function routeHasDaoToggle(pathname: string): boolean {
-  const p = pathname.toLowerCase();
-  if (p === '/' || p === '/v2') return true;
-  if (V1_NOUN_ID_RE.test(p)) return true;
-  if (V2_NOUN_ID_RE.test(p)) return true;
-  if (p === '/crystal-ball' || p === '/v2/crystal-ball') return true;
+  const { logical } = splitThemePrefix(pathname);
+  if (logical === '/' || logical === '/v2') return true;
+  if (V1_NOUN_ID_RE.test(logical)) return true;
+  if (V2_NOUN_ID_RE.test(logical)) return true;
+  if (logical === '/crystal-ball' || logical === '/v2/crystal-ball') return true;
   return false;
 }
 
@@ -62,39 +82,40 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
 
   const setActiveDao = useCallback(
     (next: ActiveDao) => {
-      // Match the source pathname case-insensitively so a capital-V link
-      // (`/V2`, `/V2/Noun/123`) still toggles cleanly. Targets we generate
-      // below are always canonical lowercase.
-      const pathname = location.pathname.toLowerCase();
+      // Strip any theme prefix so logical-path matching works regardless of
+      // whether the user is on `/v2` or `/pro/v2`. We re-prepend the prefix
+      // when building the target so the user stays on their current theme.
+      const { prefix, logical } = splitThemePrefix(location.pathname);
 
-      // Determine the destination based on the current path. Only the
-      // namespaced routes participate; everything else is a no-op so the
-      // user doesn't get yanked off the page they're on. (The global toggle
-      // is also hidden on those pages, but we defend the navigation here
-      // too in case someone calls `setActiveDao` programmatically.)
-      let target: string | null = null;
+      let logicalTarget: string | null = null;
 
       if (next === 'nounv2') {
-        if (pathname === '/') {
-          target = '/v2';
-        } else if (pathname === '/crystal-ball') {
-          target = '/v2/crystal-ball';
+        if (logical === '/') {
+          logicalTarget = '/v2';
+        } else if (logical === '/crystal-ball') {
+          logicalTarget = '/v2/crystal-ball';
         } else {
-          const m = V1_NOUN_ID_RE.exec(pathname);
-          if (m) target = `/v2/noun/${m[1]}`;
+          const m = V1_NOUN_ID_RE.exec(logical);
+          if (m) logicalTarget = `/v2/noun/${m[1]}`;
         }
       } else {
-        if (pathname === '/v2') {
-          target = '/';
-        } else if (pathname === '/v2/crystal-ball') {
-          target = '/crystal-ball';
+        if (logical === '/v2') {
+          logicalTarget = '/';
+        } else if (logical === '/v2/crystal-ball') {
+          logicalTarget = '/crystal-ball';
         } else {
-          const m = V2_NOUN_ID_RE.exec(pathname);
-          if (m) target = `/noun/${m[1]}`;
+          const m = V2_NOUN_ID_RE.exec(logical);
+          if (m) logicalTarget = `/noun/${m[1]}`;
         }
       }
 
-      if (target === null) return;
+      if (logicalTarget === null) return;
+
+      const target = prefix
+        ? logicalTarget === '/'
+          ? prefix
+          : `${prefix}${logicalTarget}`
+        : logicalTarget;
 
       // Navigating to the DAO root replaces the current entry so the
       // back-button steps page-by-page rather than toggle-by-toggle.
