@@ -498,7 +498,14 @@ function StaticVoxelScene({ voxels, autoRotate }: StaticSceneProps) {
 
   useFrame(() => {
     if (groupRef.current && autoRotate) {
-      groupRef.current.rotation.y += 0.004;
+      // Display-case float — same gentle sine tilt + bob as MorphScene so the
+      // post-morph steady state matches the in-morph feel. Reads as "noun
+      // floating in a shop window" rather than a 360° rotation. Earlier
+      // version used `rotation.y += 0.004` which produced a continuous full
+      // spin — kept that out by mistake when MorphScene's float-tilt landed.
+      const tSec = performance.now() / 1000;
+      groupRef.current.rotation.y = Math.sin(tSec * 0.4) * 0.35;
+      groupRef.current.position.y = Math.sin(tSec * 0.6) * 0.08;
     }
   });
 
