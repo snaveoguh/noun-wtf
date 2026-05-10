@@ -34,11 +34,11 @@
  *  - Texture loading is suspended through React Suspense so the parent
  *    page can show a loading fallback instead of a partial scene.
  */
-import { useMemo, useRef, useEffect, FC } from 'react';
+import { useMemo, useRef, useEffect, useState, FC } from 'react';
 
 import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { OrbitControls } from '@react-three/drei';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { buildSVG } from '@nouns/sdk';
 import * as THREE from 'three';
 
@@ -223,6 +223,108 @@ function sourcesForStream(key: string, count: number): string[] {
   }
 }
 
+// ─── Resilient texture loader ───────────────────────────────────────────
+//
+// R3F's `useLoader` is strict — if any source URL 404s or hits a CORS
+// wall, the whole Suspense boundary throws a "Could not load X" error
+// (seen on explore.nouns.world photos which don't ship permissive CORS
+// headers for WebGL texture use). We don't want one bad photo to wipe
+// the entire scene, so this hook:
+//
+//   1. Seeds the array with hue-tinted placeholder canvases so cards
+//      always have *something* to render — no Suspense, no flash of
+//      empty geometry.
+//   2. Loads each real texture in parallel with `crossOrigin='anonymous'`.
+//      On success the placeholder is swapped out in place via setState.
+//      On failure the placeholder stays.
+//   3. Cleans up the THREE.Texture instances on unmount / src change so
+//      we don't leak GPU memory when the deck rotates.
+
+function makePlaceholderTexture(hue: number): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  // Soft radial gradient in the per-card hue so failed photos still feel
+  // like part of the rainbow stream rather than an obvious "missing" tile.
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, `hsl(${hue}, 70%, 55%)`);
+  grad.addColorStop(1, `hsl(${hue}, 70%, 25%)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  // Tiny "?" centred so it's clearly a placeholder when you look closely.
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = `bold ${size * 0.42}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', size / 2, size / 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function useResilientTextures(srcs: string[], hueStart: number, hueSpan: number): THREE.Texture[] {
+  // Initial state: a placeholder per slot, hue-spread to match the stream.
+  const [textures, setTextures] = useState<THREE.Texture[]>(() =>
+    srcs.map((_, i) => makePlaceholderTexture(hueStart + (i * hueSpan) / srcs.length)),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+    // Track loaded textures so we can dispose them on cleanup.
+    const loadedReplacements: Array<{ index: number; tex: THREE.Texture }> = [];
+
+    srcs.forEach((src, i) => {
+      loader
+        .loadAsync(src)
+        .then(tex => {
+          if (cancelled) {
+            tex.dispose();
+            return;
+          }
+          // Per-source filter — pixel art (data: URIs from our SVG pipeline)
+          // wants nearest-neighbour for crispness, photo content (http URLs)
+          // wants linear mip-mapping.
+          const isPhoto = !src.startsWith('data:');
+          tex.minFilter = isPhoto ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
+          tex.magFilter = isPhoto ? THREE.LinearFilter : THREE.NearestFilter;
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.needsUpdate = true;
+          loadedReplacements.push({ index: i, tex });
+          setTextures(prev => {
+            const next = prev.slice();
+            // Dispose the placeholder we're replacing to free GPU memory.
+            const old = next[i];
+            if (old && old !== tex) old.dispose();
+            next[i] = tex;
+            return next;
+          });
+        })
+        .catch(() => {
+          // Silent — placeholder stays. We don't surface the error because
+          // a single failed photo isn't user-actionable, and the scene
+          // still works.
+          /* swallow */
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      // Dispose any textures that loaded after unmount.
+      for (const { tex } of loadedReplacements) tex.dispose();
+    };
+    // Stringify srcs so we don't re-fire when the array reference flips
+    // but contents are identical. A useMemo'd source list upstream would
+    // be cleaner; this guard matches the existing call pattern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcs.join('|'), hueStart, hueSpan]);
+
+  return textures;
+}
+
 // ─── Card ────────────────────────────────────────────────────────────────
 
 interface CardProps {
@@ -328,20 +430,10 @@ function Stream({ config }: { config: StreamConfig }) {
     () => sourcesForStream(config.key, config.cardCount),
     [config.key, config.cardCount],
   );
-  const textures = useLoader(THREE.TextureLoader, sources) as THREE.Texture[];
-
-  useEffect(() => {
-    for (const t of textures) {
-      // Photo-content streams look better with linear filtering; pixel-art
-      // streams need nearest. Detect by source type — data: URIs from our
-      // svg pipeline are pixel art, http(s) URLs are photos.
-      const isPhoto = !(t.image as HTMLImageElement | undefined)?.src?.startsWith('data:');
-      t.minFilter = isPhoto ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
-      t.magFilter = isPhoto ? THREE.LinearFilter : THREE.NearestFilter;
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.needsUpdate = true;
-    }
-  }, [textures]);
+  // Resilient loader — placeholder textures appear immediately, real
+  // images fade in as they resolve. Single failures (CORS / 404) leave
+  // the placeholder in place rather than throwing through Suspense.
+  const textures = useResilientTextures(sources, config.hueStart, config.hueSpan);
 
   const phaseSpacing = STREAM_LENGTH / config.cardCount;
   const phaseShift = config.phaseOffset * STREAM_LENGTH;
