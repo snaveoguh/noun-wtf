@@ -1,5 +1,49 @@
 import { FC, useMemo, useState } from 'react';
 
+/**
+ * Image with a deterministic fallback chain. Tries each `srcs` URL in order;
+ * if one 404s (or otherwise fails to load) advances to the next. Used for
+ * dream cards because the probe-dreams static archive (rendered SVG +
+ * custom-trait PNG) lags behind on-chain dreams — recent dreams don't have
+ * a baked SVG yet, so the previously-naive `<img src={nounSvgUrl}>` ended
+ * up with a broken-image placeholder until the archive caught up. With the
+ * cascade we fall through to artworkUri / customTraitUrl / placeholder
+ * automatically. Fully client-side, no extra network probes.
+ */
+function FallbackImg({
+  srcs,
+  alt,
+  className,
+  style,
+}: {
+  srcs: ReadonlyArray<string | null | undefined>;
+  alt: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const candidates = srcs.filter((s): s is string => typeof s === 'string' && s.length > 0);
+  const [idx, setIdx] = useState(0);
+  if (candidates.length === 0 || idx >= candidates.length) {
+    return (
+      <div
+        className="flex h-32 w-full items-center justify-center text-3xl text-gray-300"
+        style={style}
+      >
+        ?
+      </div>
+    );
+  }
+  return (
+    <img
+      src={candidates[idx]}
+      alt={alt}
+      className={className}
+      style={style}
+      onError={() => setIdx(i => i + 1)}
+    />
+  );
+}
+
 // Dreams are V2-era compositions — switch to V2 ImageData so V2-only
 // founder traits (slobber, missingnoun, white/black bodies, multicolor)
 // resolve correctly when rendering draft / on-chain dreams.
@@ -117,27 +161,23 @@ function OnChainDreamCard({
   isProposer: boolean;
   hasVotes: boolean;
 }) {
-  // Prefer the pre-rendered full noun SVG (has custom trait baked in) over the bare
-  // trait PNG — otherwise a custom-head dream shows as a floating head on white.
-  const previewSrc = dream.nounSvgUrl ?? dream.artworkUri ?? dream.customTraitUrl;
   // Threshold for promotion: need at least 2 noun votes from signatures
   const canPromote = isProposer && dream.signaturesCount >= 2;
 
   return (
     <div className="group overflow-hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
       <div className="relative flex items-end justify-center overflow-hidden bg-gray-100">
-        {previewSrc ? (
-          <img
-            src={previewSrc}
-            alt={dream.title}
-            className="w-full"
-            style={{ imageRendering: 'pixelated', display: 'block' }}
-          />
-        ) : (
-          <div className="flex h-32 w-full items-center justify-center text-3xl text-gray-300">
-            ?
-          </div>
-        )}
+        {/* Cascading fallback — prefer the pre-rendered full noun SVG (has
+            custom trait baked in), then artworkUri, then bare trait. Recent
+            dreams aren't in the static archive yet so the first src 404s;
+            FallbackImg flips to the next on error rather than leaving a
+            broken-image placeholder visible (bug seen on dreams 685, 693). */}
+        <FallbackImg
+          srcs={[dream.nounSvgUrl, dream.artworkUri, dream.customTraitUrl]}
+          alt={dream.title}
+          className="w-full"
+          style={{ imageRendering: 'pixelated', display: 'block' }}
+        />
       </div>
 
       <div className="p-3">
@@ -219,8 +259,12 @@ function ProbeDreamCard({
         className="relative flex items-end justify-center overflow-hidden"
         style={{ backgroundColor: `#${ImageData.bgcolors[dream.seeds.background] ?? 'd5d7e1'}` }}
       >
-        <img
-          src={dream.nounSvgUrl}
+        {/* useProbeDreams always sets nounSvgUrl to either the bundled
+            file (id ≤ 721) or a client-built data URL (data: URLs can't
+            404), so the cascade only matters as a defensive belt+braces.
+            customTraitUrl is the last-resort placeholder. */}
+        <FallbackImg
+          srcs={[dream.nounSvgUrl, dream.customTraitUrl]}
           alt={`Dream #${dream.id}`}
           className="w-full"
           style={{ imageRendering: 'pixelated', display: 'block' }}

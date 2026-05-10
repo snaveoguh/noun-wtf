@@ -69,11 +69,20 @@ export function useDreamCandidates() {
         const dreamId = dreamIdMatch?.[1] ?? null;
         const probeDream = dreamId ? probeDreams.get(Number(dreamId)) : null;
 
-        // Build image URLs from probe dreams archive
+        // Build image URLs from probe dreams archive. `/probe-dreams/rendered/`
+        // only contains pre-baked SVGs for dream ids ≤ 721 (the snapshot we
+        // bundled). For newer ids the file doesn't exist and the <img> would
+        // 404 → broken-image icon (bug seen on dreams #685, #693). Cap the
+        // synthesised URL at the bundled max; OnChainDreamCard's FallbackImg
+        // will fall through to artworkUri / customTraitUrl when nounSvgUrl
+        // is null.
+        const MAX_BUNDLED_RENDERED_ID = 721;
         let nounSvgUrl: string | null = null;
         let customTraitUrl: string | null = null;
         if (probeDream) {
-          nounSvgUrl = `/probe-dreams/rendered/${probeDream.id}.svg`;
+          if (probeDream.id <= MAX_BUNDLED_RENDERED_ID) {
+            nounSvgUrl = `/probe-dreams/rendered/${probeDream.id}.svg`;
+          }
           if (probeDream.customImage) {
             customTraitUrl = `/probe-dreams/traits/${probeDream.id}_${probeDream.customImage}`;
           }
