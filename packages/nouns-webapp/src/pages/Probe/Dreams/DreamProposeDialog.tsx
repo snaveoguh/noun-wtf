@@ -1,6 +1,9 @@
 import { FC, useCallback, useMemo, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+// Dream propose flow targets V2 — use V2 ImageData so the proposal preview
+// renders V2-only founder traits correctly (V1 palette only has 239 colors
+// and would error on slobber's founder palette slots).
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { toast } from 'sonner';
 import { type Address } from 'viem';

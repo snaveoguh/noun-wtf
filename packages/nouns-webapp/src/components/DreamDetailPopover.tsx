@@ -2,11 +2,15 @@ import type { ProbeDreamWithPreview } from '@/hooks/useProbeDreams';
 
 import { FC, useEffect, useMemo, useRef } from 'react';
 
-import { ImageData } from '@noundry/nouns-assets';
+// Dream popover renders V2-era dreams — V2 ImageData covers founder traits.
+import { ImageDataV2 as ImageData } from '@nouns/assets';
 import { createPortal } from 'react-dom';
 
 import { getNounColors } from '@/components/NounPalette';
-import { traitName } from '@/lib/traitName';
+// V2 variant — labels match the V2 ImageData above so V2-only founder
+// traits show 'Slobber' / 'Missingnoun' / 'White' / 'Black' / 'Multicolor'
+// instead of falling back to 'Unknown'.
+import { traitNameV2 as traitName } from '@/lib/traitName';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
 
 interface Props {
