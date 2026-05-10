@@ -5,6 +5,13 @@ import React, { useEffect, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
 import { ImageData } from '@noundry/nouns-assets';
+// V2 ImageData mirrors the on-chain NounV2 descriptor (32 bodies, 144
+// accessories, 253 heads, 23 glasses, 253-color palette including 14
+// founder colors at slots 239..252). Used here so V2-only founder traits
+// (slobber, missingnoun, white/black bodies) render with the right palette
+// — V1 npm only has 239 palette entries so attempting to build the slobber
+// SVG against V1 palette would error on the V2-only color slots.
+import { ImageDataV2 } from '@nouns/assets';
 import { buildSVG, PNGCollectionEncoder } from '@nouns/sdk';
 import JSZip from 'jszip';
 import { CopyIcon, DownloadIcon, PackageIcon } from 'lucide-react';
@@ -23,6 +30,17 @@ import { traitCategory } from '@/lib/traitCategory';
 import { traitName } from '@/lib/traitName';
 import { svg2png } from '@/utils/svg2png';
 
+/** Whether a trait is exclusive to one DAO branch.
+ *  - 'both'    → present in mainnet V1 (npm `@noundry/nouns-assets` snapshot)
+ *               AND our V2 fork (`ImageDataV2`). Renders with no badge.
+ *  - 'v1-only' → in mainnet V1's current chain state but didn't fork over to
+ *               our V2 (e.g. `glasses-lavender`, `body-lilac`, `accessory-gnars`,
+ *               `head-shrimp-tempura`). Tagged with a red "V1" badge.
+ *  - 'v2-only' → in our V2 fork only (founder additions: `body-white`,
+ *               `body-black`, `accessory-slobber`, `accessory-multicolor`,
+ *               `head-missingnoun`). Tagged with a purple "V2" badge. */
+type TraitSource = 'both' | 'v1-only' | 'v2-only';
+
 interface TraitItem {
   name: string;
   filename: string;
@@ -31,6 +49,7 @@ interface TraitItem {
   type: string;
   index: number;
   hexColor?: string;
+  source: TraitSource;
 }
 
 const encoder = new PNGCollectionEncoder(ImageData.palette);
@@ -83,20 +102,71 @@ const copyToClipboard = async (text: string) => {
   }
 };
 
+/**
+ * Resolve the human-readable display name for a trait given its raw filename.
+ *
+ * We can't reuse `traitName(type, seed)` from `@/lib/traitName` because that
+ * helper is locked to the V1 `ImageData` import — calling it for a V2 index
+ * would give the wrong filename (e.g. V2 index 30 = `body-white`, but V1
+ * index 30 doesn't exist). Doing the parse from the filename string is
+ * deterministic and matches the rules `traitName` already applies.
+ *
+ * Rules (mirroring `@/lib/traitName`):
+ *  - 'glasses' filenames have a leading `square-` prefix → strip it.
+ *  - 'accessory' filenames sometimes have a leading `body-` prefix
+ *    (renaming carryover from earlier descriptor versions) → strip it.
+ *  - Drop everything up to the first `-` (the category prefix), then
+ *    replace remaining `-` with spaces and capitalise.
+ *
+ * Important: this is the canonical key we use to dedupe between V1 and V2,
+ * because the same logical trait sometimes has slightly different filename
+ * spellings between the two descriptors (`accessory-body-bege` on V1 npm vs
+ * `body-bege` on V2). Both resolve to display name `Bege` here.
+ */
+const filenameToDisplayName = (filename: string, type: string): string => {
+  let f = filename;
+  if (type === 'glasses') f = f.replace('square-', '');
+  if (type === 'accessory') f = f.replace('body-', '');
+  const dashIdx = f.indexOf('-');
+  const stripped = dashIdx === -1 ? f : f.substring(dashIdx + 1);
+  return capitalizeFirstLetter(stripped.replace(/-/g, ' '));
+};
+
 const generateTraitItems = (): TraitItem[] => {
   const traitItems: TraitItem[] = [];
 
-  // Process each trait category
+  // For each visual category we walk both V1 (npm `@noundry/nouns-assets`
+  // current chain state) and V2 (`ImageDataV2`) and merge by display name.
+  // Order:
+  //   1. V1 traits first (preserves the existing tile order users expect),
+  //      tagged 'both' if V2 also has it and 'v1-only' otherwise.
+  //   2. V2-only traits appended at the end of the category in V2 index
+  //      order, tagged 'v2-only'. These are the founder traits the user
+  //      asked us to surface (slobber, missingnoun, white/black bodies, …).
   Object.entries(traitCategory).forEach(([traitType, imageKey]) => {
     const categoryTitle = traitKeyToTitle[imageKey] || capitalizeFirstLetter(imageKey);
-    const images = ImageData.images[imageKey];
+    const v1Images = ImageData.images[imageKey] ?? [];
+    const v2Images = ImageDataV2.images[imageKey] ?? [];
 
-    images.forEach((imageData: EncodedImage, index: number) => {
+    // Map display-name → presence in each branch.
+    const v2NamesByName = new Map<string, { item: EncodedImage; index: number }>();
+    v2Images.forEach((img: EncodedImage, idx: number) => {
+      const name = filenameToDisplayName(img.filename, traitType);
+      v2NamesByName.set(name, { item: img, index: idx });
+    });
+    const v1Names = new Set<string>(
+      v1Images.map((img: EncodedImage) => filenameToDisplayName(img.filename, traitType)),
+    );
+
+    // 1) V1 traits — keep existing index ordering.
+    v1Images.forEach((imageData: EncodedImage, index: number) => {
       const name = traitName(traitType as keyof INounSeed, index);
-
-      // Build SVG for this single trait (with transparent background)
+      const inV2 = v2NamesByName.has(name);
+      // Build SVG against V1 palette (npm `@noundry/nouns-assets`) — these
+      // indices are guaranteed to be valid in V1's 239-color palette since
+      // the trait is V1-native. V2 traits use a 253-color palette so we
+      // build those separately below with `ImageDataV2.palette`.
       const svg = buildSVG([imageData], encoder.data.palette, undefined);
-
       traitItems.push({
         name,
         filename: imageData.filename,
@@ -104,13 +174,33 @@ const generateTraitItems = (): TraitItem[] => {
         category: categoryTitle,
         type: traitType === 'glasses' ? 'Noggles' : traitType,
         index,
+        source: inV2 ? 'both' : 'v1-only',
+      });
+    });
+
+    // 2) V2-only traits — append at the end in V2 index order. Built
+    // against `ImageDataV2.palette` because founder traits like
+    // accessory-slobber and head-missingnoun reference palette slots
+    // 239..252 which only exist in V2's palette (V1 npm tops out at 239).
+    v2Images.forEach((imageData: EncodedImage, v2Index: number) => {
+      const name = filenameToDisplayName(imageData.filename, traitType);
+      if (v1Names.has(name)) return; // already emitted as 'both'
+      const svg = buildSVG([imageData], ImageDataV2.palette, undefined);
+      traitItems.push({
+        name,
+        filename: imageData.filename,
+        svg,
+        category: categoryTitle,
+        type: traitType === 'glasses' ? 'Noggles' : traitType,
+        index: v2Index,
+        source: 'v2-only',
       });
     });
   });
 
-  // Add background colors
+  // Backgrounds are identical across V1 and V2 (Cool / Warm), so we mark
+  // them 'both' and skip the diff dance.
   Object.entries(backgroundColors).forEach(([bgName, hexColor], index) => {
-    // Create a colored rectangle SVG with centered hex code text
     const svg = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
       <rect width="32" height="32" fill="${hexColor}" />
       <text x="16" y="18" text-anchor="middle" font-family="monospace" font-size="3" fill="${hexColor === '#d5d7e1' ? '#333' : '#666'}">${hexColor}</text>
@@ -124,6 +214,7 @@ const generateTraitItems = (): TraitItem[] => {
       type: 'background',
       index,
       hexColor,
+      source: 'both',
     });
   });
 
@@ -269,6 +360,27 @@ const TraitsPage: React.FC = () => {
           <p className="mt-4 text-lg text-gray-600">
             <Trans>Browse and download all available Noun traits.</Trans>
           </p>
+
+          {/* Legend — explains the V1/V2 badges that appear on the trait
+              tiles. Both DAOs share the bulk of the trait set, so most tiles
+              are unbadged; the small minority that diverged get a coloured
+              corner pill. Counts are computed live so adding a new founder
+              trait or hot-loading a fresh V1 npm snapshot just works. */}
+          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block rounded-sm bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                V2
+              </span>
+              <span>Only in our V2 fork (founder traits)</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block rounded-sm bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                V1
+              </span>
+              <span>Only in mainnet V1 (didn&apos;t fork to V2)</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -277,9 +389,33 @@ const TraitsPage: React.FC = () => {
           <h2 className="font-londrina mb-6 text-3xl font-bold text-gray-900">{category}</h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6">
             {traitsByCategory[category].map(trait => (
-              <Dialog key={trait.filename}>
+              <Dialog key={`${trait.source}-${trait.filename}`}>
                 <DialogTrigger asChild>
-                  <div className="flex h-full cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-2 transition-shadow hover:shadow-md">
+                  <div
+                    className={`relative flex h-full cursor-pointer flex-col rounded-lg border bg-white p-2 transition-shadow hover:shadow-md ${
+                      trait.source === 'v2-only'
+                        ? 'border-purple-300 ring-1 ring-purple-200'
+                        : trait.source === 'v1-only'
+                          ? 'border-rose-300 ring-1 ring-rose-200'
+                          : 'border-gray-200'
+                    }`}
+                  >
+                    {/* Corner badge — only rendered for the diverging traits.
+                        Shared traits (the vast majority) stay clean. */}
+                    {trait.source !== 'both' && (
+                      <span
+                        className={`absolute right-1.5 top-1.5 z-10 inline-block rounded-sm px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow ${
+                          trait.source === 'v2-only' ? 'bg-purple-600' : 'bg-rose-600'
+                        }`}
+                        title={
+                          trait.source === 'v2-only'
+                            ? 'Only in our V2 fork — founder trait'
+                            : "Only in mainnet V1 — didn't fork to V2"
+                        }
+                      >
+                        {trait.source === 'v2-only' ? 'V2' : 'V1'}
+                      </span>
+                    )}
                     <div className="bg-checkerboard mb-2 flex aspect-square items-center justify-center overflow-hidden rounded-lg shadow-inner">
                       <img
                         src={`data:image/svg+xml;base64,${btoa(trait.svg)}`}
@@ -296,10 +432,28 @@ const TraitsPage: React.FC = () => {
                 </DialogTrigger>
                 <DialogContent className="max-w-[min(calc(100vw-2rem),28rem)] rounded-xl">
                   <DialogHeader>
-                    <DialogTitle>
-                      {trait.name} {capitalizeFirstLetter(trait.type)}
+                    <DialogTitle className="flex items-center gap-2">
+                      <span>
+                        {trait.name} {capitalizeFirstLetter(trait.type)}
+                      </span>
+                      {trait.source !== 'both' && (
+                        <span
+                          className={`inline-block rounded-sm px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ${
+                            trait.source === 'v2-only' ? 'bg-purple-600' : 'bg-rose-600'
+                          }`}
+                        >
+                          {trait.source === 'v2-only' ? 'V2 ONLY' : 'V1 ONLY'}
+                        </span>
+                      )}
                     </DialogTitle>
                   </DialogHeader>
+                  {trait.source !== 'both' && (
+                    <p className="text-sm text-gray-600">
+                      {trait.source === 'v2-only'
+                        ? 'Founder trait added when our V2 descriptor was deployed. Not present on mainnet V1.'
+                        : "Added to mainnet V1 after our V2 descriptor was forked, so it doesn't appear in V2 nouns."}
+                    </p>
+                  )}
                   <div className="flex flex-col items-center space-y-4">
                     <div className="bg-checkerboard flex aspect-square max-w-96 items-center justify-center overflow-hidden rounded-lg shadow-inner">
                       <img
