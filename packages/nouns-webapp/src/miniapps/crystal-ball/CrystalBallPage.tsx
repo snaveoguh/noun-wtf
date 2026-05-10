@@ -822,8 +822,8 @@ function SeedVisual({
               src={fromSrc}
               alt=""
               style={{
-                width: '78%',
-                height: '78%',
+                width: '130%',
+                height: '130%',
                 imageRendering: 'pixelated',
                 objectFit: 'contain',
               }}
@@ -835,8 +835,8 @@ function SeedVisual({
             src={src}
             alt="predicted noun"
             style={{
-              width: '78%',
-              height: '78%',
+              width: '130%',
+              height: '130%',
               imageRendering: 'pixelated',
               objectFit: 'contain',
             }}
@@ -854,7 +854,26 @@ function SeedVisual({
   return (
     <div style={frameStyle}>
       <div style={layerStyle(1, 0, 1)}>
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: '"Courier New", monospace',
+                fontSize: 11,
+                letterSpacing: '0.2em',
+                color: `${haloColor}aa`,
+                textShadow: `0 0 8px ${haloColor}55`,
+              }}
+            >
+              SCRYING...
+            </div>
+          }
+        >
           <MorphingNounVoxels seed={seed} autoRotate interactive isV2={isV2} />
         </Suspense>
       </div>
