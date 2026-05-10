@@ -10,6 +10,10 @@ import { Link } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import DreamDetailPopover from '@/components/DreamDetailPopover';
+// Slug-dispatched seeded button — every dream gets a different style
+// (Terminal / Neo-Bauhaus / Decay) so the dream feed looks varied without
+// being random per render. Same dream always gets the same button.
+import { DreamButton } from '@/components/DreamButton';
 import { Button } from '@/components/ui/button';
 import { useDreamCandidates, type OnChainDream } from '@/hooks/useDreamCandidates';
 import { useDreamDrafts } from '@/hooks/useDreamDrafts';
@@ -149,43 +153,44 @@ function OnChainDreamCard({
           {dream.proposer.slice(0, 6)}...{dream.proposer.slice(-4)}
         </p>
 
-        {/* Action buttons */}
+        {/* Action buttons — DreamButton dispatches a seeded style per dream
+            slug so the feed has visual variety while staying deterministic.
+            All three buttons for the same dream share a slug, so they
+            render in the *same* style with consistent variant accents
+            (sponsor=blue, promote=green, view=gray). */}
         <div className="mt-2 flex gap-1.5">
           {hasVotes && (
-            <button
-              type="button"
-              onClick={e => {
-                e.stopPropagation();
-                onSponsor();
-              }}
-              className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
-            >
-              Sponsor
-            </button>
+            <div className="flex-1">
+              <DreamButton
+                label="Sponsor"
+                variant="sponsor"
+                dreamSlug={dream.id}
+                onClick={e => {
+                  e.stopPropagation();
+                  onSponsor();
+                }}
+              />
+            </div>
           )}
           {canPromote ? (
-            <button
-              type="button"
-              onClick={e => {
-                e.stopPropagation();
-                onPromote();
-              }}
-              className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-green-700"
-            >
-              Promote
-            </button>
+            <div className="flex-1">
+              <DreamButton
+                label="Promote"
+                variant="promote"
+                dreamSlug={dream.id}
+                onClick={e => {
+                  e.stopPropagation();
+                  onPromote();
+                }}
+              />
+            </div>
           ) : (
             <Link
               to={`/candidates/${dream.id}`}
               className="flex-1"
               onClick={e => e.stopPropagation()}
             >
-              <button
-                type="button"
-                className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200"
-              >
-                View
-              </button>
+              <DreamButton label="View" variant="view" dreamSlug={dream.id} />
             </Link>
           )}
         </div>
@@ -254,18 +259,21 @@ function ProbeDreamCard({
           {dream.dreamer.slice(0, 6)}...{dream.dreamer.slice(-4)}
         </p>
 
-        {/* Propose button — only for dreams with a custom trait */}
+        {/* Propose button — uses DreamButton with the dream id as slug so
+            the propose action keeps the same visual style as that dream's
+            sponsor/promote/view buttons elsewhere in the feed. */}
         {hasCustomTrait && onPropose && (
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation();
-              onPropose();
-            }}
-            className="mt-2 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
-          >
-            Propose Trait
-          </button>
+          <div className="mt-2 w-full">
+            <DreamButton
+              label="Propose Trait"
+              variant="create"
+              dreamSlug={String(dream.id)}
+              onClick={e => {
+                e.stopPropagation();
+                onPropose();
+              }}
+            />
+          </div>
         )}
       </div>
     </div>
