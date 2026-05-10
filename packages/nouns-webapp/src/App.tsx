@@ -194,14 +194,9 @@ function SiteRoutes() {
           </Suspense>
         }
       />
-      <Route
-        path="wave"
-        element={
-          <Suspense fallback={<GenericSkeleton />}>
-            <WavePage />
-          </Suspense>
-        }
-      />
+      {/* /wave is mounted in App at the no-chrome branch, not here.
+          Kept out of SiteRoutes intentionally so it never inherits NavBar
+          / Footer / chain notifications. */}
       <Route
         path="crystal-ball"
         element={
@@ -503,6 +498,17 @@ function ThemedAppContent() {
         >
           <AmbientMusic variant="inline" autoStart />
         </div>
+      </Suspense>
+    );
+  }
+
+  // Wave — secret 3D dream-stream preview, no chrome (transparent header
+  // requested explicitly). No nav links anywhere in the app point here;
+  // it's a deep-link-only easter egg while we iterate on the visual.
+  if (location.pathname === '/wave') {
+    return (
+      <Suspense fallback={<div style={{ background: '#000', width: '100vw', height: '100vh' }} />}>
+        <WavePage />
       </Suspense>
     );
   }
