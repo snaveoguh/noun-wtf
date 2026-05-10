@@ -31,3 +31,20 @@ export const getNounDataV2 = (seed: NounSeed): NounData => ({
   ],
   background: bgcolorsV2[seed.background],
 });
+
+/**
+ * V2 variant of `getRandomNounSeed`. Picks indices uniformly within the V2
+ * trait ranges (32 bodies / 144 accessories / 253 heads / 23 glasses) so the
+ * resulting seed is guaranteed to resolve cleanly through `getNounDataV2`.
+ *
+ * Don't use the V1 `getRandomNounSeed` in V2 contexts — its trait counts
+ * come from `image-data.json` (30/143/254) which can produce a seed.head =
+ * 253 that V2 ImageData (only 253 heads → indices 0..252) can't render.
+ */
+export const getRandomNounSeedV2 = (): NounSeed => ({
+  background: Math.floor(Math.random() * bgcolorsV2.length),
+  body: Math.floor(Math.random() * bodiesV2.length),
+  accessory: Math.floor(Math.random() * accessoriesV2.length),
+  head: Math.floor(Math.random() * headsV2.length),
+  glasses: Math.floor(Math.random() * glassesV2.length),
+});

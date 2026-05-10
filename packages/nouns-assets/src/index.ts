@@ -19,6 +19,8 @@ export {
   getNounSeedFromBlockHash,
 } from './utils';
 
-// V2 util — `getNounDataV2(seed)` mirrors `getNounData` shape but reads from
-// `image-data-v2.json`.
-export { getNounDataV2 } from './utils-v2';
+// V2 utils — `getNounDataV2(seed)` mirrors `getNounData` shape but reads
+// from `image-data-v2.json`. `getRandomNounSeedV2` picks within V2's trait
+// ranges (32 bodies / 144 accessories / 253 heads / 23 glasses) so the
+// resulting seed is guaranteed to resolve cleanly through `getNounDataV2`.
+export { getNounDataV2, getRandomNounSeedV2 } from './utils-v2';
