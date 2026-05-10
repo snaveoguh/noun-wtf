@@ -1,22 +1,34 @@
 /**
  * DreamButton — slug-dispatched seeded dream-card buttons.
  *
- * The user wanted "loads of different button designs at the same time"
- * rather than picking one winner. So we keep all three base styles
- * (Terminal / Neo-Bauhaus / Decay) and dispatch one per dream by hashing
- * the dream's slug. Within each style, the existing per-slug procedural
- * variation (tint / glyph / accent / clip) still applies, so two dreams
- * routed to the same style still render visually distinct.
+ * User feedback (2026-05-10): the previous 3 styles were too uniform — same
+ * height, same monospace font, same 1px border. The brief was actually
+ * "different styles and colors and fonts and sizes and thickness and 3dness".
+ * So this rewrite ships TWELVE wildly different button styles, dispatched
+ * by FNV-1a hash of the dream slug:
  *
- * All three styles share:
- *  - Identical button shape, height (28px / h-7), label position, focus ring
- *  - 1px hairline border, mono typography, no drop shadow
- *  - 4 semantic variants: sponsor / promote / view / create
+ *   01 Brutalist     — Impact display, 3px black border, chunky drop shadow
+ *   02 Win95         — beveled gray, raised 3D bevel, Tahoma-ish system sans
+ *   03 Aqua          — glossy gradient, rounded-full, white text + shine
+ *   04 8-bit         — monospace, 3px hard border, no antialiasing vibes
+ *   05 Neon          — black bg, neon outline + glow, italic display
+ *   06 Receipt       — tiny mono on cream, dashed border, super tight
+ *   07 Neumorph      — soft pillowy shadows, very rounded, light gray
+ *   08 Sticker       — bright tag with peel-edge, condensed italic
+ *   09 Newspaper     — Georgia serif, all caps, double border, sepia
+ *   10 Vapor         — pink/cyan gradient, italic display, drop shadow
+ *   11 Xerox         — black/white stripe, tilted rotate, mono italic
+ *   12 Crypto Term   — green-on-black, ">" prefix, monospace
  *
- * Stable across renders — the dispatch is FNV-1a of the slug, no Date.now()
- * or Math.random() anywhere. The same dream always gets the same button.
+ * Each style sets its own height, font, border thickness, padding, and 3D
+ * treatment. Within a single dream card all the action buttons share the
+ * dream's slug so they pick the same style — the card stays visually
+ * coherent. ACROSS cards, every dream gets a different look.
+ *
+ * Hash is FNV-1a 32-bit. Stable across renders/sessions/users — the same
+ * dream always renders the same button. No randomness anywhere.
  */
-import { FC } from 'react';
+import { CSSProperties, FC } from 'react';
 
 export type DreamButtonVariant = 'sponsor' | 'promote' | 'view' | 'create';
 
@@ -25,18 +37,13 @@ interface BaseProps {
   variant: DreamButtonVariant;
   dreamSlug: string;
   onClick?: (e: React.MouseEvent) => void;
-  /** When provided, overrides the auto-dispatch — useful for the
-   *  /dreams/buttons-playground page which needs to render all three side
-   *  by side regardless of slug. */
-  forceStyle?: 'terminal' | 'bauhaus' | 'decay';
+  /** Override the auto-dispatch — used by the playground to render every
+   *  style side by side. Production callers should leave this unset. */
+  forceStyle?: StyleKey;
   className?: string;
 }
 
-// Decorative glyphs for seeded corner accent. Geometric, retro-tech feel —
-// kept small so they read as marks, not icons.
-const GLYPHS = ['◇', '▲', '◐', '◈', '▣', '⬡', '◆', '▰', '◍', '◢', '◣', '◤'] as const;
-
-// Tiny deterministic hash (FNV-1a 32-bit). Stable across renders — no randomness.
+// FNV-1a 32-bit. Stable across renders — no Date.now / Math.random.
 function hash(input: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
@@ -51,209 +58,568 @@ function seededPick<T>(slug: string, salt: string, list: readonly T[]): T {
   return list[h % list.length] as T;
 }
 
-// ─── Style 1: Terminal ───────────────────────────────────────────────────────
-// Green-phosphor CRT vibe. Pure black backdrop, one accent hue per variant,
-// scanline overlay, hairline border, hover lifts a 1px glow.
+// Variant accent colors — each style remixes these so 'sponsor' usually
+// reads cool/blue, 'promote' green, 'view' gray, 'create' warm/orange. But
+// every style is free to interpret the variant as it sees fit (e.g. Vapor
+// uses pink/cyan regardless).
+type VariantPalette<T> = Record<DreamButtonVariant, T>;
 
-const TERMINAL_VARIANT: Record<
-  DreamButtonVariant,
-  { fg: string; bg: string; border: string; ring: string }
-> = {
-  sponsor: { fg: '#7CC8FF', bg: '#02080F', border: '#1F4863', ring: '#7CC8FF' },
-  promote: { fg: '#9DEFAA', bg: '#020A05', border: '#1F5C2E', ring: '#9DEFAA' },
-  view: { fg: '#C9C9C9', bg: '#0A0A0A', border: '#3A3A3A', ring: '#FFFFFF' },
-  create: { fg: '#FFD37A', bg: '#0B0805', border: '#5C401F', ring: '#FFD37A' },
+// ─── 01 Brutalist ────────────────────────────────────────────────────────────
+// Heavy display font, 3px solid black border, hard drop shadow that snaps to
+// the bottom-right. Hover lifts the shadow. All caps.
+
+const BRUTALIST: VariantPalette<{ bg: string; ink: string }> = {
+  sponsor: { bg: '#FFD400', ink: '#000' },
+  promote: { bg: '#3CFF7C', ink: '#000' },
+  view: { bg: '#FFFFFF', ink: '#000' },
+  create: { bg: '#FF4D2E', ink: '#000' },
 };
 
-const TERMINAL_TINTS = [
-  'rgba(124, 200, 255, 0.04)',
-  'rgba(157, 239, 170, 0.04)',
-  'rgba(255, 211, 122, 0.04)',
-  'rgba(232, 121, 249, 0.04)',
-  'rgba(192, 192, 192, 0.05)',
-] as const;
-
-export const TerminalButton: FC<BaseProps> = ({
+export const BrutalistButton: FC<BaseProps> = ({
   label,
   variant,
-  dreamSlug,
   onClick,
   className = '',
 }) => {
-  const palette = TERMINAL_VARIANT[variant];
-  const tint = seededPick(dreamSlug, 'tint', TERMINAL_TINTS);
-  const glyph = seededPick(dreamSlug, 'glyph', GLYPHS);
-
+  const palette = BRUTALIST[variant];
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative inline-flex h-7 w-full items-center justify-center overflow-hidden border px-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${className}`}
+      className={`group relative inline-flex h-9 w-full items-center justify-center px-3 transition-transform active:translate-x-[2px] active:translate-y-[2px] focus-visible:outline-none ${className}`}
       style={{
-        color: palette.fg,
+        color: palette.ink,
         backgroundColor: palette.bg,
-        backgroundImage: `linear-gradient(${tint}, ${tint}), repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px)`,
-        borderColor: palette.border,
+        border: '3px solid #000',
+        borderRadius: 0,
+        fontFamily: 'Impact, "Arial Narrow Bold", "Helvetica Neue", sans-serif',
+        fontSize: 14,
+        fontWeight: 900,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        boxShadow: '4px 4px 0 0 #000',
       }}
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
-        style={{ boxShadow: `inset 0 0 0 1px ${palette.fg}` }}
+        className="pointer-events-none absolute inset-0 transition-opacity group-active:opacity-0"
       />
+      {label}
+    </button>
+  );
+};
+
+// ─── 02 Win95 ────────────────────────────────────────────────────────────────
+// Classic beveled raised button — light/white top-left edges, dark
+// bottom-right edges. Pressed inverts the bevel.
+
+const WIN95: VariantPalette<{ bg: string; ink: string }> = {
+  sponsor: { bg: '#C3C3C3', ink: '#000' },
+  promote: { bg: '#C3C3C3', ink: '#003300' },
+  view: { bg: '#C3C3C3', ink: '#000' },
+  create: { bg: '#C3C3C3', ink: '#7A0000' },
+};
+
+export const Win95Button: FC<BaseProps> = ({ label, variant, onClick, className = '' }) => {
+  const palette = WIN95[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-7 w-full items-center justify-center px-3 focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: palette.bg,
+        borderTop: '2px solid #FFFFFF',
+        borderLeft: '2px solid #FFFFFF',
+        borderRight: '2px solid #404040',
+        borderBottom: '2px solid #404040',
+        boxShadow: 'inset -1px -1px 0 0 #828282, inset 1px 1px 0 0 #DFDFDF',
+        borderRadius: 0,
+        fontFamily: '"Tahoma", "MS Sans Serif", "Geneva", sans-serif',
+        fontSize: 11,
+        fontWeight: 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ─── 03 Aqua ─────────────────────────────────────────────────────────────────
+// Glossy iOS-2007 vibe. Top-half highlight, gradient body, full pill radius.
+
+const AQUA: VariantPalette<{ from: string; to: string }> = {
+  sponsor: { from: '#5BC0FF', to: '#0F7FCB' },
+  promote: { from: '#7DE49C', to: '#1E8C45' },
+  view: { from: '#D8D8D8', to: '#888' },
+  create: { from: '#FFCC60', to: '#D17800' },
+};
+
+export const AquaButton: FC<BaseProps> = ({ label, variant, onClick, className = '' }) => {
+  const palette = AQUA[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-8 w-full items-center justify-center overflow-hidden px-4 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${className}`}
+      style={{
+        background: `linear-gradient(180deg, ${palette.from} 0%, ${palette.to} 100%)`,
+        borderRadius: 9999,
+        border: `1px solid ${palette.to}`,
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.18)',
+        fontFamily: '"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+        textShadow: '0 -1px 0 rgba(0,0,0,0.25)',
+      }}
+    >
+      {/* Glossy top-half highlight */}
       <span
         aria-hidden
-        className="absolute right-1 top-0 text-[8px] leading-[1] opacity-60"
-        style={{ color: palette.fg }}
-      >
-        {glyph}
-      </span>
+        className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.05) 100%)',
+          borderTopLeftRadius: 9999,
+          borderTopRightRadius: 9999,
+        }}
+      />
       <span className="relative">{label}</span>
     </button>
   );
 };
 
-// ─── Style 2: Neo-Bauhaus ────────────────────────────────────────────────────
+// ─── 04 8-bit ────────────────────────────────────────────────────────────────
+// Pixel-perfect feel. Hard 3px border, no border-radius, monospace, big text.
 
-const BAUHAUS_VARIANT: Record<
-  DreamButtonVariant,
-  { fill: string; ink: string; border: string; ring: string }
-> = {
-  sponsor: { fill: '#E8EEF5', ink: '#1A2C3D', border: '#1A2C3D', ring: '#1A2C3D' },
-  promote: { fill: '#E8EFE9', ink: '#1F3D26', border: '#1F3D26', ring: '#1F3D26' },
-  view: { fill: '#F1EFEA', ink: '#2A2A2A', border: '#2A2A2A', ring: '#2A2A2A' },
-  create: { fill: '#F4ECDC', ink: '#3D2C0E', border: '#3D2C0E', ring: '#3D2C0E' },
+const EIGHTBIT: VariantPalette<{ bg: string; ink: string; border: string }> = {
+  sponsor: { bg: '#3754F2', ink: '#FFF', border: '#000' },
+  promote: { bg: '#28C840', ink: '#000', border: '#000' },
+  view: { bg: '#2A2A2A', ink: '#9DEFAA', border: '#9DEFAA' },
+  create: { bg: '#FFCC00', ink: '#000', border: '#000' },
 };
 
-const BAUHAUS_ACCENTS = ['#C44536', '#E8A23C', '#5B7DB1', '#3F8B6C', '#7A5C9E', '#1A2C3D'] as const;
+export const EightBitButton: FC<BaseProps> = ({
+  label,
+  variant,
+  onClick,
+  className = '',
+}) => {
+  const palette = EIGHTBIT[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-8 w-full items-center justify-center px-3 transition-transform active:translate-y-[2px] focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: palette.bg,
+        border: `3px solid ${palette.border}`,
+        borderRadius: 0,
+        fontFamily: '"Courier New", "Press Start 2P", monospace',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        boxShadow: `0 3px 0 0 ${palette.border}`,
+        imageRendering: 'pixelated',
+      }}
+    >
+      {label}
+    </button>
+  );
+};
 
-const CHAMFER_CLIPS = [
-  'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
-  'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))',
-  'polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px)',
-] as const;
+// ─── 05 Neon ─────────────────────────────────────────────────────────────────
+// Black bg with neon outline + glow. Italic display font.
 
-export const BauhausButton: FC<BaseProps> = ({
+const NEON: VariantPalette<string> = {
+  sponsor: '#00E5FF',
+  promote: '#39FF14',
+  view: '#FFFFFF',
+  create: '#FF36BA',
+};
+
+export const NeonButton: FC<BaseProps> = ({ label, variant, onClick, className = '' }) => {
+  const color = NEON[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-9 w-full items-center justify-center px-4 focus-visible:outline-none ${className}`}
+      style={{
+        color,
+        backgroundColor: '#0A0014',
+        border: `1.5px solid ${color}`,
+        borderRadius: 4,
+        fontFamily: '"Helvetica Neue", "Arial", sans-serif',
+        fontSize: 11,
+        fontWeight: 700,
+        fontStyle: 'italic',
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        boxShadow: `0 0 10px ${color}55, inset 0 0 8px ${color}33`,
+        textShadow: `0 0 6px ${color}, 0 0 10px ${color}88`,
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ─── 06 Receipt ──────────────────────────────────────────────────────────────
+// Tiny mono on cream paper. Dashed border. Super tight.
+
+const RECEIPT: VariantPalette<{ ink: string }> = {
+  sponsor: { ink: '#1B3A5C' },
+  promote: { ink: '#1F5C2E' },
+  view: { ink: '#2A2A2A' },
+  create: { ink: '#7A3A0E' },
+};
+
+export const ReceiptButton: FC<BaseProps> = ({
+  label,
+  variant,
+  onClick,
+  className = '',
+}) => {
+  const palette = RECEIPT[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-6 w-full items-center justify-center px-2 focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: '#FBF7EC',
+        border: `1px dashed ${palette.ink}`,
+        borderRadius: 2,
+        fontFamily: '"Courier New", monospace',
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.15em',
+        textTransform: 'uppercase',
+      }}
+    >
+      ─&nbsp;{label}&nbsp;─
+    </button>
+  );
+};
+
+// ─── 07 Neumorph ─────────────────────────────────────────────────────────────
+// Soft pillowy shadows, very rounded, light gray. Pressed = inset.
+
+const NEUMORPH: VariantPalette<{ ink: string }> = {
+  sponsor: { ink: '#1B3A5C' },
+  promote: { ink: '#1F5C2E' },
+  view: { ink: '#444' },
+  create: { ink: '#7A3A0E' },
+};
+
+export const NeumorphButton: FC<BaseProps> = ({
+  label,
+  variant,
+  onClick,
+  className = '',
+}) => {
+  const palette = NEUMORPH[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-9 w-full items-center justify-center px-4 transition-shadow focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: '#E6E6E9',
+        borderRadius: 14,
+        border: 'none',
+        boxShadow:
+          '6px 6px 12px rgba(166,166,180,0.55), -6px -6px 12px rgba(255,255,255,0.95)',
+        fontFamily: '"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+        fontSize: 11,
+        fontWeight: 700,
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ─── 08 Sticker ──────────────────────────────────────────────────────────────
+// Loud color tag with slight rotation, condensed italic. Drop shadow makes it
+// look pasted on. Each button rotates a touch differently per slug.
+
+const STICKER: VariantPalette<{ bg: string; ink: string }> = {
+  sponsor: { bg: '#21D4FD', ink: '#FFF' },
+  promote: { bg: '#22DD7C', ink: '#FFF' },
+  view: { bg: '#A8A8A8', ink: '#FFF' },
+  create: { bg: '#FF5E62', ink: '#FFF' },
+};
+
+export const StickerButton: FC<BaseProps> = ({
   label,
   variant,
   dreamSlug,
   onClick,
   className = '',
 }) => {
-  const palette = BAUHAUS_VARIANT[variant];
-  const accent = seededPick(dreamSlug, 'accent', BAUHAUS_ACCENTS);
-  const clip = seededPick(dreamSlug, 'clip', CHAMFER_CLIPS);
-  const glyph = seededPick(dreamSlug, 'glyph', GLYPHS);
-
+  const palette = STICKER[variant];
+  // -2.5° to 2.5° tilt per slug — same dream always tilts the same way.
+  const tilt = (hash(`${dreamSlug}::tilt`) % 50) / 10 - 2.5;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative inline-flex h-7 w-full items-center justify-center overflow-hidden border px-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${className}`}
-      style={
-        {
-          color: palette.ink,
-          backgroundColor: palette.fill,
-          borderColor: palette.border,
-          clipPath: clip,
-          ['--tw-ring-color' as string]: palette.ring,
-        } as React.CSSProperties
-      }
+      className={`group relative inline-flex h-8 w-full items-center justify-center px-3 focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: palette.bg,
+        border: '2px solid #FFFFFF',
+        borderRadius: 4,
+        fontFamily: '"Bebas Neue", "Oswald", "Arial Narrow", sans-serif',
+        fontSize: 13,
+        fontWeight: 800,
+        fontStyle: 'italic',
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        transform: `rotate(${tilt}deg)`,
+        boxShadow: '0 3px 6px rgba(0,0,0,0.22), 0 1px 2px rgba(0,0,0,0.18)',
+      }}
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 h-full w-[3px]"
-        style={{ backgroundColor: accent }}
-      />
-      <span
-        aria-hidden
-        className="absolute bottom-0 right-1 text-[8px] leading-none opacity-50 transition-colors group-hover:opacity-100"
-        style={{ color: accent }}
-      >
-        {glyph}
-      </span>
-      <span className="relative ml-1">{label}</span>
+      {label}
     </button>
   );
 };
 
-// ─── Style 3: Decay ──────────────────────────────────────────────────────────
+// ─── 09 Newspaper ────────────────────────────────────────────────────────────
+// Georgia serif, all caps, double border, sepia.
 
-const DECAY_VARIANT: Record<
-  DreamButtonVariant,
-  { fill: string; ink: string; border: string; ring: string }
-> = {
-  sponsor: { fill: '#F2EFE6', ink: '#243B53', border: '#7E8A98', ring: '#243B53' },
-  promote: { fill: '#EFEEE2', ink: '#2C4A33', border: '#7E8A75', ring: '#2C4A33' },
-  view: { fill: '#EAE8DD', ink: '#3A3A36', border: '#9A968A', ring: '#3A3A36' },
-  create: { fill: '#F2E9D2', ink: '#5C4316', border: '#9F8A5E', ring: '#5C4316' },
+const NEWSPAPER: VariantPalette<{ ink: string }> = {
+  sponsor: { ink: '#1F2F4A' },
+  promote: { ink: '#28482A' },
+  view: { ink: '#2A2A2A' },
+  create: { ink: '#5C2A0E' },
 };
 
-const DECAY_GRAIN_ANGLES = [0, 22, 45, 67, 90, 112, 135, 157] as const;
+export const NewspaperButton: FC<BaseProps> = ({
+  label,
+  variant,
+  onClick,
+  className = '',
+}) => {
+  const palette = NEWSPAPER[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-7 w-full items-center justify-center px-3 focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: '#F2EBD9',
+        border: `3px double ${palette.ink}`,
+        borderRadius: 0,
+        fontFamily: '"Georgia", "Times New Roman", serif',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {label}
+    </button>
+  );
+};
 
-export const DecayButton: FC<BaseProps> = ({
+// ─── 10 Vapor ────────────────────────────────────────────────────────────────
+// Pink/cyan gradient, italic display.
+
+const VAPOR: VariantPalette<{ from: string; to: string }> = {
+  sponsor: { from: '#43E0F4', to: '#A24DF1' },
+  promote: { from: '#7DEB9C', to: '#2E5DDF' },
+  view: { from: '#D8D8D8', to: '#888888' },
+  create: { from: '#FF6FB3', to: '#F1A24D' },
+};
+
+export const VaporButton: FC<BaseProps> = ({ label, variant, onClick, className = '' }) => {
+  const palette = VAPOR[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-9 w-full items-center justify-center overflow-hidden px-4 text-white focus-visible:outline-none ${className}`}
+      style={{
+        background: `linear-gradient(135deg, ${palette.from} 0%, ${palette.to} 100%)`,
+        borderRadius: 8,
+        border: 'none',
+        fontFamily: '"Helvetica Neue", "Arial Black", sans-serif',
+        fontSize: 13,
+        fontWeight: 900,
+        fontStyle: 'italic',
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        boxShadow: '0 4px 18px rgba(248, 87, 200, 0.4), 0 1px 0 rgba(255,255,255,0.4) inset',
+        textShadow: '1px 1px 0 rgba(0,0,0,0.18)',
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ─── 11 Xerox ────────────────────────────────────────────────────────────────
+// Black/white stripe pattern bg, slight rotate, mono italic. Lo-fi punk zine.
+
+const XEROX: VariantPalette<{ ink: string }> = {
+  sponsor: { ink: '#000' },
+  promote: { ink: '#000' },
+  view: { ink: '#000' },
+  create: { ink: '#000' },
+};
+
+export const XeroxButton: FC<BaseProps> = ({
   label,
   variant,
   dreamSlug,
   onClick,
   className = '',
 }) => {
-  const palette = DECAY_VARIANT[variant];
-  const angle = seededPick(dreamSlug, 'grain', DECAY_GRAIN_ANGLES);
-  const glyph = seededPick(dreamSlug, 'glyph', GLYPHS);
-
+  const palette = XEROX[variant];
+  // Tilted -1.5° to 1.5° per slug.
+  const tilt = (hash(`${dreamSlug}::tilt`) % 30) / 10 - 1.5;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative inline-flex h-7 w-full items-center justify-center overflow-hidden border px-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${className}`}
-      style={
-        {
-          color: palette.ink,
-          backgroundColor: palette.fill,
-          backgroundImage: `repeating-linear-gradient(${angle}deg, rgba(0,0,0,0.02) 0 1px, transparent 1px 4px), repeating-linear-gradient(${angle + 90}deg, rgba(0,0,0,0.015) 0 1px, transparent 1px 5px)`,
-          borderColor: palette.border,
-          ['--tw-ring-color' as string]: palette.ring,
-        } as React.CSSProperties
-      }
+      className={`group relative inline-flex h-8 w-full items-center justify-center px-3 focus-visible:outline-none ${className}`}
+      style={{
+        color: palette.ink,
+        backgroundColor: '#FFF',
+        backgroundImage:
+          'repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0 2px, transparent 2px 6px)',
+        border: '1.5px solid #000',
+        borderRadius: 0,
+        fontFamily: '"Courier New", monospace',
+        fontSize: 11,
+        fontWeight: 700,
+        fontStyle: 'italic',
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        transform: `rotate(${tilt}deg)`,
+        boxShadow: '2px 2px 0 0 #000',
+      }}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-[2px] border opacity-40 transition-opacity group-hover:opacity-70"
-        style={{ borderColor: palette.border }}
-      />
-      <span
-        aria-hidden
-        className="absolute left-1 top-0 text-[8px] leading-[1] opacity-40"
-        style={{ color: palette.ink }}
-      >
-        {glyph}
-      </span>
-      <span className="relative">{label}</span>
+      {label}
+    </button>
+  );
+};
+
+// ─── 12 Crypto Terminal ──────────────────────────────────────────────────────
+// Green-on-black, ">" prefix, monospace. Caret blink on hover.
+
+const TERM: VariantPalette<string> = {
+  sponsor: '#7CC8FF',
+  promote: '#9DEFAA',
+  view: '#C9C9C9',
+  create: '#FFD37A',
+};
+
+export const TerminalButton: FC<BaseProps> = ({
+  label,
+  variant,
+  onClick,
+  className = '',
+}) => {
+  const fg = TERM[variant];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative inline-flex h-7 w-full items-center justify-center px-2 focus-visible:outline-none ${className}`}
+      style={{
+        color: fg,
+        backgroundColor: '#02080F',
+        border: `1px solid ${fg}55`,
+        borderRadius: 2,
+        fontFamily: '"Courier New", "Consolas", monospace',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+      }}
+    >
+      <span className="opacity-70">&gt;&nbsp;</span>
+      {label}
+      <span className="ml-0.5 inline-block w-[5px] opacity-0 group-hover:opacity-80">_</span>
     </button>
   );
 };
 
 // ─── Slug-dispatched picker ──────────────────────────────────────────────────
 
-const STYLE_KEYS = ['terminal', 'bauhaus', 'decay'] as const;
+export const STYLE_KEYS = [
+  'brutalist',
+  'win95',
+  'aqua',
+  'eightbit',
+  'neon',
+  'receipt',
+  'neumorph',
+  'sticker',
+  'newspaper',
+  'vapor',
+  'xerox',
+  'terminal',
+] as const;
+
+export type StyleKey = (typeof STYLE_KEYS)[number];
+
+const COMPONENT_BY_KEY: Record<StyleKey, FC<BaseProps>> = {
+  brutalist: BrutalistButton,
+  win95: Win95Button,
+  aqua: AquaButton,
+  eightbit: EightBitButton,
+  neon: NeonButton,
+  receipt: ReceiptButton,
+  neumorph: NeumorphButton,
+  sticker: StickerButton,
+  newspaper: NewspaperButton,
+  vapor: VaporButton,
+  xerox: XeroxButton,
+  terminal: TerminalButton,
+};
+
+export const STYLE_META: Record<StyleKey, { name: string; blurb: string }> = {
+  brutalist: { name: 'Brutalist', blurb: 'Impact display, 3px black border, snap drop shadow.' },
+  win95: { name: 'Win95', blurb: 'Beveled raised gray. Tahoma. Pure Y2K.' },
+  aqua: { name: 'Aqua', blurb: 'Glossy gradient pill, white text + top shine, iOS-2007.' },
+  eightbit: { name: '8-bit', blurb: 'Monospace, 3px hard border, chunky pixel-game vibe.' },
+  neon: { name: 'Neon', blurb: 'Black bg, neon outline + glow, italic display.' },
+  receipt: { name: 'Receipt', blurb: 'Tiny mono on cream paper, dashed border, ─ flanks.' },
+  neumorph: { name: 'Neumorph', blurb: 'Pillowy shadows, very rounded, light gray.' },
+  sticker: { name: 'Sticker', blurb: 'Loud color tag, condensed italic, slight per-slug tilt.' },
+  newspaper: { name: 'Newspaper', blurb: 'Georgia serif, all caps, double border, sepia.' },
+  vapor: { name: 'Vapor', blurb: 'Pink/cyan gradient, italic Helvetica Black, drop shadow.' },
+  xerox: { name: 'Xerox', blurb: 'Black/white stripe pattern, tilted, lo-fi zine.' },
+  terminal: { name: 'Terminal', blurb: 'Green-on-black, "> " prefix, blinking caret on hover.' },
+};
 
 /**
- * Seeded button picker. Hashes the dream slug to dispatch one of the three
- * styles, then renders that style with the same slug so its internal
- * variation (tint / glyph / accent) also seeds off the dream. Result: every
- * dream gets a visually unique button, but the same dream always gets the
- * same button across renders / sessions / users.
+ * Seeded button picker. FNV-1a hash of `${slug}::style` mod 12 picks one of
+ * the styles; the same slug always gets the same style. Within the picked
+ * style, any per-slug variation (tilt for Sticker/Xerox) seeds off the same
+ * slug too. Override with `forceStyle` for the playground.
  */
 export const DreamButton: FC<BaseProps> = props => {
-  const styleKey = props.forceStyle
+  const styleKey: StyleKey = props.forceStyle
     ? props.forceStyle
     : STYLE_KEYS[hash(`${props.dreamSlug}::style`) % STYLE_KEYS.length];
-  const Component =
-    styleKey === 'terminal'
-      ? TerminalButton
-      : styleKey === 'bauhaus'
-        ? BauhausButton
-        : DecayButton;
+  const Component = COMPONENT_BY_KEY[styleKey];
   return <Component {...props} />;
 };
+
+// Also export the helpers in case callers want to introspect.
+export { hash, seededPick };
+export type { CSSProperties };
