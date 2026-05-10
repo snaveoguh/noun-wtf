@@ -23,6 +23,7 @@ import type { CSSProperties } from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getNounData, ImageData as NounsImageData } from '@noundry/nouns-assets';
+import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { ConnectKitButton } from 'connectkit';
 import { encodePacked, keccak256, type Hex } from 'viem';
@@ -123,18 +124,60 @@ interface TraitCounts {
 // ─── Seed Prediction ────────────────────────────────────────────────────
 // Mirrors NounsSeeder.sol — see packages/nouns-api/src/agent/traitPredictor.ts.
 //   pseudorandomness = keccak256(abi.encodePacked(blockhash(block.number - 1), nounId))
-// Reused here so the v2 path can compute the next-noun prediction client-side
-// without needing a v2-aware /api/agent/predict endpoint yet.
-function predictSeed(blockHash: Hex, nounId: number, counts: TraitCounts): NounSeed {
+// V2 mode also mirrors NounV2SlobberSeeder (0xd777E701506A86fE89f07f963aA6c08d6905cFF8):
+//   - skip-mapping over SLOBBER_INDEX so it's excluded from random rotation
+//   - 50/50 slobber rule when accessory == grease and head ∈ {retainer, index-card},
+//     decided by bit 240 of the same pseudorandomness (untouched by standard
+//     trait slices at bits 0..239).
+// Constants below MUST match the on-chain seeder. If governance ever deploys
+// a different seeder, update here too.
+const SLOBBER_INDEX = 143;
+const GREASE_INDEX = 137;
+const RETAINER_INDEX = 173;
+const INDEX_CARD_INDEX = 237;
+
+function predictSeed(
+  blockHash: Hex,
+  nounId: number,
+  counts: TraitCounts,
+  dao: 'v1' | 'v2' = 'v1',
+): NounSeed {
   const pseudorandomness = BigInt(
     keccak256(encodePacked(['bytes32', 'uint256'], [blockHash, BigInt(nounId)])),
   );
   const mask48 = (1n << 48n) - 1n;
+
+  // Accessory: V2 excludes SLOBBER_INDEX from random rotation via skip-mapping.
+  // Pick from [0, accessoryCount - 1) then bump up by 1 if pick >= SLOBBER_INDEX.
+  // V1 uses the standard uniform pick.
+  let accessory: number;
+  if (dao === 'v2') {
+    accessory = Number(
+      ((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory - 1),
+    );
+    if (accessory >= SLOBBER_INDEX) accessory += 1;
+  } else {
+    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory));
+  }
+
+  const head = Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head));
+
+  // V2 slobber rule. Trigger combo + 50/50 coin flip on bit 240.
+  let finalAccessory = accessory;
+  if (
+    dao === 'v2' &&
+    accessory === GREASE_INDEX &&
+    (head === RETAINER_INDEX || head === INDEX_CARD_INDEX) &&
+    ((pseudorandomness >> 240n) & 1n) === 1n
+  ) {
+    finalAccessory = SLOBBER_INDEX;
+  }
+
   return {
     background: Number((pseudorandomness & mask48) % BigInt(counts.background)),
     body: Number(((pseudorandomness >> 48n) & mask48) % BigInt(counts.body)),
-    accessory: Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory)),
-    head: Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head)),
+    accessory: finalAccessory,
+    head,
     glasses: Number(((pseudorandomness >> 192n) & mask48) % BigInt(counts.glasses)),
   };
 }
@@ -388,7 +431,7 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
     if (!auction || currentNounId == null || !blockData?.hash) return cached;
 
     const nextNounId = Number(currentNounId) + 1;
-    const seed = predictSeed(blockData.hash, nextNounId, traitCounts);
+    const seed = predictSeed(blockData.hash, nextNounId, traitCounts, 'v2');
     const auctionEnd = endTime != null ? Number(endTime) : 0;
     const now = Math.floor(Date.now() / 1000);
     const payload: PredictResponse = {
@@ -553,9 +596,10 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
 }
 
 // ─── 2D SVG rendering ──────────────────────────────────────────────────
-function seedToSvgDataUri(seed: NounSeed): string {
-  const { parts, background } = getNounData(seed);
-  const svg = buildSVG(parts, NounsImageData.palette, background);
+function seedToSvgDataUri(seed: NounSeed, isV2: boolean): string {
+  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
+  const palette = isV2 ? ImageDataV2.palette : NounsImageData.palette;
+  const svg = buildSVG(parts, palette, background);
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
@@ -649,6 +693,7 @@ function SeedVisual({
   size,
   isNounOClock,
   variant,
+  isV2 = false,
 }: {
   seed: NounSeed | null;
   mode: '2d' | '3d';
@@ -656,6 +701,10 @@ function SeedVisual({
   isNounOClock: boolean;
   /** Visual hint — the "match" variant tints the halo purple. */
   variant?: 'predicted' | 'match';
+  /** True when rendering a NounV2 noun — uses ImageDataV2 from the workspace
+   * `@nouns/assets` package so the V2-only founder traits render correctly.
+   * V1 path keeps using ImageData from `@noundry/nouns-assets`. */
+  isV2?: boolean;
 }) {
   const haloColor = variant === 'match' ? CRYSTAL_PURPLE : '#aaccff';
 
@@ -762,9 +811,9 @@ function SeedVisual({
   });
 
   if (mode === '2d') {
-    const src = seedToSvgDataUri(seed);
+    const src = seedToSvgDataUri(seed, isV2);
     const fromSeed = fadeRef.current.from;
-    const fromSrc = fromSeed && fromSeed !== seed ? seedToSvgDataUri(fromSeed) : null;
+    const fromSrc = fromSeed && fromSeed !== seed ? seedToSvgDataUri(fromSeed, isV2) : null;
     return (
       <div style={frameStyle}>
         {fromSrc && t < 1 && (
@@ -773,8 +822,8 @@ function SeedVisual({
               src={fromSrc}
               alt=""
               style={{
-                width: '78%',
-                height: '78%',
+                width: '130%',
+                height: '130%',
                 imageRendering: 'pixelated',
                 objectFit: 'contain',
               }}
@@ -786,8 +835,8 @@ function SeedVisual({
             src={src}
             alt="predicted noun"
             style={{
-              width: '78%',
-              height: '78%',
+              width: '130%',
+              height: '130%',
               imageRendering: 'pixelated',
               objectFit: 'contain',
             }}
@@ -805,8 +854,27 @@ function SeedVisual({
   return (
     <div style={frameStyle}>
       <div style={layerStyle(1, 0, 1)}>
-        <Suspense fallback={null}>
-          <MorphingNounVoxels seed={seed} autoRotate interactive />
+        <Suspense
+          fallback={
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: '"Courier New", monospace',
+                fontSize: 11,
+                letterSpacing: '0.2em',
+                color: `${haloColor}aa`,
+                textShadow: `0 0 8px ${haloColor}55`,
+              }}
+            >
+              SCRYING...
+            </div>
+          }
+        >
+          <MorphingNounVoxels seed={seed} autoRotate interactive isV2={isV2} />
         </Suspense>
       </div>
     </div>
@@ -1234,7 +1302,12 @@ export default function CrystalBallPage() {
               </div>
             }
           >
-            <CrystalBall size={ballSize} interactive predictionOverride={effectivePrediction} />
+            <CrystalBall
+              size={ballSize}
+              interactive
+              predictionOverride={effectivePrediction}
+              isV2={activeDao === 'nounv2'}
+            />
           </Suspense>
         ) : (
           <Suspense
@@ -1270,6 +1343,7 @@ export default function CrystalBallPage() {
                   size={ballSize}
                   isNounOClock={isNounOClock}
                   variant={showingTwin ? 'match' : 'predicted'}
+                  isV2={activeDao === 'nounv2'}
                 />
                 {/* Carousel chevrons — only mounted when there's a twin to morph to. */}
                 {carouselHasTwin && (
