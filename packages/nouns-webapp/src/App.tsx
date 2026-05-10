@@ -60,6 +60,11 @@ const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
 // Built earlier but never wired or committed — surfacing it now so the
 // user can pick a base style to bake into OnChainDreamCard.
 const DreamButtonPlayground = lazy(() => import('@/pages/Dreams/ButtonPlayground'));
+// Standalone preview of the 3D dream-wave stream (cards riding a sinusoidal
+// path toward the camera, rainbow glow, twinkling stars). Lives at /wave
+// while the visual is being iterated on; once finalised we'll lift the
+// component into the Auction page in place of the existing banner stack.
+const WavePage = lazy(() => import('@/pages/Wave'));
 const PredictionsPage = lazy(() => import('@/pages/Predictions'));
 const MarketplacePage = lazy(() => import('@/pages/Marketplace'));
 const NounDetailPage = lazy(() => import('@/pages/Marketplace/NounDetail'));
@@ -186,6 +191,14 @@ function SiteRoutes() {
         element={
           <Suspense fallback={<GenericSkeleton />}>
             <DreamButtonPlayground />
+          </Suspense>
+        }
+      />
+      <Route
+        path="wave"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <WavePage />
           </Suspense>
         }
       />
