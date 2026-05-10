@@ -224,7 +224,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                   const count = ImageData.images[category].length;
                   return (
                     <div key={key} className="flex items-center gap-2">
-                      <Trait type={key} seed={seed[key]} className="h-8 w-8 rounded" />
+                      <Trait type={key} seed={seed[key]} className="h-8 w-8 rounded" isV2 />
                       <span className="w-16 text-xs font-bold text-gray-500">{label}</span>
                       <select
                         value={seed[key]}
@@ -295,7 +295,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                       const count = ImageData.images[category].length;
                       return (
                         <div key={key} className="flex items-center gap-2">
-                          <Trait type={key} seed={seed[key]} className="h-6 w-6 rounded" />
+                          <Trait type={key} seed={seed[key]} className="h-6 w-6 rounded" isV2 />
                           <span className="w-14 text-[10px] font-bold text-gray-400">{label}</span>
                           <select
                             value={seed[key]}
