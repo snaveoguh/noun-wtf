@@ -1,6 +1,9 @@
 import { FC, useCallback, useMemo, useRef, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+// Dream builder targets V2 nouns — use ImageDataV2 so the trait dropdowns
+// expose the V2-only founder traits (slobber, missingnoun, white/black
+// bodies, multicolor) and the SVG preview palette covers slots 239..252.
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { Shuffle, Upload } from 'lucide-react';
 import { useAccount } from 'wagmi';
@@ -12,7 +15,9 @@ import { invalidateProbeDreamsCache } from '@/hooks/useProbeDreams';
 import { generateDreamId, type CustomTraitLayer, type SavedDream } from '@/lib/dreamStorage';
 import { syncDreamToProbe } from '@/lib/probeSync';
 import { encodeImageToRLE, fileToImageData, type EncodedTrait } from '@/lib/rleEncode';
-import { traitName } from '@/lib/traitName';
+// V2 trait-name resolver so dropdown labels match the V2 ImageData above —
+// otherwise body=30 would render as 'Unknown' (V1 only has 30 bodies, 0..29).
+import { traitNameV2 as traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 
 const traitTypes = [

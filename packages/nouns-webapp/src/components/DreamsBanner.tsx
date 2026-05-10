@@ -12,7 +12,8 @@ import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+// V2 ImageData so dream banner thumbnails render V2-only founder traits.
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';

@@ -1,6 +1,9 @@
 import { FC, useMemo, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+// Dreams are V2-era compositions — switch to V2 ImageData so V2-only
+// founder traits (slobber, missingnoun, white/black bodies, multicolor)
+// resolve correctly when rendering draft / on-chain dreams.
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router';
