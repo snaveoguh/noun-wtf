@@ -55,6 +55,11 @@ import CreateNounV2ProposalPage from '@/pages/NounV2/CreateProposal';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
 const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
+// Comparison surface for the seeded dream-card button styles
+// (Terminal / Neo-Bauhaus / Decay). Lives at /dreams/buttons-playground.
+// Built earlier but never wired or committed — surfacing it now so the
+// user can pick a base style to bake into OnChainDreamCard.
+const DreamButtonPlayground = lazy(() => import('@/pages/Dreams/ButtonPlayground'));
 const PredictionsPage = lazy(() => import('@/pages/Predictions'));
 const MarketplacePage = lazy(() => import('@/pages/Marketplace'));
 const NounDetailPage = lazy(() => import('@/pages/Marketplace/NounDetail'));
@@ -176,6 +181,14 @@ function SiteRoutes() {
       <Route path="nonsense" element={<NonsensePage />} />
       <Route path="dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
       <Route path="dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
+      <Route
+        path="dreams/buttons-playground"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <DreamButtonPlayground />
+          </Suspense>
+        }
+      />
       <Route
         path="crystal-ball"
         element={
