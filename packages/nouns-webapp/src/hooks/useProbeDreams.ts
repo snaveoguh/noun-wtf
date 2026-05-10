@@ -2,7 +2,12 @@ import type { CustomTraitLayer } from '@/lib/dreamStorage';
 
 import { useEffect, useState } from 'react';
 
-import { ImageData, getNounData } from '@noundry/nouns-assets';
+// Dreams are V2-era — must render against V2 ImageData so V2-only founder
+// traits (slobber, missingnoun, white/black bodies, multicolor) display
+// correctly. Bug seen 2026-05-10: a saved dream with accessory=143 (slobber
+// in V2) was rendering as silly-goose because V1 ImageData index 143 is
+// silly-goose. Same for head=252 → was rendering as shrimp-tempura.
+import { ImageDataV2 as ImageData, getNounDataV2 as getNounData } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 
 export interface ProbeDream {
