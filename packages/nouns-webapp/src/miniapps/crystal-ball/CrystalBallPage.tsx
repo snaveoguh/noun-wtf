@@ -43,8 +43,25 @@ import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
 import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
 
+// Lazy chunks. Both pull in Three.js + @react-three/fiber + drei (~1MB
+// combined) which is genuinely heavy, so we keep them lazy to avoid bloating
+// the initial page bundle. We *do* warm both chunks on mount of this page
+// (see prefetch effect below) so by the time the user tabs between view
+// modes, the chunk download is already in flight or cached. Without that,
+// switching from ASCII → 3D in a fresh session triggers a cold ~1MB
+// download from a single network request and the orb stalls for the
+// duration with only a tiny "SCRYING…" placeholder visible.
 const CrystalBall = lazy(() => import('@/components/CrystalBall'));
 const MorphingNounVoxels = lazy(() => import('@/components/MorphingNounVoxels'));
+
+// Fire both lazy imports as soon as this module evaluates — that's the
+// moment the route's lazy boundary resolves, which is *earlier* than the
+// component's first render. This way the chunk requests piggyback on the
+// page's initial network burst instead of waiting for a tab click.
+// Vite/Rollup deduplicates with the `lazy()` calls above so React's
+// Suspense still sees the same module promise.
+void import('@/components/CrystalBall');
+void import('@/components/MorphingNounVoxels');
 
 const TRAIT_KEYS = ['head', 'glasses', 'body', 'accessory', 'background'] as const;
 
@@ -675,6 +692,50 @@ function ViewModeToggle({ mode, setMode }: { mode: ViewMode; setMode: (m: ViewMo
   );
 }
 
+// ─── Renderer-loading fallback ──────────────────────────────────────────
+//
+// Used by the Suspense boundaries that wrap the lazy CrystalBall (ASCII)
+// and SeedVisual (2D/3D) renderers. The *previous* fallback was a single
+// line of low-opacity SCRYING text inside the orb; users on slow networks
+// reported missing it entirely. This version draws a spinning ring + bright
+// label inside an orb-shaped frame so the loading state reads as obvious
+// progress regardless of how long the chunk download takes.
+function RendererFallback({ size, label }: { size: number; label: string }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 35%, rgba(40,40,60,0.9), rgba(5,5,15,0.95))',
+        border: '1px solid rgba(170, 204, 255, 0.18)',
+        boxShadow:
+          '0 0 20px rgba(100,200,255,0.15), 0 0 40px rgba(100,200,255,0.05), inset 0 0 30px rgba(100,150,255,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        color: 'rgba(170, 204, 255, 0.85)',
+        fontFamily: '"Courier New", monospace',
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: '50%',
+          border: '2px solid rgba(170, 204, 255, 0.18)',
+          borderTopColor: 'rgba(170, 204, 255, 0.9)',
+          animation: 'crystal-spin 0.9s linear infinite',
+        }}
+      />
+      <span style={{ fontSize: 12, letterSpacing: '0.25em', fontWeight: 700 }}>{label}</span>
+    </div>
+  );
+}
+
 // ─── Seed key (stable identity for transitions) ─────────────────────────
 function seedKey(seed: NounSeed): string {
   return `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
@@ -861,16 +922,28 @@ function SeedVisual({
                 width: '100%',
                 height: '100%',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: 12,
                 fontFamily: '"Courier New", monospace',
-                fontSize: 11,
-                letterSpacing: '0.2em',
-                color: `${haloColor}aa`,
-                textShadow: `0 0 8px ${haloColor}55`,
+                color: `${haloColor}d0`,
               }}
             >
-              SCRYING...
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '50%',
+                  border: `2px solid ${haloColor}33`,
+                  borderTopColor: haloColor,
+                  animation: 'crystal-spin 0.9s linear infinite',
+                }}
+              />
+              <span style={{ fontSize: 11, letterSpacing: '0.25em', fontWeight: 700 }}>
+                LOADING 3D…
+              </span>
             </div>
           }
         >
@@ -1284,24 +1357,7 @@ export default function CrystalBallPage() {
             </span>
           </div>
         ) : viewMode === 'ascii' ? (
-          <Suspense
-            fallback={
-              <div
-                style={{
-                  width: ballSize,
-                  height: ballSize,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'rgba(100,200,255,0.3)',
-                  fontSize: 14,
-                  letterSpacing: '0.15em',
-                }}
-              >
-                SCRYING...
-              </div>
-            }
-          >
+          <Suspense fallback={<RendererFallback size={ballSize} label="LOADING ASCII…" />}>
             <CrystalBall
               size={ballSize}
               interactive
@@ -1312,20 +1368,10 @@ export default function CrystalBallPage() {
         ) : (
           <Suspense
             fallback={
-              <div
-                style={{
-                  width: ballSize,
-                  height: ballSize,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'rgba(100,200,255,0.3)',
-                  fontSize: 14,
-                  letterSpacing: '0.15em',
-                }}
-              >
-                SCRYING...
-              </div>
+              <RendererFallback
+                size={ballSize}
+                label={viewMode === '3d' ? 'LOADING 3D…' : 'LOADING…'}
+              />
             }
           >
             <div
@@ -1675,11 +1721,14 @@ export default function CrystalBallPage() {
         </div>
       )}
 
-      {/* Settle pulse animation */}
+      {/* Settle pulse + renderer-loading spinner animations */}
       <style>{`
         @keyframes settle-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.03); }
+        }
+        @keyframes crystal-spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
