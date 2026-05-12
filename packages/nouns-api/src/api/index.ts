@@ -746,7 +746,7 @@ app.get('/api/proposals', async c => {
       updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
       voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
       createdAtBlock: String(p.createdAtBlock),
-      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+      createdAt: String(new Date(p.createdAt).getTime()),
       signers: signerMap.get(String(p.id)) ?? [],
     };
     if (latestBlock > 0n) {
@@ -802,7 +802,7 @@ app.get('/api/proposals/:id', async c => {
     updatePeriodEndBlock: p.updatePeriodEndBlock != null ? String(p.updatePeriodEndBlock) : null,
     voteSnapshotBlock: p.voteSnapshotBlock != null ? String(p.voteSnapshotBlock) : null,
     createdAtBlock: String(p.createdAtBlock),
-    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    createdAt: String(new Date(p.createdAt).getTime()),
     signers: proposalSigners.map(s => s.signer),
     // Ponder returns BigInts for proposalId / value — stringify so Hono can JSON-serialize.
     transactions: proposalTxs.map(t => ({
@@ -897,7 +897,7 @@ app.get('/api/candidates/:id', async c => {
     versionsCount: candidate.versionsCount,
     promotedToProposalId:
       candidate.promotedToProposalId != null ? String(candidate.promotedToProposalId) : null,
-    createdAt: String(Math.floor(new Date(candidate.createdAt).getTime() / 1000)),
+    createdAt: String(new Date(candidate.createdAt).getTime()),
   });
 });
 
@@ -917,7 +917,7 @@ app.get('/api/grants', async c => {
       endBlock: String(g.endBlock),
       createdAtBlock: String(g.createdAtBlock),
       executionETA: g.executionETA != null ? String(g.executionETA) : null,
-      createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+      createdAt: String(new Date(g.createdAt).getTime()),
     };
     if (latestBlock > 0n) {
       item.status = computeDerivedGrantStatus(item, latestBlock);
@@ -959,7 +959,7 @@ app.get('/api/grants/:id', async c => {
     endBlock: String(g.endBlock),
     createdAtBlock: String(g.createdAtBlock),
     executionETA: g.executionETA != null ? String(g.executionETA) : null,
-    createdAt: String(Math.floor(new Date(g.createdAt).getTime() / 1000)),
+    createdAt: String(new Date(g.createdAt).getTime()),
   };
   if (latestBlock > 0n) {
     item.status = computeDerivedGrantStatus(item, latestBlock);
@@ -1057,7 +1057,7 @@ app.get('/api/nounv2-proposals', async c => {
       endBlock: String(p.endBlock),
       createdAtBlock: String(p.createdAtBlock),
       executionETA: p.executionETA != null ? String(p.executionETA) : null,
-      createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+      createdAt: String(new Date(p.createdAt).getTime()),
     };
     if (latestBlock > 0n) {
       item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
@@ -1098,7 +1098,7 @@ app.get('/api/nounv2-proposals/:id', async c => {
     endBlock: String(p.endBlock),
     createdAtBlock: String(p.createdAtBlock),
     executionETA: p.executionETA != null ? String(p.executionETA) : null,
-    createdAt: String(Math.floor(new Date(p.createdAt).getTime() / 1000)),
+    createdAt: String(new Date(p.createdAt).getTime()),
   };
   if (latestBlock > 0n) {
     item.status = computeDerivedNounV2ProposalStatus(item, latestBlock);
@@ -1313,8 +1313,8 @@ app.get('/api/nounv2-feed', async c => {
           txHash: a.createdAtTransaction || '',
           data: {
             nounId: Number(a.nounId),
-            startTime: Math.floor(new Date(a.startTime).getTime() / 1000),
-            endTime: Math.floor(new Date(a.endTime).getTime() / 1000),
+            startTime: new Date(a.startTime).getTime(),
+            endTime: new Date(a.endTime).getTime(),
           },
         });
       }
