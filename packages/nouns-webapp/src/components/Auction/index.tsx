@@ -51,6 +51,7 @@ import {
   useDaoNounSeed,
   useDaoReservePrice,
   useV2NounBurnedStatus,
+  useV2NounImage,
 } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
@@ -1223,10 +1224,21 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     navigate(path(Number(currentAuction.nounId) + 1));
   }, [currentAuction, dao.isV2, navigate]);
 
+  // V2 traits added on-chain after `@noundry/nouns-assets` was last bundled
+  // (e.g. body 30) diverge from the local data — the descriptor on-chain is
+  // the source of truth. Fetch the on-chain SVG via `dataURI()` and prefer
+  // it over the locally-rebuilt SVG for V2 nouns. Falls back to local render
+  // while loading. V1 path is unchanged.
+  const v2OnChainImage = useV2NounImage(
+    dao,
+    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
+  );
+
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
+    if (dao.isV2 && v2OnChainImage) return v2OnChainImage;
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentAuction, currentNounSeed]);
+  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage]);
 
   useAuctionKeyboardShortcuts({
     isEditing,

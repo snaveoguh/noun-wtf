@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { useReadContract, useWriteContract, useReadContracts } from 'wagmi';
 
 import {
@@ -258,6 +260,52 @@ export function useV2NounBurnedStatus(
   // ownerOf returned successfully — noun exists
   if (data !== undefined && data !== null) return false;
   return undefined;
+}
+
+/**
+ * Read the on-chain SVG image for a V2 noun via `dataURI(tokenId)`.
+ *
+ * V2 traits diverge from the local `@noundry/nouns-assets` bundle for any
+ * trait added on-chain after the package was last published (e.g. body 30
+ * is `body-lilac` in noundry but uses palette index 0x02 = #ffffff on the
+ * V2 descriptor). Rendering V2 locally produces an image the actual NFT
+ * isn't. For correctness, fetch the SVG straight from the descriptor.
+ *
+ * Returns the `data:image/svg+xml;base64,...` URL for the noun's image,
+ * or `undefined` while loading. Cached aggressively — per-token metadata
+ * is immutable.
+ */
+export function useV2NounImage(
+  dao: DaoContext,
+  nounId: bigint | undefined,
+): string | undefined {
+  const enabled =
+    dao.isV2 && nounId !== undefined && dao.tokenAddress !== ZERO_ADDRESS;
+
+  const { data } = useReadContract({
+    address: dao.tokenAddress,
+    abi: dao.tokenAbi,
+    functionName: 'dataURI',
+    args: nounId !== undefined ? [nounId] : undefined,
+    query: {
+      enabled,
+      retry: 2,
+      staleTime: Infinity,
+      gcTime: Infinity,
+    },
+  });
+
+  return useMemo(() => {
+    if (typeof data !== 'string') return undefined;
+    const prefix = 'data:application/json;base64,';
+    if (!data.startsWith(prefix)) return undefined;
+    try {
+      const json = JSON.parse(atob(data.slice(prefix.length)));
+      return typeof json.image === 'string' ? json.image : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [data]);
 }
 
 // Re-export so downstream consumers don't need to import wagmi directly.
