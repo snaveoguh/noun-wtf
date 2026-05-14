@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { useReadContract, useWriteContract, useReadContracts } from 'wagmi';
 
 import {
@@ -258,6 +260,51 @@ export function useV2NounBurnedStatus(
   // ownerOf returned successfully — noun exists
   if (data !== undefined && data !== null) return false;
   return undefined;
+}
+
+/**
+ * Read the on-chain SVG image for a V2 noun via `dataURI(tokenId)`.
+ *
+ * Why on-chain instead of building from a bundled snapshot: V2's descriptor
+ * can be re-upgraded by governance (last ceremony 2026-05-09). The chain
+ * is single source of truth — `dataURI` survives future descriptor swaps
+ * with no client redeploy. Mirrors the BerryOS V2 render pattern.
+ *
+ * Returns the `data:image/svg+xml;base64,…` URL ready to drop into <img>,
+ * or `undefined` while loading. Cached aggressively — per-token metadata
+ * is immutable for the lifetime of the current descriptor.
+ */
+export function useV2NounImage(
+  dao: DaoContext,
+  nounId: bigint | undefined,
+): string | undefined {
+  const enabled =
+    dao.isV2 && nounId !== undefined && dao.tokenAddress !== ZERO_ADDRESS;
+
+  const { data } = useReadContract({
+    address: dao.tokenAddress,
+    abi: dao.tokenAbi,
+    functionName: 'dataURI',
+    args: nounId !== undefined ? [nounId] : undefined,
+    query: {
+      enabled,
+      retry: 2,
+      staleTime: Infinity,
+      gcTime: Infinity,
+    },
+  });
+
+  return useMemo(() => {
+    if (typeof data !== 'string') return undefined;
+    const prefix = 'data:application/json;base64,';
+    if (!data.startsWith(prefix)) return undefined;
+    try {
+      const json = JSON.parse(atob(data.slice(prefix.length)));
+      return typeof json.image === 'string' ? json.image : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [data]);
 }
 
 // Re-export so downstream consumers don't need to import wagmi directly.

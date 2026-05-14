@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { getNounData, ImageData as data } from '@noundry/nouns-assets';
+import { getNounDataV2, ImageDataV2 } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
 import Image from 'react-bootstrap/Image';
 import { useDispatch } from 'react-redux';
@@ -35,7 +36,7 @@ interface StandaloneNounWithSeedProps {
   shouldLinkToProfile: boolean;
 }
 
-export const getNoun = (nounId: string | bigint, seed: INounSeed) => {
+export const getNoun = (nounId: string | bigint, seed: INounSeed, isV2 = false) => {
   const id = nounId.toString();
   const name = `Noun ${id}`;
   // Burned-seed sentinel (from useNounSeed on a revert). Short-circuit before
@@ -49,8 +50,13 @@ export const getNoun = (nounId: string | bigint, seed: INounSeed) => {
     };
   }
   const description = `Noun ${id} is a member of the Nouns DAO`;
-  const { parts, background } = getNounData(seed);
-  const image = `data:image/svg+xml;base64,${btoa(buildSVG(parts, data.palette, background))}`;
+  // V2 traits diverge from `@noundry/nouns-assets` for any trait added or
+  // changed on-chain post-fork (e.g. body 30 is `body-lilac` in noundry but
+  // `body-white` on V2). Switch to the workspace `@nouns/assets` snapshot
+  // which mirrors the V2 descriptor exactly.
+  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
+  const palette = isV2 ? ImageDataV2.palette : data.palette;
+  const image = `data:image/svg+xml;base64,${btoa(buildSVG(parts, palette, background))}`;
 
   return {
     name,
