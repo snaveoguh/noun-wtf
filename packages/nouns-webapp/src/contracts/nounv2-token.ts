@@ -25,6 +25,13 @@ export const nounV2TokenAbi = [
   },
   {
     type: 'function',
+    name: 'dataURI',
+    inputs: [{ name: 'tokenId', type: 'uint256', internalType: 'uint256' }],
+    outputs: [{ name: '', type: 'string', internalType: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getPriorVotes',
     inputs: [
       { name: 'account', type: 'address', internalType: 'address' },

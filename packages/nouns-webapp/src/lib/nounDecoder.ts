@@ -3,6 +3,7 @@
  * Reuses RLE decoding logic from NounParallax.
  */
 import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -62,11 +63,12 @@ function decodePartToGrid(partData: string, palette: string[]): string[][] {
 
 // ─── Main API ────────────────────────────────────────────────────────────────
 
-export function seedToPixelLayers(seed: INounSeed): NounPixelLayers {
-  const { parts, background } = getNounData(seed);
-  const palette = ImageData.palette;
+export function seedToPixelLayers(seed: INounSeed, isV2 = false): NounPixelLayers {
+  const data = isV2 ? ImageDataV2 : ImageData;
+  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
+  const palette = data.palette;
   const bgIdx = Number(background);
-  const bgColor = `#${(ImageData.bgcolors as string[])[bgIdx] ?? 'e1d7d5'}`;
+  const bgColor = `#${(data.bgcolors as string[])[bgIdx] ?? 'e1d7d5'}`;
 
   // parts order: [body, accessory, head, glasses]
   return {

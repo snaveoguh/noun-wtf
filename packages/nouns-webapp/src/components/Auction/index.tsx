@@ -51,6 +51,7 @@ import {
   useDaoNounSeed,
   useDaoReservePrice,
   useV2NounBurnedStatus,
+  useV2NounImage,
 } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
@@ -488,15 +489,15 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   // `nounLayers` stays in sync with the real current noun — used by 3D rendering
   // and anywhere the true noun data is needed.
   const nounLayers = useMemo(
-    () => (currentNounSeed ? seedToPixelLayers(currentNounSeed) : null),
-    [currentNounSeed],
+    () => (currentNounSeed ? seedToPixelLayers(currentNounSeed, dao.isV2) : null),
+    [currentNounSeed, dao.isV2],
   );
   // Layers the 2D editor starts from — diverges from `nounLayers` only while a
   // single-trait filter is active (the filter swaps in the clicked trait's
   // index so merging produces a canvas with just that trait).
   const editorLayers = useMemo(
-    () => (editorSeed ? seedToPixelLayers(editorSeed) : null),
-    [editorSeed],
+    () => (editorSeed ? seedToPixelLayers(editorSeed, dao.isV2) : null),
+    [editorSeed, dao.isV2],
   );
   const baseGrid = useMemo(() => {
     if (!editorLayers) return createEmptyGrid();
@@ -1223,10 +1224,19 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     navigate(path(Number(currentAuction.nounId) + 1));
   }, [currentAuction, dao.isV2, navigate]);
 
+  // V2 displays the on-chain `dataURI(tokenId)` SVG directly — single source
+  // of truth that survives descriptor upgrades. V1 keeps the fast bundled
+  // RLE → client SVG path. (Matches the BerryOS V1/V2 split.)
+  const v2OnChainImage = useV2NounImage(
+    dao,
+    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
+  );
+
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
+    if (dao.isV2) return v2OnChainImage ?? null;
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentAuction, currentNounSeed]);
+  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage]);
 
   useAuctionKeyboardShortcuts({
     isEditing,
@@ -1458,6 +1468,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           fullscreen
           pointerEnabled={parallaxInteractive}
           lightingPreset={lightingPreset}
+          isV2={dao.isV2}
           layerVisibility={editMode === '3d' ? edit3dVisibility : undefined}
           editable={
             editMode === '3d'
@@ -1514,7 +1525,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           style={{ pointerEvents: imageInteractive ? 'auto' : 'none' }}
         >
           <Suspense fallback={<div className={classes.heroLoading}>Loading ASCII...</div>}>
-            <AsciiNounCanvas seed={currentNounSeed} />
+            <AsciiNounCanvas seed={currentNounSeed} isV2={dao.isV2} />
           </Suspense>
         </div>
       );
