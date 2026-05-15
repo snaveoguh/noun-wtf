@@ -15,6 +15,7 @@
 import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { Html, OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -105,9 +106,9 @@ function decodeRLE(data: string) {
 
 // ─── Seed → ASCII Voxels (with part tracking) ──────────────────────────────
 
-export function seedToAsciiVoxels(seed: NounSeed): AsciiVoxel[] {
-  const { parts, background } = getNounData(seed);
-  const palette = ImageData.palette;
+export function seedToAsciiVoxels(seed: NounSeed, isV2 = false): AsciiVoxel[] {
+  const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
+  const palette = (isV2 ? ImageDataV2 : ImageData).palette;
 
   // Build 32x32 grids — color + which part painted it
   const colorGrid: string[][] = Array.from({ length: 32 }, () => Array(32).fill(background));
@@ -336,10 +337,12 @@ interface AsciiNounProps {
     head: number;
     glasses: number;
   };
+  /** Decode seed against V2 ImageData/palette instead of V1 noundry. */
+  isV2?: boolean;
 }
 
-const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed }) => {
-  const voxels = useMemo(() => seedToAsciiVoxels(seed), [seed]);
+const AsciiNounCanvas: FC<AsciiNounProps> = ({ seed, isV2 = false }) => {
+  const voxels = useMemo(() => seedToAsciiVoxels(seed, isV2), [seed, isV2]);
   const [isSplit, setIsSplit] = useState(false);
   const [splitAmount, setSplitAmount] = useState(0);
 
