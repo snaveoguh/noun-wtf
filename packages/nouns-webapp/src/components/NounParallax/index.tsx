@@ -12,6 +12,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import {
   buildGeometryFromVoxelMap,
   buildNounGeometries,
@@ -368,8 +369,17 @@ function layersToFlatVoxels(layers: NounLayers): FlatVoxel[] {
   return result;
 }
 
-function seedToFlatVoxels(seed: INounSeed, layerVisibility?: LayerVisibility): FlatVoxel[] {
-  const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
+function seedToFlatVoxels(
+  seed: INounSeed,
+  layerVisibility?: LayerVisibility,
+  isV2 = false,
+): FlatVoxel[] {
+  const layers = seedToLayers(
+    seed,
+    isV2 ? getNounDataV2 : getNounData,
+    (isV2 ? ImageDataV2 : ImageData).palette,
+    layerVisibility,
+  );
   return layersToFlatVoxels(layers);
 }
 
@@ -620,6 +630,7 @@ interface TiltSceneProps {
   layerVisibility?: LayerVisibility;
   autoSpin?: boolean;
   lightingPreset?: LightingPreset;
+  isV2?: boolean;
 }
 
 function TiltScene({
@@ -629,6 +640,7 @@ function TiltScene({
   layerVisibility,
   autoSpin = false,
   lightingPreset = 'spotlight',
+  isV2 = false,
 }: TiltSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const currentTilt = useRef<Tilt>({ x: 0, y: 0 });
@@ -651,8 +663,8 @@ function TiltScene({
   // Compute flat voxels for current seed (used by disintegration)
   const currentVoxels = useMemo(() => {
     if (voxelMap || !seed) return null;
-    return seedToFlatVoxels(seed, layerVisibility);
-  }, [seedKey, layerVisibility, voxelMap]);
+    return seedToFlatVoxels(seed, layerVisibility, isV2);
+  }, [seedKey, layerVisibility, voxelMap, isV2]);
 
   // Detect seed change and trigger disintegration
   useEffect(() => {
@@ -690,9 +702,14 @@ function TiltScene({
     if (!seed) {
       return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
     }
-    const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
+    const layers = seedToLayers(
+      seed,
+      isV2 ? getNounDataV2 : getNounData,
+      (isV2 ? ImageDataV2 : ImageData).palette,
+      layerVisibility,
+    );
     return buildNounGeometries(layers, THICC_HEADS[seed.head]);
-  }, [seedKey, layerVisibility, voxelMap]);
+  }, [seedKey, layerVisibility, voxelMap, isV2]);
 
   useEffect(() => {
     return () => {
@@ -801,6 +818,7 @@ interface InteractiveSceneProps {
   autoRotate?: boolean;
   interactionMode?: 'grab' | 'twist';
   lightingPreset?: LightingPreset;
+  isV2?: boolean;
 }
 
 function InteractiveScene({
@@ -810,6 +828,7 @@ function InteractiveScene({
   autoRotate = false,
   interactionMode = 'twist',
   lightingPreset = 'spotlight',
+  isV2 = false,
 }: InteractiveSceneProps) {
   const [curatedHeadLoaded, setCuratedHeadLoaded] = useState(false);
   const [glassesZ, setGlassesZ] = useState<number | null>(null);
@@ -830,9 +849,14 @@ function InteractiveScene({
     if (!seed) {
       return { bodyGeo: null, blingGeo: null, headGeo: null, glassesGeo: null };
     }
-    const layers = seedToLayers(seed, getNounData, ImageData.palette, layerVisibility);
+    const layers = seedToLayers(
+      seed,
+      isV2 ? getNounDataV2 : getNounData,
+      (isV2 ? ImageDataV2 : ImageData).palette,
+      layerVisibility,
+    );
     return buildNounGeometries(layers);
-  }, [seedKey, layerVisibility, voxelMap]);
+  }, [seedKey, layerVisibility, voxelMap, isV2]);
 
   useEffect(() => {
     return () => {
@@ -925,6 +949,7 @@ function EditableBackgroundBody({
   lightingPreset = 'storefront',
   glassesZShift = 0,
   hideGlasses = false,
+  isV2 = false,
 }: {
   seed: INounSeed;
   layerVisibility?: LayerVisibility;
@@ -932,6 +957,7 @@ function EditableBackgroundBody({
   glassesZShift?: number;
   /** Hide voxel glasses — used in mesh mode where GLB provides its own glasses */
   hideGlasses?: boolean;
+  isV2?: boolean;
 }) {
   const seedKey = `${seed.background}-${seed.body}-${seed.accessory}-${seed.head}-${seed.glasses}`;
 
@@ -942,11 +968,16 @@ function EditableBackgroundBody({
       head: false, // editor voxel layer has the curated head
       glasses: layerVisibility?.glasses ?? true,
     };
-    const layers = seedToLayers(seed, getNounData, ImageData.palette, vis);
+    const layers = seedToLayers(
+      seed,
+      isV2 ? getNounDataV2 : getNounData,
+      (isV2 ? ImageDataV2 : ImageData).palette,
+      vis,
+    );
     const geos = buildNounGeometries(layers);
     geos.headGeo?.dispose();
     return { bodyGeo: geos.bodyGeo, blingGeo: geos.blingGeo, glassesGeo: geos.glassesGeo };
-  }, [seedKey, layerVisibility]);
+  }, [seedKey, layerVisibility, isV2]);
 
   useEffect(() => {
     return () => {
@@ -1075,6 +1106,13 @@ interface NounParallaxProps {
   autoRotate?: boolean;
   pointerEnabled?: boolean;
   lightingPreset?: LightingPreset;
+  /**
+   * If true, decode the seed against the V2 ImageData/palette (workspace
+   * `@nouns/assets`) instead of the V1 noundry bundle. V2-only traits and
+   * palette additions are missing from noundry, so V1 decoding would pick
+   * the wrong colors for any V2 noun whose trait indices changed on-chain.
+   */
+  isV2?: boolean;
 }
 
 // Lazy-load EditableScene (heavy — raycasting + individual meshes)
@@ -1094,6 +1132,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
   autoRotate = false,
   pointerEnabled = true,
   lightingPreset = 'spotlight',
+  isV2 = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tiltRef = useRef<Tilt>({ x: 0, y: 0 });
@@ -1256,6 +1295,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
                     return Math.max(0, maxZ - 2.55 + GLASSES_DEPTH);
                   })()}
                   hideGlasses={!!editable.meshConfig && editable.meshConfig.glassesIndex !== 0}
+                  isV2={isV2}
                 />
               )}
               {editable.meshConfig ? (
@@ -1304,6 +1344,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               autoRotate={autoRotate}
               interactionMode={interactionMode}
               lightingPreset={lightingPreset}
+              isV2={isV2}
             />
           ) : (
             <TiltScene
@@ -1313,6 +1354,7 @@ const NounParallax: React.FC<NounParallaxProps> = ({
               layerVisibility={layerVisibility}
               autoSpin={autoSpin}
               lightingPreset={lightingPreset}
+              isV2={isV2}
             />
           )}
         </Suspense>
