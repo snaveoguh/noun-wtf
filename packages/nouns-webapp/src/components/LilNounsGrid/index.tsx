@@ -12,10 +12,9 @@
  * Seed algo: keccak256(blockHash, nounId) → uint48 slices at [0,48,96,144,192]
  */
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 
 import { buildSVG } from '@nouns/sdk';
-import { useAccount, useWriteContract } from 'wagmi';
+import { createPortal } from 'react-dom';
 import {
   createPublicClient,
   formatEther,
@@ -26,6 +25,7 @@ import {
   type PublicClient,
 } from 'viem';
 import { mainnet } from 'viem/chains';
+import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import { useAppSelector } from '@/hooks';
 
@@ -119,30 +119,50 @@ interface Seed {
 
 interface PoolItem {
   blockNumber: bigint;
+  blockHash: Hex;
   seed: Seed;
   svg: string;
-  traits: { body: string; accessory: string; head: string; glasses: string | null; background: string };
+  traits: {
+    body: string;
+    accessory: string;
+    head: string;
+    glasses: string | null;
+    background: string;
+  };
+}
+
+// Mirror LilVRGDA.buyNow: skip founder-reward IDs (every 10th = Lil Nounder reward,
+// every 11th = Nouns DAO reward) up to the 175300/175301 cutoff.
+function applyFounderRewardSkip(id: bigint): bigint {
+  let next = id;
+  if (next <= 175300n && next % 10n === 0n) next += 1n;
+  if (next <= 175301n && next % 10n === 1n) next += 1n;
+  return next;
+}
+
+async function readMintableNounId(client: PublicClient): Promise<bigint> {
+  const raw = await client.readContract({
+    address: VRGDA_ADDRESS,
+    abi: NEXT_NOUN_ID_ABI,
+    functionName: 'nextNounId',
+  });
+  return applyFounderRewardSkip(raw);
 }
 
 // ─── Seed from block hash (mirrors NounsSeeder.sol exactly) ─────────────────
 
-function seedFromBlockHash(
-  blockHash: Hex,
-  nounId: bigint,
-  imageData: LilNounsImageData,
-): Seed {
+function seedFromBlockHash(blockHash: Hex, nounId: bigint, imageData: LilNounsImageData): Seed {
   const hash = keccak256(encodePacked(['bytes32', 'uint256'], [blockHash, nounId]));
   const n = BigInt(hash);
   const imgs = imageData.images;
   const hasGlasses = imgs.glasses && imgs.glasses.length > 0;
   return {
-    background: Number(((n) & MASK_48) % BigInt(imageData.bgcolors.length)),
+    background: Number((n & MASK_48) % BigInt(imageData.bgcolors.length)),
     body: Number(((n >> 48n) & MASK_48) % BigInt(imgs.bodies.length)),
     accessory: Number(((n >> 96n) & MASK_48) % BigInt(imgs.accessories.length)),
     head: Number(((n >> 144n) & MASK_48) % BigInt(imgs.heads.length)),
-    glasses: hasGlasses
-      ? Number(((n >> 192n) & MASK_48) % BigInt(imgs.glasses!.length))
-      : 0,
+    glasses:
+      hasGlasses === true ? Number(((n >> 192n) & MASK_48) % BigInt(imgs.glasses!.length)) : 0,
   };
 }
 
@@ -178,15 +198,17 @@ function buildPoolItem(
     const imgs = imageData.images;
     return {
       blockNumber,
+      blockHash,
       seed,
       svg,
       traits: {
         body: traitName(imgs.bodies[seed.body]?.filename ?? ''),
         accessory: traitName(imgs.accessories[seed.accessory]?.filename ?? ''),
         head: traitName(imgs.heads[seed.head]?.filename ?? ''),
-        glasses: imgs.glasses && imgs.glasses[seed.glasses]
-          ? traitName(imgs.glasses[seed.glasses].filename)
-          : null,
+        glasses:
+          imgs.glasses != null && imgs.glasses[seed.glasses] != null
+            ? traitName(imgs.glasses[seed.glasses].filename)
+            : null,
         background: imageData.bgcolors[seed.background],
       },
     };
@@ -219,9 +241,7 @@ async function fetchBlockItems(
 
   for (let i = 0; i < blockNumbers.length; i += batchSize) {
     const batch = blockNumbers.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(n => client.getBlock({ blockNumber: n })),
-    );
+    const results = await Promise.allSettled(batch.map(n => client.getBlock({ blockNumber: n })));
 
     for (const r of results) {
       if (r.status === 'fulfilled' && r.value?.hash) {
@@ -251,16 +271,30 @@ const MintPopover: FC<{
   price: bigint | undefined;
   anchorRect: DOMRect;
   onClose: () => void;
-}> = ({ item, nounId, price, anchorRect, onClose }) => {
+  onMintConfirmed: (item: PoolItem, mintedNounId: bigint) => void;
+}> = ({ item, nounId, price, anchorRect, onClose, onMintConfirmed }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { isConnected } = useAccount();
-  const { writeContract, isPending, isSuccess } = useWriteContract();
+  const { writeContract, isPending, data: txHash } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
+
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (isConfirmed && !firedRef.current) {
+      firedRef.current = true;
+      onMintConfirmed(item, nounId);
+    }
+  }, [isConfirmed, item, nounId, onMintConfirmed]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', esc);
     return () => {
@@ -276,12 +310,10 @@ const MintPopover: FC<{
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
 
-  const priceLabel = price
-    ? `${parseFloat(formatEther(price)).toFixed(5)} ETH`
-    : '—';
+  const priceLabel = price != null ? `${parseFloat(formatEther(price)).toFixed(5)} ETH` : '—';
 
   const handleBuy = () => {
-    if (!price) return;
+    if (price == null) return;
     writeContract({
       address: VRGDA_ADDRESS,
       abi: BUY_NOW_ABI,
@@ -295,14 +327,28 @@ const MintPopover: FC<{
     <div
       ref={ref}
       style={{
-        position: 'fixed', left, top, width: popW, zIndex: 1000,
-        background: '#0f172a', border: '1px solid #334155', borderRadius: 12,
+        position: 'fixed',
+        left,
+        top,
+        width: popW,
+        zIndex: 1000,
+        background: '#0f172a',
+        border: '1px solid #334155',
+        borderRadius: 12,
         boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
-        fontFamily: "'PT Root UI', sans-serif", color: '#e2e8f0',
+        fontFamily: "'PT Root UI', sans-serif",
+        color: '#e2e8f0',
         overflow: 'hidden',
       }}
     >
-      <div style={{ background: `#${item.traits.background}`, padding: 8, display: 'flex', justifyContent: 'center' }}>
+      <div
+        style={{
+          background: `#${item.traits.background}`,
+          padding: 8,
+          display: 'flex',
+          justifyContent: 'center',
+        }}
+      >
         <img
           src={`data:image/svg+xml;base64,${item.svg}`}
           alt=""
@@ -311,7 +357,14 @@ const MintPopover: FC<{
       </div>
 
       <div style={{ padding: '10px 14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 6,
+          }}
+        >
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ec4899' }}>
             Lil Noun #{nounId.toString()}
           </span>
@@ -320,12 +373,27 @@ const MintPopover: FC<{
           </span>
         </div>
 
-        <div style={{
-          padding: '6px 10px', borderRadius: 8, marginBottom: 8,
-          background: '#1a1500', border: '1px solid #3b3011',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontSize: '0.6rem', color: '#fbbf24', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div
+          style={{
+            padding: '6px 10px',
+            borderRadius: 8,
+            marginBottom: 8,
+            background: '#1a1500',
+            border: '1px solid #3b3011',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.6rem',
+              color: '#fbbf24',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
             VRGDA Price
           </span>
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fbbf24' }}>
@@ -339,40 +407,181 @@ const MintPopover: FC<{
           ['Accessory', item.traits.accessory],
           ...(item.traits.glasses ? [['Glasses', item.traits.glasses]] : []),
         ].map(([label, value]) => (
-          <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', padding: '2px 0' }}>
+          <div
+            key={label as string}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '0.6rem',
+              padding: '2px 0',
+            }}
+          >
             <span style={{ color: '#64748b' }}>{label}</span>
-            <span style={{ color: '#94a3b8', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+            <span
+              style={{
+                color: '#94a3b8',
+                maxWidth: 150,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                textAlign: 'right',
+              }}
+            >
               {value}
             </span>
           </div>
         ))}
 
-        {isSuccess ? (
-          <div style={{
-            marginTop: 10, padding: '8px 0', textAlign: 'center',
-            fontSize: '0.7rem', fontWeight: 700, color: '#22c55e',
-            borderRadius: 8, background: '#052e16', border: '1px solid #166534',
-          }}>
-            ✓ Transaction submitted
-          </div>
-        ) : (
-          <button
-            onClick={isConnected ? handleBuy : undefined}
-            disabled={isPending || !price}
-            style={{
-              marginTop: 10, width: '100%', padding: '8px 0',
-              borderRadius: 8, border: 'none', cursor: isConnected ? 'pointer' : 'default',
-              background: isConnected ? '#ec4899' : '#334155',
-              color: isConnected ? '#fff' : '#64748b',
-              fontSize: '0.7rem', fontWeight: 700,
-              opacity: isPending ? 0.6 : 1,
-            }}
-          >
-            {!isConnected ? 'Connect Wallet to Mint' : isPending ? 'Confirming...' : `Mint for ${priceLabel}`}
-          </button>
-        )}
+        <button
+          onClick={isConnected ? handleBuy : undefined}
+          disabled={isPending || isConfirming || price == null}
+          style={{
+            marginTop: 10,
+            width: '100%',
+            padding: '8px 0',
+            borderRadius: 8,
+            border: 'none',
+            cursor: isConnected ? 'pointer' : 'default',
+            background: isConnected ? '#ec4899' : '#334155',
+            color: isConnected ? '#fff' : '#64748b',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            opacity: isPending || isConfirming ? 0.6 : 1,
+          }}
+        >
+          {!isConnected
+            ? 'Connect Wallet to Mint'
+            : isPending
+              ? 'Confirm in wallet...'
+              : isConfirming
+                ? 'Minting...'
+                : `Mint for ${priceLabel}`}
+        </button>
       </div>
     </div>
+  );
+};
+
+// ─── Mint celebration ───────────────────────────────────────────────────────
+
+const MintCelebration: FC<{
+  item: PoolItem;
+  nounId: bigint;
+  onClose: () => void;
+}> = ({ item, nounId, onClose }) => {
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
+        background: 'rgba(0,0,0,0.75)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'lilNounsMintFadeIn 200ms ease-out',
+      }}
+    >
+      <style>{`
+        @keyframes lilNounsMintFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes lilNounsMintPop { 0% { transform: scale(0.7); opacity: 0 } 70% { transform: scale(1.05) } 100% { transform: scale(1); opacity: 1 } }
+      `}</style>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 360,
+          maxWidth: '90vw',
+          background: '#0f172a',
+          border: '1px solid #ec4899',
+          borderRadius: 16,
+          boxShadow: '0 24px 80px rgba(236, 72, 153, 0.4)',
+          fontFamily: "'PT Root UI', sans-serif",
+          color: '#e2e8f0',
+          overflow: 'hidden',
+          animation: 'lilNounsMintPop 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        }}
+      >
+        <div
+          style={{
+            background: `#${item.traits.background}`,
+            padding: 24,
+            display: 'flex',
+            justifyContent: 'center',
+          }}
+        >
+          <img
+            src={`data:image/svg+xml;base64,${item.svg}`}
+            alt=""
+            style={{ width: 240, height: 240, imageRendering: 'pixelated' }}
+          />
+        </div>
+        <div style={{ padding: '20px 24px', textAlign: 'center' }}>
+          <div
+            style={{
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              color: '#22c55e',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              marginBottom: 6,
+            }}
+          >
+            ✓ Minted
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ec4899', marginBottom: 14 }}>
+            Lil Noun #{nounId.toString()}
+          </div>
+          <div
+            style={{
+              fontSize: '0.7rem',
+              color: '#94a3b8',
+              display: 'grid',
+              gap: 4,
+              marginBottom: 18,
+              textAlign: 'left',
+            }}
+          >
+            <div>
+              <span style={{ color: '#64748b' }}>Head: </span>
+              {item.traits.head}
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Body: </span>
+              {item.traits.body}
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Accessory: </span>
+              {item.traits.accessory}
+            </div>
+            {item.traits.glasses != null && (
+              <div>
+                <span style={{ color: '#64748b' }}>Glasses: </span>
+                {item.traits.glasses}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%',
+              padding: '10px 0',
+              borderRadius: 8,
+              border: 'none',
+              background: '#ec4899',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 };
 
@@ -398,6 +607,7 @@ const LilNounsGrid: FC = () => {
   const [progress, setProgress] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [popover, setPopover] = useState<{ index: number; rect: DOMRect } | null>(null);
+  const [mintReceipt, setMintReceipt] = useState<{ item: PoolItem; nounId: bigint } | null>(null);
   const [colCount, setColCount] = useState(0);
 
   const initRef = useRef(false);
@@ -482,19 +692,21 @@ const LilNounsGrid: FC = () => {
         ]);
 
         if (nounIdResult.status === 'fulfilled') {
-          nextNounId = nounIdResult.value;
-          setNounId(nextNounId);
+          nextNounId = applyFounderRewardSkip(nounIdResult.value);
         } else {
-          console.warn('[LilNounsGrid] nextNounId failed, trying totalSupply:', nounIdResult.reason);
+          console.warn(
+            '[LilNounsGrid] nextNounId failed, trying totalSupply:',
+            nounIdResult.reason,
+          );
           const supply = await client.readContract({
             address: LIL_NOUNS_TOKEN,
             abi: TOTAL_SUPPLY_ABI,
             functionName: 'totalSupply',
           });
-          nextNounId = supply;
-          setNounId(nextNounId);
+          nextNounId = applyFounderRewardSkip(supply);
         }
 
+        setNounId(nextNounId);
         nounIdRef.current = nextNounId;
 
         if (priceResult.status === 'fulfilled') {
@@ -523,7 +735,10 @@ const LilNounsGrid: FC = () => {
         ).filter(n => n > 0n);
 
         const allItems = await fetchBlockItems(
-          client, blockNumbers, nextNounId, imageData,
+          client,
+          blockNumbers,
+          nextNounId,
+          imageData,
           (pct, items) => {
             setProgress(pct);
             if (items.length > 0 && items.length % 30 < 10) {
@@ -539,12 +754,14 @@ const LilNounsGrid: FC = () => {
       } catch (err) {
         console.error('[LilNounsGrid] Error building pool:', err);
         if (pool.length === 0) {
-          setError(`Failed to load VRGDA pool: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          setError(
+            `Failed to load VRGDA pool: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
         }
         setLoading(false);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageData]);
 
   // ── Refresh pool with latest blocks ──────────────────────────────────────
@@ -554,17 +771,25 @@ const LilNounsGrid: FC = () => {
 
     setRefreshing(true);
     try {
-      // Re-read price
-      const [priceResult] = await Promise.allSettled([
+      // Re-read price + next mintable nounId (someone else may have minted, shifting the id).
+      const [priceResult, nounIdResult] = await Promise.allSettled([
         client.readContract({
           address: VRGDA_ADDRESS,
           abi: GET_VRGDA_PRICE_ABI,
           functionName: 'getCurrentVRGDAPrice',
         }),
+        readMintableNounId(client),
       ]);
       if (priceResult.status === 'fulfilled') {
         setPrice(priceResult.value);
         setContractPaused(false);
+      }
+      const prevNounId = nounIdRef.current;
+      const nextId = nounIdResult.status === 'fulfilled' ? nounIdResult.value : prevNounId;
+      const nounIdChanged = nextId !== prevNounId;
+      if (nounIdChanged) {
+        nounIdRef.current = nextId;
+        setNounId(nextId);
       }
 
       const currentBlock = await client.getBlockNumber();
@@ -580,17 +805,25 @@ const LilNounsGrid: FC = () => {
         if (newBlockNumbers.length >= 30) break; // fetch up to 30 new blocks
       }
 
-      if (newBlockNumbers.length === 0) {
+      const newItems =
+        newBlockNumbers.length > 0
+          ? await fetchBlockItems(client, newBlockNumbers, nextId, imageData)
+          : [];
+
+      if (newItems.length === 0 && !nounIdChanged) {
         setRefreshing(false);
         return;
       }
 
-      const nId = nounIdRef.current;
-      const newItems = await fetchBlockItems(client, newBlockNumbers, nId, imageData);
-
-      // Prepend new items, trim to POOL_SIZE + MAX_EXTRA
+      // If nounId shifted (someone minted), re-derive seeds/SVGs for every existing cell
+      // against the new id — otherwise the grid shows previews of the wrong upcoming Noun.
       setPool(prev => {
-        const merged = [...newItems, ...prev];
+        const reseeded = nounIdChanged
+          ? prev
+              .map(p => buildPoolItem(p.blockNumber, p.blockHash, nextId, imageData))
+              .filter((p): p is PoolItem => p !== null)
+          : prev;
+        const merged = [...newItems, ...reseeded];
         // Deduplicate by blockNumber
         const seen = new Set<string>();
         const deduped = merged.filter(item => {
@@ -611,12 +844,10 @@ const LilNounsGrid: FC = () => {
 
   const handleCellClick = useCallback((index: number, e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    setPopover(prev => prev?.index === index ? null : { index, rect });
+    setPopover(prev => (prev?.index === index ? null : { index, rect }));
   }, []);
 
-  const priceLabel = price
-    ? `${parseFloat(formatEther(price)).toFixed(4)} ETH`
-    : '—';
+  const priceLabel = price != null ? `${parseFloat(formatEther(price)).toFixed(4)} ETH` : '—';
 
   // ── Compute active pool + grayscale fill ─────────────────────────────────
   const activePool = pool.slice(0, POOL_SIZE);
@@ -635,8 +866,17 @@ const LilNounsGrid: FC = () => {
   // Loading / error states
   if (loading && pool.length === 0) {
     return (
-      <section style={{ width: '100%', background: stateBgColor, padding: '20px 16px', textAlign: 'center' }}>
-        <div style={{ fontSize: '0.7rem', color: textMuted, fontFamily: "'PT Root UI', sans-serif" }}>
+      <section
+        style={{
+          width: '100%',
+          background: stateBgColor,
+          padding: '20px 16px',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{ fontSize: '0.7rem', color: textMuted, fontFamily: "'PT Root UI', sans-serif" }}
+        >
           {error ? (
             <span style={{ color: '#ef4444' }}>{error}</span>
           ) : (
@@ -652,8 +892,17 @@ const LilNounsGrid: FC = () => {
 
   if (error && pool.length === 0) {
     return (
-      <section style={{ width: '100%', background: stateBgColor, padding: '20px 16px', textAlign: 'center' }}>
-        <div style={{ fontSize: '0.7rem', color: '#ef4444', fontFamily: "'PT Root UI', sans-serif" }}>
+      <section
+        style={{
+          width: '100%',
+          background: stateBgColor,
+          padding: '20px 16px',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{ fontSize: '0.7rem', color: '#ef4444', fontFamily: "'PT Root UI', sans-serif" }}
+        >
           {error}
         </div>
       </section>
@@ -664,15 +913,36 @@ const LilNounsGrid: FC = () => {
   if (contractPaused && pool.length === 0 && !loading) {
     return (
       <section style={{ width: '100%', background: stateBgColor, overflow: 'hidden' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px 6px', flexWrap: 'wrap', gap: 8,
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 16px 6px',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+            <span
+              style={{
+                fontWeight: 900,
+                fontSize: '0.6rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase' as const,
+              }}
+            >
               🧚
             </span>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: textMuted }}>
+            <span
+              style={{
+                fontWeight: 900,
+                fontSize: '0.6rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase' as const,
+                color: textMuted,
+              }}
+            >
               lil nouns are like nouns but little
             </span>
           </div>
@@ -680,20 +950,29 @@ const LilNounsGrid: FC = () => {
             onClick={refreshPool}
             disabled={refreshing}
             style={{
-              fontSize: '0.55rem', color: textMuted, textDecoration: 'none',
+              fontSize: '0.55rem',
+              color: textMuted,
+              textDecoration: 'none',
               fontFamily: "'PT Root UI', sans-serif",
-              padding: '3px 10px', borderRadius: 8, border: `1px solid ${borderColor}`,
-              background: 'transparent', cursor: refreshing ? 'wait' : 'pointer',
+              padding: '3px 10px',
+              borderRadius: 8,
+              border: `1px solid ${borderColor}`,
+              background: 'transparent',
+              cursor: refreshing ? 'wait' : 'pointer',
             }}
           >
             {refreshing ? 'REFRESHING...' : 'REFRESH POOL ↻'}
           </button>
         </div>
-        <div style={{
-          padding: '16px 16px 20px', textAlign: 'center',
-          fontSize: '0.65rem', color: textMuted,
-          fontFamily: "'PT Root UI', sans-serif",
-        }}>
+        <div
+          style={{
+            padding: '16px 16px 20px',
+            textAlign: 'center',
+            fontSize: '0.65rem',
+            color: textMuted,
+            fontFamily: "'PT Root UI', sans-serif",
+          }}
+        >
           Loading Lil Nouns pool...
         </div>
       </section>
@@ -703,27 +982,71 @@ const LilNounsGrid: FC = () => {
   return (
     <section style={{ width: '100%', background: stateBgColor, overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px 6px', flexWrap: 'wrap', gap: 8,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px 6px',
+          flexWrap: 'wrap',
+          gap: 8,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+          <span
+            style={{
+              fontWeight: 900,
+              fontSize: '0.6rem',
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase' as const,
+            }}
+          >
             🧚
           </span>
-          <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: textColor }}>
+          <span
+            style={{
+              fontWeight: 900,
+              fontSize: '0.6rem',
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase' as const,
+              color: textColor,
+            }}
+          >
             lil nouns are like nouns but little
           </span>
           {nounId !== undefined && (
-            <span style={{ fontSize: '0.55rem', color: '#ec4899', fontFamily: "'PT Root UI', sans-serif", fontWeight: 700 }}>
+            <span
+              style={{
+                fontSize: '0.55rem',
+                color: '#ec4899',
+                fontFamily: "'PT Root UI', sans-serif",
+                fontWeight: 700,
+              }}
+            >
               #{nounId.toString()}
             </span>
           )}
-          <span style={{ fontSize: '0.55rem', color: textMuted, fontFamily: "'PT Root UI', sans-serif" }}>
+          <span
+            style={{
+              fontSize: '0.55rem',
+              color: textMuted,
+              fontFamily: "'PT Root UI', sans-serif",
+            }}
+          >
             {activePool.length} {contractPaused ? 'possible' : 'mintable'}
           </span>
           {contractPaused && (
-            <span style={{ fontSize: '0.5rem', color: '#d97706', fontFamily: "'PT Root UI', sans-serif", fontWeight: 600, background: accentBg, padding: '1px 6px', borderRadius: 4 }}>
+            <span
+              style={{
+                fontSize: '0.5rem',
+                color: '#d97706',
+                fontFamily: "'PT Root UI', sans-serif",
+                fontWeight: 600,
+                background: accentBg,
+                padding: '1px 6px',
+                borderRadius: 4,
+              }}
+            >
               MINTING PAUSED
             </span>
           )}
@@ -731,12 +1054,18 @@ const LilNounsGrid: FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {price !== undefined && (
-            <span style={{
-              fontSize: '0.6rem', fontWeight: 700, color: '#b45309',
-              padding: '2px 8px', borderRadius: 6,
-              background: accentBg, border: `1px solid ${borderColor}`,
-              fontFamily: "'PT Root UI', sans-serif",
-            }}>
+            <span
+              style={{
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                color: '#b45309',
+                padding: '2px 8px',
+                borderRadius: 6,
+                background: accentBg,
+                border: `1px solid ${borderColor}`,
+                fontFamily: "'PT Root UI', sans-serif",
+              }}
+            >
               {priceLabel}
             </span>
           )}
@@ -744,10 +1073,15 @@ const LilNounsGrid: FC = () => {
             onClick={refreshPool}
             disabled={refreshing}
             style={{
-              fontSize: '0.55rem', color: refreshing ? '#ec4899' : textMuted, textDecoration: 'none',
+              fontSize: '0.55rem',
+              color: refreshing ? '#ec4899' : textMuted,
+              textDecoration: 'none',
               fontFamily: "'PT Root UI', sans-serif",
-              padding: '3px 10px', borderRadius: 8, border: `1px solid ${borderColor}`,
-              background: 'transparent', cursor: refreshing ? 'wait' : 'pointer',
+              padding: '3px 10px',
+              borderRadius: 8,
+              border: `1px solid ${borderColor}`,
+              background: 'transparent',
+              cursor: refreshing ? 'wait' : 'pointer',
               transition: 'all 0.15s',
             }}
           >
@@ -792,7 +1126,7 @@ const LilNounsGrid: FC = () => {
         ))}
 
         {/* Grayscale fillers — older blocks beyond the 256 active pool */}
-        {fillers.map((item) => (
+        {fillers.map(item => (
           <div
             key={`filler-${item.blockNumber}`}
             style={{
@@ -819,21 +1153,28 @@ const LilNounsGrid: FC = () => {
 
       {/* Progress indicator while still loading more */}
       {progress < 100 && pool.length > 0 && (
-        <div style={{
-          width: '100%', height: 2,
-          background: borderColor,
-        }}>
-          <div style={{
-            width: `${progress}%`,
-            height: '100%',
-            background: '#ec4899',
-            transition: 'width 0.3s ease',
-          }} />
+        <div
+          style={{
+            width: '100%',
+            height: 2,
+            background: borderColor,
+          }}
+        >
+          <div
+            style={{
+              width: `${progress}%`,
+              height: '100%',
+              background: '#ec4899',
+              transition: 'width 0.3s ease',
+            }}
+          />
         </div>
       )}
 
       {/* Popover — rendered via portal to escape overflow:hidden */}
-      {popover && activePool[popover.index] && nounId !== undefined &&
+      {popover != null &&
+        activePool[popover.index] != null &&
+        nounId !== undefined &&
         createPortal(
           <MintPopover
             item={activePool[popover.index]}
@@ -841,9 +1182,24 @@ const LilNounsGrid: FC = () => {
             price={price}
             anchorRect={popover.rect}
             onClose={() => setPopover(null)}
+            onMintConfirmed={(item, mintedNounId) => {
+              setMintReceipt({ item, nounId: mintedNounId });
+              setPopover(null);
+            }}
           />,
           document.body,
         )}
+
+      {mintReceipt != null && (
+        <MintCelebration
+          item={mintReceipt.item}
+          nounId={mintReceipt.nounId}
+          onClose={() => {
+            setMintReceipt(null);
+            refreshPool();
+          }}
+        />
+      )}
     </section>
   );
 };
