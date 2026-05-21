@@ -152,9 +152,7 @@ function predictSeed(
   // V1 uses the standard uniform pick.
   let accessory: number;
   if (dao === 'v2') {
-    accessory = Number(
-      ((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory - 1),
-    );
+    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory - 1));
     if (accessory >= SLOBBER_INDEX) accessory += 1;
   } else {
     accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory));
@@ -479,8 +477,9 @@ function readCachedPrediction(dao: 'nouns' | 'nounv2'): PredictResponse | null {
   try {
     const raw = window.localStorage.getItem(PRED_CACHE_PREFIX + dao);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && parsed.seed) return parsed as PredictResponse;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed != null && typeof parsed === 'object' && 'seed' in parsed && parsed.seed != null)
+      return parsed as PredictResponse;
   } catch {
     /* ignore */
   }
@@ -1070,8 +1069,7 @@ export default function CrystalBallPage() {
   // prediction hook intentionally short-circuits — without a guard here we'd
   // sit on "SCRYING…" forever. Surface the deployment state instead so the
   // page degrades gracefully when the env var is missing.
-  const v2NotDeployed =
-    activeDao === 'nounv2' && NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS;
+  const v2NotDeployed = activeDao === 'nounv2' && NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS;
 
   // Track how long we've been waiting for the on-chain prediction. After
   // ~10s we surface an "RPC slow, retrying…" hint so users on a hung
@@ -1088,7 +1086,7 @@ export default function CrystalBallPage() {
     ? TRAIT_KEYS.map(key => ({
         key,
         label: TRAIT_LABELS[key],
-        value: traitName(key, effectivePrediction.seed![key]),
+        value: traitName(key, effectivePrediction.seed![key], activeDao === 'nounv2'),
       }))
     : null;
 
