@@ -87,29 +87,17 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
       // when building the target so the user stays on their current theme.
       const { prefix, logical } = splitThemePrefix(location.pathname);
 
-      let logicalTarget: string | null = null;
-
+      // Toggle to the target DAO's auction root (or its crystal-ball twin).
+      // The noun id is deliberately NOT carried across: V1 and V2 are separate
+      // DAOs with unrelated id ranges, so `/noun/1640` → `/v2/noun/1640` points
+      // at a noun that doesn't exist and crashes the auction page.
+      const onCrystalBall = logical === '/crystal-ball' || logical === '/v2/crystal-ball';
+      let logicalTarget: string;
       if (next === 'nounv2') {
-        if (logical === '/') {
-          logicalTarget = '/v2';
-        } else if (logical === '/crystal-ball') {
-          logicalTarget = '/v2/crystal-ball';
-        } else {
-          const m = V1_NOUN_ID_RE.exec(logical);
-          if (m) logicalTarget = `/v2/noun/${m[1]}`;
-        }
+        logicalTarget = onCrystalBall ? '/v2/crystal-ball' : '/v2';
       } else {
-        if (logical === '/v2') {
-          logicalTarget = '/';
-        } else if (logical === '/v2/crystal-ball') {
-          logicalTarget = '/crystal-ball';
-        } else {
-          const m = V2_NOUN_ID_RE.exec(logical);
-          if (m) logicalTarget = `/noun/${m[1]}`;
-        }
+        logicalTarget = onCrystalBall ? '/crystal-ball' : '/';
       }
-
-      if (logicalTarget === null) return;
 
       const target = prefix
         ? logicalTarget === '/'
