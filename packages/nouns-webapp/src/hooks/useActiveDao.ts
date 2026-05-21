@@ -67,34 +67,17 @@ export function useActiveDao(): { activeDao: ActiveDao; setActiveDao: (dao: Acti
       // below are always canonical lowercase.
       const pathname = location.pathname.toLowerCase();
 
-      // Determine the destination based on the current path. Only the
-      // namespaced routes participate; everything else is a no-op so the
-      // user doesn't get yanked off the page they're on. (The global toggle
-      // is also hidden on those pages, but we defend the navigation here
-      // too in case someone calls `setActiveDao` programmatically.)
-      let target: string | null = null;
-
+      // Toggle to the target DAO's auction root (or its crystal-ball twin).
+      // The noun id is deliberately NOT carried across: V1 and V2 are separate
+      // DAOs with unrelated id ranges, so `/noun/1640` → `/v2/noun/1640` points
+      // at a noun that doesn't exist and crashes the auction page.
+      const onCrystalBall = pathname === '/crystal-ball' || pathname === '/v2/crystal-ball';
+      let target: string;
       if (next === 'nounv2') {
-        if (pathname === '/') {
-          target = '/v2';
-        } else if (pathname === '/crystal-ball') {
-          target = '/v2/crystal-ball';
-        } else {
-          const m = V1_NOUN_ID_RE.exec(pathname);
-          if (m) target = `/v2/noun/${m[1]}`;
-        }
+        target = onCrystalBall ? '/v2/crystal-ball' : '/v2';
       } else {
-        if (pathname === '/v2') {
-          target = '/';
-        } else if (pathname === '/v2/crystal-ball') {
-          target = '/crystal-ball';
-        } else {
-          const m = V2_NOUN_ID_RE.exec(pathname);
-          if (m) target = `/noun/${m[1]}`;
-        }
+        target = onCrystalBall ? '/crystal-ball' : '/';
       }
-
-      if (target === null) return;
 
       // Navigating to the DAO root replaces the current entry so the
       // back-button steps page-by-page rather than toggle-by-toggle.
