@@ -2,24 +2,17 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import AmbientMusic from '@/components/AmbientMusic';
-import CandleGate from '@/components/CandleGate';
-import DreamWindow from '@/components/DreamWindow';
 import BerryShell from '@/components/BerryShell';
+import CandleGate from '@/components/CandleGate';
 import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
 import ClassicHome from '@/components/ClassicShell/ClassicHome';
-import GameHome from '@/components/GameShell/GameHome';
+import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
+import GameHome from '@/components/GameShell/GameHome';
 import NavBar from '@/components/NavBar';
 import NetworkAlert from '@/components/NetworkAlert';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
@@ -40,20 +33,20 @@ import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
-import EditCandidatePage from '@/pages/EditCandidate';
 import CreateProposalPage from '@/pages/CreateProposal';
 import DelegatePage from '@/pages/DelegatePage';
+import EditCandidatePage from '@/pages/EditCandidate';
 import EditProposalPage from '@/pages/EditProposal';
 import GovernancePage from '@/pages/Governance';
 import GrantsPage from '@/pages/Grants';
 import CreateGrantPage from '@/pages/Grants/CreateGrant';
 import GrantDetailPage from '@/pages/Grants/GrantDetail';
 import HackathonPage from '@/pages/Hackathon';
-import NounV2Page from '@/pages/NounV2';
-import NounV2DetailPage from '@/pages/NounV2/Detail';
-import CreateNounV2ProposalPage from '@/pages/NounV2/CreateProposal';
 import NotFoundPage from '@/pages/NotFound';
 import NoundersPage from '@/pages/Nounders';
+import NounV2Page from '@/pages/NounV2';
+import CreateNounV2ProposalPage from '@/pages/NounV2/CreateProposal';
+import NounV2DetailPage from '@/pages/NounV2/Detail';
 const ProbePage = lazy(() => import('@/pages/Probe/ProbePage'));
 const PredictionsPage = lazy(() => import('@/pages/Predictions'));
 const MarketplacePage = lazy(() => import('@/pages/Marketplace'));
@@ -73,11 +66,7 @@ import { setActiveAccount } from '@/state/slices/account';
 import NocTicker from '@/components/NocTicker';
 import SaberOverlay from '@/components/SaberOverlay';
 import TorchOverlay from '@/components/TorchOverlay';
-import {
-  FeedSkeleton,
-  GenericSkeleton,
-  GovernanceSkeleton,
-} from '@/components/Skeleton';
+import { FeedSkeleton, GenericSkeleton, GovernanceSkeleton } from '@/components/Skeleton';
 
 import classes from './App.module.css';
 
@@ -138,7 +127,8 @@ function SiteRoutes() {
           </Suspense>
         }
       />
-      <Route path="candidates/:id" element={<CandidatePage />} />
+      {/* splat, not :id — candidate slugs can contain "/" (e.g. "24/7/365-…") */}
+      <Route path="candidates/*" element={<CandidatePage />} />
       <Route path="candidates/:id/edit" element={<EditCandidatePage />} />
       <Route path="playground" element={<Playground />} />
       <Route path="grants" element={<GrantsPage />} />
@@ -346,17 +336,10 @@ function AppRouter() {
     const isThemePrefixed = THEME_NAMES.some(
       t => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`),
     );
-    if (
-      themeParam &&
-      (THEME_NAMES as readonly string[]).includes(themeParam) &&
-      !isThemePrefixed
-    ) {
+    if (themeParam && (THEME_NAMES as readonly string[]).includes(themeParam) && !isThemePrefixed) {
       params.delete('theme');
       const remaining = params.toString();
-      navigate(
-        `/${themeParam}${remaining ? `?${remaining}` : ''}`,
-        { replace: true },
-      );
+      navigate(`/${themeParam}${remaining ? `?${remaining}` : ''}`, { replace: true });
     }
   }, [location.pathname, location.search, navigate]);
 
@@ -418,8 +401,7 @@ function ThemedAppContent() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('dao') !== 'nounv2') return;
-    const isAuctionRoute =
-      logicalPath === '/' || logicalPath.startsWith('/noun/');
+    const isAuctionRoute = logicalPath === '/' || logicalPath.startsWith('/noun/');
     if (!isAuctionRoute) return;
     const idMatch = logicalPath.match(/^\/noun\/(.+)$/);
     const nextPath = idMatch ? `/v2/noun/${idMatch[1]}` : '/v2';
