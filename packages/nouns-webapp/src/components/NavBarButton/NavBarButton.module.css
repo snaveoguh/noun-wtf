@@ -61,7 +61,7 @@
 }
 
 .coolInfo {
-  border: 1px solid var(--brand-cool-border);
+  border: none;
   border-radius: 10px;
   color: var(--brand-cool-dark-text);
 }
@@ -87,7 +87,7 @@
 }
 
 .warmInfo {
-  border: 1px solid var(--brand-warm-border);
+  border: none;
   border-radius: 10px;
   color: var(--brand-warm-dark-text);
 }
@@ -115,7 +115,7 @@
 .whiteInfo,
 .whiteWallet {
   background-color: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: none;
   color: rgb(95, 95, 95);
 }
 
