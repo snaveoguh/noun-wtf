@@ -58,7 +58,12 @@ jobs:
           # too flaky. NounV2 contracts are mainnet-only, so staging has to
           # be mainnet to exercise them.
           VITE_CHAIN_ID: '1'
-          VITE_MAINNET_JSONRPC: "https://ethereum-rpc.publicnode.com"
+          # Keyed Infura endpoint — wagmi.ts builds the mainnet RPC URL from
+          # this. Free public endpoints can't carry the app's load (publicnode
+          # 429s, drpc free tier rejects eth_getLogs), which floods the console.
+          # Requires a VITE_INFURA_KEY secret in the repo's GitHub Actions
+          # settings; without it the build falls back to publicnode.
+          VITE_INFURA_KEY: ${{ secrets.VITE_INFURA_KEY }}
           VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
           VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}
           VITE_ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
