@@ -263,7 +263,7 @@ const NavBar = () => {
               }
             }}
           >
-            <PencilLine size={18} />
+            <PencilLine size={24} />
           </button>
           <div className={clsx('justify-content-end', classes.navBarItems)}>
             {/* People dropdown (Proposals/Candidates/Grants) — desktop only.
