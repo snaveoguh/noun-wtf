@@ -30,7 +30,7 @@ export default function HeaderDaoToggle() {
     <div
       role="tablist"
       aria-label="Select DAO"
-      className="inline-flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/70 p-0.5 shadow-sm backdrop-blur-sm"
+      className="inline-flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/70 p-0.5 shadow-sm backdrop-blur-sm sm:gap-1 sm:p-1"
     >
       <Pill
         label="Nouns"
@@ -66,9 +66,7 @@ function Pill({ label, mobileLabel, active, accent, showNewBadge, onClick }: Pil
       ? 'bg-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)]'
       : 'bg-neutral-900 text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]';
   const inactiveClasses =
-    accent === 'red'
-      ? 'text-red-700 hover:bg-red-50'
-      : 'text-neutral-700 hover:bg-neutral-100';
+    accent === 'red' ? 'text-red-700 hover:bg-red-50' : 'text-neutral-700 hover:bg-neutral-100';
 
   return (
     <button
@@ -76,11 +74,11 @@ function Pill({ label, mobileLabel, active, accent, showNewBadge, onClick }: Pil
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`relative flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 md:px-2.5 md:py-1 md:text-xs ${
+      className={`relative flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 sm:px-3 sm:py-1 sm:text-xs md:px-3.5 md:py-1.5 md:text-sm ${
         accent === 'red' ? 'focus-visible:ring-red-500' : 'focus-visible:ring-neutral-500'
       } ${active ? activeClasses : inactiveClasses}`}
     >
-      {mobileLabel && mobileLabel !== label ? (
+      {mobileLabel != null && mobileLabel !== label ? (
         <>
           <span className="hidden leading-none md:inline">{label}</span>
           <span className="inline leading-none md:hidden">{mobileLabel}</span>
@@ -88,7 +86,7 @@ function Pill({ label, mobileLabel, active, accent, showNewBadge, onClick }: Pil
       ) : (
         <span className="leading-none">{label}</span>
       )}
-      {showNewBadge && (
+      {showNewBadge === true && (
         <span className="rounded-sm bg-red-600 px-1 py-[1px] text-[0.5rem] font-extrabold uppercase tracking-[0.08em] text-white">
           New
         </span>

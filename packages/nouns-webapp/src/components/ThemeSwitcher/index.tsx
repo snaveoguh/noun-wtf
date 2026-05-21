@@ -24,7 +24,6 @@ const THEMES: readonly ThemeMeta[] = [
 const __metaIds = new Set(THEMES.map(t => t.id));
 for (const id of THEME_NAMES) {
   if (!__metaIds.has(id)) {
-    // eslint-disable-next-line no-console
     console.warn(`[ThemeSwitcher] no meta entry for theme "${id}"`);
   }
 }
@@ -80,7 +79,7 @@ export default function ThemeSwitcher({ variant = 'navbar', onChange }: ThemeSwi
       }
     : {
         background: 'transparent',
-        border: '1px solid var(--theme-border, #ccc)',
+        border: 'none',
         color: 'var(--theme-text-primary, #14161b)',
         cursor: 'pointer',
         fontSize: '12px',
