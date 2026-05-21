@@ -9,26 +9,21 @@ import { createRoot } from 'react-dom/client';
 import { Provider as ReduxProvider } from 'react-redux';
 import { parseAbiItem } from 'viem';
 import { hardhat } from 'viem/chains';
-import { usePublicClient, WagmiProvider } from 'wagmi';
+import { usePublicClient, useWatchContractEvent, WagmiProvider } from 'wagmi';
 
 import { CustomConnectkitProvider } from '@/components/CustomConnectkitProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { SiteThemeProvider } from '@/contexts/SiteThemeContext';
 import { store } from '@/store';
 import { execute } from '@/subgraphs/execute';
-
-import { SiteThemeProvider } from '@/contexts/SiteThemeContext';
 
 import App from './App';
 import config, { CHAIN_ID } from './config';
 import {
+  nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
   useReadNounsAuctionHouseAuction,
-  useWatchNounsAuctionHouseAuctionBidEvent,
-  useWatchNounsAuctionHouseAuctionBidWithClientIdEvent,
-  useWatchNounsAuctionHouseAuctionCreatedEvent,
-  useWatchNounsAuctionHouseAuctionExtendedEvent,
-  useWatchNounsAuctionHouseAuctionSettledEvent,
 } from './contracts';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { LanguageProvider } from './i18n/LanguageProvider';
@@ -69,9 +64,7 @@ class ErrorBoundary extends React.Component<
       return (
         <div style={{ padding: 40, fontFamily: 'monospace' }}>
           <h2>Something went wrong</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', color: '#c00' }}>
-            {this.state.error.message}
-          </pre>
+          <pre style={{ whiteSpace: 'pre-wrap', color: '#c00' }}>{this.state.error.message}</pre>
           <button onClick={() => window.location.reload()}>Reload</button>
         </div>
       );
@@ -103,152 +96,141 @@ const ChainSubscriber: React.FC = () => {
     }
     (async () => {
       try {
-      const latestBlock = await publicClient.getBlock();
-      const fromBlock = latestBlock.number > 7200n ? latestBlock.number - 7200n : 0n;
+        const latestBlock = await publicClient.getBlock();
+        const fromBlock = latestBlock.number > 7200n ? latestBlock.number - 7200n : 0n;
 
-      const logs = await publicClient.getLogs({
-        address: nounsAuctionHouseAddress[chainId],
-        event: parseAbiItem(
-          'event AuctionBid(uint256 indexed nounId, address sender, uint256 value, bool extended)',
-        ),
-        fromBlock,
-        toBlock: latestBlock.number,
-      });
-
-      for (const {
-        args: { extended, nounId, sender, value },
-        blockNumber,
-        transactionHash,
-        transactionIndex,
-      } of logs) {
-        const block = await publicClient.getBlock({
-          blockNumber: blockNumber ?? undefined,
-        });
-        const timestamp = block.timestamp;
-
-        dispatch(
-          appendBid(
-            reduxSafeBid({
-              nounId: Number(nounId),
-              sender: sender as Address,
-              value: Number(value),
-              extended: extended !== undefined,
-              transactionHash: transactionHash ?? '',
-              transactionIndex: transactionIndex ?? 0,
-              timestamp,
-            }),
+        const logs = await publicClient.getLogs({
+          address: nounsAuctionHouseAddress[chainId],
+          event: parseAbiItem(
+            'event AuctionBid(uint256 indexed nounId, address sender, uint256 value, bool extended)',
           ),
-        );
-      }
+          fromBlock,
+          toBlock: latestBlock.number,
+        });
+
+        // Dedupe block lookups — bids commonly share a block, and one getBlock
+        // per bid turned a quiet auction into a burst of RPC calls on load.
+        const blockTimestamps = new Map<bigint, bigint>();
+        for (const bn of new Set(
+          logs.map(l => l.blockNumber).filter((b): b is bigint => b != null),
+        )) {
+          const block = await publicClient.getBlock({ blockNumber: bn });
+          blockTimestamps.set(bn, block.timestamp);
+        }
+
+        for (const {
+          args: { extended, nounId, sender, value },
+          blockNumber,
+          transactionHash,
+          transactionIndex,
+        } of logs) {
+          dispatch(
+            appendBid(
+              reduxSafeBid({
+                nounId: Number(nounId),
+                sender: sender as Address,
+                value: Number(value),
+                extended: extended !== undefined,
+                transactionHash: transactionHash ?? '',
+                transactionIndex: transactionIndex ?? 0,
+                timestamp: blockNumber != null ? (blockTimestamps.get(blockNumber) ?? 0n) : 0n,
+              }),
+            ),
+          );
+        }
       } catch (err) {
         console.error('[ChainSubscriber] Failed to fetch recent bids:', err);
       }
     })();
   }, [chainId, dispatch, publicClient]);
 
-  // Watch for new bids
-  useWatchNounsAuctionHouseAuctionBidEvent({
+  // One watcher for the whole auction house instead of five. Five separate
+  // useWatch*Event hooks meant five filtered getLogs polls every cycle; this
+  // is a single unfiltered poll, routed by event name. Combined with the 12s
+  // pollingInterval that turns 5 polls / 4s into 1 poll / 12s.
+  useWatchContractEvent({
+    address: nounsAuctionHouseAddress[chainId],
+    abi: nounsAuctionHouseAbi,
     onLogs: async logs => {
-      for (const {
-        args: { extended, nounId, sender, value },
-        blockNumber,
-        transactionHash,
-        transactionIndex,
-      } of logs) {
-        const block = await publicClient.getBlock({
-          blockNumber: blockNumber ?? undefined,
-        });
-        const timestamp = block.timestamp;
-
-        dispatch(
-          appendBid(
-            reduxSafeBid({
-              nounId: Number(nounId),
-              sender: sender as Address,
-              value: Number(value),
-              extended: extended !== undefined,
-              transactionHash: transactionHash ?? '',
-              transactionIndex: transactionIndex ?? 0,
-              timestamp,
-            }),
-          ),
-        );
-      }
-    },
-  });
-
-  // Watch for new auction creation events
-  useWatchNounsAuctionHouseAuctionCreatedEvent({
-    onLogs: logs => {
       for (const log of logs) {
-        const { startTime, endTime, nounId } = log.args;
-        dispatch(
-          setActiveAuction(
-            reduxSafeNewAuction({
-              nounId: Number(nounId),
-              startTime: Number(startTime),
-              endTime: Number(endTime),
-              settled: false,
-            }),
-          ),
-        );
-        const nounIdNumber = Number(nounId);
-        window.location.href = nounPath(nounIdNumber);
-        dispatch(setOnDisplayAuctionNounId(nounIdNumber));
-        dispatch(setLastAuctionNounId(nounIdNumber));
-      }
-    },
-  });
-
-  // Watch for AuctionBidWithClientId (emitted alongside AuctionBid). Attach
-  // the clientId to the bid already appended above, matched by nounId + value.
-  useWatchNounsAuctionHouseAuctionBidWithClientIdEvent({
-    onLogs: logs => {
-      for (const {
-        args: { nounId, value, clientId },
-      } of logs) {
-        if (nounId == null || value == null || clientId == null) continue;
-        dispatch(
-          setBidClientId({
-            nounId: Number(nounId),
-            value: value.toString(),
-            clientId: Number(clientId),
-          }),
-        );
-      }
-    },
-  });
-
-  // Watch for new auction extended events
-  useWatchNounsAuctionHouseAuctionExtendedEvent({
-    onLogs: logs => {
-      for (const log of logs) {
-        const { endTime, nounId } = log.args;
-        dispatch(
-          setAuctionExtended({
-            nounId: Number(nounId),
-            endTime: Number(endTime),
-          }),
-        );
-      }
-    },
-  });
-
-  // Watch for auction settlement events
-  useWatchNounsAuctionHouseAuctionSettledEvent({
-    onLogs: logs => {
-      for (const log of logs) {
-        const { amount, winner, nounId } = log.args;
-        // Reserve-not-met settlements emit winner=0x0000...0000 & amount=0.
-        // The slice reducer will normalize the zero-address winner to
-        // undefined so downstream renderers can branch on `!bidder`.
-        dispatch(
-          setAuctionSettled({
-            nounId: Number(nounId),
-            amount: Number(amount),
-            winner: winner as Address,
-          }),
-        );
+        switch (log.eventName) {
+          case 'AuctionBid': {
+            const { extended, nounId, sender, value } = log.args;
+            const block = await publicClient.getBlock({
+              blockNumber: log.blockNumber ?? undefined,
+            });
+            dispatch(
+              appendBid(
+                reduxSafeBid({
+                  nounId: Number(nounId),
+                  sender: sender as Address,
+                  value: Number(value),
+                  extended: extended !== undefined,
+                  transactionHash: log.transactionHash ?? '',
+                  transactionIndex: log.transactionIndex ?? 0,
+                  timestamp: block.timestamp,
+                }),
+              ),
+            );
+            break;
+          }
+          case 'AuctionBidWithClientId': {
+            // Emitted alongside AuctionBid — attach the clientId to the bid
+            // already appended above, matched by nounId + value.
+            const { nounId, value, clientId } = log.args;
+            if (nounId == null || value == null || clientId == null) break;
+            dispatch(
+              setBidClientId({
+                nounId: Number(nounId),
+                value: value.toString(),
+                clientId: Number(clientId),
+              }),
+            );
+            break;
+          }
+          case 'AuctionCreated': {
+            const { startTime, endTime, nounId } = log.args;
+            dispatch(
+              setActiveAuction(
+                reduxSafeNewAuction({
+                  nounId: Number(nounId),
+                  startTime: Number(startTime),
+                  endTime: Number(endTime),
+                  settled: false,
+                }),
+              ),
+            );
+            const nounIdNumber = Number(nounId);
+            window.location.href = nounPath(nounIdNumber);
+            dispatch(setOnDisplayAuctionNounId(nounIdNumber));
+            dispatch(setLastAuctionNounId(nounIdNumber));
+            break;
+          }
+          case 'AuctionExtended': {
+            const { endTime, nounId } = log.args;
+            dispatch(
+              setAuctionExtended({
+                nounId: Number(nounId),
+                endTime: Number(endTime),
+              }),
+            );
+            break;
+          }
+          case 'AuctionSettled': {
+            // Reserve-not-met settlements emit winner=0x0000...0000 &
+            // amount=0. The slice reducer normalizes the zero-address winner
+            // to undefined so renderers can branch on `!bidder`.
+            const { amount, winner, nounId } = log.args;
+            dispatch(
+              setAuctionSettled({
+                nounId: Number(nounId),
+                amount: Number(amount),
+                winner: winner as Address,
+              }),
+            );
+            break;
+          }
+        }
       }
     },
   });
