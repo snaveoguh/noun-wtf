@@ -233,7 +233,8 @@ function calcProposalEncodeData({
 // ─── Candidate Page ───────────────────────────────────────────────────────────
 
 const CandidatePage = () => {
-  const { id } = useParams<{ id: string }>();
+  // '*' splat param, not `id` — candidate ids embed the slug, which can contain "/"
+  const { '*': id } = useParams();
   const [isProposer, setIsProposer] = useState<boolean>(false);
   const [isCancelPending, setCancelPending] = useState<boolean>(false);
   const [dataFetchPollInterval, setDataFetchPollInterval] = useState<number>(0);
@@ -249,13 +250,12 @@ const CandidatePage = () => {
   const activeAccount = useAppSelector(state => state.account.activeAccount);
   const isWalletConnected = activeAccount !== undefined;
   const { data: currentBlock } = useBlockNumber();
-  const { data: candidateData, refetch: candidateRefetch } = useCandidateProposal(
+  const { data: candidate, refetch: candidateRefetch } = useCandidateProposal(
     id ?? '',
     dataFetchPollInterval,
     false,
     currentBlock,
   );
-  const [candidate, setCandidate] = useState<typeof candidateData>(undefined);
   const { address: account } = useAccount();
   const proposalThreshold = (useProposalThreshold() ?? 0) + 1;
   const userVotes = useUserVotes();
@@ -268,17 +268,6 @@ const CandidatePage = () => {
   const [isUpdateToProposal, setIsUpdateToProposal] = useState<boolean>(false);
   const originalProposal = useProposal(candidate?.proposalIdToUpdate ?? 0);
   const isParentProposalUpdatable = originalProposal?.status === ProposalState.UPDATABLE;
-
-  useEffect(() => {
-    (async () => {
-      if (!candidate) {
-        await candidateRefetch();
-        if (candidateData) {
-          setCandidate(candidateData);
-        }
-      }
-    })();
-  }, [candidate, candidateData, candidateRefetch]);
 
   const handleRefetchData = () => {
     feedback.refetch();
@@ -385,7 +374,13 @@ const CandidatePage = () => {
         undefined,
         () => {
           setShowSponsorModal(false);
-          candidateRefetch();
+          // Ponder lags the confirmed block — retry until it indexes the new signature.
+          let tries = 0;
+          const retryRefetch = () => {
+            candidateRefetch();
+            if (++tries < 6) setTimeout(retryRefetch, 4000);
+          };
+          retryRefetch();
         },
       ),
     [addSignatureState, onTransactionStateChange, _, candidateRefetch],

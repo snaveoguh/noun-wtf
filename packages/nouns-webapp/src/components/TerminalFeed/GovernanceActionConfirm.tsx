@@ -126,11 +126,7 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
           <ConnectKitButton.Custom>
             {({ show }) => (
-              <button
-                type="button"
-                onClick={() => show?.()}
-                style={confirmBtnStyle}
-              >
+              <button type="button" onClick={() => show?.()} style={confirmBtnStyle}>
                 connect wallet
               </button>
             )}
@@ -156,8 +152,8 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
             {action.title}
           </div>
         )}
-        {action.slug && !action.title && (
-          <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+        {action.slug && (
+          <div style={{ color: '#888', fontSize: '12px', marginTop: '4px' }}>
             slug: {action.slug}
           </div>
         )}
@@ -292,9 +288,7 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         )}
         {action.type === 'VOTE' && (
           <div style={{ color: '#444', fontSize: '11px', marginTop: '4px' }}>
-            {action.dao === 'lil-nouns' ||
-            action.dao === 'lilnouns' ||
-            action.dao === 'lil'
+            {action.dao === 'lil-nouns' || action.dao === 'lilnouns' || action.dao === 'lil'
               ? 'lil nouns dao — no gas refund'
               : 'gas refunded by nouns dao — client id 37 (noun.wtf)'}
           </div>
