@@ -1,20 +1,26 @@
 import { ImageData } from '@noundry/nouns-assets';
+import { ImageDataV2 } from '@nouns/assets';
 
 import { traitCategory } from '@/lib/traitCategory';
 import { INounSeed } from '@/wrappers/nounToken';
 
 const capitalizeFirstLetter = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
-export const traitName = (type: keyof INounSeed, seed: number) => {
+// V2 nouns ship a separate descriptor/art set (e.g. body 30 = white founder,
+// 31 = black founder) absent from V1's @noundry/nouns-assets ImageData. Resolve
+// V2 names against the workspace ImageDataV2 so they don't fall through to a
+// wrong or 'Unknown' V1 name.
+const v2Images = ImageDataV2.images as Record<string, { filename: string }[]>;
+
+export const traitName = (type: keyof INounSeed, seed: number, isV2 = false): string => {
   if (type === 'background') {
     return ['Cool', 'Warm'][seed] ?? 'Unknown';
   }
 
-  // Defensive: guard against indices that don't exist in the bundled
-  // @noundry/nouns-assets V1 ImageData. V2 nouns can roll body=31
-  // (V2-only black founder), and the npm snapshot can drift behind the
-  // actual chain — we'd rather render 'Unknown' than crash the page.
-  const entry = ImageData.images[traitCategory[type]][seed];
+  // Still defensive — an index can outrun even the V2 art set if the npm
+  // snapshot drifts behind the chain; render 'Unknown' rather than crash.
+  const category = traitCategory[type];
+  const entry = isV2 ? v2Images[category]?.[seed] : ImageData.images[category][seed];
   if (entry == null) return 'Unknown';
   let filename = entry.filename;
 
