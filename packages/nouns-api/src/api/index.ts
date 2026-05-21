@@ -530,9 +530,27 @@ async function findCandidates(
     }
   }
 
-  // Sort by score descending, then by most recent
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit).map(r => r.row);
+  // Collapse re-submission families. When a proposer re-creates a candidate the
+  // client appends a `-N` suffix; same proposer + base slug = the same proposal.
+  // Without this the original out-scores its own resubmission (exact-slug 100 vs
+  // suffixed-substring 80). `results` is newest-first, so the first seen wins.
+  const families = new Map<string, Scored>();
+  for (const r of results) {
+    const baseSlug = (r.row.slug ?? '').toString().toLowerCase().replace(/-\d+$/, '');
+    const familyKey = `${(r.row.proposer ?? '').toString().toLowerCase()}::${baseSlug}`;
+    const existing = families.get(familyKey);
+    if (!existing) {
+      families.set(familyKey, r);
+    } else if (r.score > existing.score) {
+      existing.score = r.score;
+    }
+  }
+
+  // Score desc; ties stay newest-first (stable sort over a newest-first list).
+  return Array.from(families.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(r => r.row);
 }
 
 // Extract title from candidate description
@@ -930,7 +948,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       const action = { type: 'SPONSOR', proposer: c.proposer, slug: c.slug };
       return {
         handled: true,
-        response: `Sponsor prepared for "${title}" by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`,
+        response: `Sponsor prepared for "${title}" (${c?.slug}) by ${c.proposer?.slice(0, 8)}... Confirm in your wallet.`,
         action,
       };
     } catch (err) {
@@ -981,7 +999,7 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       };
       return {
         handled: true,
-        response: `Promote prepared for "${title}" with ${validSigs.length} valid sponsor signature${validSigs.length !== 1 ? 's' : ''}. This will create a real proposal with Client ID 37. Confirm in your wallet.`,
+        response: `Promote prepared for "${title}" (${c?.slug}) with ${validSigs.length} valid sponsor signature${validSigs.length !== 1 ? 's' : ''}. This will create a real proposal with Client ID 37. Confirm in your wallet.`,
         action,
       };
     } catch (err) {
