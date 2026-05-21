@@ -38,11 +38,13 @@ const MAX_EXTRA = 60; // extra blocks to fetch for grayscale row fill
 const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
 const MASK_48 = (1n << 48n) - 1n;
 
-// Multiple RPCs for resilience — try each in order
+// Infura (keyed) first — buidlguidl was unreachable and rpc.ankr.com/eth
+// now requires its own key, so both were dropped. publicnode is the no-key
+// fallback. Try each in order.
+const INFURA_KEY = import.meta.env.VITE_INFURA_KEY as string;
 const RPC_URLS = [
-  'https://mainnet.rpc.buidlguidl.com',
+  ...(INFURA_KEY ? [`https://mainnet.infura.io/v3/${INFURA_KEY}`] : []),
   'https://ethereum-rpc.publicnode.com',
-  'https://rpc.ankr.com/eth',
 ];
 
 // ─── ABIs (minimal) ──────────────────────────────────────────────────────────
