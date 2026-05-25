@@ -1,7 +1,7 @@
 import type { CandidateTitleLookup, EnsLookup } from './eventFormatters';
 import type { ActivityEvent as ActivityEventType } from './useActivityFeed';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 
 import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router';
@@ -143,11 +143,17 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
   return (
     <div
       className="terminal-event"
-      style={{
-        padding: '3px 0',
-        borderBottom: '1px solid var(--theme-feed-row-border)',
-        lineHeight: 1.35,
-      }}
+      data-event-type={isBurnedAuction ? 'BURNED' : event.type}
+      style={
+        {
+          padding: '3px 0',
+          borderBottom: '1px solid var(--theme-feed-row-border)',
+          lineHeight: 1.35,
+          // Exposed for disco mode — the rainbow row gradient builds off this.
+          // Harmless when disco is off (no rule consumes it).
+          ['--event-color' as string]: color,
+        } as CSSProperties
+      }
     >
       {/* Main row */}
       <div
@@ -310,23 +316,39 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
                 h1: ({ ...props }) => (
                   <h1
                     {...props}
-                    style={{ fontSize: '14px', margin: '8px 0 6px', color: 'var(--theme-text-primary)' }}
+                    style={{
+                      fontSize: '14px',
+                      margin: '8px 0 6px',
+                      color: 'var(--theme-text-primary)',
+                    }}
                   />
                 ),
                 h2: ({ ...props }) => (
                   <h2
                     {...props}
-                    style={{ fontSize: '13px', margin: '8px 0 6px', color: 'var(--theme-text-primary)' }}
+                    style={{
+                      fontSize: '13px',
+                      margin: '8px 0 6px',
+                      color: 'var(--theme-text-primary)',
+                    }}
                   />
                 ),
                 h3: ({ ...props }) => (
                   <h3
                     {...props}
-                    style={{ fontSize: '12px', margin: '6px 0 4px', color: 'var(--theme-text-primary)' }}
+                    style={{
+                      fontSize: '12px',
+                      margin: '6px 0 4px',
+                      color: 'var(--theme-text-primary)',
+                    }}
                   />
                 ),
-                strong: ({ ...props }) => <strong {...props} style={{ color: 'var(--theme-text-primary)' }} />,
-                em: ({ ...props }) => <em {...props} style={{ color: 'var(--theme-text-primary)' }} />,
+                strong: ({ ...props }) => (
+                  <strong {...props} style={{ color: 'var(--theme-text-primary)' }} />
+                ),
+                em: ({ ...props }) => (
+                  <em {...props} style={{ color: 'var(--theme-text-primary)' }} />
+                ),
                 code: ({ ...props }) => (
                   <code
                     {...props}

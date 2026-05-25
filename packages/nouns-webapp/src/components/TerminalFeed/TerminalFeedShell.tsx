@@ -1,6 +1,6 @@
 import type { ChatMessage } from './TerminalPrompt';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
 
@@ -14,9 +14,17 @@ import { FILTER_TABS } from './eventFormatters';
 import TerminalPrompt from './TerminalPrompt';
 import { useActivityFeed } from './useActivityFeed';
 
+const DISCO_STORAGE_KEY = 'noun-wtf-disco';
+
 export default function TerminalFeedShell() {
   const { isEmbedded } = useSiteTheme();
   const [activeFilter, setActiveFilter] = useState('');
+  const [discoMode, setDiscoMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    // Default-on for the terminal: only honour an explicit 'off' choice.
+    // Anything else (first visit, lingering legacy 'on', unset) → disco lit.
+    return localStorage.getItem(DISCO_STORAGE_KEY) !== 'off';
+  });
   const isChatTab = activeFilter === '_CHAT';
   // Only pass filter to activity feed when not in chat mode
   const { events, loading, hasMore, error, loadMore } = useActivityFeed(
@@ -57,6 +65,14 @@ export default function TerminalFeedShell() {
     };
   }, []);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-disco', discoMode ? 'on' : 'off');
+    localStorage.setItem(DISCO_STORAGE_KEY, discoMode ? 'on' : 'off');
+    return () => {
+      document.documentElement.removeAttribute('data-disco');
+    };
+  }, [discoMode]);
+
   return (
     <div
       style={{
@@ -83,10 +99,27 @@ export default function TerminalFeedShell() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: 'var(--theme-accent)', fontSize: '14px', letterSpacing: '1px' }}>NOUN.WTF</span>
+          <span
+            className="terminal-brand"
+            style={{ color: 'var(--theme-accent)', fontSize: '14px', letterSpacing: '1px' }}
+          >
+            NOUN.WTF
+          </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* 🪩 disco mode — animated rainbow gradient blocks per event row.
+              Styles live in src/index.css under "DISCO MODE — terminal feed". */}
+          <button
+            className="disco-toggle"
+            onClick={() => setDiscoMode(d => !d)}
+            title={discoMode ? 'turn off disco' : 'turn on disco'}
+            aria-label="toggle disco mode"
+            aria-pressed={discoMode}
+          >
+            🪩
+          </button>
+
           {/* Wallet */}
           <ConnectKitButton.Custom>
             {({ isConnected, show, address }) => (
@@ -146,32 +179,42 @@ export default function TerminalFeedShell() {
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
-              style={{
-                background: isActive ? 'var(--theme-bg-tertiary)' : 'transparent',
-                border: 'none',
-                color: isActive
-                  ? isChatButton
-                    ? 'var(--theme-accent)'
-                    : 'var(--theme-accent)'
-                  : isChatButton && chatHistory.length > 0
-                    ? 'var(--theme-accent)'
-                    : 'var(--theme-text-muted)',
-                cursor: 'pointer',
-                fontSize: '11px',
-                padding: '4px 10px',
-                borderRadius: 'var(--theme-radius-sm)',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'color 0.15s',
-                opacity: isChatButton && chatHistory.length > 0 && !isActive ? 0.6 : 1,
-              }}
+              className="terminal-filter-tab"
+              data-tab-all={tab.color == null ? 'true' : undefined}
+              style={
+                {
+                  background: isActive ? 'var(--theme-bg-tertiary)' : 'transparent',
+                  border: 'none',
+                  color: isActive
+                    ? isChatButton
+                      ? 'var(--theme-accent)'
+                      : 'var(--theme-accent)'
+                    : isChatButton && chatHistory.length > 0
+                      ? 'var(--theme-accent)'
+                      : 'var(--theme-text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--theme-radius-sm)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'color 0.15s',
+                  opacity: isChatButton && chatHistory.length > 0 && !isActive ? 0.6 : 1,
+                  // Anchor for the disco-mode gradient ink. Null for ALL → CSS
+                  // handles the rainbow case via [data-tab-all].
+                  ...(tab.color ? { ['--tab-color' as string]: tab.color } : {}),
+                } as CSSProperties
+              }
               onMouseEnter={e => {
-                if (!isActive) (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
+                if (!isActive)
+                  (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
               }}
               onMouseLeave={e => {
                 if (!isActive) {
                   (e.target as HTMLElement).style.color =
-                    isChatButton && chatHistory.length > 0 ? 'var(--theme-accent)' : 'var(--theme-text-muted)';
+                    isChatButton && chatHistory.length > 0
+                      ? 'var(--theme-accent)'
+                      : 'var(--theme-text-muted)';
                   (e.target as HTMLElement).style.opacity =
                     isChatButton && chatHistory.length > 0 ? '0.6' : '1';
                 }
