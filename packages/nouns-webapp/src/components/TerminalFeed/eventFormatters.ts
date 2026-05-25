@@ -14,19 +14,64 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   PROPOSAL_CREATED: { label: 'PROP', color: '#facc15', filterKey: 'PROPOSAL_CREATED', icon: '📜' },
   AUCTION_SETTLED: { label: 'SETTLED', color: '#4ade80', filterKey: 'AUCTION_SETTLED', icon: '🔥' },
   NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED', icon: '🔔' },
-  CANDIDATE_CREATED: { label: 'CAND', color: '#fb923c', filterKey: 'CANDIDATE_CREATED', icon: '📝' },
-  CANDIDATE_SPONSORED: { label: 'SPONSOR', color: '#f472b6', filterKey: 'CANDIDATE_SPONSORED', icon: '✍️' },
-  CANDIDATE_UPDATED: { label: 'CAND-UPD', color: '#fdba74', filterKey: 'CANDIDATE_UPDATED', icon: '✏️' },
-  CANDIDATE_CANCELED: { label: 'CAND-CXL', color: '#f87171', filterKey: 'CANDIDATE_CANCELED', icon: '🗑' },
-  CANDIDATE_PROMOTED: { label: 'PROMOTED', color: '#fde047', filterKey: 'CANDIDATE_PROMOTED', icon: '⬆️' },
-  PROPOSAL_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'PROPOSAL_FEEDBACK', icon: '💬' },
-  CANDIDATE_FEEDBACK: { label: 'FEEDBACK', color: '#94a3b8', filterKey: 'CANDIDATE_FEEDBACK', icon: '💬' },
+  CANDIDATE_CREATED: {
+    label: 'CAND',
+    color: '#fb923c',
+    filterKey: 'CANDIDATE_CREATED',
+    icon: '📝',
+  },
+  CANDIDATE_SPONSORED: {
+    label: 'SPONSOR',
+    color: '#f472b6',
+    filterKey: 'CANDIDATE_SPONSORED',
+    icon: '✍️',
+  },
+  CANDIDATE_UPDATED: {
+    label: 'CAND-UPD',
+    color: '#fdba74',
+    filterKey: 'CANDIDATE_UPDATED',
+    icon: '✏️',
+  },
+  CANDIDATE_CANCELED: {
+    label: 'CAND-CXL',
+    color: '#f87171',
+    filterKey: 'CANDIDATE_CANCELED',
+    icon: '🗑',
+  },
+  CANDIDATE_PROMOTED: {
+    label: 'PROMOTED',
+    color: '#fde047',
+    filterKey: 'CANDIDATE_PROMOTED',
+    icon: '⬆️',
+  },
+  PROPOSAL_FEEDBACK: {
+    label: 'FEEDBACK',
+    color: '#94a3b8',
+    filterKey: 'PROPOSAL_FEEDBACK',
+    icon: '💬',
+  },
+  CANDIDATE_FEEDBACK: {
+    label: 'FEEDBACK',
+    color: '#94a3b8',
+    filterKey: 'CANDIDATE_FEEDBACK',
+    icon: '💬',
+  },
   STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED', icon: '🌊' },
   DELEGATION: { label: 'DELEG', color: '#e879f9', filterKey: 'DELEGATION', icon: '🤝' },
   TRANSFER: { label: 'XFER', color: '#f9a8d4', filterKey: 'TRANSFER', icon: '↔️' },
   PROPOSAL_QUEUED: { label: 'QUEUED', color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED', icon: '⏳' },
-  PROPOSAL_EXECUTED: { label: 'EXEC', color: '#34d399', filterKey: 'PROPOSAL_EXECUTED', icon: '✅' },
-  PROPOSAL_CANCELLED: { label: 'CANCEL', color: '#f87171', filterKey: 'PROPOSAL_CANCELLED', icon: '🚫' },
+  PROPOSAL_EXECUTED: {
+    label: 'EXEC',
+    color: '#34d399',
+    filterKey: 'PROPOSAL_EXECUTED',
+    icon: '✅',
+  },
+  PROPOSAL_CANCELLED: {
+    label: 'CANCEL',
+    color: '#f87171',
+    filterKey: 'PROPOSAL_CANCELLED',
+    icon: '🚫',
+  },
   PROPOSAL_VETOED: { label: 'VETOED', color: '#fb923c', filterKey: 'PROPOSAL_VETOED', icon: '⛔' },
   GRANT_CREATED: { label: 'GRANT', color: '#22d3ee', filterKey: 'GRANT_CREATED', icon: '🎁' },
   GRANT_VOTE: { label: 'GVOTE', color: '#67e8f9', filterKey: 'GRANT_VOTE', icon: '🗳' },
@@ -34,10 +79,25 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
   GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED', icon: '✅' },
   GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED', icon: '🚫' },
   LIL_BID: { label: 'L-BID', color: '#93c5fd', filterKey: 'LIL_BID', icon: '💰' },
-  LIL_AUCTION_SETTLED: { label: 'L-SETTLED', color: '#86efac', filterKey: 'LIL_AUCTION_SETTLED', icon: '🔥' },
-  LIL_NOUN_CREATED: { label: 'L-NOUN', color: '#86efac', filterKey: 'LIL_NOUN_CREATED', icon: '🔔' },
+  LIL_AUCTION_SETTLED: {
+    label: 'L-SETTLED',
+    color: '#86efac',
+    filterKey: 'LIL_AUCTION_SETTLED',
+    icon: '🔥',
+  },
+  LIL_NOUN_CREATED: {
+    label: 'L-NOUN',
+    color: '#86efac',
+    filterKey: 'LIL_NOUN_CREATED',
+    icon: '🔔',
+  },
   LIL_VOTE: { label: 'L-VOTE', color: '#d8b4fe', filterKey: 'LIL_VOTE', icon: '🗳' },
-  LIL_PROPOSAL_CREATED: { label: 'L-PROP', color: '#fde047', filterKey: 'LIL_PROPOSAL_CREATED', icon: '📜' },
+  LIL_PROPOSAL_CREATED: {
+    label: 'L-PROP',
+    color: '#fde047',
+    filterKey: 'LIL_PROPOSAL_CREATED',
+    icon: '📜',
+  },
   LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER', icon: '↔️' },
   SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE', icon: '🏷' },
   // NounV2 (fork) — all use red shades to make v2 activity visually distinct.
@@ -50,28 +110,36 @@ export const EVENT_TYPES: Record<string, EventTypeConfig> = {
 };
 
 // Filter tabs shown in the UI
-export const FILTER_TABS = [
-  { key: '', label: 'ALL' },
-  { key: 'BID', label: 'BIDS' },
-  { key: 'VOTE', label: 'VOTES' },
-  { key: 'PROPOSAL_CREATED', label: 'PROPS' },
+/**
+ * Filter tabs across the top of the terminal feed. `color` is the anchor used
+ * by the disco-mode gradient ink on each label; it mirrors the matching
+ * EVENT_CONFIG colour so the tab reads the same hue as the rows it filters.
+ * `ALL` is null → CSS paints a rainbow.
+ */
+export const FILTER_TABS: { key: string; label: string; color: string | null }[] = [
+  { key: '', label: 'ALL', color: null },
+  { key: 'BID', label: 'BIDS', color: '#60a5fa' },
+  { key: 'VOTE', label: 'VOTES', color: '#c084fc' },
+  { key: 'PROPOSAL_CREATED', label: 'PROPS', color: '#facc15' },
   {
     key: 'CANDIDATE_CREATED,CANDIDATE_SPONSORED,CANDIDATE_PROMOTED,CANDIDATE_UPDATED,CANDIDATE_FEEDBACK,CANDIDATE_CANCELED',
     label: 'CAND',
+    color: '#fb923c',
   },
-  { key: 'AUCTION_SETTLED', label: 'AUCTIONS' },
-  { key: 'DELEGATION', label: 'DELEGATIONS' },
-  { key: 'TRANSFER', label: 'TRANSFERS' },
-  { key: 'CANDIDATE_SPONSORED', label: 'SPONSORS' },
-  { key: 'STREAM_CREATED', label: 'STREAMS' },
-  { key: 'GRANT_CREATED', label: 'GRANTS' },
+  { key: 'AUCTION_SETTLED', label: 'AUCTIONS', color: '#4ade80' },
+  { key: 'DELEGATION', label: 'DELEGATIONS', color: '#e879f9' },
+  { key: 'TRANSFER', label: 'TRANSFERS', color: '#f9a8d4' },
+  { key: 'CANDIDATE_SPONSORED', label: 'SPONSORS', color: '#f472b6' },
+  { key: 'STREAM_CREATED', label: 'STREAMS', color: '#2dd4bf' },
+  { key: 'GRANT_CREATED', label: 'GRANTS', color: '#22d3ee' },
   {
     key: 'LIL_BID,LIL_AUCTION_SETTLED,LIL_NOUN_CREATED,LIL_VOTE,LIL_PROPOSAL_CREATED,LIL_TRANSFER',
     label: 'LIL',
+    color: '#93c5fd',
   },
-  { key: 'SALE,V2_SALE', label: 'SALES' },
-  { key: '_V2', label: 'V2' },
-  { key: '_CHAT', label: 'CHAT' },
+  { key: 'SALE,V2_SALE', label: 'SALES', color: '#f97316' },
+  { key: '_V2', label: 'V2', color: '#ef4444' },
+  { key: '_CHAT', label: 'CHAT', color: '#a5f3fc' },
 ];
 
 // ─── Address Formatting ────────────────────────────────────────────────────
