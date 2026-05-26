@@ -59,6 +59,7 @@ import StatsPage from '@/pages/StatsPage';
 import UndergroundPage from '@/pages/Underground';
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 import NonsensePage from '@/pages/NonsensePage';
+const WalletExplorerPage = lazy(() => import('@/pages/WalletExplorerPage'));
 import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 const VotePageRouter = lazy(() => import('@/pages/Vote/VotePageRouter'));
@@ -164,6 +165,22 @@ function SiteRoutes() {
         }
       />
       <Route path="nonsense" element={<NonsensePage />} />
+      <Route
+        path="explore/wallet"
+        element={
+          <Suspense fallback={null}>
+            <WalletExplorerPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="explore/wallet/:identity"
+        element={
+          <Suspense fallback={null}>
+            <WalletExplorerPage />
+          </Suspense>
+        }
+      />
       <Route path="dreams" element={<Navigate to="/probe?tab=dreams" replace />} />
       <Route path="dreams/create" element={<Navigate to="/probe?tab=dreams" replace />} />
       <Route

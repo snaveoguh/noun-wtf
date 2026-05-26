@@ -521,7 +521,9 @@ async function findCandidates(
     else if (kwTokens.length === 1) {
       const haystack = `${slugNorm} ${titleNorm} ${descNorm}`;
       if (haystack.includes(kwTokens[0])) {
-        score = slugNorm.includes(kwTokens[0]) ? 30 : (titleNorm.includes(kwTokens[0]) ? 25 : 15);
+        if (slugNorm.includes(kwTokens[0])) score = 30;
+        else if (titleNorm.includes(kwTokens[0])) score = 25;
+        else score = 15;
       }
     }
 
@@ -685,7 +687,9 @@ async function parseCommand(msg: string, wallet: string | undefined): Promise<Pa
       }
       const lines = ['Market signals (pooter.world):'];
       for (const s of signals) {
-        const arrow = s.direction === 'bullish' ? '↑' : (s.direction === 'bearish' ? '↓' : '→');
+        let arrow = '→';
+        if (s.direction === 'bullish') arrow = '↑';
+        else if (s.direction === 'bearish') arrow = '↓';
         lines.push(
           `  ${arrow} ${s.symbol}: ${s.direction} (confidence: ${(s.confidence * 100).toFixed(0)}%)`,
         );
@@ -5987,5 +5991,11 @@ app.get('/api/noun-holders', async c => {
 app.get('/api/health', c => {
   return c.json({ status: 'ok', timestamp: Date.now() });
 });
+
+// ─── Wallet Explorer — /api/wallet-map/:identity ────────────────────────────
+// Identity-graph endpoint that powers /explore/wallet on the frontend.
+// See ./walletMap.ts for the full pipeline.
+import { registerWalletMapRoute } from './walletMap.js';
+registerWalletMapRoute(app, db);
 
 export default app;
