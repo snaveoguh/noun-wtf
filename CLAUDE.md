@@ -19,6 +19,10 @@ Netlify's site metadata is legacy/manual-ish, so treat GitHub as the source of t
 
 GitHub Actions handles publishing to the existing Netlify sites. Do not create duplicate Netlify sites.
 
+**API deploys are separate.** The Ponder indexer/API lives on Railway project `spirited-flexibility` and does **not** auto-deploy on git push. After any change under `packages/nouns-api/`, run `railway up` from that package — pushing to GitHub only updates Netlify (the webapp), never Railway.
+
+`VITE_*` env vars for the webapp are baked at build time and are hardcoded in `.github/workflows/netlify-deploy.yml`, not in the Netlify UI. Edit the workflow to change bundled values.
+
 Remote notes:
 - `nounwtf` = your fork (`snaveoguh/noun-wtf`)
 - `origin` = upstream Nouns DAO monorepo
@@ -134,13 +138,36 @@ pnpm i18n:compile             # Compile translations
 ```
 
 ### Routing Structure
-- `/` - Current auction
-- `/noun/:id` - Specific noun auction
-- `/vote` - Governance proposals list
-- `/vote/:id` - Specific proposal
-- `/candidates/:id` - Proposal candidates
-- `/playground` - Noun trait playground
+
+Routes are split into V1 (legacy NounsToken) and V2 (NounV2Token, launched 2026-04-24) namespaces — see `nounwtf_v2_launch_dayone.md` memory for the day-one rationale. No `?dao=` query param, no localStorage toggle.
+
+V1 (default namespace):
+- `/` - Current V1 auction
+- `/noun/:id` - Specific V1 noun
+- `/vote`, `/vote/:id` - V1 governance proposals
+- `/candidates/:id` - V1 proposal candidates
+
+V2:
+- `/v2` - Current V2 auction
+- `/v2/noun/:id` - Specific V2 noun
+- `/v2/vote`, `/v2/vote/:id`, `/v2/candidates/:id` - V2 governance
+
+Shared:
+- `/playground` - Noun trait playground (2D editor; has a "Save as Dream" backlog item)
 - `/fork/:id` - Fork-specific pages
+- `/explore/wallet`, `/explore/wallet/:identity` - Wallet explorer (Nouns held + delegated, governance activity, transfer history)
+
+### AuctionHouse + Indexer Notes
+
+V4 AuctionHouse went live 2026-05-25 (Prop 968). Behavioural change vs V3: when an auction settles with **no bid**, the noun is **routed to the nouns.eth treasury** rather than burned. The indexer in `nouns-api/` distinguishes the two cases by calling `ownerOf` after settlement — only `0x000…dead` (or a true burn) sets `burned=true`; a treasury-routed noun is left owned by `nouns.eth`.
+
+The webapp's `BurnedNounContent` currently only knows the burn copy; it should not render for treasury-routed nouns (the indexer guards this), but a "held by Nouns DAO Treasury" branch is on the followups list as belt-and-braces.
+
+V4 + auto-settler context lives in `nounwtf_v4_disco_ship_2026-05-25.md` and `nounirl_settlement_bot.md` memories.
+
+### Terminal / Disco Default
+
+The terminal feed defaults to 🪩 disco mode (CSS architecture documented in `nounwtf_v4_disco_ship_2026-05-25.md`). Other themes still exist; disco is just the default skin.
 
 ## Image System
 
@@ -159,9 +186,20 @@ Required for webapp development (prefix with `VITE_`):
 - `VITE_WALLET_CONNECT_V2_PROJECT_ID`: WalletConnect integration
 
 Optional:
-- `VITE_MAINNET_JSONRPC`: Custom RPC endpoint (defaults to Infura)
+- `VITE_MAINNET_JSONRPC` / `VITE_MAINNET_WSRPC`: Override the default RPC. When unset, the webapp uses free public endpoints — primary is `https://ethereum-rpc.publicnode.com` (`src/config.ts:48-56`), with a wagmi-level fallback chain through `1rpc.io` and `eth.merkle.io`. No Infura key is used or required (the free Infura tier started 402'ing under wallet-explorer traffic; see commit `b6a25cee2`). `VITE_INFURA_KEY` is dead and can be removed from GitHub Actions secrets when convenient.
 - `VITE_ENABLE_HISTORY`: Enable proposal history features
 - `VITE_ENABLE_REDUX_LOGGER`: Enable Redux action logging in dev
+
+### TanStack QueryClient defaults
+
+The root `QueryClient` (`src/index.tsx:64-75`) is tuned for free public RPCs:
+- `staleTime: 30_000` — survives tab/route remounts without refetching
+- `retry: 1`, exponential backoff capped at 8s
+- `refetchOnWindowFocus: false`, `refetchOnReconnect: false`
+
+These exist because the TanStack defaults (staleTime 0, 3 retries, refocus refetch on) were amplifying single 429s from publicnode into 30-call cascades. Per-hook overrides still win — e.g. immutable settled-auction data uses `staleTime: Infinity`.
+
+The root `ErrorBoundary` also swallows RPC-shape render errors (Chrome's `reading 'data'` and Safari's `evaluating '...data'`) so transient RPC failures don't tombstone the whole app.
 
 ## Testing
 
