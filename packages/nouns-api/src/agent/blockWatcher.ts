@@ -62,9 +62,12 @@ import {
 } from './traitPredictor.js';
 
 // ─── Settlement Config ────────────────────────────────────────────────────
-const SETTLEMENT_GAS_LIMIT = 600_000n;
+// Preflight balance check on the RPC requires `balance >= gasLimit * maxFeePerGas`.
+// Settlement actually burns ~250-350k gas at near-base-fee. The old 600k × 200 gwei
+// reserved 0.12 ETH up front — bot was permanently locked out unless funded heavily.
+const SETTLEMENT_GAS_LIMIT = 500_000n;
 const SETTLEMENT_PRIORITY_FEE = parseGwei('5');
-const SETTLEMENT_MAX_FEE = parseGwei('200');
+const SETTLEMENT_MAX_FEE = parseGwei('20');
 
 // Pre-encoded calldata — settleCurrentAndCreateNewAuction() takes no args
 // This is constant and never changes. Encode once, reuse forever.
