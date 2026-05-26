@@ -71,12 +71,24 @@ export function seedToPixelLayers(seed: INounSeed, isV2 = false): NounPixelLayer
   const bgColor = `#${(data.bgcolors as string[])[bgIdx] ?? 'e1d7d5'}`;
 
   // parts order: [body, accessory, head, glasses]
+  // Guard against out-of-range seed indices. The V2 toggle path can pass a
+  // V1-derived seed through this with `isV2=true` during the brief render
+  // window between toggle click and the V2 auction data landing — V1 indices
+  // (e.g. accessory up to 142, head up to 253) can exceed V2's smaller arrays
+  // (144 accessories, 253 heads) by edge cases like founder-trait additions.
+  // Previously this crashed the whole page with "undefined is not an object
+  // (evaluating 'R[1].data')". Now missing parts render as transparent
+  // 32x32 grids so the page reconciles once the right seed arrives.
+  const emptyGrid = (): string[][] => Array.from({ length: 32 }, () => Array<string>(32).fill(''));
+  const safePart = (i: number): string[][] =>
+    parts[i]?.data != null ? decodePartToGrid(parts[i].data, palette) : emptyGrid();
+
   return {
     background: bgColor,
-    body: decodePartToGrid(parts[0].data, palette),
-    accessory: decodePartToGrid(parts[1].data, palette),
-    head: decodePartToGrid(parts[2].data, palette),
-    glasses: decodePartToGrid(parts[3].data, palette),
+    body: safePart(0),
+    accessory: safePart(1),
+    head: safePart(2),
+    glasses: safePart(3),
   };
 }
 
