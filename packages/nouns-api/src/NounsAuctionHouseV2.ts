@@ -63,22 +63,47 @@ ponder.on('NounsAuctionHouseV2:AuctionBidWithClientId', async ({ event, context 
 });
 
 // Zero address as the winner + zero amount = reserve-price auction that
-// ended with no qualifying bid. The NounsAuctionHouse contract burns the
-// noun in _settleAuction when the bidder is the zero address. We persist
-// burned=true and winner=null so the webapp can render a burned placeholder
-// instead of a "won by 0x000..." row.
+// ended with no qualifying bid. Historically the AuctionHouse burned the
+// noun to 0x0; as of Noun #1914 it transfers the unsold noun to the Nouns
+// DAO treasury (nouns.eth) instead. We confirm by reading ownerOf — only
+// flag burned when ownerOf reverts (no owner = actually burned).
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+const NOUNS_TOKEN_ADDRESS = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
+const NOUNS_TOKEN_OWNER_OF_ABI = [
+  {
+    type: 'function',
+    name: 'ownerOf',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const;
 
 ponder.on('NounsAuctionHouseV2:AuctionSettled', async ({ event, context }) => {
   const winner = event.args.winner;
   const amount = event.args.amount;
-  const isBurned = winner === ZERO_ADDRESS && amount === 0n;
+  const noQualifyingBid = winner === ZERO_ADDRESS && amount === 0n;
+
+  let actuallyBurned = false;
+  if (noQualifyingBid) {
+    try {
+      await context.client.readContract({
+        abi: NOUNS_TOKEN_OWNER_OF_ABI,
+        address: NOUNS_TOKEN_ADDRESS,
+        functionName: 'ownerOf',
+        args: [event.args.nounId],
+      });
+    } catch {
+      actuallyBurned = true;
+    }
+  }
+
   await context.db.update(auction, { nounId: event.args.nounId }).set({
     settled: true,
     // settler: event.transaction.from, // TODO: enable after initial sync
-    winner: isBurned ? null : winner,
+    winner: noQualifyingBid ? null : winner,
     amount,
-    burned: isBurned,
+    burned: actuallyBurned,
   });
 });
 
