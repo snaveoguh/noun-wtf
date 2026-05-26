@@ -88,8 +88,16 @@ const queryClient = new QueryClient({
 function isLikelyRpcDataError(error: Error): boolean {
   const m = (error?.message || '').toLowerCase();
   return (
+    // Chrome format: "Cannot read properties of undefined (reading 'data')"
     m.includes("reading 'data'") ||
     m.includes("reading 'result'") ||
+    // Safari format: "undefined is not an object (evaluating 'R[1].data')"
+    // Match the generic shape — any "evaluating '...data'" or "...result'"
+    // pattern, plus the bare "undefined is not an object" guard for when the
+    // expression part doesn't include those keywords.
+    (m.includes('evaluating') && (m.includes(".data'") || m.includes(".result'"))) ||
+    (m.includes('undefined is not an object') && (m.includes('.data') || m.includes('.result'))) ||
+    // Network / rate-limit shapes
     m.includes('429') ||
     m.includes('rate limit') ||
     m.includes('payment required') ||
