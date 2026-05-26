@@ -38,13 +38,14 @@ const MAX_EXTRA = 60; // extra blocks to fetch for grayscale row fill
 const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
 const MASK_48 = (1n << 48n) - 1n;
 
-// Infura (keyed) first — buidlguidl was unreachable and rpc.ankr.com/eth
-// now requires its own key, so both were dropped. publicnode is the no-key
-// fallback. Try each in order.
-const INFURA_KEY = import.meta.env.VITE_INFURA_KEY as string;
+// Free no-key CORS-enabled public endpoints, tried in order on failure.
+// Infura/Ankr/buidlguidl all dropped: Infura free tier 402s once cap hits,
+// Ankr now requires a key, buidlguidl was unreachable. See wagmi.ts for the
+// canonical list and why drpc/llamarpc/cloudflare are excluded.
 const RPC_URLS = [
-  ...(INFURA_KEY ? [`https://mainnet.infura.io/v3/${INFURA_KEY}`] : []),
   'https://ethereum-rpc.publicnode.com',
+  'https://1rpc.io/eth',
+  'https://eth.merkle.io',
 ];
 
 // ─── ABIs (minimal) ──────────────────────────────────────────────────────────

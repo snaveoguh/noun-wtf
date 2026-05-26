@@ -20,38 +20,41 @@ const activeChain =
 // cold connect, which would block every read until it settles.
 const HTTP_TIMEOUT = 5_000;
 
-// Primary RPC: a keyed Infura endpoint when VITE_INFURA_KEY is set. Free
-// public endpoints do not survive this app's load — eth.llamarpc.com and
-// cloudflare-eth.com send no CORS headers (every browser request failed
-// preflight), and drpc.org's free tier rejects eth_getLogs ("method is not
-// available on freetier"). Infura serves the full method set over CORS.
-// publicnode is the no-key fallback: it works and passes CORS, but 429s
-// under sustained load, so it must never be the primary.
+// Free, no-key, CORS-enabled public RPCs. Ordered by observed reliability:
+// fallback() tries the first; on failure (timeout / 429 / 5xx / CORS) it
+// moves to the next. A real failure of all three means the chain is down.
+//
+// Endpoints we deliberately exclude:
+//   - mainnet.infura.io  — keyed, free tier is too small and 402s once cap hits
+//   - rpc.ankr.com/eth   — now requires a key for public access
+//   - eth.llamarpc.com   — no CORS headers, every browser preflight fails
+//   - cloudflare-eth.com — same CORS issue
+//   - eth.drpc.org       — free tier rejects eth_getLogs (we need it for events)
 //
 // `rank` is deliberately off. `rank: true` fires continuous background
 // sample requests at every transport to reorder them — that was itself a
 // heavy source of 429s. Plain ordered fallback only touches a transport
 // when a real request needs one.
-const infuraKey = import.meta.env.VITE_INFURA_KEY as string;
+//
+// VITE_MAINNET_JSONRPC / VITE_SEPOLIA_JSONRPC override the primary if set
+// (e.g. local dev hitting hardhat, or pasting in a key'd Alchemy URL).
 const mainnetPrimary =
-  (import.meta.env.VITE_MAINNET_JSONRPC as string) ||
-  (infuraKey ? `https://mainnet.infura.io/v3/${infuraKey}` : 'https://ethereum-rpc.publicnode.com');
+  (import.meta.env.VITE_MAINNET_JSONRPC as string) || 'https://ethereum-rpc.publicnode.com';
 const sepoliaPrimary =
-  (import.meta.env.VITE_SEPOLIA_JSONRPC as string) ||
-  (infuraKey
-    ? `https://sepolia.infura.io/v3/${infuraKey}`
-    : 'https://ethereum-sepolia-rpc.publicnode.com');
+  (import.meta.env.VITE_SEPOLIA_JSONRPC as string) || 'https://ethereum-sepolia-rpc.publicnode.com';
 
 const transports = {
   [mainnet.id]: fallback([
     http(mainnetPrimary, { timeout: HTTP_TIMEOUT }),
-    http('https://ethereum-rpc.publicnode.com', { timeout: HTTP_TIMEOUT }),
+    http('https://1rpc.io/eth', { timeout: HTTP_TIMEOUT }),
+    http('https://eth.merkle.io', { timeout: HTTP_TIMEOUT }),
     ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
       ? [webSocket(import.meta.env.VITE_MAINNET_WSRPC)]
       : []),
   ]),
   [sepolia.id]: fallback([
     http(sepoliaPrimary, { timeout: HTTP_TIMEOUT }),
+    http('https://1rpc.io/sepolia', { timeout: HTTP_TIMEOUT }),
     ...(import.meta.env.VITE_SEPOLIA_WSRPC !== undefined
       ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
       : []),
