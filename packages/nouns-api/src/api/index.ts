@@ -9567,4 +9567,10 @@ app.get('/api/gas-leaderboard', async c => {
   return c.json({ status: 'building' }, 202);
 });
 
+// ─── Wallet Explorer — /api/wallet-map/:identity ────────────────────────────
+// Identity-graph endpoint that powers /explore/wallet on the frontend.
+// See ./walletMap.ts for the full pipeline.
+import { registerWalletMapRoute } from './walletMap.js';
+registerWalletMapRoute(app, db);
+
 export default app;
