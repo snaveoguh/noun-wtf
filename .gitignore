@@ -12,6 +12,12 @@ dist
 .claude
 .grapevine
 
+# Local promo-video skill scratch (per-render frame dumps + ffmpeg intermediates)
+.video-build/
+
+# Abandoned visionos starter — its own nested git repo, never linked as a submodule
+packages/nouns-world-visionos/
+
 # Local Netlify folder
 .netlify
 
