@@ -45,18 +45,72 @@ import { nounPath } from './utils/history';
 import { defaultChain, config as wagmiConfig } from './wagmi';
 import { clientFactory, latestAuctionsQuery, singleAuctionQuery } from './wrappers/subgraph';
 
-const queryClient = new QueryClient();
+// Defaults tuned for an RPC-constrained app on free public endpoints:
+//   - staleTime 30s — components can mount/unmount during navigation
+//     (tab switches, DAO toggle, route changes) without each remount firing
+//     a fresh chain read. TanStack's default of 0 made every transition a
+//     storm of `useReadContract` refetches.
+//   - retry 1 — wagmi reads that fail once usually fail again on the same
+//     transport. Three default retries × every read × every refocus was the
+//     amplifier turning a single 429 into a 30-call cascade.
+//   - refetchOnWindowFocus off — Cmd-Tab-ing to inspect a tx on Etherscan
+//     and back used to refire every active query. Block-level freshness is
+//     handled by the explicit watcher in `ChainSubscriber`, not by polling.
+//   - refetchOnReconnect off — same reasoning. Reconnect happens on every
+//     wifi blip and shouldn't trigger a thundering herd.
+// Per-hook overrides (e.g. `useDaoNounSeed`'s 5min staleTime for immutable
+// seed data) still take precedence; this just stops the default from being
+// "as fresh as possible at all costs".
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+      retryDelay: attempt => Math.min(1000 * 2 ** attempt, 8000),
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
+  },
+});
 
-/** Catch React render errors so the whole page doesn't go white */
+/**
+ * Catch React render errors so the whole page doesn't go white.
+ *
+ * Transient RPC failures (free public endpoints rate-limiting under a
+ * traffic spike) used to escape as `Cannot read properties of undefined
+ * (reading 'data')` and trip the boundary, tombstoning the whole app
+ * until the user manually reloaded. We now identify that family of
+ * errors and ignore them — the underlying TanStack queries will retry
+ * on their own cadence and the page reconciles itself once data lands.
+ * A logic error (anything not RPC-shape) still trips the boundary.
+ */
+function isLikelyRpcDataError(error: Error): boolean {
+  const m = (error?.message || '').toLowerCase();
+  return (
+    m.includes("reading 'data'") ||
+    m.includes("reading 'result'") ||
+    m.includes('429') ||
+    m.includes('rate limit') ||
+    m.includes('payment required') ||
+    m.includes('http request failed')
+  );
+}
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
 > {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) {
+    if (isLikelyRpcDataError(error)) {
+      console.warn('[ErrorBoundary] swallowing transient RPC error:', error.message);
+      return { error: null };
+    }
     return { error };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (isLikelyRpcDataError(error)) return;
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
   render() {
@@ -65,7 +119,9 @@ class ErrorBoundary extends React.Component<
         <div style={{ padding: 40, fontFamily: 'monospace' }}>
           <h2>Something went wrong</h2>
           <pre style={{ whiteSpace: 'pre-wrap', color: '#c00' }}>{this.state.error.message}</pre>
-          <button onClick={() => window.location.reload()}>Reload</button>
+          <button type="button" onClick={() => window.location.reload()}>
+            Reload
+          </button>
         </div>
       );
     }
