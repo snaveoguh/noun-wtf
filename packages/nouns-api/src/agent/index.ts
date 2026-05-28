@@ -39,6 +39,13 @@ import {
 } from './selfLearn.js';
 import { verifyTip, getAgentBalance } from './tipVerifier.js';
 import {
+  getTraitCounts,
+  getTraitCountsSnapshot,
+  refreshTraitCounts,
+  startTraitCountRefresher,
+  stopTraitCountRefresher,
+} from './traitCounts.js';
+import {
   predictSeed,
   seedToTraitNames,
   matchesTraits,
@@ -53,6 +60,11 @@ let started = false;
 export function initAgent(): void {
   if (started) return;
   started = true;
+
+  // Always start the live trait-count refresher so predictions stay aligned
+  // with the on-chain descriptor, even in API-only mode (the `/api/agent/predict`
+  // endpoint hits `predictSeed()` and needs the correct counts too).
+  startTraitCountRefresher();
 
   // Only start the block watcher if the agent wallet is configured
   if (process.env.NOUNIRL_ADDRESS) {
@@ -86,6 +98,13 @@ export {
   matchesTraits,
   parseTraitDescription,
   getAllTraitNames,
+
+  // Live trait counts (from on-chain descriptor)
+  getTraitCounts,
+  getTraitCountsSnapshot,
+  refreshTraitCounts,
+  startTraitCountRefresher,
+  stopTraitCountRefresher,
 
   // Deployer
   generatePatch,

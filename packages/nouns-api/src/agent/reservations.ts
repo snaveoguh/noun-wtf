@@ -122,11 +122,30 @@ function rowToSettlement(row: any): Settlement {
   };
 }
 
+// ─── On-Chain Settle Attempt Tracking ──────────────────────────────────────
+// Counts every settle tx the bot lands successfully on-chain, regardless of
+// whether the resulting noun matches the predicted/reserved traits. This is
+// the "did the bot actually settle?" counter, complementing the
+// reservation-fulfilment counter (settlements[]).
+
+export interface SettleAttempt {
+  txHash: string;
+  blockNumber: number;
+  nounId: number;
+  matched: boolean; // true = traits matched a reservation, false = predicted-vs-actual missed
+  reservationId?: string;
+  at: number;       // unix seconds
+}
+
+const SETTLE_ATTEMPT_RING_SIZE = 10;
+
 // ─── Store ─────────────────────────────────────────────────────────────────
 
 class ReservationStore {
   private reservations: Map<string, Reservation> = new Map();
   private settlements: Settlement[] = [];
+  private settleAttempts: SettleAttempt[] = [];
+  private totalOnchainSettlements = 0;
   private dirty = false;
   private pgReady = false;
 
@@ -192,6 +211,34 @@ class ReservationStore {
     }
   }
 
+  /**
+   * Persist a verified tip amount back to Postgres.
+   * Callers used to mutate `r.tipAmountEth` directly after `verifyTip`, but
+   * that change never made it to the DB (no UPDATE was issued), so every
+   * reservation read back from Postgres showed `tipAmountEth: 0`. This method
+   * mutates in-memory AND writes the new value to Postgres.
+   */
+  setTipAmount(id: string, amountEth: number): void {
+    const r = this.reservations.get(id);
+    if (!r) return;
+    r.tipAmountEth = amountEth;
+    this.dirty = true;
+    this.persistToFile();
+    void this.updateTipAmountInPg(id, amountEth);
+  }
+
+  private async updateTipAmountInPg(id: string, amountEth: number): Promise<void> {
+    if (!pool || !this.pgReady) return;
+    try {
+      await pool.query(
+        `UPDATE nounirl_reservations SET tip_amount_eth = $1 WHERE id = $2`,
+        [amountEth, id],
+      );
+    } catch (err) {
+      console.error('[NounIRL] Failed to update tip_amount_eth in Postgres:', err);
+    }
+  }
+
   fulfill(id: string, nounId: number, txHash: string): void {
     const r = this.reservations.get(id);
     if (r && r.status === 'active') {
@@ -244,6 +291,40 @@ class ReservationStore {
     return this.settlements.slice(-limit).reverse();
   }
 
+  /**
+   * Record that the bot's settle tx landed on-chain successfully — independent
+   * of whether the resulting noun matched a reservation's traits. This is the
+   * accurate "how many auctions did the bot actually settle?" counter.
+   *
+   * `matched=true` lines up with `addSettlement` (reservation fulfilment).
+   * `matched=false` means the tx succeeded but the predicted seed missed
+   * (e.g. the bot was one block late and the seeder used a different block
+   * hash), so the minted noun didn't satisfy the active reservation.
+   */
+  recordOnchainSettle(attempt: SettleAttempt): void {
+    this.totalOnchainSettlements++;
+    this.settleAttempts.push(attempt);
+    if (this.settleAttempts.length > SETTLE_ATTEMPT_RING_SIZE) {
+      this.settleAttempts.shift();
+    }
+  }
+
+  getRecentSettleAttempts(): SettleAttempt[] {
+    return [...this.settleAttempts].reverse();
+  }
+
+  /** Flip the most-recently recorded settle attempt's matched flag. Used
+   *  after trait verification passes so the ring reflects which settles
+   *  actually fulfilled the reservation. */
+  markSettleAttemptMatched(txHash: string): void {
+    for (let i = this.settleAttempts.length - 1; i >= 0; i--) {
+      if (this.settleAttempts[i]?.txHash === txHash) {
+        this.settleAttempts[i]!.matched = true;
+        return;
+      }
+    }
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────
 
   stats() {
@@ -254,7 +335,13 @@ class ReservationStore {
       pending: all.filter(r => r.status === 'pending_verification').length,
       fulfilled: all.filter(r => r.status === 'fulfilled').length,
       cancelled: all.filter(r => r.status === 'cancelled').length,
+      // Reservations fulfilled (predicted seed matched, on-chain seed matched
+      // the reservation traits). Kept for backwards compat.
       totalSettlements: this.settlements.length,
+      // Every settle tx the bot landed on-chain, including ones where the
+      // resulting noun didn't match the reservation. This is the real
+      // "how active is the bot?" number.
+      totalOnchainSettlements: this.totalOnchainSettlements,
     };
   }
 

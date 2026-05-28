@@ -205,6 +205,7 @@ import {
   buildFunctionSkillPromptSnippet,
   predictSeed,
   seedToTraitNames,
+  getTraitCountsSnapshot,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
@@ -5104,7 +5105,10 @@ CRITICAL RULES:
                     if (tipResult.valid) {
                       const r = reservationStore.get(reservation.id);
                       if (r) {
-                        r.tipAmountEth = tipResult.amountEth || 0;
+                        // Persist tip amount to Postgres before activating —
+                        // a plain `r.tipAmountEth = ...` would only mutate
+                        // memory and the value would be lost on next deploy.
+                        reservationStore.setTipAmount(reservation.id, tipResult.amountEth || 0);
                         reservationStore.activate(reservation.id);
                         console.log(
                           `[NounIRL] ✅ Reservation ${reservation.id} verified & activated — ${tipResult.amountEth} ETH from ${tipResult.chainName}`,
@@ -7700,6 +7704,8 @@ app.get('/api/agent/status', async c => {
     /* ok */
   }
 
+  const traitCountsSnapshot = getTraitCountsSnapshot();
+
   return c.json({
     agent: 'NounIRL',
     wallet: process.env.NOUNIRL_ADDRESS || 'not configured',
@@ -7715,8 +7721,15 @@ app.get('/api/agent/status', async c => {
     errors: watcherState.errors.slice(-5),
     balanceEth: Math.round(balance * 10000) / 10000,
     reservations: stats,
+    recentSettleAttempts: reservationStore.getRecentSettleAttempts(),
     canDeploy: canDeploy(),
     bridge: isBridgeConfigured() ? 'connected' : 'not configured',
+    traitCounts: {
+      counts: traitCountsSnapshot.counts,
+      source: traitCountsSnapshot.source,
+      descriptor: traitCountsSnapshot.descriptor,
+      fetchedAt: traitCountsSnapshot.fetchedAt,
+    },
   });
 });
 
@@ -7766,7 +7779,10 @@ app.post('/api/agent/reserve', async c => {
           // Update amount and activate
           const r = reservationStore.get(reservation.id);
           if (r) {
-            r.tipAmountEth = result.amountEth || 0;
+            // Persist tip amount to Postgres before activating — a plain
+            // `r.tipAmountEth = ...` would only mutate memory and the value
+            // would be lost on next deploy.
+            reservationStore.setTipAmount(reservation.id, result.amountEth || 0);
             reservationStore.activate(reservation.id);
             console.log(
               `[NounIRL] ✅ Reservation ${reservation.id} verified and activated — ${result.amountEth} ETH from ${result.chainName}`,
@@ -7816,6 +7832,92 @@ app.post('/api/agent/cancel/:id', c => {
 
   reservationStore.cancel(id);
   return c.json({ success: true, message: 'Reservation cancelled' });
+});
+
+// ── Backfill tipAmountEth for reservations stored as 0 ──────────────────
+// One-shot: walks every reservation with tipAmountEth === 0, fetches the
+// underlying tx on the correct chain, reads tx.value, and persists. Safe to
+// re-run — no-ops on rows that already have a positive amount.
+app.post('/api/agent/backfill-tip-amounts', async c => {
+  try {
+    const { createPublicClient, http, formatEther } = await import('viem');
+    const viemChains = await import('viem/chains');
+    const { SUPPORTED_CHAINS } = await import('../agent/constants.js');
+
+    // viem's per-chain types are uniquely narrowed; cast to a common shape so
+    // a single Record can hold them.
+    const chains: Record<number, any> = {
+      1: viemChains.mainnet,
+      8453: viemChains.base,
+      10: viemChains.optimism,
+      42161: viemChains.arbitrum,
+      7777777: viemChains.zora,
+    };
+
+    const all = reservationStore.getAll();
+    const candidates = all.filter(r => !r.tipAmountEth || r.tipAmountEth === 0);
+
+    const results: Array<{
+      id: string;
+      txHash: string;
+      chainId: number;
+      before: number;
+      after?: number;
+      error?: string;
+    }> = [];
+
+    for (const r of candidates) {
+      const chain = chains[r.tipChainId];
+      const cfg = SUPPORTED_CHAINS[r.tipChainId];
+      if (!chain || !cfg) {
+        results.push({
+          id: r.id,
+          txHash: r.tipTxHash,
+          chainId: r.tipChainId,
+          before: r.tipAmountEth,
+          error: `Unsupported chain ${r.tipChainId}`,
+        });
+        continue;
+      }
+      try {
+        const client = createPublicClient({ chain, transport: http(cfg.rpc) });
+        const tx = await client.getTransaction({ hash: r.tipTxHash as `0x${string}` });
+        const amount = Number(formatEther(tx.value));
+        if (amount > 0) {
+          reservationStore.setTipAmount(r.id, amount);
+        }
+        results.push({
+          id: r.id,
+          txHash: r.tipTxHash,
+          chainId: r.tipChainId,
+          before: r.tipAmountEth,
+          after: amount,
+        });
+      } catch (err) {
+        results.push({
+          id: r.id,
+          txHash: r.tipTxHash,
+          chainId: r.tipChainId,
+          before: r.tipAmountEth,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    const updated = results.filter(x => x.after && x.after > 0).length;
+    return c.json({
+      success: true,
+      scanned: candidates.length,
+      updated,
+      results,
+    });
+  } catch (err) {
+    console.error('[NounIRL] Backfill error:', err);
+    return c.json(
+      { success: false, error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
+  }
 });
 
 // ── Manual Check ────────────────────────────────────────────────────────

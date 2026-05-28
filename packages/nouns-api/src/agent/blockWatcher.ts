@@ -464,6 +464,19 @@ async function onNewBlock(
                   return; // Reservation stays active
                 }
 
+                // Tx succeeded on-chain — count it regardless of trait match.
+                // This is the "did the bot land a settle?" counter. The
+                // reservation-fulfilment counter (settlements[]) only ticks
+                // below if actual traits also match the reservation.
+                reservationStore.recordOnchainSettle({
+                  txHash,
+                  blockNumber: Number(receipt.blockNumber),
+                  nounId: settledNounId,
+                  matched: false, // flipped to true below if trait verification passes
+                  reservationId: resId,
+                  at: Math.floor(Date.now() / 1000),
+                });
+
                 // Tx succeeded — now verify actual traits match the reservation
                 let actualTraits: TraitNames | null = null;
                 try {
@@ -517,6 +530,7 @@ async function onNewBlock(
 
                 // All checks passed — record the settlement
                 const confirmedTraits = actualTraits ?? settledTraits;
+                reservationStore.markSettleAttemptMatched(txHash);
                 reservationStore.fulfill(resId, settledNounId, txHash);
                 reservationStore.addSettlement({
                   nounId: settledNounId,

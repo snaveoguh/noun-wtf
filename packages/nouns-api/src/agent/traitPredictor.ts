@@ -16,7 +16,7 @@
 
 import { keccak256, encodePacked, type Hex } from 'viem';
 import { ImageData } from '@noundry/nouns-assets';
-import { TRAIT_COUNTS } from './constants.js';
+import { getTraitCounts } from './traitCounts.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -85,10 +85,15 @@ export function predictSeed(
   // Extract 48-bit chunks via right shift + mask
   const mask48 = (1n << 48n) - 1n;
 
-  const background = Number((pseudorandomness & mask48) % BigInt(TRAIT_COUNTS.background));
-  const body = Number(((pseudorandomness >> 48n) & mask48) % BigInt(TRAIT_COUNTS.body));
-  const head = Number(((pseudorandomness >> 144n) & mask48) % BigInt(TRAIT_COUNTS.head));
-  const glasses = Number(((pseudorandomness >> 192n) & mask48) % BigInt(TRAIT_COUNTS.glasses));
+  // Use the live trait counts cached from the on-chain descriptor — falls back
+  // to the hardcoded constants in `constants.ts` if the descriptor read failed
+  // at startup (see `traitCounts.ts`).
+  const counts = getTraitCounts();
+
+  const background = Number((pseudorandomness & mask48) % BigInt(counts.background));
+  const body = Number(((pseudorandomness >> 48n) & mask48) % BigInt(counts.body));
+  const head = Number(((pseudorandomness >> 144n) & mask48) % BigInt(counts.head));
+  const glasses = Number(((pseudorandomness >> 192n) & mask48) % BigInt(counts.glasses));
 
   let accessory: number;
   if (variant === 'v2') {
@@ -96,7 +101,12 @@ export function predictSeed(
     // Sample from [0, accessoryCount - 1), then shift any pick at-or-above
     // SLOBBER_INDEX up by one. Effective range:
     //   [0, SLOBBER_INDEX) ∪ (SLOBBER_INDEX, accessoryCount)
-    const accessoryRange = BigInt(TRAIT_COUNTS.accessory - 1);
+    //
+    // NB: `counts` is sourced from the V1 descriptor. V2 prediction has its
+    // own outstanding bugs (see nounirl_settlement_bot memory) — this branch
+    // is intentionally left on the V1 counts as a known-broken path rather
+    // than wiring up a separate V2 descriptor refresher here.
+    const accessoryRange = BigInt(counts.accessory - 1);
     let acc = Number(((pseudorandomness >> 96n) & mask48) % accessoryRange);
     if (acc >= V2_SLOBBER_INDEX) acc += 1;
 
@@ -114,7 +124,7 @@ export function predictSeed(
 
     accessory = acc;
   } else {
-    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(TRAIT_COUNTS.accessory));
+    accessory = Number(((pseudorandomness >> 96n) & mask48) % BigInt(counts.accessory));
   }
 
   return { background, body, accessory, head, glasses };
