@@ -13,7 +13,7 @@
 
 import type { MovementBody } from './movementBody';
 import { findClimbFace } from './structures';
-import { WALL_RUN_GRAVITY_FACTOR, WALL_RUN_MAX_DURATION_FRAMES, LOCOMOTION_GRAVITY } from './types';
+import { TUNING } from './movementTuning';
 import { triggerFocus } from './timeControl';
 
 /**
@@ -63,11 +63,16 @@ export function startWallRun(body: MovementBody, normalX: number, normalY: numbe
   body.wallRun = {
     normalX,
     normalY,
-    timeLeft: WALL_RUN_MAX_DURATION_FRAMES,
+    timeLeft: TUNING.wallRunMaxFrames,
   };
   body.loco = 'wallRunning';
   // Kill downward velocity at latch so we don't drop before sticking.
   if (body.vz < 0) body.vz *= 0.2;
+  // Entry boost — reward arriving at the wall fast.
+  if (TUNING.wallRunEntryBoost > 1) {
+    body.vx *= TUNING.wallRunEntryBoost;
+    body.vy *= TUNING.wallRunEntryBoost;
+  }
   triggerFocus('wallRunLaunch');
 }
 
@@ -123,8 +128,8 @@ export function integrateWallRun(body: MovementBody, tangentImpulse: number): vo
     body.vy -= outward * ny;
   }
 
-  // Reduced gravity.
-  body.vz -= LOCOMOTION_GRAVITY * WALL_RUN_GRAVITY_FACTOR;
+  // Reduced gravity — a glide along the wall.
+  body.vz -= TUNING.gravity * TUNING.wallRunGravityFactor;
 
   body.wallRun.timeLeft--;
 }
