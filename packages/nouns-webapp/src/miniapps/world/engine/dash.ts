@@ -7,7 +7,7 @@
 // triggers stay in one place.
 
 import type { MovementBody } from './movementBody';
-import { DASH_SPEED as LOCO_DASH_SPEED, DASH_DURATION_FRAMES, DASH_IFRAMES_FRAMES } from './types';
+import { TUNING } from './movementTuning';
 import { triggerFocus } from './timeControl';
 import { emitDash } from './juice';
 
@@ -21,9 +21,9 @@ export function startDash(
   dirY: number,
   opts?: { speed?: number; durationFrames?: number; iFrames?: number; kind?: 'ground' | 'air' },
 ): void {
-  const speed = opts?.speed ?? LOCO_DASH_SPEED;
-  const dur = opts?.durationFrames ?? DASH_DURATION_FRAMES;
-  const iFr = opts?.iFrames ?? DASH_IFRAMES_FRAMES;
+  const speed = opts?.speed ?? TUNING.dashSpeed;
+  const dur = opts?.durationFrames ?? TUNING.dashDurationFrames;
+  const iFr = opts?.iFrames ?? TUNING.dashIFrames;
 
   const mag = Math.hypot(dirX, dirY);
   if (mag < 0.001) return;

@@ -23,6 +23,8 @@ export interface NPCDef {
   patrolRadius: number;
   respawnTime: number; // frames
   xpReward: number;
+  /** Uniform render-size multiplier. >1 = giant sea monster. */
+  scale?: number;
 }
 
 export const NPC_DEFS: NPCDef[] = [

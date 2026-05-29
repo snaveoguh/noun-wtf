@@ -22,7 +22,7 @@ import {
   DIRECTION_FACING_ANGLE,
   Tile,
 } from './engine/types';
-import type { Player, Direction, PlayerState } from './engine/types';
+import type { Player } from './engine/types';
 import {
   createInputState,
   attachInputListeners,
@@ -56,6 +56,7 @@ import { applySlomoAudio } from './engine/audioFx';
 import { useFocusTrigger } from './engine/useFocusTrigger';
 import { registerDirTap } from './engine/dash';
 import { createMovementBody } from './engine/movementBody';
+import { MovementTuningPanel } from './engine/MovementTuningPanel';
 import {
   createOceanDeathState,
   tickOceanDeath,
@@ -79,10 +80,14 @@ import type { AsciiVoxel } from '@/components/AsciiNoun';
 import { Html } from '@react-three/drei';
 // Spritesheet compositor available for future use
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
-import { createNPCs, type NPC } from './engine/npcs';
-// NPC combat imports — disabled until NPCs re-enabled
-// import { MOVE_DEFS, resolveDamage } from './engine/moves';
-// import { spawnHitSparks, spawnDamageText, spawnDeathExplosion, createScreenShake, createSlowMo } from './engine/particles';
+import { type NPC } from './engine/npcs';
+import {
+  createArenaRun,
+  startRun,
+  tickArena,
+  resolveNpcHits,
+  type ArenaRun,
+} from './engine/arena';
 import { Character3D, type CharacterState } from './engine/Character3D';
 import { TreasureChest3D, DroppedItem3D } from './engine/TreasureChest3D';
 import { DepositModal } from './wager/DepositModal';
@@ -2408,7 +2413,12 @@ export default function WorldPage() {
   const combatRef = useRef(createCombatState());
   const oceanRef = useRef(createOceanDeathState());
   const mpRef = useRef(createMultiplayerState());
-  const npcsRef = useRef<NPC[]>(createNPCs());
+  const npcsRef = useRef<NPC[]>([]);
+  const arenaRef = useRef<ArenaRun>(createArenaRun());
+  // Bumped whenever the monster roster changes (spawn/death) so the
+  // declarative <SeaMonsters/> list re-renders. HUD reads arenaHud.
+  const [npcRosterVersion, setNpcRosterVersion] = useState(0);
+  const [arenaHud, setArenaHud] = useState({ active: false, over: false, wave: 0, score: 0, kills: 0 });
   const playerCharState = useRef<CharacterState>({
     x: SPAWN_X * WORLD_SCALE,
     z: SPAWN_Y * WORLD_SCALE,
@@ -2430,29 +2440,9 @@ export default function WorldPage() {
     paintColor: null,
     swordEquipped: false,
   });
-  const npcCharStates = useRef<CharacterState[]>(
-    npcsRef.current.map(npc => ({
-      x: npc.x * WORLD_SCALE,
-      z: npc.y * WORLD_SCALE,
-      y: 0,
-      direction: 'down' as Direction,
-      state: 'idle' as PlayerState,
-      attackType: null,
-      hitFlash: 0,
-      hp: npc.hp,
-      maxHp: npc.maxHp,
-      weaponEquipped: null,
-      muzzleFlash: 0,
-      isSkating: false,
-      trickName: null,
-      trickTimer: 0,
-      airborneVy: 0,
-      vx: 0,
-      vy: 0,
-      paintColor: null,
-      swordEquipped: false,
-    })),
-  );
+  // Parallel to npcsRef — arena.ts keeps these index-aligned as monsters
+  // surface and die. Starts empty; startRun() populates it.
+  const npcCharStates = useRef<CharacterState[]>([]);
   const frameRef = useRef(0);
   const voipRef = useRef<VoipState>(createVoipState());
   const remoteTranscriptsRef = useRef<Map<string, { text: string; expires: number }>>(new Map());
@@ -3241,6 +3231,17 @@ export default function WorldPage() {
               combat,
             );
 
+            // Same move geometry also lands on arena sea-monsters.
+            resolveNpcHits(
+              arenaRef.current,
+              player,
+              intendedMove,
+              mouseWorldX,
+              mouseWorldY,
+              npcsRef.current,
+              combat,
+            );
+
             if (intendedMove !== 'block') {
               sendAttack(mp, intendedMove, player.x, player.y, angle);
             }
@@ -3334,6 +3335,29 @@ export default function WorldPage() {
 
         // Tick player — always run, but board overrides movement after
         tickPlayer(player, input, combat);
+
+        // ── Arena run — surface/drive sea monsters, apply their hits ──
+        const arena = arenaRef.current;
+        if (arena.active) {
+          const rosterChanged = tickArena(
+            arena,
+            npcsRef.current,
+            npcCharStates.current,
+            player,
+            combat,
+          );
+          if (rosterChanged) setNpcRosterVersion(v => v + 1);
+          // Throttle HUD state writes to ~6fps (cheap, avoids churn).
+          if (frame % 10 === 0 || arena.over) {
+            setArenaHud({
+              active: arena.active,
+              over: arena.over,
+              wave: arena.wave,
+              score: arena.score,
+              kills: arena.kills,
+            });
+          }
+        }
 
         // Hoverboard — no extra velocity boost needed, sprint key (R) handles speed
 
@@ -3674,6 +3698,29 @@ export default function WorldPage() {
                 </Html>
               )}
             </group>
+          );
+        })}
+      </>
+    );
+  }
+
+  // Giant sea monsters — one Character3D per live arena NPC, scaled up.
+  // Re-renders only when the roster changes (npcRosterVersion); per-frame
+  // motion is driven by mutating npcCharStates in the game loop.
+  function SeaMonsters() {
+    void npcRosterVersion; // dependency: forces re-render on roster change
+    return (
+      <>
+        {npcsRef.current.map((npc, i) => {
+          const cs = npcCharStates.current[i];
+          if (!cs) return null;
+          return (
+            <Character3D
+              key={npc.id}
+              seed={npc.def.seed}
+              stateRef={{ current: cs }}
+              scale={npc.def.scale ?? 1}
+            />
           );
         })}
       </>
@@ -4040,6 +4087,7 @@ export default function WorldPage() {
             the white ↔ fried world swap. */}
         <PlayerCharacter3D />
         <RemotePlayers />
+        <SeaMonsters />
 
         {/* Invisible follow target — kept in sync with playerTargetRef
             each tick so CameraRig can read its Object3D.position. */}
@@ -4178,6 +4226,110 @@ export default function WorldPage() {
       )}
 
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+
+      {/* Live movement-feel tuner — backslash (\) to toggle. */}
+      <MovementTuningPanel />
+
+      {/* ── Arena: giant sea-monster survival run ── */}
+      {arenaHud.active && !arenaHud.over && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            pointerEvents: 'none',
+            display: 'flex',
+            gap: 18,
+            fontFamily: 'ui-monospace, Menlo, monospace',
+            fontWeight: 700,
+            fontSize: 14,
+            color: '#fff',
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            background: 'rgba(8,8,12,0.55)',
+            border: '1px solid rgba(255,61,240,0.4)',
+            borderRadius: 8,
+            padding: '6px 16px',
+          }}
+        >
+          <span style={{ color: '#ff3df0' }}>WAVE {arenaHud.wave}</span>
+          <span>SCORE {arenaHud.score}</span>
+          <span style={{ opacity: 0.8 }}>KILLS {arenaHud.kills}</span>
+        </div>
+      )}
+
+      {(!arenaHud.active || arenaHud.over) && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%,-50%)',
+            zIndex: 30,
+            pointerEvents: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 10,
+            fontFamily: 'ui-monospace, Menlo, monospace',
+            color: '#fff',
+            textAlign: 'center',
+            background: 'rgba(8,8,12,0.82)',
+            border: '1px solid rgba(255,61,240,0.45)',
+            borderRadius: 12,
+            padding: '20px 28px',
+            boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
+          }}
+        >
+          {arenaHud.over ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#ff3df0' }}>RUN OVER</div>
+              <div style={{ fontSize: 13, opacity: 0.85 }}>
+                Reached wave {arenaHud.wave} · {arenaHud.kills} monsters slain
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>SCORE {arenaHud.score}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#ff3df0' }}>SEA RAID</div>
+              <div style={{ fontSize: 12, opacity: 0.8, maxWidth: 240 }}>
+                Giant monsters rise from the ocean and march on the island. Survive the waves.
+              </div>
+            </>
+          )}
+          <button
+            onClick={() => {
+              const player = playerRef.current;
+              if (player) {
+                player.hp = PLAYER_MAX_HP;
+                player.state = 'idle';
+                player.deathTimer = 0;
+                player.consecutiveGunshots = 0;
+                player.iFrames = 0;
+              }
+              startRun(arenaRef.current, npcsRef.current, npcCharStates.current);
+              setNpcRosterVersion(v => v + 1);
+              setArenaHud({ active: true, over: false, wave: 1, score: 0, kills: 0 });
+            }}
+            style={{
+              marginTop: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: 1,
+              color: '#000',
+              background: '#ff3df0',
+              border: 'none',
+              borderRadius: 8,
+              padding: '8px 22px',
+            }}
+          >
+            {arenaHud.over ? 'RAID AGAIN' : 'START RAID'}
+          </button>
+        </div>
+      )}
 
       {/* Hoverboard purchase modal */}
       <HoverboardPurchaseModal

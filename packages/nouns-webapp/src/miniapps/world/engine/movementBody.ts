@@ -102,6 +102,9 @@ export interface MovementBody {
   /** Mid-air jumps spent since last ground contact. */
   airJumpsUsed: number;
 
+  /** Consecutive frames spent grounded — used for bunny-hop window. */
+  groundedFrames: number;
+
   // ── Dash ────────────────────────────────────────────────────────────
   /** Frames remaining in the current dash (loco traversal burst). */
   dashTimer: number;
@@ -161,6 +164,7 @@ export function createMovementBody(x: number, y: number): MovementBody {
     // Locomotion substate & feel fields.
     loco: 'grounded',
     airJumpsUsed: 0,
+    groundedFrames: 0,
     dashTimer: 0,
     dashVx: 0,
     dashVy: 0,

@@ -340,9 +340,11 @@ function HoverboardMesh({ stateRef }: { stateRef: React.RefObject<CharacterState
 interface Character3DProps {
   seed: INounSeed;
   stateRef: React.RefObject<CharacterState>;
+  /** Uniform size multiplier — used to render giant sea monsters. */
+  scale?: number;
 }
 
-export function Character3D({ seed, stateRef }: Character3DProps) {
+export function Character3D({ seed, stateRef, scale = 1 }: Character3DProps) {
   const groupRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Record<string, THREE.AnimationAction>>({});
@@ -691,13 +693,13 @@ export function Character3D({ seed, stateRef }: Character3DProps) {
         // 0.85 → 1.05 → 1.0. Parabola peaking near k=0.6.
         scaleY = 0.85 + 0.2 * k - Math.pow(k - 0.6, 2) * 0.35;
       }
-      g.scale.y = scaleY;
-      g.scale.x = 1 + (1 - scaleY) * 0.4;
-      g.scale.z = 1 + (1 - scaleY) * 0.4;
-    } else if (g.scale.y !== 1) {
-      g.scale.y = 1;
-      g.scale.x = 1;
-      g.scale.z = 1;
+      g.scale.y = scaleY * scale;
+      g.scale.x = (1 + (1 - scaleY) * 0.4) * scale;
+      g.scale.z = (1 + (1 - scaleY) * 0.4) * scale;
+    } else if (g.scale.y !== scale) {
+      g.scale.y = scale;
+      g.scale.x = scale;
+      g.scale.z = scale;
     }
 
     // Animation crossfade
