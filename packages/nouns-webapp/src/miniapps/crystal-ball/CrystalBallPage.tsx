@@ -873,7 +873,7 @@ function SeedVisual({
             </div>
           }
         >
-          <MorphingNounVoxels seed={seed} autoRotate interactive isV2={isV2} />
+          <MorphingNounVoxels seed={seed} autoRotate={false} interactive isV2={isV2} />
         </Suspense>
       </div>
     </div>
