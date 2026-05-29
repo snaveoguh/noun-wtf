@@ -10,17 +10,27 @@
 
 import type { MovementBody, LocoSubstate } from './movementBody';
 import type { Tile } from './types';
-import {
-  LOCOMOTION_GRAVITY,
-  PLAYER_MAX_HORIZ_VEL,
-  PLAYER_JUMP_VZ,
-  PLAYER_WALL_JUMP_PUSH,
-  HARD_LANDING_VZ,
-} from './types';
+import { HARD_LANDING_VZ } from './types';
+import { TUNING } from './movementTuning';
 import { finishDash } from './dash';
 import { integrateWallRun, releaseWallRun } from './wallRun';
 import { integrateMantle } from './mantle';
 import { resolveWallSlide, sampleGroundHeight, clampToWorld } from './physics';
+
+/** Gravity for the current vertical phase — heavier while descending. */
+function grav(vz: number): number {
+  return vz > 0 ? TUNING.gravity : TUNING.gravity * TUNING.fallGravityMult;
+}
+
+/** Clamp horizontal velocity to the absolute hard cap. */
+function clampHardCap(body: MovementBody): void {
+  const sp = Math.hypot(body.vx, body.vy);
+  if (sp > TUNING.hardCap) {
+    const k = TUNING.hardCap / sp;
+    body.vx *= k;
+    body.vy *= k;
+  }
+}
 
 /** Bullet-time cue a leaf can bubble up to the dispatcher. */
 export type BulletTimeTrigger = 'dash' | 'doubleJump' | 'wallRunLaunch' | 'hardLanding' | null;
@@ -109,7 +119,7 @@ export function stepGrounded(body: MovementBody, input: LeafInput, map: Tile[][]
 
 /** Rising phase of a single jump. Transitions to falling when vz ≤ 0. */
 export function stepJumping(body: MovementBody, _input: LeafInput, map: Tile[][]): LeafResult {
-  body.vz -= LOCOMOTION_GRAVITY;
+  body.vz -= grav(body.vz);
   if (body.vz < -18) body.vz = -18;
   substepHorizontal(body, map);
   const { landed, impact } = substepVertical(body, map);
@@ -125,7 +135,7 @@ export function stepJumping(body: MovementBody, _input: LeafInput, map: Tile[][]
 
 /** Free-fall after jump apex or walking off a ledge. */
 export function stepFalling(body: MovementBody, _input: LeafInput, map: Tile[][]): LeafResult {
-  body.vz -= LOCOMOTION_GRAVITY;
+  body.vz -= grav(body.vz);
   if (body.vz < -18) body.vz = -18;
   substepHorizontal(body, map);
   const { landed, impact } = substepVertical(body, map);
@@ -144,7 +154,7 @@ export function stepDoubleJumping(
   _input: LeafInput,
   map: Tile[][],
 ): LeafResult {
-  body.vz -= LOCOMOTION_GRAVITY;
+  body.vz -= grav(body.vz);
   if (body.vz < -18) body.vz = -18;
   substepHorizontal(body, map);
   const { landed, impact } = substepVertical(body, map);
@@ -168,7 +178,7 @@ export function stepDashing(body: MovementBody, _input: LeafInput, map: Tile[][]
   substepVertical(body, map);
   body.dashTimer--;
   if (body.dashTimer <= 0) {
-    finishDash(body, 0.6);
+    finishDash(body, TUNING.dashExitScale);
     return { nextLoco: body.grounded ? 'grounded' : 'falling' };
   }
   return {};
@@ -176,18 +186,19 @@ export function stepDashing(body: MovementBody, _input: LeafInput, map: Tile[][]
 
 /** Sliding along the ground with capped horizontal friction + gravity. */
 export function stepSliding(body: MovementBody, input: LeafInput, map: Tile[][]): LeafResult {
-  // Slight friction. Scale slows by ~0.98/frame (still slick).
-  body.vx *= 0.985;
-  body.vy *= 0.985;
-  // Cap speed defensively — a slide shouldn't exceed sprint cap much.
-  const spd = Math.hypot(body.vx, body.vy);
-  const cap = PLAYER_MAX_HORIZ_VEL * 1.2;
-  if (spd > cap) {
-    const k = cap / spd;
-    body.vx *= k;
-    body.vy *= k;
+  // A slide is a commit to speed: it accelerates along its current
+  // heading, then bleeds via (slick) friction. Net feel is set by
+  // slideAccel vs slideFriction.
+  const spd0 = Math.hypot(body.vx, body.vy);
+  if (spd0 > 0.001 && TUNING.slideAccel > 0) {
+    body.vx += (body.vx / spd0) * TUNING.slideAccel;
+    body.vy += (body.vy / spd0) * TUNING.slideAccel;
   }
-  body.vz -= LOCOMOTION_GRAVITY;
+  body.vx *= TUNING.slideFriction;
+  body.vy *= TUNING.slideFriction;
+  clampHardCap(body);
+
+  body.vz -= grav(body.vz);
   substepHorizontal(body, map);
   const { landed } = substepVertical(body, map);
 
@@ -198,9 +209,13 @@ export function stepSliding(body: MovementBody, input: LeafInput, map: Tile[][])
     Math.hypot(body.vx, body.vy) < 0.2 ||
     !body.grounded;
   if (wantExit) {
-    // Jumping out of slide cancels the slide cleanly.
+    // Slide-hop: launching out of a slide converts ground speed into a
+    // boosted leap (the classic "slide jump").
     if (input.jumpPressed && body.grounded) {
-      body.vz = PLAYER_JUMP_VZ;
+      body.vz = TUNING.jumpVz;
+      body.vx *= TUNING.slideJumpBoost;
+      body.vy *= TUNING.slideJumpBoost;
+      clampHardCap(body);
       body.grounded = false;
       return { nextLoco: 'jumping' };
     }
@@ -215,12 +230,13 @@ export function stepWallRunning(body: MovementBody, input: LeafInput, map: Tile[
 
   // Jump-off kicks us outward + upward.
   if (input.jumpPressed) {
-    releaseWallRun(body, true, PLAYER_JUMP_VZ, PLAYER_WALL_JUMP_PUSH);
+    releaseWallRun(body, true, TUNING.wallRunJumpVz, TUNING.wallRunJumpPush);
     return { nextLoco: 'doubleJumping' };
   }
 
-  // Small tangent boost so we keep moving along the wall.
-  integrateWallRun(body, 0.05);
+  // Tangent accel so the wall-run *builds* speed rather than bleeding it.
+  integrateWallRun(body, TUNING.wallRunAccel);
+  clampHardCap(body);
   substepHorizontal(body, map);
   const { landed } = substepVertical(body, map);
 

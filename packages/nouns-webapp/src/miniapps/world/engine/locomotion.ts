@@ -37,11 +37,10 @@ import {
   PLAYER_WALL_JUMP_VZ,
   PLAYER_WALL_JUMP_PUSH,
   PLAYER_CLIMB_REACH,
-  PLAYER_AIR_JUMPS_MAX,
-  SLIDE_MAX_DURATION_FRAMES,
   HARD_LANDING_VZ,
 } from './types';
 import { getMovementVector } from './input';
+import { TUNING } from './movementTuning';
 import { resolveWallSlide, sampleGroundHeight, clampToWorld } from './physics';
 import { findClimbFace, getStructure } from './structures';
 import {
@@ -167,13 +166,13 @@ export function stepLocomotion(
   // Buffered jump: press sticks around for a few frames so a pre-ground
   // jump still fires on landing.
   if (input.jumpPressed) {
-    body.jumpBuffer = config.jumpBufferFrames;
+    body.jumpBuffer = TUNING.jumpBufferFrames;
     body.jumpHeld = true;
     body.jumpCut = false;
   }
   // Track held state for variable-height cutoff.
   if (!input.jumpHeld && body.jumpHeld && body.vz > 0 && !body.jumpCut) {
-    body.vz *= config.jumpCutMult;
+    body.vz *= TUNING.jumpCutMult;
     body.jumpCut = true;
   }
   body.jumpHeld = input.jumpHeld;
@@ -189,7 +188,7 @@ export function stepLocomotion(
 
   // Climb takes top priority — legacy branch, unchanged semantics.
   if (body.climb !== null) {
-    stepClimb(body, input, map, config);
+    stepClimb(body, input, map);
     // Staying on a climb face; keep loco tag consistent.
     body.loco = 'grounded';
     return;
@@ -232,8 +231,8 @@ export function stepLocomotion(
         break;
       }
       // Double-jump: jump pressed mid-air, haven't used our air jump yet.
-      if (input.jumpPressed && body.airJumpsUsed < PLAYER_AIR_JUMPS_MAX) {
-        body.vz = config.jumpVz;
+      if (input.jumpPressed && body.airJumpsUsed < TUNING.airJumpsMax) {
+        body.vz = TUNING.jumpVz;
         body.airJumpsUsed++;
         body.jumpBuffer = 0;
         body.jumpCut = false;
@@ -310,9 +309,9 @@ function stepGroundedLeaf(
 ): void {
   // Midair wall-grab: if ascending/falling next to a face and pushing into it.
   if (input.canClimb && !body.grounded && (input.moveX !== 0 || input.moveY !== 0)) {
-    maybeGrabClimb(body, input, config);
+    maybeGrabClimb(body, input);
     if (body.climb !== null) {
-      stepClimb(body, input, map, config);
+      stepClimb(body, input, map);
       return;
     }
   }
@@ -325,11 +324,11 @@ function stepGroundedLeaf(
       body.z,
       input.facingX,
       input.facingY,
-      config.climbReach,
+      TUNING.climbReach,
     );
     if (contact !== null && (body.jumpBuffer > 0 || contact.face.endZ > 4)) {
       startClimb(body, contact);
-      stepClimb(body, input, map, config);
+      stepClimb(body, input, map);
       return;
     }
   }
@@ -346,12 +345,13 @@ function stepGroundedLeaf(
     body.grounded &&
     body.slideTimer <= 0
   ) {
-    // Start a slide in the current velocity direction.
-    const spd = Math.max(Math.hypot(body.vx, body.vy), config.sprintSpeed * 0.9);
+    // Start a slide in the current velocity direction — never slower than
+    // sprint, so sliding always feels like a commit to speed.
+    const spd = Math.max(Math.hypot(body.vx, body.vy), TUNING.sprintSpeed);
     const dirMag = Math.hypot(input.moveX, input.moveY);
     body.vx = (input.moveX / dirMag) * spd;
     body.vy = (input.moveY / dirMag) * spd;
-    body.slideTimer = SLIDE_MAX_DURATION_FRAMES;
+    body.slideTimer = TUNING.slideMaxFrames;
     body.loco = 'sliding';
     body.jumpBuffer = 0;
     return;
@@ -362,7 +362,14 @@ function stepGroundedLeaf(
   // Jump — coyote time + buffer.
   const canJump = body.grounded || body.coyoteTimer > 0;
   if (body.jumpBuffer > 0 && body.jumpsRemaining > 0 && canJump) {
-    body.vz = config.jumpVz;
+    body.vz = TUNING.jumpVz;
+    // Bunny hop: jumping within a few frames of landing preserves and
+    // slightly amplifies horizontal speed instead of letting friction
+    // bleed it — chained hops accelerate.
+    if (body.groundedFrames <= TUNING.bhopWindow && TUNING.bhopBoost > 1) {
+      body.vx *= TUNING.bhopBoost;
+      body.vy *= TUNING.bhopBoost;
+    }
     body.grounded = false;
     body.jumpsRemaining = Math.max(0, body.jumpsRemaining - 1);
     body.coyoteTimer = 0;
@@ -372,12 +379,13 @@ function stepGroundedLeaf(
     body.loco = 'jumping';
   }
 
-  // Gravity.
-  body.vz -= config.gravity;
+  // Gravity — heavier on the way down for a snappier, less floaty arc.
+  const g = body.vz > 0 ? TUNING.gravity : TUNING.gravity * TUNING.fallGravityMult;
+  body.vz -= g;
   if (body.vz < -18) body.vz = -18;
 
   stepHorizontal(body, map);
-  stepVertical(body, map, config);
+  stepVertical(body, map);
 
   // Sync loco with physics outcome.
   if (!body.grounded && body.loco === 'grounded') {
@@ -416,30 +424,53 @@ function applyHorizontalAccel(
   input: LocomotionInput,
   cfg: LocomotionConfig,
 ): void {
+  void cfg; // tunables now read live from TUNING.
+  const grounded = body.grounded;
   const mag = Math.hypot(input.moveX, input.moveY);
-  const target = mag > 0.001 ? (input.sprint ? cfg.sprintSpeed : cfg.walkSpeed) : 0;
-  const accel = body.grounded ? cfg.accel : cfg.airAccel;
-  const decel = body.grounded ? cfg.decel : cfg.airAccel;
 
+  // ── Friction (ground only) ──
+  // Quake/Source model: friction bleeds speed every grounded frame, so
+  // momentum from a dash/slide/wall-run decays unless you keep moving or
+  // bunny-hop. Skipped on the frame a jump is buffered so hops preserve
+  // speed (this is what makes bhop chains feel fast).
+  if (grounded && body.jumpBuffer <= 0) {
+    const speed = Math.hypot(body.vx, body.vy);
+    if (speed > 0.0001) {
+      const drop = speed * TUNING.groundFriction;
+      const k = Math.max(0, speed - drop) / speed;
+      body.vx *= k;
+      body.vy *= k;
+      if (Math.abs(body.vx) < 0.01) body.vx = 0;
+      if (Math.abs(body.vy) < 0.01) body.vy = 0;
+    }
+  }
+
+  // ── Directional acceleration ──
+  // accelspeed only adds velocity *toward* wishdir up to wishspeed; it
+  // never brakes you. On the ground wishspeed is the soft cap; in the
+  // air it's the (low) air-wish cap, so airborne speed grows by turning
+  // into your strafe rather than by pushing forward — i.e. air-strafe.
   if (mag > 0.001) {
     const nx = input.moveX / mag;
     const ny = input.moveY / mag;
-    const desiredVx = nx * target;
-    const desiredVy = ny * target;
-    body.vx += (desiredVx - body.vx) * accel;
-    body.vy += (desiredVy - body.vy) * accel;
-  } else {
-    // Gentle decel toward zero.
-    body.vx -= body.vx * decel;
-    body.vy -= body.vy * decel;
-    if (Math.abs(body.vx) < 0.01) body.vx = 0;
-    if (Math.abs(body.vy) < 0.01) body.vy = 0;
+    const target = input.sprint ? TUNING.sprintSpeed : TUNING.walkSpeed;
+    const wishspeed = grounded
+      ? Math.min(target, TUNING.softCap)
+      : Math.min(target, TUNING.airWishCap);
+    const accelK = grounded ? TUNING.groundAccel : TUNING.airAccel;
+    const curSpeed = body.vx * nx + body.vy * ny; // projection onto wishdir
+    const addSpeed = wishspeed - curSpeed;
+    if (addSpeed > 0) {
+      const accelSpeed = Math.min(accelK * wishspeed, addSpeed);
+      body.vx += accelSpeed * nx;
+      body.vy += accelSpeed * ny;
+    }
   }
 
-  // Hard cap on horizontal speed.
+  // ── Absolute clamp (anti-tunnel + sanity) ──
   const speed = Math.hypot(body.vx, body.vy);
-  if (speed > cfg.maxHorizVel) {
-    const k = cfg.maxHorizVel / speed;
+  if (speed > TUNING.hardCap) {
+    const k = TUNING.hardCap / speed;
     body.vx *= k;
     body.vy *= k;
   }
@@ -469,7 +500,7 @@ function stepHorizontal(body: MovementBody, map: Tile[][]): void {
 
 // ── Vertical motion + grounding ───────────────────────────────────────
 
-function stepVertical(body: MovementBody, map: Tile[][], cfg: LocomotionConfig): void {
+function stepVertical(body: MovementBody, map: Tile[][]): void {
   const prevGrounded = body.grounded;
   body.z += body.vz;
 
@@ -483,17 +514,20 @@ function stepVertical(body: MovementBody, map: Tile[][], cfg: LocomotionConfig):
     body.vz = 0;
     body.grounded = true;
     body.groundMaterial = ground.material;
-    body.jumpsRemaining = cfg.jumpsMax;
+    body.jumpsRemaining = 1;
+    // Count consecutive grounded frames for the bunny-hop window.
+    body.groundedFrames = prevGrounded ? body.groundedFrames + 1 : 0;
     // Landing → burn the buffered jump window so the next coyote frame
     // doesn't immediately re-jump.
     body.coyoteTimer = 0;
   } else {
     body.grounded = false;
     body.groundMaterial = ground.material;
+    body.groundedFrames = 0;
     // Edge-off: if we *were* grounded last frame and now aren't,
     // open the coyote window.
     if (prevGrounded && body.coyoteTimer === 0 && body.vz <= 0) {
-      body.coyoteTimer = cfg.coyoteFrames;
+      body.coyoteTimer = TUNING.coyoteFrames;
     }
   }
 }
@@ -515,34 +549,29 @@ function startClimb(body: MovementBody, contact: ReturnType<typeof findClimbFace
   body.grounded = false;
 }
 
-function maybeGrabClimb(body: MovementBody, input: LocomotionInput, cfg: LocomotionConfig): void {
+function maybeGrabClimb(body: MovementBody, input: LocomotionInput): void {
   const contact = findClimbFace(
     body.x,
     body.y,
     body.z,
     input.facingX,
     input.facingY,
-    cfg.climbReach,
+    TUNING.climbReach,
   );
   if (contact) startClimb(body, contact);
 }
 
-function stepClimb(
-  body: MovementBody,
-  input: LocomotionInput,
-  map: Tile[][],
-  cfg: LocomotionConfig,
-): void {
+function stepClimb(body: MovementBody, input: LocomotionInput, map: Tile[][]): void {
   if (!body.climb) return;
 
   // Wall-jump off takes priority.
   if (body.jumpBuffer > 0) {
     const normal = climbOutwardNormal(body);
-    body.vx = normal.x * cfg.wallJumpPush;
-    body.vy = normal.y * cfg.wallJumpPush;
-    body.vz = cfg.wallJumpVz;
+    body.vx = normal.x * TUNING.wallJumpPush;
+    body.vy = normal.y * TUNING.wallJumpPush;
+    body.vz = TUNING.wallJumpVz;
     body.jumpBuffer = 0;
-    body.jumpsRemaining = Math.max(1, cfg.jumpsMax); // wall-jump grants an air jump
+    body.jumpsRemaining = 1; // wall-jump grants an air jump
     body.climb = null;
     return;
   }
@@ -589,15 +618,15 @@ function stepClimb(
   let climbVz = 0;
   if (press > 0.4) {
     // Full-strength climb up when pressing into the wall.
-    climbVz = cfg.climbSpeed;
+    climbVz = TUNING.climbSpeed;
   } else if (press < 0.1) {
     // Not actively pressing → slide down slowly.
-    climbVz = -cfg.climbSpeed * 0.5;
+    climbVz = -TUNING.climbSpeed * 0.5;
   }
 
   // Movement along the face.
-  body.x += tx * strafe * cfg.climbStrafe;
-  body.y += ty * strafe * cfg.climbStrafe;
+  body.x += tx * strafe * TUNING.climbStrafe;
+  body.y += ty * strafe * TUNING.climbStrafe;
   body.z += climbVz;
   body.vx = 0;
   body.vy = 0;
@@ -671,16 +700,13 @@ export const IDLE_LOCOMOTION_INPUT: LocomotionInput = {
  *
  * Climbing is forcibly released in passive mode.
  */
-export function stepPassive(
-  body: MovementBody,
-  map: Tile[][],
-  config: LocomotionConfig = DEFAULT_LOCOMOTION,
-): void {
+export function stepPassive(body: MovementBody, map: Tile[][]): void {
   if (body.climb !== null) body.climb = null;
-  body.vz -= config.gravity;
+  const g = body.vz > 0 ? TUNING.gravity : TUNING.gravity * TUNING.fallGravityMult;
+  body.vz -= g;
   if (body.vz < -18) body.vz = -18;
   stepHorizontal(body, map);
-  stepVertical(body, map, config);
+  stepVertical(body, map);
   const c = clampToWorld(body.x, body.y);
   body.x = c.x;
   body.y = c.y;
