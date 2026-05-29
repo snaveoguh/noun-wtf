@@ -311,10 +311,17 @@ export default function EditableMeshScene({
           loadedScene.traverse(child => {
             if (child.name === 'GlassesUV' || child.name.toLowerCase().includes('glasses')) {
               const mesh = child as THREE.Mesh;
-              const mat = mesh.material as THREE.MeshStandardMaterial;
-              if (mat?.map) {
-                glassesTex.flipY = mat.map.flipY;
-                mat.map.dispose();
+              const sourceMat = mesh.material as THREE.MeshStandardMaterial;
+              if (sourceMat?.map) {
+                // Clone the material before mutating — many of these GLB
+                // heads ship a single material/texture atlas shared across
+                // the head face AND the glasses meshes. Mutating the shared
+                // material (or worse, disposing its texture) wipes the head's
+                // texture too and leaves it rendering flat white. Cloning
+                // isolates our changes to the glasses mesh; the original keeps
+                // the head face textured. (Mirrors NounParallax/CuratedHead.)
+                const mat = sourceMat.clone();
+                glassesTex.flipY = sourceMat.map.flipY;
                 mat.map = glassesTex;
                 mat.side = THREE.FrontSide;
                 mat.depthWrite = true;
@@ -322,6 +329,7 @@ export default function EditableMeshScene({
                 mat.polygonOffsetFactor = -4;
                 mat.polygonOffsetUnits = -4;
                 mat.needsUpdate = true;
+                mesh.material = mat;
               }
               mesh.renderOrder = 1;
               mesh.position.z += 0.08;
