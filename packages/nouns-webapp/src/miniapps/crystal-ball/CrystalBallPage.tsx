@@ -88,28 +88,35 @@ interface MatchResult {
 
 // ─── Trait counts ───────────────────────────────────────────────────────
 // V1 (mainnet Nouns) and NounV2 use *different* descriptor contracts with
-// different trait counts (V1 = NounsDescriptorV2 @ 0x33A9c445…, V2 ships a
-// separate descriptor @ 0x6229c811…). Trait counts grow over time as new
+// different trait counts (V1 = NounsDescriptorV2 @ 0x33A9c445…, V2 = the
+// post-art-ceremony descriptor @ 0xae0247ca…). Trait counts grow over time as new
 // art is added on-chain via `addBodies`/`addHeads`/etc. admin calls, so
 // hardcoding them here goes stale silently and yields wrong seeds. We read
 // the counts directly from each chain's descriptor instead.
 //
-// Fallback values match the on-chain descriptors at 2026-04-29; they're
-// only used during the initial RPC roundtrip so the orb has *something*
-// to render before the live counts arrive.
+// Fallback values are used whenever the live descriptor-count RPC read fails
+// or is still in flight — which, on a flaky free-tier RPC (publicnode/dRPC
+// have been 408-timing out), is often. So these MUST track the on-chain
+// descriptors or the orb silently predicts the wrong noun on every RPC hiccup.
+// Re-queried on-chain 2026-05-30:
+//   V1 NounsToken descriptor 0x33A9c445…  → bg2 body31 accessory145 head258 glasses24
+//   V2 NounV2Token descriptor 0xae0247ca… → bg2 body32 accessory144 head253 glasses23
+// (V1 accessory was 144 before the "FREE" accessory was added → now 145. The
+// stale 252-head V2 fallback is what flipped a banana prediction to a wrong
+// head when the descriptor read timed out.)
 const V1_TRAIT_COUNTS_FALLBACK = {
   background: 2,
   body: 31,
-  accessory: 144,
+  accessory: 145,
   head: 258,
   glasses: 24,
 } as const;
 
 const V2_TRAIT_COUNTS_FALLBACK = {
   background: 2,
-  body: 30,
-  accessory: 142,
-  head: 252,
+  body: 32,
+  accessory: 144,
+  head: 253,
   glasses: 23,
 } as const;
 
