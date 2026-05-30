@@ -52,12 +52,18 @@ export const getNounIrlAddress = (): string => {
 };
 
 // ─── Trait Counts (from NounsDescriptorV2 @ 0x33A9c445fb4FB21f2c030A6b2d3e2F12D017BFAC) ──
-// These mirror the on-chain descriptor's count functions.
-// Queried: 2026-03-08 — counts MUST match on-chain or predictions are wrong.
+// These mirror the on-chain descriptor's count functions. This is only a
+// FALLBACK — the live counts come from `traitCounts.ts`, which reads the
+// descriptor at startup + hourly. Keep in sync anyway so a failed read degrades
+// gracefully instead of resurrecting a stale-count misfire.
+// Re-queried: 2026-05-30 — accessory 144→145 after the "FREE" accessory was
+// added on-chain. The stale 144 mispredicted Noun #1920's accessory as
+// "safety vest" (idx 78) instead of "insignia" (idx 61), firing a phantom
+// settle against the safety-vest reservation.
 export const TRAIT_COUNTS = {
   background: 2,
   body: 31,
-  accessory: 144,
+  accessory: 145,
   head: 258,
   glasses: 24,
 } as const;
