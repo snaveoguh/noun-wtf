@@ -3569,10 +3569,30 @@ async function parseCommand(
     if (!wallet) return { handled: true, response: 'Connect your wallet to create a candidate.' };
     const title = candidateMatch[1].trim();
     const description = candidateMatch[2].trim();
-    const action = { type: 'CANDIDATE', title, description };
+    // Must match the shape the webapp modal (GovernanceActionConfirm) and signer
+    // (useGovernanceAction) handle: type 'CREATE_CANDIDATE' with slug + the full
+    // proposal arrays. The old `{ type: 'CANDIDATE', title, description }` had no
+    // UI/signer handler at all, so the modal rendered blank and the command
+    // looked like it did nothing. This deterministic path is description-only
+    // (no tx parsing) — for executable transactions, use the LLM tool path.
+    const slug = title
+      .toLowerCase()
+      .replace(/[^\da-z]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80);
+    const action = {
+      type: 'CREATE_CANDIDATE',
+      slug,
+      title,
+      description: `# ${title}\n\n${description}`,
+      targets: [],
+      values: [],
+      signatures: [],
+      calldatas: [],
+    };
     return {
       handled: true,
-      response: `Candidate prepared: "${title}". In Nouns DAO, proposals start as candidates that collect sponsor signatures. Confirm in your wallet.`,
+      response: `Candidate prepared: "${title}" (slug: ${slug}). Description-only — for treasury transactions, describe them and I'll encode them. Confirm and sign in your wallet.`,
       action,
     };
   }
