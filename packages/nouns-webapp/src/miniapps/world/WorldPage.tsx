@@ -3572,10 +3572,15 @@ export default function WorldPage() {
 
   // ── Characters (ref-driven, zero re-renders) ─────────────────────────
   // Character3D reads from stateRef each frame — no React state updates.
-
-  function PlayerCharacter3D() {
-    return <Character3D seed={seed} stateRef={playerCharState} />;
-  }
+  //
+  // NOTE: the player avatar is rendered by inlining <Character3D> directly at
+  // the call site below — NOT via a nested `PlayerCharacter3D` wrapper. A
+  // component defined inside WorldPage's body gets a fresh function identity on
+  // every WorldPage re-render (wantedLevel / arenaHud / weaponPickups / … all
+  // trip it), so React would unmount+remount the whole subtree each time and
+  // the avatar's GLB would reload — the "constant flashing" bug. `seed`
+  // (useMemo) and `playerCharState` (useRef) are stable, so the inlined
+  // Character3D stays mounted across re-renders.
 
   // Remote players — each gets own Character3D with own GLB
   function RemotePlayers() {
@@ -4085,7 +4090,7 @@ export default function WorldPage() {
         {/* Shared systems — mounted in both worlds so state (player pos,
             multiplayer connection, camera follow, combat loop) survives
             the white ↔ fried world swap. */}
-        <PlayerCharacter3D />
+        <Character3D seed={seed} stateRef={playerCharState} />
         <RemotePlayers />
         <SeaMonsters />
 
