@@ -11,7 +11,7 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { useWriteContract, useSignTypedData } from 'wagmi';
+import { useAccount, usePublicClient, useWriteContract, useSignTypedData } from 'wagmi';
 
 import { NOUN_WTF_CLIENT_ID } from '@/config';
 import {
@@ -21,6 +21,8 @@ import {
   nounsDataAddress,
   nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
+  nounsTokenAbi,
+  nounsTokenAddress,
 } from '@/contracts';
 import {
   smallGrantsTreasuryAbi,
@@ -76,6 +78,8 @@ function calcProposalEncodeData({
 export function useGovernanceAction() {
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -171,6 +175,36 @@ export function useGovernanceAction() {
             const ccValues = (action.values || []).map(v => BigInt(v));
             const ccSigs = action.signatures || [];
             const ccCalldatas = (action.calldatas || []).map(c => c as Hex);
+
+            // createProposalCandidate charges createCandidateCost (0.01 ETH)
+            // UNLESS the signer has delegated voting power (getCurrentVotes > 0).
+            // Read both and attach the fee as value only when required — so
+            // non-delegated wallets stop hitting a fee revert, and delegated
+            // wallets don't overpay. On read failure we attach 0 (never silently
+            // overcharge; the contract still gives a clear revert if a fee was
+            // actually owed).
+            let candidateFee = 0n;
+            try {
+              if (publicClient && address) {
+                const [cost, votes] = await Promise.all([
+                  publicClient.readContract({
+                    abi: nounsDataAbi,
+                    address: nounsDataAddress[1] as Address,
+                    functionName: 'createCandidateCost',
+                  }),
+                  publicClient.readContract({
+                    abi: nounsTokenAbi,
+                    address: nounsTokenAddress[1] as Address,
+                    functionName: 'getCurrentVotes',
+                    args: [address],
+                  }),
+                ]);
+                candidateFee = (votes as bigint) > 0n ? 0n : (cost as bigint);
+              }
+            } catch {
+              candidateFee = 0n;
+            }
+
             hash = await writeContractAsync({
               abi: nounsDataAbi,
               address: nounsDataAddress[1] as Address,
@@ -184,6 +218,7 @@ export function useGovernanceAction() {
                 action.slug,
                 0n, // proposalIdToUpdate (0 = new candidate)
               ],
+              value: candidateFee,
             });
             break;
           }

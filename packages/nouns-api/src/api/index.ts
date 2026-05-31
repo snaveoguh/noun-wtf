@@ -505,6 +505,43 @@ export function expandProposalTransactions(
   return { ok: true, txs: out };
 }
 
+// Parse a single "send X <token> to <recipient>" transfer out of free text
+// (candidate title+description). Nouns rejects empty candidates
+// (MustProvideActions), so the deterministic `create candidate:` command needs
+// to encode at least one action. Returns:
+//   - a ProposalTxPrimitive when a transfer is found and the recipient resolves
+//   - 'unresolved' when a transfer is described but the recipient is unusable
+//   - null when no transfer intent is present at all
+async function parseCandidateTransfer(
+  text: string,
+): Promise<ProposalTxPrimitive | 'unresolved' | null> {
+  const amtTok = text.match(/([\d,]+(?:\.\d+)?)\s*(eth|weth|steth|usdc)\b/i);
+  if (!amtTok?.[1] || !amtTok[2]) return null; // no transfer intent → caller refuses empty candidate
+  const amount = amtTok[1].replace(/,/g, '');
+  const token = amtTok[2].toLowerCase();
+
+  const recipMatch = text.match(/\bto\s+(0x[a-fA-F0-9]{40}|[a-z0-9-]+\.eth)\b/i);
+  if (!recipMatch?.[1]) return 'unresolved';
+  let recipient = recipMatch[1];
+
+  if (recipient.toLowerCase().endsWith('.eth')) {
+    try {
+      const resolved = await nounCheckClient.getEnsAddress({ name: recipient.toLowerCase() });
+      if (!resolved) return 'unresolved';
+      recipient = resolved;
+    } catch {
+      return 'unresolved';
+    }
+  }
+
+  if (token === 'usdc') return { kind: 'usdc_transfer', recipient, amount };
+  return {
+    kind: token === 'eth' ? 'eth_transfer' : token === 'weth' ? 'weth_transfer' : 'steth_transfer',
+    recipient,
+    amountEth: amount,
+  };
+}
+
 // ─── Block Timing Helpers ──────────────────────────────────────────────────
 const BLOCK_TIME_SECONDS = 12;
 
@@ -3569,30 +3606,52 @@ async function parseCommand(
     if (!wallet) return { handled: true, response: 'Connect your wallet to create a candidate.' };
     const title = candidateMatch[1].trim();
     const description = candidateMatch[2].trim();
-    // Must match the shape the webapp modal (GovernanceActionConfirm) and signer
-    // (useGovernanceAction) handle: type 'CREATE_CANDIDATE' with slug + the full
-    // proposal arrays. The old `{ type: 'CANDIDATE', title, description }` had no
-    // UI/signer handler at all, so the modal rendered blank and the command
-    // looked like it did nothing. This deterministic path is description-only
-    // (no tx parsing) — for executable transactions, use the LLM tool path.
     const slug = title
       .toLowerCase()
       .replace(/[^\da-z]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 80);
+
+    // Nouns candidates MUST carry >=1 transaction (the contract reverts with
+    // MustProvideActions otherwise). Try to encode "send X <token> to Y" from
+    // the title+description; refuse with guidance if we can't, instead of
+    // letting the user sign a tx that's guaranteed to revert in their wallet.
+    const parsed = await parseCandidateTransfer(`${title} ${description}`);
+    if (parsed === 'unresolved') {
+      return {
+        handled: true,
+        response:
+          'I see a transfer but need a usable recipient — give me a 0x address or a .eth name, e.g. "create candidate: Fund X - send 10 ETH to 0xABC…".',
+      };
+    }
+    if (parsed === null) {
+      return {
+        handled: true,
+        response:
+          'Nouns candidates need at least one transaction — an empty one reverts on-chain. Tell me what it should do, e.g. "create candidate: Fund the movie - send 10 ETH to nouns.eth" or "… - send 5000 USDC to 0x…".',
+      };
+    }
+    const expanded = expandProposalTransactions([parsed]);
+    if (!expanded.ok) {
+      return { handled: true, response: `Couldn't encode that transaction: ${expanded.error}` };
+    }
+    const txs = expanded.txs;
+
+    // Shape must match what the webapp modal (GovernanceActionConfirm) and
+    // signer (useGovernanceAction) handle: type 'CREATE_CANDIDATE' + full arrays.
     const action = {
       type: 'CREATE_CANDIDATE',
       slug,
       title,
       description: `# ${title}\n\n${description}`,
-      targets: [],
-      values: [],
-      signatures: [],
-      calldatas: [],
+      targets: txs.map(t => t.target),
+      values: txs.map(t => t.value),
+      signatures: txs.map(t => t.signature),
+      calldatas: txs.map(t => t.calldata),
     };
     return {
       handled: true,
-      response: `Candidate prepared: "${title}" (slug: ${slug}). Description-only — for treasury transactions, describe them and I'll encode them. Confirm and sign in your wallet.`,
+      response: `Candidate prepared: "${title}" (slug: ${slug}) — ${txs.length} transaction encoded. A 0.01 ETH fee applies unless your wallet has delegated voting power. Confirm and sign in your wallet.`,
       action,
     };
   }
