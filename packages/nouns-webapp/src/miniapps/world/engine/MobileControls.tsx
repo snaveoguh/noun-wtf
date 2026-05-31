@@ -144,44 +144,47 @@ const MobileControls: FC<MobileControlsProps> = ({
   // Swipe tracking
   const swipeRef = useRef<{ id: number; startY: number; startTime: number } | null>(null);
 
-  const handleJoystickStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.changedTouches[0];
-    if (!touch || !joystickRef.current) return;
+  // Pointer Events (not touch) for the same iOS reason as the action buttons:
+  // touchstart/touchmove don't fire on a pointer-events:auto child of a
+  // pointer-events:none parent on iOS WebKit, which left the movement stick
+  // dead on iPhone. setPointerCapture on down means pointermove/up keep firing
+  // on the stick even when the finger drags outside the small knob (touch
+  // events get that implicit capture for free; pointer events need it asked for).
+  const handleJoystickStart = useCallback((e: React.PointerEvent) => {
+    if (!joystickRef.current) return;
     e.preventDefault();
-    touchIdRef.current = touch.identifier;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    touchIdRef.current = e.pointerId;
     const rect = joystickRef.current.getBoundingClientRect();
     centerRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }, []);
 
   const handleJoystickMove = useCallback(
-    (e: React.TouchEvent) => {
+    (e: React.PointerEvent) => {
+      if (e.pointerId !== touchIdRef.current) return;
       e.preventDefault();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier !== touchIdRef.current) continue;
 
-        const dx = touch.clientX - centerRef.current.x;
-        const dy = touch.clientY - centerRef.current.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxDist = JOYSTICK_SIZE / 2 - KNOB_SIZE / 2;
-        const clampedDist = Math.min(dist, maxDist);
-        const angle = Math.atan2(dy, dx);
-        const nx = (Math.cos(angle) * clampedDist) / maxDist;
-        const ny = (Math.sin(angle) * clampedDist) / maxDist;
+      const dx = e.clientX - centerRef.current.x;
+      const dy = e.clientY - centerRef.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = JOYSTICK_SIZE / 2 - KNOB_SIZE / 2;
+      const clampedDist = Math.min(dist, maxDist);
+      const angle = Math.atan2(dy, dx);
+      const nx = (Math.cos(angle) * clampedDist) / maxDist;
+      const ny = (Math.sin(angle) * clampedDist) / maxDist;
 
-        setKnobPos({ x: nx * maxDist, y: ny * maxDist });
+      setKnobPos({ x: nx * maxDist, y: ny * maxDist });
 
-        const input = inputRef.current;
-        if (input) {
-          input.keys.delete('w');
-          input.keys.delete('s');
-          input.keys.delete('a');
-          input.keys.delete('d');
-          if (ny < -DEAD_ZONE) input.keys.add('w');
-          if (ny > DEAD_ZONE) input.keys.add('s');
-          if (nx < -DEAD_ZONE) input.keys.add('a');
-          if (nx > DEAD_ZONE) input.keys.add('d');
-        }
+      const input = inputRef.current;
+      if (input) {
+        input.keys.delete('w');
+        input.keys.delete('s');
+        input.keys.delete('a');
+        input.keys.delete('d');
+        if (ny < -DEAD_ZONE) input.keys.add('w');
+        if (ny > DEAD_ZONE) input.keys.add('s');
+        if (nx < -DEAD_ZONE) input.keys.add('a');
+        if (nx > DEAD_ZONE) input.keys.add('d');
       }
     },
     [inputRef],
@@ -394,10 +397,10 @@ const MobileControls: FC<MobileControlsProps> = ({
       <div
         ref={joystickRef}
         data-joystick
-        onTouchStart={handleJoystickStart}
-        onTouchMove={handleJoystickMove}
-        onTouchEnd={handleJoystickEnd}
-        onTouchCancel={handleJoystickEnd}
+        onPointerDown={handleJoystickStart}
+        onPointerMove={handleJoystickMove}
+        onPointerUp={handleJoystickEnd}
+        onPointerCancel={handleJoystickEnd}
         style={{
           position: 'absolute',
           left: 24,
@@ -452,15 +455,23 @@ const MobileControls: FC<MobileControlsProps> = ({
         return (
           <button
             key={def.key + i}
-            onTouchStart={e => {
+            // Pointer Events (not touchstart): iOS WebKit does NOT fire
+            // touchstart/touchend on a pointer-events:auto child when an
+            // ancestor is pointer-events:none (our full-screen container is) —
+            // which left every action button dead on iPhone. Pointer events
+            // honour the pointer-events CSS property correctly. setPointerCapture
+            // guarantees the matching pointerup lands on this button even if the
+            // finger slides off, so `hold` keys (run/shift/zoom) always release.
+            onPointerDown={e => {
               e.preventDefault();
+              e.currentTarget.setPointerCapture?.(e.pointerId);
               handleButtonStart(def);
             }}
-            onTouchEnd={e => {
+            onPointerUp={e => {
               e.preventDefault();
               handleButtonEnd(def);
             }}
-            onTouchCancel={() => handleButtonEnd(def)}
+            onPointerCancel={() => handleButtonEnd(def)}
             style={{
               position: 'absolute',
               right: pos.right,
