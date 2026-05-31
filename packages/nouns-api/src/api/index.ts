@@ -206,6 +206,7 @@ import {
   predictSeed,
   seedToTraitNames,
   getTraitCountsSnapshot,
+  getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
 import {
@@ -7730,6 +7731,7 @@ app.get('/api/agent/status', async c => {
       descriptor: traitCountsSnapshot.descriptor,
       fetchedAt: traitCountsSnapshot.fetchedAt,
     },
+    recentTraitChanges: getRecentTraitChanges(),
   });
 });
 
