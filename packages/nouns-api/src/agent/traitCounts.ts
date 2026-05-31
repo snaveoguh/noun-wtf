@@ -108,6 +108,28 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 // governance actions, so this is plenty fresh without spamming the RPC.
 const TRAIT_COUNT_REFRESH_MS = 60 * 60 * 1000;
 
+// ─── Recent trait-count changes (surfaced on /api/agent/status → terminal feed)
+// When governance adds/removes art the descriptor count moves. We keep the last
+// few such changes in memory so the noun.wtf terminal feed can show "🎨 accessory
+// 144 → 145" the moment it happens — this is exactly the drift that caused the
+// 2026-05-30 banana/phantom-settle saga. Ring is small + lost on redeploy; that's
+// fine, it's a "what just changed" alert, not a permanent ledger.
+export interface TraitChangeRecord {
+  descriptor: `0x${string}`;
+  previous: TraitCounts;
+  current: TraitCounts;
+  changed: (keyof TraitCounts)[];
+  fetchedAt: number; // unix seconds
+}
+
+const MAX_TRAIT_CHANGES = 20;
+const recentTraitChanges: TraitChangeRecord[] = [];
+
+export function getRecentTraitChanges(): TraitChangeRecord[] {
+  // newest first
+  return [...recentTraitChanges].reverse();
+}
+
 // ─── Public API ────────────────────────────────────────────────────────────
 
 /**
@@ -216,13 +238,17 @@ export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
           .join(', ')}. Predictions will use the new counts immediately.`,
       );
 
-      bridgePublish('noun-trait-count-changed', {
+      const change: TraitChangeRecord = {
         descriptor,
         previous: prev,
         current: next,
         changed,
         fetchedAt: cache.fetchedAt,
-      });
+      };
+      recentTraitChanges.push(change);
+      if (recentTraitChanges.length > MAX_TRAIT_CHANGES) recentTraitChanges.shift();
+
+      bridgePublish('noun-trait-count-changed', change);
     }
 
     return cache;

@@ -41,6 +41,7 @@ import { verifyTip, getAgentBalance } from './tipVerifier.js';
 import {
   getTraitCounts,
   getTraitCountsSnapshot,
+  getRecentTraitChanges,
   refreshTraitCounts,
   startTraitCountRefresher,
   stopTraitCountRefresher,
@@ -102,6 +103,7 @@ export {
   // Live trait counts (from on-chain descriptor)
   getTraitCounts,
   getTraitCountsSnapshot,
+  getRecentTraitChanges,
   refreshTraitCounts,
   startTraitCountRefresher,
   stopTraitCountRefresher,

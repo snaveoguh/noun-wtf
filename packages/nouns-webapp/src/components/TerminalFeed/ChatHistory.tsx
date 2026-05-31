@@ -6,13 +6,27 @@ interface Props {
   messages: ChatMessage[];
 }
 
+interface TraitChange {
+  descriptor: string;
+  previous: Record<string, number>;
+  current: Record<string, number>;
+  changed: string[];
+  fetchedAt: number; // unix seconds
+}
+
 interface AgentStatus {
   running: boolean;
   lastBlock: number;
   nextNounId: number;
   predictedTraits: Record<string, string> | null;
   reservations: { active: number; total: number };
+  recentTraitChanges?: TraitChange[];
 }
+
+// Only surface a descriptor change for a week — it's a "this just happened"
+// alert, not a permanent banner. The on-chain art-add that moved the count is
+// the same drift that broke trait predictions on 2026-05-30.
+const TRAIT_CHANGE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
@@ -80,6 +94,24 @@ function AgentStatusBar() {
           predicted: {Object.values(status.predictedTraits).join(' · ')}
         </span>
       )}
+      {(() => {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const fresh = (status.recentTraitChanges ?? []).find(
+          c => nowSec - c.fetchedAt < TRAIT_CHANGE_TTL_SECONDS,
+        );
+        if (!fresh) return null;
+        const summary = fresh.changed
+          .map(k => `${k} ${fresh.previous[k]}→${fresh.current[k]}`)
+          .join(', ');
+        return (
+          <span
+            title={`Descriptor ${fresh.descriptor} changed — predictions auto-updated`}
+            style={{ color: 'var(--theme-accent, #e8a33d)', fontWeight: 600 }}
+          >
+            🎨 art updated: {summary}
+          </span>
+        );
+      })()}
     </div>
   );
 }
