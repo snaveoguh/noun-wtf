@@ -1,19 +1,21 @@
-// ─── Agent NounIRL — Live Trait Count Cache (V1 only) ──────────────────────
+// ─── Agent NounIRL — Live Trait Count Cache (V1 + V2) ──────────────────────
 //
 // PROBLEM: Trait predictions are derived from `pseudorandomness % count`. If our
-// hardcoded `TRAIT_COUNTS` drift below the on-chain descriptor's actual counts
-// (e.g. governance adds new heads), predicted indices diverge from reality and
-// the bot fails to match reservations.
+// hardcoded counts drift below the on-chain descriptor's actual counts (e.g.
+// governance adds new heads), predicted indices diverge from reality and the
+// bot fails to match reservations.
 //
-// FIX: At bot startup (and every TRAIT_COUNT_REFRESH_MS), resolve the live V1
-// descriptor via `NounsToken.descriptor()` and call its count getters. Cache
-// the result and use it in `predictSeed()`. Log loudly + emit a bridge event
-// when a count changes vs the previous cached snapshot.
+// FIX: At bot startup (and every TRAIT_COUNT_REFRESH_MS), resolve each DAO's
+// live descriptor via `<Token>.descriptor()` and call its count getters. Cache
+// the result per-DAO and use it in `predictSeed()`. Log loudly + emit a bridge
+// event when a count changes vs the previous cached snapshot.
 //
-// SCOPE: V1 only. V2 prediction has separate, more serious bugs documented in
-// the nounirl_settlement_bot memory — fixing V2 is intentionally out of scope.
-// The fallback to the hardcoded `TRAIT_COUNTS` keeps the old V1 behaviour if
-// the live descriptor call fails at startup (with a loud warning).
+// SCOPE: both Nouns DAO V1 and V2. The bot watches one DAO per process
+// (NOUNIRL_WATCH_DAO), but we refresh BOTH so the `/api/agent/predict?dao=v2`
+// debug endpoint stays correct regardless of which DAO this process watches.
+// The fallback to the hardcoded counts (`TRAIT_COUNTS` / `TRAIT_COUNTS_V2`)
+// keeps prediction working if a live descriptor call fails at startup (with a
+// loud warning).
 
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { mainnet } from 'viem/chains';
@@ -21,8 +23,11 @@ import { mainnet } from 'viem/chains';
 import { bridgePublish } from './bridge.js';
 import {
   AGENT_RPC_URL,
-  NOUNS_TOKEN_ADDRESS,
+  selectAddresses,
   TRAIT_COUNTS,
+  TRAIT_COUNTS_V2,
+  WATCHED_DAO,
+  type WatchedDao,
 } from './constants.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -36,6 +41,7 @@ export interface TraitCounts {
 }
 
 export interface TraitCountsSnapshot {
+  dao: WatchedDao;
   counts: TraitCounts;
   source: 'live' | 'fallback';
   descriptor: `0x${string}` | null;
@@ -94,14 +100,26 @@ const DESCRIPTOR_COUNT_ABI = [
 
 // ─── Cache State ───────────────────────────────────────────────────────────
 
-const FALLBACK_SNAPSHOT: TraitCountsSnapshot = {
-  counts: { ...TRAIT_COUNTS },
-  source: 'fallback',
-  descriptor: null,
-  fetchedAt: 0,
+const FALLBACK_COUNTS: Record<WatchedDao, TraitCounts> = {
+  v1: { ...TRAIT_COUNTS },
+  v2: { ...TRAIT_COUNTS_V2 },
 };
 
-let cache: TraitCountsSnapshot = FALLBACK_SNAPSHOT;
+function fallbackSnapshot(dao: WatchedDao): TraitCountsSnapshot {
+  return {
+    dao,
+    counts: { ...FALLBACK_COUNTS[dao] },
+    source: 'fallback',
+    descriptor: null,
+    fetchedAt: 0,
+  };
+}
+
+const cache: Record<WatchedDao, TraitCountsSnapshot> = {
+  v1: fallbackSnapshot('v1'),
+  v2: fallbackSnapshot('v2'),
+};
+
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 // Refresh roughly once an hour — descriptor upgrades and trait adds are rare
@@ -115,6 +133,7 @@ const TRAIT_COUNT_REFRESH_MS = 60 * 60 * 1000;
 // 2026-05-30 banana/phantom-settle saga. Ring is small + lost on redeploy; that's
 // fine, it's a "what just changed" alert, not a permanent ledger.
 export interface TraitChangeRecord {
+  dao: WatchedDao;
   descriptor: `0x${string}`;
   previous: TraitCounts;
   current: TraitCounts;
@@ -135,43 +154,44 @@ export function getRecentTraitChanges(): TraitChangeRecord[] {
 /**
  * Synchronous accessor for the cached trait counts. Always returns a snapshot —
  * before the first successful refresh this is the hardcoded fallback so that
- * `predictSeed()` never crashes.
+ * `predictSeed()` never crashes. Defaults to the DAO this process watches.
  */
-export function getTraitCounts(): TraitCounts {
-  return cache.counts;
+export function getTraitCounts(dao: WatchedDao = WATCHED_DAO): TraitCounts {
+  return cache[dao].counts;
 }
 
 /**
  * Full snapshot including provenance for the `/api/agent/status` endpoint.
+ * Defaults to the DAO this process watches.
  */
-export function getTraitCountsSnapshot(): TraitCountsSnapshot {
-  return cache;
+export function getTraitCountsSnapshot(
+  dao: WatchedDao = WATCHED_DAO,
+): TraitCountsSnapshot {
+  return cache[dao];
 }
 
 /**
- * Run one refresh against the live V1 descriptor. Safe to call repeatedly.
- * Resolves the descriptor address at runtime via NounsToken.descriptor() so
- * descriptor upgrades are picked up automatically.
+ * Refresh one DAO's counts against its live descriptor. Resolves the descriptor
+ * address at runtime via `<Token>.descriptor()` so descriptor upgrades are
+ * picked up automatically. Mutates `cache[dao]` in place on success; keeps the
+ * existing (live or fallback) snapshot on failure.
  */
-export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
-  const client: PublicClient = createPublicClient({
-    chain: mainnet,
-    transport: http(AGENT_RPC_URL),
-  });
+async function refreshOne(client: PublicClient, dao: WatchedDao): Promise<void> {
+  const { token } = selectAddresses(dao);
 
   let descriptor: `0x${string}`;
   try {
     descriptor = (await client.readContract({
-      address: NOUNS_TOKEN_ADDRESS,
+      address: token,
       abi: NOUNS_TOKEN_DESCRIPTOR_ABI,
       functionName: 'descriptor',
     })) as `0x${string}`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[NounIRL:traitCounts] ⚠️  Failed to resolve V1 descriptor() — keeping ${cache.source} counts. Reason: ${msg}`,
+      `[NounIRL:traitCounts] ⚠️  ${dao.toUpperCase()}: failed to resolve descriptor() — keeping ${cache[dao].source} counts. Reason: ${msg}`,
     );
-    return cache;
+    return;
   }
 
   try {
@@ -211,10 +231,11 @@ export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
       glasses: Number(glasses),
     };
 
-    const prev = cache.counts;
-    const prevSource = cache.source;
+    const prev = cache[dao].counts;
+    const prevSource = cache[dao].source;
 
-    cache = {
+    cache[dao] = {
+      dao,
       counts: next,
       source: 'live',
       descriptor,
@@ -223,7 +244,7 @@ export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
 
     if (prevSource !== 'live') {
       console.log(
-        `[NounIRL:traitCounts] ✅ Live counts loaded from descriptor ${descriptor}: ${JSON.stringify(next)}`,
+        `[NounIRL:traitCounts] ✅ ${dao.toUpperCase()}: live counts from descriptor ${descriptor}: ${JSON.stringify(next)}`,
       );
     }
 
@@ -233,32 +254,46 @@ export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
 
     if (prevSource === 'live' && changed.length > 0) {
       console.warn(
-        `[NounIRL:traitCounts] 🚨 TRAIT COUNT CHANGED on descriptor ${descriptor} — ${changed
+        `[NounIRL:traitCounts] 🚨 ${dao.toUpperCase()} TRAIT COUNT CHANGED on descriptor ${descriptor} — ${changed
           .map(k => `${k}: ${prev[k]} → ${next[k]}`)
           .join(', ')}. Predictions will use the new counts immediately.`,
       );
 
       const change: TraitChangeRecord = {
+        dao,
         descriptor,
         previous: prev,
         current: next,
         changed,
-        fetchedAt: cache.fetchedAt,
+        fetchedAt: cache[dao].fetchedAt,
       };
       recentTraitChanges.push(change);
       if (recentTraitChanges.length > MAX_TRAIT_CHANGES) recentTraitChanges.shift();
 
       bridgePublish('noun-trait-count-changed', change);
     }
-
-    return cache;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[NounIRL:traitCounts] ⚠️  Failed to read count getters on descriptor ${descriptor} — keeping ${cache.source} counts. Reason: ${msg}`,
+      `[NounIRL:traitCounts] ⚠️  ${dao.toUpperCase()}: failed to read count getters on descriptor ${descriptor} — keeping ${cache[dao].source} counts. Reason: ${msg}`,
     );
-    return cache;
   }
+}
+
+/**
+ * Run one refresh against both DAOs' live descriptors. Safe to call repeatedly.
+ * Returns the snapshot for the DAO this process watches (for callers that want
+ * the post-refresh result of their own DAO).
+ */
+export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
+  const client: PublicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(AGENT_RPC_URL),
+  });
+
+  await Promise.all([refreshOne(client, 'v1'), refreshOne(client, 'v2')]);
+
+  return cache[WATCHED_DAO];
 }
 
 /**

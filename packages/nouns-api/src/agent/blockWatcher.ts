@@ -9,15 +9,20 @@
 //    Pre-encode once, reuse forever.
 // 3. LOCAL NONCE TRACKING: Keep nonce in memory, increment on settlement.
 //    Avoids eth_getTransactionCount RPC call on critical path.
-// 4. FLASHBOTS PROTECT: Submit settlement via rpc.flashbots.net to prevent
-//    frontrunning. Free, no extra cost. Falls back to public mempool.
+// 4. MULTI-BUILDER FAN-OUT: To land in the EXACT next block, blast the same
+//    signed raw tx to many endpoints at once — public RPCs (mempool reach) +
+//    the major block builders directly (beaverbuild, Titan, rsync, Flashbots).
+//    One RPC gossips too slowly; Flashbots Protect alone DEFERS inclusion across
+//    blocks. Fanning out maximises the chance whoever builds N+1 already has it.
 // 5. ADAPTIVE AUCTION CACHE: Near auction end (<60s), poll every 3s instead of 15s.
 //    Ensures fresh auction state when settlement window opens.
 // 6. PRE-SIGNED RAW TX: Sign settlement tx in advance with predicted nonce + gas.
-//    On match: just sendRawTransaction — skip encode+sign step (~100-200ms saved).
+//    On match: just broadcast — skip encode+sign step (~100-200ms saved). The tx
+//    hash is deterministic from the signed bytes, so we return it locally with
+//    ZERO RPC round-trips on the hot path (broadcasts run in the background).
 //
 // RESULT: Most blocks process in <1ms (pure math + cache).
-// Settlement path: <500ms (pre-signed tx → Flashbots broadcast).
+// Settlement path: hot-path broadcast is non-blocking; tx hits all builders at once.
 
 import {
   createPublicClient,
@@ -26,6 +31,7 @@ import {
   webSocket,
   encodeFunctionData,
   parseGwei,
+  keccak256,
   type PublicClient,
   type WalletClient,
   type Hex,
@@ -80,8 +86,55 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
 // Free WebSocket endpoints — race them all, first block wins.
 const FREE_WS_ENDPOINTS = ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
 
-// Flashbots Protect RPC — free, MEV-safe submission
-const FLASHBOTS_RPC = 'https://rpc.flashbots.net';
+// ─── Settlement Broadcast Fan-Out ─────────────────────────────────────────
+// A settlement tx has NO MEV to protect (the noun goes to the winning bidder
+// regardless of who calls settle), so there's no reason to route through
+// Flashbots Protect alone — and Protect deliberately holds/retries a tx across
+// many blocks rather than targeting the next one, which is exactly how we were
+// missing by 1-3 blocks. A single free-RPC mempool send is no better: it
+// gossips slowly and may never reach the builder that wins N+1.
+//
+// Fix: blast the SAME signed raw tx at every endpoint simultaneously — several
+// public RPCs for mempool reach PLUS the major builders directly (they build
+// the large majority of blocks). All references are the same tx hash, so
+// there's no double-send risk; whichever path lands it first wins.
+// Direct builder submission endpoints. All three were verified live + accepting
+// `eth_sendRawTransaction` (2026-06-05). Builders only implement the send method
+// (generic calls like eth_chainId return method-not-found), which is exactly
+// what we need. These few builders build the large majority of mainnet blocks.
+const SETTLEMENT_BUILDER_ENDPOINTS = [
+  'https://rpc.flashbots.net', // Flashbots — now just one of many, not relied on / not first
+  'https://rpc.beaverbuild.org', // beaverbuild — top builder by block share
+  'https://rpc.titanbuilder.xyz', // Titan
+];
+
+// Public mempool RPCs — verified returning chainId 0x1 (2026-06-05). Dead/HTML
+// endpoints (merkle.io, rsync-builder, payload.de, securerpc, llamarpc) were
+// dropped after a reachability sweep. A failed endpoint is logged + ignored, so
+// this list degrading over time costs reach but never blocks settlement.
+const SETTLEMENT_PUBLIC_RPCS = [
+  'https://ethereum-rpc.publicnode.com',
+  'https://1rpc.io/eth',
+  'https://cloudflare-eth.com',
+  'https://eth.drpc.org',
+];
+
+// dRPC/paid endpoint (AGENT_RPC_URL) first, then the public RPCs for mempool
+// reach, then the builders direct. Deduped so a custom AGENT_RPC_URL that equals
+// a listed node isn't hit twice.
+function settlementBroadcastEndpoints(): string[] {
+  return [
+    ...new Set([AGENT_RPC_URL, ...SETTLEMENT_PUBLIC_RPCS, ...SETTLEMENT_BUILDER_ENDPOINTS]),
+  ];
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
 
 // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -121,7 +174,6 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let wsUnsubscribers: (() => void)[] = [];
 let publicClient: PublicClient | null = null;
 let walletClient: WalletClient | null = null;
-let flashbotsClient: PublicClient | null = null;
 let agentAccount: PrivateKeyAccount | null = null;
 
 // Local nonce tracking
@@ -135,6 +187,15 @@ let preSignedNonce: number | null = null;
 let preSignedAt = 0;
 const PRE_SIGN_TTL = 12_000; // refresh every ~1 block
 
+// Re-fire guard — once we've broadcast a settle for a given noun, don't fire
+// again for the SAME noun on the next block ticks while the receipt is still
+// pending. (We dropped the forced pre-fire `auction()` RPC read to trim hot-path
+// latency; this guard replaces the double-fire protection it gave us. It clears
+// naturally once the auction advances to a new nounId.)
+let lastFiredNounId = 0;
+let lastFiredAt = 0;
+const REFIRE_GUARD_MS = 24_000; // ~2 blocks
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 
 function initClients(): boolean {
@@ -145,11 +206,6 @@ function initClients(): boolean {
   publicClient = createPublicClient({
     chain: mainnet,
     transport: http(rpcUrl),
-  });
-
-  flashbotsClient = createPublicClient({
-    chain: mainnet,
-    transport: http(FLASHBOTS_RPC),
   });
 
   const privateKey = process.env.NOUNIRL_PRIVATE_KEY;
@@ -299,7 +355,7 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
   try {
     console.log(`[NounIRL] 🔥 SETTLING — pre-signed: ${preSignedTx ? 'YES' : 'NO'}`);
 
-    let hash: Hex;
+    let signedTx: Hex;
 
     // FAST PATH: Use pre-signed transaction if nonce is still valid
     const currentNonce = await getLocalNonce();
@@ -309,31 +365,27 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
       Date.now() - preSignedAt < PRE_SIGN_TTL * 3
     ) {
       console.log(`[NounIRL] Using pre-signed tx (nonce ${currentNonce})`);
-
-      // Try Flashbots first (MEV-safe, ~0 extra latency)
-      try {
-        hash = await sendRawTx(preSignedTx, true);
-      } catch {
-        // Fall back to public mempool
-        hash = await sendRawTx(preSignedTx, false);
-      }
+      signedTx = preSignedTx;
     } else {
-      // FALLBACK: Fresh sign + send via walletClient
+      // FALLBACK: Fresh sign with the current nonce, then fan out the same way.
       console.log(
         `[NounIRL] Fresh sign (nonce stale: expected ${preSignedNonce}, got ${currentNonce})`,
       );
-
-      // @ts-expect-error — viem strict chain typing
-      hash = await walletClient.writeContract({
-        address: AUCTION_HOUSE_ADDRESS,
-        abi: AUCTION_HOUSE_ABI,
-        functionName: 'settleCurrentAndCreateNewAuction',
+      signedTx = await agentAccount.signTransaction({
+        to: AUCTION_HOUSE_ADDRESS as `0x${string}`,
+        data: SETTLEMENT_CALLDATA,
         gas: SETTLEMENT_GAS_LIMIT,
-        maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         maxFeePerGas: SETTLEMENT_MAX_FEE,
-        chain: mainnet,
+        maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
+        nonce: currentNonce,
+        chainId: 1,
+        type: 'eip1559' as const,
       });
     }
+
+    // Fan the signed tx out to every endpoint at once. Returns the (locally
+    // computed) hash immediately — no RPC round-trip on the hot path.
+    const hash = broadcastRawTx(signedTx);
 
     // Update local nonce + invalidate pre-signed
     if (localNonce !== null) localNonce++;
@@ -341,7 +393,7 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
     preSignedNonce = null;
 
     const txTime = Date.now() - t0;
-    console.log(`[NounIRL] ✅ Settlement tx sent in ${txTime}ms: ${hash}`);
+    console.log(`[NounIRL] ✅ Settlement tx assembled + fanned out in ${txTime}ms: ${hash}`);
 
     return { txHash: hash };
   } catch (err) {
@@ -353,20 +405,65 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
   }
 }
 
-async function sendRawTx(signedTx: Hex, useFlashbots: boolean): Promise<Hex> {
-  const client = useFlashbots ? flashbotsClient : publicClient;
-  if (!client) throw new Error('No client');
-
-  const hash = await client.request({
+// Blast the SAME signed raw tx at every public RPC + builder simultaneously.
+// Returns the deterministic tx hash IMMEDIATELY (computed locally from the
+// signed bytes) so the hot path never blocks on a network round-trip; the
+// actual POSTs run in the background and log how many endpoints accepted.
+// Never throws — one slow/dead endpoint must not block settlement.
+function broadcastRawTx(signedTx: Hex): Hex {
+  const hash = keccak256(signedTx);
+  const endpoints = settlementBroadcastEndpoints();
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
     method: 'eth_sendRawTransaction',
     params: [signedTx],
   });
 
-  if (useFlashbots) {
-    console.log('[NounIRL] Submitted via Flashbots Protect (MEV-safe)');
-  }
+  const started = Date.now();
+  let accepted = 0;
 
-  return hash as Hex;
+  void Promise.allSettled(
+    endpoints.map(async url => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3_000);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body,
+          signal: ctrl.signal,
+        });
+        const json = (await res.json()) as {
+          result?: string;
+          error?: { message?: string };
+        };
+        if (json.result) {
+          accepted++;
+        } else if (json.error) {
+          // "already known" / "nonce too low" just mean another endpoint already
+          // accepted the same tx — that's a success, not a failure.
+          const m = json.error.message ?? '';
+          if (/already known|nonce too low|already exists|known transaction/i.test(m)) {
+            accepted++;
+          } else {
+            console.warn(`[NounIRL] broadcast ${hostOf(url)} rejected: ${m}`);
+          }
+        }
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        console.warn(`[NounIRL] broadcast ${hostOf(url)} failed: ${m}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }),
+  ).then(() => {
+    console.log(
+      `[NounIRL] 📡 broadcast ${hash} → ${accepted}/${endpoints.length} endpoints accepted in ${Date.now() - started}ms`,
+    );
+  });
+
+  return hash;
 }
 
 // ─── Block Processing ───────────────────────────────────────────────────
@@ -408,8 +505,8 @@ async function onNewBlock(
     // in block N+1, the seeder uses hash(N) — which is the CURRENT block's hash.
     // Using parentHash (hash of N-1) predicts what was minted in THIS block,
     // not what would be minted in the NEXT block where our tx lands.
-    const seed = predictSeed(blockHash, nextNounId);
-    const traits = seedToTraitNames(seed);
+    const seed = predictSeed(blockHash, nextNounId, { dao: WATCHED_DAO });
+    const traits = seedToTraitNames(seed, WATCHED_DAO);
 
     state.lastPredictedSeed = seed;
     state.lastPredictedTraits = traits;
@@ -421,15 +518,33 @@ async function onNewBlock(
       const isMatch = matchesTraits(traits, reservation.traits);
 
       if (isMatch && auctionEnded) {
-        const freshAuction = await getCurrentAuction(true);
-        if (!freshAuction || freshAuction.settled) {
+        // Skip if the auction we already have cached is settled, or if we just
+        // fired for this same noun and are still waiting on the receipt. We do
+        // NOT force-refresh auction() here — that RPC round-trip on the hot path
+        // is what was eating into the slot. A stale settled-flag at worst costs a
+        // cheap reverting tx; landing in the target block matters more.
+        if (auction.settled) {
           console.log('[NounIRL] Match found but auction already settled — skipping');
           continue;
         }
+        if (nextNounId === lastFiredNounId && Date.now() - lastFiredAt < REFIRE_GUARD_MS) {
+          console.log(
+            `[NounIRL] Already fired for Noun #${nextNounId} ${Date.now() - lastFiredAt}ms ago — awaiting receipt, not re-firing`,
+          );
+          continue;
+        }
 
+        // How far into slot N are we broadcasting? (lower = more of the ~12s
+        // slot left for a builder to pick up our tx for block N+1.)
+        const targetBlock = num + 1;
+        const slotMs = blockTimestamp ? Date.now() - Number(blockTimestamp) * 1000 : null;
         console.log(
-          `[NounIRL] 🎯 MATCH in ${Date.now() - t0}ms! Noun #${nextNounId} — ${JSON.stringify(traits)}`,
+          `[NounIRL] 🎯 MATCH in ${Date.now() - t0}ms! Noun #${nextNounId} → target block ${targetBlock}` +
+            `${slotMs !== null ? ` (${slotMs}ms into slot ${num})` : ''} — ${JSON.stringify(traits)}`,
         );
+
+        lastFiredNounId = nextNounId;
+        lastFiredAt = Date.now();
 
         const result = await settleAuction();
         if (result) {
@@ -447,6 +562,7 @@ async function onNewBlock(
           const settledNounId = nextNounId;
           const settledTraits = { ...traits };
           const settledBlock = num;
+          const firedTargetBlock = targetBlock;
           const txHash = result.txHash;
 
           // Wait for receipt, verify success, then verify actual onchain traits
@@ -455,6 +571,25 @@ async function onNewBlock(
             void pc
               .waitForTransactionReceipt({ hash: txHash as `0x${string}` })
               .then(async receipt => {
+                // TELEMETRY: did we land in the EXACT block we aimed for? A late
+                // landing means the predicted seed (keyed on block N's hash) is
+                // wrong — this is the "missed by N blocks" signal, now measured
+                // instead of guessed.
+                const landedBlock = Number(receipt.blockNumber);
+                const blocksLate = landedBlock - firedTargetBlock;
+                if (blocksLate === 0) {
+                  console.log(
+                    `[NounIRL] 🎯 Landed in TARGET block ${firedTargetBlock} — Noun #${settledNounId} ✅ on time`,
+                  );
+                } else {
+                  const lateMsg = `[NounIRL] ⏱️ Landed ${blocksLate} block(s) ${blocksLate > 0 ? 'LATE' : 'EARLY'} — target ${firedTargetBlock}, got ${landedBlock} (Noun #${settledNounId}, tx ${txHash})`;
+                  console.warn(lateMsg);
+                  state.errors.push(
+                    `Settle landed ${blocksLate} block(s) off target for Noun #${settledNounId} (target ${firedTargetBlock}, got ${landedBlock})`,
+                  );
+                  if (state.errors.length > 50) state.errors.shift();
+                }
+
                 if (receipt.status !== 'success') {
                   console.error(
                     `[NounIRL] ❌ Settlement tx REVERTED — Noun #${settledNounId} tx ${txHash}. Someone else settled first.`,
@@ -500,7 +635,7 @@ async function onNewBlock(
                     head: Number(onchainSeed.head),
                     glasses: Number(onchainSeed.glasses),
                   };
-                  actualTraits = seedToTraitNames(seed);
+                  actualTraits = seedToTraitNames(seed, WATCHED_DAO);
                 } catch (err) {
                   console.warn(
                     `[NounIRL] Could not read onchain seed for Noun #${settledNounId}:`,

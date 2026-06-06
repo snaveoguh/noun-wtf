@@ -17,6 +17,16 @@
 import { keccak256, encodePacked, type Hex } from 'viem';
 import { ImageData } from '@noundry/nouns-assets';
 import { getTraitCounts } from './traitCounts.js';
+import { WATCHED_DAO } from './constants.js';
+// Vendored V2 art mirror — 32 bodies / 144 accessories / 253 heads / 23 glasses,
+// founder traits at white@30, black@31, multicolor@142, slobber@143,
+// missingnoun@252 (verified on-chain 2026-06-05). Kept in-package rather than
+// via the `@nouns/assets` workspace dep because the nouns-api Docker image only
+// COPYs nouns-api/sdk/contracts (see root Dockerfile). Same schema as the V1
+// `ImageData`; name resolution only reads `.images[category][i].filename`.
+import ImageDataV2Json from './image-data-v2.json';
+
+const ImageDataV2 = ImageDataV2Json as unknown as typeof ImageData;
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -85,10 +95,10 @@ export function predictSeed(
   // Extract 48-bit chunks via right shift + mask
   const mask48 = (1n << 48n) - 1n;
 
-  // Use the live trait counts cached from the on-chain descriptor — falls back
-  // to the hardcoded constants in `constants.ts` if the descriptor read failed
-  // at startup (see `traitCounts.ts`).
-  const counts = getTraitCounts();
+  // Use the live trait counts for THIS variant, cached from the on-chain
+  // descriptor — falls back to the hardcoded constants in `constants.ts` if the
+  // descriptor read failed at startup (see `traitCounts.ts`).
+  const counts = getTraitCounts(variant);
 
   const background = Number((pseudorandomness & mask48) % BigInt(counts.background));
   const body = Number(((pseudorandomness >> 48n) & mask48) % BigInt(counts.body));
@@ -102,10 +112,8 @@ export function predictSeed(
     // SLOBBER_INDEX up by one. Effective range:
     //   [0, SLOBBER_INDEX) ∪ (SLOBBER_INDEX, accessoryCount)
     //
-    // NB: `counts` is sourced from the V1 descriptor. V2 prediction has its
-    // own outstanding bugs (see nounirl_settlement_bot memory) — this branch
-    // is intentionally left on the V1 counts as a known-broken path rather
-    // than wiring up a separate V2 descriptor refresher here.
+    // `counts` here is the V2 descriptor's live counts (getTraitCounts('v2')),
+    // so accessoryCount is V2's 144 — matching the on-chain seeder.
     const accessoryRange = BigInt(counts.accessory - 1);
     let acc = Number(((pseudorandomness >> 96n) & mask48) % accessoryRange);
     if (acc >= V2_SLOBBER_INDEX) acc += 1;
@@ -146,8 +154,18 @@ const CATEGORY_MAP: Record<string, 'bodies' | 'accessories' | 'heads' | 'glasses
 /**
  * Convert a seed index to a human-readable trait name.
  * Mirrors packages/nouns-webapp/src/lib/traitName.ts
+ *
+ * `dao` picks the art set: V1 reads the canonical `@noundry/nouns-assets`
+ * frozen trait set; V2 reads the vendored `image-data-v2.json` (V1 snapshot +
+ * founder traits at their on-chain indices). The inherited range is identical
+ * across both — only the V2 founder slots (e.g. slobber@143) differ — so this
+ * matters mainly for reservations that target those founder traits.
  */
-function traitName(type: keyof NounSeed, seedIndex: number): string {
+function traitName(
+  type: keyof NounSeed,
+  seedIndex: number,
+  dao: SeederVariant = WATCHED_DAO,
+): string {
   if (type === 'background') {
     return ['Cool', 'Warm'][seedIndex] ?? 'Unknown';
   }
@@ -155,7 +173,8 @@ function traitName(type: keyof NounSeed, seedIndex: number): string {
   const category = CATEGORY_MAP[type];
   if (!category) return 'Unknown';
 
-  const images = ImageData.images[category];
+  const source = dao === 'v2' ? ImageDataV2 : ImageData;
+  const images = source.images[category];
   if (!images || seedIndex >= images.length) return `Unknown(${seedIndex})`;
 
   const entry = images[seedIndex];
@@ -177,14 +196,18 @@ function traitName(type: keyof NounSeed, seedIndex: number): string {
 
 /**
  * Convert a full NounSeed to human-readable trait names.
+ * `dao` selects the art set (defaults to the DAO this process watches).
  */
-export function seedToTraitNames(seed: NounSeed): TraitNames {
+export function seedToTraitNames(
+  seed: NounSeed,
+  dao: SeederVariant = WATCHED_DAO,
+): TraitNames {
   return {
-    background: traitName('background', seed.background),
-    body: traitName('body', seed.body),
-    accessory: traitName('accessory', seed.accessory),
-    head: traitName('head', seed.head),
-    glasses: traitName('glasses', seed.glasses),
+    background: traitName('background', seed.background, dao),
+    body: traitName('body', seed.body, dao),
+    accessory: traitName('accessory', seed.accessory, dao),
+    head: traitName('head', seed.head, dao),
+    glasses: traitName('glasses', seed.glasses, dao),
   };
 }
 
@@ -237,13 +260,17 @@ export function matchesTraits(
  * Get all valid trait names for a given category.
  * Useful for fuzzy matching and autocomplete.
  */
-export function getAllTraitNames(category: keyof NounSeed): string[] {
+export function getAllTraitNames(
+  category: keyof NounSeed,
+  dao: SeederVariant = WATCHED_DAO,
+): string[] {
   if (category === 'background') return ['Cool', 'Warm'];
 
   const imageCategory = CATEGORY_MAP[category];
   if (!imageCategory) return [];
 
-  return ImageData.images[imageCategory].map((img, idx) => traitName(category, idx));
+  const source = dao === 'v2' ? ImageDataV2 : ImageData;
+  return source.images[imageCategory].map((_img, idx) => traitName(category, idx, dao));
 }
 
 /**
