@@ -7757,7 +7757,7 @@ app.get('/api/agent/predict', c => {
 
   if (dao === 'v2' && w.lastBlockHash != null && w.nextNounId > 0) {
     seed = predictSeed(w.lastBlockHash, w.nextNounId, { dao: 'v2' });
-    traits = seedToTraitNames(seed);
+    traits = seedToTraitNames(seed, 'v2');
   }
 
   return c.json({

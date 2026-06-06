@@ -68,6 +68,23 @@ export const TRAIT_COUNTS = {
   glasses: 24,
 } as const;
 
+// ─── Trait Counts — Nouns DAO V2 (from V2 descriptor @ 0xAe0247Ca34B211a61b03A95F8008DCb8B3124B89) ──
+// Verified on-chain 2026-06-05 via NounV2Token.descriptor().{background,body,
+// accessory,head,glasses}Count. V2 froze a 2022-era V1 trait snapshot and
+// appended founder traits at specific indices (white body 30, black body 31,
+// multicolor accessory 142, slobber accessory 143, missingnoun head 252) — so
+// the counts diverge from V1's live set. Like TRAIT_COUNTS this is only a
+// FALLBACK; the live counts come from `traitCounts.ts` reading the V2
+// descriptor at startup + hourly. The vendored `image-data-v2.json` mirrors
+// this exact trait set for name resolution.
+export const TRAIT_COUNTS_V2 = {
+  background: 2,
+  body: 32,
+  accessory: 144,
+  head: 253,
+  glasses: 23,
+} as const;
+
 // ─── Supported Chains for Omnichain Tips ───────────────────────────────────
 export const SUPPORTED_CHAINS: Record<number, { name: string; rpc: string }> = {
   1: { name: 'Ethereum', rpc: 'https://ethereum-rpc.publicnode.com' },
