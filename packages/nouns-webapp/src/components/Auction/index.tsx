@@ -1226,9 +1226,19 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
-    if (dao.isV2) return v2OnChainImage ?? null;
+    if (dao.isV2) {
+      if (v2OnChainImage) return v2OnChainImage;
+      // A no-bid V2 settle HARD-BURNS the token: dataURI() and ownerOf() revert
+      // while seeds() still returns the seed. So the on-chain image never
+      // resolves for a burned noun — fall back to building the SVG client-side
+      // from the seed (V2 palette) so burned nouns still render their art.
+      // For non-burned nouns we keep returning null until dataURI loads (no
+      // flicker / no behaviour change there).
+      if (isBurned) return getNoun(BigInt(currentAuction.nounId), currentNounSeed, true).image;
+      return null;
+    }
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage]);
+  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage, isBurned]);
 
   useAuctionKeyboardShortcuts({
     isEditing,
