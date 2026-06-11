@@ -3068,11 +3068,27 @@ Or just type freely and I'll respond with AI. ⌐◨-◨`;
 
 type CandidateRow = typeof schema.candidate.$inferSelect;
 
+// Slug/title hits (exact-slug 100, slug-contains 80, title-contains 60) count as
+// strong "the user means this candidate" matches; description/token-only hits
+// (<60) are weak relevance backstops. Used by `preferRecent` to decide which
+// matches may be re-ordered newest-first.
+const STRONG_MATCH_SCORE = 60;
+
 async function findCandidates(
   keyword: string,
-  opts: { includeCanceled?: boolean; includePromoted?: boolean; limit?: number } = {},
+  opts: {
+    includeCanceled?: boolean;
+    includePromoted?: boolean;
+    limit?: number;
+    preferRecent?: boolean;
+  } = {},
 ): Promise<CandidateRow[]> {
-  const { includeCanceled = false, includePromoted = false, limit = 5 } = opts;
+  const {
+    includeCanceled = false,
+    includePromoted = false,
+    limit = 5,
+    preferRecent = false,
+  } = opts;
   // Fetch a large pool — candidates are small rows
   const allCands = await db
     .select()
@@ -3180,10 +3196,30 @@ async function findCandidates(
   }
 
   // Score desc; ties stay newest-first (stable sort over a newest-first list).
-  return Array.from(families.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(r => r.row);
+  const ranked = Array.from(families.values()).sort((a, b) => b.score - a.score);
+
+  // Recency-as-intent. For action commands (sponsor/promote) the user means the
+  // candidate they most recently created/sponsored, not whichever historical row
+  // scores highest. A re-submitted candidate gets a fresh slug suffix that is
+  // often non-numeric (e.g. `…-mog6ls68`), so it doesn't collapse into the
+  // original's family and the original's exact-slug 100 out-ranks the
+  // resubmission's substring 80 — promoting/sponsoring the stale row. When
+  // `preferRecent` is set, re-order the strong (slug/title) matches newest-first
+  // so the latest candidate wins. Weak description/token-only matches keep score
+  // order as a relevance backstop, so a vague keyword can't drag in an unrelated
+  // recent candidate over a clear slug hit.
+  if (preferRecent) {
+    const blk = (r: Scored) => Number(r.row.createdAtBlock ?? 0n);
+    const strong = ranked
+      .filter(r => r.score >= STRONG_MATCH_SCORE)
+      .sort((a, b) => blk(b) - blk(a));
+    if (strong.length > 0) {
+      const weak = ranked.filter(r => r.score < STRONG_MATCH_SCORE);
+      return [...strong, ...weak].slice(0, limit).map(r => r.row);
+    }
+  }
+
+  return ranked.slice(0, limit).map(r => r.row);
 }
 
 // Extract title from candidate description
@@ -3662,7 +3698,9 @@ async function parseCommand(
     if (!wallet) return { handled: true, response: 'Connect your wallet to sponsor.' };
     const keyword = sponsorMatch[1].trim();
     try {
-      const matches = await findCandidates(keyword, { limit: 1 });
+      // preferRecent: sponsor the latest matching candidate, not a stale
+      // re-submission that happens to score higher on an exact-slug match.
+      const matches = await findCandidates(keyword, { limit: 1, preferRecent: true });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
@@ -3704,7 +3742,9 @@ async function parseCommand(
     if (!wallet) return { handled: true, response: 'Connect your wallet to promote.' };
     const keyword = promoteMatch[1].trim();
     try {
-      const matches = await findCandidates(keyword, { limit: 1 });
+      // preferRecent: promote the latest matching candidate, not a stale
+      // re-submission that happens to score higher on an exact-slug match.
+      const matches = await findCandidates(keyword, { limit: 1, preferRecent: true });
       if (matches.length === 0)
         return { handled: true, response: `No candidate found matching "${keyword}".` };
       const c = matches[0];
