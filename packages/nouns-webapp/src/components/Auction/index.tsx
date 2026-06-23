@@ -1180,6 +1180,28 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [dispatch],
   );
 
+  // Root guard for the V2↔V1 toggle white-screen: the instant the DAO context
+  // flips, drop any seed carried over from the other DAO. Otherwise the
+  // previous DAO's `currentNounSeed` lingers in Redux for a render or two while
+  // the new auction's seed loads, and its trait indices can be out of range for
+  // the new DAO's asset set (V2 body 31 vs V1's 0–30). The trait decoders each
+  // guard against that now (f321eced2 / b9bdb32fe / 1893304aa), but clearing the
+  // seed at the source shows a clean loading state instead of a briefly
+  // wrong/partial noun — and removes the cause rather than each symptom.
+  //
+  // Declared BEFORE the v2 seed-push effect so that, within a single commit,
+  // the stale seed is cleared before the new one is set (effects run in
+  // declaration order). The mount run is skipped via the ref so we never wipe a
+  // freshly-loaded seed. `lastSeedKeyRef` is reset so the new DAO's seed always
+  // re-dispatches even on a rare key collision.
+  const seedDaoIsV2Ref = useRef(dao.isV2);
+  useEffect(() => {
+    if (seedDaoIsV2Ref.current === dao.isV2) return;
+    seedDaoIsV2Ref.current = dao.isV2;
+    lastSeedKeyRef.current = '';
+    dispatch(setCurrentNounSeed(null));
+  }, [dao.isV2, dispatch]);
+
   // On v2 we bypass the StandaloneNounWithSeed loader (it uses the mainnet
   // Ponder cache + mainnet token contract) — push the v2 seed we already
   // read on-chain into the same handler. Same effect, different source.
