@@ -15,27 +15,31 @@ export const BORGS_ADDRESS = '0xa88E5cfA0257460490Ce54052B4faeE1b3d7f410' as con
 export const BORGS_SUPPLY_LIMIT = 50_000;
 export const BORG_GRID = 24; // 576 pixels
 
+export const generatedBorgEvent = {
+  type: 'event',
+  name: 'GeneratedBorg',
+  inputs: [
+    { name: 'borgId', type: 'uint256', indexed: true },
+    { name: 'creator', type: 'address', indexed: true },
+    { name: 'timestamp', type: 'uint256', indexed: false },
+  ],
+} as const;
+
+export const bredBorgEvent = {
+  type: 'event',
+  name: 'BredBorg',
+  inputs: [
+    { name: 'childId', type: 'uint256', indexed: true },
+    { name: 'parentId1', type: 'uint256', indexed: true },
+    { name: 'parentId2', type: 'uint256', indexed: true },
+    { name: 'breeder', type: 'address', indexed: false },
+    { name: 'timestamp', type: 'uint256', indexed: false },
+  ],
+} as const;
+
 export const borgsAbi = [
-  {
-    type: 'event',
-    name: 'GeneratedBorg',
-    inputs: [
-      { name: 'borgId', type: 'uint256', indexed: true },
-      { name: 'creator', type: 'address', indexed: true },
-      { name: 'timestamp', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'BredBorg',
-    inputs: [
-      { name: 'childId', type: 'uint256', indexed: true },
-      { name: 'parentId1', type: 'uint256', indexed: true },
-      { name: 'parentId2', type: 'uint256', indexed: true },
-      { name: 'breeder', type: 'address', indexed: false },
-      { name: 'timestamp', type: 'uint256', indexed: false },
-    ],
-  },
+  generatedBorgEvent,
+  bredBorgEvent,
   {
     type: 'function',
     name: 'generateBorg',
@@ -160,6 +164,15 @@ export const polygonClient = createPublicClient({
   ]),
 });
 
+// Historical reads need their own client: publicnode gates archival requests
+// behind a personal token, and no free polygon RPC serves usable eth_getLogs
+// ranges. drpc's free tier DOES serve archival eth_call + old block headers,
+// which is enough to binary-search mint blocks off the monotonic counters.
+const polygonArchiveClient = createPublicClient({
+  chain: polygon,
+  transport: http('https://polygon.drpc.org', { timeout: 10_000 }),
+});
+
 export interface BorgAttribute {
   /** attribute name as stored on-chain, e.g. "gold chain" or "blank7" */
   n: string;
@@ -266,6 +279,44 @@ export async function fetchNewBorgs(data: BorgsData): Promise<number> {
   const newIds = [];
   for (let id = knownMaxId + 1; id <= liveMaxId && newIds.length < 300; id++) newIds.push(id);
 
+  // Birth timestamps: binary-search each new borg's mint block using the
+  // monotonic generated+bred counters (borg id X exists from the first block
+  // where the combined count >= X), then read that block's timestamp. Ids are
+  // ascending, so the search floor walks forward — ~20 probes for the first
+  // id, a handful for each after. Budget-capped: leftovers keep born=0 until
+  // the next snapshot refresh fills them from event logs.
+  const births = new Map<number, number>();
+  try {
+    const latest = await polygonClient.getBlockNumber();
+    const countAt = async (block: bigint) => {
+      const [gen, bred] = await polygonArchiveClient.multicall({
+        contracts: [
+          { ...contract, functionName: 'getCurrentGenerationCount' },
+          { ...contract, functionName: 'getCurrentBredCount' },
+        ],
+        allowFailure: false,
+        blockNumber: block,
+      });
+      return Number(gen) + Number(bred);
+    };
+    let probes = 0;
+    let lo = BigInt(data.meta.snapshotBlock);
+    for (const id of newIds) {
+      let hi = latest;
+      while (lo < hi && probes < 120) {
+        const mid = (lo + hi) / 2n;
+        probes += 1;
+        if ((await countAt(mid)) >= id) hi = mid;
+        else lo = mid + 1n;
+      }
+      if (lo < hi) break; // probe budget exhausted mid-search
+      const block = await polygonArchiveClient.getBlock({ blockNumber: lo });
+      births.set(id, Number(block.timestamp));
+    }
+  } catch {
+    /* born stays 0 for this visit */
+  }
+
   // getBorg rebuilds the 576-pixel image in-contract — too gas-heavy to batch
   // via multicall (inner calls hit the RPC eth_call gas cap). Read one by one.
   const attrIndex = new Map(data.attributes.map((a, i) => [a.n, i]));
@@ -297,7 +348,7 @@ export async function fetchNewBorgs(data: BorgsData): Promise<number> {
       child: Number(childId),
       owner,
       name,
-      born: 0, // precise event timestamp fills in on the next snapshot refresh
+      born: births.get(id) ?? 0,
     };
     data.borgs.set(borg.id, borg);
     // Bred child ⇒ parents were burned
