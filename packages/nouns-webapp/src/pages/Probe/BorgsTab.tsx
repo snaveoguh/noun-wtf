@@ -30,6 +30,7 @@ import {
   renderBorgImage,
   renderRawBorgImage,
 } from '@/lib/borgs';
+import { playTada, startSlowJam } from '@/lib/chiptune';
 
 const MIN_CELL = 72;
 const GAP = 6;
@@ -49,6 +50,16 @@ const sortOptions: { label: string; value: SortOption }[] = [
   { label: 'Rarest', value: 'rarest' },
   { label: 'Most Common', value: 'common' },
 ];
+
+// Keyframes for the mint roll / breeding chamber. Scoped by borg- prefix.
+const BORG_KEYFRAMES = `
+@keyframes borg-bump-l {0%,100%{transform:translate(0,0) rotate(-3deg)}50%{transform:translate(14px,-3px) rotate(4deg)}}
+@keyframes borg-bump-r {0%,100%{transform:translate(0,0) rotate(3deg)}50%{transform:translate(-14px,-3px) rotate(-4deg)}}
+@keyframes borg-heart {0%{transform:translateY(8px) scale(.4);opacity:0}25%{opacity:1}100%{transform:translateY(-72px) scale(1.25);opacity:0}}
+@keyframes borg-reveal {0%{transform:scale(0) rotate(-15deg)}60%{transform:scale(1.15) rotate(4deg)}80%{transform:scale(.96)}100%{transform:scale(1) rotate(0)}}
+@keyframes borg-shake {0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-1.5deg)}75%{transform:translateX(3px) rotate(1.5deg)}}
+@keyframes borg-mood {0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+`;
 
 const rarityCache = new Map<number, number>();
 
@@ -292,6 +303,7 @@ const BorgsTab: FC = () => {
 
   return (
     <>
+      <style>{BORG_KEYFRAMES}</style>
       {/* Collection header: supply + mint/breed */}
       <div className="mt-1 flex flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-2">
         <div className="flex flex-col">
@@ -754,6 +766,31 @@ function MintBorgDialog({
     await onMinted();
   });
   const { address } = tx;
+  const busy = tx.isPending || tx.isConfirming;
+
+  // Slot-machine roll while the chain decides what you get
+  const shufflePool = useMemo(() => {
+    if (!open) return [];
+    const alive = Array.from(data.borgs.values()).filter(b => b.owner !== null);
+    const pool: string[] = [];
+    for (let i = 0; i < 24 && alive.length > 0; i++) {
+      const pick = alive[Math.floor(Math.random() * alive.length)];
+      const uri = renderBorgImage(pick.attrs, data.attributes);
+      if (uri) pool.push(uri);
+    }
+    return pool;
+  }, [open, data]);
+  const [shuffleIdx, setShuffleIdx] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setShuffleIdx(i => i + 1), 90);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  // Fanfare when the fresh borg lands
+  useEffect(() => {
+    if (mintedId !== null) playTada();
+  }, [mintedId]);
 
   // Whitelist-aware price (free founder mints return 0)
   useEffect(() => {
@@ -815,7 +852,11 @@ function MintBorgDialog({
                 src={mintedImage}
                 alt={`Borg ${mintedId}`}
                 className="h-40 w-40 rounded-xl"
-                style={{ imageRendering: 'pixelated', backgroundColor: CELL_BG }}
+                style={{
+                  imageRendering: 'pixelated',
+                  backgroundColor: CELL_BG,
+                  animation: 'borg-reveal 0.7s cubic-bezier(.2,1.4,.4,1) both',
+                }}
               />
             ) : (
               <div className="h-40 w-40 animate-pulse rounded-xl bg-gray-100" />
@@ -824,6 +865,22 @@ function MintBorgDialog({
             <Button size="sm" onClick={() => close(false)}>
               Done
             </Button>
+          </div>
+        ) : busy && shufflePool.length > 0 ? (
+          <div className="flex flex-col items-center gap-3 py-2">
+            <img
+              src={shufflePool[shuffleIdx % shufflePool.length]}
+              alt="Rolling..."
+              className="h-40 w-40 rounded-xl"
+              style={{
+                imageRendering: 'pixelated',
+                backgroundColor: CELL_BG,
+                animation: 'borg-shake 0.25s linear infinite',
+              }}
+            />
+            <p className="text-muted-foreground text-sm">
+              {tx.isPending ? 'Confirm in wallet…' : '🎰 Rolling your borg onchain…'}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -888,6 +945,25 @@ function BreedBorgsDialog({
   });
   const { address } = tx;
 
+  // The slow jam plays while the parents get acquainted. Started from the
+  // breed click (browsers require a user gesture for audio), stopped on
+  // success, failure, or the user bailing out of the dialog.
+  const jamStop = useRef<(() => void) | null>(null);
+  const stopJam = useCallback(() => {
+    jamStop.current?.();
+    jamStop.current = null;
+  }, []);
+  useEffect(() => stopJam, [stopJam]); // unmount safety
+  useEffect(() => {
+    if (tx.error) stopJam();
+  }, [tx.error, stopJam]);
+  useEffect(() => {
+    if (childId !== null) {
+      stopJam();
+      playTada();
+    }
+  }, [childId, stopJam]);
+
   // Live owned set (snapshot owners can be stale after transfers)
   useEffect(() => {
     if (!open || !address) return;
@@ -948,6 +1024,7 @@ function BreedBorgsDialog({
 
   const close = (o: boolean) => {
     if (!o) {
+      stopJam();
       tx.reset();
       setSelected([]);
       setPreview(null);
@@ -958,6 +1035,11 @@ function BreedBorgsDialog({
 
   const child = childId !== null ? data.borgs.get(childId) : null;
   const childImage = child ? renderBorgImage(child.attrs, data.attributes) : null;
+  const busy = tx.isPending || tx.isConfirming;
+  const parentImages = selected.map(id => {
+    const borg = data.borgs.get(id);
+    return borg ? renderBorgImage(borg.attrs, data.attributes) : null;
+  });
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -978,7 +1060,11 @@ function BreedBorgsDialog({
                 src={childImage}
                 alt={`Borg ${childId}`}
                 className="h-40 w-40 rounded-xl"
-                style={{ imageRendering: 'pixelated', backgroundColor: CELL_BG }}
+                style={{
+                  imageRendering: 'pixelated',
+                  backgroundColor: CELL_BG,
+                  animation: 'borg-reveal 0.8s cubic-bezier(.2,1.4,.4,1) both',
+                }}
               />
             ) : (
               <div className="h-40 w-40 animate-pulse rounded-xl bg-gray-100" />
@@ -987,6 +1073,62 @@ function BreedBorgsDialog({
             <Button size="sm" onClick={() => close(false)}>
               Done
             </Button>
+          </div>
+        ) : busy ? (
+          <div className="flex flex-col items-center gap-3 py-2">
+            <div
+              className="relative flex h-48 w-full items-center justify-center overflow-hidden rounded-xl"
+              style={{
+                background: 'linear-gradient(120deg,#2a0a3d,#4d0a33,#2a0a3d)',
+                backgroundSize: '300% 300%',
+                animation: 'borg-mood 5s ease-in-out infinite',
+              }}
+            >
+              {parentImages[0] && (
+                <img
+                  src={parentImages[0]}
+                  alt={`Borg ${selected[0]}`}
+                  className="h-24 w-24"
+                  style={{
+                    imageRendering: 'pixelated',
+                    animation: 'borg-bump-l 0.9s ease-in-out infinite',
+                  }}
+                />
+              )}
+              {parentImages[1] && (
+                <img
+                  src={parentImages[1]}
+                  alt={`Borg ${selected[1]}`}
+                  className="-ml-3 h-24 w-24"
+                  style={{
+                    imageRendering: 'pixelated',
+                    animation: 'borg-bump-r 0.9s ease-in-out infinite',
+                    transform: 'scaleX(-1)',
+                  }}
+                />
+              )}
+              {['❤️', '💕', '💖', '❤️‍🔥', '💘'].map((heart, i) => (
+                <span
+                  key={i}
+                  className="pointer-events-none absolute text-lg"
+                  style={{
+                    left: `${24 + i * 13}%`,
+                    bottom: '30%',
+                    animation: `borg-heart 1.9s ease-out ${i * 0.4}s infinite`,
+                  }}
+                >
+                  {heart}
+                </span>
+              ))}
+              <span className="absolute bottom-2 left-0 right-0 text-center text-xs font-bold text-white/80">
+                🎷 Borgs {selected[0]} &amp; {selected[1]} are getting it on…
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {tx.isPending
+                ? 'Confirm in wallet — give them some privacy…'
+                : 'Breeding onchain. The rarest genes win.'}
+            </p>
           </div>
         ) : !address ? (
           <p className="text-sm text-amber-600">Connect a wallet to breed your borgs.</p>
@@ -1059,19 +1201,17 @@ function BreedBorgsDialog({
             {tx.error && <p className="break-words text-xs text-red-500">{tx.error}</p>}
             <Button
               variant="destructive"
-              disabled={selected.length !== 2 || tx.isPending || tx.isConfirming}
-              onClick={() =>
-                tx.send({
+              disabled={selected.length !== 2 || busy}
+              onClick={() => {
+                stopJam();
+                jamStop.current = startSlowJam();
+                void tx.send({
                   functionName: 'breedBorgs',
                   args: [BigInt(selected[0]), BigInt(selected[1])],
-                })
-              }
+                });
+              }}
             >
-              {tx.isPending
-                ? 'Confirm in wallet…'
-                : tx.isConfirming
-                  ? 'Breeding on Polygon…'
-                  : 'Breed (burns both parents)'}
+              Breed (burns both parents)
             </Button>
           </div>
         )}
