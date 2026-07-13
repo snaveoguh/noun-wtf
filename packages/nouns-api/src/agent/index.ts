@@ -10,12 +10,12 @@ import {
   settleAuction,
 } from './blockWatcher.js';
 import { isBridgeConfigured } from './bridge.js';
+import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import {
   startFederationKeeper,
   stopFederationKeeper,
   getFederationKeeperState,
 } from './federationKeeper.js';
-import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import { DAO_FUNCTIONS, detectFunction, buildFunctionSkillPromptSnippet } from './functionSkill.js';
 import {
   buildGovernanceContext,

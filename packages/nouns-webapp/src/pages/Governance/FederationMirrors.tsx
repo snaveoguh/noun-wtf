@@ -105,7 +105,10 @@ const FederationMirrors: FC = () => {
       address: NOUNS_FEDERATION_ADDRESS,
       abi: nounsFederationAbi,
       functionName: 'hasVoted' as const,
-      args: [id, (address ?? '0x0000000000000000000000000000000000000000') as `0x${string}`] as const,
+      args: [
+        id,
+        (address ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
+      ] as const,
     })),
     query: {
       enabled: isFederationConfigured && mirrorCount > 0 && !!address,
@@ -118,7 +121,7 @@ const FederationMirrors: FC = () => {
     const out: MirrorRow[] = [];
     for (let i = 0; i < mirrorIds.length; i++) {
       const res = mirrorReads[i];
-      if (res?.status !== 'success' || !res.result) continue;
+      if (res?.status !== 'success' || res.result == null) continue;
       const m = res.result as unknown as {
         v1ProposalId: bigint;
         snapshotBlock: bigint;
@@ -273,6 +276,7 @@ const FederationMirrors: FC = () => {
                   ) : (
                     <>
                       <button
+                        type="button"
                         disabled={busy}
                         onClick={() => castVote(m.id, FederationSupport.For)}
                         style={voteBtn('#16a34a', busy)}
@@ -280,6 +284,7 @@ const FederationMirrors: FC = () => {
                         For
                       </button>
                       <button
+                        type="button"
                         disabled={busy}
                         onClick={() => castVote(m.id, FederationSupport.Against)}
                         style={voteBtn('#dc2626', busy)}
@@ -287,6 +292,7 @@ const FederationMirrors: FC = () => {
                         Against
                       </button>
                       <button
+                        type="button"
                         disabled={busy}
                         onClick={() => castVote(m.id, FederationSupport.Abstain)}
                         style={voteBtn('#8c8d92', busy)}

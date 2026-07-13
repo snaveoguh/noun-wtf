@@ -10,10 +10,17 @@
 //   2. relay(mirrorId)       — sent once a mirror's voting window closes and the
 //      contract reports isRelayable(). Casts the aggregated V2 tally to V1.
 //
-// Governance moves in ~12s blocks over hours, so this polls slowly (default 60s)
-// — nothing like the settlement hot path in blockWatcher.ts. Every write is
-// gated on a contract read (v1ToMirror==0 / isRelayable==true) so a failing
+// Governance moves in ~12s blocks over hours, so this polls slowly (default
+// 10min) — nothing like the settlement hot path in blockWatcher.ts. Every write
+// is gated on a contract read (v1ToMirror==0 / isRelayable==true) so a failing
 // precondition is skipped, never broadcast as a reverting tx.
+//
+// Why not once a day: V1 proposals are rare, but the two actions have hard block
+// windows. A mirror must open while the V1 prop still has between ~26h and the
+// contract's MIN_LEAD_BLOCKS (~13h) remaining; a relay must land after the ~12h
+// V2 vote closes but before the V1 deadline (~14h window). A 24h poll can drift
+// past the mirror floor or skip clean over the relay window — so we keep it to
+// minutes. 10min gives dozens of checks inside every window at negligible cost.
 //
 // Disabled unless BOTH are set: NOUNS_FEDERATION_ADDRESS and a keeper key
 // (FEDERATION_KEEPER_PRIVATE_KEY, falling back to NOUNIRL_PRIVATE_KEY).
@@ -30,6 +37,7 @@ import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
 import { nounsFederationAbi } from '../abi/NounsFederation.js';
+
 import { AGENT_RPC_URL } from './constants.js';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -45,7 +53,7 @@ const V1_GOVERNOR_ADDRESS = (process.env.FEDERATION_V1_GOVERNOR ??
 const KEEPER_PRIVATE_KEY =
   process.env.FEDERATION_KEEPER_PRIVATE_KEY ?? process.env.NOUNIRL_PRIVATE_KEY;
 
-const POLL_INTERVAL_MS = Number(process.env.FEDERATION_POLL_INTERVAL_MS ?? 60_000);
+const POLL_INTERVAL_MS = Number(process.env.FEDERATION_POLL_INTERVAL_MS ?? 600_000);
 
 // Fire mirror() once a V1 proposal has <= this many blocks remaining. ~26h at
 // 12s blocks. The contract enforces the hard [MIN_LEAD_BLOCKS, maxLeadBlocks]

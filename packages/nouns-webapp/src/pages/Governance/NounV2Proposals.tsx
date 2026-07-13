@@ -13,13 +13,13 @@ import { Link } from 'react-router';
 import { useBlockNumber, useReadContract, useReadContracts } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
-import FederationMirrors from '@/pages/Governance/FederationMirrors';
 import {
   NOUNV2_PROPOSAL_STATE_LABELS,
   NOUNV2_TREASURY_ADDRESS,
   NounV2ProposalState,
   nounV2TreasuryAbi,
 } from '@/contracts/nounv2-treasury';
+import FederationMirrors from '@/pages/Governance/FederationMirrors';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
