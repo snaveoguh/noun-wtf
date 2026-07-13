@@ -1171,6 +1171,77 @@ app.get('/api/nounv2-proposals/:id', async c => {
   });
 });
 
+// ── NounsFederation (V2→V1 meta-governance relay) ───────────────────────────
+
+/** Derive a display status for a federation mirror. */
+function federationMirrorStatus(
+  m: { endBlock: bigint; relayed: boolean },
+  latestBlock: bigint,
+): 'VOTING' | 'CLOSED' | 'RELAYED' {
+  if (m.relayed) return 'RELAYED';
+  if (latestBlock > 0n && latestBlock <= m.endBlock) return 'VOTING';
+  return 'CLOSED';
+}
+
+/** All federation mirrors, newest first. */
+app.get('/api/federation-mirrors', async c => {
+  const rows = await db
+    .select()
+    .from(schema.federationMirror)
+    .orderBy(desc(schema.federationMirror.id));
+  const latestBlock = await getLatestBlockCached();
+  const items = rows.map(m => ({
+    ...m,
+    id: String(m.id),
+    v1ProposalId: String(m.v1ProposalId),
+    snapshotBlock: String(m.snapshotBlock),
+    endBlock: String(m.endBlock),
+    relayedAtBlock: m.relayedAtBlock != null ? String(m.relayedAtBlock) : null,
+    createdAtBlock: String(m.createdAtBlock),
+    createdAt: String(new Date(m.createdAt).getTime()),
+    status: federationMirrorStatus(m, latestBlock),
+  }));
+  return c.json(items);
+});
+
+/** Single federation mirror with its votes. */
+app.get('/api/federation-mirrors/:id', async c => {
+  const idParam = c.req.param('id');
+  const all = await db.select().from(schema.federationMirror);
+  const m = all.find(row => String(row.id) === idParam);
+  if (!m) return c.json({ error: 'not found' }, 404);
+
+  const allVotes = await db
+    .select()
+    .from(schema.federationMirrorVote)
+    .orderBy(desc(schema.federationMirrorVote.createdAtBlock));
+  const votes = allVotes.filter(v => String(v.mirrorId) === idParam);
+
+  const latestBlock = await getLatestBlockCached();
+
+  return c.json({
+    mirror: {
+      ...m,
+      id: String(m.id),
+      v1ProposalId: String(m.v1ProposalId),
+      snapshotBlock: String(m.snapshotBlock),
+      endBlock: String(m.endBlock),
+      relayedAtBlock: m.relayedAtBlock != null ? String(m.relayedAtBlock) : null,
+      createdAtBlock: String(m.createdAtBlock),
+      createdAt: String(new Date(m.createdAt).getTime()),
+      status: federationMirrorStatus(m, latestBlock),
+    },
+    votes: votes.map(v => ({
+      voter: v.voter,
+      support: v.support,
+      votes: v.votes,
+      reason: v.reason,
+      createdAtBlock: String(v.createdAtBlock),
+      createdAtTransaction: v.createdAtTransaction,
+    })),
+  });
+});
+
 /** All NounV2 auctions from the indexer, newest first. */
 app.get('/api/nounv2-auctions', async c => {
   const auctions = await db

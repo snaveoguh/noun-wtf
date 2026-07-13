@@ -726,3 +726,61 @@ export const nounV2BidRelations = relations(nounV2Bid, ({ one }) => ({
     references: [nounV2Auction.nounId],
   }),
 }));
+
+// ── NounsFederation (V2 → V1 meta-governance relay) ──────────────────────────
+// A "mirror" is a federation vote on a live V1 proposal. NounV2 holders vote on
+// the mirror; once its window closes the aggregated result is relayed to V1 as a
+// single castVote. `relayedSupport`: 0=against, 1=for, 2=abstain (null until relayed).
+
+export const federationMirror = onchainTable(
+  'federation_mirror',
+  t => ({
+    id: t.bigint().primaryKey(), // mirrorId
+    v1ProposalId: t.bigint().notNull(),
+    creator: t.hex().notNull(),
+    snapshotBlock: t.bigint().notNull(),
+    endBlock: t.bigint().notNull(),
+    forVotes: t.integer().notNull().default(0),
+    againstVotes: t.integer().notNull().default(0),
+    abstainVotes: t.integer().notNull().default(0),
+    relayed: t.boolean().notNull().default(false),
+    relayedSupport: t.integer(), // 0/1/2, null until relayed
+    relayedAtBlock: t.bigint(),
+    relayedAtTransaction: t.text(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    v1ProposalIdIndex: index().on(t.v1ProposalId),
+  }),
+);
+
+export const federationMirrorRelations = relations(federationMirror, ({ many }) => ({
+  votes: many(federationMirrorVote),
+}));
+
+export const federationMirrorVote = onchainTable(
+  'federation_mirror_vote',
+  t => ({
+    voter: t.hex().notNull(),
+    mirrorId: t.bigint().notNull(),
+    support: t.integer().notNull(), // 0=against, 1=for, 2=abstain
+    votes: t.integer().notNull(),
+    reason: t.text(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    primaryKey: primaryKey({ columns: [t.voter, t.mirrorId] }),
+    mirrorIdIndex: index().on(t.mirrorId),
+  }),
+);
+
+export const federationMirrorVoteRelations = relations(federationMirrorVote, ({ one }) => ({
+  mirror: one(federationMirror, {
+    fields: [federationMirrorVote.mirrorId],
+    references: [federationMirror.id],
+  }),
+}));

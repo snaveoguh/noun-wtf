@@ -19,6 +19,7 @@ import {
   NounV2ProposalState,
   nounV2TreasuryAbi,
 } from '@/contracts/nounv2-treasury';
+import FederationMirrors from '@/pages/Governance/FederationMirrors';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
@@ -194,6 +195,9 @@ const NounV2Proposals: FC = () => {
           </Link>
         )}
       </div>
+
+      {/* Federation: NounV2 → V1 meta-governance mirrors (hidden until deployed). */}
+      <FederationMirrors />
 
       {!treasuryConfigured && (
         <div
