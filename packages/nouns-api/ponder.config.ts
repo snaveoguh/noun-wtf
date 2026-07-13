@@ -9,6 +9,7 @@ import { nounsStreamAbi } from '@nouns/sdk/stream';
 import { smallGrantsTreasuryAbi } from './src/abi/SmallGrantsTreasury';
 import { nounV2AuctionHouseAbi } from './src/abi/NounV2AuctionHouse';
 import { nounV2TreasuryAbi } from './src/abi/NounV2Treasury';
+import { nounsFederationAbi } from './src/abi/NounsFederation';
 import { createConfig, factory } from 'ponder';
 import { getAbiItem } from 'viem';
 import dotenv from 'dotenv';
@@ -29,6 +30,15 @@ const NOUNV2_AUCTION_HOUSE_ADDRESS =
 const NOUNV2_TREASURY_ADDRESS =
   (process.env.NOUNV2_TREASURY_ADDRESS as `0x${string}` | undefined) ??
   '0x0000000000000000000000000000000000000000';
+
+// NounsFederation (V2→V1 meta-governance relay). Placeholder until deploy; then
+// flip NOUNS_FEDERATION_ADDRESS / NOUNS_FEDERATION_START_BLOCK env vars.
+const NOUNS_FEDERATION_ADDRESS =
+  (process.env.NOUNS_FEDERATION_ADDRESS as `0x${string}` | undefined) ??
+  '0x0000000000000000000000000000000000000000';
+const nounsFederationStartBlockRaw = process.env.NOUNS_FEDERATION_START_BLOCK ?? 'latest';
+const nounsFederationStartBlock: number | 'latest' =
+  nounsFederationStartBlockRaw === 'latest' ? 'latest' : Number(nounsFederationStartBlockRaw);
 
 // Ponder accepts a block number or the literal "latest". Coerce numeric strings
 // to number; leave "latest" as-is.
@@ -109,6 +119,14 @@ const mainnetConfig = createConfig({
       address: NOUNV2_TREASURY_ADDRESS,
       abi: nounV2TreasuryAbi,
       startBlock: nounV2StartBlock,
+    },
+
+    // NounsFederation — V2→V1 relay. Placeholder address until mainnet deploy.
+    NounsFederation: {
+      chain: 'mainnet',
+      address: NOUNS_FEDERATION_ADDRESS,
+      abi: nounsFederationAbi,
+      startBlock: nounsFederationStartBlock,
     },
   },
 });

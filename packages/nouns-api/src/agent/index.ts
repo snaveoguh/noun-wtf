@@ -10,6 +10,11 @@ import {
   settleAuction,
 } from './blockWatcher.js';
 import { isBridgeConfigured } from './bridge.js';
+import {
+  startFederationKeeper,
+  stopFederationKeeper,
+  getFederationKeeperState,
+} from './federationKeeper.js';
 import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
 import { DAO_FUNCTIONS, detectFunction, buildFunctionSkillPromptSnippet } from './functionSkill.js';
 import {
@@ -74,6 +79,9 @@ export function initAgent(): void {
   } else {
     console.log('[NounIRL] NOUNIRL_ADDRESS not set — agent running in API-only mode');
   }
+
+  // Federation keeper self-gates on NOUNS_FEDERATION_ADDRESS + a keeper key.
+  startFederationKeeper();
 }
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
@@ -116,6 +124,11 @@ export {
 
   // Bridge
   isBridgeConfigured,
+
+  // Federation keeper (auto-mirror V1 props / auto-relay to V1)
+  startFederationKeeper,
+  stopFederationKeeper,
+  getFederationKeeperState,
 
   // Memory
   remember,

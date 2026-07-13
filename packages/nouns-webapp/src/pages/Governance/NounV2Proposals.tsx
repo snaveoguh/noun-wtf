@@ -13,6 +13,7 @@ import { Link } from 'react-router';
 import { useBlockNumber, useReadContract, useReadContracts } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
+import FederationMirrors from '@/pages/Governance/FederationMirrors';
 import {
   NOUNV2_PROPOSAL_STATE_LABELS,
   NOUNV2_TREASURY_ADDRESS,
@@ -194,6 +195,9 @@ const NounV2Proposals: FC = () => {
           </Link>
         )}
       </div>
+
+      {/* Federation: NounV2 → V1 meta-governance mirrors (hidden until deployed). */}
+      <FederationMirrors />
 
       {!treasuryConfigured && (
         <div
