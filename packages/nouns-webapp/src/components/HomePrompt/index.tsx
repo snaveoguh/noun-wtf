@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
+import { isMissingNoun } from '@/lib/missingNoun';
 import { traitName } from '@/lib/traitName';
 import { nounPath, nounV2Path } from '@/utils/history';
 import type { INounSeed } from '@/wrappers/nounToken';
@@ -34,16 +35,38 @@ interface ChatResponse {
 interface Props {
   nounId?: number;
   seed?: INounSeed;
+  isV2?: boolean;
 }
 
 function createMessage(role: Message['role'], content: string): Message {
   return { id: `${role}-${crypto.randomUUID()}`, role, content };
 }
 
-function generateIntrigue(nounId: number, seed: INounSeed): string {
-  const head = traitName('head', seed.head).toLowerCase();
-  const body = traitName('body', seed.body).toLowerCase();
-  const acc = traitName('accessory', seed.accessory).toLowerCase();
+const GLITCH_GLYPHS = [...'█▓▒░◼╳¿◊#@%&※¤◙╬�/\\|<>~^'];
+
+/**
+ * The missingnoun has no description to garble — it's the absence of a noun,
+ * so its line is noise rather than prose, rolled fresh on every mount instead
+ * of being picked deterministically from `nounId`. The `lines` templates below
+ * would otherwise render "a missingnoun watches through noggles", which is a
+ * sentence about a thing that isn't there.
+ */
+function generateNoise(): string {
+  const wordCount = 4 + Math.floor(Math.random() * 6);
+  return Array.from({ length: wordCount }, () =>
+    Array.from(
+      { length: 2 + Math.floor(Math.random() * 8) },
+      () => GLITCH_GLYPHS[Math.floor(Math.random() * GLITCH_GLYPHS.length)],
+    ).join(''),
+  ).join(' ');
+}
+
+function generateIntrigue(nounId: number, seed: INounSeed, isV2: boolean): string {
+  if (isMissingNoun(seed, isV2)) return generateNoise();
+
+  const head = traitName('head', seed.head, isV2).toLowerCase();
+  const body = traitName('body', seed.body, isV2).toLowerCase();
+  const acc = traitName('accessory', seed.accessory, isV2).toLowerCase();
   const bg = seed.background === 0 ? 'cool' : 'warm';
 
   const lines = [
@@ -64,7 +87,7 @@ function generateIntrigue(nounId: number, seed: INounSeed): string {
   return lines[nounId % lines.length];
 }
 
-const HomePrompt: FC<Props> = ({ nounId, seed }) => {
+const HomePrompt: FC<Props> = ({ nounId, seed, isV2 = false }) => {
   const { address } = useAccount();
   const { activeDao } = useActiveDao();
   const navigate = useNavigate();
@@ -76,8 +99,8 @@ const HomePrompt: FC<Props> = ({ nounId, seed }) => {
 
   const intrigueText = useMemo(() => {
     if (seed == null || nounId == null) return 'the noggles see everything. what do you see?';
-    return generateIntrigue(nounId, seed);
-  }, [nounId, seed]);
+    return generateIntrigue(nounId, seed, isV2);
+  }, [isV2, nounId, seed]);
 
   // Auto-scroll conversation
   useEffect(() => {
@@ -165,7 +188,9 @@ const HomePrompt: FC<Props> = ({ nounId, seed }) => {
               key={msg.id}
               className={msg.role === 'user' ? classes.msgUser : classes.msgAssistant}
             >
-              <span className={classes.msgLabel}>{msg.role === 'user' ? '>' : '\u2310\u25E8-\u25E8'}</span>
+              <span className={classes.msgLabel}>
+                {msg.role === 'user' ? '>' : '\u2310\u25E8-\u25E8'}
+              </span>
               <span className={classes.msgText}>{msg.content}</span>
             </div>
           ))}

@@ -1,0 +1,180 @@
+/**
+ * Glitch skin for the missingnoun head. Classes here are applied to <body> by
+ * MissingNounGlitch, so the descendant selectors are page-wide by design.
+ *
+ * Every timing/offset reads from a CSS custom property that the component
+ * re-rolls, so the same variant never plays back identically twice.
+ */
+
+.glitching {
+  --mn-split: 2px;
+  --mn-speed: 2.2s;
+  --mn-skew: 0.4deg;
+  --mn-hue: 190deg;
+}
+
+/* ── Variant: chroma — RGB split on text, jittering ───────────────────── */
+
+.chroma :is(h1, h2, h3, h4, p, span, a, button, label, li) {
+  text-shadow:
+    calc(var(--mn-split) * -1) 0 rgb(255 0 90 / 70%),
+    var(--mn-split) 0 rgb(0 220 255 / 70%);
+  animation: chromaJitter var(--mn-speed) steps(1, end) infinite;
+}
+
+@keyframes chromaJitter {
+  0%,
+  82%,
+  100% {
+    text-shadow:
+      calc(var(--mn-split) * -1) 0 rgb(255 0 90 / 70%),
+      var(--mn-split) 0 rgb(0 220 255 / 70%);
+  }
+  85% {
+    text-shadow:
+      calc(var(--mn-split) * 2) 0 rgb(255 0 90 / 90%),
+      calc(var(--mn-split) * -2) 0 rgb(0 220 255 / 90%);
+  }
+  91% {
+    text-shadow:
+      calc(var(--mn-split) * -3) 1px rgb(255 0 90 / 80%),
+      calc(var(--mn-split) * 3) -1px rgb(0 220 255 / 80%);
+  }
+}
+
+/* ── Variant: slice — horizontal tear bands across the whole page ─────── */
+
+.slice :global(#root) {
+  animation: sliceTear calc(var(--mn-speed) * 1.6) steps(1, end) infinite;
+}
+
+@keyframes sliceTear {
+  0%,
+  70%,
+  100% {
+    clip-path: none;
+    transform: none;
+  }
+  72% {
+    clip-path: polygon(0 0, 100% 0, 100% 32%, 0 32%, 0 36%, 100% 36%, 100% 100%, 0 100%);
+    transform: translateX(calc(var(--mn-split) * 2));
+  }
+  74% {
+    clip-path: none;
+    transform: translateX(calc(var(--mn-split) * -3));
+  }
+  76% {
+    clip-path: polygon(0 0, 100% 0, 100% 61%, 0 61%, 0 64%, 100% 64%, 100% 100%, 0 100%);
+    transform: translateX(var(--mn-split));
+  }
+  78% {
+    transform: none;
+  }
+}
+
+/* ── Variant: typeJitter — the type itself misbehaves ─────────────────── */
+
+.typeJitter :is(h1, h2, h3, p, span, button, label) {
+  animation: typeWarp calc(var(--mn-speed) * 1.3) steps(1, end) infinite;
+}
+
+@keyframes typeWarp {
+  0%,
+  76%,
+  100% {
+    letter-spacing: normal;
+    transform: none;
+  }
+  79% {
+    letter-spacing: 0.08em;
+    transform: skewX(var(--mn-skew));
+  }
+  83% {
+    letter-spacing: -0.04em;
+    transform: skewX(calc(var(--mn-skew) * -1.5));
+  }
+  86% {
+    letter-spacing: 0.02em;
+    transform: none;
+  }
+}
+
+/* ── Variant: fontSwap — component toggles .fontSwapOn in bursts ──────── */
+
+.fontSwapOn :is(h1, h2, h3, p, span, button, label, a) {
+  font-family: 'JetBrains Mono', 'Londrina Solid', monospace !important;
+}
+
+/* ── Variant: flicker — the whole surface loses sync ──────────────────── */
+
+.flicker :global(#root) {
+  animation: flickerSync calc(var(--mn-speed) * 2) steps(1, end) infinite;
+}
+
+@keyframes flickerSync {
+  0%,
+  88%,
+  100% {
+    filter: none;
+  }
+  90% {
+    filter: hue-rotate(var(--mn-hue)) saturate(1.6);
+  }
+  92% {
+    filter: invert(1);
+  }
+  94% {
+    filter: hue-rotate(calc(var(--mn-hue) * -1)) contrast(1.4);
+  }
+}
+
+/* ── Overlay: scanlines + rolling band (own element, never clickable) ─── */
+
+.overlay {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  inset: 0;
+  mix-blend-mode: overlay;
+}
+
+.scanlines::before {
+  position: absolute;
+  content: '';
+  inset: 0;
+  opacity: 0.35;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 22%) 0 1px, transparent 1px 3px);
+}
+
+.roll::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  content: '';
+  height: 14vh;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(255 255 255 / 14%) 45%,
+    rgb(0 220 255 / 10%) 55%,
+    transparent
+  );
+  animation: rollBand calc(var(--mn-speed) * 3) linear infinite;
+}
+
+@keyframes rollBand {
+  from {
+    top: -14vh;
+  }
+  to {
+    top: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitching *,
+  .overlay::before,
+  .overlay::after {
+    animation: none !important;
+  }
+}

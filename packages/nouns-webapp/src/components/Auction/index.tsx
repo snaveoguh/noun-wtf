@@ -3,6 +3,7 @@ import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine
 import type * as THREE from 'three';
 import { getHeadOffset } from '@/lib/headNudges';
 import { loadCuratedVoxelMap } from '@/lib/loadCuratedVoxelMap';
+import { isMissingNoun } from '@/lib/missingNoun';
 import React, {
   Suspense,
   useCallback,
@@ -24,6 +25,7 @@ import BurnedNounContent from '@/components/BurnedNounContent';
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
+import MissingNounGlitch from '@/components/MissingNounGlitch';
 import NounderNounContent from '@/components/NounderNounContent';
 import NounParallax, { LIGHTING_PRESETS, type LightingPreset } from '@/components/NounParallax';
 import PanZoomImage from '@/components/PanZoomImage';
@@ -393,6 +395,13 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   );
 
   const { address: walletAddress } = useAccount();
+
+  // `bidder` is already normalized to undefined for the zero address, so a
+  // no-bid auction can't accidentally match a disconnected wallet.
+  const isTopBidder =
+    walletAddress != null &&
+    currentAuction?.bidder != null &&
+    currentAuction.bidder.toLowerCase() === walletAddress.toLowerCase();
 
   const editorToolRef = useRef<{
     setTool: (tool: Tool) => void;
@@ -1812,7 +1821,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             />
           </div>
         )}
-        <HomePrompt nounId={currentNounId} seed={currentNounSeed ?? undefined} />
+        <HomePrompt isV2={dao.isV2} nounId={currentNounId} seed={currentNounSeed ?? undefined} />
       </div>
     );
   };
@@ -1836,6 +1845,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   return (
     <div style={{ backgroundColor: stateBgColor }}>
+      {/* Holding the top bid calms the page — bidding is the way out of the
+          glitch. Get outbid and it starts up again, which is the point. */}
+      <MissingNounGlitch active={isMissingNoun(currentNounSeed, dao.isV2) && !isTopBidder} />
       {dao.isV2 && !dao.isConfigured && (
         <div
           style={{
