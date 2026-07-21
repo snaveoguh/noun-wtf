@@ -28,6 +28,8 @@ interface NounCell {
   cy: number;
   /** Cell size in pixels */
   size: number;
+  /** Burned/dead noun — render desaturated (grayscale) instead of full color */
+  burned?: boolean;
 }
 
 interface Noun3DGridProps {
@@ -236,6 +238,20 @@ const _axis = new THREE.Vector3();
 const _pushEuler = new THREE.Euler();
 const _pushQuat = new THREE.Quaternion();
 
+// Shared desaturating material for burned/dead nouns. The 3D overlay lives
+// outside the cell wrapper so the CSS grayscale filter can't reach it — instead
+// we convert vertex colors to luminance in the fragment shader. One shared
+// instance (compiled once) drives every voxel mesh of every burned noun.
+const grayscaleMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+grayscaleMaterial.onBeforeCompile = shader => {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <color_fragment>',
+    `#include <color_fragment>
+    float _lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    diffuseColor.rgb = vec3(_lum);`,
+  );
+};
+
 function NounMesh({
   cell,
   mousePos,
@@ -248,14 +264,17 @@ function NounMesh({
   const spin = useMemo(() => nounRandom(cell.nounId), [cell.nounId]);
   const { invalidate } = useThree();
 
-  // Load curated GLB head (async, replaces voxel head when ready)
+  // Load curated GLB head (async, replaces voxel head when ready). Skipped for
+  // burned nouns — they render as desaturated voxels, and the GLB heads carry
+  // their own textured (full-color) materials we can't cheaply grayscale.
   const [glbMeshes, setGlbMeshes] = useState<GlbMeshData[] | null>(null);
   useEffect(() => {
+    if (cell.burned) return;
     return loadGlbHead(cell.seed, meshes => {
       setGlbMeshes(meshes);
       invalidate();
     });
-  }, [cell.seed.head, cell.seed.glasses]);
+  }, [cell.seed.head, cell.seed.glasses, cell.burned]);
 
   useFrame((state) => {
     const g = groupRef.current;
@@ -295,6 +314,10 @@ function NounMesh({
   });
 
   const scale = cell.size / 38;
+  const gray = !!cell.burned;
+  // Burned nouns share the desaturating material; live nouns get a fresh
+  // vertex-color material per mesh (via the JSX child element).
+  const voxelMat = gray ? { material: grayscaleMaterial } : {};
 
   return (
     <group
@@ -303,16 +326,16 @@ function NounMesh({
     >
       <group scale={[scale, scale, scale]}>
         {geos.bodyGeo && (
-          <mesh geometry={geos.bodyGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+          <mesh geometry={geos.bodyGeo} {...voxelMat}>
+            {!gray && <meshBasicMaterial vertexColors toneMapped={false} />}
           </mesh>
         )}
         {geos.blingGeo && (
-          <mesh geometry={geos.blingGeo}>
-            <meshBasicMaterial vertexColors toneMapped={false} />
+          <mesh geometry={geos.blingGeo} {...voxelMat}>
+            {!gray && <meshBasicMaterial vertexColors toneMapped={false} />}
           </mesh>
         )}
-        {glbMeshes ? (
+        {!gray && glbMeshes ? (
           <>
             {glbMeshes.map((m, i) => (
               <mesh key={i} geometry={m.geometry} material={m.material} />
@@ -327,13 +350,13 @@ function NounMesh({
         ) : (
           <>
             {geos.headGeo && (
-              <mesh geometry={geos.headGeo}>
-                <meshBasicMaterial vertexColors toneMapped={false} />
+              <mesh geometry={geos.headGeo} {...voxelMat}>
+                {!gray && <meshBasicMaterial vertexColors toneMapped={false} />}
               </mesh>
             )}
             {geos.glassesGeo && (
-              <mesh geometry={geos.glassesGeo}>
-                <meshBasicMaterial vertexColors toneMapped={false} />
+              <mesh geometry={geos.glassesGeo} {...voxelMat}>
+                {!gray && <meshBasicMaterial vertexColors toneMapped={false} />}
               </mesh>
             )}
           </>
@@ -370,6 +393,29 @@ export default function Noun3DGrid({
   cells,
   mousePos,
 }: Noun3DGridProps) {
+  // R3F's <Canvas> only boots once react-use-measure reports a non-zero size
+  // for its container. On this fixed 100vw/100vh overlay the initial
+  // ResizeObserver measurement frequently lands as {0,0} (measured before
+  // layout settles), so the Canvas never initializes and every cell shows a
+  // blank — the "3D doesn't finish painting on first load" bug. react-use-measure
+  // also listens to window 'resize' and re-reads getBoundingClientRect, which is
+  // why a manual window resize makes the nouns appear. Replicate that kick across
+  // a few frames after mount so it boots on its own.
+  useEffect(() => {
+    const fire = () => window.dispatchEvent(new Event('resize'));
+    const raf1 = requestAnimationFrame(() => {
+      fire();
+      requestAnimationFrame(fire);
+    });
+    const t1 = window.setTimeout(fire, 100);
+    const t2 = window.setTimeout(fire, 300);
+    return () => {
+      cancelAnimationFrame(raf1);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
+
   return (
     <Canvas
       orthographic

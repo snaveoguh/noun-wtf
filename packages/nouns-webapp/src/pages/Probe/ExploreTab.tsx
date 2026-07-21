@@ -15,8 +15,10 @@ interface NounCell {
   cx: number;
   cy: number;
   size: number;
+  burned?: boolean;
 }
 import NounDetailPopover from '@/components/NounDetailPopover';
+import ProbeTerminal from '@/components/ProbeTerminal';
 import { Trait } from '@/components/Trait';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/hooks';
@@ -280,16 +282,17 @@ const ExploreTab: React.FC = () => {
 
   return (
     <>
+      {/* Terminal search — real-time by ID or trait name */}
+      <ProbeTerminal
+        value={search}
+        onChange={setSearch}
+        matchCount={displayCount}
+        totalCount={nounCount >= 0 ? nounCount : 0}
+        seedsReady={seeds != null && Object.keys(seeds).length > 0}
+      />
+
       {/* Compact filter bar — single row */}
       <div className="flex flex-wrap items-center gap-2 py-3">
-        <input
-          type="text"
-          placeholder="Search ID..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border-border w-28 rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-        />
-
         <AddressDropdown
           label="Owner"
           entries={owners}
@@ -453,11 +456,10 @@ const ExploreTab: React.FC = () => {
                   const nounId = filteredAndSorted[itemIndex];
                   const hasSeed = seeds?.[nounId.toString()] != null;
                   const isBurned = burnedIds?.has(nounId) ?? false;
-                  // Burned nouns are rendered via the 2D SVG path so the
-                  // grayscale CSS filter on the cell wrapper applies — the
-                  // 3D voxel overlay lives outside the wrapper and wouldn't
-                  // pick it up.
-                  const show2D = !view3D || !hasSeed || isBurned;
+                  // Burned nouns render in 3D too, desaturated (grayscale voxel
+                  // material — see Noun3DCell). They fall back to the grayscale
+                  // 2D SVG only while no seed is loaded yet.
+                  const show2D = !view3D || !hasSeed;
 
                   return (
                     <div
@@ -531,13 +533,17 @@ const ExploreTab: React.FC = () => {
                       const nounId = filteredAndSorted[itemIndex];
                       const seed = seeds?.[nounId.toString()];
                       if (!seed) continue;
-                      // Burned nouns render via 2D so the grayscale CSS
-                      // applies — skip them in the 3D overlay layer.
-                      if (burnedIds?.has(nounId)) continue;
                       const cx =
                         containerLeft + colIdx * (layout.cellSize + GAP) + layout.cellSize / 2;
                       const cy = rowViewportY + layout.cellSize / 2;
-                      cells.push({ nounId, seed, cx, cy, size: layout.cellSize });
+                      cells.push({
+                        nounId,
+                        seed,
+                        cx,
+                        cy,
+                        size: layout.cellSize,
+                        burned: burnedIds?.has(nounId) ?? false,
+                      });
                     }
                   }
                   return cells;
