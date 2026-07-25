@@ -209,6 +209,8 @@ import {
   getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
+import { buildTraitProposal, type TraitCategory } from '../agent/traitProposal.js';
+import ImageDataV2ForTraits from '../agent/image-data-v2.json';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -4760,6 +4762,54 @@ CRITICAL RULES:
       {
         type: 'function' as const,
         function: {
+          name: 'propose_trait',
+          description:
+            'Prepare a NounV2 governance proposal that adds a NEW art trait (head, body, accessory, or glasses) to the NounV2 collection. The proposal calls the V2 descriptor addHeads-family function and is executed by the NounV2 Treasury. Returns a GovernanceAction the user signs (they must hold >=1 NounV2 to propose). Provide EITHER a raw `rle` hex image, OR derive from an existing trait via `derive_from` plus `swap_runs`/`recolor`. Every colour used must already exist in the on-chain palette.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              category: {
+                type: 'string',
+                enum: ['head', 'body', 'accessory', 'glasses'],
+                description: 'Which trait slot the new trait is added to.',
+              },
+              trait_name: {
+                type: 'string',
+                description: 'Short name for the new trait (e.g. "joker").',
+              },
+              title: { type: 'string', description: 'Proposal title.' },
+              description: {
+                type: 'string',
+                description: 'Proposal body. Markdown supported.',
+              },
+              rle: {
+                type: 'string',
+                description:
+                  'Optional: the trait image as raw Nouns RLE hex (0x…). Provide this OR derive_from.',
+              },
+              derive_from: {
+                type: 'string',
+                description:
+                  'Optional: name or index of an existing trait in this category to derive the new one from (e.g. "index-card").',
+              },
+              swap_runs: {
+                type: 'string',
+                description:
+                  'Optional derivation: two 0-based RLE run indices whose colours are swapped, as "i,j" (e.g. "1,7" swaps index-card\'s top-red and bottom-blue rule lines → joker).',
+              },
+              recolor: {
+                type: 'string',
+                description:
+                  'Optional derivation: palette-index remaps "a:b,c:d" applied to every run.',
+              },
+            },
+            required: ['category', 'trait_name', 'title', 'description'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
           name: 'prepare_update_candidate',
           description:
             'Prepare an update to an existing candidate proposal. This replaces the candidate content and transactions. IMPORTANT: updating a candidate resets all sponsor signatures — signers must re-sign the updated version. Only the original proposer can update their candidate.',
@@ -5824,6 +5874,79 @@ CRITICAL RULES:
                   success: true,
                   action: pendingAction,
                   message: `Candidate prepared: "${input.title}" (slug: ${slug}).${txNote} The user will be asked to confirm and sign. Note: creating a candidate costs a small amount of ETH (set by the DAO).`,
+                };
+              }
+              break;
+            }
+
+            case 'propose_trait': {
+              const input = args as {
+                category: TraitCategory;
+                trait_name: string;
+                title: string;
+                description: string;
+                rle?: string;
+                derive_from?: string;
+                swap_runs?: string;
+                recolor?: string;
+              };
+              if (!wallet) {
+                result = {
+                  error:
+                    'User must connect their wallet to propose a trait. Tell them to click "connect" in the header.',
+                };
+                break;
+              }
+              try {
+                const derivation: {
+                  swapRunColors?: [number, number];
+                  recolor?: [number, number][];
+                } = {};
+                if (input.swap_runs) {
+                  const [i, j] = input.swap_runs.split(',').map(Number);
+                  derivation.swapRunColors = [i, j];
+                }
+                if (input.recolor)
+                  derivation.recolor = input.recolor
+                    .split(',')
+                    .map(p => p.split(':').map(Number) as [number, number]);
+
+                const proposal = buildTraitProposal({
+                  category: input.category,
+                  title: input.title,
+                  description: input.description,
+                  rleHex: input.rle,
+                  deriveFrom: input.derive_from
+                    ? {
+                        imageData: ImageDataV2ForTraits as any,
+                        source: input.derive_from,
+                        derivation,
+                      }
+                    : undefined,
+                });
+
+                pendingAction = {
+                  type: 'PROPOSE_TRAIT',
+                  dao: 'nounv2',
+                  title: input.title,
+                  traitName: input.trait_name,
+                  category: input.category,
+                  description: proposal.description,
+                  targets: proposal.targets,
+                  values: proposal.values.map(v => v.toString()),
+                  signatures: proposal.signatures,
+                  calldatas: proposal.calldatas,
+                };
+                result = {
+                  success: true,
+                  action: pendingAction,
+                  message: `Trait proposal prepared: adds ${input.category} "${input.trait_name}" to NounV2 (${proposal.add.decompressedLength}B image, head-family addHeads call executed by the Treasury). The user will confirm and sign — they must hold >=1 NounV2 to propose. Voting is ~12h, then a 12h timelock before execute.`,
+                };
+              } catch (e) {
+                result = {
+                  error: `Could not build trait proposal: ${
+                    e instanceof Error ? e.message : String(e)
+                  }`,
                 };
               }
               break;
