@@ -51,7 +51,6 @@ import {
   useDaoNounSeed,
   useDaoReservePrice,
   useV2NounBurnedStatus,
-  useV2NounImage,
 } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
@@ -1216,29 +1215,18 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     navigate(path(Number(currentAuction.nounId) + 1));
   }, [currentAuction, dao.isV2, navigate]);
 
-  // V2 displays the on-chain `dataURI(tokenId)` SVG directly — single source
-  // of truth that survives descriptor upgrades. V1 keeps the fast bundled
-  // RLE → client SVG path. (Matches the BerryOS V1/V2 split.)
-  const v2OnChainImage = useV2NounImage(
-    dao,
-    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
-  );
-
+  // Both V1 and V2 render client-side from the seed + bundled RLE image data
+  // (V2 uses the ImageDataV2 snapshot via the isV2 flag). V2 previously pulled the
+  // on-chain `dataURI(tokenId)` SVG, but that call builds the whole SVG on-chain —
+  // a heavy eth_call that gas/compute-capped RPCs (dRPC, 1rpc) REVERT for complex
+  // nouns, and viem's fallback doesn't retry reverts, so the noun got stuck on the
+  // loading placeholder. Client-side render is fast, RPC-proof, and already the path
+  // for V1 and for burned V2 nouns. The bundled ImageDataV2 must track the descriptor
+  // (already required so newly-added traits render — e.g. the joker head).
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
-    if (dao.isV2) {
-      if (v2OnChainImage) return v2OnChainImage;
-      // A no-bid V2 settle HARD-BURNS the token: dataURI() and ownerOf() revert
-      // while seeds() still returns the seed. So the on-chain image never
-      // resolves for a burned noun — fall back to building the SVG client-side
-      // from the seed (V2 palette) so burned nouns still render their art.
-      // For non-burned nouns we keep returning null until dataURI loads (no
-      // flicker / no behaviour change there).
-      if (isBurned) return getNoun(BigInt(currentAuction.nounId), currentNounSeed, true).image;
-      return null;
-    }
-    return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage, isBurned]);
+    return getNoun(BigInt(currentAuction.nounId), currentNounSeed, dao.isV2).image;
+  }, [currentAuction, currentNounSeed, dao.isV2]);
 
   useAuctionKeyboardShortcuts({
     isEditing,
