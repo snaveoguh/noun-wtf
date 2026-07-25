@@ -58,11 +58,12 @@ jobs:
           # too flaky. NounV2 contracts are mainnet-only, so staging has to
           # be mainnet to exercise them.
           VITE_CHAIN_ID: '1'
-          # No Infura/Alchemy key — wagmi.ts uses a fallback chain of free
-          # CORS-enabled public RPCs (publicnode + 1rpc + merkle). The
-          # previous keyed Infura setup 402'd once the free tier capped,
-          # taking the app down. The public chain is slower but doesn't
-          # carry a single-point billing failure mode.
+          # Primary mainnet RPC is a paid dRPC endpoint (reliable, CORS-enabled),
+          # injected as a secret and baked into the client bundle. wagmi.ts falls
+          # back to free public RPCs (1rpc + merkle + publicnode) if it fails.
+          # publicnode began 403'ing anonymous traffic 2026-07, so it can no longer
+          # be primary. (Client-side RPC keys are inherently public in the bundle.)
+          VITE_MAINNET_JSONRPC: ${{ secrets.VITE_MAINNET_JSONRPC }}
           VITE_MAINNET_SUBGRAPH: ${{ secrets.VITE_MAINNET_SUBGRAPH }}
           VITE_WALLET_CONNECT_V2_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_V2_PROJECT_ID }}
           VITE_ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
