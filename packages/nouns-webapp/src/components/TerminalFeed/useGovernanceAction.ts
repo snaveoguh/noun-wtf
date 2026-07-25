@@ -28,6 +28,7 @@ import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
 } from '@/contracts/small-grants-treasury';
+import { nounV2TreasuryAbi, NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 
 // ─── Compute encodedProp for addSignature (mirrors CandidatePage logic) ───
@@ -512,6 +513,23 @@ export function useGovernanceAction() {
               address: SMALL_GRANTS_TREASURY_ADDRESS,
               functionName: 'propose',
               args: [gpTargets, gpValues, gpSigs, gpCalldatas, action.description],
+            });
+            break;
+          }
+
+          case 'PROPOSE_TRAIT': {
+            if (!action.description) {
+              throw new Error('Missing description');
+            }
+            const ptTargets = (action.targets || []).map(t => t as Address);
+            const ptValues = (action.values || []).map(v => BigInt(v));
+            const ptSigs = action.signatures || [];
+            const ptCalldatas = (action.calldatas || []).map(c => c as Hex);
+            hash = await writeContractAsync({
+              abi: nounV2TreasuryAbi,
+              address: NOUNV2_TREASURY_ADDRESS,
+              functionName: 'propose',
+              args: [ptTargets, ptValues, ptSigs, ptCalldatas, action.description],
             });
             break;
           }
