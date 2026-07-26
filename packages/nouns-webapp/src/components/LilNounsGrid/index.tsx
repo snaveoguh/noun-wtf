@@ -38,15 +38,17 @@ const MAX_EXTRA = 60; // extra blocks to fetch for grayscale row fill
 const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
 const MASK_48 = (1n << 48n) - 1n;
 
-// Free no-key CORS-enabled public endpoints, tried in order on failure.
-// Infura/Ankr/buidlguidl all dropped: Infura free tier 402s once cap hits,
-// Ankr now requires a key, buidlguidl was unreachable. See wagmi.ts for the
-// canonical list and why drpc/llamarpc/cloudflare are excluded.
+// Primary is the configured mainnet RPC (dRPC — reliable, CORS-enabled) when
+// VITE_MAINNET_JSONRPC is set; the rest are free no-key CORS endpoints tried in
+// order on failure. publicnode is LAST — it began 403'ing anonymous traffic
+// 2026-07, which used to hard-fail this grid ("All RPCs failed"). Infura/Ankr/
+// buidlguidl dropped earlier (keys / 402). See wagmi.ts for the canonical list.
 const RPC_URLS = [
-  'https://ethereum-rpc.publicnode.com',
+  import.meta.env.VITE_MAINNET_JSONRPC as string,
   'https://1rpc.io/eth',
   'https://eth.merkle.io',
-];
+  'https://ethereum-rpc.publicnode.com',
+].filter(Boolean);
 
 // ─── ABIs (minimal) ──────────────────────────────────────────────────────────
 

@@ -1246,13 +1246,16 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     navigate(path(Number(currentAuction.nounId) + 1));
   }, [currentAuction, dao.isV2, navigate]);
 
+  // Both V1 and V2 render client-side from the seed + bundled RLE image data
+  // (V2 uses the ImageDataV2 snapshot via the isV2 flag). V2 previously pulled the
+  // on-chain `dataURI(tokenId)` SVG, but that call builds the whole SVG on-chain —
+  // a heavy eth_call that gas/compute-capped RPCs (dRPC, 1rpc) REVERT for complex
+  // nouns, and viem's fallback doesn't retry reverts, so the noun got stuck on the
+  // loading placeholder. Client-side render is fast, RPC-proof, and already the path
+  // for V1 and for burned V2 nouns. The bundled ImageDataV2 must track the descriptor
+  // (already required so newly-added traits render — e.g. the joker head).
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
-    // Both V1 and V2 render client-side from the seed + bundled RLE image data
-    // (V2 via the ImageDataV2 snapshot). V2 previously pulled the on-chain
-    // dataURI(tokenId) SVG, but that heavy eth_call REVERTS on gas/compute-capped
-    // RPCs (dRPC, 1rpc) for complex nouns and viem's fallback doesn't retry reverts,
-    // stranding the noun on the loading placeholder. Client-side is fast + RPC-proof.
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed, dao.isV2).image;
   }, [currentAuction, currentNounSeed, dao.isV2]);
 
