@@ -1979,6 +1979,10 @@
       {
         "filename": "head-missingnoun",
         "data": "0x00051a1f07070001ef30b004f010f13e000ef24bf305f210f111f002ef30f103f410f511f002f601ef30f705f810f101f601f901f601f902fa01f904f605fb21f201ef28fc"
+      },
+      {
+        "filename": "head-joker",
+        "data": "0x00071b14052c0c168d2c0c168d2c0c168d2c0c16392c0c"
       }
     ],
     "glasses": [

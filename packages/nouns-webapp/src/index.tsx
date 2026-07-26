@@ -105,6 +105,19 @@ function isLikelyRpcDataError(error: Error): boolean {
   );
 }
 
+// Circuit breaker: swallowing an RPC-shape error re-renders the children.
+// That recovers a *transient* failure, but a *deterministic* one (a real
+// logic bug whose message happens to match the RPC shape — e.g. a render
+// that always reads `.data` of undefined) throws again on every retry.
+// React then exhausts its re-render budget and unmounts the whole tree →
+// blank white page. We count consecutive swallows in a tight time window;
+// once they pile up the error is clearly not transient, so we stop
+// swallowing and show the error UI instead of white-screening the app.
+let swallowCount = 0;
+let lastSwallowAt = 0;
+const SWALLOW_WINDOW_MS = 1000;
+const SWALLOW_LIMIT = 5;
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
@@ -112,13 +125,23 @@ class ErrorBoundary extends React.Component<
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) {
     if (isLikelyRpcDataError(error)) {
+      const now = Date.now();
+      swallowCount = now - lastSwallowAt < SWALLOW_WINDOW_MS ? swallowCount + 1 : 1;
+      lastSwallowAt = now;
+      if (swallowCount > SWALLOW_LIMIT) {
+        console.error(
+          '[ErrorBoundary] RPC-shape error repeated — treating as deterministic, not swallowing:',
+          error.message,
+        );
+        return { error };
+      }
       console.warn('[ErrorBoundary] swallowing transient RPC error:', error.message);
       return { error: null };
     }
     return { error };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    if (isLikelyRpcDataError(error)) return;
+    if (isLikelyRpcDataError(error) && swallowCount <= SWALLOW_LIMIT) return;
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
   render() {

@@ -13,6 +13,7 @@ export interface GovernanceAction {
     | 'PROPOSAL_FEEDBACK'
     | 'CANDIDATE_FEEDBACK'
     | 'CREATE_CANDIDATE'
+    | 'PROPOSE_TRAIT'
     | 'SPONSOR'
     | 'BID'
     | 'PROMOTE'
@@ -36,8 +37,11 @@ export interface GovernanceAction {
    * The agent server populates this so the dispatcher can route to the
    * correct governor contract. Defaults to mainnet Nouns when omitted.
    */
-  dao?: 'nouns' | 'lil-nouns' | 'lilnouns' | 'lil';
+  dao?: 'nouns' | 'lil-nouns' | 'lilnouns' | 'lil' | 'nounv2';
   slug?: string;
+  // PROPOSE_TRAIT fields
+  category?: string;
+  traitName?: string;
   description?: string;
   encodedProp?: string;
   updateMessage?: string;
@@ -74,6 +78,7 @@ const ACTION_LABELS: Record<string, { verb: string; color: string }> = {
   PROPOSAL_FEEDBACK: { verb: 'give feedback on', color: '#94a3b8' },
   CANDIDATE_FEEDBACK: { verb: 'give feedback on candidate', color: '#94a3b8' },
   CREATE_CANDIDATE: { verb: 'create candidate', color: '#facc15' },
+  PROPOSE_TRAIT: { verb: 'add trait to NounV2', color: '#34d399' },
   SPONSOR: { verb: 'sponsor candidate', color: '#f472b6' },
   BID: { verb: 'bid on', color: '#60a5fa' },
   PROMOTE: { verb: 'promote candidate to proposal', color: '#fb923c' },

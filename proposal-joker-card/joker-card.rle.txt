@@ -1,0 +1,30 @@
+head-joker-card RLE encoding
+============================
+
+PNG source:  proposal-joker-card/head-joker-card.png (32x32 RGBA)
+RLE:         0x00071b14052c0c168d2c0c168d2c0c168d2c0c16392c0c
+Length:      23 bytes
+
+Decoded:
+  palette_index: 0
+  bounds:        top=7, right=27, bottom=20, left=5  (22x14 visible region)
+  runs:
+    44 px color 0x0c (white #fffdf2)  -> 2 rows
+    22 px color 0x8d (blue  #a3baed)  -> 1 row
+    44 px color 0x0c (white)          -> 2 rows
+    22 px color 0x8d (blue)           -> 1 row
+    44 px color 0x0c (white)          -> 2 rows
+    22 px color 0x8d (blue)           -> 1 row
+    44 px color 0x0c (white)          -> 2 rows
+    22 px color 0x39 (red   #f38b7c)  -> 1 row  <- swapped vs index-card
+    44 px color 0x0c (white)          -> 2 rows
+  total:         308 px = 22 cols x 14 rows
+
+Comparison to existing head-index-card:
+  Existing:  0x00071b14052c0c16 39 2c0c16 8d 2c0c16 8d 2c0c16 8d 2c0c
+  Joker:     0x00071b14052c0c16 8d 2c0c16 8d 2c0c16 8d 2c0c16 39 2c0c
+
+  Only difference: the position of the single red run (0x39) and one of the
+  blue runs (0x8d) are swapped. The red line moves from the top of the head
+  (row 9) to the bottom (row 18). All three colors already exist in the live
+  V2 palette, so no addColorsToPalette() call is needed.

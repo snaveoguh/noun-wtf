@@ -1,0 +1,18 @@
+{
+  "_note": "Inputs for NounV2Treasury.propose(...) — pass these arrays in order. The Treasury propose() signature is (address[],uint256[],string[],bytes[],string).",
+  "treasury": "0x2cdeb0d251674710840d9fa990d1de138dfe7c00",
+  "descriptor": "0xae0247ca34b211a61b03a95f8008dcb8b3124b89",
+  "targets": [
+    "0xae0247ca34b211a61b03a95f8008dcb8b3124b89"
+  ],
+  "values": [
+    "0"
+  ],
+  "signatures": [
+    "addHeads(bytes,uint80,uint16)"
+  ],
+  "calldatas": [
+    "0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000206360c00b14f04b3330129027a45f9c815d5a84558747ac17095beaf0c0150000"
+  ],
+  "description": "# NounV2 Proposal: Add head trait `joker-card`\n\nSee proposal-joker-card/PROPOSAL.md for the full body. Single call to NounV2Descriptor.addHeads — adds one new head trait (the existing index-card head with top red and bottom blue lines swapped). Uses only colors already in the V2 palette."
+}

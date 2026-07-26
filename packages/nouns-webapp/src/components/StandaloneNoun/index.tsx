@@ -56,7 +56,17 @@ export const getNoun = (nounId: string | bigint, seed: INounSeed, isV2 = false) 
   // which mirrors the V2 descriptor exactly.
   const { parts, background } = isV2 ? getNounDataV2(seed) : getNounData(seed);
   const palette = isV2 ? ImageDataV2.palette : data.palette;
-  const image = `data:image/svg+xml;base64,${btoa(buildSVG(parts, palette, background))}`;
+  // Drop any part the asset set can't resolve. A stale/mismatched seed — e.g.
+  // switching V2→V1 leaves the V2 seed (body 31) in Redux while the V1 Auction
+  // mounts, and V1 only has bodies 0–30 — makes getNounData return an undefined
+  // part. buildSVG then reads `part.data` and crashes the whole <Auction>,
+  // white-screening the page. Render the missing layer as transparent instead;
+  // it reconciles the instant the correct seed loads. Mirrors the
+  // seedToPixelLayers guard (f321eced2).
+  const safeParts = (parts as Array<{ data: string } | undefined>).filter(
+    (p): p is { data: string } => typeof p?.data === 'string',
+  );
+  const image = `data:image/svg+xml;base64,${btoa(buildSVG(safeParts, palette, background))}`;
 
   return {
     name,

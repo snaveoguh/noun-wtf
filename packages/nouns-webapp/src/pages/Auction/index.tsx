@@ -21,6 +21,7 @@ import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 import { nounPath, nounV2Path } from '@/utils/history';
 import type { Auction as IAuction } from '@/wrappers/nounsAuction';
+import { useV2SettledAuction } from '@/wrappers/nounV2Bids';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
 import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
 
@@ -38,10 +39,26 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  // Build the auction object for the active route. V2 lacks an indexer so
-  // for "/v2/noun/:id" with id != live we synthesise a settled stub — the
-  // hero still renders (seed + ownerOf load on-chain inside Auction) and
-  // bid history just falls back gracefully.
+  // For a past "/v2/noun/:id" (not the live auction) pull the settled amount /
+  // winner / times from the indexer. Without this the stub below would show a
+  // hardcoded "0.00 ETH" winning bid. `undefined` for the live noun or non-V2.
+  const requestedV2Id =
+    isV2 && auctionId !== undefined && Number.isFinite(Number(auctionId)) && Number(auctionId) >= 0
+      ? Number(auctionId)
+      : undefined;
+  const isLiveV2 =
+    requestedV2Id !== undefined &&
+    v2LiveAuction !== undefined &&
+    Number(v2LiveAuction.nounId) === requestedV2Id;
+  const pastV2NounId =
+    requestedV2Id !== undefined && !isLiveV2 ? BigInt(requestedV2Id) : undefined;
+  const v2Settled = useV2SettledAuction(pastV2NounId);
+
+  // Build the auction object for the active route. V2 lacks an on-chain
+  // history for past auctions so we synthesise a settled stub, backfilling the
+  // winning bid / winner / times from the indexer (`v2Settled`) when available.
+  // The hero still renders (seed + ownerOf load on-chain inside Auction) and
+  // bid history falls back gracefully.
   const onDisplayAuction: IAuction | undefined = useMemo(() => {
     if (!isV2) return mainnetAuction;
     if (auctionId === undefined) return v2LiveAuction;
@@ -58,15 +75,15 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
 
     return {
       nounId: BigInt(requestedId),
-      amount: 0n,
-      startTime: 0n,
-      endTime: 0n,
-      bidder: undefined,
-      settled: true,
+      amount: v2Settled?.amount ?? 0n,
+      startTime: v2Settled?.startTime ?? 0n,
+      endTime: v2Settled?.endTime ?? 0n,
+      bidder: v2Settled?.winner,
+      settled: v2Settled?.settled ?? true,
       clientId: null,
       burned: false,
     };
-  }, [isV2, auctionId, mainnetAuction, v2LiveAuction]);
+  }, [isV2, auctionId, mainnetAuction, v2LiveAuction, v2Settled]);
 
   const onDisplayAuctionNounId = Number(onDisplayAuction?.nounId);
 

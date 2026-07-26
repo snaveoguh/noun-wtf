@@ -1,11 +1,12 @@
 /**
- * Cross-post dreams to probe.wtf's backend API.
- * Remove this file when DigitalOcean is sunset.
+ * Publish dreams to the dream-nouns API (nouns-api on Railway).
+ * This replaced the probe.wtf DigitalOcean Laravel backend on 2026-07-19;
+ * the endpoint accepts the same multipart form the Laravel API did.
  */
 
 import type { SavedDream } from '@/lib/dreamStorage';
 
-const PROBE_API = 'https://api.probe.wtf/api/dream-nouns';
+const PROBE_API = 'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns';
 
 /**
  * Post a new dream to probe.wtf's Laravel API.

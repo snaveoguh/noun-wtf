@@ -41,8 +41,9 @@ export interface ProbeDreamWithPreview extends ProbeDream {
   overlayTopSvgUrl: string | null;
 }
 
-// Live source: probe.wtf Laravel API
-const PROBE_API = 'https://api.probe.wtf/api/dream-nouns';
+// Live source: dream-nouns API on Railway (nouns-api) — migrated off the
+// probe.wtf DigitalOcean droplet 2026-07-19. Same Laravel paginator shape.
+const PROBE_API = 'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns';
 
 // Fallback: static JSON bundled with the webapp (frozen snapshot).
 const STATIC_URL = '/probe-dreams/dreams.json';

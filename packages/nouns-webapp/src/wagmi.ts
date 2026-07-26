@@ -1,6 +1,6 @@
 import { find, pipe } from 'remeda';
 import { createConfig, http, fallback, webSocket } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
+import { mainnet, polygon, sepolia } from 'wagmi/chains';
 import { coinbaseWallet, injected, safe, walletConnect } from 'wagmi/connectors';
 
 import { CHAIN_ID, WALLET_CONNECT_V2_PROJECT_ID } from './config';
@@ -59,10 +59,17 @@ const transports = {
       ? [webSocket(import.meta.env.VITE_SEPOLIA_WSRPC)]
       : []),
   ]),
+  // Polygon is a secondary chain used only by the Borgs collection on /probe
+  // (mint + breed txs). Reads go through the dedicated client in lib/borgs.ts.
+  [polygon.id]: fallback([
+    http('https://polygon-bor-rpc.publicnode.com', { timeout: HTTP_TIMEOUT }),
+    http('https://polygon-rpc.com', { timeout: HTTP_TIMEOUT }),
+    http('https://1rpc.io/matic', { timeout: HTTP_TIMEOUT }),
+  ]),
 };
 
 export const config = createConfig({
-  chains: [activeChain],
+  chains: [activeChain, polygon],
   transports,
   // Poll cadence for every wagmi watcher. Default 4s; with five auction
   // event watchers that was a continuous getLogs drain. 12s matches the

@@ -3,7 +3,7 @@
  * from probe.wtf. Shows user-created dream Noun designs that could become
  * real Nouns if the community supports them.
  *
- * API: https://api.probe.wtf/api/dream-nouns
+ * API: /api/dream-nouns on nouns-api (Railway) — newest first
  * Links to: https://probe.wtf/en-US/nouns/dreams
  */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -200,7 +200,7 @@ export function useDreams() {
     queryKey: ['probeDreams'],
     queryFn: async (): Promise<DreamCard[]> => {
       const res = await fetch(
-        'https://api.probe.wtf/api/dream-nouns?sort_method=desc&sort_property=id&page=1&per_page=40',
+        'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns?page=1&per_page=40',
       );
       if (!res.ok) throw new Error(`Dreams API ${res.status}`);
       const json = await res.json();

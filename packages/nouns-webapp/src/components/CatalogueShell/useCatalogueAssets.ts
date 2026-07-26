@@ -533,7 +533,8 @@ const PROBE_TRAIT_FILES = (() => {
   ];
 })();
 
-const PROBE_TRAIT_BASE = 'https://probewtf.fra1.cdn.digitaloceanspaces.com/custom-traits';
+// Custom dream traits are fully bundled at public/probe-dreams/ — the old
+// probewtf DigitalOcean Spaces CDN was retired 2026-07-19.
 
 function inferProbeLayer(filename: string): string {
   const lower = filename.toLowerCase();
@@ -571,13 +572,11 @@ function buildProbeTraitAssets(): CatalogueAsset[] {
       id: `probe-trait-${id}`,
       title: name,
       subtitle: `Custom ${layer} · Dream #${id}`,
-      // Use local public copy for snappy render — falls back to remote for any
-      // missing files.
       image: `/probe-dreams/traits/${file}`,
-      fileUrl: `${PROBE_TRAIT_BASE}/${layer}/${file.split('_').slice(1).join('_')}`,
-      href: `https://probe.wtf/en-US/nouns/dreams`,
-      sourceUrl: `https://probe.wtf/en-US/nouns/dreams`,
-      sourceLabel: 'probe.wtf',
+      fileUrl: `/probe-dreams/traits/${file}`,
+      href: `/probe?tab=dreams`,
+      sourceUrl: `/probe?tab=dreams`,
+      sourceLabel: 'Dreams',
       collection: 'probe-trait',
       media: 'image',
       isPixel: true,

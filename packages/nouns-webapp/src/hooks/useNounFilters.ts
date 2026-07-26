@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ImageData } from '@noundry/nouns-assets';
 
 import { getNounMetrics } from '@/lib/nounMetrics';
+import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 
 export type SortOption =
@@ -63,6 +64,28 @@ export function useNounFilters(
     setTraitFilters({ ...emptyFilters });
   }, []);
 
+  // Per-noun searchable text: all four trait names + background, lowercased.
+  // Built once per seeds load so keystroke filtering is a substring scan.
+  const searchText = useMemo(() => {
+    if (seeds == null) return undefined;
+    const idx = new Map<string, string>();
+    for (const [id, seed] of Object.entries(seeds)) {
+      idx.set(
+        id,
+        [
+          traitName('head', seed.head),
+          traitName('glasses', seed.glasses),
+          traitName('body', seed.body),
+          traitName('accessory', seed.accessory),
+          seed.background === 0 ? 'cool' : 'warm',
+        ]
+          .join(' ')
+          .toLowerCase(),
+      );
+    }
+    return idx;
+  }, [seeds]);
+
   const filteredAndSorted = useMemo(() => {
     let filtered = [...nounIds];
 
@@ -71,10 +94,15 @@ export function useNounFilters(
       filtered = filtered.filter(id => ownerNounIds.has(id));
     }
 
-    // Search filter (by noun ID)
+    // Smart search: every whitespace-separated token must match the noun's
+    // ID or one of its trait names, so "fox cool" = fox head AND cool bg.
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      filtered = filtered.filter(id => id.toString().includes(q));
+      const tokens = search.trim().toLowerCase().split(/\s+/);
+      filtered = filtered.filter(id => {
+        const idStr = id.toString();
+        const text = searchText?.get(idStr);
+        return tokens.every(t => idStr.includes(t) || (text != null && text.includes(t)));
+      });
     }
 
     // Trait filters
@@ -135,7 +163,7 @@ export function useNounFilters(
     });
 
     return filtered;
-  }, [nounIds, seeds, search, traitFilters, sortBy, ownerNounIds]);
+  }, [nounIds, seeds, search, searchText, traitFilters, sortBy, ownerNounIds]);
 
   // Trait counts for filter UI
   const traitCounts = useMemo(() => {

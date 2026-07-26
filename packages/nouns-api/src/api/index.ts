@@ -209,6 +209,8 @@ import {
   getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
+import { buildTraitProposal, type TraitCategory } from '../agent/traitProposal.js';
+import ImageDataV2ForTraits from '../agent/image-data-v2.json';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -3223,6 +3225,7 @@ async function parseCommand(
 - Last block: ${state.lastBlockNumber}
 - Next noun ID: ${state.nextNounId}
 - Predicted traits: ${state.lastPredictedTraits ? JSON.stringify(state.lastPredictedTraits) : 'computing...'}
+- Standing targets (always hunted, no reservation needed): ${state.standingTraits.length > 0 ? state.standingTraits.join(', ') : 'none'}
 - Active reservations: ${stats.active}
 - Total settlements: ${stats.totalSettlements}
 - Your reservations: ${walletRes.length > 0 ? walletRes.map(r => `${r.id.slice(0, 8)} (${r.traits.join(', ')}) [${r.status}]`).join('; ') : 'none'} ⌐◨-◨`,
@@ -4116,6 +4119,7 @@ app.post('/api/chat', async c => {
 - Next noun ID: ${watcherState.nextNounId}
 - Auction ends: ${watcherState.auctionEndTime ? new Date(watcherState.auctionEndTime * 1000).toISOString() : 'unknown'}
 - Predicted traits: ${watcherState.lastPredictedTraits ? JSON.stringify(watcherState.lastPredictedTraits) : 'computing...'}
+- Standing targets (ALWAYS auto-hunted for free, no reservation needed): ${watcherState.standingTraits.length > 0 ? JSON.stringify(watcherState.standingTraits) : 'none'}
 - Active reservations: ${stats.active}
 - Total settlements: ${stats.totalSettlements}
 - Caller wallet: ${wallet || 'not connected'}
@@ -4714,6 +4718,54 @@ CRITICAL RULES:
               },
             },
             required: ['title', 'description'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'propose_trait',
+          description:
+            'Prepare a NounV2 governance proposal that adds a NEW art trait (head, body, accessory, or glasses) to the NounV2 collection. The proposal calls the V2 descriptor addHeads-family function and is executed by the NounV2 Treasury. Returns a GovernanceAction the user signs (they must hold >=1 NounV2 to propose). Provide EITHER a raw `rle` hex image, OR derive from an existing trait via `derive_from` plus `swap_runs`/`recolor`. Every colour used must already exist in the on-chain palette.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              category: {
+                type: 'string',
+                enum: ['head', 'body', 'accessory', 'glasses'],
+                description: 'Which trait slot the new trait is added to.',
+              },
+              trait_name: {
+                type: 'string',
+                description: 'Short name for the new trait (e.g. "joker").',
+              },
+              title: { type: 'string', description: 'Proposal title.' },
+              description: {
+                type: 'string',
+                description: 'Proposal body. Markdown supported.',
+              },
+              rle: {
+                type: 'string',
+                description:
+                  'Optional: the trait image as raw Nouns RLE hex (0x…). Provide this OR derive_from.',
+              },
+              derive_from: {
+                type: 'string',
+                description:
+                  'Optional: name or index of an existing trait in this category to derive the new one from (e.g. "index-card").',
+              },
+              swap_runs: {
+                type: 'string',
+                description:
+                  'Optional derivation: two 0-based RLE run indices whose colours are swapped, as "i,j" (e.g. "1,7" swaps index-card\'s top-red and bottom-blue rule lines → joker).',
+              },
+              recolor: {
+                type: 'string',
+                description:
+                  'Optional derivation: palette-index remaps "a:b,c:d" applied to every run.',
+              },
+            },
+            required: ['category', 'trait_name', 'title', 'description'],
           },
         },
       },
@@ -5784,6 +5836,79 @@ CRITICAL RULES:
                   success: true,
                   action: pendingAction,
                   message: `Candidate prepared: "${input.title}" (slug: ${slug}).${txNote} The user will be asked to confirm and sign. Note: creating a candidate costs a small amount of ETH (set by the DAO).`,
+                };
+              }
+              break;
+            }
+
+            case 'propose_trait': {
+              const input = args as {
+                category: TraitCategory;
+                trait_name: string;
+                title: string;
+                description: string;
+                rle?: string;
+                derive_from?: string;
+                swap_runs?: string;
+                recolor?: string;
+              };
+              if (!wallet) {
+                result = {
+                  error:
+                    'User must connect their wallet to propose a trait. Tell them to click "connect" in the header.',
+                };
+                break;
+              }
+              try {
+                const derivation: {
+                  swapRunColors?: [number, number];
+                  recolor?: [number, number][];
+                } = {};
+                if (input.swap_runs) {
+                  const [i, j] = input.swap_runs.split(',').map(Number);
+                  derivation.swapRunColors = [i, j];
+                }
+                if (input.recolor)
+                  derivation.recolor = input.recolor
+                    .split(',')
+                    .map(p => p.split(':').map(Number) as [number, number]);
+
+                const proposal = buildTraitProposal({
+                  category: input.category,
+                  title: input.title,
+                  description: input.description,
+                  rleHex: input.rle,
+                  deriveFrom: input.derive_from
+                    ? {
+                        imageData: ImageDataV2ForTraits as any,
+                        source: input.derive_from,
+                        derivation,
+                      }
+                    : undefined,
+                });
+
+                pendingAction = {
+                  type: 'PROPOSE_TRAIT',
+                  dao: 'nounv2',
+                  title: input.title,
+                  traitName: input.trait_name,
+                  category: input.category,
+                  description: proposal.description,
+                  targets: proposal.targets,
+                  values: proposal.values.map(v => v.toString()),
+                  signatures: proposal.signatures,
+                  calldatas: proposal.calldatas,
+                };
+                result = {
+                  success: true,
+                  action: pendingAction,
+                  message: `Trait proposal prepared: adds ${input.category} "${input.trait_name}" to NounV2 (${proposal.add.decompressedLength}B image, head-family addHeads call executed by the Treasury). The user will confirm and sign — they must hold >=1 NounV2 to propose. Voting is ~12h, then a 12h timelock before execute.`,
+                };
+              } catch (e) {
+                result = {
+                  error: `Could not build trait proposal: ${
+                    e instanceof Error ? e.message : String(e)
+                  }`,
                 };
               }
               break;
@@ -7799,6 +7924,7 @@ app.get('/api/agent/status', async c => {
     lastCheckedAt: watcherState.lastCheckedAt,
     totalBlocksChecked: watcherState.totalBlocksChecked,
     errors: watcherState.errors.slice(-5),
+    standingTraits: watcherState.standingTraits,
     balanceEth: Math.round(balance * 10000) / 10000,
     reservations: stats,
     recentSettleAttempts: reservationStore.getRecentSettleAttempts(),
@@ -9755,5 +9881,10 @@ app.get('/api/gas-leaderboard', async c => {
 // See ./walletMap.ts for the full pipeline.
 import { registerWalletMapRoute } from './walletMap.js';
 registerWalletMapRoute(app, db);
+
+// ─── Dream Nouns — /api/dream-nouns ─────────────────────────────────────────
+// Replaces the Laravel API from the retired probe.wtf DigitalOcean droplet.
+import { registerDreamRoutes } from './dreams.js';
+registerDreamRoutes(app);
 
 export default app;

@@ -212,7 +212,11 @@ const Bid: React.FC<BidProps> = props => {
   const isWalletConnected = activeAccount !== undefined;
 
   return (
-    <div className={classes.bidGroup}>
+    // data-mn-safe: MissingNounGlitch never damages anything inside this
+    // subtree. Placing a bid is the only way to stop the glitch, so the bid
+    // controls have to survive it — a fault that hides this button strands the
+    // user with no way out.
+    <div className={classes.bidGroup} data-mn-safe>
       {!auctionEnded ? (
         <>
           {/* Full-width bid input */}

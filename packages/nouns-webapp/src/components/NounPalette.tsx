@@ -39,6 +39,12 @@ export const getNounColors = (seed: INounSeed): ColorInfo[] => {
   // Count pixel frequency of each color index across all parts
   const freq = new Map<number, number>();
   for (const part of parts) {
+    // A V2 seed can carry trait indices beyond the bundled V1 asset set
+    // (e.g. body 31 when only 0–30 exist), so getNounData yields an
+    // undefined part. Reading `part.data` then threw and — because the
+    // crash happens in the NavBar's palette swatch — tombstoned the whole
+    // /v2 page. Skip any part we can't decode instead of throwing.
+    if (typeof part?.data !== 'string') continue;
     const pairs = decodeRlePairs(part.data);
     for (const [runLength, colorIndex] of pairs) {
       if (colorIndex === 0) continue; // 0 = transparent

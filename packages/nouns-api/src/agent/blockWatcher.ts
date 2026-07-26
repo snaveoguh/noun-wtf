@@ -58,7 +58,7 @@ const { auctionHouse: AUCTION_HOUSE_ADDRESS, token: NOUNS_TOKEN_ADDRESS } =
 console.log(
   `[NounIRL] Watching DAO=${WATCHED_DAO.toUpperCase()} — auctionHouse=${AUCTION_HOUSE_ADDRESS} token=${NOUNS_TOKEN_ADDRESS}`,
 );
-import { reservationStore } from './reservations.js';
+import { reservationStore, type Reservation } from './reservations.js';
 import {
   predictSeed,
   seedToTraitNames,
@@ -66,6 +66,52 @@ import {
   type NounSeed,
   type TraitNames,
 } from './traitPredictor.js';
+
+// ─── Standing Trait Targets ───────────────────────────────────────────────
+// Traits the bot ALWAYS hunts, tip or no tip. Unlike reservations these are
+// never consumed — every time the next noun would mint with one of these and
+// the auction has ended, the bot fires. Comma-separated "category:name"
+// entries, matched as independent targets (OR). Names are EXACT-matched
+// (case-insensitive) rather than the reservation substring matcher, because
+// "head:wall" must not also fire on the Wallet and Wallsafe heads.
+// Override with NOUNIRL_STANDING_TRAITS; disable with NOUNIRL_STANDING_TRAITS=off.
+const STANDING_RESERVATION_ID = 'standing';
+
+function parseStandingTraits(): string[] {
+  const raw = (process.env.NOUNIRL_STANDING_TRAITS ?? 'head:wall').trim();
+  if (!raw || ['off', 'none', 'false', '0'].includes(raw.toLowerCase())) return [];
+  return raw
+    .split(',')
+    .map(t => t.trim())
+    .filter(t => t.includes(':'));
+}
+
+const STANDING_TRAITS = parseStandingTraits();
+if (STANDING_TRAITS.length > 0) {
+  console.log(`[NounIRL] Standing trait targets active: ${STANDING_TRAITS.join(', ')}`);
+}
+
+export function matchesStandingTraits(traitNames: TraitNames): boolean {
+  return STANDING_TRAITS.some(trait => {
+    const colonIdx = trait.indexOf(':');
+    const category = trait.slice(0, colonIdx).trim().toLowerCase() as keyof TraitNames;
+    const wanted = trait.slice(colonIdx + 1).trim().toLowerCase();
+    return traitNames[category]?.toLowerCase() === wanted;
+  });
+}
+
+function standingReservation(): Reservation {
+  return {
+    id: STANDING_RESERVATION_ID,
+    wallet: process.env.NOUNIRL_ADDRESS ?? '0x0',
+    tipTxHash: '',
+    tipChainId: 1,
+    tipAmountEth: 0,
+    traits: STANDING_TRAITS,
+    status: 'active',
+    createdAt: 0,
+  };
+}
 
 // ─── Settlement Config ────────────────────────────────────────────────────
 // Preflight balance check on the RPC requires `balance >= gasLimit * maxFeePerGas`.
@@ -511,11 +557,15 @@ async function onNewBlock(
     state.lastPredictedSeed = seed;
     state.lastPredictedTraits = traits;
 
-    const activeReservations = reservationStore.getActive();
+    const activeReservations: Reservation[] = [...reservationStore.getActive()];
+    if (STANDING_TRAITS.length > 0) activeReservations.push(standingReservation());
     if (activeReservations.length === 0) return;
 
     for (const reservation of activeReservations) {
-      const isMatch = matchesTraits(traits, reservation.traits);
+      const isStanding = reservation.id === STANDING_RESERVATION_ID;
+      const isMatch = isStanding
+        ? matchesStandingTraits(traits)
+        : matchesTraits(traits, reservation.traits);
 
       if (isMatch && auctionEnded) {
         // Skip if the auction we already have cached is settled, or if we just
@@ -643,13 +693,16 @@ async function onNewBlock(
                   );
                 }
 
-                // Check if actual traits match the reservation
+                // Check if actual traits match the reservation (or standing target)
+                const firedStanding = resId === STANDING_RESERVATION_ID;
                 const res = reservationStore.get(resId);
-                if (actualTraits && res) {
-                  const actuallyMatches = matchesTraits(actualTraits, res.traits);
+                if (actualTraits && (res || firedStanding)) {
+                  const actuallyMatches = firedStanding
+                    ? matchesStandingTraits(actualTraits)
+                    : matchesTraits(actualTraits, res!.traits);
                   if (!actuallyMatches) {
                     console.error(
-                      `[NounIRL] ❌ TRAIT MISMATCH — Noun #${settledNounId} actual traits: ${JSON.stringify(actualTraits)}, predicted: ${JSON.stringify(settledTraits)}, wanted: ${JSON.stringify(res.traits)}`,
+                      `[NounIRL] ❌ TRAIT MISMATCH — Noun #${settledNounId} actual traits: ${JSON.stringify(actualTraits)}, predicted: ${JSON.stringify(settledTraits)}, wanted: ${JSON.stringify(res?.traits ?? STANDING_TRAITS)}`,
                     );
                     state.errors.push(
                       `Trait mismatch for Noun #${settledNounId}: predicted ${JSON.stringify(settledTraits)}, actual ${JSON.stringify(actualTraits)}`,
@@ -666,7 +719,8 @@ async function onNewBlock(
                 // All checks passed — record the settlement
                 const confirmedTraits = actualTraits ?? settledTraits;
                 reservationStore.markSettleAttemptMatched(txHash);
-                reservationStore.fulfill(resId, settledNounId, txHash);
+                // Standing targets are never consumed — only real reservations fulfil.
+                if (!firedStanding) reservationStore.fulfill(resId, settledNounId, txHash);
                 reservationStore.addSettlement({
                   nounId: settledNounId,
                   txHash,
@@ -863,8 +917,15 @@ export function stopWatcher(): void {
   console.log('[NounIRL] Block watcher stopped');
 }
 
-export function getWatcherState(): WatcherState & { activeReservations: number } {
-  return { ...state, activeReservations: reservationStore.getActive().length };
+export function getWatcherState(): WatcherState & {
+  activeReservations: number;
+  standingTraits: string[];
+} {
+  return {
+    ...state,
+    activeReservations: reservationStore.getActive().length,
+    standingTraits: STANDING_TRAITS,
+  };
 }
 
 export async function checkNow(): Promise<{
@@ -880,6 +941,9 @@ export async function checkNow(): Promise<{
   const matchingIds = state.lastPredictedTraits
     ? active.filter(r => matchesTraits(state.lastPredictedTraits!, r.traits)).map(r => r.id)
     : [];
+  if (state.lastPredictedTraits && matchesStandingTraits(state.lastPredictedTraits)) {
+    matchingIds.push(STANDING_RESERVATION_ID);
+  }
 
   return {
     blockNumber: state.lastBlockNumber,

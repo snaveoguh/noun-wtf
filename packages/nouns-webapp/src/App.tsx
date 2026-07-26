@@ -29,6 +29,7 @@ import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
 import { MiniWindowHost } from '@/components/MiniWindow';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
+import { config as wagmiConfig } from '@/wagmi';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
@@ -600,6 +601,15 @@ function ThemedAppContent() {
   );
 }
 
+// Chains the app can operate on. The NetworkAlert wall only fires for chains
+// outside this set — being on a secondary chain (e.g. Polygon for Borgs
+// mint/breed) must not brick the app under an unclosable modal. CHAIN_ID is
+// included defensively in case the wagmi config and env ever disagree.
+const SUPPORTED_CHAIN_IDS = new Set<number>([
+  ...wagmiConfig.chains.map(c => c.id),
+  Number(CHAIN_ID),
+]);
+
 function App() {
   const { address: account, chainId } = useAccount();
   const torchMode = useAppSelector(state => state.application.torchMode);
@@ -620,7 +630,7 @@ function App() {
 
   return (
     <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
-      {chainId !== undefined && Number(CHAIN_ID) !== chainId && <NetworkAlert />}
+      {chainId !== undefined && !SUPPORTED_CHAIN_IDS.has(chainId) && <NetworkAlert />}
       <BrowserRouter>
         <AppRouter />
       </BrowserRouter>

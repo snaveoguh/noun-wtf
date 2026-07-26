@@ -20,7 +20,22 @@ interface PonderBid {
 
 interface PonderAuctionResponse {
   nounId: string;
+  startTime?: string;
+  endTime?: string;
+  settled?: boolean;
+  winner?: Address | null;
+  amount?: string | null;
   bids: PonderBid[];
+}
+
+/** Settled-auction summary for a past V2 noun, sourced from the indexer. */
+export interface V2SettledAuction {
+  nounId: bigint;
+  amount: bigint;
+  winner: Address | undefined;
+  startTime: bigint;
+  endTime: bigint;
+  settled: boolean;
 }
 
 /**
@@ -61,4 +76,54 @@ export function useV2AuctionBids(nounId: bigint): Bid[] | undefined {
   });
 
   return data;
+}
+
+/**
+ * Read the settled-auction summary (winning bid amount, winner, times) for a
+ * past V2 noun from the same indexer endpoint. V2 has no on-chain history for
+ * past auctions — the AuctionHouse only exposes the live `auction()` tuple —
+ * so without this the `/v2/noun/:id` page shows a hardcoded "0.00 ETH"
+ * placeholder. The indexer captures `amount`/`winner` on `AuctionSettled`.
+ *
+ * `nounId === undefined` (or the live noun, handled by the caller) disables
+ * the query. Returns `undefined` while loading or when the indexer has no row
+ * (e.g. a not-yet-indexed or no-bid/burned auction) — the caller keeps its
+ * placeholder in that case.
+ *
+ * The endpoint serialises times via `Date.getTime()`, but the underlying
+ * column stores raw Unix *seconds* (same quirk `useV2AuctionBids` relies on
+ * for bid timestamps), so the values already match the on-chain `auction()`
+ * seconds convention that every consumer (AuctionTimer, date headline) expects
+ * — no unit conversion needed.
+ */
+export function useV2SettledAuction(nounId: bigint | undefined): V2SettledAuction | undefined {
+  const isConfigured = NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS;
+
+  const { data } = useQuery({
+    queryKey: ['nounv2-settled-auction', nounId !== undefined ? String(nounId) : 'none'],
+    queryFn: async (): Promise<V2SettledAuction | null> => {
+      const res = await fetch(`${PONDER_BASE}/api/nounv2-auctions/${String(nounId)}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`ponder returned ${res.status}`);
+      const p = (await res.json()) as PonderAuctionResponse;
+      const toSec = (s?: string): bigint => (s ? BigInt(Math.floor(Number(s))) : 0n);
+      const winner =
+        p.winner && p.winner.toLowerCase() !== ZERO_ADDRESS ? (p.winner as Address) : undefined;
+      return {
+        nounId: BigInt(p.nounId),
+        amount: p.amount != null ? BigInt(p.amount) : 0n,
+        winner,
+        startTime: toSec(p.startTime),
+        endTime: toSec(p.endTime),
+        settled: p.settled ?? true,
+      };
+    },
+    enabled: isConfigured && nounId !== undefined,
+    // Past settled auctions are immutable — cache hard, no polling.
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
+    retry: 2,
+  });
+
+  return data ?? undefined;
 }

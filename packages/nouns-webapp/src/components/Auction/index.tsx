@@ -3,6 +3,7 @@ import type { EditableSceneViewState, Tool, VoxelMap } from '@nouns/voxel-engine
 import type * as THREE from 'three';
 import { getHeadOffset } from '@/lib/headNudges';
 import { loadCuratedVoxelMap } from '@/lib/loadCuratedVoxelMap';
+import { isMissingNoun } from '@/lib/missingNoun';
 import React, {
   Suspense,
   useCallback,
@@ -24,6 +25,7 @@ import BurnedNounContent from '@/components/BurnedNounContent';
 import DerivativeAuction from '@/components/DerivativeAuction';
 import HomePrompt from '@/components/HomePrompt';
 import { LoadingNoun } from '@/components/LegacyNoun';
+import MissingNounGlitch from '@/components/MissingNounGlitch';
 import NounderNounContent from '@/components/NounderNounContent';
 import NounParallax, { LIGHTING_PRESETS, type LightingPreset } from '@/components/NounParallax';
 import PanZoomImage from '@/components/PanZoomImage';
@@ -51,7 +53,6 @@ import {
   useDaoNounSeed,
   useDaoReservePrice,
   useV2NounBurnedStatus,
-  useV2NounImage,
 } from '@/wrappers/daoAuctionHouse';
 import { setCurrentNounSeed, setStateBackgroundColor } from '@/state/slices/application';
 import type { RootState } from '@/store';
@@ -393,6 +394,13 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
   );
 
   const { address: walletAddress } = useAccount();
+
+  // `bidder` is already normalized to undefined for the zero address, so a
+  // no-bid auction can't accidentally match a disconnected wallet.
+  const isTopBidder =
+    walletAddress != null &&
+    currentAuction?.bidder != null &&
+    currentAuction.bidder.toLowerCase() === walletAddress.toLowerCase();
 
   const editorToolRef = useRef<{
     setTool: (tool: Tool) => void;
@@ -1180,6 +1188,28 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     [dispatch],
   );
 
+  // Root guard for the V2↔V1 toggle white-screen: the instant the DAO context
+  // flips, drop any seed carried over from the other DAO. Otherwise the
+  // previous DAO's `currentNounSeed` lingers in Redux for a render or two while
+  // the new auction's seed loads, and its trait indices can be out of range for
+  // the new DAO's asset set (V2 body 31 vs V1's 0–30). The trait decoders each
+  // guard against that now (f321eced2 / b9bdb32fe / 1893304aa), but clearing the
+  // seed at the source shows a clean loading state instead of a briefly
+  // wrong/partial noun — and removes the cause rather than each symptom.
+  //
+  // Declared BEFORE the v2 seed-push effect so that, within a single commit,
+  // the stale seed is cleared before the new one is set (effects run in
+  // declaration order). The mount run is skipped via the ref so we never wipe a
+  // freshly-loaded seed. `lastSeedKeyRef` is reset so the new DAO's seed always
+  // re-dispatches even on a rare key collision.
+  const seedDaoIsV2Ref = useRef(dao.isV2);
+  useEffect(() => {
+    if (seedDaoIsV2Ref.current === dao.isV2) return;
+    seedDaoIsV2Ref.current = dao.isV2;
+    lastSeedKeyRef.current = '';
+    dispatch(setCurrentNounSeed(null));
+  }, [dao.isV2, dispatch]);
+
   // On v2 we bypass the StandaloneNounWithSeed loader (it uses the mainnet
   // Ponder cache + mainnet token contract) — push the v2 seed we already
   // read on-chain into the same handler. Same effect, different source.
@@ -1216,29 +1246,15 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
     navigate(path(Number(currentAuction.nounId) + 1));
   }, [currentAuction, dao.isV2, navigate]);
 
-  // V2 displays the on-chain `dataURI(tokenId)` SVG directly — single source
-  // of truth that survives descriptor upgrades. V1 keeps the fast bundled
-  // RLE → client SVG path. (Matches the BerryOS V1/V2 split.)
-  const v2OnChainImage = useV2NounImage(
-    dao,
-    dao.isV2 && currentAuction ? BigInt(currentAuction.nounId) : undefined,
-  );
-
   const nounSvg = useMemo(() => {
     if (!currentNounSeed || !currentAuction) return null;
-    if (dao.isV2) {
-      if (v2OnChainImage) return v2OnChainImage;
-      // A no-bid V2 settle HARD-BURNS the token: dataURI() and ownerOf() revert
-      // while seeds() still returns the seed. So the on-chain image never
-      // resolves for a burned noun — fall back to building the SVG client-side
-      // from the seed (V2 palette) so burned nouns still render their art.
-      // For non-burned nouns we keep returning null until dataURI loads (no
-      // flicker / no behaviour change there).
-      if (isBurned) return getNoun(BigInt(currentAuction.nounId), currentNounSeed, true).image;
-      return null;
-    }
-    return getNoun(BigInt(currentAuction.nounId), currentNounSeed).image;
-  }, [currentAuction, currentNounSeed, dao.isV2, v2OnChainImage, isBurned]);
+    // Both V1 and V2 render client-side from the seed + bundled RLE image data
+    // (V2 via the ImageDataV2 snapshot). V2 previously pulled the on-chain
+    // dataURI(tokenId) SVG, but that heavy eth_call REVERTS on gas/compute-capped
+    // RPCs (dRPC, 1rpc) for complex nouns and viem's fallback doesn't retry reverts,
+    // stranding the noun on the loading placeholder. Client-side is fast + RPC-proof.
+    return getNoun(BigInt(currentAuction.nounId), currentNounSeed, dao.isV2).image;
+  }, [currentAuction, currentNounSeed, dao.isV2]);
 
   useAuctionKeyboardShortcuts({
     isEditing,
@@ -1790,7 +1806,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             />
           </div>
         )}
-        <HomePrompt nounId={currentNounId} seed={currentNounSeed ?? undefined} />
+        <HomePrompt isV2={dao.isV2} nounId={currentNounId} seed={currentNounSeed ?? undefined} />
       </div>
     );
   };
@@ -1814,6 +1830,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
 
   return (
     <div style={{ backgroundColor: stateBgColor }}>
+      {/* Holding the top bid calms the page — bidding is the way out of the
+          glitch. Get outbid and it starts up again, which is the point. */}
+      <MissingNounGlitch active={isMissingNoun(currentNounSeed, dao.isV2) && !isTopBidder} />
       {dao.isV2 && !dao.isConfigured && (
         <div
           style={{

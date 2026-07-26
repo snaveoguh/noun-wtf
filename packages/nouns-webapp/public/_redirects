@@ -1,3 +1,10 @@
+# probe.wtf is retired from DigitalOcean — the domain is an alias on this
+# Netlify site, and every old probe.wtf URL (e.g. /en-US/nouns) lands on
+# the /probe explorer. Requires probe.wtf + www.probe.wtf added as domain
+# aliases in the Netlify UI and DNS pointed at Netlify.
+https://probe.wtf/*      https://noun.wtf/probe  301!
+https://www.probe.wtf/*  https://noun.wtf/probe  301!
+
 # Return proper 404 for missing static assets (prevents serving index.html as JS)
 /assets/*  /404.html  404
 
