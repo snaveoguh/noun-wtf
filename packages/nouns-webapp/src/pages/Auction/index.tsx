@@ -11,11 +11,12 @@ import FundedPropsBanner from '@/components/FundedPropsBanner';
 import NocTicker from '@/components/NocTicker';
 import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
-import NounsWorldBanner from '@/components/NounsWorldBanner';
 import PropdatesBanner from '@/components/PropdatesBanner';
 import { Bone } from '@/components/Skeleton';
 
-const LilNounsGrid = React.lazy(() => import('@/components/LilNounsGrid'));
+// Light row (fetches ~8 blocks) instead of the full LilNounsGrid, which builds a
+// 316-block pool on mount. The full grid still lives on /probe?tab=lils.
+const LilNounsMintRow = React.lazy(() => import('@/components/LilNounsMintRow'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
@@ -146,7 +147,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     >
       <Auction auction={onDisplayAuction} />
       <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
-        <LilNounsGrid />
+        <LilNounsMintRow />
       </Suspense>
       <FundedPropsBanner />
       <div className="block lg:hidden">
@@ -156,7 +157,6 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
       <CurrentPropsBanner />
       <DreamsBanner />
       <NoundryBanner />
-      <NounsWorldBanner />
       <div style={{ background: '#fff' }}>
         <NounsIntroSection />
         <Documentation backgroundColor="#ffffff" />

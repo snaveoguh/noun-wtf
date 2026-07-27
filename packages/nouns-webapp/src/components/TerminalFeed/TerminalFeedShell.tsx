@@ -142,18 +142,14 @@ export default function TerminalFeedShell() {
             )}
           </ConnectKitButton.Custom>
 
-          {/* Theme switcher — picking anything other than 'terminal' navigates
-              back to '/' so the chosen theme's home layout takes over. */}
-          {!isEmbedded && (
-            <ThemeSwitcher
-              variant="terminal"
-              onChange={next => {
-                if (next !== 'terminal') {
-                  window.location.replace('/');
-                }
-              }}
-            />
-          )}
+          {/* Theme switcher — ThemeSwitcher already sets the theme and
+              client-side navigates to `/<theme>`, which ThemePrefixRoute
+              resolves into that theme's home. We deliberately do NOT do a
+              `window.location.replace` here: a hard reload tore down this
+              whole fixed-position shell (and its terminal-mode/disco document
+              classes), which is what made the homepage visibly flash to black
+              on every theme change. */}
+          {!isEmbedded && <ThemeSwitcher variant="terminal" />}
         </div>
       </div>
 

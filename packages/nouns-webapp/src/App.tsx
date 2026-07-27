@@ -333,10 +333,11 @@ function ThemePrefixRoute() {
   // Once theme is set, defer to `ThemedAppContent`, which handles the actual
   // shell dispatch and is a single source of truth for which UI renders for
   // a given (theme, path) pair.
-  if (targetTheme !== currentTheme) {
-    // Brief flash protection: theme effect hasn't run yet, render nothing.
-    return null;
-  }
+  // NOTE: we render `ThemedAppContent` even when `targetTheme !== currentTheme`
+  // (the sync effect above hasn't committed yet). This used to `return null`,
+  // which blanked the screen for a frame — a visible flash on every theme
+  // switch. Rendering through means the worst case is one frame of the previous
+  // theme's home instead of an empty screen.
   return <ThemedAppContent />;
 }
 

@@ -31,11 +31,11 @@ import { useAppSelector } from '@/hooks';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const VRGDA_ADDRESS = '0xA2587b1e2626904c8575640512b987Bd3d3B592D' as const;
+export const VRGDA_ADDRESS = '0xA2587b1e2626904c8575640512b987Bd3d3B592D' as const;
 const LIL_NOUNS_TOKEN = '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B' as const;
 const POOL_SIZE = 256;
 const MAX_EXTRA = 60; // extra blocks to fetch for grayscale row fill
-const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
+export const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
 const MASK_48 = (1n << 48n) - 1n;
 
 // Primary is the configured mainnet RPC (dRPC — reliable, CORS-enabled) when
@@ -43,7 +43,7 @@ const MASK_48 = (1n << 48n) - 1n;
 // order on failure. publicnode is LAST — it began 403'ing anonymous traffic
 // 2026-07, which used to hard-fail this grid ("All RPCs failed"). Infura/Ankr/
 // buidlguidl dropped earlier (keys / 402). See wagmi.ts for the canonical list.
-const RPC_URLS = [
+export const RPC_URLS = [
   import.meta.env.VITE_MAINNET_JSONRPC as string,
   'https://1rpc.io/eth',
   'https://eth.merkle.io',
@@ -63,7 +63,7 @@ const NEXT_NOUN_ID_ABI = [
   },
 ] as const;
 
-const GET_VRGDA_PRICE_ABI = [
+export const GET_VRGDA_PRICE_ABI = [
   {
     inputs: [],
     name: 'getCurrentVRGDAPrice',
@@ -73,7 +73,7 @@ const GET_VRGDA_PRICE_ABI = [
   },
 ] as const;
 
-const BUY_NOW_ABI = [
+export const BUY_NOW_ABI = [
   {
     inputs: [
       { internalType: 'uint256', name: 'expectedBlockNumber', type: 'uint256' },
@@ -103,7 +103,7 @@ interface EncodedImage {
   data: string;
 }
 
-interface LilNounsImageData {
+export interface LilNounsImageData {
   bgcolors: string[];
   palette: string[];
   images: {
@@ -114,7 +114,7 @@ interface LilNounsImageData {
   };
 }
 
-interface Seed {
+export interface Seed {
   background: number;
   body: number;
   accessory: number;
@@ -122,7 +122,7 @@ interface Seed {
   glasses: number;
 }
 
-interface PoolItem {
+export interface PoolItem {
   blockNumber: bigint;
   blockHash: Hex;
   seed: Seed;
@@ -145,7 +145,7 @@ function applyFounderRewardSkip(id: bigint): bigint {
   return next;
 }
 
-async function readMintableNounId(client: PublicClient): Promise<bigint> {
+export async function readMintableNounId(client: PublicClient): Promise<bigint> {
   const raw = await client.readContract({
     address: VRGDA_ADDRESS,
     abi: NEXT_NOUN_ID_ABI,
@@ -191,7 +191,7 @@ function buildCellSvg(seed: Seed, imageData: LilNounsImageData): string {
   return btoa(buildSVG(parts, imageData.palette, bg));
 }
 
-function buildPoolItem(
+export function buildPoolItem(
   blockNumber: bigint,
   blockHash: Hex,
   nounId: bigint,
@@ -224,7 +224,7 @@ function buildPoolItem(
 
 // ─── Create a standalone viem client (no wallet required) ────────────────────
 
-function createClient(rpcIndex = 0): PublicClient {
+export function createClient(rpcIndex = 0): PublicClient {
   return createPublicClient({
     chain: mainnet,
     transport: http(RPC_URLS[rpcIndex % RPC_URLS.length], { timeout: 15_000 }),
