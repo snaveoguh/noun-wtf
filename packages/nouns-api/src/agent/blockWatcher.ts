@@ -129,8 +129,31 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
 });
 
 // ─── Multi-Provider Config ───────────────────────────────────────────────
-// Free WebSocket endpoints — race them all, first block wins.
-const FREE_WS_ENDPOINTS = ['wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
+// Race every endpoint, first block header wins.
+//
+// ⚠️ 2026-07-30: this list used to be free-tier ONLY — publicnode (which began
+// 403'ing anonymous traffic 2026-07-25) and eth.drpc.org (free tier, observed
+// serving blocks BEHIND the tip: "requested block range [N] is beyond latest
+// executed block [N-1]"). A watcher that sees block N late cannot land a tx IN
+// block N, so the snipe path silently degraded to blind settling and the
+// wall-head streak (nouns 1970-1975) died.
+//
+// The PAID dRPC websocket already exists in this environment as PONDER_WS_URL_1
+// but was never given to the watcher. Put it FIRST; keep the free ones as
+// redundancy since the race takes whichever header arrives first.
+const WS_ENDPOINTS: string[] = (() => {
+  const explicit = (process.env.NOUNIRL_WS_URLS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (explicit.length > 0) return explicit;
+
+  const paid = [process.env.NOUNIRL_WS_URL, process.env.PONDER_WS_URL_1].filter(
+    (u): u is string => typeof u === 'string' && u.startsWith('ws'),
+  );
+  return [...paid, 'wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
+})();
+
 
 // ─── Settlement Broadcast Fan-Out ─────────────────────────────────────────
 // A settlement tx has NO MEV to protect (the noun goes to the winning bidder
@@ -862,8 +885,13 @@ export function startWatcher(): void {
   // Build WebSocket URL list — use FREE providers only.
   // Infura WS counts against the rate limit and Ponder needs that budget.
   const wsUrls: Array<{ url: string; label: string }> = [];
-  for (const url of FREE_WS_ENDPOINTS) {
-    wsUrls.push({ url, label: `free (${new URL(url).hostname})` });
+  for (const url of WS_ENDPOINTS) {
+    // Label paid endpoints distinctly so the logs show whether the fast one
+    // actually connected — a silent fallback to free tier is what broke the
+    // snipe path in July.
+    const host = new URL(url).hostname;
+    const paid = host.includes('lb.drpc.live') || url.includes('/ethereum/');
+    wsUrls.push({ url, label: `${paid ? 'PAID' : 'free'} (${host})` });
   }
 
   // Subscribe ALL providers — race for fastest block
