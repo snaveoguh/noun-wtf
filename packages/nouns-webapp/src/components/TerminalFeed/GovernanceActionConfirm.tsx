@@ -42,6 +42,8 @@ export interface GovernanceAction {
   // PROPOSE_TRAIT fields
   category?: string;
   traitName?: string;
+  /** Optional preview image of the trait being proposed (rendered pixelated). */
+  previewUrl?: string;
   description?: string;
   encodedProp?: string;
   updateMessage?: string;
@@ -78,7 +80,7 @@ const ACTION_LABELS: Record<string, { verb: string; color: string }> = {
   PROPOSAL_FEEDBACK: { verb: 'give feedback on', color: '#94a3b8' },
   CANDIDATE_FEEDBACK: { verb: 'give feedback on candidate', color: '#94a3b8' },
   CREATE_CANDIDATE: { verb: 'create candidate', color: '#facc15' },
-  PROPOSE_TRAIT: { verb: 'add trait to NounV2', color: '#34d399' },
+  PROPOSE_TRAIT: { verb: 'add trait', color: '#34d399' },
   SPONSOR: { verb: 'sponsor candidate', color: '#f472b6' },
   BID: { verb: 'bid on', color: '#60a5fa' },
   PROMOTE: { verb: 'promote candidate to proposal', color: '#fb923c' },
@@ -121,6 +123,13 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
 
   const actionInfo = ACTION_LABELS[action.type] ?? { verb: action.type, color: '#ccc' };
   const supportInfo = action.support !== undefined ? SUPPORT_LABELS[action.support] : null;
+  // PROPOSE_TRAIT can target the main Nouns DAO or NounV2 (default) — surface which.
+  const traitDaoTag =
+    action.type === 'PROPOSE_TRAIT'
+      ? action.dao === 'nouns'
+        ? { label: 'NOUNS DAO', color: '#c084fc' }
+        : { label: 'NOUNV2', color: '#34d399' }
+      : null;
 
   if (!isConnected) {
     return (
@@ -151,6 +160,22 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
         <span style={{ color: actionInfo.color, fontSize: '12px', letterSpacing: '0.5px' }}>
           {actionInfo.verb.toUpperCase()}
         </span>
+        {traitDaoTag && (
+          <span
+            style={{
+              marginLeft: '8px',
+              color: traitDaoTag.color,
+              border: `1px solid ${traitDaoTag.color}`,
+              borderRadius: '2px',
+              padding: '1px 6px',
+              fontSize: '10px',
+              letterSpacing: '0.5px',
+              verticalAlign: 'middle',
+            }}
+          >
+            {traitDaoTag.label}
+          </span>
+        )}
         {action.title != null && action.title !== '' && (
           <div style={{ color: '#ccc', fontSize: '13px', marginTop: '4px' }}>
             {action.proposalId != null ? `prop #${action.proposalId}: ` : ''}
@@ -178,6 +203,24 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
             <span style={{ color: '#aaa' }}>&quot;{action.reason}&quot;</span>
           </div>
         )}
+        {action.type === 'PROPOSE_TRAIT' &&
+          action.previewUrl != null &&
+          action.previewUrl !== '' && (
+            <div style={{ marginTop: '8px' }}>
+              <img
+                src={action.previewUrl}
+                alt={action.traitName ? `${action.traitName} preview` : 'trait preview'}
+                style={{
+                  display: 'block',
+                  maxHeight: '160px',
+                  maxWidth: '100%',
+                  imageRendering: 'pixelated',
+                  border: '1px solid #1a1a1a',
+                  borderRadius: '2px',
+                }}
+              />
+            </div>
+          )}
         {(action.type === 'CREATE_CANDIDATE' || action.type === 'UPDATE_CANDIDATE') &&
           action.description && (
             <div style={{ marginTop: '4px' }}>

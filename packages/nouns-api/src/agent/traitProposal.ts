@@ -1,19 +1,32 @@
-// Shared core for adding a NounV2 art trait via a governance proposal.
+// Shared core for adding a Nouns art trait via a governance proposal — on
+// EITHER the main Nouns DAO or NounV2.
 //
-// The NounV2 descriptor (0xAe0247…) is owned by the NounV2Treasury, so new traits
-// can only be added by a passing proposal that calls addHeads/addBodies/etc. This
-// module turns an RLE trait image into the exact `NounV2Treasury.propose(...)` args.
+// The NounV2 descriptor (0xAe0247…) is owned by the NounV2Treasury; the main
+// Nouns descriptor (0x33A9c4…) is owned by the main DAO timelock. In both
+// cases new traits can only be added by a passing proposal that calls
+// addHeads/addBodies/etc — same function signatures, same 5-arg
+// propose(targets,values,signatures,calldatas,description) shape on both
+// governors. This module turns an RLE trait image into the exact propose(...)
+// args for the chosen DAO.
 //
 // It powers three consumers: the nounirl agent tool, the standalone CLI, and the
 // Claude Code skill. First shipped as NounV2 prop #1 ("joker" head #253) 2026-07-24.
 
 import { deflateRawSync } from 'node:zlib';
+import sharp from 'sharp';
 import { encodeFunctionData, type Hex } from 'viem';
+
+import { decodeRle } from './onchainArt.js';
 
 export const V2_DESCRIPTOR = '0xAe0247Ca34B211a61b03A95F8008DCb8B3124B89' as const;
 export const V2_TREASURY = '0x2cDeb0d251674710840d9fa990D1de138dfe7C00' as const;
+/** Main Nouns descriptor — owned by the main DAO timelock; arePartsLocked()=false */
+export const MAIN_DESCRIPTOR = '0x33A9c445fb4FB21f2c030A6b2d3e2F12D017BFAC' as const;
+/** Main Nouns DAO governor proxy — propose() recipient for dao:'nouns' */
+export const MAIN_DAO = '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d' as const;
 
 export type TraitCategory = 'head' | 'body' | 'accessory' | 'glasses';
+export type TraitDao = 'nounv2' | 'nouns';
 
 /** descriptor add-function per category (the RLE+deflate batch form) */
 const ADD_FN: Record<TraitCategory, string> = {
@@ -23,8 +36,8 @@ const ADD_FN: Record<TraitCategory, string> = {
   glasses: 'addGlasses',
 };
 
-/** image-data-v2.json category key per trait category */
-const IMAGE_KEY: Record<TraitCategory, string> = {
+/** image-data category key per trait category */
+export const IMAGE_KEY: Record<TraitCategory, string> = {
   head: 'heads',
   body: 'bodies',
   accessory: 'accessories',
@@ -155,6 +168,121 @@ export function assertColorsInPalette(img: DecodedRle, paletteLen: number): void
       throw new Error(`colour index ${col} not in palette (len ${paletteLen}) — palette must be extended first`);
 }
 
+// ── PNG → canonical Nouns RLE ──────────────────────────────────────────────────
+//
+// Canonical encoding (validated byte-for-byte against every stored on-chain
+// trait): header [0x00 paletteIdx][top][right][bottom][left] where top = first
+// content row, bottom = LAST content row (INCLUSIVE — official quirk), left =
+// first content col, right = last content col + 1 (EXCLUSIVE); then
+// (runLength ≤255, colourIndex) pairs over the bounded rectangle with runs
+// MERGING ACROSS row boundaries. Colour index 0 = transparent.
+
+/**
+ * Convert a PNG (e.g. a saved Dream custom trait or an upload) into canonical
+ * Nouns RLE against the given on-chain palette.
+ *
+ * - Requires a square image; larger squares are downscaled to 32×32 with
+ *   nearest-neighbour, non-square images are rejected.
+ * - Alpha 0 → transparent; every other pixel must EXACT-match a palette colour
+ *   (case-insensitive, no tolerance). Missing colours throw, listing them —
+ *   palette additions are a separate, bigger proposal.
+ * - Round-trips the encoded bytes through the decoder before returning.
+ */
+export async function pngToRle(png: Buffer, palette: string[]): Promise<Hex> {
+  let img = sharp(png, { limitInputPixels: 4096 * 4096 });
+  const meta = await img.metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (w === 0 || h === 0) throw new Error('could not read image dimensions');
+  if (w !== h) throw new Error(`trait image must be square — got ${w}×${h}`);
+  if (w < 32) throw new Error(`trait image too small (${w}×${h}) — need at least 32×32`);
+  if (w > 32) img = img.resize(32, 32, { kernel: 'nearest' });
+
+  const data = await img.ensureAlpha().raw().toBuffer();
+
+  const lookup = new Map<string, number>();
+  palette.forEach((c, i) => {
+    if (c) lookup.set(c.toLowerCase(), i);
+  });
+
+  const grid: number[][] = [];
+  const missing = new Set<string>();
+  for (let y = 0; y < 32; y++) {
+    const row: number[] = [];
+    for (let x = 0; x < 32; x++) {
+      const o = (y * 32 + x) * 4;
+      if (data[o + 3] === 0) {
+        row.push(0);
+        continue;
+      }
+      const hex = [data[o]!, data[o + 1]!, data[o + 2]!]
+        .map(v => v.toString(16).padStart(2, '0'))
+        .join('');
+      const idx = lookup.get(hex);
+      if (idx === undefined) {
+        missing.add(hex);
+        row.push(0);
+      } else {
+        row.push(idx);
+      }
+    }
+    grid.push(row);
+  }
+  if (missing.size > 0) {
+    throw new Error(
+      `${missing.size} colour(s) in the image are not in the on-chain palette: ` +
+        [...missing].map(c => '#' + c).join(', ') +
+        '. Traits can only use colours the palette already contains — adding new palette colours is a separate (bigger) proposal.',
+    );
+  }
+
+  // content bounds — bottom INCLUSIVE, right EXCLUSIVE
+  let top = 32;
+  let bottom = -1;
+  let left = 32;
+  let right = -1;
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < 32; x++) {
+      if (grid[y]![x]! === 0) continue;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (x < left) left = x;
+      if (x + 1 > right) right = x + 1;
+    }
+  }
+  if (bottom < 0) throw new Error('trait image is fully transparent — nothing to encode');
+
+  const bytes: number[] = [0x00, top, right, bottom, left];
+  let runLen = 0;
+  let runCol = -1;
+  for (let y = top; y <= bottom; y++) {
+    for (let x = left; x < right; x++) {
+      const col = grid[y]![x]!;
+      if (col === runCol && runLen < 255) {
+        runLen++;
+      } else {
+        if (runLen > 0) bytes.push(runLen, runCol);
+        runCol = col;
+        runLen = 1;
+      }
+    }
+  }
+  if (runLen > 0) bytes.push(runLen, runCol);
+
+  const rleHex = ('0x' + Buffer.from(bytes).toString('hex')) as Hex;
+
+  // round-trip self-check: decode and compare grids pixel-for-pixel
+  const decoded = decodeRle(rleHex);
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < 32; x++) {
+      if (decoded[y]![x]! !== grid[y]![x]!) {
+        throw new Error(`RLE round-trip mismatch at (${x},${y}) — encoder bug, refusing to proceed`);
+      }
+    }
+  }
+  return rleHex;
+}
+
 // ── Calldata + proposal assembly ───────────────────────────────────────────────
 
 export interface AddTraitCall {
@@ -198,23 +326,31 @@ export function buildAddTraitCall(category: TraitCategory, rleHex: Hex): AddTrai
 
 export interface TraitProposal {
   add: AddTraitCall;
+  /** which DAO this proposal targets ('nounv2' default) */
+  dao: TraitDao;
+  /** governor the propose() calldata must be sent to (V2_TREASURY or MAIN_DAO) */
+  proposeTo: `0x${string}`;
   targets: `0x${string}`[];
   values: bigint[];
   signatures: string[];
   calldatas: Hex[];
   description: string;
-  /** full propose() calldata for a raw send to the treasury */
+  /** full propose() calldata for a raw send to the governor (`proposeTo`) */
   proposeCalldata: Hex;
 }
 
 /**
- * Build the complete NounV2Treasury.propose(...) for adding one trait.
+ * Build the complete propose(...) for adding one trait.
  * Provide EITHER `rleHex` directly, OR `deriveFrom` + a `derivation`.
+ * `dao` defaults to 'nounv2' (existing behaviour); 'nouns' targets the main
+ * Nouns descriptor and the propose() recipient becomes the main DAO proxy
+ * (MAIN_DAO) — the 5-arg propose shape is identical on both governors.
  */
 export function buildTraitProposal(opts: {
   category: TraitCategory;
   title: string;
   description: string;
+  dao?: TraitDao;
   rleHex?: string;
   deriveFrom?: { imageData: ImageDataV2; source: string | number; derivation: Derivation };
 }): TraitProposal {
@@ -231,9 +367,11 @@ export function buildTraitProposal(opts: {
     throw new Error('provide rleHex or deriveFrom');
   }
 
+  const dao: TraitDao = opts.dao ?? 'nounv2';
   const add = buildAddTraitCall(opts.category, rleHex);
   const description = `# ${opts.title}\n\n${opts.description}`;
-  const targets = [V2_DESCRIPTOR] as `0x${string}`[];
+  const targets = [dao === 'nouns' ? MAIN_DESCRIPTOR : V2_DESCRIPTOR] as `0x${string}`[];
+  const proposeTo: `0x${string}` = dao === 'nouns' ? MAIN_DAO : V2_TREASURY;
   const values = [0n];
   const signatures = [add.signature];
   const calldatas = [add.innerCalldata];
@@ -242,5 +380,5 @@ export function buildTraitProposal(opts: {
     functionName: 'propose',
     args: [targets, values, signatures, calldatas, description],
   });
-  return { add, targets, values, signatures, calldatas, description, proposeCalldata };
+  return { add, dao, proposeTo, targets, values, signatures, calldatas, description, proposeCalldata };
 }

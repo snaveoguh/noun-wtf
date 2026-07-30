@@ -115,6 +115,44 @@ function parseSeed(v: unknown): number | null {
   return Number.isInteger(n) && n >= 0 && n < 10_000 ? n : null;
 }
 
+/**
+ * Load a dream's custom trait image — the same source GET
+ * /api/dream-nouns/:id/image serves from. Post-migration dreams store the
+ * upload as bytea; migrated probe.wtf dreams only have a reference file that
+ * lives under noun.wtf/probe-dreams/, which we fetch on demand.
+ *
+ * Also used by the agent's propose_trait tool (dream_id input).
+ */
+export async function getDreamTraitImage(
+  id: number,
+): Promise<{ data: Buffer; mime: string; layer: string | null } | null> {
+  if (!pool) throw new Error('dream storage unavailable');
+  await ensureInit();
+  const res = await pool.query(
+    'SELECT custom_trait_data, custom_trait_mime, custom_trait_image, custom_trait_layer FROM dream_nouns WHERE id = $1',
+    [id],
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  if (row.custom_trait_data) {
+    return {
+      data: Buffer.from(row.custom_trait_data),
+      mime: row.custom_trait_mime ?? 'image/png',
+      layer: row.custom_trait_layer ?? null,
+    };
+  }
+  if (row.custom_trait_image) {
+    const r = await fetch(`${MIGRATED_IMAGE_BASE}${row.custom_trait_image}`);
+    if (!r.ok) return null;
+    return {
+      data: Buffer.from(await r.arrayBuffer()),
+      mime: r.headers.get('content-type') ?? 'image/png',
+      layer: row.custom_trait_layer ?? null,
+    };
+  }
+  return null;
+}
+
 export function registerDreamRoutes(app: Hono) {
   // ── List (Laravel paginator shape) ───────────────────────────────────
   app.get('/api/dream-nouns', async c => {

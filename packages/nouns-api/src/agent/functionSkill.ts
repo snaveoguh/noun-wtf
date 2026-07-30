@@ -112,6 +112,30 @@ export const DAO_FUNCTIONS: readonly DaoFunctionSpec[] = [
     examples: ['execute prop 567', 'execute proposal 789'],
     actionType: 'EXECUTE_PROPOSAL',
   },
+  {
+    // Docs/prompt only — NOT wired into detectFunction(). The LLM invokes the
+    // propose_trait tool directly; there is no canonical-command fast path.
+    name: 'proposeTrait',
+    description:
+      'Prepare a governance proposal adding a NEW art trait (head/body/accessory/glasses) to main Nouns or NounV2 — from raw RLE, a saved Dream (dream_id), or a 32x32 PNG whose colours already exist in the on-chain palette. Returns a signable action plus a /api/trait-preview URL of sample nouns wearing the trait.',
+    params: [
+      'category',
+      'trait_name',
+      'title',
+      'description',
+      'dao?',
+      'rle?',
+      'dream_id?',
+      'png_data_url?',
+      'derive_from?',
+    ],
+    examples: [
+      'propose my dream 42 as a new head on nouns',
+      'add this png as a v2 glasses trait',
+      'make the joker head an official NounV2 trait',
+    ],
+    actionType: 'PROPOSE_TRAIT',
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -525,12 +525,32 @@ export function useGovernanceAction() {
             const ptValues = (action.values || []).map(v => BigInt(v));
             const ptSigs = action.signatures || [];
             const ptCalldatas = (action.calldatas || []).map(c => c as Hex);
-            hash = await writeContractAsync({
-              abi: nounV2TreasuryAbi,
-              address: NOUNV2_TREASURY_ADDRESS,
-              functionName: 'propose',
-              args: [ptTargets, ptValues, ptSigs, ptCalldatas, action.description],
-            });
+            if (action.dao === 'nouns') {
+              // Main Nouns DAO governor proxy (0x6f3E…223d). Same propose shape
+              // as the treasury, plus the clientId overload so noun.wtf is
+              // credited — mirrors the PROMOTE direct-propose path.
+              hash = await writeContractAsync({
+                abi: nounsGovernorAbi,
+                address: nounsGovernorAddress[1] as Address,
+                functionName: 'propose',
+                args: [
+                  ptTargets,
+                  ptValues,
+                  ptSigs,
+                  ptCalldatas,
+                  action.description,
+                  NOUN_WTF_CLIENT_ID,
+                ],
+              });
+            } else {
+              // Default (undefined dao or 'nounv2'): NounV2 treasury, unchanged.
+              hash = await writeContractAsync({
+                abi: nounV2TreasuryAbi,
+                address: NOUNV2_TREASURY_ADDRESS,
+                functionName: 'propose',
+                args: [ptTargets, ptValues, ptSigs, ptCalldatas, action.description],
+              });
+            }
             break;
           }
 

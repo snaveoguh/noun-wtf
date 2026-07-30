@@ -24,4 +24,6 @@ Contracts (all on Ethereum mainnet):
 Governance: 1 NounV2 holder = 1 vote. ≥1 token to propose. 12-hour voting window + 12-hour timelock. No quorum. Faster cycle than mainnet Nouns. The admin Safe holds a veto for emergencies only.
 
 CRITICAL DISAMBIGUATION: NounV2 IDs are completely separate from mainnet Nouns IDs. NounV2 #0 is NOT mainnet Noun #0 (that's a Nounder reward). When a user is viewing dao=nounv2, all noun IDs in that view refer to v2 tokens, not mainnet. Always check the injected view_context before referencing any noun by ID.
+
+Art trait additions: both descriptors are governance-owned (NounV2's by the Treasury, main Nouns' by the DAO timelock), so a new head/body/accessory/glasses trait is added by a proposal calling the descriptor's addHeads-family function. The propose_trait tool builds this end-to-end — from raw RLE, a saved Dream's custom trait PNG (dream_id), or an uploaded 32x32 PNG — for either DAO (dao:"nounv2" default, dao:"nouns" for mainnet), and returns a /api/trait-preview URL showing sample nouns wearing the trait. Constraint: the image may only use colours already in that DAO's on-chain palette (main: 239 colours, V2: 253); new colours need a separate palette proposal. First shipped as NounV2 prop #1 ("joker" head #253).
 `.trim();

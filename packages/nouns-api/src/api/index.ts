@@ -209,8 +209,27 @@ import {
   getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
-import { buildTraitProposal, type TraitCategory } from '../agent/traitProposal.js';
+import {
+  applyDerivation,
+  assertColorsInPalette,
+  buildTraitProposal,
+  findTrait,
+  IMAGE_KEY,
+  parseRle,
+  pngToRle,
+  serializeRle,
+  type TraitCategory,
+  type TraitDao,
+} from '../agent/traitProposal.js';
+import {
+  composeNoun,
+  decodeRle,
+  getOnchainArt,
+  type ArtDao,
+  type OnchainArt,
+} from '../agent/onchainArt.js';
 import ImageDataV2ForTraits from '../agent/image-data-v2.json';
+import ImageDataV1ForTraits from '../agent/image-data-v1.json';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -4766,7 +4785,7 @@ CRITICAL RULES:
         function: {
           name: 'propose_trait',
           description:
-            'Prepare a NounV2 governance proposal that adds a NEW art trait (head, body, accessory, or glasses) to the NounV2 collection. The proposal calls the V2 descriptor addHeads-family function and is executed by the NounV2 Treasury. Returns a GovernanceAction the user signs (they must hold >=1 NounV2 to propose). Provide EITHER a raw `rle` hex image, OR derive from an existing trait via `derive_from` plus `swap_runs`/`recolor`. Every colour used must already exist in the on-chain palette.',
+            'Prepare a governance proposal that adds a NEW art trait (head, body, accessory, or glasses) — to the ORIGINAL Nouns DAO (dao:"nouns") or to NounV2 (dao:"nounv2", the default). The proposal calls the descriptor addHeads-family function and is executed by that DAO\'s governor (NounV2 Treasury, or the main Nouns DAO for dao:"nouns"). Returns a GovernanceAction the user signs (NounV2: hold >=1 NounV2; main Nouns: meet the main DAO proposal threshold). Image sources, in precedence order: raw `rle` hex > `dream_id` (a saved Dream\'s custom trait PNG) > `png_data_url` (32x32 PNG, larger squares are downscaled) > `derive_from` an existing trait with `swap_runs`/`recolor`. PNG pixels must EXACTLY match colours already in that DAO\'s on-chain palette (alpha-0 = transparent) — new colours need a separate palette proposal. The result includes a previewUrl (/api/trait-preview) showing sample nouns wearing the trait; share it with the user.',
           parameters: {
             type: 'object' as const,
             properties: {
@@ -4784,10 +4803,26 @@ CRITICAL RULES:
                 type: 'string',
                 description: 'Proposal body. Markdown supported.',
               },
+              dao: {
+                type: 'string',
+                enum: ['nouns', 'nounv2'],
+                description:
+                  'Which DAO the trait is proposed to. "nounv2" (default) = NounV2; "nouns" = the original/main Nouns DAO.',
+              },
               rle: {
                 type: 'string',
                 description:
-                  'Optional: the trait image as raw Nouns RLE hex (0x…). Provide this OR derive_from.',
+                  'Optional: the trait image as raw Nouns RLE hex (0x…). Highest-precedence image source.',
+              },
+              dream_id: {
+                type: 'number',
+                description:
+                  'Optional: id of a saved Dream noun whose custom trait PNG becomes the new trait (converted to RLE against the DAO palette).',
+              },
+              png_data_url: {
+                type: 'string',
+                description:
+                  'Optional: the trait as a data:image/png;base64,… URL. Must be square; 32x32 preferred (larger squares are nearest-downscaled). Colours must already exist in the palette.',
               },
               derive_from: {
                 type: 'string',
@@ -5887,7 +5922,10 @@ CRITICAL RULES:
                 trait_name: string;
                 title: string;
                 description: string;
+                dao?: TraitDao;
                 rle?: string;
+                dream_id?: number;
+                png_data_url?: string;
                 derive_from?: string;
                 swap_runs?: string;
                 recolor?: string;
@@ -5900,36 +5938,74 @@ CRITICAL RULES:
                 break;
               }
               try {
-                const derivation: {
-                  swapRunColors?: [number, number];
-                  recolor?: [number, number][];
-                } = {};
-                if (input.swap_runs) {
-                  const [i, j] = input.swap_runs.split(',').map(Number);
-                  derivation.swapRunColors = [i, j];
+                const dao: TraitDao = input.dao === 'nouns' ? 'nouns' : 'nounv2';
+                // On-chain art is authoritative (falls back to bundled data on RPC failure)
+                const art = await getOnchainArt(dao);
+
+                // Image source precedence: rle > dream_id > png_data_url > derive_from
+                let rleHex: string | undefined;
+                if (input.rle) {
+                  rleHex = input.rle;
+                } else if (input.dream_id != null) {
+                  const img = await getDreamTraitImage(Number(input.dream_id));
+                  if (!img) {
+                    throw new Error(
+                      `Dream #${input.dream_id} not found or has no custom trait image.`,
+                    );
+                  }
+                  rleHex = await pngToRle(img.data, art.palette);
+                } else if (input.png_data_url) {
+                  const m = input.png_data_url.match(/^data:image\/[\w+-]+;base64,(.+)$/);
+                  if (!m) throw new Error('png_data_url must be a data:image/png;base64,… URL');
+                  rleHex = await pngToRle(Buffer.from(m[1]!, 'base64'), art.palette);
+                } else if (input.derive_from) {
+                  const derivation: {
+                    swapRunColors?: [number, number];
+                    recolor?: [number, number][];
+                  } = {};
+                  if (input.swap_runs) {
+                    const [i, j] = input.swap_runs.split(',').map(Number);
+                    derivation.swapRunColors = [i!, j!];
+                  }
+                  if (input.recolor)
+                    derivation.recolor = input.recolor
+                      .split(',')
+                      .map(p => p.split(':').map(Number) as [number, number]);
+                  // Names only exist in the bundled data; the actual bytes are
+                  // taken from chain at the resolved index when available.
+                  const bundle = (dao === 'nouns' ? ImageDataV1ForTraits : ImageDataV2ForTraits) as any;
+                  const src = findTrait(bundle, input.category, input.derive_from);
+                  const imagesKey = IMAGE_KEY[input.category] as keyof OnchainArt['images'];
+                  const baseRle =
+                    art.images[imagesKey][src.index] ?? src.data.replace(/^0x/, '');
+                  const derived = applyDerivation(parseRle(baseRle), derivation);
+                  assertColorsInPalette(derived, art.palette.length);
+                  rleHex = serializeRle(derived);
+                } else {
+                  throw new Error(
+                    'Provide one of: rle, dream_id, png_data_url, or derive_from.',
+                  );
                 }
-                if (input.recolor)
-                  derivation.recolor = input.recolor
-                    .split(',')
-                    .map(p => p.split(':').map(Number) as [number, number]);
 
                 const proposal = buildTraitProposal({
                   category: input.category,
                   title: input.title,
                   description: input.description,
-                  rleHex: input.rle,
-                  deriveFrom: input.derive_from
-                    ? {
-                        imageData: ImageDataV2ForTraits as any,
-                        source: input.derive_from,
-                        derivation,
-                      }
-                    : undefined,
+                  dao,
+                  rleHex,
                 });
 
+                // Absolute URL — the confirm card on noun.wtf renders this as a
+                // plain <img src>, so a relative path would resolve against
+                // Netlify instead of this API. Railway injects RAILWAY_PUBLIC_DOMAIN.
+                const apiBase = process.env.RAILWAY_PUBLIC_DOMAIN
+                  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+                  : '';
+                const previewUrl = `${apiBase}/api/trait-preview?dao=${dao}&category=${input.category}&mode=grid&rle=${proposal.add.rleHex}`;
+                const daoLabel = dao === 'nouns' ? 'the original Nouns DAO' : 'NounV2';
                 pendingAction = {
                   type: 'PROPOSE_TRAIT',
-                  dao: 'nounv2',
+                  dao,
                   title: input.title,
                   traitName: input.trait_name,
                   category: input.category,
@@ -5938,11 +6014,17 @@ CRITICAL RULES:
                   values: proposal.values.map(v => v.toString()),
                   signatures: proposal.signatures,
                   calldatas: proposal.calldatas,
+                  previewUrl,
                 };
+                const governanceNote =
+                  dao === 'nouns'
+                    ? 'propose() goes to the main Nouns DAO governor — the user must meet the main DAO proposal threshold, and voting follows mainnet timing.'
+                    : 'executed by the NounV2 Treasury — the user must hold >=1 NounV2 to propose. Voting is ~12h, then a 12h timelock before execute.';
                 result = {
                   success: true,
                   action: pendingAction,
-                  message: `Trait proposal prepared: adds ${input.category} "${input.trait_name}" to NounV2 (${proposal.add.decompressedLength}B image, head-family addHeads call executed by the Treasury). The user will confirm and sign — they must hold >=1 NounV2 to propose. Voting is ~12h, then a 12h timelock before execute.`,
+                  previewUrl,
+                  message: `Trait proposal prepared: adds ${input.category} "${input.trait_name}" to ${daoLabel} (${proposal.add.decompressedLength}B image via ${proposal.add.signature}). Preview of sample nouns wearing it: ${previewUrl} — share this link with the user. The user will confirm and sign; ${governanceNote}`,
                 };
               } catch (e) {
                 result = {
@@ -9252,6 +9334,159 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+// ─── Trait Preview — server-rendered previews for propose_trait ────────────
+//
+// GET /api/trait-preview?dao=nounv2&category=head&rle=0x…&mode=grid|gif|solo&n=12
+//   solo → the trait alone on the cool background, 512×512 nearest PNG
+//   grid → n sample nouns wearing the trait, PNG grid
+//   gif  → animated GIF cycling n sample nouns wearing the trait
+// Art comes from chain (getOnchainArt); responses are LRU-cached in memory.
+
+type TraitOverrideKey = 'overrideBody' | 'overrideAccessory' | 'overrideHead' | 'overrideGlasses';
+const TRAIT_PREVIEW_CATEGORIES: Record<
+  string,
+  { imagesKey: keyof OnchainArt['images']; overrideKey: TraitOverrideKey }
+> = {
+  head: { imagesKey: 'heads', overrideKey: 'overrideHead' },
+  body: { imagesKey: 'bodies', overrideKey: 'overrideBody' },
+  accessory: { imagesKey: 'accessories', overrideKey: 'overrideAccessory' },
+  glasses: { imagesKey: 'glasses', overrideKey: 'overrideGlasses' },
+};
+
+const traitPreviewCache = new Map<string, { body: Buffer; contentType: string }>();
+const TRAIT_PREVIEW_CACHE_MAX = 50;
+
+/** deterministic PRNG for reproducible sample seeds */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+app.get('/api/trait-preview', async c => {
+  const dao: ArtDao = c.req.query('dao') === 'nouns' ? 'nouns' : 'nounv2';
+  const category = c.req.query('category') ?? '';
+  const rle = (c.req.query('rle') ?? '').toLowerCase();
+  const mode = c.req.query('mode') ?? 'grid';
+  const n = Math.min(Math.max(parseInt(c.req.query('n') || '12', 10) || 12, 1), 48);
+  const seedParam = c.req.query('seed');
+
+  const cat = TRAIT_PREVIEW_CATEGORIES[category];
+  if (!cat) return c.json({ error: 'category must be head|body|accessory|glasses' }, 400);
+  if (!['grid', 'gif', 'solo'].includes(mode)) {
+    return c.json({ error: 'mode must be grid|gif|solo' }, 400);
+  }
+  if (!/^0x[\da-f]{10,4096}$/.test(rle) || rle.length % 2 !== 0) {
+    return c.json({ error: 'rle must be 0x-prefixed hex (a Nouns RLE image)' }, 400);
+  }
+
+  const cacheKey = `${dao}|${category}|${mode}|${n}|${seedParam ?? ''}|${rle}`;
+  const cached = traitPreviewCache.get(cacheKey);
+  if (cached) {
+    // refresh recency for the LRU
+    traitPreviewCache.delete(cacheKey);
+    traitPreviewCache.set(cacheKey, cached);
+    return new Response(new Uint8Array(cached.body), {
+      headers: {
+        'Content-Type': cached.contentType,
+        'Cache-Control': 'public, max-age=86400, immutable',
+      },
+    });
+  }
+
+  try {
+    const art = await getOnchainArt(dao);
+    const rleBare = rle.slice(2);
+    decodeRle(rleBare); // validates bounds/runs before any rendering
+
+    const upscale = (raw: Buffer, size: number) =>
+      sharp(raw, { raw: { width: 32, height: 32, channels: 3 } })
+        .resize(size, size, { kernel: 'nearest' })
+        .png()
+        .toBuffer();
+
+    // deterministic when ?seed= is provided, random otherwise
+    const rng = seedParam != null ? mulberry32(parseInt(seedParam, 10) || 0) : Math.random;
+    const sampleSeed = () => ({
+      background: Math.floor(rng() * Math.max(art.bgcolors.length, 1)),
+      body: Math.floor(rng() * Math.max(art.images.bodies.length, 1)),
+      accessory: Math.floor(rng() * Math.max(art.images.accessories.length, 1)),
+      head: Math.floor(rng() * Math.max(art.images.heads.length, 1)),
+      glasses: Math.floor(rng() * Math.max(art.images.glasses.length, 1)),
+    });
+    const composeSample = () =>
+      composeNoun({ art, seed: sampleSeed(), [cat.overrideKey]: rleBare });
+
+    let body: Buffer;
+    let contentType: string;
+    if (mode === 'solo') {
+      // the trait alone on the cool background (bg 0)
+      const raw = composeNoun({
+        art,
+        seed: { background: 0, body: -1, accessory: -1, head: -1, glasses: -1 },
+        [cat.overrideKey]: rleBare,
+      });
+      body = await upscale(raw, 512);
+      contentType = 'image/png';
+    } else if (mode === 'grid') {
+      const cell = 160;
+      const cols = Math.ceil(Math.sqrt(n));
+      const rows = Math.ceil(n / cols);
+      const cells = await Promise.all(
+        Array.from({ length: n }, async (_, i) => ({
+          input: await upscale(composeSample(), cell),
+          left: (i % cols) * cell,
+          top: Math.floor(i / cols) * cell,
+        })),
+      );
+      body = await sharp({
+        create: {
+          width: cols * cell,
+          height: rows * cell,
+          channels: 3,
+          background: { r: 13, g: 13, b: 13 },
+        },
+      })
+        .composite(cells)
+        .png()
+        .toBuffer();
+      contentType = 'image/png';
+    } else {
+      // gif — one frame per sample noun; sharp joins the frames as pages
+      const frames: Buffer[] = [];
+      for (let i = 0; i < n; i++) frames.push(await upscale(composeSample(), 320));
+      body = await sharp(frames, { join: { animated: true } })
+        .gif({ delay: 600, loop: 0 })
+        .toBuffer();
+      contentType = 'image/gif';
+    }
+
+    traitPreviewCache.set(cacheKey, { body, contentType });
+    while (traitPreviewCache.size > TRAIT_PREVIEW_CACHE_MAX) {
+      const oldest = traitPreviewCache.keys().next().value;
+      if (oldest === undefined) break;
+      traitPreviewCache.delete(oldest);
+    }
+
+    return new Response(new Uint8Array(body), {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400, immutable',
+      },
+    });
+  } catch (err) {
+    return c.json(
+      { error: `trait preview failed: ${err instanceof Error ? err.message : String(err)}` },
+      400,
+    );
+  }
+});
+
 // ─── ENS Resolution ─────────────────────────────────────────────────────
 
 const ensCache = new Map<string, { name: string | null; resolvedAt: number }>();
@@ -10176,7 +10411,7 @@ registerWalletMapRoute(app, db);
 
 // ─── Dream Nouns — /api/dream-nouns ─────────────────────────────────────────
 // Replaces the Laravel API from the retired probe.wtf DigitalOcean droplet.
-import { registerDreamRoutes } from './dreams.js';
+import { registerDreamRoutes, getDreamTraitImage } from './dreams.js';
 registerDreamRoutes(app);
 
 export default app;
