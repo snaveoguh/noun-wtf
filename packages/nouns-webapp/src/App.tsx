@@ -27,6 +27,7 @@ import '@/miniapps';
 import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
 import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
 import { MiniWindowHost } from '@/components/MiniWindow';
+import ReindexingBanner from '@/components/Nounsweeper/ReindexingBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CHAIN_ID } from '@/config';
 import { config as wagmiConfig } from '@/wagmi';
@@ -636,6 +637,7 @@ function App() {
         <AppRouter />
       </BrowserRouter>
       <MiniWindowHost />
+      <ReindexingBanner />
     </div>
   );
 }

@@ -10056,8 +10056,26 @@ app.delete('/api/farcaster/reaction', async c => {
 });
 
 // Health check
-app.get('/api/health', c => {
-  return c.json({ status: 'ok', timestamp: Date.now() });
+app.get('/api/health', async c => {
+  // Every `railway up` starts a FRESH Ponder schema, so all data endpoints
+  // return empty for ~10-15 min while the backfill replays. Report that here
+  // so the webapp can show a "reindexing" state instead of a blank site.
+  let indexing = false;
+  let proposalCount: number | null = null;
+  try {
+    const rows = await db.select({ id: schema.proposal.id }).from(schema.proposal).limit(1000);
+    proposalCount = rows.length;
+    // A healthy index has ~1000 proposals. A near-empty one mid-deploy is the tell.
+    indexing = proposalCount < 100;
+  } catch {
+    indexing = true;
+  }
+  return c.json({
+    status: indexing ? 'reindexing' : 'ok',
+    indexing,
+    proposalCount,
+    timestamp: Date.now(),
+  });
 });
 
 // ============================================================

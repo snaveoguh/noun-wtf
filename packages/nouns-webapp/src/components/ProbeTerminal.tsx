@@ -1,6 +1,11 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { parseHexColor } from '@/lib/hexColorSearch';
+
+const Nounsweeper = lazy(() => import('@/components/Nounsweeper'));
+
+/** Easter eggs: type one of these into the probe terminal to launch it. */
+const NOUNSWEEPER_WORDS = ['nounsweeper', 'minesweeper', 'nounsweep'];
 
 interface ProbeTerminalProps {
   value: string;
@@ -26,6 +31,15 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
+  const [sweeper, setSweeper] = useState(false);
+
+  // Easter egg — typing 'nounsweeper' launches the game and clears the query.
+  useEffect(() => {
+    if (NOUNSWEEPER_WORDS.includes(value.trim().toLowerCase())) {
+      setSweeper(true);
+      onChange('');
+    }
+  }, [value, onChange]);
 
   // Last query token that parses as a hex colour → inline swatch + picker.
   // Splitting on captured whitespace keeps the original spacing intact so
@@ -81,7 +95,7 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             aria-label="Search nouns by ID, trait name, or hex colour"
             className="w-full bg-transparent text-green-400 caret-green-400 placeholder:text-green-900 focus:outline-none"
             style={value === '' ? { paddingLeft: '1.5ch' } : undefined}
-            placeholder="search id, traits or hex… try: fox · disco · 1000 · #c54e38"
+            placeholder="search id, traits or hex… try: fox · disco · 1000 · #c54e38 · nounsweeper"
           />
           {value === '' && (
             <span className="pointer-events-none absolute left-0 top-0 animate-pulse text-green-500">
@@ -125,6 +139,11 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
               : '[loading traits…]'}
         </span>
       </div>
+      {sweeper && (
+        <Suspense fallback={null}>
+          <Nounsweeper onClose={() => setSweeper(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };
