@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { mainnet } from 'viem/chains';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
@@ -345,7 +346,7 @@ const LilNounsVotePage: FC = () => {
           className="prose prose-sm max-w-none"
         >
           <ReactMarkdown
-            remarkPlugins={[remarkBreaks]}
+            remarkPlugins={[remarkGfm, remarkBreaks]}
             rehypePlugins={[rehypeRaw]}
             components={{
               img: ({ src, alt, ...props }) => {

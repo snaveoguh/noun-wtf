@@ -6,6 +6,7 @@ import { useState, type CSSProperties } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 import ClientBadge from '@/components/ClientBadge';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
@@ -310,7 +311,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             <ReactMarkdown
               // No rehype-raw → raw HTML in the markdown is rendered as text,
               // not parsed. This is the safe-by-default react-markdown config.
-              remarkPlugins={[remarkBreaks]}
+              remarkPlugins={[remarkGfm, remarkBreaks]}
               components={{
                 p: ({ ...props }) => <p {...props} style={{ margin: '0 0 8px' }} />,
                 h1: ({ ...props }) => (

@@ -32,9 +32,123 @@
   font-size: 1.3rem;
 }
 
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+}
+
 .markdown img {
   max-width: 100%;
   height: auto;
+  border-radius: 12px;
+  display: block;
+  margin: 1.25rem auto;
+}
+
+/* Pixel art (noggles, traits, noun renders) must not be smoothed. Anything
+   small and square is art, not a photo — keep the hard edges. */
+.markdown img[src*='.gif'],
+.markdown img[src*='prop-assets'],
+.markdown img[src*='dream-nouns'] {
+  image-rendering: pixelated;
+}
+
+/* ── GFM tables (needs remarkGfm; without it these render as raw pipes) ── */
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.95rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown thead th {
+  text-align: left;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+.markdown th,
+.markdown td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: top;
+}
+
+.markdown tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Tables with an empty header row (the `| | |` idiom used for key/value specs)
+   read better as a plain definition list — drop the empty header band. */
+.markdown thead:empty,
+.markdown thead th:empty {
+  display: none;
+}
+
+/* ── code ── */
+.markdown code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  word-break: break-word;
+}
+
+.markdown pre {
+  background: #14141f;
+  color: #e2e8f0;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  line-height: 1.5;
+}
+
+.markdown pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 0.82rem;
+  word-break: normal;
+}
+
+/* ── quotes, rules, lists ── */
+.markdown blockquote {
+  margin: 1.1rem 0;
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 4px solid var(--brand-color-red, #c54e38);
+  color: var(--brand-gray-light-text, #79809c);
+  font-style: italic;
+}
+
+.markdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown hr {
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  margin: 1.75rem 0;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.4rem;
+}
+
+.markdown li {
+  margin-bottom: 0.3rem;
+}
+
+.markdown a {
+  word-break: break-word;
 }
 
 .txnInfoText {

@@ -6,6 +6,7 @@ import { Alert, Col, Row } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { isAddress } from 'viem';
 
 import linkIcon from '@/assets/icons/Link.svg';
@@ -70,7 +71,13 @@ const ProposalContent: React.FC<ProposalContentProps> = props => {
             <Trans>Description</Trans>
           </h5>
           {description && (
-            <ReactMarkdown className={classes.markdown} remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
+            <ReactMarkdown
+              className={classes.markdown}
+              // remarkGfm enables tables, strikethrough and autolinks — without it
+              // GFM tables render as raw `| a | b |` pipes (hit on prop 987).
+              remarkPlugins={[remarkGfm, remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
+            >
               {processProposalDescriptionText(description, title)}
             </ReactMarkdown>
           )}

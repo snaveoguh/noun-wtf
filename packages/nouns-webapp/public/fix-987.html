@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Fix prop 987 description</title>
+<style>
+  body{font:15px/1.6 ui-monospace,Menlo,monospace;max-width:640px;margin:60px auto;padding:0 20px;background:#0c0c14;color:#e2e8f0}
+  h1{font-size:20px;color:#c54e38}
+  .box{background:#14141f;border:1px solid #2a2a3a;border-radius:8px;padding:14px;margin:14px 0;word-break:break-all;font-size:12px;color:#9aa4b2}
+  button{background:#c54e38;color:#fff;border:0;border-radius:8px;padding:12px 20px;font:600 15px ui-monospace,monospace;cursor:pointer;margin-right:8px}
+  button:disabled{opacity:.4;cursor:default}
+  #log{white-space:pre-wrap;margin-top:16px;color:#7dd3a0}
+  .warn{color:#e0a458}
+</style>
+<h1>Fix proposal 987 description</h1>
+<div class="box">
+  <b>to</b> 0x6f3E6272A167e8AcCb32072d08E0957F9c79223d (Nouns DAO governor)<br>
+  <b>fn</b> updateProposalDescription(987, &lt;clean markdown&gt;, &lt;update message&gt;)<br>
+  <b>value</b> 0 ETH<br>
+  <b>from</b> must be 0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed
+</div>
+<p class="warn">Your wallet will show the transaction before anything is sent. Nothing happens until you approve it there.</p>
+<button id="c">1 · Connect wallet</button>
+<button id="s" disabled>2 · Send update</button>
+<div id="log"></div>
+<script type="module">
+const TO = '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d';
+const FROM = '0xae4705dc0816ee6d8a13f1c72780ec5021915fed';
+const log = m => (document.getElementById('log').textContent += m + '\n');
+let acct;
+const DATA = await fetch('./fix-987-calldata.txt').then(r => r.text()).then(t => t.trim());
+log('calldata loaded: ' + ((DATA.length - 2) / 2) + ' bytes');
+
+document.getElementById('c').onclick = async () => {
+  if (!window.ethereum) return log('no wallet found in this browser');
+  const [a] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  acct = a;
+  log('connected: ' + a);
+  if (a.toLowerCase() !== FROM) {
+    log('WRONG ACCOUNT — switch to the proposer address ' + FROM);
+    return;
+  }
+  const cid = await window.ethereum.request({ method: 'eth_chainId' });
+  if (cid !== '0x1') return log('wrong network — switch to Ethereum mainnet');
+  log('account + network OK. ready to send.');
+  document.getElementById('s').disabled = false;
+};
+
+document.getElementById('s').onclick = async () => {
+  try {
+    log('opening wallet for approval…');
+    const hash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: acct, to: TO, value: '0x0', data: DATA }],
+    });
+    log('SENT: https://etherscan.io/tx/' + hash);
+  } catch (e) {
+    log('cancelled or failed: ' + (e.message || e));
+  }
+};
+</script>

@@ -3,6 +3,7 @@ import { FC } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 import { type PropdateEntry, usePropdates } from '@/hooks/usePropdates';
 
@@ -73,7 +74,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
         }}
       >
         <ReactMarkdown
-          remarkPlugins={[remarkBreaks]}
+          remarkPlugins={[remarkGfm, remarkBreaks]}
           rehypePlugins={[rehypeRaw]}
           components={{
             img: ({ src, alt, ...props }) => {

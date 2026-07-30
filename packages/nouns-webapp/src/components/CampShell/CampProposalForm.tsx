@@ -4,6 +4,7 @@ import { PlusIcon, XIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { decodeFunctionData, formatEther, parseAbi } from 'viem';
 
 import ProposalActionModal from '@/components/ProposalActionsModal';
@@ -342,7 +343,7 @@ export default function CampProposalForm({
             }}
             className="camp-prop-preview"
           >
-            <ReactMarkdown remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeRaw]}>
               {previewMarkdown}
             </ReactMarkdown>
           </div>

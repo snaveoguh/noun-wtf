@@ -109,6 +109,7 @@
     "redux-logger": "^3.0.6",
     "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "remeda": "^2.22.3",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",

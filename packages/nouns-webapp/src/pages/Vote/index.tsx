@@ -19,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { useAccount, useBlockNumber } from 'wagmi';
 
@@ -99,7 +100,8 @@ const VotePage = () => {
   const [forkPeriodMessage, setForkPeriodMessage] = useState<ReactNode>(<></>);
   const [isExecutable, setIsExecutable] = useState(true);
   const [showTransactions, setShowTransactions] = useState(false);
-  const [activeTab, setActiveTab] = useState<'vote' | 'description'>('vote');
+  // Description leads — what the proposal *says* matters before the tally.
+  const [activeTab, setActiveTab] = useState<'vote' | 'description'>('description');
   const [revoteTarget, setRevoteTarget] = useState<{
     voter: string;
     support: number;
@@ -733,7 +735,7 @@ const VotePage = () => {
               marginBottom: 20,
             }}
           >
-            {(['vote', 'description'] as const).map(tab => (
+            {(['description', 'vote'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -846,7 +848,9 @@ const VotePage = () => {
             >
               {proposal.description != null && proposal.description !== '' && (
                 <ReactMarkdown
-                  remarkPlugins={[remarkBreaks]}
+                  // remarkGfm = tables / strikethrough / autolinks. Without it GFM
+                  // tables render as raw `| a | b |` pipes (hit on prop 987).
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
                   rehypePlugins={[rehypeRaw]}
                   components={{
                     img: ({ src, alt, ...props }) => {

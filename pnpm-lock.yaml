@@ -829,6 +829,9 @@ importers:
       remark-breaks:
         specifier: ^4.0.0
         version: 4.0.0
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       remeda:
         specifier: ^2.22.3
         version: 2.23.2
@@ -1062,7 +1065,7 @@ importers:
         version: 0.79.6(@babel/core@7.27.4)
       '@react-native/metro-config':
         specifier: 0.79.6
-        version: 0.79.6(@babel/core@7.27.4)(bufferutil@4.0.9)(utf-8-validate@5.0.7)
+        version: 0.79.6(@babel/core@7.27.4)
       '@react-native/typescript-config':
         specifier: 0.79.6
         version: 0.79.6
@@ -4655,7 +4658,7 @@ packages:
 
   '@paulmillr/qr@0.2.1':
     resolution: {integrity: sha512-IHnV6A+zxU7XwmKFinmYjUcwlyK9+xkG3/s9KcQhI9BjQKycrJ1JRO+FbNYPwZiPKW3je/DR0k7w8/gLa5eaxQ==}
-    deprecated: 'The package is now available as "qr": npm install qr'
+    deprecated: 'Switch to "qr" (new package name) for security updates: npm install qr'
 
   '@pinax/graph-networks-registry@0.6.7':
     resolution: {integrity: sha512-xogeCEZ50XRMxpBwE3TZjJ8RCO8Guv39gDRrrKtlpDEDEMLm0MzD3A0SQObgj7aF7qTZNRTWzsuvQdxgzw25wQ==}
@@ -17624,6 +17627,7 @@ packages:
   tsconfck@3.1.5:
     resolution: {integrity: sha512-CLDfGgUp7XPswWnezWwsCRxNmgQjhYq3VXHM0/XIRxhVrKw0M1if9agzryh1QS3nxjCROvV+xWxoJO1YctzzWg==}
     engines: {node: ^18 || >=20}
+    deprecated: unmaintained
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -24772,7 +24776,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@react-native/metro-config@0.79.6(@babel/core@7.27.4)(bufferutil@4.0.9)(utf-8-validate@5.0.7)':
+  '@react-native/metro-config@0.79.6(@babel/core@7.27.4)':
     dependencies:
       '@react-native/js-polyfills': 0.79.6
       '@react-native/metro-babel-transformer': 0.79.6(@babel/core@7.27.4)
@@ -24780,9 +24784,7 @@ snapshots:
       metro-runtime: 0.82.5
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   '@react-native/normalize-colors@0.79.6': {}
 

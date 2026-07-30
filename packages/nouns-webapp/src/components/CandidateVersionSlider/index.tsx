@@ -12,6 +12,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 import { processProposalDescriptionText } from '@/utils/processProposalDescriptionText';
 import { formatProposalTransactionDetails } from '@/wrappers/nounsDao';
@@ -428,7 +429,7 @@ const VersionPlayerModal: FC<{
             </h1>
 
             <div style={{ lineHeight: 1.8, fontSize: '1.1rem' }}>
-              <ReactMarkdown remarkPlugins={[remarkBreaks]} rehypePlugins={[rehypeRaw]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeRaw]}>
                 {processProposalDescriptionText(v.description, v.title)}
               </ReactMarkdown>
             </div>
