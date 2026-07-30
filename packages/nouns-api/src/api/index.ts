@@ -159,6 +159,8 @@ import {
   encodeFunctionData,
   getAddress,
   http,
+  keccak256,
+  stringToBytes,
   type Hex,
   parseEther,
   parseUnits,
@@ -9551,6 +9553,34 @@ app.get('/api/ens', async c => {
 // newest first, and batch-reverse-resolves the addresses involved (shares
 // ensCache with /api/ens).
 
+// labelhash(uint256 decimal string) -> "name.eth", built from our own indexed
+// ENS registrations (onchain_event). Rebuilt at most every 5 minutes.
+let ensLabelMap: Map<string, string> | null = null;
+let ensLabelMapAt = 0;
+async function getEnsLabelhashNameMap(): Promise<Map<string, string>> {
+  const now = Date.now();
+  if (ensLabelMap && now - ensLabelMapAt < 300_000) return ensLabelMap;
+  const map = new Map<string, string>();
+  try {
+    const regs = await db
+      .select({ name: schema.onchainEvent.name })
+      .from(schema.onchainEvent)
+      .where(and(eq(schema.onchainEvent.source, 'ens'), eq(schema.onchainEvent.kind, 'registration')))
+      .orderBy(desc(schema.onchainEvent.createdAt))
+      .limit(3000);
+    for (const r of regs) {
+      if (!r.name) continue;
+      const label = r.name.replace(/\.eth$/, '');
+      map.set(BigInt(keccak256(stringToBytes(label))).toString(), r.name);
+    }
+    ensLabelMap = map;
+    ensLabelMapAt = now;
+  } catch {
+    /* keep previous map if any */
+  }
+  return ensLabelMap ?? map;
+}
+
 async function resolveEnsBatch(addresses: string[]): Promise<Record<string, string>> {
   const now = Date.now();
   const out: Record<string, string> = {};
@@ -9766,7 +9796,34 @@ app.get('/api/onchain-feed', async c => {
   }
 
   items.sort((a, b) => b.timestamp - a.timestamp);
-  const sliced = items.slice(0, limit);
+
+  // ENS registrations vastly outnumber everything else (live data: 88 of the
+  // top 100) — cap ENS to ~35% of the response so the ALL view stays a mix.
+  // The ENS chip still shows the full firehose via ?limit + client filter.
+  const ensCap = Math.ceil(limit * 0.35);
+  let ensSeen = 0;
+  const sliced: typeof items = [];
+  for (const it of items) {
+    if (it.source === 'ens') {
+      if (ensSeen >= ensCap) continue;
+      ensSeen++;
+    }
+    sliced.push(it);
+    if (sliced.length >= limit) break;
+  }
+
+  // Name ENS sales/transfers: the Transfer event only carries the labelhash
+  // (tokenId = uint256(keccak(label))), but our own indexed registrations know
+  // the names — build a lazy labelhash→name map and backfill.
+  if (sliced.some(it => it.source === 'ens' && it.name == null)) {
+    const map = await getEnsLabelhashNameMap();
+    for (const it of sliced) {
+      if (it.source === 'ens' && it.name == null && it.tokenId != null) {
+        const hit = map.get(it.tokenId);
+        if (hit) it.name = hit;
+      }
+    }
+  }
 
   // Upgrade plain transfers to marketplace sales and attribute heuristic
   // sales to their venue — reuses checkTxForSale (router match + ETH/WETH/
