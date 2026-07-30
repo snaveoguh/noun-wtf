@@ -7,6 +7,11 @@ import { nounsDataAbi } from '@nouns/sdk/data';
 import { nounsStreamFactoryAbi } from '@nouns/sdk/stream-factory';
 import { nounsStreamAbi } from '@nouns/sdk/stream';
 import { smallGrantsTreasuryAbi } from './src/abi/SmallGrantsTreasury';
+import {
+  cryptoPunksMarketAbi,
+  ensRegistrarControllerAbi,
+  erc721TransferAbi,
+} from './src/abi/OnchainFeedContracts';
 import { nounV2AuctionHouseAbi } from './src/abi/NounV2AuctionHouse';
 import { nounV2TreasuryAbi } from './src/abi/NounV2Treasury';
 import { createConfig, factory } from 'ponder';
@@ -35,6 +40,10 @@ const NOUNV2_TREASURY_ADDRESS =
 const nounV2StartBlockRaw = process.env.NOUNV2_START_BLOCK ?? 'latest';
 const nounV2StartBlock: number | 'latest' =
   nounV2StartBlockRaw === 'latest' ? 'latest' : Number(nounV2StartBlockRaw);
+
+// Homepage feed contracts (Punks / ENS / Toadz) only need recent history, and
+// every deploy re-backfills into a fresh schema — keep this ~4-6 days back.
+const ONCHAIN_FEED_START_BLOCK = Number(process.env.ONCHAIN_FEED_START_BLOCK ?? 25_610_000);
 
 const mainnetConfig = createConfig({
   chains: {
@@ -109,6 +118,34 @@ const mainnetConfig = createConfig({
       address: NOUNV2_TREASURY_ADDRESS,
       abi: nounV2TreasuryAbi,
       startBlock: nounV2StartBlock,
+    },
+
+    // ── Homepage onchain feed (recent history only — see ONCHAIN_FEED_START_BLOCK) ──
+    // These are busy contracts; startBlock is deliberately near-present so each
+    // deploy's backfill stays cheap (schema-per-deploy re-syncs from scratch).
+    CryptoPunks: {
+      chain: 'mainnet',
+      address: '0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB',
+      abi: cryptoPunksMarketAbi,
+      startBlock: ONCHAIN_FEED_START_BLOCK,
+    },
+    ENSController: {
+      chain: 'mainnet',
+      address: '0x59E16fcCd424Cc24e280Be16E11Bcd56fb0CE547',
+      abi: ensRegistrarControllerAbi,
+      startBlock: ONCHAIN_FEED_START_BLOCK,
+    },
+    ENSRegistrar: {
+      chain: 'mainnet',
+      address: '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85',
+      abi: erc721TransferAbi,
+      startBlock: ONCHAIN_FEED_START_BLOCK,
+    },
+    CrypToadz: {
+      chain: 'mainnet',
+      address: '0x1CB1A5e65610AEFF2551A50f76a87a7d3fB649C6',
+      abi: erc721TransferAbi,
+      startBlock: ONCHAIN_FEED_START_BLOCK,
     },
   },
 });

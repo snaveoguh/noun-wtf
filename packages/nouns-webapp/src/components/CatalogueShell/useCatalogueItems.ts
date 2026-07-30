@@ -17,7 +17,9 @@ export type CatalogueItem =
 
 const PROPDATES_BASE = 'https://propdates.nouns.wtf/prop/';
 const NOUNDRY_GALLERY = 'https://gallery.noundry.wtf/';
-const PROBE_DREAMS = 'https://probe.wtf/en-US/nouns/dreams';
+// Dreams live here now — probe.wtf is a blanket 301 to /probe since the
+// DigitalOcean shutdown, so linking out would just bounce and lose the tab.
+const PROBE_DREAMS = '/probe?tab=dreams';
 
 function shuffle<T>(arr: T[], seed = 1): T[] {
   const out = [...arr];

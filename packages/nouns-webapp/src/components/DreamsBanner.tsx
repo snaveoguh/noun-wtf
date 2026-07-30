@@ -494,9 +494,9 @@ const DreamModal: FC<{
           {dateStr}
         </div>
 
-        {/* Link to probe.wtf */}
+        {/* Link to the Dreams tab (probe.wtf now just 301s here) */}
         <a
-          href={`https://probe.wtf/en-US/nouns/dreams`}
+          href={`/probe?tab=dreams`}
           target="_blank"
           rel="noreferrer"
           style={{

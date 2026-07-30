@@ -1,4 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+
+import { parseHexColor } from '@/lib/hexColorSearch';
 
 interface ProbeTerminalProps {
   value: string;
@@ -12,6 +14,8 @@ interface ProbeTerminalProps {
  * Terminal-styled real-time search bar for the probe explore grid.
  * Matches noun IDs and trait names (head/noggles/body/accessory/background)
  * as you type — multi-word queries AND together, e.g. "fox cool".
+ * A hex-colour token (#c54e38) filters to nouns containing that colour and
+ * shows a swatch that opens a native colour picker.
  */
 const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
   value,
@@ -21,6 +25,19 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
   seedsReady,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
+
+  // Last query token that parses as a hex colour → inline swatch + picker.
+  // Splitting on captured whitespace keeps the original spacing intact so
+  // the picker can write its colour back into the exact token it previews.
+  const colorToken = useMemo(() => {
+    const parts = value.split(/(\s+)/);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const hex = parseHexColor(parts[i]);
+      if (hex != null) return { hex, index: i, parts };
+    }
+    return null;
+  }, [value]);
 
   // "/" focuses the terminal from anywhere; Escape clears + blurs.
   useEffect(() => {
@@ -61,10 +78,10 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
-            aria-label="Search nouns by ID or trait name"
+            aria-label="Search nouns by ID, trait name, or hex colour"
             className="w-full bg-transparent text-green-400 caret-green-400 placeholder:text-green-900 focus:outline-none"
             style={value === '' ? { paddingLeft: '1.5ch' } : undefined}
-            placeholder="search id or traits… try: fox · disco · 1000 · cool crab"
+            placeholder="search id, traits or hex… try: fox · disco · 1000 · #c54e38"
           />
           {value === '' && (
             <span className="pointer-events-none absolute left-0 top-0 animate-pulse text-green-500">
@@ -72,6 +89,34 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             </span>
           )}
         </div>
+        {colorToken != null && (
+          <span className="relative shrink-0">
+            <button
+              type="button"
+              title={`Filtering by ${colorToken.hex} — click to pick a colour`}
+              aria-label={`Filtering by colour ${colorToken.hex}. Open colour picker`}
+              onClick={e => {
+                e.stopPropagation();
+                colorInputRef.current?.click();
+              }}
+              className="block h-5 w-5 rounded border border-green-700 transition-transform hover:scale-110"
+              style={{ backgroundColor: colorToken.hex }}
+            />
+            <input
+              ref={colorInputRef}
+              type="color"
+              value={colorToken.hex}
+              onChange={e => {
+                const next = [...colorToken.parts];
+                next[colorToken.index] = e.target.value;
+                onChange(next.join(''));
+              }}
+              tabIndex={-1}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-0 top-full h-0 w-0 opacity-0"
+            />
+          </span>
+        )}
         <span className="shrink-0 select-none text-xs text-green-700">
           {value.trim()
             ? `[${matchCount}/${totalCount}]`

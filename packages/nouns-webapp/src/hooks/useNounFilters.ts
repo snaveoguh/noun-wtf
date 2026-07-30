@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { ImageData } from '@noundry/nouns-assets';
 
+import { getMatchingPaletteHexes, nounContainsColor, parseHexColor } from '@/lib/hexColorSearch';
 import { getNounMetrics } from '@/lib/nounMetrics';
 import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
@@ -96,12 +97,29 @@ export function useNounFilters(
 
     // Smart search: every whitespace-separated token must match the noun's
     // ID or one of its trait names, so "fox cool" = fox head AND cool bg.
+    // A token that parses as a hex colour (#c54e38, #c53, c54e38) instead
+    // matches nouns whose art contains that colour (small RGB tolerance).
     if (search.trim()) {
       const tokens = search.trim().toLowerCase().split(/\s+/);
+      const colorSets: Set<string>[] = [];
+      const textTokens: string[] = [];
+      for (const t of tokens) {
+        const hex = parseHexColor(t);
+        if (hex != null) colorSets.push(getMatchingPaletteHexes(hex));
+        else textTokens.push(t);
+      }
       filtered = filtered.filter(id => {
         const idStr = id.toString();
         const text = searchText?.get(idStr);
-        return tokens.every(t => idStr.includes(t) || (text != null && text.includes(t)));
+        if (!textTokens.every(t => idStr.includes(t) || (text != null && text.includes(t)))) {
+          return false;
+        }
+        if (colorSets.length > 0) {
+          const seed = seeds?.[idStr];
+          if (seed == null) return false;
+          return colorSets.every(set => nounContainsColor(seed, set));
+        }
+        return true;
       });
     }
 

@@ -726,3 +726,27 @@ export const nounV2BidRelations = relations(nounV2Bid, ({ one }) => ({
     references: [nounV2Auction.nounId],
   }),
 }));
+
+// ── Onchain feed (homepage news wire: Punks / ENS / Toadz) ──────────────────
+// Nouns + NounV2 items are derived at query time from their own tables;
+// this table only stores the external-collection events.
+
+export const onchainEvent = onchainTable(
+  'onchain_event',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    source: t.text().notNull(), // 'punks' | 'ens' | 'toadz'
+    kind: t.text().notNull(), // 'sale' | 'registration' | 'transfer'
+    actor: t.hex(), // buyer / registrant / recipient
+    counterparty: t.hex(), // seller / sender
+    tokenId: t.bigint(),
+    name: t.text(), // ENS name for registrations
+    value: t.bigint(), // wei; 0 when unknown
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtIndex: index().on(t.createdAt),
+  }),
+);

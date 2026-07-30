@@ -17,6 +17,8 @@ import { Bone } from '@/components/Skeleton';
 // Light row (fetches ~8 blocks) instead of the full LilNounsGrid, which builds a
 // 316-block pool on mount. The full grid still lives on /probe?tab=lils.
 const LilNounsMintRow = React.lazy(() => import('@/components/LilNounsMintRow'));
+// Above-the-fold onchain activity feed. Lazy so it can't hurt auction LCP.
+const OnchainFeed = React.lazy(() => import('@/components/OnchainFeed'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import useActiveDao from '@/hooks/useActiveDao';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
@@ -145,6 +147,9 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
         background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
       }}
     >
+      <Suspense fallback={<Bone w="100%" h={120} style={{ borderRadius: 0 }} />}>
+        <OnchainFeed />
+      </Suspense>
       <Auction auction={onDisplayAuction} />
       <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
         <LilNounsMintRow />

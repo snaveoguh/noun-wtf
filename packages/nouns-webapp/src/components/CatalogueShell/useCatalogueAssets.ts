@@ -319,9 +319,9 @@ function buildProbeDreamAssets(): CatalogueAsset[] {
       title: `Probe Dream ${id}`,
       subtitle: 'Probe Dreams',
       image: `/probe-dreams/rendered/${id}.svg`,
-      href: `https://probe.wtf/en-US/nouns/dreams/${id}`,
-      sourceUrl: `https://probe.wtf/en-US/nouns/dreams/${id}`,
-      sourceLabel: 'probe.wtf',
+      href: `/probe?tab=dreams`,
+      sourceUrl: `/probe?tab=dreams`,
+      sourceLabel: 'noun.wtf/probe',
       collection: 'probe-dream',
       media: 'svg',
       isPixel: true,
@@ -838,7 +838,8 @@ function useArchiveAssets(): { items: CatalogueAsset[]; isLoading: boolean } {
 // ─── Other source adapters ──────────────────────────────────────────────────
 
 const PROPDATES_BASE = 'https://propdates.nouns.wtf/prop/';
-const PROBE_DREAMS = 'https://probe.wtf/en-US/nouns/dreams';
+// See useCatalogueItems — dreams are served from /probe, not probe.wtf.
+const PROBE_DREAMS = '/probe?tab=dreams';
 
 // ─── Main hook ──────────────────────────────────────────────────────────────
 
@@ -942,8 +943,8 @@ export function useCatalogueAssets(): { items: CatalogueAsset[]; isLoading: bool
           subtitle: `Dreamed by ${d.dreamer.slice(0, 6)}…${d.dreamer.slice(-4)}`,
           image: img,
           href: PROBE_DREAMS,
-          sourceUrl: `${PROBE_DREAMS}/${d.id}`,
-          sourceLabel: 'probe.wtf',
+          sourceUrl: PROBE_DREAMS,
+          sourceLabel: 'noun.wtf/probe',
           collection: 'dream',
           media: 'svg',
           isPixel: true,

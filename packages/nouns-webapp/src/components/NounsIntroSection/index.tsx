@@ -64,9 +64,7 @@ const NounsIntroSection = () => {
               there&apos;s a way for everyone to get involved with Nouns. From whimsical endeavors
               like naming a frog, to legal defence funds supporting Ethereum and privacy, or even
               crypto infrastructure like{' '}
-              <a href="https://probe.wtf" target="_blank" rel="noopener noreferrer">
-                probe.wtf
-              </a>
+              <a href="/probe">probe.wtf</a>
               . Nouns funds projects of all sizes and domains, the founders have mainly checked out
               and the community is torn between Book Value and{' '}
               <a
