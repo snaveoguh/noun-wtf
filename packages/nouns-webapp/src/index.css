@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tailwind's `.collapse` utility (visibility: collapse) collides with
+   react-bootstrap's Collapse/Accordion class of the same name — expanded
+   accordion bodies (`collapse show`) went invisible after the expand
+   animation. `.show` is bootstrap-only, so this override can't touch a
+   genuine Tailwind usage. */
+.collapse.show {
+  visibility: visible;
+}
+
 /* ─── Local font-faces (PT Root UI is bundled — Comic Neue/Londrina/JetBrains/Silkscreen come in via index.html) */
 @font-face {
   font-family: 'PT Root UI';
