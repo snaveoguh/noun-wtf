@@ -32,6 +32,7 @@ export interface FeedItem {
   /** unix seconds */
   timestamp: number;
   txHash: string;
+  via?: string; // marketplace name for detected sales
 }
 
 export interface FeedResponse {

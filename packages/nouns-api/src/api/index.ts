@@ -9367,6 +9367,7 @@ app.get('/api/onchain-feed', async c => {
     valueWei: string | null;
     timestamp: number;
     txHash: string;
+    via?: string; // marketplace name when a transfer is detected as a sale
   };
   const items: Item[] = [];
   // Legacy handler tables store `new Date(seconds)` (seconds-as-ms — getTime()
@@ -9531,6 +9532,23 @@ app.get('/api/onchain-feed', async c => {
 
   items.sort((a, b) => b.timestamp - a.timestamp);
   const sliced = items.slice(0, limit);
+
+  // Upgrade plain transfers to marketplace sales and attribute heuristic
+  // sales to their venue — reuses checkTxForSale (router match + ETH/WETH/
+  // Blur-pool price extraction, cached per tx).
+  await Promise.all(
+    sliced
+      .filter(it => it.kind === 'transfer' || (it.kind === 'sale' && it.source !== 'punks'))
+      .slice(0, 40)
+      .map(async it => {
+        const sale = await checkTxForSale(it.txHash);
+        if (sale) {
+          it.kind = 'sale';
+          it.valueWei = String(sale.priceWei);
+          it.via = sale.marketplace;
+        }
+      }),
+  );
 
   // Reverse-resolve the addresses on screen (bounded + cached).
   const addrs = new Set<string>();

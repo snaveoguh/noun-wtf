@@ -72,8 +72,10 @@ function thingLabel(item: FeedItem): string {
 function sentence(item: FeedItem, price: string | null): string {
   const thing = thingLabel(item);
   switch (item.kind) {
-    case 'sale':
-      return price ? `${thing} sold for ${price} ETH` : `${thing} sold`;
+    case 'sale': {
+      const via = item.via ? ` on ${item.via}` : '';
+      return price ? `${thing} sold for ${price} ETH${via}` : `${thing} sold${via}`;
+    }
     case 'registration':
       return `${item.name ?? thing} registered`;
     case 'bid':
@@ -98,7 +100,7 @@ function shortLine(item: FeedItem): string {
   const thing = thingLabel(item);
   switch (item.kind) {
     case 'sale':
-      return `${thing} sold`;
+      return `${thing} sold${item.via ? ` on ${item.via}` : ''}`;
     case 'registration':
       return `${item.name ?? thing} registered`;
     case 'bid':
