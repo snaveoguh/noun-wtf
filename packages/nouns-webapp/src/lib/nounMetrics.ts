@@ -4,11 +4,20 @@ import { INounSeed } from '@/wrappers/nounToken';
 
 export interface NounMetrics {
   area: number; // 0-1, proportion of non-bg pixels
-  colorfulness: number; // 0-100, color variety + saturation score
+  colorfulness: number; // 0-100, blended variety + saturation score (tiebreaker)
+  /**
+   * Literal count of distinct palette colours in the art. This is what the
+   * Most/Least Colourful sorts order by — the old blended `colorfulness`
+   * weighted saturation up to 60 points against ~40 for colour count, so a
+   * vivid 11-colour Noun outranked a muted 17-colour one, which is not what
+   * "most colourful" means to anyone looking at the grid.
+   */
+  uniqueColors: number;
   brightness: number; // 0-255, average luminance of ART pixels only (not background)
 }
 
-const CACHE_KEY = 'noun-metrics-v3';
+// v4: uniqueColors added + inclusive-bottom decode fix — old cached values are wrong.
+const CACHE_KEY = 'noun-metrics-v4';
 const metricsCache = new Map<number, NounMetrics>();
 
 try {
@@ -69,7 +78,9 @@ function computeFromPixels(seed: INounSeed): NounMetrics {
     for (const part of parts) {
       const decoded = decodeRLE(part.data);
       let pixelIdx = 0;
-      for (let y = decoded.top; y < decoded.bottom && y < 32; y++) {
+      // `bottom` in Nouns RLE is INCLUSIVE (verified against every stored
+      // trait) — `y < bottom` silently dropped the last row of every layer.
+      for (let y = decoded.top; y <= decoded.bottom && y < 32; y++) {
         for (let x = decoded.left; x < decoded.right && x < 32; x++) {
           if (pixelIdx < decoded.pixels.length) {
             const colorIdx = decoded.pixels[pixelIdx];
@@ -103,10 +114,11 @@ function computeFromPixels(seed: INounSeed): NounMetrics {
     return {
       area: Math.max(0, Math.min(1, area)),
       colorfulness: Math.max(0, Math.min(100, colorfulness)),
+      uniqueColors: uniqueColors.size,
       brightness: Math.max(0, Math.min(255, avgBrightness)),
     };
   } catch {
-    return { area: 0.5, colorfulness: 50, brightness: 128 };
+    return { area: 0.5, colorfulness: 50, uniqueColors: 0, brightness: 128 };
   }
 }
 

@@ -167,10 +167,18 @@ export function useNounFilters(
           return metricsB.area - metricsA.area;
         case 'area-asc':
           return metricsA.area - metricsB.area;
+        // Order by the LITERAL number of distinct colours; fall back to the
+        // blended saturation score only to break ties between equal counts.
         case 'colorfulness-desc':
-          return metricsB.colorfulness - metricsA.colorfulness;
+          return (
+            metricsB.uniqueColors - metricsA.uniqueColors ||
+            metricsB.colorfulness - metricsA.colorfulness
+          );
         case 'colorfulness-asc':
-          return metricsA.colorfulness - metricsB.colorfulness;
+          return (
+            metricsA.uniqueColors - metricsB.uniqueColors ||
+            metricsA.colorfulness - metricsB.colorfulness
+          );
         case 'brightness-desc':
           return metricsB.brightness - metricsA.brightness;
         case 'brightness-asc':
