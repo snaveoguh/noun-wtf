@@ -286,3 +286,66 @@ ponder.on('NounsDAOV4:ProposalObjectionPeriodSet', async ({ event, context }) =>
     objectionPeriodEndBlock: event.args.objectionPeriodEndBlock,
   });
 });
+
+// ─── Proposal updates (DAO V3+ updatable period) ──────────────────────────
+// Without these, the indexed description is frozen at ProposalCreated forever
+// and every client shows a proposer's FIRST DRAFT — even after they edit it
+// during the ~60h updatable window. Hit on prop 987 (Wall), which was edited
+// three times; noun.wtf kept rendering draft 1.
+//
+// `transaction` is keyed by (index, proposalId), so re-inserting each index
+// upserts in place. An update that SHRINKS the action list would leave stale
+// tail rows; in practice the updatable flow replaces the full set and the
+// governor re-emits every action, so tail rows are overwritten not orphaned.
+
+ponder.on('NounsDAOV4:ProposalUpdated', async ({ event, context }) => {
+  await context.db
+    .update(proposal, { id: event.args.id })
+    .set({ description: event.args.description });
+
+  for (let index = 0; index < event.args.targets.length; index++) {
+    await context.db
+      .insert(transaction)
+      .values({
+        index,
+        proposalId: event.args.id,
+        target: event.args.targets[index]!,
+        value: event.args.values[index]!,
+        signature: event.args.signatures[index]!,
+        calldata: event.args.calldatas[index]!,
+      })
+      .onConflictDoUpdate({
+        target: event.args.targets[index]!,
+        value: event.args.values[index]!,
+        signature: event.args.signatures[index]!,
+        calldata: event.args.calldatas[index]!,
+      });
+  }
+});
+
+ponder.on('NounsDAOV4:ProposalDescriptionUpdated', async ({ event, context }) => {
+  await context.db
+    .update(proposal, { id: event.args.id })
+    .set({ description: event.args.description });
+});
+
+ponder.on('NounsDAOV4:ProposalTransactionsUpdated', async ({ event, context }) => {
+  for (let index = 0; index < event.args.targets.length; index++) {
+    await context.db
+      .insert(transaction)
+      .values({
+        index,
+        proposalId: event.args.id,
+        target: event.args.targets[index]!,
+        value: event.args.values[index]!,
+        signature: event.args.signatures[index]!,
+        calldata: event.args.calldatas[index]!,
+      })
+      .onConflictDoUpdate({
+        target: event.args.targets[index]!,
+        value: event.args.values[index]!,
+        signature: event.args.signatures[index]!,
+        calldata: event.args.calldatas[index]!,
+      });
+  }
+});
