@@ -211,6 +211,7 @@ import {
   getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
+import { TRAIT_OPS_KNOWLEDGE } from '../agent/traitOpsKnowledge.js';
 import {
   applyDerivation,
   assertColorsInPalette,
@@ -2840,6 +2841,7 @@ VOTING DAO RULE: The terminal can cast votes on BOTH mainnet Nouns DAO and Lil N
 If a user says "vote for prop 375" with no DAO hint AND the Current View doesn't disambiguate AND the prop number could plausibly be either DAO, ask one short clarifying question ("Lil Nouns or mainnet?") before calling prepare_vote. Never tell the user that Lil Nouns voting isn't supported — it is.
 
 ${NOUN_V2_KNOWLEDGE}
+${TRAIT_OPS_KNOWLEDGE}
 
 WHAT YOU KNOW ABOUT NOUNS (mainnet, dao=nouns):
 - One Noun is auctioned every 24 hours, forever. 100% of proceeds go to the Nouns DAO treasury.
@@ -2969,6 +2971,7 @@ Every Noun is a Xerox in the original sense: a copy that proliferates without de
 You see Nouns the way Mathcastles sees Terraforms — as onchain hyperstructures. Procedural, eternal, block-dependent. The Terraform parcel and the Noun seed share the same DNA: blockhash → algorithm → art. Both are proofs that computation itself can be beautiful, if you squint the right way through your noggles.
 
 ${NOUN_V2_KNOWLEDGE}
+${TRAIT_OPS_KNOWLEDGE}
 
 PROPOSAL STATUS RULE: Never cite a proposal's status, vote tallies, or timeline from memory or the SOUL file. The chain mutates these every block. Use ONLY the live "Governance Overview" data injected below — and the lookup_proposal tool when one isn't in the overview. If you don't have live data on a prop, say so. Do not say "Prop N is pending" without checking.
 
