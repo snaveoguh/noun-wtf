@@ -9,6 +9,12 @@
 //     [--send --key-env NOUNIRL_PRIVATE_KEY --rpc "$RPC"]
 //
 // Provide EITHER --rle <hex>, OR --derive-from <name|index> with --swap-runs / --recolor.
+//
+// AFTER the proposal executes, ALWAYS run:
+//     --verify-index <n> --art <artAddress>
+// which reads the trait straight back off-chain. A malformed page proposes,
+// passes and executes cleanly — only the read-back fails. That is exactly how
+// V2 prop #1 shipped an unreadable joker head (heads(253) still reverts).
 // Nothing is broadcast unless --send is passed. Keys are read from env, never printed.
 
 import { readFileSync } from 'node:fs';
@@ -68,6 +74,28 @@ async function onchain() {
     if (!from) throw new Error('--simulate needs --from <proposer address>');
     await pub.call({ account: from, to: V2_TREASURY, data: proposal.proposeCalldata });
     console.log('\nSIMULATE    : OK from', from, '(propose would not revert)');
+    console.log(
+      'REMINDER    : after execute(), run --verify-index <n> --art <artAddress>.',
+    );
+  }
+
+  // Post-execution read-back — the check that would have caught V2 prop #1.
+  if (arg('verify-index') !== undefined) {
+    const artAddress = arg('art');
+    if (!artAddress) throw new Error('--verify-index needs --art <NounsArt address>');
+    const { verifyTraitReadable } = await import('../src/agent/traitProposal.ts');
+    const res = await verifyTraitReadable({
+      category,
+      index: Number(arg('verify-index')),
+      artAddress,
+      rpcUrl: rpc,
+    });
+    if (res.ok) {
+      console.log(`\nVERIFY      : OK — ${category}(${arg('verify-index')}) returns ${res.bytes} bytes. Art is readable.`);
+    } else {
+      console.error(`\nVERIFY      : FAILED — ${res.error}`);
+      process.exit(1);
+    }
   }
   if (has('send')) {
     const keyEnv = arg('key-env') || 'NOUNIRL_PRIVATE_KEY';
@@ -80,5 +108,5 @@ async function onchain() {
     console.log('\nBROADCAST   : https://etherscan.io/tx/' + hash, '\nproposer    :', account.address);
   }
 }
-if (has('simulate') || has('send'))
+if (has('simulate') || has('send') || arg('verify-index') !== undefined)
   onchain().catch(e => { console.error('ERROR:', e.message); process.exit(1); });

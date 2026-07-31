@@ -298,17 +298,53 @@ export interface AddTraitCall {
   signature: string;
 }
 
+/**
+ * ⚠️ THE ENCODING THAT BROKE V2 PROP #1.
+ *
+ * `NounsArt.imageByIndex` does `abi.decode(inflate(page), (bytes[]))`. The
+ * payload therefore has to be the DEFLATE of `abi.encode(bytes[] images)` —
+ * NOT the DEFLATE of the bare RLE. This function shipped the bare form, so V2
+ * head #253 (joker) is permanently unreadable: `heads(253)` reverts, and any
+ * Noun that rolls it has a REVERTING tokenURI. It looked fine at every step —
+ * the proposal simulated, passed and executed; only reading the art back fails.
+ *
+ * `decompressedLength` must be the length of the ABI-ENCODED buffer, not the RLE.
+ *
+ * Always verify after execution: `<art>.heads(newIndex)` must return bytes.
+ * See verifyTraitReadable() below.
+ */
+function abiEncodeBytesArray(images: Buffer[]): Buffer {
+  const n = images.length;
+  const pad = (b: Buffer) => Buffer.concat([b, Buffer.alloc((32 - (b.length % 32)) % 32)]);
+  const word = (v: number) => {
+    const b = Buffer.alloc(32);
+    b.writeUInt32BE(v, 28);
+    return b;
+  };
+  // offsets are relative to the start of the array block (just after its length)
+  const offsets: Buffer[] = [];
+  let running = 32 * n;
+  for (const img of images) {
+    offsets.push(word(running));
+    running += 32 + pad(img).length;
+  }
+  const bodies = images.map(img => Buffer.concat([word(img.length), pad(img)]));
+  // outer: offset-to-array (0x20), array length, offsets…, bodies…
+  return Buffer.concat([word(32), word(n), ...offsets, ...bodies]);
+}
+
 /** Encode a single-image add-<category> call. */
 export function buildAddTraitCall(category: TraitCategory, rleHex: Hex): AddTraitCall {
   const raw = Buffer.from(rleHex.replace(/^0x/, ''), 'hex');
-  const compressed = deflateRawSync(raw, { level: 9 });
+  const encoded = abiEncodeBytesArray([raw]);
+  const compressed = deflateRawSync(encoded, { level: 9 });
   const compressedHex = ('0x' + compressed.toString('hex')) as Hex;
   const signature = `${ADD_FN[category]}(bytes,uint80,uint16)`;
   const fnAbi = descriptorAddAbi.filter(f => f.name === ADD_FN[category]);
   const fullCalldata = encodeFunctionData({
     abi: fnAbi,
     functionName: ADD_FN[category],
-    args: [compressedHex, BigInt(raw.length), 1],
+    args: [compressedHex, BigInt(encoded.length), 1],
   });
   // inner = full minus the 4-byte selector
   const innerCalldata = ('0x' + fullCalldata.slice(10)) as Hex;
@@ -316,7 +352,7 @@ export function buildAddTraitCall(category: TraitCategory, rleHex: Hex): AddTrai
     category,
     rleHex,
     compressedHex,
-    decompressedLength: raw.length,
+    decompressedLength: abiEncodeBytesArray([raw]).length,
     imageCount: 1,
     innerCalldata,
     fullCalldata,
