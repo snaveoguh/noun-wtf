@@ -69,13 +69,26 @@ import {
 
 // ─── Standing Trait Targets ───────────────────────────────────────────────
 // Traits the bot ALWAYS hunts, tip or no tip. Unlike reservations these are
-// never consumed — every time the next noun would mint with one of these and
-// the auction has ended, the bot fires. Comma-separated "category:name"
-// entries, matched as independent targets (OR). Names are EXACT-matched
-// (case-insensitive) rather than the reservation substring matcher, because
-// "head:wall" must not also fire on the Wallet and Wallsafe heads.
-// Override with NOUNIRL_STANDING_TRAITS; disable with NOUNIRL_STANDING_TRAITS=off.
+// never consumed — every time the next noun would mint with a matching combo
+// and the auction has ended, the bot fires.
+//
+// SYNTAX
+//   "category:Name"        one condition
+//   "a:X+b:Y"              AND — every condition must hold
+//   "a:X+b:Y,c:Z"          OR of groups (comma separates groups)
+//
+// e.g. head:Index card+accessory:Grease,head:Retainer+accessory:Grease,head:Joker
+//   -> (Index card AND Grease) OR (Retainer AND Grease) OR Joker
+//
+// Names are the DISPLAY form produced by seedToTraitNames() — "head-index-card"
+// becomes "Index card" (space, not hyphen). Matching is exact + case-insensitive
+// rather than substring, because "head:Wall" must not also fire on Wallet or
+// Wallsafe. Override with NOUNIRL_STANDING_TRAITS; disable with =off.
 const STANDING_RESERVATION_ID = 'standing';
+
+type StandingCondition = { category: keyof TraitNames; wanted: string };
+/** Outer array = OR of groups; inner array = AND of conditions. */
+type StandingGroup = StandingCondition[];
 
 function parseStandingTraits(): string[] {
   const raw = (process.env.NOUNIRL_STANDING_TRAITS ?? 'head:wall').trim();
@@ -86,18 +99,38 @@ function parseStandingTraits(): string[] {
     .filter(t => t.includes(':'));
 }
 
+function parseStandingGroups(specs: string[]): StandingGroup[] {
+  return specs
+    .map(spec =>
+      spec
+        .split('+')
+        .map(part => part.trim())
+        .filter(part => part.includes(':'))
+        .map(part => {
+          const colonIdx = part.indexOf(':');
+          return {
+            category: part.slice(0, colonIdx).trim().toLowerCase() as keyof TraitNames,
+            wanted: part.slice(colonIdx + 1).trim().toLowerCase(),
+          };
+        }),
+    )
+    .filter(group => group.length > 0);
+}
+
 const STANDING_TRAITS = parseStandingTraits();
-if (STANDING_TRAITS.length > 0) {
-  console.log(`[NounIRL] Standing trait targets active: ${STANDING_TRAITS.join(', ')}`);
+const STANDING_GROUPS = parseStandingGroups(STANDING_TRAITS);
+if (STANDING_GROUPS.length > 0) {
+  console.log(
+    `[NounIRL] Standing trait targets active (${STANDING_GROUPS.length} rule(s)): ` +
+      STANDING_GROUPS.map(g => g.map(c => `${c.category}=${c.wanted}`).join(' AND ')).join(' OR '),
+  );
 }
 
 export function matchesStandingTraits(traitNames: TraitNames): boolean {
-  return STANDING_TRAITS.some(trait => {
-    const colonIdx = trait.indexOf(':');
-    const category = trait.slice(0, colonIdx).trim().toLowerCase() as keyof TraitNames;
-    const wanted = trait.slice(colonIdx + 1).trim().toLowerCase();
-    return traitNames[category]?.toLowerCase() === wanted;
-  });
+  // OR across groups, AND within a group.
+  return STANDING_GROUPS.some(group =>
+    group.every(c => traitNames[c.category]?.toLowerCase() === c.wanted),
+  );
 }
 
 function standingReservation(): Reservation {
