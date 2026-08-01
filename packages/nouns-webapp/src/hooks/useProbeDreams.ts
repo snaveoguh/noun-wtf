@@ -1,9 +1,10 @@
 import type { CustomTraitLayer } from '@/lib/dreamStorage';
 
-import { useEffect, useState } from 'react';
-
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
+import { useQuery } from '@tanstack/react-query';
+
+import { queryClient } from '@/lib/queryClient';
 
 export interface ProbeDream {
   id: number;
@@ -215,52 +216,45 @@ async function fetchAllLiveDreams(): Promise<LaravelDream[]> {
   return all;
 }
 
-let cachedDreams: ProbeDreamWithPreview[] | null = null;
+export const PROBE_DREAMS_QUERY_KEY = ['probe-dreams'] as const;
 
-export function useProbeDreams() {
-  const [dreams, setDreams] = useState<ProbeDreamWithPreview[]>(cachedDreams ?? []);
-  const [loading, setLoading] = useState(cachedDreams === null);
-
-  useEffect(() => {
-    if (cachedDreams !== null) return;
-
-    let cancelled = false;
-    (async () => {
-      // Try live probe.wtf first. Fall back to the bundled static snapshot on error
-      // so noun.wtf keeps rendering something if probe.wtf is down.
-      try {
-        const live = await fetchAllLiveDreams();
-        if (cancelled) return;
-        const mapped = live.map(laravelToPreview).sort((a, b) => b.id - a.id);
-        cachedDreams = mapped;
-        setDreams(mapped);
-      } catch (err) {
-        console.warn('[useProbeDreams] Live fetch failed, using static snapshot:', err);
-        try {
-          const r = await fetch(STATIC_URL);
-          if (!r.ok) throw new Error(`static ${r.status}`);
-          const data = (await r.json()) as ProbeDream[];
-          if (cancelled) return;
-          const mapped = data.map(staticToPreview);
-          cachedDreams = mapped;
-          setDreams(mapped);
-        } catch (fallbackErr) {
-          console.error('[useProbeDreams] Static fallback also failed:', fallbackErr);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { dreams, loading };
+// Try the live dream-nouns API first. Fall back to the bundled static snapshot
+// on error so noun.wtf keeps rendering something if the API is down.
+async function fetchDreams(): Promise<ProbeDreamWithPreview[]> {
+  try {
+    const live = await fetchAllLiveDreams();
+    return live.map(laravelToPreview).sort((a, b) => b.id - a.id);
+  } catch (err) {
+    console.warn('[useProbeDreams] Live fetch failed, using static snapshot:', err);
+    const r = await fetch(STATIC_URL);
+    if (!r.ok) throw new Error(`static ${r.status}`);
+    const data = (await r.json()) as ProbeDream[];
+    return data.map(staticToPreview);
+  }
 }
 
-/** Invalidate the module cache so the next render refetches (e.g. after a successful publish). */
+export function useProbeDreams() {
+  // staleTime/gcTime Infinity matches the old module-level session cache:
+  // fetch once, then only refetch when invalidateProbeDreamsCache() runs
+  // (the full fetch pulls every page, so background refetches aren't free).
+  const { data, isLoading } = useQuery({
+    queryKey: PROBE_DREAMS_QUERY_KEY,
+    queryFn: fetchDreams,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+
+  return { dreams: data ?? EMPTY_DREAMS, loading: isLoading };
+}
+
+const EMPTY_DREAMS: ProbeDreamWithPreview[] = [];
+
+/**
+ * Refetch the dreams list (e.g. after a successful publish). Unlike the old
+ * module-cache version, this also refreshes galleries that are currently
+ * mounted — invalidateQueries refetches active observers immediately, so a
+ * freshly dreamed noun shows up without a hard refresh.
+ */
 export function invalidateProbeDreamsCache() {
-  cachedDreams = null;
+  void queryClient.invalidateQueries({ queryKey: PROBE_DREAMS_QUERY_KEY });
 }
