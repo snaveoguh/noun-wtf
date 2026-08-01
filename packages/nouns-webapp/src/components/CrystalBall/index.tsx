@@ -42,6 +42,9 @@ interface PredictResponse {
   auctionEnded: boolean;
   running: boolean;
   checkedAt: string;
+  /** DAO the seed was computed for. The API labels this from NOUNIRL_WATCH_DAO
+   * — the watcher can be pointed at either DAO, so never assume v1. */
+  dao?: 'v1' | 'v2';
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -313,10 +316,16 @@ const CrystalBall: FC<CrystalBallProps> = ({
     return () => clearInterval(countdownRef.current);
   }, []);
 
+  // When the parent drives the prediction, its isV2 prop is authoritative.
+  // When self-polling, trust the API's dao label instead — the watcher can be
+  // pointed at either DAO, and decoding a V2 seed with V1 art renders the
+  // wrong noun (or crashes on V2-only indices, e.g. body 31).
+  const effectiveIsV2 = externallyControlled ? isV2 : (prediction?.dao ?? 'v1') === 'v2';
+
   const voxels = useMemo(() => {
     if (!prediction?.seed) return null;
-    return seedToVoxels(prediction.seed, isV2);
-  }, [prediction?.seed, isV2]);
+    return seedToVoxels(prediction.seed, effectiveIsV2);
+  }, [prediction?.seed, effectiveIsV2]);
 
   const countdown =
     prediction?.auctionEnd != null && prediction.auctionEnd > 0

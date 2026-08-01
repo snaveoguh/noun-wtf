@@ -170,7 +170,14 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
 import { smallGrantsTreasuryAbi } from '../abi/SmallGrantsTreasury.js';
-import { NOUNS_TOKEN_ADDRESS, NOUNS_TOKEN_ABI, MIN_NOUNS_FOR_DEPLOY } from '../agent/constants.js';
+import {
+  NOUNS_TOKEN_ADDRESS,
+  NOUNS_TOKEN_ABI,
+  MIN_NOUNS_FOR_DEPLOY,
+  WATCHED_DAO,
+} from '../agent/constants.js';
+import ImageDataV1ForTraits from '../agent/image-data-v1.json';
+import ImageDataV2ForTraits from '../agent/image-data-v2.json';
 import {
   initAgent,
   reservationStore,
@@ -211,6 +218,18 @@ import {
   getRecentTraitChanges,
 } from '../agent/index.js';
 import { NOUN_V2_KNOWLEDGE } from '../agent/nounV2Knowledge.js';
+import {
+  composeNoun,
+  decodeRle,
+  getOnchainArt,
+  type ArtDao,
+  type OnchainArt,
+} from '../agent/onchainArt.js';
+import {
+  getPositions as getTradingPositions,
+  getPerformance as getTradingPerformance,
+  getSignals as getTradingSignals,
+} from '../agent/tradingClient.js';
 import { TRAIT_OPS_KNOWLEDGE } from '../agent/traitOpsKnowledge.js';
 import {
   applyDerivation,
@@ -224,20 +243,6 @@ import {
   type TraitCategory,
   type TraitDao,
 } from '../agent/traitProposal.js';
-import {
-  composeNoun,
-  decodeRle,
-  getOnchainArt,
-  type ArtDao,
-  type OnchainArt,
-} from '../agent/onchainArt.js';
-import ImageDataV2ForTraits from '../agent/image-data-v2.json';
-import ImageDataV1ForTraits from '../agent/image-data-v1.json';
-import {
-  getPositions as getTradingPositions,
-  getPerformance as getTradingPerformance,
-  getSignals as getTradingSignals,
-} from '../agent/tradingClient.js';
 
 // ─── Noun Balance Check (for deploy gating) ────────────────────────────────
 const nounCheckClient = createPublicClient({
@@ -544,7 +549,7 @@ async function parseCandidateTransfer(
   const amount = amtTok[1].replace(/,/g, '');
   const token = amtTok[2].toLowerCase();
 
-  const recipMatch = text.match(/\bto\s+(0x[a-fA-F0-9]{40}|[a-z0-9-]+\.eth)\b/i);
+  const recipMatch = text.match(/\bto\s+(0x[\da-f]{40}|[\da-z-]+\.eth)\b/i);
   if (!recipMatch?.[1]) return 'unresolved';
   let recipient = recipMatch[1];
 
@@ -5978,18 +5983,19 @@ CRITICAL RULES:
                       .map(p => p.split(':').map(Number) as [number, number]);
                   // Names only exist in the bundled data; the actual bytes are
                   // taken from chain at the resolved index when available.
-                  const bundle = (dao === 'nouns' ? ImageDataV1ForTraits : ImageDataV2ForTraits) as any;
+                  /* eslint-disable @typescript-eslint/no-explicit-any */
+                  const bundle = (
+                    dao === 'nouns' ? ImageDataV1ForTraits : ImageDataV2ForTraits
+                  ) as any;
+                  /* eslint-enable @typescript-eslint/no-explicit-any */
                   const src = findTrait(bundle, input.category, input.derive_from);
                   const imagesKey = IMAGE_KEY[input.category] as keyof OnchainArt['images'];
-                  const baseRle =
-                    art.images[imagesKey][src.index] ?? src.data.replace(/^0x/, '');
+                  const baseRle = art.images[imagesKey][src.index] ?? src.data.replace(/^0x/, '');
                   const derived = applyDerivation(parseRle(baseRle), derivation);
                   assertColorsInPalette(derived, art.palette.length);
                   rleHex = serializeRle(derived);
                 } else {
-                  throw new Error(
-                    'Provide one of: rle, dream_id, png_data_url, or derive_from.',
-                  );
+                  throw new Error('Provide one of: rle, dream_id, png_data_url, or derive_from.');
                 }
 
                 const proposal = buildTraitProposal({
@@ -7997,19 +8003,25 @@ app.get('/api/treasury/flows', async c => {
 // ============================================================
 
 // ── Agent Predict (fast — no auth, no Claude, ~1ms) ─────────────────────
-// Restored from c808c43c8: accepts `?dao=v2` to recompute the seed via the
-// V2 slobber-rule predictor against the same cached blockHash/nextNounId.
-// No-arg behaviour is unchanged (returns V1 prediction).
+// Serves the block-watcher's cached prediction for the DAO it is actually
+// watching (NOUNIRL_WATCH_DAO) — the old version hardcoded `dao: 'v1'` on
+// the no-arg path, which silently lied the moment the watcher moved to V2
+// (clients then decoded V2 seeds with V1 art). `?dao=v1|v2` recomputes the
+// seed under that DAO's seeder rules against the same cached
+// blockHash/nextNounId. NOTE: the cached nextNounId belongs to the WATCHED
+// dao, so a cross-DAO recompute is a rules-preview, not a real prediction
+// of that DAO's next noun — `crossDao: true` flags this.
 app.get('/api/agent/predict', c => {
   const w = getWatcherState();
-  const dao = c.req.query('dao') === 'v2' ? 'v2' : 'v1';
+  const q = c.req.query('dao');
+  const dao = q === 'v2' ? 'v2' : q === 'v1' ? 'v1' : WATCHED_DAO;
 
   let seed = w.lastPredictedSeed;
   let traits = w.lastPredictedTraits;
 
-  if (dao === 'v2' && w.lastBlockHash != null && w.nextNounId > 0) {
-    seed = predictSeed(w.lastBlockHash, w.nextNounId, { dao: 'v2' });
-    traits = seedToTraitNames(seed, 'v2');
+  if (dao !== WATCHED_DAO && w.lastBlockHash != null && w.nextNounId > 0) {
+    seed = predictSeed(w.lastBlockHash, w.nextNounId, { dao });
+    traits = seedToTraitNames(seed, dao);
   }
 
   return c.json({
@@ -8022,6 +8034,8 @@ app.get('/api/agent/predict', c => {
     running: w.running,
     checkedAt: w.lastCheckedAt,
     dao,
+    watchedDao: WATCHED_DAO,
+    crossDao: dao !== WATCHED_DAO,
   });
 });
 
@@ -8180,6 +8194,7 @@ app.post('/api/agent/backfill-tip-amounts', async c => {
 
     // viem's per-chain types are uniquely narrowed; cast to a common shape so
     // a single Record can hold them.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chains: Record<number, any> = {
       1: viemChains.mainnet,
       8453: viemChains.base,
@@ -8247,10 +8262,7 @@ app.post('/api/agent/backfill-tip-amounts', async c => {
     });
   } catch (err) {
     console.error('[NounIRL] Backfill error:', err);
-    return c.json(
-      { success: false, error: err instanceof Error ? err.message : String(err) },
-      500,
-    );
+    return c.json({ success: false, error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
 
@@ -9568,7 +9580,9 @@ async function getEnsLabelhashNameMap(): Promise<Map<string, string>> {
     const regs = await db
       .select({ name: schema.onchainEvent.name })
       .from(schema.onchainEvent)
-      .where(and(eq(schema.onchainEvent.source, 'ens'), eq(schema.onchainEvent.kind, 'registration')))
+      .where(
+        and(eq(schema.onchainEvent.source, 'ens'), eq(schema.onchainEvent.kind, 'registration')),
+      )
       .orderBy(desc(schema.onchainEvent.createdAt))
       .limit(3000);
     for (const r of regs) {
@@ -9666,7 +9680,11 @@ app.get('/api/onchain-feed', async c => {
         .orderBy(desc(schema.nounV2Auction.endTime))
         .limit(10),
       db.select().from(schema.nounV2Bid).orderBy(desc(schema.nounV2Bid.createdAt)).limit(20),
-      db.select().from(schema.nounV2Proposal).orderBy(desc(schema.nounV2Proposal.createdAt)).limit(5),
+      db
+        .select()
+        .from(schema.nounV2Proposal)
+        .orderBy(desc(schema.nounV2Proposal.createdAt))
+        .limit(5),
     ]);
 
   for (const e of external) {

@@ -81,13 +81,7 @@ import { Html } from '@react-three/drei';
 // Spritesheet compositor available for future use
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
 import { type NPC } from './engine/npcs';
-import {
-  createArenaRun,
-  startRun,
-  tickArena,
-  resolveNpcHits,
-  type ArenaRun,
-} from './engine/arena';
+import { createArenaRun, startRun, tickArena, resolveNpcHits, type ArenaRun } from './engine/arena';
 import { Character3D, type CharacterState } from './engine/Character3D';
 import { TreasureChest3D, DroppedItem3D } from './engine/TreasureChest3D';
 import { DepositModal } from './wager/DepositModal';
@@ -2321,7 +2315,10 @@ export default function WorldPage() {
         const res = await fetch(`${apiUrl}/api/agent/predict`);
         if (res.ok) {
           const data = await res.json();
-          if (data.seed) setPredictedSeed(data.seed);
+          // The watcher can be pointed at either DAO (NOUNIRL_WATCH_DAO); the
+          // mountain decodes with V1 art, so only accept V1-labeled seeds and
+          // fall back to the auction noun otherwise.
+          if (data.seed && data.dao !== 'v2') setPredictedSeed(data.seed);
         }
       } catch {
         /* silent */
@@ -2418,7 +2415,13 @@ export default function WorldPage() {
   // Bumped whenever the monster roster changes (spawn/death) so the
   // declarative <SeaMonsters/> list re-renders. HUD reads arenaHud.
   const [npcRosterVersion, setNpcRosterVersion] = useState(0);
-  const [arenaHud, setArenaHud] = useState({ active: false, over: false, wave: 0, score: 0, kills: 0 });
+  const [arenaHud, setArenaHud] = useState({
+    active: false,
+    over: false,
+    wave: 0,
+    score: 0,
+    kills: 0,
+  });
   const playerCharState = useRef<CharacterState>({
     x: SPAWN_X * WORLD_SCALE,
     z: SPAWN_Y * WORLD_SCALE,

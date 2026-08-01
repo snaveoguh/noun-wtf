@@ -98,12 +98,13 @@ interface MatchResult {
 // or is still in flight — which, on a flaky free-tier RPC (publicnode/dRPC
 // have been 408-timing out), is often. So these MUST track the on-chain
 // descriptors or the orb silently predicts the wrong noun on every RPC hiccup.
-// Re-queried on-chain 2026-05-30:
+// Re-queried on-chain 2026-08-01:
 //   V1 NounsToken descriptor 0x33A9c445…  → bg2 body31 accessory145 head258 glasses24
-//   V2 NounV2Token descriptor 0xae0247ca… → bg2 body32 accessory144 head253 glasses23
+//   V2 NounV2Token descriptor 0xae0247ca… → bg2 body32 accessory144 head254 glasses23
 // (V1 accessory was 144 before the "FREE" accessory was added → now 145. The
 // stale 252-head V2 fallback is what flipped a banana prediction to a wrong
-// head when the descriptor read timed out.)
+// head when the descriptor read timed out. Same failure mode again 2026-07:
+// V2 prop #1 added the joker head → 254 heads, fallback still said 253.)
 const V1_TRAIT_COUNTS_FALLBACK = {
   background: 2,
   body: 31,
@@ -116,7 +117,7 @@ const V2_TRAIT_COUNTS_FALLBACK = {
   background: 2,
   body: 32,
   accessory: 144,
-  head: 253,
+  head: 254,
   glasses: 23,
 } as const;
 
