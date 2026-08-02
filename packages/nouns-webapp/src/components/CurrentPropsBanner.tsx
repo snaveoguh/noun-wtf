@@ -1,7 +1,10 @@
+/* eslint-disable react/prop-types -- the component's list state is named
+   `props`, which react/prop-types misreads as component props. */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
+import { decodeFunctionResult, encodeFunctionData, multicall3Abi } from 'viem';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
@@ -20,11 +23,12 @@ interface CurrentProp {
 }
 
 const SUBGRAPH_URL =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const RPC_URL =
-  import.meta.env.VITE_MAINNET_JSONRPC || 'https://mainnet.rpc.buidlguidl.com';
+  (import.meta.env.VITE_MAINNET_JSONRPC as string | undefined) ??
+  'https://mainnet.rpc.buidlguidl.com';
 
 // NounsGovernor mainnet address
 const NOUNS_GOVERNOR = '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d';
@@ -33,7 +37,7 @@ const STATE_SELECTOR = '0x3e4f49e6';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MD_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/;
+const MD_IMAGE_RE = /!\[[^\]]*]\(([^)]+)\)/;
 const HTML_IMG_RE = /<img[^>]+src=["']([^"']+)["']/i;
 
 function extractImageUrl(text: string): string | null {
@@ -59,56 +63,114 @@ function extractTitle(text: string): string {
  */
 function onChainStateToStatus(stateNum: number): ComputedStatus {
   switch (stateNum) {
-    case 0: return 'Upcoming';   // Pending
-    case 1: return 'Active';     // Active
-    case 2: return 'Cancelled';  // Canceled
-    case 3: return 'Failed';     // Defeated
-    case 4: return 'Passed';     // Succeeded
-    case 5: return 'Passed';     // Queued (passed, awaiting execution)
-    case 6: return 'Failed';     // Expired
-    case 7: return 'Passed';     // Executed
-    case 8: return 'Cancelled';  // Vetoed
-    case 9: return 'Active';     // ObjectionPeriod
-    case 10: return 'Active';    // Updatable
-    default: return 'Failed';
+    case 0:
+      return 'Upcoming'; // Pending
+    case 1:
+      return 'Active'; // Active
+    case 2:
+      return 'Cancelled'; // Canceled
+    case 3:
+      return 'Failed'; // Defeated
+    case 4:
+      return 'Passed'; // Succeeded
+    case 5:
+      return 'Passed'; // Queued (passed, awaiting execution)
+    case 6:
+      return 'Failed'; // Expired
+    case 7:
+      return 'Passed'; // Executed
+    case 8:
+      return 'Cancelled'; // Vetoed
+    case 9:
+      return 'Active'; // ObjectionPeriod
+    case 10:
+      return 'Active'; // Updatable
+    default:
+      return 'Failed';
   }
 }
 
+// Multicall3 — same address on every chain.
+const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
+
 /**
- * Batch-fetch on-chain state() for all proposals via JSON-RPC batch.
- * This is the authoritative source — accounts for dynamic quorum.
+ * Batch-fetch on-chain state() for all proposals in ONE eth_call via
+ * Multicall3. This used to be a 30-item JSON-RPC batch, but dRPC's free plan
+ * rejects batches of more than 3 requests ("code 31"), which emptied the map
+ * and made every prop render as Failed. A single aggregate3 call works on any
+ * plan and any provider.
  */
 async function batchFetchStates(proposalIds: string[]): Promise<Map<string, number>> {
   const stateMap = new Map<string, number>();
   if (proposalIds.length === 0) return stateMap;
 
-  const batchReq = proposalIds.map((id, i) => ({
-    jsonrpc: '2.0',
-    method: 'eth_call',
-    params: [
-      {
-        to: NOUNS_GOVERNOR,
-        data: STATE_SELECTOR + BigInt(id).toString(16).padStart(64, '0'),
-      },
-      'latest',
-    ],
-    id: i,
+  const calls = proposalIds.map(id => ({
+    target: NOUNS_GOVERNOR as `0x${string}`,
+    allowFailure: true,
+    callData: (STATE_SELECTOR + BigInt(id).toString(16).padStart(64, '0')) as `0x${string}`,
   }));
 
   const res = await fetch(RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(batchReq),
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_call',
+      params: [
+        {
+          to: MULTICALL3,
+          data: encodeFunctionData({
+            abi: multicall3Abi,
+            functionName: 'aggregate3',
+            args: [calls],
+          }),
+        },
+        'latest',
+      ],
+    }),
   });
-  const results = await res.json();
+  const json = await res.json();
+  if (typeof json?.result !== 'string') return stateMap;
 
-  // Results may come back out of order — match by id
-  for (const r of results) {
-    if (r.result) {
-      stateMap.set(proposalIds[r.id], parseInt(r.result, 16));
+  const decoded = decodeFunctionResult({
+    abi: multicall3Abi,
+    functionName: 'aggregate3',
+    data: json.result as `0x${string}`,
+  });
+  decoded.forEach((r, i) => {
+    if (r.success && r.returnData && r.returnData !== '0x') {
+      stateMap.set(proposalIds[i], parseInt(r.returnData, 16));
     }
-  }
+  });
   return stateMap;
+}
+
+/**
+ * Fallback when the on-chain state read fails entirely: map the indexer's
+ * stored status. It can lag a state transition by a beat, but a slightly
+ * stale label beats the old behaviour of painting every prop "Failed".
+ */
+function ponderStatusToStatus(s: string | null | undefined): ComputedStatus {
+  switch ((s ?? '').toUpperCase()) {
+    case 'PENDING':
+    case 'UPDATABLE':
+      return 'Upcoming';
+    case 'ACTIVE':
+    case 'OBJECTION_PERIOD':
+      return 'Active';
+    case 'SUCCEEDED':
+    case 'QUEUED':
+    case 'EXECUTED':
+      return 'Passed';
+    case 'CANCELLED':
+    case 'VETOED':
+      return 'Cancelled';
+    case 'DEFEATED':
+    case 'EXPIRED':
+    default:
+      return 'Failed';
+  }
 }
 
 function statusLabel(status: ComputedStatus): string {
@@ -172,13 +234,13 @@ const PropModal: FC<{
 
   // Clean markdown for preview
   const cleanText = prop.description
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)]\([^)]*\)/g, '$1')
     .replace(/^#+\s*/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/\|[^\n]+\|/g, '') // strip markdown tables
-    .replace(/[-:]+\|[-:|]+/g, '')
+    .replace(/[:-]+\|[:|-]+/g, '')
     .trim();
 
   const totalVotes = prop.forVotes + prop.againstVotes + prop.abstainVotes;
@@ -207,9 +269,7 @@ const PropModal: FC<{
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: visible
-          ? 'translate(-50%, -50%) scale(1)'
-          : 'translate(-50%, -50%) scale(0.92)',
+        transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
         zIndex: 100,
         maxWidth: 640,
         width: '90vw',
@@ -218,8 +278,7 @@ const PropModal: FC<{
         background: 'rgba(255, 255, 255, 0.88)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        boxShadow:
-          '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
         overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.25s ease, transform 0.25s ease',
@@ -405,8 +464,7 @@ const PropModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span>🏛️</span>{' '}
-          <span>current props</span>
+          <span>🏛️</span> <span>current props</span>
         </div>
       </div>
     </div>
@@ -426,8 +484,7 @@ const PropModal: FC<{
 
 // ─── Banner ───────────────────────────────────────────────────────────────────
 
-const PLACEHOLDER_GRADIENT =
-  'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)';
+const PLACEHOLDER_GRADIENT = 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)';
 
 /**
  * CurrentPropsBanner — auto-scrolling horizontal banner of recent Nouns proposals.
@@ -484,7 +541,7 @@ const CurrentPropsBanner: FC = () => {
         const realStatus =
           onChainState !== undefined
             ? onChainStateToStatus(onChainState)
-            : 'Failed'; // fallback if RPC failed
+            : ponderStatusToStatus(p.status); // RPC failed — trust the indexer over a blanket "Failed"
 
         // Skip Cancelled props (they clutter the banner)
         if (realStatus === 'Cancelled') continue;
@@ -540,7 +597,10 @@ const CurrentPropsBanner: FC = () => {
       if (pausedRef.current) {
         wasPaused = true;
       } else {
-        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
+        if (wasPaused) {
+          pos = el.scrollLeft;
+          wasPaused = false;
+        }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
         if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;
@@ -616,8 +676,12 @@ const CurrentPropsBanner: FC = () => {
           ref={scrollRef}
           onPointerDown={onPointerDown}
           onClickCapture={onClickCapture}
-          onMouseEnter={() => { pausedRef.current = true; }}
-          onMouseLeave={() => { pausedRef.current = false; }}
+          onMouseEnter={() => {
+            pausedRef.current = true;
+          }}
+          onMouseLeave={() => {
+            pausedRef.current = false;
+          }}
           style={{
             display: 'flex',
             gap: '10px',
@@ -693,8 +757,7 @@ const CurrentPropsBanner: FC = () => {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  background:
-                    'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                  background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
                   padding: '28px 10px 8px',
                 }}
               >
@@ -714,7 +777,7 @@ const CurrentPropsBanner: FC = () => {
                   >
                     #{prop.id} {statusLabel(prop.status)}
                   </span>
-                  {(prop.forVotes + prop.againstVotes) > 0 && (
+                  {prop.forVotes + prop.againstVotes > 0 && (
                     <span
                       style={{
                         fontSize: '0.45rem',
@@ -750,9 +813,7 @@ const CurrentPropsBanner: FC = () => {
         </div>
       </div>
 
-      {selectedProp && (
-        <PropModal prop={selectedProp} onClose={handleClose} />
-      )}
+      {selectedProp && <PropModal prop={selectedProp} onClose={handleClose} />}
     </>
   );
 };
