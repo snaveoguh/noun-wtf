@@ -134,7 +134,7 @@ function rowToSettlement(row: any): Settlement {
     blockNumber: row.block_number,
     settledAt: row.settled_at,
     gasUsed: row.gas_used || undefined,
-    dao: row.dao === 'v2' ? 'v2' : row.dao === 'v1' ? 'v1' : undefined,
+    dao: row.dao === 'v1' || row.dao === 'v2' ? (row.dao as WatchedDao) : undefined,
   };
 }
 
