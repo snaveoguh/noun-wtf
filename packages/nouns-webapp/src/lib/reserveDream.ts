@@ -42,6 +42,15 @@ export function isReserveChainSupported(chainId: number | undefined): boolean {
 
 export type ReservableLayer = 'head' | 'glasses' | 'body' | 'accessory';
 
+// Which DAO's mints the reservation watches. The agent runs ONE watcher over
+// both DAOs; a reservation only ever matches its own DAO's predictions.
+export type ReserveDao = 'v1' | 'v2';
+
+export const RESERVE_DAOS: { key: ReserveDao; label: string; hint: string }[] = [
+  { key: 'v1', label: 'Nouns', hint: 'the original DAO' },
+  { key: 'v2', label: 'NounV2', hint: 'the 2026 DAO — 2022-era trait set + founder traits' },
+];
+
 export const RESERVABLE_LAYERS: { key: ReservableLayer; label: string }[] = [
   { key: 'head', label: 'Head' },
   { key: 'glasses', label: 'Noggles' },
@@ -63,19 +72,21 @@ export interface ReserveResult {
   id: string;
   status: string;
   traits: string[];
+  dao?: ReserveDao;
   message?: string;
 }
 
 /**
  * Create the reservation. Call this ONLY after the tip tx is mined — the API
  * verifies a confirmed receipt and will cancel reservations whose tx is still
- * pending.
+ * pending. `dao` picks which DAO's mints to watch (defaults to 'v1' server-side).
  */
 export async function reserveDream(params: {
   wallet: string;
   txHash: string;
   chainId: number;
   traits: string[];
+  dao?: ReserveDao;
   settleFor?: string;
 }): Promise<ReserveResult> {
   const res = await fetch(`${API_BASE}/api/agent/reserve`, {

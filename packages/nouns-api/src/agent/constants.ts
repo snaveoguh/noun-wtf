@@ -11,21 +11,21 @@ export const AUCTION_HOUSE_ADDRESS = '0x830BD73E4184ceF73443C15111a1DF14e495C706
 export const AUCTION_HOUSE_V2_ADDRESS = '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc' as const;
 export const NOUNS_TOKEN_V2_ADDRESS = '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9' as const;
 
-// ─── DAO Selector ──────────────────────────────────────────────────────────
-// The bot watches one DAO at a time. Pick via NOUNIRL_WATCH_DAO env var.
-// To run both, deploy two instances of the agent service with different values.
+// ─── DAOs ──────────────────────────────────────────────────────────────────
+// One process watches BOTH DAOs off the same block feed (dual-DAO refactor,
+// 2026-08-01). The old NOUNIRL_WATCH_DAO "one process = one DAO" switch is
+// retired — it no longer selects anything. It is still parsed (as
+// LEGACY_WATCH_DAO) solely so an un-prefixed legacy NOUNIRL_STANDING_TRAITS
+// value keeps applying to the DAO the process used to watch.
 export type WatchedDao = 'v1' | 'v2';
 
-function parseWatchedDao(): WatchedDao {
-  const raw = (process.env.NOUNIRL_WATCH_DAO ?? 'v1').trim().toLowerCase();
-  if (raw === 'v1' || raw === 'v2') return raw;
-  console.warn(
-    `[NounIRL] Invalid NOUNIRL_WATCH_DAO="${raw}" — must be 'v1' or 'v2'. Defaulting to 'v1'.`,
-  );
-  return 'v1';
-}
+export const DAOS: readonly WatchedDao[] = ['v1', 'v2'] as const;
 
-export const WATCHED_DAO: WatchedDao = parseWatchedDao();
+export const LEGACY_WATCH_DAO: WatchedDao | null = (() => {
+  const raw = (process.env.NOUNIRL_WATCH_DAO ?? '').trim().toLowerCase();
+  if (raw === 'v1' || raw === 'v2') return raw;
+  return null;
+})();
 
 export function selectAddresses(dao: WatchedDao): {
   auctionHouse: `0x${string}`;

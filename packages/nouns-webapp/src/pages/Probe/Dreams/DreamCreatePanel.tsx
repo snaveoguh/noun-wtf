@@ -15,9 +15,11 @@ import { syncDreamToProbe } from '@/lib/probeSync';
 import {
   NOUNIRL_ADDRESS,
   RESERVABLE_LAYERS,
+  RESERVE_DAOS,
   RESERVE_SUPPORTED_CHAINS,
   RESERVE_TIP_ETH,
   type ReservableLayer,
+  type ReserveDao,
   type ReserveResult,
   buildReserveTraits,
   isReserveChainSupported,
@@ -205,6 +207,12 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
   const selectedReserveLayers = (Object.keys(reserveLayers) as ReservableLayer[]).filter(
     l => reserveLayers[l],
   );
+  // Which DAO's mints the bot should watch. The agent runs one watcher over
+  // both DAOs; the reservation only matches the DAO it's booked against.
+  const [reserveDao, setReserveDao] = useState<ReserveDao>('v1');
+  // DAO snapshotted at deposit time, like the traits, so a toggle mid-confirm
+  // can't change what gets booked.
+  const pendingDaoRef = useRef<ReserveDao>('v1');
 
   const {
     sendTransaction,
@@ -242,6 +250,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
     setReserveState('idle');
     reservedForTxRef.current = null;
     pendingTraitsRef.current = buildReserveTraits(seed, selectedReserveLayers);
+    pendingDaoRef.current = reserveDao;
     sendTransaction({ to: NOUNIRL_ADDRESS, value: parseEther(String(RESERVE_TIP_ETH)) });
   };
 
@@ -255,7 +264,13 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
 
     reservedForTxRef.current = tipTxHash;
     setReserveState('reserving');
-    reserveDream({ wallet: address, txHash: tipTxHash, chainId, traits })
+    reserveDream({
+      wallet: address,
+      txHash: tipTxHash,
+      chainId,
+      traits,
+      dao: pendingDaoRef.current,
+    })
       .then(result => {
         setReserveResult(result);
         setReserveState('done');
@@ -527,11 +542,43 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                   <p className="flex items-start gap-1.5 text-xs text-gray-600">
                     <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500" />
                     <span>
-                      nounirl.eth watches every settlement and auto-settles the next Noun matching
-                      your traits. Tip ~$5 to reserve — refunded by the win, withdraw anytime
-                      before.
+                      nounirl.eth watches every block on both DAOs and settles the exact block that
+                      mints a Noun matching your traits — it then goes to auction like any other.
+                      The ~$5 tip funds the bot&apos;s settlement gas and isn&apos;t refunded. You
+                      can cancel an unfulfilled reservation and rebook the same tip on different
+                      traits.
                     </span>
                   </p>
+
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-bold uppercase text-gray-500">
+                      Watch DAO
+                    </p>
+                    <div className="flex gap-1.5">
+                      {RESERVE_DAOS.map(({ key, label, hint }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setReserveDao(key)}
+                          disabled={reserveBusy}
+                          title={hint}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            reserveDao === key
+                              ? 'border-black bg-black text-white'
+                              : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {reserveDao === 'v2' && (
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        NounV2 uses the 2022-era trait set — traits added to Nouns since then
+                        won&apos;t ever match there.
+                      </p>
+                    )}
+                  </div>
 
                   <div>
                     <p className="mb-1.5 text-[11px] font-bold uppercase text-gray-500">
@@ -566,7 +613,11 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
 
                   {reserveState === 'done' && reserveResult ? (
                     <div className="space-y-1 rounded-lg bg-green-50 p-2.5 text-xs text-green-700">
-                      <p className="font-bold">✅ Reservation active</p>
+                      <p className="font-bold">
+                        ✅ Reservation active on{' '}
+                        {RESERVE_DAOS.find(d => d.key === (reserveResult.dao ?? 'v1'))?.label ??
+                          'Nouns'}
+                      </p>
                       <p>Watching for: {reserveResult.traits.join(', ')}</p>
                       <button
                         type="button"

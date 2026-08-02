@@ -17,7 +17,6 @@
 import { keccak256, encodePacked, type Hex } from 'viem';
 import { ImageData } from '@noundry/nouns-assets';
 import { getTraitCounts } from './traitCounts.js';
-import { WATCHED_DAO } from './constants.js';
 // Vendored V2 art mirror — 32 bodies / 144 accessories / 253 heads / 23 glasses,
 // founder traits at white@30, black@31, multicolor@142, slobber@143,
 // missingnoun@252 (verified on-chain 2026-06-05). Kept in-package rather than
@@ -122,10 +121,7 @@ export function predictSeed(
     // → bits 240..255 of pseudorandomness gate a 50/50 swap to slobber.
     // Solidity uses `(pseudorandomness >> 240) & 1`, which keeps the LSB of
     // the top 16 bits — replicated here for parity.
-    if (
-      acc === V2_GREASE_INDEX &&
-      (head === V2_RETAINER_INDEX || head === V2_INDEX_CARD_INDEX)
-    ) {
+    if (acc === V2_GREASE_INDEX && (head === V2_RETAINER_INDEX || head === V2_INDEX_CARD_INDEX)) {
       const coin = (pseudorandomness >> 240n) & 1n;
       if (coin === 1n) acc = V2_SLOBBER_INDEX;
     }
@@ -140,8 +136,7 @@ export function predictSeed(
 
 // ─── Trait Name Resolution ─────────────────────────────────────────────────
 
-const capitalizeFirstLetter = (s: string): string =>
-  s.charAt(0).toUpperCase() + s.slice(1);
+const capitalizeFirstLetter = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Maps seed category to ImageData array key
 const CATEGORY_MAP: Record<string, 'bodies' | 'accessories' | 'heads' | 'glasses'> = {
@@ -161,11 +156,7 @@ const CATEGORY_MAP: Record<string, 'bodies' | 'accessories' | 'heads' | 'glasses
  * across both — only the V2 founder slots (e.g. slobber@143) differ — so this
  * matters mainly for reservations that target those founder traits.
  */
-function traitName(
-  type: keyof NounSeed,
-  seedIndex: number,
-  dao: SeederVariant = WATCHED_DAO,
-): string {
+function traitName(type: keyof NounSeed, seedIndex: number, dao: SeederVariant = 'v1'): string {
   if (type === 'background') {
     return ['Cool', 'Warm'][seedIndex] ?? 'Unknown';
   }
@@ -196,12 +187,9 @@ function traitName(
 
 /**
  * Convert a full NounSeed to human-readable trait names.
- * `dao` selects the art set (defaults to the DAO this process watches).
+ * `dao` selects the art set (defaults to 'v1' — pass explicitly for V2).
  */
-export function seedToTraitNames(
-  seed: NounSeed,
-  dao: SeederVariant = WATCHED_DAO,
-): TraitNames {
+export function seedToTraitNames(seed: NounSeed, dao: SeederVariant = 'v1'): TraitNames {
   return {
     background: traitName('background', seed.background, dao),
     body: traitName('body', seed.body, dao),
@@ -224,10 +212,7 @@ export function seedToTraitNames(
  *
  * ALL requested traits must match (AND logic).
  */
-export function matchesTraits(
-  traitNames: TraitNames,
-  requestedTraits: string[],
-): boolean {
+export function matchesTraits(traitNames: TraitNames, requestedTraits: string[]): boolean {
   if (requestedTraits.length === 0) return false;
 
   for (const trait of requestedTraits) {
@@ -235,15 +220,16 @@ export function matchesTraits(
     if (colonIdx === -1) {
       // No category prefix — match against ALL categories
       const query = trait.toLowerCase().trim();
-      const anyMatch = Object.values(traitNames).some(
-        name => name.toLowerCase().includes(query),
-      );
+      const anyMatch = Object.values(traitNames).some(name => name.toLowerCase().includes(query));
       if (!anyMatch) return false;
       continue;
     }
 
     const category = trait.slice(0, colonIdx).toLowerCase().trim() as keyof TraitNames;
-    const query = trait.slice(colonIdx + 1).toLowerCase().trim();
+    const query = trait
+      .slice(colonIdx + 1)
+      .toLowerCase()
+      .trim();
 
     const actualValue = traitNames[category];
     if (!actualValue) return false;
@@ -260,10 +246,7 @@ export function matchesTraits(
  * Get all valid trait names for a given category.
  * Useful for fuzzy matching and autocomplete.
  */
-export function getAllTraitNames(
-  category: keyof NounSeed,
-  dao: SeederVariant = WATCHED_DAO,
-): string[] {
+export function getAllTraitNames(category: keyof NounSeed, dao: SeederVariant = 'v1'): string[] {
   if (category === 'background') return ['Cool', 'Warm'];
 
   const imageCategory = CATEGORY_MAP[category];

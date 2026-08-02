@@ -1153,7 +1153,9 @@ export default function CrystalBallPage() {
   async function handleSettle() {
     setSettling(true);
     try {
-      const res = await fetch(`${API_BASE}/api/agent/settle`, { method: 'POST' });
+      // The agent watches both DAOs — tell it which auction to settle.
+      const daoParam = activeDao === 'nounv2' ? 'v2' : 'v1';
+      const res = await fetch(`${API_BASE}/api/agent/settle?dao=${daoParam}`, { method: 'POST' });
       const data = (await res.json()) as { txHash?: string };
       if (typeof data.txHash === 'string' && data.txHash.length > 0) {
         setSettleTx(data.txHash);

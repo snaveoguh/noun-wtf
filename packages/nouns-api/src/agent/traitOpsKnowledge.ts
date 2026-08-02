@@ -64,13 +64,21 @@ the stored quorumVotes and still be DEFEATED. Read state(id) from the governor;
 never trust a cached status field.
 
 ### Settler standing targets
-NOUNIRL_STANDING_TRAITS supports AND: "+" joins conditions within a group, ","
-separates OR groups.
+ONE process watches BOTH DAOs off the same block feed (dual-DAO refactor,
+2026-08-01). Standing targets are configured PER DAO:
+  NOUNIRL_STANDING_TRAITS_V1 (default head:wall if unset)
+  NOUNIRL_STANDING_TRAITS_V2 (default off if unset)
+Syntax per DAO: "+" joins AND-conditions within a group, "," separates OR
+groups, "off" disables.
   head:Index card+accessory:Grease,head:Retainer+accessory:Grease
+The legacy NOUNIRL_STANDING_TRAITS var is still honored: groups may carry a
+"v1:"/"v2:" prefix; un-prefixed groups apply to the DAO the retired
+NOUNIRL_WATCH_DAO var names (else v1). The per-DAO vars win over legacy.
 Names are the DISPLAY form from seedToTraitNames ("head-index-card" → "Index
 card", space not hyphen), matched EXACTLY and case-insensitively so head:Wall
-never fires on Wallet or Wallsafe. NOUNIRL_WATCH_DAO selects v1|v2 — ONE DAO PER
-PROCESS. The settler never wins the Noun (V4 routes no-bid Nouns to the
-treasury); the prize is that noun.wtf credits the settler of Noun N as the
-CURATOR of Noun N+1.
+never fires on Wallet or Wallsafe. Reservations carry a dao field and only
+match their own DAO's predictions. Settle txs from the two DAOs share one
+wallet nonce and are serialized in-process. The settler never wins the Noun
+(V4 routes no-bid Nouns to the treasury); the prize is that noun.wtf credits
+the settler of Noun N as the CURATOR of Noun N+1.
 `;

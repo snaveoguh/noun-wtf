@@ -1,4 +1,4 @@
-// ─── Agent NounIRL — Block Watcher (SPEED-OPTIMIZED) ────────────────────────
+// ─── Agent NounIRL — Block Watcher (SPEED-OPTIMIZED, DUAL-DAO) ──────────────
 //
 // LATENCY BUDGET: <2 seconds from block seen → tx broadcast
 //
@@ -21,7 +21,15 @@
 //    hash is deterministic from the signed bytes, so we return it locally with
 //    ZERO RPC round-trips on the hot path (broadcasts run in the background).
 //
-// RESULT: Most blocks process in <1ms (pure math + cache).
+// DUAL-DAO (2026-08-01): ONE process watches BOTH Nouns DAO V1 and NounV2 off
+// the SAME block subscription. Each block header drives per-DAO processing —
+// separate auction caches, predictions, standing targets, pre-signed txs and
+// re-fire guards — replacing the old "one process = one DAO" NOUNIRL_WATCH_DAO
+// switch. Both DAOs share the nounirl wallet, so settle fires are serialized
+// through an in-process queue: simultaneous V1+V2 matches can never broadcast
+// two txs with the same nonce.
+//
+// RESULT: Most blocks process in <1ms per DAO (pure math + cache).
 // Settlement path: hot-path broadcast is non-blocking; tx hits all builders at once.
 
 import {
@@ -46,18 +54,11 @@ import {
   BLOCK_POLL_INTERVAL_MS,
   SAFETY_NET_POLL_INTERVAL_MS,
   AGENT_RPC_URL,
-  WATCHED_DAO,
+  DAOS,
+  LEGACY_WATCH_DAO,
   selectAddresses,
+  type WatchedDao,
 } from './constants.js';
-
-// Resolve the address pair once at module load — bot watches one DAO per process.
-// Override via NOUNIRL_WATCH_DAO env var ('v1' default | 'v2').
-const { auctionHouse: AUCTION_HOUSE_ADDRESS, token: NOUNS_TOKEN_ADDRESS } =
-  selectAddresses(WATCHED_DAO);
-
-console.log(
-  `[NounIRL] Watching DAO=${WATCHED_DAO.toUpperCase()} — auctionHouse=${AUCTION_HOUSE_ADDRESS} token=${NOUNS_TOKEN_ADDRESS}`,
-);
 import { reservationStore, type Reservation } from './reservations.js';
 import {
   predictSeed,
@@ -67,36 +68,99 @@ import {
   type TraitNames,
 } from './traitPredictor.js';
 
-// ─── Standing Trait Targets ───────────────────────────────────────────────
+// ─── Standing Trait Targets (per DAO) ─────────────────────────────────────
 // Traits the bot ALWAYS hunts, tip or no tip. Unlike reservations these are
 // never consumed — every time the next noun would mint with a matching combo
 // and the auction has ended, the bot fires.
 //
-// SYNTAX
+// SYNTAX (within one DAO's spec)
 //   "category:Name"        one condition
 //   "a:X+b:Y"              AND — every condition must hold
 //   "a:X+b:Y,c:Z"          OR of groups (comma separates groups)
+//   "off"                  disable standing targets for that DAO
 //
 // e.g. head:Index card+accessory:Grease,head:Retainer+accessory:Grease,head:Joker
 //   -> (Index card AND Grease) OR (Retainer AND Grease) OR Joker
 //
+// CONFIG SOURCES, per DAO, first match wins:
+//   1. NOUNIRL_STANDING_TRAITS_V1 / NOUNIRL_STANDING_TRAITS_V2
+//   2. Legacy NOUNIRL_STANDING_TRAITS — groups may carry a "v1:"/"v2:" prefix;
+//      un-prefixed groups apply to the DAO the (retired) NOUNIRL_WATCH_DAO var
+//      names, else v1. This keeps a pre-dual-DAO deployment (e.g. the live
+//      "hunt V2 slobber combos" config with NOUNIRL_WATCH_DAO=v2) working
+//      unchanged. A DAO that gets no legacy groups falls through to 3.
+//   3. Defaults: v1 → "head:wall" (the historic default), v2 → none.
+//
 // Names are the DISPLAY form produced by seedToTraitNames() — "head-index-card"
 // becomes "Index card" (space, not hyphen). Matching is exact + case-insensitive
 // rather than substring, because "head:Wall" must not also fire on Wallet or
-// Wallsafe. Override with NOUNIRL_STANDING_TRAITS; disable with =off.
-const STANDING_RESERVATION_ID = 'standing';
+// Wallsafe.
+const STANDING_RESERVATION_PREFIX = 'standing';
+
+function standingReservationId(dao: WatchedDao): string {
+  return `${STANDING_RESERVATION_PREFIX}-${dao}`;
+}
+
+function isStandingReservationId(id: string): boolean {
+  return id.startsWith(STANDING_RESERVATION_PREFIX);
+}
 
 type StandingCondition = { category: keyof TraitNames; wanted: string };
 /** Outer array = OR of groups; inner array = AND of conditions. */
 type StandingGroup = StandingCondition[];
 
-function parseStandingTraits(): string[] {
-  const raw = (process.env.NOUNIRL_STANDING_TRAITS ?? 'head:wall').trim();
-  if (!raw || ['off', 'none', 'false', '0'].includes(raw.toLowerCase())) return [];
+const OFF_VALUES = ['off', 'none', 'false', '0'];
+
+const DEFAULT_STANDING_SPECS: Record<WatchedDao, string[]> = {
+  v1: ['head:wall'],
+  v2: [],
+};
+
+function splitSpecs(raw: string): string[] {
   return raw
     .split(',')
     .map(t => t.trim())
     .filter(t => t.includes(':'));
+}
+
+function resolveStandingSpecs(dao: WatchedDao): string[] {
+  // 1. Per-DAO env var wins outright.
+  const perDaoRaw = (
+    process.env[dao === 'v1' ? 'NOUNIRL_STANDING_TRAITS_V1' : 'NOUNIRL_STANDING_TRAITS_V2'] ?? ''
+  ).trim();
+  if (perDaoRaw) {
+    if (OFF_VALUES.includes(perDaoRaw.toLowerCase())) return [];
+    return splitSpecs(perDaoRaw);
+  }
+
+  // 2. Legacy single-DAO var, with optional per-group v1:/v2: prefixes.
+  const legacyRaw = (process.env.NOUNIRL_STANDING_TRAITS ?? '').trim();
+  const legacyDao: WatchedDao = LEGACY_WATCH_DAO ?? 'v1';
+  if (legacyRaw) {
+    if (OFF_VALUES.includes(legacyRaw.toLowerCase())) {
+      // Legacy "off" governs only the DAO the legacy deployment watched.
+      if (dao === legacyDao) return [];
+      return DEFAULT_STANDING_SPECS[dao];
+    }
+    const mine: string[] = [];
+    for (const group of legacyRaw
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean)) {
+      const prefixMatch = group.match(/^(v1|v2):(.+)$/i);
+      if (prefixMatch) {
+        if (prefixMatch[1]!.toLowerCase() === dao && prefixMatch[2]!.includes(':')) {
+          mine.push(prefixMatch[2]!.trim());
+        }
+      } else if (dao === legacyDao && group.includes(':')) {
+        mine.push(group);
+      }
+    }
+    if (mine.length > 0) return mine;
+  }
+
+  // 3. Defaults.
+  return DEFAULT_STANDING_SPECS[dao];
 }
 
 function parseStandingGroups(specs: string[]): StandingGroup[] {
@@ -110,40 +174,14 @@ function parseStandingGroups(specs: string[]): StandingGroup[] {
           const colonIdx = part.indexOf(':');
           return {
             category: part.slice(0, colonIdx).trim().toLowerCase() as keyof TraitNames,
-            wanted: part.slice(colonIdx + 1).trim().toLowerCase(),
+            wanted: part
+              .slice(colonIdx + 1)
+              .trim()
+              .toLowerCase(),
           };
         }),
     )
     .filter(group => group.length > 0);
-}
-
-const STANDING_TRAITS = parseStandingTraits();
-const STANDING_GROUPS = parseStandingGroups(STANDING_TRAITS);
-if (STANDING_GROUPS.length > 0) {
-  console.log(
-    `[NounIRL] Standing trait targets active (${STANDING_GROUPS.length} rule(s)): ` +
-      STANDING_GROUPS.map(g => g.map(c => `${c.category}=${c.wanted}`).join(' AND ')).join(' OR '),
-  );
-}
-
-export function matchesStandingTraits(traitNames: TraitNames): boolean {
-  // OR across groups, AND within a group.
-  return STANDING_GROUPS.some(group =>
-    group.every(c => traitNames[c.category]?.toLowerCase() === c.wanted),
-  );
-}
-
-function standingReservation(): Reservation {
-  return {
-    id: STANDING_RESERVATION_ID,
-    wallet: process.env.NOUNIRL_ADDRESS ?? '0x0',
-    tipTxHash: '',
-    tipChainId: 1,
-    tipAmountEth: 0,
-    traits: STANDING_TRAITS,
-    status: 'active',
-    createdAt: 0,
-  };
 }
 
 // ─── Settlement Config ────────────────────────────────────────────────────
@@ -154,8 +192,8 @@ const SETTLEMENT_GAS_LIMIT = 500_000n;
 const SETTLEMENT_PRIORITY_FEE = parseGwei('5');
 const SETTLEMENT_MAX_FEE = parseGwei('20');
 
-// Pre-encoded calldata — settleCurrentAndCreateNewAuction() takes no args
-// This is constant and never changes. Encode once, reuse forever.
+// Pre-encoded calldata — settleCurrentAndCreateNewAuction() takes no args and
+// has the same signature on both auction houses. Encode once, reuse forever.
 const SETTLEMENT_CALLDATA = encodeFunctionData({
   abi: AUCTION_HOUSE_ABI,
   functionName: 'settleCurrentAndCreateNewAuction',
@@ -186,7 +224,6 @@ const WS_ENDPOINTS: string[] = (() => {
   );
   return [...paid, 'wss://ethereum-rpc.publicnode.com', 'wss://eth.drpc.org'];
 })();
-
 
 // ─── Settlement Broadcast Fan-Out ─────────────────────────────────────────
 // A settlement tx has NO MEV to protect (the noun goes to the winning bidder
@@ -225,9 +262,7 @@ const SETTLEMENT_PUBLIC_RPCS = [
 // reach, then the builders direct. Deduped so a custom AGENT_RPC_URL that equals
 // a listed node isn't hit twice.
 function settlementBroadcastEndpoints(): string[] {
-  return [
-    ...new Set([AGENT_RPC_URL, ...SETTLEMENT_PUBLIC_RPCS, ...SETTLEMENT_BUILDER_ENDPOINTS]),
-  ];
+  return [...new Set([AGENT_RPC_URL, ...SETTLEMENT_PUBLIC_RPCS, ...SETTLEMENT_BUILDER_ENDPOINTS])];
 }
 
 function hostOf(url: string): string {
@@ -240,15 +275,94 @@ function hostOf(url: string): string {
 
 // ─── State ─────────────────────────────────────────────────────────────────
 
+interface AuctionState {
+  nounId: number;
+  endTime: number;
+  settled: boolean;
+  amount: bigint;
+  bidder: string;
+}
+
+/** Everything the watcher tracks separately per DAO. */
+interface DaoWatchState {
+  dao: WatchedDao;
+  auctionHouse: `0x${string}`;
+  token: `0x${string}`;
+  nextNounId: number;
+  auctionEndTime: number;
+  lastPredictedSeed: NounSeed | null;
+  lastPredictedTraits: TraitNames | null;
+  // Auction cache
+  cachedAuction: AuctionState | null;
+  cachedAuctionAt: number;
+  // Pre-signed settlement tx (both DAOs pre-sign at the SAME wallet nonce; at
+  // most one of them can land, the other falls back to a fresh sign — see
+  // settleAuction's serialization queue).
+  preSignedTx: Hex | null;
+  preSignedNonce: number | null;
+  preSignedAt: number;
+  // Re-fire guard — once we've broadcast a settle for a given noun, don't fire
+  // again for the SAME noun on the next block ticks while the receipt is still
+  // pending. (We dropped the forced pre-fire `auction()` RPC read to trim
+  // hot-path latency; this guard replaces the double-fire protection it gave
+  // us. It clears naturally once the auction advances to a new nounId.)
+  lastFiredNounId: number;
+  lastFiredAt: number;
+  // Standing targets
+  standingSpecs: string[];
+  standingGroups: StandingGroup[];
+}
+
+function initDaoState(dao: WatchedDao): DaoWatchState {
+  const { auctionHouse, token } = selectAddresses(dao);
+  const standingSpecs = resolveStandingSpecs(dao);
+  return {
+    dao,
+    auctionHouse,
+    token,
+    nextNounId: 0,
+    auctionEndTime: 0,
+    lastPredictedSeed: null,
+    lastPredictedTraits: null,
+    cachedAuction: null,
+    cachedAuctionAt: 0,
+    preSignedTx: null,
+    preSignedNonce: null,
+    preSignedAt: 0,
+    lastFiredNounId: 0,
+    lastFiredAt: 0,
+    standingSpecs,
+    standingGroups: parseStandingGroups(standingSpecs),
+  };
+}
+
+const daoStates: Record<WatchedDao, DaoWatchState> = {
+  v1: initDaoState('v1'),
+  v2: initDaoState('v2'),
+};
+
+for (const dao of DAOS) {
+  const ds = daoStates[dao];
+  console.log(
+    `[NounIRL] Watching ${dao.toUpperCase()} — auctionHouse=${ds.auctionHouse} token=${ds.token}`,
+  );
+  if (ds.standingGroups.length > 0) {
+    console.log(
+      `[NounIRL] ${dao.toUpperCase()} standing trait targets (${ds.standingGroups.length} rule(s)): ` +
+        ds.standingGroups
+          .map(g => g.map(c => `${c.category}=${c.wanted}`).join(' AND '))
+          .join(' OR '),
+    );
+  } else {
+    console.log(`[NounIRL] ${dao.toUpperCase()} standing trait targets: none`);
+  }
+}
+
 interface WatcherState {
   running: boolean;
   lastBlockNumber: number;
   lastBlockHash: Hex | null;
-  lastPredictedSeed: NounSeed | null;
-  lastPredictedTraits: TraitNames | null;
   lastCheckedAt: number;
-  nextNounId: number;
-  auctionEndTime: number;
   totalBlocksChecked: number;
   transportMode: 'websocket' | 'http-poll' | 'none';
   wsProviderCount: number;
@@ -260,11 +374,7 @@ const state: WatcherState = {
   running: false,
   lastBlockNumber: 0,
   lastBlockHash: null,
-  lastPredictedSeed: null,
-  lastPredictedTraits: null,
   lastCheckedAt: 0,
-  nextNounId: 0,
-  auctionEndTime: 0,
   totalBlocksChecked: 0,
   transportMode: 'none',
   wsProviderCount: 0,
@@ -272,31 +382,46 @@ const state: WatcherState = {
   errors: [],
 };
 
+function pushError(msg: string): void {
+  state.errors.push(msg);
+  if (state.errors.length > 50) state.errors.shift();
+}
+
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let wsUnsubscribers: (() => void)[] = [];
 let publicClient: PublicClient | null = null;
 let walletClient: WalletClient | null = null;
 let agentAccount: PrivateKeyAccount | null = null;
 
-// Local nonce tracking
+// Local nonce tracking — ONE wallet serves both DAOs, so this is shared.
 let localNonce: number | null = null;
 let nonceRefreshedAt = 0;
 const NONCE_REFRESH_TTL = 30_000;
 
-// Pre-signed transaction
-let preSignedTx: Hex | null = null;
-let preSignedNonce: number | null = null;
-let preSignedAt = 0;
 const PRE_SIGN_TTL = 12_000; // refresh every ~1 block
-
-// Re-fire guard — once we've broadcast a settle for a given noun, don't fire
-// again for the SAME noun on the next block ticks while the receipt is still
-// pending. (We dropped the forced pre-fire `auction()` RPC read to trim hot-path
-// latency; this guard replaces the double-fire protection it gave us. It clears
-// naturally once the auction advances to a new nounId.)
-let lastFiredNounId = 0;
-let lastFiredAt = 0;
 const REFIRE_GUARD_MS = 24_000; // ~2 blocks
+
+export function matchesStandingTraits(dao: WatchedDao, traitNames: TraitNames): boolean {
+  // OR across groups, AND within a group.
+  return daoStates[dao].standingGroups.some(group =>
+    group.every(c => traitNames[c.category]?.toLowerCase() === c.wanted),
+  );
+}
+
+function standingReservation(dao: WatchedDao): Reservation {
+  const ds = daoStates[dao];
+  return {
+    id: standingReservationId(dao),
+    wallet: process.env.NOUNIRL_ADDRESS ?? '0x0',
+    tipTxHash: '',
+    tipChainId: 1,
+    tipAmountEth: 0,
+    traits: ds.standingSpecs,
+    dao,
+    status: 'active',
+    createdAt: 0,
+  };
+}
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -353,67 +478,73 @@ async function getLocalNonce(): Promise<number> {
   }
 }
 
-// ─── Pre-Sign Settlement Transaction ────────────────────────────────────
+// ─── Pre-Sign Settlement Transactions ────────────────────────────────────
+// Both DAOs get a pre-signed settle tx at the SAME (current) nonce. Only one
+// of them can ever land at that nonce; if both DAOs match in the same block
+// the serialized settle queue fires the first with the pre-signed tx and the
+// second detects the stale nonce and fresh-signs at nonce+1.
 
-async function refreshPreSignedTx(): Promise<void> {
+async function refreshPreSignedTxs(): Promise<void> {
   if (!agentAccount || !publicClient) return;
 
   try {
     const nonce = await getLocalNonce();
 
-    const tx = {
-      to: AUCTION_HOUSE_ADDRESS as `0x${string}`,
-      data: SETTLEMENT_CALLDATA,
-      gas: SETTLEMENT_GAS_LIMIT,
-      maxFeePerGas: SETTLEMENT_MAX_FEE,
-      maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
-      nonce,
-      chainId: 1,
-      type: 'eip1559' as const,
-    };
-
-    const signed = await agentAccount.signTransaction(tx);
-    preSignedTx = signed;
-    preSignedNonce = nonce;
-    preSignedAt = Date.now();
+    for (const dao of DAOS) {
+      const ds = daoStates[dao];
+      const signed = await agentAccount.signTransaction({
+        to: ds.auctionHouse,
+        data: SETTLEMENT_CALLDATA,
+        gas: SETTLEMENT_GAS_LIMIT,
+        maxFeePerGas: SETTLEMENT_MAX_FEE,
+        maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
+        nonce,
+        chainId: 1,
+        type: 'eip1559' as const,
+      });
+      ds.preSignedTx = signed;
+      ds.preSignedNonce = nonce;
+      ds.preSignedAt = Date.now();
+    }
   } catch (err) {
     console.error('[NounIRL] Pre-sign failed:', err instanceof Error ? err.message : err);
   }
 }
 
-// ─── Auction State ──────────────────────────────────────────────────────
-
-interface AuctionState {
-  nounId: number;
-  endTime: number;
-  settled: boolean;
-  amount: bigint;
-  bidder: string;
+function invalidatePreSignedTxs(): void {
+  for (const dao of DAOS) {
+    const ds = daoStates[dao];
+    ds.preSignedTx = null;
+    ds.preSignedNonce = null;
+  }
 }
 
-let cachedAuction: AuctionState | null = null;
-let cachedAuctionAt = 0;
+// ─── Auction State ──────────────────────────────────────────────────────
 
-function getAuctionCacheTTL(): number {
-  if (!cachedAuction) return 0;
-  const secsToEnd = cachedAuction.endTime - Math.floor(Date.now() / 1000);
+function getAuctionCacheTTL(ds: DaoWatchState): number {
+  if (!ds.cachedAuction) return 0;
+  const secsToEnd = ds.cachedAuction.endTime - Math.floor(Date.now() / 1000);
   if (secsToEnd <= 60 && secsToEnd > 0) return 3_000; // HOT ZONE
   if (secsToEnd <= 0) return 1_000; // ENDED
   return 15_000; // Normal
 }
 
-async function getCurrentAuction(forceRefresh = false): Promise<AuctionState | null> {
+async function getCurrentAuction(
+  dao: WatchedDao,
+  forceRefresh = false,
+): Promise<AuctionState | null> {
   if (!publicClient) return null;
 
+  const ds = daoStates[dao];
   const now = Date.now();
-  const ttl = getAuctionCacheTTL();
-  if (!forceRefresh && cachedAuction && now - cachedAuctionAt < ttl) {
-    return cachedAuction;
+  const ttl = getAuctionCacheTTL(ds);
+  if (!forceRefresh && ds.cachedAuction && now - ds.cachedAuctionAt < ttl) {
+    return ds.cachedAuction;
   }
 
   try {
     const result = await publicClient.readContract({
-      address: AUCTION_HOUSE_ADDRESS,
+      address: ds.auctionHouse,
       abi: AUCTION_HOUSE_ABI,
       functionName: 'auction',
     });
@@ -427,54 +558,71 @@ async function getCurrentAuction(forceRefresh = false): Promise<AuctionState | n
       settled: boolean;
     };
 
-    cachedAuction = {
+    ds.cachedAuction = {
       nounId: Number(r.nounId),
       endTime: Number(r.endTime),
       settled: r.settled,
       amount: r.amount,
       bidder: r.bidder,
     };
-    cachedAuctionAt = now;
-    state.auctionEndTime = cachedAuction.endTime;
+    ds.cachedAuctionAt = now;
+    ds.auctionEndTime = ds.cachedAuction.endTime;
 
-    return cachedAuction;
+    return ds.cachedAuction;
   } catch (err) {
-    console.error('[NounIRL] Failed to read auction:', err);
-    return cachedAuction;
+    console.error(`[NounIRL] Failed to read ${dao} auction:`, err);
+    return ds.cachedAuction;
   }
 }
 
-// ─── Settlement (ULTRA-FAST PATH) ───────────────────────────────────────
+// ─── Settlement (ULTRA-FAST PATH, SERIALIZED ACROSS DAOS) ────────────────
+// Both DAOs spend from the same wallet. A single in-process queue serializes
+// every settle fire so two matches in the same block can never broadcast two
+// txs with the same nonce — the second fire sees the incremented localNonce
+// and fresh-signs.
 
-export async function settleAuction(): Promise<{ txHash: string } | null> {
+let settleQueue: Promise<unknown> = Promise.resolve();
+
+export async function settleAuction(dao: WatchedDao = 'v1'): Promise<{ txHash: string } | null> {
+  const run = settleQueue.then(() => doSettleAuction(dao));
+  // The queue itself must never reject, or one failure would poison all
+  // subsequent fires.
+  settleQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function doSettleAuction(dao: WatchedDao): Promise<{ txHash: string } | null> {
   if (!walletClient || !publicClient || !agentAccount) {
     console.error('[NounIRL] Cannot settle — wallet not configured');
     return null;
   }
 
+  const ds = daoStates[dao];
   const t0 = Date.now();
 
   try {
-    console.log(`[NounIRL] 🔥 SETTLING — pre-signed: ${preSignedTx ? 'YES' : 'NO'}`);
+    console.log(
+      `[NounIRL] 🔥 SETTLING ${dao.toUpperCase()} — pre-signed: ${ds.preSignedTx ? 'YES' : 'NO'}`,
+    );
 
     let signedTx: Hex;
 
     // FAST PATH: Use pre-signed transaction if nonce is still valid
     const currentNonce = await getLocalNonce();
     if (
-      preSignedTx &&
-      preSignedNonce === currentNonce &&
-      Date.now() - preSignedAt < PRE_SIGN_TTL * 3
+      ds.preSignedTx &&
+      ds.preSignedNonce === currentNonce &&
+      Date.now() - ds.preSignedAt < PRE_SIGN_TTL * 3
     ) {
-      console.log(`[NounIRL] Using pre-signed tx (nonce ${currentNonce})`);
-      signedTx = preSignedTx;
+      console.log(`[NounIRL] Using pre-signed ${dao} tx (nonce ${currentNonce})`);
+      signedTx = ds.preSignedTx;
     } else {
       // FALLBACK: Fresh sign with the current nonce, then fan out the same way.
       console.log(
-        `[NounIRL] Fresh sign (nonce stale: expected ${preSignedNonce}, got ${currentNonce})`,
+        `[NounIRL] Fresh sign for ${dao} (nonce stale: expected ${ds.preSignedNonce}, got ${currentNonce})`,
       );
       signedTx = await agentAccount.signTransaction({
-        to: AUCTION_HOUSE_ADDRESS as `0x${string}`,
+        to: ds.auctionHouse,
         data: SETTLEMENT_CALLDATA,
         gas: SETTLEMENT_GAS_LIMIT,
         maxFeePerGas: SETTLEMENT_MAX_FEE,
@@ -489,20 +637,21 @@ export async function settleAuction(): Promise<{ txHash: string } | null> {
     // computed) hash immediately — no RPC round-trip on the hot path.
     const hash = broadcastRawTx(signedTx);
 
-    // Update local nonce + invalidate pre-signed
+    // Update local nonce + invalidate BOTH DAOs' pre-signed txs (they were
+    // signed at the now-consumed nonce).
     if (localNonce !== null) localNonce++;
-    preSignedTx = null;
-    preSignedNonce = null;
+    invalidatePreSignedTxs();
 
     const txTime = Date.now() - t0;
-    console.log(`[NounIRL] ✅ Settlement tx assembled + fanned out in ${txTime}ms: ${hash}`);
+    console.log(
+      `[NounIRL] ✅ ${dao.toUpperCase()} settlement tx assembled + fanned out in ${txTime}ms: ${hash}`,
+    );
 
     return { txHash: hash };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[NounIRL] Settlement failed after ${Date.now() - t0}ms:`, msg);
-    state.errors.push(`Settlement failed: ${msg}`);
-    if (state.errors.length > 50) state.errors.shift();
+    console.error(`[NounIRL] ${dao} settlement failed after ${Date.now() - t0}ms:`, msg);
+    pushError(`${dao} settlement failed: ${msg}`);
     return null;
   }
 }
@@ -581,8 +730,6 @@ async function onNewBlock(
   const num = Number(blockNumber);
   if (num <= state.lastBlockNumber) return;
 
-  const t0 = Date.now();
-
   if (blockTimestamp) {
     state.blockLatencyMs = Date.now() - Number(blockTimestamp) * 1000;
   }
@@ -592,35 +739,52 @@ async function onNewBlock(
   state.lastCheckedAt = Math.floor(Date.now() / 1000);
   state.totalBlocksChecked++;
 
+  // Both DAOs process the same header concurrently — their state is fully
+  // separate; only settle FIRES are serialized (nonce queue in settleAuction).
+  await Promise.all(DAOS.map(dao => processDaoBlock(dao, num, blockHash, blockTimestamp)));
+}
+
+async function processDaoBlock(
+  dao: WatchedDao,
+  num: number,
+  blockHash: Hex,
+  blockTimestamp?: bigint,
+): Promise<void> {
+  const ds = daoStates[dao];
+  const t0 = Date.now();
+
   try {
-    const auction = await getCurrentAuction();
+    const auction = await getCurrentAuction(dao);
     if (!auction) return;
 
-    state.auctionEndTime = auction.endTime;
+    ds.auctionEndTime = auction.endTime;
     const now = Math.floor(Date.now() / 1000);
     const auctionEnded = now >= auction.endTime;
 
     const nextNounId = auction.nounId + 1;
-    state.nextNounId = nextNounId;
+    ds.nextNounId = nextNounId;
 
     // NounsSeeder uses blockhash(block.number - 1). If our settlement tx lands
     // in block N+1, the seeder uses hash(N) — which is the CURRENT block's hash.
     // Using parentHash (hash of N-1) predicts what was minted in THIS block,
     // not what would be minted in the NEXT block where our tx lands.
-    const seed = predictSeed(blockHash, nextNounId, { dao: WATCHED_DAO });
-    const traits = seedToTraitNames(seed, WATCHED_DAO);
+    const seed = predictSeed(blockHash, nextNounId, { dao });
+    const traits = seedToTraitNames(seed, dao);
 
-    state.lastPredictedSeed = seed;
-    state.lastPredictedTraits = traits;
+    ds.lastPredictedSeed = seed;
+    ds.lastPredictedTraits = traits;
 
-    const activeReservations: Reservation[] = [...reservationStore.getActive()];
-    if (STANDING_TRAITS.length > 0) activeReservations.push(standingReservation());
+    // Only THIS DAO's reservations (plus its standing target) are eligible.
+    const activeReservations: Reservation[] = reservationStore
+      .getActive()
+      .filter(r => r.dao === dao);
+    if (ds.standingGroups.length > 0) activeReservations.push(standingReservation(dao));
     if (activeReservations.length === 0) return;
 
     for (const reservation of activeReservations) {
-      const isStanding = reservation.id === STANDING_RESERVATION_ID;
+      const isStanding = isStandingReservationId(reservation.id);
       const isMatch = isStanding
-        ? matchesStandingTraits(traits)
+        ? matchesStandingTraits(dao, traits)
         : matchesTraits(traits, reservation.traits);
 
       if (isMatch && auctionEnded) {
@@ -630,12 +794,12 @@ async function onNewBlock(
         // is what was eating into the slot. A stale settled-flag at worst costs a
         // cheap reverting tx; landing in the target block matters more.
         if (auction.settled) {
-          console.log('[NounIRL] Match found but auction already settled — skipping');
+          console.log(`[NounIRL] ${dao} match found but auction already settled — skipping`);
           continue;
         }
-        if (nextNounId === lastFiredNounId && Date.now() - lastFiredAt < REFIRE_GUARD_MS) {
+        if (nextNounId === ds.lastFiredNounId && Date.now() - ds.lastFiredAt < REFIRE_GUARD_MS) {
           console.log(
-            `[NounIRL] Already fired for Noun #${nextNounId} ${Date.now() - lastFiredAt}ms ago — awaiting receipt, not re-firing`,
+            `[NounIRL] Already fired for ${dao} Noun #${nextNounId} ${Date.now() - ds.lastFiredAt}ms ago — awaiting receipt, not re-firing`,
           );
           continue;
         }
@@ -645,22 +809,22 @@ async function onNewBlock(
         const targetBlock = num + 1;
         const slotMs = blockTimestamp ? Date.now() - Number(blockTimestamp) * 1000 : null;
         console.log(
-          `[NounIRL] 🎯 MATCH in ${Date.now() - t0}ms! Noun #${nextNounId} → target block ${targetBlock}` +
+          `[NounIRL] 🎯 ${dao.toUpperCase()} MATCH in ${Date.now() - t0}ms! Noun #${nextNounId} → target block ${targetBlock}` +
             `${slotMs !== null ? ` (${slotMs}ms into slot ${num})` : ''} — ${JSON.stringify(traits)}`,
         );
 
-        lastFiredNounId = nextNounId;
-        lastFiredAt = Date.now();
+        ds.lastFiredNounId = nextNounId;
+        ds.lastFiredAt = Date.now();
 
-        const result = await settleAuction();
+        const result = await settleAuction(dao);
         if (result) {
           // Record as pending — only confirm after receipt verification
           console.log(
-            `[NounIRL] ⏳ Settlement tx broadcast for ${reservation.id} — awaiting confirmation...`,
+            `[NounIRL] ⏳ ${dao} settlement tx broadcast for ${reservation.id} — awaiting confirmation...`,
           );
 
-          cachedAuction = null;
-          cachedAuctionAt = 0;
+          ds.cachedAuction = null;
+          ds.cachedAuctionAt = 0;
 
           // Capture values for the async callback
           const resId = reservation.id;
@@ -685,23 +849,21 @@ async function onNewBlock(
                 const blocksLate = landedBlock - firedTargetBlock;
                 if (blocksLate === 0) {
                   console.log(
-                    `[NounIRL] 🎯 Landed in TARGET block ${firedTargetBlock} — Noun #${settledNounId} ✅ on time`,
+                    `[NounIRL] 🎯 Landed in TARGET block ${firedTargetBlock} — ${dao} Noun #${settledNounId} ✅ on time`,
                   );
                 } else {
-                  const lateMsg = `[NounIRL] ⏱️ Landed ${blocksLate} block(s) ${blocksLate > 0 ? 'LATE' : 'EARLY'} — target ${firedTargetBlock}, got ${landedBlock} (Noun #${settledNounId}, tx ${txHash})`;
+                  const lateMsg = `[NounIRL] ⏱️ Landed ${blocksLate} block(s) ${blocksLate > 0 ? 'LATE' : 'EARLY'} — target ${firedTargetBlock}, got ${landedBlock} (${dao} Noun #${settledNounId}, tx ${txHash})`;
                   console.warn(lateMsg);
-                  state.errors.push(
-                    `Settle landed ${blocksLate} block(s) off target for Noun #${settledNounId} (target ${firedTargetBlock}, got ${landedBlock})`,
+                  pushError(
+                    `${dao} settle landed ${blocksLate} block(s) off target for Noun #${settledNounId} (target ${firedTargetBlock}, got ${landedBlock})`,
                   );
-                  if (state.errors.length > 50) state.errors.shift();
                 }
 
                 if (receipt.status !== 'success') {
                   console.error(
-                    `[NounIRL] ❌ Settlement tx REVERTED — Noun #${settledNounId} tx ${txHash}. Someone else settled first.`,
+                    `[NounIRL] ❌ Settlement tx REVERTED — ${dao} Noun #${settledNounId} tx ${txHash}. Someone else settled first.`,
                   );
-                  state.errors.push(`Settlement reverted for Noun #${settledNounId}: ${txHash}`);
-                  if (state.errors.length > 50) state.errors.shift();
+                  pushError(`${dao} settlement reverted for Noun #${settledNounId}: ${txHash}`);
                   return; // Reservation stays active
                 }
 
@@ -715,6 +877,7 @@ async function onNewBlock(
                   nounId: settledNounId,
                   matched: false, // flipped to true below if trait verification passes
                   reservationId: resId,
+                  dao,
                   at: Math.floor(Date.now() / 1000),
                 });
 
@@ -722,7 +885,7 @@ async function onNewBlock(
                 let actualTraits: TraitNames | null = null;
                 try {
                   const onchainSeed = (await pc.readContract({
-                    address: NOUNS_TOKEN_ADDRESS,
+                    address: ds.token,
                     abi: NOUNS_TOKEN_ABI,
                     functionName: 'seeds',
                     args: [BigInt(settledNounId)],
@@ -741,34 +904,33 @@ async function onNewBlock(
                     head: Number(onchainSeed.head),
                     glasses: Number(onchainSeed.glasses),
                   };
-                  actualTraits = seedToTraitNames(seed, WATCHED_DAO);
+                  actualTraits = seedToTraitNames(seed, dao);
                 } catch (err) {
                   console.warn(
-                    `[NounIRL] Could not read onchain seed for Noun #${settledNounId}:`,
+                    `[NounIRL] Could not read onchain seed for ${dao} Noun #${settledNounId}:`,
                     err,
                   );
                 }
 
                 // Check if actual traits match the reservation (or standing target)
-                const firedStanding = resId === STANDING_RESERVATION_ID;
+                const firedStanding = isStandingReservationId(resId);
                 const res = reservationStore.get(resId);
                 if (actualTraits && (res || firedStanding)) {
                   const actuallyMatches = firedStanding
-                    ? matchesStandingTraits(actualTraits)
+                    ? matchesStandingTraits(dao, actualTraits)
                     : matchesTraits(actualTraits, res!.traits);
                   if (!actuallyMatches) {
                     console.error(
-                      `[NounIRL] ❌ TRAIT MISMATCH — Noun #${settledNounId} actual traits: ${JSON.stringify(actualTraits)}, predicted: ${JSON.stringify(settledTraits)}, wanted: ${JSON.stringify(res?.traits ?? STANDING_TRAITS)}`,
+                      `[NounIRL] ❌ TRAIT MISMATCH — ${dao} Noun #${settledNounId} actual traits: ${JSON.stringify(actualTraits)}, predicted: ${JSON.stringify(settledTraits)}, wanted: ${JSON.stringify(res?.traits ?? ds.standingSpecs)}`,
                     );
-                    state.errors.push(
-                      `Trait mismatch for Noun #${settledNounId}: predicted ${JSON.stringify(settledTraits)}, actual ${JSON.stringify(actualTraits)}`,
+                    pushError(
+                      `${dao} trait mismatch for Noun #${settledNounId}: predicted ${JSON.stringify(settledTraits)}, actual ${JSON.stringify(actualTraits)}`,
                     );
-                    if (state.errors.length > 50) state.errors.shift();
                     // Reservation stays active — the minted Noun doesn't match
                     return;
                   }
                   console.log(
-                    `[NounIRL] ✅ Onchain trait verification passed — Noun #${settledNounId}: ${JSON.stringify(actualTraits)}`,
+                    `[NounIRL] ✅ Onchain trait verification passed — ${dao} Noun #${settledNounId}: ${JSON.stringify(actualTraits)}`,
                   );
                 }
 
@@ -785,10 +947,11 @@ async function onNewBlock(
                   blockNumber: settledBlock,
                   settledAt: Math.floor(Date.now() / 1000),
                   gasUsed: receipt.gasUsed.toString(),
+                  dao,
                 });
 
                 console.log(
-                  `[NounIRL] ✅ Confirmed settlement — Noun #${settledNounId} block ${receipt.blockNumber}, gas: ${receipt.gasUsed}`,
+                  `[NounIRL] ✅ Confirmed settlement — ${dao} Noun #${settledNounId} block ${receipt.blockNumber}, gas: ${receipt.gasUsed}`,
                 );
 
                 bridgePublish('noun-settled', {
@@ -798,14 +961,14 @@ async function onNewBlock(
                   wallet: resWallet,
                   matchedTraits: confirmedTraits,
                   blockNumber: settledBlock,
+                  dao,
                 });
               })
               .catch(err => {
-                console.error(`[NounIRL] ❌ Receipt error for Noun #${settledNounId}:`, err);
-                state.errors.push(
-                  `Receipt error for Noun #${settledNounId}: ${err instanceof Error ? err.message : err}`,
+                console.error(`[NounIRL] ❌ Receipt error for ${dao} Noun #${settledNounId}:`, err);
+                pushError(
+                  `${dao} receipt error for Noun #${settledNounId}: ${err instanceof Error ? err.message : err}`,
                 );
-                if (state.errors.length > 50) state.errors.shift();
                 // Reservation stays active — don't record a phantom settlement
               });
           }
@@ -814,7 +977,7 @@ async function onNewBlock(
         }
       } else if (isMatch && !auctionEnded) {
         console.log(
-          `[NounIRL] 👀 Match pending — Noun #${nextNounId} — ends in ${auction.endTime - now}s`,
+          `[NounIRL] 👀 ${dao} match pending — Noun #${nextNounId} — ends in ${auction.endTime - now}s`,
         );
 
         bridgePublish('noun-match-pending', {
@@ -824,14 +987,14 @@ async function onNewBlock(
           matchedTraits: { ...traits },
           auctionEndsIn: auction.endTime - now,
           blockNumber: num,
+          dao,
         });
       }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[NounIRL] Block error:', msg);
-    state.errors.push(`Block ${num}: ${msg}`);
-    if (state.errors.length > 50) state.errors.shift();
+    console.error(`[NounIRL] ${dao} block error:`, msg);
+    pushError(`${dao} block ${num}: ${msg}`);
   }
 }
 
@@ -848,8 +1011,7 @@ async function poll(): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[NounIRL] Poll error:', msg);
-    state.errors.push(`Poll: ${msg}`);
-    if (state.errors.length > 50) state.errors.shift();
+    pushError(`Poll: ${msg}`);
   }
 }
 
@@ -893,10 +1055,10 @@ let backgroundTimer: ReturnType<typeof setInterval> | null = null;
 function startBackgroundTasks(): void {
   backgroundTimer = setInterval(async () => {
     if (!agentAccount) return;
-    await refreshPreSignedTx();
+    await refreshPreSignedTxs();
   }, PRE_SIGN_TTL);
 
-  void refreshPreSignedTx();
+  void refreshPreSignedTxs();
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────
@@ -939,7 +1101,9 @@ export function startWatcher(): void {
 
   if (wsConnected > 0) {
     state.transportMode = 'websocket';
-    console.log(`[NounIRL] 🚀 Started — ${wsConnected} WebSocket providers racing`);
+    console.log(
+      `[NounIRL] 🚀 Started — ${wsConnected} WebSocket providers racing, watching ${DAOS.map(d => d.toUpperCase()).join(' + ')}`,
+    );
   } else {
     state.transportMode = 'http-poll';
     pollTimer = setInterval(poll, BLOCK_POLL_INTERVAL_MS);
@@ -978,39 +1142,111 @@ export function stopWatcher(): void {
   console.log('[NounIRL] Block watcher stopped');
 }
 
-export function getWatcherState(): WatcherState & {
-  activeReservations: number;
+// Per-DAO slice of the watcher state, safe to serialize into API responses.
+export interface DaoPublicState {
+  dao: WatchedDao;
+  auctionHouse: string;
+  token: string;
+  nextNounId: number;
+  auctionEndTime: number;
+  lastPredictedSeed: NounSeed | null;
+  lastPredictedTraits: TraitNames | null;
   standingTraits: string[];
-} {
+  activeReservations: number;
+}
+
+function daoPublicState(dao: WatchedDao): DaoPublicState {
+  const ds = daoStates[dao];
   return {
-    ...state,
-    activeReservations: reservationStore.getActive().length,
-    standingTraits: STANDING_TRAITS,
+    dao,
+    auctionHouse: ds.auctionHouse,
+    token: ds.token,
+    nextNounId: ds.nextNounId,
+    auctionEndTime: ds.auctionEndTime,
+    lastPredictedSeed: ds.lastPredictedSeed,
+    lastPredictedTraits: ds.lastPredictedTraits,
+    standingTraits: ds.standingSpecs,
+    activeReservations: reservationStore.getActive().filter(r => r.dao === dao).length,
   };
 }
 
+// Legacy top-level fields (nextNounId, lastPredictedTraits, …) mirror V1 — the
+// main DAO — so pre-dual-DAO consumers (terminal `bid`, feed widgets) keep
+// working. Per-DAO truth lives in `daos`.
+export function getWatcherState(): WatcherState & {
+  nextNounId: number;
+  auctionEndTime: number;
+  lastPredictedSeed: NounSeed | null;
+  lastPredictedTraits: TraitNames | null;
+  activeReservations: number;
+  standingTraits: string[];
+  daos: Record<WatchedDao, DaoPublicState>;
+} {
+  const daos = {
+    v1: daoPublicState('v1'),
+    v2: daoPublicState('v2'),
+  };
+  return {
+    ...state,
+    nextNounId: daos.v1.nextNounId,
+    auctionEndTime: daos.v1.auctionEndTime,
+    lastPredictedSeed: daos.v1.lastPredictedSeed,
+    lastPredictedTraits: daos.v1.lastPredictedTraits,
+    activeReservations: reservationStore.getActive().length,
+    // Combined view, dao-prefixed so a flat list stays unambiguous.
+    standingTraits: DAOS.flatMap(d => daoStates[d].standingSpecs.map(s => `${d}:${s}`)),
+    daos,
+  };
+}
+
+export interface DaoCheckResult {
+  dao: WatchedDao;
+  nextNounId: number;
+  predictedTraits: TraitNames | null;
+  auctionEnded: boolean;
+  matchingReservations: string[];
+}
+
+function daoCheckResult(dao: WatchedDao): DaoCheckResult {
+  const ds = daoStates[dao];
+  const now = Math.floor(Date.now() / 1000);
+  const active = reservationStore.getActive().filter(r => r.dao === dao);
+  const matchingIds = ds.lastPredictedTraits
+    ? active.filter(r => matchesTraits(ds.lastPredictedTraits!, r.traits)).map(r => r.id)
+    : [];
+  if (ds.lastPredictedTraits && matchesStandingTraits(dao, ds.lastPredictedTraits)) {
+    matchingIds.push(standingReservationId(dao));
+  }
+  return {
+    dao,
+    nextNounId: ds.nextNounId,
+    predictedTraits: ds.lastPredictedTraits,
+    auctionEnded: ds.auctionEndTime > 0 && now >= ds.auctionEndTime,
+    matchingReservations: matchingIds,
+  };
+}
+
+// Legacy top-level fields mirror V1; `daos` carries both.
 export async function checkNow(): Promise<{
   blockNumber: number;
   nextNounId: number;
   predictedTraits: TraitNames | null;
   auctionEnded: boolean;
   matchingReservations: string[];
+  daos: Record<WatchedDao, DaoCheckResult>;
 }> {
   await poll();
-  const now = Math.floor(Date.now() / 1000);
-  const active = reservationStore.getActive();
-  const matchingIds = state.lastPredictedTraits
-    ? active.filter(r => matchesTraits(state.lastPredictedTraits!, r.traits)).map(r => r.id)
-    : [];
-  if (state.lastPredictedTraits && matchesStandingTraits(state.lastPredictedTraits)) {
-    matchingIds.push(STANDING_RESERVATION_ID);
-  }
+  const daos = {
+    v1: daoCheckResult('v1'),
+    v2: daoCheckResult('v2'),
+  };
 
   return {
     blockNumber: state.lastBlockNumber,
-    nextNounId: state.nextNounId,
-    predictedTraits: state.lastPredictedTraits,
-    auctionEnded: now >= state.auctionEndTime,
-    matchingReservations: matchingIds,
+    nextNounId: daos.v1.nextNounId,
+    predictedTraits: daos.v1.predictedTraits,
+    auctionEnded: daos.v1.auctionEnded,
+    matchingReservations: daos.v1.matchingReservations,
+    daos,
   };
 }
