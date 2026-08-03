@@ -1,8 +1,5 @@
 {
-  "bgcolors": [
-    "d5d7e1",
-    "e1d7d5"
-  ],
+  "bgcolors": ["d5d7e1", "e1d7d5"],
   "palette": [
     "",
     "c5b9a1",
@@ -1982,6 +1979,10 @@
       },
       {
         "filename": "head-joker",
+        "data": "0x00071b14052c0c168d2c0c168d2c0c168d2c0c16392c0c"
+      },
+      {
+        "filename": "head-joker-2",
         "data": "0x00071b14052c0c168d2c0c168d2c0c168d2c0c16392c0c"
       }
     ],
