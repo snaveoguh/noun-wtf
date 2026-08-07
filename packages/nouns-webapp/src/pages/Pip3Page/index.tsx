@@ -122,18 +122,27 @@ const Pip3Page: React.FC = () => {
       background: '#000',
       padding: '0 0 80px',
     }}>
+      {/* Pip3 @font-face lives in index.css. The pro theme sets Comic Sans on *
+          with !important, so this class rule needs [data-theme] + !important
+          to out-rank it. */}
+      <style>{`
+        .pip3-type,
+        [data-theme] .pip3-type {
+          font-family: 'Pip3', 'PT Root UI', sans-serif !important;
+          text-transform: uppercase;
+        }
+      `}</style>
       {/* Header */}
       <div style={{
         padding: '48px 20px 32px',
         textAlign: 'center',
       }}>
-        <h1 style={{
-          fontFamily: "'PT Root UI', monospace, sans-serif",
+        <h1 className="pip3-type" style={{
           fontSize: '3rem',
-          fontWeight: 900,
+          fontWeight: 400,
           color: '#fff',
           margin: 0,
-          letterSpacing: '-0.03em',
+          letterSpacing: '0.02em',
         }}>
           pip3
         </h1>
@@ -141,8 +150,8 @@ const Pip3Page: React.FC = () => {
           href="https://giphy.com/channel/60r90"
           target="_blank"
           rel="noreferrer"
+          className="pip3-type"
           style={{
-            fontFamily: "'PT Root UI', sans-serif",
             fontSize: '0.7rem',
             color: 'rgba(255,255,255,0.3)',
             margin: '8px 0 0',
@@ -299,15 +308,13 @@ const Pip3Page: React.FC = () => {
 
       {/* End of feed */}
       {!hasMore && gifs.length > 0 && (
-        <div style={{
+        <div className="pip3-type" style={{
           textAlign: 'center',
           padding: '40px 0',
           color: 'rgba(255,255,255,0.2)',
           fontSize: '0.7rem',
           fontWeight: 600,
-          fontFamily: "'PT Root UI', sans-serif",
           letterSpacing: '0.15em',
-          textTransform: 'uppercase',
         }}>
           {gifs.length} gifs
         </div>
@@ -329,11 +336,11 @@ const Pip3Page: React.FC = () => {
           href="https://giphy.com/channel/60r90"
           target="_blank"
           rel="noreferrer"
+          className="pip3-type"
           style={{
             color: 'rgba(255,255,255,0.5)',
             fontSize: '0.55rem',
             fontWeight: 600,
-            fontFamily: "'PT Root UI', sans-serif",
             textDecoration: 'none',
           }}
         >

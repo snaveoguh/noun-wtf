@@ -1,9 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type SiteMode = 'new' | 'classic';
-export type ThemeName = 'pro' | 'terminal' | 'classic' | 'game' | 'berry' | 'catalogue';
+export type ThemeName = 'pro' | 'terminal' | 'classic' | 'game' | 'berry' | 'catalogue' | 'abacus';
 
-export const THEME_NAMES: ThemeName[] = ['pro', 'terminal', 'classic', 'game', 'berry', 'catalogue'];
+export const THEME_NAMES: ThemeName[] = [
+  'pro',
+  'terminal',
+  'classic',
+  'game',
+  'berry',
+  'catalogue',
+  'abacus',
+];
 
 /**
  * Each theme decides what home layout it uses. Today only Terminal has a
@@ -18,6 +26,7 @@ const THEME_TO_MODE: Record<ThemeName, SiteMode> = {
   game: 'classic',
   berry: 'classic',
   catalogue: 'classic',
+  abacus: 'classic',
 };
 
 /**

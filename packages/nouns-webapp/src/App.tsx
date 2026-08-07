@@ -14,7 +14,6 @@ import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
 import GameHome from '@/components/GameShell/GameHome';
 import NavBar from '@/components/NavBar';
-import NetworkAlert from '@/components/NetworkAlert';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 import { THEME_NAMES, useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
 
@@ -29,8 +28,6 @@ import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
 import { MiniWindowHost } from '@/components/MiniWindow';
 import ReindexingBanner from '@/components/Nounsweeper/ReindexingBanner';
 import { Toaster } from '@/components/ui/sonner';
-import { CHAIN_ID } from '@/config';
-import { config as wagmiConfig } from '@/wagmi';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
@@ -432,10 +429,11 @@ function ThemedAppContent() {
   // user to `pro` so undesigned pages don't render with broken/empty themed
   // chrome. Skipped when the URL explicitly carries a `/<theme>/...` prefix —
   // that's the escape hatch for finding the cool UI glitches on purpose.
+  // Abacus is a full pro clone (Pip3 skin), so it owns every route like pro.
   useEffect(() => {
     if (themePrefix) return;
     if (logicalPath === '/') return;
-    if (theme === 'pro') return;
+    if (theme === 'pro' || theme === 'abacus') return;
     setTheme('pro');
   }, [logicalPath, themePrefix, theme, setTheme]);
 
@@ -603,17 +601,8 @@ function ThemedAppContent() {
   );
 }
 
-// Chains the app can operate on. The NetworkAlert wall only fires for chains
-// outside this set — being on a secondary chain (e.g. Polygon for Borgs
-// mint/breed) must not brick the app under an unclosable modal. CHAIN_ID is
-// included defensively in case the wagmi config and env ever disagree.
-const SUPPORTED_CHAIN_IDS = new Set<number>([
-  ...wagmiConfig.chains.map(c => c.id),
-  Number(CHAIN_ID),
-]);
-
 function App() {
-  const { address: account, chainId } = useAccount();
+  const { address: account } = useAccount();
   const torchMode = useAppSelector(state => state.application.torchMode);
 
   const dispatch = useAppDispatch();
@@ -632,7 +621,6 @@ function App() {
 
   return (
     <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
-      {chainId !== undefined && !SUPPORTED_CHAIN_IDS.has(chainId) && <NetworkAlert />}
       <BrowserRouter>
         <AppRouter />
       </BrowserRouter>

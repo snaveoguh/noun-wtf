@@ -34,6 +34,15 @@
     url(./fonts/PT_Root_UI/PT-Root-UI_Bold.woff2) format('woff2'),
     url(./fonts/PT_Root_UI/PT-Root-UI_Bold.woff) format('woff');
 }
+/* Pip3 — uppercase-only display font forged from 60r90's GIF lettering
+   (pip3-forge). Served from public/ so the Pip3 page + abacus theme share it. */
+@font-face {
+  font-family: 'Pip3';
+  src: url(/fonts/Pip3-Regular.woff2) format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* Edge padding lives outside @layer so CSS modules can resolve the vars. */
 :root {
@@ -1363,4 +1372,187 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   [data-disco='on'] .disco-toggle {
     animation: none !important;
   }
+}
+
+/* ============================================================================
+   ABACUS 🧮→🎲 — pro's layout, everything set in Pip3 (the 60r90 GIF font).
+   Var block mirrors pro exactly except the font tokens; the forcing rules
+   below mirror pro's Comic-Sans block. Pip3 is uppercase-only, so uppercase
+   is forced everywhere; glyphs missing from Pip3 (lowercase in inputs,
+   exotic punctuation) fall through to Comic Sans, keeping the joke intact.
+   ============================================================================ */
+@layer base {
+  [data-theme='abacus'] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    --brand-bg-green: #edf2f0;
+    --brand-dark-red: #d63c5e;
+    --brand-light-green: #6da886;
+    --brand-black: #212529;
+    --brand-cool-background: #d5d7e1;
+    --brand-cool-border: rgb(189, 192, 207);
+    --brand-cool-dark-text: #151c3b;
+    --brand-cool-light-text: #79809c;
+    --brand-cool-accent: #e9ebf3;
+    --brand-warm-background: #e1d7d5;
+    --brand-warm-border: rgb(207, 189, 186);
+    --brand-warm-dark-text: #221b1a;
+    --brand-warm-light-text: #8f7e7c;
+    --brand-warm-accent: #f9f1f1;
+    --brand-gray-dark-text: #14161b;
+    --brand-gray-border: #e2e3eb;
+    --brand-gray-background: #f4f4f8;
+    --brand-gray-light-text: #8c8d92;
+    --brand-gray-light-text-translucent: rgb(140, 141, 146, 0.1);
+    --brand-gray-hover: #fafafb;
+    --brand-color-red: #e40536;
+    --brand-color-blue: #4965f0;
+    --brand-color-green: #43b369;
+    --brand-color-red-translucent: rgba(214, 60, 94, 0.1);
+    --brand-color-blue-translucent: rgba(73, 101, 240, 0.1);
+    --brand-color-green-translucent: rgba(67, 179, 105, 0.1);
+    --brand-color-blue-darker: #3a52c7;
+
+    --theme-bg-primary: #ffffff;
+    --theme-bg-secondary: #f4f4f8;
+    --theme-bg-tertiary: #e2e3eb;
+    --theme-bg-card: #ffffff;
+    --theme-bg-hover: #fafafb;
+    --theme-bg-input: #ffffff;
+    --theme-text-primary: #14161b;
+    --theme-text-secondary: #4a4d57;
+    --theme-text-muted: #8c8d92;
+    --theme-text-accent: #000000;
+    --theme-text-link: #4965f0;
+    --theme-border: #e2e3eb;
+    --theme-border-light: #f0f0f4;
+    --theme-border-strong: #c4c5cc;
+    --theme-accent: #facc15;
+    --theme-accent-hover: #fbbf24;
+    --theme-accent-text: #14161b;
+    --theme-positive: #43b369;
+    --theme-negative: #e40536;
+    --theme-feed-bg: #ffffff;
+    --theme-feed-row-border: #e2e3eb;
+    --theme-feed-badge-bg: #f4f4f8;
+    --theme-orb-glow: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+    --theme-font-body: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
+    --theme-font-display: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
+    --theme-font-size-base: 13px;
+    --theme-letter-spacing: 0.02em;
+    --theme-radius-sm: 4px;
+    --theme-radius-md: 8px;
+    --theme-radius-lg: 12px;
+    --theme-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --theme-transition: 150ms ease;
+    color-scheme: light;
+  }
+}
+
+[data-theme='abacus'] body {
+  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+  text-transform: uppercase;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+[data-theme='abacus'] h1 { font-size: 1.8rem !important; }
+[data-theme='abacus'] h2 { font-size: 1.4rem !important; }
+[data-theme='abacus'] h3 { font-size: 1.15rem !important; }
+[data-theme='abacus'] h4 { font-size: 0.95rem !important; }
+[data-theme='abacus'] h5 { font-size: 0.85rem !important; }
+[data-theme='abacus'] h6 { font-size: 0.75rem !important; }
+
+/* Single-weight font — normalise weight so nothing renders synthetic-bold smears. */
+[data-theme='abacus'] *,
+[data-theme='abacus'] *::before,
+[data-theme='abacus'] *::after {
+  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+  font-weight: normal !important;
+}
+
+[data-theme='abacus'] h1,
+[data-theme='abacus'] h2,
+[data-theme='abacus'] h3,
+[data-theme='abacus'] h4,
+[data-theme='abacus'] h5,
+[data-theme='abacus'] h6,
+[data-theme='abacus'] a,
+[data-theme='abacus'] button,
+[data-theme='abacus'] label,
+[data-theme='abacus'] th,
+[data-theme='abacus'] nav,
+[data-theme='abacus'] nav *,
+[data-theme='abacus'] .btn,
+[data-theme='abacus'] [class*='Button'],
+[data-theme='abacus'] [class*='header'],
+[data-theme='abacus'] [class*='Header'],
+[data-theme='abacus'] [class*='title'],
+[data-theme='abacus'] [class*='Title'],
+[data-theme='abacus'] [class*='label'],
+[data-theme='abacus'] [class*='Label'] {
+  text-transform: uppercase !important;
+}
+
+[data-theme='abacus'] p,
+[data-theme='abacus'] span,
+[data-theme='abacus'] div,
+[data-theme='abacus'] li,
+[data-theme='abacus'] td,
+[data-theme='abacus'] dd,
+[data-theme='abacus'] dt {
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  [data-theme='abacus'] p,
+  [data-theme='abacus'] span,
+  [data-theme='abacus'] li,
+  [data-theme='abacus'] td,
+  [data-theme='abacus'] dd,
+  [data-theme='abacus'] dt,
+  [data-theme='abacus'] .form-control,
+  [data-theme='abacus'] input,
+  [data-theme='abacus'] textarea,
+  [data-theme='abacus'] [class*='description'],
+  [data-theme='abacus'] [class*='Description'],
+  [data-theme='abacus'] [class*='content'],
+  [data-theme='abacus'] [class*='Content'],
+  [data-theme='abacus'] [class*='copy'],
+  [data-theme='abacus'] [class*='Copy'],
+  [data-theme='abacus'] [class*='body'],
+  [data-theme='abacus'] [class*='Body'] {
+    text-transform: none !important;
+  }
+  [data-theme='abacus'] body {
+    font-size: 14px;
+  }
+}
+
+[data-theme='abacus'] code {
+  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
 }

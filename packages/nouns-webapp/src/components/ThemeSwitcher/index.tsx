@@ -17,6 +17,7 @@ const THEMES: readonly ThemeMeta[] = [
   { id: 'game', label: 'Game', emoji: '🕹️' },
   { id: 'berry', label: 'Berry', emoji: '🫐' },
   { id: 'catalogue', label: 'Catalogue', emoji: '🗂️' },
+  { id: 'abacus', label: 'Abacus', emoji: '🎲' },
 ] as const;
 
 // Sanity check at import — if THEME_NAMES grows without us adding a meta entry,
