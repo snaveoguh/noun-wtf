@@ -15,17 +15,12 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 
+import { useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
 import { GlassButton, GlassPanel, GlassTabs } from '@/liquid-sand/glass';
 import { Sparkle } from '@/liquid-sand/icons';
 
-import { useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
-
 import { windowStore } from '../store/windowStore';
-import {
-  useCurrentWallpaper,
-  useWallpaperList,
-  wallpaperStore,
-} from '../system/wallpaper';
+import { useCurrentWallpaper, useWallpaperList, wallpaperStore } from '../system/wallpaper';
 
 // HIG 8pt grid: 16pt content padding, 11pt section label, 17pt body
 const sectionLabelStyle: CSSProperties = {
@@ -93,7 +88,7 @@ interface RowProps {
 function Row({ label, help, control }: RowProps) {
   return (
     <div style={rowStyle}>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div style={rowLabelStyle}>{label}</div>
         {help && <div style={rowHelpStyle}>{help}</div>}
       </div>
@@ -103,12 +98,8 @@ function Row({ label, help, control }: RowProps) {
 }
 
 const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
-  { id: 'berry', label: 'Berry' },
-  { id: 'classic', label: 'Classic' },
-  { id: 'pro', label: 'Pro' },
+  { id: 'abacus', label: 'Dice' },
   { id: 'terminal', label: 'Terminal' },
-  { id: 'game', label: 'Game' },
-  { id: 'catalogue', label: 'Catalogue' },
 ];
 
 export default function SettingsApp() {
@@ -212,11 +203,7 @@ export default function SettingsApp() {
                     'inset 0 1px 0 rgba(255,250,240,0.6), 0 0 0 1px var(--ls-border-glass)',
                 }}
               />
-              <GlassButton
-                variant="default"
-                size="sm"
-                onClick={openWallpaperApp}
-              >
+              <GlassButton variant="default" size="sm" onClick={openWallpaperApp}>
                 Change…
               </GlassButton>
             </div>
@@ -244,9 +231,7 @@ export default function SettingsApp() {
                   cursor: 'pointer',
                   outline: active ? '2px solid var(--ls-accent)' : '2px solid transparent',
                   outlineOffset: 1,
-                  boxShadow: active
-                    ? 'var(--ls-shadow-glow)'
-                    : '0 0 0 1px var(--ls-border-glass)',
+                  boxShadow: active ? 'var(--ls-shadow-glow)' : '0 0 0 1px var(--ls-border-glass)',
                   transition:
                     'outline-color var(--ls-dur-base) var(--ls-ease-soft), box-shadow var(--ls-dur-base) var(--ls-ease-soft)',
                 }}

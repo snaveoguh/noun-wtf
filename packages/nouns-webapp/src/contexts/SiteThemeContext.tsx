@@ -1,31 +1,17 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type SiteMode = 'new' | 'classic';
-export type ThemeName = 'pro' | 'terminal' | 'classic' | 'game' | 'berry' | 'catalogue' | 'abacus';
+export type ThemeName = 'terminal' | 'abacus';
 
-export const THEME_NAMES: ThemeName[] = [
-  'pro',
-  'terminal',
-  'classic',
-  'game',
-  'berry',
-  'catalogue',
-  'abacus',
-];
+export const THEME_NAMES: ThemeName[] = ['abacus', 'terminal'];
 
 /**
- * Each theme decides what home layout it uses. Today only Terminal has a
- * non-auction home (the terminal feed). The others reuse the auction page
- * for `/`, but each can grow its own bespoke home layout later by changing
- * the value here — the rest of the app routes through `mode`.
+ * Each theme decides what home layout it uses. Terminal has a non-auction
+ * home (the terminal feed); Abacus reuses the auction page for `/`. The rest
+ * of the app routes through `mode`.
  */
 const THEME_TO_MODE: Record<ThemeName, SiteMode> = {
-  pro: 'classic',
   terminal: 'new',
-  classic: 'classic',
-  game: 'classic',
-  berry: 'classic',
-  catalogue: 'classic',
   abacus: 'classic',
 };
 
@@ -35,7 +21,13 @@ const THEME_TO_MODE: Record<ThemeName, SiteMode> = {
  * theme picker / shell-router.
  */
 const SUNSET_THEME_FALLBACK: Record<string, ThemeName> = {
-  camp: 'pro',
+  camp: 'abacus',
+  pro: 'abacus',
+  hectic: 'abacus',
+  classic: 'abacus',
+  game: 'abacus',
+  berry: 'abacus',
+  catalogue: 'abacus',
 };
 
 interface SiteThemeContextValue {
@@ -43,15 +35,15 @@ interface SiteThemeContextValue {
   setTheme: (theme: ThemeName) => void;
   /** Derived from theme — kept for backwards compatibility with existing layout switches. */
   mode: SiteMode;
-  /** Setting mode directly is supported but maps to a theme: 'new' → terminal, 'classic' → last non-terminal theme (or pro). */
+  /** Setting mode directly is supported but maps to a theme: 'new' → terminal, 'classic' → abacus. */
   setMode: (mode: SiteMode) => void;
   isEmbedded: boolean;
 }
 
 const SiteThemeContext = createContext<SiteThemeContextValue>({
-  theme: 'terminal',
+  theme: 'abacus',
   setTheme: () => {},
-  mode: 'new',
+  mode: 'classic',
   setMode: () => {},
   isEmbedded: false,
 });
@@ -66,9 +58,9 @@ function isThemeName(value: unknown): value is ThemeName {
 /**
  * Read a `/<theme>/...` prefix from the current pathname. Returns the theme
  * name when the first path segment is a known theme, otherwise null. Used by
- * `getInitialState` so a hard-load of `/game` boots straight into the game
- * theme — without this the page would briefly render the localStorage theme
- * before the route-level effect kicks in and switches.
+ * `getInitialState` so a hard-load of `/terminal` boots straight into the
+ * terminal theme — without this the page would briefly render the localStorage
+ * theme before the route-level effect kicks in and switches.
  */
 function readThemeFromPath(pathname: string): ThemeName | null {
   const segment = pathname.split('/').filter(Boolean)[0];
@@ -78,7 +70,7 @@ function readThemeFromPath(pathname: string): ThemeName | null {
 
 function getInitialState(): { theme: ThemeName; isEmbedded: boolean } {
   if (typeof window === 'undefined') {
-    return { theme: 'terminal', isEmbedded: false };
+    return { theme: 'abacus', isEmbedded: false };
   }
 
   // URL path takes precedence over everything else. Visiting `/berry` should
@@ -104,22 +96,19 @@ function getInitialState(): { theme: ThemeName; isEmbedded: boolean } {
     return { theme: 'terminal', isEmbedded: true };
   }
   if (modeParam === 'classic') {
-    return { theme: 'pro', isEmbedded: false };
+    return { theme: 'abacus', isEmbedded: false };
   }
 
   // Telegram / Farcaster contexts — terminal-feed home is the embedded surface.
-  if ((window as any).Telegram?.WebApp || (window as any).farcaster) {
+  const embedHost = window as unknown as { Telegram?: { WebApp?: unknown }; farcaster?: unknown };
+  if (embedHost.Telegram?.WebApp != null || embedHost.farcaster != null) {
     return { theme: 'terminal', isEmbedded: true };
   }
 
   // localStorage — read the new key first, fall back to the legacy mode key.
   const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-  // Migrate legacy 'hectic' label → 'pro' (renamed in-place; same theme).
-  if (storedTheme === 'hectic') {
-    return { theme: 'pro', isEmbedded: false };
-  }
-  // Sunset themes (e.g. 'camp') gracefully fall back to a default rather than
-  // sticking the user on a theme that no longer renders.
+  // Sunset themes (e.g. 'pro', 'berry') gracefully fall back to a default
+  // rather than sticking the user on a theme that no longer renders.
   if (typeof storedTheme === 'string' && storedTheme in SUNSET_THEME_FALLBACK) {
     return { theme: SUNSET_THEME_FALLBACK[storedTheme], isEmbedded: false };
   }
@@ -128,13 +117,13 @@ function getInitialState(): { theme: ThemeName; isEmbedded: boolean } {
   }
   const legacyMode = localStorage.getItem(LEGACY_MODE_STORAGE_KEY);
   if (legacyMode === 'classic') {
-    return { theme: 'pro', isEmbedded: false };
+    return { theme: 'abacus', isEmbedded: false };
   }
   if (legacyMode === 'new') {
     return { theme: 'terminal', isEmbedded: false };
   }
 
-  return { theme: 'terminal', isEmbedded: false };
+  return { theme: 'abacus', isEmbedded: false };
 }
 
 function applyThemeAttribute(theme: ThemeName) {
@@ -172,15 +161,9 @@ export function SiteThemeProvider({ children }: { children: ReactNode }) {
       setTheme('terminal');
       return;
     }
-    // Switching to 'classic' from terminal — pick the last non-terminal theme
-    // the user had, falling back to pro.
+    // Switching to 'classic' from terminal — abacus is the only classic-layout theme.
     if (theme === 'terminal') {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem(THEME_STORAGE_KEY) : null;
-      if (isThemeName(stored) && stored !== 'terminal') {
-        setTheme(stored);
-        return;
-      }
-      setTheme('pro');
+      setTheme('abacus');
       return;
     }
     // Already in a classic-layout theme — no-op.
@@ -197,9 +180,9 @@ export function SiteThemeProvider({ children }: { children: ReactNode }) {
     [theme, isEmbedded],
   );
 
-  return <SiteThemeContext.Provider value={value}>{children}</SiteThemeContext.Provider>;
+  return <SiteThemeContext value={value}>{children}</SiteThemeContext>;
 }
 
 export function useSiteTheme() {
-  return useContext(SiteThemeContext);
+  return use(SiteThemeContext);
 }

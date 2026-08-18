@@ -9,16 +9,9 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
 import ClientBadge from '@/components/ClientBadge';
-import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import AsciiImage from './AsciiImage';
 import { EVENT_TYPES, formatEventDescription, timeAgo } from './eventFormatters';
-
-// Themes that should NOT navigate users off the bespoke homepage emulation.
-// Pro / terminal keep full interactivity; everything else (including Game,
-// which mirrors nouns.game read-only) hides the "view" link so the feed
-// reads as a static homepage display.
-const READ_ONLY_THEMES = new Set(['classic', 'berry', 'catalogue', 'game']);
 
 interface Props {
   event: ActivityEventType;
@@ -88,8 +81,6 @@ function isSafeHttpsUrl(url: string | undefined): boolean {
 
 export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const { theme } = useSiteTheme();
-  const isReadOnly = READ_ONLY_THEMES.has(theme);
   const config = EVENT_TYPES[event.type];
   // Override badge for burned auctions (winner = 0x0, amount = 0)
   const isBurnedAuction =
@@ -230,10 +221,8 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           )}
         </span>
 
-        {/* View link (internal, e.g. candidate / proposal page).
-            Suppressed in read-only homepage-emulation themes so users don't
-            get kicked into the default chrome from a bespoke shell. */}
-        {viewHref && !isReadOnly && (
+        {/* View link (internal, e.g. candidate / proposal page). */}
+        {viewHref && (
           <Link
             to={viewHref}
             style={{

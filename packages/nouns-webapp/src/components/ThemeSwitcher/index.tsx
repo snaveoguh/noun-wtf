@@ -11,13 +11,8 @@ interface ThemeMeta {
 }
 
 const THEMES: readonly ThemeMeta[] = [
+  { id: 'abacus', label: 'Dice', emoji: '🎲' },
   { id: 'terminal', label: 'Terminal', emoji: '🍆' },
-  { id: 'pro', label: 'Pro', emoji: '🧮' },
-  { id: 'classic', label: 'Classic', emoji: '🏛️' },
-  { id: 'game', label: 'Game', emoji: '🕹️' },
-  { id: 'berry', label: 'Berry', emoji: '🫐' },
-  { id: 'catalogue', label: 'Catalogue', emoji: '🗂️' },
-  { id: 'abacus', label: 'Abacus', emoji: '🎲' },
 ] as const;
 
 // Sanity check at import — if THEME_NAMES grows without us adding a meta entry,

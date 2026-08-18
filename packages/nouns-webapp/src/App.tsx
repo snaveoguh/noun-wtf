@@ -6,13 +6,10 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import { useAccount } from 'wagmi';
 
 import AmbientMusic from '@/components/AmbientMusic';
-import BerryShell from '@/components/BerryShell';
 import CandleGate from '@/components/CandleGate';
-import CatalogueHome from '@/components/CatalogueShell/CatalogueHome';
-import ClassicHome from '@/components/ClassicShell/ClassicHome';
 import DreamWindow from '@/components/DreamWindow';
 import { Footer } from '@/components/Footer';
-import GameHome from '@/components/GameShell/GameHome';
+import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
 import NavBar from '@/components/NavBar';
 import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
 import { THEME_NAMES, useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
@@ -24,7 +21,6 @@ import '@/index.css';
 import '@/miniapps';
 
 import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
-import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
 import { MiniWindowHost } from '@/components/MiniWindow';
 import ReindexingBanner from '@/components/Nounsweeper/ReindexingBanner';
 import { Toaster } from '@/components/ui/sonner';
@@ -89,7 +85,7 @@ const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 /**
  * The main site route table. Paths are written **relative** so the same
  * `<Routes>` tree can be mounted at the site root (`/vote/123`) AND under a
- * theme prefix (`/pro/vote/123`) without duplicating definitions. The parent
+ * theme prefix (`/abacus/vote/123`) without duplicating definitions. The parent
  * `<Route>` consumes the prefix, react-router's descendant `<Routes>` then
  * matches against what's left.
  */
@@ -268,29 +264,25 @@ function SiteRoutes() {
 }
 
 /**
- * Themes whose shells are read-only (no URL-driven internal routing). Hitting
- * any deep path under their prefix (e.g. `/game/foo`) redirects back to the
- * shell root since these UIs are either static homepages (Berry, Catalogue,
- * Classic) or own their own bespoke internal nav (Game).
- *
- * Themes NOT in this list (`pro`, `terminal`) pass through to the full
- * SiteRoutes tree under their prefix — `/pro/vote/123` and
- * `/terminal/candidates` both work because `logicalPath` strips the prefix
- * before downstream routing.
+ * Legacy theme prefixes — themes sunset from the picker but whose share links
+ * still exist in the wild. `/pro/vote/123` redirects to `/vote/123` etc. so
+ * old links land on the (abacus) default rather than a 404.
  */
-const READ_ONLY_SHELL_THEMES: readonly ThemeName[] = ['game', 'berry', 'catalogue', 'classic'];
+const LEGACY_THEME_PREFIXES = ['pro', 'classic', 'game', 'berry', 'catalogue', 'camp'] as const;
 
-function isReadOnlyShellTheme(t: ThemeName): boolean {
-  return (READ_ONLY_SHELL_THEMES as readonly string[]).includes(t);
+function LegacyThemePrefixRedirect() {
+  const location = useLocation();
+  const firstSegment = location.pathname.split('/').filter(Boolean)[0] ?? '';
+  const rest = location.pathname.slice(`/${firstSegment}`.length) || '/';
+  return <Navigate to={`${rest}${location.search}`} replace />;
 }
 
 /**
  * Wrapper for `/<theme>/*` routes — sets the active theme based on the URL
- * param, then renders the appropriate shell. Read-only shells redirect any
- * deep path back to `/<theme>` (since they have no internal routing). The
- * Pro and Terminal shells fall through to the default chrome by rendering
- * `null` here and letting the parent AppRouter handle them via `theme`
- * state — they need the same logic as the no-prefix path.
+ * param, then renders the appropriate shell. Both themes pass through to the
+ * full SiteRoutes tree under their prefix — `/abacus/vote/123` and
+ * `/terminal/candidates` both work because `logicalPath` strips the prefix
+ * before downstream routing.
  */
 function ThemePrefixRoute() {
   const { theme: currentTheme, setTheme } = useSiteTheme();
@@ -314,18 +306,6 @@ function ThemePrefixRoute() {
 
   if (!targetTheme) {
     return <Navigate to="/" replace />;
-  }
-
-  // Read-only shells: any sub-path under `/<theme>/...` redirects to the
-  // shell root, since these UIs have no URL-driven internal navigation.
-  // The deep-path detection accounts for trailing slashes — `/game/` is the
-  // same as `/game` and should NOT redirect.
-  if (isReadOnlyShellTheme(targetTheme)) {
-    const rest = location.pathname.slice(`/${targetTheme}`.length);
-    const hasDeepPath = rest.length > 0 && rest !== '/';
-    if (hasDeepPath) {
-      return <Navigate to={`/${targetTheme}${location.search}`} replace />;
-    }
   }
 
   // Once theme is set, defer to `ThemedAppContent`, which handles the actual
@@ -368,6 +348,10 @@ function AppRouter() {
       {THEME_NAMES.map(t => (
         <Route key={t} path={`/${t}/*`} element={<ThemePrefixRoute />} />
       ))}
+      {/* Sunset theme prefixes — redirect old share links into the default theme. */}
+      {LEGACY_THEME_PREFIXES.map(t => (
+        <Route key={t} path={`/${t}/*`} element={<LegacyThemePrefixRedirect />} />
+      ))}
       {/* Default route — renders whichever theme is currently active. */}
       <Route path="*" element={<ThemedAppContent />} />
     </Routes>
@@ -379,7 +363,7 @@ function AppRouter() {
  * site root or beneath a `/<theme>` prefix. All path checks are normalised
  * against `logicalPath` — the pathname with any active theme prefix stripped
  * — so a hard-coded check like `logicalPath === '/'` matches both `/` (when
- * theme='game') AND `/game` (which strips to `/`).
+ * theme='terminal') AND `/terminal` (which strips to `/`).
  */
 function ThemedAppContent() {
   const { mode, theme, setTheme } = useSiteTheme();
@@ -401,10 +385,6 @@ function ThemedAppContent() {
     : location.pathname;
 
   const isTerminalHome = mode === 'new' && logicalPath === '/';
-  const isGameHome = theme === 'game' && logicalPath === '/';
-  const isClassicHome = theme === 'classic' && logicalPath === '/';
-  const isCatalogueHome = theme === 'catalogue' && logicalPath === '/';
-  const isBerryHome = theme === 'berry' && logicalPath === '/';
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -425,37 +405,21 @@ function ThemedAppContent() {
     navigate(nextPath, { replace: true });
   }, [logicalPath, location.search, navigate]);
 
-  // Themes only own the home page (`/`). Any other route silently switches the
-  // user to `pro` so undesigned pages don't render with broken/empty themed
-  // chrome. Skipped when the URL explicitly carries a `/<theme>/...` prefix —
-  // that's the escape hatch for finding the cool UI glitches on purpose.
-  // Abacus is a full pro clone (Pip3 skin), so it owns every route like pro.
+  // Terminal only owns the home page (the feed). Any other route silently
+  // switches the user to `abacus` so internal pages render with the full
+  // (abacus-skinned) site chrome. Skipped when the URL explicitly carries a
+  // `/terminal/...` prefix — that's the escape hatch for browsing internal
+  // pages in terminal skin on purpose.
   useEffect(() => {
     if (themePrefix) return;
     if (logicalPath === '/') return;
-    if (theme === 'pro' || theme === 'abacus') return;
-    setTheme('pro');
+    if (theme === 'abacus') return;
+    setTheme('abacus');
   }, [logicalPath, themePrefix, theme, setTheme]);
 
   // Terminal mode on root — render only the terminal feed, nothing else
   if (isTerminalHome) {
     return <TerminalFeedShell />;
-  }
-
-  // Themes own the home page only. Internal routes are pro-forced by the
-  // useEffect above, so we never reach the bespoke shell branch for non-home
-  // paths in non-pro themes.
-  if (isGameHome) {
-    return <GameHome />;
-  }
-  if (isClassicHome) {
-    return <ClassicHome />;
-  }
-  if (isCatalogueHome) {
-    return <CatalogueHome />;
-  }
-  if (isBerryHome) {
-    return <BerryShell />;
   }
 
   // World — full-screen canvas, no chrome
