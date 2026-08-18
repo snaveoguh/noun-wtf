@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 
 import { useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 
 import { GenericSkeleton } from '@/components/Skeleton';
 
@@ -46,7 +47,9 @@ const ProbePage: React.FC = () => {
           onClick={() => setTab('v2')}
           aria-label="Browse NounV2 tokens"
           className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 sm:px-4 sm:py-1.5 sm:text-sm ${
-            tab === 'v2' ? 'bg-red-700 ring-2 ring-red-500 ring-offset-1' : 'bg-red-600 hover:bg-red-700'
+            tab === 'v2'
+              ? 'bg-red-700 ring-2 ring-red-500 ring-offset-1'
+              : 'bg-red-600 hover:bg-red-700'
           }`}
         >
           <span className="leading-none">V2</span>
@@ -65,6 +68,22 @@ const ProbePage: React.FC = () => {
             {t.label}
           </button>
         ))}
+        {/* ⌐◨-◨ copy-paste, restored from probe.wtf's old header */}
+        <button
+          type="button"
+          title="Copy"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText('⌐◨-◨');
+              toast.success('⌐◨-◨ copied', { duration: 3000 });
+            } catch (err) {
+              console.error('Failed to copy:', err);
+            }
+          }}
+          className="ml-auto shrink-0 cursor-grab self-center px-2 text-xs font-bold text-gray-600 transition-colors hover:text-black sm:text-sm"
+        >
+          {'⌐◨-◨'}
+        </button>
       </div>
 
       {tab === 'v2' && (
