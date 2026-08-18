@@ -46,6 +46,13 @@ const sepoliaPrimary =
 const transports = {
   [mainnet.id]: fallback([
     http(mainnetPrimary, { timeout: HTTP_TIMEOUT }),
+    // publicnode: first fallback — healthy + CORS-enabled again (verified
+    // 2026-08-18; the July anon-403 episode has cleared). Critical because the
+    // dRPC free plan 400s heavy calls (getLogs >10k blocks, batches >3), and
+    // the two below are effectively dead: 1rpc.io is over its free-plan quota
+    // and eth.merkle.io 429s browser CORS preflights. Kept at the tail anyway
+    // in case they recover.
+    http('https://ethereum-rpc.publicnode.com', { timeout: HTTP_TIMEOUT }),
     http('https://1rpc.io/eth', { timeout: HTTP_TIMEOUT }),
     http('https://eth.merkle.io', { timeout: HTTP_TIMEOUT }),
     ...(import.meta.env.VITE_MAINNET_WSRPC !== undefined
