@@ -7,22 +7,28 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import pg from 'pg';
 import { bridgePublish } from './bridge.js';
+import type { WatchedDao } from './constants.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface Reservation {
   id: string;
-  wallet: string;             // tipper address (checksummed)
-  tipTxHash: string;          // transaction hash of the tip
-  tipChainId: number;         // chain ID where tip was sent
-  tipAmountEth: number;       // tip amount in ETH
-  traits: string[];           // e.g. ["head:shark", "glasses:blue"]
-  settleFor?: string;         // optional: settle to a different address
+  wallet: string; // tipper address (checksummed)
+  tipTxHash: string; // transaction hash of the tip
+  tipChainId: number; // chain ID where tip was sent
+  tipAmountEth: number; // tip amount in ETH
+  traits: string[]; // e.g. ["head:shark", "glasses:blue"]
+  // Which DAO's mints this reservation targets. The watcher only matches it
+  // against that DAO's predictions. Rows created before the dual-DAO refactor
+  // have no stored value and are defaulted to 'v1' at load (every historical
+  // reservation was booked through the V1 dreams widget).
+  dao: WatchedDao;
+  settleFor?: string; // optional: settle to a different address
   status: 'pending_verification' | 'active' | 'fulfilled' | 'expired' | 'cancelled';
-  createdAt: number;          // unix timestamp (seconds)
-  fulfilledAt?: number;       // when settled
-  fulfilledNounId?: number;   // which noun was settled
-  fulfilledTxHash?: string;   // settlement tx hash
+  createdAt: number; // unix timestamp (seconds)
+  fulfilledAt?: number; // when settled
+  fulfilledNounId?: number; // which noun was settled
+  fulfilledTxHash?: string; // settlement tx hash
 }
 
 export interface Settlement {
@@ -32,8 +38,9 @@ export interface Settlement {
   reservationId: string;
   matchedTraits: Record<string, string>; // category → matched name
   blockNumber: number;
-  settledAt: number;          // unix timestamp
+  settledAt: number; // unix timestamp
   gasUsed?: string;
+  dao?: WatchedDao; // which DAO was settled (absent on pre-dual-DAO rows)
 }
 
 // ─── Postgres Pool ────────────────────────────────────────────────────────
@@ -44,7 +51,7 @@ let pool: pg.Pool | null = null;
 if (DATABASE_URL) {
   pool = new pg.Pool({
     connectionString: DATABASE_URL,
-    max: 3,               // small pool — agent doesn't need many connections
+    max: 3, // small pool — agent doesn't need many connections
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
   });
@@ -88,10 +95,16 @@ const INIT_SQL = `
   CREATE INDEX IF NOT EXISTS idx_reservations_status ON nounirl_reservations(status);
   CREATE INDEX IF NOT EXISTS idx_reservations_wallet ON nounirl_reservations(wallet);
   CREATE INDEX IF NOT EXISTS idx_reservations_tip_tx ON nounirl_reservations(tip_tx_hash);
+
+  -- Dual-DAO migration: pre-existing rows default to 'v1' (all historical
+  -- reservations were booked against the original Nouns DAO).
+  ALTER TABLE nounirl_reservations ADD COLUMN IF NOT EXISTS dao TEXT NOT NULL DEFAULT 'v1';
+  ALTER TABLE nounirl_settlements ADD COLUMN IF NOT EXISTS dao TEXT;
 `;
 
 // ─── Row ↔ Type Conversions ───────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToReservation(row: any): Reservation {
   return {
     id: row.id,
@@ -100,6 +113,7 @@ function rowToReservation(row: any): Reservation {
     tipChainId: row.tip_chain_id,
     tipAmountEth: row.tip_amount_eth,
     traits: row.traits,
+    dao: row.dao === 'v2' ? 'v2' : 'v1',
     settleFor: row.settle_for || undefined,
     status: row.status,
     createdAt: row.created_at,
@@ -109,6 +123,7 @@ function rowToReservation(row: any): Reservation {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToSettlement(row: any): Settlement {
   return {
     id: row.id,
@@ -119,6 +134,7 @@ function rowToSettlement(row: any): Settlement {
     blockNumber: row.block_number,
     settledAt: row.settled_at,
     gasUsed: row.gas_used || undefined,
+    dao: row.dao === 'v2' ? 'v2' : row.dao === 'v1' ? 'v1' : undefined,
   };
 }
 
@@ -134,7 +150,8 @@ export interface SettleAttempt {
   nounId: number;
   matched: boolean; // true = traits matched a reservation, false = predicted-vs-actual missed
   reservationId?: string;
-  at: number;       // unix seconds
+  dao?: WatchedDao; // which DAO the settle targeted
+  at: number; // unix seconds
 }
 
 const SETTLE_ATTEMPT_RING_SIZE = 10;
@@ -154,7 +171,7 @@ class ReservationStore {
     this.loadFromFile();
     // Async init Postgres (creates tables, loads data)
     if (pool) {
-      this.initPostgres().catch((err) => {
+      this.initPostgres().catch(err => {
         console.error('[NounIRL] Postgres init failed — using file fallback:', err);
       });
     }
@@ -171,7 +188,7 @@ class ReservationStore {
     };
     this.reservations.set(reservation.id, reservation);
     this.dirty = true;
-    this.persistReservation(reservation);
+    void this.persistReservation(reservation);
     return reservation;
   }
 
@@ -181,18 +198,15 @@ class ReservationStore {
 
   getByWallet(wallet: string): Reservation[] {
     const lower = wallet.toLowerCase();
-    return Array.from(this.reservations.values())
-      .filter(r => r.wallet.toLowerCase() === lower);
+    return Array.from(this.reservations.values()).filter(r => r.wallet.toLowerCase() === lower);
   }
 
   getActive(): Reservation[] {
-    return Array.from(this.reservations.values())
-      .filter(r => r.status === 'active');
+    return Array.from(this.reservations.values()).filter(r => r.status === 'active');
   }
 
   getAll(): Reservation[] {
-    return Array.from(this.reservations.values())
-      .sort((a, b) => b.createdAt - a.createdAt);
+    return Array.from(this.reservations.values()).sort((a, b) => b.createdAt - a.createdAt);
   }
 
   activate(id: string): void {
@@ -200,7 +214,7 @@ class ReservationStore {
     if (r && r.status === 'pending_verification') {
       r.status = 'active';
       this.dirty = true;
-      this.updateReservationStatus(r);
+      void this.updateReservationStatus(r);
 
       bridgePublish('reservation-activated', {
         reservationId: r.id,
@@ -230,10 +244,10 @@ class ReservationStore {
   private async updateTipAmountInPg(id: string, amountEth: number): Promise<void> {
     if (!pool || !this.pgReady) return;
     try {
-      await pool.query(
-        `UPDATE nounirl_reservations SET tip_amount_eth = $1 WHERE id = $2`,
-        [amountEth, id],
-      );
+      await pool.query(`UPDATE nounirl_reservations SET tip_amount_eth = $1 WHERE id = $2`, [
+        amountEth,
+        id,
+      ]);
     } catch (err) {
       console.error('[NounIRL] Failed to update tip_amount_eth in Postgres:', err);
     }
@@ -247,7 +261,7 @@ class ReservationStore {
       r.fulfilledNounId = nounId;
       r.fulfilledTxHash = txHash;
       this.dirty = true;
-      this.updateReservationStatus(r);
+      void this.updateReservationStatus(r);
 
       bridgePublish('reservation-fulfilled', {
         reservationId: r.id,
@@ -264,7 +278,7 @@ class ReservationStore {
     if (r && (r.status === 'active' || r.status === 'pending_verification')) {
       r.status = 'cancelled';
       this.dirty = true;
-      this.updateReservationStatus(r);
+      void this.updateReservationStatus(r);
     }
   }
 
@@ -272,9 +286,11 @@ class ReservationStore {
   isTxUsed(txHash: string): boolean {
     // Only block reuse if the tx is tied to an active or fulfilled reservation.
     // Cancelled/expired reservations free up the tx hash for rebooking.
-    return Array.from(this.reservations.values())
-      .some(r => r.tipTxHash.toLowerCase() === txHash.toLowerCase()
-        && (r.status === 'active' || r.status === 'pending_verification' || r.status === 'fulfilled'));
+    return Array.from(this.reservations.values()).some(
+      r =>
+        r.tipTxHash.toLowerCase() === txHash.toLowerCase() &&
+        (r.status === 'active' || r.status === 'pending_verification' || r.status === 'fulfilled'),
+    );
   }
 
   // ── Settlements ───────────────────────────────────────────────────────
@@ -283,7 +299,7 @@ class ReservationStore {
     const s: Settlement = { ...settlement, id: crypto.randomUUID() };
     this.settlements.push(s);
     this.dirty = true;
-    this.persistSettlement(s);
+    void this.persistSettlement(s);
     return s;
   }
 
@@ -356,7 +372,7 @@ class ReservationStore {
 
       // Load reservations from Postgres
       const resResult = await pool.query(
-        'SELECT * FROM nounirl_reservations ORDER BY created_at DESC'
+        'SELECT * FROM nounirl_reservations ORDER BY created_at DESC',
       );
       for (const row of resResult.rows) {
         const r = rowToReservation(row);
@@ -366,13 +382,17 @@ class ReservationStore {
 
       // Load settlements from Postgres
       const setResult = await pool.query(
-        'SELECT * FROM nounirl_settlements ORDER BY settled_at ASC'
+        'SELECT * FROM nounirl_settlements ORDER BY settled_at ASC',
       );
       this.settlements = setResult.rows.map(rowToSettlement);
 
       this.pgReady = true;
-      const activeCount = Array.from(this.reservations.values()).filter(r => r.status === 'active').length;
-      console.log(`[NounIRL] Loaded ${resResult.rows.length} reservations (${activeCount} active) and ${setResult.rows.length} settlements from Postgres`);
+      const activeCount = Array.from(this.reservations.values()).filter(
+        r => r.status === 'active',
+      ).length;
+      console.log(
+        `[NounIRL] Loaded ${resResult.rows.length} reservations (${activeCount} active) and ${setResult.rows.length} settlements from Postgres`,
+      );
     } catch (err) {
       console.error('[NounIRL] Failed to init Postgres tables:', err);
     }
@@ -385,14 +405,28 @@ class ReservationStore {
     if (!pool || !this.pgReady) return;
     try {
       await pool.query(
-        `INSERT INTO nounirl_reservations (id, wallet, tip_tx_hash, tip_chain_id, tip_amount_eth, traits, settle_for, status, created_at, fulfilled_at, fulfilled_noun_id, fulfilled_tx_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `INSERT INTO nounirl_reservations (id, wallet, tip_tx_hash, tip_chain_id, tip_amount_eth, traits, settle_for, status, created_at, fulfilled_at, fulfilled_noun_id, fulfilled_tx_hash, dao)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (id) DO UPDATE SET
            status = EXCLUDED.status,
            fulfilled_at = EXCLUDED.fulfilled_at,
            fulfilled_noun_id = EXCLUDED.fulfilled_noun_id,
            fulfilled_tx_hash = EXCLUDED.fulfilled_tx_hash`,
-        [r.id, r.wallet, r.tipTxHash, r.tipChainId, r.tipAmountEth, JSON.stringify(r.traits), r.settleFor || null, r.status, r.createdAt, r.fulfilledAt || null, r.fulfilledNounId || null, r.fulfilledTxHash || null]
+        [
+          r.id,
+          r.wallet,
+          r.tipTxHash,
+          r.tipChainId,
+          r.tipAmountEth,
+          JSON.stringify(r.traits),
+          r.settleFor || null,
+          r.status,
+          r.createdAt,
+          r.fulfilledAt || null,
+          r.fulfilledNounId || null,
+          r.fulfilledTxHash || null,
+          r.dao,
+        ],
       );
     } catch (err) {
       console.error('[NounIRL] Failed to persist reservation to Postgres:', err);
@@ -407,7 +441,13 @@ class ReservationStore {
     try {
       await pool.query(
         `UPDATE nounirl_reservations SET status = $1, fulfilled_at = $2, fulfilled_noun_id = $3, fulfilled_tx_hash = $4 WHERE id = $5`,
-        [r.status, r.fulfilledAt || null, r.fulfilledNounId || null, r.fulfilledTxHash || null, r.id]
+        [
+          r.status,
+          r.fulfilledAt || null,
+          r.fulfilledNounId || null,
+          r.fulfilledTxHash || null,
+          r.id,
+        ],
       );
     } catch (err) {
       console.error('[NounIRL] Failed to update reservation in Postgres:', err);
@@ -421,10 +461,20 @@ class ReservationStore {
     if (!pool || !this.pgReady) return;
     try {
       await pool.query(
-        `INSERT INTO nounirl_settlements (id, noun_id, tx_hash, reservation_id, matched_traits, block_number, settled_at, gas_used)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO nounirl_settlements (id, noun_id, tx_hash, reservation_id, matched_traits, block_number, settled_at, gas_used, dao)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO NOTHING`,
-        [s.id, s.nounId, s.txHash, s.reservationId, JSON.stringify(s.matchedTraits), s.blockNumber, s.settledAt, s.gasUsed || null]
+        [
+          s.id,
+          s.nounId,
+          s.txHash,
+          s.reservationId,
+          JSON.stringify(s.matchedTraits),
+          s.blockNumber,
+          s.settledAt,
+          s.gasUsed || null,
+          s.dao || null,
+        ],
       );
     } catch (err) {
       console.error('[NounIRL] Failed to persist settlement to Postgres:', err);
@@ -438,10 +488,20 @@ class ReservationStore {
       if (existsSync(PERSISTENCE_PATH)) {
         const raw = readFileSync(PERSISTENCE_PATH, 'utf-8');
         const data = JSON.parse(raw) as Reservation[];
+        let defaulted = 0;
         for (const r of data) {
+          if (r.dao !== 'v1' && r.dao !== 'v2') {
+            r.dao = 'v1';
+            defaulted++;
+          }
           this.reservations.set(r.id, r);
         }
         console.log(`[NounIRL] Loaded ${data.length} reservations from file fallback`);
+        if (defaulted > 0) {
+          console.warn(
+            `[NounIRL] ${defaulted} pre-dual-DAO reservation(s) had no dao — defaulted to 'v1'`,
+          );
+        }
       }
     } catch (err) {
       console.error('[NounIRL] Failed to load reservations from file:', err);
@@ -465,10 +525,7 @@ class ReservationStore {
         PERSISTENCE_PATH,
         JSON.stringify(Array.from(this.reservations.values()), null, 2),
       );
-      writeFileSync(
-        SETTLEMENTS_PATH,
-        JSON.stringify(this.settlements, null, 2),
-      );
+      writeFileSync(SETTLEMENTS_PATH, JSON.stringify(this.settlements, null, 2));
       this.dirty = false;
     } catch (err) {
       console.error('[NounIRL] Failed to persist to file:', err);

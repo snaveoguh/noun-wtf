@@ -10,12 +10,11 @@
 // the result per-DAO and use it in `predictSeed()`. Log loudly + emit a bridge
 // event when a count changes vs the previous cached snapshot.
 //
-// SCOPE: both Nouns DAO V1 and V2. The bot watches one DAO per process
-// (NOUNIRL_WATCH_DAO), but we refresh BOTH so the `/api/agent/predict?dao=v2`
-// debug endpoint stays correct regardless of which DAO this process watches.
-// The fallback to the hardcoded counts (`TRAIT_COUNTS` / `TRAIT_COUNTS_V2`)
-// keeps prediction working if a live descriptor call fails at startup (with a
-// loud warning).
+// SCOPE: both Nouns DAO V1 and V2 — the watcher runs both DAOs off one block
+// feed, so both caches are load-bearing (each DAO's predictSeed pulls its own
+// counts). The fallback to the hardcoded counts (`TRAIT_COUNTS` /
+// `TRAIT_COUNTS_V2`) keeps prediction working if a live descriptor call fails
+// at startup (with a loud warning).
 
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { mainnet } from 'viem/chains';
@@ -26,7 +25,6 @@ import {
   selectAddresses,
   TRAIT_COUNTS,
   TRAIT_COUNTS_V2,
-  WATCHED_DAO,
   type WatchedDao,
 } from './constants.js';
 
@@ -154,19 +152,16 @@ export function getRecentTraitChanges(): TraitChangeRecord[] {
 /**
  * Synchronous accessor for the cached trait counts. Always returns a snapshot —
  * before the first successful refresh this is the hardcoded fallback so that
- * `predictSeed()` never crashes. Defaults to the DAO this process watches.
+ * `predictSeed()` never crashes.
  */
-export function getTraitCounts(dao: WatchedDao = WATCHED_DAO): TraitCounts {
+export function getTraitCounts(dao: WatchedDao = 'v1'): TraitCounts {
   return cache[dao].counts;
 }
 
 /**
  * Full snapshot including provenance for the `/api/agent/status` endpoint.
- * Defaults to the DAO this process watches.
  */
-export function getTraitCountsSnapshot(
-  dao: WatchedDao = WATCHED_DAO,
-): TraitCountsSnapshot {
+export function getTraitCountsSnapshot(dao: WatchedDao = 'v1'): TraitCountsSnapshot {
   return cache[dao];
 }
 
@@ -248,9 +243,7 @@ async function refreshOne(client: PublicClient, dao: WatchedDao): Promise<void> 
       );
     }
 
-    const changed = (Object.keys(next) as (keyof TraitCounts)[]).filter(
-      k => prev[k] !== next[k],
-    );
+    const changed = (Object.keys(next) as (keyof TraitCounts)[]).filter(k => prev[k] !== next[k]);
 
     if (prevSource === 'live' && changed.length > 0) {
       console.warn(
@@ -282,8 +275,8 @@ async function refreshOne(client: PublicClient, dao: WatchedDao): Promise<void> 
 
 /**
  * Run one refresh against both DAOs' live descriptors. Safe to call repeatedly.
- * Returns the snapshot for the DAO this process watches (for callers that want
- * the post-refresh result of their own DAO).
+ * Returns the V1 snapshot (callers wanting a specific DAO should use
+ * `getTraitCountsSnapshot(dao)` after this resolves).
  */
 export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
   const client: PublicClient = createPublicClient({
@@ -293,7 +286,7 @@ export async function refreshTraitCounts(): Promise<TraitCountsSnapshot> {
 
   await Promise.all([refreshOne(client, 'v1'), refreshOne(client, 'v2')]);
 
-  return cache[WATCHED_DAO];
+  return cache.v1;
 }
 
 /**

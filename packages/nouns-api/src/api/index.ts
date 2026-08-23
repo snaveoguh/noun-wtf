@@ -174,7 +174,7 @@ import {
   NOUNS_TOKEN_ADDRESS,
   NOUNS_TOKEN_ABI,
   MIN_NOUNS_FOR_DEPLOY,
-  WATCHED_DAO,
+  type WatchedDao,
 } from '../agent/constants.js';
 import ImageDataV1ForTraits from '../agent/image-data-v1.json';
 import ImageDataV2ForTraits from '../agent/image-data-v2.json';
@@ -212,8 +212,6 @@ import {
   buildPeopleContext,
   detectFunction,
   buildFunctionSkillPromptSnippet,
-  predictSeed,
-  seedToTraitNames,
   getTraitCountsSnapshot,
   getRecentTraitChanges,
 } from '../agent/index.js';
@@ -3282,18 +3280,22 @@ async function parseCommand(
     const state = getWatcherState();
     const stats = reservationStore.stats();
     const walletRes = wallet ? reservationStore.getByWallet(wallet) : [];
+    const daoLines = (['v1', 'v2'] as const)
+      .map(dao => {
+        const d = state.daos[dao];
+        return `- ${dao.toUpperCase()}: next noun #${d.nextNounId} — ${d.lastPredictedTraits ? JSON.stringify(d.lastPredictedTraits) : 'computing...'}
+  standing targets: ${d.standingTraits.length > 0 ? d.standingTraits.join(', ') : 'none'} | active reservations: ${d.activeReservations}`;
+      })
+      .join('\n');
     return {
       handled: true,
-      response: `Agent NounIRL status:
+      response: `Agent NounIRL status (watching BOTH DAOs):
 - Running: ${state.running}
 - Transport: ${state.transportMode}
 - Last block: ${state.lastBlockNumber}
-- Next noun ID: ${state.nextNounId}
-- Predicted traits: ${state.lastPredictedTraits ? JSON.stringify(state.lastPredictedTraits) : 'computing...'}
-- Standing targets (always hunted, no reservation needed): ${state.standingTraits.length > 0 ? state.standingTraits.join(', ') : 'none'}
-- Active reservations: ${stats.active}
+${daoLines}
 - Total settlements: ${stats.totalSettlements}
-- Your reservations: ${walletRes.length > 0 ? walletRes.map(r => `${r.id.slice(0, 8)} (${r.traits.join(', ')}) [${r.status}]`).join('; ') : 'none'} ⌐◨-◨`,
+- Your reservations: ${walletRes.length > 0 ? walletRes.map(r => `${r.id.slice(0, 8)} [${r.dao}] (${r.traits.join(', ')}) [${r.status}]`).join('; ') : 'none'} ⌐◨-◨`,
     };
   }
 
@@ -3331,7 +3333,7 @@ async function parseCommand(
     return {
       handled: true,
       response: res
-        .map(r => `[${r.id.slice(0, 8)}] ${r.traits.join(', ')} — ${r.status}`)
+        .map(r => `[${r.id.slice(0, 8)}] [${r.dao}] ${r.traits.join(', ')} — ${r.status}`)
         .join('\n'),
     };
   }
@@ -4181,24 +4183,28 @@ app.post('/api/chat', async c => {
       const stats = reservationStore.stats();
       const walletReservations = wallet ? reservationStore.getByWallet(wallet) : [];
 
-      dynamicContext += `\n\nLIVE AGENT STATE:
+      const daoContextLines = (['v1', 'v2'] as const)
+        .map(dao => {
+          const d = watcherState.daos[dao];
+          return `- ${dao.toUpperCase()} (${dao === 'v1' ? 'main Nouns DAO' : 'NounV2'}): next noun #${d.nextNounId}, auction ends ${d.auctionEndTime ? new Date(d.auctionEndTime * 1000).toISOString() : 'unknown'}, predicted traits ${d.lastPredictedTraits ? JSON.stringify(d.lastPredictedTraits) : 'computing...'}, standing targets ${d.standingTraits.length > 0 ? JSON.stringify(d.standingTraits) : 'none'}, active reservations ${d.activeReservations}`;
+        })
+        .join('\n');
+
+      dynamicContext += `\n\nLIVE AGENT STATE (ONE watcher covers BOTH DAOs simultaneously):
 - Running: ${watcherState.running}
 - Transport: ${watcherState.transportMode} ${watcherState.transportMode === 'websocket' ? '(instant block headers via WSS)' : '(HTTP polling fallback)'}
 - Last block: ${watcherState.lastBlockNumber}
-- Next noun ID: ${watcherState.nextNounId}
-- Auction ends: ${watcherState.auctionEndTime ? new Date(watcherState.auctionEndTime * 1000).toISOString() : 'unknown'}
-- Predicted traits: ${watcherState.lastPredictedTraits ? JSON.stringify(watcherState.lastPredictedTraits) : 'computing...'}
-- Standing targets (ALWAYS auto-hunted for free, no reservation needed): ${watcherState.standingTraits.length > 0 ? JSON.stringify(watcherState.standingTraits) : 'none'}
-- Active reservations: ${stats.active}
+${daoContextLines}
+- Standing targets are ALWAYS auto-hunted for free, no reservation needed.
 - Total settlements: ${stats.totalSettlements}
 - Caller wallet: ${wallet || 'not connected'}
-- Caller's reservations: ${walletReservations.length > 0 ? JSON.stringify(walletReservations.map(r => ({ id: r.id.slice(0, 8), traits: r.traits, status: r.status }))) : 'none'}
+- Caller's reservations: ${walletReservations.length > 0 ? JSON.stringify(walletReservations.map(r => ({ id: r.id.slice(0, 8), dao: r.dao, traits: r.traits, status: r.status }))) : 'none'}
 
 TOOLS — YOU HAVE REAL ONCHAIN CAPABILITIES:
 You have the following tools. USE THEM. Don't just describe what you would do — actually call the tool.
 
 1. verify_tip(txHash, chainId) — Verify an ETH tip to nounirl.eth. Returns { valid, amountEth, from, chainName }.
-2. create_reservation(wallet, txHash, chainId, traits[]) — Create a trait reservation backed by a verified tip. The block watcher auto-settles when traits match.
+2. create_reservation(wallet, txHash, chainId, traits[], dao?) — Create a trait reservation backed by a verified tip. dao='v1' (main Nouns, default) or 'v2' (NounV2) — the watcher covers both and only matches a reservation against its own DAO's mints. The block watcher auto-settles when traits match.
 3. get_reservations(wallet?) — List reservations, optionally filtered by wallet.
 4. cancel_reservation(reservationId) — Cancel a reservation.
 5. check_block() — Force a block check. Returns predicted traits, block number, next noun ID, auction status, matching reservations.
@@ -4297,6 +4303,12 @@ CRITICAL RULES:
                 items: { type: 'string' },
                 description:
                   'Array of desired traits in "category:value" format, e.g. ["head:shark", "glasses:blue"]. All must match (AND logic).',
+              },
+              dao: {
+                type: 'string',
+                enum: ['v1', 'v2'],
+                description:
+                  "Which DAO's mints to watch: 'v1' = main Nouns DAO (default), 'v2' = NounV2.",
               },
             },
             required: ['wallet', 'txHash', 'chainId', 'traits'],
@@ -5300,6 +5312,7 @@ CRITICAL RULES:
                 txHash: string;
                 chainId: number;
                 traits: string[];
+                dao?: string;
               };
               // Check if tx already used
               if (reservationStore.isTxUsed(input.txHash)) {
@@ -5315,6 +5328,7 @@ CRITICAL RULES:
                   tipChainId: input.chainId,
                   tipAmountEth: 0,
                   traits: input.traits,
+                  dao: input.dao === 'v2' ? 'v2' : 'v1',
                 });
                 // Verify tip and activate async
                 verifyTip(input.txHash, input.chainId)
@@ -5346,6 +5360,7 @@ CRITICAL RULES:
                   reservationId: reservation.id,
                   status: reservation.status,
                   traits: reservation.traits,
+                  dao: reservation.dao,
                   message:
                     'Reservation created. Tip is being verified — it will auto-activate once confirmed onchain.',
                 };
@@ -5363,6 +5378,7 @@ CRITICAL RULES:
                   id: r.id,
                   wallet: r.wallet,
                   traits: r.traits,
+                  dao: r.dao,
                   status: r.status,
                   tipAmountEth: r.tipAmountEth,
                   tipChainId: r.tipChainId,
@@ -8003,43 +8019,38 @@ app.get('/api/treasury/flows', async c => {
 // ============================================================
 
 // ── Agent Predict (fast — no auth, no Claude, ~1ms) ─────────────────────
-// Serves the block-watcher's cached prediction for the DAO it is actually
-// watching (NOUNIRL_WATCH_DAO) — the old version hardcoded `dao: 'v1'` on
-// the no-arg path, which silently lied the moment the watcher moved to V2
-// (clients then decoded V2 seeds with V1 art). `?dao=v1|v2` recomputes the
-// seed under that DAO's seeder rules against the same cached
-// blockHash/nextNounId. NOTE: the cached nextNounId belongs to the WATCHED
-// dao, so a cross-DAO recompute is a rules-preview, not a real prediction
-// of that DAO's next noun — `crossDao: true` flags this.
+// The watcher runs BOTH DAOs off one block feed, so `?dao=v1|v2` selects that
+// DAO's NATIVE cached prediction — its own nextNounId, auction end and seed.
+// (The old cross-DAO "recompute under the other DAO's seeder rules" hack is
+// gone; every response is a real prediction of that DAO's next noun.)
+// Default dao is v1, matching the main-site consumers.
 app.get('/api/agent/predict', c => {
   const w = getWatcherState();
   const q = c.req.query('dao');
-  const dao = q === 'v2' ? 'v2' : q === 'v1' ? 'v1' : WATCHED_DAO;
-
-  let seed = w.lastPredictedSeed;
-  let traits = w.lastPredictedTraits;
-
-  if (dao !== WATCHED_DAO && w.lastBlockHash != null && w.nextNounId > 0) {
-    seed = predictSeed(w.lastBlockHash, w.nextNounId, { dao });
-    traits = seedToTraitNames(seed, dao);
-  }
+  const dao: WatchedDao = q === 'v2' ? 'v2' : 'v1';
+  const d = w.daos[dao];
 
   return c.json({
     block: w.lastBlockNumber,
-    nextNounId: w.nextNounId,
-    seed,
-    traits,
-    auctionEnd: w.auctionEndTime,
-    auctionEnded: w.auctionEndTime > 0 && Math.floor(Date.now() / 1000) >= w.auctionEndTime,
+    nextNounId: d.nextNounId,
+    seed: d.lastPredictedSeed,
+    traits: d.lastPredictedTraits,
+    auctionEnd: d.auctionEndTime,
+    auctionEnded: d.auctionEndTime > 0 && Math.floor(Date.now() / 1000) >= d.auctionEndTime,
     running: w.running,
     checkedAt: w.lastCheckedAt,
     dao,
-    watchedDao: WATCHED_DAO,
-    crossDao: dao !== WATCHED_DAO,
+    // Back-compat for clients that still read the single-DAO-era field.
+    watchedDao: dao,
+    crossDao: false,
   });
 });
 
 // ── Agent Status ────────────────────────────────────────────────────────
+// One watcher, both DAOs: `daos.v1` / `daos.v2` carry each DAO's own
+// prediction, auction state, standing targets and trait counts. The legacy
+// top-level fields (nextNounId, predictedTraits, …) mirror V1 for
+// pre-dual-DAO consumers.
 app.get('/api/agent/status', async c => {
   const watcherState = getWatcherState();
   const stats = reservationStore.stats();
@@ -8050,7 +8061,29 @@ app.get('/api/agent/status', async c => {
     /* ok */
   }
 
-  const traitCountsSnapshot = getTraitCountsSnapshot();
+  const daoSection = (dao: WatchedDao) => {
+    const d = watcherState.daos[dao];
+    const counts = getTraitCountsSnapshot(dao);
+    return {
+      dao,
+      auctionHouse: d.auctionHouse,
+      token: d.token,
+      nextNounId: d.nextNounId,
+      auctionEndTime: d.auctionEndTime,
+      predictedSeed: d.lastPredictedSeed,
+      predictedTraits: d.lastPredictedTraits,
+      standingTraits: d.standingTraits,
+      activeReservations: d.activeReservations,
+      traitCounts: {
+        counts: counts.counts,
+        source: counts.source,
+        descriptor: counts.descriptor,
+        fetchedAt: counts.fetchedAt,
+      },
+    };
+  };
+
+  const v1 = daoSection('v1');
 
   return c.json({
     agent: 'NounIRL',
@@ -8058,10 +8091,11 @@ app.get('/api/agent/status', async c => {
     running: watcherState.running,
     transport: watcherState.transportMode,
     lastBlock: watcherState.lastBlockNumber,
-    nextNounId: watcherState.nextNounId,
-    auctionEndTime: watcherState.auctionEndTime,
-    predictedSeed: watcherState.lastPredictedSeed,
-    predictedTraits: watcherState.lastPredictedTraits,
+    // Legacy top-level fields — mirror V1 (main DAO). Use `daos` for both.
+    nextNounId: v1.nextNounId,
+    auctionEndTime: v1.auctionEndTime,
+    predictedSeed: v1.predictedSeed,
+    predictedTraits: v1.predictedTraits,
     lastCheckedAt: watcherState.lastCheckedAt,
     totalBlocksChecked: watcherState.totalBlocksChecked,
     errors: watcherState.errors.slice(-5),
@@ -8071,13 +8105,12 @@ app.get('/api/agent/status', async c => {
     recentSettleAttempts: reservationStore.getRecentSettleAttempts(),
     canDeploy: canDeploy(),
     bridge: isBridgeConfigured() ? 'connected' : 'not configured',
-    traitCounts: {
-      counts: traitCountsSnapshot.counts,
-      source: traitCountsSnapshot.source,
-      descriptor: traitCountsSnapshot.descriptor,
-      fetchedAt: traitCountsSnapshot.fetchedAt,
-    },
+    traitCounts: v1.traitCounts,
     recentTraitChanges: getRecentTraitChanges(),
+    daos: {
+      v1,
+      v2: daoSection('v2'),
+    },
   });
 });
 
@@ -8085,12 +8118,13 @@ app.get('/api/agent/status', async c => {
 app.post('/api/agent/reserve', async c => {
   try {
     const body = await c.req.json();
-    const { wallet, txHash, chainId, traits, settleFor } = body as {
+    const { wallet, txHash, chainId, traits, settleFor, dao } = body as {
       wallet: string;
       txHash: string;
       chainId: number;
       traits: string[];
       settleFor?: string;
+      dao?: string;
     };
 
     // Validate inputs
@@ -8103,6 +8137,9 @@ app.post('/api/agent/reserve', async c => {
       traits.length === 0
     ) {
       return c.json({ error: 'Missing required fields: wallet, txHash, chainId, traits[]' }, 400);
+    }
+    if (dao !== undefined && dao !== 'v1' && dao !== 'v2') {
+      return c.json({ error: "Invalid dao — must be 'v1' or 'v2'" }, 400);
     }
 
     // Check if tx already used
@@ -8117,6 +8154,7 @@ app.post('/api/agent/reserve', async c => {
       tipChainId: chainId,
       tipAmountEth: 0, // will be updated after verification
       traits,
+      dao: dao === 'v2' ? 'v2' : 'v1',
       settleFor,
     });
 
@@ -8152,6 +8190,7 @@ app.post('/api/agent/reserve', async c => {
         id: reservation.id,
         status: reservation.status,
         traits: reservation.traits,
+        dao: reservation.dao,
         message: 'Reservation created — verifying tip transaction...',
       },
     });
@@ -8291,8 +8330,9 @@ app.get('/api/agent/traits/:category', c => {
     return c.json({ error: `Invalid category. Valid: ${validCategories.join(', ')}` }, 400);
   }
 
-  const names = getAllTraitNames(category);
-  return c.json({ category, count: names.length, traits: names });
+  const dao: WatchedDao = c.req.query('dao') === 'v2' ? 'v2' : 'v1';
+  const names = getAllTraitNames(category, dao);
+  return c.json({ category, dao, count: names.length, traits: names });
 });
 
 // ── Parse Natural Language Traits ───────────────────────────────────────
@@ -8310,20 +8350,32 @@ app.post('/api/agent/parse-traits', async c => {
 });
 
 // ── Manual Settlement (crystal ball twin-snipe) ────────────────────────
+// `?dao=v1|v2` (or JSON body {dao}) picks which DAO's auction to settle;
+// defaults to v1.
 app.post('/api/agent/settle', async c => {
   const w = getWatcherState();
   if (!w.running) {
     return c.json({ error: 'Watcher not running' }, 503);
   }
-  if (!w.auctionEndTime || Date.now() / 1000 < w.auctionEndTime) {
-    return c.json({ error: 'Auction not ended yet' }, 400);
+  let bodyDao: string | undefined;
+  try {
+    const body = (await c.req.json()) as { dao?: string };
+    bodyDao = body?.dao;
+  } catch {
+    /* no body is fine */
+  }
+  const rawDao = c.req.query('dao') ?? bodyDao;
+  const dao: WatchedDao = rawDao === 'v2' ? 'v2' : 'v1';
+  const d = w.daos[dao];
+  if (!d.auctionEndTime || Date.now() / 1000 < d.auctionEndTime) {
+    return c.json({ error: `${dao} auction not ended yet` }, 400);
   }
   try {
-    const result = await settleAuction();
+    const result = await settleAuction(dao);
     if (!result) {
       return c.json({ error: 'Settlement failed — wallet not configured or tx error' }, 500);
     }
-    return c.json({ txHash: result.txHash });
+    return c.json({ txHash: result.txHash, dao });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return c.json({ error: msg }, 500);
