@@ -8100,6 +8100,7 @@ app.get('/api/agent/status', async c => {
     totalBlocksChecked: watcherState.totalBlocksChecked,
     errors: watcherState.errors.slice(-5),
     standingTraits: watcherState.standingTraits,
+    settleGuard: watcherState.settleGuard,
     balanceEth: Math.round(balance * 10000) / 10000,
     reservations: stats,
     recentSettleAttempts: reservationStore.getRecentSettleAttempts(),
