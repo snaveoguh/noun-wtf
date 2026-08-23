@@ -199,6 +199,36 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
   functionName: 'settleCurrentAndCreateNewAuction',
 });
 
+// Optional exact-block guard. When NOUNIRL_SETTLER_ADDRESS is set, targeted
+// settles route through ExactBlockSettler.settleAtBlock(auctionHouse, target),
+// which reverts (~25k gas) unless the tx lands in EXACTLY the target block.
+// The minted noun's seed comes from blockhash(block.number - 1), so a settle
+// landing one block late mints a different noun than predicted — this guard
+// turns that into a cheap revert instead (see Noun #1984: predicted Wall,
+// landed 1 block late, got Porkbao). Contract: contracts/ExactBlockSettler.sol.
+// Stateless + takes the auction house as an arg, so ONE deployment serves both
+// DAOs. Unset → legacy direct-to-AH behaviour, including the manual settle
+// endpoint.
+const EXACT_BLOCK_SETTLER = ((): Hex | null => {
+  const raw = (process.env.NOUNIRL_SETTLER_ADDRESS ?? '').trim();
+  return /^0x[0-9a-fA-F]{40}$/.test(raw) ? (raw as Hex) : null;
+})();
+const SETTLER_ABI = [
+  {
+    type: 'function',
+    name: 'settleAtBlock',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'auctionHouse', type: 'address' },
+      { name: 'targetBlock', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const;
+if (EXACT_BLOCK_SETTLER) {
+  console.log(`[NounIRL] Exact-block settle guard active: ${EXACT_BLOCK_SETTLER}`);
+}
+
 // ─── Multi-Provider Config ───────────────────────────────────────────────
 // Race every endpoint, first block header wins.
 //
@@ -583,15 +613,31 @@ async function getCurrentAuction(
 
 let settleQueue: Promise<unknown> = Promise.resolve();
 
-export async function settleAuction(dao: WatchedDao = 'v1'): Promise<{ txHash: string } | null> {
-  const run = settleQueue.then(() => doSettleAuction(dao));
+export interface SettleOptions {
+  /**
+   * Block the settle MUST land in. Only honoured when NOUNIRL_SETTLER_ADDRESS
+   * is configured — the tx then routes through ExactBlockSettler.settleAtBlock
+   * and reverts if it misses the slot, instead of minting a mis-seeded noun.
+   * Omitted (manual settles): plain direct-to-AH settle, lands whenever.
+   */
+  targetBlock?: number;
+}
+
+export async function settleAuction(
+  dao: WatchedDao = 'v1',
+  opts?: SettleOptions,
+): Promise<{ txHash: string; guarded: boolean } | null> {
+  const run = settleQueue.then(() => doSettleAuction(dao, opts));
   // The queue itself must never reject, or one failure would poison all
   // subsequent fires.
   settleQueue = run.catch(() => undefined);
   return run;
 }
 
-async function doSettleAuction(dao: WatchedDao): Promise<{ txHash: string } | null> {
+async function doSettleAuction(
+  dao: WatchedDao,
+  opts?: SettleOptions,
+): Promise<{ txHash: string; guarded: boolean } | null> {
   if (!walletClient || !publicClient || !agentAccount) {
     console.error('[NounIRL] Cannot settle — wallet not configured');
     return null;
@@ -599,17 +645,36 @@ async function doSettleAuction(dao: WatchedDao): Promise<{ txHash: string } | nu
 
   const ds = daoStates[dao];
   const t0 = Date.now();
+  const guarded = Boolean(EXACT_BLOCK_SETTLER && opts?.targetBlock);
 
   try {
     console.log(
-      `[NounIRL] 🔥 SETTLING ${dao.toUpperCase()} — pre-signed: ${ds.preSignedTx ? 'YES' : 'NO'}`,
+      `[NounIRL] 🔥 SETTLING ${dao.toUpperCase()} — pre-signed: ${ds.preSignedTx ? 'YES' : 'NO'}${guarded ? ` (guarded → block ${opts?.targetBlock})` : ''}`,
     );
 
     let signedTx: Hex;
 
-    // FAST PATH: Use pre-signed transaction if nonce is still valid
     const currentNonce = await getLocalNonce();
-    if (
+    if (guarded && EXACT_BLOCK_SETTLER && opts?.targetBlock) {
+      // GUARDED PATH: fresh-sign a settleAtBlock() call. Can't use the
+      // pre-signed tx (target block is only known now); local signing costs
+      // ~1-2ms, which is noise next to broadcast latency.
+      signedTx = await agentAccount.signTransaction({
+        to: EXACT_BLOCK_SETTLER,
+        data: encodeFunctionData({
+          abi: SETTLER_ABI,
+          functionName: 'settleAtBlock',
+          args: [ds.auctionHouse, BigInt(opts.targetBlock)],
+        }),
+        gas: SETTLEMENT_GAS_LIMIT,
+        maxFeePerGas: SETTLEMENT_MAX_FEE,
+        maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
+        nonce: currentNonce,
+        chainId: 1,
+        type: 'eip1559' as const,
+      });
+    } else if (
+      // FAST PATH: Use pre-signed transaction if nonce is still valid
       ds.preSignedTx &&
       ds.preSignedNonce === currentNonce &&
       Date.now() - ds.preSignedAt < PRE_SIGN_TTL * 3
@@ -647,7 +712,7 @@ async function doSettleAuction(dao: WatchedDao): Promise<{ txHash: string } | nu
       `[NounIRL] ✅ ${dao.toUpperCase()} settlement tx assembled + fanned out in ${txTime}ms: ${hash}`,
     );
 
-    return { txHash: hash };
+    return { txHash: hash, guarded };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[NounIRL] ${dao} settlement failed after ${Date.now() - t0}ms:`, msg);
@@ -816,7 +881,7 @@ async function processDaoBlock(
         ds.lastFiredNounId = nextNounId;
         ds.lastFiredAt = Date.now();
 
-        const result = await settleAuction(dao);
+        const result = await settleAuction(dao, { targetBlock });
         if (result) {
           // Record as pending — only confirm after receipt verification
           console.log(
@@ -834,6 +899,7 @@ async function processDaoBlock(
           const settledBlock = num;
           const firedTargetBlock = targetBlock;
           const txHash = result.txHash;
+          const firedGuarded = result.guarded;
 
           // Wait for receipt, verify success, then verify actual onchain traits
           if (publicClient) {
@@ -860,10 +926,26 @@ async function processDaoBlock(
                 }
 
                 if (receipt.status !== 'success') {
-                  console.error(
-                    `[NounIRL] ❌ Settlement tx REVERTED — ${dao} Noun #${settledNounId} tx ${txHash}. Someone else settled first.`,
-                  );
-                  pushError(`${dao} settlement reverted for Noun #${settledNounId}: ${txHash}`);
+                  if (firedGuarded && blocksLate !== 0) {
+                    // Working as designed: the guard refused to settle outside
+                    // the target block, so the predicted noun was never minted
+                    // wrong. Cost: ~25k gas. The hunt continues.
+                    console.warn(
+                      `[NounIRL] 🛡️ ${dao} guard reverted — missed target block ${firedTargetBlock} (landed ${landedBlock}). Mis-seeded settle averted for Noun #${settledNounId}, still hunting.`,
+                    );
+                    pushError(
+                      `${dao} guard averted mis-seeded settle for Noun #${settledNounId} (missed block ${firedTargetBlock} by ${blocksLate})`,
+                    );
+                    // Clear this DAO's re-fire guard so the very next matching
+                    // block can fire again — the auction is still unsettled.
+                    ds.lastFiredNounId = -1;
+                    ds.lastFiredAt = 0;
+                  } else {
+                    console.error(
+                      `[NounIRL] ❌ Settlement tx REVERTED — ${dao} Noun #${settledNounId} tx ${txHash}. Someone else settled first.`,
+                    );
+                    pushError(`${dao} settlement reverted for Noun #${settledNounId}: ${txHash}`);
+                  }
                   return; // Reservation stays active
                 }
 
@@ -1180,6 +1262,7 @@ export function getWatcherState(): WatcherState & {
   lastPredictedTraits: TraitNames | null;
   activeReservations: number;
   standingTraits: string[];
+  settleGuard: Hex | null;
   daos: Record<WatchedDao, DaoPublicState>;
 } {
   const daos = {
@@ -1195,6 +1278,8 @@ export function getWatcherState(): WatcherState & {
     activeReservations: reservationStore.getActive().length,
     // Combined view, dao-prefixed so a flat list stays unambiguous.
     standingTraits: DAOS.flatMap(d => daoStates[d].standingSpecs.map(s => `${d}:${s}`)),
+    // ExactBlockSettler address when the guard is on (null = direct-to-AH).
+    settleGuard: EXACT_BLOCK_SETTLER,
     daos,
   };
 }
