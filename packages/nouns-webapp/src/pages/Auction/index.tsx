@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo } from 'react';
 
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { isNumber } from 'remeda';
 
 import Auction from '@/components/Auction';
@@ -8,6 +8,7 @@ import CurrentPropsBanner from '@/components/CurrentPropsBanner';
 import Documentation from '@/components/Documentation';
 import DreamsBanner from '@/components/DreamsBanner';
 import FundedPropsBanner from '@/components/FundedPropsBanner';
+import HomeCustomise from '@/components/HomeCustomise';
 import NocTicker from '@/components/NocTicker';
 import NoundryBanner from '@/components/NoundryBanner';
 import NounsIntroSection from '@/components/NounsIntroSection';
@@ -21,12 +22,17 @@ const LilNounsMintRow = React.lazy(() => import('@/components/LilNounsMintRow'))
 const OnchainFeed = React.lazy(() => import('@/components/OnchainFeed'));
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import useActiveDao from '@/hooks/useActiveDao';
+import { useHomeSections } from '@/hooks/useHomeSections';
 import { setOnDisplayAuctionNounId } from '@/state/slices/onDisplayAuction';
 import { nounPath, nounV2Path } from '@/utils/history';
+
 import type { Auction as IAuction } from '@/wrappers/nounsAuction';
+
 import { useV2SettledAuction } from '@/wrappers/nounV2Bids';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
 import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
+
+import classes from './AuctionPage.module.css';
 
 type AuctionPageProps = object;
 
@@ -38,6 +44,12 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
   const lastAuctionNounId = useAppSelector(state => state.onDisplayAuction.lastAuctionNounId);
   const { activeDao } = useActiveDao();
   const isV2 = activeDao === 'nounv2';
+
+  // Which optional home sections are switched on (default: none — just the
+  // noun + the auction) and which hero treatment to use. See
+  // `@/lib/homeSections` for the `?sections=` / `?hero=` + localStorage
+  // contract; the ⚙ customise popover under the hero edits the same state.
+  const { isEnabled, anyEnabled, heroStyle, applyUrlParams } = useHomeSections();
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -53,8 +65,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     requestedV2Id !== undefined &&
     v2LiveAuction !== undefined &&
     Number(v2LiveAuction.nounId) === requestedV2Id;
-  const pastV2NounId =
-    requestedV2Id !== undefined && !isLiveV2 ? BigInt(requestedV2Id) : undefined;
+  const pastV2NounId = requestedV2Id !== undefined && !isLiveV2 ? BigInt(requestedV2Id) : undefined;
   const v2Settled = useV2SettledAuction(pastV2NounId);
 
   // Build the auction object for the active route. V2 lacks an on-chain
@@ -69,10 +80,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     const requestedId = Number(auctionId);
     if (!Number.isFinite(requestedId) || requestedId < 0) return v2LiveAuction;
 
-    if (
-      v2LiveAuction !== undefined &&
-      Number(v2LiveAuction.nounId) === requestedId
-    ) {
+    if (v2LiveAuction !== undefined && Number(v2LiveAuction.nounId) === requestedId) {
       return v2LiveAuction;
     }
 
@@ -141,31 +149,59 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  // `?sections=` / `?hero=` are read once at module load for hard loads; this
+  // covers in-app navigation to a link that carries them.
+  useEffect(() => {
+    if (searchParams.has('sections') || searchParams.has('hero')) {
+      applyUrlParams(searchParams);
+    }
+  }, [searchParams, applyUrlParams]);
+
   return (
-    <div
-      style={{
-        background: 'linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%)',
-      }}
-    >
-      <Suspense fallback={<Bone w="100%" h={120} style={{ borderRadius: 0 }} />}>
-        <OnchainFeed />
-      </Suspense>
-      <Auction auction={onDisplayAuction} />
-      <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
-        <LilNounsMintRow />
-      </Suspense>
-      <FundedPropsBanner />
-      <div className="block lg:hidden">
-        <NocTicker />
+    <div className={`${classes.page} ${anyEnabled ? '' : classes.pageMinimal}`}>
+      {isEnabled('onchainWire') && (
+        <Suspense fallback={<Bone w="100%" h={120} style={{ borderRadius: 0 }} />}>
+          <OnchainFeed />
+        </Suspense>
+      )}
+
+      <div className={classes.hero}>
+        <Auction auction={onDisplayAuction} layout={heroStyle} />
       </div>
-      <PropdatesBanner />
-      <CurrentPropsBanner />
-      <DreamsBanner />
-      <NoundryBanner />
-      <div style={{ background: '#fff' }}>
-        <NounsIntroSection />
-        <Documentation backgroundColor="#ffffff" />
+
+      <div className={classes.bar}>
+        <nav className={classes.links} aria-label="Quick links">
+          <span className={classes.noggles} aria-hidden="true">
+            ⌐◨-◨
+          </span>
+          <Link to="/vote">Vote</Link>
+          <Link to="/explore/wallet">Wallet</Link>
+          <Link to="/playground">Playground</Link>
+        </nav>
+        <HomeCustomise />
       </div>
+
+      {isEnabled('lilNouns') && (
+        <Suspense fallback={<Bone w="100%" h={100} style={{ borderRadius: 0 }} />}>
+          <LilNounsMintRow />
+        </Suspense>
+      )}
+      {isEnabled('fundedProps') && <FundedPropsBanner />}
+      {isEnabled('nocTicker') && (
+        <div className="block lg:hidden">
+          <NocTicker />
+        </div>
+      )}
+      {isEnabled('propdates') && <PropdatesBanner />}
+      {isEnabled('currentProps') && <CurrentPropsBanner />}
+      {isEnabled('dreams') && <DreamsBanner />}
+      {isEnabled('noundry') && <NoundryBanner />}
+      {isEnabled('intro') && (
+        <div style={{ background: '#fff' }}>
+          <NounsIntroSection />
+          <Documentation backgroundColor="#ffffff" />
+        </div>
+      )}
     </div>
   );
 };

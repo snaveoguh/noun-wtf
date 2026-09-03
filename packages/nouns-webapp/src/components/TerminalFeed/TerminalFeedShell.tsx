@@ -10,7 +10,7 @@ import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import ActivityFeed from './ActivityFeed';
 import ChatHistory from './ChatHistory';
 import { normalizeTerminalErrorMessage } from './errorMessages';
-import { FILTER_TABS } from './eventFormatters';
+import { FILTER_TABS } from './eventRegistry';
 import TerminalPrompt from './TerminalPrompt';
 import { useActivityFeed } from './useActivityFeed';
 
@@ -153,20 +153,27 @@ export default function TerminalFeedShell() {
         </div>
       </div>
 
-      {/* Filter bar — 32px */}
+      {/* Filter bar — 32px. 17 tabs fit a 1280px viewport; narrower screens
+          scroll horizontally with the scrollbar hidden (rule below — scoped
+          here rather than index.css so the feed stays self-contained). */}
+      <style>{`
+        .terminal-filter-bar { scrollbar-width: none; -ms-overflow-style: none; }
+        .terminal-filter-bar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+      `}</style>
       <div
         style={{
           height: '32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
-          padding: '0 16px',
+          gap: '2px',
+          padding: '0 12px',
           borderBottom: '1px solid var(--theme-border)',
           flexShrink: 0,
           overflowX: 'auto',
           overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
         }}
-        className="terminal-scrollbar"
+        className="terminal-filter-bar"
       >
         {FILTER_TABS.map(tab => {
           const isActive = activeFilter === tab.key;
@@ -190,7 +197,7 @@ export default function TerminalFeedShell() {
                       : 'var(--theme-text-muted)',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  padding: '4px 10px',
+                  padding: '4px 8px',
                   borderRadius: 'var(--theme-radius-sm)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,

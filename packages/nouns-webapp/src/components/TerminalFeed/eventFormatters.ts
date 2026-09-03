@@ -1,5 +1,52 @@
-// ─── Event Type Configuration ──────────────────────────────────────────────
+/**
+ * Thin re-export barrel over `eventRegistry.ts`.
+ *
+ * Kept so the sunset shells (GameShell/GameFeed, CampShell, BerryShell) and
+ * anything else importing `EVENT_TYPES` / `formatEventDescription` /
+ * `extractAddresses` / `timeAgo` from this path keep compiling. New code
+ * should import from `./eventRegistry` directly.
+ */
+import type { ReactNode } from 'react';
 
+import {
+  EVENT_REGISTRY,
+  describeEvent,
+  type CandidateTitleLookup,
+  type EnsLookup,
+  type EventData,
+} from './eventRegistry';
+
+export type {
+  CandidateTitleLookup,
+  DescribeCtx,
+  EnsLookup,
+  EventData,
+  EventDef,
+  ExpandMode,
+  ProposalTitleLookup,
+  ResolvedEventDef,
+} from './eventRegistry';
+
+export {
+  EVENT_REGISTRY,
+  FILTER_TABS,
+  describeEvent,
+  ethFromWei,
+  extractAddresses,
+  fmtEth,
+  formatMarketplace,
+  formatStreamAmount,
+  getEventDef,
+  getEventLink,
+  getExpandableText,
+  humanDuration,
+  makeDescribeCtx,
+  prettifyCandidateId,
+  supportLabel,
+  timeAgo,
+} from './eventRegistry';
+
+/** Legacy shape consumed by the sunset shells. */
 export interface EventTypeConfig {
   label: string;
   color: string;
@@ -8,536 +55,20 @@ export interface EventTypeConfig {
   icon?: string;
 }
 
-export const EVENT_TYPES: Record<string, EventTypeConfig> = {
-  BID: { label: 'BID', color: '#60a5fa', filterKey: 'BID', icon: '💰' },
-  VOTE: { label: 'VOTE', color: '#c084fc', filterKey: 'VOTE', icon: '🗳' },
-  PROPOSAL_CREATED: { label: 'PROP', color: '#facc15', filterKey: 'PROPOSAL_CREATED', icon: '📜' },
-  AUCTION_SETTLED: { label: 'SETTLED', color: '#4ade80', filterKey: 'AUCTION_SETTLED', icon: '🔥' },
-  NOUN_CREATED: { label: 'NOUN', color: '#4ade80', filterKey: 'NOUN_CREATED', icon: '🔔' },
-  CANDIDATE_CREATED: {
-    label: 'CAND',
-    color: '#fb923c',
-    filterKey: 'CANDIDATE_CREATED',
-    icon: '📝',
-  },
-  CANDIDATE_SPONSORED: {
-    label: 'SPONSOR',
-    color: '#f472b6',
-    filterKey: 'CANDIDATE_SPONSORED',
-    icon: '✍️',
-  },
-  CANDIDATE_UPDATED: {
-    label: 'CAND-UPD',
-    color: '#fdba74',
-    filterKey: 'CANDIDATE_UPDATED',
-    icon: '✏️',
-  },
-  CANDIDATE_CANCELED: {
-    label: 'CAND-CXL',
-    color: '#f87171',
-    filterKey: 'CANDIDATE_CANCELED',
-    icon: '🗑',
-  },
-  CANDIDATE_PROMOTED: {
-    label: 'PROMOTED',
-    color: '#fde047',
-    filterKey: 'CANDIDATE_PROMOTED',
-    icon: '⬆️',
-  },
-  PROPOSAL_FEEDBACK: {
-    label: 'FEEDBACK',
-    color: '#94a3b8',
-    filterKey: 'PROPOSAL_FEEDBACK',
-    icon: '💬',
-  },
-  CANDIDATE_FEEDBACK: {
-    label: 'FEEDBACK',
-    color: '#94a3b8',
-    filterKey: 'CANDIDATE_FEEDBACK',
-    icon: '💬',
-  },
-  STREAM_CREATED: { label: 'STREAM', color: '#2dd4bf', filterKey: 'STREAM_CREATED', icon: '🌊' },
-  DELEGATION: { label: 'DELEG', color: '#e879f9', filterKey: 'DELEGATION', icon: '🤝' },
-  TRANSFER: { label: 'XFER', color: '#f9a8d4', filterKey: 'TRANSFER', icon: '↔️' },
-  PROPOSAL_QUEUED: { label: 'QUEUED', color: '#fbbf24', filterKey: 'PROPOSAL_QUEUED', icon: '⏳' },
-  PROPOSAL_EXECUTED: {
-    label: 'EXEC',
-    color: '#34d399',
-    filterKey: 'PROPOSAL_EXECUTED',
-    icon: '✅',
-  },
-  PROPOSAL_CANCELLED: {
-    label: 'CANCEL',
-    color: '#f87171',
-    filterKey: 'PROPOSAL_CANCELLED',
-    icon: '🚫',
-  },
-  PROPOSAL_VETOED: { label: 'VETOED', color: '#fb923c', filterKey: 'PROPOSAL_VETOED', icon: '⛔' },
-  GRANT_CREATED: { label: 'GRANT', color: '#22d3ee', filterKey: 'GRANT_CREATED', icon: '🎁' },
-  GRANT_VOTE: { label: 'GVOTE', color: '#67e8f9', filterKey: 'GRANT_VOTE', icon: '🗳' },
-  GRANT_QUEUED: { label: 'GQUEUE', color: '#a5f3fc', filterKey: 'GRANT_QUEUED', icon: '⏳' },
-  GRANT_EXECUTED: { label: 'GEXEC', color: '#06b6d4', filterKey: 'GRANT_EXECUTED', icon: '✅' },
-  GRANT_CANCELED: { label: 'GCANCEL', color: '#f87171', filterKey: 'GRANT_CANCELED', icon: '🚫' },
-  LIL_BID: { label: 'L-BID', color: '#93c5fd', filterKey: 'LIL_BID', icon: '💰' },
-  LIL_AUCTION_SETTLED: {
-    label: 'L-SETTLED',
-    color: '#86efac',
-    filterKey: 'LIL_AUCTION_SETTLED',
-    icon: '🔥',
-  },
-  LIL_NOUN_CREATED: {
-    label: 'L-NOUN',
-    color: '#86efac',
-    filterKey: 'LIL_NOUN_CREATED',
-    icon: '🔔',
-  },
-  LIL_VOTE: { label: 'L-VOTE', color: '#d8b4fe', filterKey: 'LIL_VOTE', icon: '🗳' },
-  LIL_PROPOSAL_CREATED: {
-    label: 'L-PROP',
-    color: '#fde047',
-    filterKey: 'LIL_PROPOSAL_CREATED',
-    icon: '📜',
-  },
-  LIL_TRANSFER: { label: 'L-XFER', color: '#fbcfe8', filterKey: 'LIL_TRANSFER', icon: '↔️' },
-  SALE: { label: 'SALE', color: '#f97316', filterKey: 'SALE', icon: '🏷' },
-  // NounV2 (fork) — all use red shades to make v2 activity visually distinct.
-  V2_BID: { label: 'V2-BID', color: '#ef4444', filterKey: 'V2_BID', icon: '💰' },
-  V2_SETTLED: { label: 'V2-SETTLED', color: '#dc2626', filterKey: 'V2_SETTLED', icon: '🔥' },
-  V2_AUCTION: { label: 'V2-AUCTION', color: '#f87171', filterKey: 'V2_AUCTION', icon: '🔔' },
-  V2_PROP: { label: 'V2-PROP', color: '#b91c1c', filterKey: 'V2_PROP', icon: '📜' },
-  V2_VOTE: { label: 'V2-VOTE', color: '#fca5a5', filterKey: 'V2_VOTE', icon: '🗳' },
-  V2_SALE: { label: 'V2-SALE', color: '#fb7185', filterKey: 'V2_SALE', icon: '🏷' },
-};
+/** Legacy static map (no data-dependent variants) derived from the registry. */
+export const EVENT_TYPES: Record<string, EventTypeConfig> = Object.fromEntries(
+  Object.entries(EVENT_REGISTRY).map(([type, d]) => [
+    type,
+    { label: d.label, color: d.color, filterKey: d.filterKey, icon: d.icon },
+  ]),
+);
 
-// Filter tabs shown in the UI
-/**
- * Filter tabs across the top of the terminal feed. `color` is the anchor used
- * by the disco-mode gradient ink on each label; it mirrors the matching
- * EVENT_CONFIG colour so the tab reads the same hue as the rows it filters.
- * `ALL` is null → CSS paints a rainbow.
- */
-export const FILTER_TABS: { key: string; label: string; color: string | null }[] = [
-  { key: '', label: 'ALL', color: null },
-  { key: 'BID', label: 'BIDS', color: '#60a5fa' },
-  { key: 'VOTE', label: 'VOTES', color: '#c084fc' },
-  { key: 'PROPOSAL_CREATED', label: 'PROPS', color: '#facc15' },
-  {
-    key: 'CANDIDATE_CREATED,CANDIDATE_SPONSORED,CANDIDATE_PROMOTED,CANDIDATE_UPDATED,CANDIDATE_FEEDBACK,CANDIDATE_CANCELED',
-    label: 'CAND',
-    color: '#fb923c',
-  },
-  { key: 'AUCTION_SETTLED', label: 'AUCTIONS', color: '#4ade80' },
-  { key: 'DELEGATION', label: 'DELEGATIONS', color: '#e879f9' },
-  { key: 'TRANSFER', label: 'TRANSFERS', color: '#f9a8d4' },
-  { key: 'CANDIDATE_SPONSORED', label: 'SPONSORS', color: '#f472b6' },
-  { key: 'STREAM_CREATED', label: 'STREAMS', color: '#2dd4bf' },
-  { key: 'GRANT_CREATED', label: 'GRANTS', color: '#22d3ee' },
-  {
-    key: 'LIL_BID,LIL_AUCTION_SETTLED,LIL_NOUN_CREATED,LIL_VOTE,LIL_PROPOSAL_CREATED,LIL_TRANSFER',
-    label: 'LIL',
-    color: '#93c5fd',
-  },
-  { key: 'SALE,V2_SALE', label: 'SALES', color: '#f97316' },
-  { key: '_V2', label: 'V2', color: '#ef4444' },
-  { key: '_CHAT', label: 'CHAT', color: '#a5f3fc' },
-];
-
-// ─── Address Formatting ────────────────────────────────────────────────────
-
-export type EnsLookup = (addr: string) => string | null;
-
-/** Look up a candidate's title by its candidateId (`${proposer}-${slug}`). */
-export type CandidateTitleLookup = (candidateId: string) => string | null;
-
-/** Look up a proposal's title by its numeric proposalId. */
-export type ProposalTitleLookup = (proposalId: number | string) => string | null;
-
-/** Pretty-print a candidate id / slug when no title is known. */
-export function prettifyCandidateId(candidateId: string): string {
-  // candidateId = `${proposer}-${slug}` where proposer is a 42-char 0x address.
-  const slug =
-    candidateId.startsWith('0x') && candidateId.length > 43 ? candidateId.slice(43) : candidateId;
-  // Slug is kebab-case, sometimes truncated. Humanize it.
-  return slug.replace(/-/g, ' ').slice(0, 60);
-}
-
-function resolveCandidateTitle(
-  candidateId: string | undefined,
-  lookup?: CandidateTitleLookup,
-): string {
-  if (!candidateId) return 'candidate';
-  const title = lookup?.(candidateId);
-  if (title) return title;
-  return prettifyCandidateId(candidateId);
-}
-
-function shortAddr(addr: string): string {
-  if (!addr || addr.length < 10) return addr || '???';
-  return `${addr.slice(0, 6)}..${addr.slice(-4)}`;
-}
-
-function resolveAddr(addr: string, ensLookup?: EnsLookup): string {
-  if (ensLookup) {
-    const name = ensLookup(addr);
-    if (name) return name;
-  }
-  return shortAddr(addr);
-}
-
-function ethFromWei(wei: string): string {
-  try {
-    const eth = Number(wei) / 1e18;
-    if (eth === 0) return '0';
-    if (eth < 0.001) return '<0.001';
-    return eth.toFixed(eth < 1 ? 4 : 2);
-  } catch {
-    return '?';
-  }
-}
-
-// USDC/stablecoins use 6 decimals, not 18
-function usdcFromWei(wei: string): string {
-  try {
-    const amount = Number(wei) / 1e6;
-    if (amount === 0) return '0';
-    if (amount < 0.01) return '<0.01';
-    return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  } catch {
-    return '?';
-  }
-}
-
-// Known token addresses (lowercase)
-const USDC_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-const STETH_ADDRESS = '0xae7ab96520de3a18e5e111b5eaab095312d7fe84';
-
-function formatStreamAmount(
-  tokenAmount: string,
-  tokenAddress?: string,
-): { amount: string; symbol: string } {
-  const addr = (tokenAddress || '').toLowerCase();
-  if (addr === USDC_ADDRESS) {
-    return { amount: usdcFromWei(tokenAmount), symbol: 'USDC' };
-  }
-  if (addr === STETH_ADDRESS) {
-    return { amount: ethFromWei(tokenAmount), symbol: 'stETH' };
-  }
-  // Default: WETH or unknown → show as ETH
-  return { amount: ethFromWei(tokenAmount), symbol: 'ETH' };
-}
-
-function supportLabel(support: number): string {
-  if (support === 0) return 'AGAINST';
-  if (support === 1) return 'FOR';
-  if (support === 2) return 'ABSTAIN';
-  return '?';
-}
-
-// Reservoir returns marketplace source as host strings like "opensea.io",
-// "blur.io", "looksrare.org", "x2y2.io", "sudoswap.xyz". Pretty-print them.
-const MARKETPLACE_DISPLAY: Record<string, string> = {
-  'opensea.io': 'OpenSea',
-  'blur.io': 'Blur',
-  'looksrare.org': 'LooksRare',
-  'x2y2.io': 'X2Y2',
-  'sudoswap.xyz': 'Sudoswap',
-  'reservoir.tools': 'Reservoir',
-  'rarible.com': 'Rarible',
-  'magiceden.io': 'Magic Eden',
-};
-
-function formatMarketplace(raw: string): string {
-  if (!raw) return '';
-  const lower = raw.toLowerCase();
-  if (MARKETPLACE_DISPLAY[lower]) return MARKETPLACE_DISPLAY[lower];
-  // Strip a single trailing TLD segment (.io / .xyz / .org / .com / .tools).
-  const stripped = lower.replace(/\.(io|xyz|org|com|tools|app|wtf|dev)$/i, '');
-  if (!stripped) return raw;
-  // Capitalize first letter for display.
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
-}
-
-// ─── Event Description Formatter ───────────────────────────────────────────
-
+/** Legacy entry point — same as `describeEvent`. */
 export function formatEventDescription(
   type: string,
-  data: Record<string, unknown>,
+  data: EventData,
   ensLookup?: EnsLookup,
   candidateTitleLookup?: CandidateTitleLookup,
-): string {
-  const addr = (a: string) => resolveAddr(a, ensLookup);
-  const candTitle = (id?: string) => resolveCandidateTitle(id, candidateTitleLookup);
-
-  switch (type) {
-    case 'BID':
-      return `${addr(data.bidder as string)} bid ${ethFromWei(data.value as string)} ETH on Noun ${data.nounId}`;
-
-    case 'VOTE': {
-      const reason = data.reason as string;
-      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on Prop ${data.proposalId}`;
-      return reason ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"` : base;
-    }
-
-    case 'PROPOSAL_CREATED': {
-      const propTitle = (data.title as string) || 'untitled';
-      return `New proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
-    }
-
-    case 'AUCTION_SETTLED': {
-      // Reserve-not-met settle: winner=0x0 + amount=0 → noun is burned.
-      // Formatting as "won by 0x000..." confuses users and leaks the
-      // internal state of the event. Show the burn outcome instead.
-      const winner = (data.winner as string | undefined) || '';
-      const amountStr = (data.amount as string | undefined) || '0';
-      const isBurned =
-        winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
-        (amountStr === '0' || amountStr === '');
-      if (isBurned) {
-        return `Noun ${data.nounId} burned 🔥`;
-      }
-      return `Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
-    }
-
-    case 'NOUN_CREATED':
-      return `Noun ${data.nounId} minted to ${addr(data.owner as string)}`;
-
-    case 'CANDIDATE_CREATED': {
-      const title = (data.title as string) || (data.slug as string) || 'untitled';
-      return `New candidate by ${addr(data.proposer as string)}: ${title}`;
-    }
-
-    case 'CANDIDATE_SPONSORED': {
-      const reason = (data.reason as string) || '';
-      const title = candTitle(data.candidateId as string | undefined);
-      const base = `${addr(data.signer as string)} sponsored "${title}"`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'CANDIDATE_UPDATED': {
-      const reason = (data.reason as string) || '';
-      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
-      const base = `${addr(data.proposer as string)} updated candidate "${title}"`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'CANDIDATE_CANCELED': {
-      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
-      return `${addr(data.proposer as string)} canceled candidate "${title}"`;
-    }
-
-    case 'CANDIDATE_PROMOTED': {
-      const title = (data.title as string) || candTitle(data.candidateId as string | undefined);
-      const proposalId = data.proposalId;
-      const suffix = proposalId != null ? ` to Prop #${proposalId}` : '';
-      return `${addr(data.proposer as string)} promoted candidate "${title}"${suffix}`;
-    }
-
-    case 'PROPOSAL_FEEDBACK': {
-      const reason = (data.reason as string) || '';
-      const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on Prop ${data.proposalId}`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'CANDIDATE_FEEDBACK': {
-      const reason = (data.reason as string) || '';
-      const title = candTitle(data.candidateId as string | undefined);
-      const base = `${addr(data.voter as string)} gave ${supportLabel(data.support as number)} feedback on "${title}"`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'STREAM_CREATED': {
-      const stream = formatStreamAmount(
-        data.tokenAmount as string,
-        data.tokenAddress as string | undefined,
-      );
-      const propSuffix = data.proposalId != null ? ` (Prop ${data.proposalId})` : '';
-      return `Stream to ${addr(data.recipient as string)} for ${stream.amount} ${stream.symbol}${propSuffix}`;
-    }
-
-    case 'DELEGATION':
-      return `${addr(data.delegator as string)} delegated votes from ${addr(data.fromDelegate as string)} → ${addr(data.toDelegate as string)}`;
-
-    case 'TRANSFER':
-      return `Noun ${data.nounId} transferred ${addr(data.from as string)} → ${addr(data.to as string)}`;
-
-    case 'PROPOSAL_QUEUED':
-      return `Prop ${data.proposalId} queued for execution`;
-
-    case 'PROPOSAL_EXECUTED':
-      return `Prop ${data.proposalId} executed onchain`;
-
-    case 'PROPOSAL_CANCELLED':
-      return `Prop ${data.proposalId} cancelled`;
-
-    case 'PROPOSAL_VETOED':
-      return `Prop ${data.proposalId} vetoed`;
-
-    case 'GRANT_CREATED': {
-      const title =
-        ((data.description as string) || '').split('\n')[0]?.replace(/^#\s*/, '').slice(0, 80) ||
-        'untitled';
-      return `${addr(data.proposer as string)} created grant #${data.grantId}: ${title}`;
-    }
-
-    case 'GRANT_VOTE': {
-      const reason = data.reason as string;
-      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on grant #${data.grantId} (${data.votes} votes)`;
-      return reason ? `${base} — "${reason.slice(0, 60)}${reason.length > 60 ? '...' : ''}"` : base;
-    }
-
-    case 'GRANT_QUEUED':
-      return `Grant #${data.grantId} queued for execution`;
-
-    case 'GRANT_EXECUTED':
-      return `Grant #${data.grantId} executed`;
-
-    case 'GRANT_CANCELED':
-      return `Grant #${data.grantId} canceled`;
-
-    case 'LIL_BID': {
-      const comment = ((data.comment as string) || (data.reason as string) || '').trim();
-      const base = `${addr(data.bidder as string)} bid ${ethFromWei(data.value as string)} ETH on Lil Noun ${data.nounId}`;
-      return comment.length > 0
-        ? `${base} — "${comment.slice(0, 80)}${comment.length > 80 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'LIL_AUCTION_SETTLED':
-      return `Lil Noun ${data.nounId} won by ${addr(data.winner as string)} for ${ethFromWei(data.amount as string)} ETH`;
-
-    case 'LIL_NOUN_CREATED':
-      return `Lil Noun ${data.nounId} minted to ${addr(data.owner as string)}`;
-
-    case 'LIL_VOTE': {
-      const reason = (data.reason as string) || '';
-      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on Lil Prop ${data.proposalId}`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'LIL_PROPOSAL_CREATED': {
-      const propTitle = (data.title as string) || 'untitled';
-      return `New Lil proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
-    }
-
-    case 'LIL_TRANSFER':
-      return `Lil Noun ${data.nounId} transferred ${addr(data.from as string)} → ${addr(data.to as string)}`;
-
-    case 'V2_BID':
-      return `${addr(data.bidder as string)} bid ${ethFromWei(data.value as string)} ETH on V2 Noun ${data.nounId}`;
-
-    case 'V2_SETTLED': {
-      const winner = (data.winner as string | undefined) || '';
-      const amountStr = (data.amount as string | undefined) || '0';
-      const isBurned =
-        winner.toLowerCase() === '0x0000000000000000000000000000000000000000' &&
-        (amountStr === '0' || amountStr === '');
-      if (isBurned) {
-        return `V2 Noun ${data.nounId} burned 🔥`;
-      }
-      return `V2 Noun ${data.nounId} won by ${addr(winner)} for ${ethFromWei(amountStr)} ETH`;
-    }
-
-    case 'V2_AUCTION':
-      return `V2 Noun ${data.nounId} auction started`;
-
-    case 'V2_PROP': {
-      const propTitle = (data.title as string) || 'untitled';
-      return `New V2 proposal #${data.proposalId} by ${addr(data.proposer as string)}: ${propTitle}`;
-    }
-
-    case 'V2_VOTE': {
-      const reason = (data.reason as string) || '';
-      const base = `${addr(data.voter as string)} voted ${supportLabel(data.support as number)} on V2 Prop ${data.proposalId}`;
-      return reason.length > 0
-        ? `${base} — "${reason.slice(0, 80)}${reason.length > 80 ? '...' : ''}"`
-        : base;
-    }
-
-    case 'SALE':
-    case 'V2_SALE': {
-      const name = (data.collectionName as string) || (data.collection as string) || 'Item';
-      const tokenId = data.tokenId != null && data.tokenId !== '' ? ` ${data.tokenId}` : '';
-      const priceEth =
-        typeof data.priceEth === 'number' ? data.priceEth : Number(data.priceEth ?? 0);
-      const priceStr =
-        priceEth === 0 ? '0' : priceEth < 0.001 ? '<0.001' : priceEth.toFixed(priceEth < 1 ? 4 : 2);
-      const currency = (data.currency as string) || 'ETH';
-      const market = formatMarketplace((data.marketplace as string) || '');
-      const marketSuffix = market ? ` on ${market}` : '';
-      const fromAddr = (data.from as string) || '';
-      const toAddr = (data.to as string) || '';
-      const seller = fromAddr ? addr(fromAddr) : '';
-      const buyer = toAddr ? addr(toAddr) : '';
-      const partySuffix =
-        seller && buyer
-          ? ` — sold by ${seller} to ${buyer}`
-          : buyer
-            ? ` to ${buyer}`
-            : seller
-              ? ` from ${seller}`
-              : '';
-      return `${name}${tokenId} sold for ${priceStr} ${currency}${marketSuffix}${partySuffix}`;
-    }
-
-    default:
-      return JSON.stringify(data).slice(0, 100);
-  }
-}
-
-/** Extract all address fields from event data */
-export function extractAddresses(data: Record<string, unknown>): string[] {
-  const addrs: string[] = [];
-  for (const key of [
-    'bidder',
-    'voter',
-    'proposer',
-    'winner',
-    'owner',
-    'signer',
-    'recipient',
-    'delegator',
-    'fromDelegate',
-    'toDelegate',
-    'from',
-    'to',
-  ]) {
-    const val = data[key] as string | undefined;
-    if (val && val.startsWith('0x') && val.length === 42) {
-      addrs.push(val);
-    }
-  }
-  return addrs;
-}
-
-// ─── Time Ago ──────────────────────────────────────────────────────────────
-
-export function timeAgo(timestamp: string): string {
-  const now = Date.now();
-  const then = new Date(timestamp).getTime();
-  const diff = Math.max(0, now - then);
-
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s`;
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d`;
-
-  const months = Math.floor(days / 30);
-  return `${months}mo`;
+): ReactNode {
+  return describeEvent(type, data, ensLookup, candidateTitleLookup);
 }

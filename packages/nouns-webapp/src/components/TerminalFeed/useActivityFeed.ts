@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { fixturesForFilter } from './feedFixtures';
 import { fetchV1ChainEvents } from './v1ChainFallback';
 import { fetchV2ChainEvents } from './v2ChainFallback';
 
@@ -19,8 +20,8 @@ interface FeedState {
   error: string | null;
 }
 
-const API_BASE =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
+const API_BASE: string =
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
   'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const POLL_INTERVAL = 12_000; // 12 seconds (1 Ethereum block)
@@ -33,6 +34,9 @@ const V2_EVENT_TYPES = new Set([
   'V2_SETTLED',
   'V2_AUCTION',
   'V2_PROP',
+  'V2_PROP_QUEUED',
+  'V2_PROP_EXECUTED',
+  'V2_PROP_CANCELED',
   'V2_VOTE',
   'V2_SALE',
 ]);
@@ -103,7 +107,7 @@ export function useActivityFeed(activeFilter: string) {
             const ac = new AbortController();
             armTimeout(ac);
             const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-            if (before) params.set('before', String(before));
+            if (before != null) params.set('before', String(before));
             if (activeFilter && activeFilter !== V2_ALL_FILTER) params.set('type', activeFilter);
             const res = await fetch(`${API_BASE}/api/activity?${params}`, { signal: ac.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -150,7 +154,7 @@ export function useActivityFeed(activeFilter: string) {
             const ac = new AbortController();
             armTimeout(ac);
             const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-            if (before) params.set('before', String(before));
+            if (before != null) params.set('before', String(before));
             const res = await fetch(`${API_BASE}/api/nounv2-feed?${params}`, { signal: ac.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const apiData = await res.json();
@@ -195,6 +199,8 @@ export function useActivityFeed(activeFilter: string) {
       // If a specific filter is active, narrow BOTH mainnet and v2 events to
       // only the wanted types. Without this, the chain fallback (which returns
       // all event types) leaks unrelated events into filtered tabs like SALES.
+      // The check is by exact type name against the tab's CSV, so any new
+      // type the API starts emitting passes through as long as a tab lists it.
       let mainnetFiltered = mainnetData.events;
       let v2Filtered = v2Data.events;
       if (activeFilter && activeFilter !== V2_ALL_FILTER) {
@@ -228,12 +234,17 @@ export function useActivityFeed(activeFilter: string) {
           setState(prev => ({ ...prev, loading: false, error: 'Failed to load activity' }));
         return;
       }
-      // Track newest block for polling
+      // Track newest block for polling — from the REAL events, before any
+      // dev fixtures are prepended (their block numbers are synthetic).
       if (result.events.length > 0) {
         newestBlockRef.current = result.events[0]!.blockNumber;
       }
+      // Dev-only: localStorage['noun-wtf-feed-fixtures']==='1' prepends one
+      // sample event per registry branch so new labels can be eyeballed
+      // before the API emits them. See feedFixtures.ts.
+      const fixtures = fixturesForFilter(activeFilter);
       setState({
-        events: result.events,
+        events: fixtures.length > 0 ? [...fixtures, ...result.events] : result.events,
         loading: false,
         hasMore: result.hasMore,
         oldestBlock: result.oldestBlock,

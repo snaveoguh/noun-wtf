@@ -1,4 +1,4 @@
-import type { CandidateTitleLookup, EnsLookup } from './eventFormatters';
+import type { CandidateTitleLookup, EnsLookup } from './eventRegistry';
 import type { ActivityEvent as ActivityEventType } from './useActivityFeed';
 
 import { useState, type CSSProperties } from 'react';
@@ -9,9 +9,16 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
 import ClientBadge from '@/components/ClientBadge';
+import { getClientInfo } from '@/utils/clientRegistry';
 
 import AsciiImage from './AsciiImage';
-import { EVENT_TYPES, formatEventDescription, timeAgo } from './eventFormatters';
+import {
+  describeEvent,
+  getEventDef,
+  getEventLink,
+  getExpandableText,
+  timeAgo,
+} from './eventRegistry';
 
 interface Props {
   event: ActivityEventType;
@@ -20,53 +27,6 @@ interface Props {
 }
 
 const ETHERSCAN_BASE = 'https://etherscan.io/tx/';
-
-const CANDIDATE_EVENT_TYPES = new Set([
-  'CANDIDATE_CREATED',
-  'CANDIDATE_SPONSORED',
-  'CANDIDATE_FEEDBACK',
-  'CANDIDATE_UPDATED',
-  'CANDIDATE_CANCELED',
-  'CANDIDATE_PROMOTED',
-]);
-
-/** Event types whose payload may contain a long-form description field. */
-const DESCRIPTION_TYPES = new Set([
-  'PROPOSAL_CREATED',
-  'CANDIDATE_CREATED',
-  'CANDIDATE_UPDATED',
-  'LIL_PROPOSAL_CREATED',
-  'V2_PROP',
-  'GRANT_CREATED',
-]);
-
-/** Event types whose payload may contain a long-form `reason` (or comment) field. */
-const REASON_TYPES = new Set([
-  'VOTE',
-  'PROPOSAL_FEEDBACK',
-  'CANDIDATE_FEEDBACK',
-  'CANDIDATE_SPONSORED',
-  'LIL_VOTE',
-  'LIL_BID',
-  'V2_VOTE',
-  'GRANT_VOTE',
-]);
-
-/** Pull whichever long-form text a given event carries, if any. */
-function getExpandableText(type: string, data: Record<string, unknown>): string | null {
-  if (DESCRIPTION_TYPES.has(type)) {
-    const desc = data.description;
-    if (typeof desc === 'string' && desc.trim().length > 0) return desc;
-  }
-  if (REASON_TYPES.has(type)) {
-    // LIL_BID stores the bidder's note under `comment` (or sometimes `reason`).
-    const candidates = [data.reason, data.comment];
-    for (const c of candidates) {
-      if (typeof c === 'string' && c.trim().length > 0) return c;
-    }
-  }
-  return null;
-}
 
 /** Treat `https:` URLs as the only safe transport for embedded media. */
 function isSafeHttpsUrl(url: string | undefined): boolean {
@@ -79,75 +39,67 @@ function isSafeHttpsUrl(url: string | undefined): boolean {
   }
 }
 
+function parseClientId(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const config = EVENT_TYPES[event.type];
-  // Override badge for burned auctions (winner = 0x0, amount = 0)
-  const isBurnedAuction =
-    (event.type === 'AUCTION_SETTLED' ||
-      event.type === 'V2_SETTLED' ||
-      event.type === 'LIL_AUCTION_SETTLED') &&
-    ((event.data.winner as string) || '').toLowerCase() ===
-      '0x0000000000000000000000000000000000000000' &&
-    ((event.data.amount as string) || '0') === '0';
-  const color = isBurnedAuction ? '#f97316' : config?.color || '#666';
-  const label = isBurnedAuction ? 'BURNED' : config?.label || event.type;
-  const description = formatEventDescription(
-    event.type,
-    event.data,
-    ensLookup,
-    candidateTitleLookup,
-  );
+  const data = event.data ?? {};
+  const def = getEventDef(event.type, data);
+  const { color, label } = def;
+  const description = describeEvent(event.type, data, ensLookup, candidateTitleLookup);
   const age = timeAgo(event.timestamp);
-  const expandableText = getExpandableText(event.type, event.data);
-  const expandable = expandableText !== null;
-  const isMarkdown = DESCRIPTION_TYPES.has(event.type);
-  const rawClientId = event.data.clientId as number | string | null | undefined;
-  const clientId =
-    rawClientId == null || rawClientId === ''
-      ? null
-      : typeof rawClientId === 'number'
-        ? rawClientId
-        : Number(rawClientId);
-  const showClientBadge = clientId != null && Number.isFinite(clientId);
-
-  // Internal link target (react-router) shown as `view` alongside the `tx` link.
-  let viewHref: string | null = null;
-  if (event.type === 'CANDIDATE_PROMOTED') {
-    const proposalId = event.data.proposalId;
-    if (proposalId != null) {
-      viewHref = `/vote/${proposalId}`;
-    } else {
-      const candidateId = event.data.candidateId as string | undefined;
-      if (candidateId) viewHref = `/candidates/${candidateId}`;
-    }
-  } else if (CANDIDATE_EVENT_TYPES.has(event.type)) {
-    const candidateId = event.data.candidateId as string | undefined;
-    if (candidateId) viewHref = `/candidates/${candidateId}`;
-  } else if (event.type === 'PROPOSAL_CREATED') {
-    const proposalId = event.data.proposalId;
-    if (proposalId != null) viewHref = `/vote/${proposalId}`;
-  }
+  // Derived events (state transitions the indexer infers from block height —
+  // voting started, objection period, ended…) have no tx of their own.
+  const isDerived = !event.txHash;
+  const expandableText = getExpandableText(event.type, data);
+  const clientId = parseClientId(data.clientId);
+  const clientInfo = clientId != null ? getClientInfo(clientId) : null;
+  // Expand when there's long-form text, or (for reason-bearing types like
+  // VOTE) when there's at least a client to name in the footer.
+  const expandable = expandableText !== null || (def.expand === 'reason' && clientInfo != null);
+  const isMarkdown = def.expand === 'markdown';
+  const viewHref = getEventLink(event.type, data);
 
   // Check if this event has an image (proposals/candidates)
-  const imageUrl = expanded ? (event.data.imageUrl as string | undefined) : undefined;
+  const imageUrl = expanded ? (data.imageUrl as string | undefined) : undefined;
+
+  const mutedLink: CSSProperties = {
+    color: 'var(--theme-text-muted)',
+    fontSize: '11px',
+    flexShrink: 0,
+    textDecoration: 'none',
+    paddingTop: '2px',
+  };
+  const hoverIn = (e: React.MouseEvent) => {
+    (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
+  };
+  const hoverOut = (e: React.MouseEvent) => {
+    (e.target as HTMLElement).style.color = 'var(--theme-text-muted)';
+  };
 
   return (
     <div
       className="terminal-event"
-      data-event-type={isBurnedAuction ? 'BURNED' : event.type}
+      data-event-type={def.variantKey}
+      data-derived={isDerived ? 'true' : undefined}
       style={
         {
           padding: '3px 0',
           borderBottom: '1px solid var(--theme-feed-row-border)',
           lineHeight: 1.35,
+          opacity: isDerived ? 0.82 : 1,
           // Exposed for disco mode — the rainbow row gradient builds off this.
           // Harmless when disco is off (no rule consumes it).
           ['--event-color' as string]: color,
         } as CSSProperties
       }
     >
-      {/* Main row */}
+      {/* Main row. Child order matters: disco CSS styles the badge via
+          `> div > span:nth-child(3)` (client slot, time, badge, …). */}
       <div
         style={{
           display: 'flex',
@@ -173,10 +125,10 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           }}
           onClick={e => e.stopPropagation()}
         >
-          {showClientBadge && <ClientBadge clientId={clientId} size={13} />}
+          {clientId != null && <ClientBadge clientId={clientId} size={13} />}
         </span>
 
-        {/* Timestamp */}
+        {/* Timestamp (+ `~` for derived / tx-less events) */}
         <span
           style={{
             color: 'var(--theme-text-muted)',
@@ -185,9 +137,12 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             textAlign: 'right',
             flexShrink: 0,
             paddingTop: '1px',
+            whiteSpace: 'nowrap',
           }}
+          title={isDerived ? 'derived from block height — no transaction' : undefined}
         >
           {age}
+          {isDerived && <span style={{ opacity: 0.55 }}>~</span>}
         </span>
 
         {/* Type badge */}
@@ -221,48 +176,28 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           )}
         </span>
 
-        {/* View link (internal, e.g. candidate / proposal page). */}
+        {/* View link (internal, e.g. noun / candidate / proposal / fork page). */}
         {viewHref && (
           <Link
             to={viewHref}
-            style={{
-              color: 'var(--theme-text-muted)',
-              fontSize: '11px',
-              flexShrink: 0,
-              textDecoration: 'none',
-              paddingTop: '2px',
-            }}
-            onMouseEnter={e => {
-              (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
-            }}
-            onMouseLeave={e => {
-              (e.target as HTMLElement).style.color = 'var(--theme-text-muted)';
-            }}
+            style={mutedLink}
+            onMouseEnter={hoverIn}
+            onMouseLeave={hoverOut}
             onClick={e => e.stopPropagation()}
           >
             view
           </Link>
         )}
 
-        {/* TX link */}
+        {/* TX link — absent for derived events. */}
         {event.txHash && (
           <a
             href={`${ETHERSCAN_BASE}${event.txHash}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              color: 'var(--theme-text-muted)',
-              fontSize: '11px',
-              flexShrink: 0,
-              textDecoration: 'none',
-              paddingTop: '2px',
-            }}
-            onMouseEnter={e => {
-              (e.target as HTMLElement).style.color = 'var(--theme-text-secondary)';
-            }}
-            onMouseLeave={e => {
-              (e.target as HTMLElement).style.color = 'var(--theme-text-muted)';
-            }}
+            style={mutedLink}
+            onMouseEnter={hoverIn}
+            onMouseLeave={hoverOut}
             onClick={e => e.stopPropagation()}
             title={event.txHash}
           >
@@ -272,7 +207,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
       </div>
 
       {/* Expanded content */}
-      {expanded && expandableText && (
+      {expanded && expandable && (
         <div
           style={{
             marginTop: '8px',
@@ -296,7 +231,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
           {/* ASCII art of proposal image */}
           {imageUrl && <AsciiImage imageUrl={imageUrl} cols={70} />}
 
-          {isMarkdown ? (
+          {expandableText && isMarkdown ? (
             <ReactMarkdown
               // No rehype-raw → raw HTML in the markdown is rendered as text,
               // not parsed. This is the safe-by-default react-markdown config.
@@ -419,8 +354,22 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
             >
               {expandableText}
             </ReactMarkdown>
-          ) : (
+          ) : expandableText ? (
             <div style={{ whiteSpace: 'pre-wrap' }}>{expandableText}</div>
+          ) : null}
+
+          {/* Client attribution — "via nouns.camp" — from the ClientBadge registry. */}
+          {clientInfo && (
+            <div
+              style={{
+                marginTop: expandableText ? '6px' : 0,
+                color: 'var(--theme-text-muted)',
+                fontSize: '11px',
+              }}
+            >
+              via {clientInfo.name}
+              {isDerived ? ' · derived' : ''}
+            </div>
           )}
         </div>
       )}

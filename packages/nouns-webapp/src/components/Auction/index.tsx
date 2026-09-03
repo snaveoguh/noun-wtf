@@ -32,6 +32,8 @@ import PanZoomImage from '@/components/PanZoomImage';
 import { getNoun, StandaloneNounWithSeed } from '@/components/StandaloneNoun';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useAuctionKeyboardShortcuts } from '@/hooks/useAuctionKeyboardShortcuts';
+import { useHomeSections } from '@/hooks/useHomeSections';
+import type { HeroStyle } from '@/lib/homeSections';
 import {
   DEFAULT_VISIBILITY,
   mergeLayersToGrid,
@@ -283,9 +285,28 @@ function LightingPicker({
 
 interface AuctionProps {
   auction?: IAuction;
+  /**
+   * Hero treatment. Defaults to the visitor's stored preference
+   * (`useHomeSections().heroStyle`); pass explicitly to pin one.
+   */
+  layout?: HeroStyle;
 }
 
-const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
+/** Modifier class per hero layout — `classic` is the untouched baseline. */
+const LAYOUT_CLASS: Record<HeroStyle, string> = {
+  classic: '',
+  centered: classes.layoutCentered,
+  split: classes.layoutSplit,
+  poster: classes.layoutPoster,
+};
+
+const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layoutProp }) => {
+  // Optional hero chrome (view tabs / control rail / chat bar) is opt-in via
+  // the home-page customise popover so the default hero is just noun + auction.
+  const { isEnabled: isHomeSectionEnabled, heroStyle: storedHeroStyle } = useHomeSections();
+  const layout: HeroStyle = layoutProp ?? storedHeroStyle;
+  const showHeroTools = isHomeSectionEnabled('heroTools');
+  const showHeroPrompt = isHomeSectionEnabled('heroPrompt');
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const stateBgColor = useAppSelector((state: RootState) => state.application.stateBackgroundColor);
@@ -1809,7 +1830,9 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             />
           </div>
         )}
-        <HomePrompt isV2={dao.isV2} nounId={currentNounId} seed={currentNounSeed ?? undefined} />
+        {showHeroPrompt && (
+          <HomePrompt isV2={dao.isV2} nounId={currentNounId} seed={currentNounSeed ?? undefined} />
+        )}
       </div>
     );
   };
@@ -1855,7 +1878,10 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
           <code>VITE_NOUNV2_TOKEN_ADDRESS</code> are set in the environment.
         </div>
       )}
-      <div className={classes.heroWrapper}>
+      <div
+        className={`${classes.heroWrapper} ${LAYOUT_CLASS[layout]} ${showHeroTools ? '' : classes.toolsHidden}`}
+        data-hero-layout={layout}
+      >
         <div className={classes.heroShell}>
           {currentAuction && !dao.isV2 && (
             <div className={classes.hiddenSeedLoader}>
@@ -1867,95 +1893,97 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
             </div>
           )}
 
-          <div className={classes.heroTopRow}>
-            <div
-              className={classes.heroTabs}
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => e.stopPropagation()}
-            >
-              {[
-                ['real', 'Real'],
-                ['3d', '3D'],
-                ['ascii', 'ASCII'],
-                ['sprite', 'Sprite'],
-                ['edit-2d', '2D Edit'],
-                ['edit-3d', '3D Edit'],
-              ].map(([value, label]) => (
-                <button
-                  type="button"
-                  key={value}
-                  className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
-                  onClick={() => {
-                    if (value === 'sprite') {
-                      // Batman transition sound + spin then enter world
-                      new Audio('/sounds/batman-transition.mp3').play().catch(() => {});
-                      setViewMode('sprite');
-                      const s = currentNounSeed;
-                      const seedParam = s
-                        ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`
-                        : '';
-                      setTimeout(() => navigate(`/world${seedParam}`), 800);
-                      return;
-                    }
-                    if (value === 'edit-2d') {
-                      startEditing('2d');
-                      return;
-                    }
-                    if (value === 'edit-3d') {
-                      startEditing('3d');
-                      return;
-                    }
-                    if (isEditing) stopEditing();
-                    setViewMode(value as HeroViewMode);
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-
-              {derivatives.map(derivative => (
-                <button
-                  type="button"
-                  key={derivative.id}
-                  className={`${classes.tabBtn} ${classes.derivativeTab} ${viewMode === `deriv-${derivative.id}` ? classes.tabActive : ''}`}
-                  onClick={() => {
-                    if (isEditing) stopEditing();
-                    setViewMode(`deriv-${derivative.id}`);
-                  }}
-                  title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
-                >
-                  {derivative.name}
-                </button>
-              ))}
-
-              {nounLinks.map(link => (
-                <button
-                  type="button"
-                  key={link.id}
-                  className={`${classes.tabBtn} ${classes.linkTab} ${viewMode === `link-${link.id}` ? classes.tabActive : ''}`}
-                  onClick={() => {
-                    if (isEditing) stopEditing();
-                    setViewMode(`link-${link.id}`);
-                  }}
-                  title={link.ogTitle || link.url}
-                >
-                  {link.name || link.ogTitle?.slice(0, 14) || new URL(link.url).hostname}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className={`${classes.tabBtn} ${classes.addTab}`}
-                onClick={() => {
-                  if (isEditing) stopEditing();
-                  setComposerOpen(true);
-                  setComposerMode('art');
-                }}
+          {showHeroTools && (
+            <div className={classes.heroTopRow}>
+              <div
+                className={classes.heroTabs}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               >
-                MAKE ART
-              </button>
+                {[
+                  ['real', 'Real'],
+                  ['3d', '3D'],
+                  ['ascii', 'ASCII'],
+                  ['sprite', 'Sprite'],
+                  ['edit-2d', '2D Edit'],
+                  ['edit-3d', '3D Edit'],
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={`${classes.tabBtn} ${viewMode === value ? classes.tabActive : ''}`}
+                    onClick={() => {
+                      if (value === 'sprite') {
+                        // Batman transition sound + spin then enter world
+                        new Audio('/sounds/batman-transition.mp3').play().catch(() => {});
+                        setViewMode('sprite');
+                        const s = currentNounSeed;
+                        const seedParam = s
+                          ? `?seed=${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`
+                          : '';
+                        setTimeout(() => navigate(`/world${seedParam}`), 800);
+                        return;
+                      }
+                      if (value === 'edit-2d') {
+                        startEditing('2d');
+                        return;
+                      }
+                      if (value === 'edit-3d') {
+                        startEditing('3d');
+                        return;
+                      }
+                      if (isEditing) stopEditing();
+                      setViewMode(value as HeroViewMode);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+
+                {derivatives.map(derivative => (
+                  <button
+                    type="button"
+                    key={derivative.id}
+                    className={`${classes.tabBtn} ${classes.derivativeTab} ${viewMode === `deriv-${derivative.id}` ? classes.tabActive : ''}`}
+                    onClick={() => {
+                      if (isEditing) stopEditing();
+                      setViewMode(`deriv-${derivative.id}`);
+                    }}
+                    title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
+                  >
+                    {derivative.name}
+                  </button>
+                ))}
+
+                {nounLinks.map(link => (
+                  <button
+                    type="button"
+                    key={link.id}
+                    className={`${classes.tabBtn} ${classes.linkTab} ${viewMode === `link-${link.id}` ? classes.tabActive : ''}`}
+                    onClick={() => {
+                      if (isEditing) stopEditing();
+                      setViewMode(`link-${link.id}`);
+                    }}
+                    title={link.ogTitle || link.url}
+                  >
+                    {link.name || link.ogTitle?.slice(0, 14) || new URL(link.url).hostname}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className={`${classes.tabBtn} ${classes.addTab}`}
+                  onClick={() => {
+                    if (isEditing) stopEditing();
+                    setComposerOpen(true);
+                    setComposerMode('art');
+                  }}
+                >
+                  MAKE ART
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className={classes.heroMain}>
             <section
@@ -1968,7 +1996,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 {renderHeroArtwork()}
               </div>
 
-              {!isEditing && (
+              {!isEditing && showHeroTools && (
                 <div className={classes.heroControlRail}>
                   <button
                     type="button"
@@ -2034,11 +2062,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction }) => {
                 </div>
               )}
 
-              {!isEditing && is3dView && (
+              {!isEditing && is3dView && showHeroTools && (
                 <LightingPicker preset={lightingPreset} onChange={setLightingPreset} />
               )}
 
-              <div className={classes.stageStatus}>{statusLabel}</div>
+              {showHeroTools && <div className={classes.stageStatus}>{statusLabel}</div>}
 
               {!isEditing && (
                 <>

@@ -676,3 +676,178 @@
   display: none !important;
 }
 
+
+/* ─── Hero layout variants ─────────────────────────────────────────────────
+   Selected from the ⚙ customise popover (or `?hero=`). Applied as modifier
+   classes on `.heroWrapper` so the stage / sidebar internals stay shared —
+   these are layout wrappers, not four forks of the hero. `classic` adds
+   nothing. */
+
+/* Hero tools (tabs / rail / status) switched off — reclaim the room the
+   mobile rules reserve for the control rail. */
+@media (max-width: 640px) {
+  .toolsHidden .heroArtFrame,
+  .toolsHidden .heroAscii,
+  .toolsHidden .heroLoading {
+    top: 0;
+  }
+}
+
+/* centered — noun centred large, bid controls stacked beneath, ~720px wide. */
+.layoutCentered .heroShell {
+  max-width: 45rem;
+  margin: 0 auto;
+}
+
+.layoutCentered .heroMain {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layoutCentered .heroStage {
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+}
+
+.layoutCentered .heroSidebar {
+  position: static;
+  gap: 0.75rem;
+}
+
+.layoutCentered .metaCard {
+  text-align: center;
+  justify-items: center;
+}
+
+/* split — noun left, a very sparse right column with no card chrome. */
+.layoutSplit .heroStage {
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+}
+
+.layoutSplit .heroSidebar {
+  position: static;
+  align-self: center;
+  gap: 1.75rem;
+}
+
+.layoutSplit .metaCard,
+.layoutSplit .auctionCard {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (min-width: 992px) {
+  .layoutSplit .heroMain {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(1.5rem, 4vw, 4rem);
+  }
+
+  .layoutSplit .heroSidebar {
+    padding-right: clamp(0rem, 3vw, 2.5rem);
+  }
+}
+
+/* poster — noun fills ~70vh on its own background colour, title + bid as a
+   thin bar along the bottom. The wrapper goes transparent so the outer
+   `stateBgColor` (the noun's cool/warm bg) carries the whole block. */
+.layoutPoster {
+  padding: 0;
+  background: transparent;
+}
+
+.layoutPoster .heroShell {
+  gap: 0;
+}
+
+.layoutPoster .heroTopRow {
+  padding: 0.85rem var(--page-edge-padding-right) 0.6rem var(--page-edge-padding-left);
+}
+
+.layoutPoster .heroMain {
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layoutPoster .heroStage {
+  min-height: 70vh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.layoutPoster .heroSidebar {
+  position: static;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 2.5rem;
+  /* Right padding clears the app's fixed bottom-right FAB column. */
+  padding: 1rem calc(var(--page-edge-padding-right) + 4.25rem) 1.25rem var(--page-edge-padding-left);
+  border-top: 1px solid rgba(20, 22, 27, 0.08);
+}
+
+.layoutPoster .metaCard,
+.layoutPoster .auctionCard {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.layoutPoster .metaCard {
+  gap: 0.5rem;
+}
+
+/* Lay the activity widget out along the bar: current bid · timer · bid input. */
+.layoutPoster .auctionCard > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 1.75rem;
+}
+
+.layoutPoster .auctionCard > div > * {
+  width: auto;
+  flex: 0 1 auto;
+}
+
+@media (max-width: 767px) {
+  .layoutPoster .heroSidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .layoutPoster .heroStage {
+    min-height: 60vh;
+  }
+
+  .layoutPoster .auctionCard > div {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabBtn,
+  .railBtn {
+    transition: none;
+  }
+
+  .spriteTransition {
+    animation: none;
+  }
+}
+
+/* The bid input + button group keeps a sane width on the poster bar instead
+   of collapsing to its content and wrapping the button under the input. */
+.layoutPoster .auctionCard > div > [class*='bidGroup'] {
+  flex: 0 0 auto;
+  width: min(24rem, 100%);
+}

@@ -60,6 +60,7 @@ import TraitsPage from '@/pages/TraitsPage';
 const VotePageRouter = lazy(() => import('@/pages/Vote/VotePageRouter'));
 import { setActiveAccount } from '@/state/slices/account';
 import NocTicker from '@/components/NocTicker';
+import { useHomeSections } from '@/hooks/useHomeSections';
 import SaberOverlay from '@/components/SaberOverlay';
 import TorchOverlay from '@/components/TorchOverlay';
 import { FeedSkeleton, GenericSkeleton, GovernanceSkeleton } from '@/components/Skeleton';
@@ -386,6 +387,17 @@ function ThemedAppContent() {
 
   const isTerminalHome = mode === 'new' && logicalPath === '/';
 
+  // The desktop noc ticker is global chrome, but on the auction home it's one
+  // of the opt-in "sections" (default off) so the Dice home stays just noun +
+  // auction. Every other route keeps it unconditionally.
+  const { isEnabled: isHomeSectionEnabled } = useHomeSections();
+  const isAuctionHome =
+    logicalPath === '/' ||
+    logicalPath === '/v2' ||
+    logicalPath.startsWith('/noun/') ||
+    logicalPath.startsWith('/v2/noun/');
+  const showDesktopTicker = !isAuctionHome || isHomeSectionEnabled('nocTicker');
+
   useEffect(() => {
     const handler = () => setDreamOpen(true);
     window.addEventListener('open-dream-window', handler);
@@ -448,9 +460,11 @@ function ThemedAppContent() {
   // Classic mode or deep link — show full site chrome
   return (
     <>
-      <div className="hidden lg:block">
-        <NocTicker />
-      </div>
+      {showDesktopTicker && (
+        <div className="hidden lg:block">
+          <NocTicker />
+        </div>
+      )}
       <NavBar />
       <SiteRoutes />
       <Footer />
