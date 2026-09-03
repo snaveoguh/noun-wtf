@@ -95,6 +95,7 @@ ponder.on('NounV2AuctionHouse:AuctionSettled', async ({ event, context }) => {
       startTime: new Date(Number(event.block.timestamp)),
       endTime: new Date(Number(event.block.timestamp)),
       settled: true,
+      settler: event.transaction.from,
       winner: event.args.winner,
       amount: event.args.amount,
       createdAt: new Date(Number(event.block.timestamp)),
@@ -103,6 +104,7 @@ ponder.on('NounV2AuctionHouse:AuctionSettled', async ({ event, context }) => {
     })
     .onConflictDoUpdate({
       settled: true,
+      settler: event.transaction.from,
       winner: event.args.winner,
       amount: event.args.amount,
     });

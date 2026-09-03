@@ -10,6 +10,10 @@ export const noun = onchainTable('nouns', t => ({
   accessory: t.integer().notNull(),
   glasses: t.integer().notNull(),
   background: t.integer().notNull(),
+  // Address the noun was minted to (Transfer from 0x0). nounders.eth for the
+  // every-10th reward nouns; the auction house for everything else. Lets the
+  // activity feed emit NOUNDER_NOUN without inspecting transfer history.
+  mintedTo: t.hex(),
   createdAt: t.timestamp().notNull(),
   createdAtBlock: t.bigint().notNull(),
   createdAtTransaction: t.text().notNull(),
@@ -70,6 +74,8 @@ export const accountDelegate = onchainTable('account_delegate', t => ({
 
 // ── Proposals ──────────────────────────────────────────────────────────────────
 
+// `OBJECTION` is only ever written to `proposal_status_change` (from
+// ProposalObjectionPeriodSet) — `proposal.status` itself never takes it.
 const proposalStatusValues = [
   'PENDING',
   'ACTIVE',
@@ -77,6 +83,7 @@ const proposalStatusValues = [
   'VETOED',
   'QUEUED',
   'EXECUTED',
+  'OBJECTION',
 ] as const;
 export type ProposalStatus = (typeof proposalStatusValues)[number];
 export const proposalStatus = onchainEnum('proposalStatus', proposalStatusValues);
@@ -115,6 +122,43 @@ export const proposalRelations = relations(proposal, ({ many }) => ({
   streams: many(stream),
   votes: many(vote),
   signers: many(proposalSigner),
+  versions: many(proposalVersion),
+}));
+
+// ── Proposal Versions ──────────────────────────────────────────────────────────
+// One row per ProposalUpdated / ProposalDescriptionUpdated /
+// ProposalTransactionsUpdated. The `proposal` row is mutated in place to hold
+// the latest content; this table is the audit trail the activity feed reads
+// to emit PROPOSAL_UPDATED.
+
+const proposalVersionKindValues = ['full', 'description', 'transactions'] as const;
+export type ProposalVersionKind = (typeof proposalVersionKindValues)[number];
+export const proposalVersionKind = onchainEnum('proposalVersionKind', proposalVersionKindValues);
+
+export const proposalVersion = onchainTable(
+  'proposal_version',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    proposalId: t.bigint().notNull(),
+    kind: proposalVersionKind().notNull(),
+    // null for `transactions`-only updates
+    description: t.text(),
+    updateMessage: t.text().notNull().default(''),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    proposalIdIndex: index().on(t.proposalId),
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+export const proposalVersionRelations = relations(proposalVersion, ({ one }) => ({
+  proposal: one(proposal, {
+    fields: [proposalVersion.proposalId],
+    references: [proposal.id],
+  }),
 }));
 
 // ── Proposal Signers ───────────────────────────────────────────────────────────
@@ -196,7 +240,15 @@ export const auction = onchainTable('nounsAuctionHouseV2', t => ({
   startTime: t.timestamp().notNull(),
   endTime: t.timestamp().notNull(),
   settled: t.boolean().notNull().default(false),
-  // settler: t.hex(), // TODO: add after initial sync completes to avoid full resync
+  // tx.from of the AuctionSettled tx. Whoever settles auction N also creates
+  // auction N+1 in the same tx (settleCurrentAndCreateNewAuction), so this is
+  // also the `curator` of the next auction.
+  settler: t.hex(),
+  settledAt: t.timestamp(),
+  settledAtBlock: t.bigint(),
+  settledAtTransaction: t.text(),
+  // tx.from of the AuctionCreated tx — i.e. the settler of the previous auction.
+  curator: t.hex(),
   winner: t.hex(),
   amount: t.bigint(), // winning bid amount
   // Mainnet prop #XXX raised reservePrice to 2.8 ETH. Auctions that end with
@@ -227,6 +279,9 @@ export const bid = onchainTable(
     nounId: t.bigint().notNull(),
     value: t.bigint().notNull(),
     bidder: t.hex().notNull(),
+    // AuctionBid.extended — true when the bid landed inside timeBuffer and
+    // pushed the auction end time out.
+    extended: t.boolean().notNull().default(false),
     clientId: t.integer(),
     createdAt: t.timestamp().notNull(),
     createdAtBlock: t.bigint().notNull(),
@@ -280,6 +335,109 @@ export const streamRelations = relations(stream, ({ one }) => ({
   }),
 }));
 
+// ── Stream Events ────────────────────────────────────────────────────────────
+// StreamCancelled / TokensWithdrawn from the per-stream contracts. `stream`
+// keeps the live aggregate; this is the per-event log for the activity feed.
+
+const streamEventKindValues = ['cancelled', 'withdrawn'] as const;
+export type StreamEventKind = (typeof streamEventKindValues)[number];
+export const streamEventKind = onchainEnum('streamEventKind', streamEventKindValues);
+
+export const streamEvent = onchainTable(
+  'stream_event',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    kind: streamEventKind().notNull(),
+    streamAddress: t.hex().notNull(),
+    recipient: t.hex().notNull(),
+    tokenAddress: t.hex().notNull(),
+    proposalId: t.bigint(),
+    // withdrawn: amount withdrawn; cancelled: recipient balance paid out on cancel
+    amount: t.bigint(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+    streamAddressIndex: index().on(t.streamAddress),
+  }),
+);
+
+// ── Fork Events ──────────────────────────────────────────────────────────────
+// EscrowedToFork / JoinFork / WithdrawFromForkEscrow / ExecuteFork on the governor.
+
+const forkEventKindValues = ['escrow', 'join', 'withdraw', 'executed'] as const;
+export type ForkEventKind = (typeof forkEventKindValues)[number];
+export const forkEventKind = onchainEnum('forkEventKind', forkEventKindValues);
+
+export const forkEvent = onchainTable(
+  'fork_event',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    kind: forkEventKind().notNull(),
+    forkId: t.integer().notNull(),
+    owner: t.hex(), // escrow / join / withdraw
+    nounIds: t.text().notNull().default('[]'), // JSON number[]
+    proposalIds: t.text().notNull().default('[]'), // JSON number[]
+    reason: t.text().notNull().default(''),
+    // executed only
+    forkTreasury: t.hex(),
+    forkToken: t.hex(),
+    forkEndTimestamp: t.bigint(),
+    tokensInEscrow: t.bigint(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── DAO Config Events ────────────────────────────────────────────────────────
+// Governor parameter changes (VotingPeriodSet, VotingDelaySet, ...). Values are
+// stored as decimal strings / addresses so one table covers every param.
+
+export const daoConfigEvent = onchainTable(
+  'dao_config_event',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    param: t.text().notNull(),
+    oldValue: t.text(),
+    newValue: t.text().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
+// ── Auction Config Events ────────────────────────────────────────────────────
+// AuctionReservePriceUpdated / AuctionTimeBufferUpdated /
+// AuctionMinBidIncrementPercentageUpdated. The AH events only carry the new
+// value; `oldValue` is back-filled from the previous row for the same param
+// (null for the first occurrence).
+
+export const auctionConfigEvent = onchainTable(
+  'auction_config_event',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    param: t.text().notNull(), // 'reservePrice' | 'timeBuffer' | 'minBidIncrement'
+    oldValue: t.text(),
+    newValue: t.text().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+    paramIndex: index().on(t.param),
+  }),
+);
+
 // ── Delegation Events ────────────────────────────────────────────────────────
 
 export const delegationEvent = onchainTable(
@@ -288,6 +446,8 @@ export const delegationEvent = onchainTable(
     delegator: t.hex().notNull(),
     fromDelegate: t.hex().notNull(),
     toDelegate: t.hex().notNull(),
+    // delegator's noun balance at the time of the event
+    nounCount: t.integer().notNull().default(0),
     createdAt: t.timestamp().notNull(),
     createdAtBlock: t.bigint().notNull(),
     createdAtTransaction: t.text().notNull(),
@@ -423,6 +583,7 @@ export const candidateSignature = onchainTable(
     canceled: t.boolean().notNull().default(false),
     createdAt: t.timestamp().notNull(),
     createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull().default(''),
   }),
   t => ({
     primaryKey: primaryKey({ columns: [t.candidateId, t.signer, t.sig] }),
@@ -448,6 +609,7 @@ export const proposalFeedback = onchainTable(
     reason: t.text().notNull().default(''),
     createdAt: t.timestamp().notNull(),
     createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull().default(''),
   }),
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
@@ -466,6 +628,7 @@ export const candidateFeedback = onchainTable(
     reason: t.text().notNull().default(''),
     createdAt: t.timestamp().notNull(),
     createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull().default(''),
   }),
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.candidateId] }),
@@ -692,6 +855,7 @@ export const nounV2Auction = onchainTable('nounv2_auction', t => ({
   startTime: t.timestamp().notNull(),
   endTime: t.timestamp().notNull(),
   settled: t.boolean().notNull().default(false),
+  settler: t.hex(), // tx.from of AuctionSettled
   winner: t.hex(),
   amount: t.bigint(),
   createdAt: t.timestamp().notNull(),

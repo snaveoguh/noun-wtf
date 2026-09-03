@@ -2,9 +2,12 @@ import { and, eq } from 'ponder';
 import { ponder } from 'ponder:registry';
 import {
   candidate,
+  daoConfigEvent,
+  forkEvent,
   proposal,
   proposalSigner,
   proposalStatusChange,
+  proposalVersion,
   stream,
   transaction,
   vote,
@@ -285,6 +288,18 @@ ponder.on('NounsDAOV4:ProposalObjectionPeriodSet', async ({ event, context }) =>
   await context.db.update(proposal, { id: event.args.id }).set({
     objectionPeriodEndBlock: event.args.objectionPeriodEndBlock,
   });
+  // Status-change row only — `proposal.status` itself stays as-is (the
+  // objection period is a phase of ACTIVE, not a terminal state).
+  await context.db
+    .insert(proposalStatusChange)
+    .values({
+      proposalId: event.args.id,
+      status: 'OBJECTION',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
 });
 
 // ─── Proposal updates (DAO V3+ updatable period) ──────────────────────────
@@ -302,6 +317,20 @@ ponder.on('NounsDAOV4:ProposalUpdated', async ({ event, context }) => {
   await context.db
     .update(proposal, { id: event.args.id })
     .set({ description: event.args.description });
+
+  await context.db
+    .insert(proposalVersion)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      proposalId: event.args.id,
+      kind: 'full',
+      description: event.args.description,
+      updateMessage: event.args.updateMessage || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
 
   for (let index = 0; index < event.args.targets.length; index++) {
     await context.db
@@ -327,9 +356,37 @@ ponder.on('NounsDAOV4:ProposalDescriptionUpdated', async ({ event, context }) =>
   await context.db
     .update(proposal, { id: event.args.id })
     .set({ description: event.args.description });
+
+  await context.db
+    .insert(proposalVersion)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      proposalId: event.args.id,
+      kind: 'description',
+      description: event.args.description,
+      updateMessage: event.args.updateMessage || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
 });
 
 ponder.on('NounsDAOV4:ProposalTransactionsUpdated', async ({ event, context }) => {
+  await context.db
+    .insert(proposalVersion)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      proposalId: event.args.id,
+      kind: 'transactions',
+      description: null,
+      updateMessage: event.args.updateMessage || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+
   for (let index = 0; index < event.args.targets.length; index++) {
     await context.db
       .insert(transaction)
@@ -348,4 +405,260 @@ ponder.on('NounsDAOV4:ProposalTransactionsUpdated', async ({ event, context }) =
         calldata: event.args.calldatas[index]!,
       });
   }
+});
+
+// ─── Fork events ───────────────────────────────────────────────────────────
+
+ponder.on('NounsDAOV4:EscrowedToFork', async ({ event, context }) => {
+  await context.db
+    .insert(forkEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      kind: 'escrow',
+      forkId: Number(event.args.forkId),
+      owner: event.args.owner,
+      nounIds: JSON.stringify(event.args.tokenIds.map(Number)),
+      proposalIds: JSON.stringify(event.args.proposalIds.map(Number)),
+      reason: event.args.reason || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:JoinFork', async ({ event, context }) => {
+  await context.db
+    .insert(forkEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      kind: 'join',
+      forkId: Number(event.args.forkId),
+      owner: event.args.owner,
+      nounIds: JSON.stringify(event.args.tokenIds.map(Number)),
+      proposalIds: JSON.stringify(event.args.proposalIds.map(Number)),
+      reason: event.args.reason || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:WithdrawFromForkEscrow', async ({ event, context }) => {
+  await context.db
+    .insert(forkEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      kind: 'withdraw',
+      forkId: Number(event.args.forkId),
+      owner: event.args.owner,
+      nounIds: JSON.stringify(event.args.tokenIds.map(Number)),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ExecuteFork', async ({ event, context }) => {
+  await context.db
+    .insert(forkEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      kind: 'executed',
+      forkId: Number(event.args.forkId),
+      forkTreasury: event.args.forkTreasury,
+      forkToken: event.args.forkToken,
+      forkEndTimestamp: event.args.forkEndTimestamp,
+      tokensInEscrow: event.args.tokensInEscrow,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+// ─── DAO config changes ────────────────────────────────────────────────────
+// Every governor parameter event is (old, new); values are stored as strings
+// so one table (and one DAO_CONFIG_CHANGED feed type) covers all of them.
+
+ponder.on('NounsDAOV4:VotingPeriodSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'votingPeriod',
+      oldValue: event.args.oldVotingPeriod.toString(),
+      newValue: event.args.newVotingPeriod.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:VotingDelaySet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'votingDelay',
+      oldValue: event.args.oldVotingDelay.toString(),
+      newValue: event.args.newVotingDelay.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ProposalThresholdBPSSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'proposalThresholdBPS',
+      oldValue: event.args.oldProposalThresholdBPS.toString(),
+      newValue: event.args.newProposalThresholdBPS.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:MinQuorumVotesBPSSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'minQuorumVotesBPS',
+      oldValue: String(event.args.oldMinQuorumVotesBPS),
+      newValue: String(event.args.newMinQuorumVotesBPS),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:MaxQuorumVotesBPSSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'maxQuorumVotesBPS',
+      oldValue: String(event.args.oldMaxQuorumVotesBPS),
+      newValue: String(event.args.newMaxQuorumVotesBPS),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:QuorumCoefficientSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'quorumCoefficient',
+      oldValue: String(event.args.oldQuorumCoefficient),
+      newValue: String(event.args.newQuorumCoefficient),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ForkPeriodSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'forkPeriod',
+      oldValue: event.args.oldForkPeriod.toString(),
+      newValue: event.args.newForkPeriod.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ForkThresholdSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'forkThreshold',
+      oldValue: event.args.oldForkThreshold.toString(),
+      newValue: event.args.newForkThreshold.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:NewVetoer', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'vetoer',
+      oldValue: event.args.oldVetoer,
+      newValue: event.args.newVetoer,
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ObjectionPeriodDurationSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'objectionPeriodDuration',
+      oldValue: String(event.args.oldObjectionPeriodDurationInBlocks),
+      newValue: String(event.args.newObjectionPeriodDurationInBlocks),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:ProposalUpdatablePeriodSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'proposalUpdatablePeriod',
+      oldValue: String(event.args.oldProposalUpdatablePeriodInBlocks),
+      newValue: String(event.args.newProposalUpdatablePeriodInBlocks),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsDAOV4:LastMinuteWindowSet', async ({ event, context }) => {
+  await context.db
+    .insert(daoConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param: 'lastMinuteWindow',
+      oldValue: String(event.args.oldLastMinuteWindowInBlocks),
+      newValue: String(event.args.newLastMinuteWindowInBlocks),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
 });

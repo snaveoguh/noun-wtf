@@ -115,6 +115,7 @@ ponder.on('NounsDAOData:SignatureAdded', async ({ event, context }) => {
       canceled: false,
       createdAt: new Date(Number(event.block.timestamp)),
       createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
     })
     .onConflictDoNothing();
 });
@@ -131,10 +132,14 @@ ponder.on('NounsDAOData:FeedbackSent', async ({ event, context }) => {
       reason: event.args.reason || '',
       createdAt: new Date(Number(event.block.timestamp)),
       createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
     })
     .onConflictDoUpdate({
       support: Number(event.args.support),
       reason: event.args.reason || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
     });
 });
 
@@ -152,9 +157,13 @@ ponder.on('NounsDAOData:CandidateFeedbackSent', async ({ event, context }) => {
       reason: event.args.reason || '',
       createdAt: new Date(Number(event.block.timestamp)),
       createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
     })
     .onConflictDoUpdate({
       support: Number(event.args.support),
       reason: event.args.reason || '',
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
     });
 });

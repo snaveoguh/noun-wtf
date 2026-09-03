@@ -1,5 +1,6 @@
+import { desc, eq } from 'ponder';
 import { ponder } from 'ponder:registry';
-import { auction, bid } from 'ponder:schema';
+import { auction, auctionConfigEvent, bid } from 'ponder:schema';
 
 ponder.on('NounsAuctionHouseV2:AuctionCreated', async ({ event, context }) => {
   await context.db.insert(auction).values({
@@ -7,6 +8,9 @@ ponder.on('NounsAuctionHouseV2:AuctionCreated', async ({ event, context }) => {
     startTime: new Date(Number(event.args.startTime)),
     endTime: new Date(Number(event.args.endTime)),
     settled: false,
+    // settleCurrentAndCreateNewAuction is one tx: whoever settled the previous
+    // auction "curates" this one.
+    curator: event.transaction.from,
     createdAt: new Date(Number(event.block.timestamp)),
     createdAtBlock: event.block.number,
     createdAtTransaction: event.transaction.hash,
@@ -28,12 +32,14 @@ ponder.on('NounsAuctionHouseV2:AuctionBid', async ({ event, context }) => {
       nounId: event.args.nounId,
       bidder: event.args.sender,
       value: event.args.value,
+      extended: event.args.extended,
       createdAt: new Date(Number(event.block.timestamp)),
       createdAtBlock: event.block.number,
       createdAtTransaction: event.transaction.hash,
     })
     .onConflictDoUpdate({
       bidder: event.args.sender,
+      extended: event.args.extended,
       createdAt: new Date(Number(event.block.timestamp)),
       createdAtBlock: event.block.number,
       createdAtTransaction: event.transaction.hash,
@@ -100,7 +106,10 @@ ponder.on('NounsAuctionHouseV2:AuctionSettled', async ({ event, context }) => {
 
   await context.db.update(auction, { nounId: event.args.nounId }).set({
     settled: true,
-    // settler: event.transaction.from, // TODO: enable after initial sync
+    settler: event.transaction.from,
+    settledAt: new Date(Number(event.block.timestamp)),
+    settledAtBlock: event.block.number,
+    settledAtTransaction: event.transaction.hash,
     winner: noQualifyingBid ? null : winner,
     amount,
     burned: actuallyBurned,
@@ -112,3 +121,76 @@ ponder.on('NounsAuctionHouseV2:AuctionSettledWithClientId', async ({ event, cont
     clientId: event.args.clientId,
   });
 });
+
+// ── Auction config changes ──────────────────────────────────────────────────
+// The AH events only carry the new value. We back-fill `oldValue` from the
+// most recent row for the same param so the feed can render "X → Y".
+
+ponder.on('NounsAuctionHouseV2:AuctionReservePriceUpdated', async ({ event, context }) => {
+  const param = 'reservePrice';
+  const prev = await context.db.sql
+    .select({ newValue: auctionConfigEvent.newValue })
+    .from(auctionConfigEvent)
+    .where(eq(auctionConfigEvent.param, param))
+    .orderBy(desc(auctionConfigEvent.createdAtBlock))
+    .limit(1);
+  await context.db
+    .insert(auctionConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param,
+      oldValue: prev[0]?.newValue ?? null,
+      newValue: event.args.reservePrice.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on('NounsAuctionHouseV2:AuctionTimeBufferUpdated', async ({ event, context }) => {
+  const param = 'timeBuffer';
+  const prev = await context.db.sql
+    .select({ newValue: auctionConfigEvent.newValue })
+    .from(auctionConfigEvent)
+    .where(eq(auctionConfigEvent.param, param))
+    .orderBy(desc(auctionConfigEvent.createdAtBlock))
+    .limit(1);
+  await context.db
+    .insert(auctionConfigEvent)
+    .values({
+      id: `${event.transaction.hash}-${event.log.logIndex}`,
+      param,
+      oldValue: prev[0]?.newValue ?? null,
+      newValue: event.args.timeBuffer.toString(),
+      createdAt: new Date(Number(event.block.timestamp)),
+      createdAtBlock: event.block.number,
+      createdAtTransaction: event.transaction.hash,
+    })
+    .onConflictDoNothing();
+});
+
+ponder.on(
+  'NounsAuctionHouseV2:AuctionMinBidIncrementPercentageUpdated',
+  async ({ event, context }) => {
+    const param = 'minBidIncrement';
+    const prev = await context.db.sql
+      .select({ newValue: auctionConfigEvent.newValue })
+      .from(auctionConfigEvent)
+      .where(eq(auctionConfigEvent.param, param))
+      .orderBy(desc(auctionConfigEvent.createdAtBlock))
+      .limit(1);
+    await context.db
+      .insert(auctionConfigEvent)
+      .values({
+        id: `${event.transaction.hash}-${event.log.logIndex}`,
+        param,
+        oldValue: prev[0]?.newValue ?? null,
+        newValue: event.args.minBidIncrementPercentage.toString(),
+        createdAt: new Date(Number(event.block.timestamp)),
+        createdAtBlock: event.block.number,
+        createdAtTransaction: event.transaction.hash,
+      })
+      .onConflictDoNothing();
+  },
+);

@@ -42,12 +42,15 @@ ponder.on('NounsToken:Transfer', async ({ event, context }) => {
   const from = event.args.from;
   const to = event.args.to;
 
+  const isMint = from.toLowerCase() === ZERO;
+
   // Upsert noun owner — Transfer may fire before NounCreated (mint)
   await context.db
     .insert(noun)
     .values({
       id: tokenId,
       owner: to,
+      mintedTo: isMint ? to : null,
       head: 0,
       body: 0,
       accessory: 0,
@@ -57,12 +60,10 @@ ponder.on('NounsToken:Transfer', async ({ event, context }) => {
       createdAtBlock: event.block.number,
       createdAtTransaction: event.transaction.hash,
     })
-    .onConflictDoUpdate({
-      owner: to,
-    });
+    .onConflictDoUpdate(isMint ? { owner: to, mintedTo: to } : { owner: to });
 
   // Track non-mint transfers in the feed (skip mints from 0x0)
-  if (from.toLowerCase() !== ZERO) {
+  if (!isMint) {
     await context.db
       .insert(nounTransfer)
       .values({
@@ -100,6 +101,14 @@ ponder.on('NounsToken:Transfer', async ({ event, context }) => {
 ponder.on('NounsToken:DelegateChanged', async ({ event, context }) => {
   const { delegator, fromDelegate, toDelegate } = event.args;
 
+  // "Which nouns does this address own right now" — `noun.owner` is kept
+  // current by every Transfer. Used both for the feed's nounCount and for
+  // re-binding `delegateNoun` rows below.
+  const ownedNouns = await context.db.sql
+    .select({ id: noun.id })
+    .from(noun)
+    .where(eq(noun.owner, delegator));
+
   // Track delegation event in the feed
   // Skip initial self-delegation on mint (fromDelegate = 0x0)
   if (fromDelegate.toLowerCase() !== ZERO) {
@@ -109,6 +118,7 @@ ponder.on('NounsToken:DelegateChanged', async ({ event, context }) => {
         delegator,
         fromDelegate,
         toDelegate,
+        nounCount: ownedNouns.length,
         createdAt: new Date(Number(event.block.timestamp)),
         createdAtBlock: event.block.number,
         createdAtTransaction: event.transaction.hash,
@@ -125,18 +135,9 @@ ponder.on('NounsToken:DelegateChanged', async ({ event, context }) => {
     .onConflictDoUpdate({ delegate: toDelegate });
 
   // Re-bind every noun this delegator currently owns from `fromDelegate` →
-  // `toDelegate` in `delegateNoun`.
-  //
-  // We use the `noun.owner` index (every Transfer keeps it current) as the
-  // source of truth for "which nouns does this address own right now". This
-  // matches the subgraph's behavior where `Account.nouns` is rebuilt on
-  // every transfer and consulted by `handleDelegateChanged` to move the
-  // delegated set in lockstep.
-  const ownedNouns = await context.db.sql
-    .select({ id: noun.id })
-    .from(noun)
-    .where(eq(noun.owner, delegator));
-
+  // `toDelegate` in `delegateNoun`. This matches the subgraph's behavior
+  // where `Account.nouns` is rebuilt on every transfer and consulted by
+  // `handleDelegateChanged` to move the delegated set in lockstep.
   for (const { id: tokenId } of ownedNouns) {
     // Always delete by nounId — the row may sit at `(delegator, nounId)`
     // when the holder previously had implicit self-delegation (no prior
