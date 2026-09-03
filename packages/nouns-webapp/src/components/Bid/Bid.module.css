@@ -180,3 +180,21 @@
     height: 2.5rem;
   }
 }
+
+/* Minimal hero: the input is just its placeholder text — no border, no fill. */
+[data-hero-layout='minimal'] .bidInput {
+  height: 3.25rem;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent;
+  padding-left: 0;
+}
+
+[data-hero-layout='minimal'] .bidInput:focus {
+  border: 0 !important;
+}
+
+[data-hero-layout='minimal'] .customPlaceholderBidAmt {
+  left: 0;
+  opacity: 0.45;
+}

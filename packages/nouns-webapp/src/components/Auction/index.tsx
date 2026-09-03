@@ -294,6 +294,7 @@ interface AuctionProps {
 
 /** Modifier class per hero layout — `classic` is the untouched baseline. */
 const LAYOUT_CLASS: Record<HeroStyle, string> = {
+  minimal: classes.layoutMinimal,
   classic: '',
   centered: classes.layoutCentered,
   split: classes.layoutSplit,

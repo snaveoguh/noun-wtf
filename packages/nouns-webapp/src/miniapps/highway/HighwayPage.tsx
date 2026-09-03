@@ -27,8 +27,7 @@ const V_LINE = '║';
 const truncate = (text: string, len: number) =>
   text.length > len ? text.slice(0, len - 1) + '…' : text;
 
-const padRight = (text: string, len: number) =>
-  text + ' '.repeat(Math.max(0, len - text.length));
+const padRight = (text: string, len: number) => text + ' '.repeat(Math.max(0, len - text.length));
 
 /** Render a candidate as an ASCII art block */
 const renderCandidateAscii = (c: CandidateProposal, width = 40): string[] => {
@@ -95,7 +94,7 @@ const HighwayPage: React.FC = () => {
           const headingMatch = c.description?.match(/^#\s+(.+)/m);
           const title = headingMatch
             ? headingMatch[1].trim()
-            : (c.description?.split('\n')[0]?.trim() || 'Untitled');
+            : c.description?.split('\n')[0]?.trim() || 'Untitled';
           return { ...c, title };
         });
         setCandidates(items);
@@ -141,9 +140,7 @@ const HighwayPage: React.FC = () => {
       {/* Header */}
       <div className="border-b border-green-800 px-4 py-3">
         <pre className="text-center text-xs text-green-600">{ASCII_NOGGLES}</pre>
-        <h1 className="text-center text-lg text-green-400">
-          ═══ PROPOSAL HIGHWAY ═══
-        </h1>
+        <h1 className="text-center text-lg text-green-400">═══ PROPOSAL HIGHWAY ═══</h1>
         <p className="text-center text-xs text-green-700">
           SCROLL TO CHANGE SPEED | CLICK A PROPOSAL TO VIEW
         </p>
@@ -193,13 +190,20 @@ const HighwayPage: React.FC = () => {
                 candidates.map((c, ci) => (
                   <button
                     key={`${rep}-${ci}`}
-                    onClick={(e) => { e.stopPropagation(); setSelectedCandidate(c); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedCandidate(c);
+                    }}
                     className="mr-4 inline-block align-top text-green-400 no-underline transition-colors hover:text-green-200"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      padding: 0,
+                    }}
                   >
-                    <pre className="text-xs leading-tight">
-                      {blocks[ci]?.join('\n')}
-                    </pre>
+                    <pre className="text-xs leading-tight">{blocks[ci]?.join('\n')}</pre>
                   </button>
                 )),
               )}
@@ -208,9 +212,7 @@ const HighwayPage: React.FC = () => {
 
           {/* Road line */}
           <div className="overflow-hidden text-green-800">
-            <pre className="text-xs">
-              {'═'.repeat(200)}
-            </pre>
+            <pre className="text-xs">{'═'.repeat(200)}</pre>
           </div>
 
           {/* Row 2: Reverse direction */}
@@ -225,9 +227,18 @@ const HighwayPage: React.FC = () => {
                 [...candidates].reverse().map((c, ci) => (
                   <button
                     key={`r${rep}-${ci}`}
-                    onClick={(e) => { e.stopPropagation(); setSelectedCandidate(c); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedCandidate(c);
+                    }}
                     className="mr-4 inline-block align-top text-green-600 no-underline transition-colors hover:text-green-300"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      padding: 0,
+                    }}
                   >
                     <pre className="text-xs leading-tight">
                       {renderCandidateAscii(c).join('\n')}
@@ -240,9 +251,7 @@ const HighwayPage: React.FC = () => {
 
           {/* Another road line */}
           <div className="mt-4 overflow-hidden text-green-800">
-            <pre className="text-xs">
-              {'─'.repeat(200)}
-            </pre>
+            <pre className="text-xs">{'─'.repeat(200)}</pre>
           </div>
         </div>
       )}
@@ -297,7 +306,7 @@ const HighwayPage: React.FC = () => {
                     return;
                   }
                   // Open the candidate page to sponsor
-                  window.open(`https://nouns.wtf/candidates/${selectedCandidate.slug}`, '_blank');
+                  window.open(`/candidates/${selectedCandidate.slug}`, '_blank');
                 }}
                 className="rounded border border-purple-600 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-900"
               >
@@ -305,7 +314,8 @@ const HighwayPage: React.FC = () => {
               </button>
             </div>
             <div className="mt-2 text-xs text-green-800">
-              BY: {selectedCandidate.proposer.slice(0, 6)}...{selectedCandidate.proposer.slice(-4)} | V{selectedCandidate.versionsCount}
+              BY: {selectedCandidate.proposer.slice(0, 6)}...{selectedCandidate.proposer.slice(-4)}{' '}
+              | V{selectedCandidate.versionsCount}
             </div>
           </div>
         </div>
@@ -313,7 +323,8 @@ const HighwayPage: React.FC = () => {
 
       {/* Footer */}
       <div className="border-t border-green-800 px-4 py-2 text-center text-xs text-green-700">
-        SPEED: {speedRef.current.toFixed(1)}x | {candidates.length} CANDIDATES ON THE HIGHWAY | CLICK A BOX TO PROMOTE/SPONSOR
+        SPEED: {speedRef.current.toFixed(1)}x | {candidates.length} CANDIDATES ON THE HIGHWAY |
+        CLICK A BOX TO PROMOTE/SPONSOR
       </div>
     </div>
   );

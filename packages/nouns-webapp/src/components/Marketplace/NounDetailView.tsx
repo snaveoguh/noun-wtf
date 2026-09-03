@@ -194,12 +194,12 @@ export function NounDetailView({ nounId }: { nounId: number }) {
           {/* Links */}
           <div className="mt-6 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
             <a
-              href={`https://nouns.wtf/noun/${nounId}`}
+              href={`/noun/${nounId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="transition-colors hover:text-[var(--ink)]"
             >
-              nouns.wtf &rsaquo;
+              noun.wtf &rsaquo;
             </a>
             <a
               href={`https://opensea.io/assets/ethereum/${NOUNS_CONTRACT}/${nounId}`}

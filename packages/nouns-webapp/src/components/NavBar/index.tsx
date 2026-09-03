@@ -29,6 +29,7 @@ import { nounsTreasuryAddress } from '@/contracts';
 import { NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useActiveDao } from '@/hooks/useActiveDao';
+import { useHomeSections } from '@/hooks/useHomeSections';
 import { setTorchMode } from '@/state/slices/application';
 import { usePickByState } from '@/utils/colorResponsiveUIUtils';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
@@ -60,6 +61,9 @@ const NavBar = () => {
     state => state.application.currentNounSeed,
   ) as INounSeed | null;
   const stateBgColor = useAppSelector(state => state.application.stateBackgroundColor);
+  // Colour swatches + edit pencil are opt-in header chrome (⚙ customise on the home page).
+  const { isEnabled: isHomeSectionEnabled } = useHomeSections();
+  const showNavChrome = isHomeSectionEnabled('navChrome');
   const torchMode = useAppSelector(state => state.application.torchMode);
   const navDispatch = useAppDispatch();
   const location = useLocation();
@@ -231,7 +235,7 @@ const NavBar = () => {
             <Nav.Item className="d-flex" style={{ alignItems: 'center', marginLeft: '8px' }}>
               <HeaderDaoToggle />
             </Nav.Item>
-            {currentNounSeed && (
+            {showNavChrome && currentNounSeed && (
               <Nav.Item
                 className="d-none d-lg-flex"
                 style={{ alignItems: 'center', marginLeft: '8px', gap: '6px' }}
@@ -252,19 +256,21 @@ const NavBar = () => {
               </Nav.Item>
             )}
           </div>
-          <button
-            type="button"
-            className={classes.makeArtHeaderBtn}
-            onClick={() => {
-              if (location.pathname === '/' || location.pathname.startsWith('/noun/')) {
-                window.dispatchEvent(new CustomEvent('noun-make-art'));
-              } else {
-                navigate('/?makeArt=1');
-              }
-            }}
-          >
-            <PencilLine size={24} />
-          </button>
+          {showNavChrome && (
+            <button
+              type="button"
+              className={classes.makeArtHeaderBtn}
+              onClick={() => {
+                if (location.pathname === '/' || location.pathname.startsWith('/noun/')) {
+                  window.dispatchEvent(new CustomEvent('noun-make-art'));
+                } else {
+                  navigate('/?makeArt=1');
+                }
+              }}
+            >
+              <PencilLine size={24} />
+            </button>
+          )}
           <div className={clsx('justify-content-end', classes.navBarItems)}>
             {/* People dropdown (Proposals/Candidates/Grants) — desktop only.
                 On mobile its items render at the top of the Noggles dropdown

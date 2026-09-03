@@ -195,11 +195,11 @@ const Documentation = (props: DocumentationProps = { backgroundColor: '#FFF' }) 
                 <Trans>
                   Nouns DUNA is a legally recognized Decentralized Unincorporated Nonprofit
                   Association established in Wyoming via{' '}
-                  <Link text="Proposal 727" url="https://nouns.wtf/vote/727" leavesPage={true} />{' '}
-                  designed to provide a robust legal framework that aligns with the decentralized
-                  nature of Nouns DAO. This structure allows Nouns DAO to operate with limited
-                  liability protection and legal clarity without compromising its decentralized
-                  governance ethos.
+                  <Link text="Proposal 727" url="/vote/727" leavesPage={false} /> designed to
+                  provide a robust legal framework that aligns with the decentralized nature of
+                  Nouns DAO. This structure allows Nouns DAO to operate with limited liability
+                  protection and legal clarity without compromising its decentralized governance
+                  ethos.
                 </Trans>
               </p>
               <p>

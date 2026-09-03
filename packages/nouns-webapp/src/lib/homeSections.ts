@@ -7,7 +7,7 @@
  * preference live in localStorage and can be seeded/overridden from the URL:
  *
  *   ?sections=all | none | onchainWire,dreams,...
- *   ?hero=classic | centered | split | poster
+ *   ?hero=minimal | classic | centered | split | poster
  *
  * Kept framework-free (plain module store) so the page, the hero and the app
  * chrome can all read the same state without prop-drilling; React binds via
@@ -25,7 +25,8 @@ export type HomeSectionId =
   | 'noundry'
   | 'intro'
   | 'heroTools'
-  | 'heroPrompt';
+  | 'heroPrompt'
+  | 'navChrome';
 
 export interface HomeSection {
   id: HomeSectionId;
@@ -37,6 +38,11 @@ export interface HomeSection {
 export const HOME_SECTIONS: readonly HomeSection[] = [
   { id: 'heroTools', label: 'Hero tools', description: '3D / ASCII / edit tabs + save rail' },
   { id: 'heroPrompt', label: 'Noun chat', description: 'The poetic line + chat / jump bar' },
+  {
+    id: 'navChrome',
+    label: 'Header extras',
+    description: 'Colour of the day swatches + edit pencil',
+  },
   { id: 'onchainWire', label: 'Onchain wire', description: 'Live activity strip above the noun' },
   { id: 'lilNouns', label: 'Lil Nouns', description: 'Mint row for the little ones' },
   { id: 'fundedProps', label: 'Funded props', description: 'Recently funded proposals' },
@@ -54,7 +60,7 @@ export function isHomeSectionId(value: unknown): value is HomeSectionId {
   return typeof value === 'string' && SECTION_IDS.has(value);
 }
 
-export type HeroStyle = 'classic' | 'centered' | 'split' | 'poster';
+export type HeroStyle = 'minimal' | 'classic' | 'centered' | 'split' | 'poster';
 
 export interface HeroStyleOption {
   id: HeroStyle;
@@ -63,6 +69,7 @@ export interface HeroStyleOption {
 }
 
 export const HERO_STYLES: readonly HeroStyleOption[] = [
+  { id: 'minimal', label: 'Minimal', description: 'Just the noun, no box, bare bid' },
   { id: 'classic', label: 'Classic', description: 'Stage + sidebar cards' },
   { id: 'centered', label: 'Centred', description: 'Big noun, bids stacked beneath' },
   { id: 'split', label: 'Split', description: 'Noun left, sparse column right' },
@@ -75,7 +82,7 @@ export function isHeroStyle(value: unknown): value is HeroStyle {
   return typeof value === 'string' && HERO_STYLE_IDS.has(value);
 }
 
-export const DEFAULT_HERO_STYLE: HeroStyle = 'split';
+export const DEFAULT_HERO_STYLE: HeroStyle = 'minimal';
 
 export const HOME_SECTIONS_STORAGE_KEY = 'noun-wtf-home-sections';
 export const HOME_HERO_STORAGE_KEY = 'noun-wtf-home-hero';

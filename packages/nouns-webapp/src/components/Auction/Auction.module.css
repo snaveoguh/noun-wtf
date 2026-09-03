@@ -851,3 +851,61 @@
   flex: 0 0 auto;
   width: min(24rem, 100%);
 }
+
+/* minimal — the default. No stage box: the noun floats on the page, scaled up;
+   the right column is bare text; the bid input is just its placeholder. */
+.layoutMinimal .heroStage {
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  width: min(100%, 78vh);
+  margin: 0 auto;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.layoutMinimal .heroStage.bgCool,
+.layoutMinimal .heroStage.bgWarm {
+  background: transparent !important;
+}
+
+.layoutMinimal .heroArtFrame {
+  border-radius: 0;
+}
+
+.layoutMinimal .heroSidebar {
+  position: static;
+  align-self: center;
+  gap: 1.75rem;
+}
+
+.layoutMinimal .metaCard,
+.layoutMinimal .auctionCard {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (min-width: 992px) {
+  .layoutMinimal .heroMain {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: center;
+    gap: clamp(1.5rem, 4vw, 4rem);
+  }
+
+  .layoutMinimal .heroSidebar {
+    padding-right: clamp(0rem, 3vw, 2.5rem);
+    max-width: 30rem;
+  }
+}
+
+@media (max-width: 991px) {
+  .layoutMinimal .heroStage {
+    width: min(100%, 60vh);
+  }
+}

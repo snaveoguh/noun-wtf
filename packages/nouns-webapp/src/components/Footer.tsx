@@ -22,20 +22,26 @@ export const Footer = () => {
     {
       category: 'Nouns DAO',
       items: [
-        { label: t`Calendar`, url: '/calendar' },
+        { label: t`Auction`, url: '/' },
         { label: t`Governance`, url: '/vote' },
-        { label: t`Brand Assets`, url: '/brand' },
-        { label: t`Playground`, url: '/playground' },
+        { label: t`Candidates`, url: '/candidates' },
+        { label: t`Grants`, url: '/grants' },
+        { label: t`NounV2`, url: '/v2' },
+        { label: t`Wallet explorer`, url: '/explore/wallet' },
+        { label: t`Stats`, url: '/stats' },
+      ],
+    },
+    {
+      category: 'Nouns',
+      items: [
         { label: t`Nouns`, url: '/nouns' },
         { label: t`Traits`, url: '/traits' },
-        {
-          label: t`Forks`,
-          url: '/fork',
-        },
-        {
-          label: t`Map`,
-          url: 'https://nounspot.com',
-        },
+        { label: t`Settlers`, url: '/settlers' },
+        { label: t`Nounders`, url: '/nounders' },
+        { label: t`Playground`, url: '/playground' },
+        { label: t`Dreams`, url: '/dreams' },
+        { label: t`Probe`, url: '/probe' },
+        { label: t`Crystal ball`, url: '/crystal-ball' },
       ],
     },
     {
@@ -69,7 +75,11 @@ export const Footer = () => {
       url: 'https://farcaster.xyz/~/channel/nouns',
       icon: <FarcasterIcon className="size-6" />,
     },
-    { alt: 'GitHub', url: 'https://github.com/nounsDAO', icon: <GitHubIcon className="size-6" /> },
+    {
+      alt: 'GitHub',
+      url: 'https://github.com/snaveoguh/noun-wtf',
+      icon: <GitHubIcon className="size-6" />,
+    },
     {
       alt: 'Discord',
       url: 'https://discord.gg/Z47Qpz26Fe',
@@ -111,9 +121,9 @@ export const Footer = () => {
                 {items.map(({ label, url }) => (
                   <li key={label}>
                     <Link
-                      reloadDocument
                       to={url}
                       target={url.startsWith('/') ? undefined : '_blank'}
+                      rel={url.startsWith('/') ? undefined : 'noreferrer'}
                       className="font-medium no-underline hover:text-red-500"
                       style={{ color: 'var(--theme-text-primary)' }}
                     >
@@ -131,7 +141,7 @@ export const Footer = () => {
         className="mt-12 flex items-center justify-center text-base sm:mt-16"
         style={{ color: 'var(--theme-text-primary)' }}
       >
-        <p className="m-0 p-1">{`${new Date().getFullYear()} Nouns DAO`}</p>·
+        <p className="m-0 p-1">{`${new Date().getFullYear()} noun.wtf`}</p>·
         <p className="m-0 p-1">
           <Trans>
             made with <NogglesLogo className="inline-block h-3 align-baseline" />
