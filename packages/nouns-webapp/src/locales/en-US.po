@@ -147,6 +147,10 @@ msgstr "Bids will appear here"
 msgid "Edit fee: {0} ETH"
 msgstr "Edit fee: {0} ETH"
 
+#: src/components/Footer.tsx
+msgid "Stats"
+msgstr "Stats"
+
 #: src/components/ProposalActionsModal/steps/FunctionCallEnterArgsStep/index.tsx
 msgid "Invalid Arguments"
 msgstr "Invalid Arguments"
@@ -162,10 +166,9 @@ msgstr "Propose"
 msgid "Winner"
 msgstr "Winner"
 
-#: src/components/NavBar/index.tsx
-#: src/components/NavBar/index.tsx
-#~ msgid "Candidates"
-#~ msgstr "Candidates"
+#: src/components/Footer.tsx
+msgid "Candidates"
+msgstr "Candidates"
 
 #: src/components/CurrentDelegatePannel/index.tsx
 msgid "Noun votes are not transferable, but are <0>delegatable</0>, which means you can assign your vote to someone else as long as you own your Noun."
@@ -212,8 +215,8 @@ msgid "Editing this candidate will clear all existing sponsor signatures. Each s
 msgstr "Editing this candidate will clear all existing sponsor signatures. Each sponsor will need to re-sign after the edit."
 
 #: src/components/Footer.tsx
-msgid "Map"
-msgstr "Map"
+#~ msgid "Map"
+#~ msgstr "Map"
 
 #: src/components/Documentation/index.tsx
 msgid "Nouns are generated randomly based Ethereum block hashes. There are no 'if' statements or other rules governing Noun trait scarcity, which makes all Nouns equally rare. As of this writing, Nouns are made up of:"
@@ -380,8 +383,8 @@ msgid "There are unfortunately no algorithmic solutions for making these determi
 msgstr "There are unfortunately no algorithmic solutions for making these determinations in advance (if there were, the veto would not be required), and proposals must be considered on a case by case basis."
 
 #: src/components/Footer.tsx
-msgid "Calendar"
-msgstr "Calendar"
+#~ msgid "Calendar"
+#~ msgstr "Calendar"
 
 #: src/pages/Playground/index.tsx
 msgid "The playground was built using the {nounsProtocolLink}. Noun's traits are determined by the Noun Seed. The seed was generated using {nounsAssetsLink} and rendered using the {nounsSDKLink}."
@@ -408,6 +411,10 @@ msgstr "You can settle manually in {0} minutes"
 #: src/components/Proposals/index.tsx
 msgid "Ends {0}"
 msgstr "Ends {0}"
+
+#: src/components/Footer.tsx
+msgid "Dreams"
+msgstr "Dreams"
 
 #: src/components/ByLineHoverCard/index.tsx
 msgid "<0>Delegated Votes: </0>"
@@ -526,6 +533,10 @@ msgstr "Background"
 msgid "You don't have enough votes to submit a proposal"
 msgstr "You don't have enough votes to submit a proposal"
 
+#: src/components/Footer.tsx
+msgid "NounV2"
+msgstr "NounV2"
+
 #. placeholder {0}: headCount?.toString()
 #: src/components/Documentation/index.tsx
 msgid "heads ({0}) "
@@ -564,6 +575,10 @@ msgstr "backgrounds ({0}) "
 #: src/components/CurrentBid/index.tsx
 msgid "Winning bid"
 msgstr "Winning bid"
+
+#: src/components/Footer.tsx
+msgid "Crystal ball"
+msgstr "Crystal ball"
 
 #. placeholder {0}: i18n.number(Number(proposal.id || '0'))
 #: src/pages/ProposalHistory/index.tsx
@@ -656,6 +671,10 @@ msgstr "'Nounders' are the group of ten builders that initiated Nouns. Here are 
 #: src/components/AuctionTimer/index.tsx
 msgid "Auction ended"
 msgstr "Auction ended"
+
+#: src/components/Footer.tsx
+msgid "Probe"
+msgstr "Probe"
 
 #: src/components/VoteModal/index.tsx
 msgid "Submit Vote"
@@ -876,8 +895,8 @@ msgid "Add Stream Date Details"
 msgstr "Add Stream Date Details"
 
 #: src/components/Footer.tsx
-msgid "Forks"
-msgstr "Forks"
+#~ msgid "Forks"
+#~ msgstr "Forks"
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "Explore traits"
@@ -886,6 +905,10 @@ msgstr "Forks"
 #: src/components/Footer.tsx
 msgid "Token"
 msgstr "Token"
+
+#: src/components/Footer.tsx
+msgid "Nounders"
+msgstr "Nounders"
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "The logos, traits and every Noun generated on the playground are <0>CC0</0> (Creative Commons Zero), meaning they are in the public domain and free to use for any purpose without restriction."
@@ -913,8 +936,8 @@ msgid "ended {0}"
 msgstr "ended {0}"
 
 #: src/components/Footer.tsx
-msgid "Brand Assets"
-msgstr "Brand Assets"
+#~ msgid "Brand Assets"
+#~ msgstr "Brand Assets"
 
 #: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
@@ -1330,6 +1353,7 @@ msgid "Submit"
 msgstr "Submit"
 
 #: src/components/Footer.tsx
+#: src/components/Footer.tsx
 msgid "Auction"
 msgstr "Auction"
 
@@ -1463,6 +1487,10 @@ msgstr "Only 32x32 PNG images are accepted"
 #: src/components/Holder/index.tsx
 msgid "You"
 msgstr "You"
+
+#: src/components/Footer.tsx
+msgid "Settlers"
+msgstr "Settlers"
 
 #: src/components/DelegationCandidateInfo/index.tsx
 #~ msgid "Now has"
@@ -1785,6 +1813,10 @@ msgstr "The Nouns Auction Contract will act as a self-sufficient Noun generation
 #~ msgid "This candidate currently has {0} signatures."
 #~ msgstr "This candidate currently has {0} signatures."
 
+#: src/components/Footer.tsx
+msgid "Grants"
+msgstr "Grants"
+
 #: src/components/Documentation/index.tsx
 msgid "make upgrades to critical smart contracts without undergoing an audit"
 msgstr "make upgrades to critical smart contracts without undergoing an audit"
@@ -1841,6 +1873,10 @@ msgstr "Candidate"
 #: src/components/Documentation/index.tsx
 msgid "Nouns DUNA is a legally recognized Decentralized Unincorporated Nonprofit Association established in Wyoming via <0/> designed to provide a robust legal framework that aligns with the decentralized nature of Nouns DAO. This structure allows Nouns DAO to operate with limited liability protection and legal clarity without compromising its decentralized governance ethos."
 msgstr "Nouns DUNA is a legally recognized Decentralized Unincorporated Nonprofit Association established in Wyoming via <0/> designed to provide a robust legal framework that aligns with the decentralized nature of Nouns DAO. This structure allows Nouns DAO to operate with limited liability protection and legal clarity without compromising its decentralized governance ethos."
+
+#: src/components/Footer.tsx
+msgid "Wallet explorer"
+msgstr "Wallet explorer"
 
 #: src/pages/EditCandidate/index.tsx
 msgid "Candidate not found."

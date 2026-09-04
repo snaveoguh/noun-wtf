@@ -147,6 +147,10 @@ msgstr "出价记录将在此显示"
 msgid "Edit fee: {0} ETH"
 msgstr ""
 
+#: src/components/Footer.tsx
+msgid "Stats"
+msgstr ""
+
 #: src/components/ProposalActionsModal/steps/FunctionCallEnterArgsStep/index.tsx
 msgid "Invalid Arguments"
 msgstr "参数无效"
@@ -162,10 +166,9 @@ msgstr ""
 msgid "Winner"
 msgstr "获胜者"
 
-#: src/components/NavBar/index.tsx
-#: src/components/NavBar/index.tsx
-#~ msgid "Candidates"
-#~ msgstr "候选提案"
+#: src/components/Footer.tsx
+msgid "Candidates"
+msgstr "候选提案"
 
 #: src/components/CurrentDelegatePannel/index.tsx
 msgid "Noun votes are not transferable, but are <0>delegatable</0>, which means you can assign your vote to someone else as long as you own your Noun."
@@ -212,8 +215,8 @@ msgid "Editing this candidate will clear all existing sponsor signatures. Each s
 msgstr ""
 
 #: src/components/Footer.tsx
-msgid "Map"
-msgstr "地图"
+#~ msgid "Map"
+#~ msgstr "地图"
 
 #: src/components/Documentation/index.tsx
 msgid "Nouns are generated randomly based Ethereum block hashes. There are no 'if' statements or other rules governing Noun trait scarcity, which makes all Nouns equally rare. As of this writing, Nouns are made up of:"
@@ -380,8 +383,8 @@ msgid "There are unfortunately no algorithmic solutions for making these determi
 msgstr "很遗憾，没有算法可在事前做出这些判定（即使有，也正因如此仍需保留否决权），提案需逐案审议。"
 
 #: src/components/Footer.tsx
-msgid "Calendar"
-msgstr "日历"
+#~ msgid "Calendar"
+#~ msgstr "日历"
 
 #: src/pages/Playground/index.tsx
 msgid "The playground was built using the {nounsProtocolLink}. Noun's traits are determined by the Noun Seed. The seed was generated using {nounsAssetsLink} and rendered using the {nounsSDKLink}."
@@ -408,6 +411,10 @@ msgstr "您可在 {0} 分钟内手动结算"
 #: src/components/Proposals/index.tsx
 msgid "Ends {0}"
 msgstr "结束于 {0}"
+
+#: src/components/Footer.tsx
+msgid "Dreams"
+msgstr ""
 
 #: src/components/ByLineHoverCard/index.tsx
 msgid "<0>Delegated Votes: </0>"
@@ -526,6 +533,10 @@ msgstr "背景"
 msgid "You don't have enough votes to submit a proposal"
 msgstr "您的票数不足，无法提交提案"
 
+#: src/components/Footer.tsx
+msgid "NounV2"
+msgstr ""
+
 #. placeholder {0}: headCount?.toString()
 #: src/components/Documentation/index.tsx
 msgid "heads ({0}) "
@@ -564,6 +575,10 @@ msgstr "背景（{0}）"
 #: src/components/CurrentBid/index.tsx
 msgid "Winning bid"
 msgstr "最高出价"
+
+#: src/components/Footer.tsx
+msgid "Crystal ball"
+msgstr ""
 
 #. placeholder {0}: i18n.number(Number(proposal.id || '0'))
 #: src/pages/ProposalHistory/index.tsx
@@ -656,6 +671,10 @@ msgstr "'Nounders' 是发起 Nouns 的十位建设者组成的团队。以下是
 #: src/components/AuctionTimer/index.tsx
 msgid "Auction ended"
 msgstr "拍卖已结束"
+
+#: src/components/Footer.tsx
+msgid "Probe"
+msgstr ""
 
 #: src/components/VoteModal/index.tsx
 msgid "Submit Vote"
@@ -876,8 +895,8 @@ msgid "Add Stream Date Details"
 msgstr "添加流支付日期详情"
 
 #: src/components/Footer.tsx
-msgid "Forks"
-msgstr "分叉"
+#~ msgid "Forks"
+#~ msgstr "分叉"
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "Explore traits"
@@ -886,6 +905,10 @@ msgstr "分叉"
 #: src/components/Footer.tsx
 msgid "Token"
 msgstr "令牌"
+
+#: src/components/Footer.tsx
+msgid "Nounders"
+msgstr ""
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "The logos, traits and every Noun generated on the playground are <0>CC0</0> (Creative Commons Zero), meaning they are in the public domain and free to use for any purpose without restriction."
@@ -913,8 +936,8 @@ msgid "ended {0}"
 msgstr "{0}结束"
 
 #: src/components/Footer.tsx
-msgid "Brand Assets"
-msgstr "品牌资产"
+#~ msgid "Brand Assets"
+#~ msgstr "品牌资产"
 
 #: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
@@ -1330,6 +1353,7 @@ msgid "Submit"
 msgstr "提交"
 
 #: src/components/Footer.tsx
+#: src/components/Footer.tsx
 msgid "Auction"
 msgstr "拍卖"
 
@@ -1463,6 +1487,10 @@ msgstr "只接受 32x32 PNG 图像"
 #: src/components/Holder/index.tsx
 msgid "You"
 msgstr "您"
+
+#: src/components/Footer.tsx
+msgid "Settlers"
+msgstr ""
 
 #: src/components/DelegationCandidateInfo/index.tsx
 #~ msgid "Now has"
@@ -1785,6 +1813,10 @@ msgstr "Nouns 拍卖合约将作为一个自给自足的 Noun 生成和分发机
 #~ msgid "This candidate currently has {0} signatures."
 #~ msgstr "该候选人目前有 {0} 个签名。"
 
+#: src/components/Footer.tsx
+msgid "Grants"
+msgstr ""
+
 #: src/components/Documentation/index.tsx
 msgid "make upgrades to critical smart contracts without undergoing an audit"
 msgstr "在未经审计的情况下对关键智能合约进行升级"
@@ -1841,6 +1873,10 @@ msgstr "候选人"
 #: src/components/Documentation/index.tsx
 msgid "Nouns DUNA is a legally recognized Decentralized Unincorporated Nonprofit Association established in Wyoming via <0/> designed to provide a robust legal framework that aligns with the decentralized nature of Nouns DAO. This structure allows Nouns DAO to operate with limited liability protection and legal clarity without compromising its decentralized governance ethos."
 msgstr "Nouns DUNA是一个在怀俄明州通过<0/>设立的法律认可的去中心化非注册非营利协会，旨在提供与Nouns DAO去中心化性质相符的强大法律框架。这种结构使Nouns DAO能够在有限责任保护和法律明确性下运营，而不损害其去中心化治理精神。"
+
+#: src/components/Footer.tsx
+msgid "Wallet explorer"
+msgstr ""
 
 #: src/pages/EditCandidate/index.tsx
 msgid "Candidate not found."
