@@ -614,13 +614,14 @@ const AutoSetupCard: FC<{
             </a>
           </>
         )}
-        {!sa.isMetaMask && (
+        {!sa.isMetaMask && !(sa.isDelegated && sa.isMetaMaskDelegator) && (
           <div className="wp-neg mt-1 flex items-start gap-1">
             <AlertTriangleIcon size={12} className="mt-0.5 shrink-0" />
             <span>
-              Connected via {sa.connectorLabel ?? 'a non-MetaMask wallet'}. Only MetaMask smart
-              accounts can grant this today. Nouns in a Safe: use Zodiac Roles instead (guide coming
-              to /docs).
+              Connected via {sa.connectorLabel ?? 'a non-MetaMask wallet'}. The one-time Smart
+              Account upgrade can only be done in MetaMask: import this account there, turn on Smart
+              account for Ethereum, then come back — signing the permission works from any wallet
+              (Rabby included). Nouns in a Safe: use Zodiac Roles instead.
             </span>
           </div>
         )}
