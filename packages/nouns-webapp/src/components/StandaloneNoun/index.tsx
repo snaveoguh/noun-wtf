@@ -36,7 +36,12 @@ interface StandaloneNounWithSeedProps {
   shouldLinkToProfile: boolean;
 }
 
-export const getNoun = (nounId: string | bigint, seed: INounSeed, isV2 = false) => {
+export const getNoun = (
+  nounId: string | bigint,
+  seed: INounSeed,
+  isV2 = false,
+  options: { transparentBackground?: boolean } = {},
+) => {
   const id = nounId.toString();
   const name = `Noun ${id}`;
   // Burned-seed sentinel (from useNounSeed on a revert). Short-circuit before
@@ -66,7 +71,9 @@ export const getNoun = (nounId: string | bigint, seed: INounSeed, isV2 = false) 
   const safeParts = (parts as Array<{ data: string } | undefined>).filter(
     (p): p is { data: string } => typeof p?.data === 'string',
   );
-  const image = `data:image/svg+xml;base64,${btoa(buildSVG(safeParts, palette, background))}`;
+  const image = `data:image/svg+xml;base64,${btoa(
+    buildSVG(safeParts, palette, options.transparentBackground === true ? undefined : background),
+  )}`;
 
   return {
     name,

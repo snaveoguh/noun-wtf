@@ -1281,6 +1281,14 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layo
     return getNoun(BigInt(currentAuction.nounId), currentNounSeed, dao.isV2).image;
   }, [currentAuction, currentNounSeed, dao.isV2]);
 
+  // Minimal hero draws the noun straight on the page — no background square.
+  const nounSvgTransparent = useMemo(() => {
+    if (layout !== 'minimal' || !currentNounSeed || !currentAuction) return null;
+    return getNoun(BigInt(currentAuction.nounId), currentNounSeed, dao.isV2, {
+      transparentBackground: true,
+    }).image;
+  }, [layout, currentAuction, currentNounSeed, dao.isV2]);
+
   useAuctionKeyboardShortcuts({
     isEditing,
     viewMode,
@@ -1612,10 +1620,11 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layo
       return (
         <PanZoomImage
           ref={panZoomRef}
-          src={nounSvg}
+          src={layout === 'minimal' ? (nounSvgTransparent ?? nounSvg) : nounSvg}
           alt={`Noun ${currentAuction?.nounId}`}
           pixelated
           interactive={imageInteractive}
+          fit={layout === 'minimal' ? 'fill' : 'contain'}
         />
       );
     }
