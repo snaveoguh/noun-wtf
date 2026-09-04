@@ -8,6 +8,10 @@
  * Data comes from /api/wallet-map/:identity on the Ponder API.
  *
  * Gated to addresses with ≥ 4 Nouns voting weight (see useNounGate below).
+ *
+ * Hosted as the "Identity graph" tab of the wallet gamer profile
+ * (`src/pages/WalletProfile`), which gives it a positioned, dark, fixed-height
+ * container (`.wp-graph`) — the shell below is `position:absolute; inset:0`.
  */
 import { useState, useEffect, FC } from 'react';
 
@@ -106,7 +110,8 @@ const WalletExplorer: FC = () => {
   const submit = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
-    navigate(`/explore/wallet/${encodeURIComponent(trimmed)}`);
+    // Stay on the gamer profile's Identity graph tab for the new identity.
+    navigate(`/gamer/${encodeURIComponent(trimmed)}?tab=graph`);
   };
 
   // ─── Gate states ──────────────────────────────────────────────────────────

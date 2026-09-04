@@ -1,0 +1,374 @@
+/* Wallet gamer profile — theme-token driven so it reads in both Dice (light)
+   and Terminal (dark). Every colour comes from --theme-*; no hardcoded hex. */
+
+.wp {
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-body);
+}
+
+.wp-card {
+  background: var(--theme-bg-card);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-md);
+  box-shadow: var(--theme-shadow);
+  padding: 14px 16px;
+}
+
+.wp-muted {
+  color: var(--theme-text-muted);
+}
+.wp-secondary {
+  color: var(--theme-text-secondary);
+}
+.wp-link {
+  color: var(--theme-text-link);
+  text-decoration: none;
+}
+.wp-link:hover {
+  text-decoration: underline;
+}
+
+.wp-h {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--theme-text-muted);
+  margin: 0 0 8px;
+}
+
+.wp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 999px;
+  background: var(--theme-feed-badge-bg);
+  color: var(--theme-text-secondary);
+  white-space: nowrap;
+}
+.wp-pill-accent {
+  border-color: var(--theme-accent);
+  background: var(--theme-accent);
+  color: var(--theme-accent-text);
+}
+.wp-pill-pos {
+  border-color: var(--theme-positive);
+  color: var(--theme-positive);
+  background: transparent;
+}
+.wp-pill-neg {
+  border-color: var(--theme-negative);
+  color: var(--theme-negative);
+  background: transparent;
+}
+.wp-pill-mid {
+  border-color: var(--theme-text-muted);
+  color: var(--theme-text-secondary);
+  background: transparent;
+}
+
+.wp-stat {
+  background: var(--theme-bg-card);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-md);
+  padding: 10px 12px;
+  min-width: 0;
+}
+.wp-stat-v {
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--theme-text-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wp-stat-l {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--theme-text-muted);
+  margin-top: 4px;
+}
+.wp-stat-s {
+  font-size: 11px;
+  color: var(--theme-text-secondary);
+  margin-top: 4px;
+}
+
+.wp-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--theme-border);
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.wp-tabs::-webkit-scrollbar {
+  display: none;
+}
+.wp-tab {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--theme-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--theme-transition),
+    color var(--theme-transition);
+}
+.wp-tab:hover {
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-primary);
+}
+.wp-tab.active {
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
+  border-color: var(--theme-text-primary);
+}
+.wp-tab-count {
+  margin-left: 5px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.wp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: var(--theme-radius-sm);
+  background: var(--theme-bg-secondary);
+  color: var(--theme-text-primary);
+  cursor: pointer;
+  transition: background var(--theme-transition);
+  white-space: nowrap;
+}
+.wp-btn:hover:not(:disabled) {
+  background: var(--theme-bg-hover);
+}
+.wp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.wp-btn-primary {
+  background: var(--theme-accent);
+  border-color: var(--theme-accent);
+  color: var(--theme-accent-text);
+}
+.wp-btn-primary:hover:not(:disabled) {
+  background: var(--theme-accent-hover);
+}
+.wp-btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.wp-btn-danger {
+  border-color: var(--theme-negative);
+  color: var(--theme-negative);
+}
+
+.wp-input,
+.wp-textarea,
+.wp-select {
+  width: 100%;
+  background: var(--theme-bg-input);
+  border: 1px solid var(--theme-border-strong);
+  border-radius: var(--theme-radius-sm);
+  color: var(--theme-text-primary);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: var(--theme-font-body);
+  outline: none;
+}
+.wp-input:focus,
+.wp-textarea:focus,
+.wp-select:focus {
+  border-color: var(--theme-accent);
+}
+.wp-textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.wp-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--theme-feed-row-border);
+  min-width: 0;
+}
+.wp-row:last-child {
+  border-bottom: none;
+}
+
+.wp-bar {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  background: var(--theme-bg-tertiary);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.wp-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+
+.wp-tri {
+  display: flex;
+  height: 6px;
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--theme-bg-tertiary);
+}
+.wp-tri > span {
+  height: 100%;
+}
+
+.wp-pos {
+  color: var(--theme-positive);
+}
+.wp-neg {
+  color: var(--theme-negative);
+}
+.wp-mid {
+  color: var(--theme-text-muted);
+}
+.wp-bg-pos {
+  background: var(--theme-positive);
+}
+.wp-bg-neg {
+  background: var(--theme-negative);
+}
+.wp-bg-mid {
+  background: var(--theme-text-muted);
+}
+.wp-bg-accent {
+  background: var(--theme-accent);
+}
+
+.wp-noun {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  image-rendering: pixelated;
+  border-radius: var(--theme-radius-sm);
+  background: var(--theme-bg-tertiary);
+}
+
+.wp-avatar {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border-radius: var(--theme-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: var(--theme-text-muted);
+}
+.wp-avatar img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.wp-skel {
+  background: var(--theme-bg-tertiary);
+  border-radius: var(--theme-radius-sm);
+  animation: wp-pulse 1.4s ease-in-out infinite;
+}
+@keyframes wp-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.wp-reason {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--theme-border-strong);
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wp-slider {
+  width: 100%;
+  accent-color: var(--theme-accent);
+}
+
+.wp-mono {
+  font-family: var(--theme-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.wp-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.wp-graph {
+  position: relative;
+  height: 72vh;
+  min-height: 520px;
+  overflow: hidden;
+  border-radius: var(--theme-radius-md);
+  border: 1px solid var(--theme-border);
+  background: #0a0a0f;
+  color: #e2e8f0;
+  text-transform: none;
+}
+
+/* Implicit grid tracks default to `auto`, whose minimum is the widest child's
+   min-content — a single nowrap proposal title could push the whole page past
+   a phone viewport. Size implicit columns like Tailwind's explicit ones. */
+.wp.grid,
+.wp .grid {
+  grid-auto-columns: minmax(0, 1fr);
+}
+.wp-card {
+  min-width: 0;
+}
+.wp-row > .flex > .wp-ellipsis,
+.wp-row > .flex > .wp-link.wp-ellipsis {
+  flex: 1 1 0;
+}
+@media (max-width: 640px) {
+  .wp-row > .flex {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
+
+/* Terminal palette sets --theme-accent-text to the accent itself (green on
+   green); anything painted with the accent needs ink from the page ground. */
+[data-theme='terminal'] .wp-pill-accent,
+[data-theme='terminal'] .wp-btn-primary,
+[data-theme='terminal'] .wp-tab.active {
+  color: var(--theme-bg-primary);
+}

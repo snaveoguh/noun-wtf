@@ -1,0 +1,341 @@
+/**
+ * Wallet "gamer profile" API contract — `/api/wallet/:identity/*`.
+ *
+ * The API is being built in parallel, so every section is nullable and every
+ * field inside a section is optional. Renderers must tolerate any of them
+ * being missing and fall back to a skeleton / empty state.
+ */
+
+export interface NounSeedLike {
+  background: number;
+  body: number;
+  accessory: number;
+  glasses: number;
+  head: number;
+}
+
+/** Unix seconds, ms, numeric string or ISO string — the API is loose here. */
+export type Timestampish = number | string | null | undefined;
+
+export interface ProfileIdentity {
+  address?: string;
+  ens?: string | null;
+  farcaster?: { fid?: number; username?: string; displayName?: string } | null;
+  tags?: string[];
+  aliases?: string[];
+  firstSeen?: { block?: number; timestamp?: Timestampish } | null;
+  lastActive?: { block?: number; timestamp?: Timestampish } | null;
+  summary?: string | null;
+}
+
+export interface HeldNoun {
+  nounId: number | string;
+  seed?: NounSeedLike | null;
+  since?: Timestampish;
+}
+
+export interface ProfileHoldings {
+  nouns?: HeldNoun[];
+  count?: number;
+  delegate?: string | null;
+  delegatedVotes?: number;
+  representsNouns?: Array<number | string>;
+  delegators?: string[];
+}
+
+export interface RecentVote {
+  proposalId: number | string;
+  title?: string | null;
+  support?: number | null;
+  votes?: number | string;
+  reason?: string | null;
+  timestamp?: Timestampish;
+  txHash?: string | null;
+  clientId?: number | null;
+  proposalStatus?: string | null;
+  proposalResult?: string | null;
+  alignedWithOutcome?: boolean | null;
+}
+
+export interface ProfileVoting {
+  total?: number;
+  for?: number;
+  against?: number;
+  abstain?: number;
+  withReason?: number;
+  participationPct?: number | null;
+  avgWeight?: number | null;
+  firstVote?: Timestampish;
+  lastVote?: Timestampish;
+  streakCurrent?: number;
+  byClient?: Array<{ clientId: number | null; count: number }>;
+  revotes?: number;
+  recent?: RecentVote[];
+}
+
+export interface AuthoredProposal {
+  id: number | string;
+  title?: string | null;
+  status?: string | null;
+  forVotes?: number | string;
+  againstVotes?: number | string;
+  abstainVotes?: number | string;
+  createdAt?: Timestampish;
+  executed?: boolean;
+}
+
+export interface ProfileProposals {
+  authored?: AuthoredProposal[];
+  signed?: Array<{ id: number | string; title?: string | null; status?: string | null }>;
+  passRate?: number | null;
+  totalRequestedEth?: number | null;
+}
+
+export interface AuthoredCandidate {
+  id: string;
+  slug?: string;
+  title?: string | null;
+  createdAt?: Timestampish;
+  canceled?: boolean;
+  promotedToProposalId?: number | string | null;
+  sponsorCount?: number;
+}
+
+export interface SponsoredCandidate {
+  candidateId: string;
+  title?: string | null;
+  reason?: string | null;
+  createdAt?: Timestampish;
+  canceled?: boolean;
+  expirationTimestamp?: Timestampish;
+}
+
+export interface ProfileCandidates {
+  authored?: AuthoredCandidate[];
+  sponsored?: SponsoredCandidate[];
+  feedbackGiven?: number;
+  proposalFeedbackGiven?: number;
+}
+
+export interface WonAuction {
+  nounId: number | string;
+  amountEth?: number | string;
+  timestamp?: Timestampish;
+  clientId?: number | null;
+  seed?: NounSeedLike | null;
+}
+
+export interface ProfileAuctions {
+  won?: WonAuction[];
+  wonCount?: number;
+  totalSpentEth?: number | string;
+  settled?: number;
+  curated?: Array<number | string>;
+  bids?: {
+    count?: number;
+    totalEth?: number | string;
+    extendedCount?: number;
+    nounsBidOn?: number;
+  } | null;
+  nounderRewards?: number | string | null;
+}
+
+export interface SaleRecord {
+  nounId: number | string;
+  priceEth?: number | string;
+  marketplace?: string | null;
+  side?: 'buy' | 'sell' | string;
+  counterparty?: string | null;
+  timestamp?: Timestampish;
+}
+
+export interface ProfileTransfers {
+  received?: number;
+  sent?: number;
+  sales?: SaleRecord[];
+}
+
+export interface StreamRecord {
+  streamAddress?: string;
+  proposalId?: number | string;
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  totalAmount?: number | string;
+  withdrawnAmount?: number | string;
+  status?: string | null;
+}
+
+export interface ProfileTreasury {
+  streams?: StreamRecord[];
+  totalReceivedUsdc?: number | string | null;
+  totalReceivedEth?: number | string | null;
+  grants?: { authored?: number; votes?: number } | null;
+}
+
+export interface ForkRecord {
+  forkId: number | string;
+  kind?: string;
+  nounIds?: Array<number | string>;
+  timestamp?: Timestampish;
+}
+
+export interface ProfileV2 {
+  votes?: number;
+  for?: number;
+  against?: number;
+  abstain?: number;
+  proposalsAuthored?: number;
+  auctionsWon?: number;
+  bids?: number;
+  settled?: number;
+}
+
+export interface DelegationRecord {
+  kind?: string;
+  fromDelegate?: string | null;
+  toDelegate?: string | null;
+  nounCount?: number;
+  timestamp?: Timestampish;
+}
+
+export interface OverviewText {
+  text?: string;
+  generatedAt?: Timestampish;
+  model?: string | null;
+  cached?: boolean;
+}
+
+export interface WalletProfile {
+  identity?: ProfileIdentity | null;
+  holdings?: ProfileHoldings | null;
+  voting?: ProfileVoting | null;
+  proposals?: ProfileProposals | null;
+  candidates?: ProfileCandidates | null;
+  auctions?: ProfileAuctions | null;
+  transfers?: ProfileTransfers | null;
+  treasury?: ProfileTreasury | null;
+  forks?: ForkRecord[] | null;
+  v2?: ProfileV2 | null;
+  delegationHistory?: DelegationRecord[] | null;
+  overview?: OverviewText | null;
+  autopilot?: { enabled?: boolean; updatedAt?: Timestampish } | null;
+  badges?: string[] | null;
+}
+
+// ─── Activity ──────────────────────────────────────────────────────────────
+
+export interface WalletActivityEvent {
+  type: string;
+  blockNumber: number;
+  timestamp: string;
+  txHash: string;
+  data: Record<string, unknown>;
+}
+
+export interface WalletActivityPage {
+  events: WalletActivityEvent[];
+  hasMore: boolean;
+  oldestBlock: number;
+}
+
+// ─── Autopilot ─────────────────────────────────────────────────────────────
+
+export type StanceKey =
+  | 'art'
+  | 'infrastructure'
+  | 'events'
+  | 'media'
+  | 'grants'
+  | 'protocolChanges'
+  | 'treasuryOps';
+
+export type Stances = Record<StanceKey, number>;
+
+export interface AutopilotPrefs {
+  philosophy: string;
+  stances: Stances;
+  maxAskEth: number | null;
+  blockedProposers: string[];
+  trustedProposers: string[];
+  defaultWhenUnsure: 'abstain' | 'skip' | 'against';
+  voteReasonStyle: 'none' | 'short' | 'full';
+}
+
+export interface AutopilotRecommendation {
+  proposalId: number | string;
+  title?: string | null;
+  support?: 0 | 1 | 2 | null;
+  confidence?: number | null;
+  reason?: string | null;
+  generatedAt?: Timestampish;
+  alreadyVoted?: boolean;
+  pending?: boolean;
+}
+
+export interface AutopilotState {
+  enabled?: boolean;
+  prefs?: AutopilotPrefs | null;
+  updatedAt?: Timestampish;
+  recommendations?: AutopilotRecommendation[];
+}
+
+export const STANCE_KEYS: StanceKey[] = [
+  'art',
+  'infrastructure',
+  'events',
+  'media',
+  'grants',
+  'protocolChanges',
+  'treasuryOps',
+];
+
+export const STANCE_LABELS: Record<StanceKey, string> = {
+  art: 'Art & culture',
+  infrastructure: 'Infrastructure & tooling',
+  events: 'Events & IRL',
+  media: 'Media & content',
+  grants: 'Grants & retro funding',
+  protocolChanges: 'Protocol changes',
+  treasuryOps: 'Treasury ops',
+};
+
+export const DEFAULT_PREFS: AutopilotPrefs = {
+  philosophy: '',
+  stances: {
+    art: 0,
+    infrastructure: 0,
+    events: 0,
+    media: 0,
+    grants: 0,
+    protocolChanges: 0,
+    treasuryOps: 0,
+  },
+  maxAskEth: null,
+  blockedProposers: [],
+  trustedProposers: [],
+  defaultWhenUnsure: 'abstain',
+  voteReasonStyle: 'short',
+};
+
+export type ProfileTab =
+  | 'overview'
+  | 'votes'
+  | 'proposals'
+  | 'candidates'
+  | 'auctions'
+  | 'nouns'
+  | 'treasury'
+  | 'activity'
+  | 'graph';
+
+export const PROFILE_TABS: { key: ProfileTab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'votes', label: 'Votes' },
+  { key: 'proposals', label: 'Proposals' },
+  { key: 'candidates', label: 'Candidates' },
+  { key: 'auctions', label: 'Auctions' },
+  { key: 'nouns', label: 'Nouns' },
+  { key: 'treasury', label: 'Treasury' },
+  { key: 'activity', label: 'Activity' },
+  { key: 'graph', label: 'Identity graph' },
+];
