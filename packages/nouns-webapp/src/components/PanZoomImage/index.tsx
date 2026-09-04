@@ -100,6 +100,9 @@ const PanZoomImage = ({
           left: '50%',
           maxWidth: fit === 'fill' ? '100%' : '85%',
           maxHeight: fit === 'fill' ? '100%' : '85%',
+          // SVGs report a small natural size (320px); fill must upscale, not just cap.
+          width: fit === 'fill' ? '100%' : undefined,
+          height: fit === 'fill' ? '100%' : undefined,
           objectFit: 'contain',
           imageRendering: pixelated ? 'pixelated' : 'auto',
           transform: `translate(-50%, -50%) translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
