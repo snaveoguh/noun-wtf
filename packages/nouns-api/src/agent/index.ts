@@ -3,6 +3,12 @@
 // Starts the block watcher and exports all agent modules for use by the API.
 
 import {
+  getAutopilotStatus,
+  runSweep as runAutopilotSweep,
+  startAutopilotRelayer,
+  stopAutopilotRelayer,
+} from './autopilotRelayer.js';
+import {
   startWatcher,
   stopWatcher,
   getWatcherState,
@@ -18,8 +24,8 @@ import {
   buildProposalsAndGrantsContext,
 } from './governanceContext.js';
 import { learnFromUrl, batchLearn, getKnowledgeStats, buildKnowledgeContext } from './knowledge.js';
-import { NOUN_V2_KNOWLEDGE } from './nounV2Knowledge.js';
 import { remember, recall, forget, recallAll, buildMemoryContext, countByScope } from './memory.js';
+import { NOUN_V2_KNOWLEDGE } from './nounV2Knowledge.js';
 import {
   buildPeopleDb,
   getBuildStatus,
@@ -74,6 +80,14 @@ export function initAgent(): void {
   } else {
     console.log('[NounIRL] NOUNIRL_ADDRESS not set — agent running in API-only mode');
   }
+
+  // Autopilot relayer sweep (its own key + nonce space; read-only without one).
+  // Runs alongside the watcher, never inside it.
+  try {
+    startAutopilotRelayer();
+  } catch (err) {
+    console.error('[Autopilot] relayer start failed (non-fatal):', err);
+  }
 }
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
@@ -88,6 +102,12 @@ export {
 
   // Reservations
   reservationStore,
+
+  // Autopilot relayer
+  startAutopilotRelayer,
+  stopAutopilotRelayer,
+  runAutopilotSweep,
+  getAutopilotStatus,
 
   // Tip verification
   verifyTip,

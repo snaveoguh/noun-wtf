@@ -5,8 +5,12 @@
  *   GET  /api/wallet/:identity/activity          per-wallet slice of the unified activity feed
  *   GET  /api/wallet/:identity/overview          stored AI overview (or null)
  *   POST /api/wallet/:identity/overview/refresh  regenerate the overview (1 per 20 min per wallet)
- *   GET  /api/wallet/:address/autopilot          signed voting prefs + AI recommendations
+ *   GET  /api/wallet/:address/autopilot          signed voting prefs + AI recommendations + delegations + auto-votes
  *   PUT  /api/wallet/:address/autopilot          save prefs (EIP-191 signature required)
+ *   POST /api/wallet/:address/delegations        store a signed ERC-7710 vote delegation for the relayer
+ *   DELETE /api/wallet/:address/delegations/:id  soft-revoke a delegation
+ *   GET  /api/agent/autopilot/status             relayer status (public)
+ *   POST /api/agent/autopilot/sweep              run a relayer sweep now (admin)
  *
  * `:identity` is a 0x address or an ENS name. Every address in a response is
  * lowercased. Every timestamp in a response is unix MILLISECONDS (`new Date(x)`
@@ -15,8 +19,9 @@
  *
  * Data comes straight from the Ponder tables via drizzle, batched (one query per
  * table, `Promise.all`, every query fault-isolated). Nothing here is N+1.
- * Persistence for the overview + autopilot uses the agent memory store
- * (`wallet:<addr>` scope) — no new tables.
+ * Persistence for the overview + autopilot prefs uses the agent memory store
+ * (`wallet:<addr>` scope); delegations + auto-votes live in the two
+ * `autopilot_*` tables (`agent/autopilotStore.ts`).
  */
 import type { ActivityResponse } from './activityFeed.js';
 import type { SQL } from 'drizzle-orm';
@@ -53,6 +58,47 @@ import {
 } from 'viem';
 import { mainnet } from 'viem/chains';
 
+import { validateDelegationSubmission } from '../agent/autopilotDelegations.js';
+import {
+  listLilActiveProposals,
+  listLilVotesBy,
+  type ActiveProposal,
+  type ProposalTx,
+} from '../agent/autopilotGov.js';
+import {
+  isAutopilotDao,
+  parsePrefs,
+  readAutopilotRecord,
+  scopeFor,
+  STANCE_KEYS,
+  type AutopilotDao,
+  type AutopilotPrefs,
+  type AutopilotRecord,
+  type Stance,
+} from '../agent/autopilotPrefs.js';
+import {
+  canSend,
+  getAutopilotStatus,
+  getRelayerAddress,
+  getRelayerBalanceEth,
+  isDelegationDisabledOnchain,
+  isRelayerEnabled,
+  registerAutopilotProviders,
+  runSweep,
+  type Recommendation,
+} from '../agent/autopilotRelayer.js';
+import {
+  DuplicateDelegationError,
+  getDelegation,
+  insertDelegation,
+  lastAutoVote,
+  listActiveDelegations,
+  listDelegations,
+  listVotes,
+  revokeDelegation,
+  type DelegationRow,
+  type VoteRow,
+} from '../agent/autopilotStore.js';
 import { hubGenerateFull } from '../agent/hubClient.js';
 import { recall, remember } from '../agent/memory.js';
 import { getPerson } from '../agent/peopleDb.js';
@@ -391,7 +437,14 @@ export interface WalletProfile {
     timestamp: number;
   }>;
   overview: Overview | null;
-  autopilot: { enabled: boolean; updatedAt: number | null };
+  autopilot: {
+    enabled: boolean;
+    updatedAt: number | null;
+    mode: 'draft' | 'auto';
+    activeDelegations: number;
+    lastAutoVote: VoteRow | null;
+    recentAutoVotes: Awaited<ReturnType<typeof shapeVotes>>;
+  };
   badges: string[];
 }
 
@@ -531,6 +584,9 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     treasuryTxs,
     overview,
     autopilot,
+    activeDelegationRows,
+    lastAuto,
+    recentAutoRows,
   ] = await Promise.all([
     safe('ens', reverseEns(A), null),
     safe('farcaster', farcaster(A), null),
@@ -860,7 +916,10 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
       [],
     ),
     safe('overview', readOverview(A), null),
-    safe('autopilot', readAutopilot(A), null),
+    safe('autopilot', readAutopilotRecord(A), null),
+    safe('activeDelegations', listActiveDelegations(A), []),
+    safe('lastAutoVote', lastAutoVote(A), null),
+    safe('recentAutoVotes', listVotes(A, 5), []),
   ]);
 
   // ── Phase 2: lookups that depend on phase-1 ids ──────────────────────────
@@ -1373,7 +1432,14 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
   return {
     ...core,
     overview,
-    autopilot: { enabled: autopilot?.enabled ?? false, updatedAt: autopilot?.updatedAt ?? null },
+    autopilot: {
+      enabled: autopilot?.enabled ?? false,
+      updatedAt: autopilot?.updatedAt ?? null,
+      mode: autopilot?.prefs.mode ?? 'draft',
+      activeDelegations: activeDelegationRows.length,
+      lastAutoVote: lastAuto,
+      recentAutoVotes: await shapeVotes(db, recentAutoRows),
+    },
     badges: deriveBadges(core),
   };
 }
@@ -1403,8 +1469,6 @@ async function getProfile(db: Db, address: Hex, fresh = false): Promise<WalletPr
 }
 
 // ─── AI overview ────────────────────────────────────────────────────────────
-
-const scopeFor = (address: string) => `wallet:${lower(address)}`;
 
 async function readJson<T>(address: string, key: string): Promise<T | null> {
   const rows = await recall(scopeFor(address), key);
@@ -1563,61 +1627,22 @@ async function refreshOverview(db: Db, address: Hex): Promise<Overview & { cache
 
 // ─── Autopilot ──────────────────────────────────────────────────────────────
 //
-// PRODUCT NOTE — what "Autopilot" is today, and what it is not:
-//   The website cannot cast votes from a user's EOA: it holds no key. So today
-//   Autopilot = AI recommendations, generated from the wallet's signed
-//   preferences + its own voting history, which the user confirms with one
-//   click (the webapp turns each recommendation into a signable
-//   `castRefundableVoteWithReason` tx). True hands-off voting would need the
-//   user to delegate to a per-user vote-proxy contract that the nounirl relayer
-//   can drive — that is NOT part of this task.
+// PRODUCT NOTE — what "Autopilot" is:
+//   mode 'draft' (default): AI recommendations generated from the wallet's
+//   signed preferences + its own voting history; the user confirms each one
+//   with a click (the webapp turns it into a `castRefundableVoteWithReason`).
+//   mode 'auto': the voter has ALSO handed noun.wtf a scoped ERC-7710
+//   delegation (EIP-7702 account, `@nouns/vote-permit` profile) that lets the
+//   autopilot relayer (`agent/autopilotRelayer.ts`) cast `castRefundableVote*`
+//   from the voter's own address — the sweep in that module decides when.
 //
-// Preferences are saved with an EIP-191 signature over a fixed message:
-//   noun.wtf autopilot\naddress: <lowercase addr>\nnonce: <unix ms>\nprefs: <sha256 hex of JSON.stringify(prefs)>
-// The client MUST hash the exact `prefs` object it sends (same key order) —
-// the server hashes the raw body object, then validates it.
-
-export type Stance = -2 | -1 | 0 | 1 | 2;
-export const STANCE_KEYS = [
-  'art',
-  'infrastructure',
-  'events',
-  'media',
-  'grants',
-  'protocolChanges',
-  'treasuryOps',
-] as const;
-export type StanceKey = (typeof STANCE_KEYS)[number];
-
-export interface AutopilotPrefs {
-  philosophy: string;
-  stances: Record<StanceKey, Stance>;
-  maxAskEth: number | null;
-  blockedProposers: string[];
-  trustedProposers: string[];
-  defaultWhenUnsure: 'abstain' | 'skip' | 'against';
-  voteReasonStyle: 'none' | 'short' | 'full';
-}
-
-interface AutopilotRecord {
-  enabled: boolean;
-  prefs: AutopilotPrefs;
-  prefsHash: string;
-  updatedAt: number;
-  lastNonce: number;
-}
-
-interface Recommendation {
-  proposalId: number;
-  title: string;
-  support: 0 | 1 | 2 | null;
-  confidence: number;
-  reason: string;
-  generatedAt: number;
-  model?: string;
-  alreadyVoted?: boolean;
-  pending?: boolean;
-}
+// Preferences (and delegation submissions / revocations) are authorised with an
+// EIP-191 signature over a fixed message:
+//   noun.wtf autopilot\naddress: <lowercase addr>\nnonce: <unix ms>\nprefs: <sha256 hex>
+// `prefs:` is sha256 of: JSON.stringify(prefs) for PUT /autopilot; the raw
+// `delegation` string for POST /delegations; the delegation id for DELETE.
+// The prefs schema itself lives in `agent/autopilotPrefs.ts` (shared with the
+// relayer); the recommendation engine stays here because it reads Ponder.
 
 interface CachedRec {
   prefsHash: string;
@@ -1628,69 +1653,8 @@ interface CachedRec {
   model: string;
 }
 
-async function readAutopilot(address: string): Promise<AutopilotRecord | null> {
-  const r = await readJson<AutopilotRecord>(address, 'autopilot');
-  return r && r.prefs && typeof r.enabled === 'boolean' ? r : null;
-}
-
-const isStance = (x: unknown): x is Stance =>
-  Number.isInteger(x) && (x as number) >= -2 && (x as number) <= 2;
-
-/** Validate + normalise prefs. Returns an error string on failure. */
-function parsePrefs(raw: unknown): { prefs: AutopilotPrefs } | { error: string } {
-  if (!raw || typeof raw !== 'object') return { error: 'prefs must be an object' };
-  const r = raw as Record<string, unknown>;
-  const philosophy = typeof r.philosophy === 'string' ? r.philosophy.trim() : '';
-  if (philosophy.length > 1000) return { error: 'philosophy must be ≤ 1000 chars' };
-  const stancesRaw = (r.stances ?? {}) as Record<string, unknown>;
-  if (typeof stancesRaw !== 'object') return { error: 'stances must be an object' };
-  const stances = {} as Record<StanceKey, Stance>;
-  for (const k of STANCE_KEYS) {
-    const v = stancesRaw[k] ?? 0;
-    if (!isStance(v)) return { error: `stances.${k} must be an integer in -2..2` };
-    stances[k] = v;
-  }
-  let maxAskEth: number | null = null;
-  if (r.maxAskEth != null) {
-    const n = Number(r.maxAskEth);
-    if (!Number.isFinite(n) || n < 0)
-      return { error: 'maxAskEth must be a non-negative number or null' };
-    maxAskEth = n;
-  }
-  const addrList = (key: string): string[] | string => {
-    const v = r[key] ?? [];
-    if (!Array.isArray(v) || v.length > 200) return `${key} must be an array of ≤ 200 addresses`;
-    const out: string[] = [];
-    for (const a of v) {
-      if (typeof a !== 'string' || !isAddress(a)) return `${key} contains a non-address`;
-      out.push(a.toLowerCase());
-    }
-    return [...new Set(out)];
-  };
-  const blocked = addrList('blockedProposers');
-  if (typeof blocked === 'string') return { error: blocked };
-  const trusted = addrList('trustedProposers');
-  if (typeof trusted === 'string') return { error: trusted };
-  const dwu = r.defaultWhenUnsure ?? 'abstain';
-  if (dwu !== 'abstain' && dwu !== 'skip' && dwu !== 'against') {
-    return { error: "defaultWhenUnsure must be 'abstain' | 'skip' | 'against'" };
-  }
-  const style = r.voteReasonStyle ?? 'short';
-  if (style !== 'none' && style !== 'short' && style !== 'full') {
-    return { error: "voteReasonStyle must be 'none' | 'short' | 'full'" };
-  }
-  return {
-    prefs: {
-      philosophy,
-      stances,
-      maxAskEth,
-      blockedProposers: blocked,
-      trustedProposers: trusted,
-      defaultWhenUnsure: dwu,
-      voteReasonStyle: style,
-    },
-  };
-}
+const recCacheKey = (dao: AutopilotDao, id: number) =>
+  dao === 'nouns' ? `autopilot:rec:${id}` : `autopilot:rec:lil:${id}`;
 
 const AUTOPILOT_MESSAGE_RE =
   /^noun\.wtf autopilot\naddress: (0x[\da-f]{40})\nnonce: (\d{1,16})\nprefs: ([\da-f]{64})$/;
@@ -1704,15 +1668,47 @@ async function verifyAutopilotSignature(address: Hex, message: string, signature
     /* fall through to ERC-1271 */
   }
   try {
-    // Smart-contract wallets (Safe etc.) — ERC-1271 via the public client.
+    // Smart-contract wallets (Safe, 7702 accounts) — ERC-1271 via the public client.
     return await client.verifyMessage({ address: checksummed, message, signature: sig });
   } catch {
     return false;
   }
 }
 
-/** Proposals currently inside their voting window (incl. objection period). */
-async function activeProposals(db: Db, latestBlock: bigint) {
+/**
+ * Shared ownership-proof check for the autopilot write routes. `expectedHash`
+ * is what the message's `prefs:` field must equal. Returns the nonce on success.
+ */
+async function checkAutopilotAuth(
+  address: Hex,
+  body: Record<string, unknown>,
+  expectedHash: string,
+): Promise<{ nonce: number } | { error: string; status: 400 | 401 | 409 }> {
+  const { message, signature } = body;
+  if (
+    typeof message !== 'string' ||
+    typeof signature !== 'string' ||
+    !/^0x[\da-f]+$/i.test(signature)
+  ) {
+    return { error: 'message and signature are required', status: 400 };
+  }
+  const m = AUTOPILOT_MESSAGE_RE.exec(message);
+  if (!m) return { error: 'message format invalid', status: 400 };
+  const [, msgAddress, nonceStr, msgHash] = m;
+  if (msgAddress !== address) return { error: 'message address does not match', status: 401 };
+  const nonce = Number(nonceStr);
+  if (Math.abs(Date.now() - nonce) > AUTOPILOT_NONCE_WINDOW) {
+    return { error: 'nonce outside the ±10 minute window', status: 409 };
+  }
+  if (msgHash !== expectedHash) return { error: 'prefs hash does not match message', status: 400 };
+  if (!(await verifyAutopilotSignature(address, message, signature))) {
+    return { error: 'signature invalid', status: 401 };
+  }
+  return { nonce };
+}
+
+/** Nouns proposals currently inside their voting window (incl. objection period), in the shared shape. */
+async function listNounsActiveProposals(db: Db, latestBlock: bigint): Promise<ActiveProposal[]> {
   const rows = await db
     .select({
       id: schema.proposal.id,
@@ -1722,6 +1718,7 @@ async function activeProposals(db: Db, latestBlock: bigint) {
       startBlock: schema.proposal.startBlock,
       endBlock: schema.proposal.endBlock,
       objectionPeriodEndBlock: schema.proposal.objectionPeriodEndBlock,
+      voteSnapshotBlock: schema.proposal.voteSnapshotBlock,
     })
     .from(schema.proposal)
     .where(
@@ -1732,7 +1729,7 @@ async function activeProposals(db: Db, latestBlock: bigint) {
     )
     .orderBy(desc(schema.proposal.id))
     .limit(40);
-  return rows.filter(p => {
+  const open = rows.filter(p => {
     if (p.startBlock > latestBlock) return false;
     const end =
       p.objectionPeriodEndBlock && p.objectionPeriodEndBlock > p.endBlock
@@ -1740,6 +1737,70 @@ async function activeProposals(db: Db, latestBlock: bigint) {
         : p.endBlock;
     return end >= latestBlock;
   });
+  if (open.length === 0) return [];
+  const txs = await safe(
+    'activeTxs',
+    db
+      .select()
+      .from(schema.transaction)
+      .where(
+        inArray(
+          schema.transaction.proposalId,
+          open.map(p => p.id),
+        ),
+      )
+      .limit(1000),
+    [],
+  );
+  const txsByProp = new Map<number, ProposalTx[]>();
+  for (const t of txs) {
+    const list = txsByProp.get(Number(t.proposalId)) ?? [];
+    list.push({
+      target: lower(t.target),
+      value: t.value,
+      signature: t.signature,
+      calldata: t.calldata,
+    });
+    txsByProp.set(Number(t.proposalId), list);
+  }
+  return open.map(p => {
+    const objection = p.objectionPeriodEndBlock != null && p.objectionPeriodEndBlock > p.endBlock;
+    const objectionOnly = objection && latestBlock > p.endBlock;
+    return {
+      dao: 'nouns' as const,
+      id: Number(p.id),
+      title: titleFromDescription(p.description) || `Prop ${p.id}`,
+      description: p.description || '',
+      proposer: lower(p.proposer),
+      startBlock: p.startBlock,
+      endBlock: objection ? p.objectionPeriodEndBlock! : p.endBlock,
+      objectionOnly,
+      snapshotBlock: p.voteSnapshotBlock ?? null,
+      txs: txsByProp.get(Number(p.id)) ?? [],
+    };
+  });
+}
+
+/** Latest block the engine reasons about: indexed head, RPC head as fallback. */
+async function engineLatestBlock(): Promise<bigint> {
+  let latestBlock = await safe('latestBlock', latestIndexedBlock(), 0n);
+  if (latestBlock === 0n) latestBlock = await safe('rpcBlock', client.getBlockNumber(), 0n);
+  return latestBlock;
+}
+
+/** Every proposal the wallet's prefs make relevant, across both DAOs. */
+async function listActiveProposalsFor(db: Db, daos: AutopilotDao[]): Promise<ActiveProposal[]> {
+  const out: ActiveProposal[] = [];
+  if (daos.includes('nouns')) {
+    const latestBlock = await engineLatestBlock();
+    if (latestBlock > 0n) {
+      out.push(...(await safe('nounsActive', listNounsActiveProposals(db, latestBlock), [])));
+    }
+  }
+  if (daos.includes('lil-nouns')) {
+    out.push(...(await safe('lilActive', listLilActiveProposals(client), [])));
+  }
+  return out;
 }
 
 function stanceWord(s: Stance): string {
@@ -1760,7 +1821,7 @@ function recommendationSystemPrompt(
     full: 'reason is 2–3 plain sentences, ≤ 280 characters.',
   }[prefs.voteReasonStyle];
   return [
-    `You are the voting brain of the Nouns DAO voter ${voterName}, running "Autopilot" on noun.wtf.`,
+    `You are the voting brain of the Nouns-ecosystem voter ${voterName}, running "Autopilot" on noun.wtf. Proposals come from Nouns DAO or Lil Nouns DAO (the proposal says which); apply the same preferences to both.`,
     'Decide how THIS voter would vote on the proposal, strictly from their stated preferences and past vote reasons. Never invent facts about the proposal.',
     'Output ONLY a JSON object: {"support": 0|1|2|null, "confidence": 0..1, "reason": "..."}',
     'support: 1 = for, 0 = against, 2 = abstain, null = skip (do not vote). confidence: how sure you are this matches the voter.',
@@ -1806,40 +1867,46 @@ function parseRecommendation(
   }
 }
 
-async function buildRecommendations(
+const DAO_LABEL: Record<AutopilotDao, string> = {
+  nouns: 'Nouns DAO',
+  'lil-nouns': 'Lil Nouns DAO',
+};
+
+/**
+ * Run the engine over a given set of proposals (any DAO mix). Cached per
+ * (address, dao, proposalId, prefsHash); ≤ AUTOPILOT_MAX_HUB_CALLS hub calls
+ * per invocation, the rest come back `pending`.
+ */
+async function buildRecommendationsFor(
   db: Db,
   address: Hex,
   record: AutopilotRecord,
+  proposals: ActiveProposal[],
 ): Promise<Recommendation[]> {
-  let latestBlock = await safe('latestBlock', latestIndexedBlock(), 0n);
-  if (latestBlock === 0n) latestBlock = await safe('rpcBlock', client.getBlockNumber(), 0n);
-  if (latestBlock === 0n) return [];
+  if (proposals.length === 0) return [];
+  const nounsIds = proposals.filter(p => p.dao === 'nouns').map(p => BigInt(p.id));
+  const lilIds = proposals.filter(p => p.dao === 'lil-nouns').map(p => p.id);
+  const wantLil = lilIds.length > 0 || record.prefs.daos.includes('lil-nouns');
 
-  const active = await safe('activeProposals', activeProposals(db, latestBlock), []);
-  if (active.length === 0) return [];
-  const ids = active.map(p => p.id);
-
-  const [myVotes, txs, reasonRows, cachedRows] = await Promise.all([
+  const [myNounsVotes, myLilVotes, reasonRows, lilReasons, cachedRows] = await Promise.all([
     safe(
       'myVotes',
-      db
-        .select({
-          proposalId: schema.vote.proposalId,
-          support: schema.vote.support,
-          reason: schema.vote.reason,
-          createdAt: schema.vote.createdAt,
-        })
-        .from(schema.vote)
-        .where(and(eq(schema.vote.voter, address), inArray(schema.vote.proposalId, ids))),
+      nounsIds.length === 0
+        ? Promise.resolve([])
+        : db
+            .select({
+              proposalId: schema.vote.proposalId,
+              support: schema.vote.support,
+              reason: schema.vote.reason,
+              createdAt: schema.vote.createdAt,
+            })
+            .from(schema.vote)
+            .where(and(eq(schema.vote.voter, address), inArray(schema.vote.proposalId, nounsIds))),
       [],
     ),
     safe(
-      'activeTxs',
-      db
-        .select()
-        .from(schema.transaction)
-        .where(inArray(schema.transaction.proposalId, ids))
-        .limit(1000),
+      'myLilVotes',
+      lilIds.length === 0 ? Promise.resolve([]) : listLilVotesBy(address, { proposalIds: lilIds }),
       [],
     ),
     safe(
@@ -1852,24 +1919,40 @@ async function buildRecommendations(
         .limit(60),
       [],
     ),
+    safe('lilReasons', wantLil ? listLilVotesBy(address, { limit: 60 }) : Promise.resolve([]), []),
     Promise.all(
-      ids.map(id => safe(`rec:${id}`, readJson<CachedRec>(address, `autopilot:rec:${id}`), null)),
+      proposals.map(p =>
+        safe(`rec:${p.dao}:${p.id}`, readJson<CachedRec>(address, recCacheKey(p.dao, p.id)), null),
+      ),
     ),
   ]);
 
-  const votedById = new Map(myVotes.map(v => [Number(v.proposalId), v]));
-  const txsByProp = new Map<number, typeof txs>();
-  for (const t of txs) {
-    const list = txsByProp.get(Number(t.proposalId)) ?? [];
-    list.push(t);
-    txsByProp.set(Number(t.proposalId), list);
+  const votedByKey = new Map<string, { support: number; reason: string; at: number }>();
+  for (const v of myNounsVotes) {
+    votedByKey.set(`nouns:${v.proposalId}`, {
+      support: v.support,
+      reason: v.reason || '',
+      at: ms(v.createdAt),
+    });
+  }
+  for (const v of myLilVotes) {
+    votedByKey.set(`lil-nouns:${v.proposalId}`, {
+      support: v.support,
+      reason: v.reason,
+      at: v.blockTimestamp * 1000,
+    });
   }
   const S = ['against', 'for', 'abstain'];
-  const reasons = reasonRows
-    .map(r => ({ reason: (r.reason || '').replace(/\s+/g, ' ').trim(), support: r.support }))
+  const reasons = [
+    ...reasonRows.map(r => ({ reason: r.reason || '', support: r.support, tag: '' })),
+    ...lilReasons.map(r => ({ reason: r.reason, support: r.support, tag: 'Lil Nouns' })),
+  ]
+    .map(r => ({ ...r, reason: r.reason.replace(/\s+/g, ' ').trim() }))
     .filter(r => r.reason.length > 0)
-    .slice(0, 15)
-    .map(r => `(${S[r.support] ?? r.support}) ${r.reason.slice(0, 300)}`);
+    .slice(0, 20)
+    .map(
+      r => `(${S[r.support] ?? r.support}${r.tag ? `, ${r.tag}` : ''}) ${r.reason.slice(0, 300)}`,
+    );
   const voterName =
     ensNameCache.get(address)?.name ?? `${address.slice(0, 6)}…${address.slice(-4)}`;
   const system = recommendationSystemPrompt(record.prefs, reasons, voterName);
@@ -1880,19 +1963,20 @@ async function buildRecommendations(
   let hubCalls = 0;
   const pending: Array<() => Promise<void>> = [];
 
-  for (let i = 0; i < active.length; i++) {
-    const p = active[i]!;
-    const id = Number(p.id);
-    const title = titleFromDescription(p.description) || `Prop ${id}`;
-    const voted = votedById.get(id);
+  for (let i = 0; i < proposals.length; i++) {
+    const p = proposals[i]!;
+    const id = p.id;
+    const title = p.title;
+    const voted = votedByKey.get(`${p.dao}:${id}`);
     if (voted) {
       out.push({
+        dao: p.dao,
         proposalId: id,
         title,
         support: voted.support as 0 | 1 | 2,
         confidence: 1,
-        reason: voted.reason || '',
-        generatedAt: ms(voted.createdAt),
+        reason: voted.reason,
+        generatedAt: voted.at,
         alreadyVoted: true,
       });
       continue;
@@ -1900,6 +1984,7 @@ async function buildRecommendations(
     const cachedRec = cachedRows[i];
     if (cachedRec && cachedRec.prefsHash === record.prefsHash) {
       out.push({
+        dao: p.dao,
         proposalId: id,
         title,
         support: cachedRec.support,
@@ -1910,21 +1995,8 @@ async function buildRecommendations(
       });
       continue;
     }
-    if (hubCalls >= AUTOPILOT_MAX_HUB_CALLS) {
-      out.push({
-        proposalId: id,
-        title,
-        support: null,
-        confidence: 0,
-        reason: '',
-        generatedAt: 0,
-        pending: true,
-      });
-      continue;
-    }
-    hubCalls++;
-    const slot = out.length;
-    out.push({
+    const placeholder: Recommendation = {
+      dao: p.dao,
       proposalId: id,
       title,
       support: null,
@@ -1932,14 +2004,22 @@ async function buildRecommendations(
       reason: '',
       generatedAt: 0,
       pending: true,
-    });
+    };
+    if (hubCalls >= AUTOPILOT_MAX_HUB_CALLS) {
+      out.push(placeholder);
+      continue;
+    }
+    hubCalls++;
+    const slot = out.length;
+    out.push(placeholder);
     pending.push(async () => {
-      const asks = sumAsks(txsByProp.get(id) ?? []);
-      const proposer = lower(p.proposer);
+      const asks = sumAsks(p.txs);
+      const proposer = p.proposer;
       const flags = [blocked.has(proposer) ? 'BLOCKED' : '', trusted.has(proposer) ? 'TRUSTED' : '']
         .filter(Boolean)
         .join(', ');
       const user = [
+        `DAO: ${DAO_LABEL[p.dao]}`,
         `Proposal #${id}: ${title}`,
         `Proposer: ${proposer}${flags ? ` (${flags})` : ''}`,
         `Ask: ${asks.eth.toFixed(2)} ETH, ${asks.usdc.toFixed(0)} USDC`,
@@ -1979,8 +2059,9 @@ async function buildRecommendations(
           generatedAt: Date.now(),
           model: res.model || 'unknown',
         };
-        await remember(scopeFor(address), `autopilot:rec:${id}`, JSON.stringify(rec));
+        await remember(scopeFor(address), recCacheKey(p.dao, id), JSON.stringify(rec));
         out[slot] = {
+          dao: p.dao,
           proposalId: id,
           title,
           support: rec.support,
@@ -1990,12 +2071,126 @@ async function buildRecommendations(
           model: rec.model,
         };
       } catch (err) {
-        console.warn(`[walletProfile] autopilot rec for #${id} failed:`, err);
+        console.warn(`[walletProfile] autopilot rec for ${p.dao} #${id} failed:`, err);
       }
     });
   }
   await Promise.all(pending.map(fn => fn()));
   return out;
+}
+
+/** All recommendations for the wallet's configured DAOs (the GET /autopilot payload). */
+async function buildRecommendations(
+  db: Db,
+  address: Hex,
+  record: AutopilotRecord,
+): Promise<Recommendation[]> {
+  const proposals = await listActiveProposalsFor(db, record.prefs.daos);
+  return buildRecommendationsFor(db, address, record, proposals);
+}
+
+/** One proposal — what the relayer sweep asks for. */
+async function recommendForProposal(
+  db: Db,
+  address: string,
+  record: AutopilotRecord,
+  proposal: ActiveProposal,
+): Promise<Recommendation | null> {
+  const recs = await buildRecommendationsFor(db, address.toLowerCase() as Hex, record, [proposal]);
+  return recs[0] ?? null;
+}
+
+// ─── Delegation + auto-vote payload shaping ─────────────────────────────────
+
+type DelegationStatus = 'active' | 'expired' | 'revoked' | 'exhausted';
+
+interface DelegationOut {
+  id: string;
+  dao: AutopilotDao;
+  delegator: string;
+  redeemer: string;
+  hash: string;
+  expiresAt: number;
+  maxVotes: number | null;
+  uses: number;
+  createdAt: number;
+  revokedAt: number | null;
+  onchainDisabled: boolean | null;
+  status: DelegationStatus;
+  /** serializeDelegation() output — needed client-side to build the on-chain revoke. */
+  delegation: string;
+}
+
+async function shapeDelegation(d: DelegationRow): Promise<DelegationOut> {
+  const now = Date.now();
+  let onchainDisabled: boolean | null = null;
+  if (d.revokedAt == null && d.expiresAt > now) {
+    onchainDisabled = await isDelegationDisabledOnchain(d.delegationHash);
+  }
+  let status: DelegationStatus = 'active';
+  if (d.revokedAt != null || onchainDisabled === true) status = 'revoked';
+  else if (d.expiresAt <= now) status = 'expired';
+  else if (d.maxVotes != null && d.uses >= d.maxVotes) status = 'exhausted';
+  return {
+    id: d.id,
+    dao: d.dao,
+    delegator: d.address,
+    redeemer: d.redeemer,
+    hash: d.delegationHash,
+    expiresAt: d.expiresAt,
+    maxVotes: d.maxVotes,
+    uses: d.uses,
+    createdAt: d.createdAt,
+    revokedAt: d.revokedAt,
+    onchainDisabled,
+    status,
+    delegation: d.delegationJson,
+  };
+}
+
+/** Vote rows + a proposal title (Nouns from Ponder, Lil from the active list / cache). */
+async function shapeVotes(db: Db, rows: VoteRow[]) {
+  const nounsIds = [...new Set(rows.filter(r => r.dao === 'nouns').map(r => BigInt(r.proposalId)))];
+  const titles = new Map<string, string>();
+  if (nounsIds.length > 0) {
+    const meta = await safe(
+      'voteTitles',
+      db
+        .select({ id: schema.proposal.id, title: firstLineOf(schema.proposal.description) })
+        .from(schema.proposal)
+        .where(inArray(schema.proposal.id, nounsIds)),
+      [],
+    );
+    for (const m of meta)
+      titles.set(`nouns:${m.id}`, titleFromDescription(m.title) || `Prop ${m.id}`);
+  }
+  if (rows.some(r => r.dao === 'lil-nouns')) {
+    const lil = await safe('lilTitles', listLilActiveProposals(client), []);
+    for (const p of lil) titles.set(`lil-nouns:${p.id}`, p.title);
+  }
+  return rows.map(r => ({
+    ...r,
+    title:
+      titles.get(`${r.dao}:${r.proposalId}`) ??
+      (r.dao === 'nouns' ? `Prop ${r.proposalId}` : `Lil Prop ${r.proposalId}`),
+  }));
+}
+
+async function relayerSummary() {
+  return {
+    address: getRelayerAddress(),
+    enabled: isRelayerEnabled() && canSend(),
+    balanceEth: await getRelayerBalanceEth(),
+  };
+}
+
+/** Admin gate for the sweep trigger: shared secret when configured, else localhost only. */
+function isAdminRequest(c: { req: { header: (k: string) => string | undefined } }): boolean {
+  const secret = process.env.AGENT_ADMIN_SECRET;
+  if (secret) return c.req.header('x-agent-secret') === secret;
+  const host = (c.req.header('host') ?? '').toLowerCase();
+  const forwarded = c.req.header('x-forwarded-for');
+  return !forwarded && (host.startsWith('localhost') || host.startsWith('127.0.0.1'));
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -2005,6 +2200,16 @@ export function registerWalletProfileRoutes(app: Hono, db: Db) {
     const identity = c.req.param('identity') ?? c.req.param('address') ?? '';
     return resolveIdentity(identity);
   };
+
+  // The relayer sweep (agent/autopilotRelayer.ts) has no Ponder access of its
+  // own — hand it the Nouns proposal list + the recommendation engine.
+  registerAutopilotProviders({
+    listNounsActiveProposals: async () => {
+      const latestBlock = await engineLatestBlock();
+      return latestBlock > 0n ? listNounsActiveProposals(db, latestBlock) : [];
+    },
+    recommend: (address, record, proposal) => recommendForProposal(db, address, record, proposal),
+  });
 
   app.get('/api/wallet/:identity/profile', async c => {
     const address = await resolveOr400(c);
@@ -2068,12 +2273,39 @@ export function registerWalletProfileRoutes(app: Hono, db: Db) {
     }
   });
 
+  // ── Autopilot ────────────────────────────────────────────────────────────
+
   app.get('/api/wallet/:address/autopilot', async c => {
     const address = await resolveOr400(c);
     if (!address) return c.json({ error: 'could not resolve address' }, 400);
-    const record = await safe('autopilot', readAutopilot(address), null);
+    const [record, relayer, delegationRows, voteRows] = await Promise.all([
+      safe('autopilot', readAutopilotRecord(address), null),
+      safe('relayer', relayerSummary(), {
+        address: getRelayerAddress(),
+        enabled: false,
+        balanceEth: 0,
+      }),
+      safe('delegations', listDelegations(address), []),
+      safe('autoVotes', listVotes(address, 20), []),
+    ]);
+    const [delegations, autoVotes] = await Promise.all([
+      Promise.all(delegationRows.map(d => shapeDelegation(d))),
+      safe(
+        'autoVotesShape',
+        shapeVotes(db, voteRows),
+        voteRows.map(r => ({ ...r, title: '' })),
+      ),
+    ]);
     if (!record) {
-      return c.json({ enabled: false, prefs: null, updatedAt: null, recommendations: [] });
+      return c.json({
+        enabled: false,
+        prefs: null,
+        updatedAt: null,
+        recommendations: [],
+        relayer,
+        delegations,
+        autoVotes,
+      });
     }
     const wantRecs = record.enabled && c.req.query('recommendations') !== 'false';
     const recommendations = wantRecs
@@ -2084,6 +2316,9 @@ export function registerWalletProfileRoutes(app: Hono, db: Db) {
       prefs: record.prefs,
       updatedAt: record.updatedAt,
       recommendations,
+      relayer,
+      delegations,
+      autoVotes,
     });
   });
 
@@ -2097,46 +2332,28 @@ export function registerWalletProfileRoutes(app: Hono, db: Db) {
     } catch {
       return c.json({ error: 'invalid JSON body' }, 400);
     }
-    const { message, signature } = body;
-    if (
-      typeof message !== 'string' ||
-      typeof signature !== 'string' ||
-      !/^0x[\da-f]+$/i.test(signature)
-    ) {
-      return c.json({ error: 'message and signature are required' }, 400);
-    }
     if (typeof body.enabled !== 'boolean')
       return c.json({ error: 'enabled must be a boolean' }, 400);
 
-    const m = AUTOPILOT_MESSAGE_RE.exec(message);
-    if (!m) return c.json({ error: 'message format invalid' }, 400);
-    const [, msgAddress, nonceStr, msgHash] = m;
-    if (msgAddress !== address) return c.json({ error: 'message address does not match' }, 401);
-
-    const nonce = Number(nonceStr);
-    if (Math.abs(Date.now() - nonce) > AUTOPILOT_NONCE_WINDOW) {
-      return c.json({ error: 'nonce outside the ±10 minute window' }, 409);
-    }
-
     // Hash the raw object exactly as sent — the client signed that serialisation.
-    const rawHash = sha256(JSON.stringify(body.prefs ?? null));
-    if (rawHash !== msgHash) return c.json({ error: 'prefs hash does not match message' }, 400);
+    const auth = await checkAutopilotAuth(
+      address,
+      body,
+      sha256(JSON.stringify(body.prefs ?? null)),
+    );
+    if ('error' in auth) return c.json({ error: auth.error }, auth.status);
     const parsed = parsePrefs(body.prefs);
     if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
-    if (!(await verifyAutopilotSignature(address, message, signature))) {
-      return c.json({ error: 'signature invalid' }, 401);
-    }
-
-    const existing = await safe('autopilot', readAutopilot(address), null);
-    if (existing && nonce <= existing.lastNonce) return c.json({ error: 'stale nonce' }, 409);
+    const existing = await safe('autopilot', readAutopilotRecord(address), null);
+    if (existing && auth.nonce <= existing.lastNonce) return c.json({ error: 'stale nonce' }, 409);
 
     const record: AutopilotRecord = {
       enabled: body.enabled,
       prefs: parsed.prefs,
       prefsHash: sha256(JSON.stringify(parsed.prefs)),
       updatedAt: Date.now(),
-      lastNonce: nonce,
+      lastNonce: auth.nonce,
     };
     try {
       await remember(scopeFor(address), 'autopilot', JSON.stringify(record));
@@ -2146,8 +2363,121 @@ export function registerWalletProfileRoutes(app: Hono, db: Db) {
     }
     const cachedProfile = profileCache.get(address);
     if (cachedProfile) {
-      cachedProfile.data.autopilot = { enabled: record.enabled, updatedAt: record.updatedAt };
+      cachedProfile.data.autopilot = {
+        ...cachedProfile.data.autopilot,
+        enabled: record.enabled,
+        updatedAt: record.updatedAt,
+        mode: record.prefs.mode,
+      };
     }
     return c.json({ enabled: record.enabled, prefs: record.prefs, updatedAt: record.updatedAt });
+  });
+
+  // POST a signed, scoped ERC-7710 delegation for the relayer to redeem.
+  app.post('/api/wallet/:address/delegations', async c => {
+    const address = await resolveOr400(c);
+    if (!address) return c.json({ error: 'could not resolve address' }, 400);
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    const { dao, delegation } = body;
+    if (!isAutopilotDao(dao)) return c.json({ error: "dao must be 'nouns' | 'lil-nouns'" }, 400);
+    if (typeof delegation !== 'string' || delegation.length === 0 || delegation.length > 20_000) {
+      return c.json({ error: 'delegation must be the serialized delegation string' }, 400);
+    }
+    const auth = await checkAutopilotAuth(address, body, sha256(delegation));
+    if ('error' in auth) return c.json({ error: auth.error }, auth.status);
+
+    const v = await validateDelegationSubmission({
+      address,
+      dao,
+      delegation,
+      relayer: getRelayerAddress(),
+      client,
+    });
+    if (!v.ok) return c.json({ error: v.error }, v.status);
+    try {
+      const row = await insertDelegation(v.row);
+      console.log(
+        `[Autopilot] delegation stored: ${row.id} ${dao} for ${address} (sig ${v.signatureMethod}, expires ${new Date(row.expiresAt).toISOString()}, maxVotes ${row.maxVotes ?? '∞'})`,
+      );
+      profileCache.delete(address);
+      return c.json({ delegation: await shapeDelegation(row) }, 201);
+    } catch (err) {
+      if (err instanceof DuplicateDelegationError) {
+        return c.json({ error: 'this delegation is already stored', hash: err.hash }, 409);
+      }
+      console.error('[walletProfile] delegation save failed:', err);
+      return c.json({ error: 'could not persist delegation' }, 503);
+    }
+  });
+
+  // Soft-revoke: stops the relayer using it. The on-chain revoke is the
+  // voter's own `disableDelegation` tx (surfaced as `onchainDisabled`).
+  app.delete('/api/wallet/:address/delegations/:id', async c => {
+    const address = await resolveOr400(c);
+    if (!address) return c.json({ error: 'could not resolve address' }, 400);
+    const id = c.req.param('id') ?? '';
+    if (!/^[\w-]{1,64}$/.test(id)) return c.json({ error: 'invalid delegation id' }, 400);
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    const auth = await checkAutopilotAuth(address, body, sha256(id));
+    if ('error' in auth) return c.json({ error: auth.error }, auth.status);
+    const existing = await safe('delegation', getDelegation(address, id), null);
+    if (!existing) return c.json({ error: 'delegation not found' }, 404);
+    if (existing.revokedAt != null) return c.json({ ok: true, alreadyRevoked: true });
+    try {
+      await revokeDelegation(address, id);
+    } catch (err) {
+      console.error('[walletProfile] delegation revoke failed:', err);
+      return c.json({ error: 'could not revoke delegation' }, 503);
+    }
+    console.log(`[Autopilot] delegation revoked: ${id} for ${address}`);
+    profileCache.delete(address);
+    return c.json({ ok: true });
+  });
+
+  // ── Relayer ops ──────────────────────────────────────────────────────────
+
+  app.get('/api/agent/autopilot/status', async c => {
+    try {
+      const status = await getAutopilotStatus();
+      const recentVotes = await safe(
+        'statusVotes',
+        shapeVotes(db, status.recentVotes),
+        status.recentVotes,
+      );
+      return c.json({ ...status, recentVotes });
+    } catch (err) {
+      console.error('[walletProfile] autopilot status failed:', err);
+      return c.json({ error: 'status unavailable' }, 500);
+    }
+  });
+
+  app.post('/api/agent/autopilot/sweep', async c => {
+    if (!isAdminRequest(c)) return c.json({ error: 'forbidden' }, 403);
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      /* empty body is fine */
+    }
+    const addresses = Array.isArray(body.addresses)
+      ? body.addresses.filter((a): a is string => typeof a === 'string' && isAddress(a))
+      : undefined;
+    const dryRun = body.dryRun === true ? true : undefined;
+    try {
+      return c.json(await runSweep({ trigger: 'manual', dryRun, addresses }));
+    } catch (err) {
+      console.error('[walletProfile] manual sweep failed:', err);
+      return c.json({ error: err instanceof Error ? err.message : 'sweep failed' }, 500);
+    }
   });
 }
