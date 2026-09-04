@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@noundry/nouns-assets": "1.17.0",
     "@nouns/sdk": "workspace:*",
+    "@nouns/vote-permit": "workspace:*",
     "drizzle-orm": "^0.41.0",
     "hono": "^4.5.0",
     "pg": "^8.15.6",

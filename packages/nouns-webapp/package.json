@@ -46,6 +46,7 @@
     "@nouns/graffiti": "workspace:*",
     "@nouns/mesh-editor": "workspace:*",
     "@nouns/sdk": "workspace:*",
+    "@nouns/vote-permit": "workspace:*",
     "@nouns/voxel-engine": "workspace:*",
     "@opensea/seaport-js": "^4.1.2",
     "@radix-ui/react-dialog": "^1.1.14",

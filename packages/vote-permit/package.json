@@ -1,0 +1,72 @@
+{
+  "name": "@nouns/vote-permit",
+  "version": "0.1.0",
+  "description": "Scoped Vote Permission (SVP): grant a relayer the right to cast Nouns / Lil Nouns governance votes from your own EOA and nothing else, via EIP-7702 + MetaMask Delegation Framework (ERC-7710) caveats.",
+  "keywords": [
+    "nouns",
+    "lil-nouns",
+    "governance",
+    "delegation",
+    "erc-7710",
+    "eip-7702",
+    "metamask",
+    "delegation-framework",
+    "viem"
+  ],
+  "homepage": "https://github.com/snaveoguh/noun-wtf/tree/main/packages/vote-permit#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snaveoguh/noun-wtf.git",
+    "directory": "packages/vote-permit"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist/**",
+    "src/**",
+    "README.md",
+    "SPEC.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify:mainnet": "tsx scripts/verify-mainnet.ts"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "viem": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "viem": ">=2.0.0"
+  }
+}

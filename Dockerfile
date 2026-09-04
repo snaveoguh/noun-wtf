@@ -12,6 +12,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc* ./
 COPY packages/nouns-api/package.json ./packages/nouns-api/
 COPY packages/nouns-sdk/package.json ./packages/nouns-sdk/
 COPY packages/nouns-contracts/package.json ./packages/nouns-contracts/
+COPY packages/vote-permit/package.json ./packages/vote-permit/
 
 # Install dependencies
 RUN pnpm install --no-frozen-lockfile
@@ -20,6 +21,7 @@ RUN pnpm install --no-frozen-lockfile
 COPY packages/nouns-sdk/ ./packages/nouns-sdk/
 COPY packages/nouns-api/ ./packages/nouns-api/
 COPY packages/nouns-contracts/ ./packages/nouns-contracts/
+COPY packages/vote-permit/ ./packages/vote-permit/
 
 # Build SDK (dependency of API)
 RUN pnpm build --filter=@nouns/sdk
