@@ -118,7 +118,7 @@ const SCAN_DUST_WEI = 10_000_000_000_000n; // 0.00001 ETH — skip dust/gas refu
 
 // ─── Identity discovery helpers ─────────────────────────────────────────────
 
-async function resolveEnsToAddress(name: string): Promise<string | null> {
+export async function resolveEnsToAddress(name: string): Promise<string | null> {
   try {
     const r = await fetch(`${ENS_IDEAS_BASE}/resolve/${encodeURIComponent(name)}`);
     if (!r.ok) return null;
@@ -142,7 +142,7 @@ async function reverseResolveAddress(
   }
 }
 
-async function getFarcasterIdentity(address: string): Promise<{
+export async function getFarcasterIdentity(address: string): Promise<{
   fid: number;
   username: string;
   displayName: string;

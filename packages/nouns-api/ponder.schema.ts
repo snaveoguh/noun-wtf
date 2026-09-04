@@ -2,22 +2,30 @@ import { index, onchainEnum, onchainTable, primaryKey, relations } from 'ponder'
 
 // ── Nouns ──────────────────────────────────────────────────────────────────────
 
-export const noun = onchainTable('nouns', t => ({
-  id: t.bigint().primaryKey(),
-  owner: t.hex().notNull(),
-  head: t.integer().notNull(),
-  body: t.integer().notNull(),
-  accessory: t.integer().notNull(),
-  glasses: t.integer().notNull(),
-  background: t.integer().notNull(),
-  // Address the noun was minted to (Transfer from 0x0). nounders.eth for the
-  // every-10th reward nouns; the auction house for everything else. Lets the
-  // activity feed emit NOUNDER_NOUN without inspecting transfer history.
-  mintedTo: t.hex(),
-  createdAt: t.timestamp().notNull(),
-  createdAtBlock: t.bigint().notNull(),
-  createdAtTransaction: t.text().notNull(),
-}));
+export const noun = onchainTable(
+  'nouns',
+  t => ({
+    id: t.bigint().primaryKey(),
+    owner: t.hex().notNull(),
+    head: t.integer().notNull(),
+    body: t.integer().notNull(),
+    accessory: t.integer().notNull(),
+    glasses: t.integer().notNull(),
+    background: t.integer().notNull(),
+    // Address the noun was minted to (Transfer from 0x0). nounders.eth for the
+    // every-10th reward nouns; the auction house for everything else. Lets the
+    // activity feed emit NOUNDER_NOUN without inspecting transfer history.
+    mintedTo: t.hex(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    // Per-wallet profile lookups (/api/wallet/:identity/profile)
+    ownerIndex: index().on(t.owner),
+    mintedToIndex: index().on(t.mintedTo),
+  }),
+);
 
 export const nounRelations = relations(noun, ({ one }) => ({
   auction: one(auction, {
@@ -67,10 +75,17 @@ export const delegateNounRelations = relations(delegateNoun, ({ one }) => ({
 // which `delegateNoun` row to delete (old owner's delegate) and insert (new
 // owner's delegate). Without this we'd need an RPC call to `delegates(addr)`
 // per transfer, which is wasteful during historical sync.
-export const accountDelegate = onchainTable('account_delegate', t => ({
-  account: t.hex().primaryKey(),
-  delegate: t.hex().notNull(),
-}));
+export const accountDelegate = onchainTable(
+  'account_delegate',
+  t => ({
+    account: t.hex().primaryKey(),
+    delegate: t.hex().notNull(),
+  }),
+  t => ({
+    // "who delegates to X" (wallet profile → delegators)
+    delegateIndex: index().on(t.delegate),
+  }),
+);
 
 // ── Proposals ──────────────────────────────────────────────────────────────────
 
@@ -171,6 +186,7 @@ export const proposalSigner = onchainTable(
   }),
   t => ({
     primaryKey: primaryKey({ columns: [t.proposalId, t.signer] }),
+    signerIndex: index().on(t.signer),
   }),
 );
 
@@ -223,6 +239,7 @@ export const vote = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
     proposalIdIndex: index().on(t.proposalId),
+    voterIndex: index().on(t.voter),
   }),
 );
 
@@ -235,33 +252,41 @@ export const voteRelations = relations(vote, ({ one }) => ({
 
 // ── Auctions ───────────────────────────────────────────────────────────────────
 
-export const auction = onchainTable('nounsAuctionHouseV2', t => ({
-  nounId: t.bigint().primaryKey(),
-  startTime: t.timestamp().notNull(),
-  endTime: t.timestamp().notNull(),
-  settled: t.boolean().notNull().default(false),
-  // tx.from of the AuctionSettled tx. Whoever settles auction N also creates
-  // auction N+1 in the same tx (settleCurrentAndCreateNewAuction), so this is
-  // also the `curator` of the next auction.
-  settler: t.hex(),
-  settledAt: t.timestamp(),
-  settledAtBlock: t.bigint(),
-  settledAtTransaction: t.text(),
-  // tx.from of the AuctionCreated tx — i.e. the settler of the previous auction.
-  curator: t.hex(),
-  winner: t.hex(),
-  amount: t.bigint(), // winning bid amount
-  // Mainnet prop #XXX raised reservePrice to 2.8 ETH. Auctions that end with
-  // no bid meeting the reserve settle as AuctionSettled(winner=0x0, amount=0)
-  // and the noun is burned in _settleAuction. Flag those rows so the webapp
-  // can branch to a burned-placeholder renderer instead of showing a "won by
-  // 0x000..." row.
-  burned: t.boolean().notNull().default(false),
-  clientId: t.integer(),
-  createdAt: t.timestamp().notNull(),
-  createdAtBlock: t.bigint().notNull(),
-  createdAtTransaction: t.text().notNull(),
-}));
+export const auction = onchainTable(
+  'nounsAuctionHouseV2',
+  t => ({
+    nounId: t.bigint().primaryKey(),
+    startTime: t.timestamp().notNull(),
+    endTime: t.timestamp().notNull(),
+    settled: t.boolean().notNull().default(false),
+    // tx.from of the AuctionSettled tx. Whoever settles auction N also creates
+    // auction N+1 in the same tx (settleCurrentAndCreateNewAuction), so this is
+    // also the `curator` of the next auction.
+    settler: t.hex(),
+    settledAt: t.timestamp(),
+    settledAtBlock: t.bigint(),
+    settledAtTransaction: t.text(),
+    // tx.from of the AuctionCreated tx — i.e. the settler of the previous auction.
+    curator: t.hex(),
+    winner: t.hex(),
+    amount: t.bigint(), // winning bid amount
+    // Mainnet prop #XXX raised reservePrice to 2.8 ETH. Auctions that end with
+    // no bid meeting the reserve settle as AuctionSettled(winner=0x0, amount=0)
+    // and the noun is burned in _settleAuction. Flag those rows so the webapp
+    // can branch to a burned-placeholder renderer instead of showing a "won by
+    // 0x000..." row.
+    burned: t.boolean().notNull().default(false),
+    clientId: t.integer(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    winnerIndex: index().on(t.winner),
+    settlerIndex: index().on(t.settler),
+    curatorIndex: index().on(t.curator),
+  }),
+);
 
 export const auctionRelations = relations(auction, ({ one, many }) => ({
   noun: one(noun, {
@@ -289,6 +314,7 @@ export const bid = onchainTable(
   }),
   t => ({
     primaryKey: primaryKey({ columns: [t.nounId, t.value] }),
+    bidderIndex: index().on(t.bidder),
   }),
 );
 
@@ -325,6 +351,7 @@ export const stream = onchainTable(
   }),
   t => ({
     createdAtBlockIndex: index().on(t.createdAtBlock),
+    recipientIndex: index().on(t.recipient),
   }),
 );
 
@@ -361,6 +388,7 @@ export const streamEvent = onchainTable(
   t => ({
     createdAtBlockIndex: index().on(t.createdAtBlock),
     streamAddressIndex: index().on(t.streamAddress),
+    recipientIndex: index().on(t.recipient),
   }),
 );
 
@@ -392,6 +420,7 @@ export const forkEvent = onchainTable(
   }),
   t => ({
     createdAtBlockIndex: index().on(t.createdAtBlock),
+    ownerIndex: index().on(t.owner),
   }),
 );
 
@@ -455,6 +484,8 @@ export const delegationEvent = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.delegator, t.createdAtBlock] }),
     createdAtBlockIndex: index().on(t.createdAtBlock),
+    delegatorIndex: index().on(t.delegator),
+    toDelegateIndex: index().on(t.toDelegate),
   }),
 );
 
@@ -473,6 +504,8 @@ export const nounTransfer = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.nounId, t.createdAtBlock, t.createdAtTransaction] }),
     createdAtBlockIndex: index().on(t.createdAtBlock),
+    fromIndex: index().on(t.from),
+    toIndex: index().on(t.to),
   }),
 );
 
@@ -588,6 +621,7 @@ export const candidateSignature = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.candidateId, t.signer, t.sig] }),
     candidateIdIndex: index().on(t.candidateId),
+    signerIndex: index().on(t.signer),
   }),
 );
 
@@ -614,6 +648,7 @@ export const proposalFeedback = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
     proposalIdIndex: index().on(t.proposalId),
+    voterIndex: index().on(t.voter),
   }),
 );
 
@@ -633,6 +668,7 @@ export const candidateFeedback = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.candidateId] }),
     candidateIdIndex: index().on(t.candidateId),
+    voterIndex: index().on(t.voter),
   }),
 );
 
@@ -715,6 +751,7 @@ export const grantVote = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.grantId] }),
     grantIdIndex: index().on(t.grantId),
+    voterIndex: index().on(t.voter),
   }),
 );
 
@@ -823,6 +860,7 @@ export const nounV2Vote = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.voter, t.proposalId] }),
     proposalIdIndex: index().on(t.proposalId),
+    voterIndex: index().on(t.voter),
   }),
 );
 
@@ -850,18 +888,25 @@ export const nounV2ProposalStatusChange = onchainTable(
 
 // ── NounV2 Auctions ─────────────────────────────────────────────────────────
 
-export const nounV2Auction = onchainTable('nounv2_auction', t => ({
-  nounId: t.bigint().primaryKey(),
-  startTime: t.timestamp().notNull(),
-  endTime: t.timestamp().notNull(),
-  settled: t.boolean().notNull().default(false),
-  settler: t.hex(), // tx.from of AuctionSettled
-  winner: t.hex(),
-  amount: t.bigint(),
-  createdAt: t.timestamp().notNull(),
-  createdAtBlock: t.bigint().notNull(),
-  createdAtTransaction: t.text().notNull(),
-}));
+export const nounV2Auction = onchainTable(
+  'nounv2_auction',
+  t => ({
+    nounId: t.bigint().primaryKey(),
+    startTime: t.timestamp().notNull(),
+    endTime: t.timestamp().notNull(),
+    settled: t.boolean().notNull().default(false),
+    settler: t.hex(), // tx.from of AuctionSettled
+    winner: t.hex(),
+    amount: t.bigint(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    winnerIndex: index().on(t.winner),
+    settlerIndex: index().on(t.settler),
+  }),
+);
 
 export const nounV2AuctionRelations = relations(nounV2Auction, ({ many }) => ({
   bids: many(nounV2Bid),
@@ -881,6 +926,7 @@ export const nounV2Bid = onchainTable(
   t => ({
     primaryKey: primaryKey({ columns: [t.nounId, t.value] }),
     nounIdIndex: index().on(t.nounId),
+    bidderIndex: index().on(t.bidder),
   }),
 );
 

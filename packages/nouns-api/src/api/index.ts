@@ -9402,6 +9402,12 @@ app.get('/api/gas-leaderboard', async c => {
 import { registerWalletMapRoute } from './walletMap.js';
 registerWalletMapRoute(app, db);
 
+// ─── Gamer profile — /api/wallet/:identity/{profile,activity,overview,autopilot}
+// Per-wallet Nouns record + AI overview + signed Autopilot voting prefs.
+// See ./walletProfile.ts.
+import { registerWalletProfileRoutes } from './walletProfile.js';
+registerWalletProfileRoutes(app, db);
+
 // ─── Dream Nouns — /api/dream-nouns ─────────────────────────────────────────
 // Replaces the Laravel API from the retired probe.wtf DigitalOcean droplet.
 import { registerDreamRoutes, getDreamTraitImage } from './dreams.js';

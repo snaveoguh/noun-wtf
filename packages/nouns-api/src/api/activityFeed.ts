@@ -19,12 +19,19 @@
  * computed from proposal start/end blocks and carry `txHash: ''`. They
  * paginate on `before` like everything else (blockNumber < before).
  *
+ * Per-wallet mode — `GET /api/activity?address=0x…` (and the wallet profile's
+ * `/api/wallet/:identity/activity`): every source narrows to rows where the
+ * wallet is the actor (voter / proposer / signer / bidder / winner / settler /
+ * curator / delegator / from / to / recipient / owner); sources with no
+ * address column emit nothing. Without `address` behaviour is unchanged.
+ *
  * Also hosts /api/nounv2-feed (same machinery, NounV2 tables).
  */
+import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { Hono } from 'hono';
 
-import { and, desc, eq, inArray, isNotNull, lt, lte, max, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like, lt, lte, max, or, sql } from 'drizzle-orm';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 
@@ -123,7 +130,7 @@ export function tsToISO(ts: unknown): string {
   return new Date(toUnixSeconds(ts) * 1000).toISOString();
 }
 
-function toUnixSeconds(ts: unknown): number {
+export function toUnixSeconds(ts: unknown): number {
   if (ts instanceof Date) {
     const ms = ts.getTime();
     return ms < 946_684_800_000 ? ms : Math.floor(ms / 1000);
@@ -133,9 +140,53 @@ function toUnixSeconds(ts: unknown): number {
   return n < 1e12 ? n : Math.floor(n / 1000);
 }
 
-function titleFromDescription(desc: string | null | undefined): string {
+export function titleFromDescription(desc: string | null | undefined): string {
   const text = (desc || '').replace(/^\s+/, '');
   return (text.split('\n')[0] || '').replace(/^#\s*/, '').trim().slice(0, 120);
+}
+
+export type ProposalResult = 'succeeded' | 'defeated' | 'pending' | null;
+
+/**
+ * Outcome of a proposal's vote, mirroring the PROPOSAL_ENDED rule
+ * (`for <= against || for < quorum` ⇒ defeated) plus the terminal statuses:
+ *   - EXECUTED / QUEUED           → 'succeeded'
+ *   - VETOED                      → 'defeated' (the DAO's answer was no)
+ *   - CANCELLED                   → 'defeated' only when cancelled after a lost
+ *                                   vote (needs `terminatedAtBlock`; without it,
+ *                                   a lost vote with ≥ 1 vote cast is assumed);
+ *                                   otherwise null (no outcome)
+ *   - still in / before its window → 'pending'
+ * `null` means the vote never produced an outcome to align with.
+ */
+export function proposalResult(
+  p: {
+    status: string;
+    forVotes: number;
+    againstVotes: number;
+    quorumVotes: bigint | number;
+    endBlock: bigint;
+    objectionPeriodEndBlock: bigint | null;
+  },
+  latestBlock: bigint,
+  /** Block of the CANCELLED / VETOED status change, when known. */
+  terminatedAtBlock?: bigint | null,
+): ProposalResult {
+  if (p.status === 'EXECUTED' || p.status === 'QUEUED') return 'succeeded';
+  if (p.status === 'VETOED') return 'defeated';
+  const effectiveEnd =
+    p.objectionPeriodEndBlock && p.objectionPeriodEndBlock > p.endBlock
+      ? p.objectionPeriodEndBlock
+      : p.endBlock;
+  const ended = latestBlock > 0n && latestBlock > effectiveEnd;
+  const defeated = p.forVotes <= p.againstVotes || p.forVotes < Number(p.quorumVotes);
+  if (p.status === 'CANCELLED') {
+    if (!ended || !defeated) return null;
+    if (terminatedAtBlock != null) return terminatedAtBlock > effectiveEnd ? 'defeated' : null;
+    return p.forVotes + p.againstVotes > 0 ? 'defeated' : null;
+  }
+  if (!ended) return 'pending';
+  return defeated ? 'defeated' : 'succeeded';
 }
 
 function firstImageUrl(desc: string): string | null {
@@ -418,7 +469,39 @@ interface FeedCtx {
   latestBlock: bigint;
   /** A source calls this when it filled its page — older rows exist. */
   markMore: () => void;
+  /** Per-wallet mode: lowercased 0x address every source must scope to. */
+  address?: string;
 }
+
+/**
+ * How a source scopes itself to `ctx.address`: the address columns to match
+ * (OR-ed), or a builder for a custom predicate (subqueries). An empty list
+ * means "this source has no actor column" → emits nothing in per-wallet mode.
+ */
+type AddrScope = readonly PgColumn[] | ((address: string) => SQL);
+
+/** `undefined` = no address filter; `null` = source cannot scope → no rows. */
+function addressFilter(ctx: FeedCtx, scope: AddrScope): SQL | undefined | null {
+  if (!ctx.address) return undefined;
+  if (typeof scope === 'function') return scope(ctx.address);
+  if (scope.length === 0) return null;
+  if (scope.length === 1) return eq(scope[0]!, ctx.address);
+  return or(...scope.map(c => eq(c, ctx.address)));
+}
+
+function whereAll(...parts: (SQL | undefined)[]): SQL | undefined {
+  const xs = parts.filter((p): p is SQL => p !== undefined);
+  if (xs.length === 0) return undefined;
+  if (xs.length === 1) return xs[0];
+  return and(...xs);
+}
+
+/** Subquery: ids of proposals authored by `address` (for status / version rows). */
+const proposalsAuthoredBy = (address: string) =>
+  db
+    .select({ id: schema.proposal.id })
+    .from(schema.proposal)
+    .where(eq(schema.proposal.proposer, address as `0x${string}`));
 
 interface FeedSource {
   name: string;
@@ -440,13 +523,17 @@ async function fetchRows<T extends PgTable>(
   blockCol: PgColumn,
   ctx: FeedCtx,
   limit = ctx.perTable,
+  scope: AddrScope = [],
 ): Promise<T['$inferSelect'][]> {
+  const addr = addressFilter(ctx, scope);
+  if (addr === null) return [];
+  const where = whereAll(ctx.before ? lt(blockCol, ctx.before) : undefined, addr);
   const q = db
     .select()
     .from(tbl as PgTable)
     .$dynamic();
-  const rows = ctx.before
-    ? await q.where(lt(blockCol, ctx.before)).orderBy(desc(blockCol)).limit(limit)
+  const rows = where
+    ? await q.where(where).orderBy(desc(blockCol)).limit(limit)
     : await q.orderBy(desc(blockCol)).limit(limit);
   if (rows.length >= limit) ctx.markMore();
   return rows as T['$inferSelect'][];
@@ -456,7 +543,9 @@ const bidsSource: FeedSource = {
   name: 'bids',
   types: ['BID'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.bid, schema.bid.createdAtBlock, ctx);
+    const rows = await fetchRows(schema.bid, schema.bid.createdAtBlock, ctx, ctx.perTable, [
+      schema.bid.bidder,
+    ]);
     return rows.map(b => ({
       type: 'BID',
       blockNumber: Number(b.createdAtBlock),
@@ -474,7 +563,7 @@ const bidsSource: FeedSource = {
 };
 
 // nouns.camp REPOST convention: "+1\n\n> quoted reason"
-const REVOTE_RE = /^\+1\s*\n\s*\n\s*>/;
+export const REVOTE_RE = /^\+1\s*\n\s*\n\s*>/;
 // Reply convention: first line "@0xabc…" or "@name.eth"
 const REPLY_RE = /^@(0x[\da-f]{40}|[\w.-]+\.eth)\b/i;
 
@@ -482,7 +571,9 @@ const votesSource: FeedSource = {
   name: 'votes',
   types: ['VOTE'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.vote, schema.vote.createdAtBlock, ctx);
+    const rows = await fetchRows(schema.vote, schema.vote.createdAtBlock, ctx, ctx.perTable, [
+      schema.vote.voter,
+    ]);
     const events: ActivityEvent[] = [];
     for (const v of rows) {
       const reason = v.reason || '';
@@ -514,7 +605,13 @@ const proposalsCreatedSource: FeedSource = {
   name: 'proposals',
   types: ['PROPOSAL_CREATED'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.proposal, schema.proposal.createdAtBlock, ctx);
+    const rows = await fetchRows(
+      schema.proposal,
+      schema.proposal.createdAtBlock,
+      ctx,
+      ctx.perTable,
+      [schema.proposal.proposer],
+    );
     return rows.map(p => {
       const descText = p.description || '';
       return {
@@ -544,7 +641,9 @@ const auctionsCreatedSource: FeedSource = {
   name: 'auctionsCreated',
   types: ['AUCTION_CREATED'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.auction, schema.auction.createdAtBlock, ctx);
+    const rows = await fetchRows(schema.auction, schema.auction.createdAtBlock, ctx, ctx.perTable, [
+      schema.auction.curator,
+    ]);
     if (rows.length === 0) return [];
 
     // "settledNounId" = the auction this creation tx settled. Normally
@@ -589,7 +688,11 @@ const auctionsSettledSource: FeedSource = {
   types: ['AUCTION_SETTLED'],
   async fetch(ctx) {
     const col = schema.auction.settledAtBlock;
-    const cond = ctx.before ? and(isNotNull(col), lt(col, ctx.before)) : isNotNull(col);
+    const cond = whereAll(
+      isNotNull(col),
+      ctx.before ? lt(col, ctx.before) : undefined,
+      addressFilter(ctx, [schema.auction.winner, schema.auction.settler]) ?? undefined,
+    );
     const rows = await db
       .select()
       .from(schema.auction)
@@ -624,24 +727,30 @@ const nounderNounsSource: FeedSource = {
   name: 'nounderNouns',
   types: ['NOUNDER_NOUN'],
   async fetch(ctx) {
-    const col = schema.noun.createdAtBlock;
+    // NounsToken mints every noun to the treasury first and then transfers the
+    // nounder reward (#0, #10, … ≤ #1820) to nounders.eth in the same tx, so
+    // `noun.mintedTo` never equals nounders.eth — the reward is the transfer.
+    if (ctx.address && ctx.address !== NOUNDERS) return [];
+    const col = schema.nounTransfer.createdAtBlock;
     const cond = ctx.before
-      ? and(eq(schema.noun.mintedTo, NOUNDERS), lt(col, ctx.before))
-      : eq(schema.noun.mintedTo, NOUNDERS);
+      ? and(eq(schema.nounTransfer.to, NOUNDERS), lt(col, ctx.before))
+      : eq(schema.nounTransfer.to, NOUNDERS);
     const rows = await db
       .select()
-      .from(schema.noun)
+      .from(schema.nounTransfer)
       .where(cond)
       .orderBy(desc(col))
       .limit(ctx.perTable);
     if (rows.length >= ctx.perTable) ctx.markMore();
-    return rows.map(n => ({
-      type: 'NOUNDER_NOUN',
-      blockNumber: Number(n.createdAtBlock),
-      timestamp: tsToISO(n.createdAt),
-      txHash: n.createdAtTransaction || '',
-      data: { nounId: Number(n.id), owner: n.mintedTo ?? NOUNDERS },
-    }));
+    return rows
+      .filter(t => Number(t.nounId) % 10 === 0 && Number(t.nounId) <= 1820)
+      .map(t => ({
+        type: 'NOUNDER_NOUN',
+        blockNumber: Number(t.createdAtBlock),
+        timestamp: tsToISO(t.createdAt),
+        txHash: t.createdAtTransaction || '',
+        data: { nounId: Number(t.nounId), owner: NOUNDERS },
+      }));
   },
 };
 
@@ -684,6 +793,7 @@ const transfersSource: FeedSource = {
       schema.nounTransfer.createdAtBlock,
       ctx,
       depth,
+      [schema.nounTransfer.from, schema.nounTransfer.to],
     );
     const events: ActivityEvent[] = [];
     for (const t of rows) {
@@ -710,6 +820,8 @@ const delegationsSource: FeedSource = {
       schema.delegationEvent,
       schema.delegationEvent.createdAtBlock,
       ctx,
+      ctx.perTable,
+      [schema.delegationEvent.delegator, schema.delegationEvent.toDelegate],
     );
     return rows.map(d => {
       const delegator = lower(d.delegator);
@@ -751,6 +863,8 @@ const proposalStatusSource: FeedSource = {
       schema.proposalStatusChange,
       schema.proposalStatusChange.createdAtBlock,
       ctx,
+      ctx.perTable,
+      a => inArray(schema.proposalStatusChange.proposalId, proposalsAuthoredBy(a)),
     );
     return rows.map(sc => ({
       type: sc.status === 'OBJECTION' ? 'PROPOSAL_OBJECTION_PERIOD' : `PROPOSAL_${sc.status}`,
@@ -771,6 +885,8 @@ const proposalVersionsSource: FeedSource = {
       schema.proposalVersion,
       schema.proposalVersion.createdAtBlock,
       ctx,
+      ctx.perTable,
+      a => inArray(schema.proposalVersion.proposalId, proposalsAuthoredBy(a)),
     );
     return rows.map(v => ({
       type: 'PROPOSAL_UPDATED',
@@ -789,7 +905,7 @@ const proposalVersionsSource: FeedSource = {
 };
 
 /** CANCELLED / VETOED block per proposal, for "was it dead before block X" checks. */
-async function fetchTerminatedBefore(proposalIds: bigint[]): Promise<Map<bigint, bigint>> {
+export async function fetchTerminatedBefore(proposalIds: bigint[]): Promise<Map<bigint, bigint>> {
   const out = new Map<bigint, bigint>();
   if (proposalIds.length === 0) return out;
   const rows = await db
@@ -827,9 +943,11 @@ const votingStartedSource: FeedSource = {
   types: ['PROPOSAL_VOTING_STARTED'],
   async fetch(ctx) {
     const col = schema.proposal.startBlock;
-    const cond = ctx.before
-      ? and(lte(col, ctx.latestBlock), lt(col, ctx.before))
-      : lte(col, ctx.latestBlock);
+    const cond = whereAll(
+      lte(col, ctx.latestBlock),
+      ctx.before ? lt(col, ctx.before) : undefined,
+      addressFilter(ctx, [schema.proposal.proposer]) ?? undefined,
+    );
     const rows = await db
       .select()
       .from(schema.proposal)
@@ -867,9 +985,11 @@ const proposalEndedSource: FeedSource = {
     // Effective end = objectionPeriodEndBlock ?? endBlock, which is >= endBlock,
     // so filtering on endBlock is a superset; the exact gate is applied below.
     const col = schema.proposal.endBlock;
-    const cond = ctx.before
-      ? and(lte(col, ctx.latestBlock), lt(col, ctx.before))
-      : lte(col, ctx.latestBlock);
+    const cond = whereAll(
+      lte(col, ctx.latestBlock),
+      ctx.before ? lt(col, ctx.before) : undefined,
+      addressFilter(ctx, [schema.proposal.proposer]) ?? undefined,
+    );
     const fetchLimit = ctx.perTable + 5;
     const rows = await db
       .select()
@@ -925,6 +1045,8 @@ const proposalFeedbackSource: FeedSource = {
       schema.proposalFeedback,
       schema.proposalFeedback.createdAtBlock,
       ctx,
+      ctx.perTable,
+      [schema.proposalFeedback.voter],
     );
     return rows.map(pf => ({
       type: 'PROPOSAL_FEEDBACK',
@@ -945,7 +1067,13 @@ const candidatesCreatedSource: FeedSource = {
   name: 'candidates',
   types: ['CANDIDATE_CREATED'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.candidate, schema.candidate.createdAtBlock, ctx);
+    const rows = await fetchRows(
+      schema.candidate,
+      schema.candidate.createdAtBlock,
+      ctx,
+      ctx.perTable,
+      [schema.candidate.proposer],
+    );
     return rows.map(cd => {
       const descText = cd.description || '';
       const targets = parseIdList(cd.targets);
@@ -977,7 +1105,14 @@ const candidateVersionsSource: FeedSource = {
   name: 'candidateVersions',
   types: ['CANDIDATE_UPDATED'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.candidateVersion, schema.candidateVersion.blockNumber, ctx);
+    // candidate ids are `${lowercased proposer}-${slug}`
+    const rows = await fetchRows(
+      schema.candidateVersion,
+      schema.candidateVersion.blockNumber,
+      ctx,
+      ctx.perTable,
+      a => like(schema.candidateVersion.candidateId, `${a}-%`),
+    );
     return rows.map(cv => {
       const descText = cv.description || '';
       const parts = cv.candidateId.split('-');
@@ -1003,7 +1138,11 @@ async function fetchCandidatesBy(
   col: typeof schema.candidate.canceledAtBlock | typeof schema.candidate.promotedAtBlock,
   ctx: FeedCtx,
 ) {
-  const cond = ctx.before ? and(isNotNull(col), lt(col, ctx.before)) : isNotNull(col);
+  const cond = whereAll(
+    isNotNull(col),
+    ctx.before ? lt(col, ctx.before) : undefined,
+    addressFilter(ctx, [schema.candidate.proposer]) ?? undefined,
+  );
   const rows = await db
     .select()
     .from(schema.candidate)
@@ -1073,6 +1212,8 @@ const candidateSignaturesSource: FeedSource = {
       schema.candidateSignature,
       schema.candidateSignature.createdAtBlock,
       ctx,
+      ctx.perTable,
+      [schema.candidateSignature.signer],
     );
     const events: ActivityEvent[] = [];
     for (const cs of rows) {
@@ -1103,6 +1244,8 @@ const candidateFeedbackSource: FeedSource = {
       schema.candidateFeedback,
       schema.candidateFeedback.createdAtBlock,
       ctx,
+      ctx.perTable,
+      [schema.candidateFeedback.voter],
     );
     return rows.map(cf => ({
       type: 'CANDIDATE_FEEDBACK',
@@ -1123,7 +1266,9 @@ const streamsCreatedSource: FeedSource = {
   name: 'streams',
   types: ['STREAM_CREATED'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.stream, schema.stream.createdAtBlock, ctx);
+    const rows = await fetchRows(schema.stream, schema.stream.createdAtBlock, ctx, ctx.perTable, [
+      schema.stream.recipient,
+    ]);
     return rows.map(s => ({
       type: 'STREAM_CREATED',
       blockNumber: Number(s.createdAtBlock),
@@ -1145,7 +1290,13 @@ const streamEventsSource: FeedSource = {
   name: 'streamEvents',
   types: ['STREAM_CANCELLED', 'STREAM_WITHDRAWN'],
   async fetch(ctx) {
-    const rows = await fetchRows(schema.streamEvent, schema.streamEvent.createdAtBlock, ctx);
+    const rows = await fetchRows(
+      schema.streamEvent,
+      schema.streamEvent.createdAtBlock,
+      ctx,
+      ctx.perTable,
+      [schema.streamEvent.recipient],
+    );
     return rows.map(e => {
       const base = {
         streamAddress: e.streamAddress,
@@ -1178,7 +1329,13 @@ const forkEventsSource: FeedSource = {
   name: 'forkEvents',
   types: Object.values(FORK_TYPE_BY_KIND),
   async fetch(ctx) {
-    const rows = await fetchRows(schema.forkEvent, schema.forkEvent.createdAtBlock, ctx);
+    const rows = await fetchRows(
+      schema.forkEvent,
+      schema.forkEvent.createdAtBlock,
+      ctx,
+      ctx.perTable,
+      [schema.forkEvent.owner],
+    );
     return rows.map(f => {
       const common = {
         blockNumber: Number(f.createdAtBlock),
@@ -1248,9 +1405,26 @@ const grantsSource: FeedSource = {
   types: GRANT_TYPES,
   async fetch(ctx) {
     const [grants, grantVotes, statusChanges] = await Promise.all([
-      fetchRows(schema.grant, schema.grant.createdAtBlock, ctx),
-      fetchRows(schema.grantVote, schema.grantVote.createdAtBlock, ctx),
-      fetchRows(schema.grantStatusChange, schema.grantStatusChange.createdAtBlock, ctx),
+      fetchRows(schema.grant, schema.grant.createdAtBlock, ctx, ctx.perTable, [
+        schema.grant.proposer,
+      ]),
+      fetchRows(schema.grantVote, schema.grantVote.createdAtBlock, ctx, ctx.perTable, [
+        schema.grantVote.voter,
+      ]),
+      fetchRows(
+        schema.grantStatusChange,
+        schema.grantStatusChange.createdAtBlock,
+        ctx,
+        ctx.perTable,
+        a =>
+          inArray(
+            schema.grantStatusChange.grantId,
+            db
+              .select({ id: schema.grant.id })
+              .from(schema.grant)
+              .where(eq(schema.grant.proposer, a as `0x${string}`)),
+          ),
+      ),
     ]);
     const events: ActivityEvent[] = [];
     for (const g of grants) {
@@ -1307,7 +1481,8 @@ const lilNounsSource: FeedSource = {
     'LIL_PROPOSAL_CREATED',
     'LIL_TRANSFER',
   ],
-  fetch: ctx => fetchLilNounsActivity(ctx.before, ctx.limit),
+  // Lil Nouns rows aren't scoped per wallet (external subgraph) — skip in per-wallet mode.
+  fetch: ctx => (ctx.address ? Promise.resolve([]) : fetchLilNounsActivity(ctx.before, ctx.limit)),
 };
 
 const SOURCES: readonly FeedSource[] = [
@@ -1513,7 +1688,7 @@ const POST_PROCESSORS: readonly PostProcessor[] = [
 // ─── Feed assembly ──────────────────────────────────────────────────────────
 
 /** Highest block any indexed table has seen — gates derived events. */
-async function latestIndexedBlock(): Promise<bigint> {
+export async function latestIndexedBlock(): Promise<bigint> {
   const probes = [
     db.select({ b: max(schema.onchainEvent.createdAtBlock) }).from(schema.onchainEvent),
     db.select({ b: max(schema.bid.createdAtBlock) }).from(schema.bid),
@@ -1533,6 +1708,8 @@ export async function buildActivityFeed(params: {
   limit: number;
   before?: bigint;
   types: string[];
+  /** Per-wallet mode — 0x address (any case); every source scopes to it. */
+  address?: string;
 }): Promise<ActivityResponse> {
   const { limit, before } = params;
   const typeFilter = params.types;
@@ -1549,6 +1726,7 @@ export async function buildActivityFeed(params: {
     markMore: () => {
       more = true;
     },
+    address: params.address ? lower(params.address) : undefined,
   };
 
   const active = SOURCES.filter(s => s.types.some(want));
@@ -1783,12 +1961,18 @@ export function registerActivityRoutes(app: Hono) {
         .map(t => t.trim().toUpperCase())
         .filter(Boolean) || [];
 
-    const key = `activity:${limit}:${before ?? 'latest'}:${types.join(',')}`;
+    const addressParam = c.req.query('address')?.trim();
+    if (addressParam && !/^0x[\da-f]{40}$/i.test(addressParam)) {
+      return c.json({ error: 'address must be a 0x address' }, 400);
+    }
+    const address = addressParam ? lower(addressParam) : undefined;
+
+    const key = `activity:${limit}:${before ?? 'latest'}:${types.join(',')}:${address ?? ''}`;
     const hit = cached(key);
     if (hit) return c.json(hit);
 
     try {
-      return c.json(remember(key, await buildActivityFeed({ limit, before, types })));
+      return c.json(remember(key, await buildActivityFeed({ limit, before, types, address })));
     } catch (err) {
       console.error('[Activity] Error:', err);
       return c.json(EMPTY, 500);

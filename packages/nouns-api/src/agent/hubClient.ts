@@ -20,10 +20,12 @@ export interface HubGenerateResponse {
   model: string;
   provider: string;
   usage: { input: number; output: number };
+  finishReason?: string;
   error?: string;
 }
 
-export async function hubGenerate(request: HubGenerateRequest): Promise<string> {
+/** Same as `hubGenerate` but returns the full hub payload (text + model + provider + usage). */
+export async function hubGenerateFull(request: HubGenerateRequest): Promise<HubGenerateResponse> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (AGENT_HUB_SECRET) headers.authorization = `Bearer ${AGENT_HUB_SECRET}`;
 
@@ -34,10 +36,14 @@ export async function hubGenerate(request: HubGenerateRequest): Promise<string> 
     signal: AbortSignal.timeout(request.timeoutMs ?? 60_000),
   });
 
-  const payload = await res.json() as HubGenerateResponse;
+  const payload = (await res.json()) as HubGenerateResponse;
   if (!res.ok || payload.error) {
     throw new Error(payload.error || `Agent hub returned ${res.status}`);
   }
 
-  return payload.text;
+  return payload;
+}
+
+export async function hubGenerate(request: HubGenerateRequest): Promise<string> {
+  return (await hubGenerateFull(request)).text;
 }
