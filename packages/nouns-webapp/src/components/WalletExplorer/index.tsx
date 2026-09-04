@@ -14,7 +14,7 @@ import { useState, useEffect, FC } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useQuery } from '@tanstack/react-query';
 import { SearchIcon, Loader2Icon, LockIcon } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { useAccount, useReadContract } from 'wagmi';
 
 import TreasuryScene from '@/components/TreasuryFlow/Scene';
