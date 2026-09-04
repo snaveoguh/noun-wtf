@@ -38,6 +38,16 @@ const BOB = '0x5a3b7c9d1e3f5a7b9c1d3e5f7a9b1c3d5e7f9a1b';
 const CAROL = '0xe1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0';
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
 const TX = '0xfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed';
+const RELAYER = '0x7e1a9c3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c';
+/** Shape only — a real one carries the enforcer caveats from @nouns/vote-permit. */
+const FIXTURE_DELEGATION_JSON = JSON.stringify({
+  delegate: RELAYER,
+  delegator: FIXTURE_ADDRESS,
+  authority: '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+  caveats: [],
+  salt: '1',
+  signature: '0x',
+});
 
 export const FIXTURE_PROFILE: WalletProfile = {
   identity: {
@@ -427,7 +437,7 @@ export const FIXTURE_PROFILE: WalletProfile = {
     generatedAt: ago(0.08),
     model: 'claude-sonnet-4-6',
   },
-  autopilot: { enabled: true, updatedAt: ago(3) },
+  autopilot: { enabled: true, updatedAt: ago(3), mode: 'auto', recentAutoVotes: [] },
   badges: ['Proposer', 'Settler', 'Streak 23', 'Reason writer', 'Curator', 'V2 early'],
 };
 
@@ -451,10 +461,85 @@ export const FIXTURE_AUTOPILOT: AutopilotState = {
     trustedProposers: [ALICE],
     defaultWhenUnsure: 'abstain',
     voteReasonStyle: 'short',
+    mode: 'auto',
+    daos: ['nouns', 'lil-nouns'],
+    minConfidence: 0.75,
+    autoVoteDelayHours: 12,
+    autoVoteOnlyWithReason: true,
   },
+  relayer: { address: RELAYER, enabled: true, balanceEth: 0.04 },
+  delegations: [
+    {
+      id: 'dlg-nouns-1',
+      dao: 'nouns',
+      delegator: FIXTURE_ADDRESS,
+      redeemer: RELAYER,
+      hash: '0x8a1c3e5f7a9b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f',
+      expiresAt: NOW + 62 * DAY,
+      maxVotes: 50,
+      uses: 3,
+      createdAt: ago(28),
+      revokedAt: null,
+      onchainDisabled: false,
+      status: 'active',
+      delegation: FIXTURE_DELEGATION_JSON,
+    },
+    {
+      id: 'dlg-lil-1',
+      dao: 'lil-nouns',
+      delegator: FIXTURE_ADDRESS,
+      redeemer: RELAYER,
+      hash: '0x2b4d6f8a0c2e4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4a6c8e0b2d4f6a8c0e2b4d',
+      expiresAt: ago(3),
+      maxVotes: null,
+      uses: 11,
+      createdAt: ago(93),
+      revokedAt: null,
+      onchainDisabled: false,
+      status: 'expired',
+      delegation: FIXTURE_DELEGATION_JSON,
+    },
+  ],
+  autoVotes: [
+    {
+      id: 'av-1',
+      dao: 'nouns',
+      proposalId: 988,
+      title: 'Nouns Comic issue 8',
+      support: 1,
+      reason: 'You signed issue 7 and it shipped on time. Same team, same ask.',
+      txHash: TX,
+      castAt: ago(0.6),
+      status: 'confirmed',
+    },
+    {
+      id: 'av-2',
+      dao: 'lil-nouns',
+      proposalId: 412,
+      title: 'Lil Nouns Discord bot maintenance — 2 ETH',
+      support: 1,
+      reason: 'Tiny infra ask from a team that has shipped before.',
+      txHash: TX,
+      castAt: ago(2.2),
+      status: 'confirmed',
+    },
+    {
+      id: 'av-3',
+      dao: 'nouns',
+      proposalId: 986,
+      title: 'Nouns pop-up gallery Tokyo — 95 ETH',
+      support: 0,
+      reason: 'Events stance -1, deliverable is impressions.',
+      txHash: null,
+      castAt: ago(4.1),
+      status: 'failed',
+      error: 'relayer: execution reverted (NounsDAO::castVoteInternal: voter already voted)',
+    },
+  ],
   recommendations: [
     {
       proposalId: 991,
+      dao: 'nouns',
       title: 'Nouns Builder grants — 90 ETH retro round',
       support: 1,
       confidence: 0.91,
@@ -464,6 +549,7 @@ export const FIXTURE_AUTOPILOT: AutopilotState = {
     },
     {
       proposalId: 990,
+      dao: 'nouns',
       title: 'Nouns at Art Basel Miami — 320 ETH activation',
       support: 0,
       confidence: 0.84,
@@ -473,6 +559,7 @@ export const FIXTURE_AUTOPILOT: AutopilotState = {
     },
     {
       proposalId: 989,
+      dao: 'nouns',
       title: 'Adjust proposal threshold to 3 nouns',
       support: 2,
       confidence: 0.55,
@@ -482,6 +569,7 @@ export const FIXTURE_AUTOPILOT: AutopilotState = {
     },
     {
       proposalId: 988,
+      dao: 'nouns',
       title: 'Nouns Comic issue 8',
       support: 1,
       confidence: 0.7,
@@ -489,7 +577,30 @@ export const FIXTURE_AUTOPILOT: AutopilotState = {
       generatedAt: ago(0.2),
       alreadyVoted: true,
     },
+    {
+      proposalId: 415,
+      dao: 'lil-nouns',
+      title: 'Lil Nouns x Nouns Esports — 12 ETH',
+      support: 0,
+      confidence: 0.81,
+      reason: 'Esports again, no retro report. Matches your Nouns 984 vote.',
+      generatedAt: ago(0.15),
+    },
+    {
+      proposalId: 414,
+      dao: 'lil-nouns',
+      title: 'Lil Nouns small grants round 3',
+      support: 1,
+      confidence: 0.88,
+      reason: 'Small, retro, measurable. Squarely in the grants lane.',
+      generatedAt: ago(0.3),
+    },
   ],
+};
+
+FIXTURE_PROFILE.autopilot = {
+  ...FIXTURE_PROFILE.autopilot,
+  recentAutoVotes: FIXTURE_AUTOPILOT.autoVotes ?? [],
 };
 
 const ev = (

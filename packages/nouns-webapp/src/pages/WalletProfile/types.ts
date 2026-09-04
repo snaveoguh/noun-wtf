@@ -218,7 +218,13 @@ export interface WalletProfile {
   v2?: ProfileV2 | null;
   delegationHistory?: DelegationRecord[] | null;
   overview?: OverviewText | null;
-  autopilot?: { enabled?: boolean; updatedAt?: Timestampish } | null;
+  autopilot?: {
+    enabled?: boolean;
+    updatedAt?: Timestampish;
+    mode?: AutopilotMode;
+    /** Last few relayer-cast votes, public so visitors see "Autopilot cast FOR on Prop N". */
+    recentAutoVotes?: AutopilotAutoVote[] | null;
+  } | null;
   badges?: string[] | null;
 }
 
@@ -251,6 +257,19 @@ export type StanceKey =
 
 export type Stances = Record<StanceKey, number>;
 
+/** DAO namespace used by the autopilot API. */
+export type AutopilotDao = 'nouns' | 'lil-nouns';
+
+export const AUTOPILOT_DAOS: AutopilotDao[] = ['nouns', 'lil-nouns'];
+
+export const AUTOPILOT_DAO_LABEL: Record<AutopilotDao, string> = {
+  nouns: 'Nouns',
+  'lil-nouns': 'Lil Nouns',
+};
+
+/** `draft`: noun.wtf recommends, you confirm. `auto`: the relayer casts via your 7702 permission. */
+export type AutopilotMode = 'draft' | 'auto';
+
 export interface AutopilotPrefs {
   philosophy: string;
   stances: Stances;
@@ -259,10 +278,20 @@ export interface AutopilotPrefs {
   trustedProposers: string[];
   defaultWhenUnsure: 'abstain' | 'skip' | 'against';
   voteReasonStyle: 'none' | 'short' | 'full';
+  mode: AutopilotMode;
+  /** DAOs the relayer may auto-vote on (auto mode only). */
+  daos: AutopilotDao[];
+  /** 0..1 — recommendations below this are drafted, never auto-cast. */
+  minConfidence: number;
+  /** Hours to wait after a recommendation before casting, so you can veto. */
+  autoVoteDelayHours: number;
+  /** Only auto-cast when a written reason was drafted. */
+  autoVoteOnlyWithReason: boolean;
 }
 
 export interface AutopilotRecommendation {
   proposalId: number | string;
+  dao?: AutopilotDao | null;
   title?: string | null;
   support?: 0 | 1 | 2 | null;
   confidence?: number | null;
@@ -272,11 +301,57 @@ export interface AutopilotRecommendation {
   pending?: boolean;
 }
 
+export interface AutopilotRelayer {
+  address?: string | null;
+  enabled?: boolean;
+  balanceEth?: number | null;
+}
+
+export type AutopilotDelegationStatus = 'active' | 'expired' | 'revoked' | 'exhausted';
+
+export interface AutopilotDelegation {
+  id: string;
+  dao: AutopilotDao;
+  delegator?: string;
+  redeemer?: string;
+  hash?: string;
+  expiresAt?: Timestampish;
+  maxVotes?: number | null;
+  uses?: number;
+  createdAt?: Timestampish;
+  revokedAt?: Timestampish | null;
+  onchainDisabled?: boolean;
+  status?: AutopilotDelegationStatus | string;
+  /**
+   * Serialized Delegation JSON (as posted). Needed to build the on-chain
+   * revoke call; the panel also caches it locally in case the API omits it.
+   */
+  delegation?: string | null;
+}
+
+export type AutopilotAutoVoteStatus = 'sent' | 'confirmed' | 'failed';
+
+export interface AutopilotAutoVote {
+  id: string;
+  dao?: AutopilotDao | null;
+  proposalId: number | string;
+  title?: string | null;
+  support?: 0 | 1 | 2 | null;
+  reason?: string | null;
+  txHash?: string | null;
+  castAt?: Timestampish;
+  status?: AutopilotAutoVoteStatus | string;
+  error?: string | null;
+}
+
 export interface AutopilotState {
   enabled?: boolean;
   prefs?: AutopilotPrefs | null;
   updatedAt?: Timestampish;
   recommendations?: AutopilotRecommendation[];
+  relayer?: AutopilotRelayer | null;
+  delegations?: AutopilotDelegation[];
+  autoVotes?: AutopilotAutoVote[];
 }
 
 export const STANCE_KEYS: StanceKey[] = [
@@ -315,6 +390,11 @@ export const DEFAULT_PREFS: AutopilotPrefs = {
   trustedProposers: [],
   defaultWhenUnsure: 'abstain',
   voteReasonStyle: 'short',
+  mode: 'draft',
+  daos: ['nouns'],
+  minConfidence: 0.6,
+  autoVoteDelayHours: 24,
+  autoVoteOnlyWithReason: false,
 };
 
 export type ProfileTab =

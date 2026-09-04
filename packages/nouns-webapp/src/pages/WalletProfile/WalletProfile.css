@@ -372,3 +372,111 @@
 [data-theme='terminal'] .wp-tab.active {
   color: var(--theme-bg-primary);
 }
+
+/* ─── Autopilot: mode switch, setup steps, log table ─────────────────────── */
+.wp-seg {
+  display: inline-flex;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: var(--theme-radius-sm);
+  overflow: hidden;
+}
+.wp-seg button {
+  padding: 5px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--theme-bg-secondary);
+  color: var(--theme-text-secondary);
+  border: none;
+  cursor: pointer;
+}
+.wp-seg button + button {
+  border-left: 1px solid var(--theme-border-strong);
+}
+.wp-seg button.active {
+  background: var(--theme-text-primary);
+  color: var(--theme-bg-primary);
+}
+.wp-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--theme-feed-row-border);
+}
+.wp-step:last-child {
+  border-bottom: none;
+}
+.wp-step-n {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border: 1px solid var(--theme-border-strong);
+  color: var(--theme-text-secondary);
+}
+.wp-step-n.done {
+  background: var(--theme-positive);
+  border-color: var(--theme-positive);
+  color: var(--theme-bg-primary);
+}
+.wp-step-n.warn {
+  border-color: var(--theme-negative);
+  color: var(--theme-negative);
+}
+.wp-sheet {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--theme-border-strong);
+  border-radius: var(--theme-radius-sm);
+  background: var(--theme-bg-input);
+  font-size: 11px;
+}
+.wp-sheet dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 0;
+}
+.wp-sheet dt {
+  color: var(--theme-text-secondary);
+}
+.wp-sheet dd {
+  margin: 0;
+  word-break: break-all;
+}
+.wp-table-wrap {
+  overflow-x: auto;
+}
+.wp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.wp-table th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--theme-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--theme-border-strong);
+  white-space: nowrap;
+}
+.wp-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--theme-feed-row-border);
+  vertical-align: top;
+}
+.wp-table tr:last-child td {
+  border-bottom: none;
+}
+.wp-checkbox {
+  accent-color: var(--theme-accent);
+  width: 14px;
+  height: 14px;
+}

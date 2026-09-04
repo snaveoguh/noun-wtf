@@ -5,6 +5,8 @@
  * checked before the API ships.
  */
 import type {
+  AutopilotDao,
+  AutopilotDelegation,
   AutopilotPrefs,
   AutopilotState,
   OverviewText,
@@ -141,12 +143,21 @@ async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
-/** Build the exact message the API verifies for a PUT /autopilot. */
-export async function buildAutopilotMessage(address: string, prefs: AutopilotPrefs) {
-  const prefsHash = await sha256Hex(JSON.stringify(prefs));
+/**
+ * Ownership proof shared by every autopilot write (PUT /autopilot, POST and
+ * DELETE /delegations): a signed message binding the connected address to a
+ * sha256 of the payload plus a ms nonce.
+ */
+export async function buildOwnershipMessage(address: string, payload: string) {
+  const prefsHash = await sha256Hex(payload);
   const nonce = Date.now();
   const message = `noun.wtf autopilot\naddress: ${address.toLowerCase()}\nnonce: ${nonce}\nprefs: ${prefsHash}`;
   return { message, nonce, prefsHash };
+}
+
+/** Build the exact message the API verifies for a PUT /autopilot. */
+export function buildAutopilotMessage(address: string, prefs: AutopilotPrefs) {
+  return buildOwnershipMessage(address, JSON.stringify(prefs));
 }
 
 export function useSaveAutopilot(address: string | undefined) {
@@ -196,4 +207,150 @@ export function useSaveAutopilot(address: string | undefined) {
   );
 
   return { save, isPending: mutation.isPending, error: mutation.error };
+}
+
+// ─── Auto-vote delegations (EIP-7702 + ERC-7710) ───────────────────────────
+
+const DELEGATION_CACHE_KEY = 'noun-wtf-autopilot-delegations';
+
+/**
+ * The API row may omit the serialized delegation; keep a local copy keyed by
+ * delegation hash so the on-chain revoke can still be built from this device.
+ */
+export function cacheSerializedDelegation(hash: string, serialized: string) {
+  try {
+    const raw = window.localStorage.getItem(DELEGATION_CACHE_KEY);
+    const map = raw != null ? (JSON.parse(raw) as Record<string, string>) : {};
+    map[hash.toLowerCase()] = serialized;
+    window.localStorage.setItem(DELEGATION_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    /* storage blocked — nothing to do */
+  }
+}
+
+export function readCachedDelegation(hash: string | undefined | null): string | null {
+  if (!hash) return null;
+  try {
+    const raw = window.localStorage.getItem(DELEGATION_CACHE_KEY);
+    const map = raw != null ? (JSON.parse(raw) as Record<string, string>) : {};
+    return map[hash.toLowerCase()] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function patchAutopilot(
+  qc: ReturnType<typeof useQueryClient>,
+  address: string | undefined,
+  fixture: boolean,
+  fn: (prev: AutopilotState) => AutopilotState,
+) {
+  qc.setQueryData<AutopilotState>(['wallet-autopilot', address?.toLowerCase(), fixture], prev =>
+    fn(prev ?? {}),
+  );
+}
+
+export function useSaveDelegation(address: string | undefined) {
+  const qc = useQueryClient();
+  const { signMessageAsync } = useSignMessage();
+  const fixture = profileFixtureEnabled();
+
+  return useMutation<
+    AutopilotDelegation,
+    Error,
+    { dao: AutopilotDao; serialized: string; hash: string; expiresAt: number; maxVotes?: number }
+  >({
+    mutationFn: async ({ dao, serialized, hash, expiresAt, maxVotes }) => {
+      if (!address) throw new Error('Connect a wallet first');
+      const { message } = await buildOwnershipMessage(address, serialized);
+      // Fixture mode has no wallet — skip the proof so the flow can be clicked through.
+      const signature = fixture ? '0x' : await signMessageAsync({ message });
+      cacheSerializedDelegation(hash, serialized);
+      if (fixture) {
+        return {
+          id: `fx-${Date.now()}`,
+          dao,
+          delegator: address.toLowerCase(),
+          redeemer: FIXTURE_AUTOPILOT.relayer?.address ?? undefined,
+          hash,
+          expiresAt,
+          maxVotes: maxVotes ?? null,
+          uses: 0,
+          createdAt: Math.floor(Date.now() / 1000),
+          revokedAt: null,
+          onchainDisabled: false,
+          status: 'active',
+          delegation: serialized,
+        };
+      }
+      const r = await fetch(`${API_BASE}/api/wallet/${enc(address)}/delegations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dao, delegation: serialized, message, signature }),
+      });
+      if (r.status === 400) {
+        const body = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Delegation rejected (400)');
+      }
+      if (r.status === 401) throw new Error('Signature rejected (401)');
+      if (r.status === 409) throw new Error('Stale nonce — try again (409)');
+      if (!r.ok) throw new Error(`API ${r.status}`);
+      const row = (await r.json()) as AutopilotDelegation;
+      return { ...row, delegation: row.delegation ?? serialized };
+    },
+    onSuccess: row => {
+      patchAutopilot(qc, address, fixture, prev => ({
+        ...prev,
+        delegations: [row, ...(prev.delegations ?? []).filter(d => d.id !== row.id)],
+      }));
+    },
+  });
+}
+
+export function useRevokeDelegation(address: string | undefined) {
+  const qc = useQueryClient();
+  const { signMessageAsync } = useSignMessage();
+  const fixture = profileFixtureEnabled();
+
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      if (!address) throw new Error('Connect a wallet first');
+      if (fixture) return;
+      const { message } = await buildOwnershipMessage(address, id);
+      const signature = await signMessageAsync({ message });
+      const r = await fetch(`${API_BASE}/api/wallet/${enc(address)}/delegations/${enc(id)}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message, signature }),
+      });
+      if (r.status === 401) throw new Error('Signature rejected (401)');
+      if (r.status === 409) throw new Error('Stale nonce — try again (409)');
+      if (!r.ok && r.status !== 404) throw new Error(`API ${r.status}`);
+    },
+    onSuccess: (_d, { id }) => {
+      const now = Math.floor(Date.now() / 1000);
+      patchAutopilot(qc, address, fixture, prev => ({
+        ...prev,
+        delegations: (prev.delegations ?? []).map(d =>
+          d.id === id ? { ...d, status: 'revoked', revokedAt: now } : d,
+        ),
+      }));
+    },
+  });
+}
+
+/** Mark a delegation as disabled on-chain in the cache (after the revoke tx is sent). */
+export function useMarkOnchainDisabled(address: string | undefined) {
+  const qc = useQueryClient();
+  const fixture = profileFixtureEnabled();
+  return useCallback(
+    (id: string) =>
+      patchAutopilot(qc, address, fixture, prev => ({
+        ...prev,
+        delegations: (prev.delegations ?? []).map(d =>
+          d.id === id ? { ...d, onchainDisabled: true } : d,
+        ),
+      })),
+    [qc, address, fixture],
+  );
 }

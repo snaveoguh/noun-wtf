@@ -1,5 +1,5 @@
 /** Overview · Votes · Proposals · Candidates tabs. */
-import type { RecentVote, WalletProfile } from './types';
+import type { AutopilotAutoVote, RecentVote, WalletProfile } from './types';
 
 import { FC, useMemo, useState } from 'react';
 
@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 
 import ClientBadge from '@/components/ClientBadge';
 
+import { AutopilotLogCard } from './AutopilotPanel';
 import { fmtDate, fmtEth, fmtInt, fmtPct, num, relTime } from './format';
 import {
   Card,
@@ -21,6 +22,8 @@ import {
   SupportChip,
   TriBar,
 } from './ui';
+
+const NO_AUTO_VOTES: AutopilotAutoVote[] = [];
 
 // ─── Vote row ──────────────────────────────────────────────────────────────
 
@@ -81,10 +84,12 @@ export const VoteRow: FC<{ vote: RecentVote; isV2?: boolean }> = ({ vote, isV2 =
 
 // ─── Overview ──────────────────────────────────────────────────────────────
 
-export const OverviewTab: FC<{ profile: WalletProfile; onTab: (t: string) => void }> = ({
-  profile,
-  onTab,
-}) => {
+export const OverviewTab: FC<{
+  profile: WalletProfile;
+  onTab: (t: string) => void;
+  /** Relayer-cast votes (owner: live autopilot state; visitor: the profile's public copy). */
+  autoVotes?: AutopilotAutoVote[];
+}> = ({ profile, onTab, autoVotes = NO_AUTO_VOTES }) => {
   const votes = profile.voting?.recent ?? [];
   const authored = profile.proposals?.authored ?? [];
   const nouns = profile.holdings?.nouns ?? [];
@@ -149,6 +154,8 @@ export const OverviewTab: FC<{ profile: WalletProfile; onTab: (t: string) => voi
             ))
           )}
         </Card>
+
+        {autoVotes.length > 0 && <AutopilotLogCard compact votes={autoVotes} />}
       </div>
 
       <div className="grid content-start gap-3">

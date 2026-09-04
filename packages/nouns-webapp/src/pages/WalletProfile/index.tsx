@@ -12,7 +12,7 @@ import { useLocation, useParams, useSearchParams } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import { ActivityTab } from './ActivityTab';
-import { useWalletProfile } from './api';
+import { useAutopilot, useWalletProfile } from './api';
 import { AuctionsTab, NounsTab, TreasuryTab } from './AssetTabs';
 import { AutopilotPanel } from './AutopilotPanel';
 import { fmtInt } from './format';
@@ -103,6 +103,14 @@ const WalletProfilePage: React.FC = () => {
     return paramIdentity == null;
   }, [fixture, connected, profileAddress, paramIdentity]);
 
+  // Owner: the live autopilot state (shared cache with AutopilotPanel).
+  // Visitor: the public copy the profile endpoint carries.
+  const autopilotQ = useAutopilot(profileAddress ?? identity, isOwner);
+  const autoVotes = useMemo(
+    () => autopilotQ.data?.autoVotes ?? profile?.autopilot?.recentAutoVotes ?? [],
+    [autopilotQ.data, profile],
+  );
+
   if (!identity) {
     return (
       <div className="wp mt-1 px-2 pb-10 sm:px-4 lg:px-6">
@@ -177,7 +185,9 @@ const WalletProfilePage: React.FC = () => {
             })}
           </div>
 
-          {tab === 'overview' && <OverviewTab profile={profile} onTab={selectTab} />}
+          {tab === 'overview' && (
+            <OverviewTab profile={profile} onTab={selectTab} autoVotes={autoVotes} />
+          )}
           {tab === 'votes' && <VotesTab profile={profile} />}
           {tab === 'proposals' && <ProposalsTab profile={profile} />}
           {tab === 'candidates' && <CandidatesTab profile={profile} />}
