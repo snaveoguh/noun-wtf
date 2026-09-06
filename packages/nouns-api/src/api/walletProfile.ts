@@ -113,6 +113,7 @@ import {
   titleFromDescription,
   toUnixSeconds,
 } from './activityFeed.js';
+import { getSettlerMaps, walletSettlerStats } from './settlerMaps.js';
 import { getFarcasterIdentity, resolveEnsToAddress } from './walletMap.js';
 
 type Db = typeof ponderDb;
@@ -561,7 +562,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     signedRows,
     won,
     settledAgg,
-    curatedRows,
+    settlerMapsV1,
     bidAgg,
     nounderRewardsAgg,
     inAgg,
@@ -581,6 +582,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     v2WonAgg,
     v2BidsAgg,
     v2SettledAgg,
+    settlerMapsV2,
     treasuryTxs,
     overview,
     autopilot,
@@ -706,16 +708,9 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
         .where(eq(schema.auction.settler, A)),
       [],
     ),
-    safe(
-      'curated',
-      db
-        .select({ nounId: schema.auction.nounId })
-        .from(schema.auction)
-        .where(eq(schema.auction.curator, A))
-        .orderBy(desc(schema.auction.nounId))
-        .limit(1000),
-      [],
-    ),
+    // Settled / curated come from the shared settler maps (same source as
+    // GET /api/settlers and the probe dropdowns) so every surface agrees.
+    safe('settlerMapsV1', getSettlerMaps(db, 'v1'), null),
     safe(
       'bids',
       db
@@ -899,6 +894,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
         .where(eq(schema.nounV2Auction.settler, A)),
       [],
     ),
+    safe('settlerMapsV2', getSettlerMaps(db, 'v2'), null),
     // Proposal txs that pay this wallet: direct ETH (target = wallet) or an
     // (address,uint256) payload whose padded address contains the wallet.
     safe(
@@ -1265,6 +1261,9 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
 
   // ── Auctions ────────────────────────────────────────────────────────────
   const bids = bidAgg[0];
+  const v1SettlerStats = settlerMapsV1 ? walletSettlerStats(settlerMapsV1, A) : null;
+  const v2SettlerStats = settlerMapsV2 ? walletSettlerStats(settlerMapsV2, A) : null;
+
   const auctions: WalletProfile['auctions'] = {
     won: won.map(w => ({
       nounId: Number(w.nounId),
@@ -1274,8 +1273,8 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     })),
     wonCount: won.length,
     totalSpentEth: Math.round(won.reduce((s, w) => s + eth(w.amount), 0) * 1000) / 1000,
-    settled: num(settledAgg[0]?.n),
-    curated: curatedRows.map(r => Number(r.nounId)),
+    settled: v1SettlerStats ? v1SettlerStats.settled.length : num(settledAgg[0]?.n),
+    curated: v1SettlerStats?.curated ?? [],
     bids: {
       count: num(bids?.n),
       totalEth: Math.round(eth(bids?.total ?? 0) * 1000) / 1000,
@@ -1387,7 +1386,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     proposalsAuthored: num(v2PropsAgg[0]?.n),
     auctionsWon: num(v2WonAgg[0]?.n),
     bids: num(v2BidsAgg[0]?.n),
-    settled: num(v2SettledAgg[0]?.n),
+    settled: v2SettlerStats ? v2SettlerStats.settled.length : num(v2SettledAgg[0]?.n),
   };
 
   const delegationHistory: WalletProfile['delegationHistory'] = delegationEvents.map(d => {

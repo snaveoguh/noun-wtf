@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import { useEffect, useState } from 'react';
 
+import { countByAddress, loadSettlerMaps } from '@/lib/settlerMaps';
+
 const API_BASE =
   import.meta.env.VITE_MAINNET_SUBGRAPH ||
   'https://spirited-flexibility-production-3c30.up.railway.app';
@@ -126,20 +128,14 @@ export function useNounSettlers() {
 
     (async () => {
       try {
-        // Load real settler data from pre-computed JSON (tx senders from settlement calls)
-        const res = await fetch('/probe-dreams/settlers.json');
-        const data = (await res.json()) as Record<string, string>;
-
-        // Aggregate: count how many nouns each address settled
-        const counts = new Map<string, number>();
-        for (const addr of Object.values(data)) {
-          const key = addr.toLowerCase();
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-
-        let entries: DirectoryEntry[] = Array.from(counts.entries())
-          .map(([address, count]) => ({ address, ens: null, count }))
-          .sort((a, b) => b.count - a.count);
+        // Indexer-backed settler map (same source as the /gamer profile);
+        // falls back to the static snapshot if the API is down.
+        const { settlers: map } = await loadSettlerMaps('v1');
+        let entries: DirectoryEntry[] = countByAddress(map).map(([address, count]) => ({
+          address,
+          ens: null,
+          count,
+        }));
 
         setSettlers(entries);
         setLoading(false);
@@ -167,18 +163,12 @@ export function useNounCurators() {
 
     (async () => {
       try {
-        const res = await fetch('/probe-dreams/curated.json');
-        const data = (await res.json()) as Record<string, string>;
-
-        const counts = new Map<string, number>();
-        for (const addr of Object.values(data)) {
-          const key = addr.toLowerCase();
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-
-        let entries: DirectoryEntry[] = Array.from(counts.entries())
-          .map(([address, count]) => ({ address, ens: null, count }))
-          .sort((a, b) => b.count - a.count);
+        const { curated: map } = await loadSettlerMaps('v1');
+        let entries: DirectoryEntry[] = countByAddress(map).map(([address, count]) => ({
+          address,
+          ens: null,
+          count,
+        }));
 
         setCurators(entries);
         setLoading(false);

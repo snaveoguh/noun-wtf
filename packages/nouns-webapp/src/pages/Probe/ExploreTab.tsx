@@ -25,6 +25,7 @@ import { useAppSelector } from '@/hooks';
 import { useNounOwners, useNounSettlers, useNounCurators } from '@/hooks/useNounDirectory';
 import { type SortOption, type TraitFilter, useNounFilters } from '@/hooks/useNounFilters';
 import { useOwnerFilter } from '@/hooks/useOwnerFilter';
+import { loadSettlerMaps, nounIdsFor } from '@/lib/settlerMaps';
 import { traitName } from '@/lib/traitName';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
 import { useBurnedNounIds, useNounSeeds } from '@/wrappers/nounToken';
@@ -173,7 +174,8 @@ const ExploreTab: React.FC = () => {
   const { settlers, loading: settlersLoading } = useNounSettlers();
   const { curators, loading: curatorsLoading } = useNounCurators();
 
-  // Settler filter state — loads from static settlers.json
+  // Settler filter — indexer-backed map via loadSettlerMaps (same source as the
+  // /gamer profile), static snapshot only as fallback.
   const [settlerAddress, setSettlerAddress] = useState('');
   const [settlerNounIds, setSettlerNounIds] = useState<Set<bigint> | undefined>(undefined);
 
@@ -182,19 +184,20 @@ const ExploreTab: React.FC = () => {
       setSettlerNounIds(undefined);
       return;
     }
-    fetch('/probe-dreams/settlers.json')
-      .then(r => r.json())
-      .then((data: Record<string, string>) => {
-        const ids = new Set<bigint>();
-        for (const [nounId, addr] of Object.entries(data)) {
-          if (addr.toLowerCase() === settlerAddress.toLowerCase()) ids.add(BigInt(nounId));
-        }
-        setSettlerNounIds(ids);
+    let cancelled = false;
+    loadSettlerMaps('v1')
+      .then(({ settlers }) => {
+        if (!cancelled) setSettlerNounIds(nounIdsFor(settlers, settlerAddress));
       })
-      .catch(() => setSettlerNounIds(new Set()));
+      .catch(() => {
+        if (!cancelled) setSettlerNounIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [settlerAddress]);
 
-  // Curated filter state — loads from static curated.json
+  // Curated filter — curated(N) = settler(N-1), from the same maps.
   const [curatorAddress, setCuratorAddress] = useState('');
   const [curatedNounIds, setCuratedNounIds] = useState<Set<bigint> | undefined>(undefined);
 
@@ -203,16 +206,17 @@ const ExploreTab: React.FC = () => {
       setCuratedNounIds(undefined);
       return;
     }
-    fetch('/probe-dreams/curated.json')
-      .then(r => r.json())
-      .then((data: Record<string, string>) => {
-        const ids = new Set<bigint>();
-        for (const [nounId, addr] of Object.entries(data)) {
-          if (addr.toLowerCase() === curatorAddress.toLowerCase()) ids.add(BigInt(nounId));
-        }
-        setCuratedNounIds(ids);
+    let cancelled = false;
+    loadSettlerMaps('v1')
+      .then(({ curated }) => {
+        if (!cancelled) setCuratedNounIds(nounIdsFor(curated, curatorAddress));
       })
-      .catch(() => setCuratedNounIds(new Set()));
+      .catch(() => {
+        if (!cancelled) setCuratedNounIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [curatorAddress]);
 
   // Combine owner + settler + curated filters (intersection)

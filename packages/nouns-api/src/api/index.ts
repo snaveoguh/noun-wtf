@@ -9408,6 +9408,10 @@ registerWalletMapRoute(app, db);
 import { registerWalletProfileRoutes } from './walletProfile.js';
 registerWalletProfileRoutes(app, db);
 
+// Settler / curator maps — single source for probe dropdowns + gamer profile.
+import { registerSettlerRoutes } from './settlerMaps.js';
+registerSettlerRoutes(app, db);
+
 // ─── Dream Nouns — /api/dream-nouns ─────────────────────────────────────────
 // Replaces the Laravel API from the retired probe.wtf DigitalOcean droplet.
 import { registerDreamRoutes, getDreamTraitImage } from './dreams.js';
