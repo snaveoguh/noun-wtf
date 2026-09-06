@@ -53,6 +53,12 @@ const mainnetConfig = createConfig({
       ws: process.env.PONDER_WS_URL_1,
       ethGetLogsBlockRange: 500,
       maxRequestsPerSecond: 8,
+      // NOTE: the RPC sync cache (`ponder_sync.*` in Postgres) is shared by
+      // every deploy; only the app schema is fresh per `railway up`. A short
+      // eth_getLogs reply gets frozen into it with its range marked complete
+      // and is never re-fetched (noun 1682's AuctionSettled went missing this
+      // way). The auction handlers reconcile such holes at index time — see
+      // healUnsettledAuctionsBefore in src/NounsAuctionHouseV2.ts.
     },
   },
   contracts: {
