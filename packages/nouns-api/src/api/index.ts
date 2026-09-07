@@ -7552,6 +7552,7 @@ app.get('/api/agent/status', async c => {
     errors: watcherState.errors.slice(-5),
     standingTraits: watcherState.standingTraits,
     settleGuard: watcherState.settleGuard,
+    settleGas: watcherState.settleGas,
     balanceEth: Math.round(balance * 10000) / 10000,
     reservations: stats,
     recentSettleAttempts: reservationStore.getRecentSettleAttempts(),

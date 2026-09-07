@@ -190,7 +190,26 @@ function parseStandingGroups(specs: string[]): StandingGroup[] {
 // reserved 0.12 ETH up front — bot was permanently locked out unless funded heavily.
 const SETTLEMENT_GAS_LIMIT = 500_000n;
 const SETTLEMENT_PRIORITY_FEE = parseGwei('5');
-const SETTLEMENT_MAX_FEE = parseGwei('20');
+// Ceiling for maxFeePerGas, and the value used before we've seen a block header.
+const SETTLEMENT_MAX_FEE_CEILING = parseGwei('20');
+// Floor keeps the tx valid through a few blocks of base-fee growth even when
+// base fee is ~0.
+const SETTLEMENT_MAX_FEE_FLOOR = SETTLEMENT_PRIORITY_FEE + parseGwei('1');
+
+// maxFeePerGas tracks the live base fee instead of a fixed 20 gwei. The RPC
+// preflight demands `balance >= gasLimit * maxFeePerGas`, so a fixed 20 gwei
+// locked the wallet out below 0.01 ETH while an actual settle at a ~0.05 gwei
+// base fee costs well under 0.001 ETH (four missed Wall-head fires on Noun
+// #2014, 2026-09-07, all "Insufficient funds for gas * price"). Base fee can
+// grow at most 12.5% per block, so 2× base + tip stays valid for ~6 blocks —
+// plenty, since a settle only ever targets the very next block.
+function settlementMaxFee(): bigint {
+  const base = state.lastBaseFeePerGas;
+  if (base === null) return SETTLEMENT_MAX_FEE_CEILING;
+  const dynamic = base * 2n + SETTLEMENT_PRIORITY_FEE;
+  if (dynamic < SETTLEMENT_MAX_FEE_FLOOR) return SETTLEMENT_MAX_FEE_FLOOR;
+  return dynamic > SETTLEMENT_MAX_FEE_CEILING ? SETTLEMENT_MAX_FEE_CEILING : dynamic;
+}
 
 // Pre-encoded calldata — settleCurrentAndCreateNewAuction() takes no args and
 // has the same signature on both auction houses. Encode once, reuse forever.
@@ -211,7 +230,7 @@ const SETTLEMENT_CALLDATA = encodeFunctionData({
 // endpoint.
 const EXACT_BLOCK_SETTLER = ((): Hex | null => {
   const raw = (process.env.NOUNIRL_SETTLER_ADDRESS ?? '').trim();
-  return /^0x[0-9a-fA-F]{40}$/.test(raw) ? (raw as Hex) : null;
+  return /^0x[\dA-Fa-f]{40}$/.test(raw) ? (raw as Hex) : null;
 })();
 const SETTLER_ABI = [
   {
@@ -397,6 +416,8 @@ interface WatcherState {
   transportMode: 'websocket' | 'http-poll' | 'none';
   wsProviderCount: number;
   blockLatencyMs: number;
+  // baseFeePerGas of the latest header (null until the first block arrives).
+  lastBaseFeePerGas: bigint | null;
   errors: string[];
 }
 
@@ -409,6 +430,7 @@ const state: WatcherState = {
   transportMode: 'none',
   wsProviderCount: 0,
   blockLatencyMs: 0,
+  lastBaseFeePerGas: null,
   errors: [],
 };
 
@@ -526,7 +548,7 @@ async function refreshPreSignedTxs(): Promise<void> {
         to: ds.auctionHouse,
         data: SETTLEMENT_CALLDATA,
         gas: SETTLEMENT_GAS_LIMIT,
-        maxFeePerGas: SETTLEMENT_MAX_FEE,
+        maxFeePerGas: settlementMaxFee(),
         maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         nonce,
         chainId: 1,
@@ -667,7 +689,7 @@ async function doSettleAuction(
           args: [ds.auctionHouse, BigInt(opts.targetBlock)],
         }),
         gas: SETTLEMENT_GAS_LIMIT,
-        maxFeePerGas: SETTLEMENT_MAX_FEE,
+        maxFeePerGas: settlementMaxFee(),
         maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         nonce: currentNonce,
         chainId: 1,
@@ -690,7 +712,7 @@ async function doSettleAuction(
         to: ds.auctionHouse,
         data: SETTLEMENT_CALLDATA,
         gas: SETTLEMENT_GAS_LIMIT,
-        maxFeePerGas: SETTLEMENT_MAX_FEE,
+        maxFeePerGas: settlementMaxFee(),
         maxPriorityFeePerGas: SETTLEMENT_PRIORITY_FEE,
         nonce: currentNonce,
         chainId: 1,
@@ -789,11 +811,14 @@ async function onNewBlock(
   blockHash: Hex,
   parentHash: Hex,
   blockTimestamp?: bigint,
+  baseFeePerGas?: bigint | null,
 ): Promise<void> {
   if (!publicClient) return;
 
   const num = Number(blockNumber);
   if (num <= state.lastBlockNumber) return;
+
+  if (baseFeePerGas != null) state.lastBaseFeePerGas = baseFeePerGas;
 
   if (blockTimestamp) {
     state.blockLatencyMs = Date.now() - Number(blockTimestamp) * 1000;
@@ -1089,7 +1114,13 @@ async function poll(): Promise<void> {
     const block = await publicClient.getBlock({ blockTag: 'latest' });
     if (Number(block.number) <= state.lastBlockNumber) return;
 
-    await onNewBlock(block.number, block.hash as Hex, block.parentHash as Hex, block.timestamp);
+    await onNewBlock(
+      block.number,
+      block.hash as Hex,
+      block.parentHash as Hex,
+      block.timestamp,
+      block.baseFeePerGas,
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[NounIRL] Poll error:', msg);
@@ -1111,9 +1142,14 @@ function subscribeWsProvider(wsUrl: string, label: string): (() => void) | null 
     const unwatch = client.watchBlocks({
       onBlock: block => {
         if (!block || block.number == null || !block.hash || !block.parentHash) return;
-        onNewBlock(block.number, block.hash as Hex, block.parentHash as Hex, block.timestamp).catch(
-          err =>
-            console.error(`[NounIRL] ${label} error:`, err instanceof Error ? err.message : err),
+        onNewBlock(
+          block.number,
+          block.hash as Hex,
+          block.parentHash as Hex,
+          block.timestamp,
+          block.baseFeePerGas,
+        ).catch(err =>
+          console.error(`[NounIRL] ${label} error:`, err instanceof Error ? err.message : err),
         );
       },
       onError: err => {
@@ -1263,14 +1299,30 @@ export function getWatcherState(): WatcherState & {
   activeReservations: number;
   standingTraits: string[];
   settleGuard: Hex | null;
+  // What the next settle tx will be signed with, and the balance the RPC
+  // preflight will demand for it (gasLimit × maxFeePerGas).
+  settleGas: {
+    baseFeeGwei: number | null;
+    maxFeeGwei: number;
+    priorityFeeGwei: number;
+    preflightEth: number;
+  };
   daos: Record<WatchedDao, DaoPublicState>;
 } {
   const daos = {
     v1: daoPublicState('v1'),
     v2: daoPublicState('v2'),
   };
+  const maxFee = settlementMaxFee();
+  const gwei = (wei: bigint) => Number(wei) / 1e9;
   return {
     ...state,
+    settleGas: {
+      baseFeeGwei: state.lastBaseFeePerGas === null ? null : gwei(state.lastBaseFeePerGas),
+      maxFeeGwei: gwei(maxFee),
+      priorityFeeGwei: gwei(SETTLEMENT_PRIORITY_FEE),
+      preflightEth: Number(SETTLEMENT_GAS_LIMIT * maxFee) / 1e18,
+    },
     nextNounId: daos.v1.nextNounId,
     auctionEndTime: daos.v1.auctionEndTime,
     lastPredictedSeed: daos.v1.lastPredictedSeed,
