@@ -1,5 +1,6 @@
 // dRPC free tier: 210M CUs/mo, ~100 RPS, flat 20 CU per method (incl. eth_getLogs)
-// Free public RPCs (publicnode, llamarpc) can't handle 38+ address Stream factory queries
+// Fallback RPCs: see FALLBACK_RPC_URLS below — only endpoints verified against
+// the 44-address Stream factory eth_getLogs belong there.
 import { nounsAuctionHouseAbi } from '@nouns/sdk/auction-house';
 import { nounsTokenAbi } from '@nouns/sdk/token';
 import { nounsGovernorAbi } from '@nouns/sdk/governor';
@@ -20,10 +21,36 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Primary: dRPC endpoint from env var
-// NOTE: Do NOT add free public RPCs — they reject multi-address eth_getLogs
-// (Stream factory creates 38+ addresses which publicnode/llamarpc can't handle)
-const rpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+// Primary: dRPC endpoint(s) from env var.
+const primaryRpcUrls = (process.env.PONDER_RPC_URL_1 ?? '').split(',').filter(Boolean);
+
+// Fallbacks. Ponder 0.16 spreads requests across every URL in `rpc` by
+// expected latency and retries a failed request on whichever backend looks
+// fastest, so a backend that fails a request type simply stops being chosen
+// for it. What it does NOT survive is the ONLY backend failing: after 10
+// attempts (~1 min) the sync throws, `ponder start` exits 75 and the whole
+// API — settler bot included — goes down. That happened 2026-09-07 23:43Z
+// when dRPC's free plan started answering every eth_getLogs with
+// `{"code":12,"message":"Can't route your request to suitable provider"}`,
+// and again on the 2026-09-08 redeploy at the first uncached range.
+//
+// Verified 2026-09-08 against Ponder's actual request shapes (500-block
+// eth_getLogs single-address historical, 44 Stream child addresses recent
+// AND historical, historical eth_getBlockByNumber with txs, historical
+// eth_call): Tenderly's public gateway and MEV Blocker pass all of them and
+// return identical log sets to each other. publicnode (403 on any
+// non-recent eth_getLogs), 1rpc/nodies (50-block cap), llamarpc, cloudflare,
+// blastapi, merkle, blockpi, flashbots and blxr all fail at least one, so
+// keep this list to endpoints that have been checked the same way.
+const FALLBACK_RPC_URLS = [
+  'https://gateway.tenderly.co/public/mainnet',
+  'https://rpc.mevblocker.io',
+];
+const fallbackRpcUrls = (process.env.PONDER_RPC_FALLBACK_URLS ?? FALLBACK_RPC_URLS.join(','))
+  .split(',')
+  .filter(Boolean);
+
+const rpcUrls = [...primaryRpcUrls, ...fallbackRpcUrls];
 
 // ── NounV2 addresses / startBlock ──────────────────────────────────────────
 // Placeholder zero addresses are a no-op until deploy; then flip the env vars.
