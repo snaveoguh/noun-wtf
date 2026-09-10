@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#000000" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<title>stupidfont</title>
+<style>
+  @font-face { font-family: 'Pip3'; src: url(/fonts/Pip3-Regular.woff2) format('woff2'); font-display: swap; }
+  :root {
+    --bg: #000; --fg: #fff; --dim: #666; --line: #222; --accent: #ff0; --ink: #fff;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); height: 100%; overscroll-behavior: none; }
+  body {
+    font-family: 'Pip3', 'JetBrains Mono', ui-monospace, monospace;
+    text-transform: uppercase; letter-spacing: .04em;
+    display: flex; flex-direction: column; min-height: 100dvh;
+    padding-bottom: calc(var(--safe-b) + 8px);
+    -webkit-user-select: none; user-select: none;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; }
+  header h1 { margin: 0; font-size: 18px; font-weight: normal; }
+  header h1 span { color: var(--accent); }
+  header .sub { color: var(--dim); font-size: 11px; }
+
+  /* Live preview */
+  .preview { margin: 0 14px; border: 1px solid var(--line); padding: 8px 10px; }
+  .preview input {
+    width: 100%; background: transparent; border: 0; color: var(--fg); outline: 0;
+    font-family: var(--live, 'Pip3'), 'Pip3', monospace; font-size: 30px; line-height: 1.1;
+    text-transform: none; padding: 0;
+  }
+  .preview input::placeholder { color: var(--dim); }
+  .preview .tag { font-size: 10px; color: var(--dim); display: flex; justify-content: space-between; margin-top: 4px; }
+
+  /* Glyph nav */
+  .glyphbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 4px; }
+  .glyphbar .cur { font-size: 42px; line-height: 1; min-width: 60px; text-align: center; text-transform: none; font-family: var(--live, 'Pip3'), 'Pip3', monospace; }
+  .glyphbar .cur small { display: block; font-size: 10px; color: var(--dim); font-family: 'Pip3', monospace; text-transform: uppercase; }
+  button {
+    font: inherit; text-transform: inherit; letter-spacing: inherit; background: #111; color: var(--fg);
+    border: 1px solid var(--line); padding: 10px 12px; border-radius: 6px; cursor: pointer; touch-action: manipulation;
+  }
+  button:active { background: #222; }
+  button.on { background: var(--accent); color: #000; border-color: var(--accent); }
+  button.danger { color: #f66; }
+  button:disabled { opacity: .35; }
+
+  /* Canvas */
+  .stage { padding: 0 14px; }
+  .canvaswrap { position: relative; width: 100%; max-width: 520px; margin: 0 auto; aspect-ratio: 1000 / 1100; background: #0a0a0a; border: 1px solid var(--line); }
+  canvas#draw { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .hint { color: var(--dim); font-size: 10px; text-align: center; padding: 6px 0 0; }
+
+  /* Tools */
+  .tools { display: flex; gap: 6px; padding: 8px 14px; align-items: center; flex-wrap: wrap; }
+  .tools .grow { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--dim); }
+  input[type=range] { flex: 1; accent-color: var(--accent); min-width: 60px; }
+
+  /* Letter strip */
+  .strip { display: flex; flex-shrink: 0; gap: 4px; overflow-x: auto; padding: 6px 14px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .strip::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; width: 44px; height: 56px; border: 1px solid var(--line); border-radius: 6px; background: #0a0a0a; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 3px; position: relative; }
+  .chip canvas { width: 36px; height: 40px; image-rendering: pixelated; }
+  .chip span { font-size: 9px; color: var(--dim); text-transform: none; }
+  .chip.sel { border-color: var(--accent); }
+  .chip.drawn::after { content: ''; position: absolute; top: 3px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .chip.sep { width: 8px; border: 0; background: transparent; }
+
+  /* Export */
+  .exportrow { display: flex; gap: 6px; padding: 4px 14px 8px; align-items: center; flex-wrap: wrap; }
+  .exportrow input[type=text] { font: inherit; text-transform: none; background: #111; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; flex: 1; min-width: 120px; outline: 0; }
+  .exportrow input[type=text]:focus { border-color: var(--accent); }
+  .foot { color: var(--dim); font-size: 10px; padding: 0 14px 6px; line-height: 1.5; }
+  .foot a { color: var(--fg); }
+  #toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 16px); transform: translateX(-50%); background: var(--accent); color: #000; padding: 8px 14px; border-radius: 6px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>stupid<span>font</span></h1>
+  <div class="sub">draw letters · get a font</div>
+</header>
+
+<div class="preview">
+  <input id="previewText" type="text" value="THE QUICK BROWN FOX 0123" placeholder="type to preview" autocomplete="off" autocorrect="off" spellcheck="false" />
+  <div class="tag"><span id="previewStatus">building…</span><span id="glyphCount"></span></div>
+</div>
+
+<div class="glyphbar">
+  <button id="prev">◀</button>
+  <div class="cur"><span id="curChar">A</span><small id="curName"></small></div>
+  <button id="next">▶</button>
+</div>
+
+<div class="stage">
+  <div class="canvaswrap"><canvas id="draw"></canvas></div>
+  <div class="hint">stand it on the baseline · left/right doesn't matter</div>
+</div>
+
+<div class="tools">
+  <button id="pen" class="on">pen</button>
+  <button id="eraser">eraser</button>
+  <div class="grow">size <input id="size" type="range" min="2" max="30" value="10" /></div>
+  <button id="undo">undo</button>
+  <button id="clear">clear</button>
+  <button id="reset" title="Reload this letter from Pip3">pip3</button>
+</div>
+
+<div class="strip" id="strip"></div>
+
+<div class="exportrow">
+  <input id="fontName" type="text" value="StupidFont" placeholder="font name" autocomplete="off" />
+  <button id="export" class="on">export .otf</button>
+  <button id="share">share</button>
+</div>
+<div class="exportrow">
+  <button id="saveJson">save project</button>
+  <button id="loadJson">load project</button>
+  <input id="fileIn" type="file" accept=".json,application/json" hidden />
+  <button id="resetAll" class="danger">reset all</button>
+</div>
+<div class="foot">
+  starts from pip3 by 60r90. every letter you draw is traced into a real opentype font, live. autosaves in this browser.
+  export the .otf and it's yours. add to home screen for the app feel.
+</div>
+<div id="toast"></div>
+
+<script src="opentype.min.js"></script>
+<script>
+(() => {
+  // ── Font box (mirrors Pip3) ──────────────────────────────────────────────
+  const UPM = 1000, ASC = 880, DESC = -220, CAP = 700, XH = 520, LSB = 45, RSB = 45, SPACE_ADV = 330;
+  const CELL = 5;                 // font units per bitmap cell
+  const W = UPM / CELL;           // 200 cells wide
+  const H = (ASC - DESC) / CELL;  // 220 cells tall
+  const BASE_ROW = ASC / CELL;    // baseline row (176)
+
+  const CHARS = [
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '|',
+    ...'0123456789', '|',
+    ...'.,!?\'"-&$@:;()/+=#%', '|',
+    ...'abcdefghijklmnopqrstuvwxyz',
+  ];
+  const GLYPH_CHARS = CHARS.filter(c => c !== '|');
+
+  // ── State ────────────────────────────────────────────────────────────────
+  const bitmaps = new Map();   // char -> Uint8Array(W*H)
+  const undo = new Map();      // char -> [Uint8Array]
+  const cache = new Map();     // char -> {path, advance} traced
+  let cur = 'A', tool = 'pen', radius = 10, pip3 = null, drawing = false, last = null, liveN = 0;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('draw'), ctx = canvas.getContext('2d');
+  const off = document.createElement('canvas'); off.width = W; off.height = H;
+  const offCtx = off.getContext('2d');
+  const toast = (m) => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600); };
+
+  const bm = ch => { if (!bitmaps.has(ch)) bitmaps.set(ch, new Uint8Array(W * H)); return bitmaps.get(ch); };
+  const isDrawn = ch => { const b = bitmaps.get(ch); if (!b) return false; for (let i = 0; i < b.length; i++) if (b[i]) return true; return false; };
+
+  // ── Pip3 prefill ─────────────────────────────────────────────────────────
+  function rasterizeFromPip3(ch) {
+    if (!pip3) return null;
+    const g = pip3.charToGlyph(ch);
+    if (!g || g.index === 0 || !g.path || !g.path.commands.length) return null;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.fillStyle = '#fff';
+    // font units -> cells: cx = ux / CELL, cy = (ASC - uy) / CELL
+    x.setTransform(1 / CELL, 0, 0, -1 / CELL, 0, BASE_ROW);
+    const p = new Path2D(g.path.toPathData(2));
+    x.fill(p, 'nonzero');
+    const d = x.getImageData(0, 0, W, H).data, out = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) out[i] = d[i * 4 + 3] > 127 ? 1 : 0;
+    return out;
+  }
+
+  // ── Tracing: bitmap -> contours -> smoothed polygons -> opentype path ──
+  function traceContours(b) {
+    // Directed cell-edge boundary following, filled cell on the right (screen coords).
+    const edges = new Map(); // key "x,y" -> [{to:[x,y], dir}]
+    const key = (x, y) => x + ',' + y;
+    const add = (x0, y0, x1, y1, dir) => { const k = key(x0, y0); if (!edges.has(k)) edges.set(k, []); edges.get(k).push({ x: x1, y: y1, dir, used: false }); };
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : b[y * W + x];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!b[y * W + x]) continue;
+      if (!at(x, y - 1)) add(x, y, x + 1, y, 0);         // top: →
+      if (!at(x + 1, y)) add(x + 1, y, x + 1, y + 1, 1); // right: ↓
+      if (!at(x, y + 1)) add(x + 1, y + 1, x, y + 1, 2); // bottom: ←
+      if (!at(x - 1, y)) add(x, y + 1, x, y, 3);         // left: ↑
+    }
+    const contours = [];
+    for (const [k, list] of edges) {
+      for (const e0 of list) {
+        if (e0.used) continue;
+        const [sx, sy] = k.split(',').map(Number);
+        const pts = [[sx, sy]];
+        let e = e0, dir = e0.dir;
+        e.used = true;
+        let guard = 0;
+        while (guard++ < 200000) {
+          const nx = e.x, ny = e.y;
+          if (nx === sx && ny === sy) break;
+          pts.push([nx, ny]);
+          const cands = (edges.get(key(nx, ny)) || []).filter(c => !c.used);
+          if (!cands.length) break;
+          // prefer right turn, then straight, then left (keeps regions separate at diagonal touches)
+          const pref = [(dir + 1) % 4, dir, (dir + 3) % 4];
+          let next = null;
+          for (const d of pref) { next = cands.find(c => c.dir === d); if (next) break; }
+          next.used = true; e = next; dir = next.dir;
+        }
+        if (pts.length >= 4) contours.push(pts);
+      }
+    }
+    return contours;
+  }
+  function chaikin(pts, iters) {
+    for (let k = 0; k < iters; k++) {
+      const out = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], q = pts[(i + 1) % pts.length];
+        out.push([p[0] * .75 + q[0] * .25, p[1] * .75 + q[1] * .25], [p[0] * .25 + q[0] * .75, p[1] * .25 + q[1] * .75]);
+      }
+      pts = out;
+    }
+    return pts;
+  }
+  function rdp(pts, tol) {
+    if (pts.length < 3) return pts;
+    const d2 = (p, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+      let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+      const ex = p[0] - (a[0] + t * dx), ey = p[1] - (a[1] + t * dy); return ex * ex + ey * ey;
+    };
+    // open polyline simplifier: pushes every kept point except seg[0]
+    const simp = (seg, s, e, out) => {
+      let mi = -1, md = 0;
+      for (let i = s + 1; i < e; i++) { const d = d2(seg[i], seg[s], seg[e]); if (d > md) { md = d; mi = i; } }
+      if (md > tol * tol) { simp(seg, s, mi, out); simp(seg, mi, e, out); } else out.push(seg[e]);
+    };
+    // closed polygon: split into two open halves at the point farthest from pts[0]
+    let far = 0, fd = 0;
+    for (let i = 1; i < pts.length; i++) { const dx = pts[i][0] - pts[0][0], dy = pts[i][1] - pts[0][1]; if (dx * dx + dy * dy > fd) { fd = dx * dx + dy * dy; far = i; } }
+    const a = pts.slice(0, far + 1), b = pts.slice(far).concat([pts[0]]);
+    const out = [a[0]];
+    simp(a, 0, a.length - 1, out);
+    simp(b, 0, b.length - 1, out);
+    out.pop(); // last pushed point is pts[0] again
+    return out;
+  }
+  function area(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+
+  function traceGlyph(ch) {
+    if (ch === ' ') return { path: new opentype.Path(), advance: SPACE_ADV };
+    const b = bitmaps.get(ch);
+    if (!b || !isDrawn(ch)) return null;
+    let minx = W, maxx = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (b[y * W + x]) { if (x < minx) minx = x; if (x > maxx) maxx = x; }
+    const contours = traceContours(b)
+      .filter(c => Math.abs(area(c)) >= 3)
+      .map(c => rdp(chaikin(c, 2), 0.35));
+    const path = new opentype.Path();
+    const shift = LSB - minx * CELL; // put ink left edge at LSB
+    for (const c of contours) {
+      const pts = c.slice().reverse(); // y-flip below flips orientation; reverse to keep outer clockwise in y-up
+      pts.forEach(([x, y], i) => {
+        const ux = Math.round(x * CELL + shift), uy = Math.round(ASC - y * CELL);
+        if (i === 0) path.moveTo(ux, uy); else path.lineTo(ux, uy);
+      });
+      path.close();
+    }
+    return { path, advance: Math.round((maxx + 1 - minx) * CELL + LSB + RSB) };
+  }
+
+  // ── Font build ───────────────────────────────────────────────────────────
+  function glyphName(ch) {
+    if (/^[A-Za-z]$/.test(ch)) return ch;
+    return 'uni' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+  }
+  function buildFont(familyName) {
+    const glyphs = [new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: 500, path: new opentype.Path() })];
+    glyphs.push(new opentype.Glyph({ name: 'space', unicode: 32, advanceWidth: SPACE_ADV, path: new opentype.Path() }));
+    let n = 0;
+    for (const ch of GLYPH_CHARS) {
+      if (!cache.has(ch)) cache.set(ch, traceGlyph(ch));
+      const t = cache.get(ch);
+      if (!t) continue;
+      glyphs.push(new opentype.Glyph({ name: glyphName(ch), unicode: ch.codePointAt(0), advanceWidth: t.advance, path: t.path }));
+      n++;
+    }
+    const font = new opentype.Font({
+      familyName: familyName || 'StupidFont', styleName: 'Regular', unitsPerEm: UPM, ascender: ASC, descender: DESC, glyphs,
+    });
+    return { font, n };
+  }
+  let rebuildT = null;
+  function scheduleRebuild() { clearTimeout(rebuildT); rebuildT = setTimeout(rebuildLive, 120); }
+  async function rebuildLive() {
+    try {
+      const { font, n } = buildFont('StupidFontLive');
+      const buf = font.toArrayBuffer();
+      const name = 'SFLive' + (++liveN);
+      const ff = new FontFace(name, buf);
+      await ff.load();
+      document.fonts.add(ff);
+      document.documentElement.style.setProperty('--live', `'${name}'`);
+      $('previewStatus').textContent = 'live · ' + (buf.byteLength / 1024).toFixed(1) + ' kb';
+      $('glyphCount').textContent = n + ' glyphs';
+    } catch (e) {
+      console.error(e);
+      $('previewStatus').textContent = 'build error: ' + (e.message || e);
+    }
+  }
+
+  // ── Drawing ──────────────────────────────────────────────────────────────
+  function stamp(b, cx, cy, r, v) {
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = x + .5 - cx, dy = y + .5 - cy;
+      if (dx * dx + dy * dy <= r * r) b[y * W + x] = v;
+    }
+  }
+  function toCell(e) {
+    const r = canvas.getBoundingClientRect();
+    return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H];
+  }
+  function render() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    if (canvas.width !== Math.round(r.width * dpr)) { canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, r.width, r.height);
+    const sx = r.width / W, sy = r.height / H;
+    // guides
+    const line = (y, color, label) => { ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, y * sy); ctx.lineTo(r.width, y * sy); ctx.stroke(); if (label) { ctx.fillStyle = color; ctx.font = '9px monospace'; ctx.fillText(label, 4, y * sy - 3); } };
+    line((ASC - CAP) / CELL, '#333', 'CAP');
+    line((ASC - XH) / CELL, '#222', 'x');
+    line(BASE_ROW, '#555', 'BASELINE');
+    ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(LSB / CELL * sx, 0); ctx.lineTo(LSB / CELL * sx, r.height); ctx.stroke();
+    // ink
+    const b = bm(cur), img = offCtx.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) if (b[i]) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
+    offCtx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, r.width, r.height);
+  }
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+    drawing = true;
+    const b = bm(cur);
+    const u = undo.get(cur) || []; u.push(b.slice()); if (u.length > 25) u.shift(); undo.set(cur, u);
+    const [x, y] = toCell(e); stamp(b, x, y, radius, tool === 'pen' ? 1 : 0); last = [x, y]; render();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drawing) return; e.preventDefault();
+    const b = bm(cur), v = tool === 'pen' ? 1 : 0;
+    let evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    if (!evs || !evs.length) evs = [e];
+    for (const ev of evs) {
+      const [x, y] = toCell(ev);
+      const d = Math.hypot(x - last[0], y - last[1]), steps = Math.max(1, Math.ceil(d / (radius / 3)));
+      for (let i = 1; i <= steps; i++) stamp(b, last[0] + (x - last[0]) * i / steps, last[1] + (y - last[1]) * i / steps, radius, v);
+      last = [x, y];
+    }
+    render();
+  });
+  const endStroke = e => { if (!drawing) return; drawing = false; changed(cur); };
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  function changed(ch) { cache.delete(ch); drawChip(ch); scheduleRebuild(); scheduleSave(); }
+
+  // ── Letter strip ─────────────────────────────────────────────────────────
+  const chips = new Map();
+  function buildStrip() {
+    const s = $('strip'); s.innerHTML = '';
+    for (const ch of CHARS) {
+      if (ch === '|') { const d = document.createElement('div'); d.className = 'chip sep'; s.appendChild(d); continue; }
+      const d = document.createElement('div'); d.className = 'chip'; d.dataset.ch = ch;
+      const c = document.createElement('canvas'); c.width = 36; c.height = 40;
+      const l = document.createElement('span'); l.textContent = ch;
+      d.append(c, l); d.addEventListener('click', () => select(ch));
+      s.appendChild(d); chips.set(ch, { el: d, c });
+      drawChip(ch);
+    }
+  }
+  function drawChip(ch) {
+    const { el, c } = chips.get(ch); const x = c.getContext('2d');
+    x.clearRect(0, 0, c.width, c.height);
+    const b = bitmaps.get(ch);
+    el.classList.toggle('drawn', isDrawn(ch));
+    if (!b) return;
+    const img = offCtx.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) if (b[i]) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
+    offCtx.putImageData(img, 0, 0);
+    x.imageSmoothingEnabled = true; x.drawImage(off, 0, 0, c.width, c.height);
+  }
+  function select(ch) {
+    cur = ch; $('curChar').textContent = ch; $('curName').textContent = glyphName(ch);
+    for (const [k, { el }] of chips) el.classList.toggle('sel', k === ch);
+    const { el } = chips.get(ch); el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    render();
+  }
+  $('prev').onclick = () => select(GLYPH_CHARS[(GLYPH_CHARS.indexOf(cur) - 1 + GLYPH_CHARS.length) % GLYPH_CHARS.length]);
+  $('next').onclick = () => select(GLYPH_CHARS[(GLYPH_CHARS.indexOf(cur) + 1) % GLYPH_CHARS.length]);
+
+  // ── Tools ────────────────────────────────────────────────────────────────
+  $('pen').onclick = () => { tool = 'pen'; $('pen').classList.add('on'); $('eraser').classList.remove('on'); };
+  $('eraser').onclick = () => { tool = 'eraser'; $('eraser').classList.add('on'); $('pen').classList.remove('on'); };
+  $('size').oninput = e => { radius = +e.target.value; };
+  $('undo').onclick = () => { const u = undo.get(cur); if (!u || !u.length) return toast('nothing to undo'); bitmaps.set(cur, u.pop()); render(); changed(cur); };
+  $('clear').onclick = () => { const b = bm(cur); (undo.get(cur) || undo.set(cur, []).get(cur)).push(b.slice()); b.fill(0); render(); changed(cur); };
+  $('reset').onclick = () => {
+    const r = rasterizeFromPip3(cur); if (!r) return toast('pip3 has no ' + cur);
+    (undo.get(cur) || undo.set(cur, []).get(cur)).push(bm(cur).slice());
+    bitmaps.set(cur, r); render(); changed(cur); toast(cur + ' reset to pip3');
+  };
+  $('resetAll').onclick = () => {
+    if (!confirm('Reset every letter back to Pip3? Your drawings in this browser will be lost.')) return;
+    for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); bitmaps.set(ch, r || new Uint8Array(W * H)); cache.delete(ch); drawChip(ch); }
+    undo.clear(); render(); scheduleRebuild(); scheduleSave(); toast('back to pip3');
+  };
+
+  // ── Persist ──────────────────────────────────────────────────────────────
+  const KEY = 'stupidfont.v1';
+  function encode(b) { // alternating-value RLE -> base64; a 0-length run keeps parity when a run exceeds 255
+    const runs = []; let v = 0, n = 0;
+    for (let i = 0; i < b.length; i++) {
+      if (b[i] === v) { if (n === 255) { runs.push(255, 0); n = 0; } n++; }
+      else { runs.push(n); v = b[i]; n = 1; }
+    }
+    runs.push(n);
+    return btoa(String.fromCharCode(...new Uint8Array(runs)));
+  }
+  function decode(s) {
+    const runs = Uint8Array.from(atob(s), c => c.charCodeAt(0)), out = new Uint8Array(W * H);
+    let i = 0, v = 0; for (const n of runs) { if (v) out.fill(1, i, i + n); i += n; v ^= 1; }
+    return out;
+  }
+  function serialize() {
+    const glyphs = {};
+    for (const ch of GLYPH_CHARS) if (isDrawn(ch)) glyphs[ch] = encode(bitmaps.get(ch));
+    return { v: 1, name: $('fontName').value, cell: CELL, w: W, h: H, glyphs };
+  }
+  function load(data) {
+    if (!data || data.v !== 1 || data.w !== W || data.h !== H) return false;
+    for (const ch of GLYPH_CHARS) bitmaps.set(ch, data.glyphs[ch] ? decode(data.glyphs[ch]) : new Uint8Array(W * H));
+    if (data.name) $('fontName').value = data.name;
+    cache.clear(); return true;
+  }
+  let saveT = null;
+  function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { } }, 400); }
+  $('fontName').oninput = scheduleSave;
+
+  $('saveJson').onclick = () => {
+    const blob = new Blob([JSON.stringify(serialize())], { type: 'application/json' });
+    deliver(blob, ($('fontName').value || 'stupidfont') + '.stupidfont.json');
+  };
+  $('loadJson').onclick = () => $('fileIn').click();
+  $('fileIn').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { if (!load(JSON.parse(await f.text()))) throw 0; for (const ch of GLYPH_CHARS) drawChip(ch); render(); scheduleRebuild(); scheduleSave(); toast('project loaded'); }
+    catch { toast('not a stupidfont project'); }
+    e.target.value = '';
+  };
+
+  // ── Export ───────────────────────────────────────────────────────────────
+  function safeName(s) { return (s || 'StupidFont').replace(/[^A-Za-z0-9]/g, '') || 'StupidFont'; }
+  async function deliver(blob, filename, preferShare) {
+    const file = new File([blob], filename, { type: blob.type });
+    if (preferShare && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: filename }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function exportFont(preferShare) {
+    const name = safeName($('fontName').value);
+    const { font, n } = buildFont(name);
+    if (!n) return toast('draw something first');
+    const buf = font.toArrayBuffer();
+    deliver(new Blob([buf], { type: 'font/otf' }), name + '-Regular.otf', preferShare);
+    toast(name + ' · ' + n + ' glyphs');
+  }
+  $('export').onclick = () => exportFont(false);
+  $('share').onclick = () => exportFont(true);
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  async function boot() {
+    buildStrip();
+    try {
+      const buf = await (await fetch('Pip3-Regular.ttf')).arrayBuffer();
+      pip3 = opentype.parse(buf);
+    } catch (e) { console.warn('pip3 not loaded', e); }
+    let restored = false;
+    try { const s = localStorage.getItem(KEY); if (s) restored = load(JSON.parse(s)); } catch (e) { }
+    if (!restored) for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); if (r) bitmaps.set(ch, r); }
+    for (const ch of GLYPH_CHARS) drawChip(ch);
+    select('A'); rebuildLive();
+    if (restored) toast('restored your drawings');
+  }
+  window.addEventListener('resize', render);
+  $('previewText').addEventListener('keydown', e => e.stopPropagation());
+  boot();
+})();
+</script>
+</body>
+</html>
