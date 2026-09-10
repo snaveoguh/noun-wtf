@@ -3657,7 +3657,8 @@ You have the following tools. USE THEM. Don't just describe what you would do �
 5. check_block() — Force a block check. Returns predicted traits, block number, next noun ID, auction status, matching reservations.
 6. list_traits(category) — List all valid trait names for background/body/accessory/head/glasses.
 7. parse_traits(description) — Parse natural language into structured "category:value" traits.
-8. get_settlements(limit?) — History of successful settlements.
+8. get_settlements(limit?) — The agent's OWN settlements only (nounirl.eth, 2026 onward). Never treat this as the full history.
+8b. get_noun_settler(nounId, dao?) — Who settled and who curated ANY noun back to Noun 0, from the noun.wtf indexer, with ENS + settle tx. ALWAYS call this for "who settled/curated #N" — never say records only go back to a certain noun, and never send people to Etherscan for it.
 9. get_agent_balance() — ETH balance of nounirl.eth.
 10. deploy_code(description, reason) — Ship a code change to the non-production "dev-noun" branch (Netlify branch-deploys it to a fixed preview URL). NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. CANNOT delete files (rejected by safety filter). After a successful deploy the result includes a previewUrl — quote it back to the user and tell them to DM @pip on Warpcast for review before any push to main/prod. Production isolation is structural — you have no path to write to main. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
 11. remember_fact(key, content, scope) — Store a fact in persistent memory. scope="wallet" for user-specific, scope="global" for shared knowledge. USE THIS PROACTIVELY. When a user tells you their name, ENS, preferences, anything personal — remember it. When you learn something important — remember it globally.
@@ -3853,8 +3854,29 @@ CRITICAL RULES:
       {
         type: 'function' as const,
         function: {
+          name: 'get_noun_settler',
+          description:
+            'Who settled / curated ANY noun, back to Noun 0, from the noun.wtf indexer (not the agent\'s own log). Returns the settler of noun N (tx.from of the AuctionSettled tx), the curator of N (= the settler of N-1, whose settle tx minted N and rolled its seed), the settle tx/time, winner and amount, with ENS names where known. Use this for every "who settled #N" / "who curated #N" question.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              nounId: { type: 'number', description: 'Noun id, e.g. 1766.' },
+              dao: {
+                type: 'string',
+                enum: ['v1', 'v2'],
+                description: "'v1' = main Nouns DAO (default), 'v2' = NounV2.",
+              },
+            },
+            required: ['nounId'],
+          },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
           name: 'get_settlements',
-          description: 'Get the history of successful auction settlements by the agent.',
+          description:
+            "The agent's OWN successful settlements (nounirl.eth, since it started firing in 2026). NOT a history of who settled every noun — use get_noun_settler for that.",
           parameters: {
             type: 'object' as const,
             properties: {
@@ -4877,6 +4899,51 @@ CRITICAL RULES:
             case 'get_settlements': {
               const input = args as { limit?: number };
               result = { settlements: reservationStore.getSettlements(input.limit || 20) };
+              break;
+            }
+
+            case 'get_noun_settler': {
+              const input = args as { nounId: number; dao?: 'v1' | 'v2' };
+              const dao: 'v1' | 'v2' = input.dao === 'v2' ? 'v2' : 'v1';
+              const id = Math.floor(Number(input.nounId));
+              if (!Number.isFinite(id) || id < 0) {
+                result = { error: 'nounId must be a non-negative integer' };
+                break;
+              }
+              const maps = await getSettlerMaps(db, dao);
+              const settler = maps.settlers[String(id)] ?? null;
+              const curator = maps.curated[String(id)] ?? null;
+              const table = dao === 'v2' ? schema.nounV2Auction : schema.auction;
+              const [row] = await db
+                .select()
+                .from(table)
+                .where(eq(table.nounId, BigInt(id)))
+                .limit(1);
+              const names = await resolveEnsBatch(
+                [settler, curator, row?.winner ?? null].filter((a): a is string => !!a),
+              );
+              const label = (a: string | null) =>
+                a ? { address: a, ens: names[a.toLowerCase()] ?? null } : null;
+              const v1row =
+                dao === 'v1' ? (row as typeof schema.auction.$inferSelect | undefined) : undefined;
+              result = {
+                dao,
+                nounId: id,
+                indexedUpTo: maps.maxNounId,
+                // Nounder nouns (V1: every 10th id ≤ 1820) were never auctioned — they were
+                // minted by the tx that settled the previous auction, so settler is inherited.
+                nounderNoun: dao === 'v1' && maps.nounderIds.includes(id),
+                settler: label(settler),
+                settledAtUnix: v1row?.settledAt ? Math.floor(v1row.settledAt.getTime()) : null,
+                settledAtTransaction: v1row?.settledAtTransaction ?? null,
+                curator: label(curator),
+                curatorNote:
+                  'curator(N) = settler(N-1): their settle tx minted N and rolled its seed.',
+                winner: label(row?.winner ?? null),
+                amountEth: row?.amount != null ? Number(row.amount) / 1e18 : null,
+                settled: row?.settled ?? null,
+                found: settler !== null || curator !== null || !!row,
+              };
               break;
             }
 
@@ -9410,7 +9477,7 @@ import { registerWalletProfileRoutes } from './walletProfile.js';
 registerWalletProfileRoutes(app, db);
 
 // Settler / curator maps — single source for probe dropdowns + gamer profile.
-import { registerSettlerRoutes } from './settlerMaps.js';
+import { getSettlerMaps, registerSettlerRoutes } from './settlerMaps.js';
 registerSettlerRoutes(app, db);
 
 // ─── Dream Nouns — /api/dream-nouns ─────────────────────────────────────────
