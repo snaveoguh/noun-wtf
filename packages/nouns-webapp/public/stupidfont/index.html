@@ -24,6 +24,7 @@
     padding-bottom: calc(var(--safe-b) + 8px);
     -webkit-user-select: none; user-select: none;
   }
+  body > * { flex-shrink: 0; }
   header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; }
   header h1 { margin: 0; font-size: 18px; font-weight: normal; }
   header h1 span { color: var(--accent); }
@@ -34,7 +35,7 @@
   .preview input {
     width: 100%; background: transparent; border: 0; color: var(--fg); outline: 0;
     font-family: var(--live, 'Pip3'), 'Pip3', monospace; font-size: 30px; line-height: 1.1;
-    text-transform: none; padding: 0;
+    text-transform: none; padding: 0; /* calt is on by default everywhere; rand is on by default in HarfBuzz (setting it to 1 would pin alternate #1) */
   }
   .preview input::placeholder { color: var(--dim); }
   .preview .tag { font-size: 10px; color: var(--dim); display: flex; justify-content: space-between; margin-top: 4px; }
@@ -51,6 +52,13 @@
   button.on { background: var(--accent); color: #000; border-color: var(--accent); }
   button.danger { color: #f66; }
   button:disabled { opacity: .35; }
+
+  /* Takes */
+  .takes { display: flex; gap: 6px; padding: 2px 14px 8px; align-items: center; }
+  .takes .lbl { font-size: 10px; color: var(--dim); margin-right: 2px; }
+  .takes button { flex: 1; padding: 8px 0; position: relative; font-size: 13px; }
+  .takes button.drawn::after { content: ''; position: absolute; top: 4px; right: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .takes button.on.drawn::after { background: #000; }
 
   /* Canvas */
   .stage { padding: 0 14px; }
@@ -70,7 +78,7 @@
   .chip canvas { width: 36px; height: 40px; image-rendering: pixelated; }
   .chip span { font-size: 9px; color: var(--dim); text-transform: none; }
   .chip.sel { border-color: var(--accent); }
-  .chip.drawn::after { content: ''; position: absolute; top: 3px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .chip .n { position: absolute; top: 2px; right: 4px; font-size: 8px; color: var(--accent); }
   .chip.sep { width: 8px; border: 0; background: transparent; }
 
   /* Export */
@@ -79,7 +87,7 @@
   .exportrow input[type=text]:focus { border-color: var(--accent); }
   .foot { color: var(--dim); font-size: 10px; padding: 0 14px 6px; line-height: 1.5; }
   .foot a { color: var(--fg); }
-  #toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 16px); transform: translateX(-50%); background: var(--accent); color: #000; padding: 8px 14px; border-radius: 6px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 16px); transform: translateX(-50%); background: var(--accent); color: #000; padding: 8px 14px; border-radius: 6px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap; }
   #toast.show { opacity: 1; }
 </style>
 </head>
@@ -90,7 +98,7 @@
 </header>
 
 <div class="preview">
-  <input id="previewText" type="text" value="THE QUICK BROWN FOX 0123" placeholder="type to preview" autocomplete="off" autocorrect="off" spellcheck="false" />
+  <input id="previewText" type="text" value="LOOK AT THE MOON 0000" placeholder="type to preview" autocomplete="off" autocorrect="off" spellcheck="false" />
   <div class="tag"><span id="previewStatus">building…</span><span id="glyphCount"></span></div>
 </div>
 
@@ -100,9 +108,11 @@
   <button id="next">▶</button>
 </div>
 
+<div class="takes" id="takes"><span class="lbl">take</span></div>
+
 <div class="stage">
   <div class="canvaswrap"><canvas id="draw"></canvas></div>
-  <div class="hint">stand it on the baseline · left/right doesn't matter</div>
+  <div class="hint" id="hint">stand it on the baseline · left/right doesn't matter</div>
 </div>
 
 <div class="tools">
@@ -111,7 +121,8 @@
   <div class="grow">size <input id="size" type="range" min="2" max="30" value="10" /></div>
   <button id="undo">undo</button>
   <button id="clear">clear</button>
-  <button id="reset" title="Reload this letter from Pip3">pip3</button>
+  <button id="reset" title="Load Pip3's letter into this take">pip3</button>
+  <button id="dup" title="Copy take 1 into this take">copy 1</button>
 </div>
 
 <div class="strip" id="strip"></div>
@@ -128,8 +139,9 @@
   <button id="resetAll" class="danger">reset all</button>
 </div>
 <div class="foot">
-  starts from pip3 by 60r90. every letter you draw is traced into a real opentype font, live. autosaves in this browser.
-  export the .otf and it's yours. add to home screen for the app feel.
+  starts from pip3 by 60r90. every letter you draw is traced into a real opentype font, live.
+  draw up to 5 takes of a letter and the font cycles through them as you type, so repeats never match.
+  autosaves in this browser. export the .otf and it's yours. add to home screen for the app feel.
 </div>
 <div id="toast"></div>
 
@@ -142,6 +154,7 @@
   const W = UPM / CELL;           // 200 cells wide
   const H = (ASC - DESC) / CELL;  // 220 cells tall
   const BASE_ROW = ASC / CELL;    // baseline row (176)
+  const MAXV = 5;                 // takes per letter
 
   const CHARS = [
     ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '|',
@@ -152,10 +165,10 @@
   const GLYPH_CHARS = CHARS.filter(c => c !== '|');
 
   // ── State ────────────────────────────────────────────────────────────────
-  const bitmaps = new Map();   // char -> Uint8Array(W*H)
-  const undo = new Map();      // char -> [Uint8Array]
-  const cache = new Map();     // char -> {path, advance} traced
-  let cur = 'A', tool = 'pen', radius = 10, pip3 = null, drawing = false, last = null, liveN = 0;
+  const bitmaps = new Map();   // char -> Array(MAXV) of Uint8Array|undefined
+  const undo = new Map();      // "ch#take" -> [Uint8Array]
+  const cache = new Map();     // "ch#take" -> {path, advance}
+  let cur = 'A', take = 0, tool = 'pen', radius = 10, pip3 = null, drawing = false, last = null, liveN = 0;
 
   const $ = id => document.getElementById(id);
   const canvas = $('draw'), ctx = canvas.getContext('2d');
@@ -163,8 +176,12 @@
   const offCtx = off.getContext('2d');
   const toast = (m) => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600); };
 
-  const bm = ch => { if (!bitmaps.has(ch)) bitmaps.set(ch, new Uint8Array(W * H)); return bitmaps.get(ch); };
-  const isDrawn = ch => { const b = bitmaps.get(ch); if (!b) return false; for (let i = 0; i < b.length; i++) if (b[i]) return true; return false; };
+  const slots = ch => { if (!bitmaps.has(ch)) bitmaps.set(ch, new Array(MAXV)); return bitmaps.get(ch); };
+  const bm = (ch, i = take) => { const s = slots(ch); if (!s[i]) s[i] = new Uint8Array(W * H); return s[i]; };
+  const hasInk = b => { if (!b) return false; for (let i = 0; i < b.length; i++) if (b[i]) return true; return false; };
+  const isDrawn = (ch, i) => hasInk(bitmaps.get(ch)?.[i]);
+  const takesOf = ch => { const out = []; for (let i = 0; i < MAXV; i++) if (isDrawn(ch, i)) out.push(i); return out; };
+  const k = (ch, i) => ch + '#' + i;
 
   // ── Pip3 prefill ─────────────────────────────────────────────────────────
   function rasterizeFromPip3(ch) {
@@ -174,10 +191,8 @@
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const x = c.getContext('2d');
     x.fillStyle = '#fff';
-    // font units -> cells: cx = ux / CELL, cy = (ASC - uy) / CELL
-    x.setTransform(1 / CELL, 0, 0, -1 / CELL, 0, BASE_ROW);
-    const p = new Path2D(g.path.toPathData(2));
-    x.fill(p, 'nonzero');
+    x.setTransform(1 / CELL, 0, 0, -1 / CELL, 0, BASE_ROW); // font units -> cells
+    x.fill(new Path2D(g.path.toPathData(2)), 'nonzero');
     const d = x.getImageData(0, 0, W, H).data, out = new Uint8Array(W * H);
     for (let i = 0; i < W * H; i++) out[i] = d[i * 4 + 3] > 127 ? 1 : 0;
     return out;
@@ -186,22 +201,22 @@
   // ── Tracing: bitmap -> contours -> smoothed polygons -> opentype path ──
   function traceContours(b) {
     // Directed cell-edge boundary following, filled cell on the right (screen coords).
-    const edges = new Map(); // key "x,y" -> [{to:[x,y], dir}]
+    const edges = new Map();
     const key = (x, y) => x + ',' + y;
-    const add = (x0, y0, x1, y1, dir) => { const k = key(x0, y0); if (!edges.has(k)) edges.set(k, []); edges.get(k).push({ x: x1, y: y1, dir, used: false }); };
+    const add = (x0, y0, x1, y1, dir) => { const kk = key(x0, y0); if (!edges.has(kk)) edges.set(kk, []); edges.get(kk).push({ x: x1, y: y1, dir, used: false }); };
     const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : b[y * W + x];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!b[y * W + x]) continue;
-      if (!at(x, y - 1)) add(x, y, x + 1, y, 0);         // top: →
-      if (!at(x + 1, y)) add(x + 1, y, x + 1, y + 1, 1); // right: ↓
-      if (!at(x, y + 1)) add(x + 1, y + 1, x, y + 1, 2); // bottom: ←
-      if (!at(x - 1, y)) add(x, y + 1, x, y, 3);         // left: ↑
+      if (!at(x, y - 1)) add(x, y, x + 1, y, 0);
+      if (!at(x + 1, y)) add(x + 1, y, x + 1, y + 1, 1);
+      if (!at(x, y + 1)) add(x + 1, y + 1, x, y + 1, 2);
+      if (!at(x - 1, y)) add(x, y + 1, x, y, 3);
     }
     const contours = [];
-    for (const [k, list] of edges) {
+    for (const [kk, list] of edges) {
       for (const e0 of list) {
         if (e0.used) continue;
-        const [sx, sy] = k.split(',').map(Number);
+        const [sx, sy] = kk.split(',').map(Number);
         const pts = [[sx, sy]];
         let e = e0, dir = e0.dir;
         e.used = true;
@@ -212,8 +227,7 @@
           pts.push([nx, ny]);
           const cands = (edges.get(key(nx, ny)) || []).filter(c => !c.used);
           if (!cands.length) break;
-          // prefer right turn, then straight, then left (keeps regions separate at diagonal touches)
-          const pref = [(dir + 1) % 4, dir, (dir + 3) % 4];
+          const pref = [(dir + 1) % 4, dir, (dir + 3) % 4]; // right, straight, left
           let next = null;
           for (const d of pref) { next = cands.find(c => c.dir === d); if (next) break; }
           next.used = true; e = next; dir = next.dir;
@@ -224,7 +238,7 @@
     return contours;
   }
   function chaikin(pts, iters) {
-    for (let k = 0; k < iters; k++) {
+    for (let it = 0; it < iters; it++) {
       const out = [];
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i], q = pts[(i + 1) % pts.length];
@@ -241,37 +255,30 @@
       let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
       const ex = p[0] - (a[0] + t * dx), ey = p[1] - (a[1] + t * dy); return ex * ex + ey * ey;
     };
-    // open polyline simplifier: pushes every kept point except seg[0]
     const simp = (seg, s, e, out) => {
       let mi = -1, md = 0;
       for (let i = s + 1; i < e; i++) { const d = d2(seg[i], seg[s], seg[e]); if (d > md) { md = d; mi = i; } }
       if (md > tol * tol) { simp(seg, s, mi, out); simp(seg, mi, e, out); } else out.push(seg[e]);
     };
-    // closed polygon: split into two open halves at the point farthest from pts[0]
     let far = 0, fd = 0;
     for (let i = 1; i < pts.length; i++) { const dx = pts[i][0] - pts[0][0], dy = pts[i][1] - pts[0][1]; if (dx * dx + dy * dy > fd) { fd = dx * dx + dy * dy; far = i; } }
     const a = pts.slice(0, far + 1), b = pts.slice(far).concat([pts[0]]);
     const out = [a[0]];
     simp(a, 0, a.length - 1, out);
     simp(b, 0, b.length - 1, out);
-    out.pop(); // last pushed point is pts[0] again
+    out.pop();
     return out;
   }
   function area(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
 
-  function traceGlyph(ch) {
-    if (ch === ' ') return { path: new opentype.Path(), advance: SPACE_ADV };
-    const b = bitmaps.get(ch);
-    if (!b || !isDrawn(ch)) return null;
+  function traceBitmap(b) {
     let minx = W, maxx = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (b[y * W + x]) { if (x < minx) minx = x; if (x > maxx) maxx = x; }
-    const contours = traceContours(b)
-      .filter(c => Math.abs(area(c)) >= 3)
-      .map(c => rdp(chaikin(c, 2), 0.35));
+    const contours = traceContours(b).filter(c => Math.abs(area(c)) >= 3).map(c => rdp(chaikin(c, 2), 0.35));
     const path = new opentype.Path();
-    const shift = LSB - minx * CELL; // put ink left edge at LSB
+    const shift = LSB - minx * CELL;
     for (const c of contours) {
-      const pts = c.slice().reverse(); // y-flip below flips orientation; reverse to keep outer clockwise in y-up
+      const pts = c.slice().reverse();
       pts.forEach(([x, y], i) => {
         const ux = Math.round(x * CELL + shift), uy = Math.round(ASC - y * CELL);
         if (i === 0) path.moveTo(ux, uy); else path.lineTo(ux, uy);
@@ -279,6 +286,136 @@
       path.close();
     }
     return { path, advance: Math.round((maxx + 1 - minx) * CELL + LSB + RSB) };
+  }
+  function traced(ch, i) {
+    const kk = k(ch, i);
+    if (!cache.has(kk)) cache.set(kk, isDrawn(ch, i) ? traceBitmap(bitmaps.get(ch)[i]) : null);
+    return cache.get(kk);
+  }
+
+  // ── GSUB: cycling contextual alternates (calt) + rand ────────────────────
+  // variants[ch] = [gid0, gid1, ...] in the order drawn. State machine: a glyph
+  // that is variant index s of its letter makes the next letter take variant
+  // (s+1) mod MAXV (mod its own count). Space is looked through so words don't restart.
+  function buildGsub(variants, spaceGid) {
+    const bases = Object.values(variants).filter(v => v.length > 1).map(v => v[0]).sort((a, b) => a - b);
+    if (!bases.length) return null;
+    const setOf = s => Object.values(variants).filter(v => v.length > s).map(v => v[s]).sort((a, b) => a - b);
+    const singles = []; // d -> {from:[], to:[]}
+    for (let d = 1; d < MAXV; d++) {
+      const from = [], to = [];
+      for (const gid of bases) { const v = Object.values(variants).find(v => v[0] === gid); const t = v[d % v.length]; if (t !== gid) { from.push(gid); to.push(t); } }
+      singles[d] = from.length ? { from, to } : null;
+    }
+    const u16 = [], w = v => u16.push(v & 0xffff);
+    const B = () => { const a = []; a.w = v => a.push(v & 0xffff); return a; };
+    const fin = a => { const buf = new Uint8Array(a.length * 2); a.forEach((v, i) => { buf[i * 2] = v >> 8; buf[i * 2 + 1] = v & 255; }); return buf; };
+    const cat = parts => { const n = parts.reduce((s, p) => s + p.length, 0), out = new Uint8Array(n); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+    const coverage = gids => { const a = B(); a.w(1); a.w(gids.length); gids.forEach(g => a.w(g)); return fin(a); };
+    const pad = n => n + (n & 1); // keep uint16 alignment
+
+    // Lookups
+    const lookups = []; // {type, subtables:[Uint8Array]}
+    const singleIdx = [];
+    for (let d = 1; d < MAXV; d++) {
+      if (!singles[d]) { singleIdx[d] = -1; continue; }
+      const { from, to } = singles[d];
+      const cov = coverage(from), a = B(); a.w(2); a.w(6 + to.length * 2); a.w(to.length); to.forEach(g => a.w(g));
+      lookups.push({ type: 1, subtables: [cat([fin(a), cov])] });
+      singleIdx[d] = lookups.length - 1;
+    }
+    // Chained rules (type 6 format 3): one subtable per (state, viaSpace)
+    const chainSubs = [];
+    const input = coverage(bases), space = coverage([spaceGid]);
+    for (let s = 0; s < MAXV; s++) {
+      const d = (s + 1) % MAXV; if (d === 0 || singleIdx[d] < 0) continue;
+      const set = setOf(s); if (!set.length) continue;
+      const back = coverage(set);
+      for (const viaSpace of [false, true]) {
+        const covs = viaSpace ? [space, back, input] : [back, input]; // backtrack (nearest first), then input
+        const nBack = covs.length - 1;
+        const headLen = 2 + 2 + nBack * 2 + 2 + 2 + 2 + 2 + 4; // format, backCount, backOffs, inCount, inOff, lookCount, substCount, 1 record
+        const a = B(); a.w(3); a.w(nBack);
+        let o = headLen; const offs = [];
+        for (const c of covs) { offs.push(o); o += pad(c.length); }
+        for (let i = 0; i < nBack; i++) a.w(offs[i]);
+        a.w(1); a.w(offs[nBack]);
+        a.w(0); // lookahead
+        a.w(1); a.w(0); a.w(singleIdx[d]);
+        const parts = [fin(a)]; for (const c of covs) { parts.push(c); if (c.length & 1) parts.push(new Uint8Array(1)); }
+        chainSubs.push(cat(parts));
+      }
+    }
+    if (!chainSubs.length) return null;
+    lookups.push({ type: 6, subtables: chainSubs });
+    const caltLookup = lookups.length - 1;
+    // rand: alternate substitution (type 3) base -> every take incl. itself (HarfBuzz picks one at random)
+    {
+      const from = bases, sets = from.map(g => Object.values(variants).find(v => v[0] === g).slice());
+      const cov = coverage(from), a = B(); a.w(1);
+      let o = 6 + from.length * 2; const covOff = o; o += pad(cov.length); const setOffs = [];
+      for (const s of sets) { setOffs.push(o); o += 2 + s.length * 2; }
+      a.w(covOff); a.w(from.length); setOffs.forEach(x => a.w(x));
+      const parts = [fin(a), cov]; if (cov.length & 1) parts.push(new Uint8Array(1));
+      for (const s of sets) { const b = B(); b.w(s.length); s.forEach(g => b.w(g)); parts.push(fin(b)); }
+      lookups.push({ type: 3, subtables: [cat(parts)] });
+    }
+    const randLookup = lookups.length - 1;
+
+    // LookupList
+    const lookupBufs = lookups.map(l => {
+      const a = B(); a.w(l.type); a.w(0); a.w(l.subtables.length);
+      let o = 6 + l.subtables.length * 2; for (const s of l.subtables) { a.w(o); o += pad(s.length); }
+      const parts = [fin(a)]; for (const s of l.subtables) { parts.push(s); if (s.length & 1) parts.push(new Uint8Array(1)); }
+      return cat(parts);
+    });
+    const ll = B(); ll.w(lookups.length); let lo = 2 + lookups.length * 2; for (const b of lookupBufs) { ll.w(lo); lo += b.length; }
+    const lookupList = cat([fin(ll), ...lookupBufs]);
+    // FeatureList: calt, rand (sorted by tag)
+    const feat = idx => { const a = B(); a.w(0); a.w(1); a.w(idx); return fin(a); };
+    const fl = B(); fl.w(2);
+    const tag = (a, t) => { a.w((t.charCodeAt(0) << 8) | t.charCodeAt(1)); a.w((t.charCodeAt(2) << 8) | t.charCodeAt(3)); };
+    tag(fl, 'calt'); fl.w(2 + 2 * 6); tag(fl, 'rand'); fl.w(2 + 2 * 6 + 6);
+    const featureList = cat([fin(fl), feat(caltLookup), feat(randLookup)]);
+    // ScriptList: DFLT + latn, both -> one Script with a default LangSys using features 0,1
+    const langSys = (() => { const a = B(); a.w(0); a.w(0xffff); a.w(2); a.w(0); a.w(1); return fin(a); })();
+    const script = (() => { const a = B(); a.w(4); a.w(0); return cat([fin(a), langSys]); })();
+    const sl = B(); sl.w(2); tag(sl, 'DFLT'); sl.w(2 + 2 * 6); tag(sl, 'latn'); sl.w(2 + 2 * 6);
+    const scriptList = cat([fin(sl), script]);
+    // Header
+    const hdr = B(); hdr.w(1); hdr.w(0);
+    const so = 10, fo = so + scriptList.length, lo2 = fo + featureList.length;
+    hdr.w(so); hdr.w(fo); hdr.w(lo2);
+    return cat([fin(hdr), scriptList, featureList, lookupList]);
+  }
+
+  // Insert/replace a table in an sfnt (OTF) buffer, fixing offsets and checksums.
+  function withTable(buf, tag, data) {
+    const src = new DataView(buf), numTables = src.getUint16(4);
+    const tables = [];
+    for (let i = 0; i < numTables; i++) {
+      const o = 12 + i * 16, t = String.fromCharCode(src.getUint8(o), src.getUint8(o + 1), src.getUint8(o + 2), src.getUint8(o + 3));
+      const off = src.getUint32(o + 8), len = src.getUint32(o + 12);
+      if (t !== tag) tables.push({ tag: t, data: new Uint8Array(buf, off, len) });
+    }
+    tables.push({ tag, data }); tables.sort((a, b) => a.tag < b.tag ? -1 : 1);
+    const pad4 = n => (n + 3) & ~3;
+    let total = 12 + tables.length * 16; for (const t of tables) total += pad4(t.data.length);
+    const out = new Uint8Array(total), dv = new DataView(out.buffer);
+    out.set(new Uint8Array(buf, 0, 4)); dv.setUint16(4, tables.length);
+    let es = 0; while ((2 << es) <= tables.length) es++; es--; const sr = (1 << es) * 16;
+    dv.setUint16(6, sr); dv.setUint16(8, es); dv.setUint16(10, tables.length * 16 - sr);
+    const csum = (u8, o, n) => { let s = 0; for (let i = 0; i < n; i += 4) s = (s + (((u8[o + i] << 24) | (u8[o + i + 1] << 16) | (u8[o + i + 2] << 8) | u8[o + i + 3]) >>> 0)) >>> 0; return s; };
+    let o = 12 + tables.length * 16, headOff = 0;
+    tables.forEach((t, i) => {
+      out.set(t.data, o);
+      if (t.tag === 'head') { headOff = o; dv.setUint32(o + 8, 0); }
+      const r = 12 + i * 16; for (let j = 0; j < 4; j++) out[r + j] = t.tag.charCodeAt(j);
+      dv.setUint32(r + 4, csum(out, o, pad4(t.data.length))); dv.setUint32(r + 8, o); dv.setUint32(r + 12, t.data.length);
+      o += pad4(t.data.length);
+    });
+    if (headOff) dv.setUint32(headOff + 8, (0xB1B0AFBA - csum(out, 0, total)) >>> 0);
+    return out.buffer;
   }
 
   // ── Font build ───────────────────────────────────────────────────────────
@@ -289,32 +426,39 @@
   function buildFont(familyName) {
     const glyphs = [new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: 500, path: new opentype.Path() })];
     glyphs.push(new opentype.Glyph({ name: 'space', unicode: 32, advanceWidth: SPACE_ADV, path: new opentype.Path() }));
-    let n = 0;
+    const spaceGid = 1, variants = {};
+    let n = 0, alts = 0;
     for (const ch of GLYPH_CHARS) {
-      if (!cache.has(ch)) cache.set(ch, traceGlyph(ch));
-      const t = cache.get(ch);
-      if (!t) continue;
-      glyphs.push(new opentype.Glyph({ name: glyphName(ch), unicode: ch.codePointAt(0), advanceWidth: t.advance, path: t.path }));
-      n++;
+      const ts = takesOf(ch); if (!ts.length) continue;
+      variants[ch] = [];
+      ts.forEach((t, vi) => {
+        const tr = traced(ch, t);
+        const name = vi === 0 ? glyphName(ch) : glyphName(ch) + '.alt' + vi;
+        glyphs.push(new opentype.Glyph(vi === 0
+          ? { name, unicode: ch.codePointAt(0), advanceWidth: tr.advance, path: tr.path }
+          : { name, advanceWidth: tr.advance, path: tr.path }));
+        variants[ch].push(glyphs.length - 1);
+        if (vi === 0) n++; else alts++;
+      });
     }
-    const font = new opentype.Font({
-      familyName: familyName || 'StupidFont', styleName: 'Regular', unitsPerEm: UPM, ascender: ASC, descender: DESC, glyphs,
-    });
-    return { font, n };
+    const font = new opentype.Font({ familyName: familyName || 'StupidFont', styleName: 'Regular', unitsPerEm: UPM, ascender: ASC, descender: DESC, glyphs });
+    let buf = font.toArrayBuffer();
+    const gsub = buildGsub(variants, spaceGid);
+    if (gsub) buf = withTable(buf, 'GSUB', gsub);
+    return { buf, n, alts };
   }
   let rebuildT = null;
   function scheduleRebuild() { clearTimeout(rebuildT); rebuildT = setTimeout(rebuildLive, 120); }
   async function rebuildLive() {
     try {
-      const { font, n } = buildFont('StupidFontLive');
-      const buf = font.toArrayBuffer();
+      const { buf, n, alts } = buildFont('StupidFontLive');
       const name = 'SFLive' + (++liveN);
       const ff = new FontFace(name, buf);
       await ff.load();
       document.fonts.add(ff);
       document.documentElement.style.setProperty('--live', `'${name}'`);
       $('previewStatus').textContent = 'live · ' + (buf.byteLength / 1024).toFixed(1) + ' kb';
-      $('glyphCount').textContent = n + ' glyphs';
+      $('glyphCount').textContent = n + ' glyphs' + (alts ? ' + ' + alts + ' alts' : '');
     } catch (e) {
       console.error(e);
       $('previewStatus').textContent = 'build error: ' + (e.message || e);
@@ -334,6 +478,13 @@
     const r = canvas.getBoundingClientRect();
     return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H];
   }
+  function blit(target, b, w, h, smooth) {
+    const img = offCtx.createImageData(W, H);
+    if (b) for (let i = 0; i < W * H; i++) if (b[i]) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
+    offCtx.putImageData(img, 0, 0);
+    target.imageSmoothingEnabled = smooth;
+    target.drawImage(off, 0, 0, w, h);
+  }
   function render() {
     const dpr = window.devicePixelRatio || 1;
     const r = canvas.getBoundingClientRect();
@@ -341,24 +492,20 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, r.width, r.height);
     const sx = r.width / W, sy = r.height / H;
-    // guides
     const line = (y, color, label) => { ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, y * sy); ctx.lineTo(r.width, y * sy); ctx.stroke(); if (label) { ctx.fillStyle = color; ctx.font = '9px monospace'; ctx.fillText(label, 4, y * sy - 3); } };
     line((ASC - CAP) / CELL, '#333', 'CAP');
     line((ASC - XH) / CELL, '#222', 'x');
     line(BASE_ROW, '#555', 'BASELINE');
     ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(LSB / CELL * sx, 0); ctx.lineTo(LSB / CELL * sx, r.height); ctx.stroke();
-    // ink
-    const b = bm(cur), img = offCtx.createImageData(W, H);
-    for (let i = 0; i < W * H; i++) if (b[i]) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
-    offCtx.putImageData(img, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(off, 0, 0, r.width, r.height);
+    // ghost of take 1 while drawing another take
+    if (take !== 0 && isDrawn(cur, 0)) { ctx.globalAlpha = 0.18; blit(ctx, bitmaps.get(cur)[0], r.width, r.height, false); ctx.globalAlpha = 1; }
+    blit(ctx, bitmaps.get(cur)?.[take], r.width, r.height, false);
   }
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault(); canvas.setPointerCapture(e.pointerId);
     drawing = true;
-    const b = bm(cur);
-    const u = undo.get(cur) || []; u.push(b.slice()); if (u.length > 25) u.shift(); undo.set(cur, u);
+    const b = bm(cur), kk = k(cur, take);
+    const u = undo.get(kk) || []; u.push(b.slice()); if (u.length > 25) u.shift(); undo.set(kk, u);
     const [x, y] = toCell(e); stamp(b, x, y, radius, tool === 'pen' ? 1 : 0); last = [x, y]; render();
   });
   canvas.addEventListener('pointermove', e => {
@@ -374,12 +521,25 @@
     }
     render();
   });
-  const endStroke = e => { if (!drawing) return; drawing = false; changed(cur); };
+  const endStroke = () => { if (!drawing) return; drawing = false; changed(cur, take); };
   canvas.addEventListener('pointerup', endStroke);
   canvas.addEventListener('pointercancel', endStroke);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-  function changed(ch) { cache.delete(ch); drawChip(ch); scheduleRebuild(); scheduleSave(); }
+  function changed(ch, i) { cache.delete(k(ch, i)); drawChip(ch); drawTakes(); scheduleRebuild(); scheduleSave(); }
+  const pushUndo = () => { const kk = k(cur, take); (undo.get(kk) || undo.set(kk, []).get(kk)).push(bm(cur).slice()); };
+
+  // ── Takes row ────────────────────────────────────────────────────────────
+  const takeBtns = [];
+  for (let i = 0; i < MAXV; i++) {
+    const b = document.createElement('button'); b.textContent = i + 1; b.onclick = () => selectTake(i);
+    $('takes').appendChild(b); takeBtns.push(b);
+  }
+  function drawTakes() { takeBtns.forEach((b, i) => { b.classList.toggle('on', i === take); b.classList.toggle('drawn', isDrawn(cur, i)); }); }
+  function selectTake(i) {
+    take = i; drawTakes(); render();
+    $('hint').textContent = i === 0 ? 'stand it on the baseline · left/right doesn\'t matter' : 'take ' + (i + 1) + ' · draw a different ' + cur + ' · take 1 ghosted behind';
+  }
 
   // ── Letter strip ─────────────────────────────────────────────────────────
   const chips = new Map();
@@ -390,27 +550,24 @@
       const d = document.createElement('div'); d.className = 'chip'; d.dataset.ch = ch;
       const c = document.createElement('canvas'); c.width = 36; c.height = 40;
       const l = document.createElement('span'); l.textContent = ch;
-      d.append(c, l); d.addEventListener('click', () => select(ch));
-      s.appendChild(d); chips.set(ch, { el: d, c });
+      const nn = document.createElement('i'); nn.className = 'n';
+      d.append(c, l, nn); d.addEventListener('click', () => select(ch));
+      s.appendChild(d); chips.set(ch, { el: d, c, nn });
       drawChip(ch);
     }
   }
   function drawChip(ch) {
-    const { el, c } = chips.get(ch); const x = c.getContext('2d');
+    const { el, c, nn } = chips.get(ch); const x = c.getContext('2d');
     x.clearRect(0, 0, c.width, c.height);
-    const b = bitmaps.get(ch);
-    el.classList.toggle('drawn', isDrawn(ch));
-    if (!b) return;
-    const img = offCtx.createImageData(W, H);
-    for (let i = 0; i < W * H; i++) if (b[i]) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
-    offCtx.putImageData(img, 0, 0);
-    x.imageSmoothingEnabled = true; x.drawImage(off, 0, 0, c.width, c.height);
+    const ts = takesOf(ch);
+    nn.textContent = ts.length > 1 ? '×' + ts.length : (ts.length === 1 ? '•' : '');
+    if (ts.length) blit(x, bitmaps.get(ch)[ts[0]], c.width, c.height, true);
   }
   function select(ch) {
     cur = ch; $('curChar').textContent = ch; $('curName').textContent = glyphName(ch);
-    for (const [k, { el }] of chips) el.classList.toggle('sel', k === ch);
-    const { el } = chips.get(ch); el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    render();
+    for (const [kk, { el }] of chips) el.classList.toggle('sel', kk === ch);
+    chips.get(ch).el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    selectTake(take);
   }
   $('prev').onclick = () => select(GLYPH_CHARS[(GLYPH_CHARS.indexOf(cur) - 1 + GLYPH_CHARS.length) % GLYPH_CHARS.length]);
   $('next').onclick = () => select(GLYPH_CHARS[(GLYPH_CHARS.indexOf(cur) + 1) % GLYPH_CHARS.length]);
@@ -419,17 +576,21 @@
   $('pen').onclick = () => { tool = 'pen'; $('pen').classList.add('on'); $('eraser').classList.remove('on'); };
   $('eraser').onclick = () => { tool = 'eraser'; $('eraser').classList.add('on'); $('pen').classList.remove('on'); };
   $('size').oninput = e => { radius = +e.target.value; };
-  $('undo').onclick = () => { const u = undo.get(cur); if (!u || !u.length) return toast('nothing to undo'); bitmaps.set(cur, u.pop()); render(); changed(cur); };
-  $('clear').onclick = () => { const b = bm(cur); (undo.get(cur) || undo.set(cur, []).get(cur)).push(b.slice()); b.fill(0); render(); changed(cur); };
+  $('undo').onclick = () => { const u = undo.get(k(cur, take)); if (!u || !u.length) return toast('nothing to undo'); slots(cur)[take] = u.pop(); render(); changed(cur, take); };
+  $('clear').onclick = () => { pushUndo(); bm(cur).fill(0); render(); changed(cur, take); };
   $('reset').onclick = () => {
     const r = rasterizeFromPip3(cur); if (!r) return toast('pip3 has no ' + cur);
-    (undo.get(cur) || undo.set(cur, []).get(cur)).push(bm(cur).slice());
-    bitmaps.set(cur, r); render(); changed(cur); toast(cur + ' reset to pip3');
+    pushUndo(); slots(cur)[take] = r; render(); changed(cur, take); toast(cur + ' take ' + (take + 1) + ' = pip3');
+  };
+  $('dup').onclick = () => {
+    if (take === 0) return toast('this is take 1');
+    if (!isDrawn(cur, 0)) return toast('take 1 is empty');
+    pushUndo(); slots(cur)[take] = bitmaps.get(cur)[0].slice(); render(); changed(cur, take); toast('copied take 1 · now mess with it');
   };
   $('resetAll').onclick = () => {
-    if (!confirm('Reset every letter back to Pip3? Your drawings in this browser will be lost.')) return;
-    for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); bitmaps.set(ch, r || new Uint8Array(W * H)); cache.delete(ch); drawChip(ch); }
-    undo.clear(); render(); scheduleRebuild(); scheduleSave(); toast('back to pip3');
+    if (!confirm('Reset every letter back to Pip3 and wipe all takes? Your drawings in this browser will be lost.')) return;
+    for (const ch of GLYPH_CHARS) { const s = new Array(MAXV); const r = rasterizeFromPip3(ch); if (r) s[0] = r; bitmaps.set(ch, s); for (let i = 0; i < MAXV; i++) cache.delete(k(ch, i)); drawChip(ch); }
+    undo.clear(); take = 0; drawTakes(); render(); scheduleRebuild(); scheduleSave(); toast('back to pip3');
   };
 
   // ── Persist ──────────────────────────────────────────────────────────────
@@ -450,12 +611,22 @@
   }
   function serialize() {
     const glyphs = {};
-    for (const ch of GLYPH_CHARS) if (isDrawn(ch)) glyphs[ch] = encode(bitmaps.get(ch));
-    return { v: 1, name: $('fontName').value, cell: CELL, w: W, h: H, glyphs };
+    for (const ch of GLYPH_CHARS) {
+      const ts = takesOf(ch); if (!ts.length) continue;
+      const arr = new Array(MAXV).fill(null);
+      for (const t of ts) arr[t] = encode(bitmaps.get(ch)[t]);
+      glyphs[ch] = arr;
+    }
+    return { v: 2, name: $('fontName').value, cell: CELL, w: W, h: H, takes: MAXV, glyphs };
   }
   function load(data) {
-    if (!data || data.v !== 1 || data.w !== W || data.h !== H) return false;
-    for (const ch of GLYPH_CHARS) bitmaps.set(ch, data.glyphs[ch] ? decode(data.glyphs[ch]) : new Uint8Array(W * H));
+    if (!data || !(data.v === 1 || data.v === 2) || data.w !== W || data.h !== H) return false;
+    for (const ch of GLYPH_CHARS) {
+      const s = new Array(MAXV), g = data.glyphs[ch];
+      if (typeof g === 'string') s[0] = decode(g);                       // v1: one bitmap per letter
+      else if (Array.isArray(g)) g.forEach((e, i) => { if (e && i < MAXV) s[i] = decode(e); });
+      bitmaps.set(ch, s);
+    }
     if (data.name) $('fontName').value = data.name;
     cache.clear(); return true;
   }
@@ -470,7 +641,7 @@
   $('loadJson').onclick = () => $('fileIn').click();
   $('fileIn').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
-    try { if (!load(JSON.parse(await f.text()))) throw 0; for (const ch of GLYPH_CHARS) drawChip(ch); render(); scheduleRebuild(); scheduleSave(); toast('project loaded'); }
+    try { if (!load(JSON.parse(await f.text()))) throw 0; for (const ch of GLYPH_CHARS) drawChip(ch); take = 0; drawTakes(); render(); scheduleRebuild(); scheduleSave(); toast('project loaded'); }
     catch { toast('not a stupidfont project'); }
     e.target.value = '';
   };
@@ -487,11 +658,10 @@
   }
   function exportFont(preferShare) {
     const name = safeName($('fontName').value);
-    const { font, n } = buildFont(name);
+    const { buf, n, alts } = buildFont(name);
     if (!n) return toast('draw something first');
-    const buf = font.toArrayBuffer();
     deliver(new Blob([buf], { type: 'font/otf' }), name + '-Regular.otf', preferShare);
-    toast(name + ' · ' + n + ' glyphs');
+    toast(name + ' · ' + n + ' glyphs' + (alts ? ' + ' + alts + ' alts' : ''));
   }
   $('export').onclick = () => exportFont(false);
   $('share').onclick = () => exportFont(true);
@@ -505,7 +675,7 @@
     } catch (e) { console.warn('pip3 not loaded', e); }
     let restored = false;
     try { const s = localStorage.getItem(KEY); if (s) restored = load(JSON.parse(s)); } catch (e) { }
-    if (!restored) for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); if (r) bitmaps.set(ch, r); }
+    if (!restored) for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); if (r) slots(ch)[0] = r; }
     for (const ch of GLYPH_CHARS) drawChip(ch);
     select('A'); rebuildLive();
     if (restored) toast('restored your drawings');
