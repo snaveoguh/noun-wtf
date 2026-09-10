@@ -556,12 +556,28 @@
       drawChip(ch);
     }
   }
+  // Box-filter the bitmap straight into the chip's own pixels. No shared canvas,
+  // no canvas->canvas drawImage: Safari defers those and chips end up showing a
+  // neighbour's letter when 64 of them are drawn in one go.
+  function thumb(x, b, w, h) {
+    const img = x.createImageData(w, h), d = img.data;
+    for (let py = 0; py < h; py++) {
+      const y0 = Math.floor(py * H / h), y1 = Math.max(y0 + 1, Math.floor((py + 1) * H / h));
+      for (let px = 0; px < w; px++) {
+        const x0 = Math.floor(px * W / w), x1 = Math.max(x0 + 1, Math.floor((px + 1) * W / w));
+        let n = 0, on = 0;
+        for (let y = y0; y < y1; y++) for (let xx = x0; xx < x1; xx++) { n++; on += b[y * W + xx]; }
+        const o = (py * w + px) * 4; d[o] = d[o + 1] = d[o + 2] = 255; d[o + 3] = Math.round(255 * on / n);
+      }
+    }
+    x.putImageData(img, 0, 0);
+  }
   function drawChip(ch) {
     const { el, c, nn } = chips.get(ch); const x = c.getContext('2d');
     x.clearRect(0, 0, c.width, c.height);
     const ts = takesOf(ch);
     nn.textContent = ts.length > 1 ? '×' + ts.length : (ts.length === 1 ? '•' : '');
-    if (ts.length) blit(x, bitmaps.get(ch)[ts[0]], c.width, c.height, true);
+    if (ts.length) thumb(x, bitmaps.get(ch)[ts[0]], c.width, c.height);
   }
   function select(ch) {
     cur = ch; $('curChar').textContent = ch; $('curName').textContent = glyphName(ch);
