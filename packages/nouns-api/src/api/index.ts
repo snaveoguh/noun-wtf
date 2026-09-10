@@ -9091,56 +9091,6 @@ app.get('/api/stats/errors', async c => {
   return c.json(getRecentErrors(50));
 });
 
-// Plausible Stats API proxy (cached 5 min)
-let plausibleCache: { data: unknown; fetchedAt: number; period: string } | null = null;
-const PLAUSIBLE_TTL = 300_000;
-
-app.get('/api/stats/plausible', async c => {
-  if (!checkDashboardKey(c)) return c.json({ error: 'Unauthorized' }, 401);
-
-  const plausibleKey = process.env.PLAUSIBLE_API_KEY;
-  if (!plausibleKey) return c.json({ error: 'Plausible not configured' }, 503);
-
-  const period = c.req.query('period') || '30d';
-  const site = 'noun.wtf';
-
-  if (
-    plausibleCache &&
-    plausibleCache.period === period &&
-    Date.now() - plausibleCache.fetchedAt < PLAUSIBLE_TTL
-  ) {
-    return c.json(plausibleCache.data);
-  }
-
-  try {
-    const headers = { Authorization: `Bearer ${plausibleKey}` };
-    const base = 'https://plausible.io/api/v1/stats';
-
-    const [aggregate, timeseries, topPages, topReferrers] = await Promise.all([
-      fetch(
-        `${base}/aggregate?site_id=${site}&period=${period}&metrics=visitors,pageviews,bounce_rate,visit_duration`,
-        { headers },
-      ).then(r => r.json()),
-      fetch(`${base}/timeseries?site_id=${site}&period=${period}&metrics=visitors,pageviews`, {
-        headers,
-      }).then(r => r.json()),
-      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=event:page&limit=10`, {
-        headers,
-      }).then(r => r.json()),
-      fetch(`${base}/breakdown?site_id=${site}&period=${period}&property=visit:source&limit=10`, {
-        headers,
-      }).then(r => r.json()),
-    ]);
-
-    const data = { aggregate, timeseries, topPages, topReferrers, period };
-    plausibleCache = { data, fetchedAt: Date.now(), period };
-    return c.json(data);
-  } catch (err) {
-    console.error('[Dashboard] Plausible fetch error:', err);
-    return c.json({ error: 'Failed to fetch Plausible data' }, 502);
-  }
-});
-
 app.get('/api/stats/health', async c => {
   let latestBlock: string = 'unknown';
   try {
@@ -9490,5 +9440,9 @@ registerSettlerRoutes(app, db);
 // Replaces the Laravel API from the retired probe.wtf DigitalOcean droplet.
 import { registerDreamRoutes, getDreamTraitImage } from './dreams.js';
 registerDreamRoutes(app);
+
+// Site pageview beacon + dashboard traffic stats (replaces the Plausible proxy)
+import { registerPageviewRoutes } from './pageviews.js';
+registerPageviewRoutes(app, checkDashboardKey);
 
 export default app;

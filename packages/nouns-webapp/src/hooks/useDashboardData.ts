@@ -52,22 +52,25 @@ export function useApiMetrics(windowMinutes = 60) {
   });
 }
 
-// ─── Plausible ───────────────────────────────────────────────────────────────
+// ─── Website traffic (first-party beacon) ────────────────────────────────────
 
-export interface PlausibleStats {
+export interface TrafficStats {
   aggregate: { results: Record<string, { value: number }> };
   timeseries: { results: { date: string; visitors: number; pageviews: number }[] };
-  topPages: { results: { page: string; visitors: number }[] };
+  topPages: { results: { page: string; visitors: number; pageviews?: number }[] };
   topReferrers: { results: { source: string; visitors: number }[] };
+  devices?: { results: { device: string; visitors: number }[] };
   period: string;
 }
 
-export function usePlausibleStats(period = '30d') {
-  return useQuery<PlausibleStats>({
-    queryKey: ['dashboard', 'plausible', period],
+export type TrafficPeriod = '1h' | '24h' | '7d' | '30d' | '6mo' | '12mo';
+
+export function useTrafficStats(period: TrafficPeriod = '30d') {
+  return useQuery<TrafficStats>({
+    queryKey: ['dashboard', 'traffic', period],
     queryFn: () =>
-      fetch(statsUrl('/api/stats/plausible', { period })).then(r => {
-        if (!r.ok) throw new Error(`Plausible API ${r.status}`);
+      fetch(statsUrl('/api/stats/traffic', { period })).then(r => {
+        if (!r.ok) throw new Error(`Traffic API ${r.status}`);
         return r.json();
       }),
     refetchInterval: 300_000,

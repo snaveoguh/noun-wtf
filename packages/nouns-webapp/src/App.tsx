@@ -25,6 +25,7 @@ import { MiniWindowHost } from '@/components/MiniWindow';
 import ReindexingBanner from '@/components/Nounsweeper/ReindexingBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { useAppDispatch, useAppSelector } from '@/hooks';
+import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 import AuctionPage from '@/pages/Auction';
 import CandidatePage from '@/pages/Candidate';
 import CreateCandidatePage from '@/pages/CreateCandidate';
@@ -320,6 +321,7 @@ function ThemePrefixRoute() {
 function AppRouter() {
   const navigate = useNavigate();
   const location = useLocation();
+  usePageviewBeacon();
 
   useEffect(() => {
     // Backwards-compat: legacy share links of the form `/?theme=foo` redirect

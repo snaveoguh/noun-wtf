@@ -11,15 +11,15 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-import { useApiMetrics, usePlausibleStats, useSystemHealth } from '@/hooks/useDashboardData';
+import { useApiMetrics, useSystemHealth, useTrafficStats } from '@/hooks/useDashboardData';
 
 // ─── Period options ──────────────────────────────────────────────────────────
 
 const PERIODS = [
-  { label: '1h', apiWindow: 60, plausible: 'day' },
-  { label: '24h', apiWindow: 1440, plausible: 'day' },
-  { label: '7d', apiWindow: 10080, plausible: '7d' },
-  { label: '30d', apiWindow: 43200, plausible: '30d' },
+  { label: '1h', apiWindow: 60, traffic: '1h' },
+  { label: '24h', apiWindow: 1440, traffic: '24h' },
+  { label: '7d', apiWindow: 10080, traffic: '7d' },
+  { label: '30d', apiWindow: 43200, traffic: '30d' },
 ] as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -78,10 +78,10 @@ const DashboardPage: React.FC = () => {
 
   const { data: metrics, isLoading: metricsLoading } = useApiMetrics(period.apiWindow);
   const {
-    data: plausible,
-    isLoading: plausibleLoading,
-    error: plausibleError,
-  } = usePlausibleStats(period.plausible);
+    data: traffic,
+    isLoading: trafficLoading,
+    error: trafficError,
+  } = useTrafficStats(period.traffic);
   const { data: health } = useSystemHealth();
 
   const hasKey = ((import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ?? '').length > 0;
@@ -128,48 +128,46 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── Website Traffic (Plausible) ───────────────────────────────── */}
+      {/* ── Website Traffic (first-party beacon) ──────────────────────── */}
       {hasKey && (
         <>
           <SectionTitle>Website Traffic</SectionTitle>
 
-          {plausibleError ? (
+          {trafficError ? (
             <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
-              Plausible not configured — add{' '}
-              <code className="rounded bg-white/10 px-1">PLAUSIBLE_API_KEY</code> to Railway env.
+              Traffic stats unavailable — {String(trafficError)}
             </div>
-          ) : plausibleLoading ? (
-            <div className="text-sm text-white/30">Loading Plausible...</div>
-          ) : plausible?.aggregate?.results &&
-            (plausible.aggregate.results.visitors?.value ?? 0) > 0 ? (
+          ) : trafficLoading ? (
+            <div className="text-sm text-white/30">Loading traffic...</div>
+          ) : traffic?.aggregate?.results &&
+            (traffic.aggregate.results.visitors?.value ?? 0) > 0 ? (
             <>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
                   label="Visitors"
-                  value={(plausible.aggregate.results.visitors?.value ?? 0).toLocaleString()}
+                  value={(traffic.aggregate.results.visitors?.value ?? 0).toLocaleString()}
                 />
                 <StatCard
                   label="Pageviews"
-                  value={(plausible.aggregate.results.pageviews?.value ?? 0).toLocaleString()}
+                  value={(traffic.aggregate.results.pageviews?.value ?? 0).toLocaleString()}
                 />
                 <StatCard
                   label="Bounce Rate"
-                  value={`${plausible.aggregate.results.bounce_rate?.value ?? 0}%`}
+                  value={`${traffic.aggregate.results.bounce_rate?.value ?? 0}%`}
                 />
                 <StatCard
-                  label="Avg Visit"
-                  value={`${Math.round((plausible.aggregate.results.visit_duration?.value ?? 0) / 60)}m`}
-                  sub={`${plausible.aggregate.results.visit_duration?.value ?? 0}s`}
+                  label="Views / Visitor"
+                  value={(traffic.aggregate.results.views_per_visit?.value ?? 0).toLocaleString()}
                 />
               </div>
 
-              {plausible.timeseries?.results != null && (
+              {traffic.timeseries?.results != null && (
                 <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
                   <div className="mb-2 text-xs text-white/40">Visitors over time</div>
                   <ResponsiveContainer width="100%" height={180}>
-                    <AreaChart data={plausible.timeseries.results}>
+                    <AreaChart data={traffic.timeseries.results}>
                       <defs>
-                        <linearGradient id="plausibleGrad" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="trafficGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#818cf8" stopOpacity={0.3} />
                           <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
                         </linearGradient>
@@ -199,7 +197,7 @@ const DashboardPage: React.FC = () => {
                         type="monotone"
                         dataKey="visitors"
                         stroke="#818cf8"
-                        fill="url(#plausibleGrad)"
+                        fill="url(#trafficGrad)"
                         strokeWidth={2}
                       />
                     </AreaChart>
@@ -207,12 +205,12 @@ const DashboardPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {plausible.topPages?.results != null && (
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {traffic.topPages?.results != null && (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                     <div className="mb-2 text-xs text-white/40">Top Pages</div>
                     <div className="space-y-1">
-                      {plausible.topPages.results.slice(0, 8).map(p => (
+                      {traffic.topPages.results.slice(0, 8).map(p => (
                         <div key={p.page} className="flex justify-between text-xs">
                           <span className="mr-2 truncate text-white/70">{p.page}</span>
                           <span className="shrink-0 text-white/40">{p.visitors}</span>
@@ -221,11 +219,11 @@ const DashboardPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {plausible.topReferrers?.results != null && (
+                {traffic.topReferrers?.results != null && (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                     <div className="mb-2 text-xs text-white/40">Top Referrers</div>
                     <div className="space-y-1">
-                      {plausible.topReferrers.results.slice(0, 8).map(r => (
+                      {traffic.topReferrers.results.slice(0, 8).map(r => (
                         <div key={r.source} className="flex justify-between text-xs">
                           <span className="mr-2 truncate text-white/70">{r.source}</span>
                           <span className="shrink-0 text-white/40">{r.visitors}</span>
@@ -234,9 +232,22 @@ const DashboardPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+                {traffic.devices?.results != null && (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="mb-2 text-xs text-white/40">Devices</div>
+                    <div className="space-y-1">
+                      {traffic.devices.results.map(d => (
+                        <div key={d.device} className="flex justify-between text-xs">
+                          <span className="mr-2 truncate text-white/70">{d.device}</span>
+                          <span className="shrink-0 text-white/40">{d.visitors}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
-          ) : plausible?.aggregate?.results ? (
+          ) : traffic?.aggregate?.results ? (
             <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-white/30">
               No traffic data for this period
             </div>
