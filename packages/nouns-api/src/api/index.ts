@@ -4943,6 +4943,12 @@ CRITICAL RULES:
                 amountEth: row?.amount != null ? Number(row.amount) / 1e18 : null,
                 settled: row?.settled ?? null,
                 found: settler !== null || curator !== null || !!row,
+                // Every deploy re-indexes into a fresh schema (~10-15 min). While that
+                // runs the maps stop short — say so instead of "no record".
+                note:
+                  settler === null && curator === null && !row && maps.maxNounId < id
+                    ? `The indexer is still catching up (settlements indexed through Noun ${maps.maxNounId}). This is a temporary backfill window after a deploy — ask again in a few minutes, the data does go back to Noun 0.`
+                    : null,
               };
               break;
             }
