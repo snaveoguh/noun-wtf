@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { ImageData } from '@noundry/nouns-assets';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { Box, ChevronDown, Filter, X } from 'lucide-react';
 import { range } from 'remeda';
@@ -19,14 +18,13 @@ interface NounCell {
 }
 import NounDetailPopover from '@/components/NounDetailPopover';
 import ProbeTerminal from '@/components/ProbeTerminal';
-import { Trait } from '@/components/Trait';
+import { TraitFilterPanel } from '@/components/TraitFilterPanel';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/hooks';
 import { useNounOwners, useNounSettlers, useNounCurators } from '@/hooks/useNounDirectory';
-import { type SortOption, type TraitFilter, useNounFilters } from '@/hooks/useNounFilters';
+import { type SortOption, useNounFilters } from '@/hooks/useNounFilters';
 import { useOwnerFilter } from '@/hooks/useOwnerFilter';
 import { loadSettlerMaps, nounIdsFor } from '@/lib/settlerMaps';
-import { traitName } from '@/lib/traitName';
 import { Auction as IAuction } from '@/wrappers/nounsAuction';
 import { useBurnedNounIds, useNounSeeds } from '@/wrappers/nounToken';
 
@@ -42,14 +40,6 @@ const sortOptions: { label: string; value: SortOption }[] = [
   { label: 'Smallest', value: 'area-asc' },
   { label: 'Brightest', value: 'brightness-desc' },
   { label: 'Darkest', value: 'brightness-asc' },
-];
-
-const traitTypes = [
-  { key: 'head' as const, label: 'Head', category: 'heads' as const },
-  { key: 'glasses' as const, label: 'Noggles', category: 'glasses' as const },
-  { key: 'body' as const, label: 'Body', category: 'bodies' as const },
-  { key: 'accessory' as const, label: 'Accessory', category: 'accessories' as const },
-  { key: 'background' as const, label: 'Background', category: null },
 ];
 
 /** Searchable dropdown for owner/settler address lists */
@@ -391,39 +381,7 @@ const ExploreTab: React.FC = () => {
       </div>
 
       {/* Trait filter panel */}
-      {showTraits && (
-        <div className="mb-3 rounded-xl border bg-white p-4 shadow-sm">
-          <div className="space-y-2">
-            {traitTypes.map(({ key, label }) => {
-              const selectedCount = traitFilters[key].length;
-              const traitCount =
-                key === 'background'
-                  ? ImageData.bgcolors.length
-                  : ImageData.images[
-                      key === 'head'
-                        ? 'heads'
-                        : key === 'body'
-                          ? 'bodies'
-                          : key === 'accessory'
-                            ? 'accessories'
-                            : 'glasses'
-                    ].length;
-
-              return (
-                <TraitFilterRow
-                  key={key}
-                  traitKey={key}
-                  label={label}
-                  traitCount={traitCount}
-                  selectedCount={selectedCount}
-                  traitFilters={traitFilters}
-                  onToggle={toggleTraitFilter}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {showTraits && <TraitFilterPanel traitFilters={traitFilters} onToggle={toggleTraitFilter} />}
 
       {/* Grid — extends page, no separate scroll */}
       <div
@@ -574,77 +532,6 @@ const ExploreTab: React.FC = () => {
     </>
   );
 };
-
-/** Expandable trait filter row */
-function TraitFilterRow({
-  traitKey,
-  label,
-  traitCount,
-  selectedCount,
-  traitFilters,
-  onToggle,
-}: {
-  traitKey: keyof TraitFilter;
-  label: string;
-  traitCount: number;
-  selectedCount: number;
-  traitFilters: TraitFilter;
-  onToggle: (type: keyof TraitFilter, index: number) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="border-border rounded-lg border">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-      >
-        <span>
-          {label}
-          {selectedCount > 0 && (
-            <span className="ml-2 rounded-full bg-black px-2 py-0.5 text-xs text-white">
-              {selectedCount}
-            </span>
-          )}
-        </span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-
-      {expanded && (
-        <div className="flex max-h-48 flex-wrap gap-1 overflow-y-auto border-t p-2">
-          {Array.from({ length: traitCount }, (_, i) => {
-            const isSelected = traitFilters[traitKey].includes(i);
-            const name =
-              traitKey === 'background' ? (i === 0 ? 'Cool' : 'Warm') : traitName(traitKey, i);
-
-            return (
-              <button
-                key={i}
-                onClick={() => onToggle(traitKey, i)}
-                className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-all ${
-                  isSelected
-                    ? 'border-black bg-black text-white'
-                    : 'border-gray-200 hover:border-gray-400'
-                }`}
-              >
-                {traitKey !== 'background' && (
-                  <Trait type={traitKey} seed={i} className="h-6 w-6 rounded" />
-                )}
-                {traitKey === 'background' && (
-                  <div
-                    className="h-6 w-6 rounded"
-                    style={{ backgroundColor: `#${ImageData.bgcolors[i]}` }}
-                  />
-                )}
-                <span className="max-w-20 truncate">{name}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default ExploreTab;
 // force-reload 1775923457

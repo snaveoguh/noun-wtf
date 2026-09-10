@@ -11,16 +11,18 @@
  * grid is cheap — no virtualization needed. Clicking a cell opens the
  * `/v2/noun/:id` page.
  */
+import type { TraitFilter } from '@/hooks/useNounFilters';
 import type { INounSeed } from '@/wrappers/nounToken';
 
 import { FC, useMemo, useState, useRef, useEffect } from 'react';
 
-import { ChevronDownIcon, XIcon } from 'lucide-react';
+import { ChevronDownIcon, FilterIcon, XIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { range } from 'remeda';
 import { useReadContracts } from 'wagmi';
 
 import { getNoun } from '@/components/StandaloneNoun';
+import { TraitFilterPanel } from '@/components/TraitFilterPanel';
 import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
 import { countByAddress, loadSettlerMaps } from '@/lib/settlerMaps';
 import { nounV2Path } from '@/utils/history';
@@ -29,6 +31,14 @@ import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 type SortOption = 'id-desc' | 'id-asc';
+
+const emptyTraitFilters: TraitFilter = {
+  head: [],
+  body: [],
+  accessory: [],
+  glasses: [],
+  background: [],
+};
 
 const sortOptions: { label: string; value: SortOption }[] = [
   { label: 'Latest', value: 'id-desc' },
@@ -268,6 +278,25 @@ const V2ExploreTab: FC = () => {
   const [settlerFilter, setSettlerFilter] = useState('');
   const [curatedFilter, setCuratedFilter] = useState('');
 
+  // Trait filters — same shape as the V1 tab's useNounFilters, but resolved
+  // against the V2 art set (ImageDataV2) via TraitFilterPanel's isV2 switch.
+  const [showTraits, setShowTraits] = useState(false);
+  const [traitFilters, setTraitFilters] = useState<TraitFilter>({ ...emptyTraitFilters });
+  const toggleTraitFilter = (type: keyof TraitFilter, index: number) => {
+    setTraitFilters(prev => {
+      const current = prev[type];
+      const next = current.includes(index) ? current.filter(i => i !== index) : [...current, index];
+      return { ...prev, [type]: next };
+    });
+  };
+  const traitFilterCount = Object.values(traitFilters).reduce((sum, arr) => sum + arr.length, 0);
+  const hasAnyFilter =
+    searchId !== '' ||
+    ownerFilter !== '' ||
+    settlerFilter !== '' ||
+    curatedFilter !== '' ||
+    traitFilterCount > 0;
+
   useEffect(() => {
     let cancelled = false;
     loadSettlerMaps('v2')
@@ -304,6 +333,13 @@ const V2ExploreTab: FC = () => {
         n => (curatedByNoun[String(n.nounId)] ?? '').toLowerCase() === curatedFilter,
       );
     }
+    if (traitFilterCount > 0) {
+      result = result.filter(n =>
+        (Object.entries(traitFilters) as [keyof TraitFilter, number[]][]).every(
+          ([type, indices]) => indices.length === 0 || indices.includes(n.seed[type]),
+        ),
+      );
+    }
     result.sort((a, b) => (sort === 'id-desc' ? b.nounId - a.nounId : a.nounId - b.nounId));
     return result;
   }, [
@@ -314,6 +350,8 @@ const V2ExploreTab: FC = () => {
     curatedFilter,
     settlerByNoun,
     curatedByNoun,
+    traitFilters,
+    traitFilterCount,
     sort,
   ]);
 
@@ -415,6 +453,40 @@ const V2ExploreTab: FC = () => {
           onChange={setCuratedFilter}
         />
 
+        <button
+          type="button"
+          onClick={() => setShowTraits(!showTraits)}
+          className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+            showTraits
+              ? 'border-black bg-black text-white'
+              : 'border-gray-200 bg-white text-gray-600'
+          }`}
+        >
+          <FilterIcon size={12} />
+          Traits
+          {traitFilterCount > 0 && (
+            <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+              {traitFilterCount}
+            </span>
+          )}
+        </button>
+
+        {hasAnyFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchId('');
+              setOwnerFilter('');
+              setSettlerFilter('');
+              setCuratedFilter('');
+              setTraitFilters({ ...emptyTraitFilters });
+            }}
+            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-red-500 hover:bg-red-50"
+          >
+            <XIcon size={12} /> Clear
+          </button>
+        )}
+
         <select
           value={sort}
           onChange={e => setSort(e.target.value as SortOption)}
@@ -428,12 +500,14 @@ const V2ExploreTab: FC = () => {
         </select>
 
         <span className="ml-auto text-xs text-gray-400">
-          {searchId !== '' || ownerFilter !== '' || settlerFilter !== '' || curatedFilter !== ''
-            ? `${filtered.length} / ${nouns.length}`
-            : nouns.length}{' '}
-          Nouns
+          {hasAnyFilter ? `${filtered.length} / ${nouns.length}` : nouns.length} Nouns
         </span>
       </div>
+
+      {/* Trait filter panel — V2 art set */}
+      {showTraits && (
+        <TraitFilterPanel traitFilters={traitFilters} onToggle={toggleTraitFilter} isV2 />
+      )}
 
       {/* Grid */}
       <div
