@@ -242,7 +242,12 @@ import {
   type TraitDao,
 } from '../agent/traitProposal.js';
 
-import { checkTxForSale, LIL_NOUNS_SUBGRAPH, registerActivityRoutes } from './activityFeed.js';
+import {
+  checkTxForSale,
+  LIL_NOUNS_SUBGRAPH,
+  registerActivityRoutes,
+  salePriceForLeg,
+} from './activityFeed.js';
 
 // ─── Noun Balance Check (for deploy gating) ────────────────────────────────
 const nounCheckClient = createPublicClient({
@@ -8828,7 +8833,8 @@ app.get('/api/onchain-feed', async c => {
         const sale = await checkTxForSale(it.txHash);
         if (sale) {
           it.kind = 'sale';
-          it.valueWei = String(sale.priceWei);
+          // actor = buyer (to), counterparty = seller (from) — see OnchainFeed.ts
+          it.valueWei = String(salePriceForLeg(sale, it.counterparty, it.actor));
           it.via = sale.marketplace;
         }
       }),

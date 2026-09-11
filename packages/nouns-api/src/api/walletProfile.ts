@@ -110,6 +110,8 @@ import {
   latestIndexedBlock,
   proposalResult,
   REVOTE_RE,
+  type SaleInfo,
+  salePriceForLeg,
   titleFromDescription,
   toUnixSeconds,
 } from './activityFeed.js';
@@ -1293,7 +1295,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
   const txHashes = [...new Set(marketTransfers.map(t => lower(t.createdAtTransaction)))]
     .filter(Boolean)
     .slice(0, 30);
-  const saleByTx = new Map<string, { marketplace: string; priceWei: bigint }>();
+  const saleByTx = new Map<string, SaleInfo>();
   await Promise.all(
     txHashes.map(async h => {
       const s = await safe('sale', checkTxForSale(h), null);
@@ -1312,7 +1314,7 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
     const side: 'buy' | 'sell' = lower(t.to) === A ? 'buy' : 'sell';
     sales.push({
       nounId: Number(t.nounId),
-      priceEth: eth(s.priceWei),
+      priceEth: eth(salePriceForLeg(s, t.from, t.to)),
       marketplace: s.marketplace,
       side,
       counterparty: side === 'buy' ? lower(t.from) : lower(t.to),

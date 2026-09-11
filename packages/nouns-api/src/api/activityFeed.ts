@@ -239,7 +239,41 @@ const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a116
 
 export interface SaleInfo {
   marketplace: string;
+  /** Tx-level price: direct ETH value, or the largest payment-token transfer. */
   priceWei: bigint;
+  /** Payment-token wei sent per payer address (lowercased). Empty for direct-ETH sales. */
+  paidBy: Map<string, bigint>;
+  /** Payment-token wei received per payee address (lowercased). Empty for direct-ETH sales. */
+  receivedBy: Map<string, bigint>;
+  /** Number of ERC721 Transfer logs in the tx (all collections) — >1 means a bundle/sweep. */
+  nftTransfers: number;
+}
+
+/**
+ * Price for one (seller → buyer) leg of a marketplace tx.
+ *
+ * A Blur "accept bids" / sweep moves several NFTs in one tx: buyers each pay
+ * the pool, the pool pays the seller one aggregated lump. The tx-level
+ * `priceWei` (largest transfer) is that lump, so attributing it to every leg
+ * overstates each sale. Prefer the amount this buyer paid or this seller
+ * received (the smaller is the more specific — it excludes the other legs and
+ * marketplace fees). With no per-address signal (direct ETH sweeps), split the
+ * tx total evenly across the NFTs moved.
+ */
+export function salePriceForLeg(
+  sale: SaleInfo,
+  from: string | null | undefined,
+  to: string | null | undefined,
+  legTokens = 1,
+): bigint {
+  const buyerPaid = sale.paidBy.get(lower(to));
+  const sellerGot = sale.receivedBy.get(lower(from));
+  const candidates = [buyerPaid, sellerGot].filter((x): x is bigint => x != null && x > 0n);
+  if (candidates.length > 0) return candidates.reduce((a, b) => (a < b ? a : b));
+  if (sale.nftTransfers > 1 && legTokens < sale.nftTransfers) {
+    return (sale.priceWei * BigInt(legTokens)) / BigInt(sale.nftTransfers);
+  }
+  return sale.priceWei;
 }
 
 /** Cache tx sale lookups: txHash → SaleInfo | null. */
@@ -275,27 +309,60 @@ export async function checkTxForSale(txHash: string): Promise<SaleInfo | null> {
     const marketplace = MARKETPLACE_ROUTERS[tx.to.toLowerCase()];
     if (!marketplace) return rememberSale(key, null);
 
-    // Direct ETH payment: tx.value > 0
-    const txValue = BigInt(tx.value || '0');
-    if (txValue > 0n) return rememberSale(key, { marketplace, priceWei: txValue });
-
-    // WETH / Blur-pool sale: largest payment-token transfer in the receipt.
+    // A failed receipt fetch must not drop a direct-ETH sale — degrade to the
+    // tx-level price with no per-leg / bundle info.
     const receipt = await rpc<{
       logs?: Array<{ address: string; topics: string[]; data: string }>;
-    }>('eth_getTransactionReceipt', [txHash]);
+    }>('eth_getTransactionReceipt', [txHash]).catch(err => {
+      console.warn('[sales] receipt lookup failed:', txHash, err);
+      return undefined;
+    });
+
+    // Per-address payment flows + NFT count, so multi-NFT txs can be
+    // attributed per leg (see salePriceForLeg).
+    const paidBy = new Map<string, bigint>();
+    const receivedBy = new Map<string, bigint>();
+    let nftTransfers = 0;
     let maxPaymentWei = 0n;
+    const topicAddr = (t: string | undefined) => `0x${(t || '').slice(-40)}`.toLowerCase();
     for (const log of receipt?.logs ?? []) {
-      if (
-        PAYMENT_TOKENS.has(log.address.toLowerCase()) &&
-        log.topics[0] === ERC20_TRANSFER_TOPIC &&
-        log.data
-      ) {
-        const amount = BigInt(log.data);
-        if (amount > maxPaymentWei) maxPaymentWei = amount;
+      if (log.topics[0] !== ERC20_TRANSFER_TOPIC) continue;
+      // ERC721 Transfer indexes tokenId (4 topics); ERC20 Transfer has 3.
+      if (log.topics.length === 4) {
+        nftTransfers++;
+        continue;
       }
+      if (!PAYMENT_TOKENS.has(log.address.toLowerCase()) || !log.data) continue;
+      const amount = BigInt(log.data);
+      if (amount > maxPaymentWei) maxPaymentWei = amount;
+      const payer = topicAddr(log.topics[1]);
+      const payee = topicAddr(log.topics[2]);
+      paidBy.set(payer, (paidBy.get(payer) ?? 0n) + amount);
+      receivedBy.set(payee, (receivedBy.get(payee) ?? 0n) + amount);
     }
-    // Marketplace tx but no extractable price still counts as a sale (price 0).
-    return rememberSale(key, { marketplace, priceWei: maxPaymentWei });
+
+    // Direct ETH payment: tx.value > 0. Sellers are paid via internal calls
+    // (invisible in logs), so only the tx total + NFT count are known.
+    const txValue = BigInt(tx.value || '0');
+    if (txValue > 0n) {
+      return rememberSale(key, {
+        marketplace,
+        priceWei: txValue,
+        paidBy: new Map(),
+        receivedBy: new Map(),
+        nftTransfers,
+      });
+    }
+
+    // WETH / Blur-pool sale. Marketplace tx but no extractable price still
+    // counts as a sale (price 0).
+    return rememberSale(key, {
+      marketplace,
+      priceWei: maxPaymentWei,
+      paidBy,
+      receivedBy,
+      nftTransfers,
+    });
   } catch (err) {
     console.warn('[sales] tx lookup failed:', txHash, err);
     return rememberSale(key, null);
@@ -1552,7 +1619,13 @@ const mergeTransfersAndSales: PostProcessor = async (events, ctx) => {
     const base = { nounIds, nounId: nounIds[0], from: g.data.from, to: g.data.to };
     const sale = sales.get(lower(g.txHash));
     if (sale) {
-      const priceEth = Number(sale.priceWei) / 1e18;
+      const legWei = salePriceForLeg(
+        sale,
+        g.data.from as string,
+        g.data.to as string,
+        nounIds.length,
+      );
+      const priceEth = Number(legWei) / 1e18;
       rest.push({
         type: 'SALE',
         blockNumber: g.blockNumber,
@@ -1561,7 +1634,7 @@ const mergeTransfersAndSales: PostProcessor = async (events, ctx) => {
         data: {
           ...base,
           priceEth,
-          priceWei: sale.priceWei.toString(),
+          priceWei: legWei.toString(),
           marketplace: sale.marketplace,
           // legacy keys (older shells render these)
           collection: 'NOUN',
