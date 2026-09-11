@@ -606,6 +606,11 @@ export function Character3D({ seed, stateRef, scale = 1 }: Character3DProps) {
     };
   }, []);
 
+  // Smoothed facing — the 8-way `direction` snaps in 45° steps; we damp
+  // the visual yaw toward it (shortest arc, framerate-independent) so turns
+  // read as a turn instead of a teleport.
+  const smoothYawRef = useRef<number | null>(null);
+
   // Per-frame update
   useFrame((_, delta) => {
     const g = groupRef.current;
@@ -619,7 +624,18 @@ export function Character3D({ seed, stateRef, scale = 1 }: Character3DProps) {
     g.position.set(s.x, s.y + 0.14 + hoverBob, s.z);
 
     // Face direction — on board: character 90° side-on, board points forward
-    const baseRotY = DIRECTION_ROTATION[s.direction] ?? 0;
+    const targetYaw = DIRECTION_ROTATION[s.direction] ?? 0;
+    let baseRotY: number;
+    if (smoothYawRef.current === null) {
+      baseRotY = targetYaw;
+    } else {
+      const cur = smoothYawRef.current;
+      const diff = Math.atan2(Math.sin(targetYaw - cur), Math.cos(targetYaw - cur));
+      // Attacks + dashes need a snappier turn than a stroll.
+      const rate = s.state === 'attacking' || s.state === 'dashing' ? 30 : 16;
+      baseRotY = cur + diff * (1 - Math.exp(-Math.min(delta, 0.1) * rate));
+    }
+    smoothYawRef.current = baseRotY;
     g.rotation.y = s.isSkating ? baseRotY + Math.PI / 2 : baseRotY;
 
     // Airborne pose — different based on rising vs falling
@@ -1067,13 +1083,11 @@ export function Character3D({ seed, stateRef, scale = 1 }: Character3DProps) {
 
       // Rainbow hue-shift for equipped spray can
       if (gunGroupRef.current && s.weaponEquipped === 'spray_can') {
-        const body = gunGroupRef.current.getObjectByName('__sprayBody') as
-          | THREE.Mesh
-          | undefined;
+        const body = gunGroupRef.current.getObjectByName('__sprayBody') as THREE.Mesh | undefined;
         if (body) {
           const mat = body.material as THREE.MeshStandardMaterial;
           // ~1 full cycle every ~3s (0.005 per frame @ 60fps = 0.3 Hz)
-          const h = ((performance.now() / 3000) % 1 + 1) % 1;
+          const h = (((performance.now() / 3000) % 1) + 1) % 1;
           mat.color.setHSL(h, 1, 0.5);
           mat.emissive.setHSL(h, 0.8, 0.3);
         }

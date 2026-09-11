@@ -4,7 +4,7 @@
 // All styles are inline. Monospace throughout. Dark semi-transparent panels.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Tile, MAP_SIZE } from './types';
+import { Tile, MAP_SIZE, MAP_ORIGIN } from './types';
 import { ISLAND_MAP } from './tilemap';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -20,6 +20,9 @@ export interface GameHUDProps {
   majaAlpha: number;
   respawnTimer: number;
   isDead: boolean;
+  /** Player position in WORLD tile coords (fractional) — centres the minimap. */
+  playerTx?: number;
+  playerTy?: number;
   micEnabled?: boolean;
   isMuted?: boolean;
   isSpeaking?: boolean;
@@ -45,6 +48,7 @@ const MINI_COLORS: Record<number, string> = {
   [Tile.Spawn]: '#6aa84f',
   [Tile.DeepWater]: '#1a4f8a',
   [Tile.Arena]: '#8b6914',
+  [Tile.Shallow]: '#7fb6e6',
 };
 
 // ── Emote definitions ────────────────────────────────────────────────
@@ -74,29 +78,43 @@ const PANEL: React.CSSProperties = {
 };
 
 // ── Minimap canvas renderer (static, only drawn once) ────────────────
+//
+// Full-resolution 640×640 image of the big island (1px per tile) built
+// once via ImageData; the HUD shows a player-centred window of it.
 
 let minimapDataURL: string | null = null;
+const MINI_VIEW_TILES = 96; // tiles visible across the 120px window
+const MINI_PX_PER_TILE = 120 / MINI_VIEW_TILES;
+
+function hexToRGB(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return hex.length === 4
+    ? [((n >> 8) & 0xf) * 17, ((n >> 4) & 0xf) * 17, (n & 0xf) * 17]
+    : [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
 
 function getMinimapImage(): string {
   if (minimapDataURL) return minimapDataURL;
-  const size = 120;
-  const scale = size / MAP_SIZE;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = MAP_SIZE;
+  canvas.height = MAP_SIZE;
   const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(MAP_SIZE, MAP_SIZE);
+  const rgb: Record<number, [number, number, number]> = {};
+  for (const k of Object.keys(MINI_COLORS)) rgb[+k] = hexToRGB(MINI_COLORS[+k]);
+  const fallback = hexToRGB('#1a4f8a');
   for (let y = 0; y < MAP_SIZE; y++) {
+    const row = ISLAND_MAP[y];
     for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = ISLAND_MAP[y]?.[x] ?? Tile.DeepWater;
-      ctx.fillStyle = MINI_COLORS[tile] ?? '#1a4f8a';
-      ctx.fillRect(
-        Math.floor(x * scale),
-        Math.floor(y * scale),
-        Math.ceil(scale),
-        Math.ceil(scale),
-      );
+      const c = rgb[row[x]] ?? fallback;
+      const i = (y * MAP_SIZE + x) * 4;
+      img.data[i] = c[0];
+      img.data[i + 1] = c[1];
+      img.data[i + 2] = c[2];
+      img.data[i + 3] = 255;
     }
   }
+  ctx.putImageData(img, 0, 0);
   minimapDataURL = canvas.toDataURL();
   return minimapDataURL;
 }
@@ -202,6 +220,8 @@ export function GameHUD({
   transcript = '',
   weaponEquipped = null,
   weaponAmmo = 0,
+  playerTx = 32,
+  playerTy = 32,
 }: GameHUDProps) {
   // inject keyframes once
   useEffect(() => injectStyles(), []);
@@ -423,12 +443,19 @@ export function GameHUD({
         >
           N
         </div>
-        <img
-          src={getMinimapImage()}
-          width={120}
-          height={120}
-          style={{ borderRadius: 4, display: 'block' }}
-          alt=""
+        <div
+          style={{
+            width: 120,
+            height: 120,
+            borderRadius: 4,
+            overflow: 'hidden',
+            backgroundImage: `url(${getMinimapImage()})`,
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: `${MAP_SIZE * MINI_PX_PER_TILE}px ${MAP_SIZE * MINI_PX_PER_TILE}px`,
+            backgroundPosition: `${60 - (playerTx - MAP_ORIGIN) * MINI_PX_PER_TILE}px ${60 - (playerTy - MAP_ORIGIN) * MINI_PX_PER_TILE}px`,
+            backgroundColor: '#1a4f8a',
+            imageRendering: 'pixelated',
+          }}
         />
         {/* Player dot (center — simplified; real position requires player coords) */}
         <div

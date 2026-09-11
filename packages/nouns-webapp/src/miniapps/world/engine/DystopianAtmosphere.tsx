@@ -14,14 +14,13 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { TILE_UNITS, CORE_SIZE } from './types';
 
 // ── Constants (mirrors Atmosphere.tsx so geometry lines up) ──────────
 
-const WORLD_SCALE = 0.1;
-const TILE_SIZE = 16;
-const MAP_SIZE = 64;
-const TERRAIN_SIZE = MAP_SIZE * TILE_SIZE * WORLD_SCALE; // 102.4
-const CENTER = TERRAIN_SIZE / 2; // 51.2
+const CENTER = (CORE_SIZE / 2) * TILE_UNITS; // 51.2 — island centre (spawn)
+/** How far the smog bank spreads around the centre (island is ~350u radius). */
+const SMOG_SPREAD = 760;
 
 // ── Dystopian Sky ────────────────────────────────────────────────────
 // Large inside-out sphere with a vertical gradient (navy → sickly
@@ -107,7 +106,7 @@ export function DystopianSky() {
 // ── Smog Clouds ──────────────────────────────────────────────────────
 // Layered dense grey haze — replaces the puffy white cloud layer.
 
-const SMOG_COUNT = 22;
+const SMOG_COUNT = 64;
 
 interface SmogDatum {
   x: number;
@@ -124,9 +123,9 @@ function makeSmogData(count: number): SmogDatum[] {
   for (let i = 0; i < count; i++) {
     const rng = (s: number) => Math.sin(i * 91.7 + s * 247.1) * 0.5 + 0.5;
     data.push({
-      x: CENTER + (rng(0) - 0.5) * TERRAIN_SIZE * 1.5,
+      x: CENTER + (rng(0) - 0.5) * SMOG_SPREAD,
       y: 6 + rng(1) * 10, // 6-16 units — thicker band, lower
-      z: CENTER + (rng(2) - 0.5) * TERRAIN_SIZE * 1.5,
+      z: CENTER + (rng(2) - 0.5) * SMOG_SPREAD,
       scale: 4 + rng(3) * 6, // 4-10 — bigger than cheerful clouds
       opacity: 0.35 + rng(4) * 0.3,
       driftSpeed: 0.15 + rng(5) * 0.3,
@@ -200,7 +199,8 @@ export function SmogClouds() {
       const c = smogData[i];
       const driftX = c.x + t * c.driftSpeed;
       const wrappedX =
-        ((driftX + TERRAIN_SIZE * 0.75) % (TERRAIN_SIZE * 1.5)) - TERRAIN_SIZE * 0.25;
+        ((((driftX - (CENTER - SMOG_SPREAD / 2)) % SMOG_SPREAD) + SMOG_SPREAD) % SMOG_SPREAD) +
+        (CENTER - SMOG_SPREAD / 2);
 
       dummy.position.set(wrappedX, c.y, c.z);
       dummy.quaternion.copy(camera.quaternion);
@@ -313,16 +313,19 @@ export function RainParticles({
   opacity = 0.45,
 }: RainParticlesProps = {}) {
   const pointsRef = useRef<THREE.Points>(null);
-  const range = TERRAIN_SIZE * 1.2;
+  const groupRef = useRef<THREE.Group>(null);
+  // Rain is camera-relative: the streaks live in a ~110u box that follows
+  // the camera, so the whole 640-tile island rains without 100k points.
+  const range = 110;
   const top = 32;
   const bottom = -1;
 
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = CENTER + (Math.random() - 0.5) * range;
+      arr[i * 3] = (Math.random() - 0.5) * range;
       arr[i * 3 + 1] = Math.random() * (top - bottom) + bottom;
-      arr[i * 3 + 2] = CENTER + (Math.random() - 0.5) * range;
+      arr[i * 3 + 2] = (Math.random() - 0.5) * range;
     }
     return arr;
   }, [count, range]);
@@ -331,9 +334,10 @@ export function RainParticles({
   const windX = 0.35;
   const windZ = 0.12;
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     const pts = pointsRef.current;
     if (!pts) return;
+    if (groupRef.current) groupRef.current.position.set(camera.position.x, 0, camera.position.z);
     const pos = pts.geometry.attributes.position;
     const arr = pos.array as Float32Array;
     const dy = speed * delta;
@@ -344,11 +348,15 @@ export function RainParticles({
       arr[yi] -= dy;
       arr[i * 3] += dx;
       arr[i * 3 + 2] += dz;
-      if (arr[yi] < bottom) {
-        // Respawn near top at a random XZ
+      if (
+        arr[yi] < bottom ||
+        Math.abs(arr[i * 3]) > range * 0.6 ||
+        Math.abs(arr[i * 3 + 2]) > range * 0.6
+      ) {
+        // Respawn near top at a random XZ (box-local)
         arr[yi] = top;
-        arr[i * 3] = CENTER + (Math.random() - 0.5) * range;
-        arr[i * 3 + 2] = CENTER + (Math.random() - 0.5) * range;
+        arr[i * 3] = (Math.random() - 0.5) * range;
+        arr[i * 3 + 2] = (Math.random() - 0.5) * range;
       }
     }
     pos.needsUpdate = true;
@@ -361,16 +369,18 @@ export function RainParticles({
   }, [positions]);
 
   return (
-    <points ref={pointsRef} geometry={geometry} frustumCulled={false}>
-      <pointsMaterial
-        color="#8ea8c8"
-        size={0.09}
-        transparent
-        opacity={opacity}
-        depthWrite={false}
-        sizeAttenuation
-      />
-    </points>
+    <group ref={groupRef}>
+      <points ref={pointsRef} geometry={geometry} frustumCulled={false}>
+        <pointsMaterial
+          color="#8ea8c8"
+          size={0.09}
+          transparent
+          opacity={opacity}
+          depthWrite={false}
+          sizeAttenuation
+        />
+      </points>
+    </group>
   );
 }
 

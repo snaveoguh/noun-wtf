@@ -1,7 +1,18 @@
 // ── Physics: knockback, gravity, juggle, collision ───────────────────
 
 import type { Player, GroundMaterial } from './types';
-import { Tile, WALKABLE, TILE_SIZE, MAP_SIZE, GRAVITY, GROUND_Y, SPRITE_SIZE } from './types';
+import {
+  Tile,
+  WALKABLE,
+  TILE_SIZE,
+  MAP_SIZE,
+  MAP_ORIGIN,
+  WORLD_MIN_PX,
+  WORLD_MAX_PX,
+  GRAVITY,
+  GROUND_Y,
+  SPRITE_SIZE,
+} from './types';
 import {
   aabbCircleOverlap,
   aabbClosestPoint,
@@ -59,8 +70,9 @@ export function isInCone(
 
 /** Get tile at world coordinate */
 export function getTileAt(worldX: number, worldY: number, map: Tile[][]): Tile {
-  const tx = Math.floor(worldX / TILE_SIZE);
-  const ty = Math.floor(worldY / TILE_SIZE);
+  // ISLAND_MAP is origin-shifted: index 0 is world tile MAP_ORIGIN.
+  const tx = Math.floor(worldX / TILE_SIZE) - MAP_ORIGIN;
+  const ty = Math.floor(worldY / TILE_SIZE) - MAP_ORIGIN;
   if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return Tile.DeepWater;
   return map[ty]?.[tx] ?? Tile.DeepWater;
 }
@@ -264,6 +276,7 @@ export function tileMaterialAt(x: number, y: number, map: Tile[][]): GroundMater
       return 'path';
     case Tile.Water:
     case Tile.DeepWater:
+    case Tile.Shallow:
       return 'water';
     case Tile.Rock:
       return 'stone';
@@ -341,10 +354,9 @@ export function applyFriction(player: Player, friction = 0.85) {
 
 /** Clamp position to world bounds */
 export function clampToWorld(x: number, y: number): { x: number; y: number } {
-  const worldPx = TILE_SIZE * MAP_SIZE;
   return {
-    x: Math.max(0, Math.min(worldPx - 1, x)),
-    y: Math.max(0, Math.min(worldPx - 1, y)),
+    x: Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX - 1, x)),
+    y: Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX - 1, y)),
   };
 }
 

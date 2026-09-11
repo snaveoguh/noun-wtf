@@ -16,11 +16,11 @@ import { GameHUD } from './engine/GameHUD';
 import {
   SEND_INTERVAL,
   TILE_SIZE,
-  MAP_SIZE,
   PLAYER_MAX_HP,
   DIRECTION_ROTATION,
   DIRECTION_FACING_ANGLE,
-  Tile,
+  CORE_SIZE,
+  TILE_UNITS,
 } from './engine/types';
 import type { Player } from './engine/types';
 import {
@@ -31,7 +31,11 @@ import {
   pollGamepad,
   type InputState,
 } from './engine/input';
-import { SPAWN_X, SPAWN_Y, ISLAND_MAP } from './engine/tilemap';
+import { SPAWN_X, SPAWN_Y, ISLAND_MAP, sampleTerrainY, COAST_POINTS } from './engine/tilemap';
+import { TerrainChunks } from './engine/scenery/TerrainChunks';
+import { Flora } from './engine/scenery/Flora';
+import { FallingLeaves } from './engine/scenery/FallingLeaves';
+import { StaticBatch } from './engine/scenery/StaticBatch';
 import { seedToKey, randomSeed } from './engine/sprites';
 import { isInDeepWater } from './engine/physics';
 import {
@@ -81,7 +85,14 @@ import { Html } from '@react-three/drei';
 // Spritesheet compositor available for future use
 // import { composeSpritesheet, getFrame, extractFrameCanvas } from './engine/spritesheet';
 import { type NPC } from './engine/npcs';
-import { createArenaRun, startRun, tickArena, resolveNpcHits, type ArenaRun } from './engine/arena';
+import {
+  createArenaRun,
+  startRun,
+  endRun,
+  tickArena,
+  resolveNpcHits,
+  type ArenaRun,
+} from './engine/arena';
 import { Character3D, type CharacterState } from './engine/Character3D';
 import { TreasureChest3D, DroppedItem3D } from './engine/TreasureChest3D';
 import { DepositModal } from './wager/DepositModal';
@@ -205,91 +216,16 @@ import { WhiteRoom, monolithPositions, whiteRoomFloorTileIds } from './worlds/Wh
 // ── Constants ─────────────────────────────────────────────────────────
 
 const WORLD_SCALE = 0.1; // Scale world coords to Three.js units
-const TERRAIN_SIZE = MAP_SIZE * TILE_SIZE * WORLD_SCALE;
-
-// ── Tile colors for terrain texture ───────────────────────────────────
-
-function tileColor(tile: Tile): [number, number, number] {
-  switch (tile) {
-    case Tile.DeepWater:
-      return [26, 79, 138];
-    case Tile.Water:
-      return [59, 125, 216];
-    case Tile.Sand:
-      return [232, 213, 163];
-    case Tile.Grass:
-      return [90, 143, 60];
-    case Tile.Tree:
-      return [45, 107, 30];
-    case Tile.Flower:
-      return [100, 153, 70];
-    case Tile.Path:
-      return [196, 165, 110];
-    case Tile.Rock:
-      return [136, 136, 136];
-    case Tile.Spawn:
-      return [106, 168, 79];
-    case Tile.Arena:
-      return [139, 105, 20];
-    default:
-      return [26, 79, 138];
-  }
-}
-
-// ── Generate terrain texture from tilemap ─────────────────────────────
-
-function generateTerrainTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = MAP_SIZE;
-  canvas.height = MAP_SIZE;
-  const ctx = canvas.getContext('2d')!;
-  const imageData = ctx.createImageData(MAP_SIZE, MAP_SIZE);
-
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = ISLAND_MAP[y]?.[x] ?? Tile.DeepWater;
-      const [r, g, b] = tileColor(tile);
-      const i = (y * MAP_SIZE + x) * 4;
-      imageData.data[i] = r;
-      imageData.data[i + 1] = g;
-      imageData.data[i + 2] = b;
-      imageData.data[i + 3] = 255;
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  return texture;
-}
-
-// ── Generate heightmap from tilemap ───────────────────────────────────
-
-function generateHeightmap(): Float32Array {
-  const heights = new Float32Array((MAP_SIZE + 1) * (MAP_SIZE + 1));
-  for (let y = 0; y <= MAP_SIZE; y++) {
-    for (let x = 0; x <= MAP_SIZE; x++) {
-      const tile =
-        ISLAND_MAP[Math.min(y, MAP_SIZE - 1)]?.[Math.min(x, MAP_SIZE - 1)] ?? Tile.DeepWater;
-      let h = 0;
-      if (tile === Tile.DeepWater) h = -2;
-      else if (tile === Tile.Water) h = -1;
-      else if (tile === Tile.Sand) h = 0.2;
-      else if (tile === Tile.Grass || tile === Tile.Flower || tile === Tile.Spawn) h = 0.5;
-      else if (tile === Tile.Path) h = 0.4;
-      else if (tile === Tile.Tree) h = 0.6;
-      else if (tile === Tile.Rock) h = 0.8;
-      else if (tile === Tile.Arena) h = 0.5;
-      heights[y * (MAP_SIZE + 1) + x] = h;
-    }
-  }
-  return heights;
-}
+/** Legacy 64-tile core in Three.js units (102.4) — paint grid, old water plane. */
+const CORE_WORLD_SIZE = CORE_SIZE * TILE_SIZE * WORLD_SCALE;
+/** Fixed simulation step. The whole engine is authored in per-frame-at-60Hz
+ * units, so we run it at exactly 60Hz regardless of display refresh and
+ * interpolate the rendered positions between ticks. */
+const SIM_STEP = 1 / 60;
+const MAX_SIM_STEPS = 4;
+const RAID_PREF_KEY = 'nouns-world-raids';
 
 // ── Terrain height sampling ───────────────────────────────────────────
-
-const HEIGHT_SCALE = WORLD_SCALE * 8;
 
 /** Get terrain height in Three.js Y at a given world X/Z position */
 function getTerrainHeight(worldX: number, worldZ: number): number {
@@ -322,122 +258,9 @@ function getTerrainHeight(worldX: number, worldZ: number): number {
     return Math.max(stairY, 0.35);
   }
 
-  // Convert Three.js world coords back to tile coords
-  const tx = Math.floor(worldX / (TILE_SIZE * WORLD_SCALE));
-  const tz = Math.floor(worldZ / (TILE_SIZE * WORLD_SCALE));
-  if (tx < 0 || tx >= MAP_SIZE || tz < 0 || tz >= MAP_SIZE) return -2 * HEIGHT_SCALE;
-  const tile = ISLAND_MAP[tz]?.[tx] ?? Tile.DeepWater;
-  let h = 0;
-  if (tile === Tile.DeepWater) h = -2;
-  else if (tile === Tile.Water) h = -1;
-  else if (tile === Tile.Sand) h = 0.2;
-  else if (tile === Tile.Grass || tile === Tile.Flower || tile === Tile.Spawn) h = 0.5;
-  else if (tile === Tile.Path) h = 0.4;
-  else if (tile === Tile.Tree) h = 0.6;
-  else if (tile === Tile.Rock) h = 0.8;
-  else if (tile === Tile.Arena) h = 0.5;
-  return h * HEIGHT_SCALE;
-}
-
-// ── Terrain Component ─────────────────────────────────────────────────
-
-function Terrain() {
-  const texture = useMemo(() => generateTerrainTexture(), []);
-  const heightmap = useMemo(() => generateHeightmap(), []);
-
-  const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, MAP_SIZE, MAP_SIZE);
-    // Apply heightmap
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, heightmap[i] * WORLD_SCALE * 8);
-    }
-    pos.needsUpdate = true;
-    geo.computeVertexNormals();
-    return geo;
-  }, [heightmap]);
-
-  return (
-    <mesh
-      geometry={geometry}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[TERRAIN_SIZE / 2, 0, TERRAIN_SIZE / 2]}
-    >
-      <meshStandardMaterial map={texture} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-// ── Trees (3D cylinders + spheres on Tree tiles) ──────────────────────
-
-function Trees() {
-  const treePositions = useMemo(() => {
-    const positions: [number, number][] = [];
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        if (ISLAND_MAP[y]?.[x] === Tile.Tree) {
-          positions.push([
-            (x + 0.5) * TILE_SIZE * WORLD_SCALE,
-            (y + 0.5) * TILE_SIZE * WORLD_SCALE,
-          ]);
-        }
-      }
-    }
-    return positions;
-  }, []);
-
-  return (
-    <group>
-      {treePositions.map(([x, z], i) => (
-        <group key={i} position={[x, 0, z]}>
-          {/* Trunk */}
-          <mesh position={[0, 0.6, 0]}>
-            <cylinderGeometry args={[0.08, 0.12, 1.2, 6]} />
-            <meshStandardMaterial color="#6b4226" />
-          </mesh>
-          {/* Canopy */}
-          <mesh position={[0, 1.4, 0]}>
-            <sphereGeometry args={[0.5, 8, 6]} />
-            <meshStandardMaterial color="#2d6b1e" />
-          </mesh>
-          <mesh position={[0.15, 1.6, 0.1]}>
-            <sphereGeometry args={[0.35, 6, 5]} />
-            <meshStandardMaterial color="#1e5214" />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-// ── Rocks ─────────────────────────────────────────────────────────────
-
-function Rocks() {
-  const rockPositions = useMemo(() => {
-    const positions: [number, number][] = [];
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        if (ISLAND_MAP[y]?.[x] === Tile.Rock) {
-          positions.push([
-            (x + 0.5) * TILE_SIZE * WORLD_SCALE,
-            (y + 0.5) * TILE_SIZE * WORLD_SCALE,
-          ]);
-        }
-      }
-    }
-    return positions;
-  }, []);
-
-  return (
-    <group>
-      {rockPositions.map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.2, z]}>
-          <dodecahedronGeometry args={[0.3, 0]} />
-          <meshStandardMaterial color="#888" roughness={0.9} />
-        </mesh>
-      ))}
-    </group>
-  );
+  // Continuous heightfield (bilinear over the tile grid, same field the
+  // terrain chunks are built from) — no per-tile steps, no pops.
+  return sampleTerrainY(worldX, worldZ);
 }
 
 // ── Paintable floor tiles ──────────────────────────────────────────────
@@ -1039,13 +862,17 @@ function CrystalBallMountain({ nounSeed }: { nounSeed: INounSeed }) {
 
 // ── Venetian Boats — old weathered boats bobbing at the shoreline ─────
 
-const BOAT_POSITIONS: [number, number, number, number][] = [
-  [20 * TILE_SIZE * WORLD_SCALE, 8 * TILE_SIZE * WORLD_SCALE, 0.3, 0],
-  [60 * TILE_SIZE * WORLD_SCALE, 15 * TILE_SIZE * WORLD_SCALE, -0.8, 1.2],
-  [70 * TILE_SIZE * WORLD_SCALE, 50 * TILE_SIZE * WORLD_SCALE, 2.1, 2.5],
-  [15 * TILE_SIZE * WORLD_SCALE, 55 * TILE_SIZE * WORLD_SCALE, 1.4, 3.8],
-  [40 * TILE_SIZE * WORLD_SCALE, 68 * TILE_SIZE * WORLD_SCALE, -1.5, 5.1],
-];
+// Boats moored just off the real coastline (x, z, bob-phase, rotation).
+const BOAT_POSITIONS: [number, number, number, number][] = [0.3, 1.5, 2.6, 3.9, 5.1].map(
+  (bearing, i) => {
+    const n = COAST_POINTS.length;
+    const cp = n ? COAST_POINTS[Math.floor((bearing / (Math.PI * 2)) * n) % n] : null;
+    const out = 7 * TILE_UNITS;
+    const x = cp ? (cp.tx + 0.5) * TILE_UNITS + Math.cos(cp.angle) * out : SPAWN_X * WORLD_SCALE;
+    const z = cp ? (cp.ty + 0.5) * TILE_UNITS + Math.sin(cp.angle) * out : SPAWN_Y * WORLD_SCALE;
+    return [x, z, [0.3, -0.8, 2.1, 1.4, -1.5][i], i * 1.25] as [number, number, number, number];
+  },
+);
 
 function VenetianBoat({
   position,
@@ -1338,9 +1165,9 @@ export function _Water() {
     <mesh
       ref={meshRef}
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[TERRAIN_SIZE / 2, -0.15, TERRAIN_SIZE / 2]}
+      position={[CORE_WORLD_SIZE / 2, -0.15, CORE_WORLD_SIZE / 2]}
     >
-      <planeGeometry args={[TERRAIN_SIZE * 1.5, TERRAIN_SIZE * 1.5]} />
+      <planeGeometry args={[CORE_WORLD_SIZE * 1.5, CORE_WORLD_SIZE * 1.5]} />
       <meshStandardMaterial color="#3377cc" transparent opacity={0.8} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -2443,6 +2270,25 @@ export default function WorldPage() {
     paintColor: null,
     swordEquipped: false,
   });
+  // Raid opt-in/out. 'ask' = first visit (show the card once); 'on' = a
+  // small START RAID pill; 'off' = raids hidden behind a muted pill.
+  // Persisted so the choice sticks across visits.
+  const [raidPref, setRaidPref] = useState<'ask' | 'on' | 'off'>(() => {
+    try {
+      const v = localStorage.getItem(RAID_PREF_KEY);
+      return v === 'on' || v === 'off' ? v : 'ask';
+    } catch {
+      return 'ask';
+    }
+  });
+  const setRaids = (v: 'on' | 'off') => {
+    setRaidPref(v);
+    try {
+      localStorage.setItem(RAID_PREF_KEY, v);
+    } catch {
+      /* private mode */
+    }
+  };
   // Parallel to npcsRef — arena.ts keeps these index-aligned as monsters
   // surface and die. Starts empty; startRun() populates it.
   const npcCharStates = useRef<CharacterState[]>([]);
@@ -2524,6 +2370,8 @@ export default function WorldPage() {
   const hudRef = useRef({
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,
+    playerTx: SPAWN_X / TILE_SIZE,
+    playerTy: SPAWN_Y / TILE_SIZE,
     playerCount: 0,
     comboHits: 0,
     controlsVisible: true,
@@ -3026,545 +2874,620 @@ export default function WorldPage() {
     openGraffitiForNearestWall,
   ]);
 
+  // ── Dev hooks (Vite dev only) ────────────────────────────────────────
+  // Exposes the R3F root + player on window.__world so a headless / hidden
+  // automation tab can step frames with `advance()` and read the sim.
+  function DevHooks() {
+    const three = useThree();
+    useEffect(() => {
+      if (!import.meta.env.DEV) return;
+      const w = window as unknown as { __world?: unknown };
+      w.__world = { three, playerRef, playerTargetRef, arenaRef, npcsRef, getPlayerBody };
+      return () => {
+        delete w.__world;
+      };
+    }, [three]);
+    return null;
+  }
+
   // ── Game Logic Component (runs inside R3F) ──────────────────────────
 
   function GameLogic() {
+    // Fixed-timestep accumulator + previous-tick snapshot for interpolation.
+    const simAcc = useRef(0);
+    const prevPlayer = useRef({ x: SPAWN_X, y: SPAWN_Y, valid: false });
+
+    // ── One 60Hz simulation tick — everything authored "per frame" runs here ──
+    const simTick = () => {
+      const player = playerRef.current;
+      const input = inputRef.current;
+      const combat = combatRef.current;
+      const ocean = oceanRef.current;
+      const mp = mpRef.current;
+      if (!player) return;
+
+      // Snapshot last-tick positions so the renderer can lerp between ticks.
+      const pp = prevPlayer.current;
+      pp.x = player.x;
+      pp.y = player.y;
+      pp.valid = true;
+      for (const npc of npcsRef.current) {
+        npc.prevX = npc.x;
+        npc.prevY = npc.y;
+      }
+
+      // Publish the authoritative body to dojoState so GravityZones /
+      // TrainingDummies can read it for proximity + impulse effects.
+      const playerBody = getPlayerBody(player);
+      setPlayerBodyForDojo(playerBody);
+
+      // Double-tap dash detection (edge-triggered on WASD just-pressed).
+      // Writes into the authoritative body so locomotion.ts picks up
+      // lastDirTapTime/Vec and triggers the actual dash state.
+      {
+        const jp = input.justPressed;
+        const body = playerBody ?? dashTapBodyRef.current;
+        const nowMs = performance.now();
+        // Camera-relative: W = forward, S = back, A = left, D = right.
+        const ca = input.cameraAngle ?? 0;
+        const forwardX = -Math.sin(ca);
+        const forwardY = -Math.cos(ca);
+        const rightX = Math.cos(ca);
+        const rightY = -Math.sin(ca);
+        const tryTap = (dx: number, dy: number) => {
+          // Consume the tap. When a double-tap closes, registerDirTap
+          // returns true — locomotion owns the actual dash + focus
+          // trigger inside combat.ts via its authoritative body, so we
+          // just record the edge here for the shared double-tap window.
+          registerDirTap(body, dx, dy, nowMs);
+        };
+        if (jp.has('w')) tryTap(forwardX, forwardY);
+        if (jp.has('s')) tryTap(-forwardX, -forwardY);
+        if (jp.has('a')) tryTap(-rightX, -rightY);
+        if (jp.has('d')) tryTap(rightX, rightY);
+      }
+
+      // ── FEATURE 2: Poll gamepad each frame ──
+      pollGamepad(input);
+
+      frameRef.current++;
+      const frame = frameRef.current;
+
+      // Ocean death — only if actually at water level (not on ramp/buildings above water tiles)
+      const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
+      const sk = skateRef.current;
+      const terrainAtPlayer = getTerrainHeight(player.x * WORLD_SCALE, player.y * WORLD_SCALE);
+      const actuallySubmerged = inWater && terrainAtPlayer < 0.3;
+      tickOceanDeath(ocean, actuallySubmerged && !sk.isSkating);
+      if (ocean.phase === 'respawning' && ocean.timer === 59) {
+        player.x = SPAWN_X;
+        player.y = SPAWN_Y;
+        player.vx = 0;
+        player.vy = 0;
+        player.hp = player.maxHp;
+      }
+
+      // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
+      // Only for real guns — spray can is a paint tool, no crosshair lock.
+      const wEq = weaponRef.current.equipped;
+      const isGun = !!wEq && !WEAPON_DEFS[wEq].isPaintTool;
+      if (isGun && frame % 3 === 0) {
+        const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+          lockRange: 140,
+          lockCone: Math.PI / 10,
+          enableLockOn: true,
+        });
+        aimSlotRef.current.lockedId = passiveAim.lockedId;
+        aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
+      } else if (!isGun) {
+        aimSlotRef.current.lockedId = null;
+        aimSlotRef.current.lockDistance = null;
+      }
+
+      // ── Weapon pickup check (GTA style — auto on walk-over) ──
+      const weapon = weaponRef.current;
+      if (frame % 120 === 0) {
+        const pickups = getActivePickups();
+        if (pickups.length > 0) {
+          const nearest = pickups.reduce(
+            (best, p) => {
+              const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
+              return d < best.d ? { d, p } : best;
+            },
+            { d: Infinity, p: pickups[0] },
+          );
+          console.log(
+            `[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`,
+          );
+        }
+      }
+      const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
+      if (pickedUp) {
+        playPickupSound();
+        setWeaponPickups([...getActivePickups()]);
+      }
+      tickReload(weapon);
+      tickMuzzleFlash(weapon);
+
+      // ── Hoverboard physics ──
+      if (sk.isSkating) {
+        const wx = player.x * WORLD_SCALE;
+        const wz = player.y * WORLD_SCALE;
+        const terrainY = getTerrainHeight(wx, wz);
+        const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
+        const dir: [number, number] = [
+          input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
+          input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
+        ];
+        const move = tickSkating(sk, dir, 1 / 60, terrainY, rampData);
+        player.x += move.dx / WORLD_SCALE;
+        player.y += move.dz / WORLD_SCALE;
+      }
+
+      // ── Paint can pickup check (auto on walk-over) ──
+      const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
+      if (paintPickedUp) {
+        playPickupSound();
+        setPaintCans([...getActivePaintCans()]);
+        console.log(`[Graffiti] Picked up ${paintPickedUp.color} paint can!`);
+      }
+
+      // Footsteps disabled — too noisy
+
+      // Combat input — disabled when skating (board handles its own controls)
+      if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
+        let intendedMove = resolveIntendedMove(input);
+
+        // If F pressed and weapon equipped, handle it.
+        // Paint tools (spray_can) open the graffiti UI instead of firing
+        // a bullet. Regular guns fire + play a sound.
+        if (intendedMove === 'gunshot' && weapon.equipped) {
+          const def = WEAPON_DEFS[weapon.equipped];
+          if (def.isPaintTool) {
+            openGraffitiForNearestWall();
+            intendedMove = null; // don't treat as combat hit
+          } else {
+            const result = fireWeapon(weapon);
+            if (result.fired) {
+              if (weapon.equipped === 'shotgun') playShotgunSound();
+              else playGunshot();
+            } else {
+              intendedMove = null; // can't fire (cooldown/no ammo/reloading)
+            }
+          }
+        } else if (intendedMove === 'gunshot' && !weapon.equipped) {
+          intendedMove = null; // no weapon
+        }
+
+        if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
+          // Play attack sound
+          if (intendedMove === 'punch') playPunchSound();
+          else if (intendedMove === 'kick') playKickSound();
+          else if (intendedMove === 'headbutt') playHeadbuttSound();
+          else if (intendedMove === 'backflip') playJumpSound();
+          // block is silent — no annoying clang on shift
+
+          // Aim resolution:
+          //   - Ranged moves use camera-ray aim + soft lock-on (continuous angle)
+          //   - Melee falls back to 8-way facing (keeps close-combat feel snappy)
+          const isRanged = intendedMove === 'gunshot' || intendedMove === 'forcePush';
+          let angle: number;
+          if (isRanged) {
+            const aim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
+              lockRange: intendedMove === 'gunshot' ? 140 : 80,
+              lockCone: intendedMove === 'gunshot' ? Math.PI / 10 : Math.PI / 7,
+              enableLockOn: true,
+            });
+            angle = aim.angle;
+            aimSlotRef.current.lockedId = aim.lockedId;
+            aimSlotRef.current.lockDistance = aim.lockDistance ?? null;
+          } else {
+            angle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
+          }
+          const mouseWorldX = player.x + Math.cos(angle) * 50;
+          const mouseWorldY = player.y + Math.sin(angle) * 50;
+
+          const hits = executeMove(
+            player,
+            intendedMove,
+            mouseWorldX,
+            mouseWorldY,
+            mp.remotePlayers,
+            combat,
+          );
+
+          // Same move geometry also lands on arena sea-monsters.
+          resolveNpcHits(
+            arenaRef.current,
+            player,
+            intendedMove,
+            mouseWorldX,
+            mouseWorldY,
+            npcsRef.current,
+            combat,
+          );
+
+          if (intendedMove !== 'block') {
+            sendAttack(mp, intendedMove, player.x, player.y, angle);
+          }
+          if (intendedMove === 'forcePush') {
+            sendForcePush(mp, player.x, player.y, angle, '#4488ff');
+          }
+
+          // Sound on hit
+          for (const hit of hits) {
+            if (hit.combo >= 3) playComboSound();
+            sendHit(mp, hit.targetId, hit.damage, hit.knockX, hit.knockY, hit.move, hit.combo);
+            const target = mp.remotePlayers.get(hit.targetId);
+            if (target && target.hp <= 0) {
+              playDeathSound();
+              combat.killFeed.push({
+                killer: `Noun #${player.nounId}`,
+                victim: `Noun #${target.nounId}`,
+                move: hit.move,
+                timestamp: Date.now(),
+              });
+              // Persist kill to K/D stats
+              if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
+                mp.ws.send(
+                  JSON.stringify({
+                    type: 'world:kd:save',
+                    wallet: connectedWallet,
+                    addKills: 1,
+                    addDeaths: 0,
+                  }),
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // ── Settlement window check (every ~15 seconds) ──
+      if (frame % 900 === 0) {
+        getAuctionState().then(auction => {
+          voipRef.current.settlementWindow = auction.isSettlementWindow;
+        });
+      }
+
+      // ── VOIP tick ──
+      const voip = voipRef.current;
+      if (voip.localStream && frame % 6 === 0) {
+        const wasSpeaking = voip.isSpeaking;
+        checkVoiceActivity(voip);
+        // Broadcast speaking state + transcript
+        if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
+          if (voip.isSpeaking !== wasSpeaking) {
+            mp.ws.send(
+              JSON.stringify({
+                type: 'world:voip:speaking',
+                speaking: voip.isSpeaking,
+              }),
+            );
+          }
+          // Broadcast transcript to other players
+          const transcript = getCurrentTranscript();
+          if (transcript) {
+            mp.ws.send(
+              JSON.stringify({
+                type: 'world:voip:transcript',
+                text: transcript,
+              }),
+            );
+          }
+        }
+        // Update crowd settle
+        const shouldSettle = updateCrowdSettle(voip);
+        if (shouldSettle) {
+          // TODO: trigger sewerpipe.eth settlement via agent hub API
+          console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
+        }
+        // Update spatial audio listener position
+        const rot = DIRECTION_ROTATION[player.direction] ?? 0;
+        updateListenerPosition(
+          voip,
+          player.x * WORLD_SCALE,
+          0,
+          player.y * WORLD_SCALE,
+          Math.sin(rot),
+          Math.cos(rot),
+        );
+        // Update spatial positions for remote players
+        for (const [id, rp] of mp.remotePlayers) {
+          updateSpatialPosition(voip, id, rp.x * WORLD_SCALE, 0, rp.y * WORLD_SCALE);
+        }
+      }
+
+      // Tick player — always run, but board overrides movement after
+      tickPlayer(player, input, combat);
+
+      // ── Arena run — surface/drive sea monsters, apply their hits ──
+      const arena = arenaRef.current;
+      if (arena.active) {
+        const rosterChanged = tickArena(
+          arena,
+          npcsRef.current,
+          npcCharStates.current,
+          player,
+          combat,
+        );
+        if (rosterChanged) setNpcRosterVersion(v => v + 1);
+        // Throttle HUD state writes to ~6fps (cheap, avoids churn).
+        if (frame % 10 === 0 || arena.over) {
+          setArenaHud({
+            active: arena.active,
+            over: arena.over,
+            wave: arena.wave,
+            score: arena.score,
+            kills: arena.kills,
+          });
+        }
+      }
+
+      // Multiplayer
+      tickRemotePlayers(mp);
+      if (frame % SEND_INTERVAL === 0) {
+        sendPlayerUpdate(mp, player);
+      }
+
+      // Effects
+      updateParticles(combat.particles);
+      updateFloatingTexts(combat.floatingTexts);
+      updateForcePushes(combat.forcePushes);
+      combat.shake = updateScreenShake(combat.shake);
+
+      // Prune old kills
+      const now = Date.now();
+      combat.killFeed = combat.killFeed.filter(k => now - k.timestamp < 10000);
+
+      // ── FEATURE 3: Wanted level from mic volume ──
+      const voipForWanted = voipRef.current;
+      if (voipForWanted.analyser && voipForWanted.localStream && !voipForWanted.isMuted) {
+        const wantedData = new Uint8Array(voipForWanted.analyser.frequencyBinCount);
+        voipForWanted.analyser.getByteFrequencyData(wantedData);
+        let wantedSum = 0;
+        for (let i = 0; i < wantedData.length; i++) wantedSum += wantedData[i];
+        const vol = wantedSum / wantedData.length / 255; // normalize to 0-1
+        let targetStars = 0;
+        if (vol > 0.9) targetStars = 5;
+        else if (vol > 0.7) targetStars = 4;
+        else if (vol > 0.5) targetStars = 3;
+        else if (vol > 0.3) targetStars = 2;
+        else if (vol > 0.1) targetStars = 1;
+        // Instant ramp up, slow decay
+        if (targetStars > wantedRef.current) {
+          wantedRef.current = targetStars;
+        } else {
+          wantedRef.current = Math.max(0, wantedRef.current - 0.02);
+        }
+      } else {
+        // Decay when mic off
+        wantedRef.current = Math.max(0, wantedRef.current - 0.02);
+      }
+      // Update React state every ~15 frames to avoid excessive re-renders
+      if (frame % 15 === 0) {
+        const rounded = Math.ceil(wantedRef.current);
+        setWantedLevel(prev => (prev !== rounded ? rounded : prev));
+      }
+
+      // Clear input
+      clearFrameFlags(input);
+
+      // Update HUD via ref (no React re-renders)
+      hudRef.current.hp = player.hp;
+      hudRef.current.maxHp = player.maxHp;
+      hudRef.current.playerCount = mp.playerCount;
+      hudRef.current.comboHits = player.comboHits;
+      hudRef.current.controlsVisible = frame < 300;
+      hudRef.current.oceanPhase = ocean.phase;
+      hudRef.current.oceanAlpha = getOceanOverlayAlpha(ocean);
+      hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
+      hudRef.current.respawnTimer = player.respawnTimer;
+      hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
+      // Update VOIP debug info every 30 frames (~0.5s)
+      if (showVoipDebug && frame % 30 === 0) {
+        setVoipDebugLines(getVoipDebugInfo(voipRef.current));
+      }
+      // Track death for K/D (only on transition to dead, not every frame)
+      if (
+        player.state === 'dead' &&
+        player.deathTimer === 59 &&
+        connectedWallet &&
+        mp.ws?.readyState === WebSocket.OPEN
+      ) {
+        mp.ws.send(
+          JSON.stringify({
+            type: 'world:kd:save',
+            wallet: connectedWallet,
+            addKills: 0,
+            addDeaths: 1,
+          }),
+        );
+      }
+      // VOIP HUD
+      hudRef.current.micEnabled = !!voipRef.current.localStream;
+      hudRef.current.isMuted = voipRef.current.isMuted;
+      hudRef.current.isSpeaking = voipRef.current.isSpeaking;
+      hudRef.current.activeSpeakers =
+        voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
+      hudRef.current.crowdMeter = voipRef.current.crowdMeter;
+      hudRef.current.settlementWindow = voipRef.current.settlementWindow;
+      hudRef.current.settleTriggered = voipRef.current.settleTriggered;
+      hudRef.current.transcript = getCurrentTranscript();
+      // Weapon HUD
+      hudRef.current.weaponEquipped = weaponRef.current.equipped;
+      hudRef.current.weaponAmmo = weaponRef.current.ammo;
+      hudRef.current.wantedLevel = Math.ceil(wantedRef.current);
+      // Skating HUD
+      hudRef.current.isSkating = sk.isSkating;
+      hudRef.current.skateSpeed = sk.speed;
+      hudRef.current.trickScore = sk.trickScore;
+      hudRef.current.currentTrick = sk.currentTrick;
+      hudRef.current.comboMultiplier = sk.comboMultiplier;
+      hudRef.current.comboScore = sk.comboScore;
+      hudRef.current.balanceMeter = sk.balanceMeter;
+      hudRef.current.grindActive = sk.grindActive;
+      hudRef.current.manualActive = sk.manualActive;
+      // Write weapon state to character for gun rendering
+      const pcs = playerCharState.current;
+      pcs.weaponEquipped = weaponRef.current.equipped;
+      pcs.muzzleFlash = weaponRef.current.muzzleFlash;
+      pcs.isSkating = skateRef.current.isSkating;
+      pcs.trickName = skateRef.current.currentTrick || null;
+      pcs.trickTimer =
+        skateRef.current.trickTimer > 0
+          ? 1 - skateRef.current.trickTimer / 0.8 // normalize to 0-1 progress (0.8s trick duration)
+          : 0;
+      player.isSkating = skateRef.current.isSkating;
+      player.trickName = skateRef.current.currentTrick || null;
+      (player as any).weaponEquipped = weaponRef.current.equipped;
+      (player as any).paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
+      pcs.airborneVy = player.airborneVy;
+      pcs.vx = player.vx;
+      pcs.vy = player.vy;
+      pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
+      pcs.swordEquipped = false; // TODO: wire sword pickup
+    };
+
+    // ── Per-render sync: interpolated positions → camera target + avatars ──
+    const renderSync = (alpha: number, frameDt: number) => {
+      const player = playerRef.current;
+      if (!player) return;
+      const sk = skateRef.current;
+      const playerBody = getPlayerBody(player);
+      // Interpolate between the last two sim ticks. A big jump (respawn /
+      // portal teleport) snaps instead of streaking across the island.
+      const pp = prevPlayer.current;
+      let px = player.x;
+      let py = player.y;
+      if (pp.valid && Math.hypot(player.x - pp.x, player.y - pp.y) < 160) {
+        px = pp.x + (player.x - pp.x) * alpha;
+        py = pp.y + (player.y - pp.y) * alpha;
+      }
+      const wx = px * WORLD_SCALE;
+      const wz = py * WORLD_SCALE;
+      let terrainY = getTerrainHeight(wx, wz);
+      // Hoverboard hovers OVER water, not under
+      if (sk.isSkating && terrainY < 0.1) terrainY = 0.1;
+      // Jump height offset — airborneY is negative when up
+      const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
+      const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
+      const totalYOffset = jumpOffset + skateOffset;
+
+      // Smooth Y interpolation — prevents jolty terrain transitions
+      const targetY = terrainY + totalYOffset;
+      const prevY = playerTargetRef.current.y;
+      // Framerate-independent exponential smoothing; snap on teleports.
+      const smoothY =
+        Math.abs(targetY - prevY) > 4
+          ? targetY
+          : prevY + (targetY - prevY) * (1 - Math.exp(-frameDt * 12));
+
+      // Camera follows the smoothed height
+      playerTargetRef.current.set(wx, smoothY, wz);
+
+      const pcs = playerCharState.current;
+      pcs.x = wx;
+      pcs.z = wz;
+      pcs.y = smoothY;
+      pcs.direction = player.direction;
+      pcs.state = player.state;
+      pcs.attackType = player.attackType;
+      pcs.hitFlash = player.hitFlash;
+      pcs.hp = player.hp;
+
+      // Fine-grained locomotion substate + landing juice + wall-run tilt
+      // read directly from the authoritative body so Character3D animations
+      // match the exact movement state.
+      if (playerBody) {
+        pcs.locoSubstate = playerBody.loco;
+        pcs.landingImpact = playerBody.landingImpact;
+        pcs.wallRunSide = playerBody.wallRun
+          ? playerBody.wallRun.normalX > 0
+            ? 'right'
+            : 'left'
+          : undefined;
+      } else {
+        pcs.locoSubstate = 'grounded';
+        pcs.landingImpact = 0;
+        pcs.wallRunSide = undefined;
+      }
+
+      // Update NPC character state refs
+      for (let i = 0; i < npcsRef.current.length; i++) {
+        const npc = npcsRef.current[i];
+        const ncs = npcCharStates.current[i];
+        if (!ncs) continue;
+        const nx = npc.prevX === undefined ? npc.x : npc.prevX + (npc.x - npc.prevX) * alpha;
+        const ny = npc.prevY === undefined ? npc.y : npc.prevY + (npc.y - npc.prevY) * alpha;
+        ncs.x = nx * WORLD_SCALE;
+        ncs.z = ny * WORLD_SCALE;
+        ncs.y = getTerrainHeight(ncs.x, ncs.z);
+        ncs.direction = npc.direction;
+        ncs.state =
+          npc.state === 'chase'
+            ? 'walking'
+            : npc.state === 'attack'
+              ? 'attacking'
+              : npc.state === 'dead'
+                ? 'dead'
+                : npc.state === 'stunned'
+                  ? 'stunned'
+                  : npc.state === 'patrol'
+                    ? npc.patrolWaitTimer > 0
+                      ? 'idle'
+                      : 'walking'
+                    : 'idle';
+        ncs.hitFlash = npc.hitFlash;
+        ncs.hp = npc.hp;
+      }
+
+      // Sync camera-target Object3D with the target Vector3 so CameraRig
+      // can read the player position via Object3D.position.
+      if (cameraTargetObjRef.current) {
+        cameraTargetObjRef.current.position.copy(playerTargetRef.current);
+      }
+      // Minimap centre (world tile coords).
+      hudRef.current.playerTx = px / TILE_SIZE;
+      hudRef.current.playerTy = py / TILE_SIZE;
+    };
+
     // Priority -10: runs BEFORE CameraRig's default-priority useFrame so the
-    // camera reads the fresh player position each frame — otherwise during a
-    // jump the camera lags by one tick and "can't keep up."
+    // camera reads the fresh player position each frame.
     useFrame((_, delta) => {
-      // Wrap the whole tick so a thrown exception (e.g. a stray null
+      // Wrap the whole frame so a thrown exception (e.g. a stray null
       // deref triggered by an input edge like Q-tap forcePush) doesn't
       // kill R3F's render loop and freeze the game. Better to drop one
       // frame's logic than halt every subsequent frame forever.
       try {
-        const player = playerRef.current;
-        const input = inputRef.current;
         const combat = combatRef.current;
-        const ocean = oceanRef.current;
-        const mp = mpRef.current;
-        if (!player) return;
         // Real (unscaled) delta, clamped so a tab-blur resume doesn't
         // advance the focus meter / slomo state machine by seconds.
-        const dt = Math.min(delta, 1 / 20);
+        const frameDt = Math.min(delta, 1 / 20);
 
-        // Sync camera-target Object3D with the target Vector3 so CameraRig
-        // can read the player position via Object3D.position.
-        if (cameraTargetObjRef.current) {
-          cameraTargetObjRef.current.position.copy(playerTargetRef.current);
+        // Real-time systems: bullet-time ramps + focus meter + audio pitch
+        // run on wall-clock time, never on scaled sim time.
+        combat.slowMo = updateSlomo(combat.slowMo, frameDt);
+        updateFocusMeter(frameDt);
+        const timeScale = combat.slowMo?.factor ?? 1;
+        applySlomoAudio(timeScale);
+
+        // Fixed 60Hz sim. Bullet-time genuinely slows the world by feeding
+        // the accumulator scaled time; a slow display runs several ticks per
+        // frame; a 120Hz display runs one every other frame and interpolates.
+        simAcc.current += frameDt * timeScale;
+        let steps = 0;
+        while (simAcc.current >= SIM_STEP && steps < MAX_SIM_STEPS) {
+          simTick();
+          simAcc.current -= SIM_STEP;
+          steps++;
         }
+        // Hopelessly behind (tab throttled, GC pause): drop the backlog so
+        // we never death-spiral, and let time dilate instead.
+        if (steps === MAX_SIM_STEPS && simAcc.current >= SIM_STEP) simAcc.current = 0;
 
-        // Publish the authoritative body to dojoState so GravityZones /
-        // TrainingDummies can read it for proximity + impulse effects.
-        const playerBody = getPlayerBody(player);
-        setPlayerBodyForDojo(playerBody);
-
-        // Double-tap dash detection (edge-triggered on WASD just-pressed).
-        // Writes into the authoritative body so locomotion.ts picks up
-        // lastDirTapTime/Vec and triggers the actual dash state.
-        {
-          const jp = input.justPressed;
-          const body = playerBody ?? dashTapBodyRef.current;
-          const nowMs = performance.now();
-          // Camera-relative: W = forward, S = back, A = left, D = right.
-          const ca = input.cameraAngle ?? 0;
-          const forwardX = -Math.sin(ca);
-          const forwardY = -Math.cos(ca);
-          const rightX = Math.cos(ca);
-          const rightY = -Math.sin(ca);
-          const tryTap = (dx: number, dy: number) => {
-            // Consume the tap. When a double-tap closes, registerDirTap
-            // returns true — locomotion owns the actual dash + focus
-            // trigger inside combat.ts via its authoritative body, so we
-            // just record the edge here for the shared double-tap window.
-            registerDirTap(body, dx, dy, nowMs);
-          };
-          if (jp.has('w')) tryTap(forwardX, forwardY);
-          if (jp.has('s')) tryTap(-forwardX, -forwardY);
-          if (jp.has('a')) tryTap(-rightX, -rightY);
-          if (jp.has('d')) tryTap(rightX, rightY);
-        }
-
-        // ── FEATURE 2: Poll gamepad each frame ──
-        pollGamepad(input);
-
-        frameRef.current++;
-        const frame = frameRef.current;
-
-        // Ocean death — only if actually at water level (not on ramp/buildings above water tiles)
-        const inWater = isInDeepWater(player.x, player.y, ISLAND_MAP);
-        const sk = skateRef.current;
-        const terrainAtPlayer = getTerrainHeight(player.x * WORLD_SCALE, player.y * WORLD_SCALE);
-        const actuallySubmerged = inWater && terrainAtPlayer < 0.3;
-        tickOceanDeath(ocean, actuallySubmerged && !sk.isSkating);
-        if (ocean.phase === 'respawning' && ocean.timer === 59) {
-          player.x = SPAWN_X;
-          player.y = SPAWN_Y;
-          player.vx = 0;
-          player.vy = 0;
-          player.hp = player.maxHp;
-        }
-
-        // ── Passive aim lock-on check (every 3 frames is enough for HUD) ──
-        // Only for real guns — spray can is a paint tool, no crosshair lock.
-        const wEq = weaponRef.current.equipped;
-        const isGun = !!wEq && !WEAPON_DEFS[wEq].isPaintTool;
-        if (isGun && frame % 3 === 0) {
-          const passiveAim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
-            lockRange: 140,
-            lockCone: Math.PI / 10,
-            enableLockOn: true,
-          });
-          aimSlotRef.current.lockedId = passiveAim.lockedId;
-          aimSlotRef.current.lockDistance = passiveAim.lockDistance ?? null;
-        } else if (!isGun) {
-          aimSlotRef.current.lockedId = null;
-          aimSlotRef.current.lockDistance = null;
-        }
-
-        // ── Weapon pickup check (GTA style — auto on walk-over) ──
-        const weapon = weaponRef.current;
-        if (frame % 120 === 0) {
-          const pickups = getActivePickups();
-          if (pickups.length > 0) {
-            const nearest = pickups.reduce(
-              (best, p) => {
-                const d = Math.hypot(player.x - p.worldX, player.y - p.worldY);
-                return d < best.d ? { d, p } : best;
-              },
-              { d: Infinity, p: pickups[0] },
-            );
-            console.log(
-              `[Weapons] Player(${player.x.toFixed(0)},${player.y.toFixed(0)}) nearest=${nearest.p.type} dist=${nearest.d.toFixed(0)} pickups=${pickups.length}`,
-            );
-          }
-        }
-        const pickedUp = checkWeaponPickup(player.x, player.y, weapon);
-        if (pickedUp) {
-          playPickupSound();
-          setWeaponPickups([...getActivePickups()]);
-        }
-        tickReload(weapon);
-        tickMuzzleFlash(weapon);
-
-        // ── Hoverboard physics ──
-        if (sk.isSkating) {
-          const wx = player.x * WORLD_SCALE;
-          const wz = player.y * WORLD_SCALE;
-          const terrainY = getTerrainHeight(wx, wz);
-          const rampData = testRampCollision(wx, wz, terrainY, MEGA_RAMP_BOUNDS);
-          const dir: [number, number] = [
-            input.keys.has('w') ? 1 : input.keys.has('s') ? -1 : 0,
-            input.keys.has('d') ? 1 : input.keys.has('a') ? -1 : 0,
-          ];
-          const move = tickSkating(sk, dir, 1 / 60, terrainY, rampData);
-          player.x += move.dx / WORLD_SCALE;
-          player.y += move.dz / WORLD_SCALE;
-        }
-
-        // ── Paint can pickup check (auto on walk-over) ──
-        const paintPickedUp = checkPaintPickup(player.x, player.y, paintRef.current);
-        if (paintPickedUp) {
-          playPickupSound();
-          setPaintCans([...getActivePaintCans()]);
-          console.log(`[Graffiti] Picked up ${paintPickedUp.color} paint can!`);
-        }
-
-        // Footsteps disabled — too noisy
-
-        // Combat input — disabled when skating (board handles its own controls)
-        if (ocean.phase === 'normal' && !skateRef.current.isSkating) {
-          let intendedMove = resolveIntendedMove(input);
-
-          // If F pressed and weapon equipped, handle it.
-          // Paint tools (spray_can) open the graffiti UI instead of firing
-          // a bullet. Regular guns fire + play a sound.
-          if (intendedMove === 'gunshot' && weapon.equipped) {
-            const def = WEAPON_DEFS[weapon.equipped];
-            if (def.isPaintTool) {
-              openGraffitiForNearestWall();
-              intendedMove = null; // don't treat as combat hit
-            } else {
-              const result = fireWeapon(weapon);
-              if (result.fired) {
-                if (weapon.equipped === 'shotgun') playShotgunSound();
-                else playGunshot();
-              } else {
-                intendedMove = null; // can't fire (cooldown/no ammo/reloading)
-              }
-            }
-          } else if (intendedMove === 'gunshot' && !weapon.equipped) {
-            intendedMove = null; // no weapon
-          }
-
-          if (intendedMove && player.state !== 'dead' && player.state !== 'respawning') {
-            // Play attack sound
-            if (intendedMove === 'punch') playPunchSound();
-            else if (intendedMove === 'kick') playKickSound();
-            else if (intendedMove === 'headbutt') playHeadbuttSound();
-            else if (intendedMove === 'backflip') playJumpSound();
-            // block is silent — no annoying clang on shift
-
-            // Aim resolution:
-            //   - Ranged moves use camera-ray aim + soft lock-on (continuous angle)
-            //   - Melee falls back to 8-way facing (keeps close-combat feel snappy)
-            const isRanged = intendedMove === 'gunshot' || intendedMove === 'forcePush';
-            let angle: number;
-            if (isRanged) {
-              const aim = computeAim(player, input.cameraAngle, mp.remotePlayers.values(), {
-                lockRange: intendedMove === 'gunshot' ? 140 : 80,
-                lockCone: intendedMove === 'gunshot' ? Math.PI / 10 : Math.PI / 7,
-                enableLockOn: true,
-              });
-              angle = aim.angle;
-              aimSlotRef.current.lockedId = aim.lockedId;
-              aimSlotRef.current.lockDistance = aim.lockDistance ?? null;
-            } else {
-              angle = DIRECTION_FACING_ANGLE[player.direction] ?? 0;
-            }
-            const mouseWorldX = player.x + Math.cos(angle) * 50;
-            const mouseWorldY = player.y + Math.sin(angle) * 50;
-
-            const hits = executeMove(
-              player,
-              intendedMove,
-              mouseWorldX,
-              mouseWorldY,
-              mp.remotePlayers,
-              combat,
-            );
-
-            // Same move geometry also lands on arena sea-monsters.
-            resolveNpcHits(
-              arenaRef.current,
-              player,
-              intendedMove,
-              mouseWorldX,
-              mouseWorldY,
-              npcsRef.current,
-              combat,
-            );
-
-            if (intendedMove !== 'block') {
-              sendAttack(mp, intendedMove, player.x, player.y, angle);
-            }
-            if (intendedMove === 'forcePush') {
-              sendForcePush(mp, player.x, player.y, angle, '#4488ff');
-            }
-
-            // Sound on hit
-            for (const hit of hits) {
-              if (hit.combo >= 3) playComboSound();
-              sendHit(mp, hit.targetId, hit.damage, hit.knockX, hit.knockY, hit.move, hit.combo);
-              const target = mp.remotePlayers.get(hit.targetId);
-              if (target && target.hp <= 0) {
-                playDeathSound();
-                combat.killFeed.push({
-                  killer: `Noun #${player.nounId}`,
-                  victim: `Noun #${target.nounId}`,
-                  move: hit.move,
-                  timestamp: Date.now(),
-                });
-                // Persist kill to K/D stats
-                if (connectedWallet && mp.ws?.readyState === WebSocket.OPEN) {
-                  mp.ws.send(
-                    JSON.stringify({
-                      type: 'world:kd:save',
-                      wallet: connectedWallet,
-                      addKills: 1,
-                      addDeaths: 0,
-                    }),
-                  );
-                }
-              }
-            }
-          }
-        }
-
-        // ── Settlement window check (every ~15 seconds) ──
-        if (frame % 900 === 0) {
-          getAuctionState().then(auction => {
-            voipRef.current.settlementWindow = auction.isSettlementWindow;
-          });
-        }
-
-        // ── VOIP tick ──
-        const voip = voipRef.current;
-        if (voip.localStream && frame % 6 === 0) {
-          const wasSpeaking = voip.isSpeaking;
-          checkVoiceActivity(voip);
-          // Broadcast speaking state + transcript
-          if (mp.ws && mp.ws.readyState === WebSocket.OPEN) {
-            if (voip.isSpeaking !== wasSpeaking) {
-              mp.ws.send(
-                JSON.stringify({
-                  type: 'world:voip:speaking',
-                  speaking: voip.isSpeaking,
-                }),
-              );
-            }
-            // Broadcast transcript to other players
-            const transcript = getCurrentTranscript();
-            if (transcript) {
-              mp.ws.send(
-                JSON.stringify({
-                  type: 'world:voip:transcript',
-                  text: transcript,
-                }),
-              );
-            }
-          }
-          // Update crowd settle
-          const shouldSettle = updateCrowdSettle(voip);
-          if (shouldSettle) {
-            // TODO: trigger sewerpipe.eth settlement via agent hub API
-            console.log('[VOIP] SETTLEMENT TRIGGERED BY CROWD!');
-          }
-          // Update spatial audio listener position
-          const rot = DIRECTION_ROTATION[player.direction] ?? 0;
-          updateListenerPosition(
-            voip,
-            player.x * WORLD_SCALE,
-            0,
-            player.y * WORLD_SCALE,
-            Math.sin(rot),
-            Math.cos(rot),
-          );
-          // Update spatial positions for remote players
-          for (const [id, rp] of mp.remotePlayers) {
-            updateSpatialPosition(voip, id, rp.x * WORLD_SCALE, 0, rp.y * WORLD_SCALE);
-          }
-        }
-
-        // Tick player — always run, but board overrides movement after
-        tickPlayer(player, input, combat);
-
-        // ── Arena run — surface/drive sea monsters, apply their hits ──
-        const arena = arenaRef.current;
-        if (arena.active) {
-          const rosterChanged = tickArena(
-            arena,
-            npcsRef.current,
-            npcCharStates.current,
-            player,
-            combat,
-          );
-          if (rosterChanged) setNpcRosterVersion(v => v + 1);
-          // Throttle HUD state writes to ~6fps (cheap, avoids churn).
-          if (frame % 10 === 0 || arena.over) {
-            setArenaHud({
-              active: arena.active,
-              over: arena.over,
-              wave: arena.wave,
-              score: arena.score,
-              kills: arena.kills,
-            });
-          }
-        }
-
-        // Hoverboard — no extra velocity boost needed, sprint key (R) handles speed
-
-        // Update camera target + character state ref
-        const wx = player.x * WORLD_SCALE;
-        const wz = player.y * WORLD_SCALE;
-        let terrainY = getTerrainHeight(wx, wz);
-        // Hoverboard hovers OVER water, not under
-        if (sk.isSkating && terrainY < 0.1) terrainY = 0.1;
-        // Jump height offset — airborneY is negative when up
-        const jumpOffset = player.airborneY < 0 ? -player.airborneY * 0.06 : 0;
-        const skateOffset = sk.isSkating ? sk.hoverHeight + sk.airborneY : 0;
-        const totalYOffset = jumpOffset + skateOffset;
-
-        // Smooth Y interpolation — prevents jolty terrain transitions
-        const targetY = terrainY + totalYOffset;
-        const prevY = playerTargetRef.current.y;
-        const smoothY = prevY + (targetY - prevY) * 0.15; // lerp factor
-
-        // Camera follows the smoothed height
-        playerTargetRef.current.set(wx, smoothY, wz);
-
-        const pcs = playerCharState.current;
-        pcs.x = wx;
-        pcs.z = wz;
-        pcs.y = smoothY;
-        pcs.direction = player.direction;
-        pcs.state = player.state;
-        pcs.attackType = player.attackType;
-        pcs.hitFlash = player.hitFlash;
-        pcs.hp = player.hp;
-
-        // Fine-grained locomotion substate + landing juice + wall-run tilt
-        // read directly from the authoritative body so Character3D animations
-        // match the exact movement state.
-        if (playerBody) {
-          pcs.locoSubstate = playerBody.loco;
-          pcs.landingImpact = playerBody.landingImpact;
-          pcs.wallRunSide = playerBody.wallRun
-            ? playerBody.wallRun.normalX > 0
-              ? 'right'
-              : 'left'
-            : undefined;
-        } else {
-          pcs.locoSubstate = 'grounded';
-          pcs.landingImpact = 0;
-          pcs.wallRunSide = undefined;
-        }
-
-        // Update NPC character state refs
-        for (let i = 0; i < npcsRef.current.length; i++) {
-          const npc = npcsRef.current[i];
-          const ncs = npcCharStates.current[i];
-          if (!ncs) continue;
-          ncs.x = npc.x * WORLD_SCALE;
-          ncs.z = npc.y * WORLD_SCALE;
-          ncs.y = getTerrainHeight(ncs.x, ncs.z);
-          ncs.direction = npc.direction;
-          ncs.state =
-            npc.state === 'chase'
-              ? 'walking'
-              : npc.state === 'attack'
-                ? 'attacking'
-                : npc.state === 'dead'
-                  ? 'dead'
-                  : npc.state === 'stunned'
-                    ? 'stunned'
-                    : npc.state === 'patrol'
-                      ? npc.patrolWaitTimer > 0
-                        ? 'idle'
-                        : 'walking'
-                      : 'idle';
-          ncs.hitFlash = npc.hitFlash;
-          ncs.hp = npc.hp;
-        }
-
-        // Multiplayer
-        tickRemotePlayers(mp);
-        if (frame % SEND_INTERVAL === 0) {
-          sendPlayerUpdate(mp, player);
-        }
-
-        // Effects
-        updateParticles(combat.particles);
-        updateFloatingTexts(combat.floatingTexts);
-        updateForcePushes(combat.forcePushes);
-        combat.shake = updateScreenShake(combat.shake);
-        // Bullet-time state machine (ramped entry / hold / exit).
-        // updateSlomo tolerates legacy {factor, timer} objects created by
-        // combat.ts hitstops, so this coexists with createSlowMo callers.
-        combat.slowMo = updateSlomo(combat.slowMo, dt);
-        updateFocusMeter(dt);
-        applySlomoAudio(combat.slowMo?.factor ?? 1);
-
-        // Prune old kills
-        const now = Date.now();
-        combat.killFeed = combat.killFeed.filter(k => now - k.timestamp < 10000);
-
-        // ── FEATURE 3: Wanted level from mic volume ──
-        const voipForWanted = voipRef.current;
-        if (voipForWanted.analyser && voipForWanted.localStream && !voipForWanted.isMuted) {
-          const wantedData = new Uint8Array(voipForWanted.analyser.frequencyBinCount);
-          voipForWanted.analyser.getByteFrequencyData(wantedData);
-          let wantedSum = 0;
-          for (let i = 0; i < wantedData.length; i++) wantedSum += wantedData[i];
-          const vol = wantedSum / wantedData.length / 255; // normalize to 0-1
-          let targetStars = 0;
-          if (vol > 0.9) targetStars = 5;
-          else if (vol > 0.7) targetStars = 4;
-          else if (vol > 0.5) targetStars = 3;
-          else if (vol > 0.3) targetStars = 2;
-          else if (vol > 0.1) targetStars = 1;
-          // Instant ramp up, slow decay
-          if (targetStars > wantedRef.current) {
-            wantedRef.current = targetStars;
-          } else {
-            wantedRef.current = Math.max(0, wantedRef.current - 0.02);
-          }
-        } else {
-          // Decay when mic off
-          wantedRef.current = Math.max(0, wantedRef.current - 0.02);
-        }
-        // Update React state every ~15 frames to avoid excessive re-renders
-        if (frame % 15 === 0) {
-          const rounded = Math.ceil(wantedRef.current);
-          setWantedLevel(prev => (prev !== rounded ? rounded : prev));
-        }
-
-        // Clear input
-        clearFrameFlags(input);
-
-        // Update HUD via ref (no React re-renders)
-        hudRef.current.hp = player.hp;
-        hudRef.current.maxHp = player.maxHp;
-        hudRef.current.playerCount = mp.playerCount;
-        hudRef.current.comboHits = player.comboHits;
-        hudRef.current.controlsVisible = frame < 300;
-        hudRef.current.oceanPhase = ocean.phase;
-        hudRef.current.oceanAlpha = getOceanOverlayAlpha(ocean);
-        hudRef.current.majaAlpha = getGranMajaTextAlpha(ocean);
-        hudRef.current.respawnTimer = player.respawnTimer;
-        hudRef.current.isDead = player.state === 'dead' || player.state === 'respawning';
-        // Update VOIP debug info every 30 frames (~0.5s)
-        if (showVoipDebug && frame % 30 === 0) {
-          setVoipDebugLines(getVoipDebugInfo(voipRef.current));
-        }
-        // Track death for K/D (only on transition to dead, not every frame)
-        if (
-          player.state === 'dead' &&
-          player.deathTimer === 59 &&
-          connectedWallet &&
-          mp.ws?.readyState === WebSocket.OPEN
-        ) {
-          mp.ws.send(
-            JSON.stringify({
-              type: 'world:kd:save',
-              wallet: connectedWallet,
-              addKills: 0,
-              addDeaths: 1,
-            }),
-          );
-        }
-        // VOIP HUD
-        hudRef.current.micEnabled = !!voipRef.current.localStream;
-        hudRef.current.isMuted = voipRef.current.isMuted;
-        hudRef.current.isSpeaking = voipRef.current.isSpeaking;
-        hudRef.current.activeSpeakers =
-          voipRef.current.activeSpeakers.size + (voipRef.current.isSpeaking ? 1 : 0);
-        hudRef.current.crowdMeter = voipRef.current.crowdMeter;
-        hudRef.current.settlementWindow = voipRef.current.settlementWindow;
-        hudRef.current.settleTriggered = voipRef.current.settleTriggered;
-        hudRef.current.transcript = getCurrentTranscript();
-        // Weapon HUD
-        hudRef.current.weaponEquipped = weaponRef.current.equipped;
-        hudRef.current.weaponAmmo = weaponRef.current.ammo;
-        hudRef.current.wantedLevel = Math.ceil(wantedRef.current);
-        // Skating HUD
-        hudRef.current.isSkating = sk.isSkating;
-        hudRef.current.skateSpeed = sk.speed;
-        hudRef.current.trickScore = sk.trickScore;
-        hudRef.current.currentTrick = sk.currentTrick;
-        hudRef.current.comboMultiplier = sk.comboMultiplier;
-        hudRef.current.comboScore = sk.comboScore;
-        hudRef.current.balanceMeter = sk.balanceMeter;
-        hudRef.current.grindActive = sk.grindActive;
-        hudRef.current.manualActive = sk.manualActive;
-        // Write weapon state to character for gun rendering
-        pcs.weaponEquipped = weaponRef.current.equipped;
-        pcs.muzzleFlash = weaponRef.current.muzzleFlash;
-        pcs.isSkating = skateRef.current.isSkating;
-        pcs.trickName = skateRef.current.currentTrick || null;
-        pcs.trickTimer =
-          skateRef.current.trickTimer > 0
-            ? 1 - skateRef.current.trickTimer / 0.8 // normalize to 0-1 progress (0.8s trick duration)
-            : 0;
-        player.isSkating = skateRef.current.isSkating;
-        player.trickName = skateRef.current.currentTrick || null;
-        (player as any).weaponEquipped = weaponRef.current.equipped;
-        (player as any).paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
-        pcs.airborneVy = player.airborneVy;
-        pcs.vx = player.vx;
-        pcs.vy = player.vy;
-        pcs.paintColor = paintRef.current.hasPaint ? paintRef.current.color : null;
-        pcs.swordEquipped = false; // TODO: wire sword pickup
+        const alpha = Math.max(0, Math.min(1, simAcc.current / SIM_STEP));
+        renderSync(alpha, frameDt);
       } catch (err) {
         console.error('[GameLogic] frame skipped due to error:', err);
       }
@@ -3737,6 +3660,26 @@ export default function WorldPage() {
 
   const isFried = worldCurrent === 'fried';
 
+  const startRaid = () => {
+    const player = playerRef.current;
+    if (player) {
+      player.hp = PLAYER_MAX_HP;
+      player.state = 'idle';
+      player.deathTimer = 0;
+      player.consecutiveGunshots = 0;
+      player.iFrames = 0;
+    }
+    startRun(arenaRef.current, npcsRef.current, npcCharStates.current);
+    setNpcRosterVersion(v => v + 1);
+    setArenaHud({ active: true, over: false, wave: 1, score: 0, kills: 0 });
+    setRaids('on');
+  };
+  const abandonRaid = () => {
+    endRun(arenaRef.current, npcsRef.current, npcCharStates.current);
+    setNpcRosterVersion(v => v + 1);
+    setArenaHud({ active: false, over: false, wave: 0, score: 0, kills: 0 });
+  };
+
   return (
     <div
       ref={canvasContainerRef}
@@ -3780,7 +3723,7 @@ export default function WorldPage() {
         {!isFried && <fog attach="fog" args={['#ffffff', 40, 340]} />}
         {isFried && (
           <>
-            <DystopianFog color="#5a4068" near={50} far={340} />
+            <DystopianFog color="#5a4068" near={60} far={400} />
             <DystopianSky />
           </>
         )}
@@ -3834,14 +3777,14 @@ export default function WorldPage() {
             <group ref={sceneRootRef}>
               <Lighting />
               <AnimatedOcean />
-              <Terrain />
+              <TerrainChunks />
               {/* Paintable floor grid overlaid on the terrain — every stroke
                   persists via partykit (surfaceId keyed by tile coords). */}
               <PaintableFloor
                 worldId="city"
                 tilesX={16}
                 tilesZ={16}
-                tileSize={TERRAIN_SIZE / 16}
+                tileSize={CORE_WORLD_SIZE / 16}
                 origin={[0, 0, 0]}
                 authorId={mpRef.current.myId || 'anon'}
                 onStrokeEnd={surfaceId => {
@@ -3850,8 +3793,8 @@ export default function WorldPage() {
                     sendSnapshot(ws as unknown as WsLike, surfaceId, mpRef.current.myId || 'anon');
                 }}
               />
-              <Trees />
-              <Rocks />
+              <Flora />
+              <FallingLeaves targetRef={playerTargetRef} />
               <CrystalBallMountain nounSeed={predictedSeed ?? auctionNounSeed ?? seed} />
               <Gravestones />
               <VenetianBoats />
@@ -3947,16 +3890,24 @@ export default function WorldPage() {
               <MegaRamp3D />
 
               {/* NYC Apartment Block (adjacent to mega ramp) */}
-              <NYCApartmentBlock />
+              <StaticBatch>
+                <NYCApartmentBlock />
+              </StaticBatch>
 
               {/* Burj Khalifa — so tall it disappears into the clouds */}
-              <BurjKhalifa />
+              <StaticBatch>
+                <BurjKhalifa />
+              </StaticBatch>
 
               {/* Caribbean Office (southeast coast) */}
-              <CaribbeanOffice />
+              <StaticBatch>
+                <CaribbeanOffice />
+              </StaticBatch>
 
               {/* City block density — street furniture, parked cars, storefronts, dumpsters */}
-              <CityBlock />
+              <StaticBatch>
+                <CityBlock />
+              </StaticBatch>
 
               {/* Distant lofi Terraforms-style skyline at the horizon */}
               <TerraformsHorizon />
@@ -4108,6 +4059,7 @@ export default function WorldPage() {
           sceneRootRef={sceneRootRef}
         />
         <GameLogic />
+        <DevHooks />
       </Canvas>
 
       {/* Deep fried grain overlay — fried world only */}
@@ -4238,17 +4190,18 @@ export default function WorldPage() {
       {/* Live movement-feel tuner — backslash (\) to toggle. */}
       <MovementTuningPanel />
 
-      {/* ── Arena: giant sea-monster survival run ── */}
-      {arenaHud.active && !arenaHud.over && (
+      {/* ── Raid: giant monster survival run — fried island only, opt-in ── */}
+      {isFried && arenaHud.active && !arenaHud.over && (
         <div
           style={{
             position: 'fixed',
-            top: 12,
+            top: 44,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 30,
             pointerEvents: 'none',
             display: 'flex',
+            alignItems: 'center',
             gap: 18,
             fontFamily: 'ui-monospace, Menlo, monospace',
             fontWeight: 700,
@@ -4258,16 +4211,35 @@ export default function WorldPage() {
             background: 'rgba(8,8,12,0.55)',
             border: '1px solid rgba(255,61,240,0.4)',
             borderRadius: 8,
-            padding: '6px 16px',
+            padding: '6px 10px 6px 16px',
           }}
         >
           <span style={{ color: '#ff3df0' }}>WAVE {arenaHud.wave}</span>
           <span>SCORE {arenaHud.score}</span>
           <span style={{ opacity: 0.8 }}>KILLS {arenaHud.kills}</span>
+          <button
+            type="button"
+            onClick={abandonRaid}
+            style={{
+              pointerEvents: 'auto',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: 1,
+              color: '#fff',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 6,
+              padding: '3px 8px',
+            }}
+          >
+            ABANDON
+          </button>
         </div>
       )}
 
-      {(!arenaHud.active || arenaHud.over) && (
+      {isFried && !arenaHud.active && (raidPref === 'ask' || arenaHud.over) && (
         <div
           style={{
             position: 'fixed',
@@ -4300,42 +4272,139 @@ export default function WorldPage() {
             </>
           ) : (
             <>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#ff3df0' }}>SEA RAID</div>
-              <div style={{ fontSize: 12, opacity: 0.8, maxWidth: 240 }}>
-                Giant monsters rise from the ocean and march on the island. Survive the waves.
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#ff3df0' }}>RAID</div>
+              <div style={{ fontSize: 12, opacity: 0.8, maxWidth: 260 }}>
+                Giant monsters rise from the deep and march on you. Survive the waves — or skip it
+                and just explore the island.
               </div>
             </>
           )}
-          <button
-            onClick={() => {
-              const player = playerRef.current;
-              if (player) {
-                player.hp = PLAYER_MAX_HP;
-                player.state = 'idle';
-                player.deathTimer = 0;
-                player.consecutiveGunshots = 0;
-                player.iFrames = 0;
-              }
-              startRun(arenaRef.current, npcsRef.current, npcCharStates.current);
-              setNpcRosterVersion(v => v + 1);
-              setArenaHud({ active: true, over: false, wave: 1, score: 0, kills: 0 });
-            }}
-            style={{
-              marginTop: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontWeight: 800,
-              fontSize: 14,
-              letterSpacing: 1,
-              color: '#000',
-              background: '#ff3df0',
-              border: 'none',
-              borderRadius: 8,
-              padding: '8px 22px',
-            }}
-          >
-            {arenaHud.over ? 'RAID AGAIN' : 'START RAID'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={startRaid}
+              style={{
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 800,
+                fontSize: 14,
+                letterSpacing: 1,
+                color: '#000',
+                background: '#ff3df0',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 22px',
+              }}
+            >
+              {arenaHud.over ? 'RAID AGAIN' : 'START RAID'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRaids('off');
+                if (arenaHud.over) abandonRaid();
+              }}
+              style={{
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 700,
+                fontSize: 14,
+                letterSpacing: 1,
+                color: '#fff',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 8,
+                padding: '8px 18px',
+              }}
+            >
+              {arenaHud.over ? 'EXPLORE' : 'JUST EXPLORE'}
+            </button>
+          </div>
+          {!arenaHud.over && (
+            <div style={{ fontSize: 10, opacity: 0.55 }}>
+              Change your mind any time via the ⚔ pill.
+            </div>
+          )}
+        </div>
+      )}
+
+      {isFried && !arenaHud.active && !arenaHud.over && raidPref !== 'ask' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 44,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: 'ui-monospace, Menlo, monospace',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 1,
+          }}
+        >
+          {raidPref === 'on' ? (
+            <>
+              <button
+                type="button"
+                onClick={startRaid}
+                style={{
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 800,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  color: '#000',
+                  background: '#ff3df0',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '5px 12px',
+                }}
+              >
+                ⚔ START RAID
+              </button>
+              <button
+                type="button"
+                onClick={() => setRaids('off')}
+                title="Turn raids off"
+                style={{
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  color: '#fff',
+                  background: 'rgba(8,8,12,0.55)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 999,
+                  width: 24,
+                  height: 24,
+                  lineHeight: '20px',
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRaids('on')}
+              title="Raids are off — click to enable"
+              style={{
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 10,
+                letterSpacing: 1,
+                color: 'rgba(255,255,255,0.6)',
+                background: 'rgba(8,8,12,0.45)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 999,
+                padding: '4px 10px',
+              }}
+            >
+              ⚔ raids off
+            </button>
+          )}
         </div>
       )}
 

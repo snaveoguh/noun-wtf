@@ -15,8 +15,9 @@
 
 import type { NPC, NPCDef } from './npcs';
 import { tickNPC, damageNPC } from './npcs';
-import type { Player, MoveType } from './types';
-import { MAP_SIZE, TILE_SIZE } from './types';
+import type { Player, MoveType, Direction } from './types';
+import { TILE_SIZE, Tile } from './types';
+import { tileAt } from './tilemap';
 import type { CombatState } from './combat';
 import { applyDamageToPlayer } from './combat';
 import { MOVE_DEFS, resolveDamage } from './moves';
@@ -28,10 +29,7 @@ import {
   createScreenShake,
 } from './particles';
 import type { CharacterState } from './Character3D';
-import type { Direction } from './types';
 import { ARENA_TUNING } from './arenaTuning';
-
-const WORLD_CENTER = (MAP_SIZE / 2) * TILE_SIZE;
 
 // ── Monster roster — giant, always-hunting variants ──────────────────
 
@@ -135,6 +133,17 @@ export function startRun(run: ArenaRun, npcs: NPC[], charStates: CharacterState[
   run.waveBreak = 0;
 }
 
+/** Abandon the current run: clear the roster, back to idle (not "over"). */
+export function endRun(run: ArenaRun, npcs: NPC[], charStates: CharacterState[]): void {
+  npcs.length = 0;
+  charStates.length = 0;
+  run.active = false;
+  run.over = false;
+  run.toSpawnThisWave = 0;
+  run.spawnedThisWave = 0;
+  run.waveBreak = 0;
+}
+
 // ── Spawning ──────────────────────────────────────────────────────────
 
 function makeCharState(npc: NPC): CharacterState {
@@ -161,7 +170,12 @@ function makeCharState(npc: NPC): CharacterState {
   };
 }
 
-function spawnSeaMonster(run: ArenaRun, npcs: NPC[], charStates: CharacterState[]): void {
+function spawnSeaMonster(
+  run: ArenaRun,
+  npcs: NPC[],
+  charStates: CharacterState[],
+  player: Player,
+): void {
   // Scale a monster's HP up gently with the wave so later waves bite, then
   // bake in the live tuning multipliers for hp + move speed.
   const base = MONSTER_DEFS[Math.floor(Math.random() * MONSTER_DEFS.length)];
@@ -172,12 +186,30 @@ function spawnSeaMonster(run: ArenaRun, npcs: NPC[], charStates: CharacterState[
     speed: base.speed * ARENA_TUNING.speedMul,
   };
 
+  // The island is ~370 tiles across now, so a ring around the island
+  // centre would surface monsters miles from the action. Ring around the
+  // PLAYER instead, preferring sea / lake / river tiles so they still rise
+  // from the deep; fall back to any tile after a few tries.
   const tilesMin = ARENA_TUNING.spawnTilesMin;
   const tilesMax = Math.max(tilesMin, ARENA_TUNING.spawnTilesMax);
-  const angle = Math.random() * Math.PI * 2;
-  const r = (tilesMin + Math.random() * (tilesMax - tilesMin)) * TILE_SIZE;
-  const x = WORLD_CENTER + Math.cos(angle) * r;
-  const y = WORLD_CENTER + Math.sin(angle) * r;
+  let x = player.x;
+  let y = player.y;
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = (tilesMin + Math.random() * (tilesMax - tilesMin)) * TILE_SIZE;
+    const cx = player.x + Math.cos(angle) * r;
+    const cy = player.y + Math.sin(angle) * r;
+    if (attempt === 0) {
+      x = cx;
+      y = cy;
+    }
+    const t = tileAt(Math.floor(cx / TILE_SIZE), Math.floor(cy / TILE_SIZE));
+    if (t === Tile.Water || t === Tile.DeepWater || t === Tile.Shallow) {
+      x = cx;
+      y = cy;
+      break;
+    }
+  }
 
   const npc: NPC = {
     id: run.nextId++,
@@ -227,7 +259,7 @@ export function tickArena(
   if (run.waveBreak <= 0 && run.spawnedThisWave < run.toSpawnThisWave) {
     run.spawnTimer--;
     if (run.spawnTimer <= 0) {
-      spawnSeaMonster(run, npcs, charStates);
+      spawnSeaMonster(run, npcs, charStates, player);
       run.spawnedThisWave++;
       run.spawnTimer = ARENA_TUNING.spawnInterval;
       rosterChanged = true;

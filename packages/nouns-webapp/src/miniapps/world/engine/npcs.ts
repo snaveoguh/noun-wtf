@@ -1,10 +1,7 @@
 // ── NPC System — Hostile Nouns that patrol and fight ─────────────────
 
 import type { Direction } from './types';
-import {
-  TILE_SIZE,
-  MAP_SIZE,
-} from './types';
+import { TILE_SIZE, CORE_SIZE } from './types';
 import { dist, angleBetween, randInt, randRange, isWalkable } from './physics';
 import { ISLAND_MAP } from './tilemap';
 import type { INounSeed } from '@/wrappers/nounToken';
@@ -69,28 +66,37 @@ export interface NPC {
   patrolTargetX: number;
   patrolTargetY: number;
   patrolWaitTimer: number;
+  /** Position at the previous sim tick — render interpolation (WorldPage). */
+  prevX?: number;
+  prevY?: number;
 }
 
 // ── NPC spawn positions (world coords, on grass tiles) ────────────────
 
 function findSpawnPositions(): [number, number][] {
   const positions: [number, number][] = [];
-  const cx = MAP_SIZE / 2;
-  const cy = MAP_SIZE / 2;
+  const cx = CORE_SIZE / 2;
+  const cy = CORE_SIZE / 2;
 
   // Spawn NPCs in a ring around the island center
   const offsets = [
-    [6, -6], [-6, -4], [8, 4], [-5, 8], [10, -2],
-    [-8, -8], [4, 10], [-10, 2], [6, 6], [-4, -10],
+    [6, -6],
+    [-6, -4],
+    [8, 4],
+    [-5, 8],
+    [10, -2],
+    [-8, -8],
+    [4, 10],
+    [-10, 2],
+    [6, 6],
+    [-4, -10],
   ];
 
   for (const [ox, oy] of offsets) {
     const tx = cx + ox;
     const ty = cy + oy;
-    if (tx >= 0 && tx < MAP_SIZE && ty >= 0 && ty < MAP_SIZE) {
-      if (isWalkable(tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2, ISLAND_MAP)) {
-        positions.push([tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2]);
-      }
+    if (isWalkable(tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2, ISLAND_MAP)) {
+      positions.push([tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2]);
     }
   }
 
@@ -254,7 +260,13 @@ export function tickNPC(
 
 // ── Apply damage to NPC ───────────────────────────────────────────────
 
-export function damageNPC(npc: NPC, damage: number, knockX: number, knockY: number, stunFrames: number): boolean {
+export function damageNPC(
+  npc: NPC,
+  damage: number,
+  knockX: number,
+  knockY: number,
+  stunFrames: number,
+): boolean {
   npc.hp = Math.max(0, npc.hp - damage);
   npc.hitFlash = 1;
   npc.vx += knockX;

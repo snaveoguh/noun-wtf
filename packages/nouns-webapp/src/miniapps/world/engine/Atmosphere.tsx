@@ -4,14 +4,14 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { MAP_SIZE, TILE_UNITS, CORE_SIZE } from './types';
+import { COAST_POINTS, ISLAND_RADIUS_TILES } from './tilemap';
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const WORLD_SCALE = 0.1;
-const TILE_SIZE = 16;
-const MAP_SIZE = 64;
-const TERRAIN_SIZE = MAP_SIZE * TILE_SIZE * WORLD_SCALE; // 102.4
-const CENTER = TERRAIN_SIZE / 2; // 51.2
+const TERRAIN_SIZE = MAP_SIZE * TILE_UNITS; // 1024 — full map edge
+const CENTER = (CORE_SIZE / 2) * TILE_UNITS; // 51.2 — island centre (spawn)
+const ISLAND_RADIUS = ISLAND_RADIUS_TILES * TILE_UNITS; // ~296
 const OCEAN_Y = -0.15;
 
 // ── Bird Flocks ──────────────────────────────────────────────────────
@@ -28,8 +28,8 @@ interface FlockConfig {
 
 const FLOCKS: FlockConfig[] = [
   { count: 7, radius: 20, height: 12, speed: 0.15, wingSpeed: 4 },
-  { count: 5, radius: 28, height: 16, speed: 0.10, wingSpeed: 3.5 },
-  { count: 8, radius: 15, height: 10, speed: 0.20, wingSpeed: 5 },
+  { count: 5, radius: 28, height: 16, speed: 0.1, wingSpeed: 3.5 },
+  { count: 8, radius: 15, height: 10, speed: 0.2, wingSpeed: 5 },
 ];
 
 function Flock({ config, seed }: { config: FlockConfig; seed: number }) {
@@ -120,7 +120,7 @@ function makeCloudData(count: number) {
     phase: number;
   }> = [];
   for (let i = 0; i < count; i++) {
-    const rng = (s: number) => (Math.sin(i * 127.1 + s * 311.7) * 0.5 + 0.5);
+    const rng = (s: number) => Math.sin(i * 127.1 + s * 311.7) * 0.5 + 0.5;
     data.push({
       x: CENTER + (rng(0) - 0.5) * TERRAIN_SIZE * 1.4,
       y: 8 + rng(1) * 7, // 8-15 units
@@ -191,7 +191,12 @@ export function CloudLayer() {
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, CLOUD_COUNT]} material={material} frustumCulled={false}>
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, CLOUD_COUNT]}
+      material={material}
+      frustumCulled={false}
+    >
       <planeGeometry args={[1, 1]} />
     </instancedMesh>
   );
@@ -201,7 +206,7 @@ export function CloudLayer() {
 // Plane with vertex displacement (sine waves) and color variation.
 // Includes foam particles near the shore boundary.
 
-const OCEAN_SEGMENTS = 64;
+const OCEAN_SEGMENTS = 220;
 
 export function AnimatedOcean() {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -225,14 +230,17 @@ export function AnimatedOcean() {
         void main() {
           vec3 pos = position;
           // Multi-frequency sine wave displacement
-          float wave1 = sin(pos.x * 1.5 + uTime * 0.8) * 0.06;
-          float wave2 = sin(pos.y * 2.0 + uTime * 1.2) * 0.04;
-          float wave3 = sin((pos.x + pos.y) * 0.8 + uTime * 0.5) * 0.08;
+          // Long swell — the plane is ~1700u across so keep frequencies
+          // low enough for the mesh to resolve them.
+          float wave1 = sin(pos.x * 0.45 + uTime * 0.8) * 0.07;
+          float wave2 = sin(pos.y * 0.6 + uTime * 1.2) * 0.05;
+          float wave3 = sin((pos.x + pos.y) * 0.25 + uTime * 0.5) * 0.09;
           pos.z += wave1 + wave2 + wave3;
 
           vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
           // Depth: distance from terrain center (further = deeper)
-          vDepth = length(vWorldPos.xz - vec2(${CENTER.toFixed(1)}, ${CENTER.toFixed(1)})) / ${(TERRAIN_SIZE * 0.75).toFixed(1)};
+          // Shallow inside the island (lakes, rivers, the surf) → deep out at sea.
+          vDepth = (length(vWorldPos.xz - vec2(${CENTER.toFixed(1)}, ${CENTER.toFixed(1)})) - ${ISLAND_RADIUS.toFixed(1)}) / 150.0 + 0.3;
           vDepth = clamp(vDepth, 0.0, 1.0);
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -264,16 +272,17 @@ export function AnimatedOcean() {
 
   // Foam particles near shore
   const foamGeo = useMemo(() => {
-    const count = 200;
+    const count = 540;
     const positions = new Float32Array(count * 3);
-    // Distribute foam in a ring around the island center (approx shore radius)
-    const shoreRadius = TERRAIN_SIZE * 0.3; // approximate shore line
+    // Scatter foam along the sampled coastline (first sea tile per bearing).
+    const pts = COAST_POINTS;
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = shoreRadius + (Math.random() - 0.5) * 6;
-      positions[i * 3] = CENTER + Math.cos(angle) * r;
+      const cp = pts.length ? pts[i % pts.length] : null;
+      const bx = cp ? (cp.tx + 0.5) * TILE_UNITS : CENTER;
+      const bz = cp ? (cp.ty + 0.5) * TILE_UNITS : CENTER;
+      positions[i * 3] = bx + (Math.random() - 0.5) * 6;
       positions[i * 3 + 1] = OCEAN_Y + 0.02 + Math.random() * 0.05;
-      positions[i * 3 + 2] = CENTER + Math.sin(angle) * r;
+      positions[i * 3 + 2] = bz + (Math.random() - 0.5) * 6;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -295,7 +304,7 @@ export function AnimatedOcean() {
     }
   });
 
-  const size = TERRAIN_SIZE * 1.5;
+  const size = TERRAIN_SIZE * 1.7;
 
   return (
     <group>
@@ -330,13 +339,13 @@ export function AnimatedOcean() {
 
 interface DolphinState {
   active: boolean;
-  time: number;        // progress through jump (0-1)
-  duration: number;    // total jump time in seconds
+  time: number; // progress through jump (0-1)
+  duration: number; // total jump time in seconds
   startX: number;
   startZ: number;
-  angle: number;       // heading
+  angle: number; // heading
   jumpHeight: number;
-  nextSpawn: number;   // countdown to next jump
+  nextSpawn: number; // countdown to next jump
   splashPhase: 'none' | 'launch' | 'land';
   splashTimer: number;
 }
@@ -376,11 +385,14 @@ export function Dolphins() {
   // Spawn a new dolphin jump at a random ocean position
   const spawnJump = () => {
     const s = stateRef.current;
-    // Random position in the ocean (outside island, inside terrain bounds)
-    const angle = Math.random() * Math.PI * 2;
-    const dist = TERRAIN_SIZE * 0.35 + Math.random() * TERRAIN_SIZE * 0.2;
-    s.startX = CENTER + Math.cos(angle) * dist;
-    s.startZ = CENTER + Math.sin(angle) * dist;
+    // Just off a random stretch of coast (8–20 tiles out from the surf).
+    const cp = COAST_POINTS.length
+      ? COAST_POINTS[Math.floor(Math.random() * COAST_POINTS.length)]
+      : null;
+    const angle = cp ? cp.angle : Math.random() * Math.PI * 2;
+    const out = (8 + Math.random() * 12) * TILE_UNITS;
+    s.startX = (cp ? (cp.tx + 0.5) * TILE_UNITS : CENTER) + Math.cos(angle) * out;
+    s.startZ = (cp ? (cp.ty + 0.5) * TILE_UNITS : CENTER) + Math.sin(angle) * out;
     s.angle = angle + Math.PI * 0.5 + (Math.random() - 0.5) * 0.5;
     s.jumpHeight = 1.5 + Math.random() * 1.5;
     s.duration = 1.8 + Math.random() * 0.8;

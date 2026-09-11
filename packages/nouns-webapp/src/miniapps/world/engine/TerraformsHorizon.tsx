@@ -26,8 +26,8 @@ const TF_PALETTES: string[][] = [
 const NEON_ACCENTS = ['#ff2e7e', '#00e5ff', '#f9a825', '#a8ff2a'];
 
 const CHUNK_COUNT = 160; // how many distant chunks
-const RING_RADIUS_MIN = 180; // inner edge of the ring
-const RING_RADIUS_MAX = 320; // outer edge of the ring
+const RING_RADIUS_MIN = 400; // inner edge of the ring — clear of the ~350u island
+const RING_RADIUS_MAX = 540; // outer edge of the ring
 const Y_OFFSET = -2; // sink base into fog
 const JITTER = 0.6; // keep column shape consistent
 

@@ -1,7 +1,7 @@
 // ── Drop Party System — Items scattered on island at settlement ──────
 
-import { TILE_SIZE, MAP_SIZE, WALKABLE } from './types';
-import { ISLAND_MAP } from './tilemap';
+import { TILE_SIZE, CORE_SIZE, WALKABLE } from './types';
+import { tileAt } from './tilemap';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -33,15 +33,20 @@ export function generateDropPositions(count: number, seed: number): [number, num
   let attempts = 0;
   while (positions.length < count && attempts < count * 100) {
     attempts++;
-    const tx = Math.floor(nextRandom() * MAP_SIZE);
-    const ty = Math.floor(nextRandom() * MAP_SIZE);
-    const tile = ISLAND_MAP[ty]?.[tx];
-    if (tile !== undefined && WALKABLE.has(tile)) {
+    // Keep drops within reach of the core (a ring of ~48 tiles around
+    // spawn) rather than scattering them across the whole 640-tile island.
+    const ang = nextRandom() * Math.PI * 2;
+    const rad = 6 + nextRandom() * 42;
+    const tx = Math.floor(CORE_SIZE / 2 + Math.cos(ang) * rad);
+    const ty = Math.floor(CORE_SIZE / 2 + Math.sin(ang) * rad);
+    const tile = tileAt(tx, ty);
+    if (WALKABLE.has(tile)) {
       const worldX = (tx + 0.5) * TILE_SIZE;
       const worldY = (ty + 0.5) * TILE_SIZE;
       // Don't place too close to existing positions
       const tooClose = positions.some(
-        ([px, py]) => Math.abs(px - worldX) < TILE_SIZE * 3 && Math.abs(py - worldY) < TILE_SIZE * 3,
+        ([px, py]) =>
+          Math.abs(px - worldX) < TILE_SIZE * 3 && Math.abs(py - worldY) < TILE_SIZE * 3,
       );
       if (!tooClose) {
         positions.push([worldX, worldY]);

@@ -18,6 +18,8 @@ export enum Tile {
   Spawn = 7,
   DeepWater = 8,
   Arena = 9,
+  /** Knee-deep water — walkable ford / lake margin. Slows, never drowns. */
+  Shallow = 10,
 }
 
 export const WALKABLE = new Set<Tile>([
@@ -27,6 +29,7 @@ export const WALKABLE = new Set<Tile>([
   Tile.Path,
   Tile.Spawn,
   Tile.Arena,
+  Tile.Shallow,
 ]);
 
 // ── Direction / State ─────────────────────────────────────────────────
@@ -242,8 +245,27 @@ export interface Camera {
 // ── Constants ─────────────────────────────────────────────────────────
 
 export const TILE_SIZE = 16;
-export const MAP_SIZE = 64;
-export const WORLD_SIZE = TILE_SIZE * MAP_SIZE; // 1024
+/** Tile-world px → Three.js units. One tile = 1.6 units. */
+export const WORLD_SCALE = 0.1;
+export const TILE_UNITS = TILE_SIZE * WORLD_SCALE;
+/**
+ * Legacy island core: tiles 0..63. Every hard-coded coordinate in the
+ * engine (spawn, buildings, paint surfaces, build pieces, billboards) lives
+ * in this frame and MUST keep working, so the big island is grown OUTWARD
+ * from it rather than re-centred.
+ */
+export const CORE_SIZE = 64;
+/** Full map edge in tiles (10× the core per axis ≈ 100× the area). */
+export const MAP_SIZE = 640;
+/**
+ * World tile index of ISLAND_MAP[0][0]. Chosen so the legacy core sits in
+ * the exact middle of the big map: tile 32 (old spawn) is the map centre.
+ */
+export const MAP_ORIGIN = CORE_SIZE / 2 - MAP_SIZE / 2; // -288
+export const WORLD_SIZE = TILE_SIZE * MAP_SIZE; // 10240
+/** Tile-world pixel bounds of the playable map. */
+export const WORLD_MIN_PX = MAP_ORIGIN * TILE_SIZE;
+export const WORLD_MAX_PX = (MAP_ORIGIN + MAP_SIZE) * TILE_SIZE;
 export const SPRITE_SIZE = 32;
 export const PLAYER_SPEED = 0.3; // legacy slow baseline (kept for callers not yet on locomotion)
 export const PLAYER_MAX_HP = 100;
