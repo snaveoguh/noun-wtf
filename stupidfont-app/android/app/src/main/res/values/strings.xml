@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">stupidfont</string>
+    <string name="title_activity_main">stupidfont</string>
+    <string name="package_name">wtf.noun.stupidfont</string>
+    <string name="custom_url_scheme">wtf.noun.stupidfont</string>
+</resources>

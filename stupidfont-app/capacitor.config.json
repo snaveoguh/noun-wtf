@@ -1,0 +1,9 @@
+{
+  "appId": "wtf.noun.stupidfont",
+  "appName": "stupidfont",
+  "webDir": "../packages/nouns-webapp/public/stupidfont",
+  "backgroundColor": "#000000",
+  "ios": { "contentInset": "never", "backgroundColor": "#000000", "scheme": "stupidfont" },
+  "android": { "backgroundColor": "#000000", "allowMixedContent": false },
+  "plugins": { "SplashScreen": { "launchShowDuration": 0, "backgroundColor": "#000000" } }
+}
