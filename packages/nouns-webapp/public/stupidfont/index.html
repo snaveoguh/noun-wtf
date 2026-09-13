@@ -7,7 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#000000" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon-192.png" />
 <title>stupidfont</title>
 <style>
   @font-face { font-family: 'Pip3'; src: url(Pip3Beef-Regular.woff2) format('woff2'); font-display: swap; }
@@ -142,11 +144,11 @@
   <input id="fontIn" type="file" accept=".ttf,.otf,.woff,font/ttf,font/otf" hidden />
   <button id="resetAll" class="danger">reset all</button>
 </div>
-<div class="foot">
+<div class="foot" id="foot">
   starts from pip3 beef by 60r90: every letter with all its takes. load font pulls any .ttf/.otf in the same way.
   every letter you draw is traced into a real opentype font, live. line = neat for cleaner vector edges.
   draw up to 5 takes of a letter and the font cycles through them as you type, so repeats never match.
-  autosaves in this browser. export the .otf and it's yours. add to home screen for the app feel.
+  autosaves on this device. export the .otf and it's yours. <a href="privacy.html">privacy</a>: nothing leaves your phone.
 </div>
 <div id="toast"></div>
 
@@ -715,7 +717,15 @@
 
   // ── Export ───────────────────────────────────────────────────────────────
   function safeName(s) { return (s || 'StupidFont').replace(/[^A-Za-z0-9]/g, '') || 'StupidFont'; }
+  const native = () => window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  async function deliverNative(blob, filename) {
+    const cap = window.Capacitor, FS = cap.registerPlugin('Filesystem'), Share = cap.registerPlugin('Share');
+    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+    const { uri } = await FS.writeFile({ path: filename, data: b64, directory: 'CACHE' });
+    await Share.share({ title: filename, files: [uri] });
+  }
   async function deliver(blob, filename, preferShare) {
+    if (native()) { try { await deliverNative(blob, filename); return; } catch (e) { if (e && /cancel/i.test(e.message || '')) return; console.warn(e); } }
     const file = new File([blob], filename, { type: blob.type });
     if (preferShare && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: filename }); return; } catch (e) { if (e.name === 'AbortError') return; }
@@ -748,6 +758,7 @@
     if (restored) toast('restored your drawings');
   }
   window.addEventListener('resize', render);
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
   $('previewText').addEventListener('keydown', e => e.stopPropagation());
   boot();
 })();

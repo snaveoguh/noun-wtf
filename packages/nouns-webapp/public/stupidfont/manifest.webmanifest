@@ -1,0 +1,23 @@
+{
+  "id": "/stupidfont/",
+  "name": "stupidfont",
+  "short_name": "stupidfont",
+  "description": "Draw letters with your finger and get a real font. Up to five takes per letter that cycle as you type, so nothing repeats.",
+  "start_url": "/stupidfont/?source=pwa",
+  "scope": "/stupidfont/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "en",
+  "categories": ["productivity", "graphics", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "store/shot-1.png", "sizes": "1080x2340", "type": "image/png", "form_factor": "narrow", "label": "Draw a letter" },
+    { "src": "store/shot-2.png", "sizes": "1080x2340", "type": "image/png", "form_factor": "narrow", "label": "Five takes per letter" }
+  ]
+}
