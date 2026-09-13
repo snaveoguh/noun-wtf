@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <title>stupidfont</title>
 <style>
-  @font-face { font-family: 'Pip3'; src: url(/fonts/Pip3-Regular.woff2) format('woff2'); font-display: swap; }
+  @font-face { font-family: 'Pip3'; src: url(Pip3Beef-Regular.woff2) format('woff2'); font-display: swap; }
   :root {
     --bg: #000; --fg: #fff; --dim: #666; --line: #222; --accent: #ff0; --ink: #fff;
     --safe-b: env(safe-area-inset-bottom, 0px);
@@ -70,6 +70,7 @@
   .tools { display: flex; gap: 6px; padding: 8px 14px; align-items: center; flex-wrap: wrap; }
   .tools .grow { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--dim); }
   input[type=range] { flex: 1; accent-color: var(--accent); min-width: 60px; }
+  select { font: inherit; text-transform: inherit; background: #111; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
 
   /* Letter strip */
   .strip { display: flex; flex-shrink: 0; gap: 4px; overflow-x: auto; padding: 6px 14px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -123,6 +124,7 @@
   <button id="clear">clear</button>
   <button id="reset" title="Load Pip3's letter into this take">pip3</button>
   <button id="dup" title="Copy take 1 into this take">copy 1</button>
+  <div class="grow">line <select id="smooth"><option value="rough">rough</option><option value="normal" selected>normal</option><option value="neat">neat</option></select></div>
 </div>
 
 <div class="strip" id="strip"></div>
@@ -136,10 +138,13 @@
   <button id="saveJson">save project</button>
   <button id="loadJson">load project</button>
   <input id="fileIn" type="file" accept=".json,application/json" hidden />
+  <button id="loadFont" title="Seed every letter (and its takes) from a .ttf / .otf">load font</button>
+  <input id="fontIn" type="file" accept=".ttf,.otf,.woff,font/ttf,font/otf" hidden />
   <button id="resetAll" class="danger">reset all</button>
 </div>
 <div class="foot">
-  starts from pip3 by 60r90. every letter you draw is traced into a real opentype font, live.
+  starts from pip3 beef by 60r90: every letter with all its takes. load font pulls any .ttf/.otf in the same way.
+  every letter you draw is traced into a real opentype font, live. line = neat for cleaner vector edges.
   draw up to 5 takes of a letter and the font cycles through them as you type, so repeats never match.
   autosaves in this browser. export the .otf and it's yours. add to home screen for the app feel.
 </div>
@@ -155,6 +160,8 @@
   const H = (ASC - DESC) / CELL;  // 220 cells tall
   const BASE_ROW = ASC / CELL;    // baseline row (176)
   const MAXV = 5;                 // takes per letter
+  const SEED = 'Pip3Beef-Regular.ttf'; // Pip3 with up to 5 takes per letter (rand/calt alternates become takes)
+  const SMOOTH = { rough: [0, 0.6], normal: [2, 0.35], neat: [4, 0.2] }; // [chaikin passes, rdp tolerance]
 
   const CHARS = [
     ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '|',
@@ -168,7 +175,7 @@
   const bitmaps = new Map();   // char -> Array(MAXV) of Uint8Array|undefined
   const undo = new Map();      // "ch#take" -> [Uint8Array]
   const cache = new Map();     // "ch#take" -> {path, advance}
-  let cur = 'A', take = 0, tool = 'pen', radius = 10, pip3 = null, drawing = false, last = null, liveN = 0;
+  let cur = 'A', take = 0, tool = 'pen', radius = 10, pip3 = null, drawing = false, last = null, liveN = 0, smooth = 'normal';
 
   const $ = id => document.getElementById(id);
   const canvas = $('draw'), ctx = canvas.getContext('2d');
@@ -184,9 +191,7 @@
   const k = (ch, i) => ch + '#' + i;
 
   // ── Pip3 prefill ─────────────────────────────────────────────────────────
-  function rasterizeFromPip3(ch) {
-    if (!pip3) return null;
-    const g = pip3.charToGlyph(ch);
+  function rasterizeGlyph(g) {
     if (!g || g.index === 0 || !g.path || !g.path.commands.length) return null;
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const x = c.getContext('2d');
@@ -196,6 +201,34 @@
     const d = x.getImageData(0, 0, W, H).data, out = new Uint8Array(W * H);
     for (let i = 0; i < W * H; i++) out[i] = d[i * 4 + 3] > 127 ? 1 : 0;
     return out;
+  }
+  function rasterizeFromPip3(ch) { return pip3 ? rasterizeGlyph(pip3.charToGlyph(ch)) : null; }
+  // Alternate glyphs a font offers for a base glyph, via rand / aalt / salt / ss01 (in that order).
+  function alternatesOf(font, gid) {
+    const out = [];
+    for (const feat of ['rand', 'aalt', 'salt', 'ss01']) {
+      let list = [];
+      try { list = font.substitution.getAlternates(feat) || []; } catch (e) { }
+      for (const r of list) if (r.sub === gid) for (const b of r.by) if (b !== gid && !out.includes(b)) out.push(b);
+      if (out.length) break;
+    }
+    return out;
+  }
+  // Fill every letter's takes from a font: take 1 = the encoded glyph, takes 2.. = its alternates.
+  function seedFromFont(font) {
+    let n = 0, alts = 0;
+    for (const ch of GLYPH_CHARS) {
+      const s = new Array(MAXV);
+      const g = font.charToGlyph(ch);
+      const base = rasterizeGlyph(g);
+      if (base) { s[0] = base; n++; }
+      if (base) alternatesOf(font, g.index).slice(0, MAXV - 1).forEach((gid, i) => {
+        const b = rasterizeGlyph(font.glyphs.get(gid)); if (b) { s[i + 1] = b; alts++; }
+      });
+      bitmaps.set(ch, s);
+    }
+    cache.clear(); undo.clear();
+    return { n, alts };
   }
 
   // ── Tracing: bitmap -> contours -> smoothed polygons -> opentype path ──
@@ -274,7 +307,8 @@
   function traceBitmap(b) {
     let minx = W, maxx = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (b[y * W + x]) { if (x < minx) minx = x; if (x > maxx) maxx = x; }
-    const contours = traceContours(b).filter(c => Math.abs(area(c)) >= 3).map(c => rdp(chaikin(c, 2), 0.35));
+    const [passes, tol] = SMOOTH[smooth] || SMOOTH.normal;
+    const contours = traceContours(b).filter(c => Math.abs(area(c)) >= 3).map(c => rdp(chaikin(c, passes), tol));
     const path = new opentype.Path();
     const shift = LSB - minx * CELL;
     for (const c of contours) {
@@ -592,11 +626,26 @@
   $('pen').onclick = () => { tool = 'pen'; $('pen').classList.add('on'); $('eraser').classList.remove('on'); };
   $('eraser').onclick = () => { tool = 'eraser'; $('eraser').classList.add('on'); $('pen').classList.remove('on'); };
   $('size').oninput = e => { radius = +e.target.value; };
+  $('smooth').onchange = e => { smooth = e.target.value; cache.clear(); scheduleRebuild(); scheduleSave(); toast('line: ' + smooth); };
+  $('loadFont').onclick = () => $('fontIn').click();
+  $('fontIn').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const font = opentype.parse(await f.arrayBuffer());
+      if (!confirm('Replace every letter with glyphs from ' + f.name + '? Alternates become takes 2-5. Your current drawings will be lost.')) return;
+      const { n, alts } = seedFromFont(font);
+      for (const ch of GLYPH_CHARS) drawChip(ch); take = 0; drawTakes(); render(); scheduleRebuild(); scheduleSave();
+      toast(n + ' letters' + (alts ? ' + ' + alts + ' takes' : '') + ' from ' + f.name);
+    } catch (err) { console.error(err); toast('could not read that font'); }
+  };
   $('undo').onclick = () => { const u = undo.get(k(cur, take)); if (!u || !u.length) return toast('nothing to undo'); slots(cur)[take] = u.pop(); render(); changed(cur, take); };
   $('clear').onclick = () => { pushUndo(); bm(cur).fill(0); render(); changed(cur, take); };
   $('reset').onclick = () => {
-    const r = rasterizeFromPip3(cur); if (!r) return toast('pip3 has no ' + cur);
-    pushUndo(); slots(cur)[take] = r; render(); changed(cur, take); toast(cur + ' take ' + (take + 1) + ' = pip3');
+    if (!pip3) return toast('pip3 not loaded');
+    const g = pip3.charToGlyph(cur), alts = alternatesOf(pip3, g.index);
+    const r = take > 0 && alts[take - 1] ? rasterizeGlyph(pip3.glyphs.get(alts[take - 1])) : rasterizeFromPip3(cur);
+    if (!r) return toast('pip3 has no ' + cur);
+    pushUndo(); slots(cur)[take] = r; render(); changed(cur, take); toast(cur + ' take ' + (take + 1) + ' = pip3' + (take > 0 && alts[take - 1] ? ' take ' + (take + 1) : ''));
   };
   $('dup').onclick = () => {
     if (take === 0) return toast('this is take 1');
@@ -604,9 +653,10 @@
     pushUndo(); slots(cur)[take] = bitmaps.get(cur)[0].slice(); render(); changed(cur, take); toast('copied take 1 · now mess with it');
   };
   $('resetAll').onclick = () => {
-    if (!confirm('Reset every letter back to Pip3 and wipe all takes? Your drawings in this browser will be lost.')) return;
-    for (const ch of GLYPH_CHARS) { const s = new Array(MAXV); const r = rasterizeFromPip3(ch); if (r) s[0] = r; bitmaps.set(ch, s); for (let i = 0; i < MAXV; i++) cache.delete(k(ch, i)); drawChip(ch); }
-    undo.clear(); take = 0; drawTakes(); render(); scheduleRebuild(); scheduleSave(); toast('back to pip3');
+    if (!confirm('Reset every letter back to Pip3 (all its takes)? Your drawings in this browser will be lost.')) return;
+    if (pip3) seedFromFont(pip3); else bitmaps.clear();
+    for (const ch of GLYPH_CHARS) drawChip(ch);
+    take = 0; drawTakes(); render(); scheduleRebuild(); scheduleSave(); toast('back to pip3');
   };
 
   // ── Persist ──────────────────────────────────────────────────────────────
@@ -633,7 +683,7 @@
       for (const t of ts) arr[t] = encode(bitmaps.get(ch)[t]);
       glyphs[ch] = arr;
     }
-    return { v: 2, name: $('fontName').value, cell: CELL, w: W, h: H, takes: MAXV, glyphs };
+    return { v: 2, name: $('fontName').value, cell: CELL, w: W, h: H, takes: MAXV, smooth, glyphs };
   }
   function load(data) {
     if (!data || !(data.v === 1 || data.v === 2) || data.w !== W || data.h !== H) return false;
@@ -644,6 +694,7 @@
       bitmaps.set(ch, s);
     }
     if (data.name) $('fontName').value = data.name;
+    if (SMOOTH[data.smooth]) { smooth = data.smooth; $('smooth').value = smooth; }
     cache.clear(); return true;
   }
   let saveT = null;
@@ -686,12 +737,12 @@
   async function boot() {
     buildStrip();
     try {
-      const buf = await (await fetch('Pip3-Regular.ttf')).arrayBuffer();
+      const buf = await (await fetch(SEED)).arrayBuffer();
       pip3 = opentype.parse(buf);
     } catch (e) { console.warn('pip3 not loaded', e); }
     let restored = false;
     try { const s = localStorage.getItem(KEY); if (s) restored = load(JSON.parse(s)); } catch (e) { }
-    if (!restored) for (const ch of GLYPH_CHARS) { const r = rasterizeFromPip3(ch); if (r) slots(ch)[0] = r; }
+    if (!restored && pip3) seedFromFont(pip3);
     for (const ch of GLYPH_CHARS) drawChip(ch);
     select('A'); rebuildLive();
     if (restored) toast('restored your drawings');
