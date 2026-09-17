@@ -1,22 +1,36 @@
-// Thick-marker line-art recreation of the "milking the treasury" noun meme (prop 997).
+// Thick-marker, deliberately crappy line-art recreation of the "milking the treasury" noun meme (prop 997).
 // Run: node scripts/marker-memes/milking-the-treasury.cjs  -> writes milking-the-treasury.svg in cwd.
-// Black wobbly strokes on white, kid-drawing style. Writes milking-the-treasury.svg
 const fs = require('fs');
 const W = 1600, H = 900, SW = 13;
-let seed = 7;
+let seed = 23;
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 const j = a => (rnd() * 2 - 1) * a;
+const pick = a => a[Math.floor(rnd() * a.length)];
 
-// resample a polyline every `step` px, jitter, then smooth (Catmull-Rom -> cubic)
-function wob(pts, { closed = false, amp = 4, step = 38 } = {}) {
+// resample, jitter, low-frequency warp, overshoot the ends, then smooth
+function wob(pts, { closed = false, amp = 5, step = 30, warp = 7, over = 0 } = {}) {
   const src = closed ? [...pts, pts[0]] : pts;
   const out = [];
+  const ph = rnd() * 6.28, fr = 0.004 + rnd() * 0.006;
+  let dist = 0;
   for (let i = 0; i < src.length - 1; i++) {
     const [x0, y0] = src[i], [x1, y1] = src[i + 1];
-    const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / step));
-    for (let k = 0; k < n; k++) { const t = k / n; out.push([x0 + (x1 - x0) * t + j(amp), y0 + (y1 - y0) * t + j(amp)]); }
+    const len = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(len / step));
+    for (let k = 0; k < n; k++) {
+      const t = k / n; const wx = Math.sin(ph + dist * fr) * warp, wy = Math.cos(ph * 1.7 + dist * fr * 1.3) * warp;
+      out.push([x0 + (x1 - x0) * t + j(amp) + wx, y0 + (y1 - y0) * t + j(amp) + wy]); dist += len / n;
+    }
   }
-  if (!closed) out.push([src[src.length - 1][0] + j(amp), src[src.length - 1][1] + j(amp)]);
+  if (!closed) {
+    const e = src[src.length - 1]; out.push([e[0] + j(amp), e[1] + j(amp)]);
+    if (over > 0 && out.length > 1) { // overshoot both ends like a rushed marker
+      const a = out[0], b = out[1], n = out.length, y = out[n - 1], z = out[n - 2];
+      const d1 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d2 = Math.hypot(y[0] - z[0], y[1] - z[1]) || 1;
+      const o1 = rnd() * over, o2 = rnd() * over;
+      out.unshift([a[0] - (b[0] - a[0]) / d1 * o1, a[1] - (b[1] - a[1]) / d1 * o1]);
+      out.push([y[0] + (y[0] - z[0]) / d2 * o2, y[1] + (y[1] - z[1]) / d2 * o2]);
+    }
+  }
   const P = closed ? [...out, out[0]] : out;
   const at = i => P[Math.max(0, Math.min(P.length - 1, i))];
   let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
@@ -27,117 +41,147 @@ function wob(pts, { closed = false, amp = 4, step = 38 } = {}) {
   }
   return d + (closed ? 'Z' : '');
 }
-const ell = (cx, cy, rx, ry, n = 24, rot = 0) => Array.from({ length: n }, (_, i) => { const a = rot + i / n * Math.PI * 2; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; });
+const ell = (cx, cy, rx, ry, n = 20, rot = 0) => Array.from({ length: n }, (_, i) => { const a = rot + i / n * Math.PI * 2; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; });
 const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+const lump = (pts, a = 12) => pts.map(([x, y]) => [x + j(a), y + j(a)]);   // pre-distort control points
 
 let svg = '';
-const S = (pts, o = {}) => { svg += `<path d="${wob(pts, o)}" fill="${o.fill || 'none'}" stroke-width="${o.sw || SW}"/>`; };
-const F = (pts, o = {}) => S(pts, { ...o, fill: '#000' });   // solid black blob
+const path = (d, fill, sw, extra = '') => { svg += `<path d="${d}" fill="${fill}" stroke-width="${sw.toFixed(1)}" ${extra}/>`; };
+// stroke: random weight, sometimes retraced with a thinner offset pass
+const S = (pts, o = {}) => {
+  const sw = (o.sw || SW) * (0.65 + rnd() * 0.9);
+  path(wob(pts, { over: o.closed ? 0 : 14, ...o }), o.fill || 'none', sw);
+  if (rnd() < 0.2) path(wob(pts.map(([x, y]) => [x + j(3), y + j(3)]), { over: 8, ...o, closed: o.closed }), 'none', sw * 0.4);
+};
 const L = (x0, y0, x1, y1, o) => S([[x0, y0], [x1, y1]], o);
+// white blob: silent white fill for occlusion + an open outline that starts anywhere and overshoots past its start
+const B = (pts, o = {}) => {
+  path(wob(pts, { closed: true, ...o }), '#fff', 0.1, 'stroke="none"');
+  const k = Math.floor(rnd() * pts.length); const ring = [...pts.slice(k), ...pts.slice(0, k + 1)];
+  S(ring, { ...o, closed: false, over: 18 });
+};
+// black scribble fill: outline + one frantic zigzag across the polygon
+const F = (pts, o = {}) => {
+  if (o.solid) { path(wob(pts, { closed: true, amp: 3, warp: 3 }), '#000', (o.sw || SW) * 0.8); return; }
+  const ys = pts.map(p => p[1]), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const zig = []; let dir = 1;
+  for (let y = y0 + 6; y < y1; y += 6 + rnd() * 3) {
+    const xs = [];
+    for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; if ((a[1] <= y) !== (b[1] <= y)) xs.push(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1])); }
+    if (xs.length < 2) continue; const lo = Math.min(...xs), hi = Math.max(...xs);
+    zig.push(dir > 0 ? [lo + j(8), y] : [hi + j(8), y]); zig.push(dir > 0 ? [hi + j(8), y + 3] : [lo + j(8), y + 3]); dir = -dir;
+  }
+  if (zig.length > 1) path(wob(zig, { amp: 2, warp: 2, step: 60 }), 'none', SW * 0.7);
+  S(pts, { ...o, closed: true });
+};
 
-// noun noggles: two boxes, bridge, left arm; right half of each lens solid black
-function noggles(x, y, s, mirror = false) { // s = lens height
-  const lw = s * 1.15, m = mirror ? -1 : 1;
-  const lens = (lx) => {
-    S(rect(lx, y, lw, s), { closed: true, amp: 2 });
-    F([[lx + lw * 0.5, y + 2], [lx + lw - 2, y + 2], [lx + lw - 2, y + s - 2], [lx + lw * 0.5, y + s - 2]], { closed: true, amp: 1, sw: 4 });
+// noun noggles, drawn badly: lenses different sizes, pupils wander
+function noggles(x, y, s) {
+  const lw = s * 1.15;
+  const lens = (lx, ly, k) => {
+    const w = lw * k, h = s * (0.85 + rnd() * 0.35);
+    S(lump(rect(lx, ly, w, h), 6), { closed: true, amp: 3 });
+    const px = lx + w * (0.4 + rnd() * 0.2);
+    F(lump([[px, ly + 4], [lx + w - 3, ly + 4], [lx + w - 3, ly + h - 4], [px, ly + h - 4]], 3), { solid: true, sw: 5 });
   };
   const l1 = x, l2 = x + lw + s * 0.25;
-  lens(l1); lens(l2);
-  L(l1 + lw, y + s * 0.45, l2, y + s * 0.45, { amp: 1 });
-  L(l1, y + s * 0.45, l1 - s * 0.55, y + s * 0.45, { amp: 1 });
-  L(l1 - s * 0.55, y + s * 0.45, l1 - s * 0.55, y + s * 0.95, { amp: 1 });
+  lens(l1, y, 0.9 + rnd() * 0.2); lens(l2, y + j(10), 0.9 + rnd() * 0.3);
+  L(l1 + lw, y + s * 0.45, l2, y + s * 0.5, { amp: 2 });
+  S([[l1, y + s * 0.45], [l1 - s * 0.6, y + s * 0.4], [l1 - s * 0.6, y + s * 1.05]], { amp: 3 });
 }
-const drop = (x, y, s) => S([[x, y], [x + s * 0.6, y + s], [x, y + s * 1.4], [x - s * 0.6, y + s]], { closed: true, amp: 1, sw: SW * 0.7 });
+const drop = (x, y, s) => S(lump([[x, y], [x + s * 0.6, y + s], [x, y + s * 1.4], [x - s * 0.6, y + s]], 3), { closed: true, amp: 2, sw: SW * 0.7 });
+const fly = (x, y) => { F(ell(x, y, 9, 7, 8), { solid: true, sw: 5 }); S([[x - 14, y - 12], [x + 2, y - 4]], { sw: 4, amp: 1 }); S([[x + 14, y - 12], [x - 2, y - 4]], { sw: 4, amp: 1 }); S([[x + 20, y + 4], [x + 40, y - 10], [x + 30, y + 20], [x + 55, y + 5]], { sw: 3, amp: 3 }); };
 
-
-const B = (pts, o = {}) => S(pts, { ...o, closed: true, fill: '#fff' });   // white-filled blob (occludes)
-
-// ───────── barn background (sparse) ─────────
-[240, 470, 1090].forEach(x => L(x, 0, x + j(10), 270 + j(30), { amp: 3 }));
-S(rect(640, 20, 330, 120), { closed: true, amp: 3 }); L(640, 80, 970, 80, { amp: 3 });
-L(0, 300, 1250, 300, { amp: 3 });                                   // beam
-// doorway right
-S([[1260, 0], [1260, 560], [1600, 560]], { amp: 3 });
-S([[1330, 110], [1350, 70], [1400, 60], [1430, 80], [1480, 70], [1520, 100], [1500, 140], [1440, 150], [1380, 145], [1330, 140]], { closed: true, amp: 3, sw: SW * 0.8 }); // cloud
-S([[1470, 380], [1470, 300], [1530, 250], [1590, 300], [1590, 380]], { amp: 3, sw: SW * 0.8 });          // barn
-S(rect(1512, 320, 36, 60), { closed: true, amp: 2, sw: SW * 0.6 });
-L(1280, 470, 1600, 470, { amp: 3, sw: SW * 0.7 }); L(1280, 520, 1600, 520, { amp: 3, sw: SW * 0.7 });     // fence
-for (let x = 1320; x < 1600; x += 90) L(x, 440, x, 545, { amp: 2, sw: SW * 0.7 });
-// floor
-L(0, 790, 1600, 790 + j(8), { amp: 4 });
-for (let x = 30; x < 1600; x += 140) S([[x, 830], [x + 25, 815], [x + 50, 835], [x + 75, 818]], { amp: 3, sw: SW * 0.6 });
+// ───────── barn background (sparse, crooked) ─────────
+[240, 470, 1090].forEach(x => L(x + j(30), 0, x + j(40), 270 + j(60), { amp: 5 }));
+S(lump(rect(640, 20, 330, 120), 15), { closed: true }); L(630, 80, 985, 90);
+L(0, 300, 1250, 310, { amp: 6 });                                   // beam
+S([[1260, 0], [1250, 560], [1600, 570]], { amp: 6 });               // doorway
+S(lump([[1330, 110], [1350, 70], [1400, 60], [1430, 80], [1480, 70], [1520, 100], [1500, 140], [1440, 150], [1380, 145], [1330, 140]], 10), { closed: true, sw: SW * 0.8 });
+S(lump([[1470, 380], [1470, 300], [1530, 250], [1590, 300], [1590, 380]], 10), { sw: SW * 0.8 });
+S(lump(rect(1512, 320, 36, 60), 5), { closed: true, sw: SW * 0.6 });
+L(1280, 470, 1600, 480, { sw: SW * 0.7 }); L(1280, 520, 1600, 515, { sw: SW * 0.7 });
+for (let x = 1320; x < 1600; x += 90) L(x, 440 + j(15), x + j(15), 545, { sw: SW * 0.7 });
+L(0, 790, 1600, 800, { amp: 6, warp: 6 });                          // floor
+for (let x = 30; x < 1600; x += 140) S([[x, 830], [x + 25, 815], [x + 50, 835], [x + 75, 818]], { sw: SW * 0.6 });
 
 // ───────── cow ─────────
-function cow(m) { // m = 1 left cow, -1 right cow (mirrored around x=800)
+function cow(m) { // m = 1 left, -1 right; each one lumped differently so they are not mirror twins
   const X = x => m === 1 ? x : 1600 - x;
-  const P = pts => pts.map(([x, y]) => [X(x), y]);
-  // legs first (behind body): two fat U legs
-  [[330, 560], [560, 570]].forEach(([x, y]) => B(P([[x, y], [x + 70, y], [x + 65, 780], [x + 5, 780]]), { amp: 3 }));
-  // tail
-  S(P([[665, 380], [720, 430], [700, 520]]), { amp: 4, sw: SW * 0.8 }); F(P(ell(705, 535, 18, 22, 10)), { closed: true, amp: 2 });
-  // body (big blob)
-  B(P([[260, 330], [420, 265], [560, 275], [660, 350], [690, 470], [670, 570], [560, 610], [420, 615], [300, 590], [240, 500]]), { amp: 5 });
-  F(P(ell(470, 340, 70, 40, 14)), { closed: true, amp: 5 });
-  F(P(ell(600, 470, 55, 45, 14)), { closed: true, amp: 5 });
-  F(P(ell(400, 540, 45, 30, 12)), { closed: true, amp: 4 });
-  // udder = ETH diamond hanging off the rear underside
-  const ux = 490, uy = 590;
-  B(P([[ux, uy], [ux + 75, uy + 90], [ux, uy + 150], [ux - 75, uy + 90]]), { amp: 3 });
-  S(P([[ux - 75, uy + 90], [ux, uy + 115], [ux + 75, uy + 90]]), { amp: 3, sw: SW * 0.8 });
-  L(X(ux), uy, X(ux), uy + 115, { amp: 2, sw: SW * 0.8 });
-  [[ux - 38, uy + 150], [ux + 38, uy + 150], [ux, uy + 168]].forEach(([x, y]) => B(P(ell(x, y, 22, 18, 10)), { amp: 2, sw: SW * 0.8 }));
-  // horns + ears (behind head)
-  S(P([[150, 360], [110, 300], [185, 330]]), { amp: 2 }); S(P([[290, 355], [330, 295], [255, 330]]), { amp: 2 });
-  B(P([[100, 450], [40, 430], [45, 490], [100, 495]]), { amp: 3 }); B(P([[330, 450], [390, 430], [385, 490], [330, 495]]), { amp: 3 });
-  // head
-  B(P([[120, 380], [200, 340], [300, 350], [340, 420], [330, 560], [280, 610], [160, 615], [95, 560], [90, 440]]), { amp: 4 });
-  F(P(ell(180, 380, 55, 25, 10)), { closed: true, amp: 4 });                                             // head patch
-  noggles(m === 1 ? 120 : 1600 - 120 - 2 * 92 - 20, 420, 80, m === -1);
-  B(P(ell(215, 560, 95, 40, 16)), { amp: 3 });                                                           // muzzle
-  F(P(ell(180, 560, 10, 8, 6)), { closed: true, amp: 1 }); F(P(ell(250, 560, 10, 8, 6)), { closed: true, amp: 1 });
+  const P = (pts, a = 14) => lump(pts.map(([x, y]) => [X(x), y]), a);
+  [[330, 560], [560, 570]].forEach(([x, y]) => B(P([[x, y], [x + 70, y], [x + 80, 785], [x - 10, 780]]), { amp: 5 }));
+  S(P([[665, 380], [740, 420], [700, 540]]), { sw: SW * 0.8 }); F(P(ell(705, 555, 22, 28, 10)), { solid: true });
+  B(P([[260, 330], [420, 255], [560, 275], [670, 350], [700, 470], [680, 580], [560, 620], [420, 625], [300, 600], [230, 500]], 22), { amp: 6, warp: 10 });
+  F(P(ell(470, 340, 75, 45, 12)), {}); F(P(ell(600, 470, 60, 50, 12)), {}); F(P(ell(400, 545, 50, 32, 10)), {});
+  // udder: saggy ETH diamond, veiny, five teats
+  const ux = 490, uy = 580;
+  B(P([[ux, uy], [ux + 95, uy + 100], [ux + 20, uy + 190], [ux - 30, uy + 200], [ux - 90, uy + 100]], 10), { amp: 6 });
+  S(P([[ux - 90, uy + 100], [ux, uy + 130], [ux + 95, uy + 100]]), { sw: SW * 0.8 });
+  L(X(ux), uy, X(ux - 5), uy + 130, { sw: SW * 0.8 });
+  for (let i = 1; i < 3; i++) S(P([[ux - 50 + i * 30, uy + 40 + i * 10], [ux - 40 + i * 30, uy + 80], [ux - 60 + i * 30, uy + 120]]), { sw: 4, amp: 4 });   // veins
+  [[ux - 55, uy + 190], [ux - 15, uy + 215], [ux + 25, uy + 205], [ux + 55, uy + 175], [ux - 90, uy + 165]].forEach(([x, y]) => B(P(ell(x, y, 18 + rnd() * 10, 16 + rnd() * 10, 9)), { sw: SW * 0.8, amp: 3 }));
+  // horns, ears, head
+  S(P([[150, 360], [100, 280], [190, 330]]), {}); S(P([[290, 355], [340, 285], [255, 330]]), {});
+  B(P([[100, 450], [30, 420], [40, 500], [100, 500]]), {}); B(P([[330, 450], [400, 425], [390, 500], [330, 495]]), {});
+  B(P([[120, 380], [200, 330], [300, 350], [350, 420], [335, 570], [280, 625], [160, 630], [90, 570], [80, 440]], 14), { amp: 6, warp: 9 });
+  F(P(ell(180, 380, 60, 28, 10)), {});
+  noggles(m === 1 ? 120 : 1600 - 120 - 2 * 92 - 20, 420 + j(20), 80);
+  if (m === 1) { B(P(ell(300, 470, 26, 30, 10)), { sw: SW * 0.8 }); F(P(ell(306, 476, 9, 11, 8)), { solid: true, sw: 4 }); }   // one eyeball escaped the noggles
+  B(P(ell(215, 565, 100, 45, 14), 8), { amp: 5 });
+  F(P(ell(180, 560, 12, 9, 6)), { solid: true, sw: 5 }); F(P(ell(250, 565, 14, 10, 6)), { solid: true, sw: 5 });
+  B(P([[200, 600], [240, 600], [255, 660], [225, 690], [195, 660]]), { amp: 4, sw: SW * 0.8 });  // tongue
+  L(X(225), 610, X(228), 680, { sw: 4 });
+  S(P([[230, 690], [232, 740], [225, 770]]), { sw: 4, amp: 3 });                              // drool
 }
 cow(1); cow(-1);
 
 // ───────── the noun ─────────
-// stool (behind)
-B(rect(720, 665, 160, 30), { amp: 3 }); L(740, 695, 732, 790, { amp: 3 }); L(860, 695, 868, 790, { amp: 3 });
-// legs + shoes
-B([[700, 640], [760, 640], [755, 770], [695, 770]], { amp: 3 }); B([[840, 640], [900, 640], [905, 770], [845, 770]], { amp: 3 });
-F([[660, 765], [760, 762], [768, 795], [655, 800]], { closed: true, amp: 3 }); F([[840, 762], [940, 765], [945, 800], [832, 795]], { closed: true, amp: 3 });
-// arms (behind torso) out to the teats
-S([[700, 500], [665, 610], [610, 715], [575, 748]], { amp: 4, sw: SW * 1.3 }); S([[900, 500], [935, 610], [990, 715], [1025, 748]], { amp: 4, sw: SW * 1.3 });
-// torso + hi-vis vest
-B([[690, 470], [910, 470], [925, 650], [675, 650]], { amp: 4 });
-S([[740, 470], [745, 650]], { amp: 2 }); S([[860, 470], [855, 650]], { amp: 2 });
-[525, 590].forEach(y => { L(690, y, 743, y + 2, { amp: 1 }); L(857, y, 912, y + 2, { amp: 1 }); L(690, y + 22, 743, y + 24, { amp: 1 }); L(857, y + 22, 912, y + 24, { amp: 1 }); });
-F([[750, 470], [850, 470], [800, 530]], { closed: true, amp: 2 });                                                            // black tee at neck
-// hands
-B(ell(555, 758, 34, 26, 12), { amp: 3 }); B(ell(1045, 758, 34, 26, 12), { amp: 3 });
-[[535, 772], [555, 780], [575, 776]].forEach(([x, y]) => L(x, y, x + 3, y + 16, { amp: 1, sw: SW * 0.6 }));
-[[1025, 772], [1045, 780], [1065, 776]].forEach(([x, y]) => L(x, y, x + 3, y + 16, { amp: 1, sw: SW * 0.6 }));
-// head (bear-ish), ears + tuft behind
-S([[650, 250], [640, 205], [700, 200], [705, 250]], { amp: 3 }); S([[950, 250], [960, 205], [900, 200], [895, 250]], { amp: 3 });
-F([[720, 250], [745, 190], [800, 215], [850, 190], [880, 250]], { closed: true, amp: 3 });
-B([[650, 245], [950, 245], [960, 470], [640, 470]], { amp: 5 });
-S([[665, 300], [935, 300]], { amp: 2, sw: SW * 0.8 });                                                                           // brow
+B(lump(rect(720, 665, 160, 30), 6), {}); L(740, 695, 725, 795); L(860, 695, 875, 795);
+B(lump([[700, 640], [760, 640], [750, 775], [690, 775]], 8), {}); B(lump([[840, 640], [900, 640], [910, 775], [850, 775]], 8), {});
+F(lump([[655, 765], [765, 762], [775, 800], [645, 805]], 6), { solid: true }); F(lump([[835, 762], [945, 765], [955, 805], [825, 800]], 6), { solid: true });
+// hairy arms
+S([[700, 500], [660, 610], [605, 715], [570, 750]], { sw: SW * 1.4, amp: 6 }); S([[900, 500], [940, 610], [995, 715], [1030, 750]], { sw: SW * 1.4, amp: 6 });
+for (let i = 0; i < 7; i++) { const t = 0.15 + i * 0.12; L(700 - 130 * t, 500 + 250 * t, 700 - 130 * t - 18, 500 + 250 * t - 6, { sw: 4, amp: 1 }); L(900 + 130 * t, 500 + 250 * t, 900 + 130 * t + 18, 500 + 250 * t - 6, { sw: 4, amp: 1 }); }
+// torso + vest
+B(lump([[690, 470], [910, 470], [935, 655], [665, 655]], 12), { amp: 6 });
+S([[740, 470], [750, 655]]); S([[860, 470], [850, 655]]);
+[525, 590].forEach(y => { L(690, y, 748, y + 6); L(852, y, 918, y - 4); L(690, y + 22, 748, y + 26); L(852, y + 24, 918, y + 18); });
+F(lump([[750, 470], [850, 470], [800, 540]], 8), { solid: true });
+// claw hands
+B(ell(550, 760, 38, 30, 10), {}); B(ell(1050, 760, 38, 30, 10), {});
+[[520, 775], [545, 785], [570, 782], [588, 770]].forEach(([x, y]) => S([[x, y], [x - 4, y + 26], [x + 6, y + 34]], { sw: 5, amp: 2 }));
+[[1012, 770], [1030, 782], [1055, 785], [1080, 775]].forEach(([x, y]) => S([[x, y], [x + 4, y + 26], [x - 6, y + 34]], { sw: 5, amp: 2 }));
+// head
+S([[650, 250], [630, 195], [700, 195], [710, 250]]); S([[950, 250], [975, 190], [900, 205], [890, 250]]);
+F(lump([[720, 250], [740, 180], [800, 220], [860, 175], [885, 250]], 8), { solid: true });
+B(lump([[650, 245], [950, 240], [970, 480], [630, 470]], 14), { amp: 6, warp: 9 });
+S([[665, 300], [800, 290], [935, 310]], { sw: SW * 0.8 });
+L(660, 285, 700, 270, { sw: 5 }); L(700, 275, 740, 262, { sw: 5 });                 // stray eyebrow hairs
 noggles(700, 320, 78);
-F(ell(800, 415, 18, 12, 8), { closed: true, amp: 1 });                                                                          // nose
-S(rect(715, 425, 170, 35), { closed: true, amp: 2 }); for (let x = 745; x < 885; x += 30) L(x, 425, x, 460, { amp: 1, sw: SW * 0.7 }); // teeth
-drop(615, 300, 22); drop(985, 330, 22); drop(600, 380, 18);
-// milk
-drop(455, 800, 16); drop(1145, 800, 16);
-S([[500, 790], [480, 830], [440, 860]], { amp: 3, sw: SW * 0.7 }); S([[1100, 790], [1120, 830], [1160, 860]], { amp: 3, sw: SW * 0.7 });
+F(lump(ell(800, 415, 22, 14, 8), 4), { solid: true }); L(790, 428, 785, 450, { sw: 4 }); L(812, 428, 818, 452, { sw: 4 });   // nose + nose hair
+// manic mouth: gaping black, crooked teeth, tongue, drool
+F(lump([[705, 425], [895, 420], [905, 500], [800, 520], [695, 495]], 8), { solid: true });
+for (let x = 725; x < 885; x += 26) { const h = 20 + rnd() * 30; B(lump(rect(x, 428, 20, h), 3), { sw: SW * 0.6, amp: 2 }); }
+B(lump([[760, 495], [840, 492], [850, 540], [800, 560], [750, 540]], 6), { sw: SW * 0.8 });
+S([[870, 500], [880, 560], [870, 610]], { sw: 4, amp: 3 });
+[[615, 300], [985, 330], [600, 380], [1000, 400], [630, 220]].forEach(([x, y]) => drop(x, y, 16 + rnd() * 14));
+// milk everywhere
+[[455, 800], [1145, 800], [420, 760], [1180, 770], [500, 840], [1100, 850]].forEach(([x, y]) => drop(x, y, 12 + rnd() * 10));
+S([[500, 790], [470, 830], [420, 870]], { sw: SW * 0.7 }); S([[1100, 790], [1130, 830], [1180, 870]], { sw: SW * 0.7 });
+S([[430, 790], [380, 840], [300, 860]], { sw: SW * 0.5 }); S([[1170, 795], [1230, 845], [1320, 865]], { sw: SW * 0.5 });
+[[360, 870], [1250, 875], [300, 880]].forEach(([x, y]) => F(ell(x, y, 8, 6, 6), { solid: true, sw: 4 }));
+// flies
+fly(300, 250); fly(1150, 700); fly(560, 130); fly(1380, 400);
 
 // ───────── props ─────────
-S(ell(80, 40, 28, 22, 12), { closed: true, amp: 2 }); L(80, 62, 80, 230, { amp: 3 }); L(20, 230, 140, 230, { amp: 3 });   // pitchfork
-[25, 60, 100, 135].forEach(x => L(x, 232, x - 3, 310, { amp: 2 }));
-B(rect(20, 650, 190, 130), { amp: 5 });                                                                                // hay bale
-for (let y = 685; y < 780; y += 40) S([[35, y], [80, y + 12], [130, y - 8], [195, y + 10]], { amp: 4, sw: SW * 0.6 });
-S([[1440, 610], [1420, 560]], { amp: 2 }); S([[1440, 610], [1475, 560]], { amp: 2 });
-B(rect(1310, 610, 260, 170), { amp: 4 }); S(rect(1335, 635, 210, 120), { closed: true, amp: 3, sw: SW * 0.7 }); // tv
+S(ell(80, 40, 28, 22, 10), { closed: true }); L(80, 62, 85, 230); L(15, 232, 145, 228);
+[25, 60, 100, 135].forEach(x => L(x, 232, x + j(8), 310 + j(15)));
+B(lump(rect(20, 650, 190, 130), 12), { amp: 6 });
+for (let y = 685; y < 780; y += 40) S([[35, y], [80, y + 12], [130, y - 8], [195, y + 10]], { sw: SW * 0.6 });
+S([[1440, 610], [1410, 550]]); S([[1440, 610], [1480, 555]]);
+B(lump(rect(1310, 610, 260, 170), 12), { amp: 6 }); S(lump(rect(1335, 635, 210, 120), 8), { closed: true, sw: SW * 0.7 });
 noggles(1385, 665, 42);
-L(1570, 690, 1600, 690, { amp: 2 });
+L(1570, 690, 1600, 695);
 
 fs.writeFileSync('milking-the-treasury.svg',
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/><g stroke="#000" stroke-linecap="round" stroke-linejoin="round">${svg}</g></svg>`);
