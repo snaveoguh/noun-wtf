@@ -8,6 +8,8 @@ import { INounsAuctionHouseV2 } from '../../../contracts/interfaces/INounsAuctio
 import { NounsAuctionHouseProxy } from '../../../contracts/proxies/NounsAuctionHouseProxy.sol';
 import { NounsToken } from '../../../contracts/NounsToken.sol';
 import { RewardsDeployer } from '../../../script/Rewards/RewardsDeployer.sol';
+import { StakingRevenueOracle } from '../../../contracts/client-incentives/StakingRevenueOracle.sol';
+import { LSTMock } from '../helpers/StakingMocks.sol';
 import 'forge-std/Test.sol';
 
 abstract contract BaseProposalRewardsTest is NounsDAOLogicBaseTest {
@@ -173,7 +175,7 @@ contract DisabledTest is BaseProposalRewardsTest {
 }
 
 contract ProposalRewardsTest is BaseProposalRewardsTest {
-    function test_revertsIfNoAuctionRevenue() public {
+    function test_revertsIfNoRevenue() public {
         fastforwardAndSettleAuction();
         fastforwardAndSettleAuction();
 
@@ -182,7 +184,7 @@ contract ProposalRewardsTest is BaseProposalRewardsTest {
 
         settleAuction();
         votingClientIds = [0];
-        vm.expectRevert('auctionRevenue must be > 0');
+        vm.expectRevert(Rewards.NoRevenue.selector);
         rewards.updateRewardsForProposalWritingAndVoting({
             lastProposalId: proposalId,
             votingClientIds: votingClientIds
@@ -518,7 +520,9 @@ contract ProposalRewardsEligibilityTest is BaseProposalRewardsTest {
         lastNounId = settleAuction();
 
         // verify assumptions
-        assertEq(nounsToken.totalSupply(), 12);
+        // 13, not the 12 upstream expects: the auction settled just above drew no bid, and this repo's auction
+        // house routes an unsold noun to the treasury instead of burning it, so supply does not drop by one.
+        assertEq(nounsToken.totalSupply(), 13);
         assertEq(nounsToken.getCurrentVotes(bidder1), 8);
 
         votingClientIds = [0];
@@ -880,5 +884,228 @@ contract VotesRewardsTest is BaseProposalRewardsTest {
             }
             fail('Array no equal');
         }
+    }
+}
+
+/**
+ * @dev Client Incentives V2: proposal and voting rewards can be funded by treasury staking yield, so they keep
+ * flowing through periods where auctions raise nothing.
+ */
+contract StakingRevenueTest is BaseProposalRewardsTest {
+    StakingRevenueOracle oracle;
+    LSTMock lst;
+
+    address treasury;
+
+    function setUp() public override {
+        super.setUp();
+
+        treasury = address(dao.timelock());
+        lst = new LSTMock(1e18);
+        lst.setBalance(treasury, 100 ether);
+
+        oracle = new StakingRevenueOracle({
+            owner_: treasury,
+            consumer_: address(rewards),
+            maxRevenuePerConsume_: 0,
+            revenueShareBps_: 10_000
+        });
+
+        vm.startPrank(treasury);
+        oracle.addAsset({
+            name: 'LST',
+            balanceProvider: address(lst),
+            balanceCalldata: abi.encodeWithSignature('balanceOf(address)', treasury),
+            rateProvider: address(lst),
+            rateCalldata: abi.encodeWithSignature('getExchangeRate()')
+        });
+        rewards.setStakingRevenueOracle(address(oracle));
+        vm.stopPrank();
+
+        erc20Mock.mint(address(rewards), 100 ether);
+    }
+
+    /// @dev 10% on a 100 ETH position is 10 ETH of staking revenue
+    function accrueStakingYield() internal {
+        lst.setRate(1.1e18);
+    }
+
+    function updateRewards(uint32 proposalId) internal {
+        votingClientIds = [0];
+        rewards.updateRewardsForProposalWritingAndVoting({
+            lastProposalId: proposalId,
+            votingClientIds: votingClientIds
+        });
+    }
+
+    ///
+    /// The headline case: zero auction revenue, rewards still flow
+    ///
+
+    function test_stakingRevenueFundsRewardsWhenAuctionsRaiseNothing() public {
+        uint256 startTimestamp = block.timestamp;
+
+        // auctions settle with no bids, as they do when there is no auction demand
+        fastforwardAndSettleAuction();
+        fastforwardAndSettleAuction();
+        accrueStakingYield();
+
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+        settleAuction();
+
+        updateRewards(proposalId);
+
+        // 10 eth staking revenue * 1% proposal reward
+        assertEq(rewards.clientBalance(clientId1), 0.1 ether);
+    }
+
+    function test_stakingRevenueFundsRewardsWhenNoAuctionSettlesAtAll() public {
+        uint256 startTimestamp = block.timestamp;
+        uint256 cursorBefore = rewards.nextProposalRewardFirstAuctionId();
+
+        accrueStakingYield();
+
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+
+        // no settleAuction() here: nothing settled in this period at all, which used to revert
+        updateRewards(proposalId);
+
+        assertEq(rewards.clientBalance(clientId1), 0.1 ether);
+        // the revenue cursor must not move past an auction that never settled
+        assertEq(rewards.nextProposalRewardFirstAuctionId(), cursorBefore);
+    }
+
+    function test_stakingRevenueAddsToAuctionRevenue() public {
+        uint256 startTimestamp = block.timestamp;
+
+        bidAndSettleAuction({ bidAmount: 5 ether });
+        accrueStakingYield();
+
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+        settleAuction();
+
+        updateRewards(proposalId);
+
+        // (5 eth auction + 10 eth staking) * 1%
+        assertEq(rewards.clientBalance(clientId1), 0.15 ether);
+    }
+
+    function test_stakingRevenueIsNotCountedTwice() public {
+        uint256 startTimestamp = block.timestamp;
+
+        accrueStakingYield();
+        vm.warp(startTimestamp + 2 weeks + 1);
+        updateRewards(proposeVoteAndEndVotingPeriod(clientId1));
+        assertEq(rewards.clientBalance(clientId1), 0.1 ether);
+
+        // a second period with no further yield and no auction revenue has nothing to distribute
+        vm.warp(block.timestamp + 2 weeks + 1);
+        uint32 proposalId2 = proposeVoteAndEndVotingPeriod(clientId1);
+
+        votingClientIds = [0];
+        vm.expectRevert(Rewards.NoRevenue.selector);
+        rewards.updateRewardsForProposalWritingAndVoting({
+            lastProposalId: proposalId2,
+            votingClientIds: votingClientIds
+        });
+    }
+
+    function test_oracleEmitsRevenueConsumed() public {
+        uint256 startTimestamp = block.timestamp;
+
+        accrueStakingYield();
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+
+        // Rewards does not mirror this; the oracle's own event is the record of what was consumed.
+        vm.expectEmit(false, false, false, true, address(oracle));
+        emit StakingRevenueOracle.RevenueConsumed(10 ether, 10 ether);
+        updateRewards(proposalId);
+    }
+
+    ///
+    /// Switches
+    ///
+
+    function test_shareBpsScalesStakingRevenue() public {
+        uint256 startTimestamp = block.timestamp;
+
+        // count only a quarter of the measured yield as rewardable revenue
+        vm.prank(treasury);
+        oracle.setRevenueShareBps(2_500);
+
+        accrueStakingYield();
+        vm.warp(startTimestamp + 2 weeks + 1);
+        updateRewards(proposeVoteAndEndVotingPeriod(clientId1));
+
+        // 10 eth * 25% * 1%
+        assertEq(rewards.clientBalance(clientId1), 0.025 ether);
+    }
+
+    function test_shareBpsZeroStopsRewards() public {
+        uint256 startTimestamp = block.timestamp;
+
+        vm.prank(treasury);
+        oracle.setRevenueShareBps(0);
+
+        accrueStakingYield();
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+
+        votingClientIds = [0];
+        vm.expectRevert(Rewards.NoRevenue.selector);
+        rewards.updateRewardsForProposalWritingAndVoting({
+            lastProposalId: proposalId,
+            votingClientIds: votingClientIds
+        });
+
+        // the measured yield is still there once the DAO dials the share back up
+        vm.prank(treasury);
+        oracle.setRevenueShareBps(10_000);
+        assertEq(oracle.pendingRevenue(), 10 ether);
+    }
+
+    function test_unsetOracleFallsBackToAuctionRevenueOnly() public {
+        uint256 startTimestamp = block.timestamp;
+
+        vm.prank(treasury);
+        rewards.setStakingRevenueOracle(address(0));
+
+        bidAndSettleAuction({ bidAmount: 5 ether });
+        accrueStakingYield();
+
+        vm.warp(startTimestamp + 2 weeks + 1);
+        uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
+        settleAuction();
+
+        updateRewards(proposalId);
+
+        assertEq(rewards.clientBalance(clientId1), 0.05 ether); // 5 eth * 1%
+    }
+
+    function test_pendingRevenue_reflectsShareBps() public {
+        accrueStakingYield();
+        assertEq(oracle.pendingRevenue(), 10 ether);
+
+        vm.prank(treasury);
+        oracle.setRevenueShareBps(5_000);
+        assertEq(oracle.pendingRevenue(), 5 ether);
+    }
+
+    function test_setStakingRevenueOracleIsOwnerOnly() public {
+        vm.expectRevert('Ownable: caller is not the owner');
+        vm.prank(makeAddr('rando'));
+        rewards.setStakingRevenueOracle(address(oracle));
+    }
+
+    function test_oracleRejectsConsumersOtherThanRewards() public {
+        accrueStakingYield();
+
+        vm.expectRevert(StakingRevenueOracle.OnlyConsumer.selector);
+        vm.prank(makeAddr('rando'));
+        oracle.consumeRevenue();
     }
 }
