@@ -63,6 +63,7 @@
     ],
     "overrides": {
       "@babel/traverse": ">=7.23.2",
+      "viem": "2.47.17",
       "@openzeppelin/contracts": "4.4.0",
       "@openzeppelin/contracts-upgradeable": "4.4.0",
       "@openzeppelin/hardhat-upgrades": "1.8.2",
