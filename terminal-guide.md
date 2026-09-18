@@ -271,7 +271,10 @@ prediction against every existing noun to find "twins", and offers a SETTLE butt
 - **`/predictions`** — prediction markets on auctions and governance outcomes
 - **`/gamer`** / **`/explore/wallet`** — wallet profiles: nouns held and delegated, governance
   activity, transfer history
-- **`/settlers`** — the auto-settler bot's leaderboard and settlement maps
+- **`/settlers`** — three leaderboards over auction history: **Settlers** (who called settle,
+  the tx that mints the Noun and opens the next auction), **Curators** (settling Noun N−1 rolls
+  the block hash that seeds N's traits, so that wallet chose what N looks like), and **Winners**
+  (highest bidder). 258 unique settlers across 2,013 Nouns at last count.
 - **`/world`** — a full-screen 3D island sim (fixed-timestep, living scenery)
 - **`/playground`** + **`/studio`** — trait playground and the 2D noun editor
 - **`/terraforms`**, **`/highway`**, **`/pip3`** — onchain-art side quests
