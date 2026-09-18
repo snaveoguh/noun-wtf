@@ -154,6 +154,30 @@ treasury's yield is earmarked for clients.
 wstETH, rETH and mETH, and the live reward bps. `packages/nouns-sdk`'s
 `readNounsTreasuryBalancesInEth` already reads exactly those balances.
 
+## What happens when auctions start getting bids again
+
+Nothing this proposal adds gets in the way.
+
+- **Bidding rewards are untouched.** `updateRewardsForAuctions`, the path that pays a client when its
+  bid wins, has no lines changed. It works the moment bids return.
+- **Auction revenue still funds proposal and voting rewards exactly as today.** The pool is
+  `auctionRevenue + stakingRevenue`; staking is a second term added on, never a replacement. If auctions
+  raise 10 ETH in a period, that 10 ETH flows into the pool precisely as before.
+- **The two bug fixes only fire in the broken case.** With healthy auctions the code path is
+  identical: same cursor advance, same arithmetic.
+
+The one thing that changes: with both revenue sources on, clients earn **more** than they did
+historically — auction revenue *plus* a share of staking yield. That may be what the DAO wants. If not,
+it is a dial, not a ratchet:
+
+| To | Call | Effect |
+|---|---|---|
+| Stop counting staking yield | `oracle.setRevenueShareBps(0)` | Oracle stays wired; reports zero |
+| Detach the oracle entirely | `rewards.setStakingRevenueOracle(address(0))` | Back to auction-only |
+| Turn it back on | either call with a non-zero value | Reversible, no upgrade needed |
+
+All three are single `onlyOwner` transactions from the treasury.
+
 ## What could go wrong
 
 **The oracle reports a wrong number.** `maxRevenuePerConsume` caps how much any one
