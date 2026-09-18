@@ -244,10 +244,14 @@ canceling candidates, sponsoring, feedback, grant proposing, grant voting, grant
 delegation. Turns "who actually shows up" into a number.
 
 ### ⌐◨-◨ `/v2` — NounV2 auction + governance
-A full second DAO namespace, launched day-one alongside V1: `/v2` for the live auction,
-`/v2/noun/:id`, `/v2/vote`, `/v2/vote/:id`, `/v2/candidates/:id`, `/v2/crystal-ball`. Separate
-token, IDs from 0, its own treasury and proposal flow — indexed, feed-integrated (`V2` tab) and
-fully wired into the terminal's governance commands.
+NounV2 launched the day the **2.8 ETH reserve price** went live on mainnet Nouns, and noun.wtf
+shipped support for it on day one — a full second DAO namespace with no `?dao=` toggle and no
+localStorage switch, just split routes: `/v2` for the live auction, `/v2/noun/:id`, `/v2/vote`,
+`/v2/vote/:id`, `/v2/candidates/:id`, `/v2/crystal-ball`. Separate token, IDs from 0, its own
+treasury and proposal flow — indexed, feed-integrated (`V2` tab) and fully wired into the
+terminal's governance commands. The reserve difference is surfaced in the UI: V1 enforces
+2.8 ETH and gets a reserve badge while an auction sits below it; V2's reserve is 50 wei,
+effectively zero, so the badge stays hidden.
 
 ### 💸 `/grants` — small grants mechanic
 An onchain Small Grants treasury with its own lightweight proposal lifecycle: propose, vote
