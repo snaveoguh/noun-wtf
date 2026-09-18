@@ -107,6 +107,37 @@ live values with `getProposalRewardParams()`**):
 
 Scale linearly for the treasury's actual staked position.
 
+### What a proposal and a vote are actually worth
+
+Run against the real contract, not a spreadsheet — `test/foundry/rewards/RewardSimulation.t.sol` drives
+`updateRewardsForProposalWritingAndVoting` over synthetic periods where auctions raised nothing and
+staking revenue funded the pool:
+
+```
+forge test --match-contract RewardSimulationTest -vv
+```
+
+At 10,000 ETH staked, 3% APR, 1% proposal + 0.5% voting:
+
+| share | proposals | votes each | revenue | per proposal | per vote | to clients / period |
+|---|---|---|---|---|---|---|
+| 25% | 3 | 60 | 2.885 ETH | 0.0096 ETH | 0.000080 ETH | 0.043 ETH |
+| 50% | 3 | 60 | 5.769 ETH | 0.0192 ETH | 0.000160 ETH | 0.087 ETH |
+| 100% | 3 | 60 | 11.538 ETH | 0.0385 ETH | 0.000321 ETH | 0.173 ETH |
+| 100% | 1 | 60 | 11.538 ETH | 0.1154 ETH | 0.000962 ETH | 0.173 ETH |
+| 100% | 6 | 60 | 11.538 ETH | 0.0192 ETH | 0.000160 ETH | 0.173 ETH |
+| 100% | 3 | 150 | 11.538 ETH | 0.0385 ETH | 0.000128 ETH | 0.173 ETH |
+
+Two things to read off this:
+
+**The pool is fixed; activity only splits it differently.** The last three rows all pay out the same
+0.173 ETH per period. Doubling the proposals halves the per-proposal reward; more votes dilute the
+per-vote reward. Nobody earns more by doing more in aggregate — this is a revenue share, not a bounty.
+
+**A single vote is worth well under a cent at these settings.** 0.00032 ETH is around $1 at $3,000/ETH,
+and that is the *client's* share for facilitating the vote, not the voter's. Writing a proposal is worth
+around 0.04 ETH. Those are the honest numbers to quote.
+
 **Be honest about the magnitude.** At 100% of staking yield this is single-digit ETH
 per year across every client, every proposal and every vote. It is meaningfully
 smaller than auction-funded rewards were. The argument for it is continuity — clients
