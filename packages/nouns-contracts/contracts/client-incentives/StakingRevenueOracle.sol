@@ -69,6 +69,7 @@ contract StakingRevenueOracle is IStakingRevenueOracle, Ownable {
     event AssetReadSkipped(uint256 indexed index);
     event RevenueConsumed(uint256 revenueInWei, uint256 measuredInWei);
     event ConsumerSet(address oldConsumer, address newConsumer);
+    event RevenueShareBpsSet(uint16 oldShareBps, uint16 newShareBps);
     event MaxRevenuePerConsumeSet(uint256 oldMax, uint256 newMax);
 
     struct Asset {
@@ -96,15 +97,22 @@ contract StakingRevenueOracle is IStakingRevenueOracle, Ownable {
     /// @notice Upper bound on the revenue a single `consumeRevenue` call may report. Zero means unbounded.
     uint256 public maxRevenuePerConsume;
 
+    /// @notice How much bips of the measured yield is reported as revenue. Zero reports nothing, which is the
+    /// switch the DAO uses to turn client staking rewards on and off. May exceed 10_000 to weight staking
+    /// revenue above auction revenue; the uint16 type caps it at 655%.
+    uint16 public revenueShareBps;
+
     Asset[] internal assets;
 
-    constructor(address owner_, address consumer_, uint256 maxRevenuePerConsume_) {
+    constructor(address owner_, address consumer_, uint256 maxRevenuePerConsume_, uint16 revenueShareBps_) {
         _transferOwnership(owner_);
         consumer = consumer_;
         maxRevenuePerConsume = maxRevenuePerConsume_;
+        revenueShareBps = revenueShareBps_;
 
         emit ConsumerSet(address(0), consumer_);
         emit MaxRevenuePerConsumeSet(0, maxRevenuePerConsume_);
+        emit RevenueShareBpsSet(0, revenueShareBps_);
     }
 
     /**
@@ -135,8 +143,7 @@ contract StakingRevenueOracle is IStakingRevenueOracle, Ownable {
             a.lastBalance = balance;
         }
 
-        uint256 cap = maxRevenuePerConsume;
-        revenueInWei = (cap != 0 && measured > cap) ? cap : measured;
+        revenueInWei = _applyShareAndCap(measured);
 
         emit RevenueConsumed(revenueInWei, measured);
     }
@@ -155,8 +162,7 @@ contract StakingRevenueOracle is IStakingRevenueOracle, Ownable {
             measured += _yield(a.lastRate, a.lastBalance, rate, balance);
         }
 
-        uint256 cap = maxRevenuePerConsume;
-        revenueInWei = (cap != 0 && measured > cap) ? cap : measured;
+        revenueInWei = _applyShareAndCap(measured);
     }
 
     /**
@@ -277,10 +283,26 @@ contract StakingRevenueOracle is IStakingRevenueOracle, Ownable {
     }
 
     /**
+     * @notice Sets how much bips of the measured yield is reported as revenue. Zero reports nothing.
+     * @dev Only `owner` can call this function
+     */
+    function setRevenueShareBps(uint16 newShareBps) external onlyOwner {
+        emit RevenueShareBpsSet(revenueShareBps, newShareBps);
+        revenueShareBps = newShareBps;
+    }
+
+    /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   INTERNAL
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    /// @dev Takes the DAO's chosen share of the measured yield, then bounds it by the per-period cap.
+    function _applyShareAndCap(uint256 measured) internal view returns (uint256) {
+        uint256 shared = (measured * revenueShareBps) / 10_000;
+        uint256 cap = maxRevenuePerConsume;
+        return (cap != 0 && shared > cap) ? cap : shared;
+    }
 
     /**
      * @dev Yield is earned only on principal held for the whole period, and only when the rate rose.

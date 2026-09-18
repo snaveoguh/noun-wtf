@@ -184,7 +184,7 @@ contract ProposalRewardsTest is BaseProposalRewardsTest {
 
         settleAuction();
         votingClientIds = [0];
-        vm.expectRevert('revenue must be > 0');
+        vm.expectRevert(Rewards.NoRevenue.selector);
         rewards.updateRewardsForProposalWritingAndVoting({
             lastProposalId: proposalId,
             votingClientIds: votingClientIds
@@ -905,7 +905,8 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
         oracle = new StakingRevenueOracle({
             owner_: treasury,
             consumer_: address(rewards),
-            maxRevenuePerConsume_: 0
+            maxRevenuePerConsume_: 0,
+            revenueShareBps_: 10_000
         });
 
         vm.startPrank(treasury);
@@ -917,7 +918,6 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
             rateCalldata: abi.encodeWithSignature('getExchangeRate()')
         });
         rewards.setStakingRevenueOracle(address(oracle));
-        rewards.setStakingRevenueShareBps(10_000);
         vm.stopPrank();
 
         erc20Mock.mint(address(rewards), 100 ether);
@@ -1004,22 +1004,23 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
         uint32 proposalId2 = proposeVoteAndEndVotingPeriod(clientId1);
 
         votingClientIds = [0];
-        vm.expectRevert('revenue must be > 0');
+        vm.expectRevert(Rewards.NoRevenue.selector);
         rewards.updateRewardsForProposalWritingAndVoting({
             lastProposalId: proposalId2,
             votingClientIds: votingClientIds
         });
     }
 
-    function test_emitsStakingRevenueUsed() public {
+    function test_oracleEmitsRevenueConsumed() public {
         uint256 startTimestamp = block.timestamp;
 
         accrueStakingYield();
         vm.warp(startTimestamp + 2 weeks + 1);
         uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
 
-        vm.expectEmit(false, false, false, true);
-        emit Rewards.StakingRevenueUsed(10 ether);
+        // Rewards does not mirror this; the oracle's own event is the record of what was consumed.
+        vm.expectEmit(false, false, false, true, address(oracle));
+        emit StakingRevenueOracle.RevenueConsumed(10 ether, 10 ether);
         updateRewards(proposalId);
     }
 
@@ -1032,7 +1033,7 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
 
         // count only a quarter of the measured yield as rewardable revenue
         vm.prank(treasury);
-        rewards.setStakingRevenueShareBps(2_500);
+        oracle.setRevenueShareBps(2_500);
 
         accrueStakingYield();
         vm.warp(startTimestamp + 2 weeks + 1);
@@ -1042,24 +1043,26 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
         assertEq(rewards.clientBalance(clientId1), 0.025 ether);
     }
 
-    function test_shareBpsZeroLeavesTheOracleUntouched() public {
+    function test_shareBpsZeroStopsRewards() public {
         uint256 startTimestamp = block.timestamp;
 
         vm.prank(treasury);
-        rewards.setStakingRevenueShareBps(0);
+        oracle.setRevenueShareBps(0);
 
         accrueStakingYield();
         vm.warp(startTimestamp + 2 weeks + 1);
         uint32 proposalId = proposeVoteAndEndVotingPeriod(clientId1);
 
         votingClientIds = [0];
-        vm.expectRevert('revenue must be > 0');
+        vm.expectRevert(Rewards.NoRevenue.selector);
         rewards.updateRewardsForProposalWritingAndVoting({
             lastProposalId: proposalId,
             votingClientIds: votingClientIds
         });
 
-        // the oracle was never consumed, so the accrual is still there when the DAO switches it back on
+        // the measured yield is still there once the DAO dials the share back up
+        vm.prank(treasury);
+        oracle.setRevenueShareBps(10_000);
         assertEq(oracle.pendingRevenue(), 10 ether);
     }
 
@@ -1081,29 +1084,19 @@ contract StakingRevenueTest is BaseProposalRewardsTest {
         assertEq(rewards.clientBalance(clientId1), 0.05 ether); // 5 eth * 1%
     }
 
-    function test_pendingStakingRevenue_appliesShareBps() public {
+    function test_pendingRevenue_reflectsShareBps() public {
         accrueStakingYield();
-        assertEq(rewards.pendingStakingRevenue(), 10 ether);
+        assertEq(oracle.pendingRevenue(), 10 ether);
 
         vm.prank(treasury);
-        rewards.setStakingRevenueShareBps(5_000);
-        assertEq(rewards.pendingStakingRevenue(), 5 ether);
-
-        vm.prank(treasury);
-        rewards.setStakingRevenueOracle(address(0));
-        assertEq(rewards.pendingStakingRevenue(), 0);
+        oracle.setRevenueShareBps(5_000);
+        assertEq(oracle.pendingRevenue(), 5 ether);
     }
 
-    function test_settersAreOwnerOnly() public {
-        vm.startPrank(makeAddr('rando'));
-
+    function test_setStakingRevenueOracleIsOwnerOnly() public {
         vm.expectRevert('Ownable: caller is not the owner');
+        vm.prank(makeAddr('rando'));
         rewards.setStakingRevenueOracle(address(oracle));
-
-        vm.expectRevert('Ownable: caller is not the owner');
-        rewards.setStakingRevenueShareBps(1);
-
-        vm.stopPrank();
     }
 
     function test_oracleRejectsConsumersOtherThanRewards() public {

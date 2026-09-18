@@ -13,8 +13,9 @@ import { StakingRevenueOracle } from '../../contracts/client-incentives/StakingR
  * @dev This script only deploys. Nothing changes onchain until the DAO executes a proposal, because every
  * switch is behind `onlyOwner` and the owner is the treasury. The script logs the proposal transactions to run.
  *
- * The upgrade is inert until the DAO sets both `stakingRevenueOracle` and a non-zero `stakingRevenueShareBps`:
- * until then `Rewards` behaves exactly as it does today, minus the two bug fixes to the no-auction-revenue path.
+ * The upgrade is inert until the DAO points `Rewards` at the oracle AND the oracle has a non-zero
+ * `revenueShareBps`: until then `Rewards` behaves exactly as it does today, minus the two bug fixes to the
+ * no-auction-revenue path. The oracle is deployed with a share of 0, so turning it on is its own decision.
  */
 contract DeployClientIncentivesV2Mainnet is OptimizedScript {
     address constant DAO_PROXY = 0x6f3E6272A167e8AcCb32072d08E0957F9c79223d;
@@ -31,6 +32,10 @@ contract DeployClientIncentivesV2Mainnet is OptimizedScript {
     /// position, so it never binds in normal operation but caps a misbehaving rate source.
     uint256 constant MAX_REVENUE_PER_CONSUME = 100 ether;
 
+    /// @dev Deployed switched off. The DAO turns staking rewards on with `setRevenueShareBps`, which is the
+    /// one economic decision in this proposal and is reversible with a single call.
+    uint16 constant INITIAL_REVENUE_SHARE_BPS = 0;
+
     function run() public returns (Rewards newLogic, StakingRevenueOracle oracle) {
         requireDefaultProfile();
 
@@ -45,7 +50,8 @@ contract DeployClientIncentivesV2Mainnet is OptimizedScript {
         oracle = new StakingRevenueOracle({
             owner_: TREASURY,
             consumer_: rewardsProxy,
-            maxRevenuePerConsume_: MAX_REVENUE_PER_CONSUME
+            maxRevenuePerConsume_: MAX_REVENUE_PER_CONSUME,
+            revenueShareBps_: INITIAL_REVENUE_SHARE_BPS
         });
 
         vm.stopBroadcast();
@@ -98,7 +104,7 @@ contract DeployClientIncentivesV2Mainnet is OptimizedScript {
         });
 
         console.log('6. %s  setStakingRevenueOracle(%s)', rewardsProxy, address(oracle));
-        console.log('7. %s  setStakingRevenueShareBps(<bps chosen by the DAO>)', rewardsProxy);
+        console.log('7. %s  setRevenueShareBps(<bps chosen by the DAO>)', address(oracle));
     }
 
     function _logAsset(

@@ -16,7 +16,7 @@ contract StakingRevenueOracleTest is Test {
     address rando = makeAddr('rando');
 
     function setUp() public {
-        oracle = new StakingRevenueOracle(owner, consumer, 0);
+        oracle = new StakingRevenueOracle(owner, consumer, 0, 10_000);
         lst = new LSTMock(1e18);
         rebasing = new RebasingLSTMock(1e18);
     }
@@ -194,6 +194,38 @@ contract StakingRevenueOracleTest is Test {
         assertEq(consume(), 1 ether);
     }
 
+    function test_revenueShareBps_scalesReportedRevenue() public {
+        addLST(100 ether);
+        vm.prank(owner);
+        oracle.setRevenueShareBps(2_500);
+
+        lst.setRate(1.01e18); // 1 ETH of yield
+
+        assertEq(oracle.pendingRevenue(), 0.25 ether);
+        assertEq(consume(), 0.25 ether);
+    }
+
+    function test_revenueShareBps_zeroReportsNothingButStillConsumes() public {
+        addLST(100 ether);
+        vm.prank(owner);
+        oracle.setRevenueShareBps(0);
+
+        lst.setRate(1.01e18);
+
+        assertEq(oracle.pendingRevenue(), 0);
+        assertEq(consume(), 0);
+    }
+
+    function test_revenueShareBps_mayExceedOneHundredPercent() public {
+        addLST(100 ether);
+        vm.prank(owner);
+        oracle.setRevenueShareBps(20_000);
+
+        lst.setRate(1.01e18);
+
+        assertEq(consume(), 2 ether);
+    }
+
     function test_maxRevenuePerConsume_capsReportedRevenue() public {
         addLST(100 ether);
         vm.prank(owner);
@@ -287,6 +319,9 @@ contract StakingRevenueOracleTest is Test {
 
         vm.expectRevert('Ownable: caller is not the owner');
         oracle.setMaxRevenuePerConsume(1);
+
+        vm.expectRevert('Ownable: caller is not the owner');
+        oracle.setRevenueShareBps(1);
 
         vm.expectRevert('Ownable: caller is not the owner');
         oracle.resyncAssets();

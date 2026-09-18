@@ -48,6 +48,7 @@ contract Rewards is
     error OnlyNFTOwner();
     error LastNounIdMustBeSettled();
     error LastNounIdMustBeHigher();
+    error NoRevenue();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -74,11 +75,6 @@ contract Rewards is
     event AuctionRewardsDisabled();
     event ProposalRewardsEnabled(uint32 nextProposalIdToReward, uint32 nextProposalRewardFirstAuctionId);
     event ProposalRewardsDisabled();
-    /// @dev Emitted alongside `ProposalRewardsUpdated`, whose `auctionRevenue` field remains auction-only.
-    /// The revenue backing a proposal rewards update is `auctionRevenue + stakingRevenue`.
-    event StakingRevenueUsed(uint256 stakingRevenue);
-    event StakingRevenueOracleSet(address oldOracle, address newOracle);
-    event StakingRevenueShareBpsSet(uint16 oldShareBps, uint16 newShareBps);
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -147,11 +143,8 @@ contract Rewards is
         /// @dev The client NFT descriptor
         address descriptor;
         /// @dev Oracle reporting non-auction (staking) revenue. The zero address disables staking revenue.
+        /// @dev How much of the measured yield it reports is the oracle's own `revenueShareBps`.
         IStakingRevenueOracle stakingRevenueOracle;
-        /// @dev How much bips of the measured staking revenue counts as rewardable revenue. Zero disables it.
-        /// @dev Values above 10_000 are allowed, letting the DAO weight staking revenue more heavily than
-        /// auction revenue; the uint16 type caps it at 655%.
-        uint16 stakingRevenueShareBps;
     }
 
     /// @dev This is a ERC-7201 storage location, calculated using:
@@ -307,7 +300,8 @@ contract Rewards is
     /// @dev struct used to avoid stack-too-deep errors
     struct Temp {
         uint32 maxClientId;
-        uint256 stakingRevenue;
+        uint256 auctionRevenue;
+        uint256 lastAuctionIdForRevenue;
         uint256 totalRevenue;
         uint256 numEligibleVotes;
         uint256 rewardPerProposal;
@@ -368,18 +362,19 @@ contract Rewards is
         t.lastProposal = proposals[proposals.length - 1];
 
         t.firstAuctionIdForRevenue = $.nextProposalRewardFirstAuctionId;
-        (uint256 auctionRevenue, uint256 lastAuctionIdForRevenue, bool anyAuctionSettled) = getAuctionRevenue({
+        // Read into `t` rather than locals to keep this function within the stack limit without via-ir.
+        (t.auctionRevenue, t.lastAuctionIdForRevenue) = getAuctionRevenue({
             firstNounId: t.firstAuctionIdForRevenue,
             endTimestamp: t.lastProposal.creationTimestamp
         });
-        // Only advance the revenue cursor across auctions that actually settled. A period with no settlement
-        // must leave it untouched, otherwise the next auction would be skipped for revenue purposes.
-        if (anyAuctionSettled) $.nextProposalRewardFirstAuctionId = uint32(lastAuctionIdForRevenue) + 1;
+        $.nextProposalRewardFirstAuctionId = uint32(t.lastAuctionIdForRevenue) + 1;
 
-        t.stakingRevenue = _consumeStakingRevenue();
-        t.totalRevenue = auctionRevenue + t.stakingRevenue;
+        // The oracle reports the DAO's chosen share of treasury staking yield, and emits RevenueConsumed
+        // with the exact figure. A zero address leaves proposal rewards funded by auction revenue alone.
+        IStakingRevenueOracle oracle = $.stakingRevenueOracle;
+        t.totalRevenue = t.auctionRevenue + (address(oracle) == address(0) ? 0 : oracle.consumeRevenue());
 
-        require(t.totalRevenue > 0, 'revenue must be > 0');
+        if (t.totalRevenue == 0) revert NoRevenue();
 
         t.proposalRewardForPeriod = (t.totalRevenue * $.proposalRewardParams.proposalRewardBps) / 10_000;
         t.votingRewardForPeriod = (t.totalRevenue * $.proposalRewardParams.votingRewardBps) / 10_000;
@@ -414,13 +409,11 @@ contract Rewards is
             nextProposalIdToReward_,
             lastProposalId,
             t.firstAuctionIdForRevenue,
-            lastAuctionIdForRevenue,
-            auctionRevenue,
+            t.lastAuctionIdForRevenue,
+            t.auctionRevenue,
             t.rewardPerProposal,
             t.rewardPerVote
         );
-
-        if (t.stakingRevenue > 0) emit StakingRevenueUsed(t.stakingRevenue);
 
         //// Second loop over the proposals:
         //// 1. Reward proposal's clientId.
@@ -552,26 +545,26 @@ contract Rewards is
 
     /**
      * @notice Returns the sum of revenue via auctions from auctioning noun with id `firstNounId` until timestamp of `endTimestamp
-     * @dev When no auction settled in the window this returns `(0, firstNounId, false)` rather than reverting.
-     * Callers must check `anySettled` before advancing a cursor off `lastAuctionId`.
+     * @dev When no auction settled in the window this reports no revenue and `firstNounId - 1`, rather than
+     * reverting on an out-of-bounds read as it used to. A caller advancing a cursor to `lastAuctionId + 1`
+     * therefore leaves that cursor where it was, instead of skipping the next auction to settle.
      * @return sumRevenue total ETH settled across the auctions in the window
-     * @return lastAuctionId id of the last auction in the window; meaningless when `anySettled` is false
-     * @return anySettled whether any auction settled in the window
+     * @return lastAuctionId id of the last auction in the window, or `firstNounId - 1` if none settled
      */
     function getAuctionRevenue(
         uint256 firstNounId,
         uint256 endTimestamp
-    ) public view returns (uint256 sumRevenue, uint256 lastAuctionId, bool anySettled) {
+    ) public view returns (uint256 sumRevenue, uint256 lastAuctionId) {
         INounsAuctionHouseV2.Settlement[] memory s = auctionHouse.getSettlementsFromIdtoTimestamp(
             firstNounId,
             endTimestamp,
             true
         );
-        if (s.length == 0) return (0, firstNounId, false);
+        // Noun 0 is a nounder noun and never carries revenue, so clamping at 0 loses nothing.
+        if (s.length == 0) return (0, firstNounId == 0 ? 0 : firstNounId - 1);
 
         sumRevenue = sumAuctions(s);
         lastAuctionId = s[s.length - 1].nounId;
-        anySettled = true;
     }
 
     /**
@@ -618,23 +611,6 @@ contract Rewards is
 
     function stakingRevenueOracle() public view returns (IStakingRevenueOracle) {
         return _getRewardsStorage().stakingRevenueOracle;
-    }
-
-    function stakingRevenueShareBps() public view returns (uint16) {
-        return _getRewardsStorage().stakingRevenueShareBps;
-    }
-
-    /**
-     * @notice The staking revenue that would back the next proposal rewards update, after applying
-     * `stakingRevenueShareBps`. Zero when staking revenue is switched off.
-     */
-    function pendingStakingRevenue() public view returns (uint256) {
-        RewardsStorage storage $ = _getRewardsStorage();
-        IStakingRevenueOracle oracle = $.stakingRevenueOracle;
-        uint16 shareBps = $.stakingRevenueShareBps;
-        if (address(oracle) == address(0) || shareBps == 0) return 0;
-
-        return (oracle.pendingRevenue() * shareBps) / 10_000;
     }
 
     function admin() public view returns (address) {
@@ -769,22 +745,7 @@ contract Rewards is
      * itself, which the same `owner` authorizes.
      */
     function setStakingRevenueOracle(address newOracle) public onlyOwner {
-        RewardsStorage storage $ = _getRewardsStorage();
-
-        emit StakingRevenueOracleSet(address($.stakingRevenueOracle), newOracle);
-        $.stakingRevenueOracle = IStakingRevenueOracle(newOracle);
-    }
-
-    /**
-     * @notice Sets how much bips of the measured staking revenue counts as rewardable revenue. Zero switches
-     * staking revenue off. May exceed 10_000 to weight staking revenue above auction revenue.
-     * @dev Only `owner` can call this function
-     */
-    function setStakingRevenueShareBps(uint16 newShareBps) public onlyOwner {
-        RewardsStorage storage $ = _getRewardsStorage();
-
-        emit StakingRevenueShareBpsSet($.stakingRevenueShareBps, newShareBps);
-        $.stakingRevenueShareBps = newShareBps;
+        _getRewardsStorage().stakingRevenueOracle = IStakingRevenueOracle(newOracle);
     }
 
     /**
@@ -834,19 +795,6 @@ contract Rewards is
      *   INTERNAL
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
-
-    /**
-     * @dev Pulls the staking revenue accrued since the previous update and applies `stakingRevenueShareBps`.
-     * Returns zero, without touching the oracle, while staking revenue is switched off.
-     */
-    function _consumeStakingRevenue() internal returns (uint256) {
-        RewardsStorage storage $ = _getRewardsStorage();
-        IStakingRevenueOracle oracle = $.stakingRevenueOracle;
-        uint16 shareBps = $.stakingRevenueShareBps;
-        if (address(oracle) == address(0) || shareBps == 0) return 0;
-
-        return (oracle.consumeRevenue() * shareBps) / 10_000;
-    }
 
     function sumAuctions(INounsAuctionHouseV2.Settlement[] memory s) internal pure returns (uint256 sum) {
         for (uint256 i = 0; i < s.length; ++i) {

@@ -78,29 +78,30 @@ All sent from the treasury.
 | 4 | `StakingRevenueOracle` | `addAsset("rETH", …)` |
 | 5 | `StakingRevenueOracle` | `addAsset("mETH", …)` |
 | 6 | `Rewards` proxy | `setStakingRevenueOracle(<oracle>)` |
-| 7 | `Rewards` proxy | `setStakingRevenueShareBps(<TODO: bps>)` |
+| 7 | `StakingRevenueOracle` | `setRevenueShareBps(<TODO: bps>)` |
 
 `script/Rewards/DeployClientIncentivesV2Mainnet.s.sol` deploys the two contracts and
 prints these transactions with the exact calldata.
 
-Transactions 1–5 are inert on their own. Nothing changes until 6 **and** 7 are both
-executed with non-zero values. Splitting them across two proposals is a perfectly
-reasonable way to run this.
+Transactions 1–5 are inert on their own. The oracle is deployed with a revenue share
+of **0**, so nothing changes until 6 **and** 7 are both executed. Splitting them
+across two proposals is a perfectly reasonable way to run this: ship the fix, watch
+the oracle report numbers with `pendingRevenue()`, then vote on the share.
 
 ## How much money is this?
 
-Roughly: `staked treasury ETH` x `staking APR` x `stakingRevenueShareBps` x the
+Roughly: `staked treasury ETH` x `staking APR` x `revenueShareBps` x the
 existing `proposalRewardBps + votingRewardBps`.
 
 **TODO: fill in the real numbers before submitting** — the live values of
 `proposalRewardBps` and `votingRewardBps`, and the treasury's current staked
-position. The sizing decision is entirely `stakingRevenueShareBps`, which the DAO
+position. The sizing decision is entirely `revenueShareBps`, which the DAO
 sets in transaction 7 and can change at any time with a single call.
 
 One note on sizing: with auctions earning nothing, the auction-bidding reward slice
 consumes nothing. If the DAO wants total client spend to stay near where it was,
-`stakingRevenueShareBps` will likely need to be above 10,000 (100%). The parameter
-is a `uint16`, so it cannot exceed 655%.
+`revenueShareBps` will likely need to be above 10,000 (100%). The parameter is a
+`uint16`, so it cannot exceed 655%.
 
 ## What could go wrong
 
@@ -127,14 +128,32 @@ the DAO tops it up.
 
 ## Changes to existing behaviour
 
-Two things change for anyone reading this contract from outside:
+`getAuctionRevenue` keeps its signature. Where it previously reverted on a window
+with no settlements, it now returns `(0, firstNounId - 1)`, so a caller advancing a
+cursor to `lastAuctionId + 1` leaves that cursor where it was.
 
-- `getAuctionRevenue` returns a third value, `anySettled`, so its ABI changes. It
-  has no other callers in the repo, and it reverted in exactly the case being fixed.
-- The revert string `'auctionRevenue must be > 0'` becomes `'revenue must be > 0'`.
+The one break: `require(auctionRevenue > 0, 'auctionRevenue must be > 0')` is now the
+custom error `NoRevenue()`. Anything matching on that revert string needs updating.
 
 Storage is appended to the end of the existing ERC-7201 namespace, so the upgrade is
 layout-safe.
+
+## The contract is near the deploy limit
+
+Worth flagging for reviewers. `Rewards` on `main` compiles to **23,896 bytes** against
+the EIP-170 limit of 24,576 — only 680 bytes of headroom. This change takes it to
+**24,516 bytes at the repo's default optimizer settings, leaving 60 bytes.**
+
+It deploys, and CI's size check passes. But it is tight enough that the next feature
+added to this contract will not fit. Several conveniences were already cut to get
+here: a `pendingStakingRevenue()` view, two config events, and a mirror of the
+oracle's `RevenueConsumed` event. The share parameter lives on the oracle rather than
+on `Rewards` for the same reason.
+
+If the DAO wants real headroom back, the obvious candidate is `getVotingClientIds`,
+which is documented as "not meant to be called onchain" and could move to a separate
+lens contract. That is an API break for whoever builds the reward-update transaction,
+so it is deliberately **not** part of this proposal.
 
 ## Code
 

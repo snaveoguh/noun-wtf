@@ -24,8 +24,8 @@ Four things in `PROPOSAL.md` are marked TODO and must be resolved first:
 - **The live `proposalRewardBps` and `votingRewardBps`.** Read them off the contract
   with `getProposalRewardParams()`.
 - **The treasury's current staked position**, for the sizing section.
-- **The `stakingRevenueShareBps` you want.** This is the only real decision in the
-  proposal.
+- **The `revenueShareBps` you want.** This is the only real decision in the proposal.
+  It is set on the oracle, not on `Rewards`.
 
 ## Deploy
 
@@ -60,13 +60,15 @@ revenue forever. Check them anyway.
 
 ## Sanity check after execution
 
-- `rewards.pendingStakingRevenue()` should return a plausible, non-zero number that
-  grows over time.
+- `oracle.pendingRevenue()` should return a plausible, non-zero number that grows
+  over time. It reflects `revenueShareBps`, so it reads 0 until transaction 7 lands.
 - `oracle.readAsset(i)` returns the raw rate and position for each asset, for
   comparing against Etherscan by hand.
 - The first `updateRewardsForProposalWritingAndVoting` after execution should emit
-  `StakingRevenueUsed`.
+  `RevenueConsumed` from the oracle, carrying both the reported and the raw measured
+  figure.
 
-If the number looks wrong, `setStakingRevenueShareBps(0)` switches staking revenue
-off immediately without touching anything else, and `resyncAssets()` drops an
-accrual the DAO does not want paid out.
+If the number looks wrong, `oracle.setRevenueShareBps(0)` switches staking revenue
+off immediately without touching anything else, `rewards.setStakingRevenueOracle(0)`
+detaches it entirely, and `resyncAssets()` drops an accrual the DAO does not want
+paid out.
