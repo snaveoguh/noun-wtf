@@ -9,7 +9,9 @@ vi.mock('@/hooks', () => ({
   useAppSelector: () => '#d5d7e1', // Mock isCool to be true
 }));
 
+// useDaoContext -> useActiveDao reads the current pathname to work out which DAO is active.
 vi.mock('react-router', () => ({
+  useLocation: () => ({ pathname: '/' }),
   useNavigate: () => vi.fn(),
 }));
 
@@ -33,8 +35,8 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const prevButton = screen.getByText('←');
-    const nextButton = screen.getByText('→');
+    const prevButton = screen.getAllByRole('button')[0];
+    const nextButton = screen.getAllByRole('button')[1];
 
     expect(prevButton).toBeInTheDocument();
     expect(nextButton).toBeInTheDocument();
@@ -52,7 +54,7 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const prevButton = screen.getByText('←');
+    const prevButton = screen.getAllByRole('button')[0];
     expect(prevButton).toBeDisabled();
   });
 
@@ -66,7 +68,7 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const nextButton = screen.getByText('→');
+    const nextButton = screen.getAllByRole('button')[1];
     expect(nextButton).toBeDisabled();
   });
 
@@ -81,7 +83,7 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const prevButton = screen.getByText('←');
+    const prevButton = screen.getAllByRole('button')[0];
     fireEvent.click(prevButton);
 
     expect(onPrevAuctionClick).toHaveBeenCalledTimes(1);
@@ -98,7 +100,7 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const nextButton = screen.getByText('→');
+    const nextButton = screen.getAllByRole('button')[1];
     fireEvent.click(nextButton);
 
     expect(onNextAuctionClick).toHaveBeenCalledTimes(1);
@@ -182,8 +184,8 @@ describe('AuctionNavigation Component', () => {
       />,
     );
 
-    const prevButton = screen.getByText('←');
-    const nextButton = screen.getByText('→');
+    const prevButton = screen.getAllByRole('button')[0];
+    const nextButton = screen.getAllByRole('button')[1];
 
     // Since we mocked isCool to be true
     expect(prevButton.className).toContain('leftArrowCool');
