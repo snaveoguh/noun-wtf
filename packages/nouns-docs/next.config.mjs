@@ -42,6 +42,9 @@ const withNextra = nextra(
 export default withNextra({
   // ... Other Next.js config options
   // output: 'export'
+  // content/governance/proposals.mdx reads a dozen governance parameters over JSON-RPC at build time. Against a
+  // public endpoint that regularly takes longer than Next's 60s default and fails the export after 3 retries.
+  staticPageGenerationTimeout: 180,
   async rewrites() {
     return [
       {
