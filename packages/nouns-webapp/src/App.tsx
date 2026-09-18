@@ -52,6 +52,7 @@ import ProposalHistory from '@/pages/ProposalHistory';
 import SettlersPage from '@/pages/SettlersPage';
 import GasLeaderboardPage from '@/pages/GasLeaderboardPage';
 import StatsPage from '@/pages/StatsPage';
+import TreasuryPage from '@/pages/TreasuryPage';
 import UndergroundPage from '@/pages/Underground';
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 import NonsensePage from '@/pages/NonsensePage';
@@ -153,6 +154,7 @@ function SiteRoutes() {
       <Route path="settlers" element={<SettlersPage />} />
       <Route path="gas" element={<GasLeaderboardPage />} />
       <Route path="stats" element={<StatsPage />} />
+      <Route path="treasury" element={<TreasuryPage />} />
       <Route
         path="dashboard"
         element={
