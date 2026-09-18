@@ -90,18 +90,38 @@ the oracle report numbers with `pendingRevenue()`, then vote on the share.
 
 ## How much money is this?
 
-Roughly: `staked treasury ETH` x `staking APR` x `revenueShareBps` x the
-existing `proposalRewardBps + votingRewardBps`.
+```
+client rewards/yr = staked ETH x staking APR x revenueShareBps x (proposalRewardBps + votingRewardBps)
+```
 
-**TODO: fill in the real numbers before submitting** — the live values of
-`proposalRewardBps` and `votingRewardBps`, and the treasury's current staked
-position. The sizing decision is entirely `revenueShareBps`, which the DAO
-sets in transaction 7 and can change at any time with a single call.
+Per **10,000 ETH staked** at a 3% APR, that is 300 ETH/yr of yield. Running it
+through the reward percentages (using 1% proposal + 0.5% voting — **TODO: confirm the
+live values with `getProposalRewardParams()`**):
 
-One note on sizing: with auctions earning nothing, the auction-bidding reward slice
-consumes nothing. If the DAO wants total client spend to stay near where it was,
-`revenueShareBps` will likely need to be above 10,000 (100%). The parameter is a
-`uint16`, so it cannot exceed 655%.
+| `revenueShareBps` | Counted as revenue | To clients per year | Per 2-week period |
+|---|---|---|---|
+| 2,500 (25%) | 75 ETH | 1.13 ETH | 0.04 ETH |
+| 5,000 (50%) | 150 ETH | 2.25 ETH | 0.09 ETH |
+| 10,000 (100%) | 300 ETH | 4.50 ETH | 0.17 ETH |
+| 20,000 (200%) | 600 ETH | 9.00 ETH | 0.35 ETH |
+
+Scale linearly for the treasury's actual staked position.
+
+**Be honest about the magnitude.** At 100% of staking yield this is single-digit ETH
+per year across every client, every proposal and every vote. It is meaningfully
+smaller than auction-funded rewards were. The argument for it is continuity — clients
+stay funded and the reward machinery keeps running — not replacing the old numbers.
+
+If the DAO decides that is too small, **`revenueShareBps` is the wrong knob to reach
+for.** Counting more than 100% of yield as revenue is conceptually odd and the
+parameter caps out at 655%. `proposalRewardBps` and `votingRewardBps` already exist,
+are already DAO-settable via `setProposalRewardParams`, and are the natural place to
+size rewards. Leave `revenueShareBps` as a plain 0-100% dial for how much of the
+treasury's yield is earmarked for clients.
+
+**TODO before submitting:** the treasury's actual staked position across stETH,
+wstETH, rETH and mETH, and the live reward bps. `packages/nouns-sdk`'s
+`readNounsTreasuryBalancesInEth` already reads exactly those balances.
 
 ## What could go wrong
 
