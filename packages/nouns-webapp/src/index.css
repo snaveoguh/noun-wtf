@@ -697,3 +697,175 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] code {
   font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
 }
+
+/* ============================================================================
+   PROPOSAL DRAFT WINDOW — user-selectable font + readable markdown.
+
+   The theme blocks above force Pip3, weight:normal and uppercase onto every
+   element with `[data-theme] * { … !important }` at specificity (0,1,0). A
+   long pasted proposal is a wall of caps that way, so the draft panel scopes
+   a chosen face over itself. Everything here sits at (0,2,0) or higher so it
+   wins the !important tie. `--draft-font` / `--draft-transform` are set
+   inline by ProposalDraftPanel from src/components/GameShell/draftFonts.ts.
+   The window chrome (MiniWindow title bar) is outside the scope and keeps
+   the site font on purpose.
+   ============================================================================ */
+.proposal-draft-font-scope,
+.proposal-draft-font-scope *,
+[data-theme='terminal'] .proposal-draft-font-scope,
+[data-theme='terminal'] .proposal-draft-font-scope *,
+[data-theme='abacus'] .proposal-draft-font-scope,
+[data-theme='abacus'] .proposal-draft-font-scope * {
+  font-family: var(--draft-font, 'Figtree', system-ui, sans-serif) !important;
+  text-transform: var(--draft-transform, none) !important;
+  letter-spacing: normal !important;
+}
+
+/* Put weight back where markdown needs it — the theme blocks flatten it. */
+.proposal-draft-font-scope strong,
+.proposal-draft-font-scope b,
+.proposal-draft-font-scope th,
+.proposal-draft-font-scope h1,
+.proposal-draft-font-scope h2,
+.proposal-draft-font-scope h3,
+.proposal-draft-font-scope h4,
+[data-theme='terminal'] .proposal-draft-font-scope strong,
+[data-theme='terminal'] .proposal-draft-font-scope b,
+[data-theme='terminal'] .proposal-draft-font-scope th,
+[data-theme='terminal'] .proposal-draft-font-scope h1,
+[data-theme='terminal'] .proposal-draft-font-scope h2,
+[data-theme='terminal'] .proposal-draft-font-scope h3,
+[data-theme='terminal'] .proposal-draft-font-scope h4,
+[data-theme='abacus'] .proposal-draft-font-scope strong,
+[data-theme='abacus'] .proposal-draft-font-scope b,
+[data-theme='abacus'] .proposal-draft-font-scope th,
+[data-theme='abacus'] .proposal-draft-font-scope h1,
+[data-theme='abacus'] .proposal-draft-font-scope h2,
+[data-theme='abacus'] .proposal-draft-font-scope h3,
+[data-theme='abacus'] .proposal-draft-font-scope h4 {
+  font-weight: 700 !important;
+}
+
+/* Code stays monospace and case-exact whatever face is picked — commands
+   like `vote for prop 968` must not be uppercased under Pip3. */
+.proposal-draft-font-scope code,
+.proposal-draft-font-scope pre,
+.proposal-draft-font-scope kbd,
+[data-theme='terminal'] .proposal-draft-font-scope code,
+[data-theme='terminal'] .proposal-draft-font-scope pre,
+[data-theme='terminal'] .proposal-draft-font-scope kbd,
+[data-theme='abacus'] .proposal-draft-font-scope code,
+[data-theme='abacus'] .proposal-draft-font-scope pre,
+[data-theme='abacus'] .proposal-draft-font-scope kbd {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace !important;
+  text-transform: none !important;
+}
+
+/* ─── Rendered markdown. ReactMarkdown only ever had h1/h2/h3/img styled, so
+   tables collapsed into run-on text and lists lost their bullets. ─── */
+.proposal-draft-font-scope .proposal-markdown {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gs-text, #e6e6f0);
+}
+.proposal-draft-font-scope .proposal-markdown h1 {
+  font-size: 1.6rem !important;
+  margin: 1.2em 0 0.5em;
+  line-height: 1.2;
+}
+.proposal-draft-font-scope .proposal-markdown h2 {
+  font-size: 1.3rem !important;
+  margin: 1.2em 0 0.45em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  line-height: 1.25;
+}
+.proposal-draft-font-scope .proposal-markdown h3 {
+  font-size: 1.1rem !important;
+  margin: 1em 0 0.4em;
+}
+.proposal-draft-font-scope .proposal-markdown h4 {
+  font-size: 1rem !important;
+  margin: 0.9em 0 0.35em;
+}
+.proposal-draft-font-scope .proposal-markdown p {
+  margin: 0 0 0.8em;
+}
+.proposal-draft-font-scope .proposal-markdown ul,
+.proposal-draft-font-scope .proposal-markdown ol {
+  padding-left: 1.5em;
+  margin: 0 0 0.8em;
+}
+.proposal-draft-font-scope .proposal-markdown ul {
+  list-style: disc;
+}
+.proposal-draft-font-scope .proposal-markdown ol {
+  list-style: decimal;
+}
+.proposal-draft-font-scope .proposal-markdown li {
+  margin: 0.2em 0;
+}
+.proposal-draft-font-scope .proposal-markdown li > p {
+  margin: 0;
+}
+.proposal-draft-font-scope .proposal-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0 1em;
+  font-size: 0.93em;
+  display: block;
+  overflow-x: auto;
+}
+.proposal-draft-font-scope .proposal-markdown th,
+.proposal-draft-font-scope .proposal-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.proposal-draft-font-scope .proposal-markdown th {
+  background: rgba(255, 255, 255, 0.05);
+}
+.proposal-draft-font-scope .proposal-markdown tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.025);
+}
+.proposal-draft-font-scope .proposal-markdown code {
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.proposal-draft-font-scope .proposal-markdown pre {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 1em;
+  line-height: 1.45;
+}
+.proposal-draft-font-scope .proposal-markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+}
+.proposal-draft-font-scope .proposal-markdown blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.18);
+  margin: 0 0 0.8em;
+  padding: 0.2em 0.9em;
+  opacity: 0.85;
+}
+.proposal-draft-font-scope .proposal-markdown hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 1.2em 0;
+}
+.proposal-draft-font-scope .proposal-markdown a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.proposal-draft-font-scope .proposal-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}

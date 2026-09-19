@@ -173,3 +173,44 @@
   padding-top: 0;
   margin-top: 0;
 }
+
+/* ─── Side-by-side edit / preview (`layout="split"`, used by the draft window) ─── */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.splitTitle {
+  grid-column: 1 / -1;
+}
+
+.splitPane {
+  min-width: 0;
+}
+
+/* Both panes start at the same y — the stacked layout's 1rem top margin
+   would otherwise push the textarea below the preview's top edge. */
+.split .proposalEditor,
+.split .previewArea {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.splitBody {
+  min-height: 520px !important;
+  resize: vertical;
+}
+
+.previewEmpty {
+  color: rgb(108, 117, 125);
+  font-style: italic;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
