@@ -1,0 +1,22 @@
+name: Settle gas report
+
+on:
+  workflow_dispatch:
+    inputs:
+      addresses:
+        description: Space-separated wallet addresses
+        required: true
+        default: 0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed 0xACc74B39976D50522621F54c18dC85E2822Ec22c
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run report
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
+        run: node scripts/settle-gas-report.mjs ${{ inputs.addresses }}

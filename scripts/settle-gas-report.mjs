@@ -1,0 +1,197 @@
+// Sum the ETH a wallet has spent on gas settling Nouns auctions.
+//
+// Usage: node scripts/settle-gas-report.mjs 0xabc... 0xdef...
+// Env:   ETHERSCAN_API_KEY (optional, Etherscan V2 fallback), RPC_URL (optional)
+//
+// Method: pull every outgoing tx for the address (Blockscout, Etherscan fallback),
+// keep the ones that (a) call settleCurrentAndCreateNewAuction / settleAuction on
+// any contract, or (b) target a contract the address itself deployed (e.g. the
+// nounirl ExactBlockSettler helper), then price each one from its receipt
+// (gasUsed * effectiveGasPrice). Reverted attempts are counted separately.
+
+const RPC = process.env.RPC_URL || 'https://ethereum-rpc.publicnode.com';
+const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY || '';
+const SETTLE_SELECTORS = new Set([
+  '0xf25efffc', // settleCurrentAndCreateNewAuction()
+  '0x87e2f6ee', // settleAuction()  (fallback; functionName match is primary)
+]);
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function getJson(url, tries = 5) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { headers: { accept: 'application/json' } });
+      if (r.status === 429 || r.status >= 500) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } catch (e) {
+      if (i === tries - 1) throw e;
+      await sleep(1500 * (i + 1));
+    }
+  }
+}
+
+async function txlistBlockscout(address) {
+  const out = [];
+  const seen = new Set();
+  let page = 1;
+  const offset = 1000;
+  for (;;) {
+    const url = `https://eth.blockscout.com/api?module=account&action=txlist&address=${address}&sort=asc&page=${page}&offset=${offset}`;
+    const j = await getJson(url);
+    if (j.status !== '1' && !(Array.isArray(j.result) && j.result.length === 0)) {
+      if (String(j.message || '').toLowerCase().includes('no transactions')) break;
+      throw new Error(`blockscout: ${j.message} ${JSON.stringify(j.result).slice(0, 200)}`);
+    }
+    const rows = j.result || [];
+    for (const t of rows) if (!seen.has(t.hash)) { seen.add(t.hash); out.push(t); }
+    if (rows.length < offset) break;
+    page++;
+    await sleep(300);
+  }
+  return out;
+}
+
+async function txlistEtherscan(address) {
+  const out = [];
+  const seen = new Set();
+  let page = 1;
+  const offset = 10000;
+  for (;;) {
+    const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${page}&offset=${offset}&sort=asc&apikey=${ETHERSCAN_KEY}`;
+    const j = await getJson(url);
+    if (j.status !== '1') {
+      if (String(j.message || '').toLowerCase().includes('no transactions')) break;
+      throw new Error(`etherscan: ${j.message} ${j.result}`);
+    }
+    for (const t of j.result) if (!seen.has(t.hash)) { seen.add(t.hash); out.push(t); }
+    if (j.result.length < offset) break;
+    page++;
+    await sleep(300);
+  }
+  return out;
+}
+
+async function txlist(address) {
+  try {
+    const rows = await txlistBlockscout(address);
+    return { source: 'blockscout', rows };
+  } catch (e) {
+    console.error(`blockscout failed for ${address}: ${e.message}`);
+    if (!ETHERSCAN_KEY) throw e;
+    const rows = await txlistEtherscan(address);
+    return { source: 'etherscan', rows };
+  }
+}
+
+async function receipts(hashes) {
+  const out = new Map();
+  for (let i = 0; i < hashes.length; i += 40) {
+    const chunk = hashes.slice(i, i + 40);
+    const body = chunk.map((h, k) => ({ jsonrpc: '2.0', id: k, method: 'eth_getTransactionReceipt', params: [h] }));
+    let res;
+    for (let t = 0; t < 5; t++) {
+      try {
+        const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        res = await r.json();
+        if (!Array.isArray(res)) throw new Error(JSON.stringify(res).slice(0, 200));
+        break;
+      } catch (e) {
+        if (t === 4) throw e;
+        await sleep(1500 * (t + 1));
+      }
+    }
+    for (const r of res) {
+      if (r.result) out.set(chunk[r.id], r.result);
+    }
+    await sleep(200);
+  }
+  return out;
+}
+
+const fmtEth = wei => (Number(wei) / 1e18).toFixed(6);
+
+async function report(address) {
+  const addr = address.toLowerCase();
+  const { source, rows } = await txlist(addr);
+  const outgoing = rows.filter(t => (t.from || '').toLowerCase() === addr);
+
+  // Contracts this wallet deployed (helper settlers etc).
+  const deployed = new Set(
+    outgoing.filter(t => (!t.to || t.to === '') && t.contractAddress).map(t => t.contractAddress.toLowerCase()),
+  );
+
+  const isSettle = t => {
+    const sel = (t.input || '').slice(0, 10).toLowerCase();
+    const fn = String(t.functionName || '').toLowerCase();
+    if (SETTLE_SELECTORS.has(sel)) return true;
+    if (fn.startsWith('settle')) return true;
+    if (t.to && deployed.has(t.to.toLowerCase())) return true;
+    return false;
+  };
+
+  const settleTxs = outgoing.filter(isSettle);
+  const rec = await receipts(settleTxs.map(t => t.hash));
+
+  let okWei = 0n, okCount = 0, revWei = 0n, revCount = 0, missing = 0;
+  const byTarget = {};
+  const rowsOut = [];
+  for (const t of settleTxs) {
+    const r = rec.get(t.hash);
+    let fee, ok;
+    if (r) {
+      fee = BigInt(r.gasUsed) * BigInt(r.effectiveGasPrice);
+      ok = r.status === '0x1';
+    } else {
+      missing++;
+      fee = BigInt(t.gasUsed) * BigInt(t.gasPrice);
+      ok = t.isError === '0';
+    }
+    if (ok) { okWei += fee; okCount++; } else { revWei += fee; revCount++; }
+    const key = `${(t.to || '').toLowerCase()} ${(t.functionName || t.input.slice(0, 10)).split('(')[0]}`;
+    byTarget[key] ??= { count: 0, ok: 0, reverted: 0, wei: 0n };
+    byTarget[key].count++;
+    byTarget[key][ok ? 'ok' : 'reverted']++;
+    byTarget[key].wei += fee;
+    rowsOut.push({ hash: t.hash, block: Number(t.blockNumber), ts: Number(t.timeStamp), ok, feeEth: fmtEth(fee) });
+  }
+
+  // Everything else outgoing, grouped, so misclassification is visible.
+  const otherByTarget = {};
+  for (const t of outgoing) {
+    if (isSettle(t)) continue;
+    const key = `${(t.to || 'CREATE').toLowerCase()} ${(t.functionName || t.input.slice(0, 10) || 'transfer').split('(')[0]}`;
+    otherByTarget[key] ??= 0;
+    otherByTarget[key]++;
+  }
+
+  const first = rowsOut[0], last = rowsOut[rowsOut.length - 1];
+  return {
+    address: addr,
+    source,
+    totalOutgoingTxs: outgoing.length,
+    deployedContracts: [...deployed],
+    settle: {
+      successful: { count: okCount, eth: fmtEth(okWei) },
+      reverted: { count: revCount, eth: fmtEth(revWei) },
+      total: { count: okCount + revCount, eth: fmtEth(okWei + revWei) },
+      receiptsMissing: missing,
+      first: first && { block: first.block, date: new Date(first.ts * 1000).toISOString(), hash: first.hash },
+      last: last && { block: last.block, date: new Date(last.ts * 1000).toISOString(), hash: last.hash },
+    },
+    settleByTarget: Object.fromEntries(Object.entries(byTarget).map(([k, v]) => [k, { ...v, eth: fmtEth(v.wei), wei: undefined }])),
+    otherOutgoingByTarget: otherByTarget,
+    txs: rowsOut,
+  };
+}
+
+const addresses = process.argv.slice(2);
+if (!addresses.length) {
+  console.error('usage: node scripts/settle-gas-report.mjs <address> [address...]');
+  process.exit(1);
+}
+const results = [];
+for (const a of addresses) results.push(await report(a));
+console.log('=== SETTLE GAS REPORT ===');
+console.log(JSON.stringify(results, null, 2));
+console.log('=== END REPORT ===');
