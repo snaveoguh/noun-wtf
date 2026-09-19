@@ -1,6 +1,8 @@
 name: Settle gas report
 
 on:
+  push:
+    branches: [claude/charming-planck-ovb3yl]
   workflow_dispatch:
     inputs:
       addresses:
@@ -19,4 +21,4 @@ jobs:
       - name: Run report
         env:
           ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
-        run: node scripts/settle-gas-report.mjs ${{ inputs.addresses }}
+        run: node scripts/settle-gas-report.mjs ${{ inputs.addresses || '0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed nounirl.eth stripymofo.eth' }}
