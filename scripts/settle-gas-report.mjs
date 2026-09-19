@@ -208,6 +208,29 @@ async function report(address) {
     otherByTarget[key]++;
   }
 
+  // Label each auction house by the ERC721 it mints (Transfer log in a successful settle tx).
+  const TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f3163c4a1b1c76d3aecbc4ac0b';
+  const ahLabels = {};
+  for (const t of settleTxs) {
+    const ah = isDirect(t) ? (t.to || '').toLowerCase() : ahFromLogs(t);
+    if (!ah || ahLabels[ah]) continue;
+    const r = rec.get(t.hash);
+    if (!r || r.status !== '0x1') continue;
+    const mint = r.logs.find(l => l.topics[0] === TRANSFER && l.topics.length === 4 && l.address.toLowerCase() !== ah);
+    let label = { token: mint?.address?.toLowerCase() ?? null };
+    try {
+      if (mint) {
+        const tk = await getJson(`https://eth.blockscout.com/api/v2/tokens/${mint.address}`);
+        label.tokenName = tk.name; label.tokenSymbol = tk.symbol;
+      }
+      const ad = await getJson(`https://eth.blockscout.com/api/v2/addresses/${ah}`);
+      label.contractName = ad.name ?? null;
+      label.implementation = ad.implementations?.map(x => x.name).filter(Boolean).join(',') || null;
+    } catch (e) { label.error = e.message; }
+    ahLabels[ah] = label;
+    await sleep(200);
+  }
+
   const first = rowsOut[0], last = rowsOut[rowsOut.length - 1];
   return {
     address: addr,
@@ -223,6 +246,7 @@ async function report(address) {
       last: last && { block: last.block, date: new Date(last.ts * 1000).toISOString(), hash: last.hash },
     },
     settleTopics: [...settleTopics],
+    auctionHouseLabels: ahLabels,
     settleByTarget: Object.fromEntries(Object.entries(byTarget).map(([k, v]) => [k, { count: v.count, ok: v.ok, reverted: v.reverted, eth: fmtEth(v.wei), first: new Date(v.firstTs * 1000).toISOString().slice(0, 10), last: new Date(v.lastTs * 1000).toISOString().slice(0, 10) }])),
     otherOutgoingGroups: Object.keys(otherByTarget).length,
     txs: rowsOut,
