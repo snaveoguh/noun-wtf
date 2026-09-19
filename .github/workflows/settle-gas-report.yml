@@ -6,7 +6,7 @@ on:
       addresses:
         description: Space-separated wallet addresses
         required: true
-        default: 0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed 0xACc74B39976D50522621F54c18dC85E2822Ec22c
+        default: 0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed nounirl.eth stripymofo.eth
 
 jobs:
   report:

@@ -185,13 +185,43 @@ async function report(address) {
   };
 }
 
-const addresses = process.argv.slice(2);
+async function resolveEns(name) {
+  const tries = [
+    async () => (await getJson(`https://api.ensideas.com/ens/resolve/${name}`)).address,
+    async () => (await getJson(`https://api.ensdata.net/${name}`)).address,
+    async () => {
+      const j = await getJson(`https://eth.blockscout.com/api/v2/search?q=${name}`);
+      const hit = (j.items || []).find(i => i.type === 'ens_domain' && String(i.ens_info?.name || i.name || '').toLowerCase() === name.toLowerCase());
+      return hit?.address || hit?.ens_info?.address_hash;
+    },
+  ];
+  for (const t of tries) {
+    try {
+      const a = await t();
+      if (a && /^0x[0-9a-fA-F]{40}$/.test(a)) return a;
+    } catch (e) { console.error(`ens resolve ${name}: ${e.message}`); }
+  }
+  throw new Error(`could not resolve ${name}`);
+}
+
+const addresses = [];
+for (const a of process.argv.slice(2)) {
+  if (a.toLowerCase().endsWith('.eth')) {
+    const r = await resolveEns(a);
+    console.log(`resolved ${a} -> ${r}`);
+    addresses.push(r);
+  } else addresses.push(a);
+}
 if (!addresses.length) {
   console.error('usage: node scripts/settle-gas-report.mjs <address> [address...]');
   process.exit(1);
 }
 const results = [];
-for (const a of addresses) results.push(await report(a));
+for (let i = 0; i < addresses.length; i++) {
+  const r = await report(addresses[i]);
+  r.input = process.argv[2 + i];
+  results.push(r);
+}
 console.log('=== SETTLE GAS REPORT ===');
 console.log(JSON.stringify(results, null, 2));
 console.log('=== END REPORT ===');
