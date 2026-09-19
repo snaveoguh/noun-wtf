@@ -11,6 +11,10 @@
 
 const RPC = process.env.RPC_URL || 'https://ethereum-rpc.publicnode.com';
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY || '';
+const KNOWN_AUCTION_HOUSES = [
+  '0x830bd73e4184cef73443c15111a1df14e495c706', // Nouns AuctionHouse proxy
+  '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc', // NounV2 AuctionHouse
+];
 const SETTLE_SELECTORS = new Set([
   '0xf25efffc', // settleCurrentAndCreateNewAuction()
   '0x87e2f6ee', // settleAuction()  (fallback; functionName match is primary)
@@ -84,27 +88,45 @@ async function txlist(address) {
   }
 }
 
-async function receipts(hashes) {
-  const out = new Map();
-  for (let i = 0; i < hashes.length; i += 40) {
-    const chunk = hashes.slice(i, i + 40);
-    const body = chunk.map((h, k) => ({ jsonrpc: '2.0', id: k, method: 'eth_getTransactionReceipt', params: [h] }));
-    let res;
-    for (let t = 0; t < 5; t++) {
+const RPCS = [RPC, 'https://eth.llamarpc.com', 'https://1rpc.io/eth', 'https://eth.drpc.org', 'https://cloudflare-eth.com'];
+
+async function rpcBatch(hashes) {
+  const body = hashes.map((h, k) => ({ jsonrpc: '2.0', id: k, method: 'eth_getTransactionReceipt', params: [h] }));
+  for (const url of RPCS) {
+    for (let t = 0; t < 3; t++) {
       try {
-        const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-        res = await r.json();
-        if (!Array.isArray(res)) throw new Error(JSON.stringify(res).slice(0, 200));
-        break;
+        const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await r.json();
+        if (!Array.isArray(res)) throw new Error(JSON.stringify(res).slice(0, 160));
+        const out = new Map();
+        for (const x of res) if (x && x.result) out.set(hashes[x.id], x.result);
+        if (out.size === hashes.length) return out;
+        // partial: fetch the rest individually from the same node
+        for (const h of hashes) {
+          if (out.has(h)) continue;
+          const r2 = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [h] }) });
+          const j2 = await r2.json();
+          if (j2 && j2.result) out.set(h, j2.result);
+          await sleep(120);
+        }
+        if (out.size === hashes.length) return out;
+        throw new Error(`only ${out.size}/${hashes.length} receipts from ${url}`);
       } catch (e) {
-        if (t === 4) throw e;
-        await sleep(1500 * (t + 1));
+        console.error(`receipts via ${url} attempt ${t + 1}: ${e.message}`);
+        await sleep(1000 * (t + 1));
       }
     }
-    for (const r of res) {
-      if (r.result) out.set(chunk[r.id], r.result);
-    }
-    await sleep(200);
+  }
+  throw new Error('all RPCs failed for a receipt batch');
+}
+
+async function receipts(hashes) {
+  const out = new Map();
+  for (let i = 0; i < hashes.length; i += 20) {
+    const chunk = hashes.slice(i, i + 20);
+    const m = await rpcBatch(chunk);
+    for (const [k, v] of m) out.set(k, v);
+    await sleep(150);
   }
   return out;
 }
@@ -121,17 +143,35 @@ async function report(address) {
     outgoing.filter(t => (!t.to || t.to === '') && t.contractAddress).map(t => t.contractAddress.toLowerCase()),
   );
 
-  const isSettle = t => {
+  const isDirect = t => {
     const sel = (t.input || '').slice(0, 10).toLowerCase();
     const fn = String(t.functionName || '').toLowerCase();
-    if (SETTLE_SELECTORS.has(sel)) return true;
-    if (fn.startsWith('settle')) return true;
-    if (t.to && deployed.has(t.to.toLowerCase())) return true;
-    return false;
+    return SETTLE_SELECTORS.has(sel) || fn.startsWith('settle');
   };
+  const direct = outgoing.filter(isDirect);
+  const helperCalls = outgoing.filter(t => !isDirect(t) && t.to && deployed.has(t.to.toLowerCase()));
+  const rec = await receipts([...direct, ...helperCalls].map(t => t.hash));
 
-  const settleTxs = outgoing.filter(isSettle);
-  const rec = await receipts(settleTxs.map(t => t.hash));
+  // Learn auction-house addresses + their settle-related topics from the direct settle txs.
+  const auctionHouses = new Set([...KNOWN_AUCTION_HOUSES, ...direct.map(t => t.to.toLowerCase())]);
+  const settleTopics = new Set();
+  for (const t of direct) {
+    const r = rec.get(t.hash);
+    if (!r || r.status !== '0x1') continue;
+    for (const l of r.logs) if (auctionHouses.has(l.address.toLowerCase())) settleTopics.add(l.topics[0]);
+  }
+  const ahFromLogs = t => {
+    const r = rec.get(t.hash);
+    if (!r) return null;
+    for (const l of r.logs) if (auctionHouses.has(l.address.toLowerCase()) && settleTopics.has(l.topics[0])) return l.address.toLowerCase();
+    return null;
+  };
+  // A helper call counts if it succeeded and emitted settle logs on an auction house, or if it
+  // reverted and the helper has at least one successful settle (so failed attempts are counted).
+  const settlingHelpers = new Set(helperCalls.filter(t => ahFromLogs(t)).map(t => t.to.toLowerCase()));
+  const viaHelper = helperCalls.filter(t => ahFromLogs(t) || settlingHelpers.has(t.to.toLowerCase()));
+  const settleTxs = [...direct, ...viaHelper].sort((a, b) => Number(a.blockNumber) - Number(b.blockNumber));
+  const isSettle = t => settleTxs.includes(t);
 
   let okWei = 0n, okCount = 0, revWei = 0n, revCount = 0, missing = 0;
   const byTarget = {};
@@ -148,12 +188,15 @@ async function report(address) {
       ok = t.isError === '0';
     }
     if (ok) { okWei += fee; okCount++; } else { revWei += fee; revCount++; }
-    const key = `${(t.to || '').toLowerCase()} ${(t.functionName || t.input.slice(0, 10)).split('(')[0]}`;
-    byTarget[key] ??= { count: 0, ok: 0, reverted: 0, wei: 0n };
+    const to = (t.to || '').toLowerCase();
+    const ah = isDirect(t) ? to : (ahFromLogs(t) || `helper:${to}`);
+    const key = isDirect(t) ? ah : `${ah} via ${to}`;
+    byTarget[key] ??= { count: 0, ok: 0, reverted: 0, wei: 0n, firstTs: Number(t.timeStamp), lastTs: Number(t.timeStamp) };
     byTarget[key].count++;
     byTarget[key][ok ? 'ok' : 'reverted']++;
     byTarget[key].wei += fee;
-    rowsOut.push({ hash: t.hash, block: Number(t.blockNumber), ts: Number(t.timeStamp), ok, feeEth: fmtEth(fee) });
+    byTarget[key].lastTs = Number(t.timeStamp);
+    rowsOut.push({ hash: t.hash, block: Number(t.blockNumber), ts: Number(t.timeStamp), ok, feeEth: fmtEth(fee), to, ah });
   }
 
   // Everything else outgoing, grouped, so misclassification is visible.
@@ -179,8 +222,9 @@ async function report(address) {
       first: first && { block: first.block, date: new Date(first.ts * 1000).toISOString(), hash: first.hash },
       last: last && { block: last.block, date: new Date(last.ts * 1000).toISOString(), hash: last.hash },
     },
-    settleByTarget: Object.fromEntries(Object.entries(byTarget).map(([k, v]) => [k, { ...v, eth: fmtEth(v.wei), wei: undefined }])),
-    otherOutgoingByTarget: otherByTarget,
+    settleTopics: [...settleTopics],
+    settleByTarget: Object.fromEntries(Object.entries(byTarget).map(([k, v]) => [k, { count: v.count, ok: v.ok, reverted: v.reverted, eth: fmtEth(v.wei), first: new Date(v.firstTs * 1000).toISOString().slice(0, 10), last: new Date(v.lastTs * 1000).toISOString().slice(0, 10) }])),
+    otherOutgoingGroups: Object.keys(otherByTarget).length,
     txs: rowsOut,
   };
 }
@@ -225,5 +269,5 @@ for (let i = 0; i < addresses.length; i++) {
 console.log('=== SETTLE GAS REPORT ===');
 console.log(JSON.stringify(results.map(({ txs, ...rest }) => rest), null, 1));
 console.log('=== TXS ===');
-for (const r of results) for (const t of r.txs) console.log(`${r.address},${t.hash},${t.block},${t.ts},${t.ok ? 1 : 0},${t.feeEth}`);
+for (const r of results) for (const t of r.txs) console.log(`${r.address},${t.hash},${t.block},${t.ts},${t.ok ? 1 : 0},${t.feeEth},${t.to},${t.ah}`);
 console.log('=== END REPORT ===');
