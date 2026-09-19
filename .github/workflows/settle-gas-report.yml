@@ -1,8 +1,6 @@
 name: Settle gas report
 
 on:
-  push:
-    branches: [claude/charming-planck-ovb3yl]
   workflow_dispatch:
     inputs:
       addresses:
