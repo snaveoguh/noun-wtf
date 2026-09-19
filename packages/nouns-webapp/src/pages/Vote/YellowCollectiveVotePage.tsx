@@ -217,9 +217,7 @@ const YellowCollectiveVotePage: FC = () => {
       </div>
 
       {/* Two-column: votes + voting panel */}
-      <div
-        style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}
-      >
+      <div className="vote-page-grid">
         {/* Left: Vote overview + activity */}
         <div>
           {/* Vote overview bars */}
@@ -385,7 +383,7 @@ const YellowCollectiveVotePage: FC = () => {
         </div>
 
         {/* Right: Voting panel (sticky) */}
-        <div style={{ position: 'sticky', top: 80 }}>
+        <div className="vote-page-side">
           <div
             style={{
               padding: 20,

@@ -869,3 +869,36 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   height: auto;
   border-radius: 4px;
 }
+
+/* ============================================================================
+   PROPOSAL PAGE GRID (pages/Vote). This was an inline `1fr 340px` grid with
+   no breakpoint, so on phones the 340px sticky vote column could not shrink
+   and the page overflowed sideways — the "vote bar off the page" bug.
+   `minmax(0, 1fr)` also stops long unbreakable content (addresses, hashes,
+   wide tables) from widening the content column past the viewport.
+   ============================================================================ */
+.vote-page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.vote-page-side {
+  position: sticky;
+  top: 90px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .vote-page-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  /* Vote panel first on phones — it's what people open the page to do, and
+     the tallies (VotingOverview) already sit above the grid. */
+  .vote-page-side {
+    position: static;
+    order: -1;
+  }
+}
