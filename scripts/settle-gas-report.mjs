@@ -131,6 +131,25 @@ async function receipts(hashes) {
   return out;
 }
 
+let keccak = null;
+if (process.env.DEPS) {
+  try {
+    const mod = await import(new URL(`file://${process.env.DEPS}/node_modules/js-sha3/src/sha3.js`).href);
+    keccak = (mod.default ?? mod).keccak256;
+  } catch (e) { console.error(`js-sha3 unavailable: ${e.message}`); }
+}
+const selector = sig => '0x' + keccak(sig).slice(0, 8);
+async function ethCall(to, data) {
+  for (const url of RPCS) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }) });
+      const j = await r.json();
+      if (j && typeof j.result === 'string') return j.result;
+    } catch {}
+  }
+  return null;
+}
+
 const fmtEth = wei => (Number(wei) / 1e18).toFixed(6);
 
 async function report(address) {
@@ -217,8 +236,22 @@ async function report(address) {
     const r = rec.get(t.hash);
     if (!r || r.status !== '0x1') continue;
     const mint = r.logs.find(l => l.topics[0] === TRANSFER && l.topics.length === 4 && l.address.toLowerCase() !== ah);
-    let label = { token: mint?.address?.toLowerCase() ?? null };
+    let label = { token: mint?.address?.toLowerCase() ?? null, logSample: r.logs.map(l => `${l.address.slice(0, 10)}:${l.topics.length}:${l.topics[0].slice(0, 10)}`).join(' ') };
     try {
+      if (!mint && keccak) {
+        // Ask the auction house for its token (nouns() on Nouns forks, token() on Builder), then name().
+        for (const getter of ['nouns()', 'token()']) {
+          const res = await ethCall(ah, selector(getter));
+          if (res && res.length === 66 && BigInt(res) !== 0n) { label.token = '0x' + res.slice(26); break; }
+        }
+      }
+      if (label.token && keccak) {
+        const res = await ethCall(label.token, selector('name()'));
+        if (res && res.length > 130) {
+          const len = Number(BigInt('0x' + res.slice(66, 130)));
+          label.tokenName = Buffer.from(res.slice(130, 130 + len * 2), 'hex').toString('utf8');
+        }
+      }
       if (mint) {
         const tk = await getJson(`https://eth.blockscout.com/api/v2/tokens/${mint.address}`);
         label.tokenName = tk.name; label.tokenSymbol = tk.symbol;

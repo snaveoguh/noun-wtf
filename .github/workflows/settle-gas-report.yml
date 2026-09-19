@@ -18,7 +18,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install keccak helper
+        run: mkdir -p "$RUNNER_TEMP/deps" && cd "$RUNNER_TEMP/deps" && npm init -y >/dev/null && npm i js-sha3@0.9.3 >/dev/null
       - name: Run report
         env:
           ETHERSCAN_API_KEY: ${{ secrets.VITE_ETHERSCAN_API_KEY }}
+          DEPS: ${{ runner.temp }}/deps
         run: node scripts/settle-gas-report.mjs ${{ inputs.addresses || '0xae4705dC0816ee6d8a13F1C72780Ec5021915Fed nounirl.eth stripymofo.eth' }}
