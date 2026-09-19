@@ -715,15 +715,7 @@ const VotePage = () => {
       </div>
 
       {/* ── Two-column layout: left = content, right = vote panel ─── */}
-      <div
-        className="vote-page-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 340px',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
+      <div className="vote-page-grid">
         {/* ── Left column ──────────────────────────────────────────── */}
         <div>
           {/* Tabs */}
@@ -926,13 +918,7 @@ const VotePage = () => {
         </div>
 
         {/* ── Right column (sticky vote panel) ─────────────────────── */}
-        <div
-          id="inline-vote-panel"
-          style={{
-            position: 'sticky',
-            top: 90,
-          }}
-        >
+        <div id="inline-vote-panel" className="vote-page-side">
           <InlineVotePanel
             proposalId={proposal.id}
             availableVotes={userVotes ?? 0}

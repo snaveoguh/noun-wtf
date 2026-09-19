@@ -68,82 +68,95 @@ const VotingOverview: FC<VotingOverviewProps> = ({
         )}
       </div>
 
-      {/* Stacked horizontal bar */}
+      {/* Stacked horizontal bar. The quorum label lives in a padded wrapper
+          ABOVE the bar — it used to be positioned at top:-18 inside the
+          overflow:hidden bar, which clipped it, so it never actually showed. */}
       <div
         style={{
           position: 'relative',
-          height: 32,
-          borderRadius: 10,
-          overflow: 'hidden',
-          background: '#f0f0f4',
-          display: 'flex',
+          paddingTop: quorum > 0 ? 16 : 0,
           marginBottom: 8,
         }}
       >
-        {forPct > 0 && (
-          <div
-            style={{
-              width: `${forPct}%`,
-              background: '#43b369',
-              height: '100%',
-              transition: 'width 0.3s ease',
-              minWidth: forPct > 0 ? 4 : 0,
-            }}
-          />
-        )}
-        {againstPct > 0 && (
-          <div
-            style={{
-              width: `${againstPct}%`,
-              background: '#e40536',
-              height: '100%',
-              transition: 'width 0.3s ease',
-              minWidth: againstPct > 0 ? 4 : 0,
-            }}
-          />
-        )}
-        {abstainPct > 0 && (
-          <div
-            style={{
-              width: `${abstainPct}%`,
-              background: '#b0b0b8',
-              height: '100%',
-              transition: 'width 0.3s ease',
-              minWidth: abstainPct > 0 ? 4 : 0,
-            }}
-          />
-        )}
-
-        {/* Quorum marker */}
         {quorum > 0 && (
           <div
             style={{
               position: 'absolute',
-              left: `${quorumPosition}%`,
               top: 0,
-              bottom: 0,
-              width: 2,
-              background: '#14141f',
-              opacity: 0.6,
-              zIndex: 2,
+              // Clamp so the label can't spill past the card edges when the
+              // marker sits near 0% or the 95% cap.
+              left: `clamp(28px, ${quorumPosition}%, calc(100% - 28px))`,
+              transform: 'translateX(-50%)',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              color: '#8c8d92',
+              whiteSpace: 'nowrap',
+              lineHeight: 1,
             }}
           >
+            Quorum {quorum}
+          </div>
+        )}
+        <div
+          style={{
+            position: 'relative',
+            height: 32,
+            borderRadius: 10,
+            overflow: 'hidden',
+            background: '#f0f0f4',
+            display: 'flex',
+          }}
+        >
+          {forPct > 0 && (
+            <div
+              style={{
+                width: `${forPct}%`,
+                background: '#43b369',
+                height: '100%',
+                transition: 'width 0.3s ease',
+                minWidth: 4,
+              }}
+            />
+          )}
+          {againstPct > 0 && (
+            <div
+              style={{
+                width: `${againstPct}%`,
+                background: '#e40536',
+                height: '100%',
+                transition: 'width 0.3s ease',
+                minWidth: 4,
+              }}
+            />
+          )}
+          {abstainPct > 0 && (
+            <div
+              style={{
+                width: `${abstainPct}%`,
+                background: '#b0b0b8',
+                height: '100%',
+                transition: 'width 0.3s ease',
+                minWidth: 4,
+              }}
+            />
+          )}
+
+          {/* Quorum marker line */}
+          {quorum > 0 && (
             <div
               style={{
                 position: 'absolute',
-                top: -18,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: '0.6rem',
-                fontWeight: 700,
-                color: '#8c8d92',
-                whiteSpace: 'nowrap',
+                left: `${quorumPosition}%`,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: '#14141f',
+                opacity: 0.6,
+                zIndex: 2,
               }}
-            >
-              Quorum {quorum}
-            </div>
-          </div>
-        )}
+            />
+          )}
+        </div>
       </div>
 
       {/* Legend */}
@@ -158,9 +171,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
         <VoteStat label="Against" count={againstVotes} color="#e40536" pct={againstPct} />
         <VoteStat label="Abstain" count={abstainVotes} color="#b0b0b8" pct={abstainPct} />
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: '#8c8d92', fontWeight: 600 }}>
-            Quorum
-          </div>
+          <div style={{ fontSize: '0.7rem', color: '#8c8d92', fontWeight: 600 }}>Quorum</div>
           <div
             style={{
               fontSize: '0.95rem',
@@ -169,9 +180,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
             }}
           >
             {forVotes}/{quorum}
-            {forReachedQuorum && (
-              <span style={{ fontSize: '0.7rem', marginLeft: 4 }}>Reached</span>
-            )}
+            {forReachedQuorum && <span style={{ fontSize: '0.7rem', marginLeft: 4 }}>Reached</span>}
           </div>
         </div>
       </div>

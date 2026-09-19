@@ -1,10 +1,10 @@
 import type { Hex } from '@/utils/types';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { i18n } from '@lingui/core';
-import { toast } from 'sonner';
 import { filter } from 'remeda';
+import { toast } from 'sonner';
 import { useAccount } from 'wagmi';
 
 import ProposalActionModal from '@/components/ProposalActionsModal';
@@ -27,6 +27,14 @@ import {
 } from '@/wrappers/nounsDao';
 import { useUserVotes } from '@/wrappers/nounToken';
 
+import {
+  DRAFT_FONT_GROUPS,
+  DRAFT_FONTS,
+  ensureDraftFontLoaded,
+  getDraftFont,
+  loadDraftFontId,
+  saveDraftFontId,
+} from './draftFonts';
 import classes from './GameShell.module.css';
 
 export interface ProposalDraftPanelProps {
@@ -68,6 +76,20 @@ export default function ProposalDraftPanel({
   const [isV1OptionVisible, setIsV1OptionVisible] = useState(false);
   const [previousProposalId, setPreviousProposalId] = useState<number | undefined>(undefined);
 
+  // Window font — see draftFonts.ts. The choice is
+  // remembered across windows and page loads. Defaults to Figtree. `font` is a stable reference
+  // from the registry array, so it's a safe effect dependency.
+  const [fontId, setFontId] = useState<string>(() => loadDraftFontId());
+  const font = getDraftFont(fontId);
+  useEffect(() => {
+    ensureDraftFontLoaded(font);
+    saveDraftFontId(font.id);
+  }, [font]);
+  const fontScopeStyle = {
+    '--draft-font': font.stack,
+    '--draft-transform': font.uppercase === true ? 'uppercase' : 'none',
+  } as CSSProperties;
+
   const latestProposalId = useProposalCount();
   const latestProposal = useProposal(latestProposalId ?? 0);
   const availableVotes = useUserVotes();
@@ -95,7 +117,7 @@ export default function ProposalDraftPanel({
         if (!transaction.calldata.startsWith('0x')) {
           transaction.calldata = `0x${transaction.calldata}`;
         }
-        if (transaction.usdcValue) {
+        if (transaction.usdcValue !== undefined && transaction.usdcValue !== 0) {
           setTotalUSDCPayment(totalUSDCPayment + transaction.usdcValue);
         }
       });
@@ -114,7 +136,10 @@ export default function ProposalDraftPanel({
   );
 
   useEffect(() => {
-    if (latestProposalId !== undefined && !previousProposalId) {
+    if (
+      latestProposalId !== undefined &&
+      (previousProposalId === undefined || previousProposalId === 0)
+    ) {
       setPreviousProposalId(latestProposalId);
     }
   }, [latestProposalId, previousProposalId]);
@@ -165,9 +190,14 @@ export default function ProposalDraftPanel({
     [proposalTransactions, titleValue, bodyValue],
   );
 
-  const hasEnoughVote = Boolean(
-    availableVotes && proposalThreshold && availableVotes > proposalThreshold,
-  );
+  // Explicit nullish/zero checks keep the original truthiness semantics
+  // (a 0 threshold or 0 votes reads as "not enough") while satisfying lint.
+  const hasEnoughVote =
+    availableVotes != null &&
+    availableVotes !== 0 &&
+    proposalThreshold != null &&
+    proposalThreshold !== 0 &&
+    availableVotes > proposalThreshold;
 
   const hasActiveOrPendingProposal =
     (latestProposal?.status === ProposalState.ACTIVE ||
@@ -237,8 +267,8 @@ export default function ProposalDraftPanel({
     if (isProposePending) return null;
     if (hasActiveOrPendingProposal) return 'Active proposal exists';
     if (!hasEnoughVote) {
-      if (proposalThreshold) {
-        return `Need ${i18n.number((proposalThreshold || 0) + 1)} votes`;
+      if (proposalThreshold != null && proposalThreshold !== 0) {
+        return `Need ${i18n.number(proposalThreshold + 1)} votes`;
       }
       return 'Insufficient votes';
     }
@@ -256,7 +286,31 @@ export default function ProposalDraftPanel({
         onActionAdd={handleAddProposalAction}
       />
 
-      <div className={classes.propPage}>
+      <div
+        className={`${classes.propPage} ${classes.propPageSplit} proposal-draft-font-scope`}
+        style={fontScopeStyle}
+      >
+        <div className={classes.propToolbar}>
+          <span className={classes.propToolbarLabel}>Font</span>
+          <select
+            className={classes.propFontSelect}
+            value={font.id}
+            onChange={e => setFontId(e.target.value)}
+            aria-label="Draft window font"
+          >
+            {DRAFT_FONT_GROUPS.map(g => (
+              <optgroup key={g.key} label={g.label}>
+                {DRAFT_FONTS.filter(f => f.group === g.key).map(f => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <span className={classes.propToolbarHint}>This window only · remembered</span>
+        </div>
+
         <main className={classes.propMain}>
           <section className={classes.propPanel}>
             <div className={classes.propPanelHeader}>
@@ -316,12 +370,13 @@ export default function ProposalDraftPanel({
             <div className={classes.propPanelHeader}>
               <span className={classes.propPanelTitle}>Proposal</span>
             </div>
-            <div className={classes.propEditorWrap}>
+            <div className={classes.propEditorWrapFull}>
               <ProposalEditor
                 title={titleValue}
                 body={bodyValue}
                 onTitleInput={setTitleValue}
                 onBodyInput={setBodyValue}
+                layout="split"
               />
             </div>
 
@@ -361,7 +416,7 @@ export default function ProposalDraftPanel({
           </section>
         </main>
 
-        <aside className={classes.propRail}>
+        <aside className={`${classes.propRail} ${classes.propRailSticky}`}>
           <section className={classes.propPanel}>
             <div className={classes.propPanelHeader}>
               <span className={classes.propPanelTitle}>Status</span>

@@ -1653,3 +1653,69 @@
 .propCommitInput:focus {
   border-color: var(--gs-accent);
 }
+
+/* ─── Draft mini-window layout ────────────────────────────────────────────
+   `.propPage` has no grid, so `.propRail` stacks under `.propMain`, and
+   `.propEditorWrap` reserves a 320px second column that nothing fills — in
+   a floating window that reads as a narrow text column beside dead space.
+   The draft panel opts into these instead. `GameEditProposal` still uses
+   the originals and is untouched. */
+.propPageSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 16px;
+  align-items: start;
+  max-width: none;
+  padding: 4px 4px 24px;
+}
+
+.propEditorWrapFull {
+  display: block;
+}
+
+.propRailSticky {
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 960px) {
+  .propPageSplit {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Toolbar row across the top of the window — currently just the font picker. */
+.propToolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--gs-card-bg);
+  border: 1px solid var(--gs-divider);
+  border-radius: 3px;
+}
+
+.propToolbarLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--gs-text-muted);
+}
+
+.propToolbarHint {
+  font-size: 11px;
+  color: var(--gs-text-muted);
+  margin-left: auto;
+}
+
+.propFontSelect {
+  background: var(--gs-panel-bg, #0f0f14);
+  color: var(--gs-text);
+  border: 1px solid var(--gs-divider);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 13px;
+  min-width: 180px;
+  cursor: pointer;
+}

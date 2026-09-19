@@ -1,7 +1,7 @@
 import type { Hex } from '@/utils/types';
+import type { ProposalTransaction } from '@/wrappers/nounsDao';
 
 import { miniWindowStore } from '@/components/MiniWindow';
-import type { ProposalTransaction } from '@/wrappers/nounsDao';
 
 import ProposalDraftPanel from './ProposalDraftPanel';
 
@@ -29,10 +29,26 @@ export interface ProposalDraftPrefill {
 
 const WINDOW_ID = 'proposal-draft';
 
+/**
+ * Size the window to the viewport. MiniWindow isn't resizable, so a fixed
+ * 880px meant a long pasted proposal sat in a narrow column with the rest of
+ * a wide screen unused. Cap so it never overflows small windows.
+ */
+function draftWindowSize(): { width: number; height: number } {
+  if (typeof window === 'undefined') return { width: 1280, height: 840 };
+  // No lower bound: a floor wider than the viewport pushes the (fixed-position)
+  // window off the right edge on phones. 32px leaves a 16px gutter each side
+  // once MiniWindow centres it.
+  return {
+    width: Math.min(1320, window.innerWidth - 32),
+    height: Math.min(860, window.innerHeight - 32),
+  };
+}
+
 function coerceTransactions(
   txs: ProposalDraftPrefill['transactions'],
 ): ProposalTransaction[] | undefined {
-  if (!txs?.length) return undefined;
+  if (txs === undefined || txs.length === 0) return undefined;
   return txs.map(tx => ({
     address: (tx.address.startsWith('0x') ? tx.address : `0x${tx.address}`) as `0x${string}`,
     value: tx.value ? BigInt(tx.value) : 0n,
@@ -49,11 +65,12 @@ function coerceTransactions(
  * inside a draft they can review and sign.
  */
 export function openProposalDraft(payload: ProposalDraftPrefill = {}): string {
+  const { width, height } = draftWindowSize();
   return miniWindowStore.open({
     id: payload.draftId ?? WINDOW_ID,
     title: payload.title?.trim() ? `Draft — ${payload.title}` : 'Draft Proposal',
-    width: 880,
-    height: 720,
+    width,
+    height,
     content: (
       <ProposalDraftPanel
         initialTitle={payload.title ?? ''}
