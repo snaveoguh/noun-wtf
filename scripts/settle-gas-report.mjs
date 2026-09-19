@@ -223,5 +223,7 @@ for (let i = 0; i < addresses.length; i++) {
   results.push(r);
 }
 console.log('=== SETTLE GAS REPORT ===');
-console.log(JSON.stringify(results, null, 2));
+console.log(JSON.stringify(results.map(({ txs, ...rest }) => rest), null, 1));
+console.log('=== TXS ===');
+for (const r of results) for (const t of r.txs) console.log(`${r.address},${t.hash},${t.block},${t.ts},${t.ok ? 1 : 0},${t.feeEth}`);
 console.log('=== END REPORT ===');
