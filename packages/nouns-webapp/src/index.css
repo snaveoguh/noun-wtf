@@ -915,3 +915,17 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     order: -1;
   }
 }
+
+/* ─── Header font switcher (components/FontSwitcher). The current font's
+   name only fits on wide headers; phones get the "Aa" glyph alone. ─── */
+.font-switcher-name {
+  display: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 900px) {
+  .font-switcher-name {
+    display: inline;
+  }
+}
