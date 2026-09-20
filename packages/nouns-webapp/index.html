@@ -13,13 +13,13 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 
-    <!-- Pip3 is the site font (self-hosted @font-face in index.css). These are
-         the missing-glyph fallbacks only: Comic Neue for the Dice/abacus theme
-         (Comic Sans MS isn't available on iOS/Android), JetBrains Mono for the
-         Terminal theme. -->
+    <!-- Figtree is the default site font (switchable in the header — see
+         src/lib/siteFonts.ts). Comic Neue backs the Comic Sans option on
+         iOS/Android, JetBrains Mono catches glyphs Pip3 lacks. Pip3 itself is
+         a self-hosted @font-face in index.css. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 
     <!-- Anti-flash theme bootstrap — set data-theme on <html> before paint
          so CSS variable resolution doesn't visibly shift during hydration.
@@ -53,6 +53,34 @@
         } catch (_) {
           document.documentElement.setAttribute('data-theme', 'abacus');
         }
+      })();
+    </script>
+    <!-- Anti-flash font bootstrap — apply the stored site font before paint.
+         Mirrors applySiteFont in src/lib/siteFonts.ts; keep them in sync. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var stack = "'Figtree', system-ui, sans-serif";
+        var transform = 'none';
+        var id = 'figtree';
+        try {
+          var f = JSON.parse(localStorage.getItem('noun-wtf-font') || 'null');
+          if (f && typeof f.stack === 'string' && f.stack) {
+            stack = f.stack;
+            transform = f.transform === 'uppercase' ? 'uppercase' : 'none';
+            id = typeof f.id === 'string' ? f.id : id;
+            if (typeof f.google === 'string' && f.google) {
+              var l = document.createElement('link');
+              l.id = 'site-font-' + id;
+              l.rel = 'stylesheet';
+              l.href = 'https://fonts.googleapis.com/css2?family=' + f.google + '&display=swap';
+              document.head.appendChild(l);
+            }
+          }
+        } catch (_) {}
+        root.style.setProperty('--site-font', stack);
+        root.style.setProperty('--site-transform', transform);
+        root.setAttribute('data-font', id);
       })();
     </script>
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#e04639" />
