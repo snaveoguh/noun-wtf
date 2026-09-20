@@ -15,16 +15,24 @@ import { FILTER_TABS } from './eventRegistry';
 import TerminalPrompt from './TerminalPrompt';
 import { useActivityFeed } from './useActivityFeed';
 
-const DISCO_STORAGE_KEY = 'noun-wtf-disco';
+// v2 key: the v1 key ('noun-wtf-disco') was auto-written as 'on' for every
+// visitor by the default-on effect, so honouring it would keep disco lit for
+// everyone who had ever opened the terminal. Fresh key → off for all until
+// they choose it.
+const DISCO_STORAGE_KEY = 'noun-wtf-disco-v2';
 
 export default function TerminalFeedShell() {
   const { isEmbedded } = useSiteTheme();
   const [activeFilter, setActiveFilter] = useState('');
   const [discoMode, setDiscoMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    // Default-on for the terminal: only honour an explicit 'off' choice.
-    // Anything else (first visit, lingering legacy 'on', unset) → disco lit.
-    return localStorage.getItem(DISCO_STORAGE_KEY) !== 'off';
+    if (typeof window === 'undefined') return false;
+    // Default OFF — the animated rainbow rows are a photosensitivity hazard.
+    // Only an explicit 'on' lights it.
+    try {
+      return localStorage.getItem(DISCO_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
   });
   const isChatTab = activeFilter === '_CHAT';
   // Only pass filter to activity feed when not in chat mode

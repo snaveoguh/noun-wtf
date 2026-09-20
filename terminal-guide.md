@@ -32,7 +32,7 @@ route falls back to the normal site unless you keep the `/terminal/...` prefix.
 └──────────────────────────────────────────────────────┘
 ```
 
-- **🪩 disco** — rainbow gradient per feed row. On by default, persists in localStorage.
+- **🪩 disco** — rainbow gradient per feed row. Off by default (it's an animated effect); tap 🪩 to turn it on, and the choice persists.
 - **connect** — wallet button. **Required for the prompt to work at all.**
 - **Filter tabs** — `ALL · AUCTIONS · BIDS · PROPS · VOTES · CAND · SPONSORS · DELEG · XFERS ·
   SALES · FORKS · STREAMS · GRANTS · DAO · LIL · V2 · CHAT`. `CHAT` swaps the feed for your

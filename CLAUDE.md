@@ -167,7 +167,7 @@ V4 + auto-settler context lives in `nounwtf_v4_disco_ship_2026-05-25.md` and `no
 
 ### Terminal / Disco Default
 
-The terminal feed defaults to 🪩 disco mode (CSS architecture documented in `nounwtf_v4_disco_ship_2026-05-25.md`). Other themes still exist; disco is just the default skin.
+The terminal feed's 🪩 disco mode (animated rainbow rows; CSS architecture documented in `nounwtf_v4_disco_ship_2026-05-25.md`) is **off by default** as of 2026-09-20 — it was a photosensitivity hazard on by default. Visitors opt in with the 🪩 toggle; the choice persists under `noun-wtf-disco-v2`.
 
 ## Image System
 
