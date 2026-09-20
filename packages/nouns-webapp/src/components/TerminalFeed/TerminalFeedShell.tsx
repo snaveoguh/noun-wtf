@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 
 import { ConnectKitButton } from 'connectkit';
 
+import FontSwitcher from '@/components/FontSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
@@ -149,6 +150,8 @@ export default function TerminalFeedShell() {
               whole fixed-position shell (and its terminal-mode/disco document
               classes), which is what made the homepage visibly flash to black
               on every theme change. */}
+          {/* Site-wide font — see src/lib/siteFonts.ts. Default Figtree. */}
+          <FontSwitcher variant="terminal" />
           {!isEmbedded && <ThemeSwitcher variant="terminal" />}
         </div>
       </div>

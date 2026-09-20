@@ -136,10 +136,10 @@ P0.1 + P1.5 immediately — both are self-contained and verifiable here.
 
 ## 5. Questions for you
 
-1. **"Default to Figtree as our font"** — I applied that to the draft window
-   only. Did you mean site-wide? Pip3 is documented as *the* site font in both
-   themes; swapping it is a brand decision I didn't want to make while you slept.
-   It's a two-line change in `index.css` if yes.
+1. ~~"Default to Figtree as our font"~~ — **done site-wide** (2026-09-20): a
+   font picker in the terminal header and the abacus navbar, default Figtree,
+   Pip3 and Comic Sans as options, choice persisted and applied before first
+   paint. The draft window's own picker now defaults to the site font.
 2. Vote panel **first** on phones (my choice) vs. after the proposal content —
    which do you prefer?
 3. For the parity table: any Camp feature you'd rank higher than I have?

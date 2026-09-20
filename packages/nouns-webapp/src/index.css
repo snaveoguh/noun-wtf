@@ -45,6 +45,24 @@
   font-display: swap;
 }
 
+/* ─── Site font (switchable in the header — src/lib/siteFonts.ts) ─────────
+   index.html sets these on <html> before first paint from localStorage; the
+   defaults below cover a fresh visitor. Both theme blocks read them instead
+   of hard-coding Pip3. Default Figtree. */
+:root {
+  --site-font: 'Figtree', system-ui, -apple-system, sans-serif;
+  --site-transform: none;
+}
+
+/* Pip3 is single-weight and uppercase-only. The uppercase transform comes
+   through --site-transform; the weight flattening (no synthetic-bold smears)
+   applies only while Pip3 is the selected font. */
+:root[data-font='pip3'] *,
+:root[data-font='pip3'] *::before,
+:root[data-font='pip3'] *::after {
+  font-weight: normal !important;
+}
+
 /* Edge padding lives outside @layer so CSS modules can resolve the vars. */
 :root {
   --page-edge-padding-left: max(1rem, env(safe-area-inset-left));
@@ -135,8 +153,8 @@
     --theme-feed-row-border: #0a1a0a;
     --theme-feed-badge-bg: #001a00;
     --theme-orb-glow: radial-gradient(circle, rgba(0, 255, 65, 0.12) 0%, transparent 70%);
-    --theme-font-body: 'Pip3', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-    --theme-font-display: 'Pip3', 'JetBrains Mono', 'Fira Code', monospace;
+    --theme-font-body: var(--site-font, 'Figtree', system-ui, sans-serif);
+    --theme-font-display: var(--site-font, 'Figtree', system-ui, sans-serif);
     --theme-font-size-base: 13px;
     --theme-letter-spacing: 0.3px;
     --theme-radius-sm: 0px;
@@ -192,25 +210,22 @@
 }
 
 /* ============================================================================
-   TERMINAL — Pip3 everywhere (JetBrains Mono catches the glyphs Pip3 lacks),
-   vantablack, sharp corners. Pip3 is uppercase-only, so uppercase is forced
-   the same way the Dice/abacus block does below — glyphs missing from Pip3
-   (lowercase in inputs, exotic punctuation) fall through to the mono stack.
+   TERMINAL — the site font everywhere (--site-font, default Figtree;
+   Pip3 selectable), vantablack, sharp corners. Uppercase is driven by
+   --site-transform, which is only 'uppercase' while Pip3 is selected.
    ============================================================================ */
 [data-theme='terminal'] body {
   background: #000000 !important;
   color: var(--theme-text-primary);
   font-family: var(--theme-font-body) !important;
-  text-transform: uppercase;
-  font-weight: normal !important;
+  text-transform: var(--site-transform, none);
 }
 
 /* Single-weight font — normalise weight so nothing renders synthetic-bold smears. */
 [data-theme='terminal'] *,
 [data-theme='terminal'] *::before,
 [data-theme='terminal'] *::after {
-  font-family: 'Pip3', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
-  font-weight: normal !important;
+  font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
 }
 
 [data-theme='terminal'] h1,
@@ -225,7 +240,7 @@
 [data-theme='terminal'] th,
 [data-theme='terminal'] nav,
 [data-theme='terminal'] nav * {
-  text-transform: uppercase !important;
+  text-transform: var(--site-transform, none) !important;
 }
 
 [data-theme='terminal'] p,
@@ -235,7 +250,7 @@
 [data-theme='terminal'] td,
 [data-theme='terminal'] dd,
 [data-theme='terminal'] dt {
-  text-transform: uppercase;
+  text-transform: var(--site-transform, none);
 }
 
 /* Legacy class-based override (still applied by TerminalFeedShell) — alias to data-theme */
@@ -246,8 +261,7 @@
 .terminal-mode *,
 .terminal-mode *::before,
 .terminal-mode *::after {
-  font-family: 'Pip3', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace !important;
-  font-weight: normal !important;
+  font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
 }
 
 /* Near-invisible scrollbar for the void */
@@ -601,8 +615,8 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --theme-feed-row-border: #e2e3eb;
     --theme-feed-badge-bg: #f4f4f8;
     --theme-orb-glow: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
-    --theme-font-body: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
-    --theme-font-display: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive;
+    --theme-font-body: var(--site-font, 'Figtree', system-ui, sans-serif);
+    --theme-font-display: var(--site-font, 'Figtree', system-ui, sans-serif);
     --theme-font-size-base: 13px;
     --theme-letter-spacing: 0.02em;
     --theme-radius-sm: 4px;
@@ -615,8 +629,8 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 }
 
 [data-theme='abacus'] body {
-  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  text-transform: uppercase;
+  font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
+  text-transform: var(--site-transform, none);
   font-size: 13px;
   background: #ffffff;
 }
@@ -632,8 +646,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] *,
 [data-theme='abacus'] *::before,
 [data-theme='abacus'] *::after {
-  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
-  font-weight: normal !important;
+  font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
 }
 
 [data-theme='abacus'] h1,
@@ -656,7 +669,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] [class*='Title'],
 [data-theme='abacus'] [class*='label'],
 [data-theme='abacus'] [class*='Label'] {
-  text-transform: uppercase !important;
+  text-transform: var(--site-transform, none) !important;
 }
 
 [data-theme='abacus'] p,
@@ -666,7 +679,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] td,
 [data-theme='abacus'] dd,
 [data-theme='abacus'] dt {
-  text-transform: uppercase;
+  text-transform: var(--site-transform, none);
 }
 
 @media (max-width: 480px) {
@@ -695,7 +708,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 }
 
 [data-theme='abacus'] code {
-  font-family: 'Pip3', 'Comic Sans MS', 'Comic Sans', 'Comic Neue', cursive !important;
+  font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
 }
 
 /* ============================================================================

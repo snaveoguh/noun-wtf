@@ -13,6 +13,7 @@ import { useBalance } from 'wagmi';
 
 import NogglesIcon from '@/assets/icons/Noggles.svg?react';
 import testnetNoun from '@/assets/testnet-noun.png';
+import FontSwitcher from '@/components/FontSwitcher';
 import HeaderDaoToggle from '@/components/HeaderDaoToggle';
 import LolLogo from '@/components/LolLogo';
 import NavBarButton, { NavBarButtonStyle } from '@/components/NavBarButton';
@@ -438,6 +439,8 @@ const NavBar = () => {
               }}
             </ConnectKitButton.Custom>
             <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+              {/* Site-wide font — see src/lib/siteFonts.ts. Default Figtree. */}
+              <FontSwitcher variant="navbar" />
               <ThemeSwitcher
                 variant="navbar"
                 onChange={next => {
