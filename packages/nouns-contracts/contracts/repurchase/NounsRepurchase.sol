@@ -33,26 +33,32 @@ import { IChainalysisSanctionsList } from '../external/chainalysis/IChainalysisS
 /**
  * @notice Lets a Noun holder exit at no more than the Noun's pro-rata share of treasury net assets.
  *
- * Legal framing (see Nouns DUNA Bylaws §3.1 and W.S. 17-32-104(c)): this is a repurchase of a membership
- * interest by the association, authorized by its governing principles, at a price capped at net asset value.
- * It is not a dividend and not a distribution of profits: every remaining Noun's book value is unchanged
- * (spread == 0) or increased (spread > 0) by each repurchase.
+ * Legal framing (Nouns DUNA Bylaws §3.1 as amended, W.S. 17-32-104(c)(iii)): this is a repurchase of a
+ * membership interest by the association, authorized by its governing principles, at a price capped at net
+ * asset value. It is the co-op model: a leaving member hands back their share and is paid what it is worth on
+ * the books, never a share of profits. Every remaining Noun's book value is unchanged (spread == 0) or
+ * increased (spread > 0) by each repurchase.
  *
  * Mechanics:
- *  - A member escrows Nouns into a FIFO queue. The escrowing wallet is screened against the sanctions
- *    oracle and, if a KYC attestor is configured, must present an EIP-712 attestation signed by it.
+ *  - A member escrows Nouns into a FIFO queue with an optional minimum price. The wallet is screened against
+ *    the sanctions oracle and, if a KYC attestor is configured, must present an EIP-712 attestation it signed.
  *  - Once per tick (e.g. daily) anyone may call `settle()`. The price is frozen for the tick at
  *    NAV * (1 - spread). Up to `maxPerTick` Nouns are repurchased in queue order. Repurchased Nouns are
- *    transferred to the DAO treasury (not burned), and ETH is sent to the member (WETH fallback).
+ *    transferred to the DAO treasury (not burned); ETH is sent to the member, with a WETH fallback.
+ *  - Entries whose owner is sanctioned at settle time, or whose minPrice is above the tick price, are frozen:
+ *    pulled from the queue but still escrowed. The owner can cancel (take the Noun back) or requeue.
  *  - NAV = (treasury ETH + this contract's ETH + Σ converter(treasury ERC20 balance) - liabilityReserve)
- *          / (totalSupply - Nouns held by the treasury).
+ *          / (totalSupply - Nouns held by the treasury and other excluded DAO-controlled holders).
  *
- * The contract is owned by the DAO Executor. Every parameter change is a DAO proposal and therefore
- * subject to Compliance Administrator review and the Veto Administrators.
+ * Owned by the DAO Executor. Every parameter change is a DAO proposal and therefore subject to Compliance
+ * Administrator review and the Veto Administrators. Funds can only ever leave to a member (at the tick price)
+ * or back to the treasury.
  */
 contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable, ReentrancyGuard, EIP712 {
-    /// @notice Hard cap on the spread so the DAO can never configure a price below zero.
-    uint16 public constant MAX_SPREAD_BPS = 10_000;
+    /// @notice Hard cap on the spread (25%). Protects queued members from a proposal that would buy them out for ~0.
+    uint16 public constant MAX_SPREAD_BPS = 2_500;
+
+    uint16 internal constant BPS = 10_000;
 
     bytes32 public constant KYC_ATTESTATION_TYPEHASH = keccak256('KycAttestation(address member,uint256 expiry)');
 
@@ -89,10 +95,14 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
     /// @notice Treasury ERC20 assets counted in NAV.
     Asset[] public assets;
 
+    /// @notice DAO-controlled holders (other than the treasury) whose Nouns are not membership interests,
+    /// e.g. the auction house (the Noun currently on auction) and the legacy treasury.
+    address[] public extraExcludedHolders;
+
     /// @notice nounId => request
     mapping(uint256 => Request) public requests;
 
-    /// @notice FIFO queue of nounIds. Cancelled / frozen entries are skipped at settle time.
+    /// @notice FIFO queue of nounIds. Cancelled / frozen / stale entries are skipped at settle time.
     uint256[] public queue;
 
     /// @notice Index of the next queue entry to consider.
@@ -108,8 +118,10 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
         uint16 _maxPerTick,
         uint32 _tickDuration,
         uint256 _liabilityReserve,
-        Asset[] memory _assets
+        Asset[] memory _assets,
+        address[] memory _extraExcludedHolders
     ) EIP712('NounsRepurchase', '1') {
+        if (address(_nouns) == address(0) || _treasury == address(0) || _weth == address(0)) revert ZeroAddress();
         nouns = _nouns;
         treasury = _treasury;
         weth = _weth;
@@ -121,6 +133,7 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
         _setTickDuration(_tickDuration);
         _setLiabilityReserve(_liabilityReserve);
         _setAssets(_assets);
+        _setExtraExcludedHolders(_extraExcludedHolders);
 
         _transferOwnership(_treasury);
     }
@@ -131,12 +144,14 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
 
     /**
      * @notice Escrow Nouns into the repurchase queue.
-     * @param nounIds Nouns owned (or approved) by msg.sender.
-     * @param kycSignature EIP-712 signature by `kycAttestor` over KycAttestation(msg.sender, expiry),
-     * ABI-encoded as abi.encode(expiry, signature). Ignored when no attestor is configured.
+     * @param nounIds Nouns owned by msg.sender (the contract must be approved).
+     * @param minPrice Lowest tick price (wei) the member will accept; 0 for no floor.
+     * @param kycSignature abi.encode(expiry, signature) where signature is the attestor's EIP-712 signature over
+     * KycAttestation(msg.sender, expiry). Ignored when no attestor is configured.
      */
     function requestRepurchase(
         uint256[] calldata nounIds,
+        uint256 minPrice,
         bytes calldata kycSignature
     ) external override whenNotPaused nonReentrant {
         _requireNotSanctioned(msg.sender);
@@ -146,21 +161,35 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
             uint256 nounId = nounIds[i];
             // transferFrom enforces ownership / approval.
             nouns.transferFrom(msg.sender, address(this), nounId);
-            requests[nounId] = Request({ owner: msg.sender, requestedAt: uint40(block.timestamp), frozen: false });
-            queue.push(nounId);
-            emit RepurchaseRequested(nounId, msg.sender, queue.length - 1);
+            uint256 index = _enqueue(nounId, msg.sender, minPrice);
+            emit RepurchaseRequested(nounId, msg.sender, index, minPrice);
         }
     }
 
     /**
-     * @notice Withdraw Nouns from the queue before they are repurchased.
+     * @notice Put frozen requests back at the end of the queue, optionally with a new minPrice.
+     */
+    function requeue(uint256[] calldata nounIds, uint256 minPrice) external override whenNotPaused nonReentrant {
+        _requireNotSanctioned(msg.sender);
+
+        for (uint256 i = 0; i < nounIds.length; ++i) {
+            uint256 nounId = nounIds[i];
+            Request memory r = requests[nounId];
+            if (r.owner != msg.sender) revert NotRequestOwner(nounId);
+            if (r.frozen == FreezeReason.None) revert RequestNotFrozen(nounId);
+            uint256 index = _enqueue(nounId, msg.sender, minPrice);
+            emit RepurchaseRequeued(nounId, msg.sender, index, minPrice);
+        }
+    }
+
+    /**
+     * @notice Withdraw Nouns from the program before they are repurchased.
      * @dev Allowed even while paused and even for frozen requests: the Noun is the member's property.
      */
     function cancelRequest(uint256[] calldata nounIds) external override nonReentrant {
         for (uint256 i = 0; i < nounIds.length; ++i) {
             uint256 nounId = nounIds[i];
-            Request memory r = requests[nounId];
-            if (r.owner != msg.sender) revert NotRequestOwner(nounId);
+            if (requests[nounId].owner != msg.sender) revert NotRequestOwner(nounId);
             delete requests[nounId];
             nouns.transferFrom(address(this), msg.sender, nounId);
             emit RepurchaseCancelled(nounId, msg.sender);
@@ -188,16 +217,23 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
             uint256 nounId = queue[head];
             Request memory r = requests[nounId];
 
-            if (r.owner == address(0) || r.frozen) {
-                // Cancelled or already frozen: drop from the queue.
+            // Cancelled, settled, already frozen, or a stale slot from an earlier request of the same Noun.
+            if (r.owner == address(0) || r.frozen != FreezeReason.None || r.queueIndex != head) {
                 ++head;
                 continue;
             }
 
             if (_isSanctioned(r.owner)) {
                 // Never pay a sanctioned wallet. Pull it out of the queue; the owner may still cancel.
-                requests[nounId].frozen = true;
-                emit RequestFrozen(nounId, r.owner);
+                requests[nounId].frozen = FreezeReason.Sanctioned;
+                emit RequestFrozen(nounId, r.owner, FreezeReason.Sanctioned);
+                ++head;
+                continue;
+            }
+
+            if (price < r.minPrice) {
+                requests[nounId].frozen = FreezeReason.BelowMinPrice;
+                emit RequestFrozen(nounId, r.owner, FreezeReason.BelowMinPrice);
                 ++head;
                 continue;
             }
@@ -228,20 +264,31 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
      */
 
     /// @notice Gross ETH-equivalent assets: treasury ETH, this contract's ETH, and converted treasury ERC20s.
+    /// @dev A failing token or converter is valued at zero, which can only lower the price the DAO pays.
     function totalAssetsEth() public view override returns (uint256 total) {
         total = treasury.balance + address(this).balance;
         uint256 len = assets.length;
         for (uint256 i = 0; i < len; ++i) {
             Asset memory a = assets[i];
-            uint256 bal = a.token.balanceOf(treasury);
-            if (bal > 0) total += a.converter.toEth(bal);
+            try a.token.balanceOf(treasury) returns (uint256 bal) {
+                if (bal == 0) continue;
+                try a.converter.toEth(bal) returns (uint256 value) {
+                    total += value;
+                } catch {}
+            } catch {}
         }
     }
 
-    /// @notice Nouns that represent member interests: total supply less Nouns the treasury itself holds.
-    /// @dev Escrowed Nouns are still owned by members and still count.
+    /// @notice Nouns that represent member interests: total supply less Nouns held by the treasury and other
+    /// DAO-controlled addresses. Escrowed Nouns are still owned by members and still count.
     function circulatingSupply() public view override returns (uint256) {
-        return nouns.totalSupply() - nouns.balanceOf(treasury);
+        uint256 excluded = nouns.balanceOf(treasury);
+        uint256 len = extraExcludedHolders.length;
+        for (uint256 i = 0; i < len; ++i) {
+            excluded += nouns.balanceOf(extraExcludedHolders[i]);
+        }
+        uint256 supply = nouns.totalSupply();
+        return supply > excluded ? supply - excluded : 0;
     }
 
     /// @notice Net asset value per circulating Noun, in wei.
@@ -259,13 +306,17 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
         return _priceFromNav(navPerNoun());
     }
 
-    /// @notice Number of queue slots not yet considered by settle (includes cancelled / frozen slots).
+    /// @notice Number of queue slots not yet considered by settle (includes cancelled / frozen / stale slots).
     function pendingCount() external view override returns (uint256) {
         return queue.length - queueHead;
     }
 
     function assetsLength() external view returns (uint256) {
         return assets.length;
+    }
+
+    function extraExcludedHoldersLength() external view returns (uint256) {
+        return extraExcludedHolders.length;
     }
 
     function queueLength() external view returns (uint256) {
@@ -304,10 +355,21 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
         _setAssets(_assets);
     }
 
+    function setExtraExcludedHolders(address[] calldata _holders) external onlyOwner {
+        _setExtraExcludedHolders(_holders);
+    }
+
     /// @notice Send unspent funding back to the treasury. Funds can only ever go to the treasury or to members.
     function returnFundsToTreasury(uint256 amount) external onlyOwner {
         _safeTransferETHWithFallback(treasury, amount);
         emit FundsReturnedToTreasury(amount);
+    }
+
+    /// @notice Move a Noun that was sent here outside of requestRepurchase (and so has no request) to the treasury.
+    function recoverStrayNoun(uint256 nounId) external onlyOwner {
+        if (requests[nounId].owner != address(0)) revert NounIsTracked(nounId);
+        nouns.transferFrom(address(this), treasury, nounId);
+        emit StrayNounRecovered(nounId);
     }
 
     function pause() external onlyOwner {
@@ -322,7 +384,12 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
     receive() external payable {}
 
     /// @dev Only Nouns arriving through requestRepurchase are tracked; reject stray safeTransfers.
-    function onERC721Received(address operator, address, uint256, bytes calldata) external view override returns (bytes4) {
+    function onERC721Received(
+        address operator,
+        address,
+        uint256,
+        bytes calldata
+    ) external view override returns (bytes4) {
         require(operator == address(this), 'NounsRepurchase: use requestRepurchase');
         return IERC721Receiver.onERC721Received.selector;
     }
@@ -331,8 +398,20 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ INTERNAL ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
+    function _enqueue(uint256 nounId, address owner, uint256 minPrice) internal returns (uint256 index) {
+        index = queue.length;
+        queue.push(nounId);
+        requests[nounId] = Request({
+            owner: owner,
+            requestedAt: uint40(block.timestamp),
+            queueIndex: uint48(index),
+            frozen: FreezeReason.None,
+            minPrice: uint128(minPrice)
+        });
+    }
+
     function _priceFromNav(uint256 nav) internal view returns (uint256) {
-        return (nav * (MAX_SPREAD_BPS - spreadBps)) / MAX_SPREAD_BPS;
+        return (nav * (BPS - spreadBps)) / BPS;
     }
 
     function _isSanctioned(address account) internal view returns (bool) {
@@ -393,11 +472,21 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
     function _setAssets(Asset[] memory _assets) internal {
         delete assets;
         for (uint256 i = 0; i < _assets.length; ++i) {
-            require(address(_assets[i].token) != address(0), 'NounsRepurchase: zero token');
-            require(address(_assets[i].converter) != address(0), 'NounsRepurchase: zero converter');
+            if (address(_assets[i].token) == address(0) || address(_assets[i].converter) == address(0)) {
+                revert ZeroAddress();
+            }
             assets.push(_assets[i]);
         }
         emit AssetsUpdated(_assets.length);
+    }
+
+    function _setExtraExcludedHolders(address[] memory _holders) internal {
+        delete extraExcludedHolders;
+        for (uint256 i = 0; i < _holders.length; ++i) {
+            if (_holders[i] == address(0)) revert ZeroAddress();
+            extraExcludedHolders.push(_holders[i]);
+        }
+        emit ExcludedHoldersUpdated(_holders.length);
     }
 
     /// @dev Mirrors NounsAuctionHouse: try a plain ETH transfer, fall back to WETH so a member can never block settle.

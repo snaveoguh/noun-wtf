@@ -14,14 +14,27 @@ interface INounsRepurchase {
         IEthConverter converter;
     }
 
+    /// @notice Why a request was pulled out of the queue without being paid.
+    enum FreezeReason {
+        None,
+        /// @dev Owner was on the sanctions list at settle time.
+        Sanctioned,
+        /// @dev The tick price fell below the owner's minPrice.
+        BelowMinPrice
+    }
+
     /// @notice A Noun escrowed by a member awaiting repurchase.
     struct Request {
         /// @dev The member who escrowed the Noun. Zero once cancelled or settled.
         address owner;
-        /// @dev Timestamp of the request.
+        /// @dev Timestamp of the (latest) request or requeue.
         uint40 requestedAt;
-        /// @dev True if the Noun was pulled out of the queue because its owner became sanctioned.
-        bool frozen;
+        /// @dev Position in `queue` this request is valid for. Stale slots from a prior request are skipped.
+        uint48 queueIndex;
+        /// @dev Non-zero once the request has been pulled out of the queue; the owner may cancel or requeue.
+        FreezeReason frozen;
+        /// @dev Slippage protection: the request is not settled below this price (wei).
+        uint128 minPrice;
     }
 
     /// @notice Signed by the KYC attestor (a Compliance Administrator key) to permit a member to request a repurchase.
@@ -30,10 +43,11 @@ interface INounsRepurchase {
         uint256 expiry;
     }
 
-    event RepurchaseRequested(uint256 indexed nounId, address indexed owner, uint256 queueIndex);
+    event RepurchaseRequested(uint256 indexed nounId, address indexed owner, uint256 queueIndex, uint256 minPrice);
+    event RepurchaseRequeued(uint256 indexed nounId, address indexed owner, uint256 queueIndex, uint256 minPrice);
     event RepurchaseCancelled(uint256 indexed nounId, address indexed owner);
     event RepurchaseSettled(uint256 indexed nounId, address indexed owner, uint256 price);
-    event RequestFrozen(uint256 indexed nounId, address indexed owner);
+    event RequestFrozen(uint256 indexed nounId, address indexed owner, FreezeReason reason);
     event TickSettled(uint256 price, uint256 settledCount, uint256 navPerNoun);
     event InsufficientFunds(uint256 price, uint256 available);
 
@@ -44,20 +58,27 @@ interface INounsRepurchase {
     event SanctionsOracleUpdated(address sanctionsOracle);
     event KycAttestorUpdated(address kycAttestor);
     event AssetsUpdated(uint256 count);
+    event ExcludedHoldersUpdated(uint256 count);
     event FundsReturnedToTreasury(uint256 amount);
+    event StrayNounRecovered(uint256 indexed nounId);
 
     error SanctionedMember(address member);
     error KycAttestationRequired();
     error InvalidKycAttestation();
     error NotRequestOwner(uint256 nounId);
+    error RequestNotFrozen(uint256 nounId);
     error NothingToSettle();
     error TickNotElapsed(uint256 nextTickAt);
     error SpreadTooHigh();
     error ZeroMaxPerTick();
     error ZeroTickDuration();
+    error ZeroAddress();
     error NoCirculatingNouns();
+    error NounIsTracked(uint256 nounId);
 
-    function requestRepurchase(uint256[] calldata nounIds, bytes calldata kycSignature) external;
+    function requestRepurchase(uint256[] calldata nounIds, uint256 minPrice, bytes calldata kycSignature) external;
+
+    function requeue(uint256[] calldata nounIds, uint256 minPrice) external;
 
     function cancelRequest(uint256[] calldata nounIds) external;
 

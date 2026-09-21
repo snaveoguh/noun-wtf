@@ -1,13 +1,13 @@
 # Proposal: Noun Repurchase Program (exit at book value, the co-op way)
 
-**Status:** draft for Compliance Administrator review
-**Code:** `packages/nouns-contracts/contracts/repurchase/` (`NounsRepurchase.sol`, `EthConverters.sol`), tests in `test/foundry/NounsRepurchase.t.sol`
+**Status:** draft, handed to the Compliance Administrators for review under Bylaws §2.2(a)
+**Code:** `packages/nouns-contracts/contracts/repurchase/` (`NounsRepurchase.sol`, `EthConverters.sol`), deploy script `script/DeployNounsRepurchase.s.sol`, tests `test/foundry/NounsRepurchase.t.sol` (48 tests, including a fuzz test of the no-overpayment invariant and an end-to-end run against the real `NounsToken`)
 
 ## TL;DR
 
 Prop 955 set the auction reserve to book value (2.8 ETH). New members now pay book to join. This proposal adds the other half of that policy: any member can leave at book, by selling their Noun back to the DAO.
 
-It does this the way every nonprofit cooperative in America does it. A co-op member who leaves does not get a share of the profits. They hand back their membership share and the co-op redeems it at par. Nobody profits, nobody is diluted, the co-op keeps operating. The Wyoming DUNA Act was written with that model in mind and expressly permits a DUNA to "repurchase membership interests to the extent authorized by the nonprofit association's governing principles." Our bylaws never adopted that authorization. This proposal adopts it, deploys a rate-limited on-chain repurchase queue, and funds it.
+It does this the way nonprofit cooperatives do it. A co-op member who leaves does not get a share of the profits. They hand back their membership share and the co-op redeems it at par. Nobody profits, nobody is diluted, the co-op keeps operating. The Wyoming DUNA Act was written with that model in mind and expressly permits a DUNA to "repurchase membership interests to the extent authorized by the nonprofit association's governing principles." Our bylaws never adopted that authorization. This proposal adopts it, deploys a rate-limited on-chain repurchase queue, and funds it.
 
 The fork is not touched. Nothing is distributed. Every remaining Noun's book value is unchanged or slightly higher after each exit.
 
@@ -26,7 +26,7 @@ Three properties make a repurchase compliant where the fork was not:
 ## Legal basis
 
 - **W.S. 17-32-104(b)** prohibits paying dividends or distributing income or profits to members.
-- **W.S. 17-32-104(c)(iii)** permits a DUNA to repurchase membership interests to the extent authorized by its governing principles. *(Verify exact wording against the codified statute before the vote; this draft relies on secondary summaries.)*
+- **W.S. 17-32-104(c)(iii)** permits a DUNA to repurchase membership interests to the extent authorized by its governing principles. _(Admins: please confirm the exact codified wording. This draft relies on secondary summaries.)_
 - **Bylaws §1.3** defines the Governing Principles as the Act, the Code, and the Bylaws, and lets the Bylaws be amended by an ordinary DAO Proposal.
 - **Bylaws §3.1** currently lists only compensation and grants as permitted payments. This proposal adds the statutory repurchase exception.
 - **Bylaws §2.2(a)** requires the Compliance Administrators to review this proposal for tax and sanctions compliance before it is voted on. That review is requested below, not bypassed.
@@ -45,55 +45,71 @@ Add a clarifying sentence at the start of 3.1(b):
 
 `NounsRepurchase` is a single non-upgradeable contract owned by the DAO Executor.
 
-| Step | What happens |
-|---|---|
-| Request | A member escrows Nouns into a FIFO queue. The wallet is checked against the Chainalysis sanctions oracle (the same one Auction House V3 uses). If the DAO has set a KYC attestor, the member presents an EIP-712 attestation signed by that key. |
-| Cancel | A member can withdraw an escrowed Noun at any time before it is repurchased, even while the program is paused. The Noun is their property. |
-| Settle | Once per tick anyone may call `settle()`. The price for the tick is frozen at NAV less the spread. Up to `maxPerTick` Nouns are repurchased in queue order. The Noun moves to the treasury, ETH goes to the member (WETH fallback if their wallet rejects ETH). |
-| Sanctioned at payout | If a queued owner becomes sanctioned before settlement, their entry is frozen and skipped. They can still cancel and take their Noun back. They are never paid. |
-| Insufficient funds | Settle stops and does not consume the tick. The queue resumes as soon as the DAO tops the contract up. |
+| Step                 | What happens                                                                                                                                                                                                                                                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request              | A member escrows Nouns into a FIFO queue, optionally with a minimum price they will accept. The wallet is checked against the Chainalysis sanctions oracle (read from the live Auction House V3 at deploy time, so both contracts screen identically). If the DAO has set a KYC attestor, the member presents an EIP-712 attestation signed by that key. |
+| Cancel               | A member can withdraw an escrowed Noun at any time before it is repurchased, even while the program is paused. The Noun is their property.                                                                                                                                                                                                               |
+| Settle               | Once per tick anyone may call `settle()`. The price for the tick is frozen at NAV less the spread. Up to `maxPerTick` Nouns are repurchased in queue order. The Noun moves to the treasury, ETH goes to the member (WETH fallback if their wallet rejects ETH).                                                                                          |
+| Sanctioned at payout | If a queued owner becomes sanctioned before settlement, their entry is frozen and skipped. They are never paid. They can still cancel and take their Noun back. They cannot requeue while sanctioned.                                                                                                                                                    |
+| Below minimum price  | If the tick price is below the member's floor, the entry is frozen and skipped. The member can cancel, or requeue at the back of the line with a new floor.                                                                                                                                                                                              |
+| Insufficient funds   | Settle stops and does not consume the tick. The queue resumes as soon as the DAO tops the contract up.                                                                                                                                                                                                                                                   |
 
-**NAV per Noun** = (treasury ETH + program ETH + Σ converter(treasury LST balances) − liability reserve) ÷ (total supply − Nouns held by the treasury).
+**NAV per Noun** = (treasury ETH + program ETH + Σ converter(treasury LST balances) − liability reserve) ÷ (total supply − Nouns held by the treasury, the auction house, and the legacy treasury).
 
-Converters read canonical protocol rates only: wstETH via Lido's `getStETHByWstETH`, rETH via Rocket Pool's `getEthValue`, mETH via Mantle's `mETHToETH`. WETH and stETH are 1:1. No spot-market prices, so NAV cannot be manipulated by a trade.
+Converters read canonical protocol rates only: wstETH via Lido's `getStETHByWstETH`, rETH via Rocket Pool's `getEthValue`, mETH via Mantle's `mETHToETH`. WETH and stETH are 1:1. No spot-market prices, so NAV cannot be manipulated by a trade. A converter that reverts (protocol paused) is valued at zero, which can only lower the price the DAO pays.
+
+**Guard rails baked into the code, not just the parameters:**
+
+- The spread is hard-capped at 25%, so no future proposal can use the program to buy queued members out for near zero.
+- Funds can only leave the contract to a member at the tick price or back to the treasury. There is no other withdrawal path.
+- Cancel-and-re-request sends a member to the back of the queue. Queue position cannot be gamed.
+- Nouns sent to the contract outside the program can only be moved to the treasury.
 
 ## Proposed initial parameters
 
-| Parameter | Value | Why |
-|---|---|---|
-| Spread | 300 bps (3%) | Every exit slightly raises remaining members' book value. Also covers LST unwind slippage. |
-| Max per tick | 1 Noun | Mirrors "one Noun, every day." Caps outflow at roughly 2.8 ETH/day so the DAO can always respond by proposal. |
-| Tick | 1 day | |
-| Liability reserve | set by Compliance Admins | Committed payment streams and administrator budgets, in ETH. |
-| Sanctions oracle | Auction House V3's Chainalysis oracle | Same screening standard already in the Code. |
-| KYC attestor | Compliance Administrator key, or unset | Admins decide whether the KYC guide's "financial transaction counterparty" category applies. |
-| Initial funding | 90 ETH | About one month of exits at the cap. Refilled by proposal. |
+| Parameter         | Value                                  | Why                                                                                                           |
+| ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Spread            | 300 bps (3%)                           | Every exit slightly raises remaining members' book value. Also covers LST unwind slippage.                    |
+| Max per tick      | 1 Noun                                 | Mirrors "one Noun, every day." Caps outflow at roughly 2.8 ETH/day so the DAO can always respond by proposal. |
+| Tick              | 1 day                                  |                                                                                                               |
+| Liability reserve | set by Compliance Admins               | Committed payment streams and administrator budgets, in ETH.                                                  |
+| Sanctions oracle  | Auction House V3's Chainalysis oracle  | Same screening standard already in the Code.                                                                  |
+| KYC attestor      | Compliance Administrator key, or unset | Admins decide whether the KYC guide's "financial transaction counterparty" category applies.                  |
+| Initial funding   | 90 ETH                                 | About one month of exits at the cap. Refilled by proposal.                                                    |
 
 Reference numbers from Prop 955: about 3,950 ETH of primary assets over 1,344 circulating Nouns, about 2.88 ETH per Noun. NAV is recomputed on-chain at every settle, so those figures are illustrative only.
 
 ## On-chain actions
 
-1. `NounsRepurchase` deployment (constructor: Nouns token, Executor, WETH, sanctions oracle, KYC attestor, spread, max per tick, tick, liability reserve, asset list). Ownership transfers to the Executor in the constructor.
+1. `NounsRepurchase` deployment via `script/DeployNounsRepurchase.s.sol`. Ownership transfers to the Executor in the constructor; the deployer never controls the program.
 2. `Executor.sendETH(repurchase, 90 ether)`.
 3. Bylaws amendment recorded via the Data V2 contract's DUNA administrator channel, with the amended text hashed in the proposal description.
 
 No changes to the Governor, token, treasury, or auction house.
 
-## Compliance review requested before vote
+## Compliance Administrator review packet
 
-Per Bylaws §2.2(a) the Compliance Administrators are asked to confirm:
+This section is the hand-off. Per Bylaws §2.2(a) the Compliance Administrators are asked to review and respond on each point through the Data V2 channel.
 
-- **Tax classification.** Whether the DUNA is treated as a partnership, a corporation, or is pursuing 501(c) exemption. Under partnership treatment a repurchase is a Section 731 distribution to the leaving member and is workable. Under corporate treatment it is a Section 302 redemption. Under a 501(c) exemption a book-value buyback would be private inurement and this program should not proceed.
-- **Whether the 3.1(b) "under no circumstances" clause** is read as limited to winding-up, as this proposal assumes, and whether the clarifying sentence above is acceptable.
-- **Whether KYC is required** for selling members, and if so, whether the EIP-712 attestation flow satisfies the KYC guide.
-- **The liability reserve figure** to seed the contract with.
+**Tax.** The DUNA is not a tax-exempt organization and this proposal does not assume one. (If a 501(c)(3) exists it is a sister entity, and nothing here touches it.) The question is only the DUNA's own federal classification. Under partnership treatment a repurchase is a Section 731 distribution to the leaving member, taxable to them against their basis and neutral to the DAO. Under a corporate election it is a Section 302 redemption. Both are ordinary and neither turns a repurchase into a dividend. Please confirm the classification and whether any information reporting to selling members is required, since the KYC gate can collect what is needed.
+
+**Sanctions.** The contract screens the escrowing wallet against the same oracle Auction House V3 uses, and screens again at payout. A sanctioned wallet is never paid. Please confirm this satisfies the §2.2(a)(i)(2) procedure for "any wallet which interacts with any aspect of the Code," and whether returning a sanctioned wallet's own Noun to it on cancel is acceptable (the contract allows it because the Noun is their property; it can be changed).
+
+**KYC.** Please decide whether a selling member is a "financial transaction counterparty" under the KYC guide. If yes, name the attestor key and the contract will refuse requests without a valid attestation. If no, leave the attestor unset.
+
+**Bylaws.** Please confirm (a) the exact wording of W.S. 17-32-104(c)(iii), (b) that the "under no circumstances" sentence in §3.1(b) is read as limited to winding-up, and (c) the amendment text above.
+
+**Liability reserve.** Please provide the ETH figure for committed streams and administrator budgets to seed the contract with.
+
+**Governing Principles compliance.** Under §2.2(a)(i)(3), please confirm nothing in the Act, the Code, or the Bylaws as amended conflicts with the program, or tell us what does.
 
 ## Risks
 
 - **Treasury drain.** Bounded by the per-tick cap. At 1 Noun/day the whole supply would take over three years to exit, and every parameter is a DAO vote.
 - **Veto.** The Veto Administrators may act on existential risk. The cap and spread exist to make that unnecessary.
 - **Investment Company Act optics.** A NAV-redeemable interest in a pool of liquid staking tokens looks more fund-like. Counsel should opine.
-- **Rate-provider risk.** Converters trust Lido, Rocket Pool, and Mantle contracts. The DAO can swap the asset list by proposal.
+- **Rate-provider risk.** Converters trust Lido, Rocket Pool, and Mantle contracts. The DAO can swap the asset list by proposal, and a failing provider only lowers the price.
+- **Audit.** The contract is small (one file, no upgradeability, no external calls except token transfers and rate reads) but has not been audited. An audit should precede mainnet deployment.
 
 ## What this is not
 
