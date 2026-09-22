@@ -67,7 +67,7 @@ const isResume = process.argv.includes('--resume');
 const BATCH_SIZE = parseInt(getArg('batch-size', '3'), 10);
 const BATCH_DELAY = parseInt(getArg('delay', '400'), 10);
 const START_FROM = parseInt(getArg('start', '1'), 10);
-const RPC_URL = getArg('rpc', 'https://mainnet.infura.io/v3/03c669afb3a948d588e7f41dd1f5a70b');
+const RPC_URL = getArg('rpc', process.env.RPC_URL ?? 'https://ethereum-rpc.publicnode.com');
 
 // ─── RPC Client ────────────────────────────────────────────────────────────
 
