@@ -10,7 +10,7 @@ const chainsPath = resolve('packages/nouns-webapp/node_modules/viem/_cjs/chains/
 
 const [v, c] = await Promise.all([import(viemPath), import(chainsPath)]);
 
-const rpc = 'https://mainnet.infura.io/v3/03c669afb3a948d588e7f41dd1f5a70b';
+const rpc = process.env.RPC_URL ?? 'https://ethereum-rpc.publicnode.com';
 const client = v.createPublicClient({ chain: c.mainnet, transport: v.http(rpc) });
 
 const ABI = [
