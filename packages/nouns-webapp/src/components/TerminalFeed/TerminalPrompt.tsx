@@ -312,8 +312,10 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         if (data.action !== undefined && data.action.type !== undefined) {
           // Debug log so we can confirm in mobile devtools whether the API
           // returned an action even when the green button isn't visible.
-          if (import.meta.env.DEV || (typeof window !== 'undefined' && window.localStorage?.getItem('nounwtf:debug') === '1')) {
-            // eslint-disable-next-line no-console
+          if (
+            import.meta.env.DEV ||
+            (typeof window !== 'undefined' && window.localStorage?.getItem('nounwtf:debug') === '1')
+          ) {
             console.log('[TerminalPrompt] action received', {
               type: data.action.type,
               isConnected,
@@ -488,7 +490,9 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           flexShrink: 0,
         }}
       >
-        <span style={{ color: 'var(--theme-accent)', marginRight: '8px', fontSize: '14px' }}>&gt;</span>
+        <span style={{ color: 'var(--theme-accent)', marginRight: '8px', fontSize: '14px' }}>
+          &gt;
+        </span>
         <input
           ref={inputRef}
           value={input}
@@ -497,6 +501,17 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           onBlur={() => setIsFocused(false)}
           onKeyDown={e => {
             if (e.key === 'Enter') sendMessage(input);
+          }}
+          onPaste={e => {
+            // A single-line <input> strips newlines from anything pasted into
+            // it, which would flatten a pasted proposal (tables, headings) into
+            // one line before sendMessage ever saw it. Intercept multi-line,
+            // proposal-shaped pastes and hand the raw text straight to the
+            // draft flow instead.
+            const text = e.clipboardData.getData('text');
+            if (!text.includes('\n') || detectProposalDraftIntent(text) === null) return;
+            e.preventDefault();
+            void sendMessage(text);
           }}
           placeholder={isLoading ? 'thinking...' : `try: ${AGENT_HINTS[hintIndex]}`}
           disabled={isLoading}
@@ -534,9 +549,7 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
           aria-hidden="true"
           style={{
             position: isMobile ? 'fixed' : 'absolute',
-            bottom: isMobile
-              ? 'calc(48px + env(safe-area-inset-bottom, 0px))'
-              : '48px',
+            bottom: isMobile ? 'calc(48px + env(safe-area-inset-bottom, 0px))' : '48px',
             left: 0,
             right: 0,
             padding: '4px 16px 6px',
@@ -554,7 +567,8 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             pointerEvents: 'none',
           }}
         >
-          while you wait, try: <span style={{ color: 'var(--theme-text-secondary)' }}>{AGENT_HINTS[hintIndex]}</span>
+          while you wait, try:{' '}
+          <span style={{ color: 'var(--theme-text-secondary)' }}>{AGENT_HINTS[hintIndex]}</span>
         </div>
       )}
     </>

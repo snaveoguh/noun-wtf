@@ -1,7 +1,6 @@
-# noun.wtf/terminal — How To Use It
+# Approve noun.wtf for Client Incentives
 
-**Client ID 37.** Every bid, vote, feedback signal and candidate action fired from this terminal
-carries noun.wtf's onchain client ID, so it counts toward client rewards.
+I would like to continue developing Noun / Client ID 37 as an experimental client for Nouns, unlocking client incentives will provide more runway to do so. Below is an overview and explainer on how to use this client.
 
 ---
 
@@ -17,20 +16,6 @@ The terminal is a **theme**, not a separate app. It owns the homepage when activ
 route falls back to the normal site unless you keep the `/terminal/...` prefix.
 
 ## 2. What's on screen
-
-```
-┌──────────────────────────────────────────────────────┐
-│ NOUN.WTF                        🪩   0x1234..abcd  ▾ │  header
-├──────────────────────────────────────────────────────┤
-│ ALL AUCTIONS BIDS PROPS VOTES CAND SPONSORS DELEG …  │  17 filter tabs
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│   live onchain activity feed (infinite scroll)       │
-│                                                      │
-├──────────────────────────────────────────────────────┤
-│ > try: what proposals are active?                    │  prompt
-└──────────────────────────────────────────────────────┘
-```
 
 - **🪩 disco** — rainbow gradient per feed row. Off by default (it's an animated effect); tap 🪩 to turn it on, and the choice persists.
 - **connect** — wallet button. **Required for the prompt to work at all.**
@@ -124,13 +109,6 @@ accidentally sponsor a dead row.
 | `my reservations` / `reservations` | Your active trait watches and their status |
 | `watch for {trait}` | Explains the reservation flow and sets it up |
 
-### Trading bot (pooter.world)
-
-| Command | Does |
-|---|---|
-| `trading status` / `trading` / `positions` | Open positions, account value, win rate, realized P&L, trade count, watched markets |
-| `market signals` / `signals` | Current bullish/bearish/neutral reads with confidence % |
-
 ### Meta
 
 | Command | Does |
@@ -152,27 +130,10 @@ trait database, a people database, and these tools:
 `prepare_execute_grant` · `propose_trait` · `get_trading_positions` ·
 `get_trading_performance` · `get_trading_signals`
 
-There's also a loose natural-language layer that maps fuzzy phrasing onto canonical commands —
-`"i want to bid 0.25 eth"` → `bid 0.25 eth`, `"sponsor the treasury diversification candidate"`
-→ `sponsor candidate treasury-diversification`.
+There's also a loose natural-language layer that maps fuzzy phrasing onto canonical commands: "i want to bid 0.25 eth" to `bid 0.25 eth`, "sponsor the treasury diversification candidate" to `sponsor candidate treasury-diversification`.
 
 The agent knows which DAO and which noun you're looking at (V1 vs V2 vs Lil), so `"who owns
 this one?"` resolves against the page you're on.
-
-**Prompts that work well** (these rotate as placeholder hints):
-
-```
-watch for ice cream
-what proposals are active?
-my reservations
-tell me about the treasury
-status
-traits head
-how does the auction work?
-tip nounirl.eth on any chain to reserve
-ask about noun 10000
-ask about missingnoun
-```
 
 Other things it handles: `philosophy` · `what's in the treasury` · `who is {ens or address}` ·
 `explain prop 968` · `can I still update my proposal?` · `what are the rarest heads` ·
@@ -190,19 +151,17 @@ Three ways, all instant (no AI round-trip):
    `## Risks`) and the draft window opens with the H1 lifted into the title field and the rest
    into the body.
 
-The agent can also return a structured draft itself — ask it to build a multi-transaction
-candidate ("pay three builders 2 ETH each and fund a multisig") and it assembles the
-targets/values/calldatas for you.
+Working on building it so the agent can also return a structured draft itself, e.g. ask it to build a multi-transaction candidate ("pay three builders 2 ETH each and fund a multisig") and it assembles the targets/values/calldatas for you.
 
 ## 7. Reserving a noun (the settler)
 
-1. Tip **≥ $5 in ETH** to `nounirl.eth` — Ethereum, Base, Optimism, Arbitrum or Zora
+1. Tip ≥ $5 in ETH to `nounirl.eth` (Ethereum, Base, Optimism, Arbitrum or Zora)
 2. Tell the terminal what you want: `watch for head:shark, glasses:blue`
 3. The agent predicts each block's seed via the NounsSeeder keccak256 math
 4. When the prediction matches **and** the auction has ended, it settles for you
 
 Trait format is `category:name` — `head:shark`, `glasses:blue`, `body:hot dog`.
-Reservations persist across deploys and work against both V1 and V2.
+Reservations persist across deploys and work against both V1 and V2 — just say whether you want to reserve on v1 or v2.
 
 ## 8. Gotchas
 
@@ -214,9 +173,8 @@ Reservations persist across deploys and work against both V1 and V2.
 - Filter tabs scroll horizontally on narrow screens (scrollbar hidden).
 
 ---
----
 
-# Also in development on noun.wtf
+## Also in development on noun.wtf
 
 A short tour of what else is live or in flight on the site.
 
@@ -282,6 +240,6 @@ prediction against every existing noun to find "twins", and offers a SETTLE butt
   **`/underground`** — DAO analytics, chronological feed, trait stats, delegation UI, and
   event pages
 
-Backlog items in progress: "Save as Dream" from the playground, and a "held by Nouns DAO
-Treasury" branch for V4 auctions that settle with no bid (V4 routes those nouns to the treasury
-rather than burning them).
+Backlog items in progress include `/world` updates, a physical Noun device, new smart contracts, and a live feed for the Lil Nounish Ice Cream truck coming soon IRL.
+
+⌐◨-◨
