@@ -929,3 +929,75 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     display: inline;
   }
 }
+
+/* ============================================================================
+   TERMINAL — controls inside SolidColorBackgroundModal (Add Action steps,
+   etc.). The legacy inputs/selects/file picker/Back button hard-code white
+   backgrounds; with the theme's green text that was unreadable. Dark them.
+   ============================================================================ */
+[data-theme='terminal'] .solid-modal-card input:not([type='file']),
+[data-theme='terminal'] .solid-modal-card select,
+[data-theme='terminal'] .solid-modal-card textarea,
+[data-theme='terminal'] .solid-modal-card .input-group-text {
+  background-color: var(--theme-bg-input) !important;
+  color: var(--theme-text-primary) !important;
+  border: 1px solid var(--theme-border-strong) !important;
+  border-radius: var(--theme-radius-md) !important;
+  box-shadow: none !important;
+}
+[data-theme='terminal'] .solid-modal-card input::placeholder,
+[data-theme='terminal'] .solid-modal-card textarea::placeholder {
+  color: var(--theme-text-muted) !important;
+}
+[data-theme='terminal'] .solid-modal-card input:focus,
+[data-theme='terminal'] .solid-modal-card select:focus,
+[data-theme='terminal'] .solid-modal-card textarea:focus {
+  border-color: var(--theme-accent) !important;
+  outline: none !important;
+}
+[data-theme='terminal'] .solid-modal-card select option {
+  background-color: var(--theme-bg-input);
+  color: var(--theme-text-primary);
+}
+[data-theme='terminal'] .solid-modal-card .input-group-text {
+  opacity: 1 !important;
+  color: var(--theme-text-muted) !important;
+}
+[data-theme='terminal'] .solid-modal-card input[type='file'] {
+  background-color: var(--theme-bg-input) !important;
+  color: var(--theme-text-secondary) !important;
+  border: 1px solid var(--theme-border-strong) !important;
+  border-radius: var(--theme-radius-md) !important;
+  box-shadow: none !important;
+}
+[data-theme='terminal'] .solid-modal-card input[type='file']::file-selector-button {
+  background-color: var(--theme-bg-tertiary) !important;
+  color: var(--theme-text-primary) !important;
+  border: 0 !important;
+  border-right: 1px solid var(--theme-border-strong) !important;
+}
+/* Buttons (NavBarButton renders a div, not a <button>): white "Back" →
+   dark outline; blue Next → green fill on black. */
+[data-theme='terminal'] .solid-modal-card [class*='delegate'] {
+  border-radius: var(--theme-radius-md) !important;
+}
+[data-theme='terminal'] .solid-modal-card [class*='delegateBack'] {
+  background-color: var(--theme-bg-tertiary) !important;
+  color: var(--theme-text-primary) !important;
+  border: 1px solid var(--theme-border-strong) !important;
+}
+[data-theme='terminal'] .solid-modal-card [class*='delegateSecondary'],
+[data-theme='terminal'] .solid-modal-card [class*='delegatePrimary'] {
+  background-color: var(--theme-accent) !important;
+  color: #000 !important;
+  border: 0 !important;
+}
+[data-theme='terminal'] .solid-modal-card [class*='delegateDisabled'] {
+  background-color: var(--theme-bg-tertiary) !important;
+  color: var(--theme-text-muted) !important;
+  border: 1px solid var(--theme-border) !important;
+  opacity: 1 !important;
+}
+[data-theme='terminal'] .solid-modal-card [class*='chevron'] {
+  color: var(--theme-text-primary) !important;
+}

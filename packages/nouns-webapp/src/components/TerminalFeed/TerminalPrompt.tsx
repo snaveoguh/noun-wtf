@@ -122,6 +122,50 @@ function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
   return title ? { title, body } : { body };
 }
 
+/**
+ * Detect a pasted draft *payload* — the same wire format NounIRL hands back
+ * (`ProposalDraftPrefill`): a JSON object with any of `title`, `body`,
+ * `transactions`. Lets a human (or another tool) paste a fully-built
+ * proposal, transactions included, straight into the prompt. Returns null for
+ * anything that isn't a JSON object of that shape.
+ */
+function detectDraftPayload(text: string): ProposalDraftPrefill | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const obj = parsed as Record<string, unknown>;
+  const hasTitle = typeof obj.title === 'string';
+  const hasBody = typeof obj.body === 'string';
+  const hasTxs = Array.isArray(obj.transactions);
+  if (!hasTitle && !hasBody && !hasTxs) return null;
+  const payload: ProposalDraftPrefill = {};
+  if (hasTitle) payload.title = obj.title as string;
+  if (hasBody) payload.body = obj.body as string;
+  if (hasTxs) {
+    payload.transactions = (obj.transactions as unknown[]).flatMap(tx => {
+      if (tx === null || typeof tx !== 'object') return [];
+      const t = tx as Record<string, unknown>;
+      if (typeof t.address !== 'string' || typeof t.calldata !== 'string') return [];
+      return [
+        {
+          address: t.address,
+          calldata: t.calldata,
+          signature: typeof t.signature === 'string' ? t.signature : '',
+          value: typeof t.value === 'string' ? t.value : undefined,
+          usdcValue: typeof t.usdcValue === 'number' ? t.usdcValue : undefined,
+        },
+      ];
+    });
+  }
+  return payload;
+}
+
 export default function TerminalPrompt({ history, onNewMessages, onError }: Props) {
   const { address, isConnected } = useAccount();
   const { activeDao } = useActiveDao();
@@ -229,14 +273,18 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
       // Short-circuit: if the user typed a draft-proposal trigger or pasted
       // proposal-shaped markdown, open the draft window directly without a
       // round-trip through the agent backend. Faster feedback + saves tokens.
-      const draftIntent = detectProposalDraftIntent(text);
+      const draftIntent = detectDraftPayload(text) ?? detectProposalDraftIntent(text);
       if (draftIntent) {
         openProposalDraft(draftIntent);
+        const txCount = draftIntent.transactions?.length ?? 0;
         const confirmation: ChatMessage = {
           role: 'assistant',
-          content: draftIntent.title
-            ? `opened a draft window with "${draftIntent.title}". add your action(s) and submit when ready.`
-            : 'opened a draft window. paste your prop text or use the editor + add actions, then submit.',
+          content:
+            txCount > 0
+              ? `opened a draft window with "${draftIntent.title ?? 'untitled'}" and ${txCount} transaction${txCount === 1 ? '' : 's'} attached. review and submit when ready.`
+              : draftIntent.title
+                ? `opened a draft window with "${draftIntent.title}". add your action(s) and submit when ready.`
+                : 'opened a draft window. paste your prop text or use the editor + add actions, then submit.',
           timestamp: Date.now(),
         };
         onNewMessages(userMsg, confirmation);
@@ -509,7 +557,9 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
             // proposal-shaped pastes and hand the raw text straight to the
             // draft flow instead.
             const text = e.clipboardData.getData('text');
-            if (!text.includes('\n') || detectProposalDraftIntent(text) === null) return;
+            if (!text.includes('\n')) return;
+            if (detectDraftPayload(text) === null && detectProposalDraftIntent(text) === null)
+              return;
             e.preventDefault();
             void sendMessage(text);
           }}

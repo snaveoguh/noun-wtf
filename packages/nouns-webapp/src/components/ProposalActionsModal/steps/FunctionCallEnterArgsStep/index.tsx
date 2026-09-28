@@ -1,11 +1,11 @@
 import type { ProposalActionModalStepProps } from '@/components/ProposalActionsModal';
 import type { Abi, AbiFunction } from 'viem';
-import { encodeFunctionData, getAbiItem } from 'viem';
 
 import React, { useEffect, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
 import { Col, FormControl, FormGroup, InputGroup, Row } from 'react-bootstrap';
+import { encodeFunctionData, getAbiItem } from 'viem';
 
 import 'bs-custom-file-input';
 import 'react-stepz/dist/index.css';
@@ -15,14 +15,28 @@ import ModalTitle from '@/components/ModalTitle';
 
 import classes from './FunctionCallEnterArgsStep.module.css';
 
+/**
+ * Convert the typed-in strings to what viem's encoder expects for each ABI
+ * input type. This used to JSON-parse only tuples/arrays and hand everything
+ * else over as a raw string — viem rejects a string for `bool`, so any
+ * function with a boolean argument (e.g. setClientApproval(uint32,bool))
+ * could never be encoded and the Next button stayed disabled with no
+ * visible reason.
+ */
 const parseArguments = (abi: Abi | undefined, func: string, args: string[]) => {
+  const abiItem = abi ? (getAbiItem({ abi, name: func }) as AbiFunction) : undefined;
   return args.map((a, i) => {
-    const abiItem = abi ? (getAbiItem({ abi, name: func }) as AbiFunction) : undefined;
-    const type = abiItem?.inputs?.[i]?.type;
-    if (type === 'tuple' || type?.endsWith('[]')) {
-      return JSON.parse(a);
+    const type = abiItem?.inputs?.[i]?.type ?? '';
+    const v = a.trim();
+    if (type === 'tuple' || type.endsWith(']')) return JSON.parse(v);
+    if (type === 'bool') {
+      const lc = v.toLowerCase();
+      if (lc === 'true' || lc === '1' || lc === 'yes') return true;
+      if (lc === 'false' || lc === '0' || lc === 'no') return false;
+      throw new Error(`Invalid boolean: ${a}`);
     }
-    return a;
+    if (/^u?int\d*$/.test(type)) return BigInt(v);
+    return v;
   });
 };
 
@@ -36,39 +50,42 @@ const FunctionCallEnterArgsStep: React.FC<ProposalActionModalStepProps> = props 
   const [isValidForNextStage, setIsValidForNextStage] = useState(false);
   const [invalidArgument, setInvalidArgument] = useState(false);
 
+  // Re-validate on every change. Validity is recomputed rather than latched:
+  // the old version set it true once and never back, and a sibling effect
+  // cleared the "invalid" flag in the same tick, so the warning never showed.
   useEffect(() => {
-    if (invalidArgument) {
-      setInvalidArgument(false);
-    }
-  }, [args, invalidArgument]);
-
-  useEffect(() => {
-    const argumentsValidator = (a: string[]) => {
-      if (!func || !abi) {
-        return true;
-      }
-
-      try {
-        const abiItem = getAbiItem({ abi, name: func }) as AbiFunction;
-        if (!abiItem?.inputs?.length) return true;
-
-        // Try to encode function data to see if args are valid
-        encodeFunctionData({
-          abi: [abiItem],
-          functionName: func,
-          args: parseArguments(abi, func, a),
-        });
-        return true;
-      } catch {
-        setInvalidArgument(true);
-        return false;
-      }
-    };
-
-    if (argumentsValidator(args) && !isValidForNextStage) {
+    if (func === '' || abi === undefined) {
       setIsValidForNextStage(true);
+      setInvalidArgument(false);
+      return;
     }
-  }, [abi, args, func, isValidForNextStage]);
+    const abiItem = getAbiItem({ abi, name: func }) as AbiFunction | undefined;
+    const inputs = abiItem?.inputs ?? [];
+    if (inputs.length === 0) {
+      setIsValidForNextStage(true);
+      setInvalidArgument(false);
+      return;
+    }
+    const filled = inputs.every((_, i) => (args[i] ?? '').trim() !== '');
+    if (!filled) {
+      // Nothing to complain about until every field has something in it.
+      setIsValidForNextStage(false);
+      setInvalidArgument(false);
+      return;
+    }
+    try {
+      encodeFunctionData({
+        abi: [abiItem as AbiFunction],
+        functionName: func,
+        args: parseArguments(abi, func, args),
+      });
+      setIsValidForNextStage(true);
+      setInvalidArgument(false);
+    } catch {
+      setIsValidForNextStage(false);
+      setInvalidArgument(true);
+    }
+  }, [abi, args, func]);
 
   const setArgument = (index: number, value: string) => {
     const values = [...args];
@@ -77,9 +94,9 @@ const FunctionCallEnterArgsStep: React.FC<ProposalActionModalStepProps> = props 
   };
 
   const getAbiInputs = () => {
-    if (!abi || !func) return [];
+    if (abi === undefined || func === '') return [];
     const abiItem = getAbiItem({ abi, name: func }) as AbiFunction;
-    return abiItem?.inputs || [];
+    return abiItem?.inputs ?? [];
   };
 
   const inputs = getAbiInputs();
