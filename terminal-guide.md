@@ -60,16 +60,16 @@ Commands are case-insensitive. `[...]` = optional.
 
 | Command | Does |
 |---|---|
-| `vote for prop <ID> [reason]` | Prepares an onchain vote (refundable, client 37) |
-| `vote against prop <ID> [reason]` | Same, AGAINST |
-| `vote abstain prop <ID> [reason]` | Same, ABSTAIN |
-| `feedback for/against prop <ID> [reason]` | Non-binding signal via `NounsData.sendFeedback` |
-| `leave feedback on prop <ID> <text>` | Same, natural phrasing |
-| `show prop <ID>` | Status, proposer, For/Against/Abstain, quorum, time left, description |
+| `vote for prop {ID} [reason]` | Prepares an onchain vote (refundable, client 37) |
+| `vote against prop {ID} [reason]` | Same, AGAINST |
+| `vote abstain prop {ID} [reason]` | Same, ABSTAIN |
+| `feedback for/against prop {ID} [reason]` | Non-binding signal via `NounsData.sendFeedback` |
+| `leave feedback on prop {ID} {text}` | Same, natural phrasing |
+| `show prop {ID}` | Status, proposer, For/Against/Abstain, quorum, time left, description |
 | `active proposals` | Everything currently live, with time remaining |
-| `execute prop <ID>` | Executes a queued prop past its timelock |
+| `execute prop {ID}` | Executes a queued prop past its timelock |
 
-Also accepted: `lookup <ID>`, `info <ID>`, `proposal <ID>`, `list proposals`, `what proposals`.
+Also accepted: `lookup {ID}`, `info {ID}`, `proposal {ID}`, `list proposals`, `what proposals`.
 
 Validity is checked before the wallet ever opens — it'll tell you if voting hasn't started,
 has ended, or the prop is already `EXECUTED` / `QUEUED` / `CANCELLED` / `VETOED`.
@@ -78,21 +78,21 @@ has ended, or the prop is already `EXECUTED` / `QUEUED` / `CANCELLED` / `VETOED`
 
 | Command | Does |
 |---|---|
-| `vote for lil prop <ID> [reason]` | Votes on the Lil Nouns governor |
-| `vote against lil nouns proposal <ID> because <reason>` | Same, verbose form |
+| `vote for lil prop {ID} [reason]` | Votes on the Lil Nouns governor |
+| `vote against lil nouns proposal {ID} because {reason}` | Same, verbose form |
 
 ### Candidates
 
 | Command | Does |
 |---|---|
-| `create candidate: <title> - <description>` | New proposal candidate (slug auto-generated) |
-| `propose: <title> - <description>` | Alias |
-| `sponsor candidate <keyword>` | Signs it via `addSignature` (EIP-712) |
-| `promote candidate <keyword>` | Pushes a signed candidate to a real proposal |
-| `feedback for/against candidate <keyword>` | Non-binding signal on a candidate |
-| `show candidate <keyword>` | Full candidate detail |
+| `create candidate: {title} - {description}` | New proposal candidate (slug auto-generated) |
+| `propose: {title} - {description}` | Alias |
+| `sponsor candidate {keyword}` | Signs it via `addSignature` (EIP-712) |
+| `promote candidate {keyword}` | Pushes a signed candidate to a real proposal |
+| `feedback for/against candidate {keyword}` | Non-binding signal on a candidate |
+| `show candidate {keyword}` | Full candidate detail |
 
-`<keyword>` is fuzzy-matched across slug, title and body — exact slug wins, then slug contains,
+`{keyword}` is fuzzy-matched across slug, title and body — exact slug wins, then slug contains,
 then title, then description. Re-submitted candidates collapse into one family so you don't
 accidentally sponsor a dead row.
 
@@ -100,19 +100,19 @@ accidentally sponsor a dead row.
 
 | Command | Does |
 |---|---|
-| `create grant: <title> - <description>` | New small-grant proposal |
-| `vote for/against grant <ID> [reason]` | Vote (voting starts immediately, no pending state) |
-| `show grant <ID>` | Grant detail |
+| `create grant: {title} - {description}` | New small-grant proposal |
+| `vote for/against grant {ID} [reason]` | Vote (voting starts immediately, no pending state) |
+| `show grant {ID}` | Grant detail |
 | `active grants` | Live grant rounds |
-| `execute grant <ID>` | Execute a passed grant |
+| `execute grant {ID}` | Execute a passed grant |
 
 ### Auction
 
 | Command | Does |
 |---|---|
-| `bid <amount> eth` | Bid on the current auction |
+| `bid {amount} eth` | Bid on the current auction |
 | `bid 0.5` | ETH implied |
-| `bid 0.5 eth on noun <ID>` | Explicit noun id |
+| `bid 0.5 eth on noun {ID}` | Explicit noun id |
 
 ### Agent / settler
 
@@ -120,9 +120,9 @@ accidentally sponsor a dead row.
 |---|---|
 | `status` | Watcher state, transport, last block, next noun id + predicted traits for **both** V1 and V2, standing trait targets, reservation counts, total settlements |
 | `check block` / `check` | Forces an immediate block check |
-| `list traits <category>` | Every trait name in `background` / `body` / `accessory` / `head` / `glasses` |
+| `list traits {category}` | Every trait name in `background` / `body` / `accessory` / `head` / `glasses` |
 | `my reservations` / `reservations` | Your active trait watches and their status |
-| `watch for <trait>` | Explains the reservation flow and sets it up |
+| `watch for {trait}` | Explains the reservation flow and sets it up |
 
 ### Trading bot (pooter.world)
 
@@ -174,7 +174,7 @@ ask about noun 10000
 ask about missingnoun
 ```
 
-Other things it handles: `philosophy` · `what's in the treasury` · `who is <ens or address>` ·
+Other things it handles: `philosophy` · `what's in the treasury` · `who is {ens or address}` ·
 `explain prop 968` · `can I still update my proposal?` · `what are the rarest heads` ·
 `what happened to noun 1234`.
 
