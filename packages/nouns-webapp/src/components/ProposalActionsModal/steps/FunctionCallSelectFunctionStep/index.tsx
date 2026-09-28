@@ -12,6 +12,7 @@ import BrandTextEntry from '@/components/BrandTextEntry';
 import ModalBottomButtonRow from '@/components/ModalBottomButtonRow';
 import ModalTitle from '@/components/ModalTitle';
 import { ETHERSCAN_API_KEY } from '@/config';
+import { getKnownContract } from '@/lib/knownAbis';
 import { buildEtherscanApiQuery } from '@/utils/etherscan';
 
 import { ProposalActionModalStepProps } from '../..';
@@ -123,6 +124,15 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
     }
 
     setABILookupError(null);
+    // Nouns contracts ship their ABIs with the app — no Etherscan round-trip,
+    // no API key needed, works offline. Everything else falls through below.
+    const known = getKnownContract(address);
+    if (known !== undefined) {
+      setABI(known.abi);
+      setABIUploadValid(true);
+      setABIFileName(`built-in: ${known.name}`);
+      return;
+    }
     try {
       const result = await getABI(address);
       const parsedAbi = JSON.parse(result);
