@@ -1,5 +1,10 @@
 # Approve noun.wtf for Client Incentives
 
+> **Status:** submitted on chain as **Prop 1000** on 2026-09-28 — the first four-digit Nouns
+> proposal — from the noun.wtf terminal draft window, with the `setClientApproval(37, true)`
+> action built in the terminal's own function-call modal. The exact payload that was pasted
+> into the prompt is `proposal-client-37-draft.json`.
+
 I would like to continue developing Noun / Client ID 37 as an experimental client for Nouns, unlocking client incentives will provide more runway to do so. Below is an overview and explainer on how to use this client.
 
 ---
@@ -111,6 +116,7 @@ Three ways, all instant (no AI round-trip):
 1. **Slash triggers** — `/draft`, `/prop`, `/proposal`
 2. **Phrases** — `draft proposal`, `create a proposal`, `open a proposal window`, `proposal builder`, `give me a prop`
 3. **Paste it** — paste >120 chars of proposal-shaped markdown (starts with `# Title`, or contains `## Summary` / `## Specification` / `## Rationale` / `## Proposal Action` / `## Risks`) and the draft window opens with the H1 lifted into the title field and the rest into the body.
+4. **Paste a payload** — paste a JSON object with `title`, `body` and `transactions` and the draft opens with the actions already attached. This proposal was built and submitted that way.
 
 Working on building it so the agent can also return a structured draft itself, e.g. ask it to build a multi-transaction candidate ("pay three builders 2 ETH each and fund a multisig") and it assembles the targets/values/calldatas for you.
 
