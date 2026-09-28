@@ -189,6 +189,11 @@ Three ways, all instant (no AI round-trip):
    contains `## Summary` / `## Specification` / `## Rationale` / `## Proposal Action` /
    `## Risks`) and the draft window opens with the H1 lifted into the title field and the rest
    into the body.
+4. **Paste a payload** — paste a JSON object with `title`, `body` and `transactions`
+   (`{address, value, signature, calldata}`) and the draft opens with the actions already
+   attached, ready to submit. This is how Prop 1000 (this client's incentives approval,
+   2026-09-28) was built and submitted — from the terminal, with the terminal's own
+   function-call builder.
 
 The agent can also return a structured draft itself — ask it to build a multi-transaction
 candidate ("pay three builders 2 ETH each and fund a multisig") and it assembles the
