@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
 import { XIcon } from '@heroicons/react/solid';
+import clsx from 'clsx';
 import ReactDOM from 'react-dom';
 
 import NounsTransition from '@/components/NounsTransition';
@@ -72,7 +73,7 @@ const SolidColorBackgroundModalOverlay: React.FC<{
       <NounsTransition
         nodeRef={modalRef}
         show={show}
-        className={classes.modal}
+        className={clsx(classes.modal, 'solid-modal-card')}
         timeout={200}
         transitionStyes={isMobile ? mobileModalSlideInFromBottm : desktopModalSlideInFromTopAndGrow}
       >

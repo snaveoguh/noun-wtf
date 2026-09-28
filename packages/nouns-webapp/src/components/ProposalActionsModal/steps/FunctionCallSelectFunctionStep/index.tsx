@@ -32,29 +32,17 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
   const [abiFileName, setABIFileName] = useState<string | undefined>('');
   // Why the dropdown is empty, when it is — the Etherscan lookup used to fail silently.
   const [abiLookupError, setABILookupError] = useState<string | null>(null);
-  const [isValidForNextStage, setIsValidForNextStage] = useState(false);
+  // Derived, not latched: the old flags were only ever set to true, so once
+  // you'd loaded one contract, switching to an unknown address still let you
+  // proceed with the previous contract's ABI.
+  const isValidForNextStage = isAddress(address) && abi !== undefined && func !== '';
 
   useEffect(() => {
     if (state.abi) {
       setABI(state.abi);
       setABIFileName('etherscan-abi-download.json');
     }
-
-    if (state.address.length > 0 && isAddress(state.address) && state.abi && !isValidForNextStage) {
-      setIsValidForNextStage(true);
-    }
-  }, [isValidForNextStage, state]);
-
-  useEffect(() => {
-    if (
-      address.length > 0 &&
-      isAddress(address) &&
-      isABIUploadValid === true &&
-      !isValidForNextStage
-    ) {
-      setIsValidForNextStage(true);
-    }
-  }, [address, isABIUploadValid, isValidForNextStage]);
+  }, [state.abi]);
 
   useEffect(() => {
     if (abi) {
@@ -124,6 +112,12 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
     }
 
     setABILookupError(null);
+    // A new address means a new contract: drop the previous ABI so its
+    // functions don't linger in the dropdown while the lookup runs.
+    setABI(undefined);
+    setFunction('');
+    setABIUploadValid(undefined);
+    setABIFileName(undefined);
     // Nouns contracts ship their ABIs with the app — no Etherscan round-trip,
     // no API key needed, works offline. Everything else falls through below.
     const known = getKnownContract(address);
@@ -151,6 +145,12 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
   };
   const addressValidator = (s: string) => {
     if (!isAddress(s)) {
+      // Partial / invalid address: nothing to select from.
+      setABI(undefined);
+      setFunction('');
+      setABIUploadValid(undefined);
+      setABIFileName(undefined);
+      setABILookupError(null);
       return false;
     }
     // To avoid blocking stepper progress, do not `await`
