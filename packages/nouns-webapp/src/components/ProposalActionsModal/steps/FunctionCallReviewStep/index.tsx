@@ -17,6 +17,20 @@ import { FinalProposalActionStepProps, ProposalActionModalState } from '../..';
 import classes from './FunctionCallReviewStep.module.css';
 
 /**
+ * Display form of a parsed argument. Booleans render as nothing in React and
+ * bigints/tuples need stringifying, so `true` used to show as a blank row.
+ */
+const formatArg = (v: unknown): string => {
+  if (typeof v === 'bigint' || typeof v === 'boolean' || typeof v === 'number') return String(v);
+  if (typeof v === 'string') return v;
+  return stringifyArgs(v);
+};
+
+/** JSON.stringify that survives bigint (which plain JSON.stringify throws on). */
+const stringifyArgs = (v: unknown): string =>
+  JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? x.toString() : x));
+
+/**
  * @internal
  */
 export const handleActionAdd = (
@@ -39,7 +53,7 @@ export const handleActionAdd = (
       address: state.address,
       value: state.amount ? parseEther(state.amount.toString()) : 0n,
       signature,
-      decodedCalldata: JSON.stringify(state.args ?? []),
+      decodedCalldata: stringifyArgs(state.args ?? []),
       calldata,
     });
 
@@ -49,7 +63,7 @@ export const handleActionAdd = (
   onActionAdd({
     address: state.address,
     value: state.amount ? parseEther(state.amount.toString()) : 0n,
-    decodedCalldata: JSON.stringify(state.args ?? []),
+    decodedCalldata: stringifyArgs(state.args ?? []),
     signature: '',
     calldata,
   });
@@ -142,7 +156,7 @@ const FunctionCallReviewStep: React.FC<FinalProposalActionStepProps> = props => 
         <Row key={i}>
           <div className={classes.argument}>
             <div className={classes.argValue}>{input.name}</div>
-            <div className={classes.argValue}>{args[i]}</div>
+            <div className={classes.argValue}>{formatArg(args[i])}</div>
           </div>
         </Row>
       ))}
