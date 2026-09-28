@@ -1,16 +1,17 @@
 import type { Address } from '@/utils/types';
 import type { AbiFunction } from 'viem';
-import { Abi, isAddress } from 'viem';
 
 import React, { ChangeEvent, useEffect, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
+import { Abi, isAddress } from 'viem';
 
 import ABIUpload from '@/components/ABIUpload';
 import BrandDropdown from '@/components/BrandDropdown';
 import BrandTextEntry from '@/components/BrandTextEntry';
 import ModalBottomButtonRow from '@/components/ModalBottomButtonRow';
 import ModalTitle from '@/components/ModalTitle';
+import { ETHERSCAN_API_KEY } from '@/config';
 import { buildEtherscanApiQuery } from '@/utils/etherscan';
 
 import { ProposalActionModalStepProps } from '../..';
@@ -28,6 +29,8 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
 
   const [isABIUploadValid, setABIUploadValid] = useState<boolean>();
   const [abiFileName, setABIFileName] = useState<string | undefined>('');
+  // Why the dropdown is empty, when it is — the Etherscan lookup used to fail silently.
+  const [abiLookupError, setABILookupError] = useState<string | null>(null);
   const [isValidForNextStage, setIsValidForNextStage] = useState(false);
 
   useEffect(() => {
@@ -42,7 +45,12 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
   }, [isValidForNextStage, state]);
 
   useEffect(() => {
-    if (address.length > 0 && isAddress(address) && isABIUploadValid && !isValidForNextStage) {
+    if (
+      address.length > 0 &&
+      isAddress(address) &&
+      isABIUploadValid === true &&
+      !isValidForNextStage
+    ) {
       setIsValidForNextStage(true);
     }
   }, [address, isABIUploadValid, isValidForNextStage]);
@@ -51,7 +59,7 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
     if (abi) {
       // Find first function in the ABI
       const functions = (abi as Abi).filter(
-        item => item.type === 'function' && item.name,
+        item => item.type === 'function' && item.name.length > 0,
       ) as AbiFunction[];
 
       if (functions.length > 0) {
@@ -60,7 +68,7 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
     }
   }, [abi]);
 
-  let abiErrorTimeout: NodeJS.Timeout;
+  let abiErrorTimeout: NodeJS.Timeout | undefined;
   const setABIInvalid = () => {
     setABIUploadValid(false);
     setABIFileName(undefined);
@@ -70,7 +78,7 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
   };
 
   const validateAndSetABI = (file: File | undefined) => {
-    if (abiErrorTimeout) {
+    if (abiErrorTimeout !== undefined) {
       clearTimeout(abiErrorTimeout);
     }
     if (!file) {
@@ -110,10 +118,11 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
   };
 
   const populateABIIfExists = async (address: string) => {
-    if (abiErrorTimeout) {
+    if (abiErrorTimeout !== undefined) {
       clearTimeout(abiErrorTimeout);
     }
 
+    setABILookupError(null);
     try {
       const result = await getABI(address);
       const parsedAbi = JSON.parse(result);
@@ -123,6 +132,11 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
     } catch {
       setABIUploadValid(undefined);
       setABIFileName(undefined);
+      setABILookupError(
+        ETHERSCAN_API_KEY === ''
+          ? "No Etherscan API key is configured on this deployment, so the ABI can't be fetched automatically. Upload the contract ABI below."
+          : "Couldn't fetch this contract's ABI from Etherscan (unverified contract, rate limit, or network). Upload the ABI below.",
+      );
     }
   };
   const addressValidator = (s: string) => {
@@ -166,15 +180,27 @@ const FunctionCallSelectFunctionStep: React.FC<ProposalActionModalStepProps> = p
         label={'Select Contract Function'}
         chevronTop={35}
       >
-        {abi &&
+        {abi === undefined && (
+          <option value="" disabled>
+            {abiLookupError === null
+              ? 'Enter a contract address to load its functions'
+              : 'No ABI loaded'}
+          </option>
+        )}
+        {abi !== undefined &&
           (abi as Abi)
-            .filter(item => item.type === 'function' && item.name)
+            .filter(item => item.type === 'function' && item.name.length > 0)
             .map(item => (
               <option key={(item as AbiFunction).name} value={(item as AbiFunction).name}>
                 {(item as AbiFunction).name}
               </option>
             ))}
       </BrandDropdown>
+      {abiLookupError !== null && abi === undefined && (
+        <p style={{ margin: '-8px 0 12px', fontSize: 13, lineHeight: 1.4, opacity: 0.85 }}>
+          {abiLookupError}
+        </p>
+      )}
 
       <ABIUpload
         abiFileName={abiFileName}
