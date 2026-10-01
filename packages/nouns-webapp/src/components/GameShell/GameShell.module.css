@@ -80,8 +80,8 @@
      it explicitly as an SF alternative). Inter already loads in index.html
      alongside JetBrains Mono + Silkscreen. */
   --gs-font-sans:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    'Inter', 'PT Root UI', system-ui, sans-serif;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'PT Root UI',
+    system-ui, sans-serif;
 
   /* Content sizing — keep main column narrower than the viewport on wide
      screens so the page has breathing room (matches nouns.game's framing).
@@ -197,10 +197,7 @@
   margin: 0 auto;
   /* Match the body content column so the brand/links align with
      the content beneath them. Background stays full-width via .nav. */
-  padding-inline: max(
-    var(--gs-page-pad-x),
-    calc((100% - var(--gs-content-max)) / 2)
-  );
+  padding-inline: max(var(--gs-page-pad-x), calc((100% - var(--gs-content-max)) / 2));
   height: 40px;
   display: flex;
   align-items: center;
@@ -483,7 +480,10 @@
   /* Label sits in body sans, not mono — only the numeric portion runs the
      full mono+tabular treatment so columns line up. */
   font-family:
-    'Inter', 'PT Root UI', -apple-system, sans-serif;
+    'Inter',
+    'PT Root UI',
+    -apple-system,
+    sans-serif;
 }
 
 /* Full-UX pill — magenta→cyan gradient, pixel-arcade vibe */
@@ -541,10 +541,7 @@
   width: 100%;
   /* Match the nav centering: full-bleed box, but content padded so it sits
      inside `--gs-content-max` once the viewport exceeds it. */
-  padding-inline: max(
-    var(--gs-page-pad-x),
-    calc((100% - var(--gs-content-max)) / 2)
-  );
+  padding-inline: max(var(--gs-page-pad-x), calc((100% - var(--gs-content-max)) / 2));
 }
 
 @media (max-width: 900px) {
@@ -1682,6 +1679,17 @@
   .propPageSplit {
     grid-template-columns: 1fr;
   }
+}
+
+/* Lil Nouns drafts: unmissable "which DAO is this" strip above the toolbar. */
+.propDaoBanner {
+  grid-column: 1 / -1;
+  padding: 10px 14px;
+  border: 1px solid #f5c542;
+  border-radius: 3px;
+  background: rgba(245, 197, 66, 0.12);
+  color: var(--gs-text);
+  font-size: 13px;
 }
 
 /* Toolbar row across the top of the window — currently just the font picker. */

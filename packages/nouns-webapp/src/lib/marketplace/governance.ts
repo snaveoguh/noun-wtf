@@ -152,6 +152,27 @@ export const LIL_NOUNS_GOVERNOR_ABI = [
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'votingDelay',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'votingPeriod',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'proposalUpdatablePeriodInBlocks',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
   // Lil Nouns runs the V3-style governor without client ids, so only the
   // 5-arg propose exists (no trailing uint32 clientId like Nouns V4).
   {
