@@ -37,6 +37,7 @@ import {
   saveDraftFontId,
 } from './draftFonts';
 import classes from './GameShell.module.css';
+import { formatApproxDuration, useGovernorTiming } from './useGovernorTiming';
 import { useLilNounsPropose } from './useLilNounsPropose';
 
 export interface ProposalDraftPanelProps {
@@ -105,6 +106,7 @@ export default function ProposalDraftPanel({
   const { proposeOnTimelockV1, proposeOnTimelockV1State } = useProposeOnTimelockV1();
   const isDaoGteV3 = useIsDaoGteV3();
   const lil = useLilNounsPropose(isLil);
+  const timing = useGovernorTiming(dao);
 
   const availableVotes = isLil ? lil.availableVotes : nounsVotes;
   const proposalThreshold = isLil ? lil.proposalThreshold : nounsThreshold;
@@ -298,7 +300,7 @@ export default function ProposalDraftPanel({
       }
       return 'Insufficient votes';
     }
-    return 'Create Proposal';
+    return isLil ? 'Create Lil Nouns Proposal' : 'Create Proposal';
   })();
 
   const submitDisabled = isFormInvalid || hasActiveOrPendingProposal || !hasEnoughVote;
@@ -317,6 +319,12 @@ export default function ProposalDraftPanel({
         className={`${classes.propPage} ${classes.propPageSplit} proposal-draft-font-scope`}
         style={fontScopeStyle}
       >
+        {isLil && (
+          <div className={classes.propDaoBanner}>
+            <strong>Lil Nouns DAO proposal</strong> · submits to the Lil Nouns governor and spends
+            from the Lil Nouns treasury, not Nouns DAO.
+          </div>
+        )}
         <div className={classes.propToolbar}>
           <span className={classes.propToolbarLabel}>Font</span>
           <select
@@ -347,12 +355,20 @@ export default function ProposalDraftPanel({
               <span className={classes.propPanelTitle}>Tip</span>
             </div>
             <p className={classes.propTip}>
-              Add one or more proposal actions and describe your proposal for the community. The
-              proposal cannot be modified after submission, so verify all info before submitting.
-              {isLil
-                ? ' Actions execute from the Lil Nouns treasury, so only ETH transfers and function calls are available here.'
-                : ' The voting period begins after 5 days and lasts 5 days.'}
+              Add one or more proposal actions and describe your proposal for the community. Verify
+              all info before submitting.
+              {isLil &&
+                ' Actions execute from the Lil Nouns treasury, so only ETH transfers and function calls are available here.'}
             </p>
+            {timing !== undefined && (
+              <p className={classes.propTip}>
+                {timing.updatableSecs > 0 &&
+                  `You can still edit it for ${formatApproxDuration(timing.updatableSecs)} after submitting. `}
+                Voting opens {formatApproxDuration(timing.startsInSecs)} after submission and lasts{' '}
+                {formatApproxDuration(timing.votingSecs)} (read live from the {DRAFT_DAO_LABEL[dao]}{' '}
+                governor; a late vote swing can add an objection period).
+              </p>
+            )}
             <p className={classes.propTipNote}>
               You <strong>MUST</strong> maintain enough voting power to meet the proposal threshold
               until your proposal is executed. If you fail to do so, anyone can cancel.
@@ -455,6 +471,10 @@ export default function ProposalDraftPanel({
             </div>
             <div className={classes.propStatusList}>
               <div className={classes.propStatusRow}>
+                <span className={classes.propStatusLabel}>DAO</span>
+                <span className={classes.propStatusValue}>{DRAFT_DAO_LABEL[dao]}</span>
+              </div>
+              <div className={classes.propStatusRow}>
                 <span className={classes.propStatusLabel}>Title</span>
                 <span
                   className={`${classes.propStatusValue} ${
@@ -497,7 +517,13 @@ export default function ProposalDraftPanel({
               {totalUSDCPayment > 0 && (
                 <div className={classes.propStatusRow}>
                   <span className={classes.propStatusLabel}>USDC</span>
-                  <span className={classes.propStatusValue}>${totalUSDCPayment.toFixed(2)}</span>
+                  <span className={classes.propStatusValue}>
+                    {/* usdcValue is in USDC base units (6 decimals). */}$
+                    {(totalUSDCPayment / 1_000_000).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
                 </div>
               )}
             </div>
