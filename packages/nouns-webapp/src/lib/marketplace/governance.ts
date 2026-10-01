@@ -138,6 +138,47 @@ export const LIL_NOUNS_GOVERNOR_ABI = [
     outputs: [{ name: '', type: 'uint96' }],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'proposalThreshold',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'latestProposalIds',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  // Lil Nouns runs the V3-style governor without client ids, so only the
+  // 5-arg propose exists (no trailing uint32 clientId like Nouns V4).
+  {
+    type: 'function',
+    name: 'propose',
+    inputs: [
+      { name: 'targets', type: 'address[]' },
+      { name: 'values', type: 'uint256[]' },
+      { name: 'signatures', type: 'string[]' },
+      { name: 'calldatas', type: 'bytes[]' },
+      { name: 'description', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+] as const;
+
+export const LIL_NOUNS_TOKEN: Address = '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B';
+
+export const LIL_NOUNS_TOKEN_VOTES_ABI = [
+  {
+    type: 'function',
+    name: 'getCurrentVotes',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint96' }],
+    stateMutability: 'view',
+  },
 ] as const;
 
 /** Back-compat internal alias for the existing on-chain fetcher below. */

@@ -6,6 +6,7 @@ import { ConnectKitButton } from 'connectkit';
 import { useLocation } from 'react-router';
 import { useAccount } from 'wagmi';
 
+import { DRAFT_DAO_LABEL, normalizeDraftDao } from '@/components/GameShell/draftDao';
 import {
   openProposalDraft,
   type ProposalDraftPrefill,
@@ -91,6 +92,9 @@ function pathnameToNounId(pathname: string): number | null {
  *      pasted text loaded into the body and (when present) the H1 lifted out
  *      as the title.
  *
+ * Short triggers that mention Lil Nouns ("/draft lil", "open a lil nouns
+ * proposal window", "/lil draft") open a Lil Nouns draft instead.
+ *
  * Returns a prefill payload to open with, or `null` to fall through to the
  * normal chat flow.
  */
@@ -99,14 +103,18 @@ function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
   if (!trimmed) return null;
   const lc = trimmed.toLowerCase();
 
+  const lil = '(?:lil[\\s-]?(?:nouns?)?(?:\\s+dao)?\\s+)?';
   const triggerPatterns: readonly RegExp[] = [
     /^\/(?:draft|prop|proposal)\b/,
-    /^(?:give me|open|show)\s+(?:a |the )?(?:proposal|prop)(?:\s+(?:window|builder|draft))?\s*\.?$/,
-    /^(?:draft|create|new|start)\s+(?:a |the )?(?:proposal|prop)\s*\.?$/,
-    /^proposal\s+(?:window|builder|draft)\s*\.?$/,
+    /^\/lil(?:[\s-]?nouns?)?\s+(?:draft|prop|proposal)\b/,
+    new RegExp(
+      `^(?:give me|open|show)\\s+(?:a |the )?${lil}(?:proposal|prop)(?:\\s+(?:window|builder|draft))?\\s*\\.?$`,
+    ),
+    new RegExp(`^(?:draft|create|new|start)\\s+(?:a |the )?${lil}(?:proposal|prop)\\s*\\.?$`),
+    new RegExp(`^${lil}proposal\\s+(?:window|builder|draft)\\s*\\.?$`),
   ];
   if (triggerPatterns.some(re => re.test(lc))) {
-    return {};
+    return /\blil\b|\blil-?nouns?\b/.test(lc) ? { dao: 'lil-nouns' } : {};
   }
 
   // Treat long markdown-shaped pastes as a proposal draft.
@@ -147,6 +155,7 @@ function detectDraftPayload(text: string): ProposalDraftPrefill | null {
   const payload: ProposalDraftPrefill = {};
   if (hasTitle) payload.title = obj.title as string;
   if (hasBody) payload.body = obj.body as string;
+  if (typeof obj.dao === 'string') payload.dao = normalizeDraftDao(obj.dao);
   if (hasTxs) {
     payload.transactions = (obj.transactions as unknown[]).flatMap(tx => {
       if (tx === null || typeof tx !== 'object') return [];
@@ -170,6 +179,10 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
   const { address, isConnected } = useAccount();
   const { activeDao } = useActiveDao();
   const location = useLocation();
+  // Lil Nouns pages are `?dao=lil` on the shared vote routes (see
+  // VotePageRouter). A bare "/draft" typed there opens a Lil Nouns draft.
+  const isLilView =
+    normalizeDraftDao(new URLSearchParams(location.search).get('dao')) === 'lil-nouns';
   const viewContext = useMemo(
     () => ({
       dao: activeDao,
@@ -275,16 +288,18 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
       // round-trip through the agent backend. Faster feedback + saves tokens.
       const draftIntent = detectDraftPayload(text) ?? detectProposalDraftIntent(text);
       if (draftIntent) {
+        if (draftIntent.dao === undefined && isLilView) draftIntent.dao = 'lil-nouns';
         openProposalDraft(draftIntent);
         const txCount = draftIntent.transactions?.length ?? 0;
+        const daoNote = `(${DRAFT_DAO_LABEL[normalizeDraftDao(draftIntent.dao)]})`;
         const confirmation: ChatMessage = {
           role: 'assistant',
           content:
             txCount > 0
-              ? `opened a draft window with "${draftIntent.title ?? 'untitled'}" and ${txCount} transaction${txCount === 1 ? '' : 's'} attached. review and submit when ready.`
+              ? `opened a draft window ${daoNote} with "${draftIntent.title ?? 'untitled'}" and ${txCount} transaction${txCount === 1 ? '' : 's'} attached. review and submit when ready.`
               : draftIntent.title
-                ? `opened a draft window with "${draftIntent.title}". add your action(s) and submit when ready.`
-                : 'opened a draft window. paste your prop text or use the editor + add actions, then submit.',
+                ? `opened a draft window ${daoNote} with "${draftIntent.title}". add your action(s) and submit when ready.`
+                : `opened a draft window ${daoNote}. paste your prop text or use the editor + add actions, then submit.`,
           timestamp: Date.now(),
         };
         onNewMessages(userMsg, confirmation);
@@ -382,7 +397,17 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
         setIsLoading(false);
       }
     },
-    [viewContext, address, isConnected, isMobile, isLoading, history, onNewMessages, onError],
+    [
+      viewContext,
+      isLilView,
+      address,
+      isConnected,
+      isMobile,
+      isLoading,
+      history,
+      onNewMessages,
+      onError,
+    ],
   );
 
   const handleActionSuccess = useCallback(

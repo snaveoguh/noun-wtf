@@ -20,10 +20,13 @@ export enum SupportedCurrency {
 }
 
 const TransferFundsDetailsStep: React.FC<ProposalActionModalStepProps> = props => {
-  const { onNextBtnClick, onPrevBtnClick, state, setState } = props;
+  const { onNextBtnClick, onPrevBtnClick, state, setState, dao } = props;
+  // Lil Nouns' treasury can only send raw ETH from here; USDC and stETH
+  // transfers route through Nouns-owned contracts.
+  const ethOnly = dao === 'lil-nouns';
 
   const [currency, setCurrency] = useState<SupportedCurrency>(
-    state.TransferFundsCurrency ?? SupportedCurrency.USDC,
+    ethOnly ? SupportedCurrency.ETH : (state.TransferFundsCurrency ?? SupportedCurrency.USDC),
   );
   const [amount, setAmount] = useState<string>(state.amount ?? '');
   const [formattedAmount, setFormattedAmount] = useState<string>(state.amount ?? '');
@@ -56,9 +59,9 @@ const TransferFundsDetailsStep: React.FC<ProposalActionModalStepProps> = props =
         onChange={e => setCurrency(SupportedCurrency[e.target.value as SupportedCurrency])}
         chevronTop={38}
       >
-        <option value="USDC">USDC</option>
+        {!ethOnly && <option value="USDC">USDC</option>}
         <option value="ETH">ETH</option>
-        <option value="STETH">Lido Staked ETH</option>
+        {!ethOnly && <option value="STETH">Lido Staked ETH</option>}
       </BrandDropdown>
 
       <BrandNumericEntry

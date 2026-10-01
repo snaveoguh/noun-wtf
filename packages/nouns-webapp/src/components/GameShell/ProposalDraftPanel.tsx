@@ -27,6 +27,7 @@ import {
 } from '@/wrappers/nounsDao';
 import { useUserVotes } from '@/wrappers/nounToken';
 
+import { DRAFT_DAO_LABEL, type DraftDao } from './draftDao';
 import {
   DRAFT_FONT_GROUPS,
   DRAFT_FONTS,
@@ -36,11 +37,14 @@ import {
   saveDraftFontId,
 } from './draftFonts';
 import classes from './GameShell.module.css';
+import { useLilNounsPropose } from './useLilNounsPropose';
 
 export interface ProposalDraftPanelProps {
   initialTitle?: string;
   initialBody?: string;
   initialTransactions?: ProposalTransaction[];
+  /** Governor to submit to. Defaults to Nouns DAO. */
+  dao?: DraftDao;
   /** Called after the propose() tx successfully lands. Use to close a host window. */
   onProposeSuccess?: () => void;
 }
@@ -61,8 +65,10 @@ export default function ProposalDraftPanel({
   initialTitle = '',
   initialBody = '',
   initialTransactions,
+  dao = 'nouns',
   onProposeSuccess,
 }: ProposalDraftPanelProps) {
+  const isLil = dao === 'lil-nouns';
   const [proposalTransactions, setProposalTransactions] = useState<ProposalTransaction[]>(
     () => initialTransactions ?? [],
   );
@@ -92,18 +98,23 @@ export default function ProposalDraftPanel({
 
   const latestProposalId = useProposalCount();
   const latestProposal = useProposal(latestProposalId ?? 0);
-  const availableVotes = useUserVotes();
-  const proposalThreshold = useProposalThreshold();
+  const nounsVotes = useUserVotes();
+  const nounsThreshold = useProposalThreshold();
   const { address: account } = useAccount();
-  const { propose, proposeState } = usePropose();
+  const { propose, proposeState: nounsProposeState } = usePropose();
   const { proposeOnTimelockV1, proposeOnTimelockV1State } = useProposeOnTimelockV1();
   const isDaoGteV3 = useIsDaoGteV3();
+  const lil = useLilNounsPropose(isLil);
+
+  const availableVotes = isLil ? lil.availableVotes : nounsVotes;
+  const proposalThreshold = isLil ? lil.proposalThreshold : nounsThreshold;
+  const proposeState = isLil ? lil.proposeState : nounsProposeState;
 
   const chainId = defaultChain.id;
   const ethNeeded = useEthNeeded(
     nounsTokenBuyerAddress[chainId] ?? '',
     totalUSDCPayment,
-    nounsTokenBuyerAddress[chainId] == undefined || totalUSDCPayment === 0,
+    isLil || nounsTokenBuyerAddress[chainId] == undefined || totalUSDCPayment === 0,
   );
   const daoEtherscanLink = buildEtherscanHoldingsLink(nounsLegacyTreasuryAddress[chainId]);
 
@@ -145,7 +156,12 @@ export default function ProposalDraftPanel({
   }, [latestProposalId, previousProposalId]);
 
   useEffect(() => {
-    if (ethNeeded !== undefined && ethNeeded !== tokenBuyerTopUpEth && totalUSDCPayment > 0) {
+    if (
+      !isLil &&
+      ethNeeded !== undefined &&
+      ethNeeded !== tokenBuyerTopUpEth &&
+      totalUSDCPayment > 0
+    ) {
       const hasTokenBuyerTopUp =
         filter(
           proposalTransactions,
@@ -183,6 +199,7 @@ export default function ProposalDraftPanel({
     tokenBuyerTopUpEth,
     totalUSDCPayment,
     chainId,
+    isLil,
   ]);
 
   const isFormInvalid = useMemo(
@@ -199,14 +216,23 @@ export default function ProposalDraftPanel({
     proposalThreshold !== 0 &&
     availableVotes > proposalThreshold;
 
-  const hasActiveOrPendingProposal =
-    (latestProposal?.status === ProposalState.ACTIVE ||
-      latestProposal?.status === ProposalState.PENDING) &&
-    latestProposal.proposer === account;
+  const hasActiveOrPendingProposal = isLil
+    ? lil.hasActiveOrPendingProposal
+    : (latestProposal?.status === ProposalState.ACTIVE ||
+        latestProposal?.status === ProposalState.PENDING) &&
+      latestProposal.proposer === account;
 
   const handleCreateProposal = async () => {
     if (!proposalTransactions?.length) return;
-    if (isProposeOnV1) {
+    if (isLil) {
+      await lil.propose(
+        proposalTransactions.map(({ address }) => address),
+        proposalTransactions.map(({ value }) => value ?? 0n),
+        proposalTransactions.map(({ signature }) => signature),
+        proposalTransactions.map(({ calldata }) => calldata),
+        `# ${titleValue}\n\n${bodyValue}`,
+      );
+    } else if (isProposeOnV1) {
       await proposeOnTimelockV1({
         args: [
           proposalTransactions.map(({ address }) => address),
@@ -256,12 +282,12 @@ export default function ProposalDraftPanel({
   );
 
   useEffect(() => {
-    if (isProposeOnV1) {
+    if (isProposeOnV1 && !isLil) {
       handleAddProposalState(proposeOnTimelockV1State);
     } else {
       handleAddProposalState(proposeState);
     }
-  }, [proposeState, proposeOnTimelockV1State, isProposeOnV1, handleAddProposalState]);
+  }, [proposeState, proposeOnTimelockV1State, isProposeOnV1, isLil, handleAddProposalState]);
 
   const submitLabel = (() => {
     if (isProposePending) return null;
@@ -284,6 +310,7 @@ export default function ProposalDraftPanel({
         onDismiss={() => setShowTransactionFormModal(false)}
         show={showTransactionFormModal}
         onActionAdd={handleAddProposalAction}
+        dao={dao}
       />
 
       <div
@@ -309,6 +336,9 @@ export default function ProposalDraftPanel({
             ))}
           </select>
           <span className={classes.propToolbarHint}>This window only · remembered</span>
+          <span className={classes.propToolbarLabel}>
+            Submitting to <strong>{DRAFT_DAO_LABEL[dao]}</strong>
+          </span>
         </div>
 
         <main className={classes.propMain}>
@@ -319,7 +349,9 @@ export default function ProposalDraftPanel({
             <p className={classes.propTip}>
               Add one or more proposal actions and describe your proposal for the community. The
               proposal cannot be modified after submission, so verify all info before submitting.
-              The voting period begins after 5 days and lasts 5 days.
+              {isLil
+                ? ' Actions execute from the Lil Nouns treasury, so only ETH transfers and function calls are available here.'
+                : ' The voting period begins after 5 days and lasts 5 days.'}
             </p>
             <p className={classes.propTipNote}>
               You <strong>MUST</strong> maintain enough voting power to meet the proposal threshold
@@ -380,7 +412,7 @@ export default function ProposalDraftPanel({
               />
             </div>
 
-            {isDaoGteV3 && config.featureToggles.proposeOnV1 && (
+            {!isLil && isDaoGteV3 && config.featureToggles.proposeOnV1 && (
               <>
                 <p style={{ margin: '14px 0 0', fontSize: 12, color: 'var(--gs-text-muted)' }}>
                   Looking for treasury v1?{' '}
