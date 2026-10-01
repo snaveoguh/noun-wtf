@@ -3,3 +3,8 @@ node_modules
 public/_pagefind
 .claude
 .env
+# Compiled output from a stray tsc run; the .ts/.tsx sources are the truth
+/*.js
+/app/**/*.js
+/components/**/*.js
+/content/**/*.js
