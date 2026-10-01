@@ -3,6 +3,7 @@ import type { ProposalTransaction } from '@/wrappers/nounsDao';
 
 import { miniWindowStore } from '@/components/MiniWindow';
 
+import { normalizeDraftDao } from './draftDao';
 import ProposalDraftPanel from './ProposalDraftPanel';
 
 /**
@@ -25,9 +26,17 @@ export interface ProposalDraftPrefill {
    * focuses + replaces content of the first instead of stacking.
    */
   draftId?: string;
+  /**
+   * Governor to submit to: `nouns` (default) or `lil-nouns`. Loose spellings
+   * (`lil`, `lilnouns`) are accepted — see `normalizeDraftDao`.
+   */
+  dao?: string;
 }
 
 const WINDOW_ID = 'proposal-draft';
+// Separate window so opening a Lil Nouns draft never replaces an in-progress
+// Nouns one (or vice versa).
+const LIL_WINDOW_ID = 'proposal-draft-lil-nouns';
 
 /**
  * Size the window to the viewport. MiniWindow isn't resizable, so a fixed
@@ -66,9 +75,17 @@ function coerceTransactions(
  */
 export function openProposalDraft(payload: ProposalDraftPrefill = {}): string {
   const { width, height } = draftWindowSize();
+  const dao = normalizeDraftDao(payload.dao);
+  const isLil = dao === 'lil-nouns';
+  const windowId = payload.draftId ?? (isLil ? LIL_WINDOW_ID : WINDOW_ID);
+  const titlePrefix = isLil ? 'Lil Nouns Draft' : 'Draft';
   return miniWindowStore.open({
-    id: payload.draftId ?? WINDOW_ID,
-    title: payload.title?.trim() ? `Draft — ${payload.title}` : 'Draft Proposal',
+    id: windowId,
+    title: payload.title?.trim()
+      ? `${titlePrefix} — ${payload.title}`
+      : isLil
+        ? 'Draft Lil Nouns Proposal'
+        : 'Draft Proposal',
     width,
     height,
     content: (
@@ -76,7 +93,8 @@ export function openProposalDraft(payload: ProposalDraftPrefill = {}): string {
         initialTitle={payload.title ?? ''}
         initialBody={payload.body ?? ''}
         initialTransactions={coerceTransactions(payload.transactions)}
-        onProposeSuccess={() => miniWindowStore.close(payload.draftId ?? WINDOW_ID)}
+        dao={dao}
+        onProposeSuccess={() => miniWindowStore.close(windowId)}
       />
     ),
   });

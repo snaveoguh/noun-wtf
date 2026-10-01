@@ -1,3 +1,4 @@
+import type { DraftDao } from '@/components/GameShell/draftDao';
 import type { Abi } from 'viem';
 
 import React, { SetStateAction, useState } from 'react';
@@ -51,6 +52,12 @@ export interface ProposalActionModalStepProps {
   onNextBtnClick: (e?: React.MouseEvent | ProposalActionCreationStep | ProposalTransaction) => void;
   state: ProposalActionModalState;
   setState: (e: SetStateAction<ProposalActionModalState>) => void;
+  /**
+   * Governor the action is for. Lil Nouns can't use the Nouns payer / stream
+   * factory / stETH contracts, so its drafts only offer ETH transfers and
+   * function calls.
+   */
+  dao?: DraftDao;
 }
 
 export interface FinalProposalActionStepProps extends ProposalActionModalStepProps {
@@ -61,13 +68,15 @@ export interface ProposalActionModalProps {
   onActionAdd: (transaction: ProposalTransaction) => void;
   show: boolean;
   onDismiss: () => void;
+  dao?: DraftDao;
 }
 
 const ModalContent: React.FC<{
   onActionAdd: (transaction: ProposalTransaction) => void;
   onDismiss: () => void;
+  dao?: DraftDao;
 }> = props => {
-  const { onActionAdd, onDismiss } = props;
+  const { onActionAdd, onDismiss, dao } = props;
 
   const [step, setStep] = useState<ProposalActionCreationStep>(
     ProposalActionCreationStep.SELECT_ACTION_TYPE,
@@ -85,13 +94,14 @@ const ModalContent: React.FC<{
           onNextBtnClick={(
             e?: React.MouseEvent | ProposalActionCreationStep | ProposalTransaction,
           ) => {
-            if (e && typeof e !== 'object') {
+            if (e !== undefined && typeof e !== 'object') {
               setStep(e);
             }
           }}
           onPrevBtnClick={onDismiss}
           state={state}
           setState={setState}
+          dao={dao}
         />
       );
     case ProposalActionCreationStep.LUMP_SUM_DETAILS:
@@ -101,16 +111,17 @@ const ModalContent: React.FC<{
           onPrevBtnClick={() => setStep(ProposalActionCreationStep.SELECT_ACTION_TYPE)}
           state={state}
           setState={setState}
+          dao={dao}
         />
       );
     case ProposalActionCreationStep.LUMP_SUM_REVIEW:
       return (
         <TransferFundsReviewStep
           onNextBtnClick={e => {
-            if (e && typeof e !== 'object') {
+            if (e !== undefined && typeof e !== 'object') {
               return;
             }
-            if (e && 'target' in e) {
+            if (e !== undefined && 'target' in e) {
               return;
             }
             onActionAdd(e as ProposalTransaction);
@@ -143,10 +154,10 @@ const ModalContent: React.FC<{
       return (
         <FunctionCallReviewStep
           onNextBtnClick={e => {
-            if (e && typeof e !== 'object') {
+            if (e !== undefined && typeof e !== 'object') {
               return;
             }
-            if (e && 'target' in e) {
+            if (e !== undefined && 'target' in e) {
               return;
             }
             onActionAdd(e as ProposalTransaction);
@@ -179,10 +190,10 @@ const ModalContent: React.FC<{
       return (
         <StreamPaymentsReviewStep
           onNextBtnClick={e => {
-            if (e && typeof e !== 'object') {
+            if (e !== undefined && typeof e !== 'object') {
               return;
             }
-            if (e && 'target' in e) {
+            if (e !== undefined && 'target' in e) {
               return;
             }
             onActionAdd(e as ProposalTransaction);
@@ -206,13 +217,13 @@ const ModalContent: React.FC<{
 };
 
 const ProposalActionModal: React.FC<ProposalActionModalProps> = props => {
-  const { onActionAdd, show, onDismiss } = props;
+  const { onActionAdd, show, onDismiss, dao } = props;
 
   return (
     <SolidColorBackgroundModal
       show={show}
       onDismiss={onDismiss}
-      content={<ModalContent onActionAdd={onActionAdd} onDismiss={onDismiss} />}
+      content={<ModalContent onActionAdd={onActionAdd} onDismiss={onDismiss} dao={dao} />}
     />
   );
 };
