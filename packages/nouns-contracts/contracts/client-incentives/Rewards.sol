@@ -28,6 +28,7 @@ import { ClientRewardsMemoryMapping } from '../libs/ClientRewardsMemoryMapping.s
 import { GasRefund } from '../libs/GasRefund.sol';
 import { INounsClientTokenDescriptor } from './INounsClientTokenDescriptor.sol';
 import { INounsClientTokenTypes } from './INounsClientTokenTypes.sol';
+import { IStakingRevenueOracle } from './IStakingRevenueOracle.sol';
 import { OwnableUpgradeable } from '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
 import { ERC721Upgradeable } from '@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol';
 import { SafeCast } from '@openzeppelin/contracts/utils/math/SafeCast.sol';
@@ -47,6 +48,7 @@ contract Rewards is
     error OnlyNFTOwner();
     error LastNounIdMustBeSettled();
     error LastNounIdMustBeHigher();
+    error NoRevenue();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -140,6 +142,9 @@ contract Rewards is
         mapping(uint32 clientId => ClientMetadata) _clientMetadata;
         /// @dev The client NFT descriptor
         address descriptor;
+        /// @dev Oracle reporting non-auction (staking) revenue. The zero address disables staking revenue.
+        /// @dev How much of the measured yield it reports is the oracle's own `revenueShareBps`.
+        IStakingRevenueOracle stakingRevenueOracle;
     }
 
     /// @dev This is a ERC-7201 storage location, calculated using:
@@ -295,6 +300,9 @@ contract Rewards is
     /// @dev struct used to avoid stack-too-deep errors
     struct Temp {
         uint32 maxClientId;
+        uint256 auctionRevenue;
+        uint256 lastAuctionIdForRevenue;
+        uint256 totalRevenue;
         uint256 numEligibleVotes;
         uint256 rewardPerProposal;
         uint256 rewardPerVote;
@@ -354,16 +362,22 @@ contract Rewards is
         t.lastProposal = proposals[proposals.length - 1];
 
         t.firstAuctionIdForRevenue = $.nextProposalRewardFirstAuctionId;
-        (uint256 auctionRevenue, uint256 lastAuctionIdForRevenue) = getAuctionRevenue({
+        // Read into `t` rather than locals to keep this function within the stack limit without via-ir.
+        (t.auctionRevenue, t.lastAuctionIdForRevenue) = getAuctionRevenue({
             firstNounId: t.firstAuctionIdForRevenue,
             endTimestamp: t.lastProposal.creationTimestamp
         });
-        $.nextProposalRewardFirstAuctionId = uint32(lastAuctionIdForRevenue) + 1;
+        $.nextProposalRewardFirstAuctionId = uint32(t.lastAuctionIdForRevenue) + 1;
 
-        require(auctionRevenue > 0, 'auctionRevenue must be > 0');
+        // The oracle reports the DAO's chosen share of treasury staking yield, and emits RevenueConsumed
+        // with the exact figure. A zero address leaves proposal rewards funded by auction revenue alone.
+        IStakingRevenueOracle oracle = $.stakingRevenueOracle;
+        t.totalRevenue = t.auctionRevenue + (address(oracle) == address(0) ? 0 : oracle.consumeRevenue());
 
-        t.proposalRewardForPeriod = (auctionRevenue * $.proposalRewardParams.proposalRewardBps) / 10_000;
-        t.votingRewardForPeriod = (auctionRevenue * $.proposalRewardParams.votingRewardBps) / 10_000;
+        if (t.totalRevenue == 0) revert NoRevenue();
+
+        t.proposalRewardForPeriod = (t.totalRevenue * $.proposalRewardParams.proposalRewardBps) / 10_000;
+        t.votingRewardForPeriod = (t.totalRevenue * $.proposalRewardParams.votingRewardBps) / 10_000;
 
         //// First loop over the proposals:
         //// 1. Count the number of votes in eligible proposals.
@@ -395,8 +409,8 @@ contract Rewards is
             nextProposalIdToReward_,
             lastProposalId,
             t.firstAuctionIdForRevenue,
-            lastAuctionIdForRevenue,
-            auctionRevenue,
+            t.lastAuctionIdForRevenue,
+            t.auctionRevenue,
             t.rewardPerProposal,
             t.rewardPerVote
         );
@@ -531,6 +545,11 @@ contract Rewards is
 
     /**
      * @notice Returns the sum of revenue via auctions from auctioning noun with id `firstNounId` until timestamp of `endTimestamp
+     * @dev When no auction settled in the window this reports no revenue and `firstNounId - 1`, rather than
+     * reverting on an out-of-bounds read as it used to. A caller advancing a cursor to `lastAuctionId + 1`
+     * therefore leaves that cursor where it was, instead of skipping the next auction to settle.
+     * @return sumRevenue total ETH settled across the auctions in the window
+     * @return lastAuctionId id of the last auction in the window, or `firstNounId - 1` if none settled
      */
     function getAuctionRevenue(
         uint256 firstNounId,
@@ -541,6 +560,9 @@ contract Rewards is
             endTimestamp,
             true
         );
+        // Noun 0 is a nounder noun and never carries revenue, so clamping at 0 loses nothing.
+        if (s.length == 0) return (0, firstNounId == 0 ? 0 : firstNounId - 1);
+
         sumRevenue = sumAuctions(s);
         lastAuctionId = s[s.length - 1].nounId;
     }
@@ -585,6 +607,10 @@ contract Rewards is
 
     function ethToken() public view returns (IERC20) {
         return _getRewardsStorage().ethToken;
+    }
+
+    function stakingRevenueOracle() public view returns (IStakingRevenueOracle) {
+        return _getRewardsStorage().stakingRevenueOracle;
     }
 
     function admin() public view returns (address) {
@@ -709,6 +735,17 @@ contract Rewards is
      */
     function setAdmin(address newAdmin) public onlyOwner {
         _getRewardsStorage().admin = newAdmin;
+    }
+
+    /**
+     * @notice Sets the oracle used to measure non-auction (staking) revenue. The zero address switches
+     * staking revenue off, leaving proposal rewards funded by auction revenue alone.
+     * @dev Only `owner` can call this function. `Rewards` makes a state-changing call into this contract on
+     * every proposal rewards update, so the oracle is trusted to the same degree as an upgrade of `Rewards`
+     * itself, which the same `owner` authorizes.
+     */
+    function setStakingRevenueOracle(address newOracle) public onlyOwner {
+        _getRewardsStorage().stakingRevenueOracle = IStakingRevenueOracle(newOracle);
     }
 
     /**

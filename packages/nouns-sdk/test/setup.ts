@@ -1,16 +1,24 @@
 import FetchAdapter from '@pollyjs/adapter-fetch';
 import { Polly } from '@pollyjs/core';
 import FSPersister from '@pollyjs/persister-fs';
+import { mainnet, sepolia } from 'viem/chains';
 
 // Register Polly adapters
 Polly.register(FetchAdapter);
 Polly.register(FSPersister);
 
+// The tests build their transports with `http(process.env.X_RPC_URL)`, so when the env var is unset
+// viem's own default endpoint for the chain is what gets hit. Those defaults move between viem
+// releases (sepolia went from drpc.org to thirdweb.com in the 2.4x line), and recordings are
+// matched on URL, so derive the fallback from the chain definition instead of hardcoding it.
 function normalizeRpcUrl(url: string): string {
   return url
-    .replace(process.env.MAINNET_RPC_URL ?? 'https://eth.merkle.io', 'https://mainnet.rpc.local')
     .replace(
-      process.env.SEPOLIA_RPC_URL ?? 'https://sepolia.drpc.org',
+      process.env.MAINNET_RPC_URL ?? mainnet.rpcUrls.default.http[0],
+      'https://mainnet.rpc.local',
+    )
+    .replace(
+      process.env.SEPOLIA_RPC_URL ?? sepolia.rpcUrls.default.http[0],
       'https://sepolia.rpc.local',
     );
 }
