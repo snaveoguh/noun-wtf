@@ -23,7 +23,8 @@ const proposalActionTypeToProposalActionCreationStep = (actionTypeString: string
 };
 
 const SelectProposalActionStep: React.FC<ProposalActionModalStepProps> = props => {
-  const { onPrevBtnClick, onNextBtnClick, state, setState } = props;
+  const { onPrevBtnClick, onNextBtnClick, state, setState, dao } = props;
+  const isLil = dao === 'lil-nouns';
 
   const [nextStep, setNextStep] = useState<ProposalActionCreationStep>(
     proposalActionTypeToProposalActionCreationStep(state.actionType?.toString() ?? ''),
@@ -35,23 +36,40 @@ const SelectProposalActionStep: React.FC<ProposalActionModalStepProps> = props =
         <Trans>Add Proposal Action</Trans>
       </ModalTitle>
 
-      <ModalSubTitle>
-        <Trans>
+      {isLil ? (
+        // Untranslated like the rest of the Lil Nouns draft copy.
+        <ModalSubTitle>
           <hr />
-          <b>Guidelines</b>
-          <hr />• Do <b>NOT</b> request ETH to trade into USDC. Instead, request USDC directly.
-          <br />• Do <b>NOT</b> transfer funds externally to create an ETH or USDC stream. Instead,
-          use the "Stream Funds" action.
+          <b>Lil Nouns DAO</b>
+          <hr />
+          Actions execute from the Lil Nouns treasury. Nouns-only helpers (USDC payer, streams,
+          stETH) aren&apos;t available.
           <hr />
           <b>Supported Action Types</b>
           <hr />
-          <b>• Transfer Funds: </b>Send USDC, ETH, or stETH.
-          <br />
-          <b>• Stream Funds: </b>Stream USDC or WETH over time.
+          <b>• Transfer Funds: </b>Send ETH.
           <br />
           <b>• Function Call: </b>Call a contract function.
-        </Trans>
-      </ModalSubTitle>
+        </ModalSubTitle>
+      ) : (
+        <ModalSubTitle>
+          <Trans>
+            <hr />
+            <b>Guidelines</b>
+            <hr />• Do <b>NOT</b> request ETH to trade into USDC. Instead, request USDC directly.
+            <br />• Do <b>NOT</b> transfer funds externally to create an ETH or USDC stream.
+            Instead, use the &quot;Stream Funds&quot; action.
+            <hr />
+            <b>Supported Action Types</b>
+            <hr />
+            <b>• Transfer Funds: </b>Send USDC, ETH, or stETH.
+            <br />
+            <b>• Stream Funds: </b>Stream USDC or WETH over time.
+            <br />
+            <b>• Function Call: </b>Call a contract function.
+          </Trans>
+        </ModalSubTitle>
+      )}
 
       <BrandDropdown
         value={state.actionType.toString()}
@@ -69,7 +87,7 @@ const SelectProposalActionStep: React.FC<ProposalActionModalStepProps> = props =
         }}
       >
         <option value={'Transfer Funds'}>Transfer Funds</option>
-        <option value={'Stream Funds'}>Stream Funds</option>
+        {!isLil && <option value={'Stream Funds'}>Stream Funds</option>}
         <option value={'Function Call'}>Function Call</option>
       </BrandDropdown>
 
