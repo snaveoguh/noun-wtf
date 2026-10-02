@@ -21,5 +21,9 @@ https://www.probe.wtf/*  https://noun.wtf/probe  301!
 /vote/:id        /.netlify/functions/og-proposal  200
 /candidates/:id  /.netlify/functions/og-proposal  200
 
+# Read-only proxy to the pooter.world trading bot API for the terminal's
+# TRADING tab (TradingPanel.tsx). Same-origin so the browser needs no CORS.
+/pooter-api/*  https://pooter.world/api/:splat  200
+
 # SPA fallback for client-side routing
 /*    /index.html   200

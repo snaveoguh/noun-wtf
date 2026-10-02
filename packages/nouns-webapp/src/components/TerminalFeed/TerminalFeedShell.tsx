@@ -13,6 +13,7 @@ import ChatHistory from './ChatHistory';
 import { normalizeTerminalErrorMessage } from './errorMessages';
 import { FILTER_TABS } from './eventRegistry';
 import TerminalPrompt from './TerminalPrompt';
+import TradingPanel from './TradingPanel';
 import { useActivityFeed } from './useActivityFeed';
 
 // v2 key: the v1 key ('noun-wtf-disco') was auto-written as 'on' for every
@@ -35,9 +36,10 @@ export default function TerminalFeedShell() {
     }
   });
   const isChatTab = activeFilter === '_CHAT';
-  // Only pass filter to activity feed when not in chat mode
+  const isTradingTab = activeFilter === '_TRADING';
+  // Only pass filter to activity feed when it's showing an event filter
   const { events, loading, hasMore, error, loadMore } = useActivityFeed(
-    isChatTab ? '' : activeFilter,
+    isChatTab || isTradingTab ? '' : activeFilter,
   );
 
   // Chat history (persisted across tab switches)
@@ -245,9 +247,11 @@ export default function TerminalFeedShell() {
         })}
       </div>
 
-      {/* Feed area — either activity feed or chat history */}
+      {/* Feed area — activity feed, chat history, or the trading agents panel */}
       {isChatTab ? (
         <ChatHistory messages={chatHistory} />
+      ) : isTradingTab ? (
+        <TradingPanel />
       ) : (
         <ActivityFeed
           events={events}
