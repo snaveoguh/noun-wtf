@@ -44,6 +44,14 @@ export default defineConfig({
     hmr: {
       overlay: true,
     },
+    // Mirrors the `/pooter-api/*` rule in public/_redirects for local dev.
+    proxy: {
+      '/pooter-api': {
+        target: 'https://pooter.world',
+        changeOrigin: true,
+        rewrite: p => p.replace(/^\/pooter-api/, '/api'),
+      },
+    },
   },
   resolve: {
     alias: {

@@ -1244,6 +1244,7 @@ export const FILTER_TABS: { key: string; label: string; color: string | null }[]
     color: C.lilBid,
   },
   { key: '_V2', label: 'V2', color: C.v2 },
+  { key: '_TRADING', label: 'TRADING', color: '#fbbf24' },
   { key: '_CHAT', label: 'CHAT', color: '#a5f3fc' },
 ];
 
