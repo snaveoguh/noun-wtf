@@ -8,7 +8,8 @@ import { encodeAbiParameters, parseEther, parseUnits } from 'viem';
 import ModalBottomButtonRow from '@/components/ModalBottomButtonRow';
 import ModalTitle from '@/components/ModalTitle';
 import ShortAddress from '@/components/ShortAddress';
-import { nounsPayerAddress, stEthAddress, usdcAddress, wethAddress } from '@/contracts';
+import { nounsPayerAddress, stEthAddress, wethAddress } from '@/contracts';
+import { LIL_NOUNS_PAYER } from '@/lib/lilNounsTreasury';
 import { Address, Hex } from '@/utils/types';
 import { defaultChain } from '@/wagmi';
 
@@ -37,9 +38,10 @@ const transferArgs = (to: Address, amount: bigint) =>
  * itself, so encoding it here too (encodeFunctionData) made the call carry the
  * selector twice and revert at execution.
  *
- * Nouns DAO pays USDC through its payer contract (with TokenBuyer top-ups);
- * Lil Nouns has no payer, so its USDC / stETH / WETH go out as plain ERC20
- * transfers straight from the treasury.
+ * USDC goes through each DAO's payer contract (`sendOrRegisterDebt`), which
+ * holds the USDC and registers debt if it runs short. Nouns DAO also gets a
+ * TokenBuyer top-up (via `usdcValue`); Lil Nouns has no TokenBuyer. stETH /
+ * WETH are plain ERC20 transfers straight from the treasury.
  */
 export const handleActionAdd = (
   state: ProposalActionModalState,
@@ -75,15 +77,12 @@ export const handleActionAdd = (
       tokenTransfer(wethAddress[chainId], 18);
       return;
     case SupportedCurrency.USDC: {
-      if (dao === 'lil-nouns') {
-        tokenTransfer(usdcAddress[chainId], 6);
-        return;
-      }
+      const isLil = dao === 'lil-nouns';
       const usdcAmount = parseUnits(amountStr, 6);
       onActionAdd({
-        address: nounsPayerAddress[chainId],
+        address: isLil ? LIL_NOUNS_PAYER : nounsPayerAddress[chainId],
         value: 0n,
-        usdcValue: Number(usdcAmount),
+        usdcValue: isLil ? undefined : Number(usdcAmount),
         signature: 'sendOrRegisterDebt(address,uint256)',
         decodedCalldata: JSON.stringify([state.address, usdcAmount.toString()]),
         calldata: transferArgs(state.address, usdcAmount),
