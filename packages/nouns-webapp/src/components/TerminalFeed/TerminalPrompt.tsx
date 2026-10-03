@@ -131,6 +131,21 @@ function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
 }
 
 /**
+ * Detect a cancel command: `/cancel 123`, `/cancel lil 45`, `cancel prop 123`,
+ * `cancel lil nouns proposal 45`. Returns the proposal id and whether Lil
+ * Nouns was named, or null. Handled locally (no agent round-trip) so it works
+ * even if the agent doesn't know the action.
+ */
+function detectCancelIntent(text: string): { proposalId: number; lil: boolean } | null {
+  const lc = text.trim().toLowerCase();
+  const m =
+    /^\/cancel\s+(?:(lil(?:[\s-]?nouns?)?)\s+)?(?:prop(?:osal)?\s+)?#?(\d+)\s*$/.exec(lc) ??
+    /^cancel\s+(?:(lil(?:[\s-]?nouns?)?)\s+)?(?:prop|proposal)\s+#?(\d+)\s*\.?$/.exec(lc);
+  if (!m) return null;
+  return { proposalId: Number.parseInt(m[2], 10), lil: m[1] !== undefined };
+}
+
+/**
  * Detect a pasted draft *payload* — the same wire format NounIRL hands back
  * (`ProposalDraftPrefill`): a JSON object with any of `title`, `body`,
  * `transactions`. Lets a human (or another tool) paste a fully-built
@@ -282,6 +297,23 @@ export default function TerminalPrompt({ history, onNewMessages, onError }: Prop
       setRequiresWallet(false);
 
       const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
+
+      // Short-circuit: `/cancel [lil] <id>` goes straight to the confirm card.
+      // A bare id on a Lil Nouns page targets Lil Nouns.
+      const cancelIntent = detectCancelIntent(text);
+      if (cancelIntent) {
+        const dao = cancelIntent.lil || isLilView ? 'lil-nouns' : 'nouns';
+        setPendingAction({ type: 'CANCEL_PROPOSAL', proposalId: cancelIntent.proposalId, dao });
+        const confirmation: ChatMessage = {
+          role: 'assistant',
+          content: `ready to cancel ${dao === 'lil-nouns' ? 'Lil Nouns' : 'Nouns DAO'} proposal #${cancelIntent.proposalId}. confirm below — only the proposer (or its signers) can cancel.`,
+          timestamp: Date.now(),
+        };
+        onNewMessages(userMsg, confirmation);
+        setResponse(confirmation.content);
+        setIsLoading(false);
+        return;
+      }
 
       // Short-circuit: if the user typed a draft-proposal trigger or pasted
       // proposal-shaped markdown, open the draft window directly without a

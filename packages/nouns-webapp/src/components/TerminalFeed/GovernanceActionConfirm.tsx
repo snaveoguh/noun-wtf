@@ -26,7 +26,8 @@ export interface GovernanceAction {
     | 'QUEUE_PROPOSAL'
     | 'QUEUE_GRANT'
     | 'EXECUTE_PROPOSAL'
-    | 'EXECUTE_GRANT';
+    | 'EXECUTE_GRANT'
+    | 'CANCEL_PROPOSAL';
   proposalId?: number;
   support?: 0 | 1 | 2;
   reason?: string;
@@ -94,6 +95,7 @@ const ACTION_LABELS: Record<string, { verb: string; color: string }> = {
   QUEUE_GRANT: { verb: 'queue grant', color: '#eab308' },
   EXECUTE_PROPOSAL: { verb: 'execute proposal', color: '#f97316' },
   EXECUTE_GRANT: { verb: 'execute grant', color: '#f97316' },
+  CANCEL_PROPOSAL: { verb: 'cancel proposal', color: '#ef4444' },
 };
 
 // ─── Component ────────────────────────────────────────────────────────────
@@ -399,6 +401,20 @@ export default function GovernanceActionConfirm({ action, onSuccess, onCancel }:
           <div style={{ color: '#eab308', fontSize: '11px', marginTop: '4px' }}>
             this will place the grant in the 12hr timelock — after that it can be executed
           </div>
+        )}
+        {action.type === 'CANCEL_PROPOSAL' && (
+          <>
+            <div>
+              <span style={{ color: '#666' }}>proposal: </span>
+              <span style={{ color: '#ef4444' }}>
+                {action.dao === 'lil-nouns' ? 'Lil Nouns' : 'Nouns DAO'} #{action.proposalId}
+              </span>
+            </div>
+            <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>
+              cancels the proposal onchain — irreversible. only the proposer or its signers can
+              cancel (anyone can if the proposer has dropped below the proposal threshold).
+            </div>
+          </>
         )}
         {action.type === 'EXECUTE_PROPOSAL' && (
           <div style={{ color: '#f97316', fontSize: '11px', marginTop: '4px' }}>

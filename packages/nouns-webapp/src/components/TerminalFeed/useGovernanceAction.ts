@@ -24,11 +24,11 @@ import {
   nounsTokenAbi,
   nounsTokenAddress,
 } from '@/contracts';
+import { nounV2TreasuryAbi, NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
 } from '@/contracts/small-grants-treasury';
-import { nounV2TreasuryAbi, NOUNV2_TREASURY_ADDRESS } from '@/contracts/nounv2-treasury';
 import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 
 // ─── Compute encodedProp for addSignature (mirrors CandidatePage logic) ───
@@ -98,9 +98,7 @@ export function useGovernanceAction() {
               throw new Error('Missing proposalId or support');
             }
             const isLilNouns =
-              action.dao === 'lil-nouns' ||
-              action.dao === 'lilnouns' ||
-              action.dao === 'lil';
+              action.dao === 'lil-nouns' || action.dao === 'lilnouns' || action.dao === 'lil';
             if (isLilNouns) {
               // Lil Nouns governor (V3) supports castRefundableVote / castRefundableVoteWithReason
               // No client-id arg unlike mainnet Nouns governor.
@@ -186,7 +184,7 @@ export function useGovernanceAction() {
             // actually owed).
             let candidateFee = 0n;
             try {
-              if (publicClient && address) {
+              if (address !== undefined) {
                 const [cost, votes] = await Promise.all([
                   publicClient.readContract({
                     abi: nounsDataAbi,
@@ -551,6 +549,28 @@ export function useGovernanceAction() {
                 args: [ptTargets, ptValues, ptSigs, ptCalldatas, action.description],
               });
             }
+            break;
+          }
+
+          case 'CANCEL_PROPOSAL': {
+            if (action.proposalId === undefined) {
+              throw new Error('Missing proposalId');
+            }
+            const isLilNouns =
+              action.dao === 'lil-nouns' || action.dao === 'lilnouns' || action.dao === 'lil';
+            hash = isLilNouns
+              ? await writeContractAsync({
+                  abi: LIL_NOUNS_GOVERNOR_ABI,
+                  address: LIL_NOUNS_GOVERNOR,
+                  functionName: 'cancel',
+                  args: [BigInt(action.proposalId)],
+                })
+              : await writeContractAsync({
+                  abi: nounsGovernorAbi,
+                  address: nounsGovernorAddress[1] as Address,
+                  functionName: 'cancel',
+                  args: [BigInt(action.proposalId)],
+                });
             break;
           }
 
