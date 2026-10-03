@@ -11,6 +11,7 @@ import { defaultChain } from '@/wagmi';
 
 import {
   findShortfalls,
+  LIL_NOUNS_PAYER,
   hasDuplicatedSelector,
   selectorOf,
   sumRequested,
@@ -99,15 +100,16 @@ describe('TransferFunds handleActionAdd', () => {
     expect(hasDuplicatedSelector(tx)).toBe(false);
   });
 
-  it('Lil Nouns USDC is a direct USDC transfer, Nouns USDC goes via the payer', () => {
+  it('USDC goes via each DAO payer; only Nouns gets a TokenBuyer top-up', () => {
     const lil = vi.fn();
     handleActionAdd(state(SupportedCurrency.USDC, '3500'), lil, 'lil-nouns');
     expect(lil.mock.calls[0][0]).toMatchObject({
-      address: usdcAddress[chainId],
-      signature: 'transfer(address,uint256)',
+      address: LIL_NOUNS_PAYER,
+      signature: 'sendOrRegisterDebt(address,uint256)',
       calldata: args(3_500_000_000n),
     });
     expect(lil.mock.calls[0][0].usdcValue).toBeUndefined();
+    expect(sumRequested([lil.mock.calls[0][0]])).toEqual({ USDC: 3_500_000_000n });
 
     const nouns = vi.fn();
     handleActionAdd(state(SupportedCurrency.USDC, '3500'), nouns, 'nouns');

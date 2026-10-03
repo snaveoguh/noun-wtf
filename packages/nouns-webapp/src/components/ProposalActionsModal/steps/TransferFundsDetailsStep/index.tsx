@@ -51,7 +51,7 @@ function lilOptionLabel(
   const bal = balances?.[asset.symbol];
   return bal === undefined
     ? asset.symbol
-    : `${asset.symbol} — ${formatAssetAmount(bal, asset)} in treasury`;
+    : `${asset.symbol} — ${formatAssetAmount(bal, asset)} ${asset.symbol === 'USDC' ? 'available (payer)' : 'in treasury'}`;
 }
 
 function lilShortfallText(
@@ -68,6 +68,9 @@ function lilShortfallText(
   }
   const [short] = findShortfalls({ [asset.symbol]: want }, balances);
   if (short === undefined) return null;
+  if (asset.symbol === 'USDC') {
+    return `The Lil Nouns payer only has ${formatAssetAmount(short.have, asset)} USDC free. The rest is registered as debt and paid when the payer is refilled.`;
+  }
   return `The Lil Nouns treasury only holds ${formatAssetAmount(short.have, asset)} ${asset.symbol}. This transfer would fail at execution.`;
 }
 

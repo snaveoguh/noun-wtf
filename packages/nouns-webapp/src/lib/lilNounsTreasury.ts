@@ -4,14 +4,15 @@ import type { Address } from 'viem';
 import { decodeAbiParameters, erc20Abi, keccak256, stringToBytes } from 'viem';
 import { useBalance, useReadContract, useReadContracts } from 'wagmi';
 
-import { stEthAddress, usdcAddress, wethAddress } from '@/contracts';
+import { nounsPayerAbi, stEthAddress, usdcAddress, wethAddress } from '@/contracts';
 import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
 import { defaultChain } from '@/wagmi';
 
 /**
- * Assets the Lil Nouns treasury can pay out from a draft. ETH is the native
- * balance; the rest are plain ERC20 `transfer`s executed by the treasury
- * (Lil Nouns has no payer / token buyer like Nouns DAO does).
+ * Assets the Lil Nouns treasury can pay out from a draft. ETH, stETH and WETH
+ * are paid straight from the treasury (the governor's timelock). USDC is held
+ * by a separate Nouns-style Payer contract and paid via `sendOrRegisterDebt`,
+ * same as Nouns DAO, so its balance comes from the payer, not the treasury.
  */
 export type TreasuryAssetSymbol = 'ETH' | 'USDC' | 'stETH' | 'WETH';
 
@@ -23,6 +24,10 @@ export interface TreasuryAsset {
 }
 
 const chainId = defaultChain.id;
+
+/** Lil Nouns USDC payer (Nouns `Payer` contract). Mainnet only. */
+export const LIL_NOUNS_PAYER: Address = '0xf62387d21153fdcbb06ab3026c2089e418688164';
+export const PAYER_SIG = 'sendOrRegisterDebt(address,uint256)';
 
 export const TREASURY_ASSETS: readonly TreasuryAsset[] = [
   { symbol: 'ETH', decimals: 18, address: null },
@@ -42,10 +47,21 @@ export type AssetAmounts = Partial<Record<TreasuryAssetSymbol, bigint>>;
  * from the governor rather than hardcoded. Everything is gated on `enabled`
  * so Nouns drafts never hit these contracts.
  */
-export function useLilNounsTreasury(enabled: boolean): {
+export interface LilNounsTreasury {
   treasury: Address | undefined;
+  /** Per-asset amount available for new requests. USDC = payer balance minus its existing debt. */
   balances: AssetAmounts | undefined;
-} {
+  payer:
+    | {
+        usdcBalance: bigint;
+        debt: bigint;
+        /** owner() is the treasury and paymentToken() is USDC. False means USDC payouts will revert. */
+        configOk: boolean;
+      }
+    | undefined;
+}
+
+export function useLilNounsTreasury(enabled: boolean): LilNounsTreasury {
   const { data: treasury } = useReadContract({
     address: LIL_NOUNS_GOVERNOR,
     abi: LIL_NOUNS_GOVERNOR_ABI,
@@ -65,13 +81,50 @@ export function useLilNounsTreasury(enabled: boolean): {
     query: { enabled: ready },
   });
 
-  if (!ready || eth === undefined || tokens === undefined) return { treasury, balances: undefined };
+  const { data: payerReads } = useReadContracts({
+    contracts: [
+      {
+        address: usdcAddress[chainId],
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [LIL_NOUNS_PAYER],
+      },
+      { address: LIL_NOUNS_PAYER, abi: nounsPayerAbi, functionName: 'totalDebt' },
+      { address: LIL_NOUNS_PAYER, abi: nounsPayerAbi, functionName: 'owner' },
+      { address: LIL_NOUNS_PAYER, abi: nounsPayerAbi, functionName: 'paymentToken' },
+    ],
+    query: { enabled: ready },
+  });
+
+  if (!ready || eth === undefined || tokens === undefined || payerReads === undefined) {
+    return { treasury, balances: undefined, payer: undefined };
+  }
   const balances: AssetAmounts = { ETH: eth.value };
   ERC20_TOKENS.forEach((t, i) => {
     const r = tokens[i];
     if (r?.status === 'success') balances[t.symbol] = r.result;
   });
-  return { treasury, balances };
+
+  const [usdcBal, debt, owner, paymentToken] = payerReads;
+  const payer =
+    usdcBal.status === 'success' && debt.status === 'success'
+      ? {
+          usdcBalance: usdcBal.result,
+          debt: debt.result,
+          configOk:
+            owner.status === 'success' &&
+            paymentToken.status === 'success' &&
+            owner.result.toLowerCase() === treasury.toLowerCase() &&
+            paymentToken.result.toLowerCase() === usdcAddress[chainId].toLowerCase(),
+        }
+      : undefined;
+  // New USDC requests queue behind the payer's existing debt.
+  if (payer !== undefined) {
+    balances.USDC = payer.usdcBalance > payer.debt ? payer.usdcBalance - payer.debt : 0n;
+  } else {
+    delete balances.USDC;
+  }
+  return { treasury, balances, payer };
 }
 
 const TRANSFER_SIG = 'transfer(address,uint256)';
@@ -106,6 +159,19 @@ export function sumRequested(txs: readonly ProposalTransaction[]): AssetAmounts 
   };
   for (const tx of txs) {
     if (tx.value !== undefined && tx.value > 0n) add('ETH', tx.value);
+    if (tx.signature === PAYER_SIG && tx.address.toLowerCase() === LIL_NOUNS_PAYER.toLowerCase()) {
+      const args = hasDuplicatedSelector(tx) ? `0x${tx.calldata.slice(10)}` : tx.calldata;
+      try {
+        const [, amount] = decodeAbiParameters(
+          [{ type: 'address' }, { type: 'uint256' }],
+          args as `0x${string}`,
+        );
+        add('USDC', amount);
+      } catch {
+        // Malformed calldata: left to the review checks.
+      }
+      continue;
+    }
     if (tx.signature !== TRANSFER_SIG) continue;
     const token = ERC20_TOKENS.find(t => t.address.toLowerCase() === tx.address.toLowerCase());
     if (token === undefined) continue;

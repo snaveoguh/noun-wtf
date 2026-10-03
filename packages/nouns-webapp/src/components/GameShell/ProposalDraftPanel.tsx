@@ -115,7 +115,7 @@ export default function ProposalDraftPanel({
   const isDaoGteV3 = useIsDaoGteV3();
   const lil = useLilNounsPropose(isLil);
   const timing = useGovernorTiming(dao);
-  const { balances: lilBalances } = useLilNounsTreasury(isLil);
+  const { balances: lilBalances, payer: lilPayer } = useLilNounsTreasury(isLil);
 
   const availableVotes = isLil ? lil.availableVotes : nounsVotes;
   const proposalThreshold = isLil ? lil.proposalThreshold : nounsThreshold;
@@ -242,11 +242,27 @@ export default function ProposalDraftPanel({
   const brokenActionIndexes = proposalTransactions.flatMap((tx, i) =>
     hasDuplicatedSelector(tx) ? [i + 1] : [],
   );
+  // USDC goes through the payer, which registers any shortfall as debt rather
+  // than reverting, so that's a notice, not an execution failure.
+  const usdcShort = shortfalls.find(s => s.asset.symbol === 'USDC');
+  const payoutNotices =
+    usdcShort === undefined
+      ? []
+      : [
+          `Requests ${formatAssetAmount(usdcShort.want, usdcShort.asset)} USDC but the Lil Nouns payer only has ${formatAssetAmount(usdcShort.have, usdcShort.asset)} free. The rest is registered as debt and paid when the payer is refilled.`,
+        ];
   const executionWarnings = [
-    ...shortfalls.map(
-      ({ asset, want, have }) =>
-        `Requests ${formatAssetAmount(want, asset)} ${asset.symbol} but the Lil Nouns treasury holds ${formatAssetAmount(have, asset)}. It will fail at execution unless funds arrive first.`,
-    ),
+    ...shortfalls
+      .filter(s => s.asset.symbol !== 'USDC')
+      .map(
+        ({ asset, want, have }) =>
+          `Requests ${formatAssetAmount(want, asset)} ${asset.symbol} but the Lil Nouns treasury holds ${formatAssetAmount(have, asset)}. It will fail at execution unless funds arrive first.`,
+      ),
+    ...(isLil && (requested.USDC ?? 0n) > 0n && lilPayer !== undefined && !lilPayer.configOk
+      ? [
+          'The Lil Nouns payer is not owned by the Lil Nouns treasury or does not pay in USDC, so USDC payouts will revert. Check the payer contract before submitting.',
+        ]
+      : []),
     ...(brokenActionIndexes.length > 0
       ? [
           `Action ${brokenActionIndexes.join(', ')} has its function selector in the calldata as well as the signature, so it will revert at execution. Remove and re-add it.`,
@@ -582,7 +598,9 @@ export default function ProposalDraftPanel({
                     const over = have !== undefined && want > have;
                     return (
                       <div key={asset.symbol} className={classes.propStatusRow}>
-                        <span className={classes.propStatusLabel}>{asset.symbol}</span>
+                        <span className={classes.propStatusLabel}>
+                          {asset.symbol === 'USDC' ? 'USDC (payer)' : asset.symbol}
+                        </span>
                         <span
                           className={`${classes.propStatusValue} ${over ? classes.propStatusBad : ''}`}
                         >
@@ -595,8 +613,22 @@ export default function ProposalDraftPanel({
                 </div>
               )}
               <p className={classes.propTipNote} style={{ marginTop: 8 }}>
-                Available now (requested / available). Function-call actions aren&apos;t counted.
+                Requested / available now. USDC is held by the Lil payer (net of its existing debt);
+                the rest by the treasury. Function-call actions aren&apos;t counted.
               </p>
+            </section>
+          )}
+
+          {payoutNotices.length > 0 && (
+            <section className={classes.propPanel}>
+              <div className={classes.propPanelHeader}>
+                <span className={classes.propPanelTitle}>Paid as debt</span>
+              </div>
+              {payoutNotices.map(n => (
+                <p key={n} className={classes.propTip}>
+                  {n}
+                </p>
+              ))}
             </section>
           )}
 
