@@ -12,6 +12,14 @@ import ProposalEditor from '@/components/ProposalEditor';
 import ProposalTransactions from '@/components/ProposalTransactions';
 import config, { NOUN_WTF_CLIENT_ID } from '@/config';
 import { nounsLegacyTreasuryAddress, nounsTokenBuyerAddress } from '@/contracts';
+import {
+  findShortfalls,
+  formatAssetAmount,
+  hasDuplicatedSelector,
+  sumRequested,
+  TREASURY_ASSETS,
+  useLilNounsTreasury,
+} from '@/lib/lilNounsTreasury';
 import { buildEtherscanHoldingsLink } from '@/utils/etherscan';
 import { useEthNeeded } from '@/utils/tokenBuyerContractUtils/tokenBuyer';
 import { defaultChain } from '@/wagmi';
@@ -107,6 +115,7 @@ export default function ProposalDraftPanel({
   const isDaoGteV3 = useIsDaoGteV3();
   const lil = useLilNounsPropose(isLil);
   const timing = useGovernorTiming(dao);
+  const { balances: lilBalances } = useLilNounsTreasury(isLil);
 
   const availableVotes = isLil ? lil.availableVotes : nounsVotes;
   const proposalThreshold = isLil ? lil.proposalThreshold : nounsThreshold;
@@ -224,8 +233,37 @@ export default function ProposalDraftPanel({
         latestProposal?.status === ProposalState.PENDING) &&
       latestProposal.proposer === account;
 
+  // Payout checks. Shortfalls only apply to Lil Nouns, whose treasury pays
+  // directly (Nouns USDC goes through the payer, which can register debt).
+  // Duplicated selectors are a bug for either DAO: the action reverts on
+  // execution.
+  const requested = useMemo(() => sumRequested(proposalTransactions), [proposalTransactions]);
+  const shortfalls = isLil ? findShortfalls(requested, lilBalances) : [];
+  const brokenActionIndexes = proposalTransactions.flatMap((tx, i) =>
+    hasDuplicatedSelector(tx) ? [i + 1] : [],
+  );
+  const executionWarnings = [
+    ...shortfalls.map(
+      ({ asset, want, have }) =>
+        `Requests ${formatAssetAmount(want, asset)} ${asset.symbol} but the Lil Nouns treasury holds ${formatAssetAmount(have, asset)}. It will fail at execution unless funds arrive first.`,
+    ),
+    ...(brokenActionIndexes.length > 0
+      ? [
+          `Action ${brokenActionIndexes.join(', ')} has its function selector in the calldata as well as the signature, so it will revert at execution. Remove and re-add it.`,
+        ]
+      : []),
+  ];
+
   const handleCreateProposal = async () => {
     if (!proposalTransactions?.length) return;
+    if (
+      executionWarnings.length > 0 &&
+      !window.confirm(
+        `This proposal is likely to fail at execution:\n\n${executionWarnings.join('\n\n')}\n\nSubmit anyway?`,
+      )
+    ) {
+      return;
+    }
     if (isLil) {
       await lil.propose(
         proposalTransactions.map(({ address }) => address),
@@ -304,7 +342,7 @@ export default function ProposalDraftPanel({
   })();
 
   const submitDisabled = isFormInvalid || hasActiveOrPendingProposal || !hasEnoughVote;
-  const submitDanger = hasActiveOrPendingProposal || !hasEnoughVote;
+  const submitDanger = hasActiveOrPendingProposal || !hasEnoughVote || executionWarnings.length > 0;
 
   return (
     <>
@@ -358,7 +396,7 @@ export default function ProposalDraftPanel({
               Add one or more proposal actions and describe your proposal for the community. Verify
               all info before submitting.
               {isLil &&
-                ' Actions execute from the Lil Nouns treasury, so only ETH transfers and function calls are available here.'}
+                ' Actions execute from the Lil Nouns treasury: request a currency it actually holds (live balances on the right).'}
             </p>
             {timing !== undefined && (
               <p className={classes.propTip}>
@@ -528,6 +566,54 @@ export default function ProposalDraftPanel({
               )}
             </div>
           </section>
+
+          {isLil && (
+            <section className={classes.propPanel}>
+              <div className={classes.propPanelHeader}>
+                <span className={classes.propPanelTitle}>Lil Nouns Treasury</span>
+              </div>
+              {lilBalances === undefined ? (
+                <div className={classes.propStatusLabel}>Loading balances…</div>
+              ) : (
+                <div className={classes.propStatusList}>
+                  {TREASURY_ASSETS.map(asset => {
+                    const have = lilBalances[asset.symbol];
+                    const want = requested[asset.symbol] ?? 0n;
+                    const over = have !== undefined && want > have;
+                    return (
+                      <div key={asset.symbol} className={classes.propStatusRow}>
+                        <span className={classes.propStatusLabel}>{asset.symbol}</span>
+                        <span
+                          className={`${classes.propStatusValue} ${over ? classes.propStatusBad : ''}`}
+                        >
+                          {want > 0n && `${formatAssetAmount(want, asset)} / `}
+                          {have === undefined ? '—' : formatAssetAmount(have, asset)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p className={classes.propTipNote} style={{ marginTop: 8 }}>
+                Available now (requested / available). Function-call actions aren&apos;t counted.
+              </p>
+            </section>
+          )}
+
+          {executionWarnings.length > 0 && (
+            <section className={classes.propPanel}>
+              <div className={classes.propPanelHeader}>
+                <span className={`${classes.propPanelTitle} ${classes.propStatusBad}`}>
+                  Will fail at execution
+                </span>
+              </div>
+              {executionWarnings.map(w => (
+                <p key={w} className={classes.propTip}>
+                  {w}
+                </p>
+              ))}
+            </section>
+          )}
 
           <button
             type="button"

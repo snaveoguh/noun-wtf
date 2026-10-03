@@ -42,12 +42,12 @@ const SelectProposalActionStep: React.FC<ProposalActionModalStepProps> = props =
           <hr />
           <b>Lil Nouns DAO</b>
           <hr />
-          Actions execute from the Lil Nouns treasury. Nouns-only helpers (USDC payer, streams,
-          stETH) aren&apos;t available.
+          Actions execute from the Lil Nouns treasury. Request a currency it actually holds: live
+          treasury balances are shown on the next step.
           <hr />
           <b>Supported Action Types</b>
           <hr />
-          <b>• Transfer Funds: </b>Send ETH.
+          <b>• Transfer Funds: </b>Send USDC, stETH, ETH, or WETH.
           <br />
           <b>• Function Call: </b>Call a contract function.
         </ModalSubTitle>

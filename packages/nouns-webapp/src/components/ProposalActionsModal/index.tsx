@@ -117,6 +117,7 @@ const ModalContent: React.FC<{
     case ProposalActionCreationStep.LUMP_SUM_REVIEW:
       return (
         <TransferFundsReviewStep
+          dao={dao}
           onNextBtnClick={e => {
             if (e !== undefined && typeof e !== 'object') {
               return;
