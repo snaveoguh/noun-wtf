@@ -180,6 +180,13 @@ export const LIL_NOUNS_GOVERNOR_ABI = [
     outputs: [{ name: '', type: 'address' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'cancel',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   // Lil Nouns runs the V3-style governor without client ids, so only the
   // 5-arg propose exists (no trailing uint32 clientId like Nouns V4).
   {
