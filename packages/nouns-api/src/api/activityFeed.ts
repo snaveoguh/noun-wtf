@@ -547,6 +547,7 @@ const PROPDATES_CHUNK = 50_000n;
 const PROPDATES_MIN_CHUNK = 500n;
 let propdatesChunk = PROPDATES_CHUNK;
 const PROPDATES_CONCURRENCY = 4;
+const PROPDATES_BATCH = 40; // ranges per committed batch
 const PROPDATES_REFRESH_MS = 60_000;
 const PROPDATES_BUDGET_MS = 3_000;
 
@@ -576,6 +577,7 @@ const propdatesState: { rows: PropdateRow[]; scannedTo: bigint; at: number } = {
   at: 0,
 };
 let propdatesInflight: Promise<PropdateRow[]> | null = null;
+let propdatesFailure: { at: number; err: unknown } | null = null;
 
 async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);
@@ -659,26 +661,10 @@ async function getLogsAdaptive(from: bigint, to: bigint): Promise<RawLog[]> {
   }
 }
 
-async function refreshPropdates(): Promise<PropdateRow[]> {
-  const head = BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
-  const from = propdatesState.scannedTo + 1n;
-  if (head < from) return propdatesState.rows;
-
-  // Learn a workable range size on the first chunk, then fan out.
-  const firstTo = from + propdatesChunk - 1n > head ? head : from + propdatesChunk - 1n;
-  const first = await getLogsAdaptive(from, firstTo);
-  const ranges: { from: bigint; to: bigint }[] = [];
-  for (let a = firstTo + 1n; a <= head; a += propdatesChunk) {
-    const b = a + propdatesChunk - 1n;
-    ranges.push({ from: a, to: b > head ? head : b });
-  }
-  // Any failed chunk throws, so scannedTo never advances past a gap.
-  const rest = await mapLimit(ranges, PROPDATES_CONCURRENCY, r => getLogsAdaptive(r.from, r.to));
-  const chunks = [first, ...rest];
-  const decoded = chunks
-    .flat()
-    .map(decodePropdateLog)
-    .filter((x): x is NonNullable<typeof x> => x != null);
+/** Decode, enrich (timestamps + poster) and merge a batch of raw logs into the cache. */
+async function ingestPropdateLogs(logs: RawLog[], head: bigint): Promise<void> {
+  const decoded = logs.map(decodePropdateLog).filter((x): x is NonNullable<typeof x> => x != null);
+  if (decoded.length === 0) return;
 
   // Exact timestamps + poster (the tx sender — only the prop's admin can post).
   const blocks = [...new Set(decoded.map(d => d.blockNumber))];
@@ -708,28 +694,66 @@ async function refreshPropdates(): Promise<PropdateRow[]> {
     timestamp:
       tsByBlock.get(d.blockNumber) ?? nowSec - (Number(head) - d.blockNumber) * SECONDS_PER_BLOCK,
   }));
-
   propdatesState.rows = [...fresh, ...propdatesState.rows].sort(
     (a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex,
   );
-  propdatesState.scannedTo = head;
+}
+
+async function refreshPropdates(): Promise<PropdateRow[]> {
+  const head = BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
+  if (head < propdatesState.scannedTo + 1n) {
+    propdatesState.at = Date.now();
+    return propdatesState.rows;
+  }
+
+  // Progress is committed batch by batch (scannedTo only advances past
+  // ranges that fully succeeded), so a failure mid-way through the cold
+  // scan resumes where it stopped instead of starting over.
+  while (propdatesState.scannedTo < head) {
+    const from = propdatesState.scannedTo + 1n;
+    // The first range runs alone so getLogsAdaptive can learn the RPC's cap.
+    const batchSize = propdatesState.scannedTo < PROPDATES_DEPLOY_BLOCK ? 1 : PROPDATES_BATCH;
+    const ranges: { from: bigint; to: bigint }[] = [];
+    for (let a = from, i = 0; a <= head && i < batchSize; a += propdatesChunk, i++) {
+      const b = a + propdatesChunk - 1n;
+      ranges.push({ from: a, to: b > head ? head : b });
+    }
+    const chunks = await mapLimit(ranges, PROPDATES_CONCURRENCY, r =>
+      getLogsAdaptive(r.from, r.to),
+    );
+    await ingestPropdateLogs(chunks.flat(), head);
+    propdatesState.scannedTo = ranges[ranges.length - 1]!.to;
+  }
+
   propdatesState.at = Date.now();
   return propdatesState.rows;
 }
 
 /**
  * Every propdate, newest first. Refreshes at most once a minute; concurrent
- * callers share one scan. After the first scan a failed refresh serves the
- * last good list instead of throwing.
+ * callers share one scan. After the first complete scan a failed refresh
+ * serves the last good list; before it, failures back off for a minute
+ * rather than re-scanning on every request.
  */
 export function getAllPropdates(): Promise<PropdateRow[]> {
-  if (propdatesState.at > 0 && Date.now() - propdatesState.at < PROPDATES_REFRESH_MS) {
+  const now = Date.now();
+  if (propdatesState.at > 0 && now - propdatesState.at < PROPDATES_REFRESH_MS) {
     return Promise.resolve(propdatesState.rows);
+  }
+  if (!propdatesInflight && propdatesFailure && now - propdatesFailure.at < PROPDATES_REFRESH_MS) {
+    return propdatesState.at > 0
+      ? Promise.resolve(propdatesState.rows)
+      : Promise.reject(propdatesFailure.err);
   }
   if (!propdatesInflight) {
     propdatesInflight = refreshPropdates()
+      .then(rows => {
+        propdatesFailure = null;
+        return rows;
+      })
       .catch(err => {
         console.warn('[propdates] refresh failed:', err);
+        propdatesFailure = { at: Date.now(), err };
         if (propdatesState.at > 0) return propdatesState.rows;
         throw err;
       })
@@ -2290,7 +2314,15 @@ export function registerActivityRoutes(app: Hono) {
     }
     const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '500', 10) || 500, 1), 1000);
     try {
-      const rows = await getAllPropdates();
+      // The first full scan takes a while; answer fast instead of hanging and
+      // let the webapp fall back until the cache is warm.
+      const scan = getAllPropdates();
+      const timedOut = new Promise<null>(resolve => setTimeout(() => resolve(null), 5_000));
+      const rows = await Promise.race([scan, timedOut]);
+      if (!rows) {
+        scan.catch(() => {});
+        return c.json({ error: 'propdates warming up' }, 503);
+      }
       const picked = propId === undefined ? rows : rows.filter(r => r.proposalId === propId);
       return c.json({ propdates: picked.slice(0, limit) });
     } catch (err) {
