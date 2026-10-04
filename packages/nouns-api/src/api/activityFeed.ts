@@ -533,8 +533,14 @@ export async function fetchLilNounsActivity(
 // from `before` in chunks until it has a page. Cached like the Lil source.
 
 const PROPDATES_ADDRESS = '0xa5bf9a9b8f60cfd98b1ccb592f2f9f37bb0033a4';
-// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update)
-const POST_UPDATE_TOPIC = '0xad584acc60e02bf07eea7e31719bb25c1bfa1c95a28a2cf1b530f88aaa2d72b4';
+// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update).
+// The first hash is the one the webapp's usePropdates reads (taken from chain);
+// the second is keccak of the signature above. They disagree, so match either
+// — topic0 OR-filter — rather than guess which the deployed contract emits.
+const POST_UPDATE_TOPICS = [
+  '0xad584acc60e02bf07eea7e31719bb25c1bfa1c95a28a2cf1b530f88aaa2d72b4',
+  '0xcbeea0cc82b02b8b2687b661a00b2beefee33d74a34bcfb9f364ff2017d00711',
+];
 const PROPDATES_DEPLOY_BLOCK = 19_399_894n;
 const PROPDATES_CHUNK = 50_000n;
 const PROPDATES_MAX_CHUNKS = 8; // ~400k blocks ≈ 2 months per page
@@ -576,7 +582,7 @@ export async function fetchPropdatesActivity(
     const chunk = await rpc<RawLog[]>('eth_getLogs', [
       {
         address: PROPDATES_ADDRESS,
-        topics: [POST_UPDATE_TOPIC],
+        topics: [POST_UPDATE_TOPICS],
         fromBlock: `0x${from.toString(16)}`,
         toBlock: `0x${to.toString(16)}`,
       },
@@ -623,6 +629,7 @@ export async function fetchPropdatesActivity(
 
   const events: ActivityEvent[] = [];
   for (const l of page) {
+    if (l.topics.length < 3) continue;
     let update = '';
     try {
       [update] = decodeAbiParameters([{ type: 'string' }], l.data as Hex);
