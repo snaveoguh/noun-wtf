@@ -1,7 +1,7 @@
 # Noun Repurchase Program, Part II of II: turn it on (exit at book value, the co-op way)
 
 **Status:** draft. Goes to a vote only after Part I's audit is published and its findings are fixed. Handed to the Compliance Administrators for review under Bylaws §2.2(a).
-**Part I:** `proposal-noun-repurchase-part-1-audit.md` funded the audit and the deployment of the audited contract, paused and owned by the DAO.
+**Part I:** `proposal-audit-part-1.md` funded one audit covering this program and Client Incentives V2, and the deployment of the audited contract, paused and owned by the DAO.
 **Code:** `packages/nouns-contracts/contracts/repurchase/` (`NounsRepurchase.sol`, `EthConverters.sol`), deploy script `script/DeployNounsRepurchase.s.sol`, tests `test/foundry/NounsRepurchase.t.sol` (64 tests, including a fuzz test of the auction invariants and an end-to-end run against the real `NounsToken`)
 
 ## TL;DR

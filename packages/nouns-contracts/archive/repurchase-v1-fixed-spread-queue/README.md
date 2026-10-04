@@ -1,7 +1,7 @@
 # Archived: Noun Repurchase Program v1 (fixed spread, 1 a day)
 
 A record of the first design. It was superseded by the reverse auction now in
-`contracts/repurchase/NounsRepurchase.sol`, proposed in two parts: `proposal-noun-repurchase-part-1-audit.md` and
+`contracts/repurchase/NounsRepurchase.sol`, proposed in two parts: `proposal-audit-part-1.md` (a shared audit with Client Incentives V2) and
 `proposal-noun-repurchase-part-2-program.md` at the repo root.
 
 These files are not compiled or tested: Hardhat and Foundry only build `contracts/`, `test/` and `script/`.
