@@ -33,7 +33,7 @@ Fill in the bracketed bits (the two commit links and how to reach you) before se
 
 ---
 
-**Subject: Quote request: two small Nouns DAO codebases (~720 nSLOC new/changed), paid by DAO proposal**
+**Subject: Quote request: two small Nouns DAO codebases (~770 nSLOC new or changed), paid by DAO proposal**
 
 Hi,
 
