@@ -541,6 +541,11 @@ export async function fetchLilNounsActivity(
 const PROPDATES_ADDRESS = '0xa5bf9a9b8f60cfd98b1ccb592f2f9f37bb0033a4';
 const PROPDATES_DEPLOY_BLOCK = 19_399_894n;
 const PROPDATES_CHUNK = 50_000n;
+// RPCs cap eth_getLogs ranges differently (dRPC's free plan rejects 50k).
+// Ranges halve on failure down to this floor, and the size that worked is
+// remembered for later chunks and refreshes.
+const PROPDATES_MIN_CHUNK = 500n;
+let propdatesChunk = PROPDATES_CHUNK;
 const PROPDATES_CONCURRENCY = 4;
 const PROPDATES_REFRESH_MS = 60_000;
 const PROPDATES_BUDGET_MS = 3_000;
@@ -604,28 +609,72 @@ function decodePropdateLog(l: RawLog): Omit<PropdateRow, 'poster' | 'timestamp'>
   }
 }
 
+async function getLogsRange(from: bigint, to: bigint): Promise<RawLog[]> {
+  const res = await fetch(MAINNET_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_getLogs',
+      params: [
+        {
+          address: PROPDATES_ADDRESS,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+        },
+      ],
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    result?: RawLog[];
+    error?: { message?: string };
+  };
+  if (Array.isArray(json.result)) return json.result;
+  throw new Error(
+    `propdates eth_getLogs ${from}-${to}: ${json.error?.message ?? `HTTP ${res.status}`}`,
+  );
+}
+
+/** eth_getLogs that retries once, then splits the range in half on failure. */
+async function getLogsAdaptive(from: bigint, to: bigint): Promise<RawLog[]> {
+  try {
+    return await getLogsRange(from, to);
+  } catch {
+    // One retry first, so a transient 429 / timeout doesn't shrink the range.
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+    try {
+      return await getLogsRange(from, to);
+    } catch (err) {
+      const span = to - from + 1n;
+      if (span <= PROPDATES_MIN_CHUNK) throw err;
+      const half = span / 2n;
+      if (half < propdatesChunk) propdatesChunk = half;
+      const mid = from + half - 1n;
+      const left = await getLogsAdaptive(from, mid);
+      const right = await getLogsAdaptive(mid + 1n, to);
+      return [...left, ...right];
+    }
+  }
+}
+
 async function refreshPropdates(): Promise<PropdateRow[]> {
   const head = BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
   const from = propdatesState.scannedTo + 1n;
   if (head < from) return propdatesState.rows;
 
+  // Learn a workable range size on the first chunk, then fan out.
+  const firstTo = from + propdatesChunk - 1n > head ? head : from + propdatesChunk - 1n;
+  const first = await getLogsAdaptive(from, firstTo);
   const ranges: { from: bigint; to: bigint }[] = [];
-  for (let a = from; a <= head; a += PROPDATES_CHUNK) {
-    const b = a + PROPDATES_CHUNK - 1n;
+  for (let a = firstTo + 1n; a <= head; a += propdatesChunk) {
+    const b = a + propdatesChunk - 1n;
     ranges.push({ from: a, to: b > head ? head : b });
   }
   // Any failed chunk throws, so scannedTo never advances past a gap.
-  const chunks = await mapLimit(ranges, PROPDATES_CONCURRENCY, async r => {
-    const logs = await rpc<RawLog[]>('eth_getLogs', [
-      {
-        address: PROPDATES_ADDRESS,
-        fromBlock: `0x${r.from.toString(16)}`,
-        toBlock: `0x${r.to.toString(16)}`,
-      },
-    ]);
-    if (!Array.isArray(logs)) throw new Error(`propdates eth_getLogs failed ${r.from}-${r.to}`);
-    return logs;
-  });
+  const rest = await mapLimit(ranges, PROPDATES_CONCURRENCY, r => getLogsAdaptive(r.from, r.to));
+  const chunks = [first, ...rest];
   const decoded = chunks
     .flat()
     .map(decodePropdateLog)
