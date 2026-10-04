@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { type Log, decodeAbiParameters, parseAbiParameters } from 'viem';
-import { useBlockNumber, usePublicClient } from 'wagmi';
+import { usePublicClient } from 'wagmi';
 
 // ─── Contract Config ──────────────────────────────────────────────────────────
 
@@ -13,8 +13,17 @@ const DEPLOY_BLOCK = 19_399_894n;
 const BLOCK_CHUNK = 50_000n;
 const MAX_PARALLEL = 8;
 
-// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update)
-const POST_UPDATE_TOPIC = '0xad584acc60e02bf07eea7e31719bb25c1bfa1c95a28a2cf1b530f88aaa2d72b4';
+// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update).
+// Logs are matched by address + shape (3 topics, string payload), not topic0:
+// the hash previously hard-coded here didn't match the event, so the filter
+// returned nothing and propdates never rendered.
+
+// The API keeps the full propdates history cached server-side; the chain scan
+// below is only a fallback for when it's unreachable.
+const API_BASE: string =
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
+  'https://spirited-flexibility-production-3c30.up.railway.app';
+const API_TIMEOUT_MS = 8_000;
 
 // Timestamp estimation
 const ANCHOR_BLOCK = 19_399_894n;
@@ -83,7 +92,6 @@ async function fetchAllLogs(
       batch.map(chunk =>
         client.getLogs({
           address,
-          topics: [POST_UPDATE_TOPIC],
           fromBlock: chunk.from,
           toBlock: chunk.to,
         }),
@@ -106,10 +114,12 @@ function decodePostUpdateLogs(logs: Log[]): PropdateEntry[] {
   for (const log of logs) {
     try {
       const topics = log.topics;
-      if (topics == null || topics.length < 3) continue;
+      if (topics == null || topics.length !== 3) continue;
 
       const propId = Number(BigInt(topics[1]!));
-      const isCompleted = BigInt(topics[2]!) !== 0n;
+      const flag = BigInt(topics[2]!);
+      if (flag > 1n) continue;
+      const isCompleted = flag === 1n;
 
       const data = log.data;
       if (data == null || data === '0x') continue;
@@ -137,6 +147,34 @@ function decodePostUpdateLogs(logs: Log[]): PropdateEntry[] {
   return entries;
 }
 
+// ─── API fetch ────────────────────────────────────────────────────────────────
+
+interface ApiPropdate {
+  proposalId: number;
+  isCompleted: boolean;
+  update: string;
+  blockNumber: number;
+  timestamp: number;
+}
+
+async function fetchFromApi(): Promise<PropdateEntry[] | null> {
+  const res = await fetch(`${API_BASE}/api/propdates?limit=1000`, {
+    signal: AbortSignal.timeout(API_TIMEOUT_MS),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { propdates?: ApiPropdate[] };
+  if (!Array.isArray(body.propdates)) return null;
+  return body.propdates.map(p => ({
+    propId: p.proposalId,
+    isCompleted: p.isCompleted,
+    update: p.update,
+    blockNumber: BigInt(p.blockNumber),
+    timestamp: p.timestamp,
+    imageUrl: extractImageUrl(p.update),
+    title: extractTitle(p.update),
+  }));
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 interface UsePropdatesOptions {
@@ -151,29 +189,28 @@ interface UsePropdatesOptions {
 export function usePropdates(options: UsePropdatesOptions = {}) {
   const { propId, dedupeByProp = true, limit = 40 } = options;
   const publicClient = usePublicClient();
-  const { data: currentBlock } = useBlockNumber();
 
-  // Single shared query for all propdates — filter client-side
+  // Single shared query for all propdates — filter client-side. The key is
+  // deliberately stable: keying on the block number restarted the full-history
+  // scan every block, so it never finished and the UI sat on "Loading".
   const query = useReactQuery({
-    queryKey: ['propdatesFromChain', currentBlock?.toString()],
+    queryKey: ['propdates'],
     queryFn: async (): Promise<PropdateEntry[]> => {
-      if (publicClient == null || currentBlock == null) return [];
+      const fromApi = await fetchFromApi().catch(() => null);
+      if (fromApi) return fromApi;
 
-      const rawLogs = await fetchAllLogs(
-        publicClient,
-        PROPDATES_ADDRESS,
-        DEPLOY_BLOCK,
-        currentBlock,
-      );
-
+      if (publicClient == null) return [];
+      const head = await publicClient.getBlockNumber();
+      const rawLogs = await fetchAllLogs(publicClient, PROPDATES_ADDRESS, DEPLOY_BLOCK, head);
       const entries = decodePostUpdateLogs(rawLogs);
       entries.sort((a, b) => Number(b.blockNumber - a.blockNumber));
       return entries;
     },
-    enabled: publicClient != null && currentBlock != null,
+    enabled: publicClient != null,
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
-    retry: 2,
+    refetchInterval: 5 * 60_000,
+    retry: 1,
   });
 
   // Client-side filtering by propId + dedup + limit

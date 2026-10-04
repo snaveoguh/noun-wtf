@@ -709,7 +709,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     filterKey: 'PROPDATE',
     icon: '📣',
     describe: (d, ctx) => {
-      const who = d.poster ? `${ctx.addr(d.poster)} posted ` : '';
+      const who = isAddress(d.poster) ? `${ctx.addr(d.poster)} posted ` : '';
       const done = bool(d.isCompleted) ? ' (marked complete)' : '';
       return `${who}update on ${propRef(d)}${done}${propTitle(d)}`;
     },
