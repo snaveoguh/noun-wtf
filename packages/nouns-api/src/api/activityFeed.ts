@@ -34,6 +34,7 @@ import type { Hono } from 'hono';
 import { and, desc, eq, inArray, isNotNull, like, lt, lte, max, or, sql } from 'drizzle-orm';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
+import { decodeAbiParameters, type Hex } from 'viem';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ export const ACTIVITY_EVENT_TYPES = [
   'PROPOSAL_VETOED',
   'VOTE',
   'PROPOSAL_FEEDBACK',
+  'PROPDATE',
   // candidates
   'CANDIDATE_CREATED',
   'CANDIDATE_UPDATED',
@@ -522,6 +524,186 @@ export async function fetchLilNounsActivity(
 
   lilActivityCache = { at: now, key, events };
   return events;
+}
+
+// ─── Propdates (onchain RPC logs) ───────────────────────────────────────────
+//
+// Propdates aren't indexed by Ponder (adding a contract would force a full
+// reindex). Instead the whole PostUpdate history is scanned once over RPC,
+// held in memory, and topped up incrementally — it's a few hundred rows.
+//
+// Logs are matched by contract address alone, not topic0: the hash the
+// webapp hard-coded didn't match the event signature, and filtering on a
+// wrong hash silently returns nothing. PostUpdate is the only event on the
+// contract with 3 topics (propId, bool isCompleted) and a string payload,
+// so the shape check below is enough to pick it out.
+
+const PROPDATES_ADDRESS = '0xa5bf9a9b8f60cfd98b1ccb592f2f9f37bb0033a4';
+const PROPDATES_DEPLOY_BLOCK = 19_399_894n;
+const PROPDATES_CHUNK = 50_000n;
+const PROPDATES_CONCURRENCY = 4;
+const PROPDATES_REFRESH_MS = 60_000;
+const PROPDATES_BUDGET_MS = 3_000;
+
+export interface PropdateRow {
+  proposalId: number;
+  isCompleted: boolean;
+  poster: string | null;
+  update: string;
+  blockNumber: number;
+  logIndex: number;
+  txHash: string;
+  /** Unix seconds. */
+  timestamp: number;
+}
+
+interface RawLog {
+  topics: string[];
+  data: string;
+  blockNumber: string;
+  transactionHash: string;
+  logIndex: string;
+}
+
+const propdatesState: { rows: PropdateRow[]; scannedTo: bigint; at: number } = {
+  rows: [],
+  scannedTo: PROPDATES_DEPLOY_BLOCK - 1n,
+  at: 0,
+};
+let propdatesInflight: Promise<PropdateRow[]> | null = null;
+
+async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
+
+function decodePropdateLog(l: RawLog): Omit<PropdateRow, 'poster' | 'timestamp'> | null {
+  if (l.topics.length !== 3 || !l.data || l.data === '0x') return null;
+  const flag = BigInt(l.topics[2]!);
+  if (flag > 1n) return null;
+  try {
+    const [update] = decodeAbiParameters([{ type: 'string' }], l.data as Hex);
+    return {
+      proposalId: Number(BigInt(l.topics[1]!)),
+      isCompleted: flag === 1n,
+      update,
+      blockNumber: Number(BigInt(l.blockNumber)),
+      logIndex: Number(BigInt(l.logIndex)),
+      txHash: l.transactionHash,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function refreshPropdates(): Promise<PropdateRow[]> {
+  const head = BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
+  const from = propdatesState.scannedTo + 1n;
+  if (head < from) return propdatesState.rows;
+
+  const ranges: { from: bigint; to: bigint }[] = [];
+  for (let a = from; a <= head; a += PROPDATES_CHUNK) {
+    const b = a + PROPDATES_CHUNK - 1n;
+    ranges.push({ from: a, to: b > head ? head : b });
+  }
+  // Any failed chunk throws, so scannedTo never advances past a gap.
+  const chunks = await mapLimit(ranges, PROPDATES_CONCURRENCY, async r => {
+    const logs = await rpc<RawLog[]>('eth_getLogs', [
+      {
+        address: PROPDATES_ADDRESS,
+        fromBlock: `0x${r.from.toString(16)}`,
+        toBlock: `0x${r.to.toString(16)}`,
+      },
+    ]);
+    if (!Array.isArray(logs)) throw new Error(`propdates eth_getLogs failed ${r.from}-${r.to}`);
+    return logs;
+  });
+  const decoded = chunks
+    .flat()
+    .map(decodePropdateLog)
+    .filter((x): x is NonNullable<typeof x> => x != null);
+
+  // Exact timestamps + poster (the tx sender — only the prop's admin can post).
+  const blocks = [...new Set(decoded.map(d => d.blockNumber))];
+  const txs = [...new Set(decoded.map(d => d.txHash))];
+  const tsByBlock = new Map<number, number>();
+  const fromByTx = new Map<string, string>();
+  await Promise.all([
+    mapLimit(blocks, PROPDATES_CONCURRENCY, async b => {
+      const blk = await rpc<{ timestamp?: string }>('eth_getBlockByNumber', [
+        `0x${b.toString(16)}`,
+        false,
+      ]).catch(() => undefined);
+      if (blk?.timestamp) tsByBlock.set(b, Number(BigInt(blk.timestamp)));
+    }),
+    mapLimit(txs, PROPDATES_CONCURRENCY, async h => {
+      const tx = await rpc<{ from?: string }>('eth_getTransactionByHash', [h]).catch(
+        () => undefined,
+      );
+      if (tx?.from) fromByTx.set(h, lower(tx.from));
+    }),
+  ]);
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const fresh: PropdateRow[] = decoded.map(d => ({
+    ...d,
+    poster: fromByTx.get(d.txHash) ?? null,
+    timestamp:
+      tsByBlock.get(d.blockNumber) ?? nowSec - (Number(head) - d.blockNumber) * SECONDS_PER_BLOCK,
+  }));
+
+  propdatesState.rows = [...fresh, ...propdatesState.rows].sort(
+    (a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex,
+  );
+  propdatesState.scannedTo = head;
+  propdatesState.at = Date.now();
+  return propdatesState.rows;
+}
+
+/**
+ * Every propdate, newest first. Refreshes at most once a minute; concurrent
+ * callers share one scan. After the first scan a failed refresh serves the
+ * last good list instead of throwing.
+ */
+export function getAllPropdates(): Promise<PropdateRow[]> {
+  if (propdatesState.at > 0 && Date.now() - propdatesState.at < PROPDATES_REFRESH_MS) {
+    return Promise.resolve(propdatesState.rows);
+  }
+  if (!propdatesInflight) {
+    propdatesInflight = refreshPropdates()
+      .catch(err => {
+        console.warn('[propdates] refresh failed:', err);
+        if (propdatesState.at > 0) return propdatesState.rows;
+        throw err;
+      })
+      .finally(() => {
+        propdatesInflight = null;
+      });
+  }
+  return propdatesInflight;
+}
+
+function propdateToEvent(r: PropdateRow): ActivityEvent {
+  return {
+    type: 'PROPDATE',
+    blockNumber: r.blockNumber,
+    timestamp: new Date(r.timestamp * 1000).toISOString(),
+    txHash: r.txHash,
+    data: {
+      proposalId: r.proposalId,
+      isCompleted: r.isCompleted,
+      poster: r.poster,
+      description: r.update.slice(0, 4000),
+    },
+  };
 }
 
 // ─── Feed source registry ───────────────────────────────────────────────────
@@ -1552,6 +1734,29 @@ const lilNounsSource: FeedSource = {
   fetch: ctx => (ctx.address ? Promise.resolve([]) : fetchLilNounsActivity(ctx.before, ctx.limit)),
 };
 
+const propdatesSource: FeedSource = {
+  name: 'propdates',
+  types: ['PROPDATE'],
+  // Not indexed per wallet (raw RPC logs) — skip in per-wallet mode.
+  async fetch(ctx) {
+    if (ctx.address) return [];
+    // The first (cold) scan walks the whole history; don't let it hold up the
+    // feed. It keeps running in the background and the next poll is warm.
+    const scan = getAllPropdates();
+    const timedOut = new Promise<null>(resolve =>
+      setTimeout(() => resolve(null), PROPDATES_BUDGET_MS),
+    );
+    const rows = await Promise.race([scan, timedOut]);
+    if (!rows) {
+      scan.catch(() => {});
+      return [];
+    }
+    const older = ctx.before != null ? rows.filter(r => BigInt(r.blockNumber) < ctx.before!) : rows;
+    if (older.length > ctx.perTable) ctx.markMore();
+    return older.slice(0, ctx.perTable).map(propdateToEvent);
+  },
+};
+
 const SOURCES: readonly FeedSource[] = [
   bidsSource,
   votesSource,
@@ -1579,6 +1784,7 @@ const SOURCES: readonly FeedSource[] = [
   daoConfigSource,
   grantsSource,
   lilNounsSource,
+  propdatesSource,
 ];
 
 // ─── Post-processors ────────────────────────────────────────────────────────
@@ -1687,6 +1893,7 @@ const suppressSideEffectDelegations: PostProcessor = async events => {
 const NEEDS_PROPOSAL_META = new Set<string>([
   'PROPOSAL_CREATED',
   'PROPOSAL_UPDATED',
+  'PROPDATE',
   ...PROPOSAL_STATUS_TYPES,
 ]);
 
@@ -2023,6 +2230,26 @@ export async function buildNounV2Feed(params: {
 const EMPTY: ActivityResponse = { events: [], hasMore: false, oldestBlock: 0 };
 
 export function registerActivityRoutes(app: Hono) {
+  // Warm the propdates cache at boot so the first visitor doesn't pay for the scan.
+  getAllPropdates().catch(() => {});
+
+  app.get('/api/propdates', async c => {
+    const propIdParam = c.req.query('propId');
+    const propId = propIdParam != null && propIdParam !== '' ? Number(propIdParam) : undefined;
+    if (propId !== undefined && !Number.isInteger(propId)) {
+      return c.json({ error: 'propId must be an integer' }, 400);
+    }
+    const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '500', 10) || 500, 1), 1000);
+    try {
+      const rows = await getAllPropdates();
+      const picked = propId === undefined ? rows : rows.filter(r => r.proposalId === propId);
+      return c.json({ propdates: picked.slice(0, limit) });
+    } catch (err) {
+      console.error('[propdates] Error:', err);
+      return c.json({ error: 'propdates unavailable' }, 503);
+    }
+  });
+
   app.get('/api/activity', async c => {
     const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
     const beforeParam = c.req.query('before');

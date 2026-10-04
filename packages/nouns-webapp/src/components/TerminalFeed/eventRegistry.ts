@@ -703,6 +703,20 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     expand: 'reason',
   }),
 
+  PROPDATE: def({
+    label: 'PROPDATE',
+    color: C.pass,
+    filterKey: 'PROPDATE',
+    icon: '📣',
+    describe: (d, ctx) => {
+      const who = isAddress(d.poster) ? `${ctx.addr(d.poster)} posted ` : '';
+      const done = bool(d.isCompleted) ? ' (marked complete)' : '';
+      return `${who}update on ${propRef(d)}${done}${propTitle(d)}`;
+    },
+    link: propLink('/vote'),
+    expand: 'markdown',
+  }),
+
   // ── Candidates ──────────────────────────────────────────────────────────
   CANDIDATE_CREATED: def({
     label: 'CAND',
@@ -1172,6 +1186,7 @@ const ADDRESS_KEYS = new Set([
   'forkTreasury',
   'sender',
   'creator',
+  'poster',
 ]);
 
 /** Array keys that are never addresses (or not worth resolving — signers are only counted). */
@@ -1216,7 +1231,7 @@ export const FILTER_TABS: { key: string; label: string; color: string | null }[]
   },
   { key: 'BID', label: 'BIDS', color: C.bid },
   {
-    key: 'PROPOSAL_CREATED,PROPOSAL_UPDATED,PROPOSAL_VOTING_STARTED,PROPOSAL_OBJECTION_PERIOD,PROPOSAL_ENDED,PROPOSAL_QUEUED,PROPOSAL_EXECUTED,PROPOSAL_CANCELLED,PROPOSAL_VETOED',
+    key: 'PROPOSAL_CREATED,PROPOSAL_UPDATED,PROPOSAL_VOTING_STARTED,PROPOSAL_OBJECTION_PERIOD,PROPOSAL_ENDED,PROPOSAL_QUEUED,PROPOSAL_EXECUTED,PROPOSAL_CANCELLED,PROPOSAL_VETOED,PROPDATE',
     label: 'PROPS',
     color: C.prop,
   },
