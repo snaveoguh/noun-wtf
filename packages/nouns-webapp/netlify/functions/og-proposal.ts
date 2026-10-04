@@ -25,6 +25,25 @@ interface HandlerEvent {
   path: string;
   headers?: Record<string, string>;
   rawUrl?: string;
+  queryStringParameters?: Record<string, string | undefined> | null;
+}
+
+/**
+ * Lil Nouns proposals share the /vote/:id route with Nouns DAO and are told
+ * apart only by `?dao=lil` (see VotePageRouter). Without this, a Lil prop
+ * link unfurled as the Nouns DAO prop with the same number.
+ */
+function isLilNounsRequest(event: HandlerEvent): boolean {
+  let dao = event.queryStringParameters?.dao;
+  if (dao === undefined && event.rawUrl !== undefined) {
+    try {
+      dao = new URL(event.rawUrl).searchParams.get('dao') ?? undefined;
+    } catch {
+      // Malformed rawUrl: treat as Nouns DAO.
+    }
+  }
+  const v = (dao ?? '').toLowerCase();
+  return v === 'lil' || v === 'lilnouns' || v === 'lil-nouns';
 }
 
 interface HandlerResponse {
@@ -123,6 +142,16 @@ async function fetchProposal(id: string): Promise<ProposalShape | null> {
   }
 }
 
+async function fetchLilProposal(id: string): Promise<ProposalShape | null> {
+  const res = await fetchWithTimeout(`${PONDER_API}/api/lil-proposals/${encodeURIComponent(id)}`);
+  if (res === null || !res.ok) return null;
+  try {
+    return (await res.json()) as ProposalShape;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchCandidate(id: string): Promise<CandidateShape | null> {
   const res = await fetchWithTimeout(`${PONDER_API}/api/candidates/${encodeURIComponent(id)}`);
   if (res === null || !res.ok) return null;
@@ -190,8 +219,17 @@ interface RouteData {
   url: string;
 }
 
-async function resolveRouteData(path: string): Promise<RouteData | null> {
+async function resolveRouteData(path: string, isLil: boolean): Promise<RouteData | null> {
   const voteMatch = path.match(/^\/vote\/([^#/?]+)/);
+  if (voteMatch !== null && isLil) {
+    const proposal = await fetchLilProposal(voteMatch[1]);
+    if (proposal === null) return null;
+    return {
+      description: proposal.description ?? '',
+      title: proposal.title ?? `Lil Nouns Prop ${proposal.id ?? voteMatch[1]}`,
+      url: `${SITE_URL}/vote/${voteMatch[1]}?dao=lil`,
+    };
+  }
   if (voteMatch !== null) {
     const proposal = await fetchProposal(voteMatch[1]);
     if (proposal === null) return null;
@@ -219,14 +257,24 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   // Netlify functions receive the original path even when invoked via
   // _redirects rewrite — `event.path` is the inbound URL path.
   const inboundPath = event.path || '/';
+  const isLil = isLilNounsRequest(event);
+  const siteName = isLil ? 'Lil Nouns DAO' : 'Nouns DAO';
+  const siteTagline = isLil
+    ? 'A Lil Nouns DAO proposal on noun.wtf'
+    : 'One Noun, every day, forever.';
+  // Nouns and Lil props share a path, so the CDN must key the cache on ?dao.
+  const cacheHeaders = {
+    'Cache-Control': 'public, max-age=60, s-maxage=300',
+    'Netlify-Vary': 'query=dao',
+  };
 
-  const [html, data] = await Promise.all([fetchIndexHtml(), resolveRouteData(inboundPath)]);
+  const [html, data] = await Promise.all([fetchIndexHtml(), resolveRouteData(inboundPath, isLil)]);
 
   // Couldn't fetch the SPA shell — fall back to a tiny standalone HTML
   // doc so crawlers at least get something with proper meta tags.
   if (html === null) {
-    const fallbackTitle = 'Nouns DAO';
-    const fallbackDesc = 'One Noun, every day, forever.';
+    const fallbackTitle = siteName;
+    const fallbackDesc = siteTagline;
     const meta = buildMetaTags({
       title: fallbackTitle,
       description: fallbackDesc,
@@ -237,14 +285,14 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       statusCode: 200,
       headers: {
         'Content-Type': 'text/html; charset=UTF-8',
-        'Cache-Control': 'public, max-age=60, s-maxage=300',
+        ...cacheHeaders,
       },
       body: `<!DOCTYPE html><html><head>${meta}<title>${escapeAttr(fallbackTitle)}</title></head><body></body></html>`,
     };
   }
 
-  let title = 'Nouns DAO';
-  let description = 'One Noun, every day, forever.';
+  let title = siteName;
+  let description = siteTagline;
   let image = FALLBACK_OG_IMAGE;
 
   if (data !== null) {
@@ -276,7 +324,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     statusCode: 200,
     headers: {
       'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': 'public, max-age=60, s-maxage=300',
+      ...cacheHeaders,
     },
     body: mutated,
   };
