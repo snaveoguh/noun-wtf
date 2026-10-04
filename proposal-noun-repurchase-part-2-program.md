@@ -1,7 +1,8 @@
-# Proposal: Noun Repurchase Program (exit at book value, the co-op way)
+# Noun Repurchase Program, Part II of II: turn it on (exit at book value, the co-op way)
 
-**Status:** draft, handed to the Compliance Administrators for review under Bylaws §2.2(a)
-**Code:** `packages/nouns-contracts/contracts/repurchase/` (`NounsRepurchase.sol`, `EthConverters.sol`), deploy script `script/DeployNounsRepurchase.s.sol`, tests `test/foundry/NounsRepurchase.t.sol` (63 tests, including a fuzz test of the auction invariants and an end-to-end run against the real `NounsToken`)
+**Status:** draft. Goes to a vote only after Part I's audit is published and its findings are fixed. Handed to the Compliance Administrators for review under Bylaws §2.2(a).
+**Part I:** `proposal-noun-repurchase-part-1-audit.md` funded the audit and the deployment of the audited contract, paused and owned by the DAO.
+**Code:** `packages/nouns-contracts/contracts/repurchase/` (`NounsRepurchase.sol`, `EthConverters.sol`), deploy script `script/DeployNounsRepurchase.s.sol`, tests `test/foundry/NounsRepurchase.t.sol` (64 tests, including a fuzz test of the auction invariants and an end-to-end run against the real `NounsToken`)
 
 ## TL;DR
 
@@ -117,9 +118,11 @@ Reference numbers from Prop 955: about 3,950 ETH of primary assets over 1,344 ci
 
 ## On-chain actions
 
-1. `NounsRepurchase` deployment via `script/DeployNounsRepurchase.s.sol`. Ownership transfers to the Executor in the constructor; the deployer never controls the program.
+The contract is already deployed from the audited commit (Part I), owned by the Executor and paused. The proposal description links the audit report and the deployment, and anyone can check that the deployed bytecode matches the audited commit.
+
+1. Bylaws amendment recorded via the Data V2 contract's DUNA administrator channel, with the amended text hashed in the proposal description.
 2. `Executor.sendETH(repurchase, 90 ether)`.
-3. Bylaws amendment recorded via the Data V2 contract's DUNA administrator channel, with the amended text hashed in the proposal description.
+3. `NounsRepurchase.unpause()`. Until this executes, nobody can ask or settle.
 
 No changes to the Governor, token, treasury, or auction house.
 
@@ -146,7 +149,7 @@ This section is the hand-off. Per Bylaws §2.2(a) the Compliance Administrators 
 - **Veto.** The Veto Administrators may act on existential risk. The budget, the minimum discount and the NAV cap exist to make that unnecessary.
 - **Investment Company Act optics.** An interest redeemable at up to NAV in a pool of liquid staking tokens looks more fund-like. Counsel should opine.
 - **Rate-provider risk.** Converters trust Lido, Rocket Pool, and Mantle contracts. The DAO can swap the asset list by proposal, and a failing provider only lowers the price.
-- **Audit.** The contract is small (one file, no upgradeability, no external calls except token transfers and rate reads) but has not been audited. An audit should precede mainnet deployment.
+- **Audit.** Funded by Part I. This proposal goes to a vote only once the audit report is public and every finding is fixed or answered in it. An audit lowers the risk of a bug; it does not remove it. The contract has no upgrade path, so a serious bug found later means pausing it, returning its funds to the treasury, and deploying a fixed version by proposal.
 
 ## What this is not
 

@@ -59,7 +59,8 @@ import { IChainalysisSanctionsList } from '../external/chainalysis/IChainalysisS
  *  - NAV = (treasury ETH + this contract's ETH + Σ converter(treasury ERC20 balance) - liabilityReserve)
  *          / (totalSupply - Nouns held by the treasury and other excluded DAO-controlled holders).
  *
- * Owned by the DAO Executor. Every parameter change is a DAO proposal and therefore subject to Compliance
+ * Deployed paused and owned by the DAO Executor, so the deployer never controls it and it does nothing until
+ * the DAO votes to unpause it. Every parameter change is a DAO proposal and therefore subject to Compliance
  * Administrator review and the Veto Administrators. Funds can only ever leave to a member (at or below NAV)
  * or back to the treasury.
  */
@@ -173,6 +174,8 @@ contract NounsRepurchase is INounsRepurchase, IERC721Receiver, Ownable, Pausable
         _setAssets(_assets);
         _setExtraExcludedHolders(_extraExcludedHolders);
 
+        // Deployed inert: nothing can be asked or settled until the DAO votes to unpause.
+        _pause();
         _transferOwnership(_treasury);
     }
 

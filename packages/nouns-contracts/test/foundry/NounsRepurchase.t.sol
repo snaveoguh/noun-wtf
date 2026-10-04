@@ -133,6 +133,8 @@ contract NounsRepurchaseTest is Test {
             assets,
             excluded
         );
+        vm.prank(treasury);
+        r.unpause();
     }
 
     function _approve(address who) internal {
@@ -850,6 +852,37 @@ contract NounsRepurchaseTest is Test {
         assertEq(repurchase.owner(), treasury);
     }
 
+    /// @dev Deployment does nothing on its own: asks and settles wait for the DAO to unpause.
+    function test_admin_deploysPausedUntilDaoUnpauses() public {
+        NounsRepurchase fresh = new NounsRepurchase(
+            IERC721Enumerable(address(nouns)),
+            treasury,
+            address(weth),
+            IChainalysisSanctionsList(address(sanctions)),
+            address(0),
+            _params(MIN_DISCOUNT, BUDGET),
+            0,
+            new INounsRepurchase.Asset[](0),
+            new address[](0)
+        );
+        assertTrue(fresh.paused());
+        assertEq(fresh.owner(), treasury);
+
+        vm.startPrank(alice);
+        nouns.setApprovalForAll(address(fresh), true);
+        vm.expectRevert('Pausable: paused');
+        fresh.placeAsks(_ids(0), 1000, 0, '');
+        vm.expectRevert('Ownable: caller is not the owner');
+        fresh.unpause();
+        vm.stopPrank();
+
+        vm.prank(treasury);
+        fresh.unpause();
+        vm.prank(alice);
+        fresh.placeAsks(_ids(0), 1000, 0, '');
+        assertEq(nouns.ownerOf(0), address(fresh));
+    }
+
     function test_admin_onlyOwner() public {
         address[] memory holders = new address[](0);
         INounsRepurchase.Asset[] memory assets = new INounsRepurchase.Asset[](0);
@@ -972,6 +1005,8 @@ contract NounsRepurchaseWithRealTokenTest is Test, DeployUtils {
             assets,
             excluded
         );
+        vm.prank(treasury);
+        repurchase.unpause();
 
         // Mint Nouns 0 (nounders) and 1, then 2 (minter). Give 1 and 2 to alice.
         vm.startPrank(minter);

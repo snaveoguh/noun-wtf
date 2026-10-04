@@ -1,7 +1,8 @@
 # Archived: Noun Repurchase Program v1 (fixed spread, 1 a day)
 
 A record of the first design. It was superseded by the reverse auction now in
-`contracts/repurchase/NounsRepurchase.sol` and `proposal-noun-repurchase-program.md` at the repo root.
+`contracts/repurchase/NounsRepurchase.sol`, proposed in two parts: `proposal-noun-repurchase-part-1-audit.md` and
+`proposal-noun-repurchase-part-2-program.md` at the repo root.
 
 These files are not compiled or tested: Hardhat and Foundry only build `contracts/`, `test/` and `script/`.
 Import paths are the originals, so they only resolve from those folders.
@@ -20,7 +21,7 @@ Feedback on the draft:
   costs the DAO nothing.
 
 v2 lets members name their own discount, fills the deepest discounts first within a weekly ETH budget, and pays
-everyone filled one clearing price. See the "Why an auction" section of the current proposal.
+everyone filled one clearing price. See the "Why an auction" section of Part II.
 
 ## Provenance
 

@@ -20,8 +20,9 @@ import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import { IERC721Enumerable } from '@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol';
 
 /// @title Deploy NounsRepurchase + LST converters on mainnet
-/// @notice Ownership goes to the DAO Executor in the constructor, so the deployer never controls the program.
-///         Funding (Executor.sendETH) and the bylaws amendment happen in the DAO proposal itself.
+/// @notice Ownership goes to the DAO Executor in the constructor, so the deployer never controls the program, and
+///         it deploys paused. Run this only on the audited commit, after Part I. Unpausing, funding
+///         (Executor.sendETH) and the bylaws amendment are the actions of the Part II proposal.
 ///         The sanctions oracle is read from the live auction house proxy (V4 since Prop 968; the V3 interface is used
 ///         only for the sanctionsOracle() selector, which V4 kept) so both contracts screen identically.
 ///
@@ -92,6 +93,7 @@ contract DeployNounsRepurchase is Script {
 
         console.log('NounsRepurchase:', address(repurchase));
         console.log('owner:', repurchase.owner());
+        console.log('paused:', repurchase.paused());
         console.log('sanctions oracle:', address(sanctionsOracle));
         console.log('NAV per Noun (wei):', repurchase.navPerNoun());
         console.log('price at min discount (wei):', repurchase.priceAtDiscount(params.minDiscountBps));
