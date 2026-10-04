@@ -34,6 +34,7 @@ import type { Hono } from 'hono';
 import { and, desc, eq, inArray, isNotNull, like, lt, lte, max, or, sql } from 'drizzle-orm';
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
+import { decodeAbiParameters, type Hex } from 'viem';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ export const ACTIVITY_EVENT_TYPES = [
   'PROPOSAL_VETOED',
   'VOTE',
   'PROPOSAL_FEEDBACK',
+  'PROPDATE',
   // candidates
   'CANDIDATE_CREATED',
   'CANDIDATE_UPDATED',
@@ -522,6 +524,138 @@ export async function fetchLilNounsActivity(
 
   lilActivityCache = { at: now, key, events };
   return events;
+}
+
+// ─── Propdates (onchain RPC logs) ───────────────────────────────────────────
+//
+// Propdates aren't indexed by Ponder (adding a contract would force a full
+// reindex), so this reads PostUpdate logs straight from the RPC, walking back
+// from `before` in chunks until it has a page. Cached like the Lil source.
+
+const PROPDATES_ADDRESS = '0xa5bf9a9b8f60cfd98b1ccb592f2f9f37bb0033a4';
+// PostUpdate(uint256 indexed propId, bool indexed isCompleted, string update).
+// The first hash is the one the webapp's usePropdates reads (taken from chain);
+// the second is keccak of the signature above. They disagree, so match either
+// — topic0 OR-filter — rather than guess which the deployed contract emits.
+const POST_UPDATE_TOPICS = [
+  '0xad584acc60e02bf07eea7e31719bb25c1bfa1c95a28a2cf1b530f88aaa2d72b4',
+  '0xcbeea0cc82b02b8b2687b661a00b2beefee33d74a34bcfb9f364ff2017d00711',
+];
+const PROPDATES_DEPLOY_BLOCK = 19_399_894n;
+const PROPDATES_CHUNK = 50_000n;
+const PROPDATES_MAX_CHUNKS = 8; // ~400k blocks ≈ 2 months per page
+const PROPDATES_TTL = 60_000;
+const PROPDATES_BUDGET_MS = 3_000;
+let propdatesCache: { at: number; key: string; events: ActivityEvent[]; more: boolean } | null =
+  null;
+const blockTsCache = new Map<string, number>();
+
+interface RawLog {
+  topics: string[];
+  data: string;
+  blockNumber: string;
+  transactionHash: string;
+  logIndex: string;
+}
+
+export async function fetchPropdatesActivity(
+  before: bigint | undefined,
+  limit: number,
+): Promise<{ events: ActivityEvent[]; more: boolean }> {
+  const key = `${before ?? 'latest'}:${limit}`;
+  const now = Date.now();
+  if (propdatesCache?.key === key && now - propdatesCache.at < PROPDATES_TTL) {
+    return { events: propdatesCache.events, more: propdatesCache.more };
+  }
+
+  const head =
+    before != null ? before - 1n : BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
+  if (head <= PROPDATES_DEPLOY_BLOCK) return { events: [], more: false };
+
+  const logs: RawLog[] = [];
+  let to = head;
+  for (let i = 0; i < PROPDATES_MAX_CHUNKS && to >= PROPDATES_DEPLOY_BLOCK; i++) {
+    const from =
+      to - PROPDATES_CHUNK + 1n > PROPDATES_DEPLOY_BLOCK
+        ? to - PROPDATES_CHUNK + 1n
+        : PROPDATES_DEPLOY_BLOCK;
+    const chunk = await rpc<RawLog[]>('eth_getLogs', [
+      {
+        address: PROPDATES_ADDRESS,
+        topics: [POST_UPDATE_TOPICS],
+        fromBlock: `0x${from.toString(16)}`,
+        toBlock: `0x${to.toString(16)}`,
+      },
+    ]);
+    if (!Array.isArray(chunk)) throw new Error('eth_getLogs failed');
+    logs.push(...chunk);
+    to = from - 1n;
+    if (logs.length >= limit) break;
+  }
+  const more = to >= PROPDATES_DEPLOY_BLOCK || logs.length > limit;
+
+  logs.sort(
+    (a, b) =>
+      Number(BigInt(b.blockNumber) - BigInt(a.blockNumber)) ||
+      Number(BigInt(b.logIndex) - BigInt(a.logIndex)),
+  );
+  const page = logs.slice(0, limit);
+
+  // Exact timestamps + poster address (the tx sender — only the prop admin can post).
+  const blocks = [...new Set(page.map(l => l.blockNumber))];
+  const txs = [...new Set(page.map(l => l.transactionHash))];
+  const [, senders] = await Promise.all([
+    Promise.all(
+      blocks
+        .filter(b => !blockTsCache.has(b))
+        .map(async b => {
+          const blk = await rpc<{ timestamp?: string }>('eth_getBlockByNumber', [b, false]).catch(
+            () => undefined,
+          );
+          if (blk?.timestamp) blockTsCache.set(b, Number(BigInt(blk.timestamp)));
+        }),
+    ),
+    Promise.all(
+      txs.map(async h => {
+        const tx = await rpc<{ from?: string }>('eth_getTransactionByHash', [h]).catch(
+          () => undefined,
+        );
+        return [h, tx?.from ? lower(tx.from) : null] as const;
+      }),
+    ),
+  ]);
+  if (blockTsCache.size > 2_000) blockTsCache.clear();
+  const senderByTx = new Map(senders);
+
+  const events: ActivityEvent[] = [];
+  for (const l of page) {
+    if (l.topics.length < 3) continue;
+    let update = '';
+    try {
+      [update] = decodeAbiParameters([{ type: 'string' }], l.data as Hex);
+    } catch {
+      continue;
+    }
+    const blockNumber = Number(BigInt(l.blockNumber));
+    const ts =
+      blockTsCache.get(l.blockNumber) ??
+      Math.floor(Date.now() / 1000) - (Number(head) - blockNumber) * SECONDS_PER_BLOCK;
+    events.push({
+      type: 'PROPDATE',
+      blockNumber,
+      timestamp: new Date(ts * 1000).toISOString(),
+      txHash: l.transactionHash,
+      data: {
+        proposalId: Number(BigInt(l.topics[1] ?? '0x0')),
+        isCompleted: BigInt(l.topics[2] ?? '0x0') !== 0n,
+        poster: senderByTx.get(l.transactionHash) ?? null,
+        description: update.slice(0, 4000),
+      },
+    });
+  }
+
+  propdatesCache = { at: now, key, events, more };
+  return { events, more };
 }
 
 // ─── Feed source registry ───────────────────────────────────────────────────
@@ -1552,6 +1686,31 @@ const lilNounsSource: FeedSource = {
   fetch: ctx => (ctx.address ? Promise.resolve([]) : fetchLilNounsActivity(ctx.before, ctx.limit)),
 };
 
+const propdatesSource: FeedSource = {
+  name: 'propdates',
+  types: ['PROPDATE'],
+  // Not indexed per wallet (raw RPC logs) — skip in per-wallet mode.
+  async fetch(ctx) {
+    if (ctx.address) return [];
+    // Propdates are sparse (a few a week), so a short page covers a long span.
+    // A cold scan is several sequential RPC calls; don't let it hold up the
+    // whole feed — give up after PROPDATES_BUDGET_MS and let the scan finish
+    // in the background so the cache is warm for the next poll.
+    const limit = Math.min(ctx.perTable, 20);
+    const scan = fetchPropdatesActivity(ctx.before, limit);
+    const timedOut = new Promise<null>(resolve =>
+      setTimeout(() => resolve(null), PROPDATES_BUDGET_MS),
+    );
+    const res = await Promise.race([scan, timedOut]);
+    if (!res) {
+      scan.catch(err => console.warn('[activity] propdates background scan failed:', err));
+      return [];
+    }
+    if (res.more && res.events.length >= limit) ctx.markMore();
+    return res.events;
+  },
+};
+
 const SOURCES: readonly FeedSource[] = [
   bidsSource,
   votesSource,
@@ -1579,6 +1738,7 @@ const SOURCES: readonly FeedSource[] = [
   daoConfigSource,
   grantsSource,
   lilNounsSource,
+  propdatesSource,
 ];
 
 // ─── Post-processors ────────────────────────────────────────────────────────
@@ -1687,6 +1847,7 @@ const suppressSideEffectDelegations: PostProcessor = async events => {
 const NEEDS_PROPOSAL_META = new Set<string>([
   'PROPOSAL_CREATED',
   'PROPOSAL_UPDATED',
+  'PROPDATE',
   ...PROPOSAL_STATUS_TYPES,
 ]);
 
