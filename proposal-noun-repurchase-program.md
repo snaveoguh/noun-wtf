@@ -45,14 +45,14 @@ Add a clarifying sentence at the start of 3.1(b):
 
 > The restrictions in this Section 3.1(b) apply upon the winding-up or dissolution of the DAO and do not apply to a Repurchase Program conducted under Section 3.1(a)(iii).
 
-## Why an auction and not a fixed price
+## Why an auction
 
-An earlier draft of this proposal bought back one Noun a day, first come first served, at a fixed 3% below book. Two pieces of feedback killed it:
+Two simpler designs were considered and rejected:
 
-- **"1 a day sucks."** With a queue of 100 members, the last one waits more than three months and has no idea what price they will get when their turn comes.
-- **The price of liquidity was wrong.** A fixed 3% charges a member who leaves in a quiet week the same as one who leaves in a rush. In a quiet week it costs the DAO nothing to pay close to book, so 3% is too expensive. The member should pay only what getting out actually costs at that moment.
+- **A fixed number of Nouns per day, first come first served.** With 100 members in line, the last one waits months and has no idea what price they will get when their turn comes.
+- **A fixed discount to book.** It charges a member who leaves in a quiet week the same as one who leaves in a rush. In a quiet week it costs the DAO almost nothing to pay close to book, so any fixed discount is too expensive then, and too cheap when everyone wants out at once.
 
-A reverse auction fixes both. Throughput is set by how much ETH the DAO budgets, not by a count. The discount is set by competition between leaving members, so it is small when few people want out and widens on its own when many do.
+A reverse auction avoids both. Throughput is set by how much ETH the DAO budgets, not by a count. The discount is set by competition between leaving members, so it is small when few people want out and widens on its own when many do.
 
 This is the same format public companies use for tender-offer buybacks (a "modified Dutch auction"): the company names a budget, holders name the price they will sell at, the company buys from the cheapest sellers up, and pays everyone it buys from the same clearing price.
 
@@ -90,8 +90,6 @@ A worked round, using the Prop 955 reference figures (NAV about 2.88 ETH, 1,344 
 Settle fills the 5 at 20%, then the 8 at 10% (13 × 2.592 = 33.7 ETH, within budget), then 3 of the 10 at 5% (16 × 2.736 = 43.8 ETH; a 17th would need 46.5 ETH). The clearing discount is 5%, so all 16 members are paid 2.736 ETH, including the five who would have taken 20% off. The other 7 asks at 5% fill first next week, then the asks at 2%.
 
 The DAO keeps 16 × 0.144 = 2.3 ETH of book value it would have paid out at NAV. NAV per remaining Noun goes from 2.880 to about 2.882 ETH. That is small for one round, but it compounds: it is paid every round the program runs, and it grows when more members want out at once.
-
-Compared with the one-a-day draft: the same week would have bought 7 Nouns at a fixed 3% and left the other 36 members waiting.
 
 **Guard rails baked into the code, not just the parameters:**
 
