@@ -44,9 +44,10 @@ If the audit turns up something that cannot be fixed, or the DAO votes Part II d
 
 ## On-chain actions
 
-1. Send 5 ETH to the recipient named below.
+1. Send the audit fee straight to the auditor: _[auditor name], [quote] ETH to [auditor 0x address]_. The DAO pays the auditor directly; no money passes through the proposer.
+2. Send the contingency (deployment gas, Etherscan verification, unforeseen costs) to `nocguild.eth` (_[0x address]_). Unspent contingency goes back to the treasury.
 
-Recipient: _to be confirmed before submission (the auditor directly, or the proposer to engage the auditor and cover deployment)._
+The auditor, quote and both addresses are filled in once quotes are back (see `audit-quote-request.md`). The total replaces the 5 ETH estimate above.
 
 ## Compliance
 
