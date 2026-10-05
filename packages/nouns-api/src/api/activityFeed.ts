@@ -569,6 +569,8 @@ interface RawLog {
   blockNumber: string;
   transactionHash: string;
   logIndex: string;
+  /** Hex unix seconds — present on Etherscan results, saves a block lookup. */
+  timeStamp?: string;
 }
 
 const propdatesState: { rows: PropdateRow[]; scannedTo: bigint; at: number } = {
@@ -670,15 +672,22 @@ async function ingestPropdateLogs(logs: RawLog[], head: bigint): Promise<void> {
   const blocks = [...new Set(decoded.map(d => d.blockNumber))];
   const txs = [...new Set(decoded.map(d => d.txHash))];
   const tsByBlock = new Map<number, number>();
+  for (const l of logs) {
+    if (l.timeStamp) tsByBlock.set(Number(BigInt(l.blockNumber)), Number(BigInt(l.timeStamp)));
+  }
   const fromByTx = new Map<string, string>();
   await Promise.all([
-    mapLimit(blocks, PROPDATES_CONCURRENCY, async b => {
-      const blk = await rpc<{ timestamp?: string }>('eth_getBlockByNumber', [
-        `0x${b.toString(16)}`,
-        false,
-      ]).catch(() => undefined);
-      if (blk?.timestamp) tsByBlock.set(b, Number(BigInt(blk.timestamp)));
-    }),
+    mapLimit(
+      blocks.filter(b => !tsByBlock.has(b)),
+      PROPDATES_CONCURRENCY,
+      async b => {
+        const blk = await rpc<{ timestamp?: string }>('eth_getBlockByNumber', [
+          `0x${b.toString(16)}`,
+          false,
+        ]).catch(() => undefined);
+        if (blk?.timestamp) tsByBlock.set(b, Number(BigInt(blk.timestamp)));
+      },
+    ),
     mapLimit(txs, PROPDATES_CONCURRENCY, async h => {
       const tx = await rpc<{ from?: string }>('eth_getTransactionByHash', [h]).catch(
         () => undefined,
@@ -699,11 +708,54 @@ async function ingestPropdateLogs(logs: RawLog[], head: bigint): Promise<void> {
   );
 }
 
+/**
+ * All propdates contract logs in [from, to] via Etherscan's logs API — no
+ * block-range cap (the production RPC's free plan rejects eth_getLogs here)
+ * and timestamps included. Pages of 1,000, newest history is a few hundred.
+ */
+async function fetchPropdateLogsEtherscan(from: bigint, to: bigint): Promise<RawLog[]> {
+  const apiKey = process.env.ETHERSCAN_API_KEY;
+  if (!apiKey) throw new Error('ETHERSCAN_API_KEY not set');
+  const out: RawLog[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const url =
+      `https://api.etherscan.io/v2/api?chainid=1&module=logs&action=getLogs` +
+      `&address=${PROPDATES_ADDRESS}&fromBlock=${from}&toBlock=${to}` +
+      `&page=${page}&offset=1000&apikey=${apiKey}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    const json = (await res.json()) as { status?: string; message?: string; result?: unknown };
+    if (json.status !== '1') {
+      if (/no records/i.test(json.message ?? '')) break;
+      throw new Error(
+        `etherscan getLogs: ${json.message ?? `HTTP ${res.status}`} ${String(json.result ?? '')}`,
+      );
+    }
+    const rows = Array.isArray(json.result) ? (json.result as RawLog[]) : [];
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
 async function refreshPropdates(): Promise<PropdateRow[]> {
   const head = BigInt((await rpc<string>('eth_blockNumber', [])) ?? '0x0');
   if (head < propdatesState.scannedTo + 1n) {
     propdatesState.at = Date.now();
     return propdatesState.rows;
+  }
+
+  // Etherscan first: one or two calls for the whole history. Fall back to
+  // the RPC range scan below if it's unavailable.
+  if (process.env.ETHERSCAN_API_KEY) {
+    try {
+      const logs = await fetchPropdateLogsEtherscan(propdatesState.scannedTo + 1n, head);
+      await ingestPropdateLogs(logs, head);
+      propdatesState.scannedTo = head;
+      propdatesState.at = Date.now();
+      return propdatesState.rows;
+    } catch (err) {
+      console.warn('[propdates] etherscan failed, falling back to RPC scan:', err);
+    }
   }
 
   // Progress is committed batch by batch (scannedTo only advances past
