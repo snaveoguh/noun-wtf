@@ -334,7 +334,7 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
     document.getElementById('s-total').textContent='₡'+(sum+left).toLocaleString('es-CR');
     if(S.funding){var f=S.funding,usd=function(c){return ' <small>≈ $'+Math.round(c/RATE).toLocaleString('en-US')+'</small>'},fmt=function(c){return (c<0?'−':'')+'₡'+Math.abs(c).toLocaleString('es-CR')+usd(Math.abs(c))};
       document.getElementById('b-fund-l').innerHTML='<span class="es">'+f.es+'</span><span class="en">'+f.en+'</span>';
-      document.getElementById('b-fund').innerHTML=fmt(f.crc);document.getElementById('b-spent').innerHTML=fmt(sum);
+      document.getElementById('b-fund').innerHTML='₡'+f.crc.toLocaleString('es-CR')+' <small>≈ $'+f.usd.toLocaleString('en-US')+'</small>';document.getElementById('b-spent').innerHTML=fmt(sum);
       document.getElementById('b-left').innerHTML=fmt(f.crc-sum);document.getElementById('b-todo').innerHTML=fmt(left);
       var e=document.getElementById('b-end');e.innerHTML=fmt(f.crc-sum-left);e.classList.toggle('neg',f.crc-sum-left<0);
       document.getElementById('budget').hidden=false}
