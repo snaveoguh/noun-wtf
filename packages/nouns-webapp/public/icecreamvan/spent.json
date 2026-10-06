@@ -21,6 +21,26 @@
    "en": "Materials and paint",
    "usd": 4373,
    "crc": 2000000
+  },
+  {
+   "date": "2026",
+   "es": "Producción del libro Meme Value",
+   "en": "Meme Value book production",
+   "usd": 3000,
+   "crc": 1372000
+  },
+  {
+   "date": "2026",
+   "es": "Comisiones de cambio y transferencias (cripto → UK → CR)",
+   "en": "Off-ramp and wire fees (crypto → UK → CR)",
+   "usd": 1000,
+   "crc": 457000
   }
- ]
+ ],
+ "funding": {
+  "es": "Fondos de Lil Nouns",
+  "en": "Lil Nouns funding",
+  "usd": 25000,
+  "crc": 11433000
+ }
 }
