@@ -1385,17 +1385,23 @@ const GOVERNOR_STATE_CODES = [
   'UPDATABLE',
 ] as const;
 
+// Statuses that change by block height alone, with no event the subgraph sees.
+const BLOCK_DRIVEN_STATUSES = new Set(['PENDING', 'ACTIVE', 'OBJECTION_PERIOD', 'UPDATABLE']);
+
 /**
- * Overwrite stale ACTIVE statuses from the subgraph with on-chain governor state.
+ * Overwrite stale statuses from the subgraph with on-chain governor state.
  * The Goldsky subgraph only updates status on explicit events (Queued/Executed/
- * Cancelled/Vetoed); proposals that timed out without resolution stay stuck at
- * ACTIVE, which misrepresents DEFEATED + EXPIRED in the UI.
+ * Cancelled/Vetoed); proposals stay stuck at PENDING after voting opens and at
+ * ACTIVE after it closes, which hides the vote form and misrepresents
+ * DEFEATED + EXPIRED in the UI.
  */
 async function overlayOnchainStatus(
   items: Array<Record<string, unknown>>,
 ): Promise<Array<Record<string, unknown>>> {
   const staleIds = items
-    .filter(p => typeof p.status === 'string' && p.status.toUpperCase() === 'ACTIVE')
+    .filter(
+      p => typeof p.status === 'string' && BLOCK_DRIVEN_STATUSES.has(p.status.toUpperCase()),
+    )
     .map(p => p.id as string);
   if (staleIds.length === 0) return items;
 
@@ -1413,7 +1419,7 @@ async function overlayOnchainStatus(
     for (let i = 0; i < staleIds.length; i++) {
       const r = results[i];
       if (r?.status === 'success' && typeof r.result === 'number') {
-        idToStatus.set(staleIds[i], GOVERNOR_STATE_CODES[r.result] ?? 'ACTIVE');
+        idToStatus.set(staleIds[i], GOVERNOR_STATE_CODES[r.result] ?? 'PENDING');
       }
     }
     return items.map(p => {
@@ -1553,7 +1559,7 @@ app.get('/api/lil-proposals/:id', async c => {
     const proposal = json.data?.proposal;
     if (proposal == null) return c.json({ error: 'not found' }, 404);
 
-    // Overwrite stale ACTIVE status with the on-chain governor state.
+    // Overwrite stale block-driven status with the on-chain governor state.
     const [enriched] = await overlayOnchainStatus([proposal]);
     const finalProposal = enriched ?? proposal;
 

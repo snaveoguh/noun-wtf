@@ -77,6 +77,21 @@ const STATUS_COLORS: Record<string, string> = {
   UPDATABLE: '#60a5fa',
 };
 
+// Governor `state()` enum → subgraph-style status labels.
+const GOVERNOR_STATES = [
+  'PENDING',
+  'ACTIVE',
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+  'OBJECTION_PERIOD',
+  'UPDATABLE',
+] as const;
+
 function statusLabel(status: string): string {
   if (status === 'OBJECTION_PERIOD') return 'Objection';
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
@@ -121,6 +136,18 @@ const LilNounsVotePage: FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAllVotes, setShowAllVotes] = useState(false);
+
+  // The subgraph only updates status on events, so a prop whose voting window
+  // opened by block height stays PENDING there. Read live state from the
+  // governor instead so the vote form shows as soon as voting opens.
+  const { data: onchainState } = useReadContract({
+    address: LIL_NOUNS_GOVERNOR,
+    abi: LIL_NOUNS_GOVERNOR_ABI,
+    functionName: 'state',
+    args: id !== undefined && /^\d+$/.test(id) ? [BigInt(id)] : undefined,
+    chainId: mainnet.id,
+    query: { enabled: id !== undefined && /^\d+$/.test(id), refetchInterval: 60_000 },
+  });
 
   useEffect(() => {
     if (id === undefined) return;
@@ -177,7 +204,10 @@ const LilNounsVotePage: FC = () => {
     );
   }
 
-  const status = proposal.status.toUpperCase();
+  const status =
+    typeof onchainState === 'number' && GOVERNOR_STATES[onchainState] !== undefined
+      ? GOVERNOR_STATES[onchainState]
+      : proposal.status.toUpperCase();
   const statusColor = STATUS_COLORS[status] ?? '#8c8d92';
   const canVote = status === 'ACTIVE' || status === 'OBJECTION_PERIOD';
   const displayedVotes = showAllVotes ? proposal.votes : proposal.votes.slice(0, 20);
@@ -306,6 +336,21 @@ const LilNounsVotePage: FC = () => {
 
       {/* Cast vote panel — only renders on ACTIVE/OBJECTION proposals */}
       {canVote && <CastVotePanel proposalId={BigInt(proposal.id)} />}
+      {(status === 'PENDING' || status === 'UPDATABLE') && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e0e0e0',
+            borderRadius: 10,
+            padding: 16,
+            marginBottom: 20,
+            fontSize: '0.8rem',
+            color: '#8c8d92',
+          }}
+        >
+          Voting opens at block {proposal.startBlock}. Come back then to cast your vote.
+        </div>
+      )}
 
       {/* External lilnouns.wtf link (always shown) */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
