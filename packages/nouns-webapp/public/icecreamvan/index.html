@@ -149,7 +149,7 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
     </div>
     <div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="track"><i id="trackfill" style="width:0"></i></div>
     <ul class="tasks" id="tasks"></ul>
-    <p class="note"><span class="es">Verde = hecho y pagado. Amarillo = lo próximo. Las tareas pesan según el trabajo aproximado.</span><span class="en">Green = done and paid for. Yellow = next up. Tasks are weighted by rough amount of work.</span></p>
+    <p class="note"><span class="es">Verde = hecho y pagado. Amarillo = en curso (cuenta la mitad). Las tareas pesan según el trabajo aproximado.</span><span class="en">Green = done and paid for. Yellow = under way (counts half). Tasks are weighted by rough amount of work.</span></p>
   </div>
 </section>
 
@@ -295,16 +295,16 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
 
   /* build progress: [es, en, weight, state] state: 1 done, 0.5 next, 0 todo */
   var T=[
-   ['Chasis y vigas delanteras soldadas','Chassis + front beams rewelded',8,1],
+   ['Chasis y vigas delanteras soldadas','Chassis + front beams rewelded',15,1],
    ['Todo el metal con anticorrosivo','All metal anti-corrosion painted',8,1],
-   ['Marco metálico interior','Interior metal frame',10,1],
-   ['Corte trasero + marco soldado','Rear cut + ring frame welded',10,1],
+   ['Marco metálico interior','Interior metal frame',15,1],
+   ['Corte trasero + marco soldado','Rear cut + ring frame welded',15,1],
    ['Compuerta con bisagra','Hatch hinged',6,1],
    ['Gradas deslizables de metal','Slide-out metal stairs',6,1],
-   ['Techo: quitar A/C oxidado, pintura reflectiva','Roof: remove rusty A/C, reflective coat',5,.5],
-   ['Plan eléctrico y solar','Power + solar plan',3,.5],
+   ['Techo: pintura reflectiva (el A/C se queda)','Roof: reflective coat (A/C stays)',5,1],
+   ['Plan eléctrico (solar por decidir)','Power plan (solar TBD)',3,1],
    ['Piso fenólico + rieles','Fenólico floor + rails',6,0],
-   ['Cableado (antes de cerrar)','Wiring rough-in (before closing up)',5,0],
+   ['Cableado (antes de cerrar)','Wiring rough-in (before closing up)',5,.5],
    ['Aislante paredes y techo','Wall + roof insulation',6,0],
    ['Cielo de aluminio','Aluminium ceiling',4,0],
    ['Forro de paredes + pintura','Wall lining + paint',5,0],
@@ -315,7 +315,7 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
    ['Pintura exterior + ribete + DOGE','Exterior paint + trim + DOGE',6,0],
    ['Empaques, cerrojos, prueba de agua','Seals, latches, water test',3,0]
   ];
-  var tw=0,dw=0;T.forEach(function(t){tw+=t[2];if(t[3]===1)dw+=t[2]});
+  var tw=0,dw=0;T.forEach(function(t){tw+=t[2];dw+=t[2]*t[3]});
   var pct=Math.round(dw/tw*100);
   document.getElementById('pct').textContent=pct+'%';document.getElementById('trackfill').style.width=pct+'%';document.getElementById('track').setAttribute('aria-valuenow',pct);
   document.getElementById('tasks').innerHTML=T.map(function(t){return '<li class="'+(t[3]===1?'done':t[3]?'next':'')+'"><span><span class="es">'+t[0]+'</span><span class="en">'+t[1]+'</span></span></li>'}).join('');
