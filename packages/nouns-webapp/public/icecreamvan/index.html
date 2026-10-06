@@ -250,7 +250,7 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
     <div class="card"><span class="tag t-c"><span class="es">Total proyectado</span><span class="en">Projected total</span></span><div class="price" id="s-total">…</div></div>
   </div>
   <div class="tw"><table><thead><tr><th><span class="es">Fecha</span><span class="en">Date</span></th><th><span class="es">Qué</span><span class="en">What</span></th><th class="n">₡</th></tr></thead><tbody id="spentrows"></tbody></table></div>
-  <p class="note"><span class="es">"?" = hecho pero falta el monto. Lo que falta usa la opción B de electricidad.</span><span class="en">"?" = done but amount not logged yet. Still-to-spend includes power option B.</span></p>
+  <p class="note"><span class="es">Montos en dólares convertidos a ₡457,33. Lo que falta usa la opción B de electricidad y no cuenta mano de obra futura.</span><span class="en">Dollar amounts converted at ₡457.33. Still-to-spend uses power option B and doesn't include future labour.</span></p>
 </section>
 
 <section id="costs">
@@ -318,7 +318,7 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
   var ct=0;document.getElementById('costrows').innerHTML=C.map(function(c){ct+=c[2];return '<tr><td><span class="es">'+c[0]+'</span><span class="en">'+c[1]+'</span></td><td class="n">'+crc(c[2])+'</td></tr>'}).join('')+'<tr class="tot"><td><span class="es">Total materiales (sin electricidad)</span><span class="en">Materials total (without power)</span></td><td class="n">'+crc(ct)+'</td></tr><tr><td><span class="es">+ electricidad, opción B</span><span class="en">+ power, option B</span></td><td class="n">'+crc(1750)+'</td></tr><tr class="tot"><td><span class="es">Total con opción B</span><span class="en">Total with option B</span></td><td class="n">'+crc(ct+1750)+'</td></tr>';
   window.__icvLeft=ct+1750;
   fetch('spent.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(S){
-    var sum=0,unk=0;document.getElementById('spentrows').innerHTML=S.items.map(function(i){if(i.crc==null)unk++;else sum+=i.crc;return '<tr><td class="n" style="text-align:left">'+(i.date||'')+'</td><td><span class="es">'+i.es+'</span><span class="en">'+i.en+'</span></td><td class="n">'+(i.crc==null?'?':'₡'+i.crc.toLocaleString('es-CR'))+'</td></tr>'}).join('')+'<tr class="tot"><td></td><td>Total</td><td class="n">₡'+sum.toLocaleString('es-CR')+(unk?' + ?':'')+'</td></tr>';
+    var sum=0,unk=0;document.getElementById('spentrows').innerHTML=S.items.map(function(i){if(i.crc==null)unk++;else sum+=i.crc;return '<tr><td class="n" style="text-align:left">'+(i.date||'')+'</td><td><span class="es">'+i.es+'</span><span class="en">'+i.en+'</span></td><td class="n">'+(i.crc==null?'?':'₡'+i.crc.toLocaleString('es-CR')+(i.usd?' <small style="color:#6b6372">≈ $'+i.usd.toLocaleString('en-US')+'</small>':''))+'</td></tr>'}).join('')+'<tr class="tot"><td></td><td>Total</td><td class="n">₡'+sum.toLocaleString('es-CR')+(unk?' + ?':'')+'</td></tr>';
     var left=Math.round(window.__icvLeft*RATE/1000)*1000;
     document.getElementById('s-spent').innerHTML='₡'+sum.toLocaleString('es-CR')+(unk?'<small>+ '+unk+' ?</small>':'');
     document.getElementById('s-left').textContent='₡'+left.toLocaleString('es-CR');

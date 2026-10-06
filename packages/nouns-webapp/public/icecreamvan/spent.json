@@ -2,40 +2,25 @@
  "rate_usd": 457.33,
  "items": [
   {
-   "date": "",
-   "es": "Chasis + vigas delanteras soldadas",
-   "en": "Chassis + front beams rewelded",
-   "crc": null
+   "date": "2026-10",
+   "es": "Compra de la buseta",
+   "en": "Van purchase",
+   "usd": 4000,
+   "crc": 1829000
   },
   {
-   "date": "",
-   "es": "Anticorrosivo en todo el metal",
-   "en": "Anti-corrosion paint, all metal",
-   "crc": null
+   "date": "2026-10",
+   "es": "Mano de obra hasta ahora (soldadura, marco, compuerta, gradas, anticorrosivo)",
+   "en": "Labour so far (welding, frame, hatch, stairs, anti-corrosion)",
+   "usd": 5500,
+   "crc": 2515000
   },
   {
-   "date": "",
-   "es": "Marco metálico interior",
-   "en": "Interior metal frame",
-   "crc": null
-  },
-  {
-   "date": "",
-   "es": "Corte trasero + marco soldado",
-   "en": "Rear cut + ring frame welded",
-   "crc": null
-  },
-  {
-   "date": "",
-   "es": "Compuerta con bisagra",
-   "en": "Hatch hinged",
-   "crc": null
-  },
-  {
-   "date": "",
-   "es": "Gradas deslizables de metal",
-   "en": "Slide-out metal stairs",
-   "crc": null
+   "date": "2026-10",
+   "es": "Materiales y pintura hasta ahora (aprox.)",
+   "en": "Materials and paint so far (approx.)",
+   "usd": 2500,
+   "crc": 1143000
   }
  ]
 }
