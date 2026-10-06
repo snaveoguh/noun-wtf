@@ -401,6 +401,8 @@ footer{padding-block:40px 60px;font:500 12px var(--mono);color:var(--muted)}
 
   /* roof, A/C units, front */
   box(-W,W,ROOF,ROOF+.06,0,6.08,M.roof);
+  box(-W,W,2.6,ROOF+.06,5.95,6.31,M.skinEdge);
+  [-.9,-.15,0,.15,.9].forEach(function(x){var mk=new T.Mesh(new T.BoxGeometry(.07,.04,.02),mat({color:0xf0a030,emissive:0x5a3000,roughness:.4}));mk.position.set(x,2.76,-6.325);scene.add(mk)});
   box(-.42,.42,ROOF+.06,ROOF+.32,1.3,2.2,M.roof); box(-.38,.38,ROOF+.06,ROOF+.22,2.9,3.6,M.roof);
   box(-W,W,.45,1.6,6.24,6.3,M.skinEdge);
   box(-1.3,1.3,.42,.62,6.28,6.42,M.chrome);
