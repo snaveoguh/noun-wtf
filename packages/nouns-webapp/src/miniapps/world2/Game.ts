@@ -7,6 +7,7 @@ import type { TimeOfDayPreset } from './nature/TimeOfDay';
 
 import * as THREE from 'three';
 
+import { PirateRadio } from './audio/PirateRadio';
 import { SkateAudio } from './audio/SkateAudio';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -24,10 +25,11 @@ import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
-import { toonify } from './render/Toon';
+import { inkExcluded, toonify } from './render/Toon';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { loadLevel, type LevelData } from './world/Level';
+import { PipBillboards } from './world/PipBillboards';
 
 export interface HudState {
   loading: string | null;
@@ -50,6 +52,7 @@ export interface HudState {
   quality: Quality;
   camMode: string;
   timeOfDay: TimeOfDayPreset;
+  radio: { on: boolean; label: string; at: number };
   /** Spray colour + whether the crosshair is on a paintable surface. */
   spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
@@ -119,6 +122,7 @@ export class Game {
     this.player = new Player(this.world, this.rails);
     this.cam = new SkateCamera(this.gfx.camera, this.world);
     this.gfx.scene.add(this.particles.group);
+    inkExcluded.add(this.particles.group);
     this.hud = {
       loading: 'booting',
       mode: 'board',
@@ -140,6 +144,7 @@ export class Game {
       quality,
       camMode: 'follow',
       timeOfDay: 'afternoon',
+      radio: { on: false, label: 'radio off', at: 0 },
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
     };
@@ -169,7 +174,17 @@ export class Game {
     this.level = level;
     this.assets = assets;
     this.gfx.scene.add(level.root);
-    if (this.gfx.toon) toonify(level.root);
+    if (this.gfx.toon) {
+      toonify(level.root);
+      // Baked indirect light stacks on the toon ramp's full-bright band; tame it
+      level.root.traverse(o => {
+        const mats = (o as THREE.Mesh).material;
+        for (const m of Array.isArray(mats) ? mats : mats !== undefined ? [mats] : []) {
+          const tm = m as THREE.MeshToonMaterial;
+          if (tm.lightMap !== null && tm.lightMap !== undefined) tm.lightMapIntensity *= 0.35;
+        }
+      });
+    }
     this.world.build(level.collisionMeshes);
     this.rails.load(level.rails);
     this.graffiti = new Graffiti(
@@ -186,6 +201,7 @@ export class Game {
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
     this.buildNature(level);
+    void this.billboards.attach(level.root);
 
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
@@ -220,6 +236,35 @@ export class Game {
   /** Call from a user gesture (click/tap/key) to unlock audio. */
   unlockAudio() {
     this.audio.start();
+    const ctx = this.audio.ctx;
+    if (ctx !== null && !this.radioAttached) {
+      this.radioAttached = true;
+      this.radio.attach(ctx, ctx.destination, this.audio.noise);
+      this.radio.onNowPlaying = label => {
+        this.hud = {
+          ...this.hud,
+          radio: { on: this.radio.mode !== 'off', label, at: performance.now() },
+        };
+        this.emit();
+      };
+      // The plaza needs a soundtrack: start the pirate station on drop-in
+      this.radio.setMode('pirate');
+    }
+  }
+
+  radio = new PirateRadio();
+  private radioAttached = false;
+  billboards = new PipBillboards();
+
+  /** off → pirate radio → live streams → off */
+  cycleRadio() {
+    this.unlockAudio();
+    this.radio.cycle();
+  }
+
+  nextRadioTrack() {
+    this.unlockAudio();
+    this.radio.nextTrack();
   }
 
   resize(w: number, h: number) {
@@ -297,6 +342,7 @@ export class Game {
     });
     this.gfx.followShadow(this.player.pos);
     this.nature?.update(dt, this.player.pos);
+    this.billboards.update(dt);
     this.gfx.render(dt);
     this.updateHud(dt, input);
   }
@@ -502,6 +548,12 @@ export class Game {
       me.board.quaternion.copy(me.root.quaternion.clone().invert().multiply(p.looseBoard.quat));
     } else {
       p.getRiderQuaternion(me.root.quaternion);
+      // Kickturn/revert: start facing the old way and whip round
+      if (p.kickturn > 0) {
+        me.root.quaternion.multiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.kickturn),
+        );
+      }
       me.board.visible = true;
       // Powerslide: board + rider rotate sideways
       const slideYaw = p.powerslide * 1.25 * (p.lean >= 0 ? 1 : -1);
@@ -528,6 +580,7 @@ export class Game {
       lean: p.mode === 'board' && p.state !== 'bail' ? p.lean : 0,
       travelled: p.mode === 'board' && p.state !== 'air' && p.state !== 'bail' ? travelled : 0,
       riding: p.mode === 'board' && p.state !== 'bail',
+      grounded: p.state === 'ground' || p.state === 'manual',
     });
 
     // Sparks while grinding metal
@@ -758,6 +811,8 @@ export class Game {
 
   dispose() {
     this.nature?.dispose();
+    this.billboards.dispose();
+    this.radio.dispose();
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);

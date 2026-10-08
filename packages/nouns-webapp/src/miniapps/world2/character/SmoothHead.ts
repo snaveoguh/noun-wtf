@@ -291,7 +291,9 @@ export function buildSmoothHead(
   const bctx = big.getContext('2d')!;
   bctx.imageSmoothingEnabled = true;
   bctx.imageSmoothingQuality = 'high';
-  bctx.filter = 'blur(5px)';
+  // Light blur only: enough to lose the pixel staircase, not enough to
+  // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
+  bctx.filter = 'blur(1.6px)';
   bctx.drawImage(canvas, 0, 0, 256, 256);
   bctx.filter = 'none';
   const img = bctx.getImageData(0, 0, 256, 256);

@@ -5,6 +5,12 @@ import * as THREE from 'three';
 
 let ramp: THREE.DataTexture | null = null;
 
+/**
+ * Objects the ink pass must ignore (additive glows, light pools, particles):
+ * they're invisible-edged planes, so their normals would draw black boxes.
+ */
+export const inkExcluded = new Set<THREE.Object3D>();
+
 /** Shared 3-band toon ramp (shadow / mid / lit). */
 export function getToonRamp(): THREE.DataTexture {
   if (ramp !== null) return ramp;
@@ -119,7 +125,9 @@ float edgeAt(const in vec2 uv, const in vec2 t) {
     vec3 nc = nrm(uv);
     float d = min(min(dot(nc, nrm(uv + vec2(t.x, 0.0))), dot(nc, nrm(uv - vec2(t.x, 0.0)))),
                   min(dot(nc, nrm(uv + vec2(0.0, t.y))), dot(nc, nrm(uv - vec2(0.0, t.y)))));
-    e = max(e, smoothstep(normalThreshold, normalThreshold - 0.15, d));
+    // NB: smoothstep needs edge0 < edge1 (reversed edges are undefined in GLSL
+    // and turn NaN/white on real GPUs) — invert instead.
+    e = max(e, 1.0 - smoothstep(normalThreshold - 0.15, normalThreshold, d));
   }
   return e;
 }

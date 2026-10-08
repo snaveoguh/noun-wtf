@@ -8,6 +8,8 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
+import { inkExcluded } from '../render/Toon';
+
 import { buildBodyTexture, buildNounHead, type NounSeed } from './NounAppearance';
 
 export interface CharacterManifest {
@@ -394,6 +396,7 @@ export class NounCharacter {
       pool.name = 'hoverPool';
       fx.add(pool);
       this.board.add(fx);
+      inkExcluded.add(fx);
       this.hoverFx = fx;
     }
     if (this.hoverFx !== null) this.hoverFx.visible = t === 'hover';
@@ -442,7 +445,10 @@ export class NounCharacter {
    * Per-frame update. `lean` tilts the rider into turns; `crouch` lowers;
    * `boardSpin` spins wheels (metres travelled this frame).
    */
-  update(dt: number, opts: { lean: number; travelled: number; riding?: boolean }) {
+  update(
+    dt: number,
+    opts: { lean: number; travelled: number; riding?: boolean; grounded?: boolean },
+  ) {
     this.mixer?.update(dt);
     // Procedural lean on top of the clip (rider + board bank into the carve)
     const lean = THREE.MathUtils.clamp(opts.lean, -1, 1);
@@ -462,7 +468,11 @@ export class NounCharacter {
         const flick = 0.85 + Math.sin(this.hoverT * 31) * 0.08 + Math.random() * 0.07;
         this.hoverFx.scale.set(1, 1, 1).multiplyScalar(flick);
         const pool = this.hoverFx.getObjectByName('hoverPool');
-        if (pool !== undefined) pool.position.y = -this.lift.position.y + 0.012;
+        if (pool !== undefined) {
+          pool.position.y = -this.lift.position.y + 0.012;
+          // The light pool belongs on the ground: hide it in the air
+          pool.visible = opts.grounded !== false;
+        }
       }
       return;
     }
@@ -474,6 +484,7 @@ export class NounCharacter {
   }
 
   dispose() {
+    if (this.hoverFx !== null) inkExcluded.delete(this.hoverFx);
     this.mixer?.stopAllAction();
     this.root.removeFromParent();
   }

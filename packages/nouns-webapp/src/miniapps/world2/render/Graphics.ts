@@ -20,7 +20,7 @@ import {
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
-import { InkOutlineEffect } from './Toon';
+import { InkOutlineEffect, inkExcluded } from './Toon';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -110,6 +110,20 @@ export class Graphics {
     let normalPass: NormalPass | null = null;
     if (this.toon && quality !== 'low') {
       normalPass = new NormalPass(this.scene, this.camera);
+      // Hide glow/particle planes while normals render so they never get inked
+      const np = normalPass;
+      const renderNormals = np.render.bind(np);
+      np.render = (...args: Parameters<typeof np.render>) => {
+        const hidden: THREE.Object3D[] = [];
+        for (const o of inkExcluded) {
+          if (o.visible) {
+            o.visible = false;
+            hidden.push(o);
+          }
+        }
+        renderNormals(...args);
+        for (const o of hidden) o.visible = true;
+      };
       this.composer.addPass(normalPass);
     }
     const aoParam = new URLSearchParams(window.location.search).get('fx');
@@ -132,7 +146,8 @@ export class Graphics {
     this.bloom = new BloomEffect({
       mipmapBlur: true,
       intensity: 0.55,
-      luminanceThreshold: 0.92,
+      // Toon: only true emissives (neon, lamps, glints) should bloom
+      luminanceThreshold: this.toon ? 1.15 : 0.92,
       luminanceSmoothing: 0.2,
       radius: 0.7,
     });
@@ -179,7 +194,7 @@ export class Graphics {
     this.sun.color.copy(level.sun.color);
     // The toon ramp's lit band is already full-bright; tame the sun so
     // flat colours don't clip to white.
-    this.sun.intensity = level.sun.intensity * (this.toon ? 0.62 : 1);
+    this.sun.intensity = level.sun.intensity * (this.toon ? 0.26 : 1);
     this.scene.fog = new THREE.FogExp2(level.fog.color, level.fog.density);
     // Sky sun position is the direction TO the sun
     const toSun = this.sunDir.clone().negate();
@@ -187,7 +202,7 @@ export class Graphics {
     this.hemi.color.copy(level.sky.zenith).lerp(new THREE.Color(0xffffff), 0.5);
     // Baked levels already contain bounce light; keep the hemi fill small.
     // Toon materials ignore the PMREM env, so ambient comes from the hemi
-    this.hemi.intensity = this.toon ? (level.baked ? 0.35 : 0.7) : level.baked ? 0.12 : 0.45;
+    this.hemi.intensity = this.toon ? (level.baked ? 0.3 : 0.45) : level.baked ? 0.12 : 0.45;
     this.buildEnvironment(level.baked ? 0.6 : 1.0, level.sky.zenith, level.sky.horizon);
   }
 

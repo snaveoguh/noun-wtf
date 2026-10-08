@@ -14,6 +14,10 @@ import * as THREE from 'three';
 import { groundAt, natureUniforms } from './shared';
 import { softSpotTexture } from './textures';
 
+/** Light scales applied in toon mode so the cel lit band sits near 1x albedo. */
+export const TOON_SUN_SCALE = 0.26;
+export const TOON_HEMI_SCALE = 0.32;
+
 export type TimeOfDayPreset = 'afternoon' | 'golden' | 'blue' | 'night';
 
 /** Minimal slice of render/Graphics this module touches. */
@@ -259,7 +263,7 @@ void main() {
   if ( h >= 0.0 ) {
     col = h < 0.22 ? mix( uHorizon, uMid, smoothstep( 0.0, 0.22, h ) ) : mix( uMid, uZenith, smoothstep( 0.22, 0.8, h ) );
   } else {
-    col = mix( uHorizon, uGround, smoothstep( 0.0, -0.12, h ) );
+    col = mix( uHorizon, uGround, 1.0 - smoothstep( -0.12, 0.0, h ) );
   }
   // Sun: hard disc + one flat halo ring (graphic, not physical)
   float sd = dot( d, uSunDir );
@@ -590,17 +594,22 @@ export class TimeOfDay {
     const h = this.host;
     const c = this.cur;
     // Graphics keeps the shadow-follow direction in a private field.
-    const gfxPriv = h as unknown as { sunDir?: THREE.Vector3; bloom?: BloomLike };
+    const gfxPriv = h as unknown as { sunDir?: THREE.Vector3; bloom?: BloomLike; toon?: boolean };
+    // Toon materials have no energy falloff: PBR-scale lights (sun ~3) push the
+    // lit band to ~4x albedo and light colours clip to white on HDR targets.
+    const toon = gfxPriv.toon === true;
+    const sunK = toon ? TOON_SUN_SCALE : 1;
+    const hemiK = toon ? TOON_HEMI_SCALE : 1;
     if (gfxPriv.sunDir instanceof THREE.Vector3) gfxPriv.sunDir.copy(c.lightDir);
     // Re-aim the light now (followShadow will keep it centred on the player)
     const tgt = h.sun.target.position;
     h.sun.position.copy(tgt).addScaledVector(c.lightDir, -90);
     h.sun.color.copy(c.sunColor);
-    h.sun.intensity = c.sunIntensity;
+    h.sun.intensity = c.sunIntensity * sunK;
     h.sun.shadow.intensity = c.shadowStrength;
     h.hemi.color.copy(c.hemiSky);
     h.hemi.groundColor.copy(c.hemiGround);
-    h.hemi.intensity = c.hemiIntensity;
+    h.hemi.intensity = c.hemiIntensity * hemiK;
     h.sky.visible = false;
     const u = this.skyDome.material.uniforms;
     (u.uZenith.value as THREE.Color).copy(c.zenith);
@@ -624,8 +633,11 @@ export class TimeOfDay {
     natureUniforms.uSelfLight.value = c.selfLight;
     const bloom = gfxPriv.bloom;
     if (bloom !== undefined) {
-      bloom.intensity = c.bloomIntensity;
-      bloom.luminanceMaterial.threshold = c.bloomThreshold;
+      bloom.intensity = c.bloomIntensity * (toon ? 0.6 : 1);
+      // In toon mode only true emissives (neon, lamps, sun glints) should bloom
+      bloom.luminanceMaterial.threshold = toon
+        ? Math.max(1.15, c.bloomThreshold)
+        : c.bloomThreshold;
     }
     for (const e of this.emissives) {
       e.mat.emissive.copy(e.emissive).lerp(e.nightColor, Math.min(1, c.lamps * 1.5));
