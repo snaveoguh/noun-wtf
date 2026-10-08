@@ -215,7 +215,8 @@ export class NounCharacter {
       });
       if (this.headBone) {
         const off = manifest.head?.offset ?? [0, 0, 0];
-        this.head.position.set(off[0], off[1], off[2]);
+        // Sit the head just above the collar
+        this.head.position.set(off[0], off[1] + 0.06, off[2]);
         if (manifest.head?.scale !== undefined && manifest.head.scale > 0)
           this.head.scale.setScalar(manifest.head.scale);
         // Undo any bone scale so the head keeps its metric size

@@ -9,6 +9,8 @@ import {
 } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
+import { buildSmoothHead, type SmoothHead } from './SmoothHead';
+
 export interface NounSeed {
   background: number;
   body: number;
@@ -48,7 +50,11 @@ interface HeadBuild {
 
 const headGeoCache = new Map<
   string,
-  { head: THREE.BufferGeometry | null; glasses: THREE.BufferGeometry | null }
+  {
+    head: THREE.BufferGeometry | null;
+    glasses: THREE.BufferGeometry | null;
+    smooth: SmoothHead | null;
+  }
 >();
 
 /**
@@ -58,35 +64,52 @@ const headGeoCache = new Map<
 export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   const key = `${seed.head}-${seed.glasses}`;
   let geos = headGeoCache.get(key);
-  if (!geos) {
+  if (geos === undefined) {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
     const g = buildNounGeometries(layers);
-    geos = { head: g.headGeo, glasses: g.glassesGeo };
+    const smooth = buildSmoothHead(layers.head);
+    // Glasses: keep them voxel, seated on the smooth head's front plateau
+    if (g.glassesGeo !== null && smooth !== null) {
+      g.glassesGeo.computeBoundingBox();
+      const bb = g.glassesGeo.boundingBox!;
+      g.glassesGeo.translate(0, 0, smooth.frontZ - 0.35 - bb.min.z);
+    }
+    geos = { head: g.headGeo, glasses: g.glassesGeo, smooth };
     headGeoCache.set(key, geos);
   }
   const group = new THREE.Group();
   const inner = new THREE.Group();
   group.add(inner);
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.62,
-    metalness: 0.02,
-  });
   const glassMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.25,
     metalness: 0.1,
   });
   const box = new THREE.Box3();
-  if (geos.head) {
-    const m = new THREE.Mesh(geos.head, mat);
+  if (geos.smooth !== null) {
+    const m = new THREE.Mesh(
+      geos.smooth.geometry,
+      new THREE.MeshStandardMaterial({
+        map: geos.smooth.texture,
+        roughness: 0.55,
+        metalness: 0.02,
+      }),
+    );
     m.castShadow = true;
     m.receiveShadow = true;
+    inner.add(m);
+    box.union(geos.smooth.geometry.boundingBox!);
+  } else if (geos.head !== null) {
+    const m = new THREE.Mesh(
+      geos.head,
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62 }),
+    );
+    m.castShadow = true;
     inner.add(m);
     geos.head.computeBoundingBox();
     box.union(geos.head.boundingBox!);
   }
-  if (geos.glasses) {
+  if (geos.glasses !== null) {
     const m = new THREE.Mesh(geos.glasses, glassMat);
     m.castShadow = true;
     inner.add(m);
