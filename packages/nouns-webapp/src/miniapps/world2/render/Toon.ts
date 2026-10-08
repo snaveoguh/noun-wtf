@@ -8,7 +8,8 @@ let ramp: THREE.DataTexture | null = null;
 /** Shared 3-band toon ramp (shadow / mid / lit). */
 export function getToonRamp(): THREE.DataTexture {
   if (ramp !== null) return ramp;
-  const tones = [70, 150, 255];
+  // JSR shadows stay colourful: lift the dark band well off black
+  const tones = [120, 190, 255];
   const data = new Uint8Array(tones.length * 4);
   tones.forEach((t, i) => data.set([t, t, t, 255], i * 4));
   ramp = new THREE.DataTexture(data, tones.length, 1, THREE.RGBAFormat);
