@@ -6,6 +6,7 @@ import { N8AOPostPass } from 'n8ao';
 import {
   BloomEffect,
   BrightnessContrastEffect,
+  type Effect,
   EffectComposer,
   EffectPass,
   HueSaturationEffect,
@@ -20,7 +21,7 @@ import {
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
-import { InkOutlineEffect, inkExcluded } from './Toon';
+import { ClampEffect, InkOutlineEffect, inkExcluded } from './Toon';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -170,13 +171,14 @@ export class Graphics {
     // `?fx=bloom,tone,grade,sat,vig` limits the stack (debugging / perf triage).
     const fxParam = new URLSearchParams(window.location.search).get('fx');
     const want = (k: string) => fxParam === null || fxParam.split(',').includes(k);
-    const effects = [
+    const effects: Effect[] = [
       want('bloom') ? this.bloom : null,
       want('tone') ? tone : null,
       want('grade') ? grade : null,
       want('sat') ? sat : null,
       want('vig') ? vignette : null,
     ].filter((e): e is NonNullable<typeof e> => e !== null);
+    effects.push(new ClampEffect(fxParam?.split(',').includes('neg') === true));
     // Ink in its own pass (merged with the grading effects it got dropped)
     if (this.outline !== null && want('ink'))
       this.composer.addPass(new EffectPass(this.camera, this.outline));

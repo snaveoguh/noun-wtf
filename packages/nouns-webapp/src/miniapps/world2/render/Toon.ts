@@ -179,3 +179,29 @@ export class InkOutlineEffect extends Effect {
     this.uniforms.get('thickness')!.value = v;
   }
 }
+
+/**
+ * Clamp the graded colour to ≥ 0 before output. Contrast/saturation push
+ * near-blacks slightly negative; the sRGB encode then takes pow() of a
+ * negative, which is NaN on Apple GPUs (renders WHITE) while software GL
+ * quietly returns 0. Must be the last effect in the grading pass.
+ */
+export class ClampEffect extends Effect {
+  constructor(debug = false) {
+    super(
+      'ClampEffect',
+      `uniform float debugNeg;
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  vec3 c = inputColor.rgb;
+  if (debugNeg > 0.5 && !(min(c.r, min(c.g, c.b)) >= 0.0)) { outputColor = vec4(1.0, 0.0, 1.0, 1.0); return; }
+  // NaN-safe: comparisons with NaN are false, so NaN → 0
+  c = vec3(c.r > 0.0 ? c.r : 0.0, c.g > 0.0 ? c.g : 0.0, c.b > 0.0 ? c.b : 0.0);
+  outputColor = vec4(c, clamp(inputColor.a, 0.0, 1.0));
+}`,
+      {
+        blendFunction: BlendFunction.SET,
+        uniforms: new Map([['debugNeg', new THREE.Uniform(debug ? 1 : 0)]]),
+      },
+    );
+  }
+}
