@@ -63,7 +63,9 @@ export class Graphics {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = quality === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+    // PCFSoftShadowMap is deprecated in r183 (silently remapped to PCF, which
+    // left early-compiled shaders with mismatched shadow samplers).
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 3000);
 

@@ -667,6 +667,24 @@ export class WaterSystem {
       .multiplyScalar(hemi.intensity * 0.9)
       .add(sun.color.clone().multiplyScalar(sun.intensity * (0.08 + 0.12 * sunUp)));
     if (this.rt === null || !this.enabled || this.bodies.length === 0) return;
+    // three r183 only remaps the deprecated PCFSoftShadowMap → PCFShadowMap
+    // inside a *shadow render* (and, because its _previousType is already
+    // PCF, without invalidating programs). This pre-pass renders with shadow
+    // auto-update off, so if it runs first it compiles the bed/rock programs
+    // with a sampler2D shadow sampler that then fails against the PCF
+    // compare-mode depth texture ("Mismatch between texture format and
+    // sampler type") on every draw — rocks, beds and refraction vanish.
+    // Normalise the type ourselves (once) and invalidate compiled programs.
+    if (renderer.shadowMap.type === THREE.PCFSoftShadowMap) {
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene.traverse(o => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (m === undefined) return;
+        for (const mm of Array.isArray(m) ? m : [m]) mm.needsUpdate = true;
+      });
+    }
+    // Let the main pass allocate the sun's shadow map before we sample it.
+    if (renderer.shadowMap.enabled && sun.castShadow && sun.shadow.map === null) return;
     let any = false;
     for (const b of this.bodies) if (b.mesh.visible) any = true;
     if (!any) return;
