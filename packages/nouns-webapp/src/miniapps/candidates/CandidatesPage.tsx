@@ -3,6 +3,8 @@
  * Uses useCandidateProposals() (Ponder GraphQL first, eth_getLogs fallback).
  * Paginated: 50 per page with infinite scroll.
  */
+import type { ProposalCandidate } from '@/wrappers/nounsData';
+
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 
 import { useQuery } from '@apollo/client';
@@ -13,7 +15,6 @@ import ShortAddress from '@/components/ShortAddress';
 import { relativeTimestamp } from '@/utils/timeUtils';
 import { useProposalThreshold } from '@/wrappers/nounsDao';
 import { useCandidateProposals } from '@/wrappers/nounsData';
-import type { ProposalCandidate } from '@/wrappers/nounsData';
 import { delegateNounsAtBlockQuery } from '@/wrappers/subgraph';
 
 type SortMode = 'recent' | 'sponsors' | 'oldest';
@@ -26,7 +27,12 @@ const CandidatesPage: React.FC = () => {
   // Apollo query isn't keyed on blockNumber, so we explicitly call refetch
   // when the block advances.
   const { data: blockNumber } = useBlockNumber({ watch: true });
-  const { loading: isLoading, data: candidates, error, refetch } = useCandidateProposals(blockNumber);
+  const {
+    loading: isLoading,
+    data: candidates,
+    error,
+    refetch,
+  } = useCandidateProposals(blockNumber);
 
   useEffect(() => {
     if (blockNumber == null) return;
@@ -102,7 +108,8 @@ const CandidatesPage: React.FC = () => {
         <div>
           <h1 style={styles.title}>🎴 Candidates</h1>
           <p style={styles.subtitle}>
-            Proposal candidates from the community. Sponsor candidates to help them become proposals.
+            Proposal candidates from the community. Sponsor candidates to help them become
+            proposals.
           </p>
         </div>
         <Link to="/create-candidate" style={styles.createBtn}>
@@ -129,7 +136,11 @@ const CandidatesPage: React.FC = () => {
                 ...(sortMode === mode ? styles.sortBtnActive : {}),
               }}
             >
-              {mode === 'recent' ? '🕐 Recent' : mode === 'sponsors' ? '✍️ Most Sponsors' : '📅 Oldest'}
+              {mode === 'recent'
+                ? '🕐 Recent'
+                : mode === 'sponsors'
+                  ? '✍️ Most Sponsors'
+                  : '📅 Oldest'}
             </button>
           ))}
         </div>
@@ -215,17 +226,10 @@ const CandidateCardMini: React.FC<{
   // metric vs. the proposal threshold, not the count of distinct signer addresses.
   const nowSec = Math.floor(Date.now() / 1000);
   const activeSignerIds = signers
-    .filter(
-      s =>
-        s.signer?.id &&
-        s.canceled !== true &&
-        Number(s.expirationTimestamp ?? 0) > nowSec,
-    )
+    .filter(s => s.signer?.id && s.canceled !== true && Number(s.expirationTimestamp ?? 0) > nowSec)
     .map(s => s.signer.id.toLowerCase());
   const proposerLower = candidate.proposer?.toLowerCase() ?? '';
-  const queryAddresses = Array.from(
-    new Set([proposerLower, ...activeSignerIds].filter(Boolean)),
-  );
+  const queryAddresses = Array.from(new Set([proposerLower, ...activeSignerIds].filter(Boolean)));
   const { query, variables } = delegateNounsAtBlockQuery(
     queryAddresses,
     currentBlock ? currentBlock - 1n : 0n,
@@ -235,10 +239,7 @@ const CandidateCardMini: React.FC<{
   }>(query, { variables, skip: queryAddresses.length === 0 });
 
   const totalSupport =
-    delegateData?.delegates?.items?.reduce(
-      (sum, d) => sum + Number(d.delegatedVotes ?? 0),
-      0,
-    ) ?? 0;
+    delegateData?.delegates?.items?.reduce((sum, d) => sum + Number(d.delegatedVotes ?? 0), 0) ?? 0;
   const progress = Math.min(totalSupport / Math.max(requiredVotes, 1), 1);
   const isOver = totalSupport >= requiredVotes;
 
@@ -302,7 +303,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.1,
   },
   subtitle: {
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
     marginTop: '0.5rem',
     fontSize: '0.95rem',
   },
@@ -344,7 +345,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0.5rem 0.8rem',
     borderRadius: 8,
     border: '1px solid #e0e0e0',
-    background: '#fff',
+    background: 'var(--theme-bg-card)',
     cursor: 'pointer',
     fontSize: '0.8rem',
     fontFamily: "'PT Root UI', sans-serif",
@@ -359,7 +360,7 @@ const styles: Record<string, React.CSSProperties> = {
   statusMessage: {
     textAlign: 'center' as const,
     padding: '3rem 1rem',
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
   },
   spinner: {
     width: 32,
@@ -373,7 +374,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyState: {
     textAlign: 'center' as const,
     padding: '4rem 2rem',
-    background: '#f8f8fa',
+    background: 'var(--theme-bg-card)',
     borderRadius: 16,
   },
   emptyTitle: {
@@ -382,7 +383,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
   },
   emptySubtitle: {
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
     marginTop: '0.5rem',
   },
   createBtnSmall: {
@@ -403,7 +404,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   card: {
     display: 'block',
-    background: '#fff',
+    background: 'var(--theme-bg-card)',
     borderRadius: 16,
     padding: '1.25rem',
     border: '1px solid #eee',
@@ -421,12 +422,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardProposer: {
     fontSize: '0.8rem',
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
     margin: '0 0 0.75rem',
   },
   progressContainer: {
     height: 6,
-    background: '#e8e8ec',
+    background: 'var(--theme-bg-card)',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: '0.75rem',
@@ -442,7 +443,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     fontSize: '0.8rem',
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
   },
   sponsorCount: {
     fontWeight: 600,
@@ -454,7 +455,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     marginTop: '2rem',
     fontSize: '0.85rem',
-    color: '#8c8d92',
+    color: 'var(--theme-text-muted)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -464,7 +465,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0.4rem 1rem',
     borderRadius: 8,
     border: '1px solid #e0e0e0',
-    background: '#fff',
+    background: 'var(--theme-bg-card)',
     cursor: 'pointer',
     fontSize: '0.8rem',
     fontFamily: "'PT Root UI', sans-serif",

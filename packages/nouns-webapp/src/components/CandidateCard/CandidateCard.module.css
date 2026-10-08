@@ -20,7 +20,7 @@
 }
 
 .candidateLink:hover {
-  background: white;
+  background: var(--theme-bg-card);
   color: inherit !important;
   cursor: pointer;
 }

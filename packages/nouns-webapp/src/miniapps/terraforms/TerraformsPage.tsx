@@ -8,7 +8,15 @@
  * Contract: 0x4E1f41613c9084FdB9E34E11fAE9412427480e56
  * All art data is fully onchain — no IPFS, no offchain storage.
  */
-import { FC, lazy, Suspense as ReactSuspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  FC,
+  lazy,
+  Suspense as ReactSuspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import { useNavigate, useParams } from 'react-router';
 import { createPublicClient, http } from 'viem';
@@ -43,23 +51,25 @@ const TERRAFORMS_ABI = [
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{
-      name: '',
-      type: 'tuple',
-      components: [
-        { name: 'tokenId', type: 'uint256' },
-        { name: 'level', type: 'uint256' },
-        { name: 'xCoordinate', type: 'uint256' },
-        { name: 'yCoordinate', type: 'uint256' },
-        { name: 'elevation', type: 'int256' },
-        { name: 'structureSpaceX', type: 'uint256' },
-        { name: 'structureSpaceY', type: 'uint256' },
-        { name: 'structureSpaceZ', type: 'uint256' },
-        { name: 'zoneName', type: 'string' },
-        { name: 'zoneColors', type: 'string[10]' },
-        { name: 'characterSet', type: 'string[9]' },
-      ],
-    }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'level', type: 'uint256' },
+          { name: 'xCoordinate', type: 'uint256' },
+          { name: 'yCoordinate', type: 'uint256' },
+          { name: 'elevation', type: 'int256' },
+          { name: 'structureSpaceX', type: 'uint256' },
+          { name: 'structureSpaceY', type: 'uint256' },
+          { name: 'structureSpaceZ', type: 'uint256' },
+          { name: 'zoneName', type: 'string' },
+          { name: 'zoneColors', type: 'string[10]' },
+          { name: 'characterSet', type: 'string[9]' },
+        ],
+      },
+    ],
   },
 ] as const;
 
@@ -143,7 +153,9 @@ function useTerraformData(tokenId: number | null) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tokenId]);
 
   return { html, meta, loading, error };
@@ -152,10 +164,15 @@ function useTerraformData(tokenId: number | null) {
 // ─── Metadata Panel ──────────────────────────────────────────────────────────
 
 const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
-  <div style={{
-    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-    fontSize: '0.75rem', color: '#c4c4c4',
-  }}>
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 10,
+      fontSize: '0.75rem',
+      color: '#c4c4c4',
+    }}
+  >
     <div style={{ background: '#1a1a2e', borderRadius: 10, padding: '12px 16px' }}>
       <div style={labelStyle}>Zone</div>
       <div style={{ ...valStyle, color: meta.zoneColors[0] || '#fff' }}>{meta.zoneName}</div>
@@ -166,43 +183,88 @@ const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
     </div>
     <div style={{ background: '#1a1a2e', borderRadius: 10, padding: '12px 16px' }}>
       <div style={labelStyle}>Coordinates</div>
-      <div style={valStyle}>({meta.x}, {meta.y})</div>
+      <div style={valStyle}>
+        ({meta.x}, {meta.y})
+      </div>
     </div>
     <div style={{ background: '#1a1a2e', borderRadius: 10, padding: '12px 16px' }}>
       <div style={labelStyle}>Elevation</div>
       <div style={{ ...valStyle, color: meta.elevation >= 0 ? '#22c55e' : '#ef4444' }}>
-        {meta.elevation >= 0 ? '+' : ''}{meta.elevation}
+        {meta.elevation >= 0 ? '+' : ''}
+        {meta.elevation}
       </div>
     </div>
 
     {/* Zone Colors */}
-    <div style={{ gridColumn: '1 / -1', background: '#1a1a2e', borderRadius: 10, padding: '12px 16px' }}>
+    <div
+      style={{
+        gridColumn: '1 / -1',
+        background: '#1a1a2e',
+        borderRadius: 10,
+        padding: '12px 16px',
+      }}
+    >
       <div style={labelStyle}>Zone Colors</div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
         {meta.zoneColors.map((c, i) => (
-          <div key={i} style={{
-            width: 28, height: 28, borderRadius: 6, background: c,
-            border: '1px solid rgba(255,255,255,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.5rem', color: 'rgba(0,0,0,0.5)', fontWeight: 'bold',
-          }}>{i}</div>
+          <div
+            key={i}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: c,
+              border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.5rem',
+              color: 'rgba(0,0,0,0.5)',
+              fontWeight: 'bold',
+            }}
+          >
+            {i}
+          </div>
         ))}
       </div>
     </div>
 
     {/* Character Set */}
-    <div style={{ gridColumn: '1 / -1', background: '#1a1a2e', borderRadius: 10, padding: '12px 16px' }}>
+    <div
+      style={{
+        gridColumn: '1 / -1',
+        background: '#1a1a2e',
+        borderRadius: 10,
+        padding: '12px 16px',
+      }}
+    >
       <div style={labelStyle}>Character Set</div>
-      <div style={{
-        display: 'flex', gap: 6, marginTop: 6, fontFamily: 'monospace',
-        fontSize: '1.1rem', color: meta.zoneColors[0] || '#fff',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          marginTop: 6,
+          fontFamily: 'monospace',
+          fontSize: '1.1rem',
+          color: meta.zoneColors[0] || '#fff',
+        }}
+      >
         {meta.characterSet.map((c, i) => (
-          <span key={i} style={{
-            width: 32, height: 32, borderRadius: 6, background: '#0d0d1a',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}>{c}</span>
+          <span
+            key={i}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              background: '#0d0d1a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            {c}
+          </span>
         ))}
       </div>
     </div>
@@ -210,11 +272,17 @@ const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
 );
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
-  letterSpacing: '0.1em', color: '#64748b', marginBottom: 4,
+  fontSize: '0.6rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  color: 'var(--theme-text-muted)',
+  marginBottom: 4,
 };
 const valStyle: React.CSSProperties = {
-  fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0',
+  fontSize: '1.1rem',
+  fontWeight: 700,
+  color: '#e2e8f0',
   fontFamily: "'Londrina Solid', 'Comic Sans MS', cursive",
 };
 
@@ -226,15 +294,24 @@ const TerraformsPage: FC = () => {
   // If no id, show the 3D Hypercastle world
   if (!id) {
     return (
-      <ReactSuspense fallback={
-        <div style={{
-          width: '100%', height: '100vh', background: '#050510',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#475569', fontSize: '0.85rem',
-        }}>
-          Loading Hypercastle...
-        </div>
-      }>
+      <ReactSuspense
+        fallback={
+          <div
+            style={{
+              width: '100%',
+              height: '100vh',
+              background: '#050510',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#475569',
+              fontSize: '0.85rem',
+            }}
+          >
+            Loading Hypercastle...
+          </div>
+        }
+      >
         <HypercastleView />
       </ReactSuspense>
     );
@@ -261,13 +338,16 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100%;height:100%}</style></head><body>${html}</body></html>`;
   }, [html]);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const n = parseInt(inputValue, 10);
-    if (!isNaN(n) && n >= 1 && n <= TOTAL_SUPPLY) {
-      navigate(`/terraforms/${n}`);
-    }
-  }, [inputValue, navigate]);
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const n = parseInt(inputValue, 10);
+      if (!isNaN(n) && n >= 1 && n <= TOTAL_SUPPLY) {
+        navigate(`/terraforms/${n}`);
+      }
+    },
+    [inputValue, navigate],
+  );
 
   const goRandom = useCallback(() => {
     const rand = Math.floor(Math.random() * TOTAL_SUPPLY) + 1;
@@ -292,35 +372,68 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
   }, [tokenId, navigate]);
 
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0a0a14',
-      fontFamily: "'PT Root UI', sans-serif", color: '#e2e8f0',
-      padding: '0 0 60px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#0a0a14',
+        fontFamily: "'PT Root UI', sans-serif",
+        color: '#e2e8f0',
+        padding: '0 0 60px',
+      }}
+    >
       {/* Header */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '32px 20px 16px', gap: 8,
-      }}>
-        <h1 style={{
-          fontFamily: "'Londrina Solid', 'Comic Sans MS', cursive",
-          fontSize: '2rem', fontWeight: 400, margin: 0, color: '#e2e8f0',
-          letterSpacing: '0.02em',
-        }}>
-          <a href="/terraforms" style={{ color: '#64748b', textDecoration: 'none' }}>&#x25A8;</a> Terraforms Explorer
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '32px 20px 16px',
+          gap: 8,
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "'Londrina Solid', 'Comic Sans MS', cursive",
+            fontSize: '2rem',
+            fontWeight: 400,
+            margin: 0,
+            color: '#e2e8f0',
+            letterSpacing: '0.02em',
+          }}
+        >
+          <a
+            href="/terraforms"
+            style={{ color: 'var(--theme-text-muted)', textDecoration: 'none' }}
+          >
+            &#x25A8;
+          </a>{' '}
+          Terraforms Explorer
         </h1>
-        <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
+        <p style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem', margin: 0 }}>
           Fully onchain ASCII art by Mathcastles · {TOTAL_SUPPLY.toLocaleString()} tokens ·{' '}
-          <a href="/terraforms" style={{ color: '#64748b', textDecoration: 'underline' }}>← Hypercastle</a>
+          <a
+            href="/terraforms"
+            style={{ color: 'var(--theme-text-muted)', textDecoration: 'underline' }}
+          >
+            ← Hypercastle
+          </a>
         </p>
       </div>
 
       {/* Search / Navigation */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 8, padding: '0 20px 24px', flexWrap: 'wrap',
-      }}>
-        <button onClick={goPrev} disabled={!tokenId || tokenId <= 1} style={navBtnStyle}>←</button>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          padding: '0 20px 24px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button onClick={goPrev} disabled={!tokenId || tokenId <= 1} style={navBtnStyle}>
+          ←
+        </button>
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6 }}>
           <input
             type="number"
@@ -330,34 +443,57 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             style={{
-              width: 160, padding: '8px 14px', borderRadius: 10,
-              border: '1px solid #334155', background: '#0f172a',
-              color: '#e2e8f0', fontSize: '0.85rem',
-              fontFamily: "'PT Root UI', sans-serif", outline: 'none',
+              width: 160,
+              padding: '8px 14px',
+              borderRadius: 10,
+              border: '1px solid #334155',
+              background: '#0f172a',
+              color: '#e2e8f0',
+              fontSize: '0.85rem',
+              fontFamily: "'PT Root UI', sans-serif",
+              outline: 'none',
               textAlign: 'center',
             }}
           />
-          <button type="submit" style={{ ...navBtnStyle, padding: '8px 16px', fontSize: '0.75rem' }}>
+          <button
+            type="submit"
+            style={{ ...navBtnStyle, padding: '8px 16px', fontSize: '0.75rem' }}
+          >
             Go
           </button>
         </form>
-        <button onClick={goNext} disabled={!tokenId || tokenId >= TOTAL_SUPPLY} style={navBtnStyle}>→</button>
-        <button onClick={goRandom} style={{ ...navBtnStyle, padding: '8px 14px', fontSize: '0.7rem' }}>
+        <button onClick={goNext} disabled={!tokenId || tokenId >= TOTAL_SUPPLY} style={navBtnStyle}>
+          →
+        </button>
+        <button
+          onClick={goRandom}
+          style={{ ...navBtnStyle, padding: '8px 14px', fontSize: '0.7rem' }}
+        >
           Random
         </button>
       </div>
 
       {/* Content */}
-      <div style={{
-        maxWidth: 900, margin: '0 auto', padding: '0 20px',
-        display: 'flex', flexDirection: 'column', gap: 20,
-      }}>
+      <div
+        style={{
+          maxWidth: 900,
+          margin: '0 auto',
+          padding: '0 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20,
+        }}
+      >
         {/* Loading */}
         {loading && (
-          <div style={{
-            textAlign: 'center', padding: '60px 0', color: '#64748b',
-            fontSize: '0.85rem',
-          }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '60px 0',
+              color: 'var(--theme-text-muted)',
+              fontSize: '0.85rem',
+            }}
+          >
             <div style={{ animation: 'pulse 2s infinite', opacity: 0.6 }}>
               Reading onchain data for token #{tokenId}...
             </div>
@@ -366,19 +502,27 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
 
         {/* Error */}
         {error && (
-          <div style={{
-            textAlign: 'center', padding: '40px 0', color: '#ef4444',
-            fontSize: '0.8rem',
-          }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px 0',
+              color: '#ef4444',
+              fontSize: '0.8rem',
+            }}
+          >
             Error: {error}
           </div>
         )}
 
         {/* No token selected */}
         {!tokenId && !loading && (
-          <div style={{
-            textAlign: 'center', padding: '80px 0', color: '#475569',
-          }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '80px 0',
+              color: '#475569',
+            }}
+          >
             <div style={{ fontSize: '3rem', marginBottom: 12 }}>&#x25A8;</div>
             <div style={{ fontSize: '0.85rem' }}>Enter a token ID or click Random to explore</div>
           </div>
@@ -389,31 +533,45 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
           <>
             {/* Title */}
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{
-                fontFamily: "'Londrina Solid', 'Comic Sans MS', cursive",
-                fontSize: '1.4rem', fontWeight: 400, margin: '0 0 4px',
-                color: meta?.zoneColors[0] || '#e2e8f0',
-              }}>
+              <h2
+                style={{
+                  fontFamily: "'Londrina Solid', 'Comic Sans MS', cursive",
+                  fontSize: '1.4rem',
+                  fontWeight: 400,
+                  margin: '0 0 4px',
+                  color: meta?.zoneColors[0] || '#e2e8f0',
+                }}
+              >
                 Terraform #{tokenId}
               </h2>
               {meta && (
-                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                  Level {meta.level} · {meta.zoneName} · ({meta.x}, {meta.y}) · Elev {meta.elevation}
+                <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
+                  Level {meta.level} · {meta.zoneName} · ({meta.x}, {meta.y}) · Elev{' '}
+                  {meta.elevation}
                 </span>
               )}
             </div>
 
             {/* Animated HTML iframe */}
-            <div style={{
-              width: '100%', aspectRatio: '1', maxWidth: 600,
-              margin: '0 auto', borderRadius: 12, overflow: 'hidden',
-              border: '1px solid #1e293b', background: '#000',
-            }}>
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: '1',
+                maxWidth: 600,
+                margin: '0 auto',
+                borderRadius: 12,
+                overflow: 'hidden',
+                border: '1px solid #1e293b',
+                background: '#000',
+              }}
+            >
               <iframe
                 srcDoc={srcdoc}
                 sandbox="allow-scripts allow-same-origin"
                 style={{
-                  width: '100%', height: '100%', border: 'none',
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
                   display: 'block',
                 }}
                 title={`Terraform #${tokenId}`}
@@ -458,16 +616,27 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
 };
 
 const navBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 10, border: '1px solid #334155',
-  background: '#1e293b', color: '#e2e8f0', fontSize: '0.85rem',
-  fontWeight: 700, cursor: 'pointer', fontFamily: "'PT Root UI', sans-serif",
+  padding: '8px 12px',
+  borderRadius: 10,
+  border: '1px solid #334155',
+  background: '#1e293b',
+  color: '#e2e8f0',
+  fontSize: '0.85rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: "'PT Root UI', sans-serif",
   transition: 'all 0.1s',
 };
 
 const linkStyle: React.CSSProperties = {
-  padding: '8px 16px', borderRadius: 10, border: '1px solid #1e293b',
-  fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8',
-  textDecoration: 'none', transition: 'background 0.1s',
+  padding: '8px 16px',
+  borderRadius: 10,
+  border: '1px solid #1e293b',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: '#94a3b8',
+  textDecoration: 'none',
+  transition: 'background 0.1s',
   fontFamily: "'PT Root UI', sans-serif",
 };
 

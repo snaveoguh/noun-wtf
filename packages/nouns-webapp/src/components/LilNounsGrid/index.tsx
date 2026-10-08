@@ -421,7 +421,7 @@ const MintPopover: FC<{
               padding: '2px 0',
             }}
           >
-            <span style={{ color: '#64748b' }}>{label}</span>
+            <span style={{ color: 'var(--theme-text-muted)' }}>{label}</span>
             <span
               style={{
                 color: '#94a3b8',
@@ -549,20 +549,20 @@ const MintCelebration: FC<{
             }}
           >
             <div>
-              <span style={{ color: '#64748b' }}>Head: </span>
+              <span style={{ color: 'var(--theme-text-muted)' }}>Head: </span>
               {item.traits.head}
             </div>
             <div>
-              <span style={{ color: '#64748b' }}>Body: </span>
+              <span style={{ color: 'var(--theme-text-muted)' }}>Body: </span>
               {item.traits.body}
             </div>
             <div>
-              <span style={{ color: '#64748b' }}>Accessory: </span>
+              <span style={{ color: 'var(--theme-text-muted)' }}>Accessory: </span>
               {item.traits.accessory}
             </div>
             {item.traits.glasses != null && (
               <div>
-                <span style={{ color: '#64748b' }}>Glasses: </span>
+                <span style={{ color: 'var(--theme-text-muted)' }}>Glasses: </span>
                 {item.traits.glasses}
               </div>
             )}

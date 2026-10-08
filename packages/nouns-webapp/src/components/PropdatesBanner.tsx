@@ -192,7 +192,7 @@ const PropdateModal: FC<{
             fontFamily: "'PT Root UI'",
             fontSize: '0.82rem',
             lineHeight: 1.6,
-            color: '#4a4a5a',
+            color: 'var(--theme-text-primary)',
             margin: '0 0 12px',
             whiteSpace: 'pre-wrap',
             maxHeight: '30vh',
@@ -206,7 +206,7 @@ const PropdateModal: FC<{
         <div
           style={{
             fontSize: '0.7rem',
-            color: '#999',
+            color: 'var(--theme-text-muted)',
             marginBottom: 16,
           }}
         >
@@ -302,7 +302,10 @@ const PropdatesBanner: FC = () => {
       if (pausedRef.current) {
         wasPaused = true;
       } else {
-        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
+        if (wasPaused) {
+          pos = el.scrollLeft;
+          wasPaused = false;
+        }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
         if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;

@@ -31,13 +31,13 @@
 
 .updatable {
   border: 2px solid #f0ad4e;
-  background-color: #fff;
+  background-color: var(--theme-bg-card);
   /* slightly darker text for legibility */
   color: #dc9e46;
 }
 .objection {
   border: 2px solid var(--brand-color-red);
-  background-color: #fff;
+  background-color: var(--theme-bg-card);
   /* slightly darker text for legibility */
   color: var(--brand-color-red);
 }

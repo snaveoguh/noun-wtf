@@ -4,7 +4,7 @@
 
 .proposal {
   margin-top: 1em;
-  background-color: white;
+  background-color: var(--theme-bg-card);
 }
 
 .backArrow {
@@ -239,13 +239,13 @@
 .versionHistory .version {
   padding: 15px;
   border-radius: 12px;
-  background-color: #f2f2f5;
+  background-color: var(--theme-bg-card);
   border: 1px solid transparent;
   text-align: left;
   text-decoration: none;
 }
 .versionHistory .version:hover {
-  background-color: #e6e6eb;
+  background-color: var(--theme-bg-card);
   border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
@@ -254,7 +254,7 @@
 }
 .versionHistory .version.activeVersion {
   border: 1px solid rgba(0, 0, 0, 0.4);
-  background-color: #fff;
+  background-color: var(--theme-bg-card);
 }
 
 .versionHistory .version h3,
@@ -308,8 +308,8 @@
   font-size: 14px;
 }
 .diffsLink.diffsLinkActive {
-  background: #fff;
-  color: #000;
+  background: var(--theme-bg-card);
+  color: var(--theme-text-primary);
   border: 3px solid #000;
 }
 .diffsWrapper table:first-of-type {

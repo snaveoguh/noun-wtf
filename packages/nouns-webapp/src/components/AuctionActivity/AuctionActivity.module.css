@@ -65,13 +65,13 @@
   padding-left: 0.5rem;
   text-decoration: none;
   opacity: 1;
-  color: rgb(95, 95, 95);
+  color: var(--theme-text-muted);
 }
 
 .nextNounLink:hover,
 .nextNounLink:hover a {
   text-decoration: none;
-  color: black;
+  color: var(--theme-text-primary);
   opacity: 1;
 }
 

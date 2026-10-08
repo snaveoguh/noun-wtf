@@ -66,12 +66,12 @@ export const CandidateVersionSlider: FC<CandidateVersionSliderProps> = ({
             height: 30,
             borderRadius: 8,
             border: '1px solid rgba(0,0,0,0.12)',
-            background: '#f8fafc',
+            background: 'var(--theme-bg-card)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#6b7280',
+            color: 'var(--theme-text-muted)',
             flexShrink: 0,
             fontSize: 14,
           }}
@@ -80,7 +80,14 @@ export const CandidateVersionSlider: FC<CandidateVersionSliderProps> = ({
         </button>
 
         {/* Version label (left) */}
-        <span style={{ fontSize: '0.75rem', color: '#6b7280', flexShrink: 0, fontWeight: 600 }}>
+        <span
+          style={{
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
+            flexShrink: 0,
+            fontWeight: 600,
+          }}
+        >
           v1
         </span>
 
@@ -101,7 +108,14 @@ export const CandidateVersionSlider: FC<CandidateVersionSliderProps> = ({
         />
 
         {/* Version label (right) */}
-        <span style={{ fontSize: '0.75rem', color: '#6b7280', flexShrink: 0, fontWeight: 600 }}>
+        <span
+          style={{
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
+            flexShrink: 0,
+            fontWeight: 600,
+          }}
+        >
           v{total}
         </span>
 
@@ -345,7 +359,7 @@ const VersionPlayerModal: FC<{
             v{v.versionNumber}/{total}
           </span>
 
-          <span style={{ fontSize: '0.55rem', color: '#6b7280' }}>
+          <span style={{ fontSize: '0.55rem', color: 'var(--theme-text-muted)' }}>
             {new Date(v.timestamp * 1000).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -380,7 +394,7 @@ const VersionPlayerModal: FC<{
           style={{
             flex: 1,
             overflow: 'hidden',
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             borderRadius: '0 0 12px 12px',
             position: 'relative',
           }}

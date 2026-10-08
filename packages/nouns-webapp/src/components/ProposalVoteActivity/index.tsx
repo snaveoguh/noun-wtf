@@ -6,8 +6,8 @@ import { MessageSquare, RefreshCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { usePublicClient } from 'wagmi';
 
 import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
-import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
 import { ensCacheKey } from '@/utils/ensLookup';
+import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
 import { lookupNNSOrENS } from '@/utils/lookupNNSOrENS';
 
 dayjs.extend(relativeTime);
@@ -30,7 +30,7 @@ interface ProposalVoteActivityProps {
 const SUPPORT_LABELS: Record<number, { label: string; color: string; bg: string }> = {
   1: { label: 'For', color: '#43b369', bg: 'rgba(67, 179, 105, 0.1)' },
   0: { label: 'Against', color: '#e40536', bg: 'rgba(228, 5, 54, 0.1)' },
-  2: { label: 'Abstain', color: '#8c8d92', bg: 'rgba(140, 141, 146, 0.1)' },
+  2: { label: 'Abstain', color: 'var(--theme-text-muted)', bg: 'rgba(140, 141, 146, 0.1)' },
 };
 
 const VoteActivityItem: FC<{
@@ -152,7 +152,7 @@ const VoteActivityItem: FC<{
             style={{
               fontSize: '0.75rem',
               fontWeight: 700,
-              color: '#8c8d92',
+              color: 'var(--theme-text-muted)',
             }}
           >
             {vote.votes} {vote.votes === 1 ? 'vote' : 'votes'}
@@ -173,7 +173,7 @@ const VoteActivityItem: FC<{
                 gap: 4,
                 fontSize: '0.65rem',
                 fontWeight: 600,
-                color: '#8c8d92',
+                color: 'var(--theme-text-muted)',
                 transition: 'all 0.15s',
               }}
               onMouseEnter={e => {
@@ -216,11 +216,11 @@ const VoteActivityItem: FC<{
             marginTop: 8,
             marginLeft: 36,
             padding: '10px 14px',
-            background: '#f8f8fa',
+            background: 'var(--theme-bg-card)',
             borderRadius: 10,
             fontSize: '0.82rem',
             lineHeight: 1.5,
-            color: '#3a3a4a',
+            color: 'var(--theme-text-primary)',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
           }}
@@ -243,9 +243,7 @@ const ProposalVoteActivity: FC<ProposalVoteActivityProps> = ({ votes, onRevote }
     switch (sortMode) {
       case 'recent':
         // Sort by block descending (most recent first)
-        return arr.sort(
-          (a, b) => Number(b.createdAtBlock || 0) - Number(a.createdAtBlock || 0),
-        );
+        return arr.sort((a, b) => Number(b.createdAtBlock || 0) - Number(a.createdAtBlock || 0));
       case 'weight':
         return arr.sort((a, b) => b.votes - a.votes);
       case 'for':
@@ -285,7 +283,7 @@ const ProposalVoteActivity: FC<ProposalVoteActivityProps> = ({ votes, onRevote }
               key={mode}
               onClick={() => setSortMode(mode)}
               style={{
-                background: sortMode === mode ? '#14141f' : '#f4f4f8',
+                background: sortMode === mode ? '#14141f' : 'var(--theme-bg-card)',
                 color: sortMode === mode ? '#fff' : '#8c8d92',
                 border: 'none',
                 borderRadius: 6,
@@ -308,7 +306,7 @@ const ProposalVoteActivity: FC<ProposalVoteActivityProps> = ({ votes, onRevote }
           style={{
             padding: 32,
             textAlign: 'center',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             fontSize: '0.85rem',
           }}
         >
@@ -329,14 +327,14 @@ const ProposalVoteActivity: FC<ProposalVoteActivityProps> = ({ votes, onRevote }
             display: 'block',
             width: '100%',
             padding: '12px',
-            background: '#f4f4f8',
+            background: 'var(--theme-bg-card)',
             border: 'none',
             borderRadius: 10,
             marginTop: 8,
             cursor: 'pointer',
             fontSize: '0.8rem',
             fontWeight: 600,
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
           }}
         >
           Show all {sorted.length} votes

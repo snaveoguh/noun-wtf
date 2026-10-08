@@ -1179,7 +1179,7 @@ export default function CrystalBallPage() {
         justifyContent: 'flex-start',
         background: 'radial-gradient(ellipse at 50% 40%, rgba(15,15,25,1), rgba(5,5,8,1))',
         fontFamily: '"Courier New", monospace',
-        color: '#888',
+        color: 'var(--theme-text-muted)',
         padding: '20px',
         gap: 20,
         position: 'relative',
@@ -1226,7 +1226,7 @@ export default function CrystalBallPage() {
           style={{
             fontSize: 9,
             letterSpacing: '0.2em',
-            color: '#555',
+            color: 'var(--theme-text-muted)',
             fontWeight: 700,
             minWidth: 36,
           }}
@@ -1281,7 +1281,7 @@ export default function CrystalBallPage() {
             <span
               style={{
                 fontSize: 10,
-                color: '#666',
+                color: 'var(--theme-text-muted)',
                 letterSpacing: '0.1em',
                 lineHeight: 1.6,
                 maxWidth: ballSize * 0.7,
@@ -1442,7 +1442,7 @@ export default function CrystalBallPage() {
                 <div
                   style={{
                     fontSize: 10,
-                    color: '#666',
+                    color: 'var(--theme-text-muted)',
                     letterSpacing: '0.05em',
                     marginTop: showingTwin ? 18 : 6,
                   }}
@@ -1673,7 +1673,7 @@ export default function CrystalBallPage() {
           style={{
             fontSize: 9,
             letterSpacing: '0.15em',
-            color: '#666',
+            color: 'var(--theme-text-muted)',
             textAlign: 'center',
             maxWidth: 420,
             lineHeight: 1.5,

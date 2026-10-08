@@ -55,7 +55,7 @@ export const NOS_CSS = `
   font-size:12px;line-height:1;cursor:pointer;padding:0}
 .nos-ctrls button:hover{background:currentColor}
 .nos-ctrls button:hover{color:inherit;filter:invert(1)}
-.nos-content{flex:1;overflow:auto;position:relative;background:#fff;color:#14161b;overscroll-behavior:contain}
+.nos-content{flex:1;overflow:auto;position:relative;background:#000;color:var(--paper);overscroll-behavior:contain}
 .is-dark>.nos-content{background:#000;color:var(--paper)}
 .nos-haze{position:absolute;inset:0;background:#020304;pointer-events:none;transition:opacity .5s ease}
 .nos-resize{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;

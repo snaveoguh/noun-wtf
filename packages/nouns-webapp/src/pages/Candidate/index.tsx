@@ -141,7 +141,14 @@ const SponsorModal: React.FC<{
           }}
         />
 
-        <p style={{ color: '#999', fontSize: '0.85rem', lineHeight: 1.5, marginBottom: 20 }}>
+        <p
+          style={{
+            color: 'var(--theme-text-muted)',
+            fontSize: '0.85rem',
+            lineHeight: 1.5,
+            marginBottom: 20,
+          }}
+        >
           Note that once the candidate is promoted to a proposal, sponsors will need to wait until
           the proposal is queued or defeated before they can author or sponsor other proposals.
         </p>
@@ -775,7 +782,7 @@ const CandidatePage = () => {
                   border: '1px solid rgba(0,0,0,0.1)',
                   marginBottom: 16,
                   fontSize: '0.8rem',
-                  color: '#6b7280',
+                  color: 'var(--theme-text-muted)',
                   fontFamily: "'PT Root UI', sans-serif",
                 }}
               >

@@ -108,7 +108,7 @@ export default function NonsensePage() {
           fallback={
             <div
               style={{
-                color: '#444',
+                color: 'var(--theme-text-primary)',
                 textAlign: 'center',
                 padding: '60px',
                 fontFamily: 'monospace',

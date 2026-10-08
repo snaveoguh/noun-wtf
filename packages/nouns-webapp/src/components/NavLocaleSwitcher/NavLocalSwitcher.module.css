@@ -2,8 +2,8 @@
   justify-content: space-between;
 }
 .dropdownActive {
-  background-color: white;
-  color: black;
+  background-color: var(--theme-bg-card);
+  color: var(--theme-text-primary);
 }
 
 .dropDownTop {
@@ -17,7 +17,7 @@
 }
 
 .dropDownTop:hover {
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .dropDownBottom {
@@ -29,7 +29,7 @@
 }
 
 .dropDownBottom:hover {
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .dropDownInterior {
@@ -41,7 +41,7 @@
 }
 
 .dropDownInterior:hover {
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .languageButton {

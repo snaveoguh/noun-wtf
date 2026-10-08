@@ -8,10 +8,7 @@ import { parseEther } from 'viem';
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 
 import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
-import {
-  NOUNV2_TREASURY_ADDRESS,
-  nounV2TreasuryAbi,
-} from '@/contracts/nounv2-treasury';
+import { NOUNV2_TREASURY_ADDRESS, nounV2TreasuryAbi } from '@/contracts/nounv2-treasury';
 
 import classes from './NounV2.module.css';
 
@@ -167,9 +164,8 @@ export default function CreateNounV2ProposalPage() {
       <div className={classes.container}>
         <h1 className={classes.title}>Create NounV2 Proposal</h1>
         <div className={classes.missingAddress}>
-          NounV2 contracts not deployed yet — set{' '}
-          <code>VITE_NOUNV2_TREASURY_ADDRESS</code> and <code>VITE_NOUNV2_TOKEN_ADDRESS</code>{' '}
-          after deploy.
+          NounV2 contracts not deployed yet — set <code>VITE_NOUNV2_TREASURY_ADDRESS</code> and{' '}
+          <code>VITE_NOUNV2_TOKEN_ADDRESS</code> after deploy.
         </div>
       </div>
     );
@@ -186,13 +182,20 @@ export default function CreateNounV2ProposalPage() {
             padding: '2.5rem 2rem',
             border: '2px solid #fecaca',
             borderRadius: 16,
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
           }}
         >
           <h2 style={{ fontSize: '1.3rem', marginBottom: '0.75rem', color: '#1e293b' }}>
             Proposal Submitted On-Chain
           </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+          <p
+            style={{
+              color: 'var(--theme-text-muted)',
+              fontSize: '0.9rem',
+              lineHeight: 1.6,
+              marginBottom: '1.5rem',
+            }}
+          >
             Voting is open immediately for ~12 hours. After it succeeds, anyone can queue it and
             execute after the 12h timelock.
           </p>
@@ -200,7 +203,13 @@ export default function CreateNounV2ProposalPage() {
             href={`https://etherscan.io/tx/${submittedTx}`}
             target="_blank"
             rel="noreferrer"
-            style={{ display: 'inline-block', fontFamily: 'monospace', fontSize: '0.8rem', color: '#3b82f6', marginBottom: '1.5rem' }}
+            style={{
+              display: 'inline-block',
+              fontFamily: 'monospace',
+              fontSize: '0.8rem',
+              color: '#3b82f6',
+              marginBottom: '1.5rem',
+            }}
           >
             {submittedTx.slice(0, 18)}... (view on Etherscan)
           </a>
@@ -227,8 +236,8 @@ export default function CreateNounV2ProposalPage() {
 
       {address && !meetsThreshold && (
         <div className={classes.missingAddress}>
-          Your wallet has <strong>{votingPower}</strong> NounV2 votes — below the proposal
-          threshold of 1. You can still fill out the form, but the transaction will revert with
+          Your wallet has <strong>{votingPower}</strong> NounV2 votes — below the proposal threshold
+          of 1. You can still fill out the form, but the transaction will revert with
           <code> BelowProposalThreshold</code>.
         </div>
       )}
@@ -270,7 +279,7 @@ export default function CreateNounV2ProposalPage() {
               height: 22,
               borderRadius: 11,
               border: 'none',
-              background: advanced ? '#dc2626' : '#d1d5db',
+              background: advanced ? '#dc2626' : 'var(--theme-bg-tertiary)',
               cursor: 'pointer',
               transition: 'background 0.2s',
               flexShrink: 0,
@@ -284,7 +293,7 @@ export default function CreateNounV2ProposalPage() {
                 width: 18,
                 height: 18,
                 borderRadius: '50%',
-                background: '#fff',
+                background: 'var(--theme-bg-card)',
                 transition: 'left 0.2s',
               }}
             />
@@ -307,7 +316,7 @@ export default function CreateNounV2ProposalPage() {
           style={{
             padding: '8px 12px',
             borderRadius: '8px',
-            background: '#fef2f2',
+            background: 'var(--theme-bg-card)',
             border: '1px solid #fecaca',
             fontSize: '0.8rem',
             marginBottom: '8px',
@@ -390,7 +399,13 @@ export default function CreateNounV2ProposalPage() {
           </>
         ) : (
           <div className={classes.txRow}>
-            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--theme-text-muted)',
+                marginBottom: '0.5rem',
+              }}
+            >
               How much ETH do you need?
             </div>
             <input
@@ -412,11 +427,7 @@ export default function CreateNounV2ProposalPage() {
           disabled={submitting || !address}
           onClick={handleSubmit}
         >
-          {submitting
-            ? 'Submitting...'
-            : !address
-              ? 'Connect Wallet'
-              : 'Submit Proposal'}
+          {submitting ? 'Submitting...' : !address ? 'Connect Wallet' : 'Submit Proposal'}
         </button>
       </div>
     </div>

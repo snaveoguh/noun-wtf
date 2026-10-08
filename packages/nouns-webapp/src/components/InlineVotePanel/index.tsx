@@ -3,11 +3,7 @@ import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { NOUN_WTF_CLIENT_ID } from '@/config';
-import {
-  useCastRefundableVote,
-  useCastRefundableVoteWithReason,
-  Vote,
-} from '@/wrappers/nounsDao';
+import { useCastRefundableVote, useCastRefundableVoteWithReason, Vote } from '@/wrappers/nounsDao';
 
 interface InlineVotePanelProps {
   proposalId: string | undefined;
@@ -56,10 +52,8 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
     const lower = raw.toLowerCase();
     if (lower.includes('user rejected') || lower.includes('user denied'))
       return 'Transaction was rejected in your wallet.';
-    if (lower.includes('insufficient funds'))
-      return 'Insufficient funds for gas.';
-    if (lower.includes('already voted'))
-      return 'You have already voted on this proposal.';
+    if (lower.includes('insufficient funds')) return 'Insufficient funds for gas.';
+    if (lower.includes('already voted')) return 'You have already voted on this proposal.';
     if (lower.includes('voting is closed') || lower.includes('not active'))
       return 'Voting is no longer active for this proposal.';
     // Fallback: take first line only, strip contract call dumps
@@ -121,7 +115,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
     return (
       <div
         style={{
-          background: '#f0faf4',
+          background: 'var(--theme-bg-card)',
           borderRadius: 16,
           border: '1px solid #c8ecd5',
           padding: '16px 20px',
@@ -147,7 +141,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
           <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
             You voted <strong>{proposalVote}</strong> on this proposal
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#6b6b7b' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
             Gas spent on voting was refunded.
           </div>
         </div>
@@ -159,7 +153,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
     return (
       <div
         style={{
-          background: '#f0faf4',
+          background: 'var(--theme-bg-card)',
           borderRadius: 16,
           border: '1px solid #c8ecd5',
           padding: '20px 24px',
@@ -168,7 +162,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
       >
         <div style={{ fontSize: '1.2rem', marginBottom: 4 }}>🎉</div>
         <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Vote submitted!</div>
-        <div style={{ fontSize: '0.75rem', color: '#6b6b7b', marginTop: 4 }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginTop: 4 }}>
           {isZeroWeight
             ? 'Your zero-weight vote has been recorded onchain.'
             : 'Gas will be refunded to your wallet.'}
@@ -181,14 +175,14 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
     return (
       <div
         style={{
-          background: '#f4f4f8',
+          background: 'var(--theme-bg-card)',
           borderRadius: 16,
           border: '1px solid #e2e3e8',
           padding: '20px 24px',
           textAlign: 'center',
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#8c8d92' }}>
+        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--theme-text-muted)' }}>
           Connect a wallet to vote
         </div>
       </div>
@@ -198,7 +192,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         borderRadius: 16,
         border: '1px solid #e2e3e8',
         padding: '20px 24px',
@@ -222,7 +216,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
         >
           Cast Your Vote
         </h3>
-        <span style={{ fontSize: '0.75rem', color: '#8c8d92', fontWeight: 600 }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
           {availableVotes} {availableVotes === 1 ? 'Noun' : 'Nouns'}
         </span>
       </div>
@@ -275,7 +269,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
           resize: 'vertical',
           outline: 'none',
           transition: 'border-color 0.15s',
-          background: '#fafafa',
+          background: 'var(--theme-bg-card)',
         }}
         onFocus={e => (e.currentTarget.style.borderColor = '#000')}
         onBlur={e => (e.currentTarget.style.borderColor = '#e2e3e8')}
@@ -305,7 +299,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
           padding: '12px',
           borderRadius: 10,
           border: 'none',
-          background: selectedVote === undefined ? '#e2e3e8' : '#14141f',
+          background: selectedVote === undefined ? 'var(--theme-bg-tertiary)' : '#14141f',
           color: selectedVote === undefined ? '#8c8d92' : '#fff',
           fontFamily: "'PT Root UI'",
           fontWeight: 700,
@@ -360,7 +354,7 @@ const VoteButton: FC<{
       padding: '10px',
       borderRadius: 10,
       border: selected ? `2px solid ${color}` : '2px solid #e2e3e8',
-      background: selected ? `${color}10` : '#fff',
+      background: selected ? `${color}10` : 'var(--theme-bg-card)',
       color: selected ? color : '#8c8d92',
       cursor: disabled ? 'not-allowed' : 'pointer',
       display: 'flex',

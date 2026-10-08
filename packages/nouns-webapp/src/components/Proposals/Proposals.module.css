@@ -37,7 +37,7 @@
 }
 
 .tab {
-  background-color: #fff;
+  background-color: var(--theme-bg-card);
   border: 1px solid transparent;
   border-radius: 12px;
   border-bottom-left-radius: 0;
@@ -46,7 +46,7 @@
   padding: 10px 14px 6px;
   font-size: 32px;
   line-height: 1;
-  color: #000;
+  color: var(--theme-text-primary);
 }
 
 .activeTab {
@@ -88,18 +88,18 @@
   font-weight: bold;
   margin-bottom: 0.5rem;
   border-radius: 12px;
-  background-color: #f4f4f8;
+  background-color: var(--theme-bg-card);
   border: #f4f4f8;
-  color: #8c8d92;
+  color: var(--theme-text-muted);
   border: 1px solid #e2e3e8;
 }
 .generateBtnDisabled:focus,
 .generateBtnDisabled:hover,
 .generateBtnDisabled:active {
   cursor: not-allowed;
-  background-color: #f4f4f8 !important;
+  background-color: var(--theme-bg-card) !important;
   border: #f4f4f8 !important;
-  color: #8c8d92 !important;
+  color: var(--theme-text-muted) !important;
   border: 1px solid #e2e3e8 !important;
   outline: none;
   box-shadow: none;
@@ -113,7 +113,7 @@
   border: 1px solid #e2e3e8;
   box-sizing: border-box;
   border-radius: 16px;
-  background: #f4f4f8;
+  background: var(--theme-bg-card);
   font-size: 22px;
   font-family: 'PT Root UI';
   font-weight: bold;
@@ -131,7 +131,7 @@
 }
 
 .proposalLink:hover {
-  background: white;
+  background: var(--theme-bg-card);
   color: inherit !important;
   cursor: pointer;
 }
@@ -252,7 +252,7 @@
 }
 
 .proposalId {
-  color: #8c8d92;
+  color: var(--theme-text-muted);
   margin-right: 0.5rem;
 }
 
@@ -307,9 +307,9 @@
 }
 
 .changeDelegateBtn {
-  background-color: white;
+  background-color: var(--theme-bg-card);
   border: 1px solid rgba(0, 0, 0, 0.1);
-  color: rgb(95, 95, 95);
+  color: var(--theme-text-muted);
   max-width: 10rem;
   height: 3rem;
   font-weight: bold;
@@ -319,14 +319,14 @@
 
 .changeDelegateBtn:focus,
 .changeDelegateBtn:hover {
-  background-color: #e2e3e8;
-  color: black;
+  background-color: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
   box-shadow: none;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .changeDelegateBtn:active {
-  background-color: #e2e3e8 !important;
+  background-color: var(--theme-bg-tertiary) !important;
 }
 
 .candidatesSidebar {
@@ -363,9 +363,9 @@
   margin-top: 1rem;
 }
 .candidatesSidebar .button.disabled {
-  background-color: #f4f4f8;
+  background-color: var(--theme-bg-card);
   border: #f4f4f8;
-  color: #8c8d92;
+  color: var(--theme-text-muted);
   border: 1px solid #e2e3e8;
   pointer-events: none;
 }
@@ -382,9 +382,9 @@
 .candidatesSidebar .button.disabled:hover,
 .candidatesSidebar .button.disabled:active {
   cursor: not-allowed;
-  background-color: #f4f4f8 !important;
+  background-color: var(--theme-bg-card) !important;
   border: #f4f4f8 !important;
-  color: #8c8d92 !important;
+  color: var(--theme-text-muted) !important;
   border: 1px solid #e2e3e8 !important;
   outline: none;
   box-shadow: none;

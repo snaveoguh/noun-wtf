@@ -6,7 +6,7 @@
 }
 
 .bone {
-  background: #d1d5db;
+  background: var(--theme-bg-tertiary);
   border-radius: 6px;
   animation: lofiPulse 1.8s ease-in-out infinite;
 }

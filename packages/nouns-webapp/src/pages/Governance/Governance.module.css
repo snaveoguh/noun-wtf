@@ -5,13 +5,13 @@
 }
 
 .headerRow span {
-  color: #8c8d92;
+  color: var(--theme-text-muted);
   font-size: 24px;
   font-family: 'Londrina Solid';
 }
 
 .headerRow h1 {
-  color: #14161b;
+  color: var(--theme-text-primary);
   font-size: 56px;
   font-family: 'Londrina Solid';
 }

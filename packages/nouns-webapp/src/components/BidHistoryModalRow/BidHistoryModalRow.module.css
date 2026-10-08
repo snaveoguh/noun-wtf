@@ -5,7 +5,7 @@
   padding: 1rem;
   margin-top: 0.75rem;
   border-bottom: 0px;
-  background-color: white;
+  background-color: var(--theme-bg-card);
 }
 
 .bidderInfoWrapper {
@@ -20,7 +20,7 @@
 }
 
 .bidDate {
-  color: rgba(140, 141, 146, 1);
+  color: var(--theme-text-muted);
   font-weight: 500;
   font-family: 'PT Root UI';
   font-size: 13px;
@@ -38,7 +38,7 @@
 }
 
 .linkIcon:hover {
-  color: black;
+  color: var(--theme-text-primary);
   cursor: pointer;
 }
 

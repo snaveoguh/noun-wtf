@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useRef } from 'react';
+
 import { createPortal } from 'react-dom';
 
 interface LilSeed {
@@ -73,7 +74,14 @@ function getLilColors(seed: LilSeed, imageData: LilImageData): ColorInfo[] {
   return colors;
 }
 
-const LilNounDetailPopover: FC<Props> = ({ lilId, seed, svgBase64, imageData, anchorRect, onClose }) => {
+const LilNounDetailPopover: FC<Props> = ({
+  lilId,
+  seed,
+  svgBase64,
+  imageData,
+  anchorRect,
+  onClose,
+}) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,10 +104,26 @@ const LilNounDetailPopover: FC<Props> = ({ lilId, seed, svgBase64, imageData, an
   const traits = useMemo(() => {
     const imgs = imageData.images;
     return [
-      ['Head', imgs.heads[seed.head]?.filename ? cleanTraitName(imgs.heads[seed.head].filename) : '—'],
-      ['Noggles', imgs.glasses?.[seed.glasses]?.filename ? cleanTraitName(imgs.glasses[seed.glasses].filename) : '—'],
-      ['Body', imgs.bodies[seed.body]?.filename ? cleanTraitName(imgs.bodies[seed.body].filename) : '—'],
-      ['Accessory', imgs.accessories[seed.accessory]?.filename ? cleanTraitName(imgs.accessories[seed.accessory].filename) : '—'],
+      [
+        'Head',
+        imgs.heads[seed.head]?.filename ? cleanTraitName(imgs.heads[seed.head].filename) : '—',
+      ],
+      [
+        'Noggles',
+        imgs.glasses?.[seed.glasses]?.filename
+          ? cleanTraitName(imgs.glasses[seed.glasses].filename)
+          : '—',
+      ],
+      [
+        'Body',
+        imgs.bodies[seed.body]?.filename ? cleanTraitName(imgs.bodies[seed.body].filename) : '—',
+      ],
+      [
+        'Accessory',
+        imgs.accessories[seed.accessory]?.filename
+          ? cleanTraitName(imgs.accessories[seed.accessory].filename)
+          : '—',
+      ],
       ['BG', seed.background === 0 ? 'Cool' : 'Warm'],
     ] as [string, string][];
   }, [seed, imageData]);
@@ -127,7 +151,7 @@ const LilNounDetailPopover: FC<Props> = ({ lilId, seed, svgBase64, imageData, an
         borderRadius: 16,
         overflow: 'auto',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         border: 'none',
       }}
     >
@@ -142,9 +166,7 @@ const LilNounDetailPopover: FC<Props> = ({ lilId, seed, svgBase64, imageData, an
 
       {/* Card body */}
       <div style={{ padding: '10px 12px 16px' }}>
-        <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>
-          Lil Noun {lilId}
-        </span>
+        <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Lil Noun {lilId}</span>
 
         {/* Traits */}
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>

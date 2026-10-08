@@ -16,7 +16,12 @@ interface ProbeButtonProps {
  * - Hard pixel-art drop shadow: 8px right, 6px down, solid black
  * - On :active / click, shadow disappears (button pushes flat)
  */
-export const ProbeButton: FC<ProbeButtonProps> = ({ children, onClick, disabled, className = '' }) => {
+export const ProbeButton: FC<ProbeButtonProps> = ({
+  children,
+  onClick,
+  disabled,
+  className = '',
+}) => {
   return (
     <button
       onClick={onClick}
@@ -26,7 +31,7 @@ export const ProbeButton: FC<ProbeButtonProps> = ({ children, onClick, disabled,
         background: '#ffef2e',
         border: '2px solid #000',
         boxShadow: '8px 6px 0 0 #000',
-        color: '#000',
+        color: 'var(--theme-text-primary)',
         fontWeight: 700,
         fontSize: '1.25rem',
         padding: '0.5rem 1.5rem',

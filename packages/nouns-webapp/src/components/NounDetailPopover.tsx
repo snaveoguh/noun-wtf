@@ -1,13 +1,13 @@
 import { FC, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
+import { createPortal } from 'react-dom';
 import { formatEther } from 'viem';
 
-import { INounSeed } from '@/wrappers/nounToken';
 import { useNounHoverData } from '@/components/NounHoverCard/useNounHoverData';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
+import { INounSeed } from '@/wrappers/nounToken';
 
 interface Props {
   nounId: bigint;
@@ -50,7 +50,7 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
   const popW = 280;
   const popEstH = 420;
   let left = anchorRect.left + anchorRect.width / 2 - popW / 2;
-  let top = Math.max(8, (window.innerHeight - popEstH) / 2);
+  const top = Math.max(8, (window.innerHeight - popEstH) / 2);
 
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
@@ -60,13 +60,13 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
   const ownerDisplay = ownerEns || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : '');
 
   const traitList = traits
-    ? [
+    ? ([
         ['Head', traits.head],
         ['Noggles', traits.glasses],
         ['Body', traits.body],
         ['Accessory', traits.accessory],
         ['BG', traits.background],
-      ] as const
+      ] as const)
     : [];
 
   return createPortal(
@@ -83,7 +83,7 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
         borderRadius: 16,
         overflow: 'auto',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         border: 'none',
       }}
     >
@@ -102,11 +102,9 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
       <div style={{ padding: '10px 12px 8px' }}>
         {/* Title row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>
-            Noun {nounId.toString()}
-          </span>
+          <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Noun {nounId.toString()}</span>
           {auction?.amount && (
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6b7280' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--theme-text-muted)' }}>
               {parseFloat(formatEther(auction.amount)).toFixed(2)} ETH
             </span>
           )}
@@ -118,7 +116,13 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
             href={`https://etherscan.io/address/${owner}`}
             target="_blank"
             rel="noreferrer"
-            style={{ fontSize: '0.65rem', color: '#3b82f6', textDecoration: 'none', display: 'block', marginTop: 2 }}
+            style={{
+              fontSize: '0.65rem',
+              color: '#3b82f6',
+              textDecoration: 'none',
+              display: 'block',
+              marginTop: 2,
+            }}
           >
             {ownerDisplay}
           </a>
@@ -159,7 +163,12 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
         <div style={{ marginTop: 8, textAlign: 'center' }}>
           <a
             href={`/noun/${nounId}`}
-            style={{ fontSize: '0.65rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none' }}
+            style={{
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              color: '#dc2626',
+              textDecoration: 'none',
+            }}
           >
             View Auction &rarr;
           </a>

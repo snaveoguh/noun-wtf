@@ -102,7 +102,7 @@ const GovernancePage = () => {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s',
-            background: daoTab === 'nouns' ? '#14141f' : '#f4f4f8',
+            background: daoTab === 'nouns' ? '#14141f' : 'var(--theme-bg-card)',
             color: daoTab === 'nouns' ? '#fff' : '#8c8d92',
           }}
         >
@@ -122,7 +122,7 @@ const GovernancePage = () => {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s',
-            background: daoTab === 'nounv2' ? '#dc2626' : '#f4f4f8',
+            background: daoTab === 'nounv2' ? '#dc2626' : 'var(--theme-bg-card)',
             color: daoTab === 'nounv2' ? '#fff' : '#dc2626',
             display: 'flex',
             alignItems: 'center',
@@ -144,7 +144,7 @@ const GovernancePage = () => {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s',
-            background: daoTab === 'yc' ? '#FFC700' : '#f4f4f8',
+            background: daoTab === 'yc' ? '#FFC700' : 'var(--theme-bg-card)',
             color: daoTab === 'yc' ? '#14141f' : '#8c8d92',
           }}
         >
@@ -161,7 +161,7 @@ const GovernancePage = () => {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s',
-            background: daoTab === 'lil' ? '#ff638d' : '#f4f4f8',
+            background: daoTab === 'lil' ? '#ff638d' : 'var(--theme-bg-card)',
             color: daoTab === 'lil' ? '#fff' : '#8c8d92',
           }}
         >

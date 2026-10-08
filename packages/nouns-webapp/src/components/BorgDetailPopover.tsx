@@ -110,7 +110,7 @@ const BorgDetailPopover: FC<Props> = ({
             />
           )}
         </span>
-        <span style={{ fontSize: '0.6rem', color: '#6b7280' }}>
+        <span style={{ fontSize: '0.6rem', color: 'var(--theme-text-muted)' }}>
           {label} #{id}
         </span>
       </button>
@@ -131,13 +131,13 @@ const BorgDetailPopover: FC<Props> = ({
         borderRadius: 16,
         overflow: 'auto',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
       }}
     >
       {/* Image */}
       <div
         style={{
-          backgroundColor: isBurned ? '#e5e7eb' : '#f4f4f5',
+          backgroundColor: isBurned ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
           lineHeight: 0,
           position: 'relative',
         }}

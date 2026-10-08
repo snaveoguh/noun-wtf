@@ -227,7 +227,14 @@ const SettlersPage: FC = () => {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="mb-1 text-4xl font-bold">⛏️ Settlers</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem', textTransform: 'none' }}>
+      <p
+        style={{
+          color: 'var(--theme-text-muted)',
+          fontSize: '0.9rem',
+          marginBottom: '1rem',
+          textTransform: 'none',
+        }}
+      >
         Every Noun is minted by someone calling settle. This is who.
       </p>
 
@@ -242,7 +249,7 @@ const SettlersPage: FC = () => {
               padding: '6px 14px',
               borderRadius: '9999px',
               border: tab === t.key ? '2px solid #000' : '1px solid #ddd',
-              background: tab === t.key ? '#000' : '#fff',
+              background: tab === t.key ? '#000' : 'var(--theme-bg-card)',
               color: tab === t.key ? '#fff' : '#555',
               fontSize: '0.8rem',
               fontWeight: 700,
@@ -257,7 +264,7 @@ const SettlersPage: FC = () => {
 
       <p
         style={{
-          color: '#666',
+          color: 'var(--theme-text-muted)',
           fontSize: '0.8rem',
           marginBottom: '1.5rem',
           textTransform: 'none',
@@ -306,7 +313,7 @@ const SettlersPage: FC = () => {
                       padding: '4px 12px',
                       borderRadius: '9999px',
                       border: clientId === 37 ? '2px solid #7c3aed' : '1px solid #ddd',
-                      background: clientId === 37 ? '#f5f0ff' : '#fafafa',
+                      background: clientId === 37 ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
                       fontSize: '0.75rem',
                       fontWeight: 700,
                     }}
@@ -337,7 +344,10 @@ const SettlersPage: FC = () => {
                   padding: '10px 16px',
                   borderRadius: '12px',
                   border: '1px solid #eee',
-                  background: rank < 3 ? ['#fffbeb', '#f8fafc', '#fef3c7'][rank] : '#fff',
+                  background:
+                    rank < 3
+                      ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', '#fef3c7'][rank]
+                      : 'var(--theme-bg-card)',
                   transition: 'transform 0.1s',
                 }}
                 onMouseEnter={e => {
@@ -401,7 +411,7 @@ const SettlersPage: FC = () => {
                     <span
                       style={{
                         fontSize: '0.6rem',
-                        color: '#999',
+                        color: 'var(--theme-text-muted)',
                         marginLeft: '4px',
                         alignSelf: 'center',
                       }}
@@ -420,7 +430,7 @@ const SettlersPage: FC = () => {
                     fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     fontWeight: 600,
-                    color: '#333',
+                    color: 'var(--theme-text-primary)',
                     textDecoration: 'none',
                     flex: 1,
                     minWidth: 0,
@@ -435,12 +445,19 @@ const SettlersPage: FC = () => {
 
                 {/* Stats */}
                 <span
-                  style={{ fontSize: '0.75rem', fontWeight: 700, color: '#333', flexShrink: 0 }}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: 'var(--theme-text-primary)',
+                    flexShrink: 0,
+                  }}
                 >
                   {row.count} noun{row.count > 1 ? 's' : ''}
                 </span>
                 {row.totalEth !== undefined && (
-                  <span style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+                  <span
+                    style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', flexShrink: 0 }}
+                  >
                     {formatEth(row.totalEth)} ETH
                   </span>
                 )}
@@ -450,7 +467,12 @@ const SettlersPage: FC = () => {
 
           {board.length > 50 && (
             <p
-              style={{ textAlign: 'center', color: '#999', fontSize: '0.8rem', marginTop: '16px' }}
+              style={{
+                textAlign: 'center',
+                color: 'var(--theme-text-muted)',
+                fontSize: '0.8rem',
+                marginTop: '16px',
+              }}
             >
               Showing top 50 of {board.length.toLocaleString()} unique {noun}s
             </p>
@@ -483,7 +505,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
         padding: '16px',
         borderRadius: '12px',
         border: '2px solid #000',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         textAlign: 'center',
       }}
     >
@@ -492,7 +514,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
         style={{
           fontSize: '0.65rem',
           fontWeight: 700,
-          color: '#888',
+          color: 'var(--theme-text-muted)',
           marginTop: '4px',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',

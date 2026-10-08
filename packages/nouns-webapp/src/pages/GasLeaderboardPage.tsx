@@ -270,14 +270,19 @@ const GasLeaderboardPage: FC = () => {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="mb-1 text-4xl font-bold">Gas Leaderboard</h1>
       <p
-        style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem', textTransform: 'none' }}
+        style={{
+          color: 'var(--theme-text-muted)',
+          fontSize: '0.9rem',
+          marginBottom: '1.5rem',
+          textTransform: 'none',
+        }}
       >
         How much gas each address has spent interacting with Nouns DAO contracts. Voting gas is
         refunded by the DAO — tracked separately.
       </p>
 
       {loading && !building && (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#888' }}>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--theme-text-muted)' }}>
           Loading gas data...
         </div>
       )}
@@ -287,7 +292,7 @@ const GasLeaderboardPage: FC = () => {
           style={{
             textAlign: 'center',
             padding: '60px 20px',
-            color: '#888',
+            color: 'var(--theme-text-muted)',
             border: '2px dashed #ddd',
             borderRadius: '12px',
             margin: '20px 0',
@@ -353,7 +358,7 @@ const GasLeaderboardPage: FC = () => {
                 border: '1px solid #ccc',
                 fontSize: '0.8rem',
                 fontWeight: 600,
-                background: '#fff',
+                background: 'var(--theme-bg-card)',
                 cursor: 'pointer',
               }}
             >
@@ -381,7 +386,9 @@ const GasLeaderboardPage: FC = () => {
               }}
             />
 
-            <span style={{ fontSize: '0.7rem', color: '#999', marginLeft: 'auto' }}>
+            <span
+              style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', marginLeft: 'auto' }}
+            >
               {processed.length.toLocaleString()} address{processed.length !== 1 ? 'es' : ''}
               {data.meta.lastUpdated && (
                 <> &middot; Updated {new Date(data.meta.lastUpdated).toLocaleString()}</>
@@ -401,7 +408,7 @@ const GasLeaderboardPage: FC = () => {
                 padding: '8px 16px',
                 fontSize: '0.65rem',
                 fontWeight: 700,
-                color: '#888',
+                color: 'var(--theme-text-muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 borderBottom: '2px solid #eee',
@@ -459,7 +466,10 @@ const GasLeaderboardPage: FC = () => {
                       padding: '10px 16px',
                       borderRadius: '10px',
                       border: '1px solid #eee',
-                      background: rank <= 3 ? ['#fffbeb', '#f8fafc', '#fef3c7'][rank - 1] : '#fff',
+                      background:
+                        rank <= 3
+                          ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', '#fef3c7'][rank - 1]
+                          : 'var(--theme-bg-card)',
                       alignItems: 'center',
                       fontSize: '0.8rem',
                       transition: 'transform 0.1s',
@@ -491,7 +501,7 @@ const GasLeaderboardPage: FC = () => {
                         fontFamily: 'monospace',
                         fontSize: '0.8rem',
                         fontWeight: 600,
-                        color: '#333',
+                        color: 'var(--theme-text-primary)',
                         textDecoration: 'none',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -526,7 +536,7 @@ const GasLeaderboardPage: FC = () => {
                     </span>
 
                     {/* Tx Count */}
-                    <span style={{ fontSize: '0.75rem', color: '#666' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
                       {actionGas ? actionGas.txCount : entry.txCount}
                     </span>
 
@@ -534,7 +544,7 @@ const GasLeaderboardPage: FC = () => {
                     <span
                       style={{
                         fontSize: '0.65rem',
-                        color: '#888',
+                        color: 'var(--theme-text-muted)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -569,7 +579,7 @@ const GasLeaderboardPage: FC = () => {
                   padding: '4px 12px',
                   borderRadius: '6px',
                   border: '1px solid #ccc',
-                  background: page === 0 ? '#f5f5f5' : '#fff',
+                  background: page === 0 ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
                   cursor: page === 0 ? 'default' : 'pointer',
                   fontWeight: 600,
                   color: page === 0 ? '#ccc' : '#333',
@@ -577,7 +587,7 @@ const GasLeaderboardPage: FC = () => {
               >
                 Prev
               </button>
-              <span style={{ color: '#666' }}>
+              <span style={{ color: 'var(--theme-text-muted)' }}>
                 Page {page + 1} of {totalPages}
               </span>
               <button
@@ -588,7 +598,8 @@ const GasLeaderboardPage: FC = () => {
                   padding: '4px 12px',
                   borderRadius: '6px',
                   border: '1px solid #ccc',
-                  background: page >= totalPages - 1 ? '#f5f5f5' : '#fff',
+                  background:
+                    page >= totalPages - 1 ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
                   cursor: page >= totalPages - 1 ? 'default' : 'pointer',
                   fontWeight: 600,
                   color: page >= totalPages - 1 ? '#ccc' : '#333',
@@ -611,7 +622,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
         padding: '16px',
         borderRadius: '12px',
         border: '2px solid #000',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         textAlign: 'center',
       }}
     >
@@ -620,7 +631,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
         style={{
           fontSize: '0.65rem',
           fontWeight: 700,
-          color: '#888',
+          color: 'var(--theme-text-muted)',
           marginTop: '4px',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',

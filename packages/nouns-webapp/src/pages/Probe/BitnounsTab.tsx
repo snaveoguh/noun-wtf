@@ -380,7 +380,7 @@ const BitnounsTab: FC = () => {
                 alt={token.name}
                 loading="lazy"
                 className="h-full w-full object-cover"
-                style={{ background: '#e1d7d5' }}
+                style={{ background: 'var(--theme-bg-tertiary)' }}
               />
             </button>
           </BuilderTokenHoverCard>

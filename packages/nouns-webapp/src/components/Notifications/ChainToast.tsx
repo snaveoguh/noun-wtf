@@ -4,11 +4,7 @@ import { blo } from 'blo';
 import { useEnsAvatar, useEnsName } from 'wagmi';
 
 import { getNoun } from '@/components/StandaloneNoun';
-import {
-  formatShortAddress,
-  isNogglesName,
-  stripNoggles,
-} from '@/utils/addressAndENSDisplayUtils';
+import { formatShortAddress, isNogglesName, stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
 import { Address } from '@/utils/types';
 import { type INounSeed, useNounSeed } from '@/wrappers/nounToken';
@@ -25,13 +21,14 @@ const useActorAvatar = (address: Address | undefined) => {
   // Noggles namespace is rugged — skip avatar lookup for those names and fall
   // back to the noun-contract resolved name (or `blo()` pixelblock).
   const avatarLookupName = isNogglesName(ensName)
-    ? (address ? resolveNounContractAddress(address) : undefined)
+    ? address
+      ? resolveNounContractAddress(address)
+      : undefined
     : (ensName ?? (address ? resolveNounContractAddress(address) : undefined));
   const { data: ensAvatar } = useEnsAvatar({ name: avatarLookupName ?? undefined });
   const fallback = address ? blo(address) : undefined;
   const resolvedName =
-    stripNoggles(ensName) ||
-    (address ? resolveNounContractAddress(address) : undefined);
+    stripNoggles(ensName) || (address ? resolveNounContractAddress(address) : undefined);
   const displayName = resolvedName ?? (address ? formatShortAddress(address) : '');
   return { src: ensAvatar ?? fallback, displayName };
 };
@@ -83,7 +80,11 @@ export const NounToast: React.FC<NounToastProps> = ({ nounId, text }) => {
           alt={`Noun ${nounId.toString()}`}
           src={noun.image}
           className="shrink-0 rounded-md"
-          style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, background: '#d5d7e1' }}
+          style={{
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
+            background: 'var(--theme-bg-tertiary)',
+          }}
         />
       )}
       <div className="text-sm leading-tight">{text}</div>

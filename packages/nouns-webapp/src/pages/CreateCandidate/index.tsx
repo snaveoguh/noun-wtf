@@ -446,7 +446,9 @@ const CreateCandidatePage = () => {
             <div
               style={{
                 padding: '16px 20px',
-                background: artworkAgreementSigned ? '#f0fdf4' : '#fafafa',
+                background: artworkAgreementSigned
+                  ? 'var(--theme-bg-card)'
+                  : 'var(--theme-bg-card)',
               }}
             >
               {!artworkAgreementSigned ? (
@@ -463,7 +465,13 @@ const CreateCandidatePage = () => {
                     must sign a CC0 waiver confirming this is your original work and releasing all
                     rights to the public domain.
                   </p>
-                  <p style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 16 }}>
+                  <p
+                    style={{
+                      fontSize: '0.7rem',
+                      color: 'var(--theme-text-muted)',
+                      marginBottom: 16,
+                    }}
+                  >
                     This is a legal requirement for all artwork contributions to Nouns DAO.{' '}
                     <a
                       href={AGREEMENT_URL}
@@ -484,7 +492,7 @@ const CreateCandidatePage = () => {
                       padding: '12px 0',
                       borderRadius: 10,
                       border: 'none',
-                      background: address ? '#1a1a2e' : '#d1d5db',
+                      background: address ? '#1a1a2e' : 'var(--theme-bg-tertiary)',
                       color: address ? '#fff' : '#9ca3af',
                       fontWeight: 700,
                       fontSize: '0.85rem',
@@ -522,7 +530,7 @@ const CreateCandidatePage = () => {
                   </div>
                   <div
                     style={{
-                      background: '#ecfdf5',
+                      background: 'var(--theme-bg-card)',
                       borderRadius: 8,
                       padding: '8px 12px',
                       marginTop: 8,
@@ -531,7 +539,7 @@ const CreateCandidatePage = () => {
                     <p
                       style={{
                         fontSize: '0.6rem',
-                        color: '#6b7280',
+                        color: 'var(--theme-text-muted)',
                         margin: '0 0 4px',
                         fontWeight: 600,
                       }}

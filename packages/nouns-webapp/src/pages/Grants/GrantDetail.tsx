@@ -322,9 +322,7 @@ export default function GrantDetailPage() {
   // Strip NounIRL `<!-- SIGNER:0x... -->` hints + leading whitespace so
   // the first meaningful line is the title and the body doesn't echo
   // the comment back at the user.
-  const cleanDescription = grant.description
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^[\s\r\n]+/, '');
+  const cleanDescription = grant.description.replace(/<!--[\S\s]*?-->/g, '').replace(/^\s+/, '');
   const descLines = cleanDescription.split('\n');
   const title = (descLines[0] || '').replace(/^#+\s*/, '').slice(0, 120) || 'Untitled';
   const body = descLines.slice(1).join('\n').trim();
@@ -367,17 +365,25 @@ export default function GrantDetailPage() {
           grant.signer ? (
             <>
               by <ShortAddress address={grant.signer as `0x${string}`} />
-              <span style={{ color: '#6b7280', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+              <span
+                style={{
+                  color: 'var(--theme-text-muted)',
+                  fontSize: '0.8rem',
+                  marginLeft: '0.4rem',
+                }}
+              >
                 (GASLESS VIA NOUNIRL)
               </span>
             </>
           ) : (
-            <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+            <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.8rem' }}>
               GASLESS VIA NOUNIRL
             </span>
           )
         ) : (
-          <>by <ShortAddress address={grant.proposer as `0x${string}`} /></>
+          <>
+            by <ShortAddress address={grant.proposer as `0x${string}`} />
+          </>
         )}
       </p>
 
@@ -415,7 +421,7 @@ export default function GrantDetailPage() {
                 fontSize: '0.85rem',
               }}
             >
-              <span style={{ fontFamily: 'monospace', color: '#555' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
                 → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
               </span>
               <span style={{ fontWeight: 700 }}>{formatEther(tx.value as bigint)} ETH</span>
@@ -526,7 +532,7 @@ export default function GrantDetailPage() {
                   href={`https://etherscan.io/tx/${(v as any).createdAtTransaction}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ fontSize: '0.7rem', color: '#666', marginLeft: 8 }}
+                  style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', marginLeft: 8 }}
                 >
                   tx
                 </a>
@@ -547,7 +553,11 @@ export default function GrantDetailPage() {
                 href={`https://etherscan.io/tx/${grant.createdAtTransaction}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace' }}
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--theme-text-muted)',
+                  fontFamily: 'monospace',
+                }}
               >
                 {grant.createdAtTransaction.slice(0, 18)}...
               </a>
@@ -573,7 +583,11 @@ export default function GrantDetailPage() {
                 href={`https://etherscan.io/tx/${sc.createdAtTransaction}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace' }}
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--theme-text-muted)',
+                  fontFamily: 'monospace',
+                }}
               >
                 {sc.createdAtTransaction.slice(0, 18)}...
               </a>

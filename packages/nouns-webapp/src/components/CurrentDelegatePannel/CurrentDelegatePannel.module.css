@@ -24,7 +24,7 @@
 
 .contentWrapper {
   border-radius: 14px;
-  background-color: white;
+  background-color: var(--theme-bg-card);
   padding: 1rem;
   display: flex;
   justify-content: space-between;

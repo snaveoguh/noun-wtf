@@ -148,7 +148,11 @@ const NounV2Proposals: FC = () => {
       {/* Header */}
       <div style={{ padding: '24px 0 16px' }}>
         <span
-          style={{ color: '#8c8d92', fontSize: '1.2rem', fontFamily: "'Londrina Solid', cursive" }}
+          style={{
+            color: 'var(--theme-text-muted)',
+            fontSize: '1.2rem',
+            fontFamily: "'Londrina Solid', cursive",
+          }}
         >
           Governance
         </span>
@@ -165,7 +169,7 @@ const NounV2Proposals: FC = () => {
         </h1>
         <p
           style={{
-            color: '#666',
+            color: 'var(--theme-text-muted)',
             fontFamily: "'PT Root UI', sans-serif",
             fontSize: '0.95rem',
             margin: '0 0 16px',
@@ -218,7 +222,7 @@ const NounV2Proposals: FC = () => {
           style={{
             textAlign: 'center',
             padding: '40px',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             fontSize: '0.85rem',
           }}
         >
@@ -269,8 +273,16 @@ const NounV2Proposals: FC = () => {
                     {label}
                     {isActive && blockNumber != null && ` (${hoursLeft.toFixed(1)}h)`}
                   </span>
-                  <span style={{ color: '#8c8d92', fontSize: '0.75rem' }}>#{p.id}</span>
-                  <span style={{ color: '#8c8d92', fontSize: '0.7rem', marginLeft: 'auto' }}>
+                  <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem' }}>
+                    #{p.id}
+                  </span>
+                  <span
+                    style={{
+                      color: 'var(--theme-text-muted)',
+                      fontSize: '0.7rem',
+                      marginLeft: 'auto',
+                    }}
+                  >
                     View →
                   </span>
                 </div>
@@ -293,7 +305,7 @@ const NounV2Proposals: FC = () => {
                     gap: 8,
                     alignItems: 'center',
                     fontSize: '0.75rem',
-                    color: '#8c8d92',
+                    color: 'var(--theme-text-muted)',
                     marginBottom: totalVotes > 0 ? 8 : 0,
                   }}
                 >
@@ -309,7 +321,7 @@ const NounV2Proposals: FC = () => {
                         flex: 1,
                         height: 6,
                         borderRadius: 3,
-                        background: '#f4f4f8',
+                        background: 'var(--theme-bg-card)',
                         overflow: 'hidden',
                       }}
                     >
@@ -322,7 +334,13 @@ const NounV2Proposals: FC = () => {
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: '#8c8d92', whiteSpace: 'nowrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        color: 'var(--theme-text-muted)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {Number(p.forVotes)} for · {Number(p.againstVotes)} against
                     </span>
                   </div>
