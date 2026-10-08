@@ -23,6 +23,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'I / O', v: 'grab' },
   { k: 'F', v: 'get on / off board' },
   { k: 'C', v: 'camera' },
+  { k: 'P', v: 'time of day' },
   { k: 'V', v: 'mic' },
   { k: 'G (hold)', v: 'spray paint · T colour' },
   { k: 'R', v: 'respawn' },
@@ -128,6 +129,8 @@ export default function World2Page() {
         e.preventDefault();
         setChatOpen(true);
         if (document.pointerLockElement) document.exitPointerLock();
+      } else if (e.code === 'KeyP' && !typing) {
+        gameRef.current?.cycleTimeOfDay();
       } else if (e.code === 'KeyH' && !typing) {
         setShowHelp(s => !s);
       } else if (e.code === 'Escape' && typing) {
@@ -328,6 +331,19 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         </div>
         <button className="w2-chip text-xs" onClick={onHelp}>
           {showHelp ? 'hide controls (H)' : 'controls (H)'}
+        </button>
+        <button
+          type="button"
+          className="w2-chip text-xs"
+          onClick={() => game.cycleTimeOfDay()}
+          title="Time of day (P)"
+        >
+          {{
+            afternoon: '☀️ afternoon',
+            golden: '🌇 golden hour',
+            blue: '🌆 blue hour',
+            night: '🌙 night',
+          }[hud.timeOfDay] ?? hud.timeOfDay}
         </button>
       </div>
 
