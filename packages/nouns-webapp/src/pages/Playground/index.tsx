@@ -2,7 +2,11 @@ import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { i18n } from '@lingui/core';
 import { Trans } from '@lingui/react/macro';
-import { getNounDataV2 as getNounData, getRandomNounSeedV2 as getRandomNounSeed, ImageDataV2 as ImageData } from "@nouns/assets";
+import {
+  getNounDataV2 as getNounData,
+  getRandomNounSeedV2 as getRandomNounSeed,
+  ImageDataV2 as ImageData,
+} from '@nouns/assets';
 import { buildSVG, EncodedImage, PNGCollectionEncoder } from '@nouns/sdk';
 import { PNG } from 'pngjs';
 import {
@@ -23,6 +27,15 @@ import Link from '@/components/Link';
 
 import NounModal from './NounModal';
 import classes from './Playground.module.css';
+
+// react-bootstrap's polymorphic Button props make TS compute a union that can
+// exceed its complexity limit (TS2590) depending on program size; this
+// narrow alias keeps these buttons' types simple. Runtime is identical.
+const PlainButton = Button as unknown as React.FC<{
+  onClick: () => void;
+  className?: string;
+  children?: React.ReactNode;
+}>;
 
 interface Trait {
   title: string;
@@ -200,9 +213,7 @@ const Playground: React.FC = () => {
   };
 
   const validateAndSetCustomTrait = (file: File | undefined) => {
-    if (pendingTraitErrorTimeout) {
-      clearTimeout(pendingTraitErrorTimeout);
-    }
+    clearTimeout(pendingTraitErrorTimeout);
     if (!file) {
       return;
     }
@@ -305,14 +316,14 @@ const Playground: React.FC = () => {
         <Row>
           <Col lg={3}>
             <Col lg={12}>
-              <Button
+              <PlainButton
                 onClick={() => {
                   generateNounSvg();
                 }}
                 className={classes.primaryBtn}
               >
                 <Trans>Generate Nouns</Trans>
-              </Button>
+              </PlainButton>
             </Col>
             <Row>
               {traits &&
@@ -394,9 +405,9 @@ const Playground: React.FC = () => {
                     ))}
                   </Form.Select>
                 </FloatingLabel>
-                <Button onClick={() => uploadCustomTrait()} className={classes.primaryBtn}>
+                <PlainButton onClick={() => uploadCustomTrait()} className={classes.primaryBtn}>
                   <Trans>Upload</Trans>
-                </Button>
+                </PlainButton>
               </>
             )}
             <p className={classes.nounYearsFooter}>
