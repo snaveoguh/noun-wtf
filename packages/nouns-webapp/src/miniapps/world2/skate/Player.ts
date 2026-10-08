@@ -1,0 +1,988 @@
+// ── Player controller — on-foot movement + skateboard physics ───────────
+//
+// Kinematic controller over the static BVH. The board is a point on the
+// surface with an orientation frame (fwd, up). Grounded motion follows the
+// surface (incl. quarter-pipe transitions), lips turn into vert airs, rails
+// snap into grinds, and landings are judged on flip completion + alignment.
+
+import type { InputFrame, TrickInput } from '../core/Input';
+import type { CollisionWorld } from '../physics/Collision';
+import type { Rail, RailSet } from '../physics/Rails';
+
+import * as THREE from 'three';
+
+import {
+  FLIPS,
+  addRunning,
+  addTrick,
+  airTrickName,
+  bailCombo,
+  bankCombo,
+  createCombo,
+  grindName,
+  spinPoints,
+  type ComboState,
+} from './Tricks';
+
+export type PlayerMode = 'foot' | 'board';
+export type BoardState = 'ground' | 'air' | 'grind' | 'manual' | 'bail';
+
+export type PlayerEvent =
+  | { type: 'pop'; strength: number }
+  | { type: 'land'; impact: number; clean: boolean }
+  | { type: 'push' }
+  | { type: 'grindStart'; railType: string }
+  | { type: 'grindEnd' }
+  | { type: 'bail'; impact: number }
+  | { type: 'flip' }
+  | { type: 'footJump' }
+  | { type: 'footLand'; impact: number }
+  | { type: 'boardOn' }
+  | { type: 'boardOff' }
+  | { type: 'trick'; name: string; points: number };
+
+export interface PlayerTuning {
+  gravity: number;
+  pushAccel: number;
+  maxPushSpeed: number;
+  maxSpeed: number;
+  rollingFriction: number;
+  drag: number;
+  turnRate: number;
+  popSpeed: number;
+  grip: number;
+  walkSpeed: number;
+  runSpeed: number;
+  jumpSpeed: number;
+}
+
+export const DEFAULT_TUNING: PlayerTuning = {
+  gravity: 12.5,
+  pushAccel: 5.2,
+  maxPushSpeed: 8.6,
+  maxSpeed: 17,
+  rollingFriction: 0.18,
+  drag: 0.0035,
+  turnRate: 2.5,
+  popSpeed: 4.3,
+  grip: 14,
+  walkSpeed: 1.9,
+  runSpeed: 5.2,
+  jumpSpeed: 5.0,
+};
+
+const UP = new THREE.Vector3(0, 1, 0);
+const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _m = new THREE.Matrix4();
+
+const BODY_RADIUS = 0.32;
+const PUSH_CYCLE = 0.9;
+
+export interface FlipState {
+  trick: TrickInput;
+  t: number;
+  duration: number;
+  roll: number;
+  spin: number;
+}
+
+export interface GrindState {
+  rail: Rail;
+  s: number;
+  dir: 1 | -1;
+  speed: number;
+  type: 'fiftyfifty' | 'fivezero' | 'nosegrind' | 'boardslide' | 'lipslide' | 'crooked';
+  /** Board yaw offset relative to the rail tangent (0 = parallel, ±π/2 = slide). */
+  yawOffset: number;
+  time: number;
+}
+
+export class Player {
+  mode: PlayerMode = 'board';
+  state: BoardState = 'ground';
+  tuning: PlayerTuning = { ...DEFAULT_TUNING };
+
+  pos = new THREE.Vector3();
+  vel = new THREE.Vector3();
+  /** Board nose direction (unit, tangent to surface when grounded). */
+  fwd = new THREE.Vector3(0, 0, 1);
+  /** Board up / surface normal. */
+  up = new THREE.Vector3(0, 1, 0);
+  /** On-foot facing yaw. */
+  footYaw = 0;
+  footGrounded = true;
+
+  crouch = 0;
+  pushTimer = -1;
+  pushQueued = false;
+  powerslide = 0;
+  manualBalance = 0;
+  manualPitch = 0;
+  lean = 0;
+  airTime = 0;
+  airYaw = 0;
+  popKind: 'ollie' | 'nollie' = 'ollie';
+  takeoffFakie = false;
+  flip: FlipState | null = null;
+  flipDone: TrickInput | null = null;
+  grab: string | null = null;
+  grabTime = 0;
+  grind: GrindState | null = null;
+  grindCooldown = 0;
+  bailTimer = 0;
+  /** Loose board (during bail): position, velocity, rotation. */
+  looseBoard = {
+    pos: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    quat: new THREE.Quaternion(),
+    spin: new THREE.Vector3(),
+  };
+  /** Board visual offsets (relative to the rider frame). */
+  boardFlipQuat = new THREE.Quaternion();
+  boardLift = 0;
+  /** Seconds since last landing — used for land anim. */
+  sinceLand = 10;
+  lastLandImpact = 0;
+  vertLip = false;
+  fakie = false;
+  emote = 0;
+  emoteTimer = 0;
+
+  combo: ComboState = createCombo();
+  events: PlayerEvent[] = [];
+  /** Last safe grounded spot for respawn after bails / falling out. */
+  safePos = new THREE.Vector3();
+  safeFwd = new THREE.Vector3(0, 0, 1);
+
+  constructor(
+    private world: CollisionWorld,
+    private rails: RailSet,
+  ) {}
+
+  spawn(p: THREE.Vector3, yaw: number) {
+    this.pos.copy(p);
+    this.vel.set(0, 0, 0);
+    this.fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
+    this.up.copy(UP);
+    this.footYaw = yaw;
+    this.state = 'ground';
+    this.grind = null;
+    this.flip = null;
+    this.crouch = 0;
+    this.safePos.copy(p);
+    this.safeFwd.copy(this.fwd);
+    // Settle onto ground
+    const hit = this.world.raycast(_v.copy(p).addScaledVector(UP, 2), _v2.set(0, -1, 0), 10);
+    if (hit) this.pos.copy(hit.point);
+  }
+
+  get speed() {
+    return this.vel.length();
+  }
+
+  /** Signed speed along the board's nose direction. */
+  get forwardSpeed() {
+    return this.vel.dot(this.fwd);
+  }
+
+  get side() {
+    return _v3.crossVectors(this.up, this.fwd).normalize();
+  }
+
+  // ── Frame update ────────────────────────────────────────────────────
+
+  update(dt: number, input: InputFrame, camYaw: number, now: number) {
+    this.events.length = 0;
+    this.grindCooldown = Math.max(0, this.grindCooldown - dt);
+    this.sinceLand += dt;
+    if (this.emoteTimer > 0) {
+      this.emoteTimer -= dt;
+      if (this.emoteTimer <= 0) this.emote = 0;
+    }
+
+    if (
+      input.boardTogglePressed &&
+      this.state !== 'bail' &&
+      this.state !== 'air' &&
+      this.state !== 'grind'
+    ) {
+      this.toggleBoard();
+    }
+
+    if (this.mode === 'foot') {
+      this.updateFoot(dt, input, camYaw);
+      return;
+    }
+
+    switch (this.state) {
+      case 'ground':
+      case 'manual':
+        this.updateGround(dt, input, now);
+        break;
+      case 'air':
+        this.updateAir(dt, input, now);
+        break;
+      case 'grind':
+        this.updateGrind(dt, input, now);
+        break;
+      case 'bail':
+        this.updateBail(dt);
+        break;
+    }
+
+    // Board flip visuals
+    this.updateFlipVisual(dt);
+
+    // Fell out of the world → respawn
+    if (this.pos.y < -30) this.respawnSafe();
+    if (input.respawnPressed) this.respawnSafe();
+  }
+
+  toggleBoard() {
+    if (this.mode === 'board') {
+      this.mode = 'foot';
+      this.footYaw = Math.atan2(this.fwd.x, this.fwd.z);
+      // Hop off — keep a bit of momentum
+      this.vel.multiplyScalar(0.4);
+      this.vel.y = 0;
+      this.up.copy(UP);
+      this.state = 'ground';
+      bankCombo(this.combo, performance.now());
+      this.events.push({ type: 'boardOff' });
+    } else {
+      this.mode = 'board';
+      this.state = 'ground';
+      this.fwd.set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw));
+      const hv = _v.copy(this.vel).setY(0);
+      this.vel.copy(this.fwd).multiplyScalar(Math.max(0, hv.dot(this.fwd)));
+      this.events.push({ type: 'boardOn' });
+    }
+  }
+
+  respawnSafe() {
+    this.mode = 'board';
+    this.state = 'ground';
+    this.pos.copy(this.safePos);
+    this.vel.set(0, 0, 0);
+    this.fwd.copy(this.safeFwd);
+    this.up.copy(UP);
+    this.grind = null;
+    this.flip = null;
+    this.bailTimer = 0;
+    this.combo.entries = [];
+    this.combo.running = 0;
+    this.combo.total = 0;
+    this.combo.multiplier = 0;
+  }
+
+  // ── On foot ─────────────────────────────────────────────────────────
+
+  private updateFoot(dt: number, input: InputFrame, camYaw: number) {
+    const t = this.tuning;
+    const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
+    const target = _v.set(0, 0, 0);
+    if (mag > 0.05) {
+      // Camera-relative: forward = camera look direction projected on ground
+      const fx = Math.sin(camYaw);
+      const fz = Math.cos(camYaw);
+      target
+        .set(fx * input.moveY - fz * input.moveX, 0, fz * input.moveY + fx * input.moveX)
+        .normalize();
+      const speed = (input.sprint ? t.runSpeed * 1.25 : mag > 0.7 ? t.runSpeed : t.walkSpeed) * mag;
+      target.multiplyScalar(speed);
+      const desiredYaw = Math.atan2(target.x, target.z);
+      this.footYaw = lerpAngle(this.footYaw, desiredYaw, 1 - Math.exp(-12 * dt));
+    }
+    const accel = this.footGrounded ? 18 : 5;
+    const hv = _v2.set(this.vel.x, 0, this.vel.z);
+    hv.lerp(target, 1 - Math.exp(-accel * dt * 0.6));
+    this.vel.x = hv.x;
+    this.vel.z = hv.z;
+
+    if (this.footGrounded && input.jumpPressed) {
+      this.vel.y = t.jumpSpeed;
+      this.footGrounded = false;
+      this.events.push({ type: 'footJump' });
+    }
+    this.vel.y -= t.gravity * dt;
+    this.pos.addScaledVector(this.vel, dt);
+
+    // Walls
+    this.resolveBody(1.4);
+
+    // Ground
+    const wasGrounded = this.footGrounded;
+    const hit = this.world.raycast(
+      _v.copy(this.pos).addScaledVector(UP, 0.6),
+      _v2.set(0, -1, 0),
+      0.6 + (wasGrounded ? 0.35 : 0.05),
+    );
+    if (hit && hit.normal.y > 0.55 && this.vel.y <= 0.5) {
+      if (!wasGrounded && this.vel.y < -3)
+        this.events.push({ type: 'footLand', impact: -this.vel.y });
+      this.pos.y = hit.point.y;
+      this.vel.y = 0;
+      this.footGrounded = true;
+      this.safePos.copy(this.pos);
+      this.safeFwd.set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw));
+    } else {
+      this.footGrounded = false;
+    }
+    if (input.emotePressed) {
+      this.emote = input.emotePressed;
+      this.emoteTimer = 4;
+    }
+    if (mag > 0.05 || !this.footGrounded) {
+      this.emote = 0;
+      this.emoteTimer = 0;
+    }
+  }
+
+  /** Capsule pushout against walls. Returns the wall normal hit (if any). */
+  private resolveBody(height: number): THREE.Vector3 | null {
+    const up = this.mode === 'board' ? this.up : UP;
+    const a = _v.copy(this.pos).addScaledVector(up, BODY_RADIUS + 0.28);
+    const b = _v2.copy(this.pos).addScaledVector(up, height - BODY_RADIUS);
+    const n = new THREE.Vector3();
+    const corr = this.world.capsulePushout(a, b, BODY_RADIUS, n);
+    if (corr.lengthSq() > 1e-8) {
+      // Ignore floor-ish contacts here: the ground probe owns those.
+      if (Math.abs(n.dot(up)) > 0.7) return null;
+      this.pos.add(corr);
+      const into = this.vel.dot(n);
+      if (into < 0) this.vel.addScaledVector(n, -into);
+      return n;
+    }
+    return null;
+  }
+
+  // ── Board: grounded ─────────────────────────────────────────────────
+
+  private probeGround(maxDist: number) {
+    // Centre probe along -up, plus nose/tail probes to smooth normals across edges.
+    const origin = _v.copy(this.pos).addScaledVector(this.up, 0.5);
+    const dir = _v2.copy(this.up).negate();
+    const center = this.world.raycast(origin, dir, 0.5 + maxDist);
+    if (!center) return null;
+    const n = center.normal.clone();
+    let count = 1;
+    for (const off of [0.32, -0.32]) {
+      const o = _v.copy(this.pos).addScaledVector(this.up, 0.5).addScaledVector(this.fwd, off);
+      const h = this.world.raycast(o, dir, 0.5 + maxDist + 0.2);
+      if (h && h.normal.dot(center.normal) > 0.6) {
+        n.add(h.normal);
+        count++;
+      }
+    }
+    n.divideScalar(count).normalize();
+    return { point: center.point, normal: n, raw: center.normal, distance: center.distance - 0.5 };
+  }
+
+  private updateGround(dt: number, input: InputFrame, now: number) {
+    const t = this.tuning;
+    const speed = this.speed;
+
+    // Surface follow
+    const snap = 0.08 + Math.min(0.35, speed * 0.03);
+    const ground = this.probeGround(snap);
+    // Convex edge (coping, kicker lip, ledge drop): if we're moving away
+    // from the next surface we launch instead of wrapping around it.
+    const launching =
+      ground !== null && ground.raw.dot(this.up) < 0.93 && this.vel.dot(ground.raw) > 0.6;
+    if (ground === null || ground.normal.dot(this.up) < 0.35 || launching) {
+      this.leaveGround(now);
+      return;
+    }
+    this.pos.copy(ground.point);
+    const align = 1 - Math.exp(-22 * dt);
+    this.up.lerp(ground.normal, align).normalize();
+    // Re-orthonormalise fwd to the new up
+    this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+
+    // Gravity along the surface
+    const g = _v.set(0, -t.gravity, 0);
+    g.addScaledVector(this.up, -g.dot(this.up));
+    this.vel.addScaledVector(g, dt);
+    // Keep velocity tangent
+    this.vel.addScaledVector(this.up, -this.vel.dot(this.up));
+
+    // Steering — carve the board and its velocity together.
+    const steer = input.moveX;
+    const sp = Math.max(0.5, speed);
+    const turn =
+      -steer *
+      t.turnRate *
+      (1.15 - Math.min(0.55, sp / 22)) *
+      dt *
+      (this.state === 'manual' ? 0.6 : 1);
+    this.lean = THREE.MathUtils.lerp(
+      this.lean,
+      steer * Math.min(1, speed / 5),
+      1 - Math.exp(-6 * dt),
+    );
+    if (Math.abs(turn) > 0) {
+      _q.setFromAxisAngle(this.up, turn);
+      this.fwd.applyQuaternion(_q);
+      this.vel.applyQuaternion(_q);
+    }
+
+    // Wheel grip: lateral velocity bleeds off (powerslide reduces grip)
+    const side = this.side;
+    const lat = this.vel.dot(side);
+    const brake = input.brake && this.state !== 'manual';
+    const sliding = brake && speed > 3;
+    this.powerslide = THREE.MathUtils.lerp(
+      this.powerslide,
+      sliding ? 1 : 0,
+      1 - Math.exp(-10 * dt),
+    );
+    const grip = t.grip * (1 - this.powerslide * 0.85);
+    this.vel.addScaledVector(side, -lat * (1 - Math.exp(-grip * dt)));
+
+    // Fakie tracking: which way are we rolling relative to the nose?
+    const fs = this.forwardSpeed;
+    if (Math.abs(fs) > 0.4) this.fakie = fs < 0;
+
+    // Push
+    const canPush = this.state === 'ground' && this.crouch < 0.2 && !brake;
+    if (input.push && canPush && this.pushTimer < 0) {
+      this.pushTimer = 0;
+      this.events.push({ type: 'push' });
+    }
+    if (this.pushTimer >= 0) {
+      this.pushTimer += dt;
+      const ph = this.pushTimer / PUSH_CYCLE;
+      if (ph > 0.25 && ph < 0.6 && Math.abs(fs) < t.maxPushSpeed) {
+        const dir = this.fakie ? -1 : 1;
+        // Standstill push still needs a direction
+        this.vel.addScaledVector(this.fwd, dir * t.pushAccel * 2.6 * dt);
+      }
+      if (this.pushTimer >= PUSH_CYCLE) {
+        this.pushTimer = input.push && canPush ? 0 : -1;
+        if (this.pushTimer === 0) this.events.push({ type: 'push' });
+      }
+    }
+
+    // Friction / braking
+    const decel =
+      t.rollingFriction +
+      t.drag * speed * speed +
+      (sliding ? 7.5 : brake ? 4.5 : 0) +
+      this.powerslide * 2;
+    const newSpeed = Math.max(0, this.speed - decel * dt);
+    if (this.speed > 1e-4) this.vel.multiplyScalar(newSpeed / this.speed);
+    if (this.speed > t.maxSpeed) this.vel.multiplyScalar(t.maxSpeed / this.speed);
+
+    // Crouch (ollie load)
+    this.crouch = THREE.MathUtils.lerp(this.crouch, input.crouch ? 1 : 0, 1 - Math.exp(-14 * dt));
+
+    // Manual
+    const wantManual = (input.manual || input.noseManual) && speed > 1.2 && !input.crouch;
+    if (wantManual && this.state === 'ground') {
+      this.state = 'manual';
+      this.manualBalance = (Math.random() - 0.5) * 0.15;
+      addTrick(this.combo, input.noseManual ? 'Nose Manual' : 'Manual', 100);
+      this.pushTimer = -1;
+    } else if (this.state === 'manual') {
+      if (!wantManual) {
+        this.state = 'ground';
+        this.manualPitch = 0;
+      } else {
+        // Balance: drifts away from centre; player counters with moveY
+        this.manualBalance += (this.manualBalance * 1.6 + (Math.random() - 0.5) * 0.4) * dt;
+        this.manualBalance -= input.moveY * 1.4 * dt;
+        addRunning(this.combo, 60 * dt);
+        if (Math.abs(this.manualBalance) > 1) {
+          this.doBail(now, 3);
+          return;
+        }
+      }
+    }
+    const targetPitch = this.state === 'manual' ? (input.noseManual ? -0.22 : 0.24) : 0;
+    this.manualPitch = THREE.MathUtils.lerp(this.manualPitch, targetPitch, 1 - Math.exp(-12 * dt));
+
+    // Integrate
+    this.pos.addScaledVector(this.vel, dt);
+
+    // Walls — slam into them fast and you bail
+    const wall = this.resolveBody(1.45);
+    if (wall) {
+      const impact = -this.vel.dot(wall);
+      if (impact > 6.5) {
+        this.doBail(now, impact);
+        return;
+      }
+    }
+
+    // Pop
+    for (const tr of input.tricks) {
+      if (this.state === 'ground' || this.state === 'manual') {
+        this.pop(tr, now);
+        return;
+      }
+    }
+
+    // Safe spot for respawn
+    if (this.up.y > 0.95 && speed < 9) {
+      this.safePos.copy(this.pos);
+      this.safeFwd.copy(this.fwd).setY(0).normalize();
+    }
+
+    // Combo ends when we roll out cleanly (not manualling)
+    if (this.state === 'ground' && this.combo.entries.length && this.sinceLand > 0.6) {
+      bankCombo(this.combo, now);
+    }
+  }
+
+  private pop(trick: TrickInput, now: number) {
+    const t = this.tuning;
+    const strength = 0.75 + 0.25 * Math.max(this.crouch, 0.6);
+    this.popKind = trick === 'nollie' ? 'nollie' : 'ollie';
+    this.vel.addScaledVector(this.up, t.popSpeed * strength);
+    // A little speed loss converted to height on steep transitions
+    this.state = 'air';
+    this.airTime = 0;
+    this.airYaw = 0;
+    this.takeoffFakie = this.fakie;
+    this.flipDone = null;
+    this.grab = null;
+    this.grabTime = 0;
+    this.crouch = 0;
+    this.pushTimer = -1;
+    this.grindCooldown = 0.12;
+    this.pos.addScaledVector(this.up, 0.03);
+    this.events.push({ type: 'pop', strength });
+    if (trick !== 'ollie' && trick !== 'nollie') this.startFlip(trick);
+    void now;
+  }
+
+  private startFlip(trick: TrickInput) {
+    if (this.flip) return;
+    const def = FLIPS[trick];
+    if (def.duration <= 0) return;
+    this.flip = { trick, t: 0, duration: def.duration, roll: def.roll, spin: def.spin };
+    this.events.push({ type: 'flip' });
+  }
+
+  private leaveGround(now: number) {
+    // Off a lip on a steep transition → vert air: kill the horizontal
+    // component that would carry us over the deck so we come back down.
+    this.vertLip = this.up.y < 0.45;
+    if (this.vertLip) {
+      const nh = _v.set(this.up.x, 0, this.up.z).normalize();
+      const into = this.vel.dot(nh);
+      this.vel.addScaledVector(nh, -into);
+      // Slight pull back toward the ramp face so we re-enter it
+      this.vel.addScaledVector(nh, 0.35);
+    }
+    this.state = 'air';
+    this.popKind = 'ollie';
+    this.airTime = 0;
+    this.airYaw = 0;
+    this.takeoffFakie = this.fakie;
+    this.flipDone = null;
+    this.grab = null;
+    this.grabTime = 0;
+    this.pushTimer = -1;
+    if (this.combo.entries.length === 0 && !this.vertLip) {
+      // Rolling off a drop isn't a trick, but airtime still counts once a trick is added.
+    }
+    void now;
+  }
+
+  // ── Board: airborne ─────────────────────────────────────────────────
+
+  private updateAir(dt: number, input: InputFrame, now: number) {
+    const t = this.tuning;
+    this.airTime += dt;
+    this.vel.y -= t.gravity * dt;
+
+    // Late flips (keyboard / second flick) while airborne
+    for (const tr of input.tricks) {
+      if (tr !== 'ollie' && tr !== 'nollie' && this.airTime < 0.6) this.startFlip(tr);
+    }
+
+    // Spin with the left stick
+    const spinRate = 6.2;
+    const spin = -input.moveX * spinRate * dt;
+    if (Math.abs(spin) > 0) {
+      _q.setFromAxisAngle(this.vertLip ? this.up : UP, spin);
+      this.fwd.applyQuaternion(_q);
+      this.airYaw += spin;
+    }
+
+    // Grabs
+    const grabbing = (input.grabL || input.grabR) && !this.flip;
+    if (grabbing) {
+      if (!this.grab) this.grab = input.grabL ? 'Melon' : 'Indy';
+      this.grabTime += dt;
+      addRunning(this.combo, 90 * dt);
+    }
+
+    // Auto-level toward the predicted landing surface
+    const prev = _v3.copy(this.pos);
+    this.pos.addScaledVector(this.vel, dt);
+    const look = this.world.raycast(
+      _v.copy(this.pos),
+      _v2.set(0, -1, 0).addScaledVector(this.vel, 0.05).normalize(),
+      6,
+    );
+    const targetUp = look && look.normal.y > 0.2 ? look.normal : UP;
+    if (!this.vertLip || this.vel.y < 0) {
+      this.up.lerp(targetUp, 1 - Math.exp(-(this.vertLip ? 2.5 : 4) * dt)).normalize();
+    }
+    this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+
+    // Walls
+    this.resolveBody(1.45);
+
+    // Grind snap (falling or level, near a rail)
+    if (this.grindCooldown <= 0 && this.vel.y < 2.5 && this.tryStartGrind(now)) return;
+
+    // Landing: sweep from previous to current position
+    const motion = _v.subVectors(this.pos, prev);
+    const dist = motion.length();
+    const from = _v2.copy(prev).addScaledVector(this.up, 0.25);
+    const downDir =
+      this.vel.y <= 0
+        ? motion
+            .clone()
+            .addScaledVector(this.up, (-0.25 / Math.max(dt, 1e-3)) * dt)
+            .normalize()
+        : null;
+    let hit = downDir ? this.world.raycast(from, downDir, dist + 0.3) : null;
+    if (!hit && this.vel.dot(this.up) <= 0.5) {
+      hit = this.world.raycast(
+        _v2.copy(this.pos).addScaledVector(this.up, 0.3),
+        _v3.copy(this.up).negate(),
+        0.32,
+      );
+    }
+    if (hit && hit.normal.dot(this.vel) < 0 && hit.normal.y > -0.2) {
+      this.land(hit.point, hit.normal, now);
+    }
+  }
+
+  private land(point: THREE.Vector3, normal: THREE.Vector3, now: number) {
+    const impact = -this.vel.dot(normal);
+    this.pos.copy(point);
+    // Judge the landing
+    const upOk = this.up.dot(normal) > 0.62;
+    const flipOk = !this.flip || this.flip.t >= this.flip.duration * 0.82;
+    // Heading vs travel: land rolling forward or fakie; sideways = bail
+    const tangentVel = _v.copy(this.vel).addScaledVector(normal, -this.vel.dot(normal));
+    const tv = tangentVel.length();
+    let headingOk = true;
+    if (tv > 2.2) {
+      const fwdT = _v2.copy(this.fwd).addScaledVector(normal, -this.fwd.dot(normal)).normalize();
+      const c = Math.abs(fwdT.dot(tangentVel.clone().normalize()));
+      headingOk = c > 0.62;
+    }
+    const grabOk = !this.grab || true;
+    const clean = upOk && flipOk && headingOk && grabOk && impact < 15;
+
+    this.up.copy(normal);
+    this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+    if (!clean) {
+      this.doBail(now, impact);
+      return;
+    }
+    // Snap the board to the travel line (keeps fakie if landed backwards)
+    if (tv > 0.5) {
+      const dir = tangentVel.normalize();
+      const sign = this.fwd.dot(dir) >= 0 ? 1 : -1;
+      this.fwd.copy(dir).multiplyScalar(sign);
+      this.fakie = sign < 0;
+    }
+    this.vel.copy(this.fwd).multiplyScalar(tv * (this.fakie ? -1 : 1) * 0.97);
+
+    // Score the air trick
+    const yawDeg = THREE.MathUtils.radToDeg(this.airYaw);
+    const spun = Math.abs(yawDeg) >= 150;
+    const didSomething =
+      this.popKind === 'nollie' ||
+      this.flipDone !== null ||
+      spun ||
+      this.grab !== null ||
+      this.airTime > 0.45 ||
+      this.flip !== null;
+    if (didSomething && (this.airTime > 0.18 || this.flipDone !== null)) {
+      const flipTrick = this.flipDone ?? (this.flip ? this.flip.trick : null);
+      const name = airTrickName({
+        flip: flipTrick,
+        pop: this.popKind,
+        fakie: this.takeoffFakie,
+        yawDeg,
+        grab: this.grab,
+        frontside: yawDeg < 0,
+      });
+      let pts =
+        (flipTrick ? FLIPS[flipTrick].points : this.popKind === 'nollie' ? 120 : 100) +
+        spinPoints(yawDeg);
+      if (this.takeoffFakie) pts *= 1.1;
+      pts += Math.round(this.airTime * 80);
+      if (this.grab) pts += 150 + Math.round(this.grabTime * 100);
+      pts = Math.round(pts);
+      addTrick(this.combo, name, pts);
+      this.events.push({ type: 'trick', name, points: pts });
+    }
+    this.flip = null;
+    this.flipDone = null;
+    this.grab = null;
+    this.state = 'ground';
+    this.vertLip = false;
+    this.sinceLand = 0;
+    this.lastLandImpact = impact;
+    this.events.push({ type: 'land', impact, clean: true });
+  }
+
+  private updateFlipVisual(dt: number) {
+    if (this.flip) {
+      this.flip.t += dt;
+      if (this.flip.t >= this.flip.duration) {
+        this.flipDone = this.flip.trick;
+        this.flip = this.state === 'air' ? this.flip : null;
+      }
+    }
+    if (this.flip && this.flip.t < this.flip.duration) {
+      const k = easeInOut(Math.min(1, this.flip.t / this.flip.duration));
+      const rollA = this.flip.roll * Math.PI * 2 * k;
+      const spinA = this.flip.spin * Math.PI * k;
+      // Roll about the board's long axis (local Z), spin about local Y
+      _q.setFromAxisAngle(_v.set(0, 1, 0), spinA);
+      this.boardFlipQuat.setFromAxisAngle(_v2.set(0, 0, 1), rollA).premultiply(_q);
+      this.boardLift = Math.sin(k * Math.PI) * 0.32;
+    } else {
+      this.boardFlipQuat.identity();
+      this.boardLift = THREE.MathUtils.lerp(this.boardLift, 0, 1 - Math.exp(-20 * dt));
+    }
+  }
+
+  // ── Grinds ──────────────────────────────────────────────────────────
+
+  private tryStartGrind(now: number): boolean {
+    // Mid-flip you can't lock on — the board has to come back under your feet
+    if (this.flip !== null && this.flip.t < this.flip.duration * 0.75) return false;
+    const q = this.rails.nearest(this.pos, 0.42);
+    if (!q) return false;
+    // Must be above (or level with) the rail, not under it
+    const dy = this.pos.y - q.point.y;
+    if (dy < -0.12 || dy > 0.42) return false;
+    const hv = _v.set(this.vel.x, 0, this.vel.z);
+    const speed = hv.length();
+    if (speed < 1.2) return false;
+    hv.divideScalar(speed);
+    const tan = _v2.set(q.tangent.x, 0, q.tangent.z).normalize();
+    const along = hv.dot(tan);
+    // Moving roughly along the rail?
+    if (Math.abs(along) < 0.42) return false;
+    const dir: 1 | -1 = along >= 0 ? 1 : -1;
+    // Board angle relative to the rail decides the grind
+    const boardH = _v3.set(this.fwd.x, 0, this.fwd.z).normalize();
+    const c = Math.abs(boardH.dot(tan));
+    let type: GrindState['type'];
+    let yawOffset = 0;
+    if (c > 0.72) {
+      type = 'fiftyfifty';
+    } else if (c < 0.45) {
+      type = 'boardslide';
+      // Keep the board perpendicular, on whichever side it already was
+      const cross = tan.x * boardH.z - tan.z * boardH.x;
+      yawOffset = cross > 0 ? Math.PI / 2 : -Math.PI / 2;
+    } else {
+      type = 'crooked';
+      const cross = tan.x * boardH.z - tan.z * boardH.x;
+      yawOffset = cross > 0 ? 0.45 : -0.45;
+    }
+    const railSpeed = Math.max(2, speed * Math.abs(along) * 0.95 + 0.6);
+    this.grind = { rail: q.rail, s: q.s, dir, speed: railSpeed, type, yawOffset, time: 0 };
+    this.state = 'grind';
+    if (this.flip !== null) this.flipDone = this.flip.trick;
+    this.flip = null;
+    this.grab = null;
+    // Flip/air trick into a grind still scores the air part
+    if (this.flipDone !== null) {
+      addTrick(this.combo, FLIPS[this.flipDone].name, FLIPS[this.flipDone].points);
+      this.flipDone = null;
+    }
+    const name = grindName(type, q.rail.type);
+    addTrick(this.combo, name, 150);
+    this.events.push({ type: 'grindStart', railType: q.rail.type });
+    void now;
+    return true;
+  }
+
+  private updateGrind(dt: number, input: InputFrame, now: number) {
+    const g = this.grind!;
+    const t = this.tuning;
+    g.time += dt;
+    const p = new THREE.Vector3();
+    const tan = new THREE.Vector3();
+    this.rails.sample(g.rail, g.s, p, tan);
+    const dirTan = tan.clone().multiplyScalar(g.dir);
+    // Gravity along the rail + friction
+    g.speed += -t.gravity * dirTan.y * dt;
+    g.speed -= (g.type === 'boardslide' ? 1.4 : 0.9) * dt;
+    g.s += g.speed * g.dir * dt;
+
+    // Lean on the stick: nose / tail variants for 50-50s
+    if (g.type === 'fiftyfifty' || g.type === 'fivezero' || g.type === 'nosegrind') {
+      const prevType = g.type;
+      g.type = input.moveY > 0.5 ? 'nosegrind' : input.moveY < -0.5 ? 'fivezero' : 'fiftyfifty';
+      if (g.type !== prevType && g.time > 0.15)
+        addTrick(this.combo, grindName(g.type, g.rail.type), 120);
+    }
+    addRunning(this.combo, (g.type === 'boardslide' ? 75 : 60) * dt);
+
+    this.rails.sample(g.rail, g.s, p, tan);
+    this.pos.copy(p);
+    this.vel.copy(tan).multiplyScalar(g.speed * g.dir);
+    // Board frame: up = world up tilted slightly by the rail, fwd along rail (+offset)
+    this.up.lerp(UP, 1 - Math.exp(-15 * dt)).normalize();
+    const base = _v.copy(dirTan);
+    if (this.fwd.dot(base) < 0 && g.yawOffset === 0) base.negate();
+    if (g.yawOffset !== 0) base.applyAxisAngle(UP, g.yawOffset);
+    this.fwd.lerp(base, 1 - Math.exp(-20 * dt)).normalize();
+    this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+    this.lean = THREE.MathUtils.lerp(
+      this.lean,
+      Math.sin(g.time * 3.1) * 0.25,
+      1 - Math.exp(-4 * dt),
+    );
+
+    const ended = g.s <= 0 || g.s >= g.rail.total || g.speed < 0.6;
+    const popped = input.tricks.length > 0;
+    if (ended || popped) {
+      this.state = 'air';
+      this.grind = null;
+      this.vertLip = false;
+      this.airTime = 0;
+      this.airYaw = 0;
+      this.flipDone = null;
+      this.grindCooldown = 0.35;
+      this.takeoffFakie = this.fakie;
+      this.events.push({ type: 'grindEnd' });
+      if (popped) {
+        this.vel.y += t.popSpeed * 0.85;
+        this.events.push({ type: 'pop', strength: 0.85 });
+        const tr = input.tricks[0];
+        this.popKind = tr === 'nollie' ? 'nollie' : 'ollie';
+        if (tr !== 'ollie' && tr !== 'nollie') this.startFlip(tr);
+      } else {
+        this.vel.y += 0.6;
+      }
+      // Board straightens out of a slide
+      if (g.yawOffset !== 0) {
+        const h = _v.set(this.vel.x, 0, this.vel.z).normalize();
+        if (h.lengthSq() > 0.5) this.fwd.copy(h);
+      }
+      this.pos.y += 0.04;
+    }
+    void now;
+  }
+
+  // ── Bails ───────────────────────────────────────────────────────────
+
+  private doBail(now: number, impact: number) {
+    this.state = 'bail';
+    this.bailTimer = 0;
+    this.flip = null;
+    this.grind = null;
+    this.grab = null;
+    this.crouch = 0;
+    bailCombo(this.combo, now);
+    // Launch the board loose
+    this.looseBoard.pos.copy(this.pos).addScaledVector(this.up, 0.1);
+    this.looseBoard.vel
+      .copy(this.vel)
+      .multiplyScalar(1.1)
+      .add(new THREE.Vector3((Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2));
+    _m.lookAt(new THREE.Vector3(), this.fwd, this.up);
+    this.looseBoard.quat.setFromRotationMatrix(_m);
+    this.looseBoard.spin.set(
+      (Math.random() - 0.5) * 18,
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 18,
+    );
+    this.events.push({ type: 'bail', impact });
+  }
+
+  private updateBail(dt: number) {
+    this.bailTimer += dt;
+    // Rider tumbles/slides along the ground
+    this.vel.y -= this.tuning.gravity * dt;
+    const hv = _v.set(this.vel.x, 0, this.vel.z);
+    hv.multiplyScalar(Math.exp(-2.2 * dt));
+    this.vel.x = hv.x;
+    this.vel.z = hv.z;
+    this.pos.addScaledVector(this.vel, dt);
+    this.resolveBody(0.9);
+    const hit = this.world.raycast(
+      _v.copy(this.pos).addScaledVector(UP, 0.8),
+      _v2.set(0, -1, 0),
+      1.2,
+    );
+    if (hit && this.pos.y <= hit.point.y + 0.02) {
+      this.pos.y = hit.point.y;
+      if (this.vel.y < 0) this.vel.y = 0;
+    }
+    this.up.lerp(UP, 1 - Math.exp(-6 * dt)).normalize();
+    const hf = _v.set(this.fwd.x, 0, this.fwd.z);
+    if (hf.lengthSq() > 1e-4) this.fwd.copy(hf.normalize());
+
+    // Loose board physics
+    const lb = this.looseBoard;
+    lb.vel.y -= this.tuning.gravity * dt;
+    lb.pos.addScaledVector(lb.vel, dt);
+    const bh = this.world.raycast(_v.copy(lb.pos).addScaledVector(UP, 0.5), _v2.set(0, -1, 0), 0.6);
+    if (bh && lb.pos.y < bh.point.y + 0.04) {
+      lb.pos.y = bh.point.y + 0.04;
+      if (lb.vel.y < 0) lb.vel.y *= -0.35;
+      lb.vel.x *= 0.8;
+      lb.vel.z *= 0.8;
+      lb.spin.multiplyScalar(0.7);
+    }
+    const ang = lb.spin.length() * dt;
+    if (ang > 1e-5) {
+      _q.setFromAxisAngle(_v.copy(lb.spin).normalize(), ang);
+      lb.quat.premultiply(_q);
+    }
+
+    if (this.bailTimer > 2.6) {
+      // Get back up on the board where we stopped
+      this.state = 'ground';
+      this.vel.set(0, 0, 0);
+      this.up.copy(UP);
+      this.sinceLand = 0;
+      this.lastLandImpact = 0;
+      if (this.pos.y < -20) this.respawnSafe();
+    }
+  }
+
+  // ── Board world transform helpers for rendering ─────────────────────
+
+  /** Rider frame: origin on the surface, Y = up, Z = nose. */
+  getRiderQuaternion(out: THREE.Quaternion) {
+    const z = _v.copy(this.fwd);
+    const y = _v2.copy(this.up);
+    const x = _v3.crossVectors(y, z).normalize();
+    z.crossVectors(x, y).normalize();
+    _m.makeBasis(x, y, z);
+    out.setFromRotationMatrix(_m);
+    return out;
+  }
+}
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+export function lerpAngle(a: number, b: number, t: number) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
