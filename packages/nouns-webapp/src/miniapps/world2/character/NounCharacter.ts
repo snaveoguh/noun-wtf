@@ -101,6 +101,18 @@ const FALLBACK_CLIP: Record<string, string[]> = {
 const _q = new THREE.Quaternion();
 
 export type BoardType = 'skate' | 'hover';
+/** Head width in metres (body is ~1.15 m tall without it). */
+export const HEAD_WIDTH = 1.15;
+
+/** Build steps for the select screen: -1 = skinny … 1 = clinically obese. */
+export const BUILDS = [
+  { name: 'SKINNY', w: -1 },
+  { name: 'SLIM', w: -0.5 },
+  { name: 'REGULAR', w: 0 },
+  { name: 'THICC', w: 0.35 },
+  { name: 'CHONK', w: 0.7 },
+  { name: 'CLINICALLY OBESE', w: 1 },
+] as const;
 export const HOVER_HEIGHT = 0.16;
 
 let glowTex: THREE.CanvasTexture | null = null;
@@ -161,7 +173,8 @@ export class NounCharacter {
 
   private buildBody() {
     const { gltf, manifest } = this.assets;
-    const headInfo = buildNounHead(this.seed, manifest.head?.width ?? 0.6);
+    // Nouns proportions: the head dominates the silhouette.
+    const headInfo = buildNounHead(this.seed, Math.max(HEAD_WIDTH, manifest.head?.width ?? 0));
     this.head = headInfo.group;
     if (gltf) {
       const model = cloneSkinned(gltf.scene) as THREE.Object3D;
@@ -210,6 +223,7 @@ export class NounCharacter {
         model.updateMatrixWorld(true);
         this.headBone.getWorldScale(ws);
         if (ws.x > 0 && Math.abs(ws.x - 1) > 1e-3) this.head.scale.divideScalar(ws.x);
+        this.headBaseScale = this.head.scale.x;
         this.headBone.add(this.head);
       } else {
         this.head.position.set(0, 1.15, 0);
@@ -296,6 +310,46 @@ export class NounCharacter {
   }
 
   /** Swap between the skateboard and the hoverboard look. */
+  /** -1 skinny … 0 regular … 1 clinically obese. */
+  weight = 0;
+  private morphMeshes: THREE.Mesh[] | null = null;
+
+  setWeight(w: number) {
+    this.weight = THREE.MathUtils.clamp(w, -1, 1);
+    if (this.morphMeshes === null) {
+      this.morphMeshes = [];
+      this.body.traverse(o => {
+        const m = o as THREE.Mesh;
+        const dict = m.morphTargetDictionary;
+        if (m.isMesh && dict !== undefined && ('weight_heavy' in dict || 'weight_thin' in dict)) {
+          this.morphMeshes!.push(m);
+        }
+      });
+    }
+    const heavy = Math.max(0, this.weight);
+    const thin = Math.max(0, -this.weight);
+    if (this.morphMeshes.length > 0) {
+      for (const m of this.morphMeshes) {
+        const dict = m.morphTargetDictionary!;
+        const inf = m.morphTargetInfluences!;
+        if (dict.weight_heavy !== undefined) inf[dict.weight_heavy] = heavy;
+        if (dict.weight_thin !== undefined) inf[dict.weight_thin] = thin;
+      }
+      this.body.scale.set(1, 1, 1);
+    } else {
+      // Fallback until the rig ships weight morphs: widen/narrow the body
+      // across the shoulders only (keeps feet on the bolts), and undo it on
+      // the head so the Noun head stays square.
+      const sx = 1 + heavy * 0.75 - thin * 0.22;
+      const sz = 1 + heavy * 0.35 - thin * 0.12;
+      this.body.scale.set(sx, 1, sz);
+      if (this.head !== null)
+        this.head.scale.set(this.headBaseScale / sx, this.headBaseScale, this.headBaseScale / sz);
+    }
+  }
+
+  private headBaseScale = 1;
+
   setBoardType(t: BoardType) {
     if (t === this.boardType) return;
     this.boardType = t;

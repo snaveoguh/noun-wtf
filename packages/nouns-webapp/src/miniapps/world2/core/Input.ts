@@ -45,6 +45,9 @@ export interface InputFrame {
   micPressed: boolean;
   respawnPressed: boolean;
   emotePressed: number; // 0 none, 1..4
+  /** Hold to spray paint. */
+  spray: boolean;
+  colorCyclePressed: boolean;
   tricks: TrickInput[];
   mode: InputMode;
 }
@@ -137,6 +140,7 @@ export class Input {
     push: false,
     brake: false,
     grab: false,
+    spray: false,
     lookX: 0,
     lookY: 0,
     boardToggle: false,
@@ -244,6 +248,8 @@ export class Input {
       micPressed: false,
       respawnPressed: false,
       emotePressed: 0,
+      spray: false,
+      colorCyclePressed: false,
       tricks: [],
       mode: this.mode,
     };
@@ -266,6 +272,8 @@ export class Input {
     f.cameraTogglePressed = this.keyPressed('KeyC');
     f.micPressed = this.keyPressed('KeyV');
     f.respawnPressed = this.keyPressed('KeyR');
+    f.spray = this.key('KeyG');
+    f.colorCyclePressed = this.keyPressed('KeyT');
     f.emotePressed = this.keyPressed('Digit1')
       ? 1
       : this.keyPressed('Digit2')
@@ -331,6 +339,9 @@ export class Input {
         f.cameraTogglePressed = btnPressed(8);
         f.respawnPressed = btnPressed(9) && false;
         f.micPressed = btnPressed(12);
+        // On foot the right trigger sprays (Game decides by mode)
+        f.spray = f.spray || btn(7);
+        f.colorCyclePressed = f.colorCyclePressed || btnPressed(11);
         f.emotePressed = btnPressed(14) ? 1 : btnPressed(15) ? 2 : btnPressed(13) ? 3 : 0;
         f.lookX += (btn(4) ? -1 : 0) + (btn(5) ? 1 : 0) * 0.04;
         // Manual: right stick held gently back (no flick)
@@ -358,6 +369,7 @@ export class Input {
         f.push = this.touch.push || f.moveY > 0.55;
         f.brake = this.touch.brake;
         f.grabR = this.touch.grab;
+        f.spray = f.spray || this.touch.spray;
         f.crouch = f.stickY < DOWN_T;
         f.lookX += this.touch.lookX;
         f.lookY += this.touch.lookY;

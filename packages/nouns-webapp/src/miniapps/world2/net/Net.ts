@@ -48,6 +48,7 @@ export interface NetPose {
   seedKey: string;
   trick: string;
   boardType: 'skate' | 'hover';
+  weight: number;
 }
 
 export interface RemotePlayer {
@@ -62,6 +63,7 @@ export interface RemotePlayer {
   transcript: string;
   transcriptAt: number;
   boardType: 'skate' | 'hover';
+  weight: number;
 }
 
 function emptyPose(): NetPose {
@@ -79,6 +81,7 @@ function emptyPose(): NetPose {
     seedKey: '0-0-0-0-0',
     trick: '',
     boardType: 'skate',
+    weight: 0,
   };
 }
 
@@ -96,6 +99,8 @@ export class Net {
   onJoin?: (id: string) => void;
   onLeave?: (id: string) => void;
   onChat?: (id: string, text: string) => void;
+  onGraffiti?: (wallId: string, tags: { imageData: string }[]) => void;
+  onOpen?: () => void;
   connected = false;
 
   connect() {
@@ -106,6 +111,7 @@ export class Net {
     ws.addEventListener('open', () => {
       this.myId = ws.id;
       this.connected = true;
+      this.onOpen?.();
     });
     ws.addEventListener('close', () => {
       this.connected = false;
@@ -160,6 +166,9 @@ export class Net {
       if (rp) rp.speaking = speaking;
       if (speaking) this.voip.activeSpeakers.add(d.id as string);
       else this.voip.activeSpeakers.delete(d.id as string);
+    } else if (type === 'world:graffiti:tags') {
+      const tags = Array.isArray(d.tags) ? (d.tags as { imageData: string }[]) : [];
+      this.onGraffiti?.(String(d.wallId ?? ''), tags);
     } else if (type === 'world:voip:transcript') {
       const id = d.id as string;
       if (id === this.myId) return;
@@ -198,6 +207,7 @@ export class Net {
     pose.name = String(blob.n ?? '').slice(0, 24);
     pose.trick = String(blob.tr ?? '').slice(0, 60);
     pose.boardType = blob.bt === 'hover' ? 'hover' : 'skate';
+    pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
     const now = performance.now();
@@ -213,6 +223,7 @@ export class Net {
         transcript: '',
         transcriptAt: 0,
         boardType: pose.boardType,
+        weight: pose.weight,
       };
       rp.current.pos.copy(pose.pos);
       rp.current.quat.copy(pose.quat);
@@ -222,6 +233,7 @@ export class Net {
     rp.seedKey = pose.seedKey;
     rp.name = pose.name;
     rp.boardType = pose.boardType;
+    rp.weight = pose.weight;
     rp.lastSeen = now;
     rp.samples.push({ t: now, pose });
     if (rp.samples.length > 8) rp.samples.shift();
@@ -289,6 +301,7 @@ export class Net {
       n: pose.name,
       tr: pose.trick,
       bt: pose.boardType,
+      w: r3(pose.weight),
     });
     const msg = JSON.stringify({
       type: 'world:move',
@@ -342,6 +355,18 @@ export class Net {
     updateListenerPosition(v, listener.x, listener.y, listener.z, forward.x, forward.z);
     for (const [id, rp] of this.players)
       updateSpatialPosition(v, id, rp.current.pos.x, rp.current.pos.y, rp.current.pos.z);
+  }
+
+  graffitiSave(wallId: string, imageData: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'world:graffiti:save', wallId, imageData }));
+    }
+  }
+
+  graffitiLoad(wallId: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'world:graffiti:load', wallId }));
+    }
   }
 
   sendChat(text: string) {

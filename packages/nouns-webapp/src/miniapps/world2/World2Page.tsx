@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAppSelector } from '@/hooks';
 
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
+import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls } from './ui/TouchControls';
@@ -23,6 +24,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'F', v: 'get on / off board' },
   { k: 'C', v: 'camera' },
   { k: 'V', v: 'mic' },
+  { k: 'G (hold)', v: 'spray paint · T colour' },
   { k: 'R', v: 'respawn' },
   { k: 'ENTER', v: 'chat' },
 ];
@@ -34,6 +36,7 @@ const PAD: { k: string; v: string }[] = [
   { k: 'B', v: 'brake' },
   { k: 'LT / RT', v: 'grabs' },
   { k: 'Y', v: 'board on / off' },
+  { k: 'RT (on foot)', v: 'spray paint · R3 colour' },
 ];
 
 export default function World2Page() {
@@ -61,6 +64,7 @@ export default function World2Page() {
       seed: urlSeed ?? saved?.seed ?? auctionSeed ?? randomSeed(),
       name: searchParams.get('name') ?? saved?.name ?? '',
       board: searchParams.get('board') === 'hover' ? 'hover' : (saved?.board ?? 'skate'),
+      build: saved?.build ?? 2,
     }),
     // Only the first resolution matters; the select screen owns it after that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +94,7 @@ export default function World2Page() {
       });
       g.showroom = searchParams.get('skip') !== '1';
       g.boardType = initialChar.board ?? 'skate';
+      g.weight = BUILDS[initialChar.build ?? 2]?.w ?? 0;
     } catch (e) {
       setError((e as Error).message || 'WebGL unavailable');
       canvas.remove();
@@ -144,6 +149,7 @@ export default function World2Page() {
     if (!g) return;
     g.setSeed(c.seed);
     g.setBoardType(c.board ?? 'skate');
+    g.setWeight(BUILDS[c.build ?? 2]?.w ?? 0);
     g.name = c.name;
     g.enterWorld();
     setPhase('play');
@@ -364,6 +370,28 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
           </div>
         )}
       </div>
+
+      {/* Spray crosshair */}
+      {(hud.mode === 'foot' || hud.spray.active) && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div
+            className="h-3 w-3 rounded-full border-2"
+            style={{
+              borderColor: hud.spray.aiming ? hud.spray.color : 'rgba(255,255,255,.35)',
+              boxShadow: hud.spray.aiming ? `0 0 10px ${hud.spray.color}` : 'none',
+            }}
+          />
+        </div>
+      )}
+      {(hud.mode === 'foot' || hud.spray.active) && (
+        <div className="w2-chip absolute bottom-4 right-4 flex items-center gap-2 text-xs">
+          <span
+            className="inline-block h-4 w-4 rounded-full border border-white/50"
+            style={{ background: hud.spray.color }}
+          />
+          {hud.spray.aiming ? 'hold G to spray · T colour' : 'aim at a wall to tag it'}
+        </div>
+      )}
 
       {/* Controls */}
       {showHelp && hud.inputMode !== 'touch' && (

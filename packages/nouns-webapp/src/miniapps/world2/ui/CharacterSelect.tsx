@@ -11,12 +11,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ImageData } from '@noundry/nouns-assets';
 
 import { randomSeed, type NounSeed } from '../character/NounAppearance';
+import { BUILDS } from '../character/NounCharacter';
 
 const STORAGE_KEY = 'noun-world-v2-character';
 
-type Row = 'head' | 'glasses' | 'body' | 'accessory' | 'board' | 'name';
-const ROWS: Row[] = ['head', 'glasses', 'body', 'accessory', 'board', 'name'];
-type TraitRow = Exclude<Row, 'name' | 'board'>;
+type Row = 'head' | 'glasses' | 'body' | 'accessory' | 'build' | 'board' | 'name';
+const ROWS: Row[] = ['head', 'glasses', 'body', 'accessory', 'build', 'board', 'name'];
+type TraitRow = Exclude<Row, 'name' | 'board' | 'build'>;
 const TRAIT_KEY: Record<TraitRow, 'heads' | 'glasses' | 'bodies' | 'accessories'> = {
   head: 'heads',
   glasses: 'glasses',
@@ -28,6 +29,8 @@ export interface SavedCharacter {
   seed: NounSeed;
   name: string;
   board?: 'skate' | 'hover';
+  /** Index into BUILDS (skinny … clinically obese). */
+  build?: number;
 }
 
 export function loadSavedCharacter(): SavedCharacter | null {
@@ -78,6 +81,7 @@ export function CharacterSelect({
   const [seed, setSeedState] = useState<NounSeed>(initial.seed);
   const [name, setName] = useState(initial.name);
   const [board, setBoard] = useState<'skate' | 'hover'>(initial.board ?? 'skate');
+  const [build, setBuild] = useState<number>(initial.build ?? 2);
   const [row, setRow] = useState(0);
   const [flash, setFlash] = useState(0);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -94,8 +98,17 @@ export function CharacterSelect({
     game.setBoardType(board);
   }, [game, board]);
 
+  useEffect(() => {
+    game.setWeight(BUILDS[build]?.w ?? 0);
+  }, [game, build]);
+
   const cycle = useCallback((r: Row, dir: number) => {
     if (r === 'name') return;
+    if (r === 'build') {
+      setBuild(b => Math.max(0, Math.min(BUILDS.length - 1, b + Math.sign(dir))));
+      setFlash(f => f + 1);
+      return;
+    }
     if (r === 'board') {
       setBoard(b => (b === 'skate' ? 'hover' : 'skate'));
       setFlash(f => f + 1);
@@ -117,10 +130,11 @@ export function CharacterSelect({
       seed: seedRef.current,
       name: name.trim().slice(0, 16) || 'NOUN',
       board,
+      build,
     };
     saveCharacter(c);
     onConfirm(c);
-  }, [name, board, onConfirm]);
+  }, [name, board, build, onConfirm]);
 
   // Keyboard
   useEffect(() => {
@@ -196,6 +210,7 @@ export function CharacterSelect({
     glasses: 'GLASSES',
     body: 'BODY',
     accessory: 'ACCESSORY',
+    build: 'BUILD',
     board: 'DECK',
     name: 'TAG',
   };
@@ -228,7 +243,24 @@ export function CharacterSelect({
                 )}
                 {rowLabel[r]}
               </div>
-              {r === 'board' ? (
+              {r === 'build' ? (
+                <div className="cs-value">
+                  <button type="button" className="cs-arrow" onClick={() => cycle(r, -1)}>
+                    ◀
+                  </button>
+                  <div className="cs-trait" key={`build-${build}-${flash}`}>
+                    <span className="cs-meter">
+                      {BUILDS.map((b, i) => (
+                        <i key={b.name} className={i <= build ? 'on' : ''} />
+                      ))}
+                    </span>
+                    <span className="cs-tname">{BUILDS[build]?.name}</span>
+                  </div>
+                  <button type="button" className="cs-arrow" onClick={() => cycle(r, 1)}>
+                    ▶
+                  </button>
+                </div>
+              ) : r === 'board' ? (
                 <div className="cs-value">
                   <button type="button" className="cs-arrow" onClick={() => cycle(r, -1)}>
                     ◀
@@ -337,6 +369,7 @@ const CSS = `
 .cs-trait{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;animation:cspop .18s steps(3)}
 @keyframes cspop{0%{transform:scale(.9);filter:brightness(2)}100%{transform:none}}
 .cs-num{font-size:9px;color:#7f74c9}
+.cs-meter{display:flex;gap:3px}.cs-meter i{width:14px;height:7px;background:#2b2160;display:block}.cs-meter i.on{background:#3ddc84}.cs-meter i.on:nth-child(n+5){background:#ff8a00}.cs-meter i.on:nth-child(6){background:#ff2d2d}
 .cs-tname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cs-name{font-family:inherit;font-size:13px;width:100%;min-width:0;flex:1;background:#0b0820;color:#3ddc84;border:3px solid #3ddc84;padding:8px;outline:none;text-transform:uppercase;caret-color:#3ddc84}
 .cs-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}

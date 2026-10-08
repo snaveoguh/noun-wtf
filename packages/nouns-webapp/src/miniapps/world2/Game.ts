@@ -14,6 +14,7 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
+import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { Net, type NetPose } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -44,6 +45,8 @@ export interface HudState {
   chat: { id: string; name: string; text: string; at: number }[];
   quality: Quality;
   camMode: string;
+  /** Spray colour + whether the crosshair is on a paintable surface. */
+  spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
 }
 
@@ -74,6 +77,7 @@ export class Game {
   audio = new SkateAudio();
   net = new Net();
   particles = new Particles();
+  graffiti: Graffiti | null = null;
   level: LevelData | null = null;
   assets: CharacterAssets | null = null;
   me: NounCharacter | null = null;
@@ -130,6 +134,7 @@ export class Game {
       chat: [],
       quality,
       camMode: 'follow',
+      spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
     };
   }
@@ -160,11 +165,23 @@ export class Game {
     this.gfx.scene.add(level.root);
     this.world.build(level.collisionMeshes);
     this.rails.load(level.rails);
+    this.graffiti = new Graffiti(
+      this.world,
+      level.baked ? 'plaza' : 'park',
+      this.opts.offline === true
+        ? null
+        : {
+            save: (id, data) => this.net.graffitiSave(id, data),
+            load: id => this.net.graffitiLoad(id),
+          },
+    );
+    this.gfx.scene.add(this.graffiti.group);
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
 
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
+    this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
     const spawn = level.spawns[Math.floor(Math.random() * level.spawns.length)] ?? {
       position: new THREE.Vector3(),
@@ -180,6 +197,8 @@ export class Game {
     if (this.opts.offline !== true) {
       this.net.onLeave = id => this.removeRemote(id);
       this.net.onChat = (id, text) => this.pushChat(id, text);
+      this.net.onGraffiti = (id, tags) => this.graffiti?.onTags(id, tags);
+      this.net.onOpen = () => this.graffiti?.loadAll();
       this.net.connect();
     }
 
@@ -211,6 +230,12 @@ export class Game {
   /** Character-select mode: physics paused, camera orbits the rider. */
   showroom = false;
   boardType: BoardType = 'skate';
+  weight = 0;
+
+  setWeight(w: number) {
+    this.weight = w;
+    this.me?.setWeight(w);
+  }
 
   setBoardType(t: BoardType) {
     this.boardType = t;
@@ -251,6 +276,7 @@ export class Game {
     this.cam.update(dt, this.player, input.lookX, input.lookY, now);
     this.updateMyCharacter(dt);
     this.updateAudio(dt);
+    this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
@@ -272,9 +298,9 @@ export class Game {
     // Rider stands sideways on the board (chest toward -X of the board
     // frame), so orbit around the chest side with a gentle sway.
     const a = riderYaw - Math.PI / 2 + Math.sin(this.showroomYaw) * 0.7;
-    const target = p.pos.clone().add(new THREE.Vector3(0, 1.05, 0));
+    const target = p.pos.clone().add(new THREE.Vector3(0, 1.35, 0));
     const cam = this.gfx.camera;
-    const dist = 3.6;
+    const dist = 4.4;
     cam.position.set(target.x + Math.sin(a) * dist, target.y + 0.35, target.z + Math.cos(a) * dist);
     // Frame the Noun on the right third of the screen (menu panel on the left)
     const right = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
@@ -292,6 +318,20 @@ export class Game {
   enterWorld() {
     this.showroom = false;
     this.cam.snap(this.player);
+  }
+
+  private updateGraffiti(dt: number, input: InputFrame) {
+    const g = this.graffiti;
+    if (g === null) return;
+    if (input.colorCyclePressed) g.cycleColor(1);
+    const p = this.player;
+    // Gamepad: right trigger sprays only on foot (it's a grab on the board)
+    const active = input.spray && (p.mode === 'foot' || input.mode !== 'gamepad');
+    const cam = this.gfx.camera;
+    const dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    g.update(dt, active, cam.position, dir, p.pos);
+    g.updateAudio(this.audio.ctx, this.audio.master, this.audio.noise);
   }
 
   private handleGlobalInput(input: InputFrame) {
@@ -518,6 +558,7 @@ export class Game {
         name: this.name,
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
+        weight: this.weight,
         trick: this.player.combo.entries.length ? comboLabel(this.player.combo).slice(-60) : '',
       };
       this.net.send(dt, pose, this.nounId);
@@ -543,6 +584,7 @@ export class Game {
       const travelled = r.lastPos.distanceTo(c.pos);
       r.lastPos.copy(c.pos);
       ch.setBoardType(rp.boardType);
+      if (ch.weight !== rp.weight) ch.setWeight(rp.weight);
       ch.update(dt, {
         lean: c.lean,
         travelled: c.mode === 'board' ? travelled : 0,
@@ -607,6 +649,7 @@ export class Game {
     }
     this.me = new NounCharacter(seed, this.assets);
     this.me.setBoardType(this.boardType);
+    this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
   }
 
@@ -656,6 +699,11 @@ export class Game {
       inputMode: input.mode,
       landmarks: lm,
       camMode: this.cam.mode,
+      spray: {
+        color: SPRAY_COLORS[this.graffiti?.color ?? 2],
+        aiming: this.graffiti?.aim !== null && this.graffiti?.aim !== undefined,
+        active: this.graffiti?.spraying === true,
+      },
     };
     this.emit();
   }
@@ -666,6 +714,7 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.input.dispose();
     this.audio.dispose();
+    this.graffiti?.dispose();
     this.net.dispose();
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     this.gfx.dispose();

@@ -70,7 +70,7 @@ export function TouchControls({ game }: { game: Game }) {
   const L = stickHandlers('L');
   const Rh = stickHandlers('R');
 
-  const hold = (key: 'push' | 'brake' | 'grab') => ({
+  const hold = (key: 'push' | 'brake' | 'grab' | 'spray') => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.stopPropagation();
       t[key] = true;
@@ -103,6 +103,9 @@ export function TouchControls({ game }: { game: Game }) {
         </div>
       )}
       <div className="absolute bottom-6 right-4 flex gap-2">
+        <button type="button" className="w2-tbtn" {...hold('spray')}>
+          🎨
+        </button>
         <button className="w2-tbtn" {...hold('grab')}>
           GRAB
         </button>

@@ -5,8 +5,8 @@
 
 export class SkateAudio {
   ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private noise: AudioBuffer | null = null;
+  master: GainNode | null = null;
+  noise: AudioBuffer | null = null;
   private roll: {
     src: AudioBufferSourceNode;
     bp: BiquadFilterNode;
