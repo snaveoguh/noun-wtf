@@ -206,7 +206,16 @@ export class Game {
   };
 
   /** One simulation + render step (exposed for tests/automation). */
+  /** Character-select mode: physics paused, camera orbits the rider. */
+  showroom = false;
+  showroomYaw = 0.5;
+
   step(dt: number, now = performance.now()) {
+    if (this.showroom) {
+      this.input.poll(now);
+      this.updateShowroom(dt);
+      return;
+    }
     const input = this.input.poll(now);
     this.handleGlobalInput(input);
 
@@ -246,6 +255,35 @@ export class Game {
     this.gfx.followShadow(this.player.pos);
     this.gfx.render(dt);
     this.updateHud(dt, input);
+  }
+
+  private updateShowroom(dt: number) {
+    const p = this.player;
+    this.showroomYaw += dt * 0.35;
+    const riderYaw = Math.atan2(p.fwd.x, p.fwd.z);
+    // Rider stands sideways on the board (chest toward -X of the board
+    // frame), so orbit around the chest side with a gentle sway.
+    const a = riderYaw - Math.PI / 2 + Math.sin(this.showroomYaw) * 0.7;
+    const target = p.pos.clone().add(new THREE.Vector3(0, 1.05, 0));
+    const cam = this.gfx.camera;
+    const dist = 3.6;
+    cam.position.set(target.x + Math.sin(a) * dist, target.y + 0.35, target.z + Math.cos(a) * dist);
+    // Frame the Noun on the right third of the screen (menu panel on the left)
+    const right = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
+    cam.lookAt(target.clone().addScaledVector(right, -0.75));
+    if (Math.abs(cam.fov - 45) > 0.01) {
+      cam.fov = 45;
+      cam.updateProjectionMatrix();
+    }
+    this.updateMyCharacter(dt);
+    this.gfx.followShadow(p.pos);
+    this.gfx.render(dt);
+  }
+
+  /** Leave the showroom and hand control to the player. */
+  enterWorld() {
+    this.showroom = false;
+    this.cam.snap(this.player);
   }
 
   private handleGlobalInput(input: InputFrame) {

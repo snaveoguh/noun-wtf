@@ -6,8 +6,9 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { useAppSelector } from '@/hooks';
 
-import { parseSeedKey, type NounSeed } from './character/NounAppearance';
+import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { Game, type HudState } from './Game';
+import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls } from './ui/TouchControls';
 
 const CONTROLS: { k: string; v: string }[] = [
@@ -40,7 +41,10 @@ export default function World2Page() {
   const labelsRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [game, setGame] = useState<Game | null>(null);
-  const [started, setStarted] = useState(false);
+  // title → select (character select over the live showroom) → play
+  const [phase, setPhase] = useState<'title' | 'select' | 'play'>('title');
+  const started = phase === 'play';
+  const saved = useMemo(() => loadSavedCharacter(), []);
   const [error, setError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
@@ -51,11 +55,17 @@ export default function World2Page() {
   const auctionSeed = useAppSelector(
     state => (state as { onDisplayAuction?: { seed?: NounSeed } }).onDisplayAuction?.seed,
   );
-  const seed = useMemo<NounSeed | null>(() => {
-    return parseSeedKey(searchParams.get('seed')) ?? auctionSeed ?? null;
-  }, [searchParams, auctionSeed]);
-  const seedRef = useRef(seed);
-  seedRef.current = seed;
+  const urlSeed = useMemo(() => parseSeedKey(searchParams.get('seed')), [searchParams]);
+  const initialChar = useMemo<SavedCharacter>(
+    () => ({
+      seed: urlSeed ?? saved?.seed ?? auctionSeed ?? randomSeed(),
+      name: searchParams.get('name') ?? saved?.name ?? '',
+    }),
+    // Only the first resolution matters; the select screen owns it after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const seedRef = useRef<NounSeed>(initialChar.seed);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -75,8 +85,9 @@ export default function World2Page() {
         seed: seedRef.current,
         offline: searchParams.get('offline') === '1',
         quality: (searchParams.get('q') as 'low' | 'medium' | 'high' | null) ?? undefined,
-        name: searchParams.get('name') ?? undefined,
+        name: initialChar.name !== '' ? initialChar.name : undefined,
       });
+      g.showroom = searchParams.get('skip') !== '1';
     } catch (e) {
       setError((e as Error).message || 'WebGL unavailable');
       canvas.remove();
@@ -101,15 +112,11 @@ export default function World2Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Swap the avatar if the seed changes after mount (auction loads late)
-  useEffect(() => {
-    if (game && seed && !game.hud.loading) game.setSeed(seed);
-  }, [game, seed]);
-
   // Keyboard: chat + help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement)?.tagName === 'INPUT';
+      if (gameRef.current?.showroom === true) return;
       if (e.code === 'Enter' && !typing) {
         e.preventDefault();
         setChatOpen(true);
@@ -126,7 +133,17 @@ export default function World2Page() {
 
   const begin = () => {
     gameRef.current?.unlockAudio();
-    setStarted(true);
+    if (gameRef.current?.showroom === true) setPhase('select');
+    else setPhase('play');
+  };
+
+  const confirmCharacter = (c: SavedCharacter) => {
+    const g = gameRef.current;
+    if (!g) return;
+    g.setSeed(c.seed);
+    g.name = c.name;
+    g.enterWorld();
+    setPhase('play');
   };
 
   return (
@@ -141,8 +158,8 @@ export default function World2Page() {
       <style>{CSS}</style>
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
-      {game && (
-        <Hud game={game} showHelp={showHelp && started} onHelp={() => setShowHelp(s => !s)} />
+      {game && started && (
+        <Hud game={game} showHelp={showHelp} onHelp={() => setShowHelp(s => !s)} />
       )}
       {game && started && <TouchControls game={game} />}
 
@@ -168,7 +185,15 @@ export default function World2Page() {
         </form>
       )}
 
-      {(!started || !game) && !error && <SplashGate game={game} onStart={begin} />}
+      {game && phase === 'select' && (
+        <CharacterSelect
+          game={game}
+          initial={initialChar}
+          auctionSeed={auctionSeed ?? null}
+          onConfirm={confirmCharacter}
+        />
+      )}
+      {(phase === 'title' || !game) && !error && <SplashGate game={game} onStart={begin} />}
 
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
@@ -226,7 +251,7 @@ function Splash({
       <div className="mt-10 h-12">
         {ready ? (
           <button className="w2-btn w2-pulse" onClick={onStart}>
-            DROP IN ⌐◨-◨
+            PRESS START ⌐◨-◨
           </button>
         ) : (
           <div className="flex items-center gap-3 text-lg opacity-80">
