@@ -76,6 +76,7 @@ const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage')
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
+const World2Page = lazy(() => import('@/miniapps/world2/World2Page'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -432,8 +433,19 @@ function ThemedAppContent() {
     return <TerminalFeedShell />;
   }
 
-  // World — full-screen canvas, no chrome
-  if (location.pathname === '/world') {
+  // World v2 (skate) — full-screen canvas, no chrome. Brings its own audio.
+  if (location.pathname === '/world' || location.pathname === '/world/') {
+    return (
+      <Suspense
+        fallback={<div style={{ background: '#0d1117', width: '100vw', height: '100vh' }} />}
+      >
+        <World2Page />
+      </Suspense>
+    );
+  }
+
+  // Classic world — full-screen canvas, no chrome
+  if (location.pathname === '/world/classic') {
     return (
       <Suspense
         fallback={<div style={{ background: '#1a4f8a', width: '100vw', height: '100vh' }} />}
