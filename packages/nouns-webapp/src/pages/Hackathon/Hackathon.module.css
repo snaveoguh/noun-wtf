@@ -139,7 +139,7 @@
 
 .sectionTitle {
   font-size: 1.1rem;
-  color: #64748b;
+  color: var(--theme-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;

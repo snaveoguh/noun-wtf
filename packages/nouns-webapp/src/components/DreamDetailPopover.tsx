@@ -110,7 +110,7 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
         borderRadius: 16,
         overflow: 'auto',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         border: 'none',
       }}
     >
@@ -161,7 +161,7 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
                 fontSize: '0.6rem',
                 fontWeight: 700,
                 color: '#7c3aed',
-                background: '#ede9fe',
+                background: 'var(--theme-bg-card)',
                 padding: '2px 6px',
                 borderRadius: 8,
               }}

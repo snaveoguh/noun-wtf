@@ -69,7 +69,7 @@
 }
 
 .nounButton:active {
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .nounButtonContents {

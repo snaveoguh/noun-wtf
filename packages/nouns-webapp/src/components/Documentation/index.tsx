@@ -47,7 +47,7 @@ function NounTraits() {
   );
 }
 
-const Documentation = (props: DocumentationProps = { backgroundColor: '#FFF' }) => {
+const Documentation = (props: DocumentationProps = { backgroundColor: 'var(--theme-bg-card)' }) => {
   const { t } = useLingui();
   const cryptopunksLink = (
     <Link text={<Trans>CryptoPunks</Trans>} url="https://cryptopunks.app/" leavesPage={true} />

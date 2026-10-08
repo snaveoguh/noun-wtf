@@ -8,12 +8,11 @@
  */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ImageData, getNounData } from '@noundry/nouns-assets';
+import { buildSVG } from '@nouns/sdk';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import ReactDOM from 'react-dom';
-
-import { ImageData, getNounData } from '@noundry/nouns-assets';
-import { buildSVG } from '@nouns/sdk';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
@@ -38,9 +37,9 @@ interface DreamNoun {
 export interface DreamCard {
   id: number;
   dreamer: string;
-  svgBase64: string | null;            // composed SVG (base64) — full noun or base layers only
-  glassesSvgBase64: string | null;     // glasses-only SVG (transparent bg) — for custom trait dreams
-  customOverlayUrl: string | null;     // custom trait image URL (if custom head)
+  svgBase64: string | null; // composed SVG (base64) — full noun or base layers only
+  glassesSvgBase64: string | null; // glasses-only SVG (transparent bg) — for custom trait dreams
+  customOverlayUrl: string | null; // custom trait image URL (if custom head)
   customLayer: string | null;
   bgColor: string;
   createdAt: string;
@@ -90,17 +89,16 @@ function buildDreamCard(dream: DreamNoun): DreamCard | null {
     const bgColor = bgcolors[bg] || bgcolors[0];
 
     // Build trait names
-    const bodyName = images.bodies[body]
-      ? traitName(images.bodies[body].filename)
-      : 'Unknown';
+    const bodyName = images.bodies[body] ? traitName(images.bodies[body].filename) : 'Unknown';
     const accessoryName = images.accessories[accessory]
       ? traitName(images.accessories[accessory].filename)
       : 'Unknown';
-    const headName = dream.head_seed_id !== null && images.heads[head]
-      ? traitName(images.heads[head].filename)
-      : dream.custom_trait_image
-        ? 'Custom'
-        : 'Unknown';
+    const headName =
+      dream.head_seed_id !== null && images.heads[head]
+        ? traitName(images.heads[head].filename)
+        : dream.custom_trait_image
+          ? 'Custom'
+          : 'Unknown';
     const glassesName = images.glasses[glasses]
       ? traitName(images.glasses[glasses].filename)
       : 'Unknown';
@@ -147,15 +145,11 @@ function buildDreamCard(dream: DreamNoun): DreamCard | null {
         topPartIndices = [];
       }
 
-      const baseParts = basePartIndices
-        .map(i => allParts[i])
-        .filter(p => p && p.data);
+      const baseParts = basePartIndices.map(i => allParts[i]).filter(p => p && p.data);
       const baseSvg = buildSVG(baseParts, palette, bgColor);
       svgBase64 = btoa(baseSvg);
 
-      const topParts = topPartIndices
-        .map(i => allParts[i])
-        .filter(p => p && p.data);
+      const topParts = topPartIndices.map(i => allParts[i]).filter(p => p && p.data);
       if (topParts.length > 0) {
         // Render topper layers on transparent background
         const topSvg = buildSVG(topParts, palette);
@@ -273,9 +267,7 @@ const DreamModal: FC<{
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: visible
-          ? 'translate(-50%, -50%) scale(1)'
-          : 'translate(-50%, -50%) scale(0.92)',
+        transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
         zIndex: 100,
         maxWidth: 420,
         width: '90vw',
@@ -284,8 +276,7 @@ const DreamModal: FC<{
         background: 'rgba(255, 255, 255, 0.90)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        boxShadow:
-          '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
         overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.25s ease, transform 0.25s ease',
@@ -449,8 +440,8 @@ const DreamModal: FC<{
                 borderBottom: '1px solid rgba(0,0,0,0.05)',
               }}
             >
-              <span style={{ color: '#888', fontWeight: 600 }}>{label}</span>
-              <span style={{ color: '#333', fontWeight: 500 }}>
+              <span style={{ color: 'var(--theme-text-muted)', fontWeight: 600 }}>{label}</span>
+              <span style={{ color: 'var(--theme-text-primary)', fontWeight: 500 }}>
                 {value}
                 {label === 'Head' && dream.customOverlayUrl && (
                   <span
@@ -473,13 +464,13 @@ const DreamModal: FC<{
         <div
           style={{
             fontSize: '0.72rem',
-            color: '#999',
+            color: 'var(--theme-text-muted)',
             marginBottom: 6,
             fontFamily: "'PT Root UI'",
           }}
         >
           Dreamer:{' '}
-          <span style={{ fontFamily: 'monospace', color: '#666' }}>
+          <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
             {shortenAddress(dream.dreamer)}
           </span>
         </div>
@@ -487,7 +478,7 @@ const DreamModal: FC<{
         <div
           style={{
             fontSize: '0.7rem',
-            color: '#999',
+            color: 'var(--theme-text-muted)',
             marginBottom: 16,
           }}
         >
@@ -533,8 +524,7 @@ const DreamModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span>🧞</span>{' '}
-          <span>nouns dreams</span>
+          <span>🧞</span> <span>nouns dreams</span>
         </div>
       </div>
     </div>
@@ -576,7 +566,10 @@ const DreamsBanner: FC = () => {
       if (pausedRef.current) {
         wasPaused = true;
       } else {
-        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
+        if (wasPaused) {
+          pos = el.scrollLeft;
+          wasPaused = false;
+        }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
         if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;
@@ -605,8 +598,7 @@ const DreamsBanner: FC = () => {
         style={{
           width: '100%',
           overflow: 'hidden',
-          background:
-            'linear-gradient(90deg, #f3eef8 0%, #ede5f5 50%, #f3eef8 100%)',
+          background: 'linear-gradient(90deg, #f3eef8 0%, #ede5f5 50%, #f3eef8 100%)',
           padding: '10px 0',
           position: 'relative',
           borderBottom: '1px solid rgba(147, 51, 234, 0.15)',
@@ -624,8 +616,7 @@ const DreamsBanner: FC = () => {
             alignItems: 'center',
             paddingLeft: '12px',
             paddingRight: '24px',
-            background:
-              'linear-gradient(90deg, #f3eef8 70%, rgba(243,238,248,0) 100%)',
+            background: 'linear-gradient(90deg, #f3eef8 70%, rgba(243,238,248,0) 100%)',
             fontWeight: 900,
             fontSize: '0.55rem',
             letterSpacing: '0.15em',
@@ -646,8 +637,7 @@ const DreamsBanner: FC = () => {
             bottom: 0,
             zIndex: 2,
             width: '50px',
-            background:
-              'linear-gradient(270deg, #f3eef8 0%, rgba(243,238,248,0) 100%)',
+            background: 'linear-gradient(270deg, #f3eef8 0%, rgba(243,238,248,0) 100%)',
             pointerEvents: 'none',
           }}
         />
@@ -695,13 +685,11 @@ const DreamsBanner: FC = () => {
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.boxShadow =
-                  '0 4px 16px rgba(0,0,0,0.15)';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow =
-                  '0 2px 8px rgba(0,0,0,0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
               }}
             >
               {/* Layer 1: Base SVG (bg + body + accessory, or full noun if no custom) */}
@@ -761,8 +749,7 @@ const DreamsBanner: FC = () => {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  background:
-                    'linear-gradient(0deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)',
+                  background: 'linear-gradient(0deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)',
                   padding: '16px 6px 5px',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -789,9 +776,7 @@ const DreamsBanner: FC = () => {
       </div>
 
       {/* Modal */}
-      {selectedDream && (
-        <DreamModal dream={selectedDream} onClose={handleClose} />
-      )}
+      {selectedDream && <DreamModal dream={selectedDream} onClose={handleClose} />}
     </>
   );
 };

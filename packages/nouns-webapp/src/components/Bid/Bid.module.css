@@ -22,9 +22,9 @@
   width: 100%;
   min-width: 0;
   height: 54px;
-  color: black;
+  color: var(--theme-text-primary);
   border-radius: 12px !important;
-  background-color: white;
+  background-color: var(--theme-bg-card);
   outline: none !important;
   box-shadow: none !important;
   font-family: 'PT Root UI';

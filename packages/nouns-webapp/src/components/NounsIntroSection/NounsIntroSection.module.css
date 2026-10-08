@@ -78,7 +78,7 @@
 }
 
 .gifCaption a {
-  color: #6c757d;
+  color: var(--theme-text-muted);
   text-decoration: underline;
 }
 

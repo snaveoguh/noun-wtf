@@ -59,7 +59,7 @@
 .link,
 .link:hover,
 .link:active {
-  color: black;
+  color: var(--theme-text-primary);
   text-decoration: none;
   display: flex;
   cursor: pointer;

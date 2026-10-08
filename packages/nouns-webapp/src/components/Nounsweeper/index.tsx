@@ -21,7 +21,17 @@ const W = 9;
 const H = 9;
 const NOUNS = 10;
 
-const NUM_COLORS = ['', '#2563eb', '#15803d', '#c54e38', '#6d28d9', '#a16207', '#0e7490', '#111', '#666'];
+const NUM_COLORS = [
+  '',
+  '#2563eb',
+  '#15803d',
+  '#c54e38',
+  '#6d28d9',
+  '#a16207',
+  '#0e7490',
+  '#111',
+  '#666',
+];
 
 function build(): Cell[][] {
   const g: Cell[][] = Array.from({ length: H }, () =>
@@ -85,7 +95,8 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
             for (let dx = -1; dx <= 1; dx++) {
               const ny = cy + dy;
               const nx = cx + dx;
-              if (ny >= 0 && ny < H && nx >= 0 && nx < W && !g[ny][nx].revealed) stack.push([nx, ny]);
+              if (ny >= 0 && ny < H && nx >= 0 && nx < W && !g[ny][nx].revealed)
+                stack.push([nx, ny]);
             }
         }
       }
@@ -140,28 +151,49 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
           boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginBottom: 4,
+          }}
+        >
           <strong style={{ fontSize: '1.05rem' }}>NOUNSWEEPER</strong>
           <button
             onClick={onClose}
-            style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+            style={{
+              border: 0,
+              background: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              lineHeight: 1,
+            }}
             aria-label="close"
           >
             ×
           </button>
         </div>
 
-        <p style={{ fontSize: '0.78rem', color: '#79809c', margin: '0 0 10px' }}>
-          The indexer is rebuilding — data will be back in a few minutes. Don&apos;t click the Nouns.
+        <p style={{ fontSize: '0.78rem', color: 'var(--theme-text-muted)', margin: '0 0 10px' }}>
+          The indexer is rebuilding — data will be back in a few minutes. Don&apos;t click the
+          Nouns.
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.8rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: 8,
+            fontSize: '0.8rem',
+          }}
+        >
           <span>⌐◨-◨ {NOUNS - flags}</span>
           <button
             onClick={reset}
             style={{
               border: '1px solid #14141f',
-              background: '#fff',
+              background: 'var(--theme-bg-card)',
               borderRadius: 6,
               padding: '2px 10px',
               cursor: 'pointer',
@@ -182,7 +214,11 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
                 style={{
                   aspectRatio: '1',
                   border: c.revealed ? '1px solid #ddd8d0' : '1px solid #14141f',
-                  background: c.revealed ? (c.noun ? '#c54e38' : '#fffdfa') : '#e2ddd4',
+                  background: c.revealed
+                    ? c.noun
+                      ? '#c54e38'
+                      : 'var(--theme-bg-card)'
+                    : '#e2ddd4',
                   borderRadius: 3,
                   cursor: dead || won ? 'default' : 'pointer',
                   fontSize: '0.8rem',
@@ -191,7 +227,7 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: NUM_COLORS[c.n] || '#111',
+                  color: NUM_COLORS[c.n] || 'var(--theme-text-primary)',
                   fontFamily: 'inherit',
                 }}
               >
@@ -202,7 +238,11 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.8rem', minHeight: 20 }}>
-          {dead && <span style={{ color: '#c54e38', fontWeight: 700 }}>you clicked a Noun. it went to the treasury.</span>}
+          {dead && (
+            <span style={{ color: '#c54e38', fontWeight: 700 }}>
+              you clicked a Noun. it went to the treasury.
+            </span>
+          )}
           {won && <span style={{ color: '#15803d', fontWeight: 700 }}>swept. ⌐◨-◨</span>}
         </div>
       </div>

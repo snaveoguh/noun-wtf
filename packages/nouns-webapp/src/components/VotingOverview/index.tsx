@@ -28,7 +28,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         borderRadius: 16,
         border: '1px solid #e2e3e8',
         padding: '20px 24px',
@@ -89,7 +89,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
               transform: 'translateX(-50%)',
               fontSize: '0.6rem',
               fontWeight: 700,
-              color: '#8c8d92',
+              color: 'var(--theme-text-muted)',
               whiteSpace: 'nowrap',
               lineHeight: 1,
             }}
@@ -103,7 +103,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
             height: 32,
             borderRadius: 10,
             overflow: 'hidden',
-            background: '#f0f0f4',
+            background: 'var(--theme-bg-card)',
             display: 'flex',
           }}
         >
@@ -171,7 +171,9 @@ const VotingOverview: FC<VotingOverviewProps> = ({
         <VoteStat label="Against" count={againstVotes} color="#e40536" pct={againstPct} />
         <VoteStat label="Abstain" count={abstainVotes} color="#b0b0b8" pct={abstainPct} />
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: '#8c8d92', fontWeight: 600 }}>Quorum</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
+            Quorum
+          </div>
           <div
             style={{
               fontSize: '0.95rem',
@@ -197,11 +199,13 @@ const VoteStat: FC<{ label: string; count: number; color: string; pct: number }>
   <div>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <span style={{ fontSize: '0.7rem', color: '#8c8d92', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
+        {label}
+      </span>
     </div>
     <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#14141f' }}>
       {count}{' '}
-      <span style={{ fontSize: '0.7rem', fontWeight: 500, color: '#8c8d92' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--theme-text-muted)' }}>
         ({pct.toFixed(1)}%)
       </span>
     </div>

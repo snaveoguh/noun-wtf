@@ -10,7 +10,11 @@ const WalletExplorer = React.lazy(() => import('@/components/WalletExplorer'));
 const IdentityGraphTab: React.FC = () => (
   <div className="wp-graph">
     <Suspense
-      fallback={<div style={{ color: '#444', textAlign: 'center', padding: 60 }}>Loading…</div>}
+      fallback={
+        <div style={{ color: 'var(--theme-text-primary)', textAlign: 'center', padding: 60 }}>
+          Loading…
+        </div>
+      }
     >
       <WalletExplorer />
     </Suspense>

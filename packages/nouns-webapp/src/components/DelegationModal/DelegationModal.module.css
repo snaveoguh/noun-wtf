@@ -20,7 +20,7 @@
   position: fixed;
   top: 15vh;
   z-index: 100;
-  background-color: rgba(244, 244, 248, 1);
+  background-color: var(--theme-bg-card);
   box-shadow: 0px 0px 24px rgba(0, 0, 0, 0.05);
   padding: 1.5rem;
   border-radius: 24px;
@@ -42,7 +42,7 @@
 .modal .title h2 {
   font-size: 24px;
   margin-top: 0.5rem;
-  color: rgba(140, 141, 146, 1);
+  color: var(--theme-text-muted);
 }
 
 .modal .title h1 {

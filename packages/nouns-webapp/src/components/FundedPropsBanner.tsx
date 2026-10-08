@@ -44,15 +44,15 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
   }, []);
 
   const cleanText = prop.description
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)]\([^)]*\)/g, '$1')
     .replace(/^#+\s*/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .trim();
 
   const imgMatch =
-    prop.description.match(/!\[[^\]]*\]\(([^)]+)\)/) ||
+    prop.description.match(/!\[[^\]]*]\(([^)]+)\)/) ||
     prop.description.match(/<img[^>]+src=["']([^"']+)["']/i);
   const imageUrl = imgMatch ? imgMatch[1] : null;
 
@@ -82,9 +82,7 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: visible
-          ? 'translate(-50%, -50%) scale(1)'
-          : 'translate(-50%, -50%) scale(0.92)',
+        transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
         zIndex: 100,
         maxWidth: 640,
         width: '90vw',
@@ -179,7 +177,14 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
               <span style={{ color: '#4ade80' }}>For {prop.forVotes}</span>
               <span style={{ color: '#f87171' }}>Against {prop.againstVotes}</span>
             </div>
-            <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: 6,
+                borderRadius: 3,
+                background: 'var(--theme-bg-card)',
+                overflow: 'hidden',
+              }}
+            >
               <div
                 style={{
                   height: '100%',
@@ -195,7 +200,7 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
             fontFamily: "'PT Root UI'",
             fontSize: '0.82rem',
             lineHeight: 1.6,
-            color: '#4a4a5a',
+            color: 'var(--theme-text-primary)',
             margin: '0 0 16px',
             whiteSpace: 'pre-wrap',
             maxHeight: '30vh',
@@ -361,7 +366,10 @@ const FundedPropsBanner: FC = () => {
       if (pausedRef.current) {
         wasPaused = true;
       } else {
-        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
+        if (wasPaused) {
+          pos = el.scrollLeft;
+          wasPaused = false;
+        }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
         if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;
@@ -381,162 +389,166 @@ const FundedPropsBanner: FC = () => {
 
   return (
     <>
-    <div
-      style={{
-        width: '100%',
-        overflow: 'hidden',
-        background: 'linear-gradient(90deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)',
-        padding: '8px 0',
-        position: 'relative',
-        borderBottom: '2px solid rgba(124,58,237,0.3)',
-      }}
-    >
-      {/* Label */}
       <div
         style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 2,
-          display: 'flex',
-          alignItems: 'center',
-          paddingLeft: '12px',
-          paddingRight: '20px',
-          background: 'linear-gradient(90deg, #1a1a2e 60%, rgba(26,26,46,0) 100%)',
-          fontWeight: 900,
-          fontSize: '0.6rem',
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase' as const,
-          whiteSpace: 'nowrap' as const,
-        }}
-      >
-        <span>💎</span>
-        <span style={{ color: '#e2e8f0', marginLeft: '6px' }}>FUNDED</span>
-      </div>
-
-      {/* Right fade */}
-      <div
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 2,
-          width: '40px',
-          background: 'linear-gradient(270deg, #1a1a2e 0%, rgba(26,26,46,0) 100%)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      <div
-        ref={scrollRef}
-        onPointerDown={onPointerDown}
-        onClickCapture={onClickCapture}
-        onMouseEnter={() => { pausedRef.current = true; }}
-        onMouseLeave={() => { pausedRef.current = false; }}
-        style={{
-          display: 'flex',
-          gap: '0',
+          width: '100%',
           overflow: 'hidden',
-          scrollbarWidth: 'none' as const,
-          paddingLeft: '80px',
-          cursor: 'grab',
+          background: 'linear-gradient(90deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)',
+          padding: '8px 0',
+          position: 'relative',
+          borderBottom: '2px solid rgba(124,58,237,0.3)',
         }}
       >
-        {displayProps.map((prop, i) => (
-          <div
-            key={`${prop.id}-${i}`}
-            onClick={() => setSelectedProp(prop)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => {
-              if (e.key === 'Enter') setSelectedProp(prop);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '4px 20px',
-              flexShrink: 0,
-              textDecoration: 'none',
-              color: 'inherit',
-              borderRight: '1px solid rgba(255,255,255,0.06)',
-              transition: 'background 0.15s',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'transparent';
-            }}
-          >
-            {/* Prop number badge */}
-            <span
+        {/* Label */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            paddingLeft: '12px',
+            paddingRight: '20px',
+            background: 'linear-gradient(90deg, #1a1a2e 60%, rgba(26,26,46,0) 100%)',
+            fontWeight: 900,
+            fontSize: '0.6rem',
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase' as const,
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          <span>💎</span>
+          <span style={{ color: '#e2e8f0', marginLeft: '6px' }}>FUNDED</span>
+        </div>
+
+        {/* Right fade */}
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 2,
+            width: '40px',
+            background: 'linear-gradient(270deg, #1a1a2e 0%, rgba(26,26,46,0) 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        <div
+          ref={scrollRef}
+          onPointerDown={onPointerDown}
+          onClickCapture={onClickCapture}
+          onMouseEnter={() => {
+            pausedRef.current = true;
+          }}
+          onMouseLeave={() => {
+            pausedRef.current = false;
+          }}
+          style={{
+            display: 'flex',
+            gap: '0',
+            overflow: 'hidden',
+            scrollbarWidth: 'none' as const,
+            paddingLeft: '80px',
+            cursor: 'grab',
+          }}
+        >
+          {displayProps.map((prop, i) => (
+            <div
+              key={`${prop.id}-${i}`}
+              onClick={() => setSelectedProp(prop)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter') setSelectedProp(prop);
+              }}
               style={{
-                fontSize: '0.6rem',
-                fontWeight: 800,
-                color: '#7c3aed',
-                background: 'rgba(124,58,237,0.15)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                whiteSpace: 'nowrap' as const,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 20px',
                 flexShrink: 0,
+                textDecoration: 'none',
+                color: 'inherit',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                transition: 'background 0.15s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
               }}
             >
-              #{prop.id}
-            </span>
-
-            {/* Title */}
-            <span
-              style={{
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                color: '#e2e8f0',
-                whiteSpace: 'nowrap' as const,
-                maxWidth: '280px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                textTransform: 'none' as const,
-              }}
-            >
-              {prop.title.length > 60 ? prop.title.slice(0, 60) + '...' : prop.title}
-            </span>
-
-            {/* Vote tally */}
-            <span
-              style={{
-                fontSize: '0.55rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap' as const,
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ color: '#4ade80' }}>✓{prop.forVotes}</span>
-              <span style={{ color: '#6b7280', margin: '0 2px' }}>/</span>
-              <span style={{ color: '#f87171' }}>✗{prop.againstVotes}</span>
-            </span>
-
-            {/* ETH amount if > 0 */}
-            {Number(prop.totalEth) > 0 && (
+              {/* Prop number badge */}
               <span
                 style={{
-                  fontSize: '0.55rem',
-                  fontWeight: 700,
-                  color: '#facc15',
+                  fontSize: '0.6rem',
+                  fontWeight: 800,
+                  color: '#7c3aed',
+                  background: 'rgba(124,58,237,0.15)',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,
                 }}
               >
-                Ξ{Number(prop.totalEth).toFixed(Number(prop.totalEth) >= 10 ? 0 : 1)}
+                #{prop.id}
               </span>
-            )}
-          </div>
-        ))}
+
+              {/* Title */}
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: '#e2e8f0',
+                  whiteSpace: 'nowrap' as const,
+                  maxWidth: '280px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  textTransform: 'none' as const,
+                }}
+              >
+                {prop.title.length > 60 ? prop.title.slice(0, 60) + '...' : prop.title}
+              </span>
+
+              {/* Vote tally */}
+              <span
+                style={{
+                  fontSize: '0.55rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap' as const,
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ color: '#4ade80' }}>✓{prop.forVotes}</span>
+                <span style={{ color: 'var(--theme-text-muted)', margin: '0 2px' }}>/</span>
+                <span style={{ color: '#f87171' }}>✗{prop.againstVotes}</span>
+              </span>
+
+              {/* ETH amount if > 0 */}
+              {Number(prop.totalEth) > 0 && (
+                <span
+                  style={{
+                    fontSize: '0.55rem',
+                    fontWeight: 700,
+                    color: '#facc15',
+                    whiteSpace: 'nowrap' as const,
+                    flexShrink: 0,
+                  }}
+                >
+                  Ξ{Number(prop.totalEth).toFixed(Number(prop.totalEth) >= 10 ? 0 : 1)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-    {selectedProp && <FundedPropModal prop={selectedProp} onClose={handleClose} />}
+      {selectedProp && <FundedPropModal prop={selectedProp} onClose={handleClose} />}
     </>
   );
 };

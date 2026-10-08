@@ -126,11 +126,11 @@
 }
 
 .bgCool {
-  background: #d5d7e1 !important;
+  background: var(--theme-bg-tertiary) !important;
 }
 
 .bgWarm {
-  background: #e1d7d5 !important;
+  background: var(--theme-bg-tertiary) !important;
 }
 
 .heroArtFrame {
@@ -222,7 +222,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--theme-bg-card);
   backdrop-filter: blur(12px);
   border-radius: 0.65rem;
   box-shadow: 0 8px 24px rgba(58, 37, 16, 0.15);
@@ -475,7 +475,7 @@
   max-height: min(90vh, 48rem);
   overflow: auto;
   border-radius: 1.6rem;
-  background: rgba(255, 249, 242, 0.96);
+  background: var(--theme-bg-card);
   border: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 28px 64px rgba(33, 23, 14, 0.26);
   padding: 1rem;

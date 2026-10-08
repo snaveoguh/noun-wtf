@@ -20,7 +20,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         borderRadius: 12,
         border: '1px solid #e2e3e8',
         padding: '16px',
@@ -39,7 +39,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
         <span
           style={{
             fontSize: '0.7rem',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             fontFamily: "'PT Root UI'",
             fontWeight: 500,
           }}
@@ -84,9 +84,9 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
                     style={{
                       display: 'block',
                       padding: '8px 12px',
-                      background: '#f4f4f8',
+                      background: 'var(--theme-bg-card)',
                       borderRadius: 6,
-                      color: '#8c8d92',
+                      color: 'var(--theme-text-muted)',
                       fontSize: '0.7rem',
                       margin: '6px 0',
                     }}
@@ -172,10 +172,10 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
                 fontSize: '0.65rem',
                 fontFamily: "'PT Root UI'",
                 fontWeight: 600,
-                background: '#f0f0f4',
+                background: 'var(--theme-bg-card)',
                 padding: '1px 6px',
                 borderRadius: 4,
-                color: '#8c8d92',
+                color: 'var(--theme-text-muted)',
               }}
             >
               {propdates.length}
@@ -190,7 +190,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
             fontSize: '0.65rem',
             fontFamily: "'PT Root UI'",
             fontWeight: 600,
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             textDecoration: 'none',
             transition: 'color 0.15s',
           }}
@@ -205,12 +205,12 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
       {isLoading && (
         <div
           style={{
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             borderRadius: 12,
             border: '1px solid #e2e3e8',
             padding: '20px 16px',
             textAlign: 'center',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             fontSize: '0.75rem',
             fontFamily: "'PT Root UI'",
           }}

@@ -396,7 +396,7 @@ const PropModal: FC<{
               style={{
                 height: 6,
                 borderRadius: 3,
-                background: '#f1f5f9',
+                background: 'var(--theme-bg-card)',
                 overflow: 'hidden',
               }}
             >
@@ -418,7 +418,7 @@ const PropModal: FC<{
             fontFamily: "'PT Root UI'",
             fontSize: '0.82rem',
             lineHeight: 1.6,
-            color: '#4a4a5a',
+            color: 'var(--theme-text-primary)',
             margin: '0 0 16px',
             whiteSpace: 'pre-wrap',
             maxHeight: '30vh',

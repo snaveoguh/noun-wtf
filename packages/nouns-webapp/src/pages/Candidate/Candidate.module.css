@@ -7,7 +7,7 @@
 
 .proposal {
   margin-top: 1em;
-  background-color: white;
+  background-color: var(--theme-bg-card);
 }
 
 .backArrow {
@@ -243,7 +243,7 @@
   font-family: 'PT Root UI';
   font-weight: bold;
   transition: all 0.125s ease-in-out;
-  background-color: #faf4f8;
+  background-color: var(--theme-bg-card);
   color: var(--brand-gray-dark-text);
   line-height: 1;
   padding: 10px 16px;

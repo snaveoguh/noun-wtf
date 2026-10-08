@@ -159,9 +159,18 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
                 {cast.author.display_name}
               </span>
-              <span style={{ fontSize: '0.7rem', color: '#999' }}>@{cast.author.username}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
+                @{cast.author.username}
+              </span>
             </div>
-            <p style={{ fontSize: '0.8rem', color: '#444', margin: 0, whiteSpace: 'pre-wrap' }}>
+            <p
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--theme-text-primary)',
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+              }}
+            >
               {cast.text.length > 200 ? cast.text.slice(0, 200) + '...' : cast.text}
             </p>
           </div>
@@ -211,7 +220,7 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
                 <div
                   style={{
                     fontSize: '0.7rem',
-                    color: '#888',
+                    color: 'var(--theme-text-muted)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -428,7 +437,9 @@ const CastModal: FC<{
               @{cast.author.username}
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: '0.7rem', color: '#999' }}>{dateStr}</div>
+          <div style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
+            {dateStr}
+          </div>
         </div>
 
         {/* Cast text */}
@@ -437,7 +448,7 @@ const CastModal: FC<{
             fontFamily: "'PT Root UI'",
             fontSize: '0.95rem',
             lineHeight: 1.6,
-            color: '#2a2a3a',
+            color: 'var(--theme-text-primary)',
             margin: '0 0 4px',
             whiteSpace: 'pre-wrap',
           }}
@@ -542,7 +553,7 @@ const CastModal: FC<{
                   alignItems: 'center',
                   gap: 4,
                   fontSize: '0.65rem',
-                  color: '#999',
+                  color: 'var(--theme-text-muted)',
                 }}
               >
                 {auth!.user.pfp_url && (
@@ -609,7 +620,7 @@ const CastModal: FC<{
                   borderRadius: 8,
                   border: '1px solid rgba(0,0,0,0.1)',
                   background: 'transparent',
-                  color: '#666',
+                  color: 'var(--theme-text-muted)',
                   cursor: 'pointer',
                   fontSize: '0.78rem',
                   fontWeight: 600,
@@ -624,7 +635,7 @@ const CastModal: FC<{
                   padding: '6px 16px',
                   borderRadius: 8,
                   border: 'none',
-                  background: replyText.trim() ? '#7c3aed' : '#ccc',
+                  background: replyText.trim() ? '#7c3aed' : 'var(--theme-bg-tertiary)',
                   color: '#fff',
                   cursor: replyText.trim() && !sending ? 'pointer' : 'default',
                   fontSize: '0.78rem',

@@ -112,7 +112,7 @@ function formatTimestamp(ts: string | null): string {
 function supportLabel(support: number): { label: string; color: string } {
   if (support === 1) return { label: 'For', color: '#43b369' };
   if (support === 0) return { label: 'Against', color: '#e40536' };
-  return { label: 'Abstain', color: '#8c8d92' };
+  return { label: 'Abstain', color: 'var(--theme-text-muted)' };
 }
 
 /** Strip "# Title" from the top of the description so the H1 doesn't duplicate the header. */
@@ -184,7 +184,12 @@ const LilNounsVotePage: FC = () => {
   if (loading) {
     return (
       <div
-        style={{ textAlign: 'center', padding: '80px 20px', color: '#8c8d92', fontSize: '0.85rem' }}
+        style={{
+          textAlign: 'center',
+          padding: '80px 20px',
+          color: 'var(--theme-text-muted)',
+          fontSize: '0.85rem',
+        }}
       >
         Loading Lil Nouns proposal…
       </div>
@@ -241,7 +246,7 @@ const LilNounsVotePage: FC = () => {
             alignItems: 'center',
             gap: 8,
             fontSize: '0.75rem',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             marginBottom: 4,
           }}
         >
@@ -269,7 +274,7 @@ const LilNounsVotePage: FC = () => {
         >
           {title}
         </h1>
-        <div style={{ fontSize: '0.75rem', color: '#8c8d92', marginTop: 6 }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginTop: 6 }}>
           Proposed by{' '}
           <a
             href={`https://etherscan.io/address/${proposal.proposer.id}`}
@@ -305,7 +310,7 @@ const LilNounsVotePage: FC = () => {
               display: 'flex',
               justifyContent: 'space-between',
               fontSize: '0.7rem',
-              color: '#8c8d92',
+              color: 'var(--theme-text-muted)',
               marginBottom: 4,
             }}
           >
@@ -317,7 +322,7 @@ const LilNounsVotePage: FC = () => {
           <div
             style={{
               height: 6,
-              background: '#f0f0f0',
+              background: 'var(--theme-bg-card)',
               borderRadius: 3,
               overflow: 'hidden',
             }}
@@ -339,13 +344,13 @@ const LilNounsVotePage: FC = () => {
       {(status === 'PENDING' || status === 'UPDATABLE') && (
         <div
           style={{
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             border: '1px solid #e0e0e0',
             borderRadius: 10,
             padding: 16,
             marginBottom: 20,
             fontSize: '0.8rem',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
           }}
         >
           Voting opens at block {proposal.startBlock}. Come back then to cast your vote.
@@ -359,7 +364,7 @@ const LilNounsVotePage: FC = () => {
           target="_blank"
           rel="noreferrer"
           style={{
-            background: '#f4f4f8',
+            background: 'var(--theme-bg-card)',
             color: '#14141f',
             padding: '6px 14px',
             borderRadius: 999,
@@ -380,7 +385,7 @@ const LilNounsVotePage: FC = () => {
       {cleanDescription.trim() !== '' && (
         <div
           style={{
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             padding: '16px 20px',
             borderRadius: 8,
             border: '1px solid #f0f0f0',
@@ -401,9 +406,9 @@ const LilNounsVotePage: FC = () => {
                       style={{
                         display: 'block',
                         padding: '12px 16px',
-                        background: '#f4f4f8',
+                        background: 'var(--theme-bg-card)',
                         borderRadius: 8,
-                        color: '#8c8d92',
+                        color: 'var(--theme-text-muted)',
                         fontSize: '0.8rem',
                         margin: '8px 0',
                       }}
@@ -452,7 +457,7 @@ const LilNounsVotePage: FC = () => {
           Vote activity ({totalVotes})
         </h2>
         {proposal.votes.length === 0 ? (
-          <p style={{ fontSize: '0.8rem', color: '#8c8d92' }}>No votes yet.</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--theme-text-muted)' }}>No votes yet.</p>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -462,7 +467,7 @@ const LilNounsVotePage: FC = () => {
                   <div
                     key={v.id}
                     style={{
-                      background: '#fff',
+                      background: 'var(--theme-bg-card)',
                       border: '1px solid #f0f0f0',
                       padding: '8px 12px',
                       borderRadius: 6,
@@ -500,7 +505,9 @@ const LilNounsVotePage: FC = () => {
                       </span>
                     </div>
                     {v.reason !== null && v.reason.trim() !== '' && (
-                      <div style={{ color: '#5a5a5a', marginTop: 4, lineHeight: 1.4 }}>
+                      <div
+                        style={{ color: 'var(--theme-text-muted)', marginTop: 4, lineHeight: 1.4 }}
+                      >
                         {v.reason}
                       </div>
                     )}
@@ -520,7 +527,7 @@ const LilNounsVotePage: FC = () => {
                   borderRadius: 6,
                   fontSize: '0.75rem',
                   cursor: 'pointer',
-                  color: '#8c8d92',
+                  color: 'var(--theme-text-muted)',
                 }}
               >
                 {showAllVotes ? `Show less (20)` : `Show all (${proposal.votes.length})`}
@@ -549,7 +556,7 @@ const LilNounsVotePage: FC = () => {
               <div
                 key={i}
                 style={{
-                  background: '#fff',
+                  background: 'var(--theme-bg-card)',
                   border: '1px solid #f0f0f0',
                   padding: '8px 12px',
                   borderRadius: 6,
@@ -558,7 +565,7 @@ const LilNounsVotePage: FC = () => {
                   wordBreak: 'break-all',
                 }}
               >
-                <div style={{ color: '#8c8d92', marginBottom: 2 }}>
+                <div style={{ color: 'var(--theme-text-muted)', marginBottom: 2 }}>
                   #{i + 1} {proposal.signatures[i] ?? ''}
                 </div>
                 <a
@@ -570,7 +577,7 @@ const LilNounsVotePage: FC = () => {
                   {target}
                 </a>
                 {proposal.values[i] !== '0' && (
-                  <div style={{ color: '#8c8d92', marginTop: 2 }}>
+                  <div style={{ color: 'var(--theme-text-muted)', marginTop: 2 }}>
                     value: {proposal.values[i]} wei
                   </div>
                 )}
@@ -610,7 +617,7 @@ const VoteCount: FC<{ label: string; value: number; color: string }> = ({
 const SUPPORT_OPTIONS: { value: 0 | 1 | 2; label: string; emoji: string; color: string }[] = [
   { value: 1, label: 'For', emoji: '👍', color: '#43b369' },
   { value: 0, label: 'Against', emoji: '👎', color: '#e40536' },
-  { value: 2, label: 'Abstain', emoji: '🤷', color: '#8c8d92' },
+  { value: 2, label: 'Abstain', emoji: '🤷', color: 'var(--theme-text-muted)' },
 ];
 
 /**
@@ -670,7 +677,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
   }, [selected, reason, writeContract, proposalId]);
 
   const panelStyle: React.CSSProperties = {
-    background: '#fff',
+    background: 'var(--theme-bg-card)',
     border: '1px solid #e0e0e0',
     borderRadius: 10,
     padding: 16,
@@ -718,7 +725,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
     return (
       <div style={panelStyle}>
         <div style={labelStyle}>Cast your vote</div>
-        <p style={{ fontSize: '0.8rem', color: '#8c8d92', margin: 0 }}>
+        <p style={{ fontSize: '0.8rem', color: 'var(--theme-text-muted)', margin: 0 }}>
           Switch to Ethereum mainnet to vote. Lil Nouns governance is on L1.
         </p>
       </div>
@@ -778,7 +785,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
               padding: '8px 10px',
               borderRadius: 8,
               border: selected === o.value ? `2px solid ${o.color}` : '1px solid #e0e0e0',
-              background: selected === o.value ? `${o.color}1a` : '#fff',
+              background: selected === o.value ? `${o.color}1a` : 'var(--theme-bg-card)',
               fontSize: '1.2rem',
               cursor: 'pointer',
             }}
@@ -813,7 +820,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
         disabled={disabled}
         style={{
           width: '100%',
-          background: disabled ? '#e0e0e0' : '#ff638d',
+          background: disabled ? 'var(--theme-bg-tertiary)' : '#ff638d',
           color: disabled ? '#8c8d92' : '#fff',
           border: 'none',
           padding: '10px 14px',

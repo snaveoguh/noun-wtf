@@ -75,7 +75,7 @@
 
 .coolInfo:hover {
   background-color: var(--brand-cool-accent);
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .warmInfo {
@@ -87,11 +87,11 @@
 .warmInfo:hover {
   background-color: var(--brand-warm-accent);
   color: var(--brand-warm-dark-text);
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .whiteInfo {
-  background: white;
+  background: var(--theme-bg-card);
 }
 
 .whiteTreasuryHeader {
@@ -99,5 +99,5 @@
 }
 
 .whiteInfo:hover {
-  background-color: #e2e3e8;
+  background-color: var(--theme-bg-tertiary);
 }

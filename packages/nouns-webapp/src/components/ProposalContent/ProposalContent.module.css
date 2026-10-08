@@ -212,7 +212,7 @@ li.transactionDiffsRow {
 .transactionDiffsRow :global(table) {
   margin: 0 !important;
   width: 100% !important;
-  background-color: #fafbfc !important;
+  background-color: var(--theme-bg-card) !important;
 }
 
 .transactionDiffsRow :global(table),

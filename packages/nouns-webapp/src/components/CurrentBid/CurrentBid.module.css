@@ -23,7 +23,7 @@
   font-weight: bold;
   font-size: 48px !important;
   margin: 0;
-  color: #1e1a17 !important;
+  color: var(--theme-text-primary) !important;
   white-space: nowrap;
   line-height: 0.9;
 }

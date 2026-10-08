@@ -195,7 +195,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
           maxHeight: '90vh',
           border: '3px solid #000',
           boxShadow: '12px 12px 0 0 rgba(0,0,0,0.3)',
-          background: '#f0f0f0',
+          background: 'var(--theme-bg-card)',
           fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
         }}
       >
@@ -228,7 +228,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
           <button
             onClick={onClose}
             style={{
-              background: '#c0c0c0',
+              background: 'var(--theme-bg-tertiary)',
               border: '2px outset #fff',
               width: '22px',
               height: '22px',
@@ -249,16 +249,16 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
             borderBottom: '1px solid #999',
             padding: '2px 8px',
             fontSize: '0.75rem',
-            background: '#f0f0f0',
+            background: 'var(--theme-bg-card)',
             display: 'flex',
             gap: '16px',
-            color: '#333',
+            color: 'var(--theme-text-primary)',
           }}
         >
           <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>File</span>
           <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>Edit</span>
           <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>View</span>
-          <span style={{ color: '#999' }}>Help</span>
+          <span style={{ color: 'var(--theme-text-muted)' }}>Help</span>
         </div>
 
         {/* Content */}
@@ -292,7 +292,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
               <button
                 onClick={randomize}
                 style={{
-                  background: '#c0c0c0',
+                  background: 'var(--theme-bg-tertiary)',
                   border: '2px outset #fff',
                   padding: '4px 16px',
                   cursor: 'pointer',
@@ -320,7 +320,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     marginBottom: '2px',
-                    color: '#333',
+                    color: 'var(--theme-text-primary)',
                   }}
                 >
                   DREAM TITLE
@@ -337,7 +337,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     fontSize: '0.875rem',
                     fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
                     fontWeight: 700,
-                    background: '#fff',
+                    background: 'var(--theme-bg-card)',
                     textTransform: 'none',
                   }}
                 />
@@ -351,7 +351,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     marginBottom: '2px',
-                    color: '#333',
+                    color: 'var(--theme-text-primary)',
                   }}
                 >
                   DESCRIPTION
@@ -367,7 +367,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     padding: '6px 8px',
                     fontSize: '0.8rem',
                     fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
-                    background: '#fff',
+                    background: 'var(--theme-bg-card)',
                     resize: 'vertical',
                     textTransform: 'none',
                   }}
@@ -379,7 +379,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                 style={{
                   display: 'flex',
                   border: '2px inset #999',
-                  background: '#e0e0e0',
+                  background: 'var(--theme-bg-tertiary)',
                   padding: 2,
                 }}
               >
@@ -392,7 +392,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    background: mode === 'traits' ? '#c0c0c0' : 'transparent',
+                    background: mode === 'traits' ? 'var(--theme-bg-tertiary)' : 'transparent',
                     border: mode === 'traits' ? '2px outset #fff' : '2px solid transparent',
                     fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
                   }}
@@ -408,7 +408,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    background: mode === 'upload' ? '#c0c0c0' : 'transparent',
+                    background: mode === 'upload' ? 'var(--theme-bg-tertiary)' : 'transparent',
                     border: mode === 'upload' ? '2px outset #fff' : '2px solid transparent',
                     fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
                   }}
@@ -430,7 +430,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       padding: '0 6px',
-                      color: '#333',
+                      color: 'var(--theme-text-primary)',
                     }}
                   >
                     CHOOSE TRAITS
@@ -497,7 +497,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       padding: '0 6px',
-                      color: '#333',
+                      color: 'var(--theme-text-primary)',
                     }}
                   >
                     UPLOAD CUSTOM TRAIT (32×32 PNG)
@@ -510,7 +510,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                           fontSize: '0.7rem',
                           fontWeight: 700,
                           marginBottom: 4,
-                          color: '#555',
+                          color: 'var(--theme-text-muted)',
                         }}
                       >
                         REPLACE LAYER
@@ -526,7 +526,8 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                               fontSize: '0.7rem',
                               fontWeight: 700,
                               cursor: 'pointer',
-                              background: customLayer === l.key ? '#000080' : '#c0c0c0',
+                              background:
+                                customLayer === l.key ? '#000080' : 'var(--theme-bg-tertiary)',
                               color: customLayer === l.key ? '#fff' : '#000',
                               border: '2px outset #fff',
                               fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
@@ -552,7 +553,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        background: '#c0c0c0',
+                        background: 'var(--theme-bg-tertiary)',
                         border: '2px outset #fff',
                         padding: '6px 12px',
                         cursor: 'pointer',
@@ -616,7 +617,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                       type="button"
                       onClick={handleSave}
                       style={{
-                        background: '#c0c0c0',
+                        background: 'var(--theme-bg-tertiary)',
                         border: '2px outset #fff',
                         padding: '4px 12px',
                         cursor: 'pointer',
@@ -646,8 +647,8 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
             borderTop: '2px groove #ccc',
             padding: '2px 8px',
             fontSize: '0.7rem',
-            color: '#666',
-            background: '#f0f0f0',
+            color: 'var(--theme-text-muted)',
+            background: 'var(--theme-bg-card)',
             display: 'flex',
             justifyContent: 'space-between',
           }}
@@ -680,7 +681,7 @@ function RetroSelect({
           fontSize: '0.65rem',
           fontWeight: 700,
           marginBottom: '1px',
-          color: '#555',
+          color: 'var(--theme-text-muted)',
           textTransform: 'uppercase',
         }}
       >
@@ -696,7 +697,7 @@ function RetroSelect({
           fontSize: '0.75rem',
           fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
           fontWeight: 700,
-          background: '#fff',
+          background: 'var(--theme-bg-card)',
           cursor: 'pointer',
         }}
       >

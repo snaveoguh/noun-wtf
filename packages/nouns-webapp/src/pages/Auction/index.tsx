@@ -197,7 +197,7 @@ const AuctionPage: React.FC<AuctionPageProps> = () => {
       {isEnabled('dreams') && <DreamsBanner />}
       {isEnabled('noundry') && <NoundryBanner />}
       {isEnabled('intro') && (
-        <div style={{ background: '#fff' }}>
+        <div style={{ background: 'var(--theme-bg-card)' }}>
           <NounsIntroSection />
           <Documentation backgroundColor="#ffffff" />
         </div>

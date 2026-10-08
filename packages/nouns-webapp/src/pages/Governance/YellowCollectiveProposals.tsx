@@ -65,7 +65,7 @@ function getSnapshotStatus(p: SnapshotProposal): { label: string; color: string 
     case 'pending':
       return { label: 'Pending', color: '#a78bfa' };
     default:
-      return { label: p.state, color: '#8c8d92' };
+      return { label: p.state, color: 'var(--theme-text-muted)' };
   }
 }
 
@@ -167,7 +167,11 @@ const YellowCollectiveProposals: FC = () => {
       {/* Header */}
       <div style={{ padding: '24px 0 16px' }}>
         <span
-          style={{ color: '#8c8d92', fontSize: '1.2rem', fontFamily: "'Londrina Solid', cursive" }}
+          style={{
+            color: 'var(--theme-text-muted)',
+            fontSize: '1.2rem',
+            fontFamily: "'Londrina Solid', cursive",
+          }}
         >
           Governance
         </span>
@@ -184,7 +188,7 @@ const YellowCollectiveProposals: FC = () => {
         </h1>
         <p
           style={{
-            color: '#666',
+            color: 'var(--theme-text-muted)',
             fontFamily: "'PT Root UI', sans-serif",
             fontSize: '0.95rem',
             margin: '0 0 16px',
@@ -208,7 +212,7 @@ const YellowCollectiveProposals: FC = () => {
               fontFamily: "'PT Root UI', sans-serif",
             }}
           >
-            <span style={{ color: '#8c8d92' }}>Treasury</span>
+            <span style={{ color: 'var(--theme-text-muted)' }}>Treasury</span>
             <span
               style={{
                 fontWeight: 700,
@@ -218,7 +222,7 @@ const YellowCollectiveProposals: FC = () => {
             >
               Ξ {treasuryEth}
             </span>
-            <span style={{ color: '#8c8d92', fontSize: '0.7rem' }}>(Base)</span>
+            <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.7rem' }}>(Base)</span>
           </div>
         )}
       </div>
@@ -234,7 +238,7 @@ const YellowCollectiveProposals: FC = () => {
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
-            background: tab === 'yc' ? '#FFC700' : '#f4f4f8',
+            background: tab === 'yc' ? '#FFC700' : 'var(--theme-bg-card)',
             color: tab === 'yc' ? '#14141f' : '#8c8d92',
           }}
         >
@@ -249,7 +253,7 @@ const YellowCollectiveProposals: FC = () => {
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
-            background: tab === 'nouns' ? '#14141f' : '#f4f4f8',
+            background: tab === 'nouns' ? '#14141f' : 'var(--theme-bg-card)',
             color: tab === 'nouns' ? '#fff' : '#8c8d92',
           }}
         >
@@ -259,7 +263,12 @@ const YellowCollectiveProposals: FC = () => {
 
       {loading && (
         <div
-          style={{ textAlign: 'center', padding: '40px 0', color: '#8c8d92', fontSize: '0.85rem' }}
+          style={{
+            textAlign: 'center',
+            padding: '40px 0',
+            color: 'var(--theme-text-muted)',
+            fontSize: '0.85rem',
+          }}
         >
           Loading proposals...
         </div>
@@ -304,8 +313,16 @@ const YellowCollectiveProposals: FC = () => {
                   >
                     {status.label}
                   </span>
-                  <span style={{ color: '#8c8d92', fontSize: '0.75rem' }}>#{p.proposalNumber}</span>
-                  <span style={{ color: '#8c8d92', fontSize: '0.7rem', marginLeft: 'auto' }}>
+                  <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem' }}>
+                    #{p.proposalNumber}
+                  </span>
+                  <span
+                    style={{
+                      color: 'var(--theme-text-muted)',
+                      fontSize: '0.7rem',
+                      marginLeft: 'auto',
+                    }}
+                  >
                     {timeRemaining(p.voteEnd)}
                   </span>
                 </div>
@@ -330,7 +347,7 @@ const YellowCollectiveProposals: FC = () => {
                         flex: 1,
                         height: 6,
                         borderRadius: 3,
-                        background: '#f4f4f8',
+                        background: 'var(--theme-bg-card)',
                         overflow: 'hidden',
                       }}
                     >
@@ -343,7 +360,13 @@ const YellowCollectiveProposals: FC = () => {
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: '#8c8d92', whiteSpace: 'nowrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        color: 'var(--theme-text-muted)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {p.forVotes} for · {p.againstVotes} against
                     </span>
                   </div>
@@ -357,7 +380,7 @@ const YellowCollectiveProposals: FC = () => {
               style={{
                 textAlign: 'center',
                 padding: '40px',
-                color: '#8c8d92',
+                color: 'var(--theme-text-muted)',
                 fontSize: '0.85rem',
               }}
             >
@@ -376,7 +399,7 @@ const YellowCollectiveProposals: FC = () => {
                 padding: '20px',
                 borderRadius: 16,
                 border: '1px solid #fbbf24',
-                background: '#fefce8',
+                background: 'var(--theme-bg-card)',
                 fontSize: '0.85rem',
                 color: '#854d0e',
                 textAlign: 'center',
@@ -425,11 +448,17 @@ const YellowCollectiveProposals: FC = () => {
                     {status.label}
                   </span>
                   {p.nounsProposalId && (
-                    <span style={{ color: '#8c8d92', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem' }}>
                       Nouns #{p.nounsProposalId}
                     </span>
                   )}
-                  <span style={{ color: '#8c8d92', fontSize: '0.7rem', marginLeft: 'auto' }}>
+                  <span
+                    style={{
+                      color: 'var(--theme-text-muted)',
+                      fontSize: '0.7rem',
+                      marginLeft: 'auto',
+                    }}
+                  >
                     {timeRemaining(p.end)}
                   </span>
                 </div>
@@ -454,7 +483,7 @@ const YellowCollectiveProposals: FC = () => {
                         flex: 1,
                         height: 6,
                         borderRadius: 3,
-                        background: '#f4f4f8',
+                        background: 'var(--theme-bg-card)',
                         overflow: 'hidden',
                         display: 'flex',
                       }}
@@ -474,7 +503,13 @@ const YellowCollectiveProposals: FC = () => {
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: '#8c8d92', whiteSpace: 'nowrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        color: 'var(--theme-text-muted)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {Math.round(forScore)} for · {Math.round(againstScore)} against
                     </span>
                   </div>
@@ -488,7 +523,7 @@ const YellowCollectiveProposals: FC = () => {
               style={{
                 textAlign: 'center',
                 padding: '40px',
-                color: '#8c8d92',
+                color: 'var(--theme-text-muted)',
                 fontSize: '0.85rem',
               }}
             >

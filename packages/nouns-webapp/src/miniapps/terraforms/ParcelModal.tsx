@@ -268,7 +268,7 @@ const ParcelModal: FC<{
               Terraform #{tokenId}
             </h2>
             {meta && (
-              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
                 Level {meta.level} · {meta.zoneName} · ({meta.x}, {meta.y}) · Elev {meta.elevation}
               </span>
             )}
@@ -461,7 +461,7 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
-  color: '#64748b',
+  color: 'var(--theme-text-muted)',
   marginBottom: 4,
 };
 const valStyle: React.CSSProperties = {

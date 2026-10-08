@@ -19,12 +19,12 @@
 }
 
 .menu a {
-  color: rgb(95, 95, 95);
+  color: var(--theme-text-muted);
   padding: 0.5rem 1rem;
   text-decoration: none;
   font-weight: bold;
   display: block;
-  /* background-color: #f4f4f8; */
+  /* background-color: var(--theme-bg-card); */
   border: 0;
   border-bottom: 1.5px solid #e2e3e8;
   border-radius: 0;
@@ -35,5 +35,5 @@
 
 .menu a:hover {
   /* color: var(--brand-black); */
-  background-color: #fff;
+  background-color: var(--theme-bg-card);
 }

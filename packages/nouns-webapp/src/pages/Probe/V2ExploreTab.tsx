@@ -533,7 +533,7 @@ const V2ExploreTab: FC = () => {
                 alt={`Noun ${n.nounId}`}
                 loading="lazy"
                 className="h-full w-full object-cover"
-                style={{ background: '#e1d7d5' }}
+                style={{ background: 'var(--theme-bg-tertiary)' }}
               />
             )}
             <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block">

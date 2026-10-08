@@ -187,7 +187,7 @@ const WireVariant: FC<VariantProps> = ({ items, resolved }) => (
             borderBottom: '1px solid rgba(0,0,0,0.05)',
             fontSize: '0.75rem',
             fontFamily: "'PT Root UI', sans-serif",
-            color: '#2a2a3a',
+            color: 'var(--theme-text-primary)',
             minWidth: 0,
           }}
         >
@@ -195,7 +195,7 @@ const WireVariant: FC<VariantProps> = ({ items, resolved }) => (
             style={{
               fontFamily: MONO,
               fontSize: '0.62rem',
-              color: '#9a948c',
+              color: 'var(--theme-text-muted)',
               width: 26,
               flexShrink: 0,
               fontVariantNumeric: 'tabular-nums',
@@ -265,7 +265,7 @@ const TerminalVariant: FC<VariantProps> = ({ items, resolved }) => (
         >
           <span
             style={{
-              color: '#55556a',
+              color: 'var(--theme-text-muted)',
               fontSize: '0.62rem',
               width: 28,
               flexShrink: 0,
@@ -381,7 +381,7 @@ const TickerCardsVariant: FC<VariantProps> = ({ items, resolved }) => {
               width: 190,
               borderRadius: 10,
               border: '1px solid rgba(0,0,0,0.07)',
-              background: '#fff',
+              background: 'var(--theme-bg-card)',
               boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
               padding: '8px 10px',
               display: 'flex',
@@ -418,7 +418,7 @@ const TickerCardsVariant: FC<VariantProps> = ({ items, resolved }) => {
                 fontFamily: "'PT Root UI', sans-serif",
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                color: '#2a2a3a',
+                color: 'var(--theme-text-primary)',
                 lineHeight: 1.25,
                 overflow: 'hidden',
                 display: '-webkit-box',
@@ -464,13 +464,13 @@ const LedgerVariant: FC<VariantProps> = ({ items, resolved }) => (
               position: 'sticky',
               top: 0,
               zIndex: 1,
-              background: '#f6f3ef',
+              background: 'var(--theme-bg-card)',
               textAlign: h === 'AMOUNT' ? 'right' : 'left',
               padding: '4px 14px',
               fontSize: '0.55rem',
               fontWeight: 800,
               letterSpacing: '0.12em',
-              color: '#9a948c',
+              color: 'var(--theme-text-muted)',
               borderBottom: '1px solid rgba(0,0,0,0.08)',
             }}
           >
@@ -492,14 +492,14 @@ const LedgerVariant: FC<VariantProps> = ({ items, resolved }) => (
                 padding: '3px 14px',
                 fontFamily: MONO,
                 fontSize: '0.62rem',
-                color: '#9a948c',
+                color: 'var(--theme-text-muted)',
                 whiteSpace: 'nowrap',
                 width: 1,
               }}
             >
               {timeAgo(item.timestamp)}
             </td>
-            <td style={{ padding: '3px 14px', color: '#2a2a3a', minWidth: 0 }}>
+            <td style={{ padding: '3px 14px', color: 'var(--theme-text-primary)', minWidth: 0 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <SourceGlyph source={item.source} size={10} />
                 <span

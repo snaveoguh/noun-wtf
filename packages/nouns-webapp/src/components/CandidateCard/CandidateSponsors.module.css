@@ -34,6 +34,6 @@
   width: 32px;
   height: 32px;
   border-radius: 100%;
-  background: #e8e8ec;
+  background: var(--theme-bg-card);
   border: 1px dashed #a7a7aa;
 }

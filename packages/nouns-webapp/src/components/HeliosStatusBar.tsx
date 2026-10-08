@@ -71,7 +71,11 @@ function getRpcs() {
 
 export default function HeliosStatusBar() {
   const [eth, setEth] = useState<ChainStatus>({ verified: false, blockNumber: null, error: null });
-  const [base, setBase] = useState<ChainStatus>({ verified: false, blockNumber: null, error: null });
+  const [base, setBase] = useState<ChainStatus>({
+    verified: false,
+    blockNumber: null,
+    error: null,
+  });
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const ethRef = useRef<HeliosProvider | null>(null);
@@ -109,17 +113,22 @@ export default function HeliosStatusBar() {
             network: 'mainnet',
           },
           'ethereum',
-        ).then(async (provider) => {
-          if (cancelled) { await provider.shutdown(); return; }
-          ethRef.current = provider;
-          const block = await pollBlock(provider);
-          setEth({ verified: true, blockNumber: block, error: null });
-        }).catch(async () => {
-          if (cancelled) return;
-          console.warn('[helios] ETH light client unavailable, falling back to RPC polling');
-          const block = await fetchBlockFromRpc(ethRpc);
-          setEth({ verified: false, blockNumber: block, error: null });
-        });
+        )
+          .then(async provider => {
+            if (cancelled) {
+              await provider.shutdown();
+              return;
+            }
+            ethRef.current = provider;
+            const block = await pollBlock(provider);
+            setEth({ verified: true, blockNumber: block, error: null });
+          })
+          .catch(async () => {
+            if (cancelled) return;
+            console.warn('[helios] ETH light client unavailable, falling back to RPC polling');
+            const block = await fetchBlockFromRpc(ethRpc);
+            setEth({ verified: false, blockNumber: block, error: null });
+          });
 
         // Base (OP Stack)
         bootWithRetry(
@@ -130,17 +139,22 @@ export default function HeliosStatusBar() {
             network: 'base',
           },
           'opstack',
-        ).then(async (provider) => {
-          if (cancelled) { await provider.shutdown(); return; }
-          baseRef.current = provider;
-          const block = await pollBlock(provider);
-          setBase({ verified: true, blockNumber: block, error: null });
-        }).catch(async () => {
-          if (cancelled) return;
-          console.warn('[helios] BASE light client unavailable, falling back to RPC polling');
-          const block = await fetchBlockFromRpc(baseRpc);
-          setBase({ verified: false, blockNumber: block, error: null });
-        });
+        )
+          .then(async provider => {
+            if (cancelled) {
+              await provider.shutdown();
+              return;
+            }
+            baseRef.current = provider;
+            const block = await pollBlock(provider);
+            setBase({ verified: true, blockNumber: block, error: null });
+          })
+          .catch(async () => {
+            if (cancelled) return;
+            console.warn('[helios] BASE light client unavailable, falling back to RPC polling');
+            const block = await fetchBlockFromRpc(baseRpc);
+            setBase({ verified: false, blockNumber: block, error: null });
+          });
 
         // Poll block numbers
         intervalRef.current = setInterval(async () => {
@@ -206,9 +220,9 @@ export default function HeliosStatusBar() {
           border: 'none',
           borderTop: '2px solid #e2e3e8',
           borderRight: '2px solid #e2e3e8',
-          background: '#f4f4f8',
+          background: 'var(--theme-bg-card)',
           fontSize: 10,
-          color: '#68778d',
+          color: 'var(--theme-text-muted)',
           cursor: 'pointer',
           textTransform: 'uppercase',
         }}
@@ -219,7 +233,12 @@ export default function HeliosStatusBar() {
             width: 6,
             height: 6,
             borderRadius: '50%',
-            background: eth.verified || base.verified ? '#27ae60' : eth.blockNumber || base.blockNumber ? '#3498db' : '#f39c12',
+            background:
+              eth.verified || base.verified
+                ? '#27ae60'
+                : eth.blockNumber || base.blockNumber
+                  ? '#3498db'
+                  : '#f39c12',
           }}
         />
         node
@@ -244,12 +263,18 @@ export default function HeliosStatusBar() {
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         fontSize: 10,
-        color: '#68778d',
+        color: 'var(--theme-text-muted)',
         textTransform: 'uppercase',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <span style={{ color: '#14171a', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+        <span
+          style={{
+            color: 'var(--theme-text-primary)',
+            fontWeight: 'bold',
+            letterSpacing: '0.05em',
+          }}
+        >
           Helios Node
         </span>
 
@@ -266,7 +291,9 @@ export default function HeliosStatusBar() {
             }}
           />
           <span>ETH {label(eth)}</span>
-          {eth.blockNumber && <span style={{ color: '#14171a' }}>{fmtBlock(eth.blockNumber)}</span>}
+          {eth.blockNumber && (
+            <span style={{ color: 'var(--theme-text-primary)' }}>{fmtBlock(eth.blockNumber)}</span>
+          )}
         </span>
 
         {/* Base */}
@@ -282,12 +309,12 @@ export default function HeliosStatusBar() {
             }}
           />
           <span>BASE {label(base)}</span>
-          {base.blockNumber && <span style={{ color: '#14171a' }}>{fmtBlock(base.blockNumber)}</span>}
+          {base.blockNumber && (
+            <span style={{ color: 'var(--theme-text-primary)' }}>{fmtBlock(base.blockNumber)}</span>
+          )}
         </span>
 
-        {loading && (
-          <span style={{ animation: 'heliosPulse 1.5s infinite' }}>booting wasm...</span>
-        )}
+        {loading && <span style={{ animation: 'heliosPulse 1.5s infinite' }}>booting wasm...</span>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -299,7 +326,7 @@ export default function HeliosStatusBar() {
           style={{
             background: 'none',
             border: 'none',
-            color: '#68778d',
+            color: 'var(--theme-text-muted)',
             cursor: 'pointer',
             fontSize: 14,
             lineHeight: 1,

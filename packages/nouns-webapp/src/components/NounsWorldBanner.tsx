@@ -40,7 +40,7 @@ export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
     image: 'https://explore.nouns.world/wp-content/uploads/2025/04/pizza-dao-banner-1024x576.png',
     url: 'https://explore.nouns.world/nouns-helps-grow-the-worlds-largest-crypto-pizza-party/',
     description:
-      'Nouns helped expand PizzaDAO\'s Global Pizza Party to hundreds of cities across the globe celebrating Bitcoin Pizza Day. With Nouns\' support, the 2023 event grew to over 112 events worldwide.',
+      "Nouns helped expand PizzaDAO's Global Pizza Party to hundreds of cities across the globe celebrating Bitcoin Pizza Day. With Nouns' support, the 2023 event grew to over 112 events worldwide.",
   },
   {
     title: 'Pirate Ship Playground',
@@ -74,8 +74,7 @@ export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
   },
   {
     title: 'Sunny Pires in Nicaragua',
-    image:
-      'https://explore.nouns.world/wp-content/uploads/2025/02/sunny-surf-gif-optimize-4.gif',
+    image: 'https://explore.nouns.world/wp-content/uploads/2025/02/sunny-surf-gif-optimize-4.gif',
     url: 'https://explore.nouns.world/nouns-and-sunny-pires-in-nicaragua/',
     description:
       'Nouns funded Sunny Pires in March 2024 to adventure along the coast of Nicaragua — combining breathtaking surfing, beach clean-ups, and connecting with the local community, all while taking Nouns along for the ride.',
@@ -86,7 +85,7 @@ export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
       'https://explore.nouns.world/wp-content/uploads/2025/04/stand-with-crypto-header-1024x576.png',
     url: 'https://explore.nouns.world/nouns-donated-100k-to-support-gitcoins-crypto-advocacy-efforts/',
     description:
-      'In August 2023, Nouns passed Proposal 278 to support Gitcoin\'s web3 policy and advocacy efforts with a donation of 55 ETH (~$103K), helping fund education for policymakers and crypto community activation.',
+      "In August 2023, Nouns passed Proposal 278 to support Gitcoin's web3 policy and advocacy efforts with a donation of 55 ETH (~$103K), helping fund education for policymakers and crypto community activation.",
   },
   {
     title: 'Mucho Love: Real-World Action',
@@ -101,7 +100,7 @@ export const NOUNS_WORLD_STORIES: NounsWorldStory[] = [
     image: 'https://explore.nouns.world/wp-content/uploads/2025/02/Cover-1-1024x614-1.jpg',
     url: 'https://explore.nouns.world/a-quick-start-guide-to-playing-nouns/',
     description:
-      'A curated guide for newcomers: six key ways to participate in Nouns weekly, from voting on proposals and joining Warpcast\'s /nouns channel to attending Nouncil calls and bidding on Nouns.',
+      "A curated guide for newcomers: six key ways to participate in Nouns weekly, from voting on proposals and joining Warpcast's /nouns channel to attending Nouncil calls and bidding on Nouns.",
   },
 ];
 
@@ -160,9 +159,7 @@ const StoryModal: FC<{
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: visible
-          ? 'translate(-50%, -50%) scale(1)'
-          : 'translate(-50%, -50%) scale(0.92)',
+        transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
         zIndex: 100,
         maxWidth: 640,
         width: '90vw',
@@ -259,7 +256,7 @@ const StoryModal: FC<{
             fontFamily: "'PT Root UI'",
             fontSize: '0.88rem',
             lineHeight: 1.6,
-            color: '#4a4a5a',
+            color: 'var(--theme-text-primary)',
             margin: '0 0 20px',
           }}
         >
@@ -305,8 +302,7 @@ const StoryModal: FC<{
             textTransform: 'uppercase' as const,
           }}
         >
-          <span>🪩</span>{' '}
-          <span>nouns.world</span>
+          <span>🪩</span> <span>nouns.world</span>
         </div>
       </div>
     </div>
@@ -351,7 +347,10 @@ const NounsWorldBanner: FC = () => {
       if (pausedRef.current) {
         wasPaused = true;
       } else {
-        if (wasPaused) { pos = el.scrollLeft; wasPaused = false; }
+        if (wasPaused) {
+          pos = el.scrollLeft;
+          wasPaused = false;
+        }
         pos += speed;
         const halfWidth = el.scrollWidth / 2;
         if (halfWidth > 0 && pos >= halfWidth) pos -= halfWidth;
@@ -423,8 +422,12 @@ const NounsWorldBanner: FC = () => {
           ref={scrollRef}
           onPointerDown={onPointerDown}
           onClickCapture={onClickCapture}
-          onMouseEnter={() => { pausedRef.current = true; }}
-          onMouseLeave={() => { pausedRef.current = false; }}
+          onMouseEnter={() => {
+            pausedRef.current = true;
+          }}
+          onMouseLeave={() => {
+            pausedRef.current = false;
+          }}
           style={{
             display: 'flex',
             gap: '10px',
@@ -510,9 +513,7 @@ const NounsWorldBanner: FC = () => {
       </div>
 
       {/* Liquid Glass Modal */}
-      {selectedStory && (
-        <StoryModal story={selectedStory} onClose={handleClose} />
-      )}
+      {selectedStory && <StoryModal story={selectedStory} onClose={handleClose} />}
     </>
   );
 };

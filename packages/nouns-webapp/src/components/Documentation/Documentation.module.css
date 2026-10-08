@@ -60,7 +60,7 @@
 }
 
 .accordionHeader button:not(.collapsed) {
-  color: #212529;
+  color: var(--theme-text-primary);
   background-color: transparent;
   box-shadow: none !important;
 }

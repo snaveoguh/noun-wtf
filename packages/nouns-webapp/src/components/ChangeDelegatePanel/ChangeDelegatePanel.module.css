@@ -4,10 +4,10 @@
   -webkit-box-sizing: border-box;
   width: 100%;
   height: 54px;
-  color: black;
+  color: var(--theme-text-primary);
   border-radius: 12px !important;
   box-shadow: inset 0px 0px 0px 1px #fff;
-  background-color: white;
+  background-color: var(--theme-bg-card);
   outline: none !important;
   box-shadow: none !important;
   font-family: 'PT Root UI';

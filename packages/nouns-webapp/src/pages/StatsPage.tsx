@@ -20,7 +20,7 @@ const StatsPage: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: "'PT Root UI', sans-serif",
-              color: '#64748b',
+              color: 'var(--theme-text-muted)',
               fontSize: '0.8rem',
             }}
           >

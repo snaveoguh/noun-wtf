@@ -6,7 +6,10 @@ import { toast } from 'sonner';
 import { parseEther } from 'viem';
 import { useAccount, useWriteContract } from 'wagmi';
 
-import { smallGrantsTreasuryAbi, SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
+import {
+  smallGrantsTreasuryAbi,
+  SMALL_GRANTS_TREASURY_ADDRESS,
+} from '@/contracts/small-grants-treasury';
 
 import classes from './Grants.module.css';
 
@@ -148,7 +151,7 @@ export default function CreateGrantPage() {
             padding: '2.5rem 2rem',
             border: '2px solid #e2e8f0',
             borderRadius: 16,
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
           }}
         >
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{'\u2310\u25E8-\u25E8'}</div>
@@ -157,7 +160,7 @@ export default function CreateGrantPage() {
           </h2>
           <p
             style={{
-              color: '#64748b',
+              color: 'var(--theme-text-muted)',
               fontSize: '0.9rem',
               lineHeight: 1.6,
               marginBottom: '1.5rem',
@@ -196,9 +199,7 @@ export default function CreateGrantPage() {
   return (
     <div className={classes.container}>
       <h1 className={classes.title}>Create Grant Proposal</h1>
-      <p className={classes.subtitle}>
-        The proposal enters a 12-hour voting period immediately.
-      </p>
+      <p className={classes.subtitle}>The proposal enters a 12-hour voting period immediately.</p>
 
       <div className={classes.form}>
         <label className={classes.label}>Title</label>
@@ -238,7 +239,7 @@ export default function CreateGrantPage() {
               height: 22,
               borderRadius: 11,
               border: 'none',
-              background: advanced ? '#22d3ee' : '#d1d5db',
+              background: advanced ? '#22d3ee' : 'var(--theme-bg-tertiary)',
               cursor: 'pointer',
               transition: 'background 0.2s',
               flexShrink: 0,
@@ -252,7 +253,7 @@ export default function CreateGrantPage() {
                 width: 18,
                 height: 18,
                 borderRadius: '50%',
-                background: '#fff',
+                background: 'var(--theme-bg-card)',
                 transition: 'left 0.2s',
               }}
             />
@@ -275,7 +276,7 @@ export default function CreateGrantPage() {
           style={{
             padding: '8px 12px',
             borderRadius: '8px',
-            background: '#f0f9ff',
+            background: 'var(--theme-bg-card)',
             border: '1px solid #bae6fd',
             fontSize: '0.8rem',
             marginBottom: '8px',
@@ -299,14 +300,14 @@ export default function CreateGrantPage() {
               cursor: 'pointer',
               padding: '0 4px',
               fontSize: '0.75rem',
-              color: '#64748b',
+              color: 'var(--theme-text-muted)',
               textTransform: 'none',
             }}
             title="Copy full address"
           >
             <CopyIcon size={13} />
           </button>{' '}
-          <span style={{ color: '#64748b' }}>(Small Grants Treasury)</span>
+          <span style={{ color: 'var(--theme-text-muted)' }}>(Small Grants Treasury)</span>
         </div>
 
         {advanced ? (
@@ -359,7 +360,13 @@ export default function CreateGrantPage() {
           </>
         ) : (
           <div className={classes.txRow}>
-            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--theme-text-muted)',
+                marginBottom: '0.5rem',
+              }}
+            >
               How much ETH do you need?
             </div>
             <input

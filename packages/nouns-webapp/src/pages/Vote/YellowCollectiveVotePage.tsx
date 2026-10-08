@@ -107,7 +107,12 @@ const YellowCollectiveVotePage: FC = () => {
   if (loading) {
     return (
       <div
-        style={{ textAlign: 'center', padding: '80px 20px', color: '#8c8d92', fontSize: '0.85rem' }}
+        style={{
+          textAlign: 'center',
+          padding: '80px 20px',
+          color: 'var(--theme-text-muted)',
+          fontSize: '0.85rem',
+        }}
       >
         Loading proposal...
       </div>
@@ -126,7 +131,7 @@ const YellowCollectiveVotePage: FC = () => {
             padding: '8px 20px',
             borderRadius: 10,
             border: '1px solid #e2e3e8',
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             cursor: 'pointer',
             fontSize: '0.8rem',
           }}
@@ -150,10 +155,10 @@ const YellowCollectiveVotePage: FC = () => {
           padding: '6px 12px',
           borderRadius: 8,
           border: '1px solid #e2e3e8',
-          background: '#fff',
+          background: 'var(--theme-bg-card)',
           cursor: 'pointer',
           fontSize: '0.75rem',
-          color: '#8c8d92',
+          color: 'var(--theme-text-muted)',
         }}
       >
         ← Yellow Collective
@@ -191,7 +196,11 @@ const YellowCollectiveVotePage: FC = () => {
           {proposal.nounsProposalId && (
             <a
               href={`/vote/${proposal.nounsProposalId}`}
-              style={{ fontSize: '0.75rem', color: '#8c8d92', textDecoration: 'underline' }}
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--theme-text-muted)',
+                textDecoration: 'underline',
+              }}
             >
               View Nouns Prop #{proposal.nounsProposalId}
             </a>
@@ -210,7 +219,7 @@ const YellowCollectiveVotePage: FC = () => {
           {proposal.title}
         </h1>
 
-        <div style={{ fontSize: '0.75rem', color: '#8c8d92' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
           by {shortenAddress(proposal.author)} · {timeString(proposal.start)} →{' '}
           {timeString(proposal.end)}
         </div>
@@ -243,7 +252,7 @@ const YellowCollectiveVotePage: FC = () => {
                     style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}
                   >
                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color }}>{choice}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#8c8d92' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
                       {Math.round(score)} votes ({pct.toFixed(1)}%)
                     </span>
                   </div>
@@ -251,7 +260,7 @@ const YellowCollectiveVotePage: FC = () => {
                     style={{
                       height: 8,
                       borderRadius: 4,
-                      background: '#f4f4f8',
+                      background: 'var(--theme-bg-card)',
                       overflow: 'hidden',
                     }}
                   >
@@ -286,7 +295,7 @@ const YellowCollectiveVotePage: FC = () => {
               <span>Votes</span>
               <span
                 style={{
-                  color: '#8c8d92',
+                  color: 'var(--theme-text-muted)',
                   fontFamily: "'PT Root UI', sans-serif",
                   fontWeight: 400,
                   fontSize: '0.75rem',
@@ -329,7 +338,13 @@ const YellowCollectiveVotePage: FC = () => {
                   >
                     {choiceLabel(v.choice, proposal.choices)}
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: '#8c8d92', marginLeft: 'auto' }}>
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      color: 'var(--theme-text-muted)',
+                      marginLeft: 'auto',
+                    }}
+                  >
                     {Math.round(v.vp)} votes
                   </span>
                 </div>
@@ -337,7 +352,7 @@ const YellowCollectiveVotePage: FC = () => {
                   <div
                     style={{
                       fontSize: '0.75rem',
-                      color: '#666',
+                      color: 'var(--theme-text-muted)',
                       paddingLeft: 16,
                       whiteSpace: 'pre-wrap',
                       lineHeight: 1.4,
@@ -357,9 +372,9 @@ const YellowCollectiveVotePage: FC = () => {
                   padding: '10px',
                   border: 'none',
                   cursor: 'pointer',
-                  background: '#f4f4f8',
+                  background: 'var(--theme-bg-card)',
                   fontSize: '0.75rem',
-                  color: '#8c8d92',
+                  color: 'var(--theme-text-muted)',
                   fontWeight: 600,
                 }}
               >
@@ -372,7 +387,7 @@ const YellowCollectiveVotePage: FC = () => {
                 style={{
                   padding: '24px',
                   textAlign: 'center',
-                  color: '#8c8d92',
+                  color: 'var(--theme-text-muted)',
                   fontSize: '0.8rem',
                 }}
               >
@@ -403,11 +418,11 @@ const YellowCollectiveVotePage: FC = () => {
             </div>
 
             {!isActive ? (
-              <div style={{ fontSize: '0.8rem', color: '#8c8d92' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--theme-text-muted)' }}>
                 Voting is {proposal.state === 'pending' ? 'not yet active' : 'closed'}.
               </div>
             ) : !address ? (
-              <div style={{ fontSize: '0.8rem', color: '#8c8d92' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--theme-text-muted)' }}>
                 Connect your wallet to vote with Yellow Collective tokens.
               </div>
             ) : (
@@ -429,7 +444,7 @@ const YellowCollectiveVotePage: FC = () => {
                           padding: '10px',
                           borderRadius: 10,
                           border: `2px solid ${isSelected ? color : '#e2e3e8'}`,
-                          background: isSelected ? color + '15' : '#fff',
+                          background: isSelected ? color + '15' : 'var(--theme-bg-card)',
                           cursor: 'pointer',
                           fontSize: '1.2rem',
                           transition: 'all 0.15s',
@@ -471,7 +486,7 @@ const YellowCollectiveVotePage: FC = () => {
                     borderRadius: 10,
                     border: 'none',
                     cursor: selectedChoice !== null ? 'pointer' : 'default',
-                    background: selectedChoice !== null ? '#FFC700' : '#f4f4f8',
+                    background: selectedChoice !== null ? '#FFC700' : 'var(--theme-bg-card)',
                     color: selectedChoice !== null ? '#14141f' : '#8c8d92',
                     fontWeight: 700,
                     fontSize: '0.85rem',
@@ -484,7 +499,7 @@ const YellowCollectiveVotePage: FC = () => {
                 <div
                   style={{
                     fontSize: '0.65rem',
-                    color: '#8c8d92',
+                    color: 'var(--theme-text-muted)',
                     marginTop: 8,
                     textAlign: 'center',
                   }}
@@ -506,7 +521,7 @@ const YellowCollectiveVotePage: FC = () => {
                 maxHeight: 300,
                 overflow: 'auto',
                 fontSize: '0.75rem',
-                color: '#666',
+                color: 'var(--theme-text-muted)',
                 lineHeight: 1.5,
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',

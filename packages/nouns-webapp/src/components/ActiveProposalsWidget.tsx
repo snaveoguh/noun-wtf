@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<number, { bg: string; color: string }> = {
   [ProposalState.PENDING]: { bg: '#43b369', color: '#fff' },
   [ProposalState.ACTIVE]: { bg: '#43b369', color: '#fff' },
   [ProposalState.UPDATABLE]: { bg: '#fff', color: '#dc9e46' },
-  [ProposalState.QUEUED]: { bg: '#8c8d92', color: '#fff' },
+  [ProposalState.QUEUED]: { bg: 'var(--theme-text-muted)', color: '#fff' },
   [ProposalState.OBJECTION_PERIOD]: { bg: '#fff', color: '#e40536' },
   [ProposalState.SUCCEEDED]: { bg: '#4965d0', color: '#fff' },
 };
@@ -57,7 +57,7 @@ const ActiveProposalsWidget: FC = () => {
           fontFamily: "'Londrina Solid'",
           fontSize: '1.1rem',
           fontWeight: 400,
-          color: '#000',
+          color: 'var(--theme-text-primary)',
           marginBottom: 8,
           letterSpacing: '0.02em',
         }}
@@ -86,7 +86,7 @@ const ActiveProposalsWidget: FC = () => {
                   padding: '8px 12px',
                   borderRadius: 10,
                   border: '1px solid #e2e3e8',
-                  background: '#f4f4f8',
+                  background: 'var(--theme-bg-card)',
                   textDecoration: 'none',
                   color: 'inherit',
                   fontFamily: "'PT Root UI'",
@@ -110,7 +110,7 @@ const ActiveProposalsWidget: FC = () => {
                     minWidth: 0,
                   }}
                 >
-                  <span style={{ color: '#8c8d92', flexShrink: 0 }}>{p.id}</span>
+                  <span style={{ color: 'var(--theme-text-muted)', flexShrink: 0 }}>{p.id}</span>
                   <span
                     style={{
                       overflow: 'hidden',
@@ -155,7 +155,7 @@ const ActiveProposalsWidget: FC = () => {
           fontSize: '0.75rem',
           fontWeight: 700,
           fontFamily: "'PT Root UI'",
-          color: '#8c8d92',
+          color: 'var(--theme-text-muted)',
           textDecoration: 'none',
         }}
         onMouseEnter={e => {

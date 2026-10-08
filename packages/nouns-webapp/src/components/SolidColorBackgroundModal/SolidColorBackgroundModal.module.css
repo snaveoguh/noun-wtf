@@ -76,7 +76,7 @@
 .modal .title h2 {
   font-size: 24px;
   margin-top: 0.5rem;
-  color: rgba(140, 141, 146, 1);
+  color: var(--theme-text-muted);
 }
 
 .modal .title h1 {

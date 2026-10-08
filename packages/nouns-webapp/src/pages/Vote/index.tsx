@@ -349,7 +349,7 @@ const VotePage = () => {
           minHeight: '60vh',
         }}
       >
-        <Spinner animation="border" style={{ color: '#8c8d92' }} />
+        <Spinner animation="border" style={{ color: 'var(--theme-text-muted)' }} />
       </div>
     );
   }
@@ -411,7 +411,7 @@ const VotePage = () => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
             textDecoration: 'none',
             fontSize: '0.82rem',
             fontWeight: 600,
@@ -438,7 +438,7 @@ const VotePage = () => {
           <span
             style={{
               fontSize: '0.8rem',
-              color: '#8c8d92',
+              color: 'var(--theme-text-muted)',
               fontWeight: 600,
             }}
           >
@@ -482,7 +482,7 @@ const VotePage = () => {
             gap: 8,
             flexWrap: 'wrap',
             fontSize: '0.8rem',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
           }}
         >
           <span>Proposed by</span>
@@ -558,7 +558,7 @@ const VotePage = () => {
             style={{
               marginTop: 8,
               fontSize: '0.75rem',
-              color: '#8c8d92',
+              color: 'var(--theme-text-muted)',
             }}
           >
             {hasManyVersions ? (
@@ -596,7 +596,7 @@ const VotePage = () => {
             gap: 6,
             marginTop: 10,
             fontSize: '0.75rem',
-            color: '#8c8d92',
+            color: 'var(--theme-text-muted)',
           }}
         >
           <Clock size={12} />
@@ -621,7 +621,7 @@ const VotePage = () => {
       {(isAwaitingStateChange() || isCancellable() || isUpdateable()) && (
         <div
           style={{
-            background: '#fff',
+            background: 'var(--theme-bg-card)',
             borderRadius: 16,
             border: '1px solid #e2e3e8',
             padding: '14px 20px',
@@ -636,7 +636,7 @@ const VotePage = () => {
           <div style={{ fontSize: '0.82rem' }}>
             <span style={{ fontWeight: 700 }}>Proposal functions</span>
             {isProposer() && isUpdateable() && (
-              <span style={{ color: '#8c8d92', marginLeft: 8 }}>
+              <span style={{ color: 'var(--theme-text-muted)', marginLeft: 8 }}>
                 Editable for {getUpdatableCountdownCopy(proposal, currentBlock ?? 0n, activeLocale)}
               </span>
             )}
@@ -754,7 +754,7 @@ const VotePage = () => {
                     <span
                       style={{
                         fontSize: '0.65rem',
-                        background: '#f0f0f4',
+                        background: 'var(--theme-bg-card)',
                         padding: '1px 6px',
                         borderRadius: 4,
                         fontWeight: 600,
@@ -779,7 +779,7 @@ const VotePage = () => {
               {proposal.details != null && proposal.details.length > 0 && (
                 <div
                   style={{
-                    background: '#fff',
+                    background: 'var(--theme-bg-card)',
                     borderRadius: 12,
                     border: '1px solid #e2e3e8',
                     marginBottom: 20,
@@ -829,7 +829,7 @@ const VotePage = () => {
             /* Description tab */
             <div
               style={{
-                background: '#fff',
+                background: 'var(--theme-bg-card)',
                 borderRadius: 16,
                 border: '1px solid #e2e3e8',
                 padding: '24px',
@@ -853,9 +853,9 @@ const VotePage = () => {
                             style={{
                               display: 'block',
                               padding: '12px 16px',
-                              background: '#f4f4f8',
+                              background: 'var(--theme-bg-card)',
                               borderRadius: 8,
-                              color: '#8c8d92',
+                              color: 'var(--theme-text-muted)',
                               fontSize: '0.8rem',
                               margin: '8px 0',
                             }}

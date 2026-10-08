@@ -45,11 +45,7 @@ export default function NounV2DetailPage() {
   const [support, setSupport] = useState<number | null>(null);
   const [reason, setReason] = useState('');
 
-  const {
-    writeContractAsync,
-    data: txHash,
-    isPending,
-  } = useWriteContract();
+  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
   const { isLoading: txMining, isSuccess: txConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
   });
@@ -106,8 +102,8 @@ export default function NounV2DetailPage() {
           &larr; NounV2
         </Link>
         <div className={classes.missingAddress}>
-          NounV2 treasury address not configured yet — set{' '}
-          <code>VITE_NOUNV2_TREASURY_ADDRESS</code> after deploy.
+          NounV2 treasury address not configured yet — set <code>VITE_NOUNV2_TREASURY_ADDRESS</code>{' '}
+          after deploy.
         </div>
       </div>
     );
@@ -174,9 +170,7 @@ export default function NounV2DetailPage() {
         ])
       : undefined;
 
-  const receipt = receiptData as
-    | { hasVoted: boolean; support: number; votes: bigint }
-    | undefined;
+  const receipt = receiptData as { hasVoted: boolean; support: number; votes: bigint } | undefined;
   const hasVoted = receipt?.hasVoted === true;
 
   const title = (description.split('\n')[0] || '').replace(/^#\s*/, '').slice(0, 120) || 'Untitled';
@@ -192,8 +186,7 @@ export default function NounV2DetailPage() {
   const isProposer = userAddr?.toLowerCase() === proposer.toLowerCase();
   const canCancel = isProposer && !['EXECUTED', 'CANCELED'].includes(label);
 
-  const blocksLeft =
-    isActive && blockNumber != null ? Number(endBlock - (blockNumber ?? 0n)) : 0;
+  const blocksLeft = isActive && blockNumber != null ? Number(endBlock - (blockNumber ?? 0n)) : 0;
   const hoursLeft = Math.max(0, (blocksLeft * 12) / 3600);
 
   const grantTransactions = actions
@@ -204,10 +197,7 @@ export default function NounV2DetailPage() {
         calldata: actions[3][i],
       }))
     : [];
-  const totalEth = grantTransactions.reduce(
-    (sum, tx) => sum + Number(formatEther(tx.value)),
-    0,
-  );
+  const totalEth = grantTransactions.reduce((sum, tx) => sum + Number(formatEther(tx.value)), 0);
 
   async function handleVote() {
     if (support === null) return;
@@ -325,10 +315,12 @@ export default function NounV2DetailPage() {
                 fontSize: '0.85rem',
               }}
             >
-              <span style={{ fontFamily: 'monospace', color: '#555' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
                 → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
                 {tx.signature && (
-                  <span style={{ marginLeft: 8, color: '#888' }}>{tx.signature}</span>
+                  <span style={{ marginLeft: 8, color: 'var(--theme-text-muted)' }}>
+                    {tx.signature}
+                  </span>
                 )}
               </span>
               <span style={{ fontWeight: 700 }}>{formatEther(tx.value)} ETH</span>
@@ -346,9 +338,7 @@ export default function NounV2DetailPage() {
                   key={s}
                   className={classes.voteBtn}
                   style={
-                    support === s
-                      ? { borderColor: supportColor(s), color: supportColor(s) }
-                      : {}
+                    support === s ? { borderColor: supportColor(s), color: supportColor(s) } : {}
                   }
                   onClick={() => setSupport(s)}
                 >

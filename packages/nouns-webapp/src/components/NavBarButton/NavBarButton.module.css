@@ -68,7 +68,7 @@
 
 .coolInfo:hover {
   background-color: var(--brand-cool-accent);
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .coolWallet {
@@ -94,7 +94,7 @@
 
 .warmInfo:hover {
   background-color: var(--brand-warm-accent);
-  color: black;
+  color: var(--theme-text-primary);
 }
 
 .warmWallet {
@@ -114,20 +114,20 @@
 
 .whiteInfo,
 .whiteWallet {
-  background-color: white;
+  background-color: var(--theme-bg-card);
   border: none;
-  color: rgb(95, 95, 95);
+  color: var(--theme-text-muted);
 }
 
 .whiteInfo:hover,
 .whiteWallet:hover {
-  background-color: #e2e3e8;
-  color: black;
+  background-color: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
 }
 
 .whiteActive {
-  background-color: #f4f4f8;
-  color: black;
+  background-color: var(--theme-bg-card);
+  color: var(--theme-text-primary);
 }
 
 .whiteActive .icon {
@@ -135,8 +135,8 @@
 }
 
 .whiteActiveVoteSubmit {
-  background-color: #e2e3e8;
-  color: black;
+  background-color: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
 }
 
 @media (max-width: 992px) {
@@ -148,14 +148,14 @@
 }
 
 .delegateBack {
-  background-color: white;
+  background-color: var(--theme-bg-card);
   border: 1px solid rgba(0, 0, 0, 0.1);
   color: var(--brand-cool-dark-text);
   width: 100px;
 }
 
 .delegateBack:hover {
-  background-color: #e2e3e8;
+  background-color: var(--theme-bg-tertiary);
   color: var(--brand-cool-dark-text);
 }
 

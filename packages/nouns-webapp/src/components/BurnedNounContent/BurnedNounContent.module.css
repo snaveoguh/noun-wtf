@@ -20,19 +20,19 @@
 
 .subline {
   font-size: 13px;
-  color: #666;
+  color: var(--theme-text-muted);
   line-height: 1.45;
   font-weight: 500;
 }
 
 .sublineStrong {
-  color: #111;
+  color: var(--theme-text-primary);
   font-weight: 700;
 }
 
 .infoRow {
   font-size: 14px;
-  color: #333;
+  color: var(--theme-text-primary);
   line-height: 1.55;
   padding-top: 0.25rem;
 }

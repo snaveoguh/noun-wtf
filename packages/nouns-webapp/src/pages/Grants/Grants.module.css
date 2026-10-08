@@ -32,7 +32,7 @@
 }
 
 .subtitle {
-  color: #666;
+  color: var(--theme-text-muted);
   font-size: 0.9rem;
   margin: 0.5rem 0 1.5rem;
   line-height: 1.5;
@@ -55,14 +55,14 @@
 }
 
 .loading {
-  color: #888;
+  color: var(--theme-text-muted);
   font-style: italic;
 }
 
 .empty {
   text-align: center;
   padding: 3rem;
-  color: #888;
+  color: var(--theme-text-muted);
 }
 
 /* ─── Grant List ─────────────────────────────────────────────── */
@@ -77,7 +77,7 @@
   display: block;
   padding: 1rem 1.25rem;
   border: 1px solid #e2e8f0;
-  background: #fafafa;
+  background: var(--theme-bg-card);
   text-decoration: none;
   color: #1a1a2e;
   transition: border-color 0.2s;
@@ -96,7 +96,7 @@
 
 .grantId {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--theme-text-muted);
   font-weight: 600;
 }
 
@@ -117,7 +117,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #888;
+  color: var(--theme-text-muted);
   margin-bottom: 0.5rem;
 }
 
@@ -138,7 +138,7 @@
 /* ─── Detail Page ────────────────────────────────────────────── */
 
 .backLink {
-  color: #888;
+  color: var(--theme-text-muted);
   text-decoration: none;
   font-size: 0.85rem;
   display: inline-block;
@@ -165,7 +165,7 @@
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #888;
+  color: var(--theme-text-muted);
 }
 
 .detailName {
@@ -175,7 +175,7 @@
 }
 
 .detailProposer {
-  color: #888;
+  color: var(--theme-text-muted);
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
 }
@@ -220,7 +220,7 @@
   padding: 0.6rem;
   background: transparent;
   border: 1px solid #d1d5db;
-  color: #666;
+  color: var(--theme-text-muted);
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
@@ -235,7 +235,7 @@
 
 .reasonInput {
   width: 100%;
-  background: #fafafa;
+  background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
   color: #1a1a2e;
   padding: 0.5rem;
@@ -312,7 +312,7 @@
 
 .voteStatusText {
   flex: 1;
-  color: #333;
+  color: var(--theme-text-primary);
 }
 
 .voteStatusTx {
@@ -382,7 +382,7 @@
   padding-top: 1.5rem;
 }
 .description h3 {
-  color: #666;
+  color: var(--theme-text-muted);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -390,7 +390,7 @@
 }
 
 .descBody {
-  color: #333;
+  color: var(--theme-text-primary);
   font-size: 0.9rem;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -408,7 +408,7 @@
   padding-top: 1.5rem;
 }
 .votesList h3 {
-  color: #666;
+  color: var(--theme-text-muted);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -425,7 +425,7 @@
 }
 
 .voteReason {
-  color: #888;
+  color: var(--theme-text-muted);
   font-style: italic;
   flex: 1;
   text-align: right;
@@ -434,7 +434,7 @@
 .txLink {
   margin-top: 1rem;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--theme-text-muted);
 }
 .txLink a {
   color: #0891b2;
@@ -448,7 +448,7 @@
 
 .label {
   display: block;
-  color: #666;
+  color: var(--theme-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -458,7 +458,7 @@
 
 .input {
   width: 100%;
-  background: #fafafa;
+  background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
   color: #1a1a2e;
   padding: 0.6rem 0.75rem;
@@ -473,7 +473,7 @@
 
 .textarea {
   width: 100%;
-  background: #fafafa;
+  background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
   color: #1a1a2e;
   padding: 0.6rem 0.75rem;
@@ -496,7 +496,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #888;
+  color: var(--theme-text-muted);
   margin-bottom: 0.5rem;
 }
 
@@ -511,7 +511,7 @@
 .addTxBtn {
   background: transparent;
   border: 1px dashed #d1d5db;
-  color: #888;
+  color: var(--theme-text-muted);
   padding: 0.5rem;
   width: 100%;
   cursor: pointer;

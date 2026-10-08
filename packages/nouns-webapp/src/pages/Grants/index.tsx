@@ -40,10 +40,10 @@ interface Grant {
 function getTitle(desc: string) {
   const stripped = desc
     // Drop HTML comments wherever they appear (multiline-aware).
-    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!--[\S\s]*?-->/g, '')
     // Strip leading whitespace + blank lines so the first *meaningful*
     // line wins regardless of how many blank lines the comment left.
-    .replace(/^[\s\r\n]+/, '');
+    .replace(/^\s+/, '');
   const firstLine = stripped.split('\n')[0] ?? '';
   return firstLine.replace(/^#+\s*/, '').slice(0, 80) || 'Untitled';
 }
@@ -193,17 +193,25 @@ export default function GrantsPage() {
                     g.signer ? (
                       <>
                         by <ShortAddress address={g.signer as `0x${string}`} />
-                        <span style={{ color: '#6b7280', fontSize: '0.75rem', marginLeft: '0.35rem' }}>
+                        <span
+                          style={{
+                            color: 'var(--theme-text-muted)',
+                            fontSize: '0.75rem',
+                            marginLeft: '0.35rem',
+                          }}
+                        >
                           (GASLESS VIA NOUNIRL)
                         </span>
                       </>
                     ) : (
-                      <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem' }}>
                         GASLESS VIA NOUNIRL
                       </span>
                     )
                   ) : (
-                    <>by <ShortAddress address={g.proposer as `0x${string}`} /></>
+                    <>
+                      by <ShortAddress address={g.proposer as `0x${string}`} />
+                    </>
                   )}
                 </span>
                 <span>

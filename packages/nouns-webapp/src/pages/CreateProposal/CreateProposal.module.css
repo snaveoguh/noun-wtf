@@ -9,7 +9,7 @@
 .createProposalForm {
   border-radius: 5px;
   padding: 0rem 2.5rem;
-  background-color: white;
+  background-color: var(--theme-bg-card);
 }
 
 .heading {
@@ -86,13 +86,13 @@
 .feeNotice {
   text-align: center;
   font-size: 18px;
-  color: #6c757d;
+  color: var(--theme-text-muted);
 }
 
 .commitMessage input {
   margin-top: 1rem;
   font-size: 1rem;
-  color: #212529;
+  color: var(--theme-text-primary);
   width: 100%;
   border: 1px solid #aaa;
   border-radius: 8px;

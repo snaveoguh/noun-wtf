@@ -33,7 +33,7 @@
 
 .warmInfo {
   color: #b6a9a7;
-  background-color: #fdf9f9;
+  background-color: var(--theme-bg-card);
 }
 
 .warmInfo:hover {
@@ -73,8 +73,8 @@
 }
 
 .warmInfoSelected {
-  background-color: #fdf9f9;
-  color: rgba(142, 129, 127, 1);
+  background-color: var(--theme-bg-card);
+  color: var(--theme-text-muted);
 }
 
 .button {
