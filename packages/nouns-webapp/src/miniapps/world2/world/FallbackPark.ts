@@ -569,7 +569,7 @@ export function buildFallbackPark(): LevelData {
       intensity: 3.2,
     },
     sky: { zenith: new THREE.Color(0x3d7fd6), horizon: new THREE.Color(0xcfe3f5) },
-    fog: { color: new THREE.Color(0xc9dcec), density: 0.0045 },
+    fog: { color: new THREE.Color(0xc9dcec), density: 0.0016 },
     landmarks: [
       { name: 'Noggles Plaza', position: new THREE.Vector3(4, platTop, -36) },
       { name: 'QP Bay', position: new THREE.Vector3(22, 0, 0) },

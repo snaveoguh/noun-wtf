@@ -378,7 +378,7 @@ export class Player {
       }
     }
     n.divideScalar(count).normalize();
-    return { point: center.point, normal: n, distance: center.distance - 0.5 };
+    return { point: center.point, normal: n, raw: center.normal, distance: center.distance - 0.5 };
   }
 
   private updateGround(dt: number, input: InputFrame, now: number) {
@@ -388,7 +388,11 @@ export class Player {
     // Surface follow
     const snap = 0.08 + Math.min(0.35, speed * 0.03);
     const ground = this.probeGround(snap);
-    if (!ground || ground.normal.dot(this.up) < 0.35) {
+    // Convex edge (coping, kicker lip, ledge drop): if we're moving away
+    // from the next surface we launch instead of wrapping around it.
+    const launching =
+      ground !== null && ground.raw.dot(this.up) < 0.93 && this.vel.dot(ground.raw) > 0.6;
+    if (ground === null || ground.normal.dot(this.up) < 0.35 || launching) {
       this.leaveGround(now);
       return;
     }
@@ -760,6 +764,8 @@ export class Player {
   // ── Grinds ──────────────────────────────────────────────────────────
 
   private tryStartGrind(now: number): boolean {
+    // Mid-flip you can't lock on — the board has to come back under your feet
+    if (this.flip !== null && this.flip.t < this.flip.duration * 0.75) return false;
     const q = this.rails.nearest(this.pos, 0.42);
     if (!q) return false;
     // Must be above (or level with) the rail, not under it
@@ -794,10 +800,11 @@ export class Player {
     const railSpeed = Math.max(2, speed * Math.abs(along) * 0.95 + 0.6);
     this.grind = { rail: q.rail, s: q.s, dir, speed: railSpeed, type, yawOffset, time: 0 };
     this.state = 'grind';
+    if (this.flip !== null) this.flipDone = this.flip.trick;
     this.flip = null;
     this.grab = null;
     // Flip/air trick into a grind still scores the air part
-    if (this.flipDone) {
+    if (this.flipDone !== null) {
       addTrick(this.combo, FLIPS[this.flipDone].name, FLIPS[this.flipDone].points);
       this.flipDone = null;
     }

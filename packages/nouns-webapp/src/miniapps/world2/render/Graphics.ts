@@ -98,7 +98,8 @@ export class Graphics {
       multisampling: 0,
     });
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    if (quality !== 'low') {
+    const aoParam = new URLSearchParams(window.location.search).get('fx');
+    if (quality !== 'low' && (aoParam === null || aoParam.split(',').includes('ao'))) {
       this.ao = new N8AOPostPass(this.scene, this.camera, 1, 1);
       const c = this.ao.configuration;
       c.aoRadius = 1.6;
@@ -123,7 +124,17 @@ export class Graphics {
     const grade = new BrightnessContrastEffect({ brightness: 0.0, contrast: 0.08 });
     const sat = new HueSaturationEffect({ saturation: 0.12 });
     const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.42 });
-    this.composer.addPass(new EffectPass(this.camera, this.bloom, tone, grade, sat, vignette));
+    // `?fx=bloom,tone,grade,sat,vig` limits the stack (debugging / perf triage).
+    const fxParam = new URLSearchParams(window.location.search).get('fx');
+    const want = (k: string) => fxParam === null || fxParam.split(',').includes(k);
+    const effects = [
+      want('bloom') ? this.bloom : null,
+      want('tone') ? tone : null,
+      want('grade') ? grade : null,
+      want('sat') ? sat : null,
+      want('vig') ? vignette : null,
+    ].filter((e): e is NonNullable<typeof e> => e !== null);
+    if (effects.length > 0) this.composer.addPass(new EffectPass(this.camera, ...effects));
     this.composer.addPass(
       new EffectPass(
         this.camera,
@@ -143,34 +154,53 @@ export class Graphics {
     this.hemi.color.copy(level.sky.zenith).lerp(new THREE.Color(0xffffff), 0.5);
     // Baked levels already contain bounce light; keep the hemi fill small.
     this.hemi.intensity = level.baked ? 0.12 : 0.45;
-    this.buildEnvironment(level.baked ? 0.6 : 1.0);
+    this.buildEnvironment(level.baked ? 0.6 : 1.0, level.sky.zenith, level.sky.horizon);
   }
 
-  /** Render the sky into a PMREM env map for PBR reflections + ambient. */
-  private buildEnvironment(intensity: number) {
+  /**
+   * Bake a simple, NaN-safe gradient sky (+ sun disc + warm ground) into a
+   * PMREM env map for PBR ambient + reflections. The analytic Sky shader is
+   * only used for the visible backdrop: baked into PMREM it can emit NaNs
+   * that turn every lit surface black.
+   */
+  private buildEnvironment(intensity: number, zenith: THREE.Color, horizon: THREE.Color) {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const envScene = new THREE.Scene();
-    const sky = new Sky();
-    sky.scale.setScalar(60);
-    const src = this.sky.material.uniforms;
-    const dst = sky.material.uniforms;
-    for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG'])
-      dst[k].value = src[k].value;
-    dst.sunPosition.value.copy(src.sunPosition.value);
-    envScene.add(sky);
-    // Warm ground bounce so undersides aren't sky-blue
-    const ground = new THREE.Mesh(
-      new THREE.SphereGeometry(50, 32, 16, 0, Math.PI * 2, Math.PI / 2 + 0.02, Math.PI / 2 - 0.02),
-      new THREE.MeshBasicMaterial({ color: 0x5a5046, side: THREE.BackSide }),
+    const geo = new THREE.SphereGeometry(50, 48, 24);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const ground = new THREE.Color(0x6a5d50);
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i) / 50;
+      if (y >= 0) c.copy(horizon).lerp(zenith, Math.pow(y, 0.6));
+      else c.copy(horizon).lerp(ground, Math.min(1, -y * 4));
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const dome = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }),
     );
-    envScene.add(ground);
+    envScene.add(dome);
+    // Sun disc gives speculars a hot spot in the right direction
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(2.2, 16, 8),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(this.sun.color).multiplyScalar(30) }),
+    );
+    sun.position.copy(this.sunDir).multiplyScalar(-45);
+    envScene.add(sun);
     this.envRT?.dispose();
-    this.envRT = pmrem.fromScene(envScene, 0.02, 0.1, 200);
+    this.envRT = pmrem.fromScene(envScene, 0.03, 0.1, 200);
     this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = intensity;
     pmrem.dispose();
-    sky.material.dispose();
-    ground.geometry.dispose();
+    geo.dispose();
+    (dome.material as THREE.Material).dispose();
+    sun.geometry.dispose();
+    (sun.material as THREE.Material).dispose();
   }
 
   /** Keep the shadow frustum centred on the player, snapped to texels. */

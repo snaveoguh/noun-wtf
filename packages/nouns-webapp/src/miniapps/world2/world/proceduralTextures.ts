@@ -110,7 +110,7 @@ export const SURFACES = {
     }),
   plazaTile: () =>
     surfaceTexture('plazaTile', {
-      base: [196, 186, 172],
+      base: [168, 160, 150],
       variation: 0.12,
       speckle: 0.08,
       stains: 0.35,
