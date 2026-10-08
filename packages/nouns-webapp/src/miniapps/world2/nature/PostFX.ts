@@ -1,7 +1,7 @@
 // ── Cinematic post additions: depth of field focused on the player ──────
 //
-// Inserted as its own EffectPass right after the RenderPass/N8AO so it
-// works on linear HDR (before bloom + AgX tone mapping). DoF is a
+// Inserted as its own EffectPass right before the bloom/tone pass so it
+// works on linear HDR (after AO + ink outlines). DoF is a
 // convolution effect, so it cannot share the bloom/tone EffectPass anyway.
 // Cost: ~5 half-res fullscreen passes. Enabled on 'high' only by default.
 
@@ -55,10 +55,19 @@ export function addCinematicEffects(
     resolutionScale: 0.5,
   });
   const pass = new EffectPass(gfx.camera, dof);
-  // Insert before the first EffectPass (bloom/tone) so DoF sees linear HDR.
+  // Insert right before the bloom/tone-mapping EffectPass: after the RenderPass,
+  // N8AO and the ink-outline pass (inserting ahead of the ink pass breaks
+  // its depth input, and blurring the ink with the image is what a lens does)
+  // but still on linear HDR. Falls back to "before the last pass" (SMAA).
   const passes = (gfx.composer as unknown as { passes: Pass[] }).passes;
-  let at = passes.findIndex(p => p instanceof EffectPass);
-  if (at < 0) at = passes.length;
+  const bloom = (gfx as unknown as { bloom?: unknown }).bloom;
+  let at = passes.findIndex(
+    p =>
+      p instanceof EffectPass &&
+      bloom !== undefined &&
+      ((p as unknown as { effects?: unknown[] }).effects ?? []).includes(bloom),
+  );
+  if (at < 0) at = Math.max(1, passes.length - 1);
   gfx.composer.addPass(pass, at);
   let focus = 6;
   const tmp = new THREE.Vector3();

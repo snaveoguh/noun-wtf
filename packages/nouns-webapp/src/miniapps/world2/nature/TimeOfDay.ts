@@ -11,7 +11,7 @@ import type { LevelData } from '../world/Level';
 
 import * as THREE from 'three';
 
-import { groundAt } from './shared';
+import { groundAt, natureUniforms } from './shared';
 import { softSpotTexture } from './textures';
 
 export type TimeOfDayPreset = 'afternoon' | 'golden' | 'blue' | 'night';
@@ -55,6 +55,8 @@ interface PresetDef {
   lamps: number;
   stars: number;
   shadowStrength: number;
+  /** Foliage self-illumination (see natureUniforms.uSelfLight). */
+  selfLight: number;
 }
 
 /** Jet-Set-Radio-ish palettes: hot cyan/yellow day, magenta/orange sunset, violet neon night. */
@@ -84,6 +86,7 @@ export const TIME_OF_DAY_PRESETS: Record<TimeOfDayPreset, PresetDef> = {
     lamps: 0,
     stars: 0,
     shadowStrength: 1,
+    selfLight: 0.06,
   },
   golden: {
     skySun: 5,
@@ -110,6 +113,7 @@ export const TIME_OF_DAY_PRESETS: Record<TimeOfDayPreset, PresetDef> = {
     lamps: 0.2,
     stars: 0,
     shadowStrength: 1,
+    selfLight: 0.26,
   },
   blue: {
     skySun: -4,
@@ -136,6 +140,7 @@ export const TIME_OF_DAY_PRESETS: Record<TimeOfDayPreset, PresetDef> = {
     lamps: 0.8,
     stars: 0.3,
     shadowStrength: 0.65,
+    selfLight: 0.07,
   },
   night: {
     skySun: -20,
@@ -162,6 +167,7 @@ export const TIME_OF_DAY_PRESETS: Record<TimeOfDayPreset, PresetDef> = {
     lamps: 1,
     stars: 1,
     shadowStrength: 0.75,
+    selfLight: 0.025,
   },
 };
 
@@ -189,6 +195,7 @@ interface State {
   lamps: number;
   stars: number;
   shadowStrength: number;
+  selfLight: number;
 }
 
 const COLOR_KEYS = [
@@ -215,6 +222,7 @@ const NUM_KEYS = [
   'lamps',
   'stars',
   'shadowStrength',
+  'selfLight',
 ] as const;
 
 const SKY_VERT = /* glsl */ `
@@ -468,6 +476,7 @@ export class TimeOfDay {
       lamps: d.lamps,
       stars: d.stars,
       shadowStrength: d.shadowStrength,
+      selfLight: d.selfLight,
     };
   }
 
@@ -612,6 +621,7 @@ export class TimeOfDay {
     }
     h.scene.environmentIntensity = c.envIntensity;
     h.renderer.toneMappingExposure = c.exposure;
+    natureUniforms.uSelfLight.value = c.selfLight;
     const bloom = gfxPriv.bloom;
     if (bloom !== undefined) {
       bloom.intensity = c.bloomIntensity;

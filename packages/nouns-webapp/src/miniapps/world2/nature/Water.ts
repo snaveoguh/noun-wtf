@@ -22,8 +22,8 @@
 //      - Fresnel blends refraction against three's reflection terms, fading
 //        out in the last few cm so shorelines have no hard edge.
 // 3. Caustics: materials under the water (bed, rocks, basin) get a patch
-//    that adds an animated two-layer Voronoi caustic inside the shadowed
-//    sun loop (so they vanish in shade), plus a darker, glossier wet band.
+//    that adds an animated two-layer Voronoi caustic (thresholded into hard
+//    graphic shapes) inside the shadowed sun loop, plus a darker wet band.
 // Low quality: no pre-pass, the water is a simple translucent surface.
 
 import * as THREE from 'three';
@@ -272,8 +272,8 @@ export interface WaterLook {
 }
 
 const DEFAULT_LOOK: Required<WaterLook> = {
-  deep: new THREE.Color(0.05, 0.42, 0.42),
-  absorb: new THREE.Vector3(2.4, 0.75, 0.55),
+  deep: new THREE.Color(0.0, 0.5, 0.72),
+  absorb: new THREE.Vector3(2.2, 0.55, 0.32),
   foamColor: new THREE.Color(0.95, 0.97, 0.95),
   foamWidth: 0.07,
   normalStrength: 0.55,
@@ -498,6 +498,7 @@ export class WaterSystem {
       metalness: 0,
       envMapIntensity: 1,
     });
+    m.userData.noToon = true; // keep PBR spec/env for glints if the scene gets toonified
     const lowQ = this.rt === null;
     if (lowQ) {
       m.transparent = true;

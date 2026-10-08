@@ -58,10 +58,20 @@ export function buildNatureShowcase(
   const Y = g0.y;
   const O = new THREE.Vector3(origin.x, Y, origin.z);
   const at = (x: number, z: number): [number, number] => [O.x + x, O.z + z];
-  const level = Y + 0.035;
+  // Water must sit above the highest ground along its outline, or nearby
+  // ground (e.g. raised plaza tiles next to a sunken lawn) would cover it.
+  const levelFor = (pts: [number, number][]) => {
+    let top = Y;
+    for (const [x, z] of pts) {
+      const gy = groundAt(ground, x, z, Y, Y + 3).y;
+      if (gy < Y + 0.5) top = Math.max(top, gy); // ignore props (benches, ledges)
+    }
+    return top + 0.035;
+  };
 
   // ── Pond
   const pondPts = blob(4, -6, 5.2, 3).map(([x, z]) => at(x, z));
+  const level = levelFor(pondPts);
   const pond = nature.water.create({
     name: 'pond',
     shape: { type: 'polygon', points: pondPts },
@@ -84,10 +94,11 @@ export function buildNatureShowcase(
     at(-7, -12),
     at(-9, -17),
   ];
+  const streamLevel = levelFor(streamPts);
   const stream = nature.water.create({
     name: 'stream',
     shape: { type: 'path', points: streamPts, width: 2.0 },
-    level,
+    level: streamLevel,
     depth: 0.35,
     shoreWidth: 0.6,
     beach: 0.6,
@@ -123,7 +134,7 @@ export function buildNatureShowcase(
     });
   }
   // Stream banks + stepping stones
-  const sp = streamPts.map(([x, z]) => new THREE.Vector3(x, level, z));
+  const sp = streamPts.map(([x, z]) => new THREE.Vector3(x, streamLevel, z));
   for (const side of [-1, 1]) {
     wet.addAlong(sp, {
       spacing: 1.7,
@@ -138,7 +149,7 @@ export function buildNatureShowcase(
     const curve = new THREE.CatmullRomCurve3(sp, false, 'centripetal');
     const p = curve.getPointAt(t);
     wet.add({
-      position: new THREE.Vector3(p.x + rng.range(-0.3, 0.3), level - 0.12, p.z),
+      position: new THREE.Vector3(p.x + rng.range(-0.3, 0.3), streamLevel - 0.12, p.z),
       size: new THREE.Vector3(0.55, 0.32, 0.5),
       variant: rng.int(0, 4),
     });
@@ -149,7 +160,7 @@ export function buildNatureShowcase(
       wet.add({
         position: new THREE.Vector3(
           x + rng.range(-1.2, 1.2),
-          level - 0.1,
+          streamLevel - 0.1,
           z + rng.range(-0.8, 0.8),
         ),
         size: rng.range(0.6, 1.2),

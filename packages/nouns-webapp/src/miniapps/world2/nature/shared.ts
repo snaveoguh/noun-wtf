@@ -23,6 +23,8 @@ export const natureUniforms = {
   uPlayerPos: { value: new THREE.Vector3(1e5, 0, 1e5) },
   /** Tileable caustics pattern (set by the water module). */
   uCaustics: { value: null as THREE.Texture | null },
+  /** Foliage self-illumination (keeps greens green under tinted sunset/night light). */
+  uSelfLight: { value: 0.1 },
   /** Sun colour * intensity (synced from the scene's directional light). */
   uSunColor: { value: new THREE.Color(1, 1, 1) },
 };
@@ -364,6 +366,7 @@ const ALPHA_MIP = /* glsl */ `
 
 const TRANS_PARS = /* glsl */ `
 uniform vec3 uTransColor;
+uniform float uSelfLight;
 uniform float uTransStrength;
 #ifdef NW_TIPLIGHT
 varying float vNwTip;
@@ -490,6 +493,7 @@ export function patchFoliageMaterial<T extends THREE.Material>(mat: T, o: Foliag
     shader.uniforms.uGrassFade = grassFade;
     shader.uniforms.uTransColor = transColor;
     shader.uniforms.uTransStrength = transStrength;
+    shader.uniforms.uSelfLight = natureUniforms.uSelfLight;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${WIND_PARS}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${WIND_VERTEX}`)
@@ -502,6 +506,10 @@ export function patchFoliageMaterial<T extends THREE.Material>(mat: T, o: Foliag
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <common>',
       `#include <common>\n${TRANS_PARS}`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uSelfLight;`,
     );
     if (o.bentNormals === true) {
       shader.fragmentShader = shader.fragmentShader.replace(

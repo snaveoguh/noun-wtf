@@ -1,6 +1,7 @@
 // ── Procedural instanced vegetation ─────────────────────────────────────
 //
-// Broadleaf trees (tapered-tube skeleton + folded leaf cards), palms
+// Cel-shaded (MeshToonMaterial + shared ramp) Jet-Set-Radio-style plants.
+// Broadleaf trees (tapered-tube skeleton + stylised leaf-clump cards), palms
 // (curved ringed trunk + arching fronds), bushes (+ blossoms), grass tufts
 // and meadow flowers. Every plant type is generated as a few seeded
 // variants, then instanced in XZ chunks with shared materials:
@@ -642,8 +643,8 @@ export function generateGrassTuft(seed: number, blades: number): THREE.BufferGeo
     const lean = new THREE.Vector3(Math.cos(a), 0, Math.sin(a))
       .applyAxisAngle(UP, rng.range(-0.8, 0.8))
       .multiplyScalar(rng.range(0.1, 0.45));
-    const h = rng.range(0.22, 0.5);
-    const w = rng.range(0.022, 0.035);
+    const h = rng.range(0.18, 0.4);
+    const w = rng.range(0.045, 0.07);
     const side = new THREE.Vector3(-lean.z, 0, lean.x)
       .normalize()
       .applyAxisAngle(UP, rng.range(-0.6, 0.6));
@@ -921,8 +922,8 @@ export interface FoliageRegion {
   exclude?: (x: number, z: number) => boolean;
 }
 
-const GRASS_DENSITY: Record<NatureQuality, number> = { low: 1.6, medium: 4.8, high: 10 };
-const GRASS_BLADES: Record<NatureQuality, number> = { low: 6, medium: 7, high: 10 };
+const GRASS_DENSITY: Record<NatureQuality, number> = { low: 1.6, medium: 5.5, high: 10 };
+const GRASS_BLADES: Record<NatureQuality, number> = { low: 4, medium: 5, high: 7 };
 const VARIANTS = 3;
 
 export class FoliageSystem {

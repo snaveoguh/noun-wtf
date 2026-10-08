@@ -1,8 +1,8 @@
 // ── Rounded boulders + pebbles ──────────────────────────────────────────
 //
-// Displaced, Laplacian-smoothed icospheres (soft, river-worn shapes) with a
-// cel-shaded creamy stone: flat-shaded facets on the shared toon ramp,
-// (no UV seams), cavity AO baked into vertex colours. Instanced per variant.
+// Displaced, Laplacian-smoothed low-detail icospheres (river-worn shapes),
+// split into flat facets ("flat planes") and shaded with the shared toon
+// ramp; creamy tint + cavity AO baked into vertex colours. Instanced per variant.
 
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
