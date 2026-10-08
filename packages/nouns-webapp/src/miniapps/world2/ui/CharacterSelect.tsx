@@ -12,6 +12,7 @@ import { ImageData } from '@noundry/nouns-assets';
 
 import { randomSeed, type NounSeed } from '../character/NounAppearance';
 import { BUILDS } from '../character/NounCharacter';
+import { worldPause } from '../worldPause';
 
 const STORAGE_KEY = 'noun-world-v2-character';
 
@@ -139,6 +140,7 @@ export function CharacterSelect({
   // Keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (worldPause.get()) return;
       const typing = (e.target as HTMLElement | null)?.tagName === 'INPUT';
       if (typing && !['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.code)) return;
       const r = ROWS[row];

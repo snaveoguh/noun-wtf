@@ -35,7 +35,7 @@ async function fetchGifIds(): Promise<string[]> {
 }
 
 interface Screen {
-  material: THREE.MeshToonMaterial | THREE.MeshStandardMaterial;
+  material: THREE.MeshBasicMaterial;
   video: HTMLVideoElement;
   texture: THREE.VideoTexture;
   next: number;
@@ -50,18 +50,24 @@ export class PipBillboards {
 
   /** Find screen materials under the level root and start the feed. */
   async attach(levelRoot: THREE.Object3D) {
-    const mats = new Map<string, THREE.MeshToonMaterial | THREE.MeshStandardMaterial>();
+    // Screens are swapped to unlit materials: the GIFs are black line art on
+    // white and should read exactly like that — no sun, no shadow, no toon band.
+    const mats = new Map<string, THREE.MeshBasicMaterial>();
+    const targets: { mesh: THREE.Mesh; index: number; key: string }[] = [];
     levelRoot.traverse(o => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of list) {
-        if (SCREEN_MATERIAL.test(m.name) && !mats.has(m.uuid)) {
-          mats.set(m.uuid, m as THREE.MeshToonMaterial);
-        }
-      }
+      list.forEach((m, index) => {
+        if (SCREEN_MATERIAL.test(m.name)) targets.push({ mesh, index, key: m.uuid });
+      });
     });
-    if (mats.size === 0) return;
+    if (targets.length === 0) return;
+    for (const t of targets) {
+      if (!mats.has(t.key)) {
+        mats.set(t.key, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+      }
+    }
     const ids = await fetchGifIds();
     if (this.disposed || ids.length === 0) return;
     // Shuffle so every visit shows a different mix
@@ -70,6 +76,11 @@ export class PipBillboards {
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
     this.ids = ids;
+    for (const t of targets) {
+      const m = mats.get(t.key)!;
+      if (Array.isArray(t.mesh.material)) t.mesh.material[t.index] = m;
+      else t.mesh.material = m;
+    }
     let k = 0;
     for (const material of mats.values()) {
       const video = document.createElement('video');
@@ -85,12 +96,6 @@ export class PipBillboards {
       texture.magFilter = THREE.NearestFilter; // keep the low-res GIF crunch
       texture.generateMipmaps = false;
       material.map = texture;
-      material.color.set(0xffffff);
-      // Screens glow a little so they read as lit billboards at night too
-      material.emissive.set(0xffffff);
-      material.emissiveMap = texture;
-      material.emissiveIntensity = 0.45;
-      material.transparent = false;
       material.needsUpdate = true;
       const screen: Screen = { material, video, texture, next: (k * 3) % CYCLE_SECONDS };
       this.screens.push(screen);

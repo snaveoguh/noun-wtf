@@ -273,9 +273,22 @@ export class Game {
     this.gfx.resize(w, h);
   }
 
+  /** Backgrounded behind the NounOS desk: no sim, no render, no input. */
+  paused = false;
+
+  setPaused(p: boolean) {
+    if (this.paused === p) return;
+    this.paused = p;
+    this.input.setEnabled(!p);
+  }
+
   private frame = (now: number) => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.frame);
+    if (this.paused) {
+      this.last = now;
+      return;
+    }
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (dt <= 0) return;

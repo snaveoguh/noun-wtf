@@ -11,6 +11,7 @@ import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls } from './ui/TouchControls';
+import { worldPause } from './worldPause';
 
 const CONTROLS: { k: string; v: string }[] = [
   { k: 'W', v: 'push' },
@@ -41,7 +42,12 @@ const PAD: { k: string; v: string }[] = [
   { k: 'RT (on foot)', v: 'spray paint · R3 colour' },
 ];
 
-export default function World2Page() {
+export interface World2PageProps {
+  /** Backgrounded behind the NounOS desk: freeze sim + render, release input. */
+  paused?: boolean;
+}
+
+export default function World2Page({ paused = false }: World2PageProps = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
@@ -121,11 +127,19 @@ export default function World2Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  useEffect(() => {
+    worldPause.set(paused);
+    game?.setPaused(paused);
+    if (paused) setChatOpen(false);
+  }, [game, paused]);
+
   // Keyboard: chat + help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement)?.tagName === 'INPUT';
-      if (gameRef.current?.showroom === true) return;
+      if (pausedRef.current || gameRef.current?.showroom === true) return;
       if (e.code === 'Enter' && !typing) {
         e.preventDefault();
         setChatOpen(true);
@@ -254,6 +268,7 @@ function Splash({
   useEffect(() => {
     if (!ready) return;
     const k = (e: KeyboardEvent) => {
+      if (worldPause.get()) return;
       if (e.code === 'Enter' || e.code === 'Space') onStart();
     };
     window.addEventListener('keydown', k);

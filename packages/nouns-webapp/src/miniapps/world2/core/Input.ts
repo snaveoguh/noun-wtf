@@ -162,8 +162,23 @@ export class Input {
       this.disposers.push(() => target.removeEventListener(type, fn as EventListener, opts));
     };
 
+    // macOS swallows keyups while ⌘ is held (e.g. ⌘⇧4 screenshots), which
+    // left Shift "held" = stuck in a manual. Trust the event's modifier
+    // flags over our key set, and drop everything when ⌘ is involved.
+    const syncModifiers = (e: KeyboardEvent | MouseEvent) => {
+      if (!e.shiftKey) {
+        this.keys.delete('ShiftLeft');
+        this.keys.delete('ShiftRight');
+      }
+      if (e.metaKey) this.keys.clear();
+    };
+    on(window, 'mousemove', syncModifiers);
+    const onVis = () => this.keys.clear();
+    document.addEventListener('visibilitychange', onVis);
+    this.disposers.push(() => document.removeEventListener('visibilitychange', onVis));
     on(window, 'keydown', e => {
-      if (isTyping(e)) return;
+      syncModifiers(e);
+      if (!this.enabled || isTyping(e)) return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code))
         e.preventDefault();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
@@ -171,6 +186,8 @@ export class Input {
       this.mode = 'keyboard';
     });
     on(window, 'keyup', e => {
+      syncModifiers(e);
+      if (e.key === 'Meta') this.keys.clear();
       this.keys.delete(e.code);
       this.released.add(e.code);
     });
@@ -184,7 +201,7 @@ export class Input {
         this.rmb = true;
         this.mouseStick.x = this.mouseStick.y = 0;
       }
-      if (e.button === 0 && !this.pointerLocked && !('ontouchstart' in window)) {
+      if (e.button === 0 && this.enabled && !this.pointerLocked && !('ontouchstart' in window)) {
         el.requestPointerLock?.();
       }
       this.mode = 'keyboard';
@@ -210,6 +227,19 @@ export class Input {
     };
     document.addEventListener('pointerlockchange', plc);
     this.disposers.push(() => document.removeEventListener('pointerlockchange', plc));
+  }
+
+  private enabled = true;
+
+  /** Disable while the game is backgrounded (keys cleared, pointer released). */
+  setEnabled(on: boolean) {
+    this.enabled = on;
+    if (!on) {
+      this.keys.clear();
+      this.rmb = false;
+      this.mouseDX = this.mouseDY = 0;
+      if (document.pointerLockElement === this.el) document.exitPointerLock?.();
+    }
   }
 
   dispose() {
