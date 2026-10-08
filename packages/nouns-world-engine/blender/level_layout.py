@@ -1081,6 +1081,7 @@ def build_buildings(L):
                 # alley: ground + a set-back back building closing the view
                 aw = 4.5
                 building(L, side, t, t + aw, 8.0, 3, "facade_c", "brick", rng, setback=9.0, shops=False)
+                L.facades.append(dict(side=side, t0=t, t1=t + aw, floors=3, setback=9.0, kind="alley"))
                 _alley_ground(L, side, t, t + aw, 9.0)
                 t += aw
                 idx += 1
@@ -1094,6 +1095,8 @@ def build_buildings(L):
                 floors = 4
                 tint = "cream"
             building(L, side, t, t + w, depth, floors, style, tint, rng, mural=mural)
+            L.facades.append(dict(side=side, t0=t, t1=t + w, floors=floors, setback=0.0,
+                                  kind="mural" if mural else "block"))
             if mural:
                 murals.append((side, t, t + w, floors))
             t += w
@@ -1190,6 +1193,21 @@ def build_decals(L, murals):
             w = min(14.0, (t1 - t0) - 2.0)
             decal_quad(L, (cx, FACADE), (0, -1), w, w * 0.62, "mural", 3.8)
     # posters on building fronts at street level are in the shopfront texture.
+    # JSR street style: big graffiti pieces above the shopfronts of every other plaza-facing block,
+    # tags on the alley back walls (render-only, no collision; deterministic)
+    gi = 3
+    for k, f in enumerate(getattr(L, "facades", [])):
+        tc = (f["t0"] + f["t1"]) / 2
+        F = FACADE + f["setback"]
+        pos, nrm = {0: ((tc, -F), (0, 1)), 1: ((tc, F), (0, -1)),
+                    2: ((-F, tc), (1, 0)), 3: ((F, tc), (-1, 0))}[f["side"]]
+        if f["kind"] == "alley":
+            decal_quad(L, pos, nrm, 3.4, 0.85, f"graffiti_{gi % 8}", 0.9, off=0.03)
+            gi += 1
+        elif f["kind"] == "block" and k % 2 == 0 and abs(tc) < 62 and f["t1"] - f["t0"] >= 10.0:
+            w = min(f["t1"] - f["t0"] - 2.0, 10.0)
+            decal_quad(L, pos, nrm, w, w * 0.25, f"graffiti_{gi % 8}", 3.6, off=0.05)
+            gi += 1
 
 
 def build_all():

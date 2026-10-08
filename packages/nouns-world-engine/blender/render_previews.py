@@ -76,16 +76,114 @@ def parent_to_bone(ob, rig, bone):
     ob.matrix_basis = Matrix()
 
 
-def setup_scene():
+def load_head(texture=None):
+    """noun_head_base.glb (optionally re-textured, e.g. with the labelled debug
+    grid from head_debug_grid.py); falls back to the box proxy."""
+    path = C.OUT_DIR / "noun_head_base.glb"
+    if not path.exists():
+        return proxy_head()
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    head = next(o for o in set(bpy.data.objects) - before if o.type == "MESH")
+    if texture:
+        img = bpy.data.images.load(str(texture))
+        for m in head.data.materials:
+            for n in m.node_tree.nodes:
+                if n.type == "TEX_IMAGE":
+                    n.image = img
+    return head
+
+
+def head_offset_bl():
+    try:
+        m = json.loads((C.OUT_DIR / "character_manifest.json").read_text())
+        x, y, z = m.get("head", {}).get("offset", [0, 0, 0])
+        return Vector((x, -z, y))
+    except (OSError, ValueError):
+        return Vector((0, 0, 0))
+
+
+def setup_scene(head_texture=None):
     C.reset_scene()
     bpy.ops.import_scene.gltf(filepath=str(C.OUT_DIR / "noun_character.glb"))
     rig = next(o for o in bpy.data.objects if o.type == "ARMATURE")
-    head = proxy_head()
+    head = load_head(head_texture)
     parent_to_bone(head, rig, "head")
+    head.matrix_basis = Matrix.Translation(head_offset_bl())
+    morph = arg("--morph")          # e.g. weight_heavy=1
+    if morph:
+        name, val = morph.split("=")
+        for o in bpy.data.objects:
+            if o.type == "MESH" and o.data.shape_keys and name in o.data.shape_keys.key_blocks:
+                o.data.shape_keys.key_blocks[name].value = float(val)
     bpy.ops.import_scene.gltf(filepath=str(C.OUT_DIR / "skateboard.glb"))
     board = bpy.data.objects["Skateboard"]
     parent_to_bone(board, rig, "board")
     return rig, head, board
+
+
+def toonify(outline=0.009):
+    """Quick cel-shaded preview in Cycles: Toon BSDF (2-tone ramp) + flat
+    ambient emission, and inverted-hull black outlines (Solidify, flipped
+    normals, back-facing parts transparent). Standard view transform so flat
+    albedo colours stay flat."""
+    ol = bpy.data.materials.new("PreviewOutline")
+    ol.use_nodes = True
+    nt = ol.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (0.01, 0.01, 0.012, 1)
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(geo.outputs["Backfacing"], mix.inputs[0])
+    nt.links.new(em.outputs[0], mix.inputs[1])
+    nt.links.new(tr.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    done = set()
+    for ob in bpy.data.objects:
+        if ob.type != "MESH" or ob.name.startswith("Preview"):
+            continue
+        for m in ob.data.materials:
+            if m is None or m.name in done or not m.use_nodes:
+                continue
+            done.add(m.name)
+            t = m.node_tree
+            bsdf = next((n for n in t.nodes if n.type == "BSDF_PRINCIPLED"), None)
+            mo = next((n for n in t.nodes if n.type == "OUTPUT_MATERIAL"), None)
+            if bsdf is None or mo is None:
+                continue
+            bc = bsdf.inputs["Base Color"]
+            src = bc.links[0].from_socket if bc.links else None
+            toon = t.nodes.new("ShaderNodeBsdfToon")
+            toon.inputs["Size"].default_value = 0.62
+            toon.inputs["Smooth"].default_value = 0.0
+            amb = t.nodes.new("ShaderNodeEmission")
+            amb.inputs["Strength"].default_value = 0.38
+            add = t.nodes.new("ShaderNodeAddShader")
+            for sock in (toon.inputs["Color"], amb.inputs["Color"]):
+                if src is not None:
+                    t.links.new(src, sock)
+                else:
+                    sock.default_value = bc.default_value
+            t.links.new(toon.outputs[0], add.inputs[0])
+            t.links.new(amb.outputs[0], add.inputs[1])
+            t.links.new(add.outputs[0], mo.inputs["Surface"])
+        n = len(ob.data.materials)
+        ob.data.materials.append(ol)
+        sol = ob.modifiers.new("Outline", "SOLIDIFY")
+        sol.thickness = outline
+        sol.offset = 1.0
+        sol.use_flip_normals = True
+        sol.use_rim = False
+        sol.material_offset = n
+        sol.use_quality_normals = True
+    scn = bpy.context.scene
+    scn.view_settings.view_transform = "Standard"
+    scn.cycles.diffuse_bounces = 0
+    scn.cycles.glossy_bounces = 0
+    scn.world.node_tree.nodes["Background"].inputs[1].default_value = 0.35
 
 
 def set_clip(rig, name):
@@ -109,12 +207,16 @@ def main():
     samples = arg("--samples", 8, int)
     out = Path(arg("--out", str(C.PREVIEW_DIR)))
     hero = "--hero" in sys.argv
+    if "--turnaround" in sys.argv:
+        return turnaround(out, size, samples)
     manifest = json.loads((C.OUT_DIR / "character_manifest.json").read_text())
     clip_meta = {c["name"]: c for c in manifest["clips"]}
     names = clips_arg.split(",") if clips_arg else list(clip_meta)
-    rig, head, board = setup_scene()
+    rig, head, board = setup_scene(arg("--head-texture"))
     print("bones:", len(rig.data.bones), "actions:", len(bpy.data.actions))
     R.setup("CYCLES", (size, size), samples=samples, fast=not hero)
+    if "--toon" in sys.argv:
+        toonify()
     R.add_sun()
     R.add_ground(size=12)
     scn = bpy.context.scene
@@ -133,11 +235,11 @@ def main():
                        "top": ((0.01, 0.0, 4.0), (0, 0, 0.0)), "heel": ((3.6, 0.0, 0.8), (0, 0, 0.62))}
             R.camera(presets[cam][0], presets[cam][1], lens=arg("--lens", 50, float))
         elif skate and name not in ("skate_bail", "skate_getup"):
-            R.camera((-2.5, -1.7, 1.15), (0, 0.0, 0.62), lens=50)
+            R.camera((-4.1, -2.8, 1.75), (0, 0.0, 1.0), lens=50)
         elif name in ("skate_bail", "skate_getup"):
-            R.camera((-1.2, -3.4, 1.6), (0.1, 0, 0.45), lens=45)
+            R.camera((-1.9, -5.2, 2.3), (0.1, 0, 0.6), lens=45)
         else:
-            R.camera((1.5, -2.7, 1.15), (0, 0, 0.72), lens=50)
+            R.camera((2.4, -4.4, 1.7), (0, 0, 1.02), lens=50)
         n = nframes
         for i in range(n):
             if meta["loop"]:
@@ -147,6 +249,38 @@ def main():
             scn.frame_set(int(math.floor(fr)), subframe=fr - math.floor(fr))
             R.render(frames_dir / f"{name}_{i}.png")
     print("done")
+
+
+def turnaround(out, size, samples):
+    """Character turnaround (8 views around + close-ups) in a given clip frame
+    (default: idle frame 0). --head-texture swaps the head map (debug grid)."""
+    rig, head, board = setup_scene(arg("--head-texture"))
+    clip = arg("--clip", "idle")
+    set_clip(rig, clip)
+    fr = arg("--frame", 0.0, float)
+    scn = bpy.context.scene
+    scn.frame_set(int(fr), subframe=fr - int(fr))
+    skate = clip.startswith("skate_") and clip not in ("skate_bail", "skate_getup")
+    for o in [board] + list(board.children_recursive):
+        o.hide_render = not skate
+    if "--no-head" in sys.argv:
+        head.hide_render = True
+    R.setup("CYCLES", (size, int(size * 1.25)), samples=samples, fast=False)
+    if "--toon" in sys.argv:
+        toonify()
+    R.add_sun()
+    R.add_ground(size=12)
+    tag = arg("--tag", clip)
+    dist, h, tgt = arg("--dist", 3.4, float), arg("--height", 1.0, float), arg("--target", 0.82, float)
+    views = arg("--views", "0,45,90,135,180,225,270,315")
+    paths = []
+    for a in [float(x) for x in views.split(",")]:
+        # a = 0: camera in front of the character (Blender -Y), counter-clockwise from above
+        th = math.radians(a)
+        loc = (math.sin(th) * dist, -math.cos(th) * dist, h)
+        R.camera(loc, (0, 0, tgt), lens=arg("--lens", 50, float))
+        paths.append(R.render(out / "turn" / f"{tag}_{int(a)}.png"))
+    print("turnaround:", *paths)
 
 
 if __name__ == "__main__":

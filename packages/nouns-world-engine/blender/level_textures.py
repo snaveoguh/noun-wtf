@@ -141,15 +141,18 @@ def _word_mask(word, H, W, rng, cell):
     return m
 
 
-WORDS = ["NOUNS", "WTF!", "SK8"]
+WORDS = ["NOUNS", "WTF!", "SK8", "TOKO", "FUN!", "NOWS", "KOOK", "STUNT"]
+N_GRAFFITI = len(WORDS)
+FILLS = [("pink", "yellow"), ("teal", "blue"), ("orange", "red"), ("yellow", "green"),
+         ("purple", "pink"), ("blue", "teal"), ("green", "yellow"), ("red", "purple")]
 
 
 def graffiti(i, size=(384, 1536)):
     rng = _rng(200 + i)
     H, W = size
     img = np.zeros((H, W, 4))
-    fills = [(PAL["pink"], PAL["yellow"]), (PAL["teal"], PAL["blue"]), (PAL["orange"], PAL["red"])][i % 3]
-    word = WORDS[i % 3]
+    fills = tuple(PAL[c] for c in FILLS[i % len(FILLS)])
+    word = WORDS[i % len(WORDS)]
     cell = min(H / 9.5, W / (len(word) * 6 + 1))
     m = _word_mask(word, H, W, rng, cell)
     field = _gauss_blur(m, cell * 0.55)
@@ -238,7 +241,7 @@ def make_decals(out_dir):
         p = os.path.join(out_dir, f"poster_{i}.png")
         write_png(poster(i), p)
         files[f"poster_{i}"] = {"color": p}
-    for i in range(3):
+    for i in range(N_GRAFFITI):
         p = os.path.join(out_dir, f"graffiti_{i}.png")
         write_png(graffiti(i), p)
         files[f"graffiti_{i}"] = {"color": p}

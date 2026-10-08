@@ -601,7 +601,7 @@ for nm, col, rgh, mtl in [
 
 for i in range(4):
     _spec(f"poster_{i}", kind="decal", rough=0.8, color=(0.6, 0.6, 0.6), alpha="MASK")
-for i in range(3):
+for i in range(8):
     _spec(f"graffiti_{i}", kind="decal", rough=0.6, color=(0.6, 0.6, 0.6), alpha="MASK")
 _spec("mural", kind="decal", rough=0.85, color=(0.6, 0.6, 0.6), alpha="MASK")
 

@@ -9,9 +9,11 @@ Options:
     --previews DIR       render preview PNGs there (default: none)
     --preview-only       skip lightmap bake + export (layout/material iteration)
     --views a,b,c        subset of preview cameras
-    --lm-samples N       lightmap bake samples (default 64)
+    --lm-samples N       lightmap bake samples (default 40, OIDN-denoised)
     --lm-scale F         lightmap resolution multiplier (default 1.0)
     --preview-samples N  (default 48)
+    --style NAME         art direction: "jsr" (default: flat cel-shade-friendly colour fields, see
+                         level_style.py) or "photo" (the raw procedural textures + normal maps)
     --save-blend PATH    save the final .blend for inspection
 
 See LEVEL_README.md for the full pipeline description.
@@ -47,10 +49,11 @@ def parse():
     ap.add_argument("--previews", default=None)
     ap.add_argument("--preview-only", action="store_true")
     ap.add_argument("--views", default=None)
-    ap.add_argument("--lm-samples", type=int, default=64)
+    ap.add_argument("--lm-samples", type=int, default=40)
     ap.add_argument("--lm-scale", type=float, default=1.0)
     ap.add_argument("--preview-samples", type=int, default=48)
     ap.add_argument("--save-blend", default=None)
+    ap.add_argument("--style", default="jsr", choices=["jsr", "photo"])
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     return ap.parse_args(argv)
 
@@ -67,6 +70,11 @@ def main():
     log("baking tiling textures (cached)")
     tex = LMAT.bake_textures(os.path.join(args.cache, "tex"), log=log)
     decals = level_textures.make_decals(os.path.join(args.cache, "decals"))
+    if args.style == "jsr":
+        import level_style
+        log("JSR style pass")
+        level_style.apply_const_palette()
+        tex = level_style.stylize_textures(tex, os.path.join(args.cache, "jsr"), log=log)
 
     # 2. geometry --------------------------------------------------------------------
     log("building layout")

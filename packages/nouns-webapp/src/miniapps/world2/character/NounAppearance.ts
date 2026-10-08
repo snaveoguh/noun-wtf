@@ -119,9 +119,13 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   const w = box.max.x - box.min.x;
   const s = width / Math.max(1, w);
   inner.scale.setScalar(s);
+  // Anchor at the Nouns art's neck line (top of the body sprite, pixel row
+  // y = 11 → -5 in centred coords) rather than the head's lowest pixel, so
+  // heads sit exactly as in the 2D art (some overhang the shoulders).
+  const NECK_Y = -5;
   inner.position.set(
     -((box.min.x + box.max.x) / 2) * s,
-    -box.min.y * s,
+    -NECK_Y * s,
     -((box.min.z + box.max.z) / 2) * s,
   );
 

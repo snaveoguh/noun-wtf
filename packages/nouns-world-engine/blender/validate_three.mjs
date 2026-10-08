@@ -146,7 +146,7 @@ function soleStats(side) {
   }
   const lx = pts.reduce((a, b) => (b[0] > a[0] ? b : a)), hy = pts.reduce((a, b) => (b[1] > a[1] ? b : a));
   ok(total > 0 && inRect === total, `torso front verts in front UV rect: ${inRect}/${total}`);
-  ok(lx[2] > 0.3 && hy[3] < 0.1, `front UV orientation: character-left (+X) -> image right (u=${lx[2].toFixed(3)}), top of torso -> image top (v=${hy[3].toFixed(3)})`);
+  ok(lx[2] > (u0 + u1) / 2 + 0.02 && hy[3] < 0.1, `front UV orientation: character-left (+X) -> image right (u=${lx[2].toFixed(3)}), top of torso -> image top (v=${hy[3].toFixed(3)})`);
 }
 
 // rest / head
@@ -231,6 +231,58 @@ const wfl = bs.getObjectByName('WheelFL').position;
 ok(wfl.x > 0 && wfl.z > 0 && Math.abs(wfl.y - 0.027) < 0.002, `WheelFL pivot at ${f3(wfl)} (front-left = +Z,+X)`);
 let btris = 0; bs.traverse(o => { if (o.isMesh) btris += o.geometry.index.count / 3; });
 ok(btris < 3000, `board triangles ${btris}`);
+
+// weight morph targets (shape keys) on every body primitive, usable together with skinning
+{
+  const names = manifest.morphTargets ?? [];
+  const okAll = skinnedMeshes.every(m => names.every(n => m.morphTargetDictionary && n in m.morphTargetDictionary)
+    && m.geometry.morphAttributes.position?.length === names.length);
+  ok(names.length === 2 && okAll, `morph targets ${names.join(', ')} on all ${skinnedMeshes.length} skinned primitives`);
+  // heavy really is heavier: the torso's front bulges forward
+  const body = skinnedMeshes.find(m => [].concat(m.material).some(x => x.name === 'NounBody'));
+  const mi = body.morphTargetDictionary['weight_heavy'];
+  const P = body.geometry.attributes.position, D = body.geometry.morphAttributes.position[mi];
+  let maxFwd = 0;
+  for (let i = 0; i < P.count; i++) if (P.getY(i) > 0.75 && P.getY(i) < 0.9) maxFwd = Math.max(maxFwd, D.getZ(i));
+  ok(maxFwd > 0.12, `weight_heavy pushes the belly forward by ${maxFwd.toFixed(3)} m`);
+}
+
+// smooth head base (noun_head_base.glb) + headUv contract
+{
+  const hg = await load(manifest.files.head);
+  let hm = null;
+  hg.scene.traverse(o => { if (o.isMesh) hm = o; });
+  ok(!!hm && hm.material.name === 'NounHead', `head mesh ${hm?.name} with material ${hm?.material?.name}`);
+  hg.scene.updateMatrixWorld(true);
+  const hb = new THREE.Box3().setFromObject(hg.scene);
+  const sz = hb.getSize(new THREE.Vector3());
+  const { width, height, depth } = manifest.headModel.size;
+  ok(Math.abs(sz.x - width) < 0.005 && Math.abs(sz.y - height) < 0.005 && Math.abs(sz.z - depth) < 0.005,
+    `head size ${f3(sz)} (expected ${width} x ${height} x ${depth})`);
+  ok(Math.abs(hb.min.y) < 1e-3 && Math.abs(hb.min.x + hb.max.x) < 1e-3 && Math.abs(hb.min.z + hb.max.z) < 1e-3,
+    `head origin at bottom centre (min ${f3(hb.min)})`);
+  const g = hm.geometry, P = g.attributes.position, N = g.attributes.normal, UV = g.attributes.uv;
+  const faces = {
+    front: [i => N.getZ(i) > 0.99, i => P.getX(i), i => -P.getY(i)],   // +X -> larger u, top -> smaller v
+    back: [i => N.getZ(i) < -0.99, i => -P.getX(i), i => -P.getY(i)],
+    left: [i => N.getX(i) > 0.99, i => -P.getZ(i), i => -P.getY(i)],   // image left = front (+Z)
+    right: [i => N.getX(i) < -0.99, i => P.getZ(i), i => -P.getY(i)],  // image left = back (-Z)
+    top: [i => N.getY(i) > 0.99, i => P.getX(i), i => P.getZ(i)],      // image top = back (-Z)
+  };
+  for (const [name, [sel, ku, kv]] of Object.entries(faces)) {
+    const [u0, v0, u1, v1] = manifest.headUv[name];
+    const pts = [];
+    for (let i = 0; i < P.count; i++) if (sel(i)) pts.push([UV.getX(i), UV.getY(i), ku(i), kv(i)]);
+    const inRect = pts.every(([u, v]) => u >= u0 - 1e-3 && u <= u1 + 1e-3 && v >= v0 - 1e-3 && v <= v1 + 1e-3);
+    // orientation: u grows with ku, v grows with kv
+    const corr = (a, b) => {
+      const n = pts.length, ma = pts.reduce((s, p) => s + p[a], 0) / n, mb = pts.reduce((s, p) => s + p[b], 0) / n;
+      return pts.reduce((s, p) => s + (p[a] - ma) * (p[b] - mb), 0);
+    };
+    ok(pts.length > 0 && inRect && corr(0, 2) > 0 && corr(1, 3) > 0,
+      `head ${name}: ${pts.length} verts inside headUv.${name} [${[u0, v0, u1, v1]}] with the documented orientation`);
+  }
+}
 
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);

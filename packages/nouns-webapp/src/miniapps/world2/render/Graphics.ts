@@ -9,6 +9,7 @@ import {
   EffectComposer,
   EffectPass,
   HueSaturationEffect,
+  NormalPass,
   RenderPass,
   SMAAEffect,
   SMAAPreset,
@@ -18,6 +19,8 @@ import {
 } from 'postprocessing';
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+
+import { InkOutlineEffect } from './Toon';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -33,6 +36,9 @@ export class Graphics {
   hemi: THREE.HemisphereLight;
   sky: Sky;
   quality: Quality;
+  /** Jet Set Radio cel-shaded look (disable with ?toon=0). */
+  toon = new URLSearchParams(window.location.search).get('toon') !== '0';
+  outline: InkOutlineEffect | null = null;
   private ao: InstanceType<typeof N8AOPostPass> | null = null;
   private bloom: BloomEffect;
   private sunDir = new THREE.Vector3(-0.45, -0.75, 0.48).normalize();
@@ -98,13 +104,21 @@ export class Graphics {
       multisampling: 0,
     });
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    // Normals for crease outlines (skip on low to save a scene pass)
+    let normalPass: NormalPass | null = null;
+    if (this.toon && quality !== 'low') {
+      normalPass = new NormalPass(this.scene, this.camera);
+      this.composer.addPass(normalPass);
+    }
     const aoParam = new URLSearchParams(window.location.search).get('fx');
-    if (quality !== 'low' && (aoParam === null || aoParam.split(',').includes('ao'))) {
+    // Toon mode skips SSAO: cel shading doesn't want it, and N8AO clobbers the
+    // depth the ink pass reads.
+    if (quality !== 'low' && (aoParam === null ? !this.toon : aoParam.split(',').includes('ao'))) {
       this.ao = new N8AOPostPass(this.scene, this.camera, 1, 1);
       const c = this.ao.configuration;
       c.aoRadius = 1.6;
       c.distanceFalloff = 0.6;
-      c.intensity = 2.2;
+      c.intensity = this.toon ? 1.3 : 2.2;
       c.aoSamples = quality === 'high' ? 16 : 8;
       c.denoiseSamples = quality === 'high' ? 8 : 4;
       c.halfRes = quality !== 'high';
@@ -120,9 +134,21 @@ export class Graphics {
       luminanceSmoothing: 0.2,
       radius: 0.7,
     });
-    const tone = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
-    const grade = new BrightnessContrastEffect({ brightness: 0.0, contrast: 0.08 });
-    const sat = new HueSaturationEffect({ saturation: 0.12 });
+    // JSR wants punchy, saturated colour: neutral tone curve + extra saturation
+    const tone = new ToneMappingEffect({
+      mode: this.toon ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX,
+    });
+    const grade = new BrightnessContrastEffect({
+      brightness: 0.0,
+      contrast: this.toon ? 0.12 : 0.08,
+    });
+    const sat = new HueSaturationEffect({ saturation: this.toon ? 0.28 : 0.12 });
+    if (this.toon) {
+      this.outline = new InkOutlineEffect({
+        normalBuffer: normalPass?.texture ?? null,
+        thickness: quality === 'high' ? 2.2 : 1.8,
+      });
+    }
     const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.42 });
     // `?fx=bloom,tone,grade,sat,vig` limits the stack (debugging / perf triage).
     const fxParam = new URLSearchParams(window.location.search).get('fx');
@@ -134,6 +160,9 @@ export class Graphics {
       want('sat') ? sat : null,
       want('vig') ? vignette : null,
     ].filter((e): e is NonNullable<typeof e> => e !== null);
+    // Ink in its own pass (merged with the grading effects it got dropped)
+    if (this.outline !== null && want('ink'))
+      this.composer.addPass(new EffectPass(this.camera, this.outline));
     if (effects.length > 0) this.composer.addPass(new EffectPass(this.camera, ...effects));
     this.composer.addPass(
       new EffectPass(
@@ -146,14 +175,17 @@ export class Graphics {
   applyLevel(level: LevelData) {
     this.sunDir.copy(level.sun.direction).normalize();
     this.sun.color.copy(level.sun.color);
-    this.sun.intensity = level.sun.intensity;
+    // The toon ramp's lit band is already full-bright; tame the sun so
+    // flat colours don't clip to white.
+    this.sun.intensity = level.sun.intensity * (this.toon ? 0.62 : 1);
     this.scene.fog = new THREE.FogExp2(level.fog.color, level.fog.density);
     // Sky sun position is the direction TO the sun
     const toSun = this.sunDir.clone().negate();
     this.sky.material.uniforms.sunPosition.value.copy(toSun);
     this.hemi.color.copy(level.sky.zenith).lerp(new THREE.Color(0xffffff), 0.5);
     // Baked levels already contain bounce light; keep the hemi fill small.
-    this.hemi.intensity = level.baked ? 0.12 : 0.45;
+    // Toon materials ignore the PMREM env, so ambient comes from the hemi
+    this.hemi.intensity = this.toon ? (level.baked ? 0.35 : 0.7) : level.baked ? 0.12 : 0.45;
     this.buildEnvironment(level.baked ? 0.6 : 1.0, level.sky.zenith, level.sky.horizon);
   }
 

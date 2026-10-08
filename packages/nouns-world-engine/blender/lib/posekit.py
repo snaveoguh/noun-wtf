@@ -24,6 +24,17 @@ from mathutils import Matrix, Quaternion, Vector
 
 R = math.radians
 
+# Big-head limits (Nouns proportions: a 1.1 m box head pivoting 5 cm above
+# its bottom). The head's pitch/roll relative to the chest is clamped (yaw
+# stays free) so its edges never sink into the shoulders, and clavicle
+# shrugs are capped so the shoulders never rise into the head.
+HEAD_SWING_MAX = 6.0     # degrees, None = unlimited
+CLAV_UP_MAX = 3.0        # degrees, None = unlimited
+# Forward (positive) pitch of hips/spine/chest is scaled down: the clips were
+# keyed for a small head; a skater leaning 20-35 deg under a 1.1 m head reads
+# as the head toppling. Upright torso = balanced silhouette. IK keeps the feet.
+TORSO_PITCH_SCALE = 0.5
+
 
 # ---------------------------------------------------------------------------
 # Splines
@@ -136,6 +147,7 @@ def default_controls():
         "neck.rot": (0.0, 0.0, 0.0), "head.rot": (0.0, 0.0, 0.0),
         "head.aim": 0.0, "head.world": (0.0, 0.0, 0.0),
         "board.pos": (0.0, 0.0, 0.0), "board.rot": (0.0, 0.0, 0.0),
+        "head.swing_max": HEAD_SWING_MAX if HEAD_SWING_MAX is not None else 180.0,
     }
     for s, sx in (("L", 1), ("R", -1)):
         c.update({
@@ -308,12 +320,26 @@ class RigSolver:
             tgt = q_eul(c["head.world"]) @ q_eul(c["head.rot"]) @ self.Rr["head"]
             self._place(W, "head", fk_rot.slerp(tgt, min(1.0, aim)), W["head"].translation.copy())
         chest_d = self._delta(W, "chest")
+        if HEAD_SWING_MAX is not None and c.get("head.swing_max", HEAD_SWING_MAX) < 179.0:
+            rel = chest_d.inverted() @ self._delta(W, "head")
+            tw = Quaternion((rel.w, 0.0, 0.0, rel.z))
+            tw = tw.normalized() if tw.magnitude > 1e-9 else Quaternion()
+            sw = rel @ tw.inverted()
+            if sw.w < 0:
+                sw = -sw
+            ang = 2.0 * math.acos(min(1.0, sw.w))
+            lim = R(c.get("head.swing_max", HEAD_SWING_MAX))
+            if ang > lim:
+                sw = Quaternion(sw.axis, lim)
+                self._place(W, "head", chest_d @ sw @ tw @ self.Rr["head"], W["head"].translation.copy())
         hips_d = self._delta(W, "hips")
         for s in ("L", "R"):
             mir = (lambda q: q) if s == "L" else mirror_q
             sx = 1 if s == "L" else -1
             # clavicle
             up, fwd = c[f"arm.{s}.clav"]
+            if CLAV_UP_MAX is not None:
+                up = min(up, CLAV_UP_MAX)
             self._fk(W, f"shoulder.{s}", mir(Quaternion((0, 0, 1), R(-fwd)) @ Quaternion((0, 1, 0), R(-up))))
             # FK arm
             o, f, u = c[f"arm.{s}.dir"]
@@ -390,6 +416,11 @@ class Clip:
 def eval_controls(clip, t):
     c = default_controls()
     c.update(clip.fn(t))
+    if TORSO_PITCH_SCALE != 1.0:
+        for k in ("hips.rot", "spine.rot", "chest.rot"):
+            p, sd, y = c[k]
+            if p > 0:
+                c[k] = (p * TORSO_PITCH_SCALE, sd, y)
     return c
 
 

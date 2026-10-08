@@ -12,6 +12,11 @@ import numpy as np
 from mathutils import Vector
 
 import common as C
+import paint as PT
+import sculpt as SC
+
+SKIN_HEX = "#e3b48f"
+MORPHS = {"weight_thin": -1.0, "weight_heavy": 1.0}
 
 # ---------------------------------------------------------------------------
 # Skeleton (Blender armature space). name: (head, tail, parent, deform)
@@ -48,7 +53,7 @@ BONE_ORDER = list(BONES.keys())
 # i.e. the glTF / three.js / canvas convention). 512px canvas = 16 px per
 # Nouns pixel; torso front is 14 x 14 Nouns pixels (0.42 m, 0.03 m / px).
 # ---------------------------------------------------------------------------
-TORSO = dict(x=0.21, y=0.12, z0=0.64, z1=1.06)
+TORSO = dict(x=0.21, y=0.13, z0=0.64, z1=1.06)
 UV_REGIONS = {
     "front": (0.0, 0.0, 0.4375, 0.4375),
     "back": (0.5, 0.0, 0.9375, 0.4375),
@@ -90,169 +95,21 @@ def torso_uv(co, normal):
     return _rect_uv("sleeves", (co.x + X) / (2 * X), (co.y + Y) / (2 * Y))
 
 
-def _interp_weights(z, table):
-    """table: list of (z, {bone: w}) sorted by z; linear blend."""
-    if z <= table[0][0]:
-        return dict(table[0][1])
-    for (za, wa), (zb, wb) in zip(table, table[1:]):
-        if z <= zb:
-            t = (z - za) / (zb - za)
-            out = {}
-            for k in set(wa) | set(wb):
-                out[k] = wa.get(k, 0) * (1 - t) + wb.get(k, 0) * t
-            return out
-    return dict(table[-1][1])
+def sleeve_uv(a, b):
+    """Arm sleeves -> the 'sleeves' rect (overlapping islands, runtime fills flat)."""
+    return _rect_uv_img("sleeves", 0.05 + 0.9 * min(max(a, 0), 1), 0.05 + 0.9 * min(max(b, 0), 1))
 
 
-TORSO_W = [
-    (0.645, {"hips": 0.65, "spine": 0.35}),
-    (0.70, {"hips": 0.3, "spine": 0.7}),
-    (0.78, {"spine": 1.0}),
-    (0.86, {"spine": 0.5, "chest": 0.5}),
-    (0.95, {"chest": 1.0}),
-]
+def _rect_uv_img(region, a, b):
+    u0, v0, u1, v1 = UV_REGIONS[region]
+    return (u0 + (u1 - u0) * a, v0 + (v1 - v0) * b)
 
 
-class Part:
-    def __init__(self, name, mat, xs, ys, zs, weights, bevel=0.018, segs=2, deform=None, uv="box"):
-        self.name, self.mat, self.xs, self.ys, self.zs = name, mat, xs, ys, zs
-        self.weights, self.bevel, self.segs, self.deform, self.uv = weights, bevel, segs, deform, uv
-
-
-def body_parts():
-    T = TORSO
-    parts = [
-        Part("torso", BODY, [-T["x"], -0.07, 0.07, T["x"]], [-T["y"], T["y"]],
-             [T["z0"], 0.70, 0.78, 0.86, 0.95, T["z1"]],
-             lambda co: _torso_weights(co), bevel=0.022, uv="torso"),
-        Part("pelvis", PANTS, [-0.19, 0.19], [-0.11, 0.11], [0.45, 0.67], lambda co: {"hips": 1.0}, bevel=0.02),
-        Part("neck", SKIN, [-0.075, 0.075], [-0.065, 0.065], [1.02, 1.09, NECK_TOP_Z + 0.005],
-             lambda co: _interp_weights(co.z, [(1.045, {"chest": 0.5, "neck": 0.5}), (1.09, {"neck": 1.0})]),
-             bevel=0.015),
-    ]
-    for side, sx in (("L", 1), ("R", -1)):
-        def X(a, b, sx=sx):
-            return sorted([a * sx, b * sx])
-        parts += [
-            Part(f"upperarm.{side}", BODY, X(0.215, 0.325), [-0.055, 0.055], [0.75, 0.90, 1.045],
-                 lambda co, s=side: _interp_weights(co.z, [(1.0, {f"upperarm.{s}": 1.0}),
-                                                          (1.045, {f"upperarm.{s}": 0.8, f"shoulder.{s}": 0.2})]),
-                 bevel=0.018, uv="sleeve"),
-            Part(f"forearm.{side}", BODY, X(0.22, 0.32), [-0.05, 0.05], [0.585, 0.70, 0.80],
-                 lambda co, s=side: {f"forearm.{s}": 1.0}, bevel=0.016, uv="sleeve"),
-            Part(f"hand.{side}", SKIN, X(0.228, 0.312), [-0.05, 0.045], [0.465, 0.60],
-                 lambda co, s=side: {f"hand.{s}": 1.0}, bevel=0.016),
-            Part(f"thumb.{side}", SKIN, X(0.236, 0.268), [-0.078, -0.03], [0.50, 0.565],
-                 lambda co, s=side: {f"hand.{s}": 1.0}, bevel=0.01, segs=1),
-            Part(f"thigh.{side}", PANTS, X(0.02, 0.16), [-0.075, 0.075], [0.265, 0.40, 0.555],
-                 lambda co, s=side: {f"thigh.{s}": 1.0}, bevel=0.02),
-            Part(f"shin.{side}", PANTS, X(0.0275, 0.1525), [-0.068, 0.068], [0.09, 0.20, 0.33],
-                 lambda co, s=side: {f"shin.{s}": 1.0}, bevel=0.018),
-            Part(f"shoe.{side}", SHOE, X(0.025, 0.155), [-0.185, -0.13, -0.10, -0.07, 0.0, 0.075], [0.026, 0.12],
-                 lambda co, s=side: _foot_weights(co, s), bevel=0.016, deform=_shoe_deform),
-            Part(f"sole.{side}", SOLE, X(0.019, 0.161), [-0.193, -0.13, -0.10, -0.07, 0.0, 0.082], [0.0, 0.03],
-                 lambda co, s=side: _foot_weights(co, s), bevel=0.007, segs=1),
-            Part(f"tongue.{side}", SHOE, X(0.05, 0.13), [-0.06, 0.02], [0.10, 0.135],
-                 lambda co, s=side: {f"foot.{s}": 1.0}, bevel=0.008, segs=1),
-        ]
-    return parts
-
-
-def _torso_weights(co):
-    w = _interp_weights(co.z, TORSO_W)
-    if co.z > 0.98 and abs(co.x) > 0.15:
-        side = "L" if co.x > 0 else "R"
-        k = min(1.0, (abs(co.x) - 0.15) / 0.06) * min(1.0, (co.z - 0.98) / 0.06) * 0.3
-        w = {b: v * (1 - k) for b, v in w.items()}
-        w[f"shoulder.{side}"] = w.get(f"shoulder.{side}", 0) + k
-    return w
-
-
-def _foot_weights(co, side):
-    return _interp_weights(-co.y, [(0.07, {f"foot.{side}": 1.0}), (0.10, {f"foot.{side}": 0.5, f"toe.{side}": 0.5}),
-                                   (0.13, {f"toe.{side}": 1.0})])
-
-
-def _shoe_deform(co, idx, n):
-    if idx[2] == n[2] - 1:  # top row: lower toward the toe (sneaker toe box)
-        f = -co.y
-        if f > 0.0:
-            co.z = 0.12 - min(1.0, f / 0.13) * 0.045
-            if f > 0.13:
-                co.z -= (f - 0.13) / 0.055 * 0.012
-    return co
-
-
-# ---------------------------------------------------------------------------
-def default_body_texture(body_hex="#5a65fa", accessory="accessory-txt-noun-multicolor"):
-    S = 512
-    img = np.zeros((S, S, 4), np.uint8)
-    body = [int(c * 255) for c in C.hex_rgb(body_hex)]
-    img[..., :3] = body
-    img[..., 3] = 255
-    acc = C.noun_part(accessory)
-    # sprite region cols 9..22, rows 21..31 -> front rect at 16 canvas px / noun px
-    region = acc[21:32, 9:23]
-    C.blit(img, region, 0, 0, scale=16)
-    return img
-
-
-def build_body(mats, tex_rgba=None):
-    me = bpy.data.meshes.new("NounBodyMesh")
-    bm = bmesh.new()
-    uvl = bm.loops.layers.uv.new("UVMap")
-    part_layer = bm.faces.layers.int.new("part")
-    parts = body_parts()
-    for pi, part in enumerate(parts):
-        faces = C.grid_box(bm, part.xs, part.ys, part.zs, deform=part.deform)
-        for f in faces:
-            f.material_index = part.mat
-            f[part_layer] = pi
-        if part.bevel > 0:
-            faces = C.bevel_sharp(bm, faces, part.bevel, segments=part.segs)
-        for f in faces:
-            f.material_index = part.mat
-            f[part_layer] = pi
-    bm.normal_update()
-    # UVs
-    for f in bm.faces:
-        part = parts[f[part_layer]]
-        n = f.normal
-        for lp in f.loops:
-            co = lp.vert.co
-            if part.uv == "torso":
-                lp[uvl].uv = torso_uv(co, n)
-            elif part.uv == "sleeve":
-                bx = (min(part.xs), max(part.xs))
-                ax = max(range(3), key=lambda i: abs(n[i]))
-                a = (co.y + 0.06) / 0.12 if ax == 0 else (co.x - bx[0]) / (bx[1] - bx[0])
-                b = (1.06 - co.z) / 0.62 if ax != 2 else (co.y + 0.06) / 0.12
-                lp[uvl].uv = _rect_uv("sleeves", min(max(a, 0), 1) * 0.9 + 0.05, min(max(b, 0), 1) * 0.9 + 0.05)
-            else:
-                ax = max(range(3), key=lambda i: abs(n[i]))
-                pa = [c for i, c in enumerate(co) if i != ax]
-                lp[uvl].uv = (pa[0] * 2 + 0.5, pa[1] * 2 + 0.5)
-    # vertex weights
-    bm.verts.index_update()
-    vweights = {}
-    for v in bm.verts:
-        part = parts[min(lf[part_layer] for lf in v.link_faces)]
-        vweights[v.index] = part.weights(v.co)
-    C.finalize_mesh(bm, me, smooth_angle_deg=35)
-    bm.free()
-    for m in mats:
-        me.materials.append(m)
-    ob = bpy.data.objects.new("NounBody", me)
-    C.link(ob)
-    groups = {}
-    for b, (_, _, _, deform) in BONES.items():
-        if deform:
-            groups[b] = ob.vertex_groups.new(name=b)
-    for vi, w in vweights.items():
-        tot = sum(w.values())
-        for b, val in w.items():
-            if val > 1e-4:
-                groups[b].add([vi], val / tot, "REPLACE")
+def build_body(mats):
+    md = SC.build_meshdata(sleeve_uv, 0.0)
+    ob = SC.to_mesh(md, "NounBody", mats, torso_uv)
+    SC.apply_weights(ob, md, [b for b, v in BONES.items() if v[3]])
+    SC.add_shape_keys(ob, {name: SC.build_meshdata(sleeve_uv, w) for name, w in MORPHS.items()})
     return ob
 
 
@@ -279,13 +136,15 @@ def build_armature():
 
 
 def build_character():
-    tex = C.save_png("noun_body_default", default_body_texture())
+    tex_body = C.save_png("noun_body_default", PT.body_texture())
+    tex_pants = C.save_png("noun_pants", PT.pants_texture(256))
+    tex_shoe = C.save_png("noun_shoe", PT.shoe_texture(256))
     mats = [
-        C.make_material("NounBody", (1, 1, 1), roughness=0.85, image=tex),
-        C.make_material("NounSkin", C.hex_rgb("#e3b48f"), roughness=0.7),
-        C.make_material("NounPants", C.hex_rgb("#2e3d5c"), roughness=0.9),
-        C.make_material("NounShoe", C.hex_rgb("#e8473a"), roughness=0.75),
-        C.make_material("NounSole", C.hex_rgb("#f4f1e8"), roughness=0.8),
+        C.make_material("NounBody", (1, 1, 1), roughness=0.9, image=tex_body),
+        C.make_material("NounSkin", C.hex_rgb(SKIN_HEX), roughness=0.8),
+        C.make_material("NounPants", (1, 1, 1), roughness=0.92, image=tex_pants),
+        C.make_material("NounShoe", (1, 1, 1), roughness=0.85, image=tex_shoe),
+        C.make_material("NounSole", (1, 1, 1), roughness=0.9, image=tex_shoe),
     ]
     rig = build_armature()
     body = build_body(mats)

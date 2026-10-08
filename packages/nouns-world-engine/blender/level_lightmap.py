@@ -6,7 +6,7 @@ What is baked (per texel, in W/m^2 irradiance units == three.js light units):
                                                    >= 1 diffuse bounce (light-path trick)
       = sky light (occluded) + sun bounce light + sky bounce light
     final = E * lerp(1, AO(0.6 m), AO_MIX)            (extra contact darkening)
-Stored: sRGB-encoded (final / LM_RANGE) in 8-bit -> runtime: texture.colorSpace = SRGBColorSpace,
+Stored: LINEAR (final / LM_RANGE), dithered 8-bit -> runtime: texture.colorSpace = LinearSRGBColorSpace,
 material.lightMapIntensity = LM_RANGE, texture.channel = 1 (uv1), texture.flipY = false.
 """
 import ctypes
@@ -23,10 +23,10 @@ import level_scene as LS
 ATLASES = [
     ("ground", ["Ground"], 2048),
     ("obstacles", ["Obstacles"], 2048),
-    ("buildings", ["Buildings"], 2048),
+    ("buildings", ["Buildings"], 1024),   # big flat facades: soft sky/bounce, 1k is plenty
     ("props", ["Props"], 2048),
     ("detail", ["Foliage", "Decals", "Water"], 1024),
-    ("backdrop", ["Backdrop"], 1024),
+    ("backdrop", ["Backdrop"], 512),
 ]
 AO_DISTANCE = 0.6
 AO_MIX = 0.45
@@ -68,7 +68,16 @@ def unwrap(objs, log=print):
 # ---------------------------------------------------------------------------- OIDN
 class OIDN:
     def __init__(self):
-        libdir = os.path.join(os.path.dirname(bpy.__file__), "lib")
+        d = os.path.dirname(bpy.__file__)
+        libdir = None
+        while d and d != os.path.dirname(d):
+            if os.path.isdir(os.path.join(d, "lib")) and any(
+                    f.startswith("libOpenImageDenoise.so") for f in os.listdir(os.path.join(d, "lib"))):
+                libdir = os.path.join(d, "lib")
+                break
+            d = os.path.dirname(d)
+        if libdir is None:
+            raise RuntimeError("libOpenImageDenoise not found next to bpy")
         cand = [os.path.join(libdir, f) for f in os.listdir(libdir) if f.startswith("libOpenImageDenoise.so")]
         cand.sort(key=len)
         self.lib = ctypes.CDLL(cand[0])
@@ -161,8 +170,71 @@ def _bake(objs, img, btype, **kw):
     return _pixels(img)
 
 
+def _diffuse_override(objs):
+    """Swap every Principled BSDF for a plain white-irradiance-friendly Diffuse BSDF (same base colour,
+    normal and alpha) while baking. Metallic surfaces have no diffuse lobe, so a DIFFUSE bake of the real
+    material comes out black/noisy; the lightmap must hold irradiance regardless of the surface BRDF.
+    Returns an undo list for _restore_override."""
+    undo = []
+    seen = set()
+    for ob in objs:
+        for slot in ob.material_slots:
+            m = slot.material
+            if m is None or m.name in seen:
+                continue
+            seen.add(m.name)
+            nt = m.node_tree
+            outn = [n for n in nt.nodes if n.bl_idname == "ShaderNodeOutputMaterial"][0]
+            if not outn.inputs["Surface"].links:
+                continue
+            old = outn.inputs["Surface"].links[0].from_socket
+            bsdf = old.node
+            if bsdf.bl_idname != "ShaderNodeBsdfPrincipled":
+                continue
+            new = []
+            dif = nt.nodes.new("ShaderNodeBsdfDiffuse")
+            new.append(dif)
+            for src, dst in (("Base Color", "Color"), ("Normal", "Normal")):
+                inp = bsdf.inputs[src]
+                if inp.links:
+                    nt.links.new(inp.links[0].from_socket, dif.inputs[dst])
+                elif src == "Base Color":
+                    dif.inputs[dst].default_value = inp.default_value
+            surf = dif.outputs[0]
+            a = bsdf.inputs["Alpha"]
+            if a.links or a.default_value < 0.999:
+                tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+                mix = nt.nodes.new("ShaderNodeMixShader")
+                new += [tr, mix]
+                if a.links:
+                    nt.links.new(a.links[0].from_socket, mix.inputs[0])
+                else:
+                    mix.inputs[0].default_value = a.default_value
+                nt.links.new(tr.outputs[0], mix.inputs[1])
+                nt.links.new(dif.outputs[0], mix.inputs[2])
+                surf = mix.outputs[0]
+            nt.links.new(surf, outn.inputs["Surface"])
+            undo.append((nt, outn, old, new))
+    return undo
+
+
+def _restore_override(undo):
+    for nt, outn, old, new in undo:
+        nt.links.new(old, outn.inputs["Surface"])
+        for n in new:
+            nt.nodes.remove(n)
+
+
+def _ray_visible(ob, on):
+    ob.visible_diffuse = on
+    ob.visible_shadow = on
+    ob.visible_glossy = on
+    ob.visible_transmission = on
+
+
 def bake_all(scene, objs, out_dir, samples=64, scale=1.0, log=print):
     unwrap(objs, log=log)
+    undo = _diffuse_override(list(objs.values()))
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
     scene.render.threads_mode = "FIXED"
@@ -183,6 +255,10 @@ def bake_all(scene, objs, out_dir, samples=64, scale=1.0, log=print):
             continue
         res = int(base * scale)
         t = time.time()
+        # decals float 1-2 cm in front of walls/floors: keep them from occluding the surface behind them
+        # (except while baking their own atlas)
+        if "Decals" in objs:
+            _ray_visible(objs["Decals"], "Decals" in names)
         scene.cycles.samples = samples
         img = _target_image(f"LM_{atlas}", res)
         d = _bake(group, img, "DIFFUSE", pass_filter={"DIRECT", "INDIRECT"})
@@ -200,13 +276,21 @@ def bake_all(scene, objs, out_dir, samples=64, scale=1.0, log=print):
         log(f"  baked lightmap {atlas} {res}px ({time.time() - t:.1f}s) "
             f"mean {den[mask].mean():.3f} p99 {np.percentile(den[mask], 99):.3f}")
     LS.set_sun_indirect_only(sun.data, False)
+    _restore_override(undo)
+    if "Decals" in objs:
+        _ray_visible(objs["Decals"], True)
     # global range
     allv = np.concatenate([v[0][v[1]].ravel() for v in raw.values()])
     p = float(np.percentile(allv, 99.7))
     lm_range = max(1.0, math.ceil(p * 2.0) / 2.0)
     files = {}
+    rng = np.random.default_rng(7)
     for atlas, (den, mask) in raw.items():
-        enc = _srgb(np.clip(den / lm_range, 0.0, 1.0))
+        # LINEAR encoding (runtime loads lightmaps as LinearSRGBColorSpace); triangular dither
+        # of +-1 LSB hides 8-bit banding in the dark AO corners.
+        lin = np.clip(den / lm_range, 0.0, 1.0)
+        dither = (rng.random(lin.shape[:2]) - rng.random(lin.shape[:2]))[..., None] / 255.0
+        enc = np.clip(lin + dither, 0.0, 1.0)
         path = os.path.join(out_dir, f"lightmap_{atlas}{LM_EXT}")
         _save(enc, path)
         files[atlas] = os.path.basename(path)

@@ -148,7 +148,9 @@ def blit(dst: np.ndarray, src: np.ndarray, x0: int, y0: int, scale: int = 1):
 # Materials
 # --------------------------------------------------------------------------
 def make_material(name, color=(0.8, 0.8, 0.8), roughness=0.8, metallic=0.0,
-                  image: bpy.types.Image | None = None, emission=None):
+                  image: bpy.types.Image | None = None, emission=None, tint=False):
+    """With an image, `color` only feeds the viewport colour unless tint=True,
+    which multiplies the map by `color` (exported as glTF baseColorFactor)."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -162,7 +164,18 @@ def make_material(name, color=(0.8, 0.8, 0.8), roughness=0.8, metallic=0.0,
         tex.image = image
         tex.interpolation = "Closest" if image.size[0] <= 64 else "Linear"
         tex.location = (-400, 200)
-        nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        if tint and any(abs(x - 1.0) > 1e-4 for x in lin):
+            # texture x colour factor (exported as baseColorFactor, tintable at runtime)
+            mix = nt.nodes.new("ShaderNodeMix")
+            mix.data_type = "RGBA"
+            mix.blend_type = "MULTIPLY"
+            mix.inputs[0].default_value = 1.0
+            mix.location = (-200, 200)
+            nt.links.new(tex.outputs["Color"], mix.inputs[6])
+            mix.inputs[7].default_value = (lin[0], lin[1], lin[2], 1.0)
+            nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
+        else:
+            nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
     mat.diffuse_color = (lin[0], lin[1], lin[2], 1.0)  # workbench preview colour
     return mat
 

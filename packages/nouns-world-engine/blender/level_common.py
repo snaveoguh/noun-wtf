@@ -76,6 +76,7 @@ class Level:
         self.rails = []
         self.spawns = []
         self.landmarks = []
+        self.facades = []  # building street facades (for decal placement)
         self._rail_ids = {}
 
     # ---------------------------------------------------------------- parts
@@ -245,14 +246,16 @@ class Level:
                 clean.append(p)
         if abs(clean[0][0] - clean[-1][0]) < 1e-6 and abs(clean[0][1] - clean[-1][1]) < 1e-6:
             clean.pop()
+        # outline runs along +s over the top then back along the bottom (clockwise in the s/z
+        # plane), so as-is it faces +y: use it for the +y cap and reverse it for the -y cap.
         b = len(verts)
-        for s, z in clean:
+        for s, z in reversed(clean):
             verts.append((s, -hw, z))
-        faces.append(list(range(b, b + len(clean))))  # -y side (outline order => normal -y)
+        faces.append(list(range(b, b + len(clean))))  # -y side cap, normal -y
         mats.append(mat_side)
         smooth.append(False)
         b = len(verts)
-        for s, z in reversed(clean):
+        for s, z in clean:
             verts.append((s, hw, z))
         faces.append(list(range(b, b + len(clean))))
         mats.append(mat_side)

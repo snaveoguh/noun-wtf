@@ -417,7 +417,7 @@ const CSS = `
 .w2-pulse{animation:w2pulse 1.6s ease-in-out infinite}
 @keyframes w2pulse{50%{transform:scale(1.05)}}
 .w2-splash{background:radial-gradient(ellipse at 50% 40%,rgba(30,40,70,.55),rgba(5,6,12,.92))}
-.w2-title{font-size:clamp(56px,11vw,140px);line-height:.85;font-weight:900;letter-spacing:-.02em;text-shadow:0 8px 0 #d22209,0 16px 40px rgba(0,0,0,.6);font-style:italic}
+.w2-title{font-family:'Pip3',system-ui,sans-serif;text-transform:uppercase;font-size:clamp(64px,13vw,170px);line-height:.85;font-weight:400;letter-spacing:.01em;text-shadow:0 8px 0 #d22209,0 16px 40px rgba(0,0,0,.6);font-style:italic}
 .w2-title span{display:block;color:#ffd400;font-size:.55em;text-align:right}
 .w2-spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.25);border-top-color:#ffd400;border-radius:50%;animation:w2spin .8s linear infinite}
 @keyframes w2spin{to{transform:rotate(360deg)}}

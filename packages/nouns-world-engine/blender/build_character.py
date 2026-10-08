@@ -2,7 +2,7 @@
 noun_character.glb + character_manifest.json.
 
 Run:  <blender-python> packages/nouns-world-engine/blender/build_character.py
-(build_skateboard.py should run first; build_all.sh does both + validation.)
+(build_skateboard.py and build_head.py run first; build_character_assets.sh does all + validation.)
 """
 import json
 import sys
@@ -20,6 +20,9 @@ import posekit as PK  # noqa: E402
 import clips_foot  # noqa: E402
 import clips_skate  # noqa: E402
 from build_skateboard import board_info  # noqa: E402
+import build_head as BH  # noqa: E402
+
+HEAD_OFFSET = [0.0, -0.02, 0.0]   # three.js, head-bone space: head bottom at y 1.13 sits on the funnel collar
 
 
 def bl2three(v):
@@ -60,10 +63,24 @@ def export(path):
         export_frame_step=1, export_optimize_animation_size=True, export_anim_single_armature=True,
         export_def_bones=False, export_leaf_bone=False, export_reset_pose_bones=True,
         export_rest_position_armature=True, export_anim_slide_to_zero=True, export_bake_animation=False,
-        export_skins=True, export_morph=False, export_lights=False, export_cameras=False,
+        export_skins=True, export_morph=True, export_morph_normal=True, export_lights=False, export_cameras=False,
         export_draco_mesh_compression_enable=False, export_image_format="AUTO",
+        export_vertex_color="NONE",
     )
     print(f"[character] wrote {path} ({Path(path).stat().st_size} bytes)")
+
+
+def glb_triangles(path):
+    import struct
+    b = Path(path).read_bytes()
+    n = struct.unpack("<I", b[12:16])[0]
+    j = json.loads(b[20:20 + n])
+    tot = 0
+    for m in j["meshes"]:
+        for p in m["primitives"]:
+            acc = j["accessors"][p["indices"]] if "indices" in p else j["accessors"][p["attributes"]["POSITION"]]
+            tot += acc["count"] // 3
+    return tot
 
 
 def manifest(rig, body, solver, clips):
@@ -90,7 +107,7 @@ def manifest(rig, body, solver, clips):
         "generator": "packages/nouns-world-engine/blender/build_character.py",
         "units": "meters",
         "fps": 30,
-        "files": {"character": "noun_character.glb", "skateboard": "skateboard.glb"},
+        "files": {"character": "noun_character.glb", "skateboard": "skateboard.glb", "head": "noun_head_base.glb"},
         "coordinateSystem": {
             "up": "+Y", "forward": "+Z", "left": "+X",
             "note": "Character origin = ground point between the soles. In three.js the character faces +Z "
@@ -101,7 +118,37 @@ def manifest(rig, body, solver, clips):
             "skinnedMesh": "NounBody",
             "triangles": C.tri_count(body.data),
             "heightWithoutHead": RG.NECK_TOP_Z,
-            "approxHeightWithHead": round(RG.NECK_TOP_Z + 0.55, 3),
+            "approxHeightWithHead": round(RG.NECK_TOP_Z + HEAD_OFFSET[1] + BH.H, 3),
+            "style": "Jet Set Radio-style angular low poly for cel shading: chamfered 6-10 sided lofted "
+                     "sections, flat-shaded planes (crease angle 28 deg), flat albedo per material, "
+                     "smooth multi-bone weights. Designed for a 2-3 tone toon ramp + black outlines.",
+            "morphTargets": list(RG.MORPHS),
+        },
+        "head": {
+            "bone": "head",
+            "offset": HEAD_OFFSET,
+            "width": BH.W,
+            "model": "noun_head_base.glb",
+            "note": "Runtime attach: add the head (origin = bottom centre, facing +Z) as a child of the "
+                    "`head` bone at `offset` (head-bone space = character axes at rest, origin at the neck "
+                    "top). noun_head_base.glb is already `width` m wide, so no scaling is needed; a voxel "
+                    "head should be normalised to `width` with its bbox bottom at y = 0.",
+        },
+        "headModel": dict(BH.head_info(glb_triangles(C.OUT_DIR / "noun_head_base.glb")
+                                       if (C.OUT_DIR / "noun_head_base.glb").exists() else None)),
+        "headUv": {**{k: v for k, v in BH.HEAD_UV.items()}, "notes": BH.HEAD_UV_NOTES},
+        "uvRegions": uv,
+        "morphTargets": list(RG.MORPHS),
+        "morphNotes": {
+            "weight_thin": "skinny: everything ~15-25 % slimmer.",
+            "weight_heavy": "clinically obese: round belly pushing the jacket out, double-wide waist and seat, "
+                            "thick thighs/arms (sleeves and hands are pushed outward so hanging arms clear the "
+                            "belly).",
+            "usage": "Both targets are on every primitive of the skinned body (glTF morph targets with "
+                     "normals; three.js applies morphs before skinning). Drive "
+                     "mesh.morphTargetInfluences[mesh.morphTargetDictionary[name]] in 0..1 on every "
+                     "primitive (the GLB body is a Group of 5 SkinnedMeshes, one per material). For one "
+                     "slider s in -1..1: thin = max(0, -s), heavy = max(0, s).",
         },
         "bones": {b: three_name(b) for b in bones},
         "boneNamesThree": [three_name(b) for b in bones],
@@ -123,19 +170,24 @@ def manifest(rig, body, solver, clips):
             "boneLocalFrame": "head bone local axes at rest equal the character axes (+Y up, +Z forward, +X left); "
                               "its origin is the neck top.",
             "recommended": {
-                "fitWidth": 0.55,
-                "placement": "Scale the head model uniformly so its bounding-box width (X) is ~0.55 m, centre it "
-                             "on X/Z, and offset it so the bbox bottom sits at y = 0 in head-bone space "
-                             "(i.e. headModel.position.y = -bbox.min.y * scale). Add it as a child of the head "
-                             "bone. A small +Z nudge (0.0-0.03 m) reads well for heads with long snouts.",
+                "fitWidth": BH.W,
+                "placement": "Scale the head model uniformly so its bounding-box width (X) is `head.width` m, "
+                             "centre it on X/Z, and offset it so the bbox bottom sits at y = head.offset[1] in "
+                             "head-bone space (noun_head_base.glb already satisfies this at scale 1). Add it as "
+                             "a child of the head bone; its bottom then rests on the hood roll. A small +Z "
+                             "nudge (0.0-0.03 m) reads well for heads with long snouts.",
             },
         },
         "materials": {
-            "NounBody": "shirt torso + sleeves; base colour map replaced at runtime by a canvas texture",
-            "NounSkin": "hands + neck stub; tint to the head's skin tone (default #e3b48f)",
-            "NounPants": "pelvis + legs (default dark denim #2e3d5c)",
-            "NounShoe": "shoe uppers (default #e8473a)",
-            "NounSole": "soles (default #f4f1e8)",
+            "NounBody": "cropped jacket (torso, funnel collar, puffy sleeves); base colour map replaced at "
+                        "runtime by a canvas texture (see nounBodyTexture) - keep it flat colour.",
+            "NounSkin": "mitten hands, no map: flat baseColorFactor (default #e3b48f); set material.color to "
+                        "the head's skin tone. There is no neck (the collar hides it).",
+            "NounPants": "baggy cargo pants: flat olive #5d6b3c map with a yellow outer-seam stripe and darker "
+                         "cargo pocket panels; baseColorFactor white.",
+            "NounShoe": "chunky sneaker uppers: flat red #e8473a with white side panels + lace block; shares "
+                        "shoe.png with NounSole. Recolour by replacing the map.",
+            "NounSole": "thick sole: off-white with a black band and dark tread.",
         },
         "nounBodyTexture": {
             "uvConvention": "glTF / three.js (texture.flipY = false, as GLTFLoader sets): (u, v) with v = 0 at "
@@ -183,8 +235,9 @@ def manifest(rig, body, solver, clips):
             "frontFootDeckZ": clips_skate.FRONT_F,
             "backFootDeckZ": clips_skate.BACK_F,
             "ollieFootDeckZ": {"front": clips_skate.OLLIE_FRONT_F, "back": clips_skate.OLLIE_BACK_F},
-            "bailEnd": "skate_bail ends lying on the back, head toward +X, still centred near the origin; "
-                       "skate_getup starts from that exact pose and ends in the on-foot idle stance facing +Z.",
+            "bailEnd": "skate_bail ends on the back, reclined ~45 deg against the giant head, which rests flat "
+                       "on the ground (head toward +X), still centred near the origin; skate_getup starts from "
+                       "that exact pose and ends in the on-foot idle stance facing +Z.",
         },
         "skateboard": board_info(),
     }

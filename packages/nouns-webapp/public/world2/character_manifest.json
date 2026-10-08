@@ -5,7 +5,8 @@
   "fps": 30,
   "files": {
     "character": "noun_character.glb",
-    "skateboard": "skateboard.glb"
+    "skateboard": "skateboard.glb",
+    "head": "noun_head_base.glb"
   },
   "coordinateSystem": {
     "up": "+Y",
@@ -16,9 +17,135 @@
   "character": {
     "rootNode": "NounRig",
     "skinnedMesh": "NounBody",
-    "triangles": 2596,
+    "triangles": 1818,
     "heightWithoutHead": 1.15,
-    "approxHeightWithHead": 1.7
+    "approxHeightWithHead": 2.13,
+    "style": "Jet Set Radio-style angular low poly for cel shading: chamfered 6-10 sided lofted sections, flat-shaded planes (crease angle 28 deg), flat albedo per material, smooth multi-bone weights. Designed for a 2-3 tone toon ramp + black outlines.",
+    "morphTargets": [
+      "weight_thin",
+      "weight_heavy"
+    ]
+  },
+  "head": {
+    "bone": "head",
+    "offset": [
+      0.0,
+      -0.02,
+      0.0
+    ],
+    "width": 1.1,
+    "model": "noun_head_base.glb",
+    "note": "Runtime attach: add the head (origin = bottom centre, facing +Z) as a child of the `head` bone at `offset` (head-bone space = character axes at rest, origin at the neck top). noun_head_base.glb is already `width` m wide, so no scaling is needed; a voxel head should be normalised to `width` with its bbox bottom at y = 0."
+  },
+  "headModel": {
+    "file": "noun_head_base.glb",
+    "mesh": "NounHead",
+    "material": "NounHead",
+    "size": {
+      "width": 1.1,
+      "height": 1.0,
+      "depth": 0.85
+    },
+    "origin": "bottom centre; faces +Z; +Y up",
+    "chamfer": 0.07,
+    "triangles": 128,
+    "canvasSize": 512,
+    "defaultTexture": "head-crt-bsod + glasses-square-red (reference painter: build_head.default_texture)"
+  },
+  "headUv": {
+    "front": [
+      0.0,
+      0.0,
+      0.5,
+      0.5
+    ],
+    "left": [
+      0.5,
+      0.0,
+      0.75,
+      0.5
+    ],
+    "right": [
+      0.75,
+      0.0,
+      1.0,
+      0.5
+    ],
+    "top": [
+      0.0,
+      0.5,
+      0.5,
+      1.0
+    ],
+    "back": [
+      0.5,
+      0.5,
+      1.0,
+      1.0
+    ],
+    "bottom": [
+      0.24,
+      0.49,
+      0.26,
+      0.5
+    ],
+    "notes": {
+      "convention": "glTF / three.js UVs (texture.flipY = false): canvas pixel = (u * width, v * height), v = 0 at the TOP row. Rects are [u0, v0, u1, v1] (u0, v0 = top-left).",
+      "front": "face toward +Z, NOT mirrored: image left = the character's right (-X), image top = top of the head. 1.10 x 1.00 m -> paint the Noun's head sprite here (glasses included).",
+      "left": "character's left side (+X), image left = front. 0.85 x 1.00 m.",
+      "right": "character's right side (-X), image left = back. 0.85 x 1.00 m.",
+      "top": "seen from above, image top = back of the head, image left = character's right. 1.10 x 0.85 m.",
+      "back": "seen from behind, image left = character's left (+X). 1.10 x 1.00 m.",
+      "bottom": "bottom face (sits on the neck) samples a tiny strip at the bottom-centre of the front rect.",
+      "bevels": "each chamfer belongs to the nearer box face and is projected with that face's rect, so a rect's outer ~0.07 m wraps around the edge."
+    }
+  },
+  "uvRegions": {
+    "front": [
+      0.0,
+      0.0,
+      0.4375,
+      0.4375
+    ],
+    "back": [
+      0.5,
+      0.0,
+      0.9375,
+      0.4375
+    ],
+    "left": [
+      0.0,
+      0.5,
+      0.25,
+      0.9375
+    ],
+    "right": [
+      0.25,
+      0.5,
+      0.5,
+      0.9375
+    ],
+    "top": [
+      0.5,
+      0.5,
+      0.9375,
+      0.75
+    ],
+    "sleeves": [
+      0.5,
+      0.78125,
+      1.0,
+      1.0
+    ]
+  },
+  "morphTargets": [
+    "weight_thin",
+    "weight_heavy"
+  ],
+  "morphNotes": {
+    "weight_thin": "skinny: everything ~15-25 % slimmer.",
+    "weight_heavy": "clinically obese: round belly pushing the jacket out, double-wide waist and seat, thick thighs/arms (sleeves and hands are pushed outward so hanging arms clear the belly).",
+    "usage": "Both targets are on every primitive of the skinned body (glTF morph targets with normals; three.js applies morphs before skinning). Drive mesh.morphTargetInfluences[mesh.morphTargetDictionary[name]] in 0..1 on every primitive (the GLB body is a Group of 5 SkinnedMeshes, one per material). For one slider s in -1..1: thin = max(0, -s), heavy = max(0, s)."
   },
   "bones": {
     "root": "root",
@@ -85,16 +212,16 @@
     ],
     "boneLocalFrame": "head bone local axes at rest equal the character axes (+Y up, +Z forward, +X left); its origin is the neck top.",
     "recommended": {
-      "fitWidth": 0.55,
-      "placement": "Scale the head model uniformly so its bounding-box width (X) is ~0.55 m, centre it on X/Z, and offset it so the bbox bottom sits at y = 0 in head-bone space (i.e. headModel.position.y = -bbox.min.y * scale). Add it as a child of the head bone. A small +Z nudge (0.0-0.03 m) reads well for heads with long snouts."
+      "fitWidth": 1.1,
+      "placement": "Scale the head model uniformly so its bounding-box width (X) is `head.width` m, centre it on X/Z, and offset it so the bbox bottom sits at y = head.offset[1] in head-bone space (noun_head_base.glb already satisfies this at scale 1). Add it as a child of the head bone; its bottom then rests on the hood roll. A small +Z nudge (0.0-0.03 m) reads well for heads with long snouts."
     }
   },
   "materials": {
-    "NounBody": "shirt torso + sleeves; base colour map replaced at runtime by a canvas texture",
-    "NounSkin": "hands + neck stub; tint to the head's skin tone (default #e3b48f)",
-    "NounPants": "pelvis + legs (default dark denim #2e3d5c)",
-    "NounShoe": "shoe uppers (default #e8473a)",
-    "NounSole": "soles (default #f4f1e8)"
+    "NounBody": "cropped jacket (torso, funnel collar, puffy sleeves); base colour map replaced at runtime by a canvas texture (see nounBodyTexture) - keep it flat colour.",
+    "NounSkin": "mitten hands, no map: flat baseColorFactor (default #e3b48f); set material.color to the head's skin tone. There is no neck (the collar hides it).",
+    "NounPants": "baggy cargo pants: flat olive #5d6b3c map with a yellow outer-seam stripe and darker cargo pocket panels; baseColorFactor white.",
+    "NounShoe": "chunky sneaker uppers: flat red #e8473a with white side panels + lace block; shares shoe.png with NounSole. Recolour by replacing the map.",
+    "NounSole": "thick sole: off-white with a black band and dark tread."
   },
   "nounBodyTexture": {
     "uvConvention": "glTF / three.js (texture.flipY = false, as GLTFLoader sets): (u, v) with v = 0 at the TOP row of the image, i.e. canvas pixel = (u * width, v * height). Rects are [u0, v0, u1, v1] in that convention (u0,v0 = top-left corner).",
@@ -377,7 +504,7 @@
       "front": 0.05,
       "back": -0.31
     },
-    "bailEnd": "skate_bail ends lying on the back, head toward +X, still centred near the origin; skate_getup starts from that exact pose and ends in the on-foot idle stance facing +Z."
+    "bailEnd": "skate_bail ends on the back, reclined ~45 deg against the giant head, which rests flat on the ground (head toward +X), still centred near the origin; skate_getup starts from that exact pose and ends in the on-foot idle stance facing +Z."
   },
   "skateboard": {
     "file": "skateboard.glb",

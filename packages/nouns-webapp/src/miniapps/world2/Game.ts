@@ -21,6 +21,7 @@ import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
+import { toonify } from './render/Toon';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { loadLevel, type LevelData } from './world/Level';
@@ -163,6 +164,7 @@ export class Game {
     this.level = level;
     this.assets = assets;
     this.gfx.scene.add(level.root);
+    if (this.gfx.toon) toonify(level.root);
     this.world.build(level.collisionMeshes);
     this.rails.load(level.rails);
     this.graffiti = new Graffiti(
@@ -181,6 +183,7 @@ export class Game {
 
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
+    if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
     const spawn = level.spawns[Math.floor(Math.random() * level.spawns.length)] ?? {
@@ -523,6 +526,7 @@ export class Game {
     if (!r) {
       const seed = parseSeedKey(seedK) ?? randomSeed();
       const character = new NounCharacter(seed, this.assets);
+      if (this.gfx.toon) toonify(character.root);
       this.gfx.scene.add(character.root);
       const label = document.createElement('div');
       label.className = 'w2-nametag';
@@ -649,6 +653,7 @@ export class Game {
     }
     this.me = new NounCharacter(seed, this.assets);
     this.me.setBoardType(this.boardType);
+    if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
   }

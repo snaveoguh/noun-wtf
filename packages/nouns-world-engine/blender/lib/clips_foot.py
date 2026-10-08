@@ -33,6 +33,7 @@ def arms(dir_l, dir_r=None, elbow=(10, 10), clav=((0, 0), (0, 0)), wrist=((0, 0,
 STAND = {
     "hips.pos": (0.0, 0.0, -0.012), "hips.rot": (1.0, 0.0, 0.0),
     "spine.rot": (1.5, 0.0, 0.0), "chest.rot": (-1.5, 0.0, 0.0), "neck.rot": (1.0, 0, 0), "head.rot": (-1.5, 0, 0),
+    "head.swing_max": 6.0,
     "leg.L.pos": (0.10, 0.0, ANKLE_H), "leg.R.pos": (-0.10, 0.0, ANKLE_H),
     "leg.L.rot": (0.0, 0.0, 7.0), "leg.R.rot": (0.0, 0.0, -7.0),
     "leg.L.pole": (0.15, 1.0, 0.0), "leg.R.pole": (-0.15, 1.0, 0.0),
@@ -242,14 +243,14 @@ CROUCH = P(STAND, **{
 PUSH_OFF = P(STAND, **{
     "hips.pos": (0.0, 0.02, 0.025), "hips.rot": (4.0, 0, 0), "spine.rot": (-2.0, 0, 0), "chest.rot": (-6.0, 0, 0),
     "neck.rot": (-2.0, 0, 0), "head.rot": (-6.0, 0, 0),
-    **arms((0.25, 0.9, 0.55), elbow=(30, 30), clav=((10, 6), (10, 6)), wrist=((10, 0, 0), (10, 0, 0))),
+    **arms((0.55, 0.85, 0.05), elbow=(25, 25), clav=((3, 6), (3, 6)), wrist=((10, 0, 0), (10, 0, 0))),
     "leg.L.pos": (0.10, 0.06, 0.13), "leg.R.pos": (-0.10, 0.06, 0.13),
     "leg.L.rot": (42.0, 0, 7), "leg.R.rot": (42.0, 0, -7), "leg.L.toe": 40.0, "leg.R.toe": 40.0,
 })
 AIR = P(STAND, **{
     "hips.pos": (0.0, 0.0, 0.0), "hips.rot": (6.0, 0, 0), "spine.rot": (4.0, 0, 0), "chest.rot": (-4.0, 0, 0),
     "neck.rot": (0.0, 0, 0), "head.rot": (-6.0, 0, 0),
-    **arms((0.55, 0.35, 0.25), elbow=(35, 35), clav=((6, 2), (6, 2)), wrist=((0, 0, 0), (0, 0, 0))),
+    **arms((0.75, 0.35, -0.05), elbow=(35, 35), clav=((3, 2), (3, 2)), wrist=((0, 0, 0), (0, 0, 0))),
     "leg.L.pos": (0.11, 0.08, 0.27), "leg.R.pos": (-0.10, -0.06, 0.20),
     "leg.L.rot": (-10.0, 0, 8), "leg.R.rot": (20.0, 0, -8),
     "leg.L.pole": (0.2, 1.0, 0.3), "leg.R.pole": (-0.2, 1.0, 0.2),
@@ -275,8 +276,8 @@ def jump_air():
         c["hips.pos"] = (0.0, 0.0, 0.005 * S(x * 2))
         c["chest.rot"] = (-4.0 + 1.5 * S(x + 0.2), 1.5 * S(x + 0.3), 0)
         for side, ss in (("L", 1), ("R", -1)):
-            c[f"arm.{side}.dir"] = (0.55 + 0.08 * S(x + 0.25 * ss), 0.35 + 0.12 * S(x + 0.1 + 0.5 * (ss < 0)),
-                                    0.25 + 0.1 * Cc(x + 0.5 * (ss < 0)))
+            c[f"arm.{side}.dir"] = (0.75 + 0.08 * S(x + 0.25 * ss), 0.35 + 0.12 * S(x + 0.1 + 0.5 * (ss < 0)),
+                                    -0.05 + 0.08 * Cc(x + 0.5 * (ss < 0)))
             c[f"arm.{side}.elbow"] = 35 + 10 * S(x + 0.3 * ss)
             c[f"arm.{side}.wrist"] = (10 * S(x + 0.4 * ss), 0, 0)
         return c
@@ -297,9 +298,9 @@ def fall():
         for side, ss, ph in (("L", 1, 0.0), ("R", -1, 0.5)):
             a = TAU * (x + ph)
             # windmilling arms high above the shoulders
-            c[f"arm.{side}.dir"] = (0.75 + 0.15 * math.cos(a), 0.25 * math.sin(a), 0.75 + 0.25 * math.cos(a))
-            c[f"arm.{side}.elbow"] = 30 + 20 * math.sin(a + 1.0)
-            c[f"arm.{side}.clav"] = (14 + 5 * math.cos(a), 0)
+            c[f"arm.{side}.dir"] = (1.0, 0.45 * math.sin(a), -0.1 + 0.12 * math.cos(a))
+            c[f"arm.{side}.elbow"] = 20 + 15 * math.sin(a + 1.0)
+            c[f"arm.{side}.clav"] = (9 + 4 * math.cos(a), 0)
             c[f"arm.{side}.wrist"] = (20 * math.sin(a + 1.6), 0, 0)
             # bicycling legs
             c[f"leg.{side}.pos"] = (0.10 * ss, 0.07 * math.sin(a + 0.6), 0.16 + 0.07 * math.cos(a + 0.6))
@@ -336,18 +337,18 @@ def wave():
     up = P(STAND, **{
         "hips.pos": (-0.012, 0.0, -0.012), "hips.rot": (1, 2.0, 3.0), "spine.rot": (0, -2.0, 2.0),
         "chest.rot": (-3.0, -3.0, 4.0), "head.rot": (-4.0, 6.0, 4.0),
-        "arm.R.dir": (0.85, 0.25, 0.75), "arm.R.elbow": 70.0, "arm.R.clav": (12.0, 3.0), "arm.R.twist": -60.0,
+        "arm.R.dir": (1.0, 0.45, -0.05), "arm.R.elbow": 30.0, "arm.R.clav": (2.0, 6.0), "arm.R.twist": -85.0,
         "arm.R.wrist": (0.0, -10.0, 0.0),
         "arm.L.dir": (0.14, 0.04, -1.0), "arm.L.elbow": 14.0,
     })
 
     def w(a):
-        return P(up, **{"arm.R.wrist": (0.0, a, 0.0), "arm.R.elbow": 70.0 - a * 0.4,
-                        "arm.R.dir": (0.85 + a * 0.004, 0.25, 0.75)})
+        return P(up, **{"arm.R.wrist": (0.0, a, 0.0), "arm.R.elbow": 30.0 + a * 0.5,
+                        "arm.R.dir": (1.0, 0.45 + a * 0.006, -0.05)})
 
     seq = PoseSeq([
         (0.0, STAND), (0.12, P(STAND, **{"arm.R.dir": (0.25, -0.1, -0.9), "arm.R.elbow": 20.0}), ""),
-        (0.38, up), (0.55, w(28)), (0.75, w(-28)), (0.95, w(28)), (1.15, w(-28)), (1.35, w(22), ""),
+        (0.38, up), (0.55, w(30)), (0.75, w(-25)), (0.95, w(30)), (1.15, w(-25)), (1.35, w(20), ""),
         (1.6, P(STAND, **{"arm.R.dir": (0.3, 0.2, -0.9), "arm.R.elbow": 30.0})), (2.0, STAND, "h"),
     ], lag={"arm.R.wrist": 0.04, "arm.R.elbow": 0.02, "head": 0.06, "chest": 0.03})
     return Clip("wave", T, seq, False)
@@ -386,9 +387,9 @@ def dance():
             # raise-the-roof: arm pumps up on alternate beats
             pump = 0.5 + 0.5 * Cc(2 * x - ph * 2 + 0.0)
             hit = 0.5 + 0.5 * Cc(b - 0.08)
-            c[f"arm.{s_}.dir"] = (0.75, 0.25 + 0.15 * hit, -0.6 + 1.25 * pump)
-            c[f"arm.{s_}.elbow"] = 95 - 35 * pump * hit
-            c[f"arm.{s_}.twist"] = -40.0
+            c[f"arm.{s_}.dir"] = (0.95, 0.3 + 0.25 * pump, -0.9 + 0.3 * pump)
+            c[f"arm.{s_}.elbow"] = 80 - 20 * pump * hit
+            c[f"arm.{s_}.twist"] = -10.0
             c[f"arm.{s_}.clav"] = (6 * pump + 3 * hit, 3)
             c[f"arm.{s_}.wrist"] = (-25 * hit, 0, 0)
         return c
@@ -401,7 +402,7 @@ def celebrate():
     pump_up = P(STAND, **{
         "hips.pos": (0.0, 0.0, 0.0), "hips.rot": (-2, 0, 0), "spine.rot": (-6, 0, 0), "chest.rot": (-8, 0, 3),
         "neck.rot": (-3, 0, 0), "head.rot": (-12, 0, 4),
-        "arm.R.dir": (0.35, 0.15, 1.0), "arm.R.elbow": 20.0, "arm.R.clav": (16, 3), "arm.R.twist": -30.0,
+        "arm.R.dir": (1.0, 0.25, 0.05), "arm.R.elbow": 12.0, "arm.R.clav": (3, 3), "arm.R.twist": -30.0,
         "arm.R.wrist": (-10, 0, 0),
         "arm.L.dir": (0.35, 0.55, -0.6), "arm.L.elbow": 105.0, "arm.L.clav": (-2, 6), "arm.L.twist": -20.0,
         "leg.L.pos": (0.11, 0.0, ANKLE_H + 0.05), "leg.R.pos": (-0.11, 0.0, ANKLE_H + 0.05),
@@ -430,8 +431,8 @@ GUARD = P(STAND, **{
     "neck.rot": (0, 0, -8), "head.rot": (-6, 0, -10),
     "leg.L.pos": (0.11, 0.09, ANKLE_H), "leg.R.pos": (-0.09, -0.10, ANKLE_H),
     "leg.L.rot": (0, 0, 12), "leg.R.rot": (0, 0, -25),
-    "arm.L.dir": (0.25, 0.6, -0.6), "arm.L.elbow": 115.0, "arm.L.twist": -30.0, "arm.L.wrist": (-20, 0, 0),
-    "arm.R.dir": (0.3, 0.45, -0.75), "arm.R.elbow": 125.0, "arm.R.twist": -30.0, "arm.R.wrist": (-20, 0, 0),
+    "arm.L.dir": (0.3, 0.45, -0.8), "arm.L.elbow": 100.0, "arm.L.twist": -30.0, "arm.L.wrist": (-20, 0, 0),
+    "arm.R.dir": (0.35, 0.35, -0.85), "arm.R.elbow": 105.0, "arm.R.twist": -30.0, "arm.R.wrist": (-20, 0, 0),
 })
 
 

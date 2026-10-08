@@ -42,9 +42,7 @@ def export_all(scene, objs, col_objs, L, lm, out_dir, log=print):
     render = list(objs.values())
     _strip_bake_nodes(render)
     # ---------------------------------------------------------------- plaza.glb
-    b = col_objs.get("COL_Boundary")
-    sel = render + ([b] if b else [])
-    _select(sel)
+    _select(render)
     p = os.path.join(out_dir, "plaza.glb")
     bpy.ops.export_scene.gltf(filepath=p, export_format="GLB", use_selection=True, export_apply=False,
                               export_texcoords=True, export_normals=True, export_tangents=False,
@@ -75,84 +73,44 @@ def export_all(scene, objs, col_objs, L, lm, out_dir, log=print):
     sky_max = max(sky_rgb)
     ground_bounce = [0.28 * (e_sun_h + e_up) * c for c in (1.0, 0.95, 0.88)]
     data = {
-        "name": "Noggle Plaza",
-        "version": 1,
-        "units": "meters",
-        "coordinateSystem": "three.js Y-up (Blender (x,y,z) -> (x,z,-y)); origin = plaza centre, plaza floor y=0",
-        "files": {"render": "plaza.glb", "collision": "collision.glb"},
-        "bounds": {"min": [-76.0, -0.5, -76.0], "max": [76.0, 30.0, 76.0],
-                   "note": "playable AABB; invisible walls (COL_Boundary) sit just outside x/z = +-76"},
+        # ---- keys consumed by the runtime (src/miniapps/world2/world/Level.ts) ----
+        "glb": "plaza.glb",
+        "collisionGlb": "collision.glb",
+        "rails": [{"id": r["id"], "type": r["type"], "points": r["points"]} for r in L.rails],
+        "spawns": L.spawns,
         "sun": {
             "direction": sun_dir,
-            "directionNote": "unit vector pointing FROM the sun TOWARD the scene (light travels along it); "
-                             "place a DirectionalLight at target - direction * distance",
-            "elevationDeg": LS.SUN_ELEVATION_DEG,
-            "colorLinear": [round(c, 4) for c in LS.SUN_COLOR],
-            "colorHex": _srgb_hex(LS.SUN_COLOR),
+            "color": _srgb_hex(LS.SUN_COLOR),
             "intensity": LS.SUN_STRENGTH,
+            "elevationDeg": LS.SUN_ELEVATION_DEG,
             "angularDiameterDeg": LS.SUN_ANGLE_DEG,
         },
-        "sky": {
-            "zenithLinear": [round(c, 4) for c in LS.SKY_ZENITH],
-            "horizonLinear": [round(c, 4) for c in LS.SKY_HORIZON],
-            "groundLinear": [round(c, 4) for c in LS.SKY_GROUND],
-            "zenithHex": _srgb_hex(LS.SKY_ZENITH),
-            "horizonHex": _srgb_hex(LS.SKY_HORIZON),
-            "blendExponent": LS.SKY_GAMMA,
-            "note": "radiance(dir) = mix(horizon, zenith, max(dir.y,0)^blendExponent); below horizon = ground. "
-                    "Linear values are the exact radiance used for the bake (render the dome with them and the "
-                    "same tone mapping to match)",
-        },
-        "fog": {"type": "FogExp2", "colorHex": _srgb_hex(LS.SKY_HORIZON), "density": 0.0035},
-        "renderer": {"toneMapping": "AgX", "toneMappingExposure": 1.0, "outputColorSpace": "srgb",
-                     "note": "Blender previews use AgX, exposure 0 (== three exposure 1.0)"},
-        "ambientForDynamicObjects": {
-            "type": "HemisphereLight",
-            "skyColorLinear": [round(c / sky_max, 4) for c in sky_rgb],
-            "groundColorLinear": [round(c / max(ground_bounce), 4) for c in ground_bounce],
-            "intensity": round(e_up, 3),
-            "groundIntensityRatio": round(max(ground_bounce) / max(e_up, 1e-3), 3),
-            "note": "for the character/props that have no lightmap. Lightmapped level meshes must NOT also receive "
-                    "this ambient (their lightmap already contains sky + bounce)",
-        },
-        "lightmaps": {
-            "uvChannel": 1,
-            "uvAttribute": "uv1 (glTF TEXCOORD_1, Blender UV map 'lightmap')",
-            "lightMapIntensity": lm["range"],
-            "colorSpace": "srgb",
-            "flipY": False,
-            "encoding": "sRGB-encoded (irradiance / lightMapIntensity), 8-bit; decoded value * lightMapIntensity = "
-                        "irradiance in three.js light units (W/m^2, same scale as sun.intensity)",
-            "contains": "sky light + all bounce light (sun and sky) + short-range AO; NO direct sun",
-            "meshes": lm["meshes"],
-            "files": sorted(set(lm["files"].values())),
-            "howTo": "tex = new TextureLoader().load(file); tex.channel = 1; tex.flipY = false; "
-                     "tex.colorSpace = SRGBColorSpace; for each mesh under node <name>: "
-                     "material.lightMap = tex; material.lightMapIntensity = lightMapIntensity. Materials are already "
-                     "unique per lightmapped node (suffix __<Node>), so no cloning is needed.",
-        },
-        "meshes": {
-            "lightmapped": sorted(lm["meshes"].keys()),
-            "renderOnly": [n for n in RENDER_ONLY if n in [o.name for o in render]],
-            "collisionOnly": COLLISION_ONLY_IN_RENDER_GLB,
-            "collisionOnlyNote": "present in plaza.glb with material 'invisible': set visible=false but keep for raycasts",
-            "raycastAgainst": [o.name for o in render if o.name not in RENDER_ONLY] + COLLISION_ONLY_IN_RENDER_GLB,
-            "multiPrimitiveNote": "each node holds one primitive per material; GLTFLoader turns it into a Group whose "
-                                  "child meshes share the node's lightmap",
-        },
-        "collision": COLLISION_ONLY_IN_RENDER_GLB,
-        "collisionGlb": {
-            "file": "collision.glb",
-            "meshes": sorted(col_objs.keys()),
-            "note": "merged low-poly physics geometry (positions only). COL_Rails holds handrails/coping/flat bar "
-                    "tubes -- include it if you want to bonk/collide with rails, grinding should use 'rails'. "
-                    "Foliage, lamp heads, decals, awnings and building details are excluded.",
-        },
-        "rails": L.rails,
-        "railTypes": ["ledge", "rail", "coping", "curb"],
-        "spawns": L.spawns,
-        "spawnNote": "yaw radians about +Y, 0 = facing +Z; forward = (sin yaw, 0, cos yaw)",
+        "sky": {"zenith": _srgb_hex(LS.SKY_ZENITH), "horizon": _srgb_hex(LS.SKY_HORIZON),
+                "ground": _srgb_hex(LS.SKY_GROUND)},
+        "fog": {"color": _srgb_hex(LS.SKY_HORIZON), "density": 0.0035},
+        "lightmaps": lm["meshes"],
+        "lightMapIntensity": lm["range"],
+        "bounds": {"min": [-76.0, -0.5, -76.0], "max": [76.0, 30.0, 76.0]},
         "landmarks": L.landmarks,
+        # ---- informational ----
+        "meta": {
+            "name": "Noggle Plaza",
+            "version": 2,
+            "units": "meters",
+            "coordinateSystem": "three.js Y-up (Blender (x,y,z) -> (x,z,-y)); origin = plaza centre, floor y=0",
+            "sunDirection": "unit vector FROM the sun TOWARD the scene",
+            "spawnYaw": "radians about +Y, 0 = facing +Z; forward = (sin yaw, 0, cos yaw)",
+            "lightmapEncoding": "LINEAR 8-bit (irradiance / lightMapIntensity), uv1 (TEXCOORD_1), flipY=false; "
+                                "contains sky light + all bounce light + AO, NO direct sun (runtime sun is live)",
+            "lightmapGroundMedian": round(stats["ground_median"], 3),
+            "hemisphereSuggestion": {"sky": _srgb_hex([c / sky_max for c in sky_rgb]),
+                                     "ground": _srgb_hex([c / max(ground_bounce) for c in ground_bounce]),
+                                     "intensity": round(e_up, 3),
+                                     "note": "for non-lightmapped dynamic objects (character)"},
+            "collisionMeshes": sorted(col_objs.keys()),
+            "renderOnlyMeshes": [n for n in RENDER_ONLY if n in [o.name for o in render]],
+            "railCounts": {t: sum(1 for r in L.rails if r["type"] == t) for t in ("ledge", "rail", "coping", "curb")},
+        },
     }
     p3 = os.path.join(out_dir, "level.json")
     with open(p3, "w") as f:
