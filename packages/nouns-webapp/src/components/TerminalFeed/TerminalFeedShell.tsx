@@ -22,7 +22,7 @@ import { useActivityFeed } from './useActivityFeed';
 // they choose it.
 const DISCO_STORAGE_KEY = 'noun-wtf-disco-v2';
 
-export default function TerminalFeedShell() {
+export default function TerminalFeedShell({ windowed = false }: { windowed?: boolean } = {}) {
   const { isEmbedded } = useSiteTheme();
   const [activeFilter, setActiveFilter] = useState('');
   const [discoMode, setDiscoMode] = useState<boolean>(() => {
@@ -58,8 +58,10 @@ export default function TerminalFeedShell() {
     setChatHistory(prev => [...prev, userMsg, errAssistant]);
   }, []);
 
-  // Add terminal-mode class to document for CSS isolation
+  // Add terminal-mode class to document for CSS isolation (full-page only —
+  // inside a NounOS window the theme is scoped to the window instead)
   useEffect(() => {
+    if (windowed) return;
     document.documentElement.classList.add('terminal-mode');
     // Set meta theme-color for mobile browsers
     let meta = document.querySelector('meta[name="theme-color"]');
@@ -74,7 +76,7 @@ export default function TerminalFeedShell() {
       document.documentElement.classList.remove('terminal-mode');
       meta?.setAttribute('content', '#ffffff');
     };
-  }, []);
+  }, [windowed]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-disco', discoMode ? 'on' : 'off');
@@ -87,14 +89,14 @@ export default function TerminalFeedShell() {
   return (
     <div
       style={{
-        position: 'fixed',
+        position: windowed ? 'absolute' : 'fixed',
         inset: 0,
         background: 'var(--theme-bg-primary)',
         color: 'var(--theme-text-secondary)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        zIndex: 1000,
+        zIndex: windowed ? 'auto' : 1000,
       }}
     >
       {/* Header — 40px */}
@@ -162,7 +164,7 @@ export default function TerminalFeedShell() {
               on every theme change. */}
           {/* Site-wide font — see src/lib/siteFonts.ts. Default Figtree. */}
           <FontSwitcher variant="terminal" />
-          {!isEmbedded && <ThemeSwitcher variant="terminal" />}
+          {!isEmbedded && !windowed && <ThemeSwitcher variant="terminal" />}
         </div>
       </div>
 
