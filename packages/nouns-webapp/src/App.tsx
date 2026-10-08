@@ -8,11 +8,10 @@ import { useAccount } from 'wagmi';
 import AmbientMusic from '@/components/AmbientMusic';
 import CandleGate from '@/components/CandleGate';
 import DreamWindow from '@/components/DreamWindow';
-import { Footer } from '@/components/Footer';
 import { openProposalDraft } from '@/components/GameShell/openProposalDraft';
-import NavBar from '@/components/NavBar';
-import TerminalFeedShell from '@/components/TerminalFeed/TerminalFeedShell';
-import { THEME_NAMES, useSiteTheme, type ThemeName } from '@/contexts/SiteThemeContext';
+import { MiniWindowHost } from '@/components/MiniWindow';
+import NounOS from '@/components/NounOS/NounOS';
+import { THEME_NAMES, useSiteTheme } from '@/contexts/SiteThemeContext';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/index.css';
@@ -20,10 +19,7 @@ import '@/index.css';
 // Register all miniapps
 import '@/miniapps';
 
-import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
-import { MiniWindowHost } from '@/components/MiniWindow';
 import ReindexingBanner from '@/components/Nounsweeper/ReindexingBanner';
-import { Toaster } from '@/components/ui/sonner';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 import AuctionPage from '@/pages/Auction';
@@ -60,9 +56,6 @@ import StudioPage from '@/pages/StudioPage';
 import TraitsPage from '@/pages/TraitsPage';
 const VotePageRouter = lazy(() => import('@/pages/Vote/VotePageRouter'));
 import { setActiveAccount } from '@/state/slices/account';
-import NocTicker from '@/components/NocTicker';
-import { useHomeSections } from '@/hooks/useHomeSections';
-import SaberOverlay from '@/components/SaberOverlay';
 import TorchOverlay from '@/components/TorchOverlay';
 import { FeedSkeleton, GenericSkeleton, GovernanceSkeleton } from '@/components/Skeleton';
 
@@ -76,7 +69,6 @@ const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage')
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
-const World2Page = lazy(() => import('@/miniapps/world2/World2Page'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -276,48 +268,6 @@ function LegacyThemePrefixRedirect() {
   return <Navigate to={`${rest}${location.search}`} replace />;
 }
 
-/**
- * Wrapper for `/<theme>/*` routes — sets the active theme based on the URL
- * param, then renders the appropriate shell. Both themes pass through to the
- * full SiteRoutes tree under their prefix — `/abacus/vote/123` and
- * `/terminal/candidates` both work because `logicalPath` strips the prefix
- * before downstream routing.
- */
-function ThemePrefixRoute() {
-  const { theme: currentTheme, setTheme } = useSiteTheme();
-  const location = useLocation();
-
-  // Detect which theme prefix is in the URL — we mount one of these per
-  // theme above, so the first segment is guaranteed to be a real theme name
-  // by the time we render here.
-  const firstSegment = location.pathname.split('/').filter(Boolean)[0] ?? '';
-  const targetTheme = (THEME_NAMES as readonly string[]).includes(firstSegment)
-    ? (firstSegment as ThemeName)
-    : null;
-
-  // Sync URL → theme state. Persists to localStorage via setTheme so reloads
-  // and ?theme= fallbacks both work.
-  useEffect(() => {
-    if (targetTheme && targetTheme !== currentTheme) {
-      setTheme(targetTheme);
-    }
-  }, [targetTheme, currentTheme, setTheme]);
-
-  if (!targetTheme) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Once theme is set, defer to `ThemedAppContent`, which handles the actual
-  // shell dispatch and is a single source of truth for which UI renders for
-  // a given (theme, path) pair.
-  // NOTE: we render `ThemedAppContent` even when `targetTheme !== currentTheme`
-  // (the sync effect above hasn't committed yet). This used to `return null`,
-  // which blanked the screen for a frame — a visible flash on every theme
-  // switch. Rendering through means the worst case is one frame of the previous
-  // theme's home instead of an empty screen.
-  return <ThemedAppContent />;
-}
-
 /** Inner router — uses useLocation to conditionally show chrome vs terminal */
 function AppRouter() {
   const navigate = useNavigate();
@@ -346,7 +296,7 @@ function AppRouter() {
           top-level routes like `/vote` or `/probe` with a wildcard
           `:themeName` that would also greedily match them. */}
       {THEME_NAMES.map(t => (
-        <Route key={t} path={`/${t}/*`} element={<ThemePrefixRoute />} />
+        <Route key={t} path={`/${t}/*`} element={<LegacyThemePrefixRedirect />} />
       ))}
       {/* Sunset theme prefixes — redirect old share links into the default theme. */}
       {LEGACY_THEME_PREFIXES.map(t => (
@@ -366,12 +316,11 @@ function AppRouter() {
  * theme='terminal') AND `/terminal` (which strips to `/`).
  */
 function ThemedAppContent() {
-  const { mode, theme, setTheme } = useSiteTheme();
+  const { theme, setTheme } = useSiteTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const torchMode = useAppSelector(state => state.application.torchMode);
   const [dreamOpen, setDreamOpen] = useState(false);
-  const [saberMode, setSaberMode] = useState(false);
 
   // Strip any `/<theme>` prefix from the pathname for downstream checks. The
   // checks below all compare against canonical `/`, `/create-proposal` etc;
@@ -383,19 +332,6 @@ function ThemedAppContent() {
   const logicalPath = themePrefix
     ? location.pathname.slice(`/${themePrefix}`.length) || '/'
     : location.pathname;
-
-  const isTerminalHome = mode === 'new' && logicalPath === '/';
-
-  // The desktop noc ticker is global chrome, but on the auction home it's one
-  // of the opt-in "sections" (default off) so the Dice home stays just noun +
-  // auction. Every other route keeps it unconditionally.
-  const { isEnabled: isHomeSectionEnabled } = useHomeSections();
-  const isAuctionHome =
-    logicalPath === '/' ||
-    logicalPath === '/v2' ||
-    logicalPath.startsWith('/noun/') ||
-    logicalPath.startsWith('/v2/noun/');
-  const showDesktopTicker = !isAuctionHome || isHomeSectionEnabled('nocTicker');
 
   useEffect(() => {
     const handler = () => setDreamOpen(true);
@@ -428,22 +364,6 @@ function ThemedAppContent() {
     setTheme('abacus');
   }, [logicalPath, themePrefix, theme, setTheme]);
 
-  // Terminal mode on root — render only the terminal feed, nothing else
-  if (isTerminalHome) {
-    return <TerminalFeedShell />;
-  }
-
-  // World v2 (skate) — full-screen canvas, no chrome. Brings its own audio.
-  if (location.pathname === '/world' || location.pathname === '/world/') {
-    return (
-      <Suspense
-        fallback={<div style={{ background: '#0d1117', width: '100vw', height: '100vh' }} />}
-      >
-        <World2Page />
-      </Suspense>
-    );
-  }
-
   // Classic world — full-screen canvas, no chrome
   if (location.pathname === '/world/classic') {
     return (
@@ -467,122 +387,12 @@ function ThemedAppContent() {
     );
   }
 
-  // Classic mode or deep link — show full site chrome
+  // Everything else lives in NounOS: the game on `/`, every page in a window.
   return (
     <>
-      {showDesktopTicker && (
-        <div className="hidden lg:block">
-          <NocTicker />
-        </div>
-      )}
-      <NavBar />
-      <SiteRoutes />
-      <Footer />
-      {/* <HeliosStatusBar /> — disabled: a16z consensus endpoints are down, causes infinite 502 retry loop */}
-      <ChainNotificationsMount />
-      <Toaster
-        expand
-        closeButton
-        toastOptions={{
-          classNames: {
-            closeButton:
-              '[--toast-close-button-start:auto] [--toast-close-button-end:0] [--toast-close-button-transform:translate(35%,-35%)]',
-          },
-        }}
-      />
-
-      {/* Fixed bottom-right liquid glass icon buttons */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '1rem',
-          right: '1rem',
-          zIndex: 900,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          alignItems: 'center',
-        }}
-      >
-        {/* Ambient music play/pause above the saber button — shown on Probe, Terraforms, and World (autostarts on /world) */}
-        {(location.pathname.startsWith('/probe') ||
-          location.pathname.startsWith('/terraforms') ||
-          location.pathname.startsWith('/world')) && (
-          <AmbientMusic variant="inline" autoStart={location.pathname.startsWith('/world')} />
-        )}
-        <button
-          onClick={() => setSaberMode(s => !s)}
-          title={saberMode ? 'Exit Saber' : 'Saber'}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: '1px solid rgba(255,255,255,0.4)',
-            background: saberMode ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.15) inset',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.2rem',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = saberMode
-              ? 'rgba(239, 68, 68, 0.4)'
-              : 'rgba(255, 255, 255, 0.35)';
-            e.currentTarget.style.transform = 'scale(1.08)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = saberMode
-              ? 'rgba(239, 68, 68, 0.25)'
-              : 'rgba(255, 255, 255, 0.2)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          {saberMode ? '\u2716' : '\u2694\uFE0F'}
-        </button>
-        <button
-          onClick={() => setDreamOpen(true)}
-          title="Dream"
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: '1px solid rgba(255,255,255,0.4)',
-            background: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.15) inset',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.2rem',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
-            e.currentTarget.style.transform = 'scale(1.08)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          {'\uD83D\uDCA4'}
-        </button>
-      </div>
-
-      {/* Dream creation retro window */}
+      <NounOS routes={<SiteRoutes />} />
+      {/* Dream creation retro window (opened via the 'open-dream-window' event) */}
       <DreamWindow open={dreamOpen} onClose={() => setDreamOpen(false)} />
-
-      {/* Saber battle overlay */}
-      <SaberOverlay active={saberMode} onClose={() => setSaberMode(false)} />
-
-      {/* Torch / dungeon mode overlay + music */}
       <TorchOverlay active={torchMode} />
       <CandleGate />
     </>
