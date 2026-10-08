@@ -47,6 +47,7 @@ export interface NetPose {
   name: string;
   seedKey: string;
   trick: string;
+  boardType: 'skate' | 'hover';
 }
 
 export interface RemotePlayer {
@@ -60,6 +61,7 @@ export interface RemotePlayer {
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
+  boardType: 'skate' | 'hover';
 }
 
 function emptyPose(): NetPose {
@@ -76,6 +78,7 @@ function emptyPose(): NetPose {
     name: '',
     seedKey: '0-0-0-0-0',
     trick: '',
+    boardType: 'skate',
   };
 }
 
@@ -194,6 +197,7 @@ export class Net {
     pose.speed = Number(blob.sp) || 0;
     pose.name = String(blob.n ?? '').slice(0, 24);
     pose.trick = String(blob.tr ?? '').slice(0, 60);
+    pose.boardType = blob.bt === 'hover' ? 'hover' : 'skate';
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
     const now = performance.now();
@@ -208,6 +212,7 @@ export class Net {
         speaking: false,
         transcript: '',
         transcriptAt: 0,
+        boardType: pose.boardType,
       };
       rp.current.pos.copy(pose.pos);
       rp.current.quat.copy(pose.quat);
@@ -216,6 +221,7 @@ export class Net {
     }
     rp.seedKey = pose.seedKey;
     rp.name = pose.name;
+    rp.boardType = pose.boardType;
     rp.lastSeen = now;
     rp.samples.push({ t: now, pose });
     if (rp.samples.length > 8) rp.samples.shift();
@@ -282,6 +288,7 @@ export class Net {
       sp: r3(pose.speed),
       n: pose.name,
       tr: pose.trick,
+      bt: pose.boardType,
     });
     const msg = JSON.stringify({
       type: 'world:move',

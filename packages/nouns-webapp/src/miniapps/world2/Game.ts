@@ -10,6 +10,7 @@ import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/No
 import {
   loadCharacterAssets,
   NounCharacter,
+  type BoardType,
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
@@ -163,6 +164,7 @@ export class Game {
     this.hud.baked = level.baked;
 
     this.me = new NounCharacter(this.seed, assets);
+    this.me.setBoardType(this.boardType);
     this.gfx.scene.add(this.me.root);
     const spawn = level.spawns[Math.floor(Math.random() * level.spawns.length)] ?? {
       position: new THREE.Vector3(),
@@ -208,6 +210,12 @@ export class Game {
   /** One simulation + render step (exposed for tests/automation). */
   /** Character-select mode: physics paused, camera orbits the rider. */
   showroom = false;
+  boardType: BoardType = 'skate';
+
+  setBoardType(t: BoardType) {
+    this.boardType = t;
+    this.me?.setBoardType(t);
+  }
   showroomYaw = 0.5;
 
   step(dt: number, now = performance.now()) {
@@ -433,6 +441,7 @@ export class Game {
     me.update(dt, {
       lean: p.mode === 'board' && p.state !== 'bail' ? p.lean : 0,
       travelled: p.mode === 'board' && p.state !== 'air' && p.state !== 'bail' ? travelled : 0,
+      riding: p.mode === 'board' && p.state !== 'bail',
     });
 
     // Sparks while grinding metal
@@ -453,7 +462,14 @@ export class Game {
     const p = this.player;
     const rolling = p.mode === 'board' && (p.state === 'ground' || p.state === 'manual');
     const grinding = p.mode === 'board' && p.state === 'grind';
-    this.audio.update(p.speed, rolling, grinding, p.grind?.rail.type ?? null, 0.5);
+    this.audio.update(
+      p.speed,
+      rolling,
+      grinding,
+      p.grind?.rail.type ?? null,
+      0.5,
+      this.boardType === 'hover' && p.mode === 'board' && p.state !== 'bail',
+    );
     void dt;
   }
 
@@ -501,6 +517,7 @@ export class Game {
         speed: p.speed,
         name: this.name,
         seedKey: seedKey(this.seed),
+        boardType: this.boardType,
         trick: this.player.combo.entries.length ? comboLabel(this.player.combo).slice(-60) : '',
       };
       this.net.send(dt, pose, this.nounId);
@@ -525,7 +542,12 @@ export class Game {
       ch.play({ clip: c.anim, fade: 0.15, once: /bail|getup|ollie|flip|land/.test(c.anim) });
       const travelled = r.lastPos.distanceTo(c.pos);
       r.lastPos.copy(c.pos);
-      ch.update(dt, { lean: c.lean, travelled: c.mode === 'board' ? travelled : 0 });
+      ch.setBoardType(rp.boardType);
+      ch.update(dt, {
+        lean: c.lean,
+        travelled: c.mode === 'board' ? travelled : 0,
+        riding: c.mode === 'board' && !c.anim.includes('bail'),
+      });
       // Name tag
       if (r.label) {
         const v = c.pos
@@ -584,6 +606,7 @@ export class Game {
       this.me.dispose();
     }
     this.me = new NounCharacter(seed, this.assets);
+    this.me.setBoardType(this.boardType);
     this.gfx.scene.add(this.me.root);
   }
 

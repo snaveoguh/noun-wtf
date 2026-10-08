@@ -14,6 +14,12 @@ export class SkateAudio {
     gain: GainNode;
     rumble: GainNode;
   } | null = null;
+  private hum: {
+    osc: OscillatorNode;
+    osc2: OscillatorNode;
+    lp: BiquadFilterNode;
+    gain: GainNode;
+  } | null = null;
   private grind: { src: AudioBufferSourceNode; gain: GainNode; bp: BiquadFilterNode } | null = null;
   volume = 0.8;
 
@@ -74,6 +80,27 @@ export class SkateAudio {
       src.start();
       this.roll = { src, bp, lp, gain, rumble };
     }
+    // Hoverboard hum: detuned saws through a lowpass, pitch tracks speed
+    {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 55;
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sawtooth';
+      osc2.frequency.value = 55.7;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 400;
+      lp.Q.value = 4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(lp);
+      osc2.connect(lp);
+      lp.connect(gain).connect(this.master);
+      osc.start();
+      osc2.start();
+      this.hum = { osc, osc2, lp, gain };
+    }
     // Grind loop
     {
       const src = ctx.createBufferSource();
@@ -109,16 +136,25 @@ export class SkateAudio {
     grinding: boolean,
     railType: string | null,
     surfaceRough: number,
+    hover = false,
   ) {
     const ctx = this.ctx;
     if (!ctx || !this.roll || !this.grind) return;
     const t = ctx.currentTime;
     const sp = Math.min(1, speed / 14);
-    const rollGain = rolling
+    const wheels = rolling && !hover;
+    const rollGain = wheels
       ? Math.min(0.55, sp * 0.7 + (speed > 0.3 ? 0.04 : 0)) * (0.7 + surfaceRough * 0.5)
       : 0;
     this.roll.gain.gain.setTargetAtTime(rollGain, t, 0.05);
-    this.roll.rumble.gain.setTargetAtTime(rolling ? sp * 0.9 : 0, t, 0.05);
+    this.roll.rumble.gain.setTargetAtTime(wheels ? sp * 0.9 : 0, t, 0.05);
+    if (this.hum !== null) {
+      this.hum.gain.gain.setTargetAtTime(hover ? 0.05 + sp * 0.08 : 0, t, 0.08);
+      const f = 48 + sp * 70;
+      this.hum.osc.frequency.setTargetAtTime(f, t, 0.1);
+      this.hum.osc2.frequency.setTargetAtTime(f * 1.012, t, 0.1);
+      this.hum.lp.frequency.setTargetAtTime(260 + sp * 1400, t, 0.1);
+    }
     this.roll.bp.frequency.setTargetAtTime(220 + sp * 900 + surfaceRough * 300, t, 0.08);
     this.roll.src.playbackRate.setTargetAtTime(0.6 + sp * 0.8, t, 0.08);
     const gg = grinding ? 0.35 + sp * 0.3 : 0;

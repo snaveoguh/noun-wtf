@@ -14,9 +14,10 @@ import { randomSeed, type NounSeed } from '../character/NounAppearance';
 
 const STORAGE_KEY = 'noun-world-v2-character';
 
-type Row = 'head' | 'glasses' | 'body' | 'accessory' | 'name';
-const ROWS: Row[] = ['head', 'glasses', 'body', 'accessory', 'name'];
-const TRAIT_KEY: Record<Exclude<Row, 'name'>, 'heads' | 'glasses' | 'bodies' | 'accessories'> = {
+type Row = 'head' | 'glasses' | 'body' | 'accessory' | 'board' | 'name';
+const ROWS: Row[] = ['head', 'glasses', 'body', 'accessory', 'board', 'name'];
+type TraitRow = Exclude<Row, 'name' | 'board'>;
+const TRAIT_KEY: Record<TraitRow, 'heads' | 'glasses' | 'bodies' | 'accessories'> = {
   head: 'heads',
   glasses: 'glasses',
   body: 'bodies',
@@ -26,6 +27,7 @@ const TRAIT_KEY: Record<Exclude<Row, 'name'>, 'heads' | 'glasses' | 'bodies' | '
 export interface SavedCharacter {
   seed: NounSeed;
   name: string;
+  board?: 'skate' | 'hover';
 }
 
 export function loadSavedCharacter(): SavedCharacter | null {
@@ -48,11 +50,11 @@ function saveCharacter(c: SavedCharacter) {
   }
 }
 
-function traitCount(row: Exclude<Row, 'name'>) {
+function traitCount(row: TraitRow) {
   return ImageData.images[TRAIT_KEY[row]].length;
 }
 
-function traitName(row: Exclude<Row, 'name'>, i: number) {
+function traitName(row: TraitRow, i: number) {
   const f = ImageData.images[TRAIT_KEY[row]][i]?.filename ?? '';
   return f
     .replace(/^(head|glasses|body|accessory)-/, '')
@@ -75,6 +77,7 @@ export function CharacterSelect({
 }) {
   const [seed, setSeedState] = useState<NounSeed>(initial.seed);
   const [name, setName] = useState(initial.name);
+  const [board, setBoard] = useState<'skate' | 'hover'>(initial.board ?? 'skate');
   const [row, setRow] = useState(0);
   const [flash, setFlash] = useState(0);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -87,8 +90,17 @@ export function CharacterSelect({
     return () => window.clearTimeout(t);
   }, [game, seed]);
 
+  useEffect(() => {
+    game.setBoardType(board);
+  }, [game, board]);
+
   const cycle = useCallback((r: Row, dir: number) => {
     if (r === 'name') return;
+    if (r === 'board') {
+      setBoard(b => (b === 'skate' ? 'hover' : 'skate'));
+      setFlash(f => f + 1);
+      return;
+    }
     const key = r;
     const n = traitCount(key);
     setSeedState(s => ({ ...s, [key]: (((s[key] + dir) % n) + n) % n }));
@@ -101,10 +113,14 @@ export function CharacterSelect({
   }, []);
 
   const confirm = useCallback(() => {
-    const c = { seed: seedRef.current, name: name.trim().slice(0, 16) || 'NOUN' };
+    const c: SavedCharacter = {
+      seed: seedRef.current,
+      name: name.trim().slice(0, 16) || 'NOUN',
+      board,
+    };
     saveCharacter(c);
     onConfirm(c);
-  }, [name, onConfirm]);
+  }, [name, board, onConfirm]);
 
   // Keyboard
   useEffect(() => {
@@ -180,6 +196,7 @@ export function CharacterSelect({
     glasses: 'GLASSES',
     body: 'BODY',
     accessory: 'ACCESSORY',
+    board: 'DECK',
     name: 'TAG',
   };
 
@@ -211,7 +228,22 @@ export function CharacterSelect({
                 )}
                 {rowLabel[r]}
               </div>
-              {r === 'name' ? (
+              {r === 'board' ? (
+                <div className="cs-value">
+                  <button type="button" className="cs-arrow" onClick={() => cycle(r, -1)}>
+                    ◀
+                  </button>
+                  <div className="cs-trait" key={`board-${board}-${flash}`}>
+                    <span className="cs-num">{board === 'skate' ? '01/02' : '02/02'}</span>
+                    <span className="cs-tname">
+                      {board === 'skate' ? 'SKATEBOARD' : 'HOVERBOARD ⚡'}
+                    </span>
+                  </div>
+                  <button type="button" className="cs-arrow" onClick={() => cycle(r, 1)}>
+                    ▶
+                  </button>
+                </div>
+              ) : r === 'name' ? (
                 <input
                   ref={nameRef}
                   className="cs-name"
@@ -293,20 +325,20 @@ const CSS = `
 .cs-credit{color:#ffd400;font-size:.6em}
 .cs-blink{color:#ffd400;text-shadow:4px 4px 0 #d22209,0 0 18px rgba(255,212,0,.5);animation:csblink 1.1s steps(1) infinite}
 @keyframes csblink{50%{opacity:.25}}
-.cs-panel{position:absolute;left:28px;top:84px;bottom:20px;width:min(470px,calc(100vw - 56px));display:flex;flex-direction:column;gap:8px;overflow-y:auto}
-.cs-row{border:4px solid #3a2f7a;background:rgba(20,14,60,.85);box-shadow:6px 6px 0 #000;padding:8px 12px;cursor:pointer;transition:transform .06s}
+.cs-panel{position:absolute;left:28px;top:84px;bottom:20px;width:min(540px,calc(100vw - 56px));display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.cs-row{border:4px solid #3a2f7a;background:rgba(20,14,60,.85);box-shadow:6px 6px 0 #000;padding:8px 10px;cursor:pointer;transition:transform .06s;display:flex;align-items:center;gap:8px}
 .cs-active{border-color:#ffd400;background:rgba(40,26,110,.95);transform:translateX(6px)}
-.cs-label{font-size:11px;color:#9c8cff;margin-bottom:8px;display:flex;gap:8px}
+.cs-label{font-size:10px;color:#9c8cff;display:flex;gap:6px;width:118px;flex-shrink:0}
 .cs-active .cs-label{color:#ffd400}
 .cs-cursor{width:12px;display:inline-block;animation:csblink .6s steps(1) infinite}
-.cs-value{display:flex;align-items:center;gap:10px}
+.cs-value{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .cs-arrow{font-family:inherit;font-size:14px;color:#fff;background:#d22209;border:none;padding:8px 10px;box-shadow:3px 3px 0 #000;cursor:pointer}
 .cs-arrow:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000}
 .cs-trait{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;animation:cspop .18s steps(3)}
 @keyframes cspop{0%{transform:scale(.9);filter:brightness(2)}100%{transform:none}}
 .cs-num{font-size:9px;color:#7f74c9}
 .cs-tname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cs-name{font-family:inherit;font-size:16px;width:100%;background:#0b0820;color:#3ddc84;border:3px solid #3ddc84;padding:8px;outline:none;text-transform:uppercase;caret-color:#3ddc84}
+.cs-name{font-family:inherit;font-size:13px;width:100%;min-width:0;flex:1;background:#0b0820;color:#3ddc84;border:3px solid #3ddc84;padding:8px;outline:none;text-transform:uppercase;caret-color:#3ddc84}
 .cs-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 .cs-btn{font-family:inherit;font-size:10px;color:#fff;background:#2b2160;border:3px solid #9c8cff;padding:10px 12px;box-shadow:4px 4px 0 #000;cursor:pointer}
 .cs-btn:hover{border-color:#ffd400;color:#ffd400}
@@ -315,5 +347,5 @@ const CSS = `
 .cs-help{position:absolute;bottom:18px;right:28px;text-align:right;font-size:8px;line-height:1.9;color:#9c8cff;text-shadow:2px 2px 0 #000}
 @media (max-width:700px){.cs-root{background:linear-gradient(0deg,rgba(6,4,24,.94) 0%,rgba(6,4,24,.85) 52%,rgba(6,4,24,0) 70%)}
   .cs-panel{top:auto;bottom:70px;left:16px;width:calc(100vw - 32px);gap:6px}
-  .cs-row{padding:6px 8px}.cs-label{margin-bottom:4px}.cs-help{display:none}.cs-header{padding:0 14px}}
+  .cs-row{padding:6px 8px}.cs-label{width:84px;font-size:8px}.cs-help{display:none}.cs-header{padding:0 14px}}
 `;

@@ -100,6 +100,27 @@ const FALLBACK_CLIP: Record<string, string[]> = {
 
 const _q = new THREE.Quaternion();
 
+export type BoardType = 'skate' | 'hover';
+export const HOVER_HEIGHT = 0.16;
+
+let glowTex: THREE.CanvasTexture | null = null;
+function getGlowTexture() {
+  if (glowTex !== null) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(120,240,255,0.85)');
+  g.addColorStop(0.6, 'rgba(40,140,255,0.25)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  glowTex = new THREE.CanvasTexture(c);
+  glowTex.colorSpace = THREE.SRGBColorSpace;
+  return glowTex;
+}
+
 export class NounCharacter {
   /** Rider frame root (placed on the surface, +Z = board nose / facing). */
   root = new THREE.Group();
@@ -121,12 +142,19 @@ export class NounCharacter {
   hasRig = false;
   seed: NounSeed;
   private assets: CharacterAssets;
+  /** Lifts rider + board together (hoverboard float). */
+  private lift = new THREE.Group();
+  boardType: BoardType = 'skate';
+  private hoverFx: THREE.Group | null = null;
+  private hoverParts: THREE.Object3D[] = [];
+  private hoverT = Math.random() * 10;
 
   constructor(seed: NounSeed, assets: CharacterAssets) {
     this.seed = seed;
     this.assets = assets;
-    this.root.add(this.body);
-    this.root.add(this.board);
+    this.root.add(this.lift);
+    this.lift.add(this.body);
+    this.lift.add(this.board);
     this.buildBody();
     this.buildBoard();
   }
@@ -267,6 +295,55 @@ export class NounCharacter {
     }
   }
 
+  /** Swap between the skateboard and the hoverboard look. */
+  setBoardType(t: BoardType) {
+    if (t === this.boardType) return;
+    this.boardType = t;
+    if (this.hoverParts.length === 0 && this.boardModel !== null) {
+      this.boardModel.traverse(o => {
+        if (/^(truck|wheel)/i.test(o.name)) this.hoverParts.push(o);
+      });
+      if (this.hoverParts.length === 0) this.hoverParts.push(...this.wheels);
+    }
+    for (const o of this.hoverParts) o.visible = t === 'skate';
+    if (t === 'hover' && this.hoverFx === null) {
+      const fx = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({
+        map: getGlowTexture(),
+        color: new THREE.Color(0x7ff4ff).multiplyScalar(3),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      for (const z of [0.24, -0.24]) {
+        const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), mat);
+        pad.rotation.x = -Math.PI / 2;
+        pad.position.set(0, 0.035, z);
+        fx.add(pad);
+      }
+      // Ground splash: soft light pool under the board
+      const pool = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.1, 1.4),
+        new THREE.MeshBasicMaterial({
+          map: getGlowTexture(),
+          color: new THREE.Color(0x3fb8ff).multiplyScalar(0.9),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      pool.rotation.x = -Math.PI / 2;
+      pool.position.y = -HOVER_HEIGHT + 0.01;
+      pool.name = 'hoverPool';
+      fx.add(pool);
+      this.board.add(fx);
+      this.hoverFx = fx;
+    }
+    if (this.hoverFx !== null) this.hoverFx.visible = t === 'hover';
+    if (t === 'skate') this.lift.position.y = 0;
+  }
+
   /** Play a clip with a crossfade (no-op if already playing). */
   play(p: AnimParams) {
     if (!this.mixer) return;
@@ -309,13 +386,31 @@ export class NounCharacter {
    * Per-frame update. `lean` tilts the rider into turns; `crouch` lowers;
    * `boardSpin` spins wheels (metres travelled this frame).
    */
-  update(dt: number, opts: { lean: number; travelled: number }) {
+  update(dt: number, opts: { lean: number; travelled: number; riding?: boolean }) {
     this.mixer?.update(dt);
     // Procedural lean on top of the clip (rider + board bank into the carve)
     const lean = THREE.MathUtils.clamp(opts.lean, -1, 1);
     this.body.rotation.z = -lean * 0.22;
     this.board.rotation.z = -lean * 0.12;
-    if (this.wheels.length && opts.travelled !== 0) {
+    if (this.boardType === 'hover') {
+      this.hoverT += dt;
+      if (opts.riding === false) {
+        // On foot / bailing: rider is on the ground, board floats where it is
+        this.lift.position.y = 0;
+        this.board.position.y += HOVER_HEIGHT;
+        return;
+      }
+      const bob = Math.sin(this.hoverT * 3.1) * 0.018 + Math.sin(this.hoverT * 7.3) * 0.006;
+      this.lift.position.y = HOVER_HEIGHT + bob;
+      if (this.hoverFx !== null) {
+        const flick = 0.85 + Math.sin(this.hoverT * 31) * 0.08 + Math.random() * 0.07;
+        this.hoverFx.scale.set(1, 1, 1).multiplyScalar(flick);
+        const pool = this.hoverFx.getObjectByName('hoverPool');
+        if (pool !== undefined) pool.position.y = -this.lift.position.y + 0.012;
+      }
+      return;
+    }
+    if (this.wheels.length > 0 && opts.travelled !== 0) {
       const ang = opts.travelled / this.wheelRadius;
       _q.setFromAxisAngle(this.wheelAxis, ang);
       for (const w of this.wheels) w.quaternion.multiply(_q);

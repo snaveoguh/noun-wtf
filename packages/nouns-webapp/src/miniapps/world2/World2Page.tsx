@@ -60,6 +60,7 @@ export default function World2Page() {
     () => ({
       seed: urlSeed ?? saved?.seed ?? auctionSeed ?? randomSeed(),
       name: searchParams.get('name') ?? saved?.name ?? '',
+      board: searchParams.get('board') === 'hover' ? 'hover' : (saved?.board ?? 'skate'),
     }),
     // Only the first resolution matters; the select screen owns it after that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +89,7 @@ export default function World2Page() {
         name: initialChar.name !== '' ? initialChar.name : undefined,
       });
       g.showroom = searchParams.get('skip') !== '1';
+      g.boardType = initialChar.board ?? 'skate';
     } catch (e) {
       setError((e as Error).message || 'WebGL unavailable');
       canvas.remove();
@@ -141,6 +143,7 @@ export default function World2Page() {
     const g = gameRef.current;
     if (!g) return;
     g.setSeed(c.seed);
+    g.setBoardType(c.board ?? 'skate');
     g.name = c.name;
     g.enterWorld();
     setPhase('play');
