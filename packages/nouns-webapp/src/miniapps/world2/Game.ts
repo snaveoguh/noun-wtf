@@ -28,6 +28,7 @@ import { SkateCamera } from './render/SkateCamera';
 import { inkExcluded, toonify } from './render/Toon';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
+import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { PipBillboards } from './world/PipBillboards';
 
@@ -186,6 +187,7 @@ export class Game {
       });
     }
     this.world.build(level.collisionMeshes);
+    this.placeIceCreamVan(level);
     this.rails.load(level.rails);
     this.graffiti = new Graffiti(
       this.world,
@@ -373,6 +375,60 @@ export class Game {
 
   nature: NatureSystem | null = null;
 
+  /** Collision for props added on top of the baked level (ice cream van…). */
+  private propCollision: THREE.Mesh[] = [];
+
+  /** Park the DOGE ice cream van on the first clear, flat spot near the plaza. */
+  private placeIceCreamVan(level: LevelData) {
+    try {
+      const candidates: [number, number, number][] = level.baked
+        ? [
+            [14, 40, -Math.PI / 2],
+            [-14, 42, Math.PI / 2],
+            [16, 22, -Math.PI / 2],
+            [-16, 22, Math.PI / 2],
+            [0, 44, Math.PI],
+          ]
+        : [
+            [10, 10, 0],
+            [-10, 10, 0],
+          ];
+      const down = new THREE.Vector3(0, -1, 0);
+      const o = new THREE.Vector3();
+      const isClear = (x: number, z: number, yaw: number) => {
+        // Footprint incl. awning/stairs behind the van (local -Z)
+        const c = Math.cos(yaw);
+        const sn = Math.sin(yaw);
+        let ground: number | null = null;
+        for (const lx of [-1.5, 0, 1.5])
+          for (const lz of [-5.6, -3, 0, 3.4]) {
+            const wx = x + lx * c + lz * sn;
+            const wz = z - lx * sn + lz * c;
+            const hit = this.world.raycast(o.set(wx, 8, wz), down, 12);
+            if (hit === null || hit.normal.y < 0.97) return null;
+            if (ground === null) ground = hit.point.y;
+            else if (Math.abs(hit.point.y - ground) > 0.12) return null;
+          }
+        return ground;
+      };
+      for (const [x, z, yaw] of candidates) {
+        const y = isClear(x, z, yaw);
+        if (y === null) continue;
+        const van = buildIceCreamVan();
+        van.position.set(x, y, z);
+        van.rotation.y = yaw;
+        van.updateMatrixWorld(true);
+        if (this.gfx.toon) toonify(van);
+        this.gfx.scene.add(van);
+        this.propCollision.push(iceCreamVanCollisionBox(van));
+        this.world.build([...level.collisionMeshes, ...this.propCollision]);
+        return;
+      }
+    } catch (err) {
+      console.warn('[world2] ice cream van failed to place', err);
+    }
+  }
+
   /** Lush foliage, water, rocks + time of day. Never allowed to break the game. */
   private buildNature(level: LevelData) {
     if (new URLSearchParams(window.location.search).get('nature') === '0') return;
@@ -385,7 +441,11 @@ export class Game {
         replaceFallbackTrees(level.root, nature);
       }
       nature.build();
-      this.world.build([...level.collisionMeshes, ...nature.collisionMeshes()]);
+      this.world.build([
+        ...level.collisionMeshes,
+        ...this.propCollision,
+        ...nature.collisionMeshes(),
+      ]);
       applyTimeOfDay(this.gfx, 'afternoon', level, { duration: 0 });
       this.nature = nature;
     } catch (err) {
