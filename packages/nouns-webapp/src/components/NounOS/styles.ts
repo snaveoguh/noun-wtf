@@ -119,17 +119,18 @@ export const NOS_CSS = `
 .nos-dir-foot{margin-top:26px;text-align:center}
 
 /* ── 3. pond ──────────────────────────────────────────── */
-.nos-water{position:absolute;left:0;bottom:0;width:100vw;z-index:1;pointer-events:none;transition:opacity .7s ease}
+.nos-water{position:absolute;left:0;bottom:0;width:100vw;z-index:1;pointer-events:none;transition:opacity .7s ease;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 64px);mask-image:linear-gradient(to bottom,transparent 0,#000 64px)}
 .mode-world .nos-water{opacity:0}
 
 /* ── 4. tray ──────────────────────────────────────────── */
-.nos-tray{position:absolute;z-index:6;left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;
+.nos-tray{position:absolute;z-index:6;left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-wrap:wrap;width:max-content;justify-content:center;
   gap:6px;align-items:center;padding:6px;max-width:calc(100vw - 24px);
   background:rgba(5,6,7,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(236,235,228,.35);
   box-shadow:6px 6px 0 rgba(0,0,0,.6);transition:all .5s cubic-bezier(.2,.9,.25,1)}
 .mode-world .nos-tray{left:auto;right:14px;transform:none;justify-content:flex-end;flex-wrap:nowrap;max-width:calc(100vw - 24px)}
 @media (max-width:760px){
-  .nos-tray{left:0;right:0;bottom:0;transform:none;max-width:none;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;
+  .nos-tray{left:0;right:0;bottom:0;transform:none;max-width:none;width:auto;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;
     border-width:1px 0 0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));scrollbar-width:none}
   .nos-tray::-webkit-scrollbar{display:none}
   .mode-world .nos-tray{top:52px;bottom:auto;left:8px;right:8px;border-width:1px;padding:4px;gap:4px}
