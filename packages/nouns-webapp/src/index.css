@@ -38,6 +38,18 @@
    (pip3-forge). THE site font — both themes (dice/abacus + terminal) set it
    on everything; served from public/. */
 @font-face {
+  font-family: 'Londrina Solid';
+  src: url(./fonts/Londrina_Solid/LondrinaSolid-Regular.ttf) format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Londrina Solid';
+  src: url(./fonts/Londrina_Solid/LondrinaSolid-Black.ttf) format('truetype');
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Pip3';
   src: url(/fonts/Pip3-Regular.32fae758.woff2) format('woff2');
   font-weight: normal;
