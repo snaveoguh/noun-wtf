@@ -252,7 +252,16 @@ const WATER_OUT = /* glsl */ `
   vec3 spec = floor( totalSpecular * 4.0 / max( 1.0, F * 4.0 ) ) * 0.25 * F * 3.0;
   spec += vec3( smoothstep( 1.6, 1.9, sl ) ) * 2.2;
   spec *= edgeFade;
-  outgoingLight = waterCol * ( 1.0 - F * edgeFade * 0.6 ) * ( 1.0 - nwFoam ) + totalDiffuse + spec;
+  // Cel crest highlights: thin bright lines on the steepest ripple slopes,
+  // lit by sun + ambient so the surface stays readable at night.
+  float crestS = length( nwWN.xz );
+  float cfw = fwidth( crestS ) + 1e-4;
+  float crest = smoothstep( 0.2 - cfw, 0.2 + cfw, crestS ) * edgeFade * ( 1.0 - nwFoam );
+  vec3 crestCol = uFoamColor * ( uWaterLight * 0.9 + uDeep * 0.25 );
+  // Minimum in-scatter so deep water keeps a hue under dim light
+  waterCol = max( waterCol, uDeep * 0.08 );
+  outgoingLight = waterCol * ( 1.0 - F * edgeFade * 0.6 ) * ( 1.0 - nwFoam ) * ( 1.0 - crest * 0.6 )
+    + crestCol * crest + totalDiffuse + spec;
 }
 `;
 
