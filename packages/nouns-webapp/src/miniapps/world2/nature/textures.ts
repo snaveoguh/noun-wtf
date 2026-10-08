@@ -129,115 +129,18 @@ interface LeafStyle {
   width: number;
 }
 
-function drawLeaf(
-  ctx: CanvasRenderingContext2D,
-  rng: Rng,
-  x: number,
-  y: number,
-  angle: number,
-  len: number,
-  wid: number,
-  st: LeafStyle,
-) {
-  const hue = rng.range(st.hue[0], st.hue[1]);
-  const sat = rng.range(st.sat[0], st.sat[1]);
-  const li = rng.range(st.light[0], st.light[1]);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  // Leaf points along -y (canvas up) from its stem at the origin.
-  const path = new Path2D();
-  path.moveTo(0, 0);
-  path.bezierCurveTo(wid * 0.95, -len * 0.18, wid * 0.55, -len * 0.82, 0, -len);
-  path.bezierCurveTo(-wid * 0.55, -len * 0.82, -wid * 0.95, -len * 0.18, 0, 0);
-  const g = ctx.createLinearGradient(0, 0, 0, -len);
-  g.addColorStop(0, `hsl(${hue + 6}, ${sat - 8}%, ${li - 9}%)`);
-  g.addColorStop(0.55, `hsl(${hue}, ${sat}%, ${li}%)`);
-  g.addColorStop(1, `hsl(${hue - 8}, ${sat + 6}%, ${li + 7}%)`);
-  ctx.fillStyle = g;
-  ctx.fill(path);
-  // One half slightly darker (midrib fold)
-  ctx.save();
-  ctx.clip(path);
-  ctx.fillStyle = 'rgba(20,40,0,0.13)';
-  ctx.fillRect(0, -len, wid, len);
-  // Veins
-  ctx.strokeStyle = `hsla(${hue - 10}, 60%, ${li + 22}%, 0.45)`;
-  ctx.lineWidth = Math.max(1, wid * 0.07);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(wid * 0.05, -len * 0.5, 0, -len * 0.95);
-  ctx.stroke();
-  ctx.lineWidth = Math.max(0.6, wid * 0.03);
-  ctx.strokeStyle = `hsla(${hue - 10}, 50%, ${li + 18}%, 0.22)`;
-  for (let i = 1; i <= 5; i++) {
-    const t = i / 6.5;
-    ctx.beginPath();
-    ctx.moveTo(0, -len * t);
-    ctx.lineTo(wid * 0.6, -len * (t + 0.12));
-    ctx.moveTo(0, -len * t);
-    ctx.lineTo(-wid * 0.6, -len * (t + 0.12));
-    ctx.stroke();
-  }
-  ctx.restore();
-  ctx.strokeStyle = `hsla(${hue + 10}, ${sat}%, ${li - 18}%, 0.35)`;
-  ctx.lineWidth = 1;
-  ctx.stroke(path);
-  ctx.restore();
-}
-
-function drawTwig(
-  ctx: CanvasRenderingContext2D,
-  rng: Rng,
-  x0: number,
-  y0: number,
-  angle: number,
-  length: number,
-  leaves: number,
-  st: LeafStyle,
-  scale: number,
-) {
-  const cx = x0 + Math.sin(angle) * length * 0.5 + rng.range(-12, 12) * scale;
-  const cy = y0 - Math.cos(angle) * length * 0.5;
-  const x1 = x0 + Math.sin(angle) * length;
-  const y1 = y0 - Math.cos(angle) * length;
-  ctx.strokeStyle = '#5b4a2c';
-  ctx.lineWidth = 3.2 * scale;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.quadraticCurveTo(cx, cy, x1, y1);
-  ctx.stroke();
-  const pt = (t: number) => {
-    const a = (1 - t) * (1 - t);
-    const b = 2 * (1 - t) * t;
-    const c = t * t;
-    return [a * x0 + b * cx + c * x1, a * y0 + b * cy + c * y1];
-  };
-  for (let i = 0; i < leaves; i++) {
-    const t = 0.18 + (i / Math.max(1, leaves - 1)) * 0.82;
-    const [px, py] = pt(Math.min(1, t));
-    const sideSign = i % 2 === 0 ? 1 : -1;
-    const isTip = i === leaves - 1;
-    const a = isTip ? angle + rng.range(-0.15, 0.15) : angle + sideSign * rng.range(0.55, 1.05);
-    const sz = (0.75 + 0.25 * Math.sin(t * Math.PI)) * scale;
-    const len = rng.range(st.length[0], st.length[1]) * sz;
-    drawLeaf(ctx, rng, px, py, a, len, len * st.width * rng.range(0.85, 1.15), st);
-  }
-}
-
 const BROADLEAF: LeafStyle = {
-  hue: [72, 98],
-  sat: [52, 72],
-  light: [34, 50],
+  hue: [74, 96],
+  sat: [78, 92],
+  light: [38, 56],
   length: [62, 86],
   width: 0.42,
 };
 
 const BUSH: LeafStyle = {
-  hue: [95, 125],
-  sat: [38, 58],
-  light: [24, 38],
+  hue: [92, 125],
+  sat: [66, 82],
+  light: [34, 50],
   length: [40, 56],
   width: 0.5,
 };
@@ -245,27 +148,95 @@ const BUSH: LeafStyle = {
 /** 512² card: a few twigs fanning from the bottom-centre, ~20 leaves. */
 export function leafClusterTexture(kind: 'broadleaf' | 'bush' = 'broadleaf'): THREE.DataTexture {
   return cached(`leaf-${kind}`, () => {
+    // Stylised leaf CLUMP (JSR / cel look): a solid scalloped blob whose
+    // rim is made of leaf tips, with flat two-tone leaves drawn inside and a
+    // few thin ink lines. No see-through gaps inside the clump, so the
+    // screen-space ink pass only traces clump silhouettes.
     const S = 512;
     const [, ctx] = canvas2d(S, S);
     const rng = new Rng(kind === 'broadleaf' ? 11 : 23);
     const st = kind === 'broadleaf' ? BROADLEAF : BUSH;
-    const twigs = kind === 'broadleaf' ? 5 : 7;
-    for (let i = 0; i < twigs; i++) {
-      const a = -0.9 + (i / (twigs - 1)) * 1.8 + rng.range(-0.12, 0.12);
-      const len = rng.range(270, 360) * (1 - Math.abs(a) * 0.22);
-      drawTwig(
-        ctx,
-        rng,
-        256 + rng.range(-10, 10),
-        505,
-        a,
+    const hue = (st.hue[0] + st.hue[1]) / 2;
+    const sat = (st.sat[0] + st.sat[1]) / 2;
+    const L0 = st.light[0];
+    const L1 = st.light[1];
+    const cx = 256;
+    const cy = 262;
+    const R = 200;
+    const leafPath = (len: number, wid: number) => {
+      const p = new Path2D();
+      p.moveTo(0, 0);
+      p.bezierCurveTo(wid * 0.95, -len * 0.2, wid * 0.6, -len * 0.8, 0, -len);
+      p.bezierCurveTo(-wid * 0.6, -len * 0.8, -wid * 0.95, -len * 0.2, 0, 0);
+      return p;
+    };
+    const leafAt = (
+      x: number,
+      y: number,
+      ang: number,
+      len: number,
+      fill: string,
+      ink: string | null,
+    ) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      const p = leafPath(len, len * st.width * 1.1);
+      ctx.fillStyle = fill;
+      ctx.fill(p);
+      if (ink !== null) {
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 2.4;
+        ctx.stroke(p);
+        ctx.beginPath();
+        ctx.moveTo(0, -len * 0.1);
+        ctx.lineTo(0, -len * 0.7);
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    const base = `hsl(${hue}, ${sat}%, ${(L0 + L1) / 2}%)`;
+    const dark = `hsl(${hue + 10}, ${sat}%, ${L0 - 4}%)`;
+    const light = `hsl(${hue - 8}, ${Math.min(100, sat + 8)}%, ${L1 + 6}%)`;
+    const ink = `hsla(${hue + 20}, 80%, 13%, 0.9)`;
+    // 1. solid core
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, R * 0.78, R * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 2. scalloped rim of leaf tips
+    const rim = kind === 'broadleaf' ? 26 : 32;
+    for (let i = 0; i < rim; i++) {
+      const a = (i / rim) * Math.PI * 2 + rng.range(-0.08, 0.08);
+      const r0 = R * rng.range(0.5, 0.62);
+      const x = cx + Math.cos(a) * r0;
+      const y = cy + Math.sin(a) * r0 * 0.92;
+      const len = R * rng.range(0.42, 0.55) * (kind === 'bush' ? 0.8 : 1);
+      // canvas leaves point along -y; rotate so they point outward
+      const below = Math.sin(a) > 0.35;
+      leafAt(x, y, a + Math.PI / 2, len, below ? dark : base, null);
+    }
+    // 3. interior leaves: lit (upper-left) vs shaded (lower-right), some inked
+    const inner = kind === 'broadleaf' ? 34 : 44;
+    for (let i = 0; i < inner; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const rr = Math.sqrt(rng.next()) * R * 0.62;
+      const x = cx + Math.cos(a) * rr;
+      const y = cy + Math.sin(a) * rr * 0.9;
+      const lit = (cx - x) * 0.7 + (cy - y) * 0.7 + rng.range(-40, 40) > 10;
+      const len = R * rng.range(0.24, 0.34) * (kind === 'bush' ? 0.85 : 1);
+      const ang = Math.atan2(y - cy, x - cx) + Math.PI / 2 + rng.range(-0.6, 0.6);
+      leafAt(
+        x,
+        y,
+        ang,
         len,
-        kind === 'broadleaf' ? 6 : 9,
-        st,
-        1,
+        lit ? light : rng.next() < 0.5 ? base : dark,
+        rng.next() < 0.45 ? ink : null,
       );
     }
-    return spriteTexture(ctx, S, S, kind === 'broadleaf' ? [96, 128, 40] : [52, 82, 32]);
+    return spriteTexture(ctx, S, S, null);
   });
 }
 
@@ -320,7 +291,7 @@ export function palmFrondTexture(): THREE.DataTexture {
     ctx.strokeStyle = 'rgba(230,230,170,0.35)';
     ctx.lineWidth = 2;
     ctx.stroke();
-    return spriteTexture(ctx, W, H, [78, 104, 40]);
+    return spriteTexture(ctx, W, H, null);
   });
 }
 
@@ -581,6 +552,13 @@ export function barkTextures(kind: 'broadleaf' | 'palm'): {
         b = 108 * k;
       }
       heights[y * W + x] = h;
+      // Posterise to 3 flat tones (cel look)
+      const lum = (r + g + b) / 3;
+      const q = lum < 70 ? 0.7 : lum < 95 ? 0.88 : 1.05;
+      const avg = kind === 'broadleaf' ? [104, 78, 58] : [160, 128, 96];
+      r = avg[0] * q;
+      g = avg[1] * q;
+      b = avg[2] * q;
       const i = (y * W + x) * 4;
       rgba[i] = Math.min(255, r);
       rgba[i + 1] = Math.min(255, g);
@@ -611,11 +589,10 @@ export function pebbleTextures(): { map: THREE.Texture; normal: THREE.Texture } 
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const n = fbm2(x / S, y / S, 7, 5, 8);
-      const g = hash3(x, y, 1, 3) * 0.12;
       const i = (y * S + x) * 4;
-      base.data[i] = 150 * (0.75 + n * 0.4 + g);
-      base.data[i + 1] = 136 * (0.75 + n * 0.4 + g);
-      base.data[i + 2] = 112 * (0.75 + n * 0.4 + g);
+      base.data[i] = 150 * (n > 0.5 ? 1.0 : 0.9);
+      base.data[i + 1] = 136 * (n > 0.5 ? 1.0 : 0.9);
+      base.data[i + 2] = 112 * (n > 0.5 ? 1.0 : 0.9);
       base.data[i + 3] = 255;
     }
   }
@@ -663,18 +640,29 @@ export function pebbleTextures(): { map: THREE.Texture; normal: THREE.Texture } 
         cctx.save();
         cctx.translate(x, y);
         cctx.rotate(s.a);
-        const g = cctx.createRadialGradient(-s.r * 0.3, -s.r * 0.3, s.r * 0.1, 0, 0, s.r * 1.05);
         const [r, gg, b] = s.c;
-        g.addColorStop(
-          0,
-          `rgb(${Math.min(255, r + 25)},${Math.min(255, gg + 25)},${Math.min(255, b + 22)})`,
-        );
-        g.addColorStop(0.7, `rgb(${r},${gg},${b})`);
-        g.addColorStop(1, `rgb(${r * 0.72},${gg * 0.72},${b * 0.72})`);
-        cctx.fillStyle = g;
+        // Flat pebble + light crescent + dark outline (cel style)
+        cctx.fillStyle = `rgb(${r},${gg},${b})`;
         cctx.beginPath();
         cctx.ellipse(0, 0, s.r, s.r * s.e, 0, 0, Math.PI * 2);
         cctx.fill();
+        cctx.fillStyle = `rgb(${Math.min(255, r + 28)},${Math.min(255, gg + 28)},${Math.min(255, b + 24)})`;
+        cctx.beginPath();
+        cctx.ellipse(
+          -s.r * 0.18,
+          -s.r * s.e * 0.2,
+          s.r * 0.62,
+          s.r * s.e * 0.55,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        cctx.fill();
+        cctx.strokeStyle = 'rgba(52,40,30,0.9)';
+        cctx.lineWidth = 2;
+        cctx.beginPath();
+        cctx.ellipse(0, 0, s.r, s.r * s.e, 0, 0, Math.PI * 2);
+        cctx.stroke();
         cctx.restore();
         hctx.save();
         hctx.translate(x, y);
@@ -714,10 +702,10 @@ export function lawnTexture(): THREE.Texture {
         const n = fbm2(u, v, 21, 5, 6);
         const fine = hash3(x, y, 7, 2);
         const dirt = fbm2(u, v, 55, 4, 3);
-        const d = Math.max(0, Math.min(1, (dirt - 0.6) * 5));
+        const d = dirt > 0.72 ? 1 : 0;
         const i = (y * S + x) * 4;
-        const k = 0.7 + n * 0.5 + (fine - 0.5) * 0.22;
-        const gr = [64 * k, 104 * k, 30 * k];
+        const k = (n > 0.5 ? 1.08 : 0.9) + (fine > 0.93 ? 0.18 : 0);
+        const gr = [86 * k, 150 * k, 34 * k];
         const dr = [118 * k, 98 * k, 64 * k];
         data[i] = gr[0] + (dr[0] - gr[0]) * d;
         data[i + 1] = gr[1] + (dr[1] - gr[1]) * d;
@@ -824,9 +812,13 @@ export function softSpotTexture(): THREE.Texture {
     const S = 128;
     const [c, ctx] = canvas2d(S, S);
     const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    // Cel light pool: bright core, flat mid ring, faint outer ring (hard steps)
     g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
-    g.addColorStop(0.7, 'rgba(255,255,255,0.15)');
+    g.addColorStop(0.42, 'rgba(255,255,255,1)');
+    g.addColorStop(0.44, 'rgba(255,255,255,0.5)');
+    g.addColorStop(0.72, 'rgba(255,255,255,0.5)');
+    g.addColorStop(0.74, 'rgba(255,255,255,0.18)');
+    g.addColorStop(0.96, 'rgba(255,255,255,0.18)');
     g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, S, S);

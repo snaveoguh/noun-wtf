@@ -31,6 +31,7 @@ import {
   groundAt,
   patchFoliageMaterial,
   regionSampler,
+  toonMaterial,
 } from './shared';
 import {
   FLOWER_CELLS,
@@ -223,7 +224,7 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
   const R = o.crownRadius ?? H * rng.range(0.4, 0.5);
   const tr = o.trunkRadius ?? H * 0.03;
   const dens = o.leafDensity ?? 1;
-  const leafSize = o.leafSize ?? 1.25;
+  const leafSize = o.leafSize ?? 1.75;
   const wood = new GeoBuilder();
   const leaves = new GeoBuilder();
 
@@ -319,7 +320,7 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
   }
 
   // Leaf cards
-  const cardsPer = Math.round(11 * dens);
+  const cardsPer = Math.round(6.5 * dens);
   const tmp = new THREE.Vector3();
   const tint = new THREE.Color();
   for (const tip of tips) {
@@ -567,12 +568,12 @@ export function generateBush(o: BushOptions = {}): PlantAsset {
     const a = i * 2.39996 + rng.range(-0.3, 0.3);
     const dir = new THREE.Vector3(Math.cos(a) * r, yv, Math.sin(a) * r);
     const centre = C.clone().add(dir.clone().multiply(radii).multiplyScalar(0.62));
-    const nCards = Math.max(3, Math.round(7 * dens));
+    const nCards = Math.max(3, Math.round(4 * dens));
     for (let k = 0; k < nCards; k++) {
       const d = rng.dir().addScaledVector(dir, 0.9).normalize();
       const upv = d.clone().add(rng.dir().multiplyScalar(0.4)).addScaledVector(UP, 0.3).normalize();
       const right = new THREE.Vector3().crossVectors(upv, rng.dir()).normalize();
-      const size = rng.range(0.5, 0.7) * Math.min(1.3, R);
+      const size = rng.range(0.75, 1.0) * Math.min(1.3, R);
       const base = centre
         .clone()
         .addScaledVector(d, rng.range(0, 0.25) * R)
@@ -629,9 +630,9 @@ export function generateBush(o: BushOptions = {}): PlantAsset {
 export function generateGrassTuft(seed: number, blades: number): THREE.BufferGeometry {
   const rng = new Rng(seed);
   const b = new GeoBuilder();
-  const base = new THREE.Color().setRGB(0.18, 0.3, 0.07, THREE.SRGBColorSpace);
-  const mid = new THREE.Color().setRGB(0.36, 0.55, 0.14, THREE.SRGBColorSpace);
-  const tipC = new THREE.Color().setRGB(0.66, 0.78, 0.28, THREE.SRGBColorSpace);
+  const base = new THREE.Color().setRGB(0.12, 0.36, 0.06, THREE.SRGBColorSpace);
+  const mid = new THREE.Color().setRGB(0.32, 0.64, 0.1, THREE.SRGBColorSpace);
+  const tipC = new THREE.Color().setRGB(0.68, 0.88, 0.2, THREE.SRGBColorSpace);
   const dry = new THREE.Color().setRGB(0.72, 0.68, 0.36, THREE.SRGBColorSpace);
   const c = new THREE.Color();
   for (let i = 0; i < blades; i++) {
@@ -730,25 +731,30 @@ const PATCH = {
 } satisfies Record<string, FoliagePatchOptions>;
 
 export interface FoliageMaterials {
-  leaf: THREE.MeshStandardMaterial;
+  leaf: THREE.MeshToonMaterial;
   leafDepth: THREE.MeshDepthMaterial;
-  bark: THREE.MeshStandardMaterial;
+  bark: THREE.MeshToonMaterial;
   barkDepth: THREE.MeshDepthMaterial;
-  frond: THREE.MeshStandardMaterial;
+  frond: THREE.MeshToonMaterial;
   frondDepth: THREE.MeshDepthMaterial;
-  palmBark: THREE.MeshStandardMaterial;
+  palmBark: THREE.MeshToonMaterial;
   palmBarkDepth: THREE.MeshDepthMaterial;
-  bush: THREE.MeshStandardMaterial;
+  bush: THREE.MeshToonMaterial;
   bushDepth: THREE.MeshDepthMaterial;
-  blossom: THREE.MeshStandardMaterial;
+  blossom: THREE.MeshToonMaterial;
   blossomDepth: THREE.MeshDepthMaterial;
-  grass: THREE.MeshStandardMaterial;
-  meadow: THREE.MeshStandardMaterial;
-  lawn: THREE.MeshStandardMaterial;
+  grass: THREE.MeshToonMaterial;
+  meadow: THREE.MeshToonMaterial;
+  lawn: THREE.MeshToonMaterial;
 }
 
 let sharedMats: FoliageMaterials | null = null;
 
+/**
+ * Shared cel-shaded foliage materials (MeshToonMaterial + the nature toon
+ * ramp from shared.ts). Created once; the first caller's quality sets the
+ * grass fade distances.
+ */
 export function foliageMaterials(quality: NatureQuality = 'medium'): FoliageMaterials {
   if (sharedMats !== null) return sharedMats;
   const leafTex = leafClusterTexture('broadleaf');
@@ -773,109 +779,55 @@ export function foliageMaterials(quality: NatureQuality = 'medium'): FoliageMate
       translucency: { color: trans, strength: s },
       alphaMip: { texSize, amount: 0.22 },
     };
-    const m = new THREE.MeshStandardMaterial({
-      map,
-      alphaTest: AT,
-      side: THREE.DoubleSide,
-      vertexColors: true,
-      roughness: 0.72,
-      metalness: 0,
-      envMapIntensity: 0.7,
-    });
+    const m = toonMaterial({ map, alphaTest: AT, side: THREE.DoubleSide, vertexColors: true });
     m.shadowSide = THREE.DoubleSide;
     patchFoliageMaterial(m, o);
     const d = foliageDepthMaterial(map, AT, { ...o, translucency: undefined, bentNormals: false });
     return [m, d] as const;
   };
-  const wood = (
-    maps: { map: THREE.Texture; normal: THREE.Texture },
-    patch: FoliagePatchOptions,
-    key: string,
-  ) => {
-    const m = new THREE.MeshStandardMaterial({
-      map: maps.map,
-      normalMap: maps.normal,
-      normalScale: new THREE.Vector2(1.2, 1.2),
-      vertexColors: true,
-      roughness: 0.95,
-      metalness: 0,
-    });
-    const o: FoliagePatchOptions = { ...patch, key, wind: { ...patch.wind, flutterAmp: 0 } };
+  const wood = (map: THREE.Texture, patch: FoliagePatchOptions, key: string) => {
+    const m = toonMaterial({ map, vertexColors: true });
+    const w = patch.wind ?? { swayAmp: 0, swayFreq: 1, flutterAmp: 0, flutterFreq: 1 };
+    const o: FoliagePatchOptions = { ...patch, key, wind: { ...w, flutterAmp: 0 } };
     patchFoliageMaterial(m, o);
     const d = foliageDepthMaterial(null, 0, o);
     return [m, d] as const;
   };
-  const [leaf, leafDepth] = card(
-    leafTex,
-    PATCH.tree,
-    new THREE.Color(1.0, 1.05, 0.35),
-    0.85,
-    512,
-    'leaf',
-  );
-  const [bush, bushDepth] = card(
-    bushTex,
-    PATCH.bush,
-    new THREE.Color(0.85, 1.0, 0.35),
-    0.6,
-    512,
-    'bushleaf',
-  );
-  const [frond, frondDepth] = card(
-    frondTex,
-    PATCH.palm,
-    new THREE.Color(1.0, 1.0, 0.4),
-    0.75,
-    1024,
-    'frond',
-  );
+  const rim = new THREE.Color(1.0, 1.0, 0.45);
+  const [leaf, leafDepth] = card(leafTex, PATCH.tree, rim, 0.75, 512, 'leaf');
+  const [bush, bushDepth] = card(bushTex, PATCH.bush, rim, 0.55, 512, 'bushleaf');
+  const [frond, frondDepth] = card(frondTex, PATCH.palm, rim, 0.7, 1024, 'frond');
   const [blossom, blossomDepth] = card(
     flowers,
     PATCH.bush,
-    new THREE.Color(1, 0.9, 0.8),
-    0.45,
+    new THREE.Color(1, 0.95, 0.9),
+    0.4,
     512,
     'blossom',
   );
-  const [barkM, barkDepth] = wood(bark, PATCH.tree, 'bark');
-  const [palmBark, palmBarkDepth] = wood(pbark, PATCH.palm, 'pbark');
+  const [barkM, barkDepth] = wood(bark.map, PATCH.tree, 'bark');
+  const [palmBark, palmBarkDepth] = wood(pbark.map, PATCH.palm, 'pbark');
 
   const fade = { low: [10, 15], medium: [20, 28], high: [32, 42] }[quality];
-  const grass = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    roughness: 0.78,
-    metalness: 0,
-    envMapIntensity: 0.6,
-  });
+  const grass = toonMaterial({ vertexColors: true, side: THREE.DoubleSide });
   patchFoliageMaterial(grass, {
     ...PATCH.grass,
     bentNormals: true,
-    translucency: { color: new THREE.Color(0.9, 1.0, 0.4), strength: 0.5 },
+    translucency: { color: new THREE.Color(1.0, 1.0, 0.5), strength: 0.35 },
     grass: { fadeStart: fade[0], fadeEnd: fade[1], trample: true },
-    tipLight: 0.15,
+    tipLight: 0.12,
   });
-  const meadow = new THREE.MeshStandardMaterial({
-    map: flowers,
-    alphaTest: AT,
-    side: THREE.DoubleSide,
-    roughness: 0.7,
-    metalness: 0,
-  });
+  const meadow = toonMaterial({ map: flowers, alphaTest: AT, side: THREE.DoubleSide });
   patchFoliageMaterial(meadow, {
     ...PATCH.grass,
     key: 'meadow',
     bentNormals: true,
-    translucency: { color: new THREE.Color(1, 0.95, 0.8), strength: 0.35 },
+    translucency: { color: new THREE.Color(1, 0.95, 0.8), strength: 0.3 },
     grass: { fadeStart: fade[0] * 0.9, fadeEnd: fade[1] * 0.9, trample: true },
     atlas: { cols: 4, rows: 2 },
     alphaMip: { texSize: 256, amount: 0.2 },
   });
-  const lawn = new THREE.MeshStandardMaterial({
-    map: lawnTexture(),
-    roughness: 0.95,
-    metalness: 0,
-  });
+  const lawn = toonMaterial({ map: lawnTexture() });
   sharedMats = {
     leaf,
     leafDepth,
@@ -944,6 +896,8 @@ export interface PlantPlacement {
   scale?: number;
   /** Variant index (defaults to a hash of the position). */
   variant?: number;
+  /** Add a trunk collision box (default true for trees/palms). */
+  collide?: boolean;
 }
 
 export interface FoliageRegion {
@@ -967,8 +921,8 @@ export interface FoliageRegion {
   exclude?: (x: number, z: number) => boolean;
 }
 
-const GRASS_DENSITY: Record<NatureQuality, number> = { low: 1.6, medium: 6, high: 11 };
-const GRASS_BLADES: Record<NatureQuality, number> = { low: 6, medium: 8, high: 10 };
+const GRASS_DENSITY: Record<NatureQuality, number> = { low: 1.6, medium: 4.8, high: 10 };
+const GRASS_BLADES: Record<NatureQuality, number> = { low: 6, medium: 7, high: 10 };
 const VARIANTS = 3;
 
 export class FoliageSystem {
@@ -1020,7 +974,7 @@ export class FoliageSystem {
 
   addPlant(p: PlantPlacement) {
     this.placements.push(p);
-    if (p.kind === 'broadleaf' || p.kind === 'palm') {
+    if ((p.kind === 'broadleaf' || p.kind === 'palm') && p.collide !== false) {
       const s = p.scale ?? 1;
       const r = (p.kind === 'palm' ? 0.26 : 0.32) * s;
       const col = new THREE.Mesh(new THREE.BoxGeometry(r * 2, 3 * s, r * 2));

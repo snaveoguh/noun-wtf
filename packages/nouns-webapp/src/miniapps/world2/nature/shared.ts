@@ -6,6 +6,8 @@
 
 import * as THREE from 'three';
 
+import { getToonRamp as getGameToonRamp } from '../render/Toon';
+
 export type NatureQuality = 'low' | 'medium' | 'high';
 
 /** Camera layer used by the water refraction pre-pass (bed, rocks, basin walls). */
@@ -388,14 +390,41 @@ export function injectDirLightHook(fragmentShader: string, code: string): string
   return fs.replace(DIR_HOOK, `${code}\n${DIR_HOOK}`);
 }
 
+// Cel version: back-lit leaves get a flat bright rim band instead of a soft glow.
 const TRANSLUCENCY_HOOK = /* glsl */ `
 {
   float nwBack = pow( saturate( dot( -geometryViewDir, directLight.direction ) ), 3.0 );
   float nwThru = saturate( dot( -geometryNormal, directLight.direction ) );
-  reflectedLight.directDiffuse += directLight.color * uTransColor * diffuseColor.rgb
-    * ( nwBack * 1.6 + nwThru * 0.55 ) * uTransStrength;
+  float nwT = nwBack * 1.6 + nwThru * 0.55;
+  float nwFw = fwidth( nwT ) + 1e-3;
+  float nwBand = smoothstep( 0.5 - nwFw, 0.5 + nwFw, nwT );
+  reflectedLight.directDiffuse += directLight.color * uTransColor * diffuseColor.rgb * nwBand * uTransStrength;
 }
 `;
+
+// ── Toon ramp ───────────────────────────────────────────────────────────
+
+let toonRamp: THREE.Texture | null = null;
+
+/**
+ * Shared toon gradient map for every nature MeshToonMaterial — defaults to
+ * the game's ramp (render/Toon.ts) so foliage, rocks and the level band
+ * identically. Override with setToonRamp() before building.
+ */
+export function getToonRamp(): THREE.Texture {
+  if (toonRamp === null) toonRamp = getGameToonRamp();
+  return toonRamp;
+}
+
+/** Use the game's own ramp (call before any nature material is created). */
+export function setToonRamp(t: THREE.Texture) {
+  toonRamp = t;
+}
+
+/** MeshToonMaterial preset wired to the shared ramp. */
+export function toonMaterial(p: THREE.MeshToonMaterialParameters = {}): THREE.MeshToonMaterial {
+  return new THREE.MeshToonMaterial({ gradientMap: getToonRamp(), ...p });
+}
 
 /** Chain an extra onBeforeCompile patch onto a material (keeps existing patches). */
 export function chainPatch(
