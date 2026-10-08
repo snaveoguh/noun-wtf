@@ -24,6 +24,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'F', v: 'get on / off board' },
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
+  { k: 'M / .', v: 'radio station · next track' },
   { k: 'V', v: 'mic' },
   { k: 'G (hold)', v: 'spray paint · T colour' },
   { k: 'R', v: 'respawn' },
@@ -129,6 +130,10 @@ export default function World2Page() {
         e.preventDefault();
         setChatOpen(true);
         if (document.pointerLockElement) document.exitPointerLock();
+      } else if (e.code === 'KeyM' && !typing) {
+        gameRef.current?.cycleRadio();
+      } else if (e.code === 'Period' && !typing) {
+        gameRef.current?.nextRadioTrack();
       } else if (e.code === 'KeyP' && !typing) {
         gameRef.current?.cycleTimeOfDay();
       } else if (e.code === 'KeyH' && !typing) {
@@ -345,7 +350,27 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             night: '🌙 night',
           }[hud.timeOfDay] ?? hud.timeOfDay}
         </button>
+        <button
+          type="button"
+          className={`w2-chip text-xs ${hud.radio.on ? 'w2-on' : ''}`}
+          onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
+          onContextMenu={e => {
+            e.preventDefault();
+            game.cycleRadio();
+          }}
+          title="Radio: M station · . next track (right-click: change station)"
+        >
+          📻 {hud.radio.on ? hud.radio.label : 'radio off'}
+        </button>
       </div>
+
+      {/* Now playing toast (JSR-style station card) */}
+      {hud.radio.on && now - hud.radio.at < 4500 && (
+        <div key={hud.radio.at} className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2">
+          <span>📻 NOW PLAYING</span>
+          <b>{hud.radio.label}</b>
+        </div>
+      )}
 
       {/* Chat feed */}
       <div className="absolute bottom-28 left-4 flex max-w-[60vw] flex-col gap-1">
@@ -433,6 +458,9 @@ const CSS = `
 .w2-pulse{animation:w2pulse 1.6s ease-in-out infinite}
 @keyframes w2pulse{50%{transform:scale(1.05)}}
 .w2-splash{background:radial-gradient(ellipse at 50% 40%,rgba(30,40,70,.55),rgba(5,6,12,.92))}
+/* Site themes force *{font-family:...!important}; out-specify it for the title only */
+.w2-splash .w2-title,.w2-splash .w2-title *{font-family:'Pip3',system-ui,sans-serif !important;text-transform:uppercase !important}
+.w2-splash .w2-btn{font-family:'Londrina Solid',system-ui,sans-serif !important;font-size:30px;letter-spacing:.04em;font-weight:900}
 .w2-title{font-family:'Pip3',system-ui,sans-serif;text-transform:uppercase;font-size:clamp(64px,13vw,170px);line-height:.85;font-weight:400;letter-spacing:.01em;text-shadow:0 8px 0 #d22209,0 16px 40px rgba(0,0,0,.6);font-style:italic}
 .w2-title span{display:block;color:#ffd400;font-size:.55em;text-align:right}
 .w2-spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.25);border-top-color:#ffd400;border-radius:50%;animation:w2spin .8s linear infinite}
@@ -443,6 +471,7 @@ const CSS = `
 .w2-banked{font-size:clamp(30px,5vw,60px);font-weight:900;color:#3ddc84;font-style:italic;text-shadow:0 3px 0 #0b5a2f;animation:w2bank 2.6s ease-out forwards}
 .w2-bailed{color:#ff4d3d;text-shadow:0 3px 0 #6a0f06}
 @keyframes w2bank{0%{transform:scale(.6);opacity:0}10%{transform:scale(1.1);opacity:1}20%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-20px)}}
+.w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-said{background:#fff;color:#111;border-radius:10px;padding:3px 8px;margin-bottom:4px;max-width:220px;white-space:normal;font-size:12px}

@@ -148,6 +148,9 @@ export class Player {
   lastLandImpact = 0;
   vertLip = false;
   fakie = false;
+  /** Visual kickturn/revert spin remaining (radians), decays to 0. */
+  kickturn = 0;
+  private prevFs = 0;
   emote = 0;
   emoteTimer = 0;
 
@@ -443,7 +446,15 @@ export class Player {
     this.vel.addScaledVector(side, -lat * (1 - Math.exp(-grip * dt)));
 
     // Fakie tracking: which way are we rolling relative to the nose?
-    const fs = this.forwardSpeed;
+    let fs = this.forwardSpeed;
+    // Auto kickturn: stall on a slope and start rolling back → spin the board
+    // 180 so the rider comes back down facing forward instead of fakie.
+    if (this.state === 'ground' && this.up.y < 0.97 && this.prevFs > 0.15 && fs < -0.15) {
+      this.fwd.negate();
+      this.kickturn = Math.PI;
+      fs = -fs;
+    }
+    this.prevFs = fs;
     if (Math.abs(fs) > 0.4) this.fakie = fs < 0;
 
     // Push
@@ -697,6 +708,13 @@ export class Player {
       this.fwd.copy(dir).multiplyScalar(sign);
       this.fakie = sign < 0;
     }
+    // Vert air back into the transition without spinning → revert so we
+    // ride out forward (still scores as the air trick it was).
+    if (this.fakie && (this.vertLip || normal.y < 0.9) && Math.abs(this.airYaw) < 2.6) {
+      this.fwd.negate();
+      this.fakie = false;
+      this.kickturn = Math.PI;
+    }
     this.vel.copy(this.fwd).multiplyScalar(tv * (this.fakie ? -1 : 1) * 0.97);
 
     // Score the air trick
@@ -735,11 +753,13 @@ export class Player {
     this.state = 'ground';
     this.vertLip = false;
     this.sinceLand = 0;
+    this.prevFs = 0;
     this.lastLandImpact = impact;
     this.events.push({ type: 'land', impact, clean: true });
   }
 
   private updateFlipVisual(dt: number) {
+    if (this.kickturn > 0) this.kickturn = Math.max(0, this.kickturn - dt * 11);
     if (this.flip) {
       this.flip.t += dt;
       if (this.flip.t >= this.flip.duration) {
