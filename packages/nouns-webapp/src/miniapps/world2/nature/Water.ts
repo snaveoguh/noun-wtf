@@ -252,7 +252,16 @@ const WATER_OUT = /* glsl */ `
   vec3 spec = floor( totalSpecular * 4.0 / max( 1.0, F * 4.0 ) ) * 0.25 * F * 3.0;
   spec += vec3( smoothstep( 1.6, 1.9, sl ) ) * 2.2;
   spec *= edgeFade;
-  outgoingLight = waterCol * ( 1.0 - F * edgeFade * 0.6 ) * ( 1.0 - nwFoam ) + totalDiffuse + spec;
+  // Cel crest highlights: thin bright lines on the steepest ripple slopes,
+  // lit by sun + ambient so the surface stays readable at night.
+  float crestS = length( nwWN.xz );
+  float cfw = fwidth( crestS ) + 1e-4;
+  float crest = smoothstep( 0.2 - cfw, 0.2 + cfw, crestS ) * edgeFade * ( 1.0 - nwFoam );
+  vec3 crestCol = uFoamColor * ( uWaterLight * 0.9 + uDeep * 0.25 );
+  // Minimum in-scatter so deep water keeps a hue under dim light
+  waterCol = max( waterCol, uDeep * 0.08 );
+  outgoingLight = waterCol * ( 1.0 - F * edgeFade * 0.6 ) * ( 1.0 - nwFoam ) * ( 1.0 - crest * 0.6 )
+    + crestCol * crest + totalDiffuse + spec;
 }
 `;
 
@@ -658,6 +667,24 @@ export class WaterSystem {
       .multiplyScalar(hemi.intensity * 0.9)
       .add(sun.color.clone().multiplyScalar(sun.intensity * (0.08 + 0.12 * sunUp)));
     if (this.rt === null || !this.enabled || this.bodies.length === 0) return;
+    // three r183 only remaps the deprecated PCFSoftShadowMap → PCFShadowMap
+    // inside a *shadow render* (and, because its _previousType is already
+    // PCF, without invalidating programs). This pre-pass renders with shadow
+    // auto-update off, so if it runs first it compiles the bed/rock programs
+    // with a sampler2D shadow sampler that then fails against the PCF
+    // compare-mode depth texture ("Mismatch between texture format and
+    // sampler type") on every draw — rocks, beds and refraction vanish.
+    // Normalise the type ourselves (once) and invalidate compiled programs.
+    if (renderer.shadowMap.type === THREE.PCFSoftShadowMap) {
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene.traverse(o => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (m === undefined) return;
+        for (const mm of Array.isArray(m) ? m : [m]) mm.needsUpdate = true;
+      });
+    }
+    // Let the main pass allocate the sun's shadow map before we sample it.
+    if (renderer.shadowMap.enabled && sun.castShadow && sun.shadow.map === null) return;
     let any = false;
     for (const b of this.bodies) if (b.mesh.visible) any = true;
     if (!any) return;

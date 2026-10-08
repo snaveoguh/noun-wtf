@@ -3,6 +3,8 @@
 // Owns the renderer, level, player, characters, camera, audio and network,
 // and runs the frame loop. React only mounts the canvas + reads `hud`.
 
+import type { TimeOfDayPreset } from './nature/TimeOfDay';
+
 import * as THREE from 'three';
 
 import { SkateAudio } from './audio/SkateAudio';
@@ -15,6 +17,7 @@ import {
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
+import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { Net, type NetPose } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -46,6 +49,7 @@ export interface HudState {
   chat: { id: string; name: string; text: string; at: number }[];
   quality: Quality;
   camMode: string;
+  timeOfDay: TimeOfDayPreset;
   /** Spray colour + whether the crosshair is on a paintable surface. */
   spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
@@ -135,6 +139,7 @@ export class Game {
       chat: [],
       quality,
       camMode: 'follow',
+      timeOfDay: 'afternoon',
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
     };
@@ -180,6 +185,7 @@ export class Game {
     this.gfx.scene.add(this.graffiti.group);
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
+    this.buildNature(level);
 
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
@@ -290,6 +296,7 @@ export class Game {
       return hit ? hit.point.y : null;
     });
     this.gfx.followShadow(this.player.pos);
+    this.nature?.update(dt, this.player.pos);
     this.gfx.render(dt);
     this.updateHud(dt, input);
   }
@@ -314,7 +321,43 @@ export class Game {
     }
     this.updateMyCharacter(dt);
     this.gfx.followShadow(p.pos);
+    this.nature?.update(dt, p.pos);
     this.gfx.render(dt);
+  }
+
+  nature: NatureSystem | null = null;
+
+  /** Lush foliage, water, rocks + time of day. Never allowed to break the game. */
+  private buildNature(level: LevelData) {
+    if (new URLSearchParams(window.location.search).get('nature') === '0') return;
+    try {
+      const nature = new NatureSystem(this.gfx);
+      if (level.baked) {
+        // Open lawn east of the plaza (probed clear: x 50–74, z 8–48)
+        buildNatureShowcase(nature, this.world, new THREE.Vector3(60, 0, 26));
+      } else {
+        replaceFallbackTrees(level.root, nature);
+      }
+      nature.build();
+      this.world.build([...level.collisionMeshes, ...nature.collisionMeshes()]);
+      applyTimeOfDay(this.gfx, 'afternoon', level, { duration: 0 });
+      this.nature = nature;
+    } catch (err) {
+      console.warn('[world2] nature layer failed, continuing without it', err);
+      this.nature = null;
+    }
+  }
+
+  private static TOD: TimeOfDayPreset[] = ['afternoon', 'golden', 'blue', 'night'];
+
+  /** Cycle afternoon → golden → blue hour → night (2 s transition). */
+  cycleTimeOfDay() {
+    if (this.nature === null || this.level === null) return;
+    const i = Game.TOD.indexOf(this.hud.timeOfDay);
+    const next = Game.TOD[(i + 1) % Game.TOD.length];
+    applyTimeOfDay(this.gfx, next, this.level);
+    this.hud = { ...this.hud, timeOfDay: next };
+    this.emit();
   }
 
   /** Leave the showroom and hand control to the player. */
@@ -714,6 +757,7 @@ export class Game {
   }
 
   dispose() {
+    this.nature?.dispose();
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);
