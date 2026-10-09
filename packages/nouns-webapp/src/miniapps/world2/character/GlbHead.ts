@@ -169,6 +169,9 @@ function pickModel(e: ManifestEntry): { url: string; set: HeadSet } | null {
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
 const glassesTex = new Map<number, Promise<THREE.Texture | null>>();
 
+/** Glasses index whose shape the 3dnouns glasses mesh can't show. */
+const HIP_ROSE = 0;
+
 function isGlasses(o: THREE.Object3D) {
   return o.name === 'GlassesUV' || o.name.toLowerCase().includes('glasses');
 }
@@ -311,6 +314,17 @@ export async function loadGlbHead(head: number, glasses: number): Promise<GlbHea
   const head3d = tpl.clone();
   head3d.userData.headSet = pick.set;
   if (pick.set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false };
+  // The 3dnouns glasses mesh is the square-frame shape; textures can't turn
+  // it into shapes it doesn't have. Hip-rose (2 px bridge, stepped arm)
+  // drops it and wears the Noun's voxel glasses built from the art instead.
+  if (glasses === HIP_ROSE) {
+    const drop: THREE.Object3D[] = [];
+    head3d.traverse(o => {
+      if ((o as THREE.Mesh).isMesh && isGlasses(o)) drop.push(o);
+    });
+    for (const o of drop) o.removeFromParent();
+    return { object: head3d, set: '3dnouns', hasGlasses: false };
+  }
   const tex = await loadGlassesTexture(glasses);
   head3d.traverse(o => {
     const m = o as THREE.Mesh;
