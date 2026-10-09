@@ -19,6 +19,7 @@ import {
 import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
+import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -30,6 +31,14 @@ import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
+import { MountainStream } from './world/mountain/MountainStream';
+import { rampDecorator, rockDecorator, warmMountainProps } from './world/mountain/Props';
+import {
+  edgeDistance,
+  terrainHeight,
+  terrainInDomain,
+  terrainSurface,
+} from './world/mountain/terrain';
 import { PipBillboards } from './world/PipBillboards';
 
 export interface HudState {
@@ -57,6 +66,8 @@ export interface HudState {
   /** Spray colour + whether the crosshair is on a paintable surface. */
   spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
+  /** Out on the mountain: metres downhill from the city + current surface. */
+  mountain: { down: number; surface: string; streak: number } | null;
 }
 
 interface RemoteAvatar {
@@ -148,6 +159,7 @@ export class Game {
       radio: { on: false, label: 'radio off', at: 0 },
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
+      mountain: null,
     };
   }
 
@@ -188,6 +200,7 @@ export class Game {
     }
     this.world.build(level.collisionMeshes);
     this.player.softBounds = level.softBounds ?? Infinity;
+    if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
     if (fountain) this.player.homeSpots.push({ pos: fountain.position.clone(), yaw: fountain.yaw });
     this.placeIceCreamVan(level);
@@ -224,6 +237,9 @@ export class Game {
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
+    // Mesh the mountain around the spawn (terrain, rocks, ramps) so their
+    // shaders are in the precompile below instead of hitching on first sight
+    this.mountain?.prime(this.player.pos);
     // Precompile shaders so the first frames don't hitch
     this.gfx.renderer.compile(this.gfx.scene, this.gfx.camera);
 
@@ -329,8 +345,12 @@ export class Game {
     this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
 
-    // Physics in fixed-ish substeps for stability at low FPS
-    const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
+    // Physics in fixed-ish substeps for stability at low FPS — and short
+    // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
+    const steps = Math.min(
+      64,
+      Math.max(1, Math.ceil(dt / (1 / 90)), Math.ceil((this.player.speed * dt) / 0.5)),
+    );
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
       // Only consume one-shot inputs on the first substep
@@ -364,6 +384,15 @@ export class Game {
       return hit ? hit.point.y : null;
     });
     this.gfx.followShadow(this.player.pos);
+    if (this.mountain !== null) {
+      this.mountain.update(this.player.pos, this.player.vel);
+      // Out on the slopes (or way up a tower) the sky dome below the horizon
+      // turns to haze, since the world falls away below eye level. Down in
+      // the streets it stays exactly as it was.
+      const c = this.gfx.camera.position;
+      const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
+      setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
+    }
     this.nature?.update(dt, this.player.pos);
     this.billboards.update(dt);
     this.gfx.render(dt);
@@ -395,6 +424,28 @@ export class Game {
   }
 
   nature: NatureSystem | null = null;
+  /** Endless downhill terrain past the alleys (baked plaza only). */
+  mountain: MountainStream | null = null;
+
+  private buildMountain(level: LevelData) {
+    try {
+      const m = new MountainStream(this.world, this.gfx.quality, this.gfx.toon);
+      warmMountainProps();
+      m.addDecorator(rockDecorator);
+      m.addDecorator(rampDecorator);
+      this.gfx.scene.add(m.group);
+      this.mountain = m;
+      this.player.mountain = level.mountain ?? null;
+      this.player.terrain = {
+        height: terrainHeight,
+        inDomain: terrainInDomain,
+        surface: terrainSurface,
+      };
+    } catch (err) {
+      console.warn('[world2] mountain failed, continuing without it', err);
+      this.mountain = null;
+    }
+  }
 
   /** Collision for props added on top of the baked level (ice cream van…). */
   private propCollision: THREE.Mesh[] = [];
@@ -444,7 +495,10 @@ export class Game {
         this.propCollision.push(iceCreamVanCollisionBox(van));
         // Respawn spot: beside the serving hatch, facing out
         const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        this.player.homeSpots.push({ pos: new THREE.Vector3(x, y, z).add(side), yaw: yaw + Math.PI / 2 });
+        this.player.homeSpots.push({
+          pos: new THREE.Vector3(x, y, z).add(side),
+          yaw: yaw + Math.PI / 2,
+        });
         this.world.build([...level.collisionMeshes, ...this.propCollision]);
         return;
       }
@@ -1057,6 +1111,14 @@ export class Game {
       inputMode: input.mode,
       landmarks: lm,
       camMode: this.cam.mode,
+      mountain:
+        this.mountain !== null && edgeDistance(p.pos.x, p.pos.z) > 0
+          ? {
+              down: Math.round(edgeDistance(p.pos.x, p.pos.z)),
+              surface: p.surface ?? 'grass',
+              streak: Math.round(p.runTime),
+            }
+          : null,
       spray: {
         color: SPRAY_COLORS[this.graffiti?.color ?? 2],
         aiming: this.graffiti?.aim !== null && this.graffiti?.aim !== undefined,
@@ -1067,6 +1129,7 @@ export class Game {
   }
 
   dispose() {
+    this.mountain?.dispose();
     this.nature?.dispose();
     this.billboards.dispose();
     this.radio.dispose();

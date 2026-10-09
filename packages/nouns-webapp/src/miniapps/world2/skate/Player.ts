@@ -59,6 +59,22 @@ export interface PlayerTuning {
   jumpSpeed: number;
 }
 
+/** What the player needs from the endless terrain. */
+export interface PlayerTerrain {
+  height(x: number, z: number): number;
+  inDomain(x: number, z: number): boolean;
+  surface(x: number, z: number): 'track' | 'grass' | 'alley' | null;
+}
+
+/**
+ * Mountain speed model (see Player.run): air drag ∝ v² divided by
+ * (1 + run / RUN_DRAG_K), so terminal velocity keeps rising the longer you
+ * ride without bailing. No hard top speed.
+ */
+const RUN_DRAG_K = 400;
+/** Extra acceleration (m/s²) per minute of unbroken mountain riding. */
+const STREAK_ACCEL = 0.35;
+
 export const DEFAULT_TUNING: PlayerTuning = {
   gravity: 12.5,
   pushAccel: 5.2,
@@ -187,6 +203,24 @@ export class Player {
   private wallPush = 0;
   /** |x|, |z| clamp for the play area (replaces invisible boundary walls). */
   softBounds = Infinity;
+  /**
+   * Endless mountain all round the city: where the clamp lets you through
+   * the ring (the alley corridors), and the |x| / |z| past which you're out
+   * on the slope (no clamp).
+   */
+  mountain: { inCorridor: (x: number, z: number) => boolean; minZ: number } | null = null;
+  /** Analytic ground (mountain) for fall-out checks, rescue + surface friction. */
+  terrain: PlayerTerrain | null = null;
+  /**
+   * Distance (m) ridden on the mountain since you last fell off. Air drag
+   * eases off as it grows, so the longer you stay on, the faster you go —
+   * with no top speed. Reset by bails, respawns and stepping off the board.
+   */
+  run = 0;
+  /** Seconds ridden on the mountain since you last fell off. */
+  runTime = 0;
+  /** Surface under the board right now (for HUD / audio). */
+  surface: 'track' | 'grass' | 'alley' | null = null;
 
   combo: ComboState = createCombo();
   events: PlayerEvent[] = [];
@@ -256,7 +290,8 @@ export class Player {
       if (this.climb !== null) this.updateClimb(dt, input);
       else this.updateFoot(dt, input, camYaw);
       this.clampBounds();
-      if (this.pos.y < -30) this.respawnSafe();
+      this.terrainRescue();
+      if (this.fellOut()) this.respawnSafe();
       if (input.respawnPressed) this.respawnHome();
       return;
     }
@@ -277,13 +312,53 @@ export class Player {
         break;
     }
 
+    // Ride streak on the mountain (anything but a bail keeps it going)
+    if (
+      this.state !== 'bail' &&
+      this.terrain !== null &&
+      this.terrain.inDomain(this.pos.x, this.pos.z)
+    ) {
+      this.run += this.speed * dt;
+      this.runTime += dt;
+    }
+
     // Board flip visuals
     this.updateFlipVisual(dt);
 
     this.clampBounds();
+    this.terrainRescue();
     // Fell out of the world → respawn
-    if (this.pos.y < -30) this.respawnSafe();
+    if (this.fellOut()) this.respawnSafe();
     if (input.respawnPressed) this.respawnHome();
+  }
+
+  /** Lowest walkable floor under (x, z): the terrain on the mountain, else the plaza. */
+  floorAt(x: number, z: number): number {
+    const t = this.terrain;
+    if (t !== null && t.inDomain(x, z)) return Math.min(0, t.height(x, z));
+    return 0;
+  }
+
+  /** Out of the world = well below whatever ground is under you (not a fixed y). */
+  private fellOut() {
+    return this.pos.y < this.floorAt(this.pos.x, this.pos.z) - 30;
+  }
+
+  /**
+   * Never end up inside the mountain (e.g. a huge-speed step skimming a
+   * crest): pop back onto the surface, keeping the tangential speed.
+   */
+  private terrainRescue() {
+    const t = this.terrain;
+    if (t === null || this.climb !== null) return;
+    const p = this.pos;
+    if (!t.inDomain(p.x, p.z)) return;
+    const h = t.height(p.x, p.z);
+    if (p.y < h - 0.25) {
+      p.y = h;
+      if (this.vel.y < 0) this.vel.y = 0;
+      if (this.mode === 'foot') this.footGrounded = true;
+    }
   }
 
   toggleBoard() {
@@ -295,6 +370,8 @@ export class Player {
       this.vel.y = 0;
       this.up.copy(UP);
       this.state = 'ground';
+      this.run = 0;
+      this.runTime = 0;
       bankCombo(this.combo, performance.now());
       this.events.push({ type: 'boardOff' });
     } else {
@@ -314,7 +391,8 @@ export class Player {
   respawnHome() {
     let best: { pos: THREE.Vector3; yaw: number } | null = null;
     for (const h of this.homeSpots)
-      if (best === null || h.pos.distanceToSquared(this.pos) < best.pos.distanceToSquared(this.pos)) best = h;
+      if (best === null || h.pos.distanceToSquared(this.pos) < best.pos.distanceToSquared(this.pos))
+        best = h;
     if (best !== null) {
       this.safePos.copy(best.pos);
       this.safeFwd.set(Math.sin(best.yaw), 0, Math.cos(best.yaw));
@@ -328,6 +406,8 @@ export class Player {
     this.climb = null;
     this.pos.copy(this.safePos);
     this.vel.set(0, 0, 0);
+    this.run = 0;
+    this.runTime = 0;
     this.fwd.copy(this.safeFwd);
     this.up.copy(UP);
     this.grind = null;
@@ -423,12 +503,32 @@ export class Player {
   private clampBounds() {
     const b = this.softBounds;
     if (!Number.isFinite(b)) return;
-    if (Math.abs(this.pos.x) > b) {
-      this.pos.x = Math.sign(this.pos.x) * b;
+    const p = this.pos;
+    const m = this.mountain;
+    if (m !== null) {
+      // Out on the slopes: free to roam (the city wall keeps you off its back)
+      if (Math.max(Math.abs(p.x), Math.abs(p.z)) >= m.minZ) return;
+      // Through an alley corridor (its walls are real geometry)
+      if (m.inCorridor(p.x, p.z)) return;
+      // Between the ring and the slope, outside a corridor: back to the
+      // nearer side (the plaza, or down onto the mountain)
+      const mid = (b + m.minZ) / 2;
+      if (Math.abs(p.x) > b) {
+        p.x = Math.sign(p.x) * (Math.abs(p.x) > mid ? m.minZ : b);
+        this.vel.x = 0;
+      }
+      if (Math.abs(p.z) > b) {
+        p.z = Math.sign(p.z) * (Math.abs(p.z) > mid ? m.minZ : b);
+        this.vel.z = 0;
+      }
+      return;
+    }
+    if (Math.abs(p.x) > b) {
+      p.x = Math.sign(p.x) * b;
       this.vel.x = 0;
     }
-    if (Math.abs(this.pos.z) > b) {
-      this.pos.z = Math.sign(this.pos.z) * b;
+    if (Math.abs(p.z) > b) {
+      p.z = Math.sign(p.z) * b;
       this.vel.z = 0;
     }
   }
@@ -781,15 +881,41 @@ export class Player {
       }
     }
 
-    // Friction / braking
+    // Friction / braking. On the mountain the drag eases off the longer the
+    // run (no hard top speed — it keeps building), grass is slower than the
+    // dirt line, and brakes scale with speed so stopping still works at 60 m/s.
+    const terr = this.terrain;
+    const onMountain = terr !== null && terr.inDomain(this.pos.x, this.pos.z);
+    this.surface = onMountain ? terr.surface(this.pos.x, this.pos.z) : null;
+    let friction = t.rollingFriction;
+    let drag = t.drag;
+    let brakeK = 1;
+    if (onMountain) {
+      // Ride streak: drag eases off with distance ridden, and a push from
+      // behind grows with time on (+0.35 m/s² per minute), both since the
+      // last bail. No top speed — only the emergent drag terminal velocity,
+      // which keeps rising as the streak does.
+      if (!brake && speed > 3) {
+        const boost = STREAK_ACCEL * (this.runTime / 60);
+        this.vel.addScaledVector(this.vel, (boost * dt) / speed);
+      }
+      drag = t.drag / (1 + this.run / RUN_DRAG_K);
+      friction = 0.1;
+      if (this.surface === 'grass') {
+        friction += 1.1;
+        drag *= 2.2;
+      }
+      brakeK = 1 + speed / 30;
+    }
     const decel =
-      t.rollingFriction +
-      t.drag * speed * speed +
-      (sliding ? 7.5 : brake ? 4.5 : 0) +
-      this.powerslide * 2;
+      friction +
+      drag * speed * speed +
+      (sliding ? 7.5 : brake ? 4.5 : 0) * brakeK +
+      this.powerslide * 2 * brakeK;
     const newSpeed = Math.max(0, this.speed - decel * dt);
     if (this.speed > 1e-4) this.vel.multiplyScalar(newSpeed / this.speed);
-    if (this.speed > t.maxSpeed) this.vel.multiplyScalar(t.maxSpeed / this.speed);
+    // The city keeps its top speed; the mountain has none
+    if (!onMountain && this.speed > t.maxSpeed) this.vel.multiplyScalar(t.maxSpeed / this.speed);
 
     // Crouch (ollie load)
     this.crouch = THREE.MathUtils.lerp(this.crouch, input.crouch ? 1 : 0, 1 - Math.exp(-14 * dt));
@@ -840,8 +966,8 @@ export class Player {
       }
     }
 
-    // Safe spot for respawn
-    if (this.up.y > 0.95 && speed < 9) {
+    // Safe spot for respawn (on the mountain at any speed: it's all safe ground)
+    if (this.up.y > 0.95 && (speed < 9 || onMountain)) {
       this.safePos.copy(this.pos);
       this.safeFwd.copy(this.fwd).setY(0).normalize();
     }
@@ -1008,7 +1134,12 @@ export class Player {
       headingOk = c > 0.62;
     }
     const grabOk = !this.grab || true;
-    const clean = upOk && flipOk && headingOk && grabOk && impact < 15;
+    // Fast mountain landings come in hot: impact is already measured along
+    // the landing slope's normal, and the tolerance grows with the speed
+    // carried along the slope (the city keeps its 15 m/s limit)
+    const onMountain = this.terrain !== null && this.terrain.inDomain(point.x, point.z);
+    const maxImpact = onMountain ? Math.max(18, tv * 0.8) : 15;
+    const clean = upOk && flipOk && headingOk && grabOk && impact < maxImpact;
 
     this.up.copy(normal);
     this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
@@ -1030,7 +1161,8 @@ export class Player {
       this.fakie = false;
       this.kickturn = Math.PI;
     }
-    this.vel.copy(this.fwd).multiplyScalar(tv * (this.fakie ? -1 : 1) * 0.97);
+    // (a clean mountain landing keeps all its speed: the streak is the point)
+    this.vel.copy(this.fwd).multiplyScalar(tv * (this.fakie ? -1 : 1) * (onMountain ? 1 : 0.97));
 
     // Score the air trick
     const yawDeg = THREE.MathUtils.radToDeg(this.airYaw);
@@ -1223,6 +1355,8 @@ export class Player {
   private doBail(now: number, impact: number) {
     this.state = 'bail';
     this.bailTimer = 0;
+    this.run = 0;
+    this.runTime = 0;
     this.flip = null;
     this.grind = null;
     this.grab = null;
@@ -1292,7 +1426,7 @@ export class Player {
       this.up.copy(UP);
       this.sinceLand = 0;
       this.lastLandImpact = 0;
-      if (this.pos.y < -20) this.respawnSafe();
+      if (this.fellOut()) this.respawnSafe();
     }
   }
 
