@@ -476,7 +476,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                       return (
                         <div key={key} className="flex items-center gap-2">
                           <Trait type={key} seed={seed[key]} className="h-6 w-6 rounded" />
-                          <span className="w-14 text-[10px] font-bold text-gray-400">{label}</span>
+                          <span className="w-14 text-xs font-bold text-gray-400">{label}</span>
                           <select
                             value={seed[key]}
                             onChange={e => updateTrait(key, Number(e.target.value))}
@@ -551,7 +551,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                   </p>
 
                   <div>
-                    <p className="mb-1.5 text-[11px] font-bold uppercase text-gray-500">
+                    <p className="mb-1.5 text-xs font-bold uppercase text-gray-500">
                       Watch DAO
                     </p>
                     <div className="flex gap-1.5">
@@ -562,7 +562,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                           onClick={() => setReserveDao(key)}
                           disabled={reserveBusy}
                           title={hint}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                          className={`rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
                             reserveDao === key
                               ? 'border-black bg-black text-white'
                               : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400'
@@ -573,7 +573,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                       ))}
                     </div>
                     {reserveDao === 'v2' && (
-                      <p className="mt-1 text-[11px] text-gray-400">
+                      <p className="mt-1 text-xs text-gray-400">
                         NounV2 uses the 2022-era trait set — traits added to Nouns since then
                         won&apos;t ever match there.
                       </p>
@@ -581,7 +581,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                   </div>
 
                   <div>
-                    <p className="mb-1.5 text-[11px] font-bold uppercase text-gray-500">
+                    <p className="mb-1.5 text-xs font-bold uppercase text-gray-500">
                       Require these traits
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -592,7 +592,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                             key={key}
                             type="button"
                             onClick={() => toggleReserveLayer(key)}
-                            className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            className={`rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
                               on
                                 ? 'border-black bg-black text-white'
                                 : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400'
@@ -605,7 +605,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                       })}
                     </div>
                     {selectedReserveLayers.length === 0 && (
-                      <p className="mt-1 text-[11px] text-amber-600">
+                      <p className="mt-1 text-xs text-amber-600">
                         Select at least one trait to require.
                       </p>
                     )}
@@ -622,7 +622,7 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                       <button
                         type="button"
                         onClick={resetReserve}
-                        className="mt-1 text-[11px] font-bold text-green-800 underline"
+                        className="mt-1 text-xs font-bold text-green-800 underline"
                       >
                         Reserve another
                       </button>
@@ -648,27 +648,27 @@ const DreamCreatePanel: FC<Props> = ({ onSave, onClose }) => {
                               : `Deposit ~$5 (${RESERVE_TIP_ETH} ETH) to reserve`}
                       </Button>
                       {!address && (
-                        <p className="text-[11px] text-gray-500">Connect a wallet to reserve.</p>
+                        <p className="text-xs text-gray-500">Connect a wallet to reserve.</p>
                       )}
                       {address && !chainSupported && (
-                        <p className="text-[11px] text-amber-600">
+                        <p className="text-xs text-amber-600">
                           Switch to a supported chain:{' '}
                           {Object.values(RESERVE_SUPPORTED_CHAINS).join(', ')}.
                         </p>
                       )}
                       {address && chainSupported && (
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-xs text-gray-400">
                           Tipping on {RESERVE_SUPPORTED_CHAINS[chainId]}.
                         </p>
                       )}
                       {tipSendError && (
-                        <p className="text-[11px] text-red-500">
+                        <p className="text-xs text-red-500">
                           {tipSendError.message.includes('User rejected')
                             ? 'Transaction rejected.'
                             : tipSendError.message}
                         </p>
                       )}
-                      {reserveError && <p className="text-[11px] text-red-500">{reserveError}</p>}
+                      {reserveError && <p className="text-xs text-red-500">{reserveError}</p>}
                     </>
                   )}
                 </div>

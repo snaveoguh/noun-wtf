@@ -461,11 +461,11 @@ const BorgsTab: FC = () => {
                         />
                       )}
                       {isBurned && (
-                        <span className="absolute right-1 top-1 text-[10px]" title="Bred away">
+                        <span className="absolute right-1 top-1 text-xs" title="Bred away">
                           ☠️
                         </span>
                       )}
-                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block">
+                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-xs font-bold shadow-sm group-hover:block">
                         {borg.id}
                       </span>
                     </div>
@@ -1164,9 +1164,9 @@ function BreedBorgsDialog({
                         style={{ width: '100%', imageRendering: 'pixelated' }}
                       />
                     ) : (
-                      <span className="text-[10px]">{id}</span>
+                      <span className="text-xs">{id}</span>
                     )}
-                    <span className="absolute bottom-0 left-0 right-0 bg-white/80 text-[9px] font-bold">
+                    <span className="absolute bottom-0 left-0 right-0 bg-white/80 text-xs font-bold">
                       {id}
                     </span>
                   </button>

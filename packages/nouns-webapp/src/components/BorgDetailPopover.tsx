@@ -156,7 +156,7 @@ const BorgDetailPopover: FC<Props> = ({
           />
         )}
         {isBurned && (
-          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-xs font-bold text-white">
             ☠️ bred away
           </span>
         )}

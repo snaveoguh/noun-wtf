@@ -39,7 +39,7 @@ export const VoteRow: FC<{ vote: RecentVote; isV2?: boolean }> = ({ vote, isV2 =
       <div className="flex items-center gap-2">
         <SupportChip support={vote.support} />
         <PropLink id={vote.proposalId} title={vote.title} isV2={isV2} />
-        <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+        <span className="ml-auto flex shrink-0 items-center gap-2 text-xs">
           {vote.votes != null && (
             <span className="wp-muted wp-mono" title="voting weight">
               ×{fmtInt(vote.votes)}
@@ -69,7 +69,7 @@ export const VoteRow: FC<{ vote: RecentVote; isV2?: boolean }> = ({ vote, isV2 =
           {long && (
             <button
               type="button"
-              className="wp-link ml-2 inline-flex items-center gap-1 text-[11px]"
+              className="wp-link ml-2 inline-flex items-center gap-1 text-xs"
               onClick={() => setOpen(o => !o)}
             >
               {open ? <ChevronUpIcon size={11} /> : <ChevronDownIcon size={11} />}
@@ -102,7 +102,7 @@ export const OverviewTab: FC<{
         <Card
           title="Recent votes"
           right={
-            <button type="button" className="wp-link text-[11px]" onClick={() => onTab('votes')}>
+            <button type="button" className="wp-link text-xs" onClick={() => onTab('votes')}>
               all {fmtInt(profile.voting?.total)} →
             </button>
           }
@@ -121,7 +121,7 @@ export const OverviewTab: FC<{
           right={
             <button
               type="button"
-              className="wp-link text-[11px]"
+              className="wp-link text-xs"
               onClick={() => onTab('proposals')}
             >
               all {authored.length} →
@@ -135,12 +135,12 @@ export const OverviewTab: FC<{
               <div key={String(p.id)} className="wp-row flex-col !items-stretch">
                 <div className="flex items-center gap-2">
                   <PropLink id={p.id} title={p.title} />
-                  <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+                  <span className="ml-auto flex shrink-0 items-center gap-2 text-xs">
                     <StatusPill status={p.status} />
                     <span className="wp-muted">{relTime(p.createdAt)}</span>
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-[11px]">
+                <div className="mt-1 flex items-center gap-2 text-xs">
                   <div className="flex-1">
                     <TriBar forN={p.forVotes} againstN={p.againstVotes} abstainN={p.abstainVotes} />
                   </div>
@@ -162,7 +162,7 @@ export const OverviewTab: FC<{
         <Card
           title={`Held nouns, ${fmtInt(profile.holdings?.count ?? nouns.length)}`}
           right={
-            <button type="button" className="wp-link text-[11px]" onClick={() => onTab('nouns')}>
+            <button type="button" className="wp-link text-xs" onClick={() => onTab('nouns')}>
               detail →
             </button>
           }
@@ -188,7 +188,7 @@ export const OverviewTab: FC<{
               abstainN={profile.voting.abstain}
               height={8}
             />
-            <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[11px]">
+            <div className="mt-2 grid grid-cols-3 gap-1 text-center text-xs">
               <div>
                 <div className="wp-pos wp-mono text-sm font-bold">{fmtInt(profile.voting.for)}</div>
                 <div className="wp-muted">for</div>
@@ -206,7 +206,7 @@ export const OverviewTab: FC<{
                 <div className="wp-muted">abstain</div>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-x-3 text-[11px]">
+            <div className="mt-3 grid grid-cols-2 gap-x-3 text-xs">
               <Row
                 k="with reason"
                 v={`${fmtInt(profile.voting.withReason)} (${fmtPct(
@@ -240,7 +240,7 @@ export const OverviewTab: FC<{
 
         {hasV2 && v2 != null && (
           <Card title="NounV2">
-            <div className="grid grid-cols-2 gap-x-3 text-[11px]">
+            <div className="grid grid-cols-2 gap-x-3 text-xs">
               <Row k="votes" v={fmtInt(v2.votes)} />
               <Row k="for / against" v={`${fmtInt(v2.for)} / ${fmtInt(v2.against)}`} />
               <Row k="proposals" v={fmtInt(v2.proposalsAuthored)} />
@@ -248,7 +248,7 @@ export const OverviewTab: FC<{
               <Row k="bids" v={fmtInt(v2.bids)} />
               <Row k="settled" v={fmtInt(v2.settled)} />
             </div>
-            <Link to="/v2" className="wp-link mt-2 inline-block text-[11px]">
+            <Link to="/v2" className="wp-link mt-2 inline-block text-xs">
               V2 auction →
             </Link>
           </Card>
@@ -307,7 +307,7 @@ export const VotesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
       title={`Votes, ${fmtInt(profile.voting?.total ?? all.length)}`}
       right={
         judged > 0 ? (
-          <span className="wp-muted text-[11px]">
+          <span className="wp-muted text-xs">
             with outcome {fmtPct((aligned / judged) * 100)} of {judged}
           </span>
         ) : null
@@ -332,7 +332,7 @@ export const VotesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
         list.map(v => <VoteRow key={`${v.proposalId}-${v.txHash ?? ''}`} vote={v} />)
       )}
       {all.length > 0 && num(profile.voting?.total) > all.length && (
-        <div className="wp-muted mt-2 text-[11px]">
+        <div className="wp-muted mt-2 text-xs">
           Showing the {all.length} most recent of {fmtInt(profile.voting?.total)}.
         </div>
       )}
@@ -351,7 +351,7 @@ export const ProposalsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
       <Card
         title={`Authored, ${authored.length}`}
         right={
-          <span className="wp-muted text-[11px]">
+          <span className="wp-muted text-xs">
             {p?.passRate != null && <>pass rate {fmtPct(p.passRate)}, </>}
             {p?.totalRequestedEth != null && <>asked {fmtEth(p.totalRequestedEth)}</>}
           </span>
@@ -364,7 +364,7 @@ export const ProposalsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             <div key={String(pr.id)} className="wp-row flex-col !items-stretch">
               <div className="flex items-center gap-2">
                 <PropLink id={pr.id} title={pr.title} />
-                <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+                <span className="ml-auto flex shrink-0 items-center gap-2 text-xs">
                   {pr.executed === true && <Pill tone="pos">executed</Pill>}
                   <StatusPill status={pr.status} />
                   <span className="wp-muted" title={fmtDate(pr.createdAt)}>
@@ -372,7 +372,7 @@ export const ProposalsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                   </span>
                 </span>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px]">
+              <div className="mt-1 flex items-center gap-2 text-xs">
                 <div className="flex-1">
                   <TriBar
                     forN={pr.forVotes}
@@ -431,7 +431,7 @@ export const CandidatesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
               <Link to={`/candidates/${encodeURIComponent(cd.id)}`} className="wp-link wp-ellipsis">
                 {cd.title ?? cd.slug ?? cd.id}
               </Link>
-              <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+              <span className="ml-auto flex shrink-0 items-center gap-2 text-xs">
                 <span className="wp-muted">{fmtInt(cd.sponsorCount)} sponsors</span>
                 {cd.promotedToProposalId != null && (
                   <Link to={`/vote/${cd.promotedToProposalId}`} className="wp-pill wp-pill-pos">
@@ -461,7 +461,7 @@ export const CandidatesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                   >
                     {sp.title ?? sp.candidateId}
                   </Link>
-                  <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+                  <span className="ml-auto flex shrink-0 items-center gap-2 text-xs">
                     {sp.canceled === true && <Pill tone="neg">canceled</Pill>}
                     {exp != null &&
                       (expired ? (

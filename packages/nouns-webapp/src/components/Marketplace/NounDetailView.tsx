@@ -76,7 +76,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
   return (
     <div>
       {/* Breadcrumb */}
-      <nav className="mb-4 font-mono text-[9px] uppercase tracking-wider text-[var(--ink-faint)]">
+      <nav className="mb-4 font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
         <Link to="/marketplace" className="transition-colors hover:text-[var(--ink)]">
           Nouns Marketplace
         </Link>
@@ -111,7 +111,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
 
           {/* Owner */}
           {owner && (
-            <div className="mt-2 font-mono text-[10px] uppercase tracking-wider text-[var(--ink-light)]">
+            <div className="mt-2 font-mono text-xs uppercase tracking-wider text-[var(--ink-light)]">
               Owner:{' '}
               <a
                 href={`https://etherscan.io/address/${owner}`}
@@ -126,7 +126,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
 
           {/* Traits */}
           {seed && (
-            <div className="mt-4 space-y-1 font-mono text-[10px] uppercase tracking-wider text-[var(--ink-light)]">
+            <div className="mt-4 space-y-1 font-mono text-xs uppercase tracking-wider text-[var(--ink-light)]">
               {headName && (
                 <p>
                   Head: <span className="text-[var(--ink)]">{headName}</span>
@@ -159,13 +159,13 @@ export function NounDetailView({ nounId }: { nounId: number }) {
             {detail?.listedPriceEth ? (
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="font-mono text-[9px] uppercase tracking-wider text-[var(--ink-faint)]">
+                  <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
                     Listed Price
                   </p>
                   <p className="font-mono text-2xl font-bold text-[var(--ink)]">
                     {parseFloat(detail.listedPriceEth).toFixed(4)} ETH
                   </p>
-                  <p className="mt-0.5 font-mono text-[8px] text-[var(--ink-faint)]">
+                  <p className="mt-0.5 font-mono text-xs text-[var(--ink-faint)]">
                     0% marketplace fee
                   </p>
                 </div>
@@ -174,11 +174,11 @@ export function NounDetailView({ nounId }: { nounId: number }) {
                 )}
               </div>
             ) : loading ? (
-              <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
+              <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
                 Loading marketplace data...
               </p>
             ) : (
-              <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
+              <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
                 No active listing
               </p>
             )}
@@ -192,7 +192,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
           )}
 
           {/* Links */}
-          <div className="mt-6 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
+          <div className="mt-6 flex flex-wrap items-center gap-3 font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             <a
               href={`/noun/${nounId}`}
               target="_blank"

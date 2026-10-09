@@ -122,7 +122,7 @@ const WalletProfilePage: React.FC = () => {
   return (
     <div className="wp mt-1 grid gap-3 px-2 pb-10 pt-3 sm:px-4 lg:px-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="wp-muted text-[11px] uppercase tracking-widest">Gamer profile</div>
+        <div className="wp-muted text-xs uppercase tracking-widest">Gamer profile</div>
         <div className="w-full sm:w-80">
           <WalletSearch compact initial={paramIdentity ?? ''} basePath={basePath} />
         </div>

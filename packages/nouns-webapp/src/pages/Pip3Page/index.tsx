@@ -311,7 +311,7 @@ const Pip3Page: React.FC = () => {
         <div className="pip3-type" style={{
           textAlign: 'center',
           padding: '40px 0',
-          color: 'rgba(255,255,255,0.2)',
+          color: 'rgba(255,255,255,0.55)',
           fontSize: '0.7rem',
           fontWeight: 600,
           letterSpacing: '0.15em',
@@ -339,7 +339,7 @@ const Pip3Page: React.FC = () => {
           className="pip3-type"
           style={{
             color: 'rgba(255,255,255,0.5)',
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             textDecoration: 'none',
           }}

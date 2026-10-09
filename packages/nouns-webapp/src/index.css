@@ -587,17 +587,17 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --brand-light-green: #6da886;
     --brand-black: #ecebe4;
     --brand-cool-background: #0c0c0f;
-    --brand-cool-border: #2c2c30;
+    --brand-cool-border: rgba(255, 255, 255, 0.08);
     --brand-cool-dark-text: #ecebe4;
     --brand-cool-light-text: #8d8c84;
     --brand-cool-accent: #141418;
     --brand-warm-background: #0c0c0f;
-    --brand-warm-border: #2c2c30;
+    --brand-warm-border: rgba(255, 255, 255, 0.08);
     --brand-warm-dark-text: #ecebe4;
     --brand-warm-light-text: #8d8c84;
     --brand-warm-accent: #141418;
     --brand-gray-dark-text: #ecebe4;
-    --brand-gray-border: #2c2c30;
+    --brand-gray-border: rgba(255, 255, 255, 0.08);
     --brand-gray-background: #0c0c0f;
     --brand-gray-light-text: #8d8c84;
     --brand-gray-light-text-translucent: rgba(141, 140, 132, 0.12);
@@ -624,15 +624,16 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --theme-surface: rgba(255, 255, 255, 0.05);
     --theme-divider: rgba(255, 255, 255, 0.08);
     --theme-free: #3dff8a; /* FREEDOM section (nounv2, grants, hackathons) */
-    --brand-dark-green: #3dff8a;
+    --brand-dark-green: #ecebe4; /* was dark-green body copy on the light skin */
     --theme-text-primary: #ecebe4;
     --theme-text-secondary: #c9c8c0;
     --theme-text-muted: #8d8c84;
     --theme-text-accent: #ffffff;
     --theme-text-link: #d4ff3a;
-    --theme-border: #2c2c30;
-    --theme-border-light: #1c1c20;
-    --theme-border-strong: #4a4a50;
+    /* Outlines are hairlines at most: surfaces separate by tint, not by line. */
+    --theme-border: rgba(255, 255, 255, 0.08);
+    --theme-border-light: rgba(255, 255, 255, 0.05);
+    --theme-border-strong: rgba(255, 255, 255, 0.18);
     --theme-accent: #d4ff3a;
     --theme-accent-hover: #e2ff74;
     --theme-accent-text: #000000;
@@ -666,7 +667,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --bs-tertiary-color-rgb: 141, 140, 132;
     --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
     --bs-code-color: #d4ff3a; /* inline <code> was bootstrap pink (#d63384, 4:1) */
-    --bs-border-color: #2c2c30;
+    --bs-border-color: rgba(255, 255, 255, 0.08);
     --bs-secondary-color: #8d8c84;
     --bs-tertiary-bg: #16161a;
     --bs-secondary-bg: #0b0b0d;
@@ -762,6 +763,14 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   border-radius: 999px;
   font-weight: 600;
 }
+/* Black-filled Tailwind buttons/chips vanish into the glass: give them the
+   default button's glass fill (STYLEGUIDE: every filled button is glass). */
+[data-theme='abacus'] :is(button, a, [role='button']):is(.bg-black, .bg-gray-900, .bg-neutral-900, .bg-zinc-900, .bg-slate-900) {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+[data-theme='abacus'] :is(button, a, [role='button']):is(.bg-black, .bg-gray-900, .bg-neutral-900, .bg-zinc-900, .bg-slate-900):hover {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+}
 [data-theme='abacus'] .modal-backdrop.show {
   opacity: 0.8;
 }
@@ -769,7 +778,7 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   filter: invert(1);
 }
 [data-theme='abacus'] hr {
-  border-color: #2c2c30;
+  border-color: var(--theme-divider);
   opacity: 1;
 }
 
@@ -1274,6 +1283,22 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .text-white\/50,
 [data-theme='abacus'] .text-white\/60 {
   color: #a9a8a0 !important;
+}
+
+/* NOIR: the marketplace + predictions pages are written against a "paper"
+   palette (--paper / --ink / --rule …) that nothing defined inside a window,
+   so they inherited the OS shell's --ink:#060607 and drew black headings on
+   the glass (1.1:1). Resolve the palette to the dark tokens for every page. */
+[data-theme='abacus'] .nos-page {
+  --ink: #ecebe4;
+  --ink-light: #c9c8c0;
+  --ink-faint: #8d8c84;
+  --paper: var(--theme-bg-card);
+  --paper-dark: var(--theme-bg-tertiary);
+  --rule: transparent;
+  --rule-light: var(--theme-divider);
+  --accent-red: #ff3b5c;
+  --accent-green: #3dff8a;
 }
 
 /* NOIR: translucent white pills keep dark text (text now defaults to white) */

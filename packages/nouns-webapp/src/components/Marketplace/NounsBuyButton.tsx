@@ -15,7 +15,7 @@ export function NounsBuyButton({ orderHash, priceEth }: NounsBuyButtonProps) {
 
   if (status === 'success') {
     return (
-      <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink)]">
+      <span className="font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink)]">
         Purchased
       </span>
     );
@@ -28,7 +28,7 @@ export function NounsBuyButton({ orderHash, priceEth }: NounsBuyButtonProps) {
       <button
         onClick={buy}
         disabled={isPending}
-        className="border border-[var(--ink)] bg-[var(--ink)] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+        className="border border-[var(--ink)] bg-[var(--ink)] px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
       >
         {status === 'switching'
           ? 'Switch Chain...'
@@ -41,7 +41,7 @@ export function NounsBuyButton({ orderHash, priceEth }: NounsBuyButtonProps) {
       {status === 'error' && error && (
         <button
           onClick={reset}
-          className="mt-0.5 font-mono text-[7px] text-[var(--accent-red)] hover:underline"
+          className="mt-0.5 font-mono text-xs text-[var(--accent-red)] hover:underline"
         >
           {error.slice(0, 60)} — retry?
         </button>

@@ -163,7 +163,7 @@ const Step: FC<{
     <StepNumber n={n} state={state} />
     <div className="min-w-0">
       <div className="mb-1 text-xs font-bold">{title}</div>
-      <div className="text-[11px]">{children}</div>
+      <div className="text-xs">{children}</div>
     </div>
   </div>
 );
@@ -308,15 +308,15 @@ const GrantRow: FC<{
     <div className="wp-row flex-col !items-stretch">
       <div className="flex flex-wrap items-center gap-2">
         <DaoPill dao={dao} />
-        <span className="wp-mono wp-muted text-[10px]" title={DAO_GOVERNOR[dao].address}>
+        <span className="wp-mono wp-muted text-xs" title={DAO_GOVERNOR[dao].address}>
           governor {shortAddr(DAO_GOVERNOR[dao].address)}
         </span>
         {activeCount > 0 && <Pill tone="pos">{activeCount} active</Pill>}
         <span className="ml-auto flex flex-wrap items-center gap-2">
-          <label className="wp-muted flex items-center gap-1 text-[10px]">
+          <label className="wp-muted flex items-center gap-1 text-xs">
             expiry
             <select
-              className="wp-select !w-auto !py-1 !text-[11px]"
+              className="wp-select !w-auto !py-1 !text-xs"
               value={draft.days}
               onChange={e =>
                 setDraft(d => ({ ...d, days: Number(e.target.value) as GrantDraft['days'] }))
@@ -330,13 +330,13 @@ const GrantRow: FC<{
               ))}
             </select>
           </label>
-          <label className="wp-muted flex items-center gap-1 text-[10px]">
+          <label className="wp-muted flex items-center gap-1 text-xs">
             max votes
             <input
               type="number"
               min={1}
               step={1}
-              className="wp-input !w-20 !py-1 !text-[11px]"
+              className="wp-input !w-20 !py-1 !text-xs"
               placeholder="∞"
               value={draft.maxVotes}
               onChange={e => setDraft(d => ({ ...d, maxVotes: e.target.value }))}
@@ -404,7 +404,7 @@ const GrantRow: FC<{
             >
               Cancel
             </button>
-            <span className="wp-muted text-[10px]">
+            <span className="wp-muted text-xs">
               Two signatures: the typed permission, then a plain message proving this wallet posted
               it. No transaction, no gas.
             </span>
@@ -478,7 +478,7 @@ const DelegationRow: FC<{ row: AutopilotDelegation; address: string }> = ({ row,
 
   return (
     <div className="wp-row flex-col !items-stretch">
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <DaoPill dao={row.dao} />
         <Pill tone={delegationTone(status)}>{status}</Pill>
         {row.onchainDisabled === true && <Pill tone="neg">disabled on-chain</Pill>}
@@ -491,7 +491,7 @@ const DelegationRow: FC<{ row: AutopilotDelegation; address: string }> = ({ row,
           {row.maxVotes != null ? <span className="wp-mono"> / {row.maxVotes}</span> : ', no cap'}
         </span>
         {row.hash != null && (
-          <span className="wp-mono wp-muted text-[10px]" title={row.hash}>
+          <span className="wp-mono wp-muted text-xs" title={row.hash}>
             {shortAddr(row.hash)}
           </span>
         )}
@@ -577,7 +577,7 @@ const AutoSetupCard: FC<{
         </span>
       }
     >
-      <p className="wp-muted m-0 mb-1 text-[11px] leading-snug">
+      <p className="wp-muted m-0 mb-1 text-xs leading-snug">
         Votes are cast from your address by the noun.wtf relayer, only through the scoped permission
         you signed. It can&apos;t move nouns or ETH. Revoke anytime.
       </p>
@@ -682,7 +682,7 @@ const AutoSetupCard: FC<{
           ))}
         </div>
       )}
-      <p className="wp-muted m-0 mt-2 text-[10px] leading-snug">
+      <p className="wp-muted m-0 mt-2 text-xs leading-snug">
         Nuclear option: turn off Smart Account in MetaMask (same screen as step 1). That reverts the
         address to a plain account and every permission stops working at once.
       </p>
@@ -710,7 +710,7 @@ export const AutopilotLogCard: FC<{
           votes.slice(0, 5).map(v => {
             const dao = normDao(v.dao);
             return (
-              <div key={v.id} className="wp-row !py-1.5 text-[11px]">
+              <div key={v.id} className="wp-row !py-1.5 text-xs">
                 <span className="wp-ellipsis flex-1">
                   <SparklesIcon size={10} className="mr-1 inline" />
                   Autopilot cast <b>{supportLabel(v.support)}</b> on{' '}
@@ -771,7 +771,7 @@ export const AutopilotLogCard: FC<{
                     <td>
                       <Pill tone={autoVoteTone(v.status)}>{v.status ?? '—'}</Pill>
                       {typeof v.error === 'string' && v.error.length > 0 && (
-                        <div className="wp-neg mt-1 max-w-[240px] text-[10px]" title={v.error}>
+                        <div className="wp-neg mt-1 max-w-[240px] text-xs" title={v.error}>
                           {v.error.slice(0, 120)}
                         </div>
                       )}
@@ -867,11 +867,11 @@ const RecommendationRow: FC<{
         <DaoPill dao={dao} />
         <SupportChip support={support} />
         <PropRef dao={dao} id={rec.proposalId} title={rec.title} />
-        <span className="wp-muted ml-auto shrink-0 text-[11px]" title={fmtDate(rec.generatedAt)}>
+        <span className="wp-muted ml-auto shrink-0 text-xs" title={fmtDate(rec.generatedAt)}>
           {relTime(rec.generatedAt)}
         </span>
       </div>
-      <div className="mt-1 flex items-center gap-2 text-[11px]">
+      <div className="mt-1 flex items-center gap-2 text-xs">
         <span className="wp-muted w-20 shrink-0">confidence</span>
         <div className="flex-1">
           <Bar pct={confidence} tone={confidence >= 75 ? 'pos' : 'accent'} />
@@ -968,7 +968,7 @@ export const AutopilotPanel: FC<{
 
   if (!isOwner) {
     return (
-      <div className="wp-muted flex items-center gap-2 text-[11px]">
+      <div className="wp-muted flex items-center gap-2 text-xs">
         <SparklesIcon size={12} />
         Autopilot: {enabledHint === true ? <span className="wp-pos">on</span> : 'off'}
         <span className="opacity-70">
@@ -1050,7 +1050,7 @@ export const AutopilotPanel: FC<{
           </span>
         }
         right={
-          <label className="flex cursor-pointer items-center gap-2 text-[11px]">
+          <label className="flex cursor-pointer items-center gap-2 text-xs">
             <span className={enabled ? 'wp-pos' : 'wp-muted'}>{enabled ? 'ON' : 'OFF'}</span>
             <input
               type="checkbox"
@@ -1088,14 +1088,14 @@ export const AutopilotPanel: FC<{
                 Auto
               </button>
             </div>
-            <span className="wp-muted text-[11px] leading-snug">
+            <span className="wp-muted text-xs leading-snug">
               {mode === 'draft'
                 ? 'noun.wtf drafts a vote for every active proposal; you confirm each one from your wallet.'
                 : 'Votes are cast from your address by the noun.wtf relayer, only through the scoped permission you signed. It can’t move nouns or ETH. Revoke anytime.'}
             </span>
             {dirty && (
               <span className="ml-auto flex items-center gap-2">
-                <span className="wp-muted text-[11px]">unsaved</span>
+                <span className="wp-muted text-xs">unsaved</span>
                 {saveButton}
               </span>
             )}
@@ -1133,7 +1133,7 @@ export const AutopilotPanel: FC<{
                   {STANCE_KEYS.map(k => {
                     const v = prefs.stances[k] ?? 0;
                     return (
-                      <div key={k} className="text-[11px]">
+                      <div key={k} className="text-xs">
                         <div className="flex justify-between">
                           <span>{STANCE_LABELS[k]}</span>
                           <span
@@ -1152,7 +1152,7 @@ export const AutopilotPanel: FC<{
                           className="wp-slider"
                           aria-label={STANCE_LABELS[k]}
                         />
-                        <div className="wp-muted flex justify-between text-[9px] uppercase tracking-wide">
+                        <div className="wp-muted flex justify-between text-xs uppercase tracking-wide">
                           <span>fund less</span>
                           <span>fund more</span>
                         </div>
@@ -1245,12 +1245,12 @@ export const AutopilotPanel: FC<{
                   <div className="wp-h !mb-0">Auto-vote rules</div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <div className="wp-muted mb-1 text-[11px]">DAOs to auto-vote</div>
+                      <div className="wp-muted mb-1 text-xs">DAOs to auto-vote</div>
                       <div className="flex flex-wrap gap-3">
                         {AUTOPILOT_DAOS.map(dao => (
                           <label
                             key={dao}
-                            className="flex cursor-pointer items-center gap-2 text-[11px]"
+                            className="flex cursor-pointer items-center gap-2 text-xs"
                           >
                             <input
                               type="checkbox"
@@ -1264,7 +1264,7 @@ export const AutopilotPanel: FC<{
                       </div>
                     </div>
                     <div>
-                      <div className="wp-muted mb-1 flex justify-between text-[11px]">
+                      <div className="wp-muted mb-1 flex justify-between text-xs">
                         <span>Min confidence</span>
                         <span className="wp-mono">{Math.round(prefs.minConfidence * 100)}%</span>
                       </div>
@@ -1278,12 +1278,12 @@ export const AutopilotPanel: FC<{
                         className="wp-slider"
                         aria-label="Minimum confidence to auto-vote"
                       />
-                      <div className="wp-muted text-[9px] uppercase tracking-wide">
+                      <div className="wp-muted text-xs uppercase tracking-wide">
                         below this → draft only
                       </div>
                     </div>
                     <div>
-                      <div className="wp-muted mb-1 text-[11px]">Delay before casting (hours)</div>
+                      <div className="wp-muted mb-1 text-xs">Delay before casting (hours)</div>
                       <input
                         type="number"
                         min={0}
@@ -1292,11 +1292,11 @@ export const AutopilotPanel: FC<{
                         value={prefs.autoVoteDelayHours}
                         onChange={e => set('autoVoteDelayHours', Number(e.target.value))}
                       />
-                      <div className="wp-muted mt-1 text-[10px]">
+                      <div className="wp-muted mt-1 text-xs">
                         your window to veto a draft before it is cast
                       </div>
                     </div>
-                    <label className="flex cursor-pointer items-center gap-2 self-center text-[11px]">
+                    <label className="flex cursor-pointer items-center gap-2 self-center text-xs">
                       <input
                         type="checkbox"
                         className="wp-checkbox"
@@ -1311,14 +1311,14 @@ export const AutopilotPanel: FC<{
 
               <div className="flex flex-wrap items-center gap-3">
                 {saveButton}
-                {dirty && <span className="wp-muted text-[11px]">unsaved changes</span>}
+                {dirty && <span className="wp-muted text-xs">unsaved changes</span>}
                 {q.isError && (
-                  <span className="wp-neg text-[11px]">
+                  <span className="wp-neg text-xs">
                     could not load saved prefs: {q.error.message}
                   </span>
                 )}
               </div>
-              <p className="wp-muted m-0 text-[10px] leading-snug">
+              <p className="wp-muted m-0 text-xs leading-snug">
                 {mode === 'draft'
                   ? "noun.wtf can't vote from your wallet in draft mode — it drafts, you confirm. "
                   : 'In auto mode the relayer casts only what passes these rules, inside the permission you signed. '}
@@ -1367,7 +1367,7 @@ export const AutopilotPanel: FC<{
             </div>
           ))}
           {recs.length > 0 && (
-            <p className="wp-muted mb-0 mt-2 text-[10px] leading-snug">
+            <p className="wp-muted mb-0 mt-2 text-xs leading-snug">
               &quot;Vote as suggested&quot; is a normal on-chain transaction from your connected
               wallet — Nouns via noun.wtf (client #{NOUN_WTF_CLIENT_ID}), Lil Nouns via its own
               governor. Gas is refunded by the DAO.

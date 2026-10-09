@@ -324,7 +324,7 @@ const BitnounsTab: FC = () => {
             onClick={() => setTraitFilter(null)}
             className="flex h-8 items-center gap-1 rounded-lg border border-black bg-black px-2 text-xs font-semibold text-white"
           >
-            <span className="font-mono text-[10px] uppercase opacity-60">{traitFilter.layer}:</span>
+            <span className="font-mono text-xs uppercase opacity-60">{traitFilter.layer}:</span>
             <span>{traitFilter.label}</span>
             <XIcon size={12} className="ml-1" />
           </button>

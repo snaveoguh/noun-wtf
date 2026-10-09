@@ -145,8 +145,8 @@
   gap: 6px;
   padding: 6px 12px;
   font-size: 12px;
-  border: 1px solid var(--theme-border-strong);
-  border-radius: var(--theme-radius-sm);
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: var(--theme-bg-secondary);
   color: var(--theme-text-primary);
   cursor: pointer;

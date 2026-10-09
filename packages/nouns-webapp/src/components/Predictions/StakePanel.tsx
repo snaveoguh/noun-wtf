@@ -59,7 +59,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
   if (isSuccess) {
     return (
       <div className="border border-[var(--rule-light)] p-3 text-center">
-        <p className="font-mono text-[11px] font-bold text-[var(--ink)]">
+        <p className="font-mono text-xs font-bold text-[var(--ink)]">
           Stake placed successfully.
         </p>
       </div>
@@ -72,7 +72,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
       <div className="flex gap-2">
         <button
           onClick={() => setSide('for')}
-          className={`flex-1 border py-1.5 font-mono text-[9px] uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
             side === 'for'
               ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)]'
@@ -82,7 +82,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
         </button>
         <button
           onClick={() => setSide('against')}
-          className={`flex-1 border py-1.5 font-mono text-[9px] uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
             side === 'against'
               ? 'border-[var(--accent-red)] bg-[var(--accent-red)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)]'
@@ -106,7 +106,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
             <button
               key={qa}
               onClick={() => setAmount(qa)}
-              className="border border-[var(--rule-light)] px-2 py-0.5 font-mono text-[8px] text-[var(--ink-faint)] transition-colors hover:border-[var(--rule)] hover:text-[var(--ink)]"
+              className="border border-[var(--rule-light)] px-2 py-0.5 font-mono text-xs text-[var(--ink-faint)] transition-colors hover:border-[var(--rule)] hover:text-[var(--ink)]"
             >
               {qa}
             </button>
@@ -116,7 +116,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
 
       {/* Payout preview */}
       {amountWei > BigInt(0) && (
-        <div className="border border-[var(--rule-light)] p-2 font-mono text-[9px]">
+        <div className="border border-[var(--rule-light)] p-2 font-mono text-xs">
           <div className="flex justify-between">
             <span className="text-[var(--ink-faint)]">Potential payout:</span>
             <span className="font-bold text-[var(--ink)]">{formatEth(payout)}</span>
@@ -132,7 +132,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
       <button
         onClick={handleStake}
         disabled={!amount || isPending || isConfirming}
-        className="w-full border border-[var(--rule)] bg-[var(--ink)] py-2 font-mono text-[9px] uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+        className="w-full border border-[var(--rule)] bg-[var(--ink)] py-2 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
       >
         {isPending
           ? 'Signing...'
@@ -142,7 +142,7 @@ export function StakePanel({ dao, proposalId, market }: StakePanelProps) {
       </button>
 
       {error && (
-        <p className="font-mono text-[9px] text-[var(--accent-red)]">
+        <p className="font-mono text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}

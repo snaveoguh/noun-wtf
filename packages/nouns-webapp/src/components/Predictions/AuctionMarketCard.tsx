@@ -60,7 +60,7 @@ export function AuctionMarketCard() {
   if (statsError) {
     return (
       <div className="border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
-        <p className="font-mono text-[11px] text-[var(--ink-faint)]">{statsError}</p>
+        <p className="font-mono text-xs text-[var(--ink-faint)]">{statsError}</p>
       </div>
     );
   }
@@ -176,20 +176,20 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
           <Noun nounId={nounId} className="h-full w-full" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
+          <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             Auction, Noun #{nounId.toString()}
           </p>
           <h3 className="font-headline mt-0.5 text-sm font-bold leading-snug text-[var(--ink)]">
             Higher or Lower than 7-day avg?
           </h3>
-          <p className="mt-1 break-words font-mono text-[9px] text-[var(--ink-faint)]">
+          <p className="mt-1 break-words font-mono text-xs text-[var(--ink-faint)]">
             Current bid: <span className="text-[var(--ink)]">{formatEthShort(currentBid)}</span>
             {' ,  '}
             Avg ({sampleSize}): <span className="text-[var(--ink)]">{formatEthShort(avgWei)}</span>
           </p>
         </div>
         <span
-          className="shrink-0 border px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider"
+          className="shrink-0 border px-2 py-0.5 font-mono text-xs uppercase tracking-wider"
           style={{ borderColor: outcomeColor, color: outcomeColor }}
         >
           {outcomeLabel}
@@ -199,20 +199,20 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
       {/* Odds bar */}
       <div className="mb-2 flex h-6 w-full overflow-hidden border border-[var(--rule-light)]">
         <div
-          className="flex items-center justify-center bg-[var(--ink)] font-mono text-[9px] font-bold text-[var(--paper)] transition-all"
+          className="flex items-center justify-center bg-[var(--ink)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
           style={{ width: `${higherPercent}%` }}
         >
           {higherPercent > 10 ? `HIGHER ${higherPercent}%` : ''}
         </div>
         <div
-          className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-[9px] font-bold text-[var(--paper)] transition-all"
+          className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
           style={{ width: `${lowerPercent}%` }}
         >
           {lowerPercent > 10 ? `LOWER ${lowerPercent}%` : ''}
         </div>
       </div>
 
-      <div className="mb-3 font-mono text-[9px] text-[var(--ink-faint)]">
+      <div className="mb-3 font-mono text-xs text-[var(--ink-faint)]">
         Pool: {formatEthShort(totalPool)},{' '}
         {(market?.higherStakers ?? 0) + (market?.lowerStakers ?? 0)} stakers
         {!auctionEnded && (
@@ -221,14 +221,14 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
           </span>
         )}
         {market?.exists !== true && !auctionEnded && (
-          <div className="text-[8px] uppercase tracking-wider">
+          <div className="text-xs uppercase tracking-wider">
             No market yet — first mover opens it onchain
           </div>
         )}
       </div>
 
       {position && position.higherStake + position.lowerStake > BigInt(0) && (
-        <div className="mb-3 border border-[var(--rule-light)] p-2 font-mono text-[9px]">
+        <div className="mb-3 border border-[var(--rule-light)] p-2 font-mono text-xs">
           <span className="font-bold uppercase tracking-wider text-[var(--ink)]">
             Your Position:
           </span>
@@ -265,7 +265,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         !position.claimed && <ClaimButton nounId={nounId} />}
 
       {isResolved && market !== null && (
-        <p className="mt-2 font-mono text-[8px] text-[var(--ink-faint)]">
+        <p className="mt-2 font-mono text-xs text-[var(--ink-faint)]">
           Settled at {formatEthShort(market.priceWei)} vs avg {formatEthShort(market.avgWei)}
         </p>
       )}
@@ -305,7 +305,7 @@ function InlineWager({
 
   if (!isConnected) {
     return (
-      <p className="py-2 text-center font-mono text-[9px] text-[var(--ink-faint)]">
+      <p className="py-2 text-center font-mono text-xs text-[var(--ink-faint)]">
         Connect wallet to wager
       </p>
     );
@@ -313,7 +313,7 @@ function InlineWager({
 
   if (isSuccess && pendingAction === 'stake') {
     return (
-      <div className="border border-[var(--rule-light)] p-2 text-center font-mono text-[9px] font-bold text-[var(--ink)]">
+      <div className="border border-[var(--rule-light)] p-2 text-center font-mono text-xs font-bold text-[var(--ink)]">
         Wager placed.
       </div>
     );
@@ -347,14 +347,14 @@ function InlineWager({
   if (!marketExists) {
     return (
       <div className="space-y-2">
-        <p className="font-mono text-[9px] text-[var(--ink-faint)]">
+        <p className="font-mono text-xs text-[var(--ink-faint)]">
           No market yet — open it (one tx), then stake in the next.
         </p>
         <button
           type="button"
           onClick={handleCreateMarket}
           disabled={isPending || isConfirming}
-          className="w-full border border-[var(--rule)] bg-[var(--paper)] py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+          className="w-full border border-[var(--rule)] bg-[var(--paper)] py-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
         >
           {isPending
             ? 'Confirming in wallet…'
@@ -363,7 +363,7 @@ function InlineWager({
               : 'Open Market'}
         </button>
         {error !== null && (
-          <p className="font-mono text-[8px] text-[var(--accent-red)]">
+          <p className="font-mono text-xs text-[var(--accent-red)]">
             {(error as { shortMessage?: string }).shortMessage || error.message}
           </p>
         )}
@@ -377,7 +377,7 @@ function InlineWager({
         <button
           type="button"
           onClick={() => setSide('higher')}
-          className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
             side === 'higher'
               ? 'border-green-600 bg-green-600 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -388,7 +388,7 @@ function InlineWager({
         <button
           type="button"
           onClick={() => setSide('lower')}
-          className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
             side === 'lower'
               ? 'border-red-500 bg-red-500 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -406,7 +406,7 @@ function InlineWager({
               type="button"
               onClick={() => handleQuickStake(amt)}
               disabled={isPending || isConfirming}
-              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-[9px] text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
             >
               {isPending || isConfirming ? '...' : `${amt} ETH`}
             </button>
@@ -415,7 +415,7 @@ function InlineWager({
       )}
 
       {error && (
-        <p className="font-mono text-[8px] text-[var(--accent-red)]">
+        <p className="font-mono text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}
@@ -451,12 +451,12 @@ function ResolveButton({ nounId, onSuccess }: { nounId: bigint; onSuccess: () =>
           })
         }
         disabled={isPending || isConfirming}
-        className="w-full border border-[var(--rule)] bg-[var(--paper)] py-1.5 font-mono text-[9px] uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+        className="w-full border border-[var(--rule)] bg-[var(--paper)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
       >
         {isPending ? 'Signing…' : isConfirming ? 'Confirming…' : 'Resolve Market'}
       </button>
       {error && (
-        <p className="mt-1 font-mono text-[8px] text-[var(--accent-red)]">
+        <p className="mt-1 font-mono text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}
@@ -487,7 +487,7 @@ function ClaimButton({ nounId }: { nounId: bigint }) {
         })
       }
       disabled={isPending || isConfirming}
-      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-[9px] uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
     >
       {isPending ? 'Signing…' : isConfirming ? 'Confirming…' : 'Claim Winnings'}
     </button>
