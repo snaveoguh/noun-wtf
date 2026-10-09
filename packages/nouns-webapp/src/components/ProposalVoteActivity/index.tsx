@@ -119,7 +119,7 @@ const VoteActivityItem: FC<{
             style={{
               fontWeight: 700,
               fontSize: '0.85rem',
-              color: '#14141f',
+              color: 'var(--theme-text-primary)',
               textDecoration: 'none',
               overflow: 'hidden',
               textOverflow: 'ellipsis',

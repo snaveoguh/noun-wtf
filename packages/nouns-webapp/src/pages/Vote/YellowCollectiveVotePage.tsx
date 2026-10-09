@@ -213,7 +213,7 @@ const YellowCollectiveVotePage: FC = () => {
             fontFamily: "'Londrina Solid', cursive",
             fontWeight: 400,
             margin: '0 0 8px',
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
           }}
         >
           {proposal.title}

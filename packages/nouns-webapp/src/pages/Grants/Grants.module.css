@@ -4,7 +4,7 @@
   margin: 2rem auto;
   padding: 0 1.5rem;
   box-sizing: border-box;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   font-family: 'PT Root UI', monospace, sans-serif;
 }
 
@@ -79,12 +79,12 @@
   border: 1px solid #e2e8f0;
   background: var(--theme-bg-card);
   text-decoration: none;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   transition: border-color 0.2s;
 }
 .card:hover {
   border-color: #0891b2;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
 }
 
 .cardHeader {
@@ -170,7 +170,7 @@
 
 .detailName {
   font-size: 1.2rem;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   margin: 0.25rem 0 0.25rem;
 }
 
@@ -237,7 +237,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.5rem;
   font-size: 0.85rem;
   resize: vertical;
@@ -460,7 +460,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;
@@ -475,7 +475,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;

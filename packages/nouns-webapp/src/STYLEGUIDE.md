@@ -16,7 +16,8 @@ for compatibility). The OS shell lives in `src/components/NounOS/styles.ts`.
 | acid       | `#d4ff3a`               | the ONE accent: focus, key CTA, links |
 | red        | `#ff3b5c`               | destructive, "captured"               |
 | green      | `#3dff8a`               | FREEDOM section                       |
-| cyan       | `#5ef1ff`               | MARKET section                        |
+| cyan       | `#5ef1ff`               | MARKET section (OS shell only)        |
+| blue       | `#0000ff`               | executed status pill (white label)    |
 
 No outlines on surfaces: separation comes from the glass tint and shadow.
 No hard-coded light backgrounds (`#fff`, `bg-white`, `#f4f4f8`); use

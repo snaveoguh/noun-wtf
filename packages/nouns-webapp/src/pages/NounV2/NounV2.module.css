@@ -6,7 +6,7 @@
   margin: 2rem auto;
   padding: 0 1.5rem;
   box-sizing: border-box;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   font-family: 'PT Root UI', monospace, sans-serif;
 }
 
@@ -130,7 +130,7 @@
 .auctionNoun {
   font-size: 1.8rem;
   font-weight: 800;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   margin: 0.2rem 0 0.1rem;
 }
 
@@ -152,7 +152,7 @@
 .auctionStatValue {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   font-family: monospace;
 }
 
@@ -168,7 +168,7 @@
   padding: 0.65rem 0.75rem;
   border: 1px solid #d1d5db;
   background: var(--theme-bg-card);
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   font-family: inherit;
   font-size: 0.95rem;
   border-radius: 3px;
@@ -221,7 +221,7 @@
 .sectionTitle {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   margin: 2rem 0 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #e2e8f0;
@@ -239,13 +239,13 @@
   border: 1px solid #e2e8f0;
   background: var(--theme-bg-card);
   text-decoration: none;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   transition: border-color 0.15s;
   border-radius: 4px;
 }
 .card:hover {
   border-color: #dc2626;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
 }
 
 .cardHeader {
@@ -331,7 +331,7 @@
 
 .detailName {
   font-size: 1.2rem;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   margin: 0.25rem 0 0.25rem;
 }
 
@@ -396,7 +396,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.5rem;
   font-size: 0.85rem;
   resize: vertical;
@@ -494,7 +494,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;
@@ -510,7 +510,7 @@
   width: 100%;
   background: var(--theme-bg-card);
   border: 1px solid #d1d5db;
-  color: #1a1a2e;
+  color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;

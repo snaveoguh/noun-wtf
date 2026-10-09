@@ -497,7 +497,7 @@ const VotePage = () => {
               rel="noreferrer"
               style={{
                 fontWeight: 700,
-                color: '#14141f',
+                color: 'var(--theme-text-primary)',
                 textDecoration: 'none',
               }}
             >
@@ -539,7 +539,7 @@ const VotePage = () => {
                       rel="noreferrer"
                       style={{
                         fontWeight: 700,
-                        color: '#14141f',
+                        color: 'var(--theme-text-primary)',
                         textDecoration: 'none',
                       }}
                     >
@@ -602,7 +602,7 @@ const VotePage = () => {
           <Clock size={12} />
           <span>{startOrEndTimeCopy()}</span>
           {startOrEndTimeTime() && (
-            <span style={{ fontWeight: 600, color: '#14141f' }}>
+            <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
               {i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
                 dateStyle: 'long',
                 timeStyle: 'short',
@@ -611,7 +611,7 @@ const VotePage = () => {
           )}
           <span style={{ color: '#d0d0d4' }}>|</span>
           <span>Snapshot block</span>
-          <span style={{ fontWeight: 600, color: '#14141f' }}>
+          <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
             {String(proposal.voteSnapshotBlock)}
           </span>
         </div>
@@ -800,7 +800,7 @@ const VotePage = () => {
                       fontFamily: "'PT Root UI'",
                       fontWeight: 700,
                       fontSize: '0.82rem',
-                      color: '#14141f',
+                      color: 'var(--theme-text-primary)',
                     }}
                   >
                     <span>Proposed Transactions ({proposal.details.length})</span>

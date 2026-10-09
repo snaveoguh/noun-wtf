@@ -63,12 +63,13 @@ const headGeoCache = new Map<
  */
 export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   const key = `${seed.head}-${seed.glasses}`;
+  const headName = (ImageData.images.heads as { filename: string }[])[seed.head]?.filename ?? '';
+  const profile = headProfile(headName);
   let geos = headGeoCache.get(key);
   if (geos === undefined) {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
     const g = buildNounGeometries(layers);
-    const headName = (ImageData.images.heads as { filename: string }[])[seed.head]?.filename ?? '';
-    const smooth = buildSmoothHead(layers.head, headProfile(headName));
+    const smooth = buildSmoothHead(layers.head, profile);
     // Glasses: keep them voxel, seated on the smooth head's front plateau
     if (g.glassesGeo !== null && smooth !== null) {
       g.glassesGeo.computeBoundingBox();
@@ -123,11 +124,14 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   // Anchor at the Nouns art's neck line (top of the body sprite, pixel row
   // y = 11 → -5 in centred coords) rather than the head's lowest pixel, so
   // heads sit exactly as in the 2D art (some overhang the shoulders).
+  // Flat heads (cards, signs) are thinner than the neck, which would bulge
+  // through the card's face: sit them in front of the neck instead.
+  const flat = profile.crisp === true;
   const NECK_Y = -5;
   inner.position.set(
     -((box.min.x + box.max.x) / 2) * s,
     -NECK_Y * s,
-    -((box.min.z + box.max.z) / 2) * s,
+    -((box.min.z + box.max.z) / 2) * s + (flat ? 0.08 : 0),
   );
 
   // Skin tone: most common head colour

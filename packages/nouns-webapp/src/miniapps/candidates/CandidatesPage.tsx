@@ -418,7 +418,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1.15rem',
     margin: '0 0 0.5rem',
     lineHeight: 1.2,
-    color: '#14141f',
+    color: 'var(--theme-text-primary)',
   },
   cardProposer: {
     fontSize: '0.8rem',

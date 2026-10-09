@@ -203,7 +203,7 @@ const VoteStat: FC<{ label: string; count: number; color: string; pct: number }>
         {label}
       </span>
     </div>
-    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#14141f' }}>
+    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--theme-text-primary)' }}>
       {count}{' '}
       <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--theme-text-muted)' }}>
         ({pct.toFixed(1)}%)
