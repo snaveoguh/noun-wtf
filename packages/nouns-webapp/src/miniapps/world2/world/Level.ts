@@ -12,7 +12,7 @@ export interface LevelData {
   root: THREE.Object3D;
   collisionMeshes: THREE.Mesh[];
   rails: RailDef[];
-  spawns: { position: THREE.Vector3; yaw: number }[];
+  spawns: { position: THREE.Vector3; yaw: number; name?: string }[];
   sun: { direction: THREE.Vector3; color: THREE.Color; intensity: number };
   sky: { zenith: THREE.Color; horizon: THREE.Color };
   fog: { color: THREE.Color; density: number };
@@ -33,7 +33,7 @@ interface LevelJson {
   collision?: string[];
   collisionGlb?: string;
   rails?: RailDef[];
-  spawns?: { position: [number, number, number]; yaw: number }[];
+  spawns?: { position: [number, number, number]; yaw: number; name?: string }[];
   sun?: {
     direction: [number, number, number];
     color?: string | [number, number, number];
@@ -179,6 +179,7 @@ export async function loadLevel(
       spawns: (json.spawns ?? [{ position: [0, 0, 0], yaw: 0 }]).map(s => ({
         position: new THREE.Vector3(...s.position),
         yaw: s.yaw,
+        name: s.name,
       })),
       sun: {
         direction: new THREE.Vector3(...sunDir).normalize(),

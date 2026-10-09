@@ -132,6 +132,23 @@ export class Input {
   private gamepadPrev: boolean[] = [];
   mode: InputMode = 'keyboard';
   pointerLocked = false;
+  /** Mouse cursor in normalised device coords (-1..1, y up). */
+  cursorX = 0;
+  cursorY = 0;
+  private _freeCursor = false;
+  /**
+   * On foot the mouse is a free cursor: left-drag paints where it points,
+   * right-drag turns the camera, and the pointer is never locked.
+   */
+  get freeCursor() {
+    return this._freeCursor;
+  }
+  set freeCursor(on: boolean) {
+    if (on === this._freeCursor) return;
+    this._freeCursor = on;
+    this.el.style.cursor = on ? 'crosshair' : '';
+    if (on && document.pointerLockElement === this.el) document.exitPointerLock?.();
+  }
 
   // Touch state (driven by the React touch overlay)
   touch = {
@@ -205,7 +222,13 @@ export class Input {
         this.mouseStick.x = this.mouseStick.y = 0;
       }
       if (e.button === 0 && this.enabled) this.lmb = true;
-      if (e.button === 0 && this.enabled && !this.pointerLocked && !('ontouchstart' in window)) {
+      if (
+        e.button === 0 &&
+        this.enabled &&
+        !this._freeCursor &&
+        !this.pointerLocked &&
+        !('ontouchstart' in window)
+      ) {
         el.requestPointerLock?.();
       }
       this.mode = 'keyboard';
@@ -218,6 +241,17 @@ export class Input {
       }
     });
     on(window, 'mousemove', e => {
+      const r = el.getBoundingClientRect();
+      this.cursorX = ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1;
+      this.cursorY = -(((e.clientY - r.top) / Math.max(1, r.height)) * 2 - 1);
+      if (this._freeCursor) {
+        // Free cursor: only a right-drag turns the camera
+        if (this.rmb) {
+          this.mouseDX += e.movementX;
+          this.mouseDY += e.movementY;
+        }
+        return;
+      }
       if (this.rmb) {
         // Mouse flick: drag down then up to ollie (screen-y inverted → stick-y)
         this.mouseStick.x = clamp(this.mouseStick.x + e.movementX / 70, -1, 1);
