@@ -27,6 +27,8 @@ export class SkateCamera {
   private shake = 0;
   mode: CamMode = 'follow';
   fov = 70;
+  /** 0..1 blend into the climbing framing (pulled back, low, looking up the wall). */
+  private climbK = 0;
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -78,7 +80,20 @@ export class SkateCamera {
       this.yaw -= lookX * 1.2;
       this.orbitYaw = lerpAngle(this.orbitYaw, 0, 1 - Math.exp(-3 * dt));
       this.pitch = THREE.MathUtils.clamp(this.pitch + lookY * 0.9, -0.5, 1.1);
+      // Climbing: swing round behind the climber (square to the wall) unless
+      // the player is steering the camera themselves.
+      if (p.climb !== null && now - this.lastInputAt > 700) {
+        const n = p.climb.normal;
+        // Slightly off-square (3/4 view) so the reaching arms read past the big head
+        this.yaw = lerpAngle(this.yaw, Math.atan2(-n.x, -n.z) + 0.42, 1 - Math.exp(-3.5 * dt));
+      }
     }
+    this.climbK = THREE.MathUtils.lerp(
+      this.climbK,
+      p.climb !== null ? 1 : 0,
+      1 - Math.exp(-(p.climb !== null ? 3 : 2) * dt),
+    );
+    const ck = this.climbK;
 
     const yaw = this.yaw + this.orbitYaw;
     const preset =
@@ -88,13 +103,14 @@ export class SkateCamera {
           ? { d: 5.6, h: 2.0, la: 1.0 }
           : { d: 3.3, h: 1.05, la: 0.95 };
     const speedPull = onBoard ? Math.min(1.2, p.speed * 0.045) : 0;
-    const dist = (onBoard ? preset.d : 3.6) + speedPull;
-    const pitch = onBoard ? 0.1 + this.orbitPitch : this.pitch;
+    const dist = (onBoard ? preset.d : THREE.MathUtils.lerp(3.6, 6.8, ck)) + speedPull;
+    // Climbing pulls the camera below the climber, looking up the facade
+    const pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
 
     const target = new THREE.Vector3().copy(p.pos);
     // On vert, frame the ramp + rider instead of chasing straight up
     if (onBoard && p.state === 'air' && p.vertLip) target.y = Math.min(target.y, this.look.y + 0.5);
-    target.y += onBoard ? preset.la : 1.25;
+    target.y += onBoard ? preset.la : 1.25 + ck * 0.9;
 
     const back = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const desired = target
