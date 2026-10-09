@@ -153,7 +153,7 @@ const Pip3Page: React.FC = () => {
           className="pip3-type"
           style={{
             fontSize: '0.7rem',
-            color: 'rgba(255,255,255,0.3)',
+            color: 'rgba(255,255,255,0.55)',
             margin: '8px 0 0',
             fontWeight: 500,
             letterSpacing: '0.12em',
@@ -325,12 +325,12 @@ const Pip3Page: React.FC = () => {
         position: 'fixed',
         bottom: 12,
         right: 12,
-        opacity: 0.25,
+        opacity: 0.5,
         transition: 'opacity 0.2s',
         zIndex: 10,
       }}
         onMouseEnter={e => { e.currentTarget.style.opacity = '0.6'; }}
-        onMouseLeave={e => { e.currentTarget.style.opacity = '0.25'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; }}
       >
         <a
           href="https://giphy.com/channel/60r90"

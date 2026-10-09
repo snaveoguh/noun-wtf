@@ -290,7 +290,7 @@ const TabButton: FC<{
       borderRadius: 6,
       border: active ? '1px solid #475569' : '1px solid transparent',
       background: active ? 'var(--theme-bg-tertiary)' : 'transparent',
-      color: active ? '#e2e8f0' : '#64748b',
+      color: active ? '#e2e8f0' : 'var(--theme-text-muted)',
       fontSize: '0.75rem',
       cursor: 'pointer',
       fontFamily: 'monospace',
@@ -875,7 +875,7 @@ const HypercastleView: FC = () => {
             fontWeight: 400,
           }}
         >
-          <span style={{ color: '#64748b' }}>&#x25A8;</span> Hypercastle
+          <span style={{ color: 'var(--theme-text-muted)' }}>&#x25A8;</span> Hypercastle
         </h1>
         <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
           <TabButton
