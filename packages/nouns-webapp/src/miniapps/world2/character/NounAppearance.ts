@@ -133,6 +133,9 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   // through the card's face: sit them in front of the neck instead.
   const flat = profile.crisp === true;
   const NECK_Y = -5;
+  // 3D models sit a little above the shoulders so a bit of neck shows;
+  // flush on the shoulders they read as squashed / neckless
+  const NECK_GAP = 1.4;
   inner.position.set(
     -((box.min.x + box.max.x) / 2) * s,
     -NECK_Y * s,
@@ -165,14 +168,14 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
       const thinNudge = !flat && mb.max.z - mb.min.z <= 4 ? 0.08 / s : 0;
       model.position.set(
         cx - (mb.min.x + mb.max.x) / 2,
-        NECK_Y - 0.3 - mb.min.y,
+        NECK_Y + NECK_GAP - mb.min.y,
         cz - (mb.min.z + mb.max.z) / 2 + thinNudge,
       );
       inner.add(model);
       if (keepGlasses) {
         geos.head?.computeBoundingBox();
         const artMinY = geos.head?.boundingBox?.min.y ?? NECK_Y;
-        seatGlasses(glassesMesh!, model, NECK_Y - 0.3 - artMinY);
+        seatGlasses(glassesMesh!, model, NECK_Y + NECK_GAP - artMinY);
       }
     });
   }

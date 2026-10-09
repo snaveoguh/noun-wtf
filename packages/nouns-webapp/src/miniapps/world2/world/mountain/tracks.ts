@@ -4,7 +4,7 @@
 // line starts at each alley exit, meanders (smooth 1D noise curvature) but is
 // always pulled back to "away from the city", so it only ever goes downhill.
 // Mains fork every ~0.7–1.6 km into a side branch that drifts off at an
-// angle, runs a few km and fades back into the grass.
+// angle and keeps going forever like the mains (only mains fork).
 //
 // Growth is lazy (only as far out as anyone has looked) but strictly
 // sequential per track, so the result never depends on query order: every
@@ -372,12 +372,13 @@ class TrackNetwork {
     if (t.depth === 0 && ns >= t.nextFork && !busy) {
       t.forks++;
       const side = hashInts(t.id, t.forks, 13) < 0.5 ? -1 : 1;
-      const len = 1400 + hashInts(t.id, t.forks, 17) * 2200;
       this.addTrack({
         id: t.id * 1000 + t.forks,
         depth: 1,
         s0: ns,
-        end: ns + len,
+        // Branches never end: a dead-end fork used to leave riders on
+        // open grass with no line and no more jumps
+        end: Infinity,
         x: nx,
         z: nz,
         h: h + side * 0.32,
