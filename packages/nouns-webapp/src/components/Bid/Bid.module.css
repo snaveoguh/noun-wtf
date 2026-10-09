@@ -23,20 +23,20 @@
   min-width: 0;
   height: 54px;
   color: var(--theme-text-primary);
-  border-radius: 12px !important;
-  background-color: var(--theme-bg-card);
+  border-radius: 14px !important;
+  background-color: rgba(255, 255, 255, 0.08);
   outline: none !important;
   box-shadow: none !important;
   font-family: 'PT Root UI';
   font-weight: bold;
   font-size: 22px;
-  border: 1.5px solid #c0c3cc;
+  border: 0;
   padding-left: 2rem;
   transition: border-color 0.2s ease-in-out;
 }
 
 .bidInput:focus {
-  border-color: var(--brand-cool-dark-text);
+  background-color: rgba(255, 255, 255, 0.12);
   box-shadow: none !important;
 }
 

@@ -671,9 +671,6 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .accordion-item,
 [data-theme='abacus'] .accordion-button,
 [data-theme='abacus'] .nav-tabs .nav-link.active,
-[data-theme='abacus'] .form-control,
-[data-theme='abacus'] .form-select,
-[data-theme='abacus'] .input-group-text,
 [data-theme='abacus'] .table,
 [data-theme='abacus'] .table > :not(caption) > * > * {
   background-color: #08080a !important;
@@ -1185,4 +1182,40 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] [class~='bg-white/90'],
 [data-theme='abacus'] [class~='bg-white/95'] {
   color: #111 !important;
+}
+
+/* NOIR: light hover fills read as white flashes on black — flatten them */
+[data-theme='abacus'] .hover\:bg-white:hover,
+[data-theme='abacus'] .hover\:bg-gray-50:hover,
+[data-theme='abacus'] .hover\:bg-gray-100:hover,
+[data-theme='abacus'] .hover\:bg-gray-200:hover,
+[data-theme='abacus'] .hover\:bg-slate-50:hover,
+[data-theme='abacus'] .hover\:bg-slate-100:hover,
+[data-theme='abacus'] .hover\:bg-neutral-50:hover,
+[data-theme='abacus'] .hover\:bg-neutral-100:hover,
+[data-theme='abacus'] .hover\:bg-zinc-50:hover,
+[data-theme='abacus'] .hover\:bg-zinc-100:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* NOIR: inputs are natural glass, never a black box */
+[data-theme='abacus'] .form-control,
+[data-theme='abacus'] .form-select,
+[data-theme='abacus'] .input-group-text,
+[data-theme='abacus'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.nos-bare),
+[data-theme='abacus'] textarea,
+[data-theme='abacus'] select {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ecebe4 !important;
+  border-color: transparent !important;
+  border-radius: 12px;
+}
+[data-theme='abacus'] .form-control:focus,
+[data-theme='abacus'] input:not(.nos-bare):focus,
+[data-theme='abacus'] textarea:focus {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+}
+[data-theme='abacus'] ::placeholder {
+  color: rgba(236, 235, 228, 0.4) !important;
 }

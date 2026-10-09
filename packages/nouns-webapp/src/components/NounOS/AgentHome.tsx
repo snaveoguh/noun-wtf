@@ -11,6 +11,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAccount } from 'wagmi';
 
+import { DRAFT_DAO_LABEL, normalizeDraftDao } from '@/components/GameShell/draftDao';
+import {
+  openProposalDraft,
+  type ProposalDraftPrefill,
+} from '@/components/GameShell/openProposalDraft';
+import GovernanceActionConfirm, {
+  type GovernanceAction,
+} from '@/components/TerminalFeed/GovernanceActionConfirm';
+import {
+  detectCancelIntent,
+  detectDraftPayload,
+  detectProposalDraftIntent,
+} from '@/components/TerminalFeed/TerminalPrompt';
+
 const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
 const API_BASE =
   typeof apiBaseEnv === 'string' && apiBaseEnv.length > 0
@@ -61,6 +75,7 @@ export default function AgentHome({
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [action, setAction] = useState<GovernanceAction | null>(null);
   const history = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -143,6 +158,33 @@ export default function AgentHome({
       local[cmd]!();
       return;
     }
+    // Same command layer as TERMINAL.EXE: /cancel, /draft, /propose [lil],
+    // pasted proposal JSON/markdown open the draft window or confirm card.
+    const cancel = detectCancelIntent(text);
+    if (cancel) {
+      const dao = cancel.lil ? 'lil-nouns' : 'nouns';
+      setAction({
+        type: 'CANCEL_PROPOSAL',
+        proposalId: cancel.proposalId,
+        dao,
+      } as GovernanceAction);
+      say(
+        `ready to cancel ${dao === 'lil-nouns' ? 'lil nouns' : 'nouns'} prop #${cancel.proposalId}. confirm below, only the proposer can cancel`,
+      );
+      return;
+    }
+    const draft = detectDraftPayload(text) ?? detectProposalDraftIntent(text);
+    if (draft) {
+      openProposalDraft(draft);
+      const label = DRAFT_DAO_LABEL[normalizeDraftDao(draft.dao)];
+      const tx = draft.transactions?.length ?? 0;
+      say(
+        tx > 0
+          ? `opened a ${label} draft with ${tx} transaction${tx === 1 ? '' : 's'}. review and submit`
+          : `opened a ${label} draft. write it up, add actions, submit`,
+      );
+      return;
+    }
     setBusy(true);
     history.current.push({ role: 'user', content: text });
     try {
@@ -157,7 +199,14 @@ export default function AgentHome({
           view_context: { page: 'home' },
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { response?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        response?: string;
+        error?: string;
+        action?: GovernanceAction;
+        proposalDraft?: ProposalDraftPrefill;
+      };
+      if (data.proposalDraft) openProposalDraft(data.proposalDraft);
+      if (data.action?.type !== undefined) setAction(data.action);
       const reply =
         data.response ??
         (res.status === 401
@@ -205,6 +254,20 @@ export default function AgentHome({
             </pre>
           ))}
           {busy && <pre className="nos-line who-sys">…</pre>}
+          {action && (
+            <div className="nos-action">
+              <GovernanceActionConfirm
+                action={action}
+                onSuccess={hash =>
+                  say(`tx submitted: ${hash.slice(0, 10)}… etherscan.io/tx/${hash}`)
+                }
+                onCancel={() => {
+                  setAction(null);
+                  say('cancelled');
+                }}
+              />
+            </div>
+          )}
         </div>
         <form
           className="nos-prompt"
@@ -218,6 +281,7 @@ export default function AgentHome({
           <span>›</span>
           <input
             ref={inputRef}
+            className="nos-bare"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="say something"
