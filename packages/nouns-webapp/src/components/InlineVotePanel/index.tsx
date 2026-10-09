@@ -177,7 +177,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
         style={{
           background: 'var(--theme-bg-card)',
           borderRadius: 16,
-          border: '1px solid #e2e3e8',
+          border: '1px solid transparent',
           padding: '20px 24px',
           textAlign: 'center',
         }}
@@ -194,7 +194,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
       style={{
         background: 'var(--theme-bg-card)',
         borderRadius: 16,
-        border: '1px solid #e2e3e8',
+        border: '1px solid transparent',
         padding: '20px 24px',
       }}
     >
@@ -263,7 +263,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
           width: '100%',
           padding: '10px 14px',
           borderRadius: 10,
-          border: '1px solid #e2e3e8',
+          border: '1px solid transparent',
           fontFamily: "'PT Root UI'",
           fontSize: '0.82rem',
           resize: 'vertical',
@@ -325,7 +325,7 @@ const InlineVotePanel: FC<InlineVotePanelProps> = ({
       <div
         style={{
           textAlign: 'center',
-          fontSize: '0.7rem',
+          fontSize: '0.75rem',
           color: isZeroWeight ? '#d97706' : '#b0b0b8',
           marginTop: 8,
         }}

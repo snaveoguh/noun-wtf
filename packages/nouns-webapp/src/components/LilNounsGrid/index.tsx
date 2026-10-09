@@ -337,8 +337,8 @@ const MintPopover: FC<{
         top,
         width: popW,
         zIndex: 1000,
-        background: '#0f172a',
-        border: '1px solid #334155',
+        background: 'var(--theme-bg-card)',
+        border: '1px solid var(--theme-divider)',
         borderRadius: 12,
         boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
         fontFamily: "'PT Root UI', sans-serif",
@@ -373,7 +373,7 @@ const MintPopover: FC<{
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ec4899' }}>
             Lil Noun #{nounId.toString()}
           </span>
-          <span style={{ fontSize: '0.65rem', color: '#475569', fontFamily: 'monospace' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', fontFamily: 'monospace' }}>
             Block {item.blockNumber.toString().slice(-6)}
           </span>
         </div>
@@ -392,7 +392,7 @@ const MintPopover: FC<{
         >
           <span
             style={{
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               color: '#fbbf24',
               fontWeight: 700,
               textTransform: 'uppercase',
@@ -417,7 +417,7 @@ const MintPopover: FC<{
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               padding: '2px 0',
             }}
           >
@@ -447,9 +447,9 @@ const MintPopover: FC<{
             borderRadius: 8,
             border: 'none',
             cursor: isConnected ? 'pointer' : 'default',
-            background: isConnected ? '#ec4899' : '#334155',
+            background: isConnected ? '#ec4899' : 'var(--theme-bg-tertiary)',
             color: isConnected ? '#fff' : '#64748b',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             opacity: isPending || isConfirming ? 0.6 : 1,
           }}
@@ -498,8 +498,8 @@ const MintCelebration: FC<{
         style={{
           width: 360,
           maxWidth: '90vw',
-          background: '#0f172a',
-          border: '1px solid #ec4899',
+          background: 'var(--theme-bg-card)',
+          border: '1px solid transparent',
           borderRadius: 16,
           boxShadow: '0 24px 80px rgba(236, 72, 153, 0.4)',
           fontFamily: "'PT Root UI', sans-serif",
@@ -525,7 +525,7 @@ const MintCelebration: FC<{
         <div style={{ padding: '20px 24px', textAlign: 'center' }}>
           <div
             style={{
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               color: '#22c55e',
               letterSpacing: '0.1em',
@@ -540,7 +540,7 @@ const MintCelebration: FC<{
           </div>
           <div
             style={{
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               color: '#94a3b8',
               display: 'grid',
               gap: 4,
@@ -597,7 +597,7 @@ const LilNounsGrid: FC = () => {
   const isCool = useAppSelector(state => state.application.isCoolBackground);
 
   // Adaptive text/border colors based on light background
-  const textColor = isCool ? '#374151' : '#44403c';
+  const textColor = isCool ? 'var(--theme-text-primary)' : 'var(--theme-text-primary)';
   const textMuted = isCool ? '#6b7280' : '#78716c';
   const borderColor = isCool ? '#c4c7d0' : '#d1ccc8';
   const accentBg = isCool ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.04)';
@@ -880,7 +880,7 @@ const LilNounsGrid: FC = () => {
         }}
       >
         <div
-          style={{ fontSize: '0.7rem', color: textMuted, fontFamily: "'PT Root UI', sans-serif" }}
+          style={{ fontSize: '0.75rem', color: textMuted, fontFamily: "'PT Root UI', sans-serif" }}
         >
           {error ? (
             <span style={{ color: '#ef4444' }}>{error}</span>
@@ -906,7 +906,7 @@ const LilNounsGrid: FC = () => {
         }}
       >
         <div
-          style={{ fontSize: '0.7rem', color: '#ef4444', fontFamily: "'PT Root UI', sans-serif" }}
+          style={{ fontSize: '0.75rem', color: '#ef4444', fontFamily: "'PT Root UI', sans-serif" }}
         >
           {error}
         </div>
@@ -932,7 +932,7 @@ const LilNounsGrid: FC = () => {
             <span
               style={{
                 fontWeight: 900,
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 letterSpacing: '0.15em',
                 textTransform: 'uppercase' as const,
               }}
@@ -942,7 +942,7 @@ const LilNounsGrid: FC = () => {
             <span
               style={{
                 fontWeight: 900,
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 letterSpacing: '0.15em',
                 textTransform: 'uppercase' as const,
                 color: textMuted,
@@ -955,7 +955,7 @@ const LilNounsGrid: FC = () => {
             onClick={refreshPool}
             disabled={refreshing}
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.75rem',
               color: textMuted,
               textDecoration: 'none',
               fontFamily: "'PT Root UI', sans-serif",
@@ -973,7 +973,7 @@ const LilNounsGrid: FC = () => {
           style={{
             padding: '16px 16px 20px',
             textAlign: 'center',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             color: textMuted,
             fontFamily: "'PT Root UI', sans-serif",
           }}
@@ -1001,7 +1001,7 @@ const LilNounsGrid: FC = () => {
           <span
             style={{
               fontWeight: 900,
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               letterSpacing: '0.15em',
               textTransform: 'uppercase' as const,
             }}
@@ -1011,7 +1011,7 @@ const LilNounsGrid: FC = () => {
           <span
             style={{
               fontWeight: 900,
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               letterSpacing: '0.15em',
               textTransform: 'uppercase' as const,
               color: textColor,
@@ -1022,7 +1022,7 @@ const LilNounsGrid: FC = () => {
           {nounId !== undefined && (
             <span
               style={{
-                fontSize: '0.55rem',
+                fontSize: '0.75rem',
                 color: '#ec4899',
                 fontFamily: "'PT Root UI', sans-serif",
                 fontWeight: 700,
@@ -1033,7 +1033,7 @@ const LilNounsGrid: FC = () => {
           )}
           <span
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.75rem',
               color: textMuted,
               fontFamily: "'PT Root UI', sans-serif",
             }}
@@ -1043,7 +1043,7 @@ const LilNounsGrid: FC = () => {
           {contractPaused && (
             <span
               style={{
-                fontSize: '0.5rem',
+                fontSize: '0.75rem',
                 color: '#d97706',
                 fontFamily: "'PT Root UI', sans-serif",
                 fontWeight: 600,
@@ -1061,7 +1061,7 @@ const LilNounsGrid: FC = () => {
           {price !== undefined && (
             <span
               style={{
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#b45309',
                 padding: '2px 8px',
@@ -1078,7 +1078,7 @@ const LilNounsGrid: FC = () => {
             onClick={refreshPool}
             disabled={refreshing}
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.75rem',
               color: refreshing ? '#ec4899' : textMuted,
               textDecoration: 'none',
               fontFamily: "'PT Root UI', sans-serif",

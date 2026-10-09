@@ -465,7 +465,7 @@ const V2ExploreTab: FC = () => {
           <FilterIcon size={12} />
           Traits
           {traitFilterCount > 0 && (
-            <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+            <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-xs text-white">
               {traitFilterCount}
             </span>
           )}
@@ -536,7 +536,7 @@ const V2ExploreTab: FC = () => {
                 style={{ background: 'var(--theme-bg-tertiary)' }}
               />
             )}
-            <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block">
+            <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-xs font-bold shadow-sm group-hover:block">
               {n.nounId}
             </span>
           </button>

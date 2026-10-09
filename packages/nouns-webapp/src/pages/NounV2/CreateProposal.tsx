@@ -180,12 +180,18 @@ export default function CreateNounV2ProposalPage() {
             margin: '4rem auto',
             textAlign: 'center',
             padding: '2.5rem 2rem',
-            border: '2px solid #fecaca',
+            border: '2px solid transparent',
             borderRadius: 16,
             background: 'var(--theme-bg-card)',
           }}
         >
-          <h2 style={{ fontSize: '1.3rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+          <h2
+            style={{
+              fontSize: '1.3rem',
+              marginBottom: '0.75rem',
+              color: 'var(--theme-text-primary)',
+            }}
+          >
             Proposal Submitted On-Chain
           </h2>
           <p
@@ -207,7 +213,7 @@ export default function CreateNounV2ProposalPage() {
               display: 'inline-block',
               fontFamily: 'monospace',
               fontSize: '0.8rem',
-              color: '#3b82f6',
+              color: 'var(--theme-text-link)',
               marginBottom: '1.5rem',
             }}
           >
@@ -317,7 +323,7 @@ export default function CreateNounV2ProposalPage() {
             padding: '8px 12px',
             borderRadius: '8px',
             background: 'var(--theme-bg-card)',
-            border: '1px solid #fecaca',
+            border: '1px solid transparent',
             fontSize: '0.8rem',
             marginBottom: '8px',
             textTransform: 'none',

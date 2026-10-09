@@ -332,7 +332,7 @@ const ExploreTab: React.FC = () => {
           <Box className="h-4 w-4" />
           3D
           {view3D && (seeds == null || Object.keys(seeds).length < 1500) && (
-            <span className="ml-1 inline-flex items-center gap-1 font-mono text-[10px] opacity-70">
+            <span className="ml-1 inline-flex items-center gap-1 font-mono text-xs opacity-70">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
               {seeds == null ? 'loading…' : `${Object.keys(seeds).length.toLocaleString()}`}
             </span>
@@ -451,7 +451,7 @@ const ExploreTab: React.FC = () => {
                         />
                       )}
                       <span
-                        className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-black/80 px-1.5 text-[11px] font-bold text-white shadow-sm group-hover:block"
+                        className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-black/80 px-1.5 text-xs font-bold text-white shadow-sm group-hover:block"
                         style={{ zIndex: 2 }}
                       >
                         {nounId.toString()}

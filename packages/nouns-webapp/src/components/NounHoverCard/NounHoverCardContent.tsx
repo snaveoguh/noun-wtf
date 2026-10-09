@@ -53,7 +53,7 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
       {/* ── Traits ── */}
       {traits && (
         <div className="border-b border-gray-200 px-3 py-2">
-          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-gray-400">
+          <p className="mb-1 font-mono text-xs font-bold uppercase tracking-[0.15em] text-gray-400">
             Traits
           </p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
@@ -73,18 +73,18 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
                correct but misleading — the noun no longer exists. */}
           {auction.burned ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-red-600">
+              <span className="text-xs font-bold uppercase tracking-widest text-red-600">
                 Burned
               </span>
               <span className="text-xs font-semibold text-gray-700">Reserve not met</span>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-xs text-gray-500">
                 No bid reached the minimum reserve price.
               </span>
             </div>
           ) : (
             <div className="flex items-center justify-between text-xs">
               <div>
-                <span className="font-mono text-[8px] uppercase text-gray-400">
+                <span className="font-mono text-xs uppercase text-gray-400">
                   Winning Bid
                 </span>
                 <br />
@@ -95,7 +95,7 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
                 </span>
               </div>
               <div className="text-right">
-                <span className="font-mono text-[8px] uppercase text-gray-400">
+                <span className="font-mono text-xs uppercase text-gray-400">
                   Bids
                 </span>
                 <br />
@@ -150,7 +150,7 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
 
 const TraitRow: FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <span className="font-mono text-[8px] uppercase text-gray-400">{label}</span>
+    <span className="font-mono text-xs uppercase text-gray-400">{label}</span>
     <br />
     <span className="font-semibold">{value}</span>
   </div>

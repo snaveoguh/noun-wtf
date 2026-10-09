@@ -355,7 +355,7 @@ const PropModal: FC<{
               padding: '4px 10px',
               borderRadius: 6,
               background: `${statusColor(prop.status)}20`,
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               color: statusColor(prop.status),
             }}
@@ -384,7 +384,7 @@ const PropModal: FC<{
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 marginBottom: 4,
               }}
@@ -457,7 +457,7 @@ const PropModal: FC<{
             marginTop: 16,
             paddingTop: 12,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a890',
@@ -648,14 +648,14 @@ const CurrentPropsBanner: FC = () => {
             paddingRight: '24px',
             background: 'linear-gradient(90deg, #fef3e2 70%, rgba(254,243,226,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,
           }}
         >
           <span>🏛️</span>
-          <span style={{ color: '#92400e', marginLeft: '6px' }}>PROPS</span>
+          <span style={{ color: 'var(--theme-text-primary)', marginLeft: '6px' }}>PROPS</span>
         </div>
 
         {/* Right fade */}
@@ -766,7 +766,7 @@ const CurrentPropsBanner: FC = () => {
                   <span
                     style={{
                       display: 'inline-block',
-                      fontSize: '0.5rem',
+                      fontSize: '0.75rem',
                       fontWeight: 800,
                       background: `${statusColor(prop.status)}cc`,
                       color: '#fff',
@@ -799,7 +799,7 @@ const CurrentPropsBanner: FC = () => {
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                     color: '#fff',
-                    fontSize: '0.6rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     lineHeight: 1.3,
                     textShadow: '0 1px 3px rgba(0,0,0,0.5)',

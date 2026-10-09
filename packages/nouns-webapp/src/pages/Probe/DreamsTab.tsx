@@ -78,7 +78,7 @@ function DreamDraftCard({
         <h3 className="truncate text-sm font-bold">{dream.title}</h3>
         <div className="mt-1 flex items-center gap-2">
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+            className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${
               dream.status === 'draft'
                 ? 'bg-gray-100 text-gray-600'
                 : dream.status === 'candidate'
@@ -137,12 +137,12 @@ function OnChainDreamCard({
         <h3 className="truncate text-sm font-bold">{dream.title}</h3>
         <div className="mt-1 flex items-center gap-2">
           {dream.signaturesCount > 0 && (
-            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700">
               {dream.signaturesCount} sig{dream.signaturesCount !== 1 && 's'}
             </span>
           )}
         </div>
-        <p className="text-muted-foreground mt-1 text-[10px]">
+        <p className="text-muted-foreground mt-1 text-xs">
           {dream.proposer.slice(0, 6)}...{dream.proposer.slice(-4)}
         </p>
 
@@ -155,7 +155,7 @@ function OnChainDreamCard({
                 e.stopPropagation();
                 onSponsor();
               }}
-              className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
+              className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700"
             >
               Sponsor
             </button>
@@ -167,7 +167,7 @@ function OnChainDreamCard({
                 e.stopPropagation();
                 onPromote();
               }}
-              className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-green-700"
+              className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-green-700"
             >
               Promote
             </button>
@@ -179,7 +179,7 @@ function OnChainDreamCard({
             >
               <button
                 type="button"
-                className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200"
+                className="w-full rounded-lg bg-gray-100 px-2 py-1.5 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 View
               </button>
@@ -239,15 +239,15 @@ function ProbeDreamCard({
         <h3 className="truncate text-sm font-bold">Dream #{dream.id}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           {hasCustomTrait && (
-            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700">
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold uppercase text-purple-700">
               Custom {dream.customLayer}
             </span>
           )}
-          <span className="text-muted-foreground text-[10px]">
+          <span className="text-muted-foreground text-xs">
             {new Date(dream.createdAt).toLocaleDateString()}
           </span>
         </div>
-        <p className="text-muted-foreground mt-1 text-[10px]">
+        <p className="text-muted-foreground mt-1 text-xs">
           {dream.dreamer.slice(0, 6)}...{dream.dreamer.slice(-4)}
         </p>
 
@@ -259,7 +259,7 @@ function ProbeDreamCard({
               e.stopPropagation();
               onPropose();
             }}
-            className="mt-2 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700"
+            className="mt-2 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700"
           >
             Propose Trait
           </button>

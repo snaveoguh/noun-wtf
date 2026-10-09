@@ -29,7 +29,7 @@
 }
 
 .wp-h {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--theme-text-muted);
@@ -41,7 +41,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   border: 1px solid var(--theme-border-strong);
   border-radius: 999px;
@@ -87,14 +87,14 @@
   text-overflow: ellipsis;
 }
 .wp-stat-l {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--theme-text-muted);
   margin-top: 4px;
 }
 .wp-stat-s {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--theme-text-secondary);
   margin-top: 4px;
 }
@@ -135,7 +135,7 @@
 }
 .wp-tab-count {
   margin-left: 5px;
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.7;
 }
 
@@ -145,8 +145,8 @@
   gap: 6px;
   padding: 6px 12px;
   font-size: 12px;
-  border: 1px solid var(--theme-border-strong);
-  border-radius: var(--theme-radius-sm);
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: var(--theme-bg-secondary);
   color: var(--theme-text-primary);
   cursor: pointer;
@@ -170,7 +170,7 @@
 }
 .wp-btn-sm {
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .wp-btn-danger {
   border-color: var(--theme-negative);
@@ -382,7 +382,7 @@
 }
 .wp-seg button {
   padding: 5px 12px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   background: var(--theme-bg-secondary);
@@ -414,7 +414,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid var(--theme-border-strong);
   color: var(--theme-text-secondary);
 }
@@ -433,7 +433,7 @@
   border: 1px dashed var(--theme-border-strong);
   border-radius: var(--theme-radius-sm);
   background: var(--theme-bg-input);
-  font-size: 11px;
+  font-size: 12px;
 }
 .wp-sheet dl {
   display: grid;
@@ -454,7 +454,7 @@
 .wp-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
 }
 .wp-table th {
   text-align: left;
@@ -462,7 +462,7 @@
   color: var(--theme-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: 9px;
+  font-size: 12px;
   padding: 4px 6px;
   border-bottom: 1px solid var(--theme-border-strong);
   white-space: nowrap;

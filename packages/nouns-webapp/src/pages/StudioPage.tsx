@@ -760,7 +760,7 @@ const StudioPage: FC = () => {
         {/* Zoom display */}
         <span
           style={{
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: '#666',
             whiteSpace: 'nowrap',
@@ -838,7 +838,7 @@ const StudioPage: FC = () => {
                 width: 22,
                 height: 22,
                 borderRadius: '4px',
-                border: '1px solid #ccc',
+                border: '1px solid transparent',
                 cursor: 'pointer',
                 padding: 0,
               }}
@@ -860,13 +860,13 @@ const StudioPage: FC = () => {
         <button
           onClick={() => setShowPreview(p => !p)}
           style={{
-            background: 'rgba(255,255,255,0.9)',
+            background: 'var(--theme-glass)',
             backdropFilter: 'blur(8px)',
             border: 'none',
             borderRadius: '8px',
             padding: '4px 8px',
             cursor: 'pointer',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: '#666',
             display: 'flex',
@@ -915,10 +915,10 @@ const StudioPage: FC = () => {
                 marginTop: '6px',
                 padding: '4px',
                 borderRadius: '6px',
-                border: '1px solid #ddd',
-                background: '#f9f9f9',
+                border: '1px solid transparent',
+                background: 'var(--theme-surface)',
                 cursor: 'pointer',
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
@@ -970,14 +970,14 @@ const StudioPage: FC = () => {
                     onChange={e => onChange(Number(e.target.value))}
                     style={{
                       flex: 1,
-                      fontSize: '0.6rem',
+                      fontSize: '0.75rem',
                       fontWeight: 600,
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid transparent',
                       borderRadius: '4px',
                       padding: '2px 4px',
-                      background: '#fff',
+                      background: 'var(--theme-surface)',
                       cursor: 'pointer',
-                      color: layerVisibility[layer] ? '#333' : '#999',
+                      color: layerVisibility[layer] ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
                       minWidth: 0,
                     }}
                   >
@@ -1024,10 +1024,10 @@ const StudioPage: FC = () => {
             placeholder="Trait name..."
             style={{
               width: '100%',
-              border: '1px solid #e5e7eb',
+              border: '1px solid transparent',
               borderRadius: '6px',
               padding: '4px 8px',
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 600,
               marginBottom: '4px',
             }}
@@ -1037,10 +1037,10 @@ const StudioPage: FC = () => {
             onChange={e => setTraitType(e.target.value)}
             style={{
               width: '100%',
-              border: '1px solid #e5e7eb',
+              border: '1px solid transparent',
               borderRadius: '6px',
               padding: '4px 8px',
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 600,
               marginBottom: '6px',
               cursor: 'pointer',
@@ -1088,7 +1088,7 @@ const StudioPage: FC = () => {
               borderRadius: '8px',
               padding: '6px 10px',
               color: '#fff',
-              fontSize: '0.65rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
@@ -1130,7 +1130,7 @@ const StudioPage: FC = () => {
           >
             <div
               style={{
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 fontWeight: 800,
                 color: '#666',
                 textTransform: 'uppercase',
@@ -1141,7 +1141,7 @@ const StudioPage: FC = () => {
               SAVED TRAITS
             </div>
             {savedTraits.length === 0 ? (
-              <p style={{ fontSize: '0.65rem', color: '#999' }}>Nothing saved yet</p>
+              <p style={{ fontSize: '0.75rem', color: '#999' }}>Nothing saved yet</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {savedTraits.map(trait => (
@@ -1151,14 +1151,14 @@ const StudioPage: FC = () => {
                     style={{
                       cursor: 'pointer',
                       borderRadius: '6px',
-                      border: '1px solid #eee',
+                      border: '1px solid transparent',
                       padding: '4px',
                       textAlign: 'center',
                       position: 'relative',
                       transition: 'background 0.1s',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = '#f5f3ff';
+                      (e.currentTarget as HTMLElement).style.background = 'var(--theme-bg-hover)';
                     }}
                     onMouseLeave={e => {
                       (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -1180,7 +1180,7 @@ const StudioPage: FC = () => {
                     )}
                     <div
                       style={{
-                        fontSize: '0.55rem',
+                        fontSize: '0.75rem',
                         fontWeight: 600,
                         marginTop: '2px',
                         overflow: 'hidden',
@@ -1209,7 +1209,7 @@ const StudioPage: FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '0.5rem',
+                        fontSize: '0.75rem',
                         opacity: 0,
                         transition: 'opacity 0.1s',
                       }}
@@ -1241,7 +1241,7 @@ const StudioPage: FC = () => {
           borderRadius: '8px',
           padding: '6px 10px',
           color: 'rgba(255,255,255,0.5)',
-          fontSize: '0.55rem',
+          fontSize: '0.75rem',
           fontWeight: 600,
           lineHeight: 1.8,
         }}
@@ -1295,7 +1295,7 @@ function ToolButton({
         background: accent ? '#f0fdf4' : active ? '#f5f3ff' : '#fff',
         color: disabled ? '#ccc' : accent ? '#16a34a' : '#333',
         cursor: disabled ? 'default' : 'pointer',
-        fontSize: '0.6rem',
+        fontSize: '0.75rem',
         fontWeight: 700,
         whiteSpace: 'nowrap',
         transition: 'all 0.1s',
@@ -1311,7 +1311,7 @@ const kbdStyle: React.CSSProperties = {
   background: 'rgba(255,255,255,0.15)',
   borderRadius: '3px',
   padding: '1px 4px',
-  fontSize: '0.5rem',
+  fontSize: '0.75rem',
   fontFamily: 'monospace',
   marginRight: '2px',
 };

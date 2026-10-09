@@ -38,7 +38,7 @@
 
 .hint {
   color: var(--theme-text-primary);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 32px;
 }
 
@@ -194,7 +194,7 @@
   display: flex;
   gap: 24px;
   color: var(--theme-text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ── responsive ──────────────────────────────────── */
@@ -210,11 +210,11 @@
   }
 
   .code {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px 10px;
   }
 
   .table {
-    font-size: 11px;
+    font-size: 12px;
   }
 }

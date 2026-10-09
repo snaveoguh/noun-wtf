@@ -127,7 +127,7 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
             color: '#fff',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             lineHeight: 1.4,
             whiteSpace: 'nowrap',
             zIndex: 99999,
@@ -150,9 +150,9 @@ const ClientBadge: FC<ClientBadgeProps> = ({ clientId, size = 16 }) => {
             )}
             {client.name}
           </div>
-          <div style={{ opacity: 0.7, fontSize: '0.6rem' }}>{client.description}</div>
+          <div style={{ opacity: 0.7, fontSize: '0.75rem' }}>{client.description}</div>
           {client.url && (
-            <div style={{ opacity: 0.5, fontSize: '0.55rem', marginTop: 2 }}>{client.url}</div>
+            <div style={{ opacity: 0.5, fontSize: '0.75rem', marginTop: 2 }}>{client.url}</div>
           )}
           {/* Arrow — pointing left, toward the badge */}
           <div

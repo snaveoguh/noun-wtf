@@ -2,7 +2,7 @@
   margin-top: 1rem;
   margin-bottom: 1rem;
   padding: 0.5rem 1rem 1rem 1rem;
-  border: 1px solid #aaa !important;
+  border: 1px solid transparent !important;
   border-radius: 8px !important;
   outline: none !important;
   box-shadow: none !important;
@@ -42,7 +42,7 @@
 
 .previewArea {
   padding: 0.5rem 1rem 1rem 1rem;
-  border: 1px solid #aaa !important;
+  border: 1px solid transparent !important;
   border-radius: 8px !important;
   outline: none !important;
   box-shadow: none !important;
@@ -76,7 +76,7 @@
 /* diff compare overrides */
 .diffs {
   font-size: inherit;
-  font-family: 'PT Root UI' !important;
+  font-family: var(--site-font) !important;
   font-size: 1.1rem;
 }
 .diffs h1 {

@@ -65,7 +65,7 @@ export function NounsMarketplace() {
       </div>
 
       {/* ── Sort / Count ── */}
-      <div className="mb-4 flex flex-wrap items-center gap-0 border-b border-[var(--rule-light)] pb-3 font-mono text-[10px] uppercase tracking-wider">
+      <div className="mb-4 flex flex-wrap items-center gap-0 border-b border-[var(--rule-light)] pb-3 font-mono text-xs uppercase tracking-wider">
         {SORT_OPTIONS.map((opt, i) => (
           <span key={opt.value} className="flex shrink-0 items-center">
             {i > 0 && <span className="mx-1 text-[var(--rule-light)]">|</span>}
@@ -99,7 +99,7 @@ export function NounsMarketplace() {
         <div className="font-body-serif py-16 text-center text-sm italic text-[var(--ink-faint)]">
           No Nouns are currently listed for sale.
           <br />
-          <span className="mt-2 block font-mono text-[8px] uppercase tracking-wider">
+          <span className="mt-2 block font-mono text-xs uppercase tracking-wider">
             Connect your wallet and visit a Noun&rsquo;s detail page to list it.
           </span>
         </div>

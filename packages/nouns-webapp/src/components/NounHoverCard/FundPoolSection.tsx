@@ -17,15 +17,15 @@ export const FundPoolSection: FC<FundPoolSectionProps> = ({ nounId: _nounId }) =
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Lock className="size-3 text-gray-500" />
-          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-gray-400">
+          <span className="font-mono text-xs font-bold uppercase tracking-[0.15em] text-gray-400">
             Fund Pool
           </span>
         </div>
-        <span className="text-[10px] text-gray-400">Locked &mdash; no withdrawals</span>
+        <span className="text-xs text-gray-400">Locked &mdash; no withdrawals</span>
       </div>
       <div className="mt-1 flex items-baseline justify-between">
         <span className="text-sm font-bold">0.00 ETH</span>
-        <span className="text-[10px] text-gray-400">0 contributors</span>
+        <span className="text-xs text-gray-400">0 contributors</span>
       </div>
       <button
         className="mt-1.5 w-full rounded border border-gray-300 bg-white py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100"

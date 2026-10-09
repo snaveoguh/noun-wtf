@@ -707,15 +707,15 @@ const InlineEditor: FC<InlineEditorProps> = ({
 
       {/* Hint bar */}
       <div className={classes.hint}>
-        <kbd>Esc</kbd> exit · <kbd>B</kbd> paint · <kbd>E</kbd> erase · <kbd>G</kbd> fill ·{' '}
+        <kbd>Esc</kbd> exit, <kbd>B</kbd> paint, <kbd>E</kbd> erase, <kbd>G</kbd> fill,{' '}
         <kbd>I</kbd> pick
         {isMeshMode && (
           <>
             {' '}
-            · <kbd>V</kbd> build
+           , <kbd>V</kbd> build
           </>
         )}{' '}
-        · <kbd>Ctrl+Z</kbd> undo
+       , <kbd>Ctrl+Z</kbd> undo
       </div>
     </div>
   );

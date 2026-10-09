@@ -507,7 +507,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                     <div>
                       <div
                         style={{
-                          fontSize: '0.7rem',
+                          fontSize: '0.75rem',
                           fontWeight: 700,
                           marginBottom: 4,
                           color: 'var(--theme-text-muted)',
@@ -523,7 +523,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                             onClick={() => setCustomLayer(l.key)}
                             style={{
                               padding: '2px 8px',
-                              fontSize: '0.7rem',
+                              fontSize: '0.75rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               background:
@@ -570,12 +570,12 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                       {customEncoded !== null ? 'CHANGE FILE…' : 'CHOOSE PNG FILE…'}
                     </button>
                     {customEncoded !== null && (
-                      <div style={{ fontSize: '0.7rem', color: '#007700' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#007700' }}>
                         ✓ {customEncoded.filename}
                       </div>
                     )}
                     {customArtError !== null && (
-                      <div style={{ fontSize: '0.7rem', color: '#c00000' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#c00000' }}>
                         ⚠ {customArtError}
                       </div>
                     )}
@@ -621,7 +621,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                         border: '2px outset #fff',
                         padding: '4px 12px',
                         cursor: 'pointer',
-                        fontSize: '0.7rem',
+                        fontSize: '0.75rem',
                         fontWeight: 700,
                         fontFamily: "'Comic Sans MS', 'Comic Sans', cursive",
                       }}
@@ -631,10 +631,10 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
                   </>
                 )}
                 {status === 'error' && errorMessage !== null && (
-                  <div style={{ fontSize: '0.7rem', color: '#c00000' }}>⚠ {errorMessage}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#c00000' }}>⚠ {errorMessage}</div>
                 )}
                 {status === 'published' && (
-                  <div style={{ fontSize: '0.7rem', color: '#007700' }}>✓ Live on probe.wtf</div>
+                  <div style={{ fontSize: '0.75rem', color: '#007700' }}>✓ Live on probe.wtf</div>
                 )}
               </div>
             </div>
@@ -646,7 +646,7 @@ const DreamWindow: FC<DreamWindowProps> = ({ open, onClose }) => {
           style={{
             borderTop: '2px groove #ccc',
             padding: '2px 8px',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             color: 'var(--theme-text-muted)',
             background: 'var(--theme-bg-card)',
             display: 'flex',
@@ -678,7 +678,7 @@ function RetroSelect({
       <label
         style={{
           display: 'block',
-          fontSize: '0.65rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           marginBottom: '1px',
           color: 'var(--theme-text-muted)',

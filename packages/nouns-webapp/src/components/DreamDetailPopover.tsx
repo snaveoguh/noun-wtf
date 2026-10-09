@@ -158,7 +158,7 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
           {dream.customLayer && (
             <span
               style={{
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#7c3aed',
                 background: 'var(--theme-bg-card)',
@@ -176,8 +176,8 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
           target="_blank"
           rel="noreferrer"
           style={{
-            fontSize: '0.65rem',
-            color: '#3b82f6',
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-link)',
             textDecoration: 'none',
             display: 'block',
             marginTop: 2,
@@ -186,7 +186,7 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
           {dreamerDisplay}
         </a>
 
-        <p style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: 2 }}>
+        <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 2 }}>
           {new Date(dream.createdAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -197,9 +197,9 @@ const DreamDetailPopover: FC<Props> = ({ dream, anchorRect, onClose }) => {
         {/* Traits */}
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {traitList.map(([label, value]) => (
-            <div key={label} style={{ fontSize: '0.65rem', display: 'flex', gap: 6 }}>
+            <div key={label} style={{ fontSize: '0.75rem', display: 'flex', gap: 6 }}>
               <span style={{ color: '#9ca3af', width: 68, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontWeight: 600, color: '#374151' }}>{value}</span>
+              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>{value}</span>
             </div>
           ))}
         </div>

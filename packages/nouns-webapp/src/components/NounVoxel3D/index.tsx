@@ -285,7 +285,7 @@ const NounVoxel3D: FC<NounVoxel3DProps> = ({ onPredict, pollInterval = 3_000 }) 
           {countdown && (
             <div
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 color: isNounOClock ? '#ef4444' : '#555',
                 letterSpacing: '0.08em',
                 fontWeight: isNounOClock ? 700 : 400,

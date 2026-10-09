@@ -170,7 +170,7 @@ const LilNounsMintRow: FC = () => {
           paddingRight: '24px',
           background: 'linear-gradient(90deg, #eef6f0 70%, rgba(238,246,240,0) 100%)',
           fontWeight: 900,
-          fontSize: '0.55rem',
+          fontSize: '0.75rem',
           letterSpacing: '0.15em',
           textTransform: 'uppercase' as const,
           whiteSpace: 'nowrap' as const,

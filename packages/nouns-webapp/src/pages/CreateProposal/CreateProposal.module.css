@@ -19,7 +19,7 @@
 }
 
 .section {
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--theme-divider);
   word-wrap: break-word;
   padding-top: 2rem;
   margin-top: 2rem;
@@ -94,7 +94,7 @@
   font-size: 1rem;
   color: var(--theme-text-primary);
   width: 100%;
-  border: 1px solid #aaa;
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 button.modalButtonLink {

@@ -24,7 +24,7 @@ const NOUNS = 10;
 const NUM_COLORS = [
   '',
   '#2563eb',
-  '#15803d',
+  'var(--theme-free)',
   '#c54e38',
   '#6d28d9',
   '#a16207',
@@ -141,8 +141,8 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#f4f0ea',
-          border: '3px solid #14141f',
+          background: 'var(--theme-bg-card)',
+          border: 0,
           borderRadius: 14,
           padding: 16,
           maxWidth: 380,
@@ -243,7 +243,7 @@ const Nounsweeper: FC<{ onClose: () => void }> = ({ onClose }) => {
               you clicked a Noun. it went to the treasury.
             </span>
           )}
-          {won && <span style={{ color: '#15803d', fontWeight: 700 }}>swept. ⌐◨-◨</span>}
+          {won && <span style={{ color: 'var(--theme-free)', fontWeight: 700 }}>swept. ⌐◨-◨</span>}
         </div>
       </div>
     </div>

@@ -110,7 +110,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
 
   const s: React.CSSProperties = {
     fontFamily: "'PT Root UI', sans-serif",
-    fontSize: '0.6rem',
+    fontSize: '0.75rem',
     color: 'rgba(255,255,255,0.9)',
   };
 
@@ -134,7 +134,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
   if (isEnded && auction.startTime > 0 && remaining === 0) {
     return (
       <div style={{ ...s, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontWeight: 700 }}>ENDED · {fmt(auction.amount)} ETH</span>
+        <span style={{ fontWeight: 700 }}>ENDED, {fmt(auction.amount)} ETH</span>
         {isWalletConnected && (
           <button
             type="button"
@@ -147,7 +147,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
               background: '#22c55e',
               color: 'var(--theme-text-primary)',
               cursor: 'pointer',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               fontFamily: "'PT Root UI', sans-serif",
               opacity: settlePending ? 0.5 : 1,
@@ -193,7 +193,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                 border: '1px solid rgba(255,255,255,0.3)',
                 borderRadius: 4,
                 padding: '3px 6px',
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontFamily: "'PT Root UI', sans-serif",
                 background: 'rgba(0,0,0,0.4)',
                 color: '#fff',
@@ -212,7 +212,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                   border: '1px solid rgba(255,255,255,0.2)',
                   borderRadius: 8,
                   padding: '6px 8px',
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   fontFamily: "'PT Root UI', sans-serif",
                   background: 'rgba(0,0,0,0.28)',
                   color: '#fff',
@@ -232,7 +232,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                   background: 'var(--theme-bg-card)',
                   color: 'var(--theme-text-primary)',
                   cursor: 'pointer',
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
                   fontFamily: "'PT Root UI', sans-serif",
                   opacity: bidPending ? 0.5 : 1,
@@ -241,7 +241,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                 {bidPending ? '...' : 'BID'}
               </button>
               {auction.supportsBidReason && (
-                <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.5rem' }}>
+                <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>
                   {bidReasonInput.length}/{MAX_BID_REASON_LENGTH}
                 </span>
               )}
@@ -259,7 +259,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
         <span style={{ color: 'rgba(255,255,255,0.6)' }}>
           Reserve: {fmt(auction.reservePrice)} ETH
         </span>
-        <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)' }}>
+        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
           24h auction starts on first bid
         </span>
       </div>
@@ -280,7 +280,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
               border: '1px solid rgba(255,255,255,0.3)',
               borderRadius: 4,
               padding: '3px 6px',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontFamily: "'PT Root UI', sans-serif",
               background: 'rgba(0,0,0,0.4)',
               color: '#fff',
@@ -299,7 +299,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                 border: '1px solid rgba(255,255,255,0.2)',
                 borderRadius: 8,
                 padding: '6px 8px',
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontFamily: "'PT Root UI', sans-serif",
                 background: 'rgba(0,0,0,0.28)',
                 color: '#fff',
@@ -319,7 +319,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
                 background: 'var(--theme-bg-card)',
                 color: 'var(--theme-text-primary)',
                 cursor: 'pointer',
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 fontFamily: "'PT Root UI', sans-serif",
                 opacity: bidPending ? 0.5 : 1,
@@ -328,7 +328,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
               {bidPending ? '...' : 'BID'}
             </button>
             {auction.supportsBidReason && (
-              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.5rem' }}>
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>
                 {bidReasonInput.length}/{MAX_BID_REASON_LENGTH}
               </span>
             )}

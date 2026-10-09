@@ -40,7 +40,7 @@ const ActivityRow: FC<{ ev: WalletActivityEvent; ens: (a: string) => string | nu
           {def.label}
         </span>
         <span className="min-w-0 flex-1 break-words">{describeEvent(ev.type, ev.data, ens)}</span>
-        <span className="wp-muted ml-auto flex shrink-0 items-center gap-2 text-[11px]">
+        <span className="wp-muted ml-auto flex shrink-0 items-center gap-2 text-xs">
           {link != null && (
             <Link to={link} className="wp-link">
               view
@@ -56,7 +56,7 @@ const ActivityRow: FC<{ ev: WalletActivityEvent; ens: (a: string) => string | nu
           {expandable.length > 200 && (
             <button
               type="button"
-              className="wp-link ml-2 text-[11px]"
+              className="wp-link ml-2 text-xs"
               onClick={() => setOpen(o => !o)}
             >
               {open ? 'less' : 'more'}
@@ -90,7 +90,7 @@ export const ActivityTab: FC<{ identity: string | undefined }> = ({ identity }) 
   }, [q, q.hasNextPage, q.isFetchingNextPage]);
 
   return (
-    <Card title={`Activity · ${events.length}${q.hasNextPage === true ? '+' : ''}`}>
+    <Card title={`Activity, ${events.length}${q.hasNextPage === true ? '+' : ''}`}>
       {q.isLoading && (
         <div className="grid gap-2">
           <Skeleton />

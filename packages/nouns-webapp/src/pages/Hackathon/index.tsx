@@ -457,7 +457,7 @@ export default function HackathonPage() {
       <div className={classes.footer}>
         <div>CC0. No rights reserved. Fork everything.</div>
         <div style={{ marginTop: '0.25rem' }}>
-          <a href="https://noun.wtf">noun.wtf</a> · <a href="https://pooter.world">pooter.world</a> · Client ID 37
+          <a href="https://noun.wtf">noun.wtf</a>, <a href="https://pooter.world">pooter.world</a>, Client ID 37
         </div>
       </div>
     </div>
