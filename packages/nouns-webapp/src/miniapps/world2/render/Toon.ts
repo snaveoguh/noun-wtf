@@ -194,8 +194,9 @@ export class ClampEffect extends Effect {
 void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
   vec3 c = inputColor.rgb;
   if (debugNeg > 0.5 && !(min(c.r, min(c.g, c.b)) >= 0.0)) { outputColor = vec4(1.0, 0.0, 1.0, 1.0); return; }
-  // NaN-safe: comparisons with NaN are false, so NaN → 0
-  c = vec3(c.r > 0.0 ? c.r : 0.0, c.g > 0.0 ? c.g : 0.0, c.b > 0.0 ? c.b : 0.0);
+  // min/max lower to IEEE fmin/fmax on Metal, which return the non-NaN
+  // operand even under fast-math (ternary NaN checks get optimised away)
+  c = min(max(c, vec3(0.0)), vec3(64.0));
   outputColor = vec4(c, clamp(inputColor.a, 0.0, 1.0));
 }`,
       {

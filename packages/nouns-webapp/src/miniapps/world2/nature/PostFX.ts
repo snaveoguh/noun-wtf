@@ -67,6 +67,10 @@ export function addCinematicEffects(
       bloom !== undefined &&
       ((p as unknown as { effects?: unknown[] }).effects ?? []).includes(bloom),
   );
+  if (at < 0) {
+    const grade = (gfx as unknown as { gradePass?: Pass | null }).gradePass ?? null;
+    at = grade !== null ? passes.indexOf(grade) : -1;
+  }
   if (at < 0) at = Math.max(1, passes.length - 1);
   gfx.composer.addPass(pass, at);
   let focus = 6;
