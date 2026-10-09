@@ -610,12 +610,21 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --brand-color-green-translucent: rgba(212, 255, 58, 0.12);
     --brand-color-blue-darker: #2fc8d8;
 
+    /* Surfaces step UP in lightness from the black ground: window glass
+       (~#141519) → card → hover. A card inside a window is a lighter tint,
+       never a darker hole, so it separates without an outline. */
     --theme-bg-primary: #000000;
-    --theme-bg-secondary: #0b0b0d;
-    --theme-bg-tertiary: #16161a;
-    --theme-bg-card: #08080a;
-    --theme-bg-hover: #16161a;
-    --theme-bg-input: #000000;
+    --theme-bg-secondary: #111216;
+    --theme-bg-tertiary: #24252b;
+    --theme-bg-card: #1b1c21;
+    --theme-bg-hover: #24252b;
+    --theme-bg-input: rgba(255, 255, 255, 0.08);
+    --theme-glass: rgba(20, 21, 25, 0.74);
+    --theme-glass-fill: rgba(255, 255, 255, 0.14);
+    --theme-surface: rgba(255, 255, 255, 0.05);
+    --theme-divider: rgba(255, 255, 255, 0.08);
+    --theme-free: #3dff8a; /* FREEDOM section (nounv2, grants, hackathons) */
+    --brand-dark-green: #3dff8a;
     --theme-text-primary: #ecebe4;
     --theme-text-secondary: #c9c8c0;
     --theme-text-muted: #8d8c84;
@@ -637,10 +646,10 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --theme-font-display: var(--site-font, 'Figtree', system-ui, sans-serif);
     --theme-font-size-base: 15px;
     --theme-letter-spacing: 0;
-    --theme-radius-sm: 0px;
-    --theme-radius-md: 0px;
-    --theme-radius-lg: 0px;
-    --theme-shadow: none;
+    --theme-radius-sm: 12px;
+    --theme-radius-md: 12px;
+    --theme-radius-lg: 18px;
+    --theme-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     --theme-transition: 150ms ease;
     color-scheme: dark;
 
@@ -673,11 +682,14 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .nav-tabs .nav-link.active,
 [data-theme='abacus'] .table,
 [data-theme='abacus'] .table > :not(caption) > * > * {
-  background-color: #08080a !important;
+  background-color: var(--theme-bg-card) !important;
   color: #ecebe4 !important;
-  border-color: #2c2c30 !important;
-  --bs-table-bg: #08080a;
+  border-color: transparent !important;
+  --bs-table-bg: var(--theme-bg-card);
   --bs-table-color: #ecebe4;
+}
+[data-theme='abacus'] .table > :not(caption) > * > * {
+  border-color: var(--theme-divider) !important;
 }
 [data-theme='abacus'] .text-dark,
 [data-theme='abacus'] .text-black,
@@ -1138,13 +1150,13 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .bg-slate-100,
 [data-theme='abacus'] .bg-zinc-50,
 [data-theme='abacus'] .bg-zinc-100 {
-  background-color: #0b0b0d !important;
+  background-color: var(--theme-bg-card) !important;
 }
 [data-theme='abacus'] .bg-gray-200,
 [data-theme='abacus'] .bg-neutral-200,
 [data-theme='abacus'] .bg-slate-200,
 [data-theme='abacus'] .bg-zinc-200 {
-  background-color: #16161a !important;
+  background-color: var(--theme-bg-tertiary) !important;
 }
 [data-theme='abacus'] .text-black,
 [data-theme='abacus'] .text-gray-900,
@@ -1173,7 +1185,8 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .border-gray-300,
 [data-theme='abacus'] .border-neutral-200,
 [data-theme='abacus'] .border-slate-200 {
-  border-color: #2c2c30 !important;
+  /* no outlines on surfaces: tint + shadow separate them */
+  border-color: transparent !important;
 }
 
 /* NOIR: translucent white pills keep dark text (text now defaults to white) */
