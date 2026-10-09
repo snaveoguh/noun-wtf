@@ -2,10 +2,10 @@
 // (packages/nouns-webapp/src/miniapps/world2) is untouched and keeps working
 // in a plain browser, this file only reacts to Capacitor lifecycle events.
 
+import type { Game } from '@/miniapps/world2/Game';
+
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-
-import type { Game } from '@/miniapps/world2/Game';
 
 /** World2Page publishes the live Game on window.__w2 (handy in devtools). */
 function game(): Game | null {

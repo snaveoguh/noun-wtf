@@ -173,6 +173,27 @@ export default defineConfig([
     },
   },
 
+  // noun-world-app (Capacitor shell): resolves the game via this package's
+  // own tsconfig paths ("@/..." -> packages/nouns-webapp/src), so the import
+  // resolver has to be pointed at that tsconfig, not the root one.
+  {
+    files: ['**/packages/noun-world-app/**/*.{ts,tsx}'],
+    settings: {
+      ...importPlugin.configs.typescript.settings,
+      'import/resolver': {
+        ...importPlugin.configs.typescript.settings['import/resolver'],
+        typescript: {
+          project: 'packages/noun-world-app/tsconfig.json',
+        },
+      },
+    },
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+
   // Additional React-specific rules only for the webapp package
   {
     files: ['**/packages/nouns-webapp/**/*.{ts,tsx}'],

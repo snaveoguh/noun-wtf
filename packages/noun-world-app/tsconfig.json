@@ -22,5 +22,13 @@
       "@nouns/voxel-engine": ["../voxel-engine/src/index.ts"]
     }
   },
-  "include": ["src", "vite.config.ts", "capacitor.config.ts", "tailwind.config.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "capacitor.config.ts",
+    "tailwind.config.ts",
+    // n8ao ships no .d.ts; the game keeps its ambient module declaration
+    // as a .ts next to its sources (see the comment in that file).
+    "../nouns-webapp/src/miniapps/world2/n8ao-types.ts"
+  ]
 }

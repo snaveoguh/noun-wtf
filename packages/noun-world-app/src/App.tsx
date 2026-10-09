@@ -1,6 +1,5 @@
-import { MemoryRouter, Route, Routes } from 'react-router';
-
 import World2Page from '@/miniapps/world2/World2Page';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 /**
  * The game page reads `?seed`, `?q`, `?skip`… from the router and navigates
