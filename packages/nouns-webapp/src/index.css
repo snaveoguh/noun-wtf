@@ -1219,3 +1219,11 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] ::placeholder {
   color: rgba(236, 235, 228, 0.4) !important;
 }
+
+/* NOIR: alerts/tips are dark glass */
+[data-theme='abacus'] .alert {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #ecebe4 !important;
+  border: 0 !important;
+  border-radius: 14px;
+}

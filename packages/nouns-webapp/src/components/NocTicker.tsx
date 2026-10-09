@@ -422,7 +422,7 @@ const CastModal: FC<{
                 fontFamily: "'PT Root UI'",
                 fontWeight: 700,
                 fontSize: '0.9rem',
-                color: '#14141f',
+                color: 'var(--theme-text-primary)',
               }}
             >
               {cast.author.display_name}

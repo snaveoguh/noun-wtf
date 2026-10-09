@@ -365,7 +365,7 @@ const LilNounsVotePage: FC = () => {
           rel="noreferrer"
           style={{
             background: 'var(--theme-bg-card)',
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
             padding: '6px 14px',
             borderRadius: 999,
             fontSize: '0.8rem',
@@ -450,7 +450,7 @@ const LilNounsVotePage: FC = () => {
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
             marginBottom: 10,
           }}
         >
@@ -483,7 +483,7 @@ const LilNounsVotePage: FC = () => {
                         rel="noreferrer"
                         style={{
                           fontFamily: 'monospace',
-                          color: '#14141f',
+                          color: 'var(--theme-text-primary)',
                           textDecoration: 'none',
                           fontWeight: 600,
                         }}
@@ -572,7 +572,7 @@ const LilNounsVotePage: FC = () => {
                   href={`https://etherscan.io/address/${target}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: '#14141f', fontWeight: 600, textDecoration: 'none' }}
+                  style={{ color: 'var(--theme-text-primary)', fontWeight: 600, textDecoration: 'none' }}
                 >
                   {target}
                 </a>
@@ -688,7 +688,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    color: '#14141f',
+    color: 'var(--theme-text-primary)',
     marginBottom: 8,
   };
 

@@ -414,7 +414,7 @@ const DreamModal: FC<{
             fontWeight: 400,
             margin: '0 0 12px',
             lineHeight: 1.2,
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
           }}
         >
           Dream Noun #{dream.id}

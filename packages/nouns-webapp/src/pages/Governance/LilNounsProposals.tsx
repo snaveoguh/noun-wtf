@@ -94,7 +94,7 @@ const LilNounsProposals: FC = () => {
           style={{
             fontSize: '2.5rem',
             fontFamily: "'Londrina Solid', cursive",
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
             margin: '4px 0 8px',
             fontWeight: 400,
           }}

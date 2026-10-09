@@ -20,6 +20,8 @@ export interface SmoothHeadOptions {
   bevel?: number;
   /** Texture softening blur (px at 256²); lower keeps object detail. */
   blur?: number;
+  /** Print the art pixel-sharp (cards, signs): no smoothing, no blur. */
+  crisp?: boolean;
 }
 
 const FLAT = new Set(
@@ -37,9 +39,9 @@ const OBJECT = new Set(
  * edges and detail, everything organic gets the soft pillow. */
 export function headProfile(name: string): SmoothHeadOptions {
   const n = name.replace(/^head-/, '');
-  if (FLAT.has(n)) return { halfDepth: 1.6, bevel: 1.2, blur: 0.7 };
+  if (FLAT.has(n)) return { halfDepth: 1.6, bevel: 1.2, blur: 0, crisp: true };
   if (OBJECT.has(n)) return { halfDepth: 6, bevel: 1.8, blur: 0.6 };
-  return {};
+  return { blur: 0.8 };
 }
 
 export interface SmoothHead {
@@ -311,11 +313,11 @@ export function buildSmoothHead(
   const big = document.createElement('canvas');
   big.width = big.height = 256;
   const bctx = big.getContext('2d')!;
-  bctx.imageSmoothingEnabled = true;
+  bctx.imageSmoothingEnabled = opts.crisp !== true;
   bctx.imageSmoothingQuality = 'high';
   // Light blur only: enough to lose the pixel staircase, not enough to
   // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
-  bctx.filter = `blur(${opts.blur ?? 1.6}px)`;
+  bctx.filter = opts.crisp === true ? 'none' : `blur(${opts.blur ?? 1.6}px)`;
   bctx.drawImage(canvas, 0, 0, 256, 256);
   bctx.filter = 'none';
   const img = bctx.getImageData(0, 0, 256, 256);

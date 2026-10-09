@@ -90,6 +90,32 @@ let lastSwallowAt = 0;
 const SWALLOW_WINDOW_MS = 1000;
 const SWALLOW_LIMIT = 5;
 
+// After a deploy, an open tab still references the previous build's chunk
+// hashes; lazy routes then fail with "Failed to fetch dynamically imported
+// module". Reload once (guarded per-URL so a real outage can't loop).
+const CHUNK_RELOAD_KEY = 'nounwtf-chunk-reload';
+const isChunkLoadError = (e: unknown) =>
+  e instanceof Error &&
+  /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk/i.test(
+    e.message,
+  );
+function reloadForNewBuild(): boolean {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === window.location.href) return false;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, window.location.href);
+  } catch {
+    // storage blocked — still try once
+  }
+  window.location.reload();
+  return true;
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', event => {
+    event.preventDefault();
+    reloadForNewBuild();
+  });
+}
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
@@ -113,6 +139,7 @@ class ErrorBoundary extends React.Component<
     return { error };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (isChunkLoadError(error) && reloadForNewBuild()) return;
     if (isLikelyRpcDataError(error) && swallowCount <= SWALLOW_LIMIT) return;
     console.error('[ErrorBoundary]', error, info.componentStack);
   }

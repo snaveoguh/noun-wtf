@@ -371,7 +371,7 @@ const PropModal: FC<{
             fontWeight: 400,
             margin: '0 0 10px',
             lineHeight: 1.2,
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
           }}
         >
           {prop.title}

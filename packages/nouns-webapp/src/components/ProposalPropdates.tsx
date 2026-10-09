@@ -68,7 +68,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
           fontFamily: "'PT Root UI'",
           fontSize: '0.8rem',
           lineHeight: 1.6,
-          color: '#14141f',
+          color: 'var(--theme-text-primary)',
           overflowWrap: 'break-word',
           wordBreak: 'break-word' as const,
         }}
@@ -159,7 +159,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
             fontFamily: "'Londrina Solid'",
             fontSize: '1.1rem',
             fontWeight: 400,
-            color: '#14141f',
+            color: 'var(--theme-text-primary)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,

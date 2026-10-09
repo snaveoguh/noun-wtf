@@ -38,7 +38,11 @@ export function addCinematicEffects(
   gfx: CinematicHost,
   opts: CinematicOptions = {},
 ): CinematicEffects {
-  const want = opts.dof ?? gfx.quality === 'high';
+  // Off by default: the bokeh made the whole plaza read as blurry. Opt in
+  // with ?dof=1 for cinematic shots.
+  const dofParam =
+    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('dof');
+  const want = opts.dof ?? dofParam === '1';
   if (!want) {
     return {
       dof: null,
