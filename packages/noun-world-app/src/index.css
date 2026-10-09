@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonts the game asks for, served from the bundle (copied by
+   scripts/sync-game-assets.mjs). Press Start 2P (character select) is
+   pulled from Google Fonts by the game itself and degrades to system-ui
+   offline. */
+@font-face {
+  font-family: 'PT Root UI';
+  src:
+    url(/fonts/PT_Root_UI/PT-Root-UI_Regular.woff2) format('woff2'),
+    url(/fonts/PT_Root_UI/PT-Root-UI_Regular.woff) format('woff');
+}
+@font-face {
+  font-family: 'PT Root UI';
+  font-weight: 500;
+  src:
+    url(/fonts/PT_Root_UI/PT-Root-UI_Medium.woff2) format('woff2'),
+    url(/fonts/PT_Root_UI/PT-Root-UI_Medium.woff) format('woff');
+}
+@font-face {
+  font-family: 'PT Root UI';
+  font-weight: bold;
+  src:
+    url(/fonts/PT_Root_UI/PT-Root-UI_Bold.woff2) format('woff2'),
+    url(/fonts/PT_Root_UI/PT-Root-UI_Bold.woff) format('woff');
+}
+@font-face {
+  font-family: 'Londrina Solid';
+  src: url(/fonts/Londrina_Solid/LondrinaSolid-Regular.ttf) format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Londrina Solid';
+  src: url(/fonts/Londrina_Solid/LondrinaSolid-Black.ttf) format('truetype');
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pip3';
+  src: url(/fonts/Pip3-Regular.32fae758.woff2) format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0d1117;
+  color: #fff;
+  overflow: hidden;
+  /* No rubber-banding / pull-to-refresh under the touch sticks. */
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+}
+
+/* Shown only when the device is held in portrait (the native projects lock
+   landscape, this is the belt-and-braces for split-screen / tablets). */
+.nw-rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  background: #0d1117;
+  font-family: 'Londrina Solid', system-ui, sans-serif;
+  font-size: 28px;
+  text-align: center;
+  padding: 24px;
+}
+@media (orientation: portrait) {
+  .nw-rotate {
+    display: flex;
+  }
+}

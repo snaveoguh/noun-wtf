@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "isolatedModules": true,
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/hooks": ["./src/shims/hooks.ts"],
+      "@/*": ["../nouns-webapp/src/*"],
+      "@nouns/voxel-engine": ["../voxel-engine/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "capacitor.config.ts", "tailwind.config.ts"]
+}

@@ -1,0 +1,32 @@
+# Game assets are copied in from packages/nouns-webapp/public by scripts/sync-game-assets.mjs
+/public
+/dist
+
+# Capacitor copies dist/ into the native projects on `cap sync`
+/android/app/src/main/assets/public
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+/ios/App/App/public
+/ios/App/App/capacitor.config.json
+/ios/App/Pods
+/ios/App/Podfile.lock
+/ios/App/App.xcworkspace/xcuserdata
+/ios/App/App.xcodeproj/xcuserdata
+/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata
+/ios/DerivedData
+
+# Gradle / Android build output
+/android/.gradle
+/android/build
+/android/app/build
+/android/capacitor-cordova-android-plugins/build
+/android/local.properties
+/android/.idea
+/android/*.iml
+/android/app/*.iml
+
+# Local signing material must never be committed
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
