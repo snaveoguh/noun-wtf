@@ -1,0 +1,194 @@
+# Codemagic CI for the Noun World mobile app (packages/noun-world-app).
+#
+# Two workflows:
+#   android-debug  -> app-debug.apk (unsigned debug build, sideloadable)
+#   ios-app-store  -> signed .ipa uploaded to TestFlight
+#
+# Both run from the monorepo root: the game is imported in place from
+# packages/nouns-webapp/src/miniapps/world2, so the install has to include
+# the workspace packages the app depends on (voxel-engine), not just this
+# package. See README.md in this directory for the one-time setup
+# (App Store Connect integration, bundle id, keystore env group).
+workflows:
+  android-debug:
+    name: Noun World · Android debug APK
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      java: 21
+      node: 22
+      vars:
+        PACKAGE: packages/noun-world-app
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'claude/mobile-app'
+          include: true
+        - pattern: 'main'
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Install pnpm
+        script: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm --version
+      - name: Install workspace deps (app + voxel-engine only)
+        script: |
+          pnpm install --frozen-lockfile \
+            --filter @nouns/noun-world-app \
+            --filter @nouns/voxel-engine
+      - name: Typecheck + build web bundle
+        script: |
+          cd $PACKAGE
+          pnpm check
+          pnpm build
+      - name: Capacitor sync
+        script: |
+          cd $PACKAGE
+          pnpm exec cap sync android
+      - name: Gradle assembleDebug
+        script: |
+          cd $PACKAGE/android
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          ./gradlew assembleDebug --no-daemon
+    artifacts:
+      - packages/noun-world-app/android/app/build/outputs/apk/debug/app-debug.apk
+    publishing:
+      email:
+        recipients:
+          - you@example.com # replace with the address that should get build mail
+        notify:
+          success: false
+          failure: true
+
+  android-release:
+    name: Noun World · Android release (signed AAB + APK)
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      java: 21
+      node: 22
+      # Upload the upload-keystore in Codemagic UI (Code signing identities ->
+      # Android) with reference name `noun_world_upload`.
+      android_signing:
+        - noun_world_upload
+      vars:
+        PACKAGE: packages/noun-world-app
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'noun-world-app-v*'
+          include: true
+    scripts:
+      - name: Install pnpm
+        script: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+      - name: Install workspace deps
+        script: |
+          pnpm install --frozen-lockfile \
+            --filter @nouns/noun-world-app \
+            --filter @nouns/voxel-engine
+      - name: Build web bundle + sync
+        script: |
+          cd $PACKAGE
+          pnpm build
+          pnpm exec cap sync android
+      - name: Gradle release
+        script: |
+          cd $PACKAGE/android
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          # CM_KEYSTORE_PATH / CM_KEYSTORE_PASSWORD / CM_KEY_ALIAS /
+          # CM_KEY_PASSWORD are exported by the android_signing block above
+          # and read by the signingConfig in app/build.gradle.
+          ./gradlew bundleRelease assembleRelease --no-daemon
+    artifacts:
+      - packages/noun-world-app/android/app/build/outputs/bundle/release/*.aab
+      - packages/noun-world-app/android/app/build/outputs/apk/release/*.apk
+
+  ios-app-store:
+    name: Noun World · iOS (TestFlight)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    integrations:
+      # Codemagic UI -> Teams -> Integrations -> App Store Connect: add an
+      # API key and name it `noun_world_asc`.
+      app_store_connect: noun_world_asc
+    environment:
+      xcode: latest
+      node: 22
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: wtf.noun.world
+      vars:
+        PACKAGE: packages/noun-world-app
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+        APP_STORE_APPLE_ID: 0000000000 # replace with the numeric App ID from App Store Connect
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: 'claude/mobile-app'
+          include: true
+        - pattern: 'main'
+          include: true
+      tag_patterns:
+        - pattern: 'noun-world-app-v*'
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Install pnpm
+        script: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+      - name: Install workspace deps
+        script: |
+          pnpm install --frozen-lockfile \
+            --filter @nouns/noun-world-app \
+            --filter @nouns/voxel-engine
+      - name: Build web bundle + sync
+        script: |
+          cd $PACKAGE
+          pnpm check
+          pnpm build
+          pnpm exec cap sync ios
+      - name: Resolve Swift packages
+        script: |
+          cd $PACKAGE
+          xcodebuild -resolvePackageDependencies -project $XCODE_PROJECT -scheme $XCODE_SCHEME
+      - name: Apply signing profiles
+        script: |
+          cd $PACKAGE
+          xcode-project use-profiles --project $XCODE_PROJECT
+      - name: Bump build number
+        script: |
+          cd $PACKAGE
+          BUILD=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0) + 1))
+          agvtool new-version -all "$BUILD" || \
+            xcode-project set-build-number --project $XCODE_PROJECT "$BUILD"
+      - name: Archive + export IPA
+        script: |
+          cd $PACKAGE
+          xcode-project build-ipa --project $XCODE_PROJECT --scheme $XCODE_SCHEME
+    artifacts:
+      - packages/noun-world-app/build/ios/ipa/*.ipa
+      - packages/noun-world-app/ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Nouners
+      email:
+        recipients:
+          - you@example.com # replace with the address that should get build mail
+        notify:
+          success: true
+          failure: true
