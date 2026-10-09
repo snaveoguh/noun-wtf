@@ -23,14 +23,14 @@ export default function PredictionsPage() {
       <div className="mb-6 border-b-2 border-neutral-200 pb-4 dark:border-neutral-700">
         <h1 className="font-londrina text-4xl">Nouns + Lil Nouns Predictions</h1>
         <p className="mt-1 text-xs uppercase tracking-widest text-neutral-500">
-          Parimutuel · Ethereum Mainnet · 2% Resolution Fee
+          Parimutuel, Ethereum Mainnet, 2% Resolution Fee
         </p>
       </div>
 
-      {/* Next Auction · Price Guess */}
+      {/* Next Auction, Price Guess */}
       <section className="mb-8">
         <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">
-          Next Auction · Price Guess
+          Next Auction, Price Guess
         </h2>
         <AuctionMarketCard />
       </section>

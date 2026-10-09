@@ -73,7 +73,7 @@ export const TriBar: FC<{
   const t = f + a + ab;
   if (t === 0) return <div className="wp-tri" style={{ height }} />;
   return (
-    <div className="wp-tri" style={{ height }} title={`${f} for · ${a} against · ${ab} abstain`}>
+    <div className="wp-tri" style={{ height }} title={`${f} for, ${a} against, ${ab} abstain`}>
       <span className="wp-bg-pos" style={{ width: `${(f / t) * 100}%` }} />
       <span className="wp-bg-neg" style={{ width: `${(a / t) * 100}%` }} />
       <span className="wp-bg-mid" style={{ width: `${(ab / t) * 100}%` }} />

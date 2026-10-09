@@ -141,7 +141,7 @@ export const Footer = () => {
         className="mt-12 flex items-center justify-center text-base sm:mt-16"
         style={{ color: 'var(--theme-text-primary)' }}
       >
-        <p className="m-0 p-1">{`${new Date().getFullYear()} noun.wtf`}</p>·
+        <p className="m-0 p-1">{`${new Date().getFullYear()} noun.wtf`}</p>
         <p className="m-0 p-1">
           <Trans>
             made with <NogglesLogo className="inline-block h-3 align-baseline" />

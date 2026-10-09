@@ -1,5 +1,5 @@
 /**
- * /gamer/:identity · /explore/wallet/:identity — per-wallet "gamer profile"
+ * /gamer/:identity, /explore/wallet/:identity — per-wallet "gamer profile"
  * for Nouns DAO: everything the wallet has done in and around the DAO, an AI
  * overview, and the owner's Autopilot panel.
  *

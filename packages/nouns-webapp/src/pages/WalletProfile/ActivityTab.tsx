@@ -90,7 +90,7 @@ export const ActivityTab: FC<{ identity: string | undefined }> = ({ identity }) 
   }, [q, q.hasNextPage, q.isFetchingNextPage]);
 
   return (
-    <Card title={`Activity · ${events.length}${q.hasNextPage === true ? '+' : ''}`}>
+    <Card title={`Activity, ${events.length}${q.hasNextPage === true ? '+' : ''}`}>
       {q.isLoading && (
         <div className="grid gap-2">
           <Skeleton />

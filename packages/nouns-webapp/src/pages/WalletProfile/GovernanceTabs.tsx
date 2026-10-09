@@ -1,4 +1,4 @@
-/** Overview · Votes · Proposals · Candidates tabs. */
+/** Overview, Votes, Proposals, Candidates tabs. */
 import type { AutopilotAutoVote, RecentVote, WalletProfile } from './types';
 
 import { FC, useMemo, useState } from 'react';
@@ -160,7 +160,7 @@ export const OverviewTab: FC<{
 
       <div className="grid content-start gap-3">
         <Card
-          title={`Held nouns · ${fmtInt(profile.holdings?.count ?? nouns.length)}`}
+          title={`Held nouns, ${fmtInt(profile.holdings?.count ?? nouns.length)}`}
           right={
             <button type="button" className="wp-link text-[11px]" onClick={() => onTab('nouns')}>
               detail →
@@ -304,7 +304,7 @@ export const VotesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
 
   return (
     <Card
-      title={`Votes · ${fmtInt(profile.voting?.total ?? all.length)}`}
+      title={`Votes, ${fmtInt(profile.voting?.total ?? all.length)}`}
       right={
         judged > 0 ? (
           <span className="wp-muted text-[11px]">
@@ -349,10 +349,10 @@ export const ProposalsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   return (
     <div className="grid gap-3">
       <Card
-        title={`Authored · ${authored.length}`}
+        title={`Authored, ${authored.length}`}
         right={
           <span className="wp-muted text-[11px]">
-            {p?.passRate != null && <>pass rate {fmtPct(p.passRate)} · </>}
+            {p?.passRate != null && <>pass rate {fmtPct(p.passRate)}, </>}
             {p?.totalRequestedEth != null && <>asked {fmtEth(p.totalRequestedEth)}</>}
           </span>
         }
@@ -392,7 +392,7 @@ export const ProposalsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
           ))
         )}
       </Card>
-      <Card title={`Signed as sponsor · ${signed.length}`}>
+      <Card title={`Signed as sponsor, ${signed.length}`}>
         {signed.length === 0 ? (
           <Empty>No sponsor signatures on proposals.</Empty>
         ) : (
@@ -422,7 +422,7 @@ export const CandidatesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
         <Pill>candidate feedback {fmtInt(c?.feedbackGiven)}</Pill>
         <Pill>proposal feedback {fmtInt(c?.proposalFeedbackGiven)}</Pill>
       </div>
-      <Card title={`Authored candidates · ${authored.length}`}>
+      <Card title={`Authored candidates, ${authored.length}`}>
         {authored.length === 0 ? (
           <Empty>No candidates authored.</Empty>
         ) : (
@@ -445,7 +445,7 @@ export const CandidatesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
           ))
         )}
       </Card>
-      <Card title={`Sponsored · ${sponsored.length}`}>
+      <Card title={`Sponsored, ${sponsored.length}`}>
         {sponsored.length === 0 ? (
           <Empty>No candidate sponsorships.</Empty>
         ) : (
@@ -467,7 +467,7 @@ export const CandidatesTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                       (expired ? (
                         <Pill tone="mid">sig expired</Pill>
                       ) : (
-                        <Pill tone="pos">sig live · {relTime(exp)}</Pill>
+                        <Pill tone="pos">sig live, {relTime(exp)}</Pill>
                       ))}
                     <span className="wp-muted">{relTime(sp.createdAt)}</span>
                   </span>

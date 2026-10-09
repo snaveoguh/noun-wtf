@@ -186,7 +186,7 @@ function parseVoxelMap(voxelData?: string) {
 
 function formatUpdateLabel(updatedAt?: string) {
   if (!updatedAt) return 'Waiting for the first live save';
-  return `Live on site · ${new Date(updatedAt).toLocaleTimeString('en-US', {
+  return `Live on site, ${new Date(updatedAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
   })}`;
@@ -218,7 +218,7 @@ function LightingPicker({
         borderRadius: 999,
         padding: '0 8px',
         fontFamily: 'monospace',
-        fontSize: 9,
+        fontSize: 12,
         letterSpacing: '0.05em',
         cursor: 'pointer',
       }}
@@ -231,7 +231,7 @@ function LightingPicker({
         }
       }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginRight: 3, lineHeight: 1 }}>
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginRight: 3, lineHeight: 1 }}>
         💡
       </span>
       {LIGHTING_PRESETS.map(p => {
@@ -246,7 +246,7 @@ function LightingPicker({
               onChange(p.name);
             }}
             style={{
-              fontSize: 9,
+              fontSize: 12,
               border: 'none',
               borderRadius: 4,
               lineHeight: '14px',
@@ -271,7 +271,7 @@ function LightingPicker({
         <span
           style={{
             color: 'rgba(255,255,255,0.35)',
-            fontSize: 10,
+            fontSize: 12,
             marginLeft: 1,
             transition: 'opacity 0.2s',
           }}
@@ -917,7 +917,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layo
 
       const dream: SavedDream = {
         id: generateDreamId(),
-        title: `2D Edit · Noun #${currentNounId}`,
+        title: `2D Edit, Noun #${currentNounId}`,
         description: '',
         seed: editorSeed,
         createdAt: Date.now(),
@@ -1960,7 +1960,7 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layo
                       if (isEditing) stopEditing();
                       setViewMode(`deriv-${derivative.id}`);
                     }}
-                    title={`${derivative.name} · ${new Date(derivative.createdAt).toLocaleDateString()}`}
+                    title={`${derivative.name}, ${new Date(derivative.createdAt).toLocaleDateString()}`}
                   >
                     {derivative.name}
                   </button>

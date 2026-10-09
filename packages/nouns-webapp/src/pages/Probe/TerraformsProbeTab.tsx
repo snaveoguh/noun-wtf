@@ -25,7 +25,7 @@ const TerraformsProbeTab: React.FC = () => (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#475569',
+            color: 'var(--theme-text-muted)',
             fontSize: '0.85rem',
           }}
         >

@@ -250,7 +250,7 @@ const LilNounsVotePage: FC = () => {
             marginBottom: 4,
           }}
         >
-          <span>LIL NOUNS · #{proposal.id}</span>
+          <span>LIL NOUNS, #{proposal.id}</span>
           <span
             style={{
               color: statusColor,
@@ -284,7 +284,7 @@ const LilNounsVotePage: FC = () => {
           >
             <ShortAddress address={proposal.proposer.id as Address} />
           </a>
-          {proposal.createdTimestamp !== '' && ` · ${formatTimestamp(proposal.createdTimestamp)}`}
+          {proposal.createdTimestamp !== '' && `, ${formatTimestamp(proposal.createdTimestamp)}`}
         </div>
       </div>
 
@@ -309,7 +309,7 @@ const LilNounsVotePage: FC = () => {
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               color: 'var(--theme-text-muted)',
               marginBottom: 4,
             }}
@@ -345,7 +345,7 @@ const LilNounsVotePage: FC = () => {
         <div
           style={{
             background: 'var(--theme-bg-card)',
-            border: '1px solid #e0e0e0',
+            border: '1px solid transparent',
             borderRadius: 10,
             padding: 16,
             marginBottom: 20,
@@ -388,7 +388,7 @@ const LilNounsVotePage: FC = () => {
             background: 'var(--theme-bg-card)',
             padding: '16px 20px',
             borderRadius: 8,
-            border: '1px solid #f0f0f0',
+            border: '1px solid transparent',
             marginBottom: 24,
             lineHeight: 1.6,
             fontSize: '0.9rem',
@@ -468,7 +468,7 @@ const LilNounsVotePage: FC = () => {
                     key={v.id}
                     style={{
                       background: 'var(--theme-bg-card)',
-                      border: '1px solid #f0f0f0',
+                      border: '1px solid transparent',
                       padding: '8px 12px',
                       borderRadius: 6,
                       fontSize: '0.8rem',
@@ -494,7 +494,7 @@ const LilNounsVotePage: FC = () => {
                         style={{
                           color,
                           fontWeight: 700,
-                          fontSize: '0.7rem',
+                          fontSize: '0.75rem',
                           background: `${color}1a`,
                           padding: '1px 6px',
                           borderRadius: 4,
@@ -523,7 +523,7 @@ const LilNounsVotePage: FC = () => {
                   marginTop: 10,
                   padding: '6px 12px',
                   background: 'transparent',
-                  border: '1px solid #e0e0e0',
+                  border: '1px solid transparent',
                   borderRadius: 6,
                   fontSize: '0.75rem',
                   cursor: 'pointer',
@@ -557,7 +557,7 @@ const LilNounsVotePage: FC = () => {
                 key={i}
                 style={{
                   background: 'var(--theme-bg-card)',
-                  border: '1px solid #f0f0f0',
+                  border: '1px solid transparent',
                   padding: '8px 12px',
                   borderRadius: 6,
                   fontSize: '0.75rem',
@@ -603,7 +603,7 @@ const VoteCount: FC<{ label: string; value: number; color: string }> = ({
       borderRadius: 6,
     }}
   >
-    <div style={{ fontSize: '0.65rem', color, fontWeight: 700, textTransform: 'uppercase' }}>
+    <div style={{ fontSize: '0.75rem', color, fontWeight: 700, textTransform: 'uppercase' }}>
       {label}
     </div>
     <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: "'Londrina Solid', cursive" }}>
@@ -678,7 +678,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
 
   const panelStyle: React.CSSProperties = {
     background: 'var(--theme-bg-card)',
-    border: '1px solid #e0e0e0',
+    border: '1px solid transparent',
     borderRadius: 10,
     padding: 16,
     marginBottom: 20,
@@ -758,8 +758,8 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
 
   if (isSuccess) {
     return (
-      <div style={{ ...panelStyle, borderColor: '#43b369', background: '#e8f7ee' }}>
-        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2a8653' }}>
+      <div style={{ ...panelStyle, borderColor: 'transparent', background: 'var(--theme-surface)' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--theme-free)' }}>
           ✓ Vote cast on-chain. Receipt updating…
         </div>
       </div>
@@ -805,7 +805,7 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
           width: '100%',
           padding: 10,
           borderRadius: 8,
-          border: '1px solid #e0e0e0',
+          border: '1px solid transparent',
           fontSize: '0.85rem',
           fontFamily: 'inherit',
           resize: 'vertical',

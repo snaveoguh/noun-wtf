@@ -36,14 +36,14 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
         alignItems: 'center',
       }}>
         <span style={{
-          fontSize: '0.6rem',
-          color: '#475569',
+          fontSize: '0.75rem',
+          color: 'var(--theme-text-muted)',
           background: 'rgba(0,0,0,0.5)',
           padding: '4px 10px',
           borderRadius: 6,
-          border: '1px solid #1e293b',
+          border: '1px solid var(--theme-divider)',
         }}>
-          WASD / Arrows to move · Click + drag to look · Space for auto-walk
+          WASD / Arrows to move, Click + drag to look, Space for auto-walk
         </span>
       </div>
 
@@ -69,8 +69,8 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
         position: 'absolute',
         bottom: 12,
         right: 16,
-        fontSize: '0.6rem',
-        color: '#475569',
+        fontSize: '0.75rem',
+        color: 'var(--theme-text-muted)',
         fontFamily: 'monospace',
       }}>
         {progress.toFixed(0)}% explored
@@ -82,7 +82,7 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
           position: 'absolute',
           bottom: 12,
           left: 16,
-          fontSize: '0.55rem',
+          fontSize: '0.75rem',
           color: '#fbbf24',
           background: 'rgba(0,0,0,0.5)',
           padding: '3px 8px',

@@ -151,7 +151,7 @@ export const VoterHoverCardContent: FC<VoterHoverCardContentProps> = memo(({ add
                 <span className="tabular-nums" style={fontMono}>
                   +{phantomDelegated}
                 </span>
-                <span style={{ ...colorMuted, fontSize: '8px', marginTop: 2 }}>
+                <span style={{ ...colorMuted, fontSize: 12, marginTop: 2 }}>
                   deleg
                 </span>
               </div>
@@ -290,7 +290,7 @@ const NounThumb: FC<{ nounId: number; kind: 'owned' | 'delegated' }> = memo(
       </div>
       <span
         className="leading-none tabular-nums"
-        style={{ ...fontMono, ...colorMuted, fontSize: '9px' }}
+        style={{ ...fontMono, ...colorMuted, fontSize: 12 }}
       >
         {nounId}
       </span>

@@ -132,7 +132,7 @@ export function MarketsTable() {
           Recent Markets
         </h2>
         <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
-          {counts.needsResolve} needs resolve · {counts.live} live · {counts.resolved} resolved
+          {counts.needsResolve} needs resolve, {counts.live} live, {counts.resolved} resolved
         </p>
       </div>
 

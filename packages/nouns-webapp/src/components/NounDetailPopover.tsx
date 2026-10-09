@@ -104,7 +104,7 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Noun {nounId.toString()}</span>
           {auction?.amount && (
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--theme-text-muted)' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--theme-text-muted)' }}>
               {parseFloat(formatEther(auction.amount)).toFixed(2)} ETH
             </span>
           )}
@@ -117,8 +117,8 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
             target="_blank"
             rel="noreferrer"
             style={{
-              fontSize: '0.65rem',
-              color: '#3b82f6',
+              fontSize: '0.75rem',
+              color: 'var(--theme-text-link)',
               textDecoration: 'none',
               display: 'block',
               marginTop: 2,
@@ -132,9 +132,9 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
         {traitList.length > 0 && (
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
             {traitList.map(([label, value]) => (
-              <div key={label} style={{ fontSize: '0.65rem', display: 'flex', gap: 6 }}>
+              <div key={label} style={{ fontSize: '0.75rem', display: 'flex', gap: 6 }}>
                 <span style={{ color: '#9ca3af', width: 68, flexShrink: 0 }}>{label}</span>
-                <span style={{ fontWeight: 600, color: '#374151' }}>{value}</span>
+                <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>{value}</span>
               </div>
             ))}
           </div>
@@ -164,7 +164,7 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
           <a
             href={`/noun/${nounId}`}
             style={{
-              fontSize: '0.65rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               color: '#dc2626',
               textDecoration: 'none',

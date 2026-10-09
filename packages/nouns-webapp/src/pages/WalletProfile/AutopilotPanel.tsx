@@ -291,7 +291,7 @@ const GrantRow: FC<{
       });
       toast.success(`${AUTOPILOT_DAO_LABEL[dao]} vote permission granted`, {
         description: `expires ${fmtDate(built.summary.expiresAt)}${
-          built.summary.maxVotes != null ? ` · max ${built.summary.maxVotes} votes` : ''
+          built.summary.maxVotes != null ? `, max ${built.summary.maxVotes} votes` : ''
         }`,
         duration: 6000,
       });
@@ -362,7 +362,7 @@ const GrantRow: FC<{
           <dl>
             <dt>governor</dt>
             <dd>
-              {AUTOPILOT_DAO_LABEL[dao]} DAO ·{' '}
+              {AUTOPILOT_DAO_LABEL[dao]} DAO,{' '}
               <span className="wp-mono">{built.summary.governor}</span>
             </dd>
             <dt>allowed calls</dt>
@@ -488,7 +488,7 @@ const DelegationRow: FC<{ row: AutopilotDelegation; address: string }> = ({ row,
         </span>
         <span className="wp-muted">
           used <span className="wp-mono">{row.uses ?? 0}</span>
-          {row.maxVotes != null ? <span className="wp-mono"> / {row.maxVotes}</span> : ' · no cap'}
+          {row.maxVotes != null ? <span className="wp-mono"> / {row.maxVotes}</span> : ', no cap'}
         </span>
         {row.hash != null && (
           <span className="wp-mono wp-muted text-[10px]" title={row.hash}>
@@ -572,7 +572,7 @@ const AutoSetupCard: FC<{
         <span className="flex items-center gap-2">
           Auto-vote setup
           {active.length > 0 && (
-            <span className="wp-pos normal-case">· {active.length} active permission(s)</span>
+            <span className="wp-pos normal-case">{active.length} active permission(s)</span>
           )}
         </span>
       }
@@ -657,7 +657,7 @@ const AutoSetupCard: FC<{
             <span className="wp-mono" title={relayerAddr}>
               {relayerAddr}
             </span>{' '}
-            · balance{' '}
+           , balance{' '}
             <span className={`wp-mono ${relayerLow ? 'wp-neg' : ''}`}>
               {relayerBalance != null ? `${relayerBalance.toFixed(4)} ETH` : '—'}
             </span>
@@ -1001,7 +1001,7 @@ export const AutopilotPanel: FC<{
       setDirty(false);
       toast.success(
         enabled
-          ? `Autopilot saved · ${next.mode === 'auto' ? 'auto-vote' : 'draft'} mode`
+          ? `Autopilot saved, ${next.mode === 'auto' ? 'auto-vote' : 'draft'} mode`
           : 'Autopilot switched off',
       );
     } catch (err) {
@@ -1044,7 +1044,7 @@ export const AutopilotPanel: FC<{
             <SparklesIcon size={12} /> Autopilot
             {q.data?.updatedAt != null && (
               <span className="hidden normal-case opacity-60 sm:inline">
-                · saved {relTime(q.data.updatedAt)}
+               , saved {relTime(q.data.updatedAt)}
               </span>
             )}
           </span>
@@ -1139,7 +1139,7 @@ export const AutopilotPanel: FC<{
                           <span
                             className={`wp-mono ${v > 0 ? 'wp-pos' : v < 0 ? 'wp-neg' : 'wp-muted'}`}
                           >
-                            {v > 0 ? `+${v}` : v} · {STANCE_HINT[v] ?? ''}
+                            {v > 0 ? `+${v}` : v}, {STANCE_HINT[v] ?? ''}
                           </span>
                         </div>
                         <input
@@ -1329,7 +1329,7 @@ export const AutopilotPanel: FC<{
           )}
         </Card>
 
-        <Card className="lg:col-span-2" title={`Recommendations · ${recs.length}`}>
+        <Card className="lg:col-span-2" title={`Recommendations, ${recs.length}`}>
           {q.isLoading && (
             <div className="grid gap-2">
               <Skeleton h={60} />
@@ -1348,7 +1348,7 @@ export const AutopilotPanel: FC<{
             <div key={g.dao} className="mb-2">
               {recsByDao.length > 1 && (
                 <div className="wp-h flex items-center gap-2">
-                  {AUTOPILOT_DAO_LABEL[g.dao]} · {g.rows.length}
+                  {AUTOPILOT_DAO_LABEL[g.dao]}, {g.rows.length}
                 </div>
               )}
               {g.rows.map(r => {
@@ -1383,7 +1383,7 @@ export const AutopilotPanel: FC<{
             <span>
               Autopilot log
               {autoVotes.length > 0 && (
-                <span className="normal-case opacity-60"> · last {autoVotes.length}</span>
+                <span className="normal-case opacity-60">, last {autoVotes.length}</span>
               )}
             </span>
           }

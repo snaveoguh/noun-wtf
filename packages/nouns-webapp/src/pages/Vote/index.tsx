@@ -448,12 +448,12 @@ const VotePage = () => {
           {isObjectionPeriod && (
             <span
               style={{
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#e40536',
                 padding: '2px 8px',
                 borderRadius: 6,
-                border: '1.5px solid #e40536',
+                border: '1.5px solid transparent',
                 background: 'rgba(228, 5, 54, 0.05)',
               }}
             >
@@ -623,7 +623,7 @@ const VotePage = () => {
           style={{
             background: 'var(--theme-bg-card)',
             borderRadius: 16,
-            border: '1px solid #e2e3e8',
+            border: '1px solid transparent',
             padding: '14px 20px',
             marginBottom: 16,
             display: 'flex',
@@ -723,7 +723,7 @@ const VotePage = () => {
             style={{
               display: 'flex',
               gap: 0,
-              borderBottom: '2px solid #e2e3e8',
+              borderBottom: '2px solid var(--theme-divider)',
               marginBottom: 20,
             }}
           >
@@ -753,7 +753,7 @@ const VotePage = () => {
                     Votes & Activity{' '}
                     <span
                       style={{
-                        fontSize: '0.65rem',
+                        fontSize: '0.75rem',
                         background: 'var(--theme-bg-card)',
                         padding: '1px 6px',
                         borderRadius: 4,
@@ -781,7 +781,7 @@ const VotePage = () => {
                   style={{
                     background: 'var(--theme-bg-card)',
                     borderRadius: 12,
-                    border: '1px solid #e2e3e8',
+                    border: '1px solid transparent',
                     marginBottom: 20,
                     overflow: 'hidden',
                   }}
@@ -810,7 +810,7 @@ const VotePage = () => {
                     <div
                       style={{
                         padding: '0 16px 16px',
-                        borderTop: '1px solid #e2e3e8',
+                        borderTop: '1px solid var(--theme-divider)',
                       }}
                     >
                       <ProposalTransactions details={proposal.details} />
@@ -831,7 +831,7 @@ const VotePage = () => {
               style={{
                 background: 'var(--theme-bg-card)',
                 borderRadius: 16,
-                border: '1px solid #e2e3e8',
+                border: '1px solid transparent',
                 padding: '24px',
                 overflowWrap: 'break-word',
                 wordBreak: 'break-word' as const,
@@ -876,7 +876,7 @@ const VotePage = () => {
                             target.style.display = 'none';
                             const fallback = document.createElement('div');
                             fallback.style.cssText =
-                              'padding:12px 16px;background:#f4f4f8;border-radius:8px;color:#8c8d92;font-size:0.8rem;margin:8px 0;';
+                              'padding:12px 16px;background:var(--theme-surface);border-radius:8px;color:var(--theme-text-muted);font-size:0.8rem;margin:8px 0;';
                             fallback.textContent = `Image unavailable: ${alt ?? 'image'}`;
                             target.parentNode?.insertBefore(fallback, target.nextSibling);
                           }}

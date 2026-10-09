@@ -164,8 +164,8 @@ export default function TradingPanel() {
       }}
     >
       <div style={{ color: 'var(--theme-text-muted)', fontSize: '11px' }}>
-        pooter.world trading agents · read-only · refreshes every 30s
-        {lastUpdated > 0 && ` · updated ${new Date(lastUpdated).toLocaleTimeString()}`}
+        pooter.world trading agents, read-only, refreshes every 30s
+        {lastUpdated > 0 && `, updated ${new Date(lastUpdated).toLocaleTimeString()}`}
       </div>
 
       {isLoading && <div style={{ marginTop: 16 }}>loading trading data…</div>}
@@ -291,7 +291,7 @@ export default function TradingPanel() {
                       <td style={{ ...cell, color: 'var(--theme-text-primary)' }}>
                         {p.symbol || p.venue || '?'}
                         {p.symbol && p.venue && (
-                          <span style={{ color: 'var(--theme-text-muted)' }}> · {p.venue}</span>
+                          <span style={{ color: 'var(--theme-text-muted)' }}>, {p.venue}</span>
                         )}
                       </td>
                       <td style={cell}>{usd(p.entryNotionalUsd)}</td>
@@ -325,7 +325,7 @@ export default function TradingPanel() {
               <div key={s.symbol}>
                 <span style={{ color }}>{arrow}</span> {s.symbol}{' '}
                 <span style={{ color: 'var(--theme-text-muted)' }}>
-                  {s.direction} · {(num(s.confidence) * 100).toFixed(0)}%
+                  {s.direction}, {(num(s.confidence) * 100).toFixed(0)}%
                 </span>
               </div>
             );

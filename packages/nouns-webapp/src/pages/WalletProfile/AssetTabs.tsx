@@ -1,4 +1,4 @@
-/** Auctions · Nouns · Treasury tabs. */
+/** Auctions, Nouns, Treasury tabs. */
 import type { WalletProfile } from './types';
 
 import { FC, useMemo } from 'react';
@@ -30,7 +30,7 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <Card
-          title={`Won · ${fmtInt(a?.wonCount ?? won.length)}`}
+          title={`Won, ${fmtInt(a?.wonCount ?? won.length)}`}
           right={<span className="wp-muted text-[11px]">spent {fmtEth(a?.totalSpentEth)}</span>}
         >
           {won.length === 0 ? (
@@ -73,7 +73,7 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             <KV k="nounder rewards" v={fmtEth(a.nounderRewards)} />
           )}
         </Card>
-        <Card title={`Curated · ${curated.length}`}>
+        <Card title={`Curated, ${curated.length}`}>
           {curated.length === 0 ? (
             <Empty>Never settled the auction that minted the next noun.</Empty>
           ) : (
@@ -116,7 +116,7 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <Card title={`Held · ${fmtInt(h?.count ?? nouns.length)}`}>
+        <Card title={`Held, ${fmtInt(h?.count ?? nouns.length)}`}>
           {nouns.length === 0 ? (
             <Empty>Holds no Nouns right now.</Empty>
           ) : (
@@ -179,7 +179,7 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             </div>
           )}
         </Card>
-        <Card title={`Delegation history · ${history.length}`}>
+        <Card title={`Delegation history, ${history.length}`}>
           {history.length === 0 ? (
             <Empty>No delegation changes.</Empty>
           ) : (
@@ -204,7 +204,7 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
           )}
         </Card>
         {forks.length > 0 && (
-          <Card title={`Forks · ${forks.length}`}>
+          <Card title={`Forks, ${forks.length}`}>
             {forks.map(f => (
               <div
                 key={`${f.forkId}-${f.kind ?? ''}-${String(f.timestamp ?? '')}`}
@@ -243,7 +243,7 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="grid gap-3 lg:col-span-2">
-        <Card title={`Streams · ${streams.length}`}>
+        <Card title={`Streams, ${streams.length}`}>
           {streams.length === 0 ? (
             <Empty>No treasury streams to this wallet.</Empty>
           ) : (
@@ -292,7 +292,7 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             })
           )}
         </Card>
-        <Card title={`Secondary sales · ${sales.length}`}>
+        <Card title={`Secondary sales, ${sales.length}`}>
           {sales.length === 0 ? (
             <Empty>No secondary sales.</Empty>
           ) : (

@@ -88,7 +88,7 @@ const KeyboardShortcutsHelp: FC<Props> = ({ onClose }) => {
               background: 'var(--theme-bg-tertiary)',
               borderRadius: 'var(--theme-radius-md)',
               padding: '6px 20px',
-              fontSize: '0.65rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               fontFamily: "'PT Root UI', sans-serif",
               cursor: 'pointer',
@@ -108,7 +108,7 @@ const Column: FC<{ title: string; shortcuts: string[][] }> = ({ title, shortcuts
     <div
       style={{
         fontFamily: "'PT Root UI', sans-serif",
-        fontSize: '0.6rem',
+        fontSize: '0.75rem',
         fontWeight: 800,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
@@ -127,7 +127,7 @@ const Column: FC<{ title: string; shortcuts: string[][] }> = ({ title, shortcuts
           alignItems: 'center',
           padding: '3px 0',
           fontFamily: "'PT Root UI', sans-serif",
-          fontSize: '0.65rem',
+          fontSize: '0.75rem',
         }}
       >
         <kbd
@@ -136,7 +136,7 @@ const Column: FC<{ title: string; shortcuts: string[][] }> = ({ title, shortcuts
             borderRadius: 'var(--theme-radius-sm)',
             padding: '2px 6px',
             fontFamily: "'Courier New', monospace",
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: 'var(--theme-text-primary)',
             minWidth: 60,

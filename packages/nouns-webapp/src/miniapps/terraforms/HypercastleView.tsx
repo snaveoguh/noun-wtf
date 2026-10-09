@@ -289,9 +289,9 @@ const TabButton: FC<{
       padding: '4px 12px',
       borderRadius: 6,
       border: active ? '1px solid #475569' : '1px solid transparent',
-      background: active ? '#1e293b' : 'transparent',
+      background: active ? 'var(--theme-bg-tertiary)' : 'transparent',
       color: active ? '#e2e8f0' : '#64748b',
-      fontSize: '0.65rem',
+      fontSize: '0.75rem',
       cursor: 'pointer',
       fontFamily: 'monospace',
       fontWeight: active ? 700 : 400,
@@ -395,7 +395,7 @@ const LiveCell: FC<{
   return (
     <div
       onClick={onClick}
-      title={`#${tokenId} · ${zoneName} · L${level}`}
+      title={`#${tokenId}, ${zoneName}, L${level}`}
       style={{
         width: size,
         height: size,
@@ -430,7 +430,7 @@ const LiveCell: FC<{
             alignItems: 'center',
             justifyContent: 'center',
             color: 'rgba(255,255,255,0.3)',
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             fontFamily: 'monospace',
           }}
         >
@@ -704,7 +704,7 @@ const HoverPreview: FC<{
               alignItems: 'center',
               justifyContent: 'center',
               color: 'rgba(255,255,255,0.55)',
-              fontSize: '0.65rem',
+              fontSize: '0.75rem',
             }}
           >
             <div
@@ -743,18 +743,18 @@ const HoverPreview: FC<{
         {parcel && (
           <div
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.75rem',
               color: '#94a3b8',
               marginTop: 2,
             }}
           >
-            {parcel.zoneName} · L{parcel.level} · ({parcel.x},{parcel.y})
+            {parcel.zoneName}, L{parcel.level}, ({parcel.x},{parcel.y})
           </div>
         )}
         <div
           style={{
-            fontSize: '0.5rem',
-            color: '#475569',
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
             marginTop: 4,
             letterSpacing: '0.06em',
           }}
@@ -828,7 +828,7 @@ const HypercastleView: FC = () => {
             style={{
               width: 120,
               height: 4,
-              background: '#1e293b',
+              background: 'var(--theme-bg-tertiary)',
               borderRadius: 2,
               overflow: 'hidden',
             }}
@@ -846,7 +846,7 @@ const HypercastleView: FC = () => {
           <span
             style={{
               color: '#94a3b8',
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontFamily: 'monospace',
             }}
           >
@@ -897,13 +897,13 @@ const HypercastleView: FC = () => {
         <p
           style={{
             margin: '4px 0 0',
-            fontSize: '0.55rem',
-            color: '#475569',
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
             fontFamily: 'monospace',
           }}
         >
           {loadedCount.toLocaleString()} parcels
-          {terrainData ? ` · ${terrainData.count} terrain maps` : ''}
+          {terrainData ? `, ${terrainData.count} terrain maps` : ''}
         </p>
       </div>
 
@@ -926,10 +926,10 @@ const HypercastleView: FC = () => {
           style={{
             padding: '6px 14px',
             borderRadius: 8,
-            border: '1px solid #334155',
-            background: '#1e293b',
+            border: '1px solid var(--theme-divider)',
+            background: 'var(--theme-bg-tertiary)',
             color: '#e2e8f0',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             cursor: 'pointer',
             fontFamily: 'monospace',
           }}

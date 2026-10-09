@@ -42,7 +42,7 @@ export default function FontSwitcher({ variant = 'navbar' }: FontSwitcherProps) 
         background: 'transparent',
         border: '1px solid #222',
         color: '#00ff41',
-        fontSize: '11px',
+        fontSize: 12,
         padding: '4px 8px',
         borderRadius: '2px',
         lineHeight: 1,

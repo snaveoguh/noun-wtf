@@ -88,7 +88,7 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
         width: '90vw',
         maxHeight: '85vh',
         borderRadius: 20,
-        background: 'rgba(255, 255, 255, 0.9)',
+        background: 'var(--theme-glass)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3) inset',
@@ -138,13 +138,13 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
             padding: '4px 10px',
             borderRadius: 6,
             background: 'rgba(124, 58, 237, 0.12)',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: '#7c3aed',
             marginBottom: 10,
           }}
         >
-          Prop {prop.id} · Executed
+          Prop {prop.id}, Executed
           {Number(prop.totalEth) > 0 && (
             <span style={{ marginLeft: 8, color: '#b45309' }}>
               Ξ{Number(prop.totalEth).toFixed(Number(prop.totalEth) >= 10 ? 0 : 2)}
@@ -169,7 +169,7 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 marginBottom: 4,
               }}
@@ -232,7 +232,7 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
             marginTop: 16,
             paddingTop: 12,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a890',
@@ -413,7 +413,7 @@ const FundedPropsBanner: FC = () => {
             paddingRight: '20px',
             background: 'linear-gradient(90deg, #1a1a2e 60%, rgba(26,26,46,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,
@@ -487,7 +487,7 @@ const FundedPropsBanner: FC = () => {
               {/* Prop number badge */}
               <span
                 style={{
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   fontWeight: 800,
                   color: '#7c3aed',
                   background: 'rgba(124,58,237,0.15)',
@@ -503,7 +503,7 @@ const FundedPropsBanner: FC = () => {
               {/* Title */}
               <span
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: '0.75rem',
                   fontWeight: 600,
                   color: '#e2e8f0',
                   whiteSpace: 'nowrap' as const,
@@ -519,7 +519,7 @@ const FundedPropsBanner: FC = () => {
               {/* Vote tally */}
               <span
                 style={{
-                  fontSize: '0.55rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,
@@ -534,7 +534,7 @@ const FundedPropsBanner: FC = () => {
               {Number(prop.totalEth) > 0 && (
                 <span
                   style={{
-                    fontSize: '0.55rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     color: '#facc15',
                     whiteSpace: 'nowrap' as const,

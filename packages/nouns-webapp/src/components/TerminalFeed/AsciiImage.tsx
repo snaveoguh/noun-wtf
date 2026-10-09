@@ -63,7 +63,7 @@ export default function AsciiImage({ imageUrl, cols = 70 }: Props) {
 
   if (loading) {
     return (
-      <div style={{ color: '#333', fontSize: '11px', padding: '8px 0' }}>
+      <div style={{ color: 'var(--theme-text-muted)', fontSize: '11px', padding: '8px 0' }}>
         converting image to ascii...
       </div>
     );
@@ -71,7 +71,7 @@ export default function AsciiImage({ imageUrl, cols = 70 }: Props) {
 
   if (error || !data) {
     return (
-      <div style={{ color: '#333', fontSize: '11px', padding: '8px 0' }}>
+      <div style={{ color: 'var(--theme-text-muted)', fontSize: '11px', padding: '8px 0' }}>
         [image could not be converted]
       </div>
     );

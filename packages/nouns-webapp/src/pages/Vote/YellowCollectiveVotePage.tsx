@@ -130,7 +130,7 @@ const YellowCollectiveVotePage: FC = () => {
           style={{
             padding: '8px 20px',
             borderRadius: 10,
-            border: '1px solid #e2e3e8',
+            border: '1px solid transparent',
             background: 'var(--theme-bg-card)',
             cursor: 'pointer',
             fontSize: '0.8rem',
@@ -154,7 +154,7 @@ const YellowCollectiveVotePage: FC = () => {
           margin: '16px 0 8px',
           padding: '6px 12px',
           borderRadius: 8,
-          border: '1px solid #e2e3e8',
+          border: '1px solid transparent',
           background: 'var(--theme-bg-card)',
           cursor: 'pointer',
           fontSize: '0.75rem',
@@ -220,7 +220,7 @@ const YellowCollectiveVotePage: FC = () => {
         </h1>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
-          by {shortenAddress(proposal.author)} · {timeString(proposal.start)} →{' '}
+          by {shortenAddress(proposal.author)}, {timeString(proposal.start)} →{' '}
           {timeString(proposal.end)}
         </div>
       </div>
@@ -234,7 +234,7 @@ const YellowCollectiveVotePage: FC = () => {
             style={{
               padding: 20,
               borderRadius: 16,
-              border: '1px solid #e2e3e8',
+              border: '1px solid transparent',
               marginBottom: 16,
             }}
           >
@@ -280,11 +280,11 @@ const YellowCollectiveVotePage: FC = () => {
           </div>
 
           {/* Vote activity */}
-          <div style={{ borderRadius: 16, border: '1px solid #e2e3e8', overflow: 'hidden' }}>
+          <div style={{ borderRadius: 16, border: '1px solid transparent', overflow: 'hidden' }}>
             <div
               style={{
                 padding: '12px 20px',
-                borderBottom: '1px solid #e2e3e8',
+                borderBottom: '1px solid var(--theme-divider)',
                 fontSize: '0.85rem',
                 fontWeight: 700,
                 fontFamily: "'Londrina Solid', cursive",
@@ -310,7 +310,7 @@ const YellowCollectiveVotePage: FC = () => {
                 key={v.id}
                 style={{
                   padding: '10px 20px',
-                  borderBottom: '1px solid #f4f4f8',
+                  borderBottom: '1px solid var(--theme-divider)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 4,
@@ -331,7 +331,7 @@ const YellowCollectiveVotePage: FC = () => {
                   </span>
                   <span
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       fontWeight: 700,
                       color: choiceColor(v.choice, proposal.choices),
                     }}
@@ -340,7 +340,7 @@ const YellowCollectiveVotePage: FC = () => {
                   </span>
                   <span
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       color: 'var(--theme-text-muted)',
                       marginLeft: 'auto',
                     }}
@@ -403,7 +403,7 @@ const YellowCollectiveVotePage: FC = () => {
             style={{
               padding: 20,
               borderRadius: 16,
-              border: '1px solid #e2e3e8',
+              border: '1px solid transparent',
             }}
           >
             <div
@@ -467,7 +467,7 @@ const YellowCollectiveVotePage: FC = () => {
                     width: '100%',
                     padding: '8px 12px',
                     borderRadius: 10,
-                    border: '1px solid #e2e3e8',
+                    border: '1px solid transparent',
                     fontSize: '0.8rem',
                     fontFamily: "'PT Root UI', sans-serif",
                     resize: 'vertical',
@@ -498,7 +498,7 @@ const YellowCollectiveVotePage: FC = () => {
 
                 <div
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize: '0.75rem',
                     color: 'var(--theme-text-muted)',
                     marginTop: 8,
                     textAlign: 'center',
@@ -517,7 +517,7 @@ const YellowCollectiveVotePage: FC = () => {
                 marginTop: 12,
                 padding: 16,
                 borderRadius: 16,
-                border: '1px solid #e2e3e8',
+                border: '1px solid transparent',
                 maxHeight: 300,
                 overflow: 'auto',
                 fontSize: '0.75rem',

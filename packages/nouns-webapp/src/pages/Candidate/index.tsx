@@ -177,7 +177,7 @@ const SponsorModal: React.FC<{
               padding: '10px 24px',
               borderRadius: 10,
               border: 'none',
-              background: '#3b82f6',
+              background: 'var(--theme-text-link)',
               color: '#fff',
               cursor: isPending ? 'not-allowed' : 'pointer',
               fontSize: '0.95rem',
@@ -732,9 +732,9 @@ const CandidatePage = () => {
       {canSponsor && isWalletConnected && (
         <Row>
           <Col lg={12}>
-            <div className={classes.editCandidate} style={{ borderColor: '#3b82f6' }}>
+            <div className={classes.editCandidate} style={{ borderColor: 'var(--theme-text-link)' }}>
               <p>
-                <span className={classes.proposerOptionsHeader} style={{ color: '#3b82f6' }}>
+                <span className={classes.proposerOptionsHeader} style={{ color: 'var(--theme-text-link)' }}>
                   Sponsor this candidate
                 </span>
                 Add your signature to help this candidate reach the {proposalThreshold} vote
@@ -747,7 +747,7 @@ const CandidatePage = () => {
                   onClick={() => setShowSponsorModal(true)}
                   variant="primary"
                   className={clsx(classes.primaryButton, classes.button)}
-                  style={{ background: '#3b82f6', borderColor: '#3b82f6', color: '#fff' }}
+                  style={{ background: 'var(--theme-text-link)', borderColor: 'var(--theme-text-link)', color: '#fff' }}
                 >
                   Sponsor
                 </Button>

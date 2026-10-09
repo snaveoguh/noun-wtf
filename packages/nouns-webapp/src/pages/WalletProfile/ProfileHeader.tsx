@@ -45,7 +45,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
           </h1>
           {isOwner && <Pill tone="accent">this is you</Pill>}
           {profile.autopilot?.enabled === true && (
-            <Pill tone="pos" title={`Autopilot on · ${relTime(profile.autopilot.updatedAt)}`}>
+            <Pill tone="pos" title={`Autopilot on, ${relTime(profile.autopilot.updatedAt)}`}>
               <SparklesIcon size={10} /> autopilot on
             </Pill>
           )}
@@ -216,9 +216,9 @@ export const OverviewCard: FC<{ profile: WalletProfile; identity: string }> = ({
           <SparklesIcon size={12} /> AI overview
           {hasText && (
             <span className="hidden normal-case opacity-60 sm:inline">
-              · generated {relTime(ov?.generatedAt)}
-              {ov?.model != null && ov.model !== '' ? ` · ${ov.model}` : ''}
-              {refresh.data?.cached === true ? ' · rate-limited, showing cached' : ''}
+             , generated {relTime(ov?.generatedAt)}
+              {ov?.model != null && ov.model !== '' ? `, ${ov.model}` : ''}
+              {refresh.data?.cached === true ? ', rate-limited, showing cached' : ''}
             </span>
           )}
         </span>

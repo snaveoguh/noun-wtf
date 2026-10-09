@@ -250,7 +250,7 @@ const SettlersPage: FC = () => {
               borderRadius: '9999px',
               border: tab === t.key ? '2px solid #000' : '1px solid #ddd',
               background: tab === t.key ? '#000' : 'var(--theme-bg-card)',
-              color: tab === t.key ? '#fff' : '#555',
+              color: tab === t.key ? '#fff' : 'var(--theme-text-muted)',
               fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer',
@@ -343,10 +343,10 @@ const SettlersPage: FC = () => {
                   gap: '12px',
                   padding: '10px 16px',
                   borderRadius: '12px',
-                  border: '1px solid #eee',
+                  border: '1px solid transparent',
                   background:
                     rank < 3
-                      ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', '#fef3c7'][rank]
+                      ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', 'var(--theme-bg-card)'][rank]
                       : 'var(--theme-bg-card)',
                   transition: 'transform 0.1s',
                 }}
@@ -387,7 +387,7 @@ const SettlersPage: FC = () => {
                           height: '24px',
                           borderRadius: '4px',
                           marginLeft: '-4px',
-                          border: '1px solid #fff',
+                          border: '1px solid transparent',
                           imageRendering: 'pixelated' as const,
                         }}
                       />
@@ -400,7 +400,7 @@ const SettlersPage: FC = () => {
                           height: '24px',
                           borderRadius: '4px',
                           marginLeft: '-4px',
-                          border: '1px solid #fff',
+                          border: '1px solid transparent',
                           background: 'rgba(0,0,0,0.06)',
                           flexShrink: 0,
                         }}
@@ -410,7 +410,7 @@ const SettlersPage: FC = () => {
                   {row.nouns.length > 5 && (
                     <span
                       style={{
-                        fontSize: '0.6rem',
+                        fontSize: '0.75rem',
                         color: 'var(--theme-text-muted)',
                         marginLeft: '4px',
                         alignSelf: 'center',
@@ -456,7 +456,7 @@ const SettlersPage: FC = () => {
                 </span>
                 {row.totalEth !== undefined && (
                   <span
-                    style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', flexShrink: 0 }}
+                    style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', flexShrink: 0 }}
                   >
                     {formatEth(row.totalEth)} ETH
                   </span>
@@ -485,7 +485,7 @@ const SettlersPage: FC = () => {
               style={{
                 textAlign: 'center',
                 color: '#b45309',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 marginTop: '8px',
               }}
             >
@@ -512,7 +512,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: '1.5rem', fontWeight: 900, lineHeight: 1 }}>{value}</div>
       <div
         style={{
-          fontSize: '0.65rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           color: 'var(--theme-text-muted)',
           marginTop: '4px',

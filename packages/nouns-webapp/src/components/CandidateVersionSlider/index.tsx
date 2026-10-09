@@ -124,11 +124,11 @@ export const CandidateVersionSlider: FC<CandidateVersionSliderProps> = ({
           style={{
             padding: '3px 10px',
             borderRadius: 6,
-            background: activeVersion === total - 1 ? '#dcfce7' : '#fef3c7',
-            border: `1px solid ${activeVersion === total - 1 ? '#86efac' : '#fcd34d'}`,
-            fontSize: '0.7rem',
+            background: activeVersion === total - 1 ? 'rgba(61,255,138,0.16)' : 'rgba(220,158,70,0.2)',
+            border: '1px solid transparent',
+            fontSize: '0.75rem',
             fontWeight: 700,
-            color: activeVersion === total - 1 ? '#166534' : '#92400e',
+            color: activeVersion === total - 1 ? 'var(--theme-free)' : 'var(--theme-text-primary)',
             flexShrink: 0,
             whiteSpace: 'nowrap',
           }}
@@ -141,7 +141,7 @@ export const CandidateVersionSlider: FC<CandidateVersionSliderProps> = ({
         {v != null && (
           <span
             style={{
-              fontSize: '0.65rem',
+              fontSize: '0.75rem',
               color: '#9ca3af',
               flexShrink: 0,
               whiteSpace: 'nowrap',
@@ -312,7 +312,7 @@ const VersionPlayerModal: FC<{
               background: 'rgba(255,255,255,0.1)',
               cursor: 'pointer',
               color: '#9ca3af',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
             }}
           >
@@ -348,7 +348,7 @@ const VersionPlayerModal: FC<{
 
           <span
             style={{
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               color: '#9ca3af',
               fontFamily: 'monospace',
@@ -359,7 +359,7 @@ const VersionPlayerModal: FC<{
             v{v.versionNumber}/{total}
           </span>
 
-          <span style={{ fontSize: '0.55rem', color: 'var(--theme-text-muted)' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
             {new Date(v.timestamp * 1000).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -408,10 +408,10 @@ const VersionPlayerModal: FC<{
                 left: 0,
                 right: 0,
                 padding: '4px 12px',
-                background: 'rgba(239,246,255,0.95)',
-                borderBottom: '1px solid #dbeafe',
-                fontSize: '0.55rem',
-                color: '#1e40af',
+                background: 'var(--theme-bg-card)',
+                borderBottom: '1px solid var(--theme-divider)',
+                fontSize: '0.75rem',
+                color: 'var(--theme-text-primary)',
                 zIndex: 1,
               }}
             >

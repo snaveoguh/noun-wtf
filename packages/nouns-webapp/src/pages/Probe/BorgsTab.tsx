@@ -307,10 +307,10 @@ const BorgsTab: FC = () => {
       {/* Collection header: supply + mint/breed */}
       <div className="mt-1 flex flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-2">
         <div className="flex flex-col">
-          <span className="text-sm font-bold">Borgs · fully onchain · Polygon</span>
+          <span className="text-sm font-bold">Borgs, fully onchain, Polygon</span>
           <span className="text-muted-foreground text-xs">
             {data.meta.generated.toLocaleString()} / {BORGS_SUPPLY_LIMIT.toLocaleString()} generated
-            · {data.meta.bred.toLocaleString()} bred · {aliveCount.toLocaleString()} alive
+           , {data.meta.bred.toLocaleString()} bred, {aliveCount.toLocaleString()} alive
           </span>
         </div>
         <div className="ml-auto flex gap-2">

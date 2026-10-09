@@ -871,7 +871,7 @@ function SeedVisual({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: '"Courier New", monospace',
-                fontSize: 11,
+                fontSize: 12,
                 letterSpacing: '0.2em',
                 color: `${haloColor}aa`,
                 textShadow: `0 0 8px ${haloColor}55`,
@@ -1198,7 +1198,7 @@ export default function CrystalBallPage() {
             position: 'absolute',
             top: 64,
             right: 16,
-            fontSize: 9,
+            fontSize: 12,
             color: '#4ade80',
             fontFamily: 'monospace',
             letterSpacing: '0.05em',
@@ -1224,7 +1224,7 @@ export default function CrystalBallPage() {
       >
         <span
           style={{
-            fontSize: 9,
+            fontSize: 12,
             letterSpacing: '0.2em',
             color: 'var(--theme-text-muted)',
             fontWeight: 700,
@@ -1270,7 +1270,7 @@ export default function CrystalBallPage() {
           >
             <span
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 letterSpacing: '0.2em',
                 color: CRYSTAL_PURPLE,
                 fontWeight: 700,
@@ -1280,7 +1280,7 @@ export default function CrystalBallPage() {
             </span>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 12,
                 color: 'var(--theme-text-muted)',
                 letterSpacing: '0.1em',
                 lineHeight: 1.6,
@@ -1441,7 +1441,7 @@ export default function CrystalBallPage() {
               {effectivePrediction && (
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     color: 'var(--theme-text-muted)',
                     letterSpacing: '0.05em',
                     marginTop: showingTwin ? 18 : 6,
@@ -1498,7 +1498,7 @@ export default function CrystalBallPage() {
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 12,
                 letterSpacing: '0.2em',
                 color: matchColor,
                 fontWeight: 700,
@@ -1586,7 +1586,7 @@ export default function CrystalBallPage() {
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  fontSize: 10,
+                  fontSize: 12,
                   color: '#4ade80',
                   fontFamily: 'monospace',
                   letterSpacing: '0.05em',
@@ -1607,7 +1607,7 @@ export default function CrystalBallPage() {
           role="status"
           aria-live="polite"
           style={{
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: '0.2em',
             color: '#eab308',
             fontFamily: '"Courier New", monospace',
@@ -1643,7 +1643,7 @@ export default function CrystalBallPage() {
               >
                 <span
                   style={{
-                    fontSize: 9,
+                    fontSize: 12,
                     color: isMatch ? matchColor : '#555',
                     letterSpacing: '0.15em',
                     fontWeight: 700,
@@ -1671,7 +1671,7 @@ export default function CrystalBallPage() {
       {activeDao === 'nounv2' && effectivePrediction?.seed && (
         <div
           style={{
-            fontSize: 9,
+            fontSize: 12,
             letterSpacing: '0.15em',
             color: 'var(--theme-text-muted)',
             textAlign: 'center',

@@ -359,7 +359,7 @@ function describeSettled(data: EventData, ctx: DescribeCtx, dao = ''): string {
   const noun = `${dao}Noun ${str(data.nounId, '?')}`;
   const settler =
     isAddress(data.settler) && !isZeroAddr(data.settler)
-      ? ` · settled by ${ctx.addr(data.settler)}`
+      ? `, settled by ${ctx.addr(data.settler)}`
       : '';
   const outcome = settleOutcome(data);
   if (outcome === 'treasury') return `${noun} had no bids → held by Nouns DAO treasury${settler}`;
@@ -393,7 +393,7 @@ function describeVote(data: EventData, ctx: DescribeCtx, propLabel: string): str
 
 function describeProposalCreated(data: EventData, ctx: DescribeCtx, dao = ''): string {
   const signers = arr(data.signers).length;
-  const withSigners = signers > 0 ? ` · with ${plural(signers, 'signer')}` : '';
+  const withSigners = signers > 0 ? `, with ${plural(signers, 'signer')}` : '';
   return `New ${dao}proposal #${str(data.proposalId, '?')} by ${ctx.addr(data.proposer)}: ${str(data.title, 'untitled')}${withSigners}`;
 }
 
@@ -516,7 +516,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     describe: (d, ctx) => {
       const curator =
         isAddress(d.curator) && !isZeroAddr(d.curator)
-          ? ` · curated by ${ctx.addr(d.curator)}`
+          ? `, curated by ${ctx.addr(d.curator)}`
           : '';
       return `Auction for Noun ${str(d.nounId, '?')} started${curator}`;
     },
@@ -537,7 +537,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     filterKey: 'BID',
     icon: '💰',
     describe: (d, ctx) =>
-      `${ctx.addr(d.bidder)} bid ${ethFromWei(d.value)} on Noun ${str(d.nounId, '?')}${bool(d.extended) ? ' · extended auction' : ''}`,
+      `${ctx.addr(d.bidder)} bid ${ethFromWei(d.value)} on Noun ${str(d.nounId, '?')}${bool(d.extended) ? ', extended auction' : ''}`,
     link: nounLink('/noun'),
   }),
   NOUN_CREATED: def({
@@ -653,7 +653,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     icon: '⏳',
     describe: d => {
       const eta = relative(d.executionETA ?? d.eta);
-      const etaStr = eta ? ` · executes ${eta === 'now' ? 'now' : eta}` : '';
+      const etaStr = eta ? `, executes ${eta === 'now' ? 'now' : eta}` : '';
       return `${propRef(d)} queued for execution${etaStr}${propTitle(d)}`;
     },
     link: propLink('/vote'),
@@ -988,7 +988,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     filterKey: 'V2_BID',
     icon: '💰',
     describe: (d, ctx) =>
-      `${ctx.addr(d.bidder)} bid ${ethFromWei(d.value)} on V2 Noun ${str(d.nounId, '?')}${bool(d.extended) ? ' · extended auction' : ''}`,
+      `${ctx.addr(d.bidder)} bid ${ethFromWei(d.value)} on V2 Noun ${str(d.nounId, '?')}${bool(d.extended) ? ', extended auction' : ''}`,
     link: nounLink('/v2/noun'),
   }),
   V2_SETTLED: def({
@@ -1008,7 +1008,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     describe: (d, ctx) => {
       const curator =
         isAddress(d.curator) && !isZeroAddr(d.curator)
-          ? ` · curated by ${ctx.addr(d.curator)}`
+          ? `, curated by ${ctx.addr(d.curator)}`
           : '';
       return `V2 Noun ${str(d.nounId, '?')} auction started${curator}`;
     },
@@ -1030,7 +1030,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     icon: '⏳',
     describe: d => {
       const eta = relative(d.executionETA ?? d.eta);
-      return `${propRef(d, 'V2 ')} queued for execution${eta ? ` · executes ${eta}` : ''}${propTitle(d)}`;
+      return `${propRef(d, 'V2 ')} queued for execution${eta ? `, executes ${eta}` : ''}${propTitle(d)}`;
     },
     link: propLink('/v2/vote'),
   }),

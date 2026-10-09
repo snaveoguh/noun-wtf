@@ -177,14 +177,14 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
-            Auction · Noun #{nounId.toString()}
+            Auction, Noun #{nounId.toString()}
           </p>
           <h3 className="font-headline mt-0.5 text-sm font-bold leading-snug text-[var(--ink)]">
             Higher or Lower than 7-day avg?
           </h3>
           <p className="mt-1 break-words font-mono text-[9px] text-[var(--ink-faint)]">
             Current bid: <span className="text-[var(--ink)]">{formatEthShort(currentBid)}</span>
-            {'  ·  '}
+            {' ,  '}
             Avg ({sampleSize}): <span className="text-[var(--ink)]">{formatEthShort(avgWei)}</span>
           </p>
         </div>
@@ -213,11 +213,11 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
       </div>
 
       <div className="mb-3 font-mono text-[9px] text-[var(--ink-faint)]">
-        Pool: {formatEthShort(totalPool)} ·{' '}
+        Pool: {formatEthShort(totalPool)},{' '}
         {(market?.higherStakers ?? 0) + (market?.lowerStakers ?? 0)} stakers
         {!auctionEnded && (
           <span className="ml-2">
-            · Closes in {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m
+           , Closes in {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m
           </span>
         )}
         {market?.exists !== true && !auctionEnded && (
