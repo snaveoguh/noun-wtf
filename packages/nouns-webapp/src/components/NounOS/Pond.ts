@@ -58,18 +58,21 @@ function proxyTexture(focused: boolean): THREE.CanvasTexture {
   c.width = 256;
   c.height = 256;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#0a0b0d';
+  g.fillStyle = '#16171b';
   g.fillRect(0, 0, 256, 256);
-  g.fillStyle = focused ? '#d4ff3a' : '#2a2b30';
+  g.fillStyle = '#2a2b30';
   g.fillRect(0, 0, 256, 22);
   g.fillStyle = 'rgba(236,235,228,.28)';
   for (let y = 40; y < 240; y += 14) {
     const w = 60 + ((y * 37) % 150);
     g.fillRect(14, y, w, 4);
   }
-  g.strokeStyle = focused ? '#d4ff3a' : 'rgba(236,235,228,.7)';
-  g.lineWidth = 8;
-  g.strokeRect(0, 0, 256, 256);
+  if (focused) {
+    g.fillStyle = '#d4ff3a';
+    g.beginPath();
+    g.arc(14, 11, 4, 0, Math.PI * 2);
+    g.fill();
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

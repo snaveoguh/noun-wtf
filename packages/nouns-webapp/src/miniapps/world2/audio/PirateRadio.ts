@@ -434,6 +434,7 @@ export class PirateRadio {
   private startPirate() {
     const ctx = this.ctx;
     if (ctx === null || this.music === null) return;
+    this.out?.gain.setTargetAtTime(this.volume, ctx.currentTime + 0.05, 0.05);
     this.nextTime = ctx.currentTime + 0.15;
     this.step = 0;
     this.bar = 0;
@@ -465,12 +466,17 @@ export class PirateRadio {
     }
     this.applySongFx();
     this.riser(this.nextTime);
-    this.timer = window.setInterval(() => this.schedule(), 25);
+    // Long lookahead: the main thread can stall (3D frames, tab throttling to
+    // 1 Hz in the background) — notes already queued on the audio clock play on.
+    this.timer = window.setInterval(() => this.schedule(), 120);
   }
 
   private stopPirate() {
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
+    // Notes are queued ~1.5 s ahead on the audio clock — mute so "off" is instant
+    if (this.ctx !== null && this.out !== null)
+      this.out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
     for (const b of this.beds) {
       try {
         b.stop();
@@ -485,7 +491,9 @@ export class PirateRadio {
     const ctx = this.ctx;
     if (ctx === null || this.mode !== 'pirate') return;
     const sixteenth = 60 / this.song.bpm / 4;
-    while (this.nextTime < ctx.currentTime + 0.15) {
+    // Fell behind (tab was frozen): skip ahead instead of firing a burst
+    if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05;
+    while (this.nextTime < ctx.currentTime + 1.5) {
       this.playStep(this.nextTime, this.step, this.bar, sixteenth);
       this.nextTime += sixteenth;
       this.step++;

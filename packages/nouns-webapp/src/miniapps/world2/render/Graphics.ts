@@ -33,6 +33,11 @@ export class Graphics {
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
   composer: EffectComposer;
+  /** Exposed for ?diag=1 */
+  inkPass: EffectPass | null = null;
+  /** Bypass the composer entirely (?diag=1) */
+  rawRender = false;
+  gradePass: EffectPass | null = null;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   sky: Sky;
@@ -181,8 +186,9 @@ export class Graphics {
     effects.push(new ClampEffect(fxParam?.split(',').includes('neg') === true));
     // Ink in its own pass (merged with the grading effects it got dropped)
     if (this.outline !== null && want('ink'))
-      this.composer.addPass(new EffectPass(this.camera, this.outline));
-    if (effects.length > 0) this.composer.addPass(new EffectPass(this.camera, ...effects));
+      this.composer.addPass((this.inkPass = new EffectPass(this.camera, this.outline)));
+    if (effects.length > 0)
+      this.composer.addPass((this.gradePass = new EffectPass(this.camera, ...effects)));
     this.composer.addPass(
       new EffectPass(
         this.camera,
@@ -284,6 +290,10 @@ export class Graphics {
   }
 
   render(dt: number) {
+    if (this.rawRender) {
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
     this.composer.render(dt);
   }
 

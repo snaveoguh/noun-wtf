@@ -34,19 +34,29 @@ const WaterGarden = function WaterGarden({
     const canvas = canvasRef.current;
     if (!canvas) return;
     let disposed = false;
-    void import('./Pond')
-      .then(({ Pond }) => {
-        if (disposed) return;
-        try {
-          pondRef.current = new Pond(canvas);
-          pondRef.current.active = activeRef.current;
-        } catch (err) {
-          console.warn('[NounOS] pond unavailable', err);
-        }
-      })
-      .catch(err => console.warn('[NounOS] pond failed to load', err));
+    // Load three + the pond after first paint so the home console is instant
+    const start = () =>
+      void import('./Pond')
+        .then(({ Pond }) => {
+          if (disposed) return;
+          try {
+            pondRef.current = new Pond(canvas);
+            pondRef.current.active = activeRef.current;
+          } catch (err) {
+            console.warn('[NounOS] pond unavailable', err);
+          }
+        })
+        .catch(err => console.warn('[NounOS] pond failed to load', err));
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    const timer = ric !== undefined ? -1 : window.setTimeout(start, 900);
+    if (ric !== undefined) ric(start, { timeout: 1500 });
     return () => {
       disposed = true;
+      if (timer >= 0) window.clearTimeout(timer);
       pondRef.current?.dispose();
       pondRef.current = null;
     };

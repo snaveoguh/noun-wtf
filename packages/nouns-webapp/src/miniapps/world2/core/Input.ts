@@ -124,6 +124,8 @@ export class Input {
   private mouseDX = 0;
   private mouseDY = 0;
   private rmb = false;
+  /** Left mouse held — sprays (hold + drag to paint) */
+  private lmb = false;
   private mouseStick = { x: 0, y: 0 };
   private stickTracker = newTracker();
   private pendingTricks: TrickInput[] = [];
@@ -194,6 +196,7 @@ export class Input {
     on(window, 'blur', () => {
       this.keys.clear();
       this.rmb = false;
+      this.lmb = false;
     });
     on(el, 'contextmenu', e => e.preventDefault());
     on(el, 'mousedown', e => {
@@ -201,12 +204,14 @@ export class Input {
         this.rmb = true;
         this.mouseStick.x = this.mouseStick.y = 0;
       }
+      if (e.button === 0 && this.enabled) this.lmb = true;
       if (e.button === 0 && this.enabled && !this.pointerLocked && !('ontouchstart' in window)) {
         el.requestPointerLock?.();
       }
       this.mode = 'keyboard';
     });
     on(window, 'mouseup', e => {
+      if (e.button === 0) this.lmb = false;
       if (e.button === 2) {
         this.rmb = false;
         this.mouseStick.x = this.mouseStick.y = 0;
@@ -237,6 +242,7 @@ export class Input {
     if (!on) {
       this.keys.clear();
       this.rmb = false;
+      this.lmb = false;
       this.mouseDX = this.mouseDY = 0;
       if (document.pointerLockElement === this.el) document.exitPointerLock?.();
     }
@@ -302,7 +308,7 @@ export class Input {
     f.cameraTogglePressed = this.keyPressed('KeyC');
     f.micPressed = this.keyPressed('KeyV');
     f.respawnPressed = this.keyPressed('KeyR');
-    f.spray = this.key('KeyG');
+    f.spray = this.key('KeyG') || this.lmb;
     f.colorCyclePressed = this.keyPressed('KeyT');
     f.emotePressed = this.keyPressed('Digit1')
       ? 1
