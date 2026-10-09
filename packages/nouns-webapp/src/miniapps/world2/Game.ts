@@ -188,6 +188,8 @@ export class Game {
     }
     this.world.build(level.collisionMeshes);
     this.player.softBounds = level.softBounds ?? Infinity;
+    const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
+    if (fountain) this.player.homeSpots.push({ pos: fountain.position.clone(), yaw: fountain.yaw });
     this.placeIceCreamVan(level);
     this.rails.load(level.rails);
     this.graffiti = new Graffiti(
@@ -323,6 +325,8 @@ export class Game {
       return;
     }
     const input = this.input.poll(now);
+    // On foot (and on walls) the mouse is a free cursor for painting
+    this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
 
     // Physics in fixed-ish substeps for stability at low FPS
@@ -438,6 +442,9 @@ export class Game {
         if (this.gfx.toon) toonify(van);
         this.gfx.scene.add(van);
         this.propCollision.push(iceCreamVanCollisionBox(van));
+        // Respawn spot: beside the serving hatch, facing out
+        const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        this.player.homeSpots.push({ pos: new THREE.Vector3(x, y, z).add(side), yaw: yaw + Math.PI / 2 });
         this.world.build([...level.collisionMeshes, ...this.propCollision]);
         return;
       }
@@ -613,6 +620,8 @@ export class Game {
     this.cam.snap(this.player);
   }
 
+  private sprayRay = new THREE.Raycaster();
+
   private updateGraffiti(dt: number, input: InputFrame) {
     const g = this.graffiti;
     if (g === null) return;
@@ -622,7 +631,11 @@ export class Game {
     const active = input.spray && (p.mode === 'foot' || input.mode !== 'gamepad');
     const cam = this.gfx.camera;
     const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
+    if (this.input.freeCursor) {
+      // Paint exactly where the mouse points
+      this.sprayRay.setFromCamera(new THREE.Vector2(this.input.cursorX, this.input.cursorY), cam);
+      dir.copy(this.sprayRay.ray.direction);
+    } else cam.getWorldDirection(dir);
     g.update(dt, active, cam.position, dir, p.pos);
     g.updateAudio(this.audio.ctx, this.audio.master, this.audio.noise);
   }

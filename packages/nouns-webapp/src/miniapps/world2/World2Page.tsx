@@ -31,8 +31,9 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'P', v: 'time of day' },
   { k: 'M / .', v: 'radio station, next track' },
   { k: 'V', v: 'mic' },
-  { k: 'CLICK+DRAG / G', v: 'spray paint, T colour' },
-  { k: 'R', v: 'respawn' },
+  { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot), T colour' },
+  { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
+  { k: 'R', v: 'respawn at the fountain or ice cream van' },
   { k: 'ENTER', v: 'chat' },
 ];
 
@@ -475,25 +476,15 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         )}
       </div>
 
-      {/* Spray crosshair */}
-      {(hud.mode === 'foot' || hud.spray.active) && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div
-            className="h-3 w-3 rounded-full border-2"
-            style={{
-              borderColor: hud.spray.aiming ? hud.spray.color : 'rgba(255,255,255,.35)',
-              boxShadow: hud.spray.aiming ? `0 0 10px ${hud.spray.color}` : 'none',
-            }}
-          />
-        </div>
-      )}
       {(hud.mode === 'foot' || hud.spray.active) && (
         <div className="w2-chip absolute bottom-4 right-4 flex items-center gap-2 text-xs">
           <span
             className="inline-block h-4 w-4 rounded-full border border-white/50"
             style={{ background: hud.spray.color }}
           />
-          {hud.spray.aiming ? 'hold G to spray, T colour' : 'aim at a wall to tag it'}
+          {hud.spray.aiming
+            ? 'click and drag to spray, T colour'
+            : 'point at a wall to tag it, right-drag to look'}
         </div>
       )}
 

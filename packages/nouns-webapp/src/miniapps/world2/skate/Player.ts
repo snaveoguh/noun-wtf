@@ -257,7 +257,7 @@ export class Player {
       else this.updateFoot(dt, input, camYaw);
       this.clampBounds();
       if (this.pos.y < -30) this.respawnSafe();
-      if (input.respawnPressed) this.respawnSafe();
+      if (input.respawnPressed) this.respawnHome();
       return;
     }
 
@@ -283,7 +283,7 @@ export class Player {
     this.clampBounds();
     // Fell out of the world → respawn
     if (this.pos.y < -30) this.respawnSafe();
-    if (input.respawnPressed) this.respawnSafe();
+    if (input.respawnPressed) this.respawnHome();
   }
 
   toggleBoard() {
@@ -305,6 +305,21 @@ export class Player {
       this.vel.copy(this.fwd).multiplyScalar(Math.max(0, hv.dot(this.fwd)));
       this.events.push({ type: 'boardOn' });
     }
+  }
+
+  /** Landmarks R takes you back to (noggles fountain, ice cream van). */
+  homeSpots: { pos: THREE.Vector3; yaw: number }[] = [];
+
+  /** R: back to the nearest landmark, or the last safe spot if none. */
+  respawnHome() {
+    let best: { pos: THREE.Vector3; yaw: number } | null = null;
+    for (const h of this.homeSpots)
+      if (best === null || h.pos.distanceToSquared(this.pos) < best.pos.distanceToSquared(this.pos)) best = h;
+    if (best !== null) {
+      this.safePos.copy(best.pos);
+      this.safeFwd.set(Math.sin(best.yaw), 0, Math.cos(best.yaw));
+    }
+    this.respawnSafe();
   }
 
   respawnSafe() {
