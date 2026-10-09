@@ -33,7 +33,11 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'V', v: 'mic' },
   { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot), T colour' },
   { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
-  { k: 'R', v: 'respawn at the fountain or ice cream van' },
+  {
+    k: 'MOUNTAIN',
+    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you stay on the faster you go (a bail resets it)',
+  },
+  { k: 'R', v: 'respawn at the fountain or ice cream van (back up from the mountain)' },
   { k: 'ENTER', v: 'chat' },
 ];
 
@@ -46,6 +50,10 @@ const PAD: { k: string; v: string }[] = [
   { k: 'Y', v: 'board on / off' },
   { k: 'Climb', v: 'walk or jump into any wall, L stick climbs, A wall-jump, Y let go' },
   { k: 'RT (on foot)', v: 'spray paint, R3 colour' },
+  {
+    k: 'Mountain',
+    v: 'the arched alleys lead out to endless downhill, stay on to keep speeding up, B brakes',
+  },
 ];
 
 export interface World2PageProps {
@@ -354,6 +362,10 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
   const pad = hud.inputMode === 'gamepad';
   return (
     <div className="pointer-events-none absolute inset-0">
+      {/* Speed lines once a mountain run outpaces the plaza (CSS only) */}
+      {hud.mode === 'board' && hud.speed > 20 && (
+        <div className="w2-speedlines" style={{ opacity: Math.min(0.75, (hud.speed - 20) / 45) }} />
+      )}
       {/* Top-left: session */}
       <div className="absolute left-4 top-4 flex flex-col gap-1">
         <div className="w2-chip">
@@ -364,6 +376,12 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
           {hud.connected ? '●' : '○'} {hud.players} online, {hud.mode === 'board' ? '🛹' : '🚶'}{' '}
           {Math.round(hud.speed * 3.6)} km/h
         </div>
+        {hud.mountain !== null && (
+          <div className="w2-chip text-xs opacity-80">
+            ⛰ {(hud.mountain.down / 1000).toFixed(2)} km out, {hud.mountain.surface}, streak{' '}
+            {hud.mountain.streak}s
+          </div>
+        )}
       </div>
 
       {/* Top-centre: landmarks compass */}
@@ -504,6 +522,8 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
 }
 
 const CSS = `
+.w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
+@keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
 .w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
 .w2-on{border-color:#3ddc84}
 .w2-live{border-color:#3ddc84;background:rgba(61,220,132,.35)}

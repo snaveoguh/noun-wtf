@@ -29,6 +29,9 @@ export class SkateCamera {
   fov = 70;
   /** 0..1 blend into the climbing framing (pulled back, low, looking up the wall). */
   private climbK = 0;
+  /** Rider position last frame (camera feed-forward at speed). */
+  private lastRider = new THREE.Vector3();
+  private hasLastRider = false;
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -132,6 +135,20 @@ export class SkateCamera {
     );
     if (g && desired.y < g.point.y + 0.25) desired.y = g.point.y + 0.25;
 
+    // Feed-forward: carry the camera along with the rider at mountain speeds
+    // so the spring doesn't trail metres behind (a critically damped spring
+    // lags 2v/ω). At city speeds (≤ 17 m/s) the original chase feel is untouched.
+    if (this.hasLastRider && this.initialized) {
+      const moved = new THREE.Vector3().subVectors(p.pos, this.lastRider);
+      if (moved.lengthSq() > 60 * 60) this.initialized = false;
+      else if (onBoard) {
+        const k = THREE.MathUtils.smoothstep(p.speed, 17, 35);
+        this.pos.addScaledVector(moved, k);
+        this.look.addScaledVector(moved, k);
+      }
+    }
+    this.lastRider.copy(p.pos);
+    this.hasLastRider = true;
     if (!this.initialized) {
       this.pos.copy(desired);
       this.look.copy(target);
@@ -161,7 +178,13 @@ export class SkateCamera {
     this.camera.lookAt(this.look);
 
     // Speed FOV
-    const targetFov = onBoard ? 68 + Math.min(14, p.speed * 0.9) : 62;
+    // Speed FOV: the original ramp to 82° by ~16 m/s, then keeps opening up
+    // as mountain runs build past the city's top speed — capped at 110°
+    // (speed itself is unbounded)
+    const fast = Math.max(0, p.speed - 17);
+    const targetFov = onBoard
+      ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
+      : 62;
     this.fov = THREE.MathUtils.lerp(this.fov, targetFov, 1 - Math.exp(-3 * dt));
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;
