@@ -32,6 +32,9 @@
   --brand-warm-accent: rgba(0, 0, 0, 0.06);
   --brand-gray-hover: rgba(0, 0, 0, 0.1);
   --bs-code-color: #1c1815;
+  /* status colours used as *text* on the pastel ground need their ink shades */
+  --theme-negative: #b3102f;
+  --theme-text-link: #1c1815;
   color: var(--theme-text-primary);
 }
 /* Bootstrap alerts on the pastel page: the global noir rule paints them as
