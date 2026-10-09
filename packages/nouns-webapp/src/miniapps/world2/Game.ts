@@ -30,6 +30,7 @@ import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
+import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { PipBillboards } from './world/PipBillboards';
 
 export interface HudState {
@@ -189,6 +190,7 @@ export class Game {
     this.world.build(level.collisionMeshes);
     this.placeIceCreamVan(level);
     this.rails.load(level.rails);
+    this.placeMegaRamp(level);
     this.graffiti = new Graffiti(
       this.world,
       level.baked ? 'plaza' : 'park',
@@ -215,6 +217,8 @@ export class Game {
       yaw: 0,
     };
     this.player.spawn(spawn.position, spawn.yaw);
+    if (this.megaRamp !== null)
+      this.player.spawn(this.megaRamp.spawn.position, this.megaRamp.spawn.yaw);
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -442,6 +446,33 @@ export class Game {
     }
   }
 
+  /** Dev set piece (`?megaramp=1`): the mega ramp on the east lawn, spawn on its drop-in. */
+  megaRamp: PlacedMegaRamp | null = null;
+
+  private placeMegaRamp(level: LevelData) {
+    if (new URLSearchParams(window.location.search).get('megaramp') !== '1') return;
+    try {
+      const ramp = buildMegaRamp({ seed: 1 });
+      // East boulevard (x ≈ 64) is open from z −64 to 64; the ~115 m run heads +Z
+      // and finishes on the lawn east of the plaza. Render-only palms either side
+      // brush the scaffold edges; nothing there has collision.
+      const ground = this.world.raycast(
+        new THREE.Vector3(64, 20, -62),
+        new THREE.Vector3(0, -1, 0),
+        40,
+      );
+      this.megaRamp = placeMegaRamp(ramp, new THREE.Vector3(64, ground?.point.y ?? 0, -62), 0);
+      if (this.gfx.toon) toonify(ramp.group);
+      this.gfx.scene.add(ramp.group);
+      this.propCollision.push(...this.megaRamp.collision);
+      this.world.build([...level.collisionMeshes, ...this.propCollision]);
+      this.rails.load([...level.rails, ...this.megaRamp.rails]);
+    } catch (err) {
+      console.warn('[world2] mega ramp failed to place', err);
+      this.megaRamp = null;
+    }
+  }
+
   /** Lush foliage, water, rocks + time of day. Never allowed to break the game. */
   private buildNature(level: LevelData) {
     if (new URLSearchParams(window.location.search).get('nature') === '0') return;
@@ -449,7 +480,8 @@ export class Game {
       const nature = new NatureSystem(this.gfx);
       if (level.baked) {
         // Open lawn east of the plaza (probed clear: x 50–74, z 8–48)
-        buildNatureShowcase(nature, this.world, new THREE.Vector3(60, 0, 26));
+        if (this.megaRamp === null)
+          buildNatureShowcase(nature, this.world, new THREE.Vector3(60, 0, 26));
       } else {
         replaceFallbackTrees(level.root, nature);
       }
