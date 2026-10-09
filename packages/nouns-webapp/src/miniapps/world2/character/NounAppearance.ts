@@ -10,6 +10,7 @@ import {
 import * as THREE from 'three';
 
 import { toonify } from '../render/Toon';
+
 import { loadGlbHead } from './GlbHead';
 import { buildSmoothHead, headProfile, type SmoothHead } from './SmoothHead';
 
@@ -113,10 +114,12 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
     geos.head.computeBoundingBox();
     box.union(geos.head.boundingBox!);
   }
+  let glassesMesh: THREE.Mesh | null = null;
   if (geos.glasses !== null) {
     const m = new THREE.Mesh(geos.glasses, glassMat);
     m.castShadow = true;
     inner.add(m);
+    glassesMesh = m;
   }
   // Head pixels: x across, y up, z depth (front = +z). Normalise.
   if (box.isEmpty()) box.set(new THREE.Vector3(-8, 0, -1), new THREE.Vector3(8, 12, 1));
@@ -140,24 +143,37 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   // the generated ones). The generated head shows until it loads.
   if (USE_MODELS) {
     const generated = [...inner.children];
-    void loadGlbHead(seed.head, seed.glasses).then(model => {
-      if (model === null) return;
+    void loadGlbHead(seed.head, seed.glasses).then(loaded => {
+      if (loaded === null) return;
+      const model = loaded.object;
       // Match whatever look the character already has (toon or lit)
-      const toon = generated.some(o => ((o as THREE.Mesh).material as THREE.Material)?.userData?.toonSrc !== undefined);
+      const toon = generated.some(
+        o => ((o as THREE.Mesh).material as THREE.Material)?.userData?.toonSrc !== undefined,
+      );
       if (toon) toonify(model);
-      for (const o of generated) o.visible = false;
+      // Models without glasses of their own keep this Noun's voxel glasses
+      const keepGlasses = !loaded.hasGlasses && glassesMesh !== null;
+      for (const o of generated) o.visible = keepGlasses && o === glassesMesh;
       // Seat every model the same way instead of per-head nudges: lowest
       // point just onto the shoulder line, centred over the neck across
       // and front-to-back, so no head sinks into the torso.
       const mb = new THREE.Box3().setFromObject(model);
       const cx = (box.min.x + box.max.x) / 2;
       const cz = (box.min.z + box.max.z) / 2;
+      // Thin models (cards, disks) would have the neck poke through their
+      // face: sit them in front of it like flat generated heads
+      const thinNudge = !flat && mb.max.z - mb.min.z <= 4 ? 0.08 / s : 0;
       model.position.set(
         cx - (mb.min.x + mb.max.x) / 2,
         NECK_Y - 0.3 - mb.min.y,
-        cz - (mb.min.z + mb.max.z) / 2,
+        cz - (mb.min.z + mb.max.z) / 2 + thinNudge,
       );
       inner.add(model);
+      if (keepGlasses) {
+        geos.head?.computeBoundingBox();
+        const artMinY = geos.head?.boundingBox?.min.y ?? NECK_Y;
+        seatGlasses(glassesMesh!, model, NECK_Y - 0.3 - artMinY);
+      }
     });
   }
 
@@ -166,8 +182,63 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   return { group, skin };
 }
 
+/**
+ * Put this Noun's voxel glasses on a model drawn in the 2D art's pixel
+ * frame (the noundry set: same columns, rows offset by `dy` so the model's
+ * lowest point lines up with the art head's), resting on the model's face
+ * wherever the glasses cover it.
+ */
+function seatGlasses(glasses: THREE.Mesh, model: THREE.Object3D, dy: number) {
+  glasses.geometry.computeBoundingBox();
+  const gb = glasses.geometry.boundingBox!;
+  const px = model.position.x;
+  glasses.position.set(px, dy, 0);
+  const x0 = gb.min.x + px;
+  const x1 = gb.max.x + px;
+  const y0 = gb.min.y + dy;
+  const y1 = gb.max.y + dy;
+  // Voxel faces are merged into large quads, so test triangles (not just
+  // vertices) against the glasses' footprint. Model space = this frame
+  // offset by model.position (its meshes carry no transforms).
+  let front = -Infinity;
+  let maxZ = -Infinity;
+  const { x: mx, y: my, z: mz } = model.position;
+  model.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const g = m.geometry;
+    const pos = g.attributes.position;
+    const idx = g.index;
+    const n = idx !== null ? idx.count : pos.count;
+    for (let t = 0; t + 2 < n; t += 3) {
+      let ax = Infinity,
+        bx = -Infinity,
+        ay = Infinity,
+        by = -Infinity,
+        tz = -Infinity;
+      for (let k = 0; k < 3; k++) {
+        const i = idx !== null ? idx.getX(t + k) : t + k;
+        const x = pos.getX(i) + mx;
+        const y = pos.getY(i) + my;
+        const z = pos.getZ(i) + mz;
+        ax = Math.min(ax, x);
+        bx = Math.max(bx, x);
+        ay = Math.min(ay, y);
+        by = Math.max(by, y);
+        tz = Math.max(tz, z);
+      }
+      maxZ = Math.max(maxZ, tz);
+      if (bx > x0 && ax < x1 && by > y0 && ay < y1) front = Math.max(front, tz);
+    }
+  });
+  if (front === -Infinity) front = maxZ;
+  // Sink a hair into the face so no gap shows at grazing angles
+  glasses.position.z = front - gb.min.z - 0.1;
+}
+
 const USE_MODELS =
-  typeof window === 'undefined' || new URLSearchParams(window.location.search).get('heads') !== 'pixel';
+  typeof window === 'undefined' ||
+  new URLSearchParams(window.location.search).get('heads') !== 'pixel';
 
 function dominantColor(geo: THREE.BufferGeometry | null): THREE.Color | null {
   if (!geo?.attributes.color) return null;
