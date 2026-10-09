@@ -183,6 +183,7 @@ export default function AgentHome({
       <button
         type="button"
         className="nos-poster-card"
+        data-nos-reflect="poster"
         onPointerDown={e => e.stopPropagation()}
         onClick={() => {
           say(gameLoaded ? 'back to the plaza' : 'loading noun world. grab a board');

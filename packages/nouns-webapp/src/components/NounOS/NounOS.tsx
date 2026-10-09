@@ -204,6 +204,8 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     if (e.target !== e.currentTarget) return;
     const horizon = window.innerHeight - waterHeight();
     if (e.clientY > horizon) waterRef.current?.ripple(e.clientX, e.clientY, 1);
+    else
+      document.querySelector<HTMLInputElement>('.nos-prompt input')?.focus({ preventScroll: true });
   };
 
   const visible = windows.filter(w => !w.minimized);

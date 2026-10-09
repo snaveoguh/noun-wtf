@@ -691,18 +691,57 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .text-secondary {
   color: #8d8c84 !important;
 }
+/* ── BUTTON SYSTEM (src/STYLEGUIDE.md) ─────────────────────────────────────
+   Every button: pill, semibold, white text. Bootstrap + hand-rolled Tailwind
+   buttons are mapped onto the shared <Button> look here. */
+[data-theme='abacus'] .btn {
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
 [data-theme='abacus'] .btn-light,
 [data-theme='abacus'] .btn-outline-dark,
-[data-theme='abacus'] .btn-secondary {
-  background: #16161a !important;
-  color: #ecebe4 !important;
-  border-color: #4a4a50 !important;
-}
+[data-theme='abacus'] .btn-secondary,
+[data-theme='abacus'] .btn-outline-secondary,
+[data-theme='abacus'] .btn-outline-primary,
 [data-theme='abacus'] .btn-dark,
-[data-theme='abacus'] .btn-primary {
-  background: #d4ff3a !important;
-  color: #000 !important;
-  border-color: #d4ff3a !important;
+[data-theme='abacus'] .btn-primary,
+[data-theme='abacus'] .btn-success,
+[data-theme='abacus'] .btn-info {
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+}
+[data-theme='abacus'] .btn-light:hover,
+[data-theme='abacus'] .btn-dark:hover,
+[data-theme='abacus'] .btn-primary:hover,
+[data-theme='abacus'] .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+[data-theme='abacus'] .btn-danger {
+  background: #ff3b5c !important;
+  color: #fff !important;
+}
+/* Filled, saturated Tailwind buttons → white text, pill */
+[data-theme='abacus'] :is(button, a)[class*='bg-blue-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-indigo-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-violet-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-purple-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-red-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-rose-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-pink-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-green-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-emerald-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-orange-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-sky-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-teal-'],
+[data-theme='abacus'] :is(button, a)[class*='bg-gray-8'],
+[data-theme='abacus'] :is(button, a)[class*='bg-gray-9'],
+[data-theme='abacus'] :is(button, a)[class*='bg-black'],
+[data-theme='abacus'] :is(button, a)[class*='bg-primary'] {
+  color: #fff !important;
+  border-radius: 999px;
+  font-weight: 600;
 }
 [data-theme='abacus'] .modal-backdrop.show {
   opacity: 0.8;
@@ -1138,4 +1177,12 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .border-neutral-200,
 [data-theme='abacus'] .border-slate-200 {
   border-color: #2c2c30 !important;
+}
+
+/* NOIR: translucent white pills keep dark text (text now defaults to white) */
+[data-theme='abacus'] [class~='bg-white/70'],
+[data-theme='abacus'] [class~='bg-white/80'],
+[data-theme='abacus'] [class~='bg-white/90'],
+[data-theme='abacus'] [class~='bg-white/95'] {
+  color: #111 !important;
 }

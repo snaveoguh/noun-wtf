@@ -10,9 +10,9 @@ export const NOS_CSS = `
   position:fixed;inset:0;overflow:hidden;background:var(--ink);color:var(--paper);z-index:1;
   --glass:rgba(20,21,25,.74);--glass-hi:rgba(255,255,255,.07);--glass-edge:transparent;--r:18px;
   font-weight:500;-webkit-font-smoothing:auto}
-.nos-root,.nos-root *{cursor:url('/cursor-et-idle.svg') 5 5,auto}
+.nos-root,.nos-root *{cursor:url('/cursor-et-idle.png') 12 14,auto}
 .nos-root a,.nos-root a *,.nos-root button,.nos-root button *,.nos-root [role=button],.nos-root label,.nos-root select,
-.nos-root summary{cursor:url('/cursor-et-hot.svg') 5 5,pointer !important}
+.nos-root summary{cursor:url('/cursor-et-hot.png') 12 14,pointer !important}
 .nos-root input,.nos-root textarea,.nos-root [contenteditable=true]{cursor:text !important}
 .nos-root canvas{cursor:inherit}
 .nos-root::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;background-image:${GRAIN};
@@ -21,7 +21,8 @@ export const NOS_CSS = `
 .nos-root .nos-titlebar,.nos-root .nos-titlebar *,.nos-root .nos-tray,.nos-root .nos-tray *,
 .nos-root .nos-manifesto,.nos-root .nos-manifesto *,.nos-root .nos-dir,.nos-root .nos-dir *,
 .nos-root .nos-navbar,.nos-root .nos-navbar *,.nos-root .nos-empty,.nos-root .nos-empty *,
-.nos-root .nos-loading,.nos-root .nos-home,.nos-root .nos-home *{font-family:var(--site-font) !important;text-transform:none}
+.nos-root .nos-loading{font-family:var(--site-font) !important;text-transform:none}
+.nos-root .nos-home,.nos-root .nos-home *{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono',monospace !important;text-transform:none}
 .nos-root .nos-wordmark,.nos-root .nos-wordmark *{font-family:'Pip3',system-ui,sans-serif !important;text-transform:uppercase !important}
 .nos-root .nos-manifesto h1,.nos-root .nos-manifesto h1 *,.nos-root .nos-manifesto .nos-big{font-family:'Londrina Solid',system-ui,sans-serif !important}
 
@@ -36,7 +37,7 @@ export const NOS_CSS = `
 /* ── 2. desk (3D) ─────────────────────────────────────── */
 .nos-backdrop{position:absolute;inset:0;z-index:1}
 .mode-world .nos-backdrop{pointer-events:none}
-.nos-stage{position:absolute;inset:0;z-index:2;perspective:1500px;perspective-origin:50% 32%;transition:opacity .45s ease;pointer-events:none}
+.nos-stage{position:absolute;inset:0;z-index:3;perspective:1500px;perspective-origin:50% 32%;transition:opacity .45s ease;pointer-events:none}
 .mode-world .nos-stage{opacity:0}
 .mode-world .nos-stage *{pointer-events:none !important}
 .nos-space{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none;
@@ -129,7 +130,8 @@ export const NOS_CSS = `
 .nos-dir-foot{margin-top:26px;text-align:center}
 
 /* ── home: agent console over the poster ──────────────── */
-.nos-home{position:absolute;inset:0;z-index:1}
+.nos-home{position:absolute;inset:0;z-index:2;pointer-events:none}
+.nos-home .nos-poster-card,.nos-home .nos-console{pointer-events:auto}
 .mode-world .nos-home{opacity:0;pointer-events:none}
 .nos-poster{position:absolute;inset:-6%;overflow:hidden;pointer-events:none}
 .nos-poster img{width:100%;height:100%;object-fit:cover;filter:blur(28px) brightness(.32) saturate(1.3)}
@@ -153,12 +155,12 @@ export const NOS_CSS = `
   display:flex;flex-direction:column;gap:10px;max-height:calc(74vh - 120px)}
 .nos-log{overflow-y:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px);mask-image:linear-gradient(to bottom,transparent 0,#000 40px);padding-top:40px}
 .nos-log::-webkit-scrollbar{display:none}
-.nos-line{margin:0 0 10px;white-space:pre-wrap;word-break:break-word;font-size:clamp(15px,1.35vw,18px);line-height:1.5;font-weight:600;
+.nos-line{margin:0 0 10px;white-space:pre-wrap;word-break:break-word;font-size:clamp(13px,1.1vw,15px);line-height:1.55;font-weight:500;
   color:rgba(236,235,228,.92);text-shadow:0 1px 12px rgba(0,0,0,.9);background:none;border:0;padding:0}
 .nos-line.who-you{color:var(--acid)}
 .nos-line.who-sys{color:var(--dim)}
 .nos-caret{color:var(--acid);animation:nos-blink .9s steps(2) infinite}
-.nos-prompt{display:flex;align-items:center;gap:10px;font-size:clamp(14px,1.3vw,17px);color:var(--acid)}
+.nos-prompt{display:flex;align-items:center;gap:10px;font-size:clamp(13px,1.1vw,15px);font-weight:500;color:var(--acid)}
 .nos-prompt input{flex:1;background:transparent;border:0;outline:none;color:#fff;font-size:inherit;caret-color:var(--acid);
   text-shadow:0 1px 12px rgba(0,0,0,.9)}
 .nos-prompt input::placeholder{color:rgba(236,235,228,.35)}
@@ -209,6 +211,8 @@ export const NOS_CSS = `
 .nos-auction:hover .nos-auction-card,.nos-auction:focus-within .nos-auction-card{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
 .mode-world .nos-auction:hover .nos-auction-card,.mode-world .nos-auction:focus-within .nos-auction-card{transform:translate(0,0)}
 @media (max-width:760px){.mode-world .nos-auction-card{bottom:auto;top:calc(100% + 10px)}}
+.nos-auction-card::after{content:'';position:absolute;left:0;right:0;top:100%;height:16px}
+@media (max-width:760px){.mode-world .nos-auction-card::after{top:auto;bottom:100%}}
 .nos-auction-img{width:120px;height:120px;flex-shrink:0;background:#d5d7e1;overflow:hidden;border-radius:12px}
 .nos-auction-meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--dim);min-width:0}
 .nos-auction-meta b{color:var(--paper);font-size:13px;letter-spacing:.1em;margin-bottom:4px}

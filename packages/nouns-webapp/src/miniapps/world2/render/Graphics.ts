@@ -71,7 +71,15 @@ export class Graphics {
     this.renderer.shadowMap.enabled = true;
     // PCFSoftShadowMap is deprecated in r183 (silently remapped to PCF, which
     // left early-compiled shaders with mismatched shadow samplers).
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // BASIC, not PCF: r183's PCF path samples a hardware depth-compare
+    // sampler (sampler2DShadow) that returns garbage on Apple GPUs, turning
+    // everything inside the shadow frustum (rider, board, nearby road) WHITE.
+    // Basic does a plain texture read + step(); hard shadow edges also suit
+    // the cel look. ?shadows=pcf opts back in for comparison.
+    this.renderer.shadowMap.type =
+      new URLSearchParams(window.location.search).get('shadows') === 'pcf'
+        ? THREE.PCFShadowMap
+        : THREE.BasicShadowMap;
 
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 3000);
 
@@ -88,8 +96,11 @@ export class Graphics {
     sc.far = 220;
     sc.updateProjectionMatrix();
     this.sun.shadow.mapSize.set(SHADOW_SIZE[quality], SHADOW_SIZE[quality]);
-    this.sun.shadow.bias = -0.00025;
-    this.sun.shadow.normalBias = 0.035;
+    // Basic (single-tap) shadows need a stronger bias than PCF or the
+    // rider/heads get acne stripes.
+    const pcf = this.renderer.shadowMap.type === THREE.PCFShadowMap;
+    this.sun.shadow.bias = pcf ? -0.00025 : -0.0012;
+    this.sun.shadow.normalBias = pcf ? 0.035 : 0.09;
     this.sun.shadow.radius = 3;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);

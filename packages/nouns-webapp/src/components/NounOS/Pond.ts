@@ -93,6 +93,7 @@ export class Pond {
   private flySeeds: Float32Array;
   private texFocused = proxyTexture(true);
   private texIdle = proxyTexture(false);
+  private texPoster: THREE.Texture | null = null;
   private raycaster = new THREE.Raycaster();
   private plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private W = 1;
@@ -211,7 +212,6 @@ export class Pond {
 
   /** Low dark hills + a jagged treeline on the far bank, for depth. */
   private buildFarShore() {
-    const r = rand(5);
     const pts: number[] = [];
     const R = 900;
     const segs = 180;
@@ -221,8 +221,9 @@ export class Pond {
     for (let i = 0; i < segs; i++) {
       const a0 = (i / segs) * Math.PI * 2;
       const a1 = ((i + 1) / segs) * Math.PI * 2;
-      const h0 = 14 + Math.sin(a0 * 5) * 9 + r() * 10;
-      const h1 = 14 + Math.sin(a1 * 5) * 9 + r() * 10;
+      // gentle rolling hills, no jagged noise (it read as glitchy in the mirror)
+      const h0 = 7 + Math.sin(a0 * 3) * 3 + Math.sin(a0 * 7 + 1) * 1.5;
+      const h1 = 7 + Math.sin(a1 * 3) * 3 + Math.sin(a1 * 7 + 1) * 1.5;
       pts.push(h0);
       const p = (a: number, h: number) => [Math.sin(a) * R, h, -Math.cos(a) * R] as const;
       pos.push(...p(a0, -2), ...p(a1, -2), ...p(a1, h1), ...p(a0, -2), ...p(a1, h1), ...p(a0, h0));
@@ -424,9 +425,10 @@ export class Pond {
 
   private syncProxies() {
     const seen = new Set<string>();
-    const els = document.querySelectorAll<HTMLElement>('[data-nos-win]');
+    const els = document.querySelectorAll<HTMLElement>('[data-nos-win], [data-nos-reflect]');
     for (const el of els) {
-      const id = el.dataset.nosWin ?? '';
+      const id = el.dataset.nosWin ?? `reflect:${el.dataset.nosReflect ?? ''}`;
+      const poster = el.dataset.nosReflect === 'poster';
       if (el.classList.contains('is-sunk')) continue;
       const rc = el.getBoundingClientRect();
       if (rc.width < 2 || rc.top > this.yh) continue;
@@ -442,14 +444,18 @@ export class Pond {
         this.scene.add(mesh);
       }
       const focused = el.classList.contains('is-focused');
-      const key = focused ? 'f' : 'i';
+      const key = poster ? 'p' : focused ? 'f' : 'i';
+      if (poster && this.texPoster === null) {
+        this.texPoster = new THREE.TextureLoader().load('/world2/cover-1200.webp');
+        this.texPoster.colorSpace = THREE.SRGBColorSpace;
+      }
       if (p.key !== key) {
-        p.mesh.material.map = focused ? this.texFocused : this.texIdle;
+        p.mesh.material.map = poster ? this.texPoster : focused ? this.texFocused : this.texIdle;
         p.mesh.material.needsUpdate = true;
         p.key = key;
       }
       const rank = Number(el.dataset.nosRank ?? 0);
-      p.mesh.material.color.setScalar(Math.max(0.18, 0.62 - rank * 0.16));
+      p.mesh.material.color.setScalar(poster ? 0.75 : Math.max(0.18, 0.62 - rank * 0.16));
       const bottom = Math.min(rc.bottom, this.yh + this.strip * 0.14);
       const cx = (rc.left + rc.right) / 2 - this.W / 2;
       const yTop = CAM_H + (this.yh - rc.top) / this.k;

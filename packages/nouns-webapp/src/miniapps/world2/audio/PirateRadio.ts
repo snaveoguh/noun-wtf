@@ -291,7 +291,7 @@ export class PirateRadio {
 
     // Reverb: generated 4.5 s stereo impulse (dark, diffuse)
     const conv = ctx.createConvolver();
-    conv.buffer = this.makeImpulse(4.5);
+    conv.buffer = this.makeImpulse(2.6); // long IRs overload Safari's audio thread
     const verbIn = ctx.createGain();
     verbIn.gain.value = 1;
     const verbOut = ctx.createGain();
@@ -490,6 +490,9 @@ export class PirateRadio {
   private schedule() {
     const ctx = this.ctx;
     if (ctx === null || this.mode !== 'pirate') return;
+    // Safari/iOS can suspend or 'interrupt' the context (other audio, calls,
+    // tab switches) — nudge it back instead of going silent for good.
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
     const sixteenth = 60 / this.song.bpm / 4;
     // Fell behind (tab was frozen): skip ahead instead of firing a burst
     if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05;
@@ -699,7 +702,7 @@ export class PirateRadio {
     f.connect(g);
     this.send(g, 0.55, 0.9);
     for (const n of notes) {
-      for (const det of [-11, 0, 12]) {
+      for (const det of [-10, 10]) {
         const o = ctx.createOscillator();
         o.type = 'sawtooth';
         o.frequency.value = midiHz(n);
@@ -717,6 +720,16 @@ export class PirateRadio {
     const ctx = this.ctx!;
     const mix = ctx.createGain();
     mix.gain.value = 1;
+    const srcs = [-14, 9].map(det => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = midiHz(note);
+      o.detune.value = det;
+      this.wobbleOsc(o);
+      o.start(t);
+      o.stop(t + dur * 1.3);
+      return o;
+    });
     for (const [freq, q, amp] of [
       [750, 9, 1],
       [1150, 11, 0.7],
@@ -728,16 +741,7 @@ export class PirateRadio {
       bp.Q.value = q;
       const a = ctx.createGain();
       a.gain.value = amp;
-      for (const det of [-14, 9]) {
-        const o = ctx.createOscillator();
-        o.type = 'sawtooth';
-        o.frequency.value = midiHz(note);
-        o.detune.value = det;
-        this.wobbleOsc(o);
-        o.connect(bp);
-        o.start(t);
-        o.stop(t + dur * 1.3);
-      }
+      for (const o of srcs) o.connect(bp);
       bp.connect(a).connect(mix);
     }
     const g = this.env(t, 0.09, dur * 0.4, dur * 0.2, dur * 0.5);

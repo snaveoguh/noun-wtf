@@ -451,7 +451,7 @@ const ExploreTab: React.FC = () => {
                         />
                       )}
                       <span
-                        className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block"
+                        className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-black/80 px-1.5 text-[11px] font-bold text-white shadow-sm group-hover:block"
                         style={{ zIndex: 2 }}
                       >
                         {nounId.toString()}
