@@ -9,7 +9,7 @@ import {
 } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
-import { buildSmoothHead, type SmoothHead } from './SmoothHead';
+import { buildSmoothHead, headProfile, type SmoothHead } from './SmoothHead';
 
 export interface NounSeed {
   background: number;
@@ -67,7 +67,8 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   if (geos === undefined) {
     const layers = seedToLayers(seed, getNounData, ImageData.palette, HEAD_VIS);
     const g = buildNounGeometries(layers);
-    const smooth = buildSmoothHead(layers.head);
+    const headName = (ImageData.images.heads as { filename: string }[])[seed.head]?.filename ?? '';
+    const smooth = buildSmoothHead(layers.head, headProfile(headName));
     // Glasses: keep them voxel, seated on the smooth head's front plateau
     if (g.glassesGeo !== null && smooth !== null) {
       g.glassesGeo.computeBoundingBox();

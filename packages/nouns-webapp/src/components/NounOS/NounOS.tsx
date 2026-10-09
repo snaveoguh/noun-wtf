@@ -344,7 +344,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
               {w.id === 'navigator' ? titleForPath(path) : SHORT[w.id]}
             </button>
           ))}
-        {!desk && (
+        {!os.isOpen('terminal') && (
           <button type="button" className="nos-chip" onClick={() => os.open('terminal')}>
             TERMINAL <span className="nos-key">`</span>
           </button>

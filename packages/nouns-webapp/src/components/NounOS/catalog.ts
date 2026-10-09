@@ -97,7 +97,11 @@ export const CATALOG: Section[] = [
       { path: '/probe', name: 'PROBE', blurb: 'explore every noun, every dream.' },
       { path: '/explore/wallet', name: 'WALLETS', blurb: 'who holds what, who votes how.' },
       { path: '/feed', name: 'FEED', blurb: 'everything happening, live.' },
-      { path: '/dashboard', name: 'DASHBOARD', blurb: 'the treasury at a glance.' },
+      {
+        path: '/dashboard',
+        name: 'DASHBOARD',
+        blurb: "analytics. who's bidding, voting, building.",
+      },
       { path: '/underground', name: 'UNDERGROUND', blurb: 'the basement.' },
     ],
   },

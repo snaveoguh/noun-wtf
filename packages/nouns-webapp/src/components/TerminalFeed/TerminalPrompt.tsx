@@ -98,7 +98,7 @@ function pathnameToNounId(pathname: string): number | null {
  * Returns a prefill payload to open with, or `null` to fall through to the
  * normal chat flow.
  */
-function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
+export function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
   const lc = trimmed.toLowerCase();
@@ -136,7 +136,7 @@ function detectProposalDraftIntent(text: string): ProposalDraftPrefill | null {
  * Nouns was named, or null. Handled locally (no agent round-trip) so it works
  * even if the agent doesn't know the action.
  */
-function detectCancelIntent(text: string): { proposalId: number; lil: boolean } | null {
+export function detectCancelIntent(text: string): { proposalId: number; lil: boolean } | null {
   const lc = text.trim().toLowerCase();
   const m =
     /^\/cancel\s+(?:(lil(?:[\s-]?nouns?)?)\s+)?(?:prop(?:osal)?\s+)?#?(\d+)\s*$/.exec(lc) ??
@@ -152,7 +152,7 @@ function detectCancelIntent(text: string): { proposalId: number; lil: boolean } 
  * proposal, transactions included, straight into the prompt. Returns null for
  * anything that isn't a JSON object of that shape.
  */
-function detectDraftPayload(text: string): ProposalDraftPrefill | null {
+export function detectDraftPayload(text: string): ProposalDraftPrefill | null {
   const trimmed = text.trim();
   if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
   let parsed: unknown;

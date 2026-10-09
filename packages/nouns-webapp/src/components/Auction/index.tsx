@@ -1865,7 +1865,8 @@ const Auction: React.FC<AuctionProps> = ({ auction: currentAuction, layout: layo
         : `${statusIcon} Scroll mode`;
 
   return (
-    <div style={{ backgroundColor: stateBgColor }}>
+    // NOIR: no page-wide noun-background fill (the noun art keeps its own)
+    <div data-noun-bg={stateBgColor}>
       {/* Holding the top bid calms the page — bidding is the way out of the
           glitch. Get outbid and it starts up again, which is the point. */}
       <MissingNounGlitch active={isMissingNoun(currentNounSeed, dao.isV2) && !isTopBidder} />

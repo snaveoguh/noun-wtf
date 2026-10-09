@@ -10,9 +10,9 @@ export const NOS_CSS = `
   position:fixed;inset:0;overflow:hidden;background:var(--ink);color:var(--paper);z-index:1;
   --glass:rgba(20,21,25,.74);--glass-hi:rgba(255,255,255,.07);--glass-edge:transparent;--r:18px;
   font-weight:500;-webkit-font-smoothing:auto}
-.nos-root,.nos-root *{cursor:url('/cursor-et-idle.png') 13 13,auto}
+.nos-root,.nos-root *{cursor:url('/cursor-cd.png') 1 1,auto}
 .nos-root a,.nos-root a *,.nos-root button,.nos-root button *,.nos-root [role=button],.nos-root label,.nos-root select,
-.nos-root summary{cursor:url('/cursor-et-hot.png') 13 13,pointer !important}
+.nos-root summary{cursor:url('/cursor-cd.png') 1 1,pointer !important}
 .nos-root input,.nos-root textarea,.nos-root [contenteditable=true]{cursor:text !important}
 .nos-root canvas{cursor:inherit}
 .nos-root::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;background-image:${GRAIN};
@@ -124,8 +124,7 @@ export const NOS_CSS = `
   padding:8px 10px;color:var(--paper)}
 .nos-dir-sec li button b{min-width:130px;font-size:13.5px;letter-spacing:.02em;font-weight:700;color:var(--sec,var(--paper))}
 .nos-dir-sec li button span{font-size:13px;color:#a9a8a0}
-.nos-dir-sec li button:hover{background:var(--sec,var(--paper))}
-.nos-dir-sec li button:hover b,.nos-dir-sec li button:hover span{color:#000}
+.nos-dir-sec li button:hover{background:rgba(255,255,255,.05)}
 .nos-hot{font-style:normal;font-size:9px;background:var(--red);color:#fff;padding:1px 4px;margin-right:6px;animation:nos-blink 1s steps(2) infinite}
 .nos-dir-foot{margin-top:26px;text-align:center}
 
@@ -159,6 +158,7 @@ export const NOS_CSS = `
   color:rgba(236,235,228,.92);text-shadow:0 1px 12px rgba(0,0,0,.9);background:none;border:0;padding:0}
 .nos-line.who-you{color:var(--acid)}
 .nos-line.who-sys{color:var(--dim)}
+.nos-action{margin:6px 0 14px;max-width:520px;padding:12px;border-radius:14px;background:rgba(10,11,13,.82);backdrop-filter:blur(8px)}
 .nos-caret{color:var(--acid);animation:nos-blink .9s steps(2) infinite}
 .nos-prompt{display:flex;align-items:center;gap:10px;font-size:clamp(13px,1.1vw,15px);font-weight:500;color:var(--acid)}
 .nos-prompt input{flex:1;background:transparent;border:0;outline:none;color:#fff;font-size:inherit;caret-color:var(--acid);

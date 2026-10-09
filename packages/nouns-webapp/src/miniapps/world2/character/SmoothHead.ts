@@ -18,6 +18,28 @@ export interface SmoothHeadOptions {
   halfDepth?: number;
   /** Bevel radius in pixels. */
   bevel?: number;
+  /** Texture softening blur (px at 256²); lower keeps object detail. */
+  blur?: number;
+}
+
+const FLAT = new Set(
+  'index-card calendar chart-bars chipboard film-strip film-35mm cd cassettetape goldcoin hockeypuck maze mirror paperclip ruler-triangular saw wall fence rainbow lightning-bolt bubble-speech star-sparkles smile road abstract void wallet skateboard outlet vent console-handheld laptop dictionary chocolate sponge cookie pizza'.split(
+    ' ',
+  ),
+);
+const OBJECT = new Set(
+  'bank boombox box calculator camcorder cash-register crt-bsod fax-machine factory-dark house mailbox microwave piano robot stapler toaster trashcan vending-machine wallsafe washingmachine treasurechest taxi car couch lock fan weight mixer drill chainsaw rangefinder satellite tuba backpack cordlessphone pirateship sailboat snowmobile helicopter plane ufo piggybank mug milk ketchup mustard beer wine-barrel toiletpaper-full trashcan firehydrant shower skilift crane tooth watch pill bell bomb clutch hardhat chefhat wizardhat queencrown crown'.split(
+    ' ',
+  ),
+);
+
+/** Shape profile per head: flat things stay thin, objects keep crisp
+ * edges and detail, everything organic gets the soft pillow. */
+export function headProfile(name: string): SmoothHeadOptions {
+  const n = name.replace(/^head-/, '');
+  if (FLAT.has(n)) return { halfDepth: 1.6, bevel: 1.2, blur: 0.7 };
+  if (OBJECT.has(n)) return { halfDepth: 6, bevel: 1.8, blur: 0.6 };
+  return {};
 }
 
 export interface SmoothHead {
@@ -293,7 +315,7 @@ export function buildSmoothHead(
   bctx.imageSmoothingQuality = 'high';
   // Light blur only: enough to lose the pixel staircase, not enough to
   // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
-  bctx.filter = 'blur(1.6px)';
+  bctx.filter = `blur(${opts.blur ?? 1.6}px)`;
   bctx.drawImage(canvas, 0, 0, 256, 256);
   bctx.filter = 'none';
   const img = bctx.getImageData(0, 0, 256, 256);
