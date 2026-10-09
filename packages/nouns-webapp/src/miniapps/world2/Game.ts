@@ -495,13 +495,69 @@ export class Game {
         if (x.side === THREE.DoubleSide) toonMats.push(x);
       }
     });
+    // Meshes whose material came from toonify(): remember both versions
+    const swaps: {
+      mesh: THREE.Mesh;
+      toon: THREE.Material | THREE.Material[];
+      pbr: THREE.Material | THREE.Material[];
+    }[] = [];
+    const ramps = new Map<THREE.MeshToonMaterial, THREE.Texture | null>();
+    const unlit: {
+      mesh: THREE.Mesh;
+      orig: THREE.Material | THREE.Material[];
+      basic: THREE.Material[];
+    }[] = [];
+    g.scene.traverse(o => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of list) {
+        const tm = m as THREE.MeshToonMaterial;
+        if (tm.isMeshToonMaterial === true) ramps.set(tm, tm.gradientMap);
+      }
+      unlit.push({
+        mesh,
+        orig: mesh.material,
+        basic: list.map(m => {
+          const sm = m as THREE.MeshStandardMaterial;
+          return new THREE.MeshBasicMaterial({
+            map: sm.map ?? null,
+            color: sm.color?.clone() ?? new THREE.Color(0xffffff),
+            vertexColors: sm.vertexColors,
+            side: sm.side,
+            transparent: sm.transparent,
+            alphaTest: sm.alphaTest,
+          });
+        }),
+      });
+      if (!list.some(m => m.userData.toonSrc !== undefined)) return;
+      const pbr = list.map(m => (m.userData.toonSrc as THREE.Material | undefined) ?? m);
+      swaps.push({ mesh, toon: mesh.material, pbr: Array.isArray(mesh.material) ? pbr : pbr[0]! });
+    });
+    const dof = this.nature?.cinematic?.pass ?? null;
     const set = (o: {
       ink: boolean;
       grade: boolean;
       raw: boolean;
       shadows: boolean;
       front: boolean;
+      pbr?: boolean;
+      noRamp?: boolean;
+      noDof?: boolean;
+      unlit?: boolean;
     }) => {
+      for (const sw of swaps) sw.mesh.material = o.pbr === true ? sw.pbr : sw.toon;
+      if (o.unlit === true)
+        for (const u of unlit) u.mesh.material = Array.isArray(u.orig) ? u.basic : u.basic[0]!;
+      else for (const u of unlit) if (o.pbr !== true) u.mesh.material = u.orig;
+      for (const [m, tex] of ramps) {
+        const want = o.noRamp === true ? null : tex;
+        if (m.gradientMap !== want) {
+          m.gradientMap = want;
+          m.needsUpdate = true;
+        }
+      }
+      if (dof) dof.enabled = o.noDof !== true;
       if (g.inkPass) g.inkPass.enabled = o.ink;
       if (g.gradePass) g.gradePass.enabled = o.grade;
       g.rawRender = o.raw;
@@ -521,7 +577,7 @@ export class Game {
       }
     };
     const base = { ink: true, grade: true, raw: false, shadows: true, front: false };
-    const configs: [string, typeof base][] = [
+    const configs: [string, Parameters<typeof set>[0]][] = [
       ['A baseline', base],
       ['B ink off', { ...base, ink: false }],
       ['C grade off', { ...base, grade: false }],
@@ -530,6 +586,10 @@ export class Game {
       ['F shadows off', { ...base, shadows: false }],
       ['G single-sided', { ...base, front: true }],
       ['H single-sided + no shadows', { ...base, front: true, shadows: false }],
+      ['I no depth-of-field', { ...base, noDof: true }],
+      ['J no toon (original materials)', { ...base, pbr: true }],
+      ['K toon, no light-band texture', { ...base, noRamp: true }],
+      ['L unlit (texture colours only)', { ...base, unlit: true }],
     ];
     const out: { label: string; url: string }[] = [];
     for (const [label, c] of configs) {
@@ -539,6 +599,7 @@ export class Game {
       out.push({ label, url: canvas.toDataURL('image/jpeg', 0.72) });
     }
     set(base);
+    for (const u of unlit) for (const m of u.basic) m.dispose();
     return out;
   }
 
