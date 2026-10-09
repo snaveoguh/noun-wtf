@@ -33,7 +33,8 @@ import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { MountainStream } from './world/mountain/MountainStream';
-import { rampDecorator, rockDecorator, warmMountainProps } from './world/mountain/Props';
+import { dressingDecorator } from './world/mountain/DressingDecorator';
+import { rampDecorator, warmMountainProps } from './world/mountain/Props';
 import {
   edgeDistance,
   terrainHeight,
@@ -437,7 +438,8 @@ export class Game {
     try {
       const m = new MountainStream(this.world, this.gfx.quality, this.gfx.toon);
       warmMountainProps();
-      m.addDecorator(rockDecorator);
+      // Streams, ponds, bridges, plants, trees + rocks (replaces rockDecorator)
+      m.addDecorator(dressingDecorator(this.gfx.quality));
       m.addDecorator(rampDecorator);
       this.gfx.scene.add(m.group);
       this.mountain = m;
