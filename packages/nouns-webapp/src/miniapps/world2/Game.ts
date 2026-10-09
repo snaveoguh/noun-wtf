@@ -19,6 +19,7 @@ import {
 import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
+import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -30,6 +31,16 @@ import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
+import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
+import { MountainStream } from './world/mountain/MountainStream';
+import { dressingDecorator } from './world/mountain/DressingDecorator';
+import { rampDecorator, warmMountainProps } from './world/mountain/Props';
+import {
+  edgeDistance,
+  terrainHeight,
+  terrainInDomain,
+  terrainSurface,
+} from './world/mountain/terrain';
 import { PipBillboards } from './world/PipBillboards';
 
 export interface HudState {
@@ -57,6 +68,8 @@ export interface HudState {
   /** Spray colour + whether the crosshair is on a paintable surface. */
   spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
+  /** Out on the mountain: metres downhill from the city + current surface. */
+  mountain: { down: number; surface: string; streak: number } | null;
 }
 
 interface RemoteAvatar {
@@ -148,6 +161,7 @@ export class Game {
       radio: { on: false, label: 'radio off', at: 0 },
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
+      mountain: null,
     };
   }
 
@@ -188,10 +202,12 @@ export class Game {
     }
     this.world.build(level.collisionMeshes);
     this.player.softBounds = level.softBounds ?? Infinity;
+    if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
     if (fountain) this.player.homeSpots.push({ pos: fountain.position.clone(), yaw: fountain.yaw });
     this.placeIceCreamVan(level);
     this.rails.load(level.rails);
+    this.placeMegaRamp(level);
     this.graffiti = new Graffiti(
       this.world,
       level.baked ? 'plaza' : 'park',
@@ -209,6 +225,8 @@ export class Game {
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
     this.buildNature(level);
+    if (new URLSearchParams(window.location.search).get('dressing') === '1')
+      this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
 
     this.me = new NounCharacter(this.seed, assets);
@@ -221,9 +239,14 @@ export class Game {
       yaw: 0,
     };
     this.player.spawn(spawn.position, spawn.yaw);
+    if (this.megaRamp !== null)
+      this.player.spawn(this.megaRamp.spawn.position, this.megaRamp.spawn.yaw);
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
+    // Mesh the mountain around the spawn (terrain, rocks, ramps) so their
+    // shaders are in the precompile below instead of hitching on first sight
+    this.mountain?.prime(this.player.pos);
     // Precompile shaders so the first frames don't hitch
     this.gfx.renderer.compile(this.gfx.scene, this.gfx.camera);
 
@@ -329,8 +352,12 @@ export class Game {
     this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
 
-    // Physics in fixed-ish substeps for stability at low FPS
-    const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
+    // Physics in fixed-ish substeps for stability at low FPS — and short
+    // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
+    const steps = Math.min(
+      64,
+      Math.max(1, Math.ceil(dt / (1 / 90)), Math.ceil((this.player.speed * dt) / 0.5)),
+    );
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
       // Only consume one-shot inputs on the first substep
@@ -364,6 +391,15 @@ export class Game {
       return hit ? hit.point.y : null;
     });
     this.gfx.followShadow(this.player.pos);
+    if (this.mountain !== null) {
+      this.mountain.update(this.player.pos, this.player.vel);
+      // Out on the slopes (or way up a tower) the sky dome below the horizon
+      // turns to haze, since the world falls away below eye level. Down in
+      // the streets it stays exactly as it was.
+      const c = this.gfx.camera.position;
+      const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
+      setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
+    }
     this.nature?.update(dt, this.player.pos);
     this.billboards.update(dt);
     this.gfx.render(dt);
@@ -395,6 +431,29 @@ export class Game {
   }
 
   nature: NatureSystem | null = null;
+  /** Endless downhill terrain past the alleys (baked plaza only). */
+  mountain: MountainStream | null = null;
+
+  private buildMountain(level: LevelData) {
+    try {
+      const m = new MountainStream(this.world, this.gfx.quality, this.gfx.toon);
+      warmMountainProps();
+      // Streams, ponds, bridges, plants, trees + rocks (replaces rockDecorator)
+      m.addDecorator(dressingDecorator(this.gfx.quality));
+      m.addDecorator(rampDecorator);
+      this.gfx.scene.add(m.group);
+      this.mountain = m;
+      this.player.mountain = level.mountain ?? null;
+      this.player.terrain = {
+        height: terrainHeight,
+        inDomain: terrainInDomain,
+        surface: terrainSurface,
+      };
+    } catch (err) {
+      console.warn('[world2] mountain failed, continuing without it', err);
+      this.mountain = null;
+    }
+  }
 
   /** Collision for props added on top of the baked level (ice cream van…). */
   private propCollision: THREE.Mesh[] = [];
@@ -444,12 +503,42 @@ export class Game {
         this.propCollision.push(iceCreamVanCollisionBox(van));
         // Respawn spot: beside the serving hatch, facing out
         const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        this.player.homeSpots.push({ pos: new THREE.Vector3(x, y, z).add(side), yaw: yaw + Math.PI / 2 });
+        this.player.homeSpots.push({
+          pos: new THREE.Vector3(x, y, z).add(side),
+          yaw: yaw + Math.PI / 2,
+        });
         this.world.build([...level.collisionMeshes, ...this.propCollision]);
         return;
       }
     } catch (err) {
       console.warn('[world2] ice cream van failed to place', err);
+    }
+  }
+
+  /** Dev set piece (`?megaramp=1`): the mega ramp on the east lawn, spawn on its drop-in. */
+  megaRamp: PlacedMegaRamp | null = null;
+
+  private placeMegaRamp(level: LevelData) {
+    if (new URLSearchParams(window.location.search).get('megaramp') !== '1') return;
+    try {
+      const ramp = buildMegaRamp({ seed: 1 });
+      // East boulevard (x ≈ 64) is open from z −64 to 64; the ~115 m run heads +Z
+      // and finishes on the lawn east of the plaza. Render-only palms either side
+      // brush the scaffold edges; nothing there has collision.
+      const ground = this.world.raycast(
+        new THREE.Vector3(64, 20, -62),
+        new THREE.Vector3(0, -1, 0),
+        40,
+      );
+      this.megaRamp = placeMegaRamp(ramp, new THREE.Vector3(64, ground?.point.y ?? 0, -62), 0);
+      if (this.gfx.toon) toonify(ramp.group);
+      this.gfx.scene.add(ramp.group);
+      this.propCollision.push(...this.megaRamp.collision);
+      this.world.build([...level.collisionMeshes, ...this.propCollision]);
+      this.rails.load([...level.rails, ...this.megaRamp.rails]);
+    } catch (err) {
+      console.warn('[world2] mega ramp failed to place', err);
+      this.megaRamp = null;
     }
   }
 
@@ -460,7 +549,8 @@ export class Game {
       const nature = new NatureSystem(this.gfx);
       if (level.baked) {
         // Open lawn east of the plaza (probed clear: x 50–74, z 8–48)
-        buildNatureShowcase(nature, this.world, new THREE.Vector3(60, 0, 26));
+        if (this.megaRamp === null)
+          buildNatureShowcase(nature, this.world, new THREE.Vector3(60, 0, 26));
       } else {
         replaceFallbackTrees(level.root, nature);
       }
@@ -476,6 +566,24 @@ export class Game {
       console.warn('[world2] nature layer failed, continuing without it', err);
       this.nature = null;
     }
+  }
+
+  /** Dev (?dressing=1): mountain dressing on a standalone test patch east of the plaza. */
+  private buildDressingDemo(level: LevelData) {
+    void import('./world/mountain/DressingDemo')
+      .then(({ buildDressingDemo }) => {
+        if (this.disposed) return;
+        const demo = buildDressingDemo(this.gfx);
+        this.world.build([
+          ...level.collisionMeshes,
+          ...this.propCollision,
+          ...(this.nature?.collisionMeshes() ?? []),
+          ...demo.collisionMeshes,
+        ]);
+        (window as unknown as { __dressing?: unknown }).__dressing = demo;
+        console.info('[world2] dressing demo', demo.stats);
+      })
+      .catch(err => console.warn('[world2] dressing demo failed', err));
   }
 
   private static TOD: TimeOfDayPreset[] = ['afternoon', 'golden', 'blue', 'night'];
@@ -1057,6 +1165,14 @@ export class Game {
       inputMode: input.mode,
       landmarks: lm,
       camMode: this.cam.mode,
+      mountain:
+        this.mountain !== null && edgeDistance(p.pos.x, p.pos.z) > 0
+          ? {
+              down: Math.round(edgeDistance(p.pos.x, p.pos.z)),
+              surface: p.surface ?? 'grass',
+              streak: Math.round(p.runTime),
+            }
+          : null,
       spray: {
         color: SPRAY_COLORS[this.graffiti?.color ?? 2],
         aiming: this.graffiti?.aim !== null && this.graffiti?.aim !== undefined,
@@ -1067,6 +1183,7 @@ export class Game {
   }
 
   dispose() {
+    this.mountain?.dispose();
     this.nature?.dispose();
     this.billboards.dispose();
     this.radio.dispose();

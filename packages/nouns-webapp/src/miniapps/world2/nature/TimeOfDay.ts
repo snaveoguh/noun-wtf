@@ -229,6 +229,14 @@ const NUM_KEYS = [
   'selfLight',
 ] as const;
 
+let skyGroundFog = 0;
+
+/** 0 = the preset's ground tint under the horizon, 1 = the fog colour. */
+export function setSkyGroundFog(k: number) {
+  skyGroundFog = Math.min(1, Math.max(0, k));
+}
+let appliedGroundFog = 0;
+
 const SKY_VERT = /* glsl */ `
 varying vec3 vDir;
 void main() {
@@ -615,7 +623,10 @@ export class TimeOfDay {
     (u.uZenith.value as THREE.Color).copy(c.zenith);
     (u.uMid.value as THREE.Color).copy(c.mid);
     (u.uHorizon.value as THREE.Color).copy(c.horizon);
-    (u.uGround.value as THREE.Color).copy(c.ground);
+    // Below the horizon: the dome's ground tint, or (with the endless
+    // mountain) the fog colour, so the slope falling away below the eye line
+    // dissolves into haze instead of a band of brown dome
+    (u.uGround.value as THREE.Color).copy(c.ground).lerp(c.fog, skyGroundFog);
     (u.uCloud.value as THREE.Color).copy(c.cloud);
     (u.uCloudShade.value as THREE.Color).copy(c.cloudShade);
     u.uCloudCover.value = c.cloudCover;
@@ -656,6 +667,12 @@ export class TimeOfDay {
   /** Keep sky decorations centred on the camera (call per frame; cheap). */
   update() {
     const cam = this.host.camera;
+    if (skyGroundFog !== appliedGroundFog) {
+      appliedGroundFog = skyGroundFog;
+      (this.skyDome.material.uniforms.uGround.value as THREE.Color)
+        .copy(this.cur.ground)
+        .lerp(this.cur.fog, skyGroundFog);
+    }
     this.skyDome.position.copy(cam.position);
     this.skyDome.material.uniforms.uTime.value = performance.now() / 1000;
     if (this.stars.visible) this.stars.position.copy(cam.position);
