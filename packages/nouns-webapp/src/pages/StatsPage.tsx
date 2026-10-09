@@ -8,14 +8,14 @@ const TreasuryCorridor = React.lazy(() => import('@/components/TreasuryCorridor'
 
 const StatsPage: React.FC = () => {
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: '#050510' }}>
+    <div style={{ width: '100%', minHeight: '100vh', background: 'transparent' }}>
       <Suspense
         fallback={
           <div
             style={{
               width: '100%',
               height: '100vh',
-              background: '#050510',
+              background: 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

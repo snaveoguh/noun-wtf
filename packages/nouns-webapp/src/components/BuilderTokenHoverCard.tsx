@@ -106,7 +106,7 @@ export const BuilderTokenHoverCard: FC<BuilderTokenHoverCardProps> = ({
           {/* Traits */}
           {traits.length > 0 && (
             <div className="border-b border-gray-200 px-3 py-2">
-              <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-gray-400">
+              <p className="mb-1 font-mono text-xs font-bold uppercase tracking-[0.15em] text-gray-400">
                 Traits — click to filter
               </p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
@@ -125,7 +125,7 @@ export const BuilderTokenHoverCard: FC<BuilderTokenHoverCardProps> = ({
                         isActive ? 'bg-black text-white' : 'hover:bg-gray-100'
                       }`}
                     >
-                      <span className="block font-mono text-[8px] uppercase text-gray-400">
+                      <span className="block font-mono text-xs uppercase text-gray-400">
                         {t.layer}
                       </span>
                       <span className="block font-semibold">{t.label}</span>

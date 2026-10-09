@@ -206,7 +206,7 @@ const ParcelModal: FC<{
           maxWidth: 720,
           maxHeight: 'calc(100vh - 40px)',
           background: '#0a0a14',
-          border: '1px solid #1e293b',
+          border: '1px solid var(--theme-divider)',
           borderRadius: 14,
           overflow: 'hidden',
           display: 'flex',
@@ -268,8 +268,8 @@ const ParcelModal: FC<{
               Terraform #{tokenId}
             </h2>
             {meta && (
-              <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
-                Level {meta.level} · {meta.zoneName} · ({meta.x}, {meta.y}) · Elev {meta.elevation}
+              <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
+                Level {meta.level}, {meta.zoneName}, ({meta.x}, {meta.y}), Elev {meta.elevation}
               </span>
             )}
           </div>
@@ -283,7 +283,7 @@ const ParcelModal: FC<{
               margin: '0 auto',
               borderRadius: 12,
               overflow: 'hidden',
-              border: '1px solid #1e293b',
+              border: '1px solid var(--theme-divider)',
               background: '#000',
               position: 'relative',
             }}
@@ -303,7 +303,7 @@ const ParcelModal: FC<{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#475569',
+                  color: 'var(--theme-text-muted)',
                   fontSize: '0.8rem',
                   fontFamily: 'monospace',
                 }}
@@ -405,7 +405,7 @@ const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.5rem',
+              fontSize: '0.75rem',
               color: 'rgba(0,0,0,0.5)',
               fontWeight: 'bold',
             }}
@@ -457,7 +457,7 @@ const cardStyle: React.CSSProperties = {
   padding: '10px 14px',
 };
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.6rem',
+  fontSize: '0.75rem',
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
@@ -473,8 +473,8 @@ const valStyle: React.CSSProperties = {
 const actionBtnStyle: React.CSSProperties = {
   padding: '8px 16px',
   borderRadius: 10,
-  border: '1px solid #334155',
-  background: '#1e293b',
+  border: '1px solid var(--theme-divider)',
+  background: 'var(--theme-bg-tertiary)',
   color: '#e2e8f0',
   fontSize: '0.75rem',
   fontWeight: 600,
@@ -484,8 +484,8 @@ const actionBtnStyle: React.CSSProperties = {
 const linkStyle: React.CSSProperties = {
   padding: '8px 14px',
   borderRadius: 10,
-  border: '1px solid #1e293b',
-  fontSize: '0.7rem',
+  border: '1px solid var(--theme-divider)',
+  fontSize: '0.75rem',
   fontWeight: 600,
   color: '#94a3b8',
   textDecoration: 'none',

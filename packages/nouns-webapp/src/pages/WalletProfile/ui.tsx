@@ -73,7 +73,7 @@ export const TriBar: FC<{
   const t = f + a + ab;
   if (t === 0) return <div className="wp-tri" style={{ height }} />;
   return (
-    <div className="wp-tri" style={{ height }} title={`${f} for · ${a} against · ${ab} abstain`}>
+    <div className="wp-tri" style={{ height }} title={`${f} for, ${a} against, ${ab} abstain`}>
       <span className="wp-bg-pos" style={{ width: `${(f / t) * 100}%` }} />
       <span className="wp-bg-neg" style={{ width: `${(a / t) * 100}%` }} />
       <span className="wp-bg-mid" style={{ width: `${(ab / t) * 100}%` }} />
@@ -198,7 +198,7 @@ export const EtherscanTx: FC<{ hash: string | null | undefined }> = ({ hash }) =
       href={`https://etherscan.io/tx/${hash}`}
       target="_blank"
       rel="noreferrer"
-      className="wp-link text-[10px]"
+      className="wp-link text-xs"
       title={hash}
     >
       tx ↗

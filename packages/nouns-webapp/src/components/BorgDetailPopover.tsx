@@ -110,7 +110,7 @@ const BorgDetailPopover: FC<Props> = ({
             />
           )}
         </span>
-        <span style={{ fontSize: '0.6rem', color: 'var(--theme-text-muted)' }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
           {label} #{id}
         </span>
       </button>
@@ -156,7 +156,7 @@ const BorgDetailPopover: FC<Props> = ({
           />
         )}
         {isBurned && (
-          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-xs font-bold text-white">
             ☠️ bred away
           </span>
         )}
@@ -171,31 +171,31 @@ const BorgDetailPopover: FC<Props> = ({
           {borg.name && <span className="text-xs text-gray-400">#{borg.id}</span>}
         </div>
         {borg.born > 0 && (
-          <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
+          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
             Born{' '}
             {new Date(borg.born * 1000).toLocaleDateString(undefined, {
               day: 'numeric',
               month: 'short',
               year: 'numeric',
             })}
-            {borg.parent1 > 0 ? ' · bred' : ' · generated'}
+            {borg.parent1 > 0 ? ', bred' : ', generated'}
           </span>
         )}
 
         {/* Traits with rarity */}
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {traits.length === 0 && (
-            <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
+            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
               Naked borg — all layers blank
             </span>
           )}
           {traits.map(t => (
             <div
               key={`${t.layer}-${t.name}`}
-              style={{ fontSize: '0.65rem', display: 'flex', gap: 6 }}
+              style={{ fontSize: '0.75rem', display: 'flex', gap: 6 }}
             >
               <span style={{ color: '#9ca3af', width: 62, flexShrink: 0 }}>{t.layer}</span>
-              <span style={{ fontWeight: 600, color: '#374151', flexGrow: 1 }}>{t.name}</span>
+              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)', flexGrow: 1 }}>{t.name}</span>
               <span style={{ color: '#9ca3af' }} title={`${t.used} borgs have this`}>
                 {t.pct < 1 ? t.pct.toFixed(1) : Math.round(t.pct)}%
               </span>
@@ -208,7 +208,7 @@ const BorgDetailPopover: FC<Props> = ({
           <div style={{ marginTop: 10 }}>
             <span
               style={{
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#9ca3af',
                 textTransform: 'uppercase',
@@ -230,7 +230,7 @@ const BorgDetailPopover: FC<Props> = ({
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
           }}
         >
           {borg.owner ? (

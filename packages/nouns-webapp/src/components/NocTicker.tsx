@@ -159,7 +159,7 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
                 {cast.author.display_name}
               </span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
                 @{cast.author.username}
               </span>
             </div>
@@ -219,7 +219,7 @@ const InlineEmbeds: FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               {html.ogDescription && (
                 <div
                   style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.75rem',
                     color: 'var(--theme-text-muted)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -437,7 +437,7 @@ const CastModal: FC<{
               @{cast.author.username}
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
+          <div style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
             {dateStr}
           </div>
         </div>
@@ -552,7 +552,7 @@ const CastModal: FC<{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 4,
-                  fontSize: '0.65rem',
+                  fontSize: '0.75rem',
                   color: 'var(--theme-text-muted)',
                 }}
               >
@@ -655,7 +655,7 @@ const CastModal: FC<{
             marginTop: 14,
             paddingTop: 10,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a890',
@@ -788,7 +788,7 @@ const NocTicker: FC = () => {
             background:
               'linear-gradient(90deg, var(--theme-bg-primary) 70%, rgba(255,255,255,0) 100%)',
             fontWeight: 800,
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.1em',
             textTransform: 'uppercase' as const,
             color: 'var(--theme-accent)',
@@ -857,7 +857,7 @@ const NocTicker: FC = () => {
               )}
               <span
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
                   color: 'var(--theme-text-primary)',
                   whiteSpace: 'nowrap' as const,
@@ -872,7 +872,7 @@ const NocTicker: FC = () => {
               </span>
               <span
                 style={{
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   color: 'var(--theme-text-secondary)',
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,
@@ -882,7 +882,7 @@ const NocTicker: FC = () => {
               </span>
               <span
                 style={{
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   color: 'var(--theme-text-muted)',
                   whiteSpace: 'nowrap' as const,
                   flexShrink: 0,

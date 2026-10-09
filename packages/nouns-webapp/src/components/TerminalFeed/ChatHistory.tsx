@@ -91,7 +91,7 @@ function AgentStatusBar() {
       <span>{status.reservations.active} watches</span>
       {status.predictedTraits && (
         <span style={{ opacity: 0.5 }}>
-          predicted: {Object.values(status.predictedTraits).join(' · ')}
+          predicted: {Object.values(status.predictedTraits).join(', ')}
         </span>
       )}
       {(() => {

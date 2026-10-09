@@ -6,6 +6,16 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { buildFallbackPark } from './FallbackPark';
+import {
+  alleyCutBoxes,
+  buildAlleys,
+  buildRingBacks,
+  cutTriangles,
+  inCorridor,
+  ringBands,
+  seatBackdrop,
+} from './mountain/Alleys';
+import { MOUNTAIN } from './mountain/config';
 import { buildSkyline } from './Skyline';
 
 export interface LevelData {
@@ -25,6 +35,12 @@ export interface LevelData {
    * invisible collision walls, so there's nothing invisible to climb.
    */
   softBounds?: number;
+  /**
+   * Endless downhill mountain all round the city. `inCorridor` says where
+   * the soft clamp lets you through the ring (the alleys); once |x| or |z|
+   * ≥ minZ you're out on the slope.
+   */
+  mountain?: { inCorridor: (x: number, z: number) => boolean; minZ: number };
 }
 
 const BASE = '/world2/level/';
@@ -151,6 +167,7 @@ export async function loadLevel(
     // put a ceiling under the towers, so swap it for a soft clamp just
     // outside the ring plus a catch floor behind the buildings.
     let softBounds: number | undefined;
+    let mountain: LevelData['mountain'];
     let skylineTop = 0;
     if (collisionMeshes.some(m => m.name === 'COL_Buildings')) {
       const roofs = collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null;
@@ -158,8 +175,47 @@ export async function loadLevel(
       scene.add(skyline.group);
       skylineTop = skyline.maxY;
       collisionMeshes = collisionMeshes.filter(m => m.name !== 'COL_Boundary');
-      collisionMeshes.push(...skyline.collision, ...catchFloor(85, 96, -0.2));
+      collisionMeshes.push(...skyline.collision);
       softBounds = 93.6;
+      const withMountain = new URLSearchParams(window.location.search).get('mountain') !== '0';
+      if (withMountain) {
+        // Three alleys through the ring: cut the baked blocks (render +
+        // collision) and build the corridor walls, arches + outer wall.
+        const cuts = alleyCutBoxes();
+        const named = (o: THREE.Object3D, re: RegExp) =>
+          re.test(o.name) || (o.parent !== null && re.test(o.parent.name));
+        const backdrop: THREE.Object3D[] = [];
+        scene.traverse(o => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          if (named(mesh, /^(buildings|decals|props)/i)) cutTriangles(mesh, cuts);
+          // The backdrop city beyond the ring would float over the slopes
+          // that now fall away on every side: re-seat it on the terrain
+          else if (named(mesh, /^backdrop/i)) backdrop.push(mesh);
+        });
+        for (const b of backdrop) collisionMeshes.push(...seatBackdrop(b as THREE.Mesh));
+        for (const m of collisionMeshes)
+          if (/^col_(buildings|props)/i.test(m.name)) cutTriangles(m, cuts);
+        const backs = buildRingBacks(collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null);
+        if (backs !== null) scene.add(backs);
+        const alleys = buildAlleys();
+        scene.add(alleys.group);
+        collisionMeshes.push(...alleys.collision);
+        // Catch floor behind the buildings, stopping at the outer wall and
+        // open along the corridors
+        for (const b of ringBands(85, MOUNTAIN.wallZ, 96)) {
+          const m = new THREE.Mesh(
+            new THREE.BoxGeometry(b.max.x - b.min.x, 0.2, b.max.z - b.min.z),
+          );
+          m.name = 'COL_CatchFloor';
+          m.position.set((b.min.x + b.max.x) / 2, -0.3, (b.min.z + b.max.z) / 2);
+          m.updateMatrixWorld(true);
+          collisionMeshes.push(m);
+        }
+        mountain = { inCorridor, minZ: MOUNTAIN.minZ };
+      } else {
+        collisionMeshes.push(...catchFloor(85, 96, -0.2));
+      }
     }
 
     const sunDir = json.sun?.direction ?? [-0.45, -0.75, 0.48];
@@ -198,6 +254,7 @@ export async function loadLevel(
       bounds,
       baked: !!json.lightmaps && Object.keys(json.lightmaps).length > 0,
       softBounds,
+      mountain,
     };
   } catch (err) {
     console.info(

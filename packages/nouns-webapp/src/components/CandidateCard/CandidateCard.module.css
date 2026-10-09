@@ -3,10 +3,10 @@
   margin-top: 0.4rem;
   display: flex;
   flex-direction: column;
-  border: 1px solid #e2e3e8;
+  border: 1px solid transparent;
   box-sizing: border-box;
   border-radius: 16px;
-  background: #f4f4f8;
+  background: var(--theme-bg-card);
   font-size: 22px;
   font-family: 'PT Root UI';
   font-weight: bold;
@@ -30,7 +30,7 @@
 }
 
 .footer {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--theme-divider);
   padding-top: 10px;
   margin-top: 10px;
   display: flex;

@@ -165,7 +165,7 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
         style={{
           fontSize: '0.8rem',
           fontWeight: 800,
-          color: '#222',
+          color: 'var(--theme-text-primary)',
           margin: 0,
           letterSpacing: '0.02em',
           fontFamily: "'PT Root UI', sans-serif",
@@ -183,7 +183,7 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
           textAlign: 'center',
           cursor: 'pointer',
           transition: 'border-color 0.2s, background 0.2s',
-          fontSize: '0.7rem',
+          fontSize: '0.75rem',
           fontWeight: 600,
           color: '#777',
           display: 'flex',
@@ -215,13 +215,13 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
                 objectFit: 'contain',
               }}
             />
-            <span style={{ fontSize: '0.6rem', color: '#aaa' }}>Click or drop to replace</span>
+            <span style={{ fontSize: '0.75rem', color: '#aaa' }}>Click or drop to replace</span>
           </>
         ) : (
           <>
             <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{'\u{1F3A8}'}</span>
             <span>Drop your artwork here or click to browse</span>
-            <span style={{ fontSize: '0.55rem', color: '#bbb' }}>
+            <span style={{ fontSize: '0.75rem', color: '#bbb' }}>
               PNG, JPG, GIF (animated OK!) — max 5MB
             </span>
           </>
@@ -246,16 +246,16 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
           value={name}
           onChange={e => setName(e.target.value)}
           style={{
-            border: '1px solid rgba(0,0,0,0.12)',
+            border: '1px solid transparent',
             borderRadius: 8,
             padding: '8px 12px',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             outline: 'none',
             flex: 1,
             minWidth: 140,
             fontFamily: "'PT Root UI', sans-serif",
-            background: 'rgba(255,255,255,0.6)',
+            background: 'var(--theme-bg-input)',
           }}
           maxLength={30}
           onKeyDown={e => {
@@ -268,16 +268,16 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
           value={auctionUrl}
           onChange={e => setAuctionUrl(e.target.value)}
           style={{
-            border: '1px solid rgba(0,0,0,0.12)',
+            border: '1px solid transparent',
             borderRadius: 8,
             padding: '8px 12px',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             outline: 'none',
             flex: 1,
             minWidth: 140,
             fontFamily: "'PT Root UI', sans-serif",
-            background: 'rgba(255,255,255,0.6)',
+            background: 'var(--theme-bg-input)',
           }}
           onKeyDown={e => {
             if (e.key === 'Enter' && !uploading) handleSubmit();
@@ -294,7 +294,7 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
             borderRadius: 8,
             padding: '8px 20px',
             fontWeight: 700,
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             cursor: uploading || !name.trim() || !imageData ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
             fontFamily: "'PT Root UI', sans-serif",
@@ -314,10 +314,10 @@ const DerivativeUploadForm: React.FC<DerivativeUploadFormProps> = ({ nounId, onU
       </div>
 
       {error && (
-        <span style={{ color: '#dc2626', fontSize: '0.65rem', fontWeight: 600 }}>{error}</span>
+        <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 600 }}>{error}</span>
       )}
       {success && (
-        <span style={{ color: '#16a34a', fontSize: '0.65rem', fontWeight: 600 }}>{success}</span>
+        <span style={{ color: '#16a34a', fontSize: '0.75rem', fontWeight: 600 }}>{success}</span>
       )}
     </div>
   );

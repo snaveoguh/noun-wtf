@@ -90,7 +90,7 @@ function votingTimerLabel(
   const blocksLeft = Number(target) - Number(currentBlock);
   if (blocksLeft <= 0) return 'VOTING';
   const baseLabel = status === ProposalState.OBJECTION_PERIOD ? 'OBJECTION' : 'VOTING';
-  return `${baseLabel} · ${formatTimeLeft(blocksLeft * AVG_BLOCK_TIME_S)}`;
+  return `${baseLabel}, ${formatTimeLeft(blocksLeft * AVG_BLOCK_TIME_S)}`;
 }
 
 /**

@@ -49,7 +49,7 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
 
           {/* Listed price overlay */}
           {noun.listedPriceEth && (
-            <span className="absolute bottom-2 right-2 bg-[var(--ink)] px-1.5 py-0.5 font-mono text-[9px] font-bold text-[var(--paper)]">
+            <span className="absolute bottom-2 right-2 bg-[var(--ink)] px-1.5 py-0.5 font-mono text-xs font-bold text-[var(--paper)]">
               {parseFloat(noun.listedPriceEth).toFixed(4)} ETH
             </span>
           )}
@@ -65,7 +65,7 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
         </Link>
 
         {noun.owner && (
-          <p className="mt-0.5 truncate font-mono text-[8px] text-[var(--ink-faint)]">
+          <p className="mt-0.5 truncate font-mono text-xs text-[var(--ink-faint)]">
             Owner: {noun.owner.slice(0, 6)}...{noun.owner.slice(-4)}
           </p>
         )}
@@ -77,7 +77,7 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
           ) : (
             <Link
               to={`/marketplace/${noun.nounId}`}
-              className="font-mono text-[9px] uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)]"
+              className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)]"
             >
               View Details
             </Link>

@@ -218,7 +218,7 @@ const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.5rem',
+              fontSize: '0.75rem',
               color: 'rgba(0,0,0,0.5)',
               fontWeight: 'bold',
             }}
@@ -272,7 +272,7 @@ const MetaPanel: FC<{ meta: TokenMeta }> = ({ meta }) => (
 );
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.6rem',
+  fontSize: '0.75rem',
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
@@ -304,7 +304,7 @@ const TerraformsPage: FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#475569',
+              color: 'var(--theme-text-muted)',
               fontSize: '0.85rem',
             }}
           >
@@ -410,7 +410,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
           Terraforms Explorer
         </h1>
         <p style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem', margin: 0 }}>
-          Fully onchain ASCII art by Mathcastles · {TOTAL_SUPPLY.toLocaleString()} tokens ·{' '}
+          Fully onchain ASCII art by Mathcastles, {TOTAL_SUPPLY.toLocaleString()} tokens,{' '}
           <a
             href="/terraforms"
             style={{ color: 'var(--theme-text-muted)', textDecoration: 'underline' }}
@@ -446,8 +446,8 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
               width: 160,
               padding: '8px 14px',
               borderRadius: 10,
-              border: '1px solid #334155',
-              background: '#0f172a',
+              border: '1px solid var(--theme-divider)',
+              background: 'var(--theme-bg-card)',
               color: '#e2e8f0',
               fontSize: '0.85rem',
               fontFamily: "'PT Root UI', sans-serif",
@@ -467,7 +467,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
         </button>
         <button
           onClick={goRandom}
-          style={{ ...navBtnStyle, padding: '8px 14px', fontSize: '0.7rem' }}
+          style={{ ...navBtnStyle, padding: '8px 14px', fontSize: '0.75rem' }}
         >
           Random
         </button>
@@ -520,7 +520,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
             style={{
               textAlign: 'center',
               padding: '80px 0',
-              color: '#475569',
+              color: 'var(--theme-text-muted)',
             }}
           >
             <div style={{ fontSize: '3rem', marginBottom: 12 }}>&#x25A8;</div>
@@ -545,8 +545,8 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
                 Terraform #{tokenId}
               </h2>
               {meta && (
-                <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)' }}>
-                  Level {meta.level} · {meta.zoneName} · ({meta.x}, {meta.y}) · Elev{' '}
+                <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
+                  Level {meta.level}, {meta.zoneName}, ({meta.x}, {meta.y}), Elev{' '}
                   {meta.elevation}
                 </span>
               )}
@@ -561,7 +561,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
                 margin: '0 auto',
                 borderRadius: 12,
                 overflow: 'hidden',
-                border: '1px solid #1e293b',
+                border: '1px solid var(--theme-divider)',
                 background: '#000',
               }}
             >
@@ -618,8 +618,8 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
 const navBtnStyle: React.CSSProperties = {
   padding: '8px 12px',
   borderRadius: 10,
-  border: '1px solid #334155',
-  background: '#1e293b',
+  border: '1px solid var(--theme-divider)',
+  background: 'var(--theme-bg-tertiary)',
   color: '#e2e8f0',
   fontSize: '0.85rem',
   fontWeight: 700,
@@ -631,7 +631,7 @@ const navBtnStyle: React.CSSProperties = {
 const linkStyle: React.CSSProperties = {
   padding: '8px 16px',
   borderRadius: 10,
-  border: '1px solid #1e293b',
+  border: '1px solid var(--theme-divider)',
   fontSize: '0.75rem',
   fontWeight: 600,
   color: '#94a3b8',

@@ -143,7 +143,7 @@ const LilNounsProposals: FC = () => {
                   display: 'block',
                   padding: '16px 20px',
                   borderRadius: 16,
-                  border: '1px solid #e2e3e8',
+                  border: '1px solid transparent',
                   textDecoration: 'none',
                   color: 'inherit',
                   transition: 'border-color 0.15s',
@@ -154,7 +154,7 @@ const LilNounsProposals: FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <span
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: 6,
@@ -170,7 +170,7 @@ const LilNounsProposals: FC = () => {
                   <span
                     style={{
                       color: 'var(--theme-text-muted)',
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       marginLeft: 'auto',
                     }}
                   >
@@ -212,12 +212,12 @@ const LilNounsProposals: FC = () => {
                     </div>
                     <span
                       style={{
-                        fontSize: '0.65rem',
+                        fontSize: '0.75rem',
                         color: 'var(--theme-text-muted)',
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {p.forVotes} for · {p.againstVotes} against
+                      {p.forVotes} for, {p.againstVotes} against
                     </span>
                   </div>
                 )}

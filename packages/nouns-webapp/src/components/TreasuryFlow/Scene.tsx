@@ -679,7 +679,7 @@ function NodeLabels({
     if (parts.length === 1 && node.totalIn > 0) {
       parts.push(`received ${Math.round(node.totalIn)} ETH`);
     }
-    return parts.join(' · ');
+    return parts.join(', ');
   }, []);
 
   return (
@@ -733,7 +733,7 @@ function NodeLabels({
                 <div
                   style={{
                     fontFamily: "'PT Root UI', sans-serif",
-                    fontSize: '9px',
+                    fontSize: 12,
                     color: isMatched ? '#fbbf24' : '#94a3b8',
                     lineHeight: 1.3,
                   }}

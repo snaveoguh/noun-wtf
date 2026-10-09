@@ -73,7 +73,7 @@ export function OperatorPanel() {
   if (loading) {
     return (
       <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
-        <p className="font-mono text-[9px] text-[var(--ink-faint)]">Loading operator data...</p>
+        <p className="font-mono text-xs text-[var(--ink-faint)]">Loading operator data...</p>
       </section>
     );
   }
@@ -81,10 +81,10 @@ export function OperatorPanel() {
   if (error) {
     return (
       <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
-        <h2 className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
+        <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
           Operator Panel
         </h2>
-        <p className="font-mono text-[9px] text-[var(--accent-red)]">{error}</p>
+        <p className="font-mono text-xs text-[var(--accent-red)]">{error}</p>
       </section>
     );
   }
@@ -95,17 +95,17 @@ export function OperatorPanel() {
 
   return (
     <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
-      <h2 className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
+      <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
         Operator Panel
       </h2>
-      <p className="mb-4 font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
+      <p className="mb-4 font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
         Markets auto-open on first wager. Operator view is for monitoring live markets and resolving
         terminal outcomes.
       </p>
 
       {needsResolve.length > 0 && (
         <div className="mb-6">
-          <h3 className="mb-2 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--accent-red)]">
+          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--accent-red)]">
             Needs Resolution ({needsResolve.length})
           </h3>
           <OpsTable
@@ -138,7 +138,7 @@ export function OperatorPanel() {
 
       {watchlist.length > 0 && (
         <div className="mb-6">
-          <h3 className="mb-2 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-light)]">
+          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink-light)]">
             Live / Auto Markets ({watchlist.length})
           </h3>
           <OpsTable
@@ -169,7 +169,7 @@ export function OperatorPanel() {
 
       {resolved.length > 0 && (
         <div>
-          <h3 className="mb-2 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-faint)]">
+          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink-faint)]">
             Already Resolved ({resolved.length})
           </h3>
           <OpsTable
@@ -225,7 +225,7 @@ function OpsTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse font-mono text-[9px]">
+      <table className="w-full border-collapse font-mono text-xs">
         <thead>
           <tr className="border-b border-[var(--rule)] text-left text-[var(--ink-faint)]">
             {columns.map(column => (
@@ -278,7 +278,7 @@ function ResolveButton({ daoKey, proposalId }: { daoKey: string; proposalId: str
         {isPending ? 'Sign...' : isConfirming ? 'Confirming...' : 'Resolve'}
       </button>
       {error && (
-        <p className="mt-0.5 text-[8px] text-[var(--accent-red)]">
+        <p className="mt-0.5 text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}

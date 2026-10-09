@@ -257,7 +257,7 @@ const WalletExplorer: FC = () => {
               <div
                 style={{
                   fontFamily: 'ui-monospace, monospace',
-                  fontSize: 11,
+                  fontSize: 12,
                   color: '#9be',
                   wordBreak: 'break-all',
                 }}
@@ -265,8 +265,8 @@ const WalletExplorer: FC = () => {
                 {selectedNode.id}
               </div>
               <div style={{ marginTop: 8, fontSize: 12 }}>{selectedNode.description}</div>
-              <div style={{ marginTop: 10, fontSize: 11, color: '#888' }}>
-                In: {selectedNode.totalIn?.toFixed(2) ?? 0} Ξ · Out:{' '}
+              <div style={{ marginTop: 10, fontSize: 12, color: '#888' }}>
+                In: {selectedNode.totalIn?.toFixed(2) ?? 0} Ξ, Out:{' '}
                 {selectedNode.totalOut?.toFixed(2) ?? 0} Ξ
               </div>
             </div>

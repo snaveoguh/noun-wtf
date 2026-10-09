@@ -398,7 +398,7 @@ const DreamModal: FC<{
             padding: '4px 10px',
             borderRadius: 6,
             background: 'rgba(168, 85, 247, 0.12)',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: '#9333ea',
             marginBottom: 10,
@@ -447,7 +447,7 @@ const DreamModal: FC<{
                   <span
                     style={{
                       marginLeft: 6,
-                      fontSize: '0.6rem',
+                      fontSize: '0.75rem',
                       color: '#9333ea',
                       fontWeight: 700,
                     }}
@@ -463,7 +463,7 @@ const DreamModal: FC<{
         {/* Dreamer */}
         <div
           style={{
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             color: 'var(--theme-text-muted)',
             marginBottom: 6,
             fontFamily: "'PT Root UI'",
@@ -477,7 +477,7 @@ const DreamModal: FC<{
 
         <div
           style={{
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             color: 'var(--theme-text-muted)',
             marginBottom: 16,
           }}
@@ -517,7 +517,7 @@ const DreamModal: FC<{
             marginTop: 16,
             paddingTop: 12,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a0c0',
@@ -618,7 +618,7 @@ const DreamsBanner: FC = () => {
             paddingRight: '24px',
             background: 'linear-gradient(90deg, #f3eef8 70%, rgba(243,238,248,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,
@@ -758,7 +758,7 @@ const DreamsBanner: FC = () => {
               >
                 <span
                   style={{
-                    fontSize: '0.5rem',
+                    fontSize: '0.75rem',
                     fontWeight: 800,
                     background: 'rgba(147, 51, 234, 0.85)',
                     color: '#fff',

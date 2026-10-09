@@ -456,7 +456,7 @@ const CreateCandidatePage = () => {
                   <p
                     style={{
                       fontSize: '0.78rem',
-                      color: '#374151',
+                      color: 'var(--theme-text-primary)',
                       lineHeight: 1.6,
                       marginBottom: 12,
                     }}
@@ -467,7 +467,7 @@ const CreateCandidatePage = () => {
                   </p>
                   <p
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       color: 'var(--theme-text-muted)',
                       marginBottom: 16,
                     }}
@@ -477,7 +477,7 @@ const CreateCandidatePage = () => {
                       href={AGREEMENT_URL}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: '#3b82f6', textDecoration: 'underline' }}
+                      style={{ color: 'var(--theme-text-link)', textDecoration: 'underline' }}
                     >
                       Read the full Nouns Art Contribution Agreement
                     </a>
@@ -516,14 +516,14 @@ const CreateCandidatePage = () => {
                         height: 40,
                         imageRendering: 'pixelated',
                         borderRadius: 8,
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid transparent',
                       }}
                     />
                     <div>
                       <p style={{ fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
                         {traitName ?? 'Custom Trait'}
                       </p>
-                      <p style={{ fontSize: '0.65rem', color: '#22c55e', margin: 0 }}>
+                      <p style={{ fontSize: '0.75rem', color: '#22c55e', margin: 0 }}>
                         Released under CC0 1.0
                       </p>
                     </div>
@@ -538,7 +538,7 @@ const CreateCandidatePage = () => {
                   >
                     <p
                       style={{
-                        fontSize: '0.6rem',
+                        fontSize: '0.75rem',
                         color: 'var(--theme-text-muted)',
                         margin: '0 0 4px',
                         fontWeight: 600,
@@ -548,8 +548,8 @@ const CreateCandidatePage = () => {
                     </p>
                     <p
                       style={{
-                        fontSize: '0.6rem',
-                        color: '#374151',
+                        fontSize: '0.75rem',
+                        color: 'var(--theme-text-primary)',
                         fontFamily: 'monospace',
                         wordBreak: 'break-all',
                         margin: 0,
@@ -566,8 +566,8 @@ const CreateCandidatePage = () => {
                       display: 'block',
                       textAlign: 'center',
                       marginTop: 10,
-                      fontSize: '0.65rem',
-                      color: '#3b82f6',
+                      fontSize: '0.75rem',
+                      color: 'var(--theme-text-link)',
                     }}
                   >
                     View Full Agreement on Arweave &rarr;

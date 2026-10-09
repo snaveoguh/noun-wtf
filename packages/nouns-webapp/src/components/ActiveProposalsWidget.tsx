@@ -16,9 +16,9 @@ const STATUS_LABELS: Record<number, string> = {
 const STATUS_COLORS: Record<number, { bg: string; color: string }> = {
   [ProposalState.PENDING]: { bg: '#43b369', color: '#fff' },
   [ProposalState.ACTIVE]: { bg: '#43b369', color: '#fff' },
-  [ProposalState.UPDATABLE]: { bg: '#fff', color: '#dc9e46' },
+  [ProposalState.UPDATABLE]: { bg: '#dc9e46', color: '#fff' },
   [ProposalState.QUEUED]: { bg: 'var(--theme-text-muted)', color: '#fff' },
-  [ProposalState.OBJECTION_PERIOD]: { bg: '#fff', color: '#e40536' },
+  [ProposalState.OBJECTION_PERIOD]: { bg: '#e40536', color: '#fff' },
   [ProposalState.SUCCEEDED]: { bg: '#4965d0', color: '#fff' },
 };
 
@@ -85,7 +85,7 @@ const ActiveProposalsWidget: FC = () => {
                   gap: 8,
                   padding: '8px 12px',
                   borderRadius: 10,
-                  border: '1px solid #e2e3e8',
+                  border: '1px solid transparent',
                   background: 'var(--theme-bg-card)',
                   textDecoration: 'none',
                   color: 'inherit',
@@ -95,10 +95,10 @@ const ActiveProposalsWidget: FC = () => {
                   transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.background = '#fff';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--theme-bg-hover)';
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.background = '#f4f4f8';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--theme-bg-card)';
                 }}
               >
                 <div
@@ -125,7 +125,7 @@ const ActiveProposalsWidget: FC = () => {
                 <span
                   style={{
                     flexShrink: 0,
-                    fontSize: '0.65rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     padding: '2px 8px',
                     borderRadius: 6,

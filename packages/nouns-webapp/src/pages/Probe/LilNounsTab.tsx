@@ -472,7 +472,7 @@ const LilNounsTab: FC = () => {
                           style={{ width: layout.cellSize, height: layout.cellSize, imageRendering: 'pixelated' }}
                         />
                       )}
-                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-[10px] font-bold shadow-sm group-hover:block">
+                      <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 rounded bg-white/90 px-1 text-xs font-bold shadow-sm group-hover:block">
                         {lilId}
                       </span>
                     </div>

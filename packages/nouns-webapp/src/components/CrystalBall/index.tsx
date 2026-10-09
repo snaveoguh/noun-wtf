@@ -419,7 +419,7 @@ const CrystalBall: FC<CrystalBallProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: '"Courier New", monospace',
-              fontSize: 10,
+              fontSize: 12,
               color: 'rgba(100,200,255,0.3)',
               letterSpacing: '0.1em',
             }}
@@ -437,7 +437,7 @@ const CrystalBall: FC<CrystalBallProps> = ({
               left: '50%',
               transform: 'translateX(-50%)',
               fontFamily: '"Courier New", monospace',
-              fontSize: 8,
+              fontSize: 12,
               fontWeight: 800,
               color: '#ef4444',
               letterSpacing: '0.15em',
@@ -465,20 +465,20 @@ const CrystalBall: FC<CrystalBallProps> = ({
       >
         {prediction && (
           <>
-            <div style={{ fontSize: 10, color: '#666', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 12, color: 'var(--theme-text-muted)', letterSpacing: '0.05em' }}>
               <span style={{ color: prediction.running ? '#4ade80' : '#ef4444' }}>
                 {prediction.running ? '\u25CF' : '\u25CB'}
               </span>{' '}
               NOUN #{prediction.nextNounId}
               {prediction.block > 0 && (
-                <span style={{ color: '#444', marginLeft: 6 }}>BLK {prediction.block}</span>
+                <span style={{ color: 'var(--theme-text-muted)', marginLeft: 6 }}>BLK {prediction.block}</span>
               )}
             </div>
             {countdown && (
               <div
                 style={{
-                  fontSize: 9,
-                  color: isNounOClock ? '#ef4444' : '#555',
+                  fontSize: 12,
+                  color: isNounOClock ? 'var(--theme-negative)' : 'var(--theme-text-muted)',
                   letterSpacing: '0.08em',
                 }}
               >

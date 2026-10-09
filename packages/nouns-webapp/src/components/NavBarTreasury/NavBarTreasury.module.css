@@ -30,7 +30,7 @@
 
 .warmInfo .icon {
   color: #b6a9a7;
-  border-left: 1px solid #e1d7d5;
+  border-left: 1px solid var(--theme-divider);
 }
 
 .treasuryBalance {

@@ -295,7 +295,7 @@ const StoryModal: FC<{
             marginTop: 16,
             paddingTop: 12,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a890',
@@ -394,7 +394,7 @@ const NounsWorldBanner: FC = () => {
             paddingRight: '24px',
             background: 'linear-gradient(90deg, #faf5ee 70%, rgba(250,245,238,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,
@@ -494,7 +494,7 @@ const NounsWorldBanner: FC = () => {
                 <span
                   style={{
                     color: '#fff',
-                    fontSize: '0.65rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     lineHeight: 1.3,
                     display: '-webkit-box',
