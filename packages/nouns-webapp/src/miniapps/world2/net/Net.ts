@@ -7,29 +7,13 @@
 //   airborneY     → world Y
 //   flipRotation  → rider yaw
 //   state         → compact JSON blob (anim, rider quat, board pose, …)
-// Voice reuses the v1 WebRTC mesh (engine/voip.ts) unchanged.
+// Voice is a WebRTC mesh signalled over the same socket (see Voice.ts).
 
 import PartySocket from 'partysocket';
 import * as THREE from 'three';
 
 import { PARTYKIT_HOST } from '../../world/engine/types';
-import {
-  addTracksToExistingPeers,
-  callPeer,
-  checkVoiceActivity,
-  createVoipState,
-  destroyVoip,
-  handleAnswer,
-  handleIceCandidate,
-  handleOffer,
-  initVoip,
-  initVoipListenOnly,
-  removePeer,
-  toggleMute,
-  updateListenerPosition,
-  updateSpatialPosition,
-  type VoipState,
-} from '../../world/engine/voip';
+import { Voice } from './Voice';
 
 export const V2_ROOM = 'nouns-world-v2';
 const SEND_HZ = 15;
@@ -92,8 +76,10 @@ export class Net {
   myId = '';
   players = new Map<string, RemotePlayer>();
   count = 0;
-  voip: VoipState = createVoipState();
-  micOn = false;
+  voip = new Voice();
+  get micOn() {
+    return this.voip.micOn;
+  }
   private sendAcc = 0;
   private lastSent = '';
   onJoin?: (id: string) => void;
@@ -107,9 +93,9 @@ export class Net {
     if (this.ws) return;
     const ws = new PartySocket({ host: PARTYKIT_HOST, room: V2_ROOM });
     this.ws = ws;
-    initVoipListenOnly(this.voip);
     ws.addEventListener('open', () => {
       this.myId = ws.id;
+      this.voip.bind(ws, ws.id);
       this.connected = true;
       this.onOpen?.();
     });
@@ -137,8 +123,8 @@ export class Net {
         this.ingest(id, p);
       }
       this.count = (d.count as number) ?? this.count;
-      if (this.micOn && this.ws)
-        for (const id of this.players.keys()) void callPeer(this.voip, id, this.ws, this.myId);
+      // Everyone joins the voice mesh (listening works without a mic)
+      for (const id of this.players.keys()) this.voip.ensurePeer(id);
     } else if (type === 'world:player') {
       const id = d.id as string;
       if (id && id !== this.myId) this.ingest(id, d);
@@ -147,25 +133,26 @@ export class Net {
       const id = d.id as string;
       if (id && id !== this.myId) {
         this.onJoin?.(id);
-        if (this.micOn && this.ws) void callPeer(this.voip, id, this.ws, this.myId);
+        this.voip.ensurePeer(id);
       }
     } else if (type === 'world:leave') {
       const id = d.id as string;
       this.count = (d.count as number) ?? this.count;
       if (this.players.delete(id)) this.onLeave?.(id);
-      removePeer(this.voip, id);
-    } else if (type === 'world:voip:offer' && this.ws) {
-      void handleOffer(this.voip, d.from as string, d.sdp as string, this.ws, this.myId);
+      this.voip.dropPeer(id);
+    } else if (type === 'world:voip:offer') {
+      if (d.to !== undefined && d.to !== this.myId) return;
+      void this.voip.handleOffer(d.from as string, d.sdp as string);
     } else if (type === 'world:voip:answer') {
-      void handleAnswer(this.voip, d.from as string, d.sdp as string);
+      if (d.to !== undefined && d.to !== this.myId) return;
+      void this.voip.handleAnswer(d.from as string, d.sdp as string);
     } else if (type === 'world:voip:ice') {
-      void handleIceCandidate(this.voip, d.from as string, d.candidate as string);
+      if (d.to !== undefined && d.to !== this.myId) return;
+      void this.voip.handleIce(d.from as string, d.candidate as string);
     } else if (type === 'world:voip:speaking') {
       const rp = this.players.get(d.id as string);
       const speaking = d.speaking === true;
       if (rp) rp.speaking = speaking;
-      if (speaking) this.voip.activeSpeakers.add(d.id as string);
-      else this.voip.activeSpeakers.delete(d.id as string);
     } else if (type === 'world:graffiti:tags') {
       const tags = Array.isArray(d.tags) ? (d.tags as { imageData: string }[]) : [];
       this.onGraffiti?.(String(d.wallId ?? ''), tags);
@@ -228,6 +215,7 @@ export class Net {
       rp.current.pos.copy(pose.pos);
       rp.current.quat.copy(pose.quat);
       this.players.set(id, rp);
+      this.voip.ensurePeer(id);
       this.onJoin?.(id);
     }
     rp.seedKey = pose.seedKey;
@@ -325,36 +313,22 @@ export class Net {
 
   // ── Voice ──────────────────────────────────────────────────────────
 
-  async toggleMic(): Promise<'on' | 'muted' | 'denied'> {
-    if (!this.micOn) {
-      const ok = await initVoip(this.voip);
-      if (!ok) return 'denied';
-      this.micOn = true;
-      if (this.ws) {
-        await addTracksToExistingPeers(this.voip, this.ws, this.myId);
-        for (const id of this.players.keys()) void callPeer(this.voip, id, this.ws, this.myId);
-      }
-      return 'on';
-    }
-    toggleMute(this.voip);
-    return this.voip.isMuted ? 'muted' : 'on';
+  toggleMic(): Promise<'on' | 'muted' | 'denied'> {
+    return this.voip.toggleMic();
   }
 
   private vadAcc = 0;
-  tickVoice(dt: number, listener: THREE.Vector3, forward: THREE.Vector3) {
+  tickVoice(dt: number, _listener: THREE.Vector3, _forward: THREE.Vector3) {
     this.vadAcc += dt;
     if (this.vadAcc < 0.1) return;
     this.vadAcc = 0;
     const v = this.voip;
-    if (v.localStream && this.ws?.readyState === WebSocket.OPEN) {
+    if (v.micOn && this.ws?.readyState === WebSocket.OPEN) {
       const was = v.isSpeaking;
-      checkVoiceActivity(v);
+      v.checkSpeaking();
       if (v.isSpeaking !== was)
         this.ws.send(JSON.stringify({ type: 'world:voip:speaking', speaking: v.isSpeaking }));
     }
-    updateListenerPosition(v, listener.x, listener.y, listener.z, forward.x, forward.z);
-    for (const [id, rp] of this.players)
-      updateSpatialPosition(v, id, rp.current.pos.x, rp.current.pos.y, rp.current.pos.z);
   }
 
   graffitiSave(wallId: string, imageData: string) {
@@ -376,7 +350,7 @@ export class Net {
   }
 
   dispose() {
-    destroyVoip(this.voip);
+    this.voip.destroy();
     this.ws?.close();
     this.ws = null;
     this.players.clear();
