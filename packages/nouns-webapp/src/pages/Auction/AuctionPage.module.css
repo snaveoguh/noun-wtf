@@ -36,35 +36,35 @@
 }
 /* Bootstrap alerts on the pastel page: the global noir rule paints them as
    dark glass with white text; here they need ink on a faint tint. */
-.page :global(.alert) {
+.page.page :global(.alert) {
   background: rgba(0, 0, 0, 0.05) !important;
   color: var(--theme-text-primary) !important;
 }
-.page :global(.alert) a,
-.page :global(.alert) code,
-.page :global(.alert) strong {
+.page.page :global(.alert) a,
+.page.page :global(.alert) code,
+.page.page :global(.alert) strong {
   color: var(--theme-text-primary) !important;
 }
 /* Tailwind pastel pairs are mapped to bright text for the dark theme in
    index.css; on this light ground they need their original ink shades. */
-.page :global(.text-red-700),
-.page :global(.text-red-800),
-.page :global(.text-red-900) {
+.page.page :global(.text-red-700),
+.page.page :global(.text-red-800),
+.page.page :global(.text-red-900) {
   color: #9f1239 !important;
 }
-.page :global(.text-green-700),
-.page :global(.text-green-800),
-.page :global(.text-green-900) {
+.page.page :global(.text-green-700),
+.page.page :global(.text-green-800),
+.page.page :global(.text-green-900) {
   color: #166534 !important;
 }
-.page :global(.text-amber-700),
-.page :global(.text-amber-800),
-.page :global(.text-yellow-800) {
+.page.page :global(.text-amber-700),
+.page.page :global(.text-amber-800),
+.page.page :global(.text-yellow-800) {
   color: #92400e !important;
 }
-.page :global(.text-white\/30),
-.page :global(.text-white\/40),
-.page :global(.text-white\/50) {
+.page.page :global(.text-white\/30),
+.page.page :global(.text-white\/40),
+.page.page :global(.text-white\/50) {
   color: var(--theme-text-muted) !important;
 }
 .page h1,
