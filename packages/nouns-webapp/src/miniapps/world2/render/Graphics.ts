@@ -186,8 +186,18 @@ export class Graphics {
     const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.42 });
     // `?fx=bloom,tone,grade,sat,vig` limits the stack (debugging / perf triage).
     const fxParam = new URLSearchParams(window.location.search).get('fx');
-    const want = (k: string) => fxParam === null || fxParam.split(',').includes(k);
+    // Default look = clamp + vignette only. The tone/contrast/saturation/bloom
+    // grade turned dark toon surfaces white on Apple GPUs, and the ungraded
+    // image read better anyway (?diag=1 on an M4, tile C). ?fx=…,tone,grade,
+    // sat,bloom brings stages back for experiments.
+    const want = (k: string) =>
+      fxParam === null ? k === 'vig' || k === 'ink' : fxParam.split(',').includes(k);
     const effects: Effect[] = [
+      // Clamp FIRST: on Apple GPUs the scene render can leave slightly negative
+      // values in dark areas; NEUTRAL tone mapping's offset term
+      // (x - 6.25x²) explodes for negative input and turns them near-white.
+      // (?diag=1 on an M4: grade pass on → white, grade pass off → correct.)
+      new ClampEffect(),
       want('bloom') ? this.bloom : null,
       want('tone') ? tone : null,
       want('grade') ? grade : null,
