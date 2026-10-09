@@ -23,6 +23,10 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'SHIFT / Q', v: 'manual, nose manual' },
   { k: 'I / O', v: 'grab' },
   { k: 'F', v: 'get on / off board' },
+  {
+    k: 'CLIMB',
+    v: 'walk / jump into any building (or hold W mid-air), W/S up/down, A/D along, SHIFT faster, SPACE wall-jump, F let go',
+  },
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
   { k: 'M / .', v: 'radio station, next track' },
@@ -39,6 +43,7 @@ const PAD: { k: string; v: string }[] = [
   { k: 'B', v: 'brake' },
   { k: 'LT / RT', v: 'grabs' },
   { k: 'Y', v: 'board on / off' },
+  { k: 'Climb', v: 'walk or jump into any wall, L stick climbs, A wall-jump, Y let go' },
   { k: 'RT (on foot)', v: 'spray paint, R3 colour' },
 ];
 

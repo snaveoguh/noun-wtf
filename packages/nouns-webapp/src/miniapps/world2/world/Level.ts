@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { buildFallbackPark } from './FallbackPark';
+import { buildSkyline } from './Skyline';
 
 export interface LevelData {
   root: THREE.Object3D;
@@ -19,6 +20,11 @@ export interface LevelData {
   bounds: THREE.Box3;
   /** True when lighting comes from Blender lightmaps. */
   baked: boolean;
+  /**
+   * Soft play-area clamp (|x|, |z| ≤ this) applied by the player instead of
+   * invisible collision walls, so there's nothing invisible to climb.
+   */
+  softBounds?: number;
 }
 
 const BASE = '/world2/level/';
@@ -140,6 +146,22 @@ export async function loadLevel(
       ];
     }
 
+    // Skyscrapers on top of the ring of buildings. The baked invisible
+    // boundary box (±76.5, capped at 30 m) would wall off the rooftops and
+    // put a ceiling under the towers, so swap it for a soft clamp just
+    // outside the ring plus a catch floor behind the buildings.
+    let softBounds: number | undefined;
+    let skylineTop = 0;
+    if (collisionMeshes.some(m => m.name === 'COL_Buildings')) {
+      const roofs = collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null;
+      const skyline = buildSkyline(roofs);
+      scene.add(skyline.group);
+      skylineTop = skyline.maxY;
+      collisionMeshes = collisionMeshes.filter(m => m.name !== 'COL_Boundary');
+      collisionMeshes.push(...skyline.collision, ...catchFloor(85, 96, -0.2));
+      softBounds = 93.6;
+    }
+
     const sunDir = json.sun?.direction ?? [-0.45, -0.75, 0.48];
     const bounds = json.bounds
       ? Array.isArray(json.bounds)
@@ -149,6 +171,7 @@ export async function loadLevel(
             new THREE.Vector3(...json.bounds.max),
           )
       : new THREE.Box3().setFromObject(scene);
+    bounds.max.y = Math.max(bounds.max.y, skylineTop);
     return {
       root: scene,
       collisionMeshes,
@@ -173,6 +196,7 @@ export async function loadLevel(
       })),
       bounds,
       baked: !!json.lightmaps && Object.keys(json.lightmaps).length > 0,
+      softBounds,
     };
   } catch (err) {
     console.info(
@@ -182,4 +206,25 @@ export async function loadLevel(
     onProgress?.('building park');
     return buildFallbackPark();
   }
+}
+
+/** Collision-only ground ring between `inner` and `outer` (behind the buildings). */
+function catchFloor(inner: number, outer: number, y: number): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  const span = outer * 2;
+  const depth = outer - inner;
+  const mid = (outer + inner) / 2;
+  for (const [x, z, w, d] of [
+    [0, mid, span, depth],
+    [0, -mid, span, depth],
+    [mid, 0, depth, span],
+    [-mid, 0, depth, span],
+  ] as const) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d));
+    m.name = 'COL_CatchFloor';
+    m.position.set(x, y - 0.1, z);
+    m.updateMatrixWorld(true);
+    out.push(m);
+  }
+  return out;
 }
