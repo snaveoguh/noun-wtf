@@ -65,6 +65,12 @@ export interface PlayerTerrain {
   height(x: number, z: number): number;
   inDomain(x: number, z: number): boolean;
   surface(x: number, z: number): 'track' | 'grass' | 'alley' | null;
+  /**
+   * Speed governor (m/s) for a rider rolling at (x, y, z), Infinity = none.
+   * Where it's finite (set pieces built for the city, i.e. the mega ramps)
+   * the board also rides with the city's friction and drag, no streak.
+   */
+  speedLimit?(x: number, y: number, z: number): number;
 }
 
 /**
@@ -892,10 +898,18 @@ export class Player {
     const terr = this.terrain;
     const onMountain = terr !== null && terr.inDomain(this.pos.x, this.pos.z);
     this.surface = onMountain ? terr.surface(this.pos.x, this.pos.z) : null;
+    // Set pieces built for the city's physics (the mega ramps) bring them
+    // along on the mountain: city friction + drag, no streak, and their own
+    // speed governor in place of the city's top speed
+    const limit =
+      onMountain && terr.speedLimit !== undefined
+        ? terr.speedLimit(this.pos.x, this.pos.y, this.pos.z)
+        : Infinity;
+    const cityRide = !onMountain || limit < Infinity;
     let friction = t.rollingFriction;
     let drag = t.drag;
     let brakeK = 1;
-    if (onMountain) {
+    if (!cityRide) {
       // Ride streak: drag eases off with distance ridden, and a push from
       // behind grows with time on (+0.35 m/s² per minute), both since the
       // last bail. No top speed — only the emergent drag terminal velocity,
@@ -919,8 +933,9 @@ export class Player {
       this.powerslide * 2 * brakeK;
     const newSpeed = Math.max(0, this.speed - decel * dt);
     if (this.speed > 1e-4) this.vel.multiplyScalar(newSpeed / this.speed);
-    // The city keeps its top speed; the mountain has none
-    if (!onMountain && this.speed > t.maxSpeed) this.vel.multiplyScalar(t.maxSpeed / this.speed);
+    // The city keeps its top speed; the mountain has none (bar governed set pieces)
+    const cap = onMountain ? limit : t.maxSpeed;
+    if (this.speed > cap) this.vel.multiplyScalar(cap / this.speed);
 
     // Crouch (ollie load)
     this.crouch = THREE.MathUtils.lerp(this.crouch, input.crouch ? 1 : 0, 1 - Math.exp(-14 * dt));
@@ -1204,8 +1219,7 @@ export class Player {
       // Each extra flip in the chain is worth more than the last
       const flipPts = flips.reduce((sum, f, i) => sum + FLIPS[f].points * (1 + i * 0.5), 0);
       let pts =
-        (flips.length > 0 ? flipPts : this.popKind === 'nollie' ? 120 : 100) +
-        spinPoints(yawDeg);
+        (flips.length > 0 ? flipPts : this.popKind === 'nollie' ? 120 : 100) + spinPoints(yawDeg);
       if (this.takeoffFakie) pts *= 1.1;
       pts += Math.round(this.airTime * 80);
       if (this.grab) pts += 150 + Math.round(this.grabTime * 100);
@@ -1351,8 +1365,8 @@ export class Player {
       this.vertLip = false;
       this.airTime = 0;
       this.airYaw = 0;
-    this.airFlips = [];
-    this.queuedFlips = [];
+      this.airFlips = [];
+      this.queuedFlips = [];
       this.flipDone = null;
       this.grindCooldown = 0.35;
       this.takeoffFakie = this.fakie;

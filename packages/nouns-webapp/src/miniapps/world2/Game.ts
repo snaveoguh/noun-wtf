@@ -32,16 +32,26 @@ import { comboLabel, comboScore } from './skate/Tricks';
 import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
-import { MountainStream } from './world/mountain/MountainStream';
 import { dressingDecorator } from './world/mountain/DressingDecorator';
+import { megaRampDecorator } from './world/mountain/MegaRamps';
+import { MountainStream } from './world/mountain/MountainStream';
 import { rampDecorator, warmMountainProps } from './world/mountain/Props';
 import {
   edgeDistance,
+  megaFrame,
+  megaSpawn,
+  megaSpeedLimit,
   terrainHeight,
   terrainInDomain,
   terrainSurface,
 } from './world/mountain/terrain';
+import { MEGA_SITE } from './world/mountain/tracks';
 import { PipBillboards } from './world/PipBillboards';
+
+/** `?megaramp=` dev param: '1' = city boulevard ramp, 'mtn' = spawn on the hero mountain ramp. */
+function megaParam(): string | null {
+  return new URLSearchParams(window.location.search).get('megaramp');
+}
 
 export interface HudState {
   loading: string | null;
@@ -241,6 +251,9 @@ export class Game {
     this.player.spawn(spawn.position, spawn.yaw);
     if (this.megaRamp !== null)
       this.player.spawn(this.megaRamp.spawn.position, this.megaRamp.spawn.yaw);
+    // `?megaramp=mtn`: straight onto the hero mountain mega ramp's drop-in
+    if (megaParam() === 'mtn' && this.mountainHero !== null)
+      this.player.spawn(this.mountainHero.pos, this.mountainHero.yaw);
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -433,6 +446,8 @@ export class Game {
   nature: NatureSystem | null = null;
   /** Endless downhill terrain past the alleys (baked plaza only). */
   mountain: MountainStream | null = null;
+  /** Drop-in deck of the hero mega ramp on the mountain (an R respawn spot). */
+  mountainHero: { pos: THREE.Vector3; yaw: number } | null = null;
 
   private buildMountain(level: LevelData) {
     try {
@@ -441,6 +456,8 @@ export class Game {
       // Streams, ponds, bridges, plants, trees + rocks (replaces rockDecorator)
       m.addDecorator(dressingDecorator(this.gfx.quality));
       m.addDecorator(rampDecorator);
+      // Mega ramp set pieces: terrace + bridge + ramp, rails stream with the chunk
+      m.addDecorator(megaRampDecorator(this.rails));
       this.gfx.scene.add(m.group);
       this.mountain = m;
       this.player.mountain = level.mountain ?? null;
@@ -448,7 +465,16 @@ export class Game {
         height: terrainHeight,
         inDomain: terrainInDomain,
         surface: terrainSurface,
+        speedLimit: megaSpeedLimit,
       };
+      // R respawn: the hero mega ramp's drop-in, a short way down the +Z line
+      m.network.ensure(MEGA_SITE.heroS + 200);
+      const hero = m.network.main(0).megas[0];
+      if (hero !== undefined && !megaFrame(hero).dead) {
+        const sp = megaSpawn(hero);
+        this.mountainHero = { pos: new THREE.Vector3(sp.x, sp.y, sp.z), yaw: sp.yaw };
+        this.player.homeSpots.push(this.mountainHero);
+      }
     } catch (err) {
       console.warn('[world2] mountain failed, continuing without it', err);
       this.mountain = null;
@@ -515,11 +541,14 @@ export class Game {
     }
   }
 
-  /** Dev set piece (`?megaramp=1`): the mega ramp on the east lawn, spawn on its drop-in. */
+  /**
+   * Dev set piece (`?megaramp=1`): the mega ramp on the east lawn, spawn on
+   * its drop-in. (`?megaramp=mtn` spawns on the hero ramp on the mountain.)
+   */
   megaRamp: PlacedMegaRamp | null = null;
 
   private placeMegaRamp(level: LevelData) {
-    if (new URLSearchParams(window.location.search).get('megaramp') !== '1') return;
+    if (megaParam() !== '1') return;
     try {
       const ramp = buildMegaRamp({ seed: 1 });
       // East boulevard (x ≈ 64) is open from z −64 to 64; the ~115 m run heads +Z

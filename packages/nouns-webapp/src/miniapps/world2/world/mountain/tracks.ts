@@ -63,6 +63,10 @@ export interface Track {
   nextRamp: number;
   /** The main line a branch split from. */
   parent: Track | null;
+  /** Mega ramp sites (mains only), in along-track order. */
+  megas: MegaSite[];
+  /** Nominal along-track distance of the next mega ramp site to schedule. */
+  nextMega: number;
 }
 
 export interface NearestTrack {
@@ -146,6 +150,51 @@ export interface Ramp {
   heading: number;
 }
 
+// ── Mega ramp sites ──
+//
+// Main lines get a noggles mega ramp set piece (world/MegaRamp.ts) a short
+// way below their alley — the hero, on the +Z line — and then every
+// 3–5 km. Each site reserves a stretch of the line: dead straight from the
+// approach bridge to past the terrace (terrain.ts cuts a level pad into the
+// slope there), no launch ramps and no forks. The ramp itself stands beside
+// the line, `off` m to one side. Only the along-track position and side are
+// fixed here (growth never evaluates the terrain); the pad level, bridge
+// length, etc. are resolved lazily by terrain.ts → megaFrame().
+
+export const MEGA_SITE = {
+  /** Ramp centreline: lateral offset from the track centre (m). */
+  off: 16,
+  /** Hero site (+Z main): back of the drop-in deck, along-track m. */
+  heroS: 420,
+  /** First site on the other mains. */
+  first: 2200,
+  firstJitter: 1600,
+  /** Spacing between sites along a main. */
+  gap: 3000,
+  gapJitter: 2000,
+  /** Straight, ramp-free line this far before / after the drop-in deck. */
+  pre: 210,
+  post: 300,
+  /** No forks this far before the deck (branches must clear the terrace). */
+  forkClear: 600,
+  /** Sites are fixed this far ahead of the growth frontier. */
+  look: 800,
+} as const;
+
+export interface MegaSite {
+  track: Track;
+  k: number;
+  /** Along-track distance of the back of the drop-in deck (pad u = 0). */
+  s: number;
+  /** +1: ramp to the right of travel, −1: to the left. */
+  side: number;
+  /** Lazily resolved placement (terrain.ts → megaFrame). */
+  frame: unknown;
+  /** Anchor (ramp middle) — the chunk that owns the build. */
+  ax: number;
+  az: number;
+}
+
 class TrackNetwork {
   tracks: Track[] = [];
   private cells = new Map<number, number[]>();
@@ -202,6 +251,13 @@ class TrackNetwork {
       seedB: (MOUNTAIN.seed + o.id * 104729 + 3) | 0,
       ramps: [],
       parent: o.parent ?? null,
+      megas: [],
+      nextMega:
+        o.depth !== 0
+          ? Infinity
+          : o.id === 1
+            ? MEGA_SITE.heroS
+            : MEGA_SITE.first + hashInts(o.id, 0, 61) * MEGA_SITE.firstJitter,
       nextRamp:
         o.s0 + (o.depth === 0 ? RAMP_FIRST : RAMP_FIRST_BRANCH) + hashInts(o.id, 0, 31) * 120,
     };
@@ -224,6 +280,27 @@ class TrackNetwork {
     const ls = s - t.s0;
     const bias = t.bias * (1 - smoothstep(0, t.biasFade, ls));
     const diff = wrapAngle(Math.atan2(out.x, out.z) + bias - h);
+    // Fix the next mega ramp site well before the line gets there: clear of
+    // the last launch ramp's landing hill, and far enough ahead that the
+    // whole reserved stretch is still to be grown
+    if (s + MEGA_SITE.look >= t.nextMega) {
+      let sb = Math.max(t.nextMega, s + MEGA_SITE.pre + STEP);
+      const lr = t.ramps[t.ramps.length - 1];
+      if (lr !== undefined)
+        sb = Math.max(sb, lr.s + lr.spec.land + lr.spec.recover + RAMP_GAP + MEGA_SITE.pre);
+      const k = t.megas.length;
+      t.megas.push({
+        track: t,
+        k,
+        s: sb,
+        side: hashInts(t.id, k, 67) < 0.5 ? -1 : 1,
+        frame: null,
+        ax: NaN,
+        az: NaN,
+      });
+      t.nextMega = sb + MEGA_SITE.gap + hashInts(t.id, k + 1, 61) * MEGA_SITE.gapJitter;
+    }
+    const mega = this.megaNear(t, s);
     // Schedule the next ramp once its run-in comes into view
     const last = t.ramps[t.ramps.length - 1];
     if ((last === undefined || last.s < t.nextRamp) && s + 60 >= t.nextRamp - 30) {
@@ -232,7 +309,15 @@ class TrackNetwork {
       const spec = r < 0.45 ? RAMP_SPECS.small : r < 0.8 ? RAMP_SPECS.medium : RAMP_SPECS.big;
       // A branch only gets a ramp where its landing hill stays clear of the
       // line it split from (the run-in + landing will be straight from here)
-      if (t.parent !== null && this.nearParent(t, x, z, h, t.nextRamp - s, spec)) {
+      const blocker = this.megaOverlap(
+        t,
+        t.nextRamp - spec.length - 40,
+        t.nextRamp + spec.land + spec.recover,
+      );
+      if (blocker !== null) {
+        // Keep launch ramps (and their landing hills) off a mega ramp terrace
+        t.nextRamp = blocker.s + MEGA_SITE.post + RAMP_GAP + hashInts(t.id, blocker.k, 47) * 120;
+      } else if (t.parent !== null && this.nearParent(t, x, z, h, t.nextRamp - s, spec)) {
         t.nextRamp += 150;
       } else {
         t.ramps.push({ track: t, k: n, spec, s: t.nextRamp, x: NaN, z: NaN, heading: NaN });
@@ -241,9 +326,10 @@ class TrackNetwork {
     const pend = t.ramps[t.ramps.length - 1];
     // Dead straight from the run-in to well into the landing
     const straight =
-      pend !== undefined &&
-      s >= pend.s - pend.spec.length - 40 &&
-      s <= pend.s + pend.spec.land * 0.8;
+      (pend !== undefined &&
+        s >= pend.s - pend.spec.length - 40 &&
+        s <= pend.s + pend.spec.land * 0.8) ||
+      (mega !== null && s >= mega.s - MEGA_SITE.pre && s <= mega.s + MEGA_SITE.post);
     if (pend !== undefined && s > pend.s + pend.spec.land * 0.8 && t.nextRamp <= pend.s) {
       t.nextRamp =
         pend.s +
@@ -275,10 +361,14 @@ class TrackNetwork {
     // Forks: mains split off a branch every so often
     const ns = s + STEP;
     // (no forking in the middle of a ramp's run-in / landing hill)
+    const megaN = this.megaNear(t, ns);
     const busy =
-      pend !== undefined &&
-      ns >= pend.s - pend.spec.length - 60 &&
-      ns <= pend.s + pend.spec.land + pend.spec.recover;
+      (pend !== undefined &&
+        ns >= pend.s - pend.spec.length - 60 &&
+        ns <= pend.s + pend.spec.land + pend.spec.recover) ||
+      (megaN !== null &&
+        ns >= megaN.s - MEGA_SITE.forkClear &&
+        ns <= megaN.s + MEGA_SITE.post + 60);
     if (t.depth === 0 && ns >= t.nextFork && !busy) {
       t.forks++;
       const side = hashInts(t.id, t.forks, 13) < 0.5 ? -1 : 1;
@@ -296,6 +386,48 @@ class TrackNetwork {
       });
       t.nextFork = ns + 700 + hashInts(t.id, t.forks + 1, 11) * 900;
     }
+  }
+
+  /** The mega site whose fork-free stretch contains s (or null). */
+  private megaNear(t: Track, s: number): MegaSite | null {
+    for (let i = t.megas.length - 1; i >= 0; i--) {
+      const m = t.megas[i];
+      if (s >= m.s - MEGA_SITE.forkClear && s <= m.s + MEGA_SITE.post + 60) return m;
+      if (s > m.s + MEGA_SITE.post + 60) break;
+    }
+    return null;
+  }
+
+  /** A mega site whose reserved stretch overlaps along-track [a, b], or null. */
+  private megaOverlap(t: Track, a: number, b: number): MegaSite | null {
+    for (const m of t.megas)
+      if (b >= m.s - MEGA_SITE.pre - 20 && a <= m.s + MEGA_SITE.post) return m;
+    return null;
+  }
+
+  /** Mega ramp sites (on any main) whose anchor lies in the rectangle. */
+  megasIn(x0: number, z0: number, x1: number, z1: number): MegaSite[] {
+    this.ensure(
+      Math.max(
+        edgeDistance(x0, z0),
+        edgeDistance(x1, z1),
+        edgeDistance(x0, z1),
+        edgeDistance(x1, z0),
+      ) + INFLUENCE,
+    );
+    const out: MegaSite[] = [];
+    for (const t of this.tracks) {
+      if (t.depth !== 0) continue;
+      for (const m of t.megas) {
+        if (Number.isNaN(m.ax)) {
+          const p = this.pointAt(t, m.s + 60, _p);
+          m.ax = p.x + Math.cos(p.h) * m.side * MEGA_SITE.off;
+          m.az = p.z - Math.sin(p.h) * m.side * MEGA_SITE.off;
+        }
+        if (m.ax >= x0 && m.ax < x1 && m.az >= z0 && m.az < z1) out.push(m);
+      }
+    }
+    return out;
   }
 
   /** Register segment (point i → i+1) in every cell within INFLUENCE. */
