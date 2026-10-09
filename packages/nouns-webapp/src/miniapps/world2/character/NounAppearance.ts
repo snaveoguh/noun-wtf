@@ -146,6 +146,17 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
       const toon = generated.some(o => ((o as THREE.Mesh).material as THREE.Material)?.userData?.toonSrc !== undefined);
       if (toon) toonify(model);
       for (const o of generated) o.visible = false;
+      // Seat every model the same way instead of per-head nudges: lowest
+      // point just onto the shoulder line, centred over the neck across
+      // and front-to-back, so no head sinks into the torso.
+      const mb = new THREE.Box3().setFromObject(model);
+      const cx = (box.min.x + box.max.x) / 2;
+      const cz = (box.min.z + box.max.z) / 2;
+      model.position.set(
+        cx - (mb.min.x + mb.max.x) / 2,
+        NECK_Y - 0.3 - mb.min.y,
+        cz - (mb.min.z + mb.max.z) / 2,
+      );
       inner.add(model);
     });
   }
