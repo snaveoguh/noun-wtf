@@ -10,9 +10,9 @@ export const NOS_CSS = `
   position:fixed;inset:0;overflow:hidden;background:var(--ink);color:var(--paper);z-index:1;
   --glass:rgba(20,21,25,.74);--glass-hi:rgba(255,255,255,.07);--glass-edge:transparent;--r:18px;
   font-weight:500;-webkit-font-smoothing:auto}
-.nos-root,.nos-root *{cursor:url('/cursor-et-idle.png') 12 14,auto}
+.nos-root,.nos-root *{cursor:url('/cursor-et-idle.png') 13 13,auto}
 .nos-root a,.nos-root a *,.nos-root button,.nos-root button *,.nos-root [role=button],.nos-root label,.nos-root select,
-.nos-root summary{cursor:url('/cursor-et-hot.png') 12 14,pointer !important}
+.nos-root summary{cursor:url('/cursor-et-hot.png') 13 13,pointer !important}
 .nos-root input,.nos-root textarea,.nos-root [contenteditable=true]{cursor:text !important}
 .nos-root canvas{cursor:inherit}
 .nos-root::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;background-image:${GRAIN};
