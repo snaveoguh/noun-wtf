@@ -16,6 +16,7 @@ import {
   addRunning,
   addTrick,
   airTrickName,
+  chainedFlipName,
   bailCombo,
   bankCombo,
   createCombo,
@@ -156,6 +157,10 @@ export class Player {
   takeoffFakie = false;
   flip: FlipState | null = null;
   flipDone: TrickInput | null = null;
+  /** Every flip completed this jump, in order (double/triple kickflips…). */
+  private airFlips: TrickInput[] = [];
+  /** Flips pressed while one is still turning: each starts as the last ends. */
+  private queuedFlips: TrickInput[] = [];
   grab: string | null = null;
   grabTime = 0;
   grind: GrindState | null = null;
@@ -861,6 +866,8 @@ export class Player {
     this.state = 'air';
     this.airTime = 0;
     this.airYaw = 0;
+    this.airFlips = [];
+    this.queuedFlips = [];
     this.takeoffFakie = this.fakie;
     this.flipDone = null;
     this.grab = null;
@@ -897,6 +904,8 @@ export class Player {
     this.popKind = 'ollie';
     this.airTime = 0;
     this.airYaw = 0;
+    this.airFlips = [];
+    this.queuedFlips = [];
     this.takeoffFakie = this.fakie;
     this.flipDone = null;
     this.grab = null;
@@ -915,9 +924,12 @@ export class Player {
     this.airTime += dt;
     this.vel.y -= t.gravity * dt;
 
-    // Late flips (keyboard / second flick) while airborne
+    // Flips while airborne chain for as long as you're up there: press
+    // again mid-flip and the next one starts the moment this one ends.
     for (const tr of input.tricks) {
-      if (tr !== 'ollie' && tr !== 'nollie' && this.airTime < 0.6) this.startFlip(tr);
+      if (tr === 'ollie' || tr === 'nollie') continue;
+      if (this.flip === null) this.startFlip(tr);
+      else if (this.queuedFlips.length < 8) this.queuedFlips.push(tr);
     }
 
     // Spin with the left stick
@@ -1044,7 +1056,8 @@ export class Player {
       this.flip !== null;
     if (didSomething && (this.airTime > 0.18 || this.flipDone !== null)) {
       const flipTrick = this.flipDone ?? (this.flip ? this.flip.trick : null);
-      const name = airTrickName({
+      const flips = this.airFlips.length > 0 ? this.airFlips : flipTrick ? [flipTrick] : [];
+      const baseName = airTrickName({
         flip: flipTrick,
         pop: this.popKind,
         fakie: this.takeoffFakie,
@@ -1052,8 +1065,14 @@ export class Player {
         grab: this.grab,
         frontside: yawDeg < 0,
       });
+      const name =
+        flips.length > 1 && flipTrick
+          ? baseName.replace(FLIPS[flipTrick].name, chainedFlipName(flips))
+          : baseName;
+      // Each extra flip in the chain is worth more than the last
+      const flipPts = flips.reduce((sum, f, i) => sum + FLIPS[f].points * (1 + i * 0.5), 0);
       let pts =
-        (flipTrick ? FLIPS[flipTrick].points : this.popKind === 'nollie' ? 120 : 100) +
+        (flips.length > 0 ? flipPts : this.popKind === 'nollie' ? 120 : 100) +
         spinPoints(yawDeg);
       if (this.takeoffFakie) pts *= 1.1;
       pts += Math.round(this.airTime * 80);
@@ -1064,6 +1083,8 @@ export class Player {
     }
     this.flip = null;
     this.flipDone = null;
+    this.airFlips = [];
+    this.queuedFlips = [];
     this.grab = null;
     this.state = 'ground';
     this.vertLip = false;
@@ -1078,7 +1099,10 @@ export class Player {
       this.flip.t += dt;
       if (this.flip.t >= this.flip.duration) {
         this.flipDone = this.flip.trick;
-        this.flip = this.state === 'air' ? this.flip : null;
+        if (this.state === 'air') this.airFlips.push(this.flip.trick);
+        this.flip = null;
+        const next = this.state === 'air' ? this.queuedFlips.shift() : undefined;
+        if (next !== undefined) this.startFlip(next);
       }
     }
     if (this.flip && this.flip.t < this.flip.duration) {
@@ -1195,6 +1219,8 @@ export class Player {
       this.vertLip = false;
       this.airTime = 0;
       this.airYaw = 0;
+    this.airFlips = [];
+    this.queuedFlips = [];
       this.flipDone = null;
       this.grindCooldown = 0.35;
       this.takeoffFakie = this.fakie;

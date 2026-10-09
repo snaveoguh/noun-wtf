@@ -122,6 +122,25 @@ export function airTrickName(opts: {
   return name || 'Ollie';
 }
 
+const MULTI = ['', '', 'Double', 'Triple', 'Quadruple', 'Quintuple', 'Sextuple'];
+
+/** "Double Kickflip", "Quadruple Heelflip", "Kickflip to Double Heelflip"… */
+export function chainedFlipName(flips: TrickInput[]): string {
+  const runs: { trick: TrickInput; n: number }[] = [];
+  for (const f of flips) {
+    const last = runs[runs.length - 1];
+    if (last && last.trick === f) last.n++;
+    else runs.push({ trick: f, n: 1 });
+  }
+  return runs
+    .map(({ trick, n }) => {
+      const name = FLIPS[trick].name;
+      if (n === 1) return name;
+      return `${MULTI[n] ?? `${n}x`} ${name}`;
+    })
+    .join(' to ');
+}
+
 export function spinPoints(yawDeg: number) {
   const halfTurns = Math.round(Math.abs(yawDeg) / 180);
   return halfTurns * 220;
