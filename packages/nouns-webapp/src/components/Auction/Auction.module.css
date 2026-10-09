@@ -66,7 +66,7 @@
   background: rgba(255, 255, 255, 0.76);
   color: rgba(28, 24, 21, 0.72);
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -204,7 +204,7 @@
 
 .railLabel {
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -237,7 +237,7 @@
   padding: 0.45rem 0.7rem;
   border-radius: 0.4rem;
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--theme-text-primary);
   cursor: pointer;
@@ -387,7 +387,7 @@
   border: 0;
   border-radius: 999px;
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
   text-decoration: none;
@@ -425,7 +425,7 @@
 .inlineLabel {
   color: rgba(86, 63, 36, 0.65);
   font-family: 'PT Root UI', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -563,7 +563,7 @@
 
   .tabBtn {
     padding: 0.25rem 0.65rem;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
 
   .heroStage {
@@ -594,7 +594,7 @@
   }
 
   .railIcon {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
 
   .railLabel {

@@ -37,13 +37,13 @@
 }
 
 .section h4 {
-  font-family: 'PT Root UI' !important;
-  font-size: 10px !important;
+  font-family: var(--site-font) !important;
+  font-size: 12px !important;
   line-height: 14px !important;
 }
 
 .section h2 {
-  font-family: 'PT Root UI' !important;
+  font-family: var(--site-font) !important;
   font-weight: bold;
   font-size: 14px !important;
 }
@@ -74,7 +74,7 @@
 
 @media (max-width: 992px) {
   .section h4 {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .section h2 {

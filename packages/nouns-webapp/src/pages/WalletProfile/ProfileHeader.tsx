@@ -45,12 +45,12 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
           </h1>
           {isOwner && <Pill tone="accent">this is you</Pill>}
           {profile.autopilot?.enabled === true && (
-            <Pill tone="pos" title={`Autopilot on · ${relTime(profile.autopilot.updatedAt)}`}>
+            <Pill tone="pos" title={`Autopilot on, ${relTime(profile.autopilot.updatedAt)}`}>
               <SparklesIcon size={10} /> autopilot on
             </Pill>
           )}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
           {address != null && (
             <span className="wp-muted wp-mono flex items-center gap-1" title={address}>
               {shortAddr(address)} <CopyButton text={address} label="address" />
@@ -93,7 +93,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
             ))}
           </div>
         )}
-        <div className="wp-muted mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+        <div className="wp-muted mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <span title={fmtDate(id.firstSeen?.timestamp)}>
             first seen{' '}
             {toDate(id.firstSeen?.timestamp) != null ? relTime(id.firstSeen?.timestamp) : '—'}
@@ -216,9 +216,9 @@ export const OverviewCard: FC<{ profile: WalletProfile; identity: string }> = ({
           <SparklesIcon size={12} /> AI overview
           {hasText && (
             <span className="hidden normal-case opacity-60 sm:inline">
-              · generated {relTime(ov?.generatedAt)}
-              {ov?.model != null && ov.model !== '' ? ` · ${ov.model}` : ''}
-              {refresh.data?.cached === true ? ' · rate-limited, showing cached' : ''}
+             , generated {relTime(ov?.generatedAt)}
+              {ov?.model != null && ov.model !== '' ? `, ${ov.model}` : ''}
+              {refresh.data?.cached === true ? ', rate-limited, showing cached' : ''}
             </span>
           )}
         </span>
@@ -252,7 +252,7 @@ export const OverviewCard: FC<{ profile: WalletProfile; identity: string }> = ({
         </div>
       )}
       {refresh.isError && (
-        <div className="wp-neg mt-2 text-[11px]">Refresh failed: {refresh.error.message}</div>
+        <div className="wp-neg mt-2 text-xs">Refresh failed: {refresh.error.message}</div>
       )}
     </Card>
   );

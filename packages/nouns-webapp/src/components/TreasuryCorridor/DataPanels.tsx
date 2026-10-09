@@ -120,7 +120,7 @@ function DataPanel({ position, playerZ, color, title, children, width = 5, heigh
           padding: '8px',
         }}>
           <div style={{
-            fontSize: '10px',
+            fontSize: 12,
             fontWeight: 800,
             color: color,
             textTransform: 'uppercase',
@@ -241,7 +241,7 @@ export default function DataPanels({ data, playerZ }: DataPanelsProps) {
         gridTemplateColumns: '1fr 1fr',
         gap: '4px',
         marginTop: '10px',
-        fontSize: '8px',
+        fontSize: 12,
       }}>
         {[
           ['ETH', data.treasuryBreakdown.eth],
@@ -274,14 +274,14 @@ export default function DataPanels({ data, playerZ }: DataPanelsProps) {
           ? `${data.totalAuctionRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} ETH`
           : '...'}
       </div>
-      <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>
+      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: '2px' }}>
         Total Auction Revenue
       </div>
-      <div style={{ fontSize: '8px', color: '#64748b', marginTop: '6px' }}>
+      <div style={{ fontSize: 12, color: '#64748b', marginTop: '6px' }}>
         {data.nounCount > 0 ? `${data.nounCount} Nouns minted` : ''}
       </div>
       {data.recentAuctions.length > 0 && (
-        <div style={{ marginTop: '8px', fontSize: '7px', color: '#475569' }}>
+        <div style={{ marginTop: '8px', fontSize: '7px', color: 'var(--theme-text-muted)' }}>
           Latest: Noun #{data.recentAuctions[0].nounId} — {data.recentAuctions[0].amount} ETH
         </div>
       )}
@@ -329,7 +329,7 @@ export default function DataPanels({ data, playerZ }: DataPanelsProps) {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: '6px' }}>
         {data.proposals.total} Total Proposals
       </div>
     </>
@@ -422,7 +422,7 @@ export default function DataPanels({ data, playerZ }: DataPanelsProps) {
         width={5}
         height={1.5}
       >
-        <div style={{ fontSize: '9px', color: '#94a3b8' }}>
+        <div style={{ fontSize: 12, color: '#94a3b8' }}>
           Last {monthlyBars.length} months of auction revenue
         </div>
       </DataPanel>
@@ -456,7 +456,7 @@ export default function DataPanels({ data, playerZ }: DataPanelsProps) {
         width={5}
         height={1.5}
       >
-        <div style={{ fontSize: '9px', color: '#94a3b8' }}>
+        <div style={{ fontSize: 12, color: '#94a3b8' }}>
           Passed proposals by category
         </div>
       </DataPanel>

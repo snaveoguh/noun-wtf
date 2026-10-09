@@ -108,7 +108,7 @@ export function MarketsTable() {
   if (isLoading) {
     return (
       <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
-        <p className="font-mono text-[9px] text-[var(--ink-faint)]">Loading markets…</p>
+        <p className="font-mono text-xs text-[var(--ink-faint)]">Loading markets…</p>
       </section>
     );
   }
@@ -116,7 +116,7 @@ export function MarketsTable() {
   if (error != null) {
     return (
       <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
-        <p className="font-mono text-[9px] text-[var(--accent-red)]">
+        <p className="font-mono text-xs text-[var(--accent-red)]">
           {error instanceof Error ? error.message : 'Failed to load markets'}
         </p>
       </section>
@@ -128,11 +128,11 @@ export function MarketsTable() {
   return (
     <section className="mb-8 border-t-2 border-[var(--rule)] pt-6">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
+        <h2 className="font-mono text-xs font-bold uppercase tracking-[0.3em] text-[var(--ink)]">
           Recent Markets
         </h2>
-        <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
-          {counts.needsResolve} needs resolve · {counts.live} live · {counts.resolved} resolved
+        <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
+          {counts.needsResolve} needs resolve, {counts.live} live, {counts.resolved} resolved
         </p>
       </div>
 
@@ -141,11 +141,11 @@ export function MarketsTable() {
         {paged.map(entry => (
           <div
             key={entry.id}
-            className="rounded border border-[var(--rule)] p-3 font-mono text-[10px]"
+            className="rounded border border-[var(--rule)] p-3 font-mono text-xs"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span
-                className="border px-1.5 py-0.5 text-[9px] uppercase tracking-wider"
+                className="border px-1.5 py-0.5 text-xs uppercase tracking-wider"
                 style={{
                   borderColor: 'var(--rule)',
                   color:
@@ -163,12 +163,12 @@ export function MarketsTable() {
                     : 'NOUNS'}
               </span>
               <span
-                className="text-[9px] uppercase"
+                className="text-xs uppercase"
                 style={{ color: statusColor(entry.status) }}
               >
                 {statusLabel(entry.status)}
                 {entry.status === 'resolved' && OUTCOME_LABEL[entry.outcome] != null && (
-                  <span className="ml-1 text-[8px] text-[var(--ink-faint)]">
+                  <span className="ml-1 text-xs text-[var(--ink-faint)]">
                     {OUTCOME_LABEL[entry.outcome]}
                   </span>
                 )}
@@ -203,7 +203,7 @@ export function MarketsTable() {
       </div>
 
       <div className="hidden w-full overflow-x-auto md:block">
-        <table className="w-full min-w-[520px] border-collapse font-mono text-[9px]">
+        <table className="w-full min-w-[520px] border-collapse font-mono text-xs">
           <thead>
             <tr className="border-b border-[var(--rule)] text-left text-[var(--ink-faint)]">
               <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Kind</th>
@@ -218,7 +218,7 @@ export function MarketsTable() {
               <tr key={entry.id} className="border-b border-[var(--rule-light)]">
                 <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-3">
                   <span
-                    className="border px-1 py-0.5 text-[8px] uppercase tracking-wider"
+                    className="border px-1 py-0.5 text-xs uppercase tracking-wider"
                     style={{
                       borderColor: 'var(--rule)',
                       color:
@@ -259,7 +259,7 @@ export function MarketsTable() {
                 >
                   {statusLabel(entry.status)}
                   {entry.status === 'resolved' && OUTCOME_LABEL[entry.outcome] != null && (
-                    <span className="ml-1 text-[8px] text-[var(--ink-faint)]">
+                    <span className="ml-1 text-xs text-[var(--ink-faint)]">
                       {OUTCOME_LABEL[entry.outcome]}
                     </span>
                   )}
@@ -278,7 +278,7 @@ export function MarketsTable() {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-between font-mono text-[9px] text-[var(--ink-faint)]">
+        <div className="mt-3 flex items-center justify-between font-mono text-xs text-[var(--ink-faint)]">
           <button
             type="button"
             onClick={() => setPage(p => Math.max(0, p - 1))}
@@ -345,7 +345,7 @@ function ResolveActionButton({ entry }: { entry: MarketEntry }) {
         {isPending ? 'Sign…' : isConfirming ? 'Confirming…' : 'Resolve'}
       </button>
       {error != null && (
-        <p className="mt-0.5 text-[8px] text-[var(--accent-red)]">
+        <p className="mt-0.5 text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}

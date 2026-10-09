@@ -63,7 +63,7 @@ export default function ThemeSwitcher({ variant = 'navbar', onChange }: ThemeSwi
         border: '1px solid #222',
         color: '#00ff41',
         cursor: 'pointer',
-        fontSize: '11px',
+        fontSize: 12,
         padding: '4px 8px',
         borderRadius: '2px',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -131,7 +131,7 @@ export default function ThemeSwitcher({ variant = 'navbar', onChange }: ThemeSwi
         style={triggerStyle}
       >
         <span style={{ fontSize: '16px', lineHeight: 1 }}>{current.emoji}</span>
-        <span style={{ opacity: 0.6, fontSize: '10px' }}>▾</span>
+        <span style={{ opacity: 0.6, fontSize: 12 }}>▾</span>
       </button>
 
       {open && (

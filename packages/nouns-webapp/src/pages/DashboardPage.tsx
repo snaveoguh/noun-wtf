@@ -89,7 +89,7 @@ const DashboardPage: React.FC = () => {
   return (
     <div
       className="mx-auto min-h-screen max-w-6xl px-4 py-8 md:px-8"
-      style={{ fontFamily: "'PT Root UI', sans-serif", background: '#050510', color: '#fff' }}
+      style={{ fontFamily: "'PT Root UI', sans-serif", background: 'transparent', color: 'var(--theme-text-primary)' }}
     >
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
@@ -174,12 +174,12 @@ const DashboardPage: React.FC = () => {
                       </defs>
                       <XAxis
                         dataKey="date"
-                        tick={{ fontSize: 10, fill: '#ffffff40' }}
+                        tick={{ fontSize: 12, fill: '#ffffff40' }}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis
-                        tick={{ fontSize: 10, fill: '#ffffff40' }}
+                        tick={{ fontSize: 12, fill: '#ffffff40' }}
                         tickLine={false}
                         axisLine={false}
                         width={30}
@@ -293,12 +293,12 @@ const DashboardPage: React.FC = () => {
                   <XAxis
                     dataKey="bucket"
                     tickFormatter={formatTime}
-                    tick={{ fontSize: 10, fill: '#ffffff40' }}
+                    tick={{ fontSize: 12, fill: '#ffffff40' }}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    tick={{ fontSize: 10, fill: '#ffffff40' }}
+                    tick={{ fontSize: 12, fill: '#ffffff40' }}
                     tickLine={false}
                     axisLine={false}
                     width={30}

@@ -68,7 +68,7 @@ export function YourNouns() {
     <div className="mb-8">
       <div className="mb-4 border-b border-[var(--rule-light)] pb-2">
         <h2 className="font-headline text-xl text-[var(--ink)]">Your Nouns</h2>
-        <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-[var(--ink-faint)]">
+        <p className="mt-0.5 font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
           {balance > 0
             ? `${balance} Noun${balance !== 1 ? 's' : ''} in your wallet — click to list for sale`
             : 'Loading...'}

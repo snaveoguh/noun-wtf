@@ -114,7 +114,7 @@ export function MarketCard({
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[8px] uppercase tracking-wider text-[var(--ink-faint)]">
+          <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             {dao} &bull; #{proposalId}
           </p>
           <h3 className="font-headline mt-0.5 break-words text-sm font-bold leading-snug text-[var(--ink)]">
@@ -122,7 +122,7 @@ export function MarketCard({
           </h3>
         </div>
         <span
-          className="shrink-0 border px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider"
+          className="shrink-0 border px-2 py-0.5 font-mono text-xs uppercase tracking-wider"
           style={{ borderColor: outcomeInfo.color, color: outcomeInfo.color }}
         >
           {outcomeInfo.label}
@@ -133,13 +133,13 @@ export function MarketCard({
       <div className="mb-2">
         <div className="flex h-6 w-full overflow-hidden border border-[var(--rule-light)]">
           <div
-            className="flex items-center justify-center bg-[var(--ink)] font-mono text-[9px] font-bold text-[var(--paper)] transition-all"
+            className="flex items-center justify-center bg-[var(--ink)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
             style={{ width: `${displayMarket.forPercent}%` }}
           >
             {displayMarket.forPercent > 10 ? `PASS ${displayMarket.forPercent.toFixed(0)}%` : ''}
           </div>
           <div
-            className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-[9px] font-bold text-[var(--paper)] transition-all"
+            className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
             style={{ width: `${displayMarket.againstPercent}%` }}
           >
             {displayMarket.againstPercent > 10
@@ -150,7 +150,7 @@ export function MarketCard({
       </div>
 
       {/* Pool info + governance votes */}
-      <div className="mb-3 space-y-1 font-mono text-[9px] text-[var(--ink-faint)]">
+      <div className="mb-3 space-y-1 font-mono text-xs text-[var(--ink-faint)]">
         <div className="flex flex-wrap items-center justify-between gap-x-2">
           <span className="min-w-0">
             Pool: {formatEth(displayMarket.totalPool)} &bull;{' '}
@@ -168,13 +168,13 @@ export function MarketCard({
           )}
         </div>
         {(votesFor !== undefined || votesAgainst !== undefined) && (
-          <div className="text-[8px]">
+          <div className="text-xs">
             Governance: {votesFor ?? 0} for / {votesAgainst ?? 0} against
             {quorum !== undefined && <span> (quorum: {quorum})</span>}
           </div>
         )}
         {market?.exists !== true && votingClosed !== true && (
-          <div className="text-[8px] uppercase tracking-wider">
+          <div className="text-xs uppercase tracking-wider">
             First wager auto-creates the market onchain
           </div>
         )}
@@ -182,7 +182,7 @@ export function MarketCard({
 
       {/* User position */}
       {position && position.totalStake > BigInt(0) && (
-        <div className="mb-3 border border-[var(--rule-light)] p-2 font-mono text-[9px]">
+        <div className="mb-3 border border-[var(--rule-light)] p-2 font-mono text-xs">
           <span className="font-bold uppercase tracking-wider text-[var(--ink)]">
             Your Position:
           </span>
@@ -205,7 +205,7 @@ export function MarketCard({
 
       {/* Voting closed but contract not yet resolved by operator */}
       {!isResolved && votingClosed === true && market?.exists === true && (
-        <p className="py-2 text-center font-mono text-[9px] text-[var(--ink-faint)]">
+        <p className="py-2 text-center font-mono text-xs text-[var(--ink-faint)]">
           Voting ended &mdash; awaiting onchain resolution
         </p>
       )}
@@ -234,7 +234,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
 
   if (!isConnected) {
     return (
-      <p className="py-2 text-center font-mono text-[9px] text-[var(--ink-faint)]">
+      <p className="py-2 text-center font-mono text-xs text-[var(--ink-faint)]">
         Connect wallet to wager
       </p>
     );
@@ -242,7 +242,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
 
   if (isSuccess) {
     return (
-      <div className="border border-[var(--rule-light)] p-2 text-center font-mono text-[9px] font-bold text-[var(--ink)]">
+      <div className="border border-[var(--rule-light)] p-2 text-center font-mono text-xs font-bold text-[var(--ink)]">
         Wager placed.
       </div>
     );
@@ -266,7 +266,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
       <div className="flex gap-2">
         <button
           onClick={() => setSide('for')}
-          className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
             side === 'for'
               ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -276,7 +276,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
         </button>
         <button
           onClick={() => setSide('against')}
-          className={`flex-1 border py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
             side === 'against'
               ? 'border-[var(--accent-red)] bg-[var(--accent-red)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -294,7 +294,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
               key={amt}
               onClick={() => handleQuickStake(amt)}
               disabled={isPending || isConfirming}
-              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-[9px] text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
             >
               {isPending || isConfirming ? '...' : `${amt} ETH`}
             </button>
@@ -304,7 +304,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
 
       {/* Error display */}
       {error && (
-        <p className="font-mono text-[8px] text-[var(--accent-red)]">
+        <p className="font-mono text-xs text-[var(--accent-red)]">
           {(error as { shortMessage?: string }).shortMessage || error.message}
         </p>
       )}
@@ -334,7 +334,7 @@ function ClaimButton({ dao, proposalId }: { dao: string; proposalId: string }) {
         })
       }
       disabled={isPending || isConfirming}
-      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-[9px] uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
     >
       {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : 'Claim Winnings'}
     </button>

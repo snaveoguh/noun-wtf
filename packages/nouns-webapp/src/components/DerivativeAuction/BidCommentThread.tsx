@@ -62,7 +62,7 @@ const CommentRow: FC<{
             {fmtEth(comment.amount)} ETH
           </span>
         </span>
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.5rem' }}>
+        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>
           {timeAgo(comment.timestamp)}
         </span>
       </div>
@@ -102,7 +102,7 @@ const BidCommentThread: FC<Props> = ({ tokenId, isSettled, winnerAddress }) => {
         flexDirection: 'column',
         gap: 4,
         fontFamily: "'PT Root UI', sans-serif",
-        fontSize: '0.55rem',
+        fontSize: '0.75rem',
       }}
     >
       {sorted.map((comment, i) => (

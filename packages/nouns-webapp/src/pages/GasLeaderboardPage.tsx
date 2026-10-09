@@ -293,7 +293,7 @@ const GasLeaderboardPage: FC = () => {
             textAlign: 'center',
             padding: '60px 20px',
             color: 'var(--theme-text-muted)',
-            border: '2px dashed #ddd',
+            border: '2px dashed transparent',
             borderRadius: '12px',
             margin: '20px 0',
           }}
@@ -355,7 +355,7 @@ const GasLeaderboardPage: FC = () => {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #ccc',
+                border: '1px solid transparent',
                 fontSize: '0.8rem',
                 fontWeight: 600,
                 background: 'var(--theme-bg-card)',
@@ -378,7 +378,7 @@ const GasLeaderboardPage: FC = () => {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #ccc',
+                border: '1px solid transparent',
                 fontSize: '0.8rem',
                 flex: 1,
                 minWidth: '180px',
@@ -387,7 +387,7 @@ const GasLeaderboardPage: FC = () => {
             />
 
             <span
-              style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', marginLeft: 'auto' }}
+              style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginLeft: 'auto' }}
             >
               {processed.length.toLocaleString()} address{processed.length !== 1 ? 'es' : ''}
               {data.meta.lastUpdated && (
@@ -406,12 +406,12 @@ const GasLeaderboardPage: FC = () => {
                 minWidth: '560px',
                 gap: '8px',
                 padding: '8px 16px',
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: 'var(--theme-text-muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                borderBottom: '2px solid #eee',
+                borderBottom: '2px solid var(--theme-divider)',
                 marginBottom: '4px',
               }}
             >
@@ -465,7 +465,7 @@ const GasLeaderboardPage: FC = () => {
                       gap: '8px',
                       padding: '10px 16px',
                       borderRadius: '10px',
-                      border: '1px solid #eee',
+                      border: '1px solid transparent',
                       background:
                         rank <= 3
                           ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', '#fef3c7'][rank - 1]
@@ -543,7 +543,7 @@ const GasLeaderboardPage: FC = () => {
                     {/* Top Action */}
                     <span
                       style={{
-                        fontSize: '0.65rem',
+                        fontSize: '0.75rem',
                         color: 'var(--theme-text-muted)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -578,7 +578,7 @@ const GasLeaderboardPage: FC = () => {
                 style={{
                   padding: '4px 12px',
                   borderRadius: '6px',
-                  border: '1px solid #ccc',
+                  border: '1px solid transparent',
                   background: page === 0 ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
                   cursor: page === 0 ? 'default' : 'pointer',
                   fontWeight: 600,
@@ -597,7 +597,7 @@ const GasLeaderboardPage: FC = () => {
                 style={{
                   padding: '4px 12px',
                   borderRadius: '6px',
-                  border: '1px solid #ccc',
+                  border: '1px solid transparent',
                   background:
                     page >= totalPages - 1 ? 'var(--theme-bg-card)' : 'var(--theme-bg-card)',
                   cursor: page >= totalPages - 1 ? 'default' : 'pointer',
@@ -629,7 +629,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1 }}>{value}</div>
       <div
         style={{
-          fontSize: '0.65rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           color: 'var(--theme-text-muted)',
           marginTop: '4px',

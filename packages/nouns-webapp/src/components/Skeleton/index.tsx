@@ -172,7 +172,7 @@ export const SettlersSkeleton: FC = () => (
     <Bone w={160} h={32} />
     <Bone w="50%" h={14} delay={0.1} />
     {/* Table header */}
-    <div className={classes.settlersRow} style={{ borderBottom: '2px solid #e5e7eb' }}>
+    <div className={classes.settlersRow} style={{ borderBottom: '2px solid var(--theme-divider)' }}>
       <Bone w={30} h={14} />
       <Bone w={100} h={14} delay={0.05} />
       <Bone w={60} h={14} delay={0.1} />

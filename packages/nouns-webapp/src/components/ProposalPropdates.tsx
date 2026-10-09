@@ -22,7 +22,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
       style={{
         background: 'var(--theme-bg-card)',
         borderRadius: 12,
-        border: '1px solid #e2e3e8',
+        border: '1px solid transparent',
         padding: '16px',
         overflow: 'hidden',
       }}
@@ -38,7 +38,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
       >
         <span
           style={{
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             color: 'var(--theme-text-muted)',
             fontFamily: "'PT Root UI'",
             fontWeight: 500,
@@ -49,7 +49,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
         {entry.isCompleted && (
           <span
             style={{
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               background: 'rgba(34, 197, 94, 0.12)',
               color: '#16a34a',
@@ -87,7 +87,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
                       background: 'var(--theme-bg-card)',
                       borderRadius: 6,
                       color: 'var(--theme-text-muted)',
-                      fontSize: '0.7rem',
+                      fontSize: '0.75rem',
                       margin: '6px 0',
                     }}
                   >
@@ -119,7 +119,7 @@ const PropdateCard: FC<{ entry: PropdateEntry }> = ({ entry }) => {
                 {...props}
                 target="_blank"
                 rel="noreferrer"
-                style={{ color: '#2563eb', textDecoration: 'underline' }}
+                style={{ color: 'var(--theme-text-link)', textDecoration: 'underline' }}
               />
             ),
           }}
@@ -169,7 +169,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
           {propdates != null && propdates.length > 0 && (
             <span
               style={{
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 fontFamily: "'PT Root UI'",
                 fontWeight: 600,
                 background: 'var(--theme-bg-card)',
@@ -187,7 +187,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
           target="_blank"
           rel="noreferrer"
           style={{
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontFamily: "'PT Root UI'",
             fontWeight: 600,
             color: 'var(--theme-text-muted)',
@@ -207,7 +207,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
           style={{
             background: 'var(--theme-bg-card)',
             borderRadius: 12,
-            border: '1px solid #e2e3e8',
+            border: '1px solid transparent',
             padding: '20px 16px',
             textAlign: 'center',
             color: 'var(--theme-text-muted)',

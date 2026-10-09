@@ -368,7 +368,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
               }}
             >
               via {clientInfo.name}
-              {isDerived ? ' · derived' : ''}
+              {isDerived ? ', derived' : ''}
             </div>
           )}
         </div>

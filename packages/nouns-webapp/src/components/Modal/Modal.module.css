@@ -16,7 +16,7 @@
   top: 30vh;
   left: 10%;
   z-index: 1050;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: var(--theme-glass);
   backdrop-filter: blur(10px);
   padding: 3rem 2rem;
   text-align: center;
@@ -29,7 +29,7 @@
   border-radius: 10px;
   min-height: 44px;
   padding-top: 7px;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: var(--theme-glass-fill);
 }
 
 .modal button:hover {

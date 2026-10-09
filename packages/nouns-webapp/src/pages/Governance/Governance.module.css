@@ -47,7 +47,7 @@ p {
 .treasuryInfoCard {
   margin-bottom: 3rem;
   border-radius: 20px;
-  border: 1px solid #e2e3e8;
+  border: 1px solid transparent;
 }
 
 .treasuryAmtWrapper {
@@ -79,7 +79,7 @@ p {
 }
 
 .ethSymbol {
-  font-family: 'PT Root UI' !important;
+  font-family: var(--site-font) !important;
   margin-right: 0.5rem;
 }
 
@@ -99,10 +99,10 @@ p {
 
 @media (min-width: 992px) {
   .treasuryAmtWrapper {
-    border-right: 2px solid #e2e3e8;
+    border-right: 2px solid var(--theme-divider);
   }
 
   .ethTreasuryAmt {
-    border-right: 2px solid #e2e3e8;
+    border-right: 2px solid var(--theme-divider);
   }
 }

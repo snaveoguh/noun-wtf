@@ -203,7 +203,7 @@
 
 /* candidate page */
 .editCandidate {
-  border: 1px solid #e6e6e6;
+  border: 1px solid transparent;
   padding: 15px;
   border-radius: 12px;
   display: flex;
@@ -253,10 +253,10 @@
 
 .editCandidate .editButton {
   font-weight: bold;
-  background-color: #000;
+  background-color: var(--theme-glass-fill);
   color: white;
-  border-radius: 8px;
-  border-color: #000;
+  border-radius: 999px;
+  border-color: transparent;
   transition: all 0.125s ease-in-out;
 }
 
@@ -266,7 +266,8 @@
 }
 
 a.primaryButton {
-  background: #000;
+  background: var(--theme-glass-fill);
+  border-radius: 999px;
   color: #fff;
   text-decoration: none;
 }
@@ -294,7 +295,7 @@ a.primaryButton:hover {
 }
 
 .sponsorsLoading {
-  border: 1px solid #e6e6e6;
+  border: 1px solid transparent;
   padding: 25px;
   border-radius: 12px;
   text-align: left;
@@ -319,9 +320,9 @@ a.primaryButton:hover {
 }
 
 .jump {
-  background: #fff;
+  background: var(--theme-bg-card);
   width: 100%;
-  border: 1px solid #e6e6e6;
+  border: 1px solid transparent;
   margin-top: 0.5rem;
   margin-bottom: 0;
   padding: 0.5rem;

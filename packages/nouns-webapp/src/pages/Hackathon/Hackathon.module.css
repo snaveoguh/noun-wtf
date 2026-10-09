@@ -14,7 +14,7 @@
   text-align: center;
   margin-bottom: 3rem;
   padding: 3rem 1.5rem;
-  border: 1px solid #1e293b;
+  border: 1px solid transparent;
   background:
     repeating-linear-gradient(
       0deg,
@@ -23,7 +23,7 @@
       rgba(34, 211, 238, 0.015) 2px,
       rgba(34, 211, 238, 0.015) 4px
     ),
-    #0a0a0a;
+    var(--theme-bg-card);
   position: relative;
   overflow: hidden;
 }
@@ -35,7 +35,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-free), transparent);
 }
 
 .heroTitle {
@@ -49,7 +49,7 @@
 
 .heroSub {
   font-size: 1.3rem;
-  color: #22d3ee;
+  color: var(--theme-free);
   margin: 0 0 1rem;
   font-weight: 600;
 }
@@ -67,7 +67,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 1rem;
-  border: 1px solid #22d3ee;
+  border: 1px solid var(--theme-free);
   background: rgba(34, 211, 238, 0.06);
   margin-bottom: 1.5rem;
 }
@@ -75,12 +75,12 @@
 .treasuryAddr {
   font-family: monospace;
   font-size: 0.8rem;
-  color: #22d3ee;
+  color: var(--theme-free);
   text-decoration: none;
 }
 .treasuryAddr:hover {
   text-decoration: underline;
-  color: #22d3ee;
+  color: var(--theme-free);
 }
 
 .treasuryBal {
@@ -99,8 +99,8 @@
 .heroCta {
   display: inline-block;
   padding: 0.7rem 1.5rem;
-  border: 1px solid #22d3ee;
-  color: #22d3ee;
+  border: 1px solid var(--theme-free);
+  color: var(--theme-free);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
@@ -108,24 +108,24 @@
 }
 .heroCta:hover {
   background: rgba(34, 211, 238, 0.12);
-  color: #22d3ee;
+  color: var(--theme-free);
 }
 
 .heroCtaFilled {
   composes: heroCta;
-  background: #22d3ee;
+  background: var(--theme-free);
   color: #000;
 }
 .heroCtaFilled:hover {
-  background: #06b6d4;
+  background: var(--theme-free);
   color: #000;
 }
 
 .heroAscii {
   margin-top: 1.5rem;
   font-family: 'Courier New', monospace;
-  font-size: 0.7rem;
-  color: #334155;
+  font-size: 0.75rem;
+  color: var(--theme-text-muted);
   line-height: 1.2;
   white-space: pre;
   user-select: none;
@@ -145,7 +145,7 @@
   font-weight: 700;
   margin: 0 0 1.25rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid transparent;
 }
 
 .sectionDesc {
@@ -164,15 +164,15 @@
 }
 
 .ruleCard {
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid transparent;
+  background: var(--theme-bg-card);
   padding: 1rem;
 }
 
 .ruleNum {
   font-size: 1.4rem;
   font-weight: 900;
-  color: #22d3ee;
+  color: var(--theme-free);
   margin-bottom: 0.5rem;
   font-family: monospace;
 }
@@ -186,7 +186,7 @@
   color: #e2e8f0;
 }
 .ruleText a {
-  color: #22d3ee;
+  color: var(--theme-free);
   text-decoration: none;
 }
 .ruleText a:hover {
@@ -195,10 +195,10 @@
 
 .ruleFootnote {
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--theme-text-muted);
   font-style: italic;
   padding: 0.75rem 1rem;
-  border-left: 2px solid #22d3ee;
+  border-left: 2px solid var(--theme-free);
   background: rgba(34, 211, 238, 0.04);
 }
 
@@ -211,15 +211,15 @@
 }
 
 .contractCard {
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid transparent;
+  background: var(--theme-bg-card);
   padding: 0.75rem 1.25rem;
   text-decoration: none;
   color: #e2e8f0;
   transition: all 0.25s;
 }
 .contractCard:hover {
-  border-color: #22d3ee;
+  border-color: var(--theme-free);
   color: #e2e8f0;
   box-shadow: 0 2px 12px rgba(34, 211, 238, 0.06);
 }
@@ -232,7 +232,7 @@
 }
 
 .contractTag {
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -244,7 +244,7 @@
   color: #f87171;
 }
 .tagCore {
-  color: #22d3ee;
+  color: var(--theme-free);
 }
 .tagMarket {
   color: #a78bfa;
@@ -257,8 +257,8 @@
 }
 
 .contractChain {
-  font-size: 0.6rem;
-  color: #475569;
+  font-size: 0.75rem;
+  color: var(--theme-text-muted);
   font-family: monospace;
 }
 
@@ -270,8 +270,8 @@
 }
 
 .contractAddr {
-  font-size: 0.7rem;
-  color: #22d3ee;
+  font-size: 0.75rem;
+  color: var(--theme-free);
   font-family: monospace;
   margin-bottom: 0.5rem;
   display: block;
@@ -286,8 +286,8 @@
 }
 
 .contractCaption {
-  font-size: 0.7rem;
-  color: #22d3ee;
+  font-size: 0.75rem;
+  color: var(--theme-free);
   line-height: 1.4;
   margin: 0.25rem 0 0;
   grid-column: 1 / -1;
@@ -304,8 +304,8 @@
 }
 
 .cartridge {
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid transparent;
+  background: var(--theme-bg-card);
   text-decoration: none;
   color: #e2e8f0;
   transition: all 0.25s;
@@ -314,7 +314,7 @@
   overflow: hidden;
 }
 .cartridge:hover {
-  border-color: #22d3ee;
+  border-color: var(--theme-free);
   color: #e2e8f0;
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(34, 211, 238, 0.08);
@@ -323,8 +323,8 @@
 .cartridgeScreen {
   margin: 0.75rem 1rem 0;
   padding: 1.25rem 1rem;
-  background: #111318;
-  border: 1px solid #1e293b;
+  background: var(--theme-bg-card);
+  border: 1px solid transparent;
   min-height: 80px;
   display: flex;
   align-items: center;
@@ -333,8 +333,8 @@
 
 .cartridgeArt {
   font-family: 'Courier New', monospace;
-  font-size: 0.6rem;
-  color: #334155;
+  font-size: 0.75rem;
+  color: var(--theme-text-muted);
   line-height: 1.15;
   white-space: pre;
   text-align: center;
@@ -372,16 +372,16 @@
 
 .ideaCard {
   padding: 0.75rem 1rem;
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid transparent;
+  background: var(--theme-bg-card);
   transition: border-color 0.2s;
 }
 .ideaCard:hover {
-  border-color: #334155;
+  border-color: var(--theme-text-muted);
 }
 
 .ideaCat {
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
@@ -395,8 +395,8 @@
 }
 
 .ideaSub {
-  font-size: 0.7rem;
-  color: #475569;
+  font-size: 0.75rem;
+  color: var(--theme-text-muted);
   margin-top: 0.25rem;
 }
 
@@ -413,8 +413,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  border: 1px solid #1e293b;
-  background: #0a0a0a;
+  border: 1px solid transparent;
+  background: var(--theme-bg-card);
   font-size: 0.85rem;
   transition: border-color 0.2s;
   text-decoration: none;
@@ -422,7 +422,7 @@
   gap: 1rem;
 }
 .linkRow:hover {
-  border-color: #22d3ee;
+  border-color: var(--theme-free);
   color: #e2e8f0;
 }
 
@@ -439,8 +439,8 @@
 }
 
 .linkUrl {
-  color: #22d3ee;
-  font-size: 0.7rem;
+  color: var(--theme-free);
+  font-size: 0.75rem;
   font-family: monospace;
   white-space: nowrap;
 }
@@ -448,8 +448,8 @@
 /* ─── Code Block ────────────────────────────────────────────── */
 
 .codeBlock {
-  background: #0a0a0a;
-  border: 1px solid #1e293b;
+  background: var(--theme-bg-card);
+  border: 1px solid transparent;
   padding: 1.25rem;
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
@@ -459,11 +459,11 @@
 }
 
 .comment {
-  color: #475569;
+  color: var(--theme-text-muted);
 }
 
 .prompt {
-  color: #22d3ee;
+  color: var(--theme-free);
 }
 
 /* ─── Footer ────────────────────────────────────────────────── */
@@ -471,15 +471,15 @@
 .footer {
   text-align: center;
   padding: 2rem 0;
-  color: #334155;
+  color: var(--theme-text-muted);
   font-size: 0.8rem;
 }
 .footer a {
-  color: #475569;
+  color: var(--theme-text-muted);
   text-decoration: none;
 }
 .footer a:hover {
-  color: #22d3ee;
+  color: var(--theme-free);
 }
 
 /* ─── Responsive ────────────────────────────────────────────── */
@@ -512,4 +512,11 @@
   .heroCta {
     display: block;
   }
+}
+
+/* noun.wtf button system (src/STYLEGUIDE.md): pills, semibold. */
+.heroCta,
+.heroCtaFilled {
+  border-radius: 999px;
+  font-weight: 600;
 }

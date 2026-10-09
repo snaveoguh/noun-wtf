@@ -15,7 +15,7 @@
   padding: 0.55rem 0.9rem;
   border-radius: 8px;
   text-align: center;
-  border: 2px solid #222;
+  border: 2px solid transparent;
 }
 
 .subline {

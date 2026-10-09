@@ -231,13 +231,13 @@ const ProposalActionModal: React.FC<ProposalActionModalProps> = props => {
               style={{
                 marginBottom: 12,
                 padding: '8px 12px',
-                border: '1px solid #f5c542',
+                border: '1px solid transparent',
                 borderRadius: 3,
                 background: 'rgba(245, 197, 66, 0.12)',
                 fontSize: 13,
               }}
             >
-              <strong>Lil Nouns DAO</strong> · this action executes from the Lil Nouns treasury
+              <strong>Lil Nouns DAO</strong>, this action executes from the Lil Nouns treasury
             </div>
           )}
           <ModalContent onActionAdd={onActionAdd} onDismiss={onDismiss} dao={dao} />

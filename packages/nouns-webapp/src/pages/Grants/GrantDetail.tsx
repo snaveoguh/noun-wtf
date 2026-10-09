@@ -417,7 +417,7 @@ export default function GrantDetailPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '0.5rem 0',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: '1px solid var(--theme-divider)',
                 fontSize: '0.85rem',
               }}
             >
@@ -532,7 +532,7 @@ export default function GrantDetailPage() {
                   href={`https://etherscan.io/tx/${(v as any).createdAtTransaction}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', marginLeft: 8 }}
+                  style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginLeft: 8 }}
                 >
                   tx
                 </a>

@@ -41,14 +41,14 @@
   margin: 0.5rem 0;
   border-radius: 12px;
   background-color: var(--theme-bg-card) !important;
-  border-color: #e2e3e8 !important;
+  border-color: transparent !important;
   font-size: 18px;
   font-weight: bold;
   color: var(--theme-text-primary);
 }
 .traitFormBtn:hover,
 .traitFormBtn:focus {
-  border-color: #e2e3e8 !important;
+  border-color: transparent !important;
   background-color: var(--theme-bg-card) !important;
   box-shadow: none !important;
 }

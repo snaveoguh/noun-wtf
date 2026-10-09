@@ -164,7 +164,7 @@ const PropdateModal: FC<{
             padding: '4px 10px',
             borderRadius: 6,
             background: entry.isCompleted ? 'rgba(34, 197, 94, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: entry.isCompleted ? '#16a34a' : '#2563eb',
             marginBottom: 10,
@@ -205,7 +205,7 @@ const PropdateModal: FC<{
 
         <div
           style={{
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             color: 'var(--theme-text-muted)',
             marginBottom: 16,
           }}
@@ -245,7 +245,7 @@ const PropdateModal: FC<{
             marginTop: 16,
             paddingTop: 12,
             borderTop: '1px solid rgba(0,0,0,0.06)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: '#b0a890',
@@ -354,7 +354,7 @@ const PropdatesBanner: FC = () => {
             paddingRight: '24px',
             background: 'linear-gradient(90deg, #eef5ee 70%, rgba(238,245,238,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,
@@ -472,7 +472,7 @@ const PropdatesBanner: FC = () => {
                 <span
                   style={{
                     display: 'inline-block',
-                    fontSize: '0.5rem',
+                    fontSize: '0.75rem',
                     fontWeight: 800,
                     background: entry.isCompleted
                       ? 'rgba(34, 197, 94, 0.8)'
@@ -494,7 +494,7 @@ const PropdatesBanner: FC = () => {
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                     color: '#fff',
-                    fontSize: '0.6rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     lineHeight: 1.3,
                     textShadow: '0 1px 3px rgba(0,0,0,0.5)',

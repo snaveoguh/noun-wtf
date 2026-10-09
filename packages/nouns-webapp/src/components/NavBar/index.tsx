@@ -243,7 +243,7 @@ const NavBar = () => {
               >
                 <span
                   style={{
-                    fontSize: '0.6rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',

@@ -95,7 +95,7 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             aria-label="Search nouns by ID, trait name, or hex colour"
             className="w-full bg-transparent text-green-400 caret-green-400 placeholder:text-green-900 focus:outline-none"
             style={value === '' ? { paddingLeft: '1.5ch' } : undefined}
-            placeholder="search id, traits or hex… try: fox · disco · 1000 · #c54e38 · nounsweeper"
+            placeholder="search id, traits or hex… try: fox, disco, 1000, #c54e38, nounsweeper"
           />
           {value === '' && (
             <span className="pointer-events-none absolute left-0 top-0 animate-pulse text-green-500">

@@ -223,7 +223,7 @@ function VoteSignals({
                 {!isFeedbackClosed && userVotes !== undefined && userVotes > 0 && (
                   <div
                     className={clsx(
-                      'flex w-full flex-col items-center justify-center gap-2.5 border-t border-[#e6e6e6] bg-[#f4f4f8] p-5',
+                      'flex w-full flex-col items-center justify-center gap-2.5 border-t border-transparent bg-white/5 p-5',
                       userVoteSupport && 'block',
                     )}
                   >

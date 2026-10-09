@@ -311,7 +311,7 @@ export default function NounV2DetailPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '0.5rem 0',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: '1px solid var(--theme-divider)',
                 fontSize: '0.85rem',
               }}
             >

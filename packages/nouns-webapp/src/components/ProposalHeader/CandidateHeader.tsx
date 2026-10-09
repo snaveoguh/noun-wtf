@@ -150,7 +150,7 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
       </div>
 
       <p className={classes.versionHistory} style={{ fontSize: 13, opacity: 0.6 }}>
-        Version {versionsCount} · {versionsCount === 1 ? 'created' : 'updated'}{' '}
+        Version {versionsCount}, {versionsCount === 1 ? 'created' : 'updated'}{' '}
         {relativeTimestamp(lastUpdatedTimestamp)}
       </p>
 

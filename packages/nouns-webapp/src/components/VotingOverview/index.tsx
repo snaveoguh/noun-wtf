@@ -30,7 +30,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
       style={{
         background: 'var(--theme-bg-card)',
         borderRadius: 16,
-        border: '1px solid #e2e3e8',
+        border: '1px solid transparent',
         padding: '20px 24px',
       }}
     >
@@ -55,7 +55,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
         {isActive && (
           <span
             style={{
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 600,
               color: '#43b369',
               padding: '3px 10px',
@@ -87,7 +87,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
               // marker sits near 0% or the 95% cap.
               left: `clamp(28px, ${quorumPosition}%, calc(100% - 28px))`,
               transform: 'translateX(-50%)',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               color: 'var(--theme-text-muted)',
               whiteSpace: 'nowrap',
@@ -171,7 +171,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
         <VoteStat label="Against" count={againstVotes} color="#e40536" pct={againstPct} />
         <VoteStat label="Abstain" count={abstainVotes} color="#b0b0b8" pct={abstainPct} />
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
             Quorum
           </div>
           <div
@@ -182,7 +182,7 @@ const VotingOverview: FC<VotingOverviewProps> = ({
             }}
           >
             {forVotes}/{quorum}
-            {forReachedQuorum && <span style={{ fontSize: '0.7rem', marginLeft: 4 }}>Reached</span>}
+            {forReachedQuorum && <span style={{ fontSize: '0.75rem', marginLeft: 4 }}>Reached</span>}
           </div>
         </div>
       </div>
@@ -199,13 +199,13 @@ const VoteStat: FC<{ label: string; count: number; color: string; pct: number }>
   <div>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <span style={{ fontSize: '0.7rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
+      <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', fontWeight: 600 }}>
         {label}
       </span>
     </div>
     <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--theme-text-primary)' }}>
       {count}{' '}
-      <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--theme-text-muted)' }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--theme-text-muted)' }}>
         ({pct.toFixed(1)}%)
       </span>
     </div>

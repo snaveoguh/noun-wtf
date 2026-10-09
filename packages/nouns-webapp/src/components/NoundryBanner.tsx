@@ -152,7 +152,7 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
         left: '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 9999,
-        background: '#fff',
+        background: 'var(--theme-bg-card)',
         borderRadius: 16,
         padding: 20,
         boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
@@ -179,8 +179,8 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
         </div>
         <div
           style={{
-            fontSize: '0.6rem',
-            color: '#999',
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
             marginTop: 2,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -206,7 +206,7 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
             borderRadius: 8,
             background: '#d4544e',
             color: '#fff',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             cursor: 'pointer',
           }}
@@ -221,7 +221,7 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
             padding: '6px 14px',
             borderRadius: 8,
             border: '1px solid rgba(0,0,0,0.1)',
-            fontSize: '0.7rem',
+            fontSize: '0.75rem',
             color: '#666',
             textDecoration: 'none',
             fontWeight: 700,
@@ -243,7 +243,7 @@ const TraitModal: FC<{ card: TraitCard; onClose: () => void }> = ({ card, onClos
           height: 28,
           cursor: 'pointer',
           fontSize: '0.8rem',
-          color: '#999',
+          color: 'var(--theme-text-muted)',
         }}
       >
         ×
@@ -329,7 +329,7 @@ const NoundryBanner: FC = () => {
             paddingRight: 24,
             background: 'linear-gradient(90deg, #fef3e8 70%, rgba(254,243,232,0) 100%)',
             fontWeight: 900,
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             letterSpacing: '0.15em',
             textTransform: 'uppercase' as const,
             whiteSpace: 'nowrap' as const,

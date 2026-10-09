@@ -171,9 +171,9 @@ const LilNounDetailPopover: FC<Props> = ({
         {/* Traits */}
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {traits.map(([label, value]) => (
-            <div key={label} style={{ fontSize: '0.65rem', display: 'flex', gap: 6 }}>
+            <div key={label} style={{ fontSize: '0.75rem', display: 'flex', gap: 6 }}>
               <span style={{ color: '#9ca3af', width: 68, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontWeight: 600, color: '#374151' }}>{value}</span>
+              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>{value}</span>
             </div>
           ))}
         </div>

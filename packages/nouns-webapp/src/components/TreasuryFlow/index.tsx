@@ -41,7 +41,7 @@ const ENTITY_TYPES: Record<string, { label: string; color: string; shape: string
   media: { label: 'Media & Content', color: '#38bdf8', shape: '◆' },
   dev: { label: 'Development', color: '#a78bfa', shape: '◎' },
   community: { label: 'Community', color: '#fbbf24', shape: '◆' },
-  bidder: { label: 'Bidders', color: '#6b7280', shape: '●' },
+  bidder: { label: 'Bidders', color: 'var(--theme-text-muted)', shape: '●' },
   wallet: { label: 'Wallets', color: '#64748b', shape: '●' },
 };
 
@@ -231,7 +231,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
       }}
     >
       {/* Header */}
-      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--theme-divider)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span style={{
@@ -245,20 +245,20 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
           </div>
           <span style={{
             display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-            background: `${typeColor}20`, fontSize: '0.7rem', fontWeight: 600,
+            background: `${typeColor}20`, fontSize: '0.75rem', fontWeight: 600,
             textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: typeColor,
           }}>
             {ENTITY_TYPES[node.type]?.label ?? node.type}
           </span>
           {node.id !== 'treasury' && (
-            <span style={{ marginLeft: 8, fontSize: '0.65rem', color: '#64748b', fontFamily: 'monospace' }}>
+            <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
               {node.id.slice(0, 6)}...{node.id.slice(-4)}
             </span>
           )}
           {node.nounIds && node.nounIds.length > 0 && (
             <span style={{
               display: 'inline-block', marginLeft: 8, padding: '2px 6px', borderRadius: 4,
-              background: '#1a1500', fontSize: '0.65rem', fontWeight: 600, color: '#fbbf24',
+              background: '#1a1500', fontSize: '0.75rem', fontWeight: 600, color: '#fbbf24',
               border: '1px solid #3b3011',
             }}>
               {node.nounIds.length} Noun{node.nounIds.length !== 1 ? 's' : ''} held
@@ -269,7 +269,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
           onClick={onClose}
           style={{
             width: 32, height: 32, borderRadius: 8, border: 'none',
-            background: '#1e293b', cursor: 'pointer', display: 'flex',
+            background: 'var(--theme-bg-tertiary)', cursor: 'pointer', display: 'flex',
             alignItems: 'center', justifyContent: 'center', color: '#94a3b8',
           }}
         >
@@ -288,7 +288,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
         {/* Flow stats */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
           <div style={{ background: '#1a0a0a', border: '1px solid #3b1111', borderRadius: 10, padding: '12px 16px' }}>
-            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
               {node.id === 'treasury' ? 'Total Out' : 'Received'}
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fca5a5' }}>
@@ -296,7 +296,7 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
             </div>
           </div>
           <div style={{ background: '#0a1a0a', border: '1px solid #113b11', borderRadius: 10, padding: '12px 16px' }}>
-            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#22c55e', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#22c55e', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
               {node.id === 'treasury' ? 'Total In' : 'Contributed'}
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#86efac' }}>
@@ -306,8 +306,8 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
         </div>
 
         {/* Net flow */}
-        <div style={{ marginBottom: 20, padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10 }}>
-          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
+        <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 10 }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 4 }}>
             Net Flow
           </div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: node.netFlow >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -322,20 +322,20 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
               Governance Activity
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: '0.6rem', color: '#64748b', textTransform: 'uppercase' as const }}>Votes Cast</div>
+              <div style={{ background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' as const }}>Votes Cast</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0' }}>{node.votesCount}</div>
               </div>
-              <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: '0.6rem', color: '#64748b', textTransform: 'uppercase' as const }}>Voting Weight</div>
+              <div style={{ background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' as const }}>Voting Weight</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0' }}>{(node.totalVotingWeight ?? 0).toLocaleString()}</div>
               </div>
-              <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: '0.6rem', color: '#64748b', textTransform: 'uppercase' as const }}>Props Authored</div>
+              <div style={{ background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' as const }}>Props Authored</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0' }}>{node.proposalsCreated}</div>
               </div>
-              <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: '0.6rem', color: '#64748b', textTransform: 'uppercase' as const }}>Participation</div>
+              <div style={{ background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' as const }}>Participation</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0' }}>{node.participationRate ?? 0}%</div>
               </div>
             </div>
@@ -344,15 +344,15 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
 
         {/* Flow role indicator */}
         {node.id !== 'treasury' && (node.outboundConnections > 0 || node.inboundConnections > 0) && (
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10 }}>
-            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 6 }}>
+          <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 10 }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 6 }}>
               Flow Role
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: (node.flowRole ?? 0) > 0.3 ? '#22c55e' : (node.flowRole ?? 0) < -0.3 ? '#ef4444' : '#f59e0b' }}>
                 {(node.flowRole ?? 0) > 0.3 ? 'Proliferator' : (node.flowRole ?? 0) < -0.3 ? 'Beneficiary' : 'Steward'}
               </span>
-              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                 ({node.outboundConnections ?? 0} out / {node.inboundConnections ?? 0} in)
               </span>
             </div>
@@ -404,12 +404,12 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
                   href={`/vote/${id}`}
                   style={{
                     display: 'inline-block', padding: '4px 10px', borderRadius: 6,
-                    background: '#1e293b', fontSize: '0.8rem', fontWeight: 600,
+                    background: 'var(--theme-bg-tertiary)', fontSize: '0.8rem', fontWeight: 600,
                     color: '#94a3b8', textDecoration: 'none',
-                    transition: 'background 0.1s', border: '1px solid #334155',
+                    transition: 'background 0.1s', border: '1px solid var(--theme-divider)',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#334155')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#1e293b')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--theme-bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--theme-bg-tertiary)')}
                 >
                   Prop #{id}
                 </a>
@@ -440,11 +440,11 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
             rel="noreferrer"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 16px', borderRadius: 10, border: '1px solid #1e293b',
+              padding: '10px 16px', borderRadius: 10, border: '1px solid var(--theme-divider)',
               fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8',
               textDecoration: 'none', transition: 'background 0.1s',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--theme-bg-tertiary)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             View on Etherscan &#8599;
@@ -456,11 +456,11 @@ const DetailPanel: FC<{ node: FlowNode; onClose: () => void }> = ({ node, onClos
               rel="noreferrer"
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 16px', borderRadius: 10, border: '1px solid #1e293b',
+                padding: '10px 16px', borderRadius: 10, border: '1px solid var(--theme-divider)',
                 fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8',
                 textDecoration: 'none', transition: 'background 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--theme-bg-tertiary)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               Visit Website &#8599;
@@ -871,7 +871,7 @@ const TreasuryFlowSection: FC = () => {
         <div style={{
           display: 'flex', flexWrap: 'wrap' as const, gap: '12px 20px',
           padding: '8px 24px',
-          fontSize: '0.7rem', fontFamily: "'PT Root UI', sans-serif", color: '#94a3b8',
+          fontSize: '0.75rem', fontFamily: "'PT Root UI', sans-serif", color: '#94a3b8',
           justifyContent: 'center',
           position: 'relative', zIndex: 5, background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(8px)',
           pointerEvents: 'none',
@@ -907,10 +907,10 @@ const TreasuryFlowSection: FC = () => {
           position: 'relative', zIndex: 5, background: 'rgba(10,10,15,0.6)', backdropFilter: 'blur(6px)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#b45309' }}>
+            <span style={{ fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#b45309' }}>
               &#x2310;&#x25E8;-&#x25E8;
             </span>
-            <span style={{ fontWeight: 900, fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#94a3b8' }}>
+            <span style={{ fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#94a3b8' }}>
               NEURAL TREASURY
             </span>
             {/* Freeze toggle */}
@@ -918,10 +918,10 @@ const TreasuryFlowSection: FC = () => {
               onClick={() => setScenePaused(p => !p)}
               title={scenePaused ? 'Unfreeze scene' : 'Freeze scene (easier to explore)'}
               style={{
-                width: 24, height: 24, borderRadius: 6, border: '1px solid #334155',
+                width: 24, height: 24, borderRadius: 6, border: '1px solid var(--theme-divider)',
                 background: scenePaused ? '#1a1500' : 'transparent',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: scenePaused ? '#fbbf24' : '#475569',
+                color: scenePaused ? '#fbbf24' : 'var(--theme-text-muted)',
               }}
             >
               {scenePaused ? <Lock size={10} /> : <Unlock size={10} />}
@@ -940,10 +940,10 @@ const TreasuryFlowSection: FC = () => {
                     onClick={() => setOpenDropdown(isOpen ? null : group.label)}
                     style={{
                       padding: '3px 10px', borderRadius: 12, cursor: 'pointer',
-                      border: `1.5px solid ${activeCount > 0 ? '#475569' : '#334155'}`,
-                      background: activeCount > 0 ? '#1e293b' : 'transparent',
+                      border: `1px solid ${activeCount > 0 ? 'var(--theme-border-strong)' : 'var(--theme-divider)'}`,
+                      background: activeCount > 0 ? 'var(--theme-bg-tertiary)' : 'transparent',
                       color: activeCount > 0 ? '#e2e8f0' : '#64748b',
-                      fontSize: '0.65rem', fontWeight: 700,
+                      fontSize: '0.75rem', fontWeight: 700,
                       fontFamily: "'PT Root UI', sans-serif",
                       display: 'flex', alignItems: 'center', gap: 4,
                       transition: 'all 0.15s',
@@ -955,19 +955,19 @@ const TreasuryFlowSection: FC = () => {
                   {isOpen && (
                     <div style={{
                       position: 'absolute', top: '100%', left: 0, marginTop: 4,
-                      background: '#0f172a', border: '1px solid #334155', borderRadius: 10,
+                      background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 10,
                       padding: '8px 0', zIndex: 50, minWidth: 180,
                       boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                     }}>
                       {/* All/None toggle */}
-                      <div style={{ padding: '4px 12px 8px', borderBottom: '1px solid #1e293b', display: 'flex', gap: 8 }}>
+                      <div style={{ padding: '4px 12px 8px', borderBottom: '1px solid var(--theme-divider)', display: 'flex', gap: 8 }}>
                         <button
                           onClick={() => { const next = new Set(activeTypes); group.types.forEach(t => next.add(t)); setActiveTypes(next); }}
-                          style={{ fontSize: '0.6rem', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                          style={{ fontSize: '0.75rem', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                         >All</button>
                         <button
                           onClick={() => { const next = new Set(activeTypes); group.types.forEach(t => next.delete(t)); setActiveTypes(next); }}
-                          style={{ fontSize: '0.6rem', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                          style={{ fontSize: '0.75rem', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                         >None</button>
                       </div>
                       {group.types.map(type => {
@@ -983,23 +983,23 @@ const TreasuryFlowSection: FC = () => {
                               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                               padding: '6px 12px', background: 'none', border: 'none',
                               cursor: 'pointer', color: isActive ? '#e2e8f0' : '#64748b',
-                              fontSize: '0.7rem', fontFamily: "'PT Root UI', sans-serif",
+                              fontSize: '0.75rem', fontFamily: "'PT Root UI', sans-serif",
                               textAlign: 'left' as const,
                             }}
                           >
                             <span style={{
                               width: 14, height: 14, borderRadius: 3,
-                              border: `1.5px solid ${isActive ? info.color : '#475569'}`,
+                              border: `1.5px solid ${isActive ? info.color : 'var(--theme-text-muted)'}`,
                               background: isActive ? info.color : 'transparent',
                               flexShrink: 0,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '0.5rem', color: '#fff',
+                              fontSize: '0.75rem', color: '#fff',
                             }}>
                               {isActive ? '✓' : ''}
                             </span>
                             <span style={{ color: info.color, fontSize: '0.75rem' }}>{info.shape}</span>
                             <span style={{ flex: 1 }}>{info.label}</span>
-                            <span style={{ color: '#475569', fontSize: '0.6rem' }}>{count}</span>
+                            <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.75rem' }}>{count}</span>
                           </button>
                         );
                       })}
@@ -1011,7 +1011,7 @@ const TreasuryFlowSection: FC = () => {
 
             {/* Connection count filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
-              <span style={{ fontSize: '0.55rem', color: '#475569', marginRight: 2, fontFamily: "'PT Root UI', sans-serif" }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginRight: 2, fontFamily: "'PT Root UI', sans-serif" }}>
                 Conn:
               </span>
               {[1, 2, 3, 4, 5, 6, 7, 10].map(n => (
@@ -1020,10 +1020,10 @@ const TreasuryFlowSection: FC = () => {
                   onClick={() => setMinConnections(n)}
                   style={{
                     padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
-                    border: `1px solid ${minConnections === n ? '#f59e0b' : '#334155'}`,
+                    border: `1px solid ${minConnections === n ? '#dc9e46' : 'var(--theme-divider)'}`,
                     background: minConnections === n ? '#1a1500' : 'transparent',
                     color: minConnections === n ? '#fbbf24' : '#64748b',
-                    fontSize: '0.6rem', fontWeight: 700,
+                    fontSize: '0.75rem', fontWeight: 700,
                     fontFamily: "'PT Root UI', sans-serif",
                     minWidth: 20, textAlign: 'center' as const,
                   }}
@@ -1037,8 +1037,8 @@ const TreasuryFlowSection: FC = () => {
             <div ref={searchRef} style={{ position: 'relative' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', borderRadius: 8, border: '1px solid #334155',
-                background: '#0f172a', width: 220,
+                padding: '4px 10px', borderRadius: 8, border: '1px solid var(--theme-divider)',
+                background: 'var(--theme-bg-card)', width: 220,
               }}>
                 <Search size={12} color="#64748b" />
                 <input
@@ -1059,7 +1059,7 @@ const TreasuryFlowSection: FC = () => {
                   }}
                   style={{
                     flex: 1, border: 'none', outline: 'none',
-                    fontSize: '0.7rem', fontFamily: "'PT Root UI', sans-serif",
+                    fontSize: '0.75rem', fontFamily: "'PT Root UI', sans-serif",
                     background: 'transparent', color: '#e2e8f0',
                   }}
                 />
@@ -1075,11 +1075,11 @@ const TreasuryFlowSection: FC = () => {
               {searchOpen && searchResults.length > 0 && (
                 <div style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-                  background: '#0f172a', border: '1px solid #334155', borderRadius: 10,
+                  background: 'var(--theme-bg-card)', border: '1px solid var(--theme-divider)', borderRadius: 10,
                   maxHeight: 300, overflowY: 'auto', zIndex: 50,
                   boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                 }}>
-                  <div style={{ padding: '6px 10px', fontSize: '0.6rem', color: '#475569', borderBottom: '1px solid #1e293b' }}>
+                  <div style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--theme-text-muted)', borderBottom: '1px solid var(--theme-divider)' }}>
                     {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
                   </div>
                   {searchResults.map((item, i) => {
@@ -1091,8 +1091,8 @@ const TreasuryFlowSection: FC = () => {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                           padding: '8px 12px', border: 'none', cursor: 'pointer',
-                          background: i === searchHighlight ? '#1e293b' : 'transparent',
-                          color: '#e2e8f0', fontSize: '0.7rem',
+                          background: i === searchHighlight ? 'var(--theme-bg-tertiary)' : 'transparent',
+                          color: '#e2e8f0', fontSize: '0.75rem',
                           fontFamily: "'PT Root UI', sans-serif",
                           textAlign: 'left' as const,
                           borderBottom: '1px solid #1e293b10',
@@ -1106,7 +1106,7 @@ const TreasuryFlowSection: FC = () => {
                           {item.label}
                         </span>
                         {item.volume > 0 && (
-                          <span style={{ fontSize: '0.6rem', color: '#475569', flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', flexShrink: 0 }}>
                             {item.volume.toLocaleString()} ETH
                           </span>
                         )}
@@ -1173,7 +1173,7 @@ const TreasuryFlowSection: FC = () => {
               style={{
                 padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(0,0,0,0.12)',
                 background: 'transparent', cursor: 'pointer',
-                color: '#6b7280', fontSize: '0.6rem', fontWeight: 700,
+                color: 'var(--theme-text-muted)', fontSize: '0.75rem', fontWeight: 700,
                 fontFamily: "'PT Root UI', sans-serif", flexShrink: 0,
               }}
             >
@@ -1181,7 +1181,7 @@ const TreasuryFlowSection: FC = () => {
             </button>
 
             {/* Date label (left) */}
-            <span style={{ fontSize: '0.6rem', color: '#6b7280', flexShrink: 0, minWidth: 42 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', flexShrink: 0, minWidth: 42 }}>
               {new Date(NOUNS_GENESIS * 1000).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
             </span>
 
@@ -1199,16 +1199,16 @@ const TreasuryFlowSection: FC = () => {
             />
 
             {/* Date label (right) */}
-            <span style={{ fontSize: '0.6rem', color: '#6b7280', flexShrink: 0, minWidth: 42, textAlign: 'right' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', flexShrink: 0, minWidth: 42, textAlign: 'right' }}>
               Now
             </span>
 
             {/* Current position date */}
             {timeEnabled && (
               <span style={{
-                padding: '2px 8px', borderRadius: 4, background: '#fef3c7',
-                border: '1px solid #fcd34d', fontSize: '0.65rem', fontWeight: 700,
-                color: '#92400e', flexShrink: 0,
+                padding: '2px 8px', borderRadius: 4, background: 'var(--theme-surface)',
+                border: '1px solid transparent', fontSize: '0.75rem', fontWeight: 700,
+                color: 'var(--theme-text-primary)', flexShrink: 0,
               }}>
                 {new Date(timePosition * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
@@ -1221,7 +1221,7 @@ const TreasuryFlowSection: FC = () => {
                 style={{
                   padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(0,0,0,0.12)',
                   background: 'transparent', cursor: 'pointer',
-                  color: '#6b7280', fontSize: '0.6rem', flexShrink: 0,
+                  color: 'var(--theme-text-muted)', fontSize: '0.75rem', flexShrink: 0,
                 }}
               >
                 Reset
@@ -1246,17 +1246,17 @@ const TreasuryFlowSection: FC = () => {
             <span style={{ color: ENTITY_TYPES[hoveredNode.type]?.color ?? '#64748b' }}>
               {' '}{ENTITY_TYPES[hoveredNode.type]?.shape ?? ''} {ENTITY_TYPES[hoveredNode.type]?.label ?? hoveredNode.type}
             </span>
-            {hoveredNode.totalIn > 0 && <span style={{ color: '#fca5a5' }}> · {hoveredNode.totalIn.toLocaleString()} ETH received</span>}
-            {hoveredNode.totalOut > 0 && <span style={{ color: '#86efac' }}> · {hoveredNode.totalOut.toLocaleString()} ETH contributed</span>}
-            {hoveredNode.votesCount > 0 && <span style={{ color: '#a78bfa' }}> · {hoveredNode.votesCount} votes</span>}
-            {hoveredNode.proposalsCreated > 0 && <span style={{ color: '#a78bfa' }}> · {hoveredNode.proposalsCreated} props authored</span>}
+            {hoveredNode.totalIn > 0 && <span style={{ color: '#fca5a5' }}>, {hoveredNode.totalIn.toLocaleString()} ETH received</span>}
+            {hoveredNode.totalOut > 0 && <span style={{ color: '#86efac' }}>, {hoveredNode.totalOut.toLocaleString()} ETH contributed</span>}
+            {hoveredNode.votesCount > 0 && <span style={{ color: '#a78bfa' }}>, {hoveredNode.votesCount} votes</span>}
+            {hoveredNode.proposalsCreated > 0 && <span style={{ color: '#a78bfa' }}>, {hoveredNode.proposalsCreated} props authored</span>}
           </div>
         )}
 
         {/* Legend */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 12, padding: '10px 24px 14px', fontSize: '0.6rem', color: '#64748b',
+          gap: 12, padding: '10px 24px 14px', fontSize: '0.75rem', color: '#64748b',
           fontFamily: "'PT Root UI', sans-serif", flexWrap: 'wrap' as const,
         }}>
           {(['nounder', 'delegate', 'subdao', 'builder', 'culture', 'infra', 'education'] as const).map(type => {
@@ -1268,7 +1268,7 @@ const TreasuryFlowSection: FC = () => {
               </div>
             );
           })}
-          <span style={{ color: '#334155' }}>|</span>
+          <span style={{ color: 'var(--theme-text-muted)' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 4px #22c55e' }} />
             <span>Contributor</span>
@@ -1281,15 +1281,15 @@ const TreasuryFlowSection: FC = () => {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 4px #ef4444' }} />
             <span>Recipient</span>
           </div>
-          <span style={{ color: '#334155' }}>|</span>
+          <span style={{ color: 'var(--theme-text-muted)' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ color: '#8b5cf6', fontSize: '0.7rem' }}>→</span><span>Proposed</span>
+            <span style={{ color: '#8b5cf6', fontSize: '0.75rem' }}>→</span><span>Proposed</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ color: '#06b6d4', fontSize: '0.7rem' }}>→</span><span>Stream</span>
+            <span style={{ color: '#06b6d4', fontSize: '0.75rem' }}>→</span><span>Stream</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ color: '#22c55e', fontSize: '0.7rem' }}>→</span><span>ETH flow</span>
+            <span style={{ color: '#22c55e', fontSize: '0.75rem' }}>→</span><span>ETH flow</span>
           </div>
         </div>
       </div>

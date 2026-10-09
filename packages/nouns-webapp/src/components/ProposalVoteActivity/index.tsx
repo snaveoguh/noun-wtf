@@ -76,7 +76,7 @@ const VoteActivityItem: FC<{
     <div
       style={{
         padding: '16px 0',
-        borderBottom: '1px solid #e8e8ec',
+        borderBottom: '1px solid var(--theme-divider)',
       }}
     >
       {/* Header row */}
@@ -164,14 +164,14 @@ const VoteActivityItem: FC<{
               onClick={() => onRevote(vote.voter, vote.support)}
               style={{
                 background: 'none',
-                border: '1px solid #e2e3e8',
+                border: '1px solid transparent',
                 borderRadius: 6,
                 padding: '3px 8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 color: 'var(--theme-text-muted)',
                 transition: 'all 0.15s',
@@ -198,7 +198,7 @@ const VoteActivityItem: FC<{
               target="_blank"
               rel="noreferrer"
               style={{
-                fontSize: '0.65rem',
+                fontSize: '0.75rem',
                 color: '#b0b0b8',
                 textDecoration: 'none',
               }}
@@ -288,7 +288,7 @@ const ProposalVoteActivity: FC<ProposalVoteActivityProps> = ({ votes, onRevote }
                 border: 'none',
                 borderRadius: 6,
                 padding: '4px 10px',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 textTransform: 'capitalize',

@@ -1,4 +1,4 @@
-/** Auctions · Nouns · Treasury tabs. */
+/** Auctions, Nouns, Treasury tabs. */
 import type { WalletProfile } from './types';
 
 import { FC, useMemo } from 'react';
@@ -30,8 +30,8 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <Card
-          title={`Won · ${fmtInt(a?.wonCount ?? won.length)}`}
-          right={<span className="wp-muted text-[11px]">spent {fmtEth(a?.totalSpentEth)}</span>}
+          title={`Won, ${fmtInt(a?.wonCount ?? won.length)}`}
+          right={<span className="wp-muted text-xs">spent {fmtEth(a?.totalSpentEth)}</span>}
         >
           {won.length === 0 ? (
             <Empty>No auction wins.</Empty>
@@ -46,14 +46,14 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                       title={`Noun ${w.nounId}`}
                     />
                   </NounLink>
-                  <div className="mt-1 flex items-center justify-between gap-1 text-[11px]">
+                  <div className="mt-1 flex items-center justify-between gap-1 text-xs">
                     <NounLink nounId={w.nounId}>#{w.nounId}</NounLink>
                     <span className="wp-mono flex items-center">
                       {fmtEth(w.amountEth)}
                       <ClientBadge clientId={w.clientId} size={12} />
                     </span>
                   </div>
-                  <div className="wp-muted text-[10px]" title={fmtDate(w.timestamp)}>
+                  <div className="wp-muted text-xs" title={fmtDate(w.timestamp)}>
                     {relTime(w.timestamp)}
                   </div>
                 </div>
@@ -73,7 +73,7 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             <KV k="nounder rewards" v={fmtEth(a.nounderRewards)} />
           )}
         </Card>
-        <Card title={`Curated · ${curated.length}`}>
+        <Card title={`Curated, ${curated.length}`}>
           {curated.length === 0 ? (
             <Empty>Never settled the auction that minted the next noun.</Empty>
           ) : (
@@ -85,7 +85,7 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
               ))}
             </div>
           )}
-          <div className="wp-muted mt-2 text-[10px]">
+          <div className="wp-muted mt-2 text-xs">
             Curated = settled N, so N+1 exists because of this wallet.
           </div>
         </Card>
@@ -116,7 +116,7 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <Card title={`Held · ${fmtInt(h?.count ?? nouns.length)}`}>
+        <Card title={`Held, ${fmtInt(h?.count ?? nouns.length)}`}>
           {nouns.length === 0 ? (
             <Empty>Holds no Nouns right now.</Empty>
           ) : (
@@ -126,7 +126,7 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                   <NounLink nounId={n.nounId}>
                     <NounSeedImage nounId={n.nounId} seed={n.seed} title={`Noun ${n.nounId}`} />
                   </NounLink>
-                  <div className="mt-1 flex items-center justify-between text-[11px]">
+                  <div className="mt-1 flex items-center justify-between text-xs">
                     <NounLink nounId={n.nounId}>#{n.nounId}</NounLink>
                     <span className="wp-muted" title={fmtDate(n.since)}>
                       {n.since != null ? relTime(n.since) : ''}
@@ -179,14 +179,14 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             </div>
           )}
         </Card>
-        <Card title={`Delegation history · ${history.length}`}>
+        <Card title={`Delegation history, ${history.length}`}>
           {history.length === 0 ? (
             <Empty>No delegation changes.</Empty>
           ) : (
             history.map(d => (
               <div
                 key={`${d.kind ?? ''}-${d.fromDelegate ?? ''}-${d.toDelegate ?? ''}-${String(d.timestamp ?? '')}`}
-                className="wp-row flex-col !items-stretch text-[11px]"
+                className="wp-row flex-col !items-stretch text-xs"
               >
                 <div className="flex items-center gap-2">
                   <Pill tone={d.kind?.includes('in') === true ? 'pos' : 'mid'}>
@@ -204,11 +204,11 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
           )}
         </Card>
         {forks.length > 0 && (
-          <Card title={`Forks · ${forks.length}`}>
+          <Card title={`Forks, ${forks.length}`}>
             {forks.map(f => (
               <div
                 key={`${f.forkId}-${f.kind ?? ''}-${String(f.timestamp ?? '')}`}
-                className="wp-row items-center text-[11px]"
+                className="wp-row items-center text-xs"
               >
                 <Link to={`/fork/${f.forkId}`} className="wp-link">
                   Fork #{f.forkId}
@@ -243,7 +243,7 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       <div className="grid gap-3 lg:col-span-2">
-        <Card title={`Streams · ${streams.length}`}>
+        <Card title={`Streams, ${streams.length}`}>
           {streams.length === 0 ? (
             <Empty>No treasury streams to this wallet.</Empty>
           ) : (
@@ -282,7 +282,7 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
                       href={`https://etherscan.io/address/${s.streamAddress}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="wp-muted wp-mono mt-1 text-[10px]"
+                      className="wp-muted wp-mono mt-1 text-xs"
                     >
                       {shortAddr(s.streamAddress)} ↗
                     </a>
@@ -292,7 +292,7 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
             })
           )}
         </Card>
-        <Card title={`Secondary sales · ${sales.length}`}>
+        <Card title={`Secondary sales, ${sales.length}`}>
           {sales.length === 0 ? (
             <Empty>No secondary sales.</Empty>
           ) : (

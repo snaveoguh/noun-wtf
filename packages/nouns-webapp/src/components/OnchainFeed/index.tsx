@@ -170,7 +170,7 @@ const PriceText: FC<{ price: string | null; color?: string }> = ({ price, color 
     </span>
   ) : null;
 
-// ─── V1 · wire ────────────────────────────────────────────────────────────────
+// ─── V1, wire ────────────────────────────────────────────────────────────────
 
 const WireVariant: FC<VariantProps> = ({ items, resolved }) => (
   <div>
@@ -242,7 +242,7 @@ const WireVariant: FC<VariantProps> = ({ items, resolved }) => (
   </div>
 );
 
-// ─── V2 · terminal ────────────────────────────────────────────────────────────
+// ─── V2, terminal ────────────────────────────────────────────────────────────
 
 const TerminalVariant: FC<VariantProps> = ({ items, resolved }) => (
   <div style={{ background: '#0c0c14', padding: '6px 0' }}>
@@ -311,7 +311,7 @@ const TerminalVariant: FC<VariantProps> = ({ items, resolved }) => (
   </div>
 );
 
-// ─── V3 · ticker-cards ────────────────────────────────────────────────────────
+// ─── V3, ticker-cards ────────────────────────────────────────────────────────
 
 const TickerCardsVariant: FC<VariantProps> = ({ items, resolved }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -443,7 +443,7 @@ const TickerCardsVariant: FC<VariantProps> = ({ items, resolved }) => {
   );
 };
 
-// ─── V4 · ledger ──────────────────────────────────────────────────────────────
+// ─── V4, ledger ──────────────────────────────────────────────────────────────
 
 const LedgerVariant: FC<VariantProps> = ({ items, resolved }) => (
   <table
