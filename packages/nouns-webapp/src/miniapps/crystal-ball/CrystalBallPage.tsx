@@ -666,7 +666,7 @@ function ViewModeToggle({ mode, setMode }: { mode: ViewMode; setMode: (m: ViewMo
     <div
       role="tablist"
       aria-label="Select view mode"
-      className="inline-flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/70 p-0.5 shadow-sm backdrop-blur-sm"
+      className="inline-flex items-center gap-0.5 rounded-full border border-transparent bg-white/10 p-0.5 shadow-sm backdrop-blur-sm"
     >
       {VIEW_MODES.map(m => (
         <Pill
@@ -1140,7 +1140,7 @@ export default function CrystalBallPage() {
         ? NOUNS_RED
         : bestMatch != null && bestMatch.matches >= 3
           ? '#eab308'
-          : '#444';
+          : 'var(--theme-text-muted)';
 
   const showSettle =
     bestMatch != null &&
@@ -1644,7 +1644,7 @@ export default function CrystalBallPage() {
                 <span
                   style={{
                     fontSize: 12,
-                    color: isMatch ? matchColor : '#555',
+                    color: isMatch ? matchColor : 'var(--theme-text-muted)',
                     letterSpacing: '0.15em',
                     fontWeight: 700,
                   }}

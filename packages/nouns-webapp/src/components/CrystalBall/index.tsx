@@ -465,20 +465,20 @@ const CrystalBall: FC<CrystalBallProps> = ({
       >
         {prediction && (
           <>
-            <div style={{ fontSize: 12, color: '#666', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 12, color: 'var(--theme-text-muted)', letterSpacing: '0.05em' }}>
               <span style={{ color: prediction.running ? '#4ade80' : '#ef4444' }}>
                 {prediction.running ? '\u25CF' : '\u25CB'}
               </span>{' '}
               NOUN #{prediction.nextNounId}
               {prediction.block > 0 && (
-                <span style={{ color: '#444', marginLeft: 6 }}>BLK {prediction.block}</span>
+                <span style={{ color: 'var(--theme-text-muted)', marginLeft: 6 }}>BLK {prediction.block}</span>
               )}
             </div>
             {countdown && (
               <div
                 style={{
                   fontSize: 12,
-                  color: isNounOClock ? '#ef4444' : '#555',
+                  color: isNounOClock ? 'var(--theme-negative)' : 'var(--theme-text-muted)',
                   letterSpacing: '0.08em',
                 }}
               >
