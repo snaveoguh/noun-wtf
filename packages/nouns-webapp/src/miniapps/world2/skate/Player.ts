@@ -873,7 +873,9 @@ export class Player {
     if (Math.abs(fs) > 0.4) this.fakie = fs < 0;
 
     // Push
-    const canPush = this.state === 'ground' && this.crouch < 0.2 && !brake;
+    // Holding the ollie crouch doesn't stop you pushing (it used to, so
+    // charging an ollie on the flat bled all your speed)
+    const canPush = this.state === 'ground' && !brake;
     if (input.push && canPush && this.pushTimer < 0) {
       this.pushTimer = 0;
       this.events.push({ type: 'push' });
@@ -926,9 +928,11 @@ export class Player {
       }
       brakeK = 1 + speed / 30;
     }
+    // Crouched = tucked: a little less rolling and air drag
+    const tuck = 1 - 0.35 * this.crouch;
     const decel =
-      friction +
-      drag * speed * speed +
+      friction * tuck +
+      drag * tuck * speed * speed +
       (sliding ? 7.5 : brake ? 4.5 : 0) * brakeK +
       this.powerslide * 2 * brakeK;
     const newSpeed = Math.max(0, this.speed - decel * dt);
