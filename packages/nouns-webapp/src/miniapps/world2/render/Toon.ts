@@ -73,7 +73,7 @@ export function toToon(src: THREE.Material): THREE.Material {
     polygonOffsetFactor: s.polygonOffsetFactor,
     polygonOffsetUnits: s.polygonOffsetUnits,
   });
-  m.userData = { ...s.userData, toonFrom: s.type };
+  m.userData = { ...s.userData, toonFrom: s.type, toonSrc: s };
   converted.set(src, m);
   return m;
 }

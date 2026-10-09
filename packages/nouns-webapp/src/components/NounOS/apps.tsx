@@ -133,6 +133,8 @@ function timeLeft(end: number) {
 }
 
 function eth(v: unknown) {
+  if (v === undefined || v === null || v === '0' || v === 0 || v === BigInt(0))
+    return 'no bids yet';
   try {
     const n = typeof v === 'bigint' ? v : BigInt(String(v));
     const f = Number(formatEther(n));

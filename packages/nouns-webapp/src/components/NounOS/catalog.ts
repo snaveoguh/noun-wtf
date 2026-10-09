@@ -57,7 +57,7 @@ export const CATALOG: Section[] = [
       {
         path: '/nounv2',
         name: 'NOUN V2',
-        blurb: 'the free dao. no reserve to raid, built here.',
+        blurb: 'the free dao. no reserve as a wall. built here.',
         hot: true,
       },
       { path: '/v2', name: 'V2 AUCTION', blurb: 'one v2 noun a day. bid.' },
@@ -97,7 +97,6 @@ export const CATALOG: Section[] = [
       { path: '/probe', name: 'PROBE', blurb: 'explore every noun, every dream.' },
       { path: '/explore/wallet', name: 'WALLETS', blurb: 'who holds what, who votes how.' },
       { path: '/feed', name: 'FEED', blurb: 'everything happening, live.' },
-      { path: '/stats', name: 'STATS', blurb: 'numbers.' },
       { path: '/dashboard', name: 'DASHBOARD', blurb: 'the treasury at a glance.' },
       { path: '/underground', name: 'UNDERGROUND', blurb: 'the basement.' },
     ],
