@@ -149,6 +149,8 @@ export interface GrindState {
   /** Board yaw offset relative to the rail tangent (0 = parallel, ±π/2 = slide). */
   yawOffset: number;
   time: number;
+  /** Seconds spent nearly stopped (a stall on a flat bit ends the grind). */
+  stall?: number;
 }
 
 export class Player {
@@ -1334,6 +1336,15 @@ export class Player {
     // Gravity along the rail + friction
     g.speed += -t.gravity * dirTan.y * dt;
     g.speed -= (g.type === 'boardslide' ? 1.4 : 0.9) * dt;
+    // Ran out of speed on a slope (e.g. the top of the mega ramp arch):
+    // slide back down the rail fakie instead of dropping through it
+    if (g.speed < 0) {
+      if (dirTan.y > 0.02) {
+        g.speed = -g.speed;
+        g.dir = g.dir === 1 ? -1 : 1;
+        this.fakie = !this.fakie;
+      } else g.speed = 0; // flat: friction just stops you (then the stall ends it)
+    }
     g.s += g.speed * g.dir * dt;
 
     // Lean on the stick: nose / tail variants for 50-50s
@@ -1361,7 +1372,9 @@ export class Player {
       1 - Math.exp(-4 * dt),
     );
 
-    const ended = g.s <= 0 || g.s >= g.rail.total || g.speed < 0.6;
+    // Only a real stall ends it: nearly stopped on a flat bit for a moment
+    g.stall = g.speed < 0.6 && Math.abs(tan.y) < 0.08 ? (g.stall ?? 0) + dt : 0;
+    const ended = g.s <= 0 || g.s >= g.rail.total || g.stall > 0.5;
     const popped = input.tricks.length > 0;
     if (ended || popped) {
       this.state = 'air';
