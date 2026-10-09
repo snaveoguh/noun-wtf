@@ -27,6 +27,10 @@
   --brand-gray-light-text: #6b6762;
   --brand-cool-light-text: #6b6762;
   --brand-warm-light-text: #6b6762;
+  /* info-row buttons (NounInfoRowButton) fill with the *-accent tokens */
+  --brand-cool-accent: rgba(0, 0, 0, 0.06);
+  --brand-warm-accent: rgba(0, 0, 0, 0.06);
+  --brand-gray-hover: rgba(0, 0, 0, 0.1);
   --bs-code-color: #1c1815;
   color: var(--theme-text-primary);
 }
@@ -40,6 +44,28 @@
 .page :global(.alert) code,
 .page :global(.alert) strong {
   color: var(--theme-text-primary) !important;
+}
+/* Tailwind pastel pairs are mapped to bright text for the dark theme in
+   index.css; on this light ground they need their original ink shades. */
+.page :global(.text-red-700),
+.page :global(.text-red-800),
+.page :global(.text-red-900) {
+  color: #9f1239 !important;
+}
+.page :global(.text-green-700),
+.page :global(.text-green-800),
+.page :global(.text-green-900) {
+  color: #166534 !important;
+}
+.page :global(.text-amber-700),
+.page :global(.text-amber-800),
+.page :global(.text-yellow-800) {
+  color: #92400e !important;
+}
+.page :global(.text-white\/30),
+.page :global(.text-white\/40),
+.page :global(.text-white\/50) {
+  color: var(--theme-text-muted) !important;
 }
 .page h1,
 .page h2,

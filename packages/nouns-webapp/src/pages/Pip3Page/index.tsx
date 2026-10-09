@@ -325,12 +325,12 @@ const Pip3Page: React.FC = () => {
         position: 'fixed',
         bottom: 12,
         right: 12,
-        opacity: 0.5,
+        opacity: 0.75,
         transition: 'opacity 0.2s',
         zIndex: 10,
       }}
         onMouseEnter={e => { e.currentTarget.style.opacity = '0.6'; }}
-        onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; }}
       >
         <a
           href="https://giphy.com/channel/60r90"
