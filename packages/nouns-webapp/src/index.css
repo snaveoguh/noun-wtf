@@ -62,8 +62,11 @@
    defaults below cover a fresh visitor. Both theme blocks read them instead
    of hard-coding Pip3. Default Figtree. */
 :root {
-  --site-font: 'Figtree', system-ui, -apple-system, sans-serif;
-  --site-transform: none;
+  /* Native UI font on every platform: SF (Apple), Segoe UI (Windows), Roboto
+     (Android/ChromeOS). !important beats a font saved by the old switcher. */
+  --site-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', system-ui,
+    sans-serif !important;
+  --site-transform: none !important;
 }
 
 /* Pip3 is single-weight and uppercase-only. The uppercase transform comes
@@ -632,8 +635,8 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --theme-orb-glow: radial-gradient(circle, rgba(212, 255, 58, 0.12) 0%, transparent 70%);
     --theme-font-body: var(--site-font, 'Figtree', system-ui, sans-serif);
     --theme-font-display: var(--site-font, 'Figtree', system-ui, sans-serif);
-    --theme-font-size-base: 13px;
-    --theme-letter-spacing: 0.02em;
+    --theme-font-size-base: 15px;
+    --theme-letter-spacing: 0;
     --theme-radius-sm: 0px;
     --theme-radius-md: 0px;
     --theme-radius-lg: 0px;
@@ -715,9 +718,11 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] body {
   font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
   text-transform: var(--site-transform, none);
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 450;
   background: #000000;
   color: #ecebe4;
+  -webkit-font-smoothing: auto;
 }
 
 [data-theme='abacus'] h1 { font-size: 1.8rem !important; }

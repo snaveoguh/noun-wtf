@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatEther } from 'viem';
 
 import { StandaloneNounImage } from '@/components/StandaloneNoun';
+import { useAppSelector } from '@/hooks';
 import useOnDisplayAuction from '@/wrappers/onDisplayAuction';
 
 import { CATALOG, type Entry } from './catalog';
@@ -18,7 +19,7 @@ export function Manifesto({
 }) {
   return (
     <article className="nos-manifesto">
-      <p className="nos-mono-dim">noun.wtf // transmission 001 // cc0, copy this</p>
+      <p className="nos-mono-dim">noun.wtf, transmission 001. cc0, copy this</p>
       <h1>
         THE DAO
         <br />
@@ -48,10 +49,10 @@ export function Manifesto({
         the art, the world, the feed, and whoever is online right now.
       </p>
       <ul className="nos-tenets">
-        <li>⌐◨-◨ nouns is forever. the capture is temporary.</li>
-        <li>⌐◨-◨ cc0 means it&apos;s already ours.</li>
-        <li>⌐◨-◨ make things, not proposals about making things.</li>
-        <li>⌐◨-◨ the network is the church. log on.</li>
+        <li>nouns is forever. the capture is temporary.</li>
+        <li>cc0 means it&apos;s already ours.</li>
+        <li>make things, not proposals about making things.</li>
+        <li>the network is the church. log on.</li>
       </ul>
       <div className="nos-row">
         <button type="button" className="nos-btn is-acid" onClick={onEnterWorld}>
@@ -61,7 +62,7 @@ export function Manifesto({
           SEE THE ART (PIP3)
         </button>
       </div>
-      <p className="nos-mono-dim">— the underground. we are punk. nouns is forever.</p>
+      <p className="nos-mono-dim">we are punk. nouns is forever.</p>
     </article>
   );
 }
@@ -84,15 +85,9 @@ export function Directory({ onOpen }: { onOpen: (e: Entry) => void }) {
   return (
     <div className="nos-dir">
       <div className="nos-dir-head">
-        <div>
-          <div className="nos-wordmark">NOUN.WTF</div>
-          <div className="nos-mono-dim">
-            an underground index of everything nounish · est. day 1 · forever
-          </div>
-        </div>
         <input
           className="nos-input"
-          placeholder="search the index…"
+          placeholder="search"
           value={q}
           onChange={e => setQ(e.target.value)}
         />
@@ -120,7 +115,7 @@ export function Directory({ onOpen }: { onOpen: (e: Entry) => void }) {
         ))}
       </div>
       <p className="nos-mono-dim nos-dir-foot">
-        best viewed with headphones on · webring: ⌐◨-◨ ← noun.wtf → ⌐◨-◨ · you are visitor #∞
+        best viewed with headphones on. you are visitor #∞
       </p>
     </div>
   );
@@ -148,7 +143,11 @@ function eth(v: unknown) {
 }
 
 export function AuctionChip({ onOpen }: { onOpen: (path: string) => void }) {
-  const auction = useOnDisplayAuction();
+  // Live auction from the chain subscriber (onDisplayAuction is only set by
+  // the auction page, which isn't mounted on the home screen).
+  const live = useAppSelector(st => st.auction.activeAuction);
+  const shown = useOnDisplayAuction();
+  const auction = live ?? shown;
   const [, tick] = useState(0);
   useEffect(() => {
     const t = window.setInterval(() => tick(x => x + 1), 1000);
@@ -171,7 +170,7 @@ export function AuctionChip({ onOpen }: { onOpen: (path: string) => void }) {
         <span className="nos-auction-thumb">
           <StandaloneNounImage nounId={id} />
         </span>
-        NOUN {String(id)} · {eth(auction.amount)} · {timeLeft(end)}
+        NOUN {String(id)}&nbsp;&nbsp;{eth(auction.amount)}&nbsp;&nbsp;{timeLeft(end)}
       </button>
       <span className="nos-auction-card" role="tooltip">
         <span className="nos-auction-img">

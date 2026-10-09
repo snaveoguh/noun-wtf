@@ -479,6 +479,69 @@ export class Game {
     this.emit();
   }
 
+  /**
+   * ?diag=1 — render the current view under several pipeline configurations
+   * and return snapshots, so a GPU-specific artefact can be pinned to a stage
+   * from one screenshot on the affected machine.
+   */
+  runDiagnostics(): { label: string; url: string }[] {
+    const g = this.gfx;
+    const r = g.renderer;
+    const canvas = r.domElement;
+    const toonMats: THREE.Material[] = [];
+    g.scene.traverse(o => {
+      const m = (o as THREE.Mesh).material;
+      for (const x of Array.isArray(m) ? m : m !== undefined ? [m] : []) {
+        if (x.side === THREE.DoubleSide) toonMats.push(x);
+      }
+    });
+    const set = (o: {
+      ink: boolean;
+      grade: boolean;
+      raw: boolean;
+      shadows: boolean;
+      front: boolean;
+    }) => {
+      if (g.inkPass) g.inkPass.enabled = o.ink;
+      if (g.gradePass) g.gradePass.enabled = o.grade;
+      g.rawRender = o.raw;
+      if (r.shadowMap.enabled !== o.shadows) {
+        r.shadowMap.enabled = o.shadows;
+        g.scene.traverse(x => {
+          const m = (x as THREE.Mesh).material;
+          for (const y of Array.isArray(m) ? m : m !== undefined ? [m] : []) y.needsUpdate = true;
+        });
+      }
+      for (const m of toonMats) {
+        const want = o.front ? THREE.FrontSide : THREE.DoubleSide;
+        if (m.side !== want) {
+          m.side = want;
+          m.needsUpdate = true;
+        }
+      }
+    };
+    const base = { ink: true, grade: true, raw: false, shadows: true, front: false };
+    const configs: [string, typeof base][] = [
+      ['A baseline', base],
+      ['B ink off', { ...base, ink: false }],
+      ['C grade off', { ...base, grade: false }],
+      ['D ink+grade off', { ...base, ink: false, grade: false }],
+      ['E no post (raw)', { ...base, raw: true }],
+      ['F shadows off', { ...base, shadows: false }],
+      ['G single-sided', { ...base, front: true }],
+      ['H single-sided + no shadows', { ...base, front: true, shadows: false }],
+    ];
+    const out: { label: string; url: string }[] = [];
+    for (const [label, c] of configs) {
+      set(c);
+      g.render(1 / 60);
+      g.render(1 / 60);
+      out.push({ label, url: canvas.toDataURL('image/jpeg', 0.72) });
+    }
+    set(base);
+    return out;
+  }
+
   /** Leave the showroom and hand control to the player. */
   enterWorld() {
     this.showroom = false;

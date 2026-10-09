@@ -23,6 +23,7 @@ import { ChainNotificationsMount } from '@/components/Notifications/useChainNoti
 import { Toaster } from '@/components/ui/sonner';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
+import AgentHome from './AgentHome';
 import { AuctionChip, Directory, Manifesto } from './apps';
 import { titleForPath, type Entry } from './catalog';
 import { cx, isMobile, os, useOS, type AppKind } from './osStore';
@@ -35,7 +36,8 @@ const TerminalFeedShell = lazy(() => import('@/components/TerminalFeed/TerminalF
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 
 const README_KEY = 'nounos-readme-seen';
-const WORLD_PATHS = new Set(['/', '/world', '/world/']);
+const WORLD_PATHS = new Set(['/world', '/world/']);
+const HOME_PATHS = new Set(['/', '']);
 
 const APP_TITLES: Record<Exclude<AppKind, 'navigator'>, string> = {
   terminal: 'TERMINAL.EXE',
@@ -84,6 +86,10 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       os.close('navigator');
       os.setMode('world');
       setGameMounted(true);
+    } else if (HOME_PATHS.has(path)) {
+      // Home = the agent console over the poster; the game only loads on demand
+      os.close('navigator');
+      os.setMode('desk');
     } else {
       os.open('navigator');
     }
@@ -91,13 +97,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
 
   useEffect(() => {
     if (mode === 'world') setGameMounted(true);
-    if (mode === 'desk' && !readmeSeen && !os.isOpen('manifesto') && onWorldPath) {
-      // First visit: the README sits behind whatever was just asked for
-      const top = os.get().windows.at(-1);
-      os.open('manifesto');
-      if (top !== undefined) os.focus(top.id);
-    }
-  }, [mode, readmeSeen, onWorldPath]);
+  }, [mode]);
 
   useEffect(() => {
     const t = window.setInterval(() => setClock(new Date()), 15000);
@@ -138,8 +138,10 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       raf = requestAnimationFrame(loop);
       cx += (tx - cx) * 0.06;
       cy += (ty - cy) * 0.06;
-      stage.style.setProperty('--rx', `${(-cy * 3.2).toFixed(3)}deg`);
-      stage.style.setProperty('--ry', `${(cx * 4.5).toFixed(3)}deg`);
+      // On the root so the desk AND the home poster both lean with the pointer
+      const host = stage.parentElement ?? stage;
+      host.style.setProperty('--rx', `${(-cy * 3.2).toFixed(3)}deg`);
+      host.style.setProperty('--ry', `${(cx * 4.5).toFixed(3)}deg`);
     };
     window.addEventListener('pointermove', onMove);
     raf = requestAnimationFrame(loop);
@@ -152,7 +154,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
   const goWorld = useCallback(() => {
     setGameMounted(true);
     os.setMode('world');
-    if (!onWorldPath) navigate('/');
+    if (!onWorldPath) navigate('/world');
   }, [navigate, onWorldPath]);
 
   const openEntry = useCallback(
@@ -202,7 +204,6 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     if (e.target !== e.currentTarget) return;
     const horizon = window.innerHeight - waterHeight();
     if (e.clientY > horizon) waterRef.current?.ripple(e.clientX, e.clientY, 1);
-    else if (gameMounted || onWorldPath) os.setMode('world');
   };
 
   const visible = windows.filter(w => !w.minimized);
@@ -258,16 +259,23 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
 
       {/* 1. the world */}
       <div className="nos-world" aria-hidden={desk}>
-        {gameMounted ? (
+        {gameMounted && (
           <Suspense fallback={<div className="nos-world-fallback" />}>
             <World2Page paused={desk} />
           </Suspense>
-        ) : (
-          <div className="nos-world-fallback">
-            <div className="nos-noggles">⌐◨-◨</div>
-          </div>
         )}
       </div>
+
+      {/* 1b. home: the agent, over the Noun World poster (hidden while skating) */}
+      {!gameMounted || desk ? (
+        <AgentHome
+          active={desk && visible.length === 0}
+          gameLoaded={gameMounted}
+          onEnterWorld={goWorld}
+          onOpen={id => os.open(id)}
+          onNavigate={openPath}
+        />
+      ) : null}
 
       {/* 2. the desk */}
       {/* background clicks (sky → world, water → ripples) land here, under the 3D stage */}
@@ -306,20 +314,6 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
             </OSWindow>
           ))}
         </div>
-        {visible.length === 0 && desk && (
-          <div className="nos-empty">
-            <div className="nos-wordmark">NOUN.WTF</div>
-            <p>nouns is forever. the capture is temporary.</p>
-            <div className="nos-row">
-              <button type="button" className="nos-btn is-acid" onClick={goWorld}>
-                ENTER NOUN WORLD
-              </button>
-              <button type="button" className="nos-btn" onClick={() => os.open('directory')}>
-                OPEN INDEX
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 3. the pond */}

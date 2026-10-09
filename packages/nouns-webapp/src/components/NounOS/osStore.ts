@@ -29,7 +29,7 @@ interface State {
 const LAYOUT_KEY = 'nounos-layout-v1';
 
 const listeners = new Set<() => void>();
-let state: State = { mode: 'world', windows: [] };
+let state: State = { mode: 'desk', windows: [] };
 
 function emit() {
   for (const l of listeners) l();

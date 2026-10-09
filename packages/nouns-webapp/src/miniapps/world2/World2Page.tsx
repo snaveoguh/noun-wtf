@@ -27,7 +27,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'P', v: 'time of day' },
   { k: 'M / .', v: 'radio station · next track' },
   { k: 'V', v: 'mic' },
-  { k: 'G (hold)', v: 'spray paint · T colour' },
+  { k: 'CLICK+DRAG / G', v: 'spray paint · T colour' },
   { k: 'R', v: 'respawn' },
   { k: 'ENTER', v: 'chat' },
 ];
@@ -225,6 +225,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         />
       )}
       {(phase === 'title' || !game) && !error && <SplashGate game={game} onStart={begin} />}
+      {game && searchParams.get('diag') === '1' && <Diagnostics game={game} />}
 
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
@@ -243,6 +244,48 @@ function useHud(game: Game): HudState {
   return useSyncExternalStore(
     cb => game.subscribe(cb),
     () => game.hud,
+  );
+}
+
+function Diagnostics({ game }: { game: Game }) {
+  const [shots, setShots] = useState<{ label: string; url: string }[] | null>(null);
+  const gpu = useMemo(() => {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+      return ext ? String(gl!.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown GPU';
+    } catch {
+      return 'unknown GPU';
+    }
+  }, []);
+  return (
+    <div className="absolute left-3 top-3 z-50" style={{ fontFamily: 'ui-monospace, monospace' }}>
+      <button
+        type="button"
+        className="rounded bg-[#d4ff3a] px-3 py-2 text-sm font-bold text-black"
+        onClick={() => setShots(game.runDiagnostics())}
+      >
+        RUN DIAGNOSTIC
+      </button>
+      {shots && (
+        <div className="fixed inset-0 overflow-auto bg-black p-3 text-white">
+          <div className="mb-2 text-xs">
+            {gpu} · {navigator.userAgent.slice(0, 120)}{' '}
+            <button type="button" className="ml-2 underline" onClick={() => setShots(null)}>
+              close
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {shots.map(s => (
+              <figure key={s.label} className="m-0">
+                <img src={s.url} alt={s.label} className="w-full" />
+                <figcaption className="text-sm">{s.label}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
