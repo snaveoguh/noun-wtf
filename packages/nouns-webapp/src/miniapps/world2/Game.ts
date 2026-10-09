@@ -201,6 +201,9 @@ export class Game {
           },
     );
     this.gfx.scene.add(this.graffiti.group);
+    // Paint is decals on walls: the normals pass would draw each canvas as a
+    // solid panel and ink its edges as floating black frames
+    inkExcluded.add(this.graffiti.group);
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
     this.buildNature(level);

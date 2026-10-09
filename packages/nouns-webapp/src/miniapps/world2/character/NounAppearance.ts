@@ -9,6 +9,8 @@ import {
 } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
+import { toonify } from '../render/Toon';
+import { loadGlbHead } from './GlbHead';
 import { buildSmoothHead, headProfile, type SmoothHead } from './SmoothHead';
 
 export interface NounSeed {
@@ -134,10 +136,27 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
     -((box.min.z + box.max.z) / 2) * s + (flat ? 0.08 : 0),
   );
 
+  // Swap in the hand-modelled 3D head when one exists (?heads=pixel keeps
+  // the generated ones). The generated head shows until it loads.
+  if (USE_MODELS) {
+    const generated = [...inner.children];
+    void loadGlbHead(seed.head, seed.glasses).then(model => {
+      if (model === null) return;
+      // Match whatever look the character already has (toon or lit)
+      const toon = generated.some(o => ((o as THREE.Mesh).material as THREE.Material)?.userData?.toonSrc !== undefined);
+      if (toon) toonify(model);
+      for (const o of generated) o.visible = false;
+      inner.add(model);
+    });
+  }
+
   // Skin tone: most common head colour
   const skin = dominantColor(geos.head) ?? new THREE.Color(0xd8b48c);
   return { group, skin };
 }
+
+const USE_MODELS =
+  typeof window === 'undefined' || new URLSearchParams(window.location.search).get('heads') !== 'pixel';
 
 function dominantColor(geo: THREE.BufferGeometry | null): THREE.Color | null {
   if (!geo?.attributes.color) return null;
