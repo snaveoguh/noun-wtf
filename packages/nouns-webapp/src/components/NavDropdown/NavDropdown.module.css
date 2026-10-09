@@ -26,7 +26,7 @@
   display: block;
   /* background-color: var(--theme-bg-card); */
   border: 0;
-  border-bottom: 1.5px solid #e2e3e8;
+  border-bottom: 1.5px solid var(--theme-divider);
   border-radius: 0;
 }
 .menu a:last-child {

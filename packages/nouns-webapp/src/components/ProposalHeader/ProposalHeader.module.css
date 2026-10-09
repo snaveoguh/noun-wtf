@@ -199,7 +199,7 @@
 
 .versionHistory strong {
   padding: 6px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid transparent;
   border-radius: 6px;
   margin-right: 5px;
 }

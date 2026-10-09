@@ -21,13 +21,13 @@
 .title {
   font-size: 2rem;
   font-weight: 700;
-  color: #0891b2;
+  color: var(--theme-free);
   margin: 0;
 }
 
 .treasury {
   font-size: 1.2rem;
-  color: #4ade80;
+  color: var(--theme-free);
   font-weight: 600;
 }
 
@@ -42,16 +42,16 @@
   display: inline-block;
   padding: 0.6rem 1.2rem;
   background: transparent;
-  border: 1px solid #0891b2;
-  color: #0891b2;
+  border: 1px solid var(--theme-free);
+  color: var(--theme-free);
   text-decoration: none;
   font-size: 0.9rem;
   cursor: pointer;
   transition: background 0.2s;
 }
 .createBtn:hover {
-  background: rgba(34, 211, 238, 0.1);
-  color: #0891b2;
+  background: rgba(61, 255, 138, 0.1);
+  color: var(--theme-free);
 }
 
 .loading {
@@ -76,14 +76,14 @@
 .card {
   display: block;
   padding: 1rem 1.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid transparent;
   background: var(--theme-bg-card);
   text-decoration: none;
   color: var(--theme-text-primary);
   transition: border-color 0.2s;
 }
 .card:hover {
-  border-color: #0891b2;
+  border-color: var(--theme-free);
   color: var(--theme-text-primary);
 }
 
@@ -124,14 +124,14 @@
 .voteBar {
   width: 100%;
   height: 4px;
-  background: #f87171;
+  background: var(--theme-negative);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .forBar {
   height: 100%;
-  background: #4ade80;
+  background: var(--theme-free);
   transition: width 0.3s;
 }
 
@@ -145,7 +145,7 @@
   margin-bottom: 1.5rem;
 }
 .backLink:hover {
-  color: #0891b2;
+  color: var(--theme-free);
 }
 
 .detailHeader {
@@ -157,7 +157,7 @@
 
 .detailTitle {
   font-size: 1.5rem;
-  color: #0891b2;
+  color: var(--theme-free);
   margin: 0;
 }
 
@@ -182,9 +182,9 @@
 
 .timeBar {
   padding: 0.5rem 0.75rem;
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid #a5f3fc;
-  color: #0891b2;
+  background: rgba(61, 255, 138, 0.08);
+  border: 1px solid transparent;
+  color: var(--theme-free);
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
 }
@@ -204,7 +204,7 @@
 }
 
 .votePanel {
-  border: 1px solid #e2e8f0;
+  border: 1px solid transparent;
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -219,7 +219,7 @@
   flex: 1;
   padding: 0.6rem;
   background: transparent;
-  border: 1px solid #d1d5db;
+  border: 1px solid transparent;
   color: var(--theme-text-muted);
   cursor: pointer;
   font-size: 0.85rem;
@@ -236,7 +236,7 @@
 .reasonInput {
   width: 100%;
   background: var(--theme-bg-card);
-  border: 1px solid #d1d5db;
+  border: 1px solid transparent;
   color: var(--theme-text-primary);
   padding: 0.5rem;
   font-size: 0.85rem;
@@ -248,7 +248,7 @@
 .submitVote {
   width: 100%;
   padding: 0.6rem;
-  background: #22d3ee;
+  background: var(--theme-free);
   color: #000;
   border: none;
   font-weight: 700;
@@ -269,23 +269,23 @@
   margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid transparent;
   animation: fadeSlideIn 0.25s ease-out;
 }
 .voteStatusBar[data-status='signing'] {
-  border-color: #eab308;
+  border-color: #dc9e46;
   background: rgba(234, 179, 8, 0.06);
 }
 .voteStatusBar[data-status='mining'] {
-  border-color: #f59e0b;
+  border-color: #dc9e46;
   background: rgba(245, 158, 11, 0.06);
 }
 .voteStatusBar[data-status='confirmed'] {
-  border-color: #4ade80;
+  border-color: var(--theme-free);
   background: rgba(74, 222, 128, 0.06);
 }
 .voteStatusBar[data-status='failed'] {
-  border-color: #f87171;
+  border-color: var(--theme-negative);
   background: rgba(248, 113, 113, 0.06);
 }
 
@@ -296,18 +296,18 @@
   flex-shrink: 0;
 }
 .voteStatusBar[data-status='signing'] .voteStatusDot {
-  background: #eab308;
+  background: #dc9e46;
   animation: pulse 1.2s infinite;
 }
 .voteStatusBar[data-status='mining'] .voteStatusDot {
-  background: #f59e0b;
+  background: #dc9e46;
   animation: pulse 1.2s infinite;
 }
 .voteStatusBar[data-status='confirmed'] .voteStatusDot {
-  background: #4ade80;
+  background: var(--theme-free);
 }
 .voteStatusBar[data-status='failed'] .voteStatusDot {
-  background: #f87171;
+  background: var(--theme-negative);
 }
 
 .voteStatusText {
@@ -316,7 +316,7 @@
 }
 
 .voteStatusTx {
-  color: #0891b2;
+  color: var(--theme-free);
   font-size: 0.75rem;
   font-family: monospace;
   text-decoration: none;
@@ -342,15 +342,15 @@
 }
 
 .voted {
-  color: #4ade80;
+  color: var(--theme-free);
   font-size: 0.9rem;
 }
 
 .actionBtn {
   padding: 0.6rem 1.2rem;
   background: transparent;
-  border: 1px solid #4ade80;
-  color: #4ade80;
+  border: 1px solid var(--theme-free);
+  color: var(--theme-free);
   cursor: pointer;
   font-weight: 600;
   margin-right: 0.75rem;
@@ -365,8 +365,8 @@
 .cancelBtn {
   padding: 0.6rem 1.2rem;
   background: transparent;
-  border: 1px solid #f87171;
-  color: #f87171;
+  border: 1px solid var(--theme-negative);
+  color: var(--theme-negative);
   cursor: pointer;
   font-weight: 600;
 }
@@ -378,7 +378,7 @@
 
 .description {
   margin-top: 2rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--theme-divider);
   padding-top: 1.5rem;
 }
 .description h3 {
@@ -404,7 +404,7 @@
 
 .votesList {
   margin-top: 2rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--theme-divider);
   padding-top: 1.5rem;
 }
 .votesList h3 {
@@ -420,7 +420,7 @@
   gap: 1rem;
   padding: 0.4rem 0;
   font-size: 0.85rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--theme-divider);
   align-items: center;
 }
 
@@ -437,7 +437,7 @@
   color: var(--theme-text-muted);
 }
 .txLink a {
-  color: #0891b2;
+  color: var(--theme-free);
 }
 
 /* ─── Create Form ────────────────────────────────────────────── */
@@ -459,7 +459,7 @@
 .input {
   width: 100%;
   background: var(--theme-bg-card);
-  border: 1px solid #d1d5db;
+  border: 1px solid transparent;
   color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
@@ -468,13 +468,13 @@
 }
 .input:focus {
   outline: none;
-  border-color: #0891b2;
+  border-color: var(--theme-free);
 }
 
 .textarea {
   width: 100%;
   background: var(--theme-bg-card);
-  border: 1px solid #d1d5db;
+  border: 1px solid transparent;
   color: var(--theme-text-primary);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
@@ -483,11 +483,11 @@
 }
 .textarea:focus {
   outline: none;
-  border-color: #0891b2;
+  border-color: var(--theme-free);
 }
 
 .txRow {
-  border: 1px solid #e2e8f0;
+  border: 1px solid transparent;
   padding: 0.75rem;
   margin-bottom: 0.5rem;
 }
@@ -503,14 +503,14 @@
 .removeTx {
   background: none;
   border: none;
-  color: #f87171;
+  color: var(--theme-negative);
   cursor: pointer;
   font-size: 0.8rem;
 }
 
 .addTxBtn {
   background: transparent;
-  border: 1px dashed #d1d5db;
+  border: 1px dashed transparent;
   color: var(--theme-text-muted);
   padding: 0.5rem;
   width: 100%;
@@ -519,15 +519,15 @@
   margin-top: 0.5rem;
 }
 .addTxBtn:hover {
-  border-color: #0891b2;
-  color: #0891b2;
+  border-color: var(--theme-free);
+  color: var(--theme-free);
 }
 
 .submitBtn {
   width: 100%;
   padding: 0.75rem;
   margin-top: 2rem;
-  background: #22d3ee;
+  background: var(--theme-free);
   color: #000;
   border: none;
   font-weight: 700;
@@ -537,4 +537,17 @@
 .submitBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* noun.wtf button system (src/STYLEGUIDE.md): every button is a pill,
+   semibold; the filled key action is the FREEDOM green with black text. */
+.createBtn,
+.voteBtn,
+.submitVote,
+.actionBtn,
+.cancelBtn,
+.addTxBtn,
+.submitBtn {
+  border-radius: 999px;
+  font-weight: 600;
 }

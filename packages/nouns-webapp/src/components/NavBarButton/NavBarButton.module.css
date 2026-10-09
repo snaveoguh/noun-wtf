@@ -148,9 +148,9 @@
 }
 
 .delegateBack {
-  background-color: var(--theme-bg-card);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  color: var(--brand-cool-dark-text);
+  background-color: var(--theme-glass-fill);
+  border: 1px solid transparent;
+  color: #fff;
   width: 100px;
 }
 
@@ -159,29 +159,31 @@
   color: var(--brand-cool-dark-text);
 }
 
+/* The key action on the modal: acid cta, black text (src/STYLEGUIDE.md).
+   It used to paint white text on the near-white --brand-cool-dark-text. */
 .delegatePrimary {
-  background-color: var(--brand-cool-dark-text);
-  color: white;
+  background-color: var(--theme-accent);
+  color: #000;
   width: 315px;
 }
 
 .delegatePrimary:hover {
-  filter: brightness(200%);
+  filter: brightness(108%);
 }
 
 .delegateSecondary {
-  background-color: var(--brand-color-blue);
+  background-color: var(--theme-glass-fill);
   color: white;
   width: 315px;
   border: none;
 }
 
 .delegateSecondary:hover {
-  background-color: var(--brand-color-blue-darker);
+  background-color: rgba(255, 255, 255, 0.22);
 }
 
 .delegateDisabled {
-  background-color: var(--brand-color-blue);
+  background-color: var(--theme-glass-fill);
   opacity: 0.5;
   color: white;
   width: 315px;

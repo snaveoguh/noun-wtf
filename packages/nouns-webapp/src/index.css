@@ -653,9 +653,19 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
     --theme-transition: 150ms ease;
     color-scheme: dark;
 
-    /* bootstrap 5 tokens */
+    /* bootstrap 5 tokens. The *-rgb forms matter too: floating labels,
+       placeholders and .text-body-secondary are rgba(var(--bs-body-color-rgb), .65),
+       which was black ink on the dark ground without them. */
     --bs-body-bg: #000;
+    --bs-body-bg-rgb: 0, 0, 0;
     --bs-body-color: #ecebe4;
+    --bs-body-color-rgb: 236, 235, 228;
+    --bs-emphasis-color-rgb: 255, 255, 255;
+    --bs-secondary-color-rgb: 141, 140, 132;
+    --bs-tertiary-color: #8d8c84;
+    --bs-tertiary-color-rgb: 141, 140, 132;
+    --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+    --bs-code-color: #d4ff3a; /* inline <code> was bootstrap pink (#d63384, 4:1) */
     --bs-border-color: #2c2c30;
     --bs-secondary-color: #8d8c84;
     --bs-tertiary-bg: #16161a;
@@ -1187,6 +1197,83 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] .border-slate-200 {
   /* no outlines on surfaces: tint + shadow separate them */
   border-color: transparent !important;
+}
+
+/* NOIR: Tailwind's pastel tints (bg-green-100, text-red-800 …) are light-skin
+   pairs. Fills become translucent tints of the theme colour; the dark text
+   becomes the bright one so the pair still reads on black. */
+[data-theme='abacus'] .bg-green-50,
+[data-theme='abacus'] .bg-green-100,
+[data-theme='abacus'] .bg-emerald-50,
+[data-theme='abacus'] .bg-emerald-100 {
+  background-color: rgba(61, 255, 138, 0.14) !important;
+}
+[data-theme='abacus'] .bg-red-50,
+[data-theme='abacus'] .bg-red-100,
+[data-theme='abacus'] .bg-rose-50,
+[data-theme='abacus'] .bg-rose-100 {
+  background-color: rgba(255, 59, 92, 0.14) !important;
+}
+[data-theme='abacus'] .bg-purple-50,
+[data-theme='abacus'] .bg-purple-100,
+[data-theme='abacus'] .bg-violet-50,
+[data-theme='abacus'] .bg-violet-100 {
+  background-color: rgba(167, 139, 250, 0.16) !important;
+}
+[data-theme='abacus'] .bg-yellow-100,
+[data-theme='abacus'] .bg-yellow-200,
+[data-theme='abacus'] .bg-amber-50,
+[data-theme='abacus'] .bg-amber-100 {
+  background-color: rgba(220, 158, 70, 0.18) !important;
+}
+[data-theme='abacus'] .bg-blue-50,
+[data-theme='abacus'] .bg-blue-100,
+[data-theme='abacus'] .bg-sky-100 {
+  background-color: rgba(94, 241, 255, 0.12) !important;
+}
+[data-theme='abacus'] .text-green-700,
+[data-theme='abacus'] .text-green-800,
+[data-theme='abacus'] .text-green-900,
+[data-theme='abacus'] .text-emerald-700,
+[data-theme='abacus'] .text-emerald-800 {
+  color: #3dff8a !important;
+}
+[data-theme='abacus'] .text-red-700,
+[data-theme='abacus'] .text-red-800,
+[data-theme='abacus'] .text-red-900,
+[data-theme='abacus'] .text-rose-700 {
+  color: #ff3b5c !important;
+}
+[data-theme='abacus'] .text-purple-700,
+[data-theme='abacus'] .text-purple-800,
+[data-theme='abacus'] .text-violet-700 {
+  color: #c4b5fd !important;
+}
+[data-theme='abacus'] .text-blue-700,
+[data-theme='abacus'] .text-blue-800,
+[data-theme='abacus'] .text-sky-700 {
+  color: #5ef1ff !important;
+}
+[data-theme='abacus'] .text-amber-700,
+[data-theme='abacus'] .text-amber-800,
+[data-theme='abacus'] .text-yellow-700,
+[data-theme='abacus'] .text-yellow-800 {
+  color: #f2c879 !important;
+}
+
+/* NOIR: faint white captions (text-white/15 … /40) sit at 1.4-3.8:1 on the
+   glass; clamp them to the muted token, which is the floor for readable text. */
+[data-theme='abacus'] .text-white\/10,
+[data-theme='abacus'] .text-white\/15,
+[data-theme='abacus'] .text-white\/20,
+[data-theme='abacus'] .text-white\/25,
+[data-theme='abacus'] .text-white\/30,
+[data-theme='abacus'] .text-white\/40 {
+  color: #8d8c84 !important;
+}
+[data-theme='abacus'] .text-white\/50,
+[data-theme='abacus'] .text-white\/60 {
+  color: #a9a8a0 !important;
 }
 
 /* NOIR: translucent white pills keep dark text (text now defaults to white) */

@@ -4,6 +4,38 @@
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #ffffff 0%, #f8f5f2 15%, #f0ebe6 40%, #e8e2dc 100%);
+  /* The auction page keeps its pastel ground (pending with the owner), so the
+     text tokens flip to ink here: the global theme sets white type, which was
+     unreadable (1.1:1) on this background. Children read the same var names. */
+  --theme-text-primary: #1c1815;
+  --theme-text-secondary: #3b3733;
+  --theme-text-muted: #6b6762;
+  --theme-text-accent: #000000;
+  --theme-text-link: #1c1815;
+  --theme-bg-primary: #ffffff;
+  --theme-bg-secondary: #f4f1ee;
+  --theme-bg-card: rgba(255, 255, 255, 0.72);
+  --theme-bg-tertiary: rgba(0, 0, 0, 0.06);
+  --theme-bg-hover: rgba(0, 0, 0, 0.06);
+  --theme-surface: rgba(0, 0, 0, 0.04);
+  --theme-divider: rgba(0, 0, 0, 0.08);
+  --theme-bg-input: rgba(0, 0, 0, 0.05);
+  --brand-black: #1c1815;
+  --brand-cool-dark-text: #1c1815;
+  --brand-warm-dark-text: #1c1815;
+  --brand-gray-dark-text: #1c1815;
+  --brand-gray-light-text: #6b6762;
+  --brand-cool-light-text: #6b6762;
+  --brand-warm-light-text: #6b6762;
+  color: var(--theme-text-primary);
+}
+.page h1,
+.page h2,
+.page h3,
+.page h4,
+.page h5,
+.page h6 {
+  color: var(--theme-text-primary);
 }
 
 /* Nothing enabled: let the hero breathe — fill the viewport under the navbar
@@ -34,7 +66,7 @@
   padding: 0.25rem calc(var(--page-edge-padding-right) + 4.25rem) 1.5rem
     var(--page-edge-padding-left);
   color: var(--theme-text-muted, #8c8d92);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
