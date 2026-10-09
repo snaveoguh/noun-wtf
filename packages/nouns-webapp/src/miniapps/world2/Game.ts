@@ -965,8 +965,11 @@ export class Game {
       // Adaptive quality: sustained low FPS on high → drop pixel ratio
       if (fps < 40) this.lowFpsTime += 0.5;
       else this.lowFpsTime = 0;
-      if (this.lowFpsTime > 4 && this.gfx.renderer.getPixelRatio() > 1) {
-        this.gfx.renderer.setPixelRatio(Math.max(1, this.gfx.renderer.getPixelRatio() - 0.5));
+      // Gentle steps with a floor: dropping a Retina screen to 1x is what
+      // made the whole game read as blurry.
+      const floor = window.devicePixelRatio >= 2 ? 1.25 : 1;
+      if (this.lowFpsTime > 4 && this.gfx.renderer.getPixelRatio() > floor) {
+        this.gfx.renderer.setPixelRatio(Math.max(floor, this.gfx.renderer.getPixelRatio() - 0.25));
         this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
         this.lowFpsTime = 0;
       }

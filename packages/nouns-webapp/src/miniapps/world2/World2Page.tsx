@@ -15,31 +15,31 @@ import { worldPause } from './worldPause';
 
 const CONTROLS: { k: string; v: string }[] = [
   { k: 'W', v: 'push' },
-  { k: 'A / D', v: 'carve · spin in air' },
-  { k: 'S', v: 'brake · powerslide' },
+  { k: 'A / D', v: 'carve, spin in air' },
+  { k: 'S', v: 'brake, powerslide' },
   { k: 'SPACE', v: 'hold to crouch, release to ollie' },
-  { k: 'J / L / K / U', v: 'kickflip · heelflip · shove-it · 360 flip' },
+  { k: 'J / L / K / U', v: 'kickflip, heelflip, shove-it, 360 flip' },
   { k: 'RMB drag', v: 'flick-it: pull down, flick up (diagonals = flips)' },
-  { k: 'SHIFT / Q', v: 'manual · nose manual' },
+  { k: 'SHIFT / Q', v: 'manual, nose manual' },
   { k: 'I / O', v: 'grab' },
   { k: 'F', v: 'get on / off board' },
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
-  { k: 'M / .', v: 'radio station · next track' },
+  { k: 'M / .', v: 'radio station, next track' },
   { k: 'V', v: 'mic' },
-  { k: 'CLICK+DRAG / G', v: 'spray paint · T colour' },
+  { k: 'CLICK+DRAG / G', v: 'spray paint, T colour' },
   { k: 'R', v: 'respawn' },
   { k: 'ENTER', v: 'chat' },
 ];
 
 const PAD: { k: string; v: string }[] = [
-  { k: 'L stick', v: 'carve · spin' },
+  { k: 'L stick', v: 'carve, spin' },
   { k: 'R stick', v: 'flick-it tricks (down → up = ollie)' },
   { k: 'A / X', v: 'push' },
   { k: 'B', v: 'brake' },
   { k: 'LT / RT', v: 'grabs' },
   { k: 'Y', v: 'board on / off' },
-  { k: 'RT (on foot)', v: 'spray paint · R3 colour' },
+  { k: 'RT (on foot)', v: 'spray paint, R3 colour' },
 ];
 
 export interface World2PageProps {
@@ -270,7 +270,7 @@ function Diagnostics({ game }: { game: Game }) {
       {shots && (
         <div className="fixed inset-0 overflow-auto bg-black p-3 text-white">
           <div className="mb-2 text-xs">
-            {gpu} · {navigator.userAgent.slice(0, 120)}{' '}
+            {gpu}, {navigator.userAgent.slice(0, 120)}{' '}
             <button type="button" className="ml-2 underline" onClick={() => setShots(null)}>
               close
             </button>
@@ -322,7 +322,7 @@ function Splash({
       <div className="w2-title">
         NOUN<span>WORLD</span>
       </div>
-      <div className="mt-1 text-sm tracking-[0.35em] opacity-70">SKATE THE PLAZA · v2</div>
+      <div className="mt-1 text-sm tracking-[0.35em] opacity-70">SKATE THE PLAZA</div>
       <div className="mt-10 h-12">
         {ready ? (
           <button className="w2-btn w2-pulse" onClick={onStart}>
@@ -335,7 +335,7 @@ function Splash({
         )}
       </div>
       <div className="absolute bottom-6 text-xs opacity-50">
-        gamepad recommended · headphones on · mic optional
+        gamepad recommended, headphones on, mic optional
       </div>
     </div>
   );
@@ -352,10 +352,10 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
       <div className="absolute left-4 top-4 flex flex-col gap-1">
         <div className="w2-chip">
           <b>{hud.session.toLocaleString()}</b> pts{' '}
-          <span className="opacity-60">· best {hud.best.toLocaleString()}</span>
+          <span className="opacity-60">best {hud.best.toLocaleString()}</span>
         </div>
         <div className="w2-chip text-xs opacity-80">
-          {hud.connected ? '●' : '○'} {hud.players} online · {hud.mode === 'board' ? '🛹' : '🚶'}{' '}
+          {hud.connected ? '●' : '○'} {hud.players} online, {hud.mode === 'board' ? '🛹' : '🚶'}{' '}
           {Math.round(hud.speed * 3.6)} km/h
         </div>
       </div>
@@ -389,8 +389,8 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
                 : '🎙️ live'}
         </button>
         <div className="w2-chip text-[10px] opacity-60">
-          {hud.fps} fps · {hud.quality}
-          {hud.baked ? ' · baked GI' : ''} · cam {hud.camMode}
+          {hud.fps} fps, {hud.quality}
+          {hud.baked ? ', baked GI' : ''}, cam {hud.camMode}
         </div>
         <button className="w2-chip text-xs" onClick={onHelp}>
           {showHelp ? 'hide controls (H)' : 'controls (H)'}
@@ -416,7 +416,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             e.preventDefault();
             game.cycleRadio();
           }}
-          title="Radio: M station · . next track (right-click: change station)"
+          title="Radio: M station, . next track (right-click: change station)"
         >
           📻 {hud.radio.on ? hud.radio.label : 'radio off'}
         </button>
@@ -488,7 +488,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             className="inline-block h-4 w-4 rounded-full border border-white/50"
             style={{ background: hud.spray.color }}
           />
-          {hud.spray.aiming ? 'hold G to spray · T colour' : 'aim at a wall to tag it'}
+          {hud.spray.aiming ? 'hold G to spray, T colour' : 'aim at a wall to tag it'}
         </div>
       )}
 
