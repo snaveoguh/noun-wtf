@@ -23,6 +23,7 @@ import { ChainNotificationsMount } from '@/components/Notifications/useChainNoti
 import { Toaster } from '@/components/ui/sonner';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 
+import AccessoryIcon from './AccessoryIcon';
 import AgentHome from './AgentHome';
 import { AuctionChip, Directory, Manifesto } from './apps';
 import { titleForPath, type Entry } from './catalog';
@@ -320,6 +321,8 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
 
       {/* 3. the pond */}
       <WaterGarden ref={waterRef} active={desk} />
+
+      <AccessoryIcon onClick={() => os.open('directory')} />
 
       {/* 4. the tray */}
       <nav className="nos-tray" aria-label="noun.wtf">

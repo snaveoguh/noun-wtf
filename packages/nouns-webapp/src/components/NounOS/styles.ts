@@ -166,6 +166,13 @@ export const NOS_CSS = `
 .nos-prompt input::placeholder{color:rgba(236,235,228,.35)}
 @media (max-width:760px){.nos-console{bottom:calc(26vh + 60px);max-height:28vh}}
 
+.nos-icon{position:absolute;z-index:7;left:16px;top:16px;width:46px;height:46px;padding:9px;border:0;border-radius:14px;
+  background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 var(--glass-hi),0 10px 30px rgba(0,0,0,.4);
+  transition:transform .15s}
+.nos-icon:hover{transform:scale(1.06)}
+.nos-icon svg{width:100%;height:100%;display:block}
+.mode-world .nos-icon{opacity:0;pointer-events:none}
+
 /* ── 3. pond ──────────────────────────────────────────── */
 .nos-water{position:absolute;left:0;bottom:0;width:100vw;z-index:1;pointer-events:none;transition:opacity .7s ease;
   -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 64px);mask-image:linear-gradient(to bottom,transparent 0,#000 64px)}
