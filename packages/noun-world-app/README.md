@@ -36,6 +36,35 @@ webapp as its own small PR.
 | Back button    | `src/native.ts`                                                                                                                                                                             | Minimises the app instead of killing the session                                                                         |
 | Pause          | `src/native.ts`                                                                                                                                                                             | `game.setPaused(true)` when backgrounded                                                                                 |
 
+## Modes and controls
+
+The app opens on a launcher with two modes:
+
+- **Downhill**: the player is placed under the `DOWNHILL` arch (the +Z alley
+  out of Noggle Plaza) facing the mountain. A run starts when the board
+  starts rolling and ends on a bail; the overlay shows metres out from the
+  city (`edgeDistance`), time on board, points banked and top speed, with
+  the best distance / longest run saved on the device. "Drop in again"
+  teleports back to the arch via the player's `safePos` + `respawnSafe()`.
+- **Plaza**: the normal online free skate with the game's spawn.
+
+Controls are the app's own layer (`src/controls/`), driven through
+`game.input.touch` and `queueTrick()` so the game stays untouched:
+
+| Input                           | Action                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| Tilt the phone (default on)     | steer (`accelerationIncludingGravity`, calibrated neutral, dead zone, smoothing) |
+| Left thumb tap / hold           | push / brake (tilt on) · virtual move stick (tilt off)                           |
+| Right thumb swipe               | flick stick: pull down then up = ollie, diagonals = flips, sideways = shuvit     |
+| PUSH / GRAB (hold), OLLIE (tap) | buttons, bottom right; 🛹 and 🎨 in Plaza mode                                   |
+| ⚙ (bottom centre)              | tilt on/off, sensitivity, invert, calibrate, back to menu                        |
+
+iOS asks for motion access the first time (requested from the launcher tap,
+as `DeviceMotionEvent.requestPermission` only works inside a user gesture);
+denied → the virtual stick is used. The game's own touch overlay sits under
+this layer and never receives pointer events; its buttons are hidden with a
+CSS rule in `src/index.css` until a small game-side flag exists.
+
 ## Prerequisites
 
 - Node 22, pnpm 10.12 (`corepack enable`)
