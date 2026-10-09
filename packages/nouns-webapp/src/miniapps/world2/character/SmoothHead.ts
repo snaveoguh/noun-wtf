@@ -160,11 +160,14 @@ export function buildSmoothHead(
   const uvs: number[] = [];
   const frontIdx = new Int32Array(V * V).fill(-1);
   const backIdx = new Int32Array(V * V).fill(-1);
+  // Back-edge vertices for the side walls: back position, front-atlas UVs,
+  // so the thin rim never stretches across the atlas gap
+  const wallIdx = new Int32Array(V * V).fill(-1);
   const isBoundary = new Uint8Array(V * V);
   const xy: [number, number][] = [];
 
-  const vIndex = (vx: number, vy: number, back: boolean) => {
-    const arr = back ? backIdx : frontIdx;
+  const vIndex = (vx: number, vy: number, back: boolean, wallBack = false) => {
+    const arr = wallBack ? wallIdx : back ? backIdx : frontIdx;
     const k = vy * V + vx;
     if (arr[k] >= 0) return arr[k];
     const dv = vertDist(vx, vy);
@@ -173,8 +176,9 @@ export function buildSmoothHead(
     const px = vx / S;
     const py = vy / S;
     const idx = positions.length / 3;
-    positions.push(px - 16, py - 16, back ? -z : z);
-    uvs.push(px / 32, py / 32);
+    positions.push(px - 16, py - 16, back || wallBack ? -z : z);
+    // Atlas: front art on the left, the interpreted back on the right
+    uvs.push(((back && !wallBack ? BACK_X : 0) + px) / ATLAS_W, py / 32);
     xy.push([vx, vy]);
     arr[k] = idx;
     if (dv === 0) isBoundary[k] = 1;
@@ -200,8 +204,8 @@ export function buildSmoothHead(
       const wall = (ax: number, ay: number, bx: number, by: number) => {
         const fa = vIndex(ax, ay, false);
         const fb = vIndex(bx, by, false);
-        const ba = vIndex(ax, ay, true);
-        const bb = vIndex(bx, by, true);
+        const ba = vIndex(ax, ay, true, true);
+        const bb = vIndex(bx, by, true, true);
         index.push(fa, ba, bb, fa, bb, fb);
       };
       if (!inside(cx, cy - 1)) wall(cx, cy, cx + 1, cy); // bottom
@@ -257,7 +261,7 @@ export function buildSmoothHead(
       next.set(k, [pos[i * 3] * 0.5 + ax * 0.5, pos[i * 3 + 1] * 0.5 + ay * 0.5]);
     }
     for (const [k, [x, y]] of next) {
-      for (const i of [frontIdx[k], backIdx[k]]) {
+      for (const i of [frontIdx[k], backIdx[k], wallIdx[k]]) {
         if (i < 0) continue;
         pos[i * 3] = x;
         pos[i * 3 + 1] = y;
@@ -272,12 +276,57 @@ export function buildSmoothHead(
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
 
-  // Pixel-art texture (dilated so edge texels never sample transparency)
+  // Pixel-art texture atlas (dilated so edge texels never sample
+  // transparency): the front art, and an interpreted back.
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 32;
+  canvas.width = ATLAS_W;
+  canvas.height = 32;
   const ctx = canvas.getContext('2d')!;
-  const grid: (string | null)[] = new Array(32 * 32).fill(null);
-  for (const p of pixels) grid[p.y * 32 + p.x] = `rgb(${p.r},${p.g},${p.b})`;
+  const front: (string | null)[] = new Array(32 * 32).fill(null);
+  for (const p of pixels) front[p.y * 32 + p.x] = `rgb(${p.r},${p.g},${p.b})`;
+  const back = opts.crisp === true ? front.slice() : interpretBack(front);
+  for (const [grid, ox] of [
+    [front, 0],
+    [back, BACK_X],
+  ] as const) {
+    dilate(grid);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const c = grid[y * 32 + x];
+        if (c === null) continue;
+        ctx.fillStyle = c;
+        ctx.fillRect(ox + x, 31 - y, 1, 1);
+      }
+    }
+  }
+  // Soften the pixel art into smooth colour regions: upscale bilinearly,
+  // blur, then gently posterise so it reads as painted shapes, not pixels.
+  const big = document.createElement('canvas');
+  big.width = ATLAS_W * 8;
+  big.height = 256;
+  const bctx = big.getContext('2d')!;
+  bctx.imageSmoothingEnabled = opts.crisp !== true;
+  bctx.imageSmoothingQuality = 'high';
+  // Light blur only: enough to lose the pixel staircase, not enough to
+  // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
+  bctx.filter = opts.crisp === true ? 'none' : `blur(${opts.blur ?? 1.6}px)`;
+  bctx.drawImage(canvas, 0, 0, big.width, big.height);
+  bctx.filter = 'none';
+  const img = bctx.getImageData(0, 0, big.width, big.height);
+  for (let p = 0; p < img.data.length; p += 4) {
+    for (let k = 0; k < 3; k++) img.data[p + k] = Math.round(img.data[p + k] / 12) * 12;
+  }
+  bctx.putImageData(img, 0, 0);
+  const texture = new THREE.CanvasTexture(big);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return { geometry, texture, frontZ: D };
+}
+
+const ATLAS_W = 72;
+const BACK_X = 40;
+
+function dilate(grid: (string | null)[]) {
   for (let pass = 0; pass < 3; pass++) {
     const copy = grid.slice();
     for (let y = 0; y < 32; y++) {
@@ -300,33 +349,93 @@ export function buildSmoothHead(
       }
     }
   }
-  for (let y = 0; y < 32; y++) {
-    for (let x = 0; x < 32; x++) {
-      const c = grid[y * 32 + x];
-      if (c === null) continue;
-      ctx.fillStyle = c;
-      ctx.fillRect(x, 31 - y, 1, 1);
+}
+
+/**
+ * Guess what the back of a head looks like: big colour regions that reach
+ * the outline (body, stripes, panels) carry round, while small or enclosed
+ * features (mouths, teeth, eyes, buttons, speakers, screens) are front-only
+ * and get filled with the surrounding colour. A robot's back is plain
+ * robot, not another mouth.
+ */
+function interpretBack(front: (string | null)[]): (string | null)[] {
+  const N = front.length;
+  let total = 0;
+  const counts = new Map<string, number>();
+  for (const c of front) {
+    if (c === null) continue;
+    total++;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let dominant = '';
+  let best = 0;
+  for (const [c, n] of counts) if (n > best) [dominant, best] = [c, n];
+  // Split into same-colour connected regions. A region wraps round to the
+  // back only if it's sizeable and reaches the silhouette edge itself;
+  // enclosed or small regions (speakers, screens, mouths, rivets) are
+  // front features.
+  const min = Math.max(6, total * 0.06);
+  const region = new Int32Array(N).fill(-1);
+  const out: (string | null)[] = new Array(N).fill(null);
+  const isOut = (x: number, y: number) =>
+    x < 0 || y < 0 || x >= 32 || y >= 32 || front[y * 32 + x] === null;
+  let r = 0;
+  for (let i = 0; i < N; i++) {
+    const c = front[i];
+    if (c === null || region[i] >= 0) continue;
+    const cells = [i];
+    region[i] = r;
+    let edge = false;
+    for (let q = 0; q < cells.length; q++) {
+      const k = cells[q]!;
+      const x = k % 32;
+      const y = (k - x) / 32;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (isOut(nx, ny)) {
+          edge = true;
+          continue;
+        }
+        const j = ny * 32 + nx;
+        if (region[j] < 0 && front[j] === c) {
+          region[j] = r;
+          cells.push(j);
+        }
+      }
+    }
+    if ((edge && cells.length >= min) || (c === dominant && cells.length >= min))
+      for (const k of cells) out[k] = c;
+    r++;
+  }
+  if (!out.some(c => c !== null)) for (let i = 0; i < N; i++) if (front[i] === dominant) out[i] = dominant;
+  // Multi-source BFS: every dropped pixel takes its nearest kept colour
+  const queue: number[] = [];
+  for (let i = 0; i < out.length; i++) if (out[i] !== null) queue.push(i);
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q]!;
+    const x = i % 32;
+    const y = (i - x) / 32;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= 32 || ny >= 32) continue;
+      const j = ny * 32 + nx;
+      if (front[j] === null || out[j] !== null) continue;
+      out[j] = out[i]!;
+      queue.push(j);
     }
   }
-  // Soften the pixel art into smooth colour regions: upscale bilinearly,
-  // blur, then gently posterise so it reads as painted shapes, not pixels.
-  const big = document.createElement('canvas');
-  big.width = big.height = 256;
-  const bctx = big.getContext('2d')!;
-  bctx.imageSmoothingEnabled = opts.crisp !== true;
-  bctx.imageSmoothingQuality = 'high';
-  // Light blur only: enough to lose the pixel staircase, not enough to
-  // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
-  bctx.filter = opts.crisp === true ? 'none' : `blur(${opts.blur ?? 1.6}px)`;
-  bctx.drawImage(canvas, 0, 0, 256, 256);
-  bctx.filter = 'none';
-  const img = bctx.getImageData(0, 0, 256, 256);
-  for (let p = 0; p < img.data.length; p += 4) {
-    for (let k = 0; k < 3; k++) img.data[p + k] = Math.round(img.data[p + k] / 12) * 12;
-  }
-  bctx.putImageData(img, 0, 0);
-  const texture = new THREE.CanvasTexture(big);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return { geometry, texture, frontZ: D };
+  for (let i = 0; i < out.length; i++) if (front[i] !== null && out[i] === null) out[i] = dominant;
+  return out;
 }
