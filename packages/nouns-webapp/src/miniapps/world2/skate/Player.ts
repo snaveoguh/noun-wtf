@@ -39,6 +39,9 @@ export type PlayerEvent =
   | { type: 'footLand'; impact: number }
   | { type: 'boardOn' }
   | { type: 'boardOff' }
+  | { type: 'climbStart' }
+  | { type: 'mantle' }
+  | { type: 'wallJump' }
   | { type: 'trick'; name: string; points: number };
 
 export interface PlayerTuning {
@@ -80,6 +83,31 @@ const _m = new THREE.Matrix4();
 
 const BODY_RADIUS = 0.32;
 const PUSH_CYCLE = 0.9;
+
+// ── Climbing ──
+/** Horizontal gap kept between the player's origin and the wall face. */
+const CLIMB_DIST = 0.52;
+/** Probe heights above the feet: chest (stick) + hands (top-out). */
+const CLIMB_CHEST = 1.05;
+const CLIMB_HANDS = 1.75;
+const CLIMB_UP = 2.5;
+const CLIMB_UP_FAST = 3.6;
+const CLIMB_DOWN = 3.2;
+const CLIMB_SIDE = 2.1;
+const MANTLE_TIME = 0.55;
+/** Seconds of walking into a wall before you grab it (jumping in is instant). */
+const WALL_PUSH_GRAB = 0.12;
+
+export interface ClimbState {
+  /** Horizontal unit wall normal (points out of the wall, toward the player). */
+  normal: THREE.Vector3;
+  /** Gait phase (radians) — advances with distance climbed. */
+  phase: number;
+  /** 0..1 how fast we're moving on the wall (for anim). */
+  moving: number;
+  /** Active top-out: start + end positions and progress (s). */
+  mantle: { from: THREE.Vector3; to: THREE.Vector3; t: number } | null;
+}
 
 export interface FlipState {
   trick: TrickInput;
@@ -153,6 +181,13 @@ export class Player {
   emote = 0;
   emoteTimer = 0;
 
+  /** Non-null while stuck to a wall (always on foot). */
+  climb: ClimbState | null = null;
+  private climbCooldown = 0;
+  private wallPush = 0;
+  /** |x|, |z| clamp for the play area (replaces invisible boundary walls). */
+  softBounds = Infinity;
+
   combo: ComboState = createCombo();
   events: PlayerEvent[] = [];
   /** Last safe grounded spot for respawn after bails / falling out. */
@@ -173,6 +208,7 @@ export class Player {
     this.state = 'ground';
     this.grind = null;
     this.flip = null;
+    this.climb = null;
     this.crouch = 0;
     this.safePos.copy(p);
     this.safeFwd.copy(this.fwd);
@@ -199,6 +235,7 @@ export class Player {
   update(dt: number, input: InputFrame, camYaw: number, now: number) {
     this.events.length = 0;
     this.grindCooldown = Math.max(0, this.grindCooldown - dt);
+    this.climbCooldown = Math.max(0, this.climbCooldown - dt);
     this.sinceLand += dt;
     if (this.emoteTimer > 0) {
       this.emoteTimer -= dt;
@@ -209,13 +246,18 @@ export class Player {
       input.boardTogglePressed &&
       this.state !== 'bail' &&
       this.state !== 'air' &&
-      this.state !== 'grind'
+      this.state !== 'grind' &&
+      this.climb === null
     ) {
       this.toggleBoard();
     }
 
     if (this.mode === 'foot') {
-      this.updateFoot(dt, input, camYaw);
+      if (this.climb !== null) this.updateClimb(dt, input);
+      else this.updateFoot(dt, input, camYaw);
+      this.clampBounds();
+      if (this.pos.y < -30) this.respawnSafe();
+      if (input.respawnPressed) this.respawnSafe();
       return;
     }
 
@@ -238,6 +280,7 @@ export class Player {
     // Board flip visuals
     this.updateFlipVisual(dt);
 
+    this.clampBounds();
     // Fell out of the world → respawn
     if (this.pos.y < -30) this.respawnSafe();
     if (input.respawnPressed) this.respawnSafe();
@@ -267,6 +310,7 @@ export class Player {
   respawnSafe() {
     this.mode = 'board';
     this.state = 'ground';
+    this.climb = null;
     this.pos.copy(this.safePos);
     this.vel.set(0, 0, 0);
     this.fwd.copy(this.safeFwd);
@@ -300,7 +344,8 @@ export class Player {
     }
     const accel = this.footGrounded ? 18 : 5;
     const hv = _v2.set(this.vel.x, 0, this.vel.z);
-    hv.lerp(target, 1 - Math.exp(-accel * dt * 0.6));
+    // Airborne with no stick input keeps its momentum (wall jumps carry)
+    if (this.footGrounded || mag > 0.05) hv.lerp(target, 1 - Math.exp(-accel * dt * 0.6));
     this.vel.x = hv.x;
     this.vel.z = hv.z;
 
@@ -312,8 +357,23 @@ export class Player {
     this.vel.y -= t.gravity * dt;
     this.pos.addScaledVector(this.vel, dt);
 
-    // Walls
-    this.resolveBody(1.4);
+    // Walls — walk or jump into one to grab it
+    const wantX = target.x;
+    const wantZ = target.z;
+    const wall = this.resolveBody(1.4);
+    if (wall !== null && mag > 0.3) {
+      const into = -(wantX * wall.x + wantZ * wall.z) / Math.max(1e-4, Math.hypot(wantX, wantZ));
+      if (into > 0.55) this.wallPush += dt;
+      else this.wallPush = 0;
+      if (
+        (!this.footGrounded || this.wallPush > WALL_PUSH_GRAB) &&
+        into > 0.55 &&
+        this.tryStartClimb(wall)
+      )
+        return;
+    } else {
+      this.wallPush = 0;
+    }
 
     // Ground
     const wasGrounded = this.footGrounded;
@@ -341,6 +401,236 @@ export class Player {
       this.emote = 0;
       this.emoteTimer = 0;
     }
+  }
+
+  // ── Climbing ────────────────────────────────────────────────────────
+
+  private clampBounds() {
+    const b = this.softBounds;
+    if (!Number.isFinite(b)) return;
+    if (Math.abs(this.pos.x) > b) {
+      this.pos.x = Math.sign(this.pos.x) * b;
+      this.vel.x = 0;
+    }
+    if (Math.abs(this.pos.z) > b) {
+      this.pos.z = Math.sign(this.pos.z) * b;
+      this.vel.z = 0;
+    }
+  }
+
+  /**
+   * Steep wall hit looking into -n from `at` + height (+ optional sideways
+   * offset along the wall). Null when there's no wall-like surface there.
+   */
+  private wallProbe(at: THREE.Vector3, n: THREE.Vector3, height: number, side = 0) {
+    const o = _v.copy(at).addScaledVector(UP, height).addScaledVector(n, 0.55);
+    if (side !== 0) o.addScaledVector(_v3.set(n.z, 0, -n.x), side);
+    const hit = this.world.raycast(o, _v2.copy(n).negate(), CLIMB_DIST + 1.1);
+    if (hit === null || Math.abs(hit.normal.y) > 0.45) return null;
+    return hit;
+  }
+
+  /** A flat-enough, tall-enough wall to climb in front of us along -n? */
+  private canClimb(wallN: THREE.Vector3) {
+    if (this.climbCooldown > 0 || Math.abs(wallN.y) > 0.3) return false;
+    const n = new THREE.Vector3(wallN.x, 0, wallN.z);
+    if (n.lengthSq() < 1e-4) return false;
+    n.normalize();
+    // Needs wall at chest and above the head (a knee-high ledge isn't a
+    // climb), and flat across the shoulders (poles, trunks and lamp posts
+    // aren't walls).
+    const chest = this.wallProbe(this.pos, n, CLIMB_CHEST);
+    if (chest === null) return false;
+    const cn = chest.normal.clone();
+    if (this.wallProbe(this.pos, n, 2.2) === null) return false;
+    const l = this.wallProbe(this.pos, n, CLIMB_CHEST, -0.32);
+    if (l === null || l.normal.dot(cn) < 0.85) return false;
+    const r = this.wallProbe(this.pos, n, CLIMB_CHEST, 0.32);
+    return r !== null && r.normal.dot(cn) > 0.85;
+  }
+
+  private tryStartClimb(wallN: THREE.Vector3): boolean {
+    if (!this.canClimb(wallN)) return false;
+    const n = new THREE.Vector3(wallN.x, 0, wallN.z).normalize();
+    const hit = this.wallProbe(this.pos, n, CLIMB_CHEST);
+    if (hit === null) return false;
+    n.set(hit.normal.x, 0, hit.normal.z).normalize();
+    this.climb = { normal: n, phase: 0, moving: 0, mantle: null };
+    this.pos.x = hit.point.x + n.x * CLIMB_DIST;
+    this.pos.z = hit.point.z + n.z * CLIMB_DIST;
+    if (this.footGrounded) this.pos.y += 0.12;
+    this.vel.set(0, 0, 0);
+    this.footGrounded = false;
+    this.wallPush = 0;
+    this.footYaw = Math.atan2(-n.x, -n.z);
+    this.emote = 0;
+    this.emoteTimer = 0;
+    this.events.push({ type: 'climbStart' });
+    return true;
+  }
+
+  /** Let go of the wall with a velocity. */
+  private releaseClimb(vel: THREE.Vector3, cooldown = 0.3) {
+    this.climb = null;
+    this.vel.copy(vel);
+    this.footGrounded = false;
+    this.climbCooldown = cooldown;
+  }
+
+  private updateClimb(dt: number, input: InputFrame) {
+    const c = this.climb!;
+    const n = c.normal;
+
+    // Top-out: up over the lip, then in onto the roof
+    if (c.mantle !== null) {
+      const m = c.mantle;
+      m.t += dt;
+      const k = Math.min(1, m.t / MANTLE_TIME);
+      const ky = easeInOut(Math.min(1, k / 0.6));
+      const kh = easeInOut(Math.max(0, (k - 0.45) / 0.55));
+      this.pos.set(
+        THREE.MathUtils.lerp(m.from.x, m.to.x, kh),
+        THREE.MathUtils.lerp(m.from.y, m.to.y, ky),
+        THREE.MathUtils.lerp(m.from.z, m.to.z, kh),
+      );
+      c.phase += dt * 9;
+      c.moving = 1;
+      this.vel.set(0, 0, 0);
+      if (k >= 1) {
+        this.climb = null;
+        this.footGrounded = true;
+        this.climbCooldown = 0.25;
+        this.safePos.copy(this.pos);
+        this.safeFwd.set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw));
+      }
+      return;
+    }
+
+    // Let go (board key) / wall jump
+    if (input.boardTogglePressed) {
+      this.releaseClimb(new THREE.Vector3().copy(n).multiplyScalar(1.5), 0.45);
+      return;
+    }
+    if (input.jumpPressed) {
+      this.releaseClimb(
+        new THREE.Vector3().copy(n).multiplyScalar(6.2).addScaledVector(UP, 6.4),
+        0.35,
+      );
+      this.footYaw = Math.atan2(n.x, n.z);
+      this.events.push({ type: 'wallJump' });
+      this.events.push({ type: 'footJump' });
+      return;
+    }
+
+    const right = new THREE.Vector3(n.z, 0, -n.x);
+    const upSpeed = input.moveY > 0 ? (input.sprint ? CLIMB_UP_FAST : CLIMB_UP) : CLIMB_DOWN;
+    const dy = input.moveY * upSpeed * dt;
+    const dx = input.moveX * CLIMB_SIDE * dt;
+    const start = this.pos.clone();
+    const next = this.pos.clone().addScaledVector(UP, dy).addScaledVector(right, dx);
+
+    // Bottom: climbing down onto the ground hops you off
+    if (dy < 0) {
+      const g = this.world.raycast(_v.copy(next).addScaledVector(UP, 0.4), _v2.set(0, -1, 0), 0.42);
+      if (g !== null && g.normal.y > 0.55) {
+        this.pos.copy(next);
+        this.pos.y = g.point.y;
+        this.climb = null;
+        this.footGrounded = true;
+        this.vel.set(0, 0, 0);
+        this.pos.addScaledVector(n, 0.06);
+        this.climbCooldown = 0.5;
+        this.events.push({ type: 'footLand', impact: 1 });
+        return;
+      }
+    }
+
+    // Inner corner: a wall right where we're shuffling → turn onto it
+    if (Math.abs(dx) > 1e-5) {
+      const side = this.world.raycast(
+        _v.copy(next).addScaledVector(UP, CLIMB_CHEST),
+        _v2.copy(right).multiplyScalar(Math.sign(dx)),
+        CLIMB_DIST + 0.05,
+      );
+      if (side !== null && Math.abs(side.normal.y) < 0.45) {
+        n.set(side.normal.x, 0, side.normal.z).normalize();
+        next.copy(start);
+      }
+    }
+
+    // Stick: chest probe
+    let chest = this.wallProbe(next, n, CLIMB_CHEST);
+    if (chest === null && Math.abs(dx) > 1e-5) {
+      // Outer corner: wrap around onto the side face
+      const dir = Math.sign(dx);
+      const o = _v
+        .copy(next)
+        .addScaledVector(UP, CLIMB_CHEST)
+        .addScaledVector(n, -(CLIMB_DIST + 0.35));
+      const wrap = this.world.raycast(o, _v2.copy(right).multiplyScalar(-dir), 1.2);
+      if (wrap !== null && Math.abs(wrap.normal.y) < 0.45) {
+        n.set(wrap.normal.x, 0, wrap.normal.z).normalize();
+        next.set(wrap.point.x, next.y, wrap.point.z).addScaledVector(n, CLIMB_DIST);
+        chest = this.wallProbe(next, n, CLIMB_CHEST);
+      }
+      if (chest === null) {
+        // No wrap: block the sideways move instead
+        next.copy(start).addScaledVector(UP, dy);
+        chest = this.wallProbe(next, n, CLIMB_CHEST);
+      }
+    }
+    const hands = this.wallProbe(next, n, CLIMB_HANDS);
+
+    // Top: hands over the lip while climbing up → mantle onto the roof
+    if (hands === null && dy > 0) {
+      const inside = _v
+        .copy(next)
+        .addScaledVector(n, -(CLIMB_DIST + 0.65))
+        .addScaledVector(UP, CLIMB_HANDS + 1.2);
+      const roof = this.world.raycast(inside, _v2.set(0, -1, 0), CLIMB_HANDS + 1.6);
+      if (roof !== null && roof.normal.y > 0.7 && roof.point.y > next.y + 0.3) {
+        const to = roof.point.clone();
+        // Headroom on top?
+        const clear = this.world.raycast(_v.copy(to).addScaledVector(UP, 0.1), UP, 1.6);
+        if (clear === null) {
+          c.mantle = { from: next.clone(), to, t: 0 };
+          this.footYaw = Math.atan2(-n.x, -n.z);
+          this.events.push({ type: 'mantle' });
+          return;
+        }
+      }
+    }
+    if (chest === null && hands === null) {
+      // Wall ran out (top with no roof, or a gap) → fall
+      this.pos.copy(next);
+      this.releaseClimb(new THREE.Vector3().copy(n).multiplyScalar(0.8), 0.4);
+      return;
+    }
+    if (chest === null) {
+      // Only hands on the wall: hold position instead of sliding off
+      next.copy(start);
+      chest = this.wallProbe(next, n, CLIMB_CHEST);
+    }
+    // Closest surface wins so cornices / trim bands push us out
+    let stick = chest ?? hands!;
+    if (hands !== null && chest !== null && hands.distance < chest.distance) stick = hands;
+    const tn = new THREE.Vector3(stick.normal.x, 0, stick.normal.z);
+    if (tn.lengthSq() > 1e-4) n.lerp(tn.normalize(), 1 - Math.exp(-14 * dt)).normalize();
+    next.x = stick.point.x + n.x * CLIMB_DIST;
+    next.z = stick.point.z + n.z * CLIMB_DIST;
+
+    // Ceiling / overhang above the head blocks upward motion
+    if (dy > 0) {
+      const head = this.world.raycast(_v.copy(start).addScaledVector(UP, 1.5), UP, 0.45 + dy);
+      if (head !== null && head.normal.y < -0.5) next.y = start.y;
+    }
+
+    this.pos.copy(next);
+    this.vel.subVectors(next, start).divideScalar(Math.max(dt, 1e-4));
+    this.footYaw = lerpAngle(this.footYaw, Math.atan2(-n.x, -n.z), 1 - Math.exp(-16 * dt));
+    const moved = start.distanceTo(next);
+    c.phase += moved * 3.4;
+    c.moving = THREE.MathUtils.lerp(c.moving, moved > 1e-4 ? 1 : 0, 1 - Math.exp(-10 * dt));
   }
 
   /** Capsule pushout against walls. Returns the wall normal hit (if any). */
@@ -646,8 +936,19 @@ export class Player {
     }
     this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
 
-    // Walls
-    this.resolveBody(1.45);
+    // Walls — hold W into a wall mid-air to step off the board and grab it
+    const wall = this.resolveBody(1.45);
+    if (wall !== null && input.moveY > 0.5 && this.canClimb(wall)) {
+      this.mode = 'foot';
+      this.state = 'ground';
+      this.flip = null;
+      this.grab = null;
+      this.up.copy(UP);
+      bankCombo(this.combo, now);
+      this.events.push({ type: 'boardOff' });
+      this.tryStartClimb(wall);
+      return;
+    }
 
     // Grind snap (falling or level, near a rail)
     if (this.grindCooldown <= 0 && this.vel.y < 2.5 && this.tryStartGrind(now)) return;

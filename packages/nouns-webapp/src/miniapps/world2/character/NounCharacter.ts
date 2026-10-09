@@ -101,6 +101,45 @@ const FALLBACK_CLIP: Record<string, string[]> = {
 };
 
 const _q = new THREE.Quaternion();
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
+const _pa = new THREE.Vector3();
+const _pb = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _want = new THREE.Vector3();
+
+interface ClimbArm {
+  upper: THREE.Object3D;
+  fore: THREE.Object3D;
+  hand: THREE.Object3D;
+}
+
+/**
+ * Swing `bone` so the segment bone → `child` points along `worldDir`
+ * (blended by `amount`). Works for any bone axis convention because it
+ * measures the segment from the joint positions.
+ */
+function aimBone(
+  bone: THREE.Object3D,
+  child: THREE.Object3D,
+  worldDir: THREE.Vector3,
+  amount: number,
+) {
+  const parent = bone.parent;
+  if (parent === null) return;
+  bone.getWorldPosition(_pa);
+  child.getWorldPosition(_pb);
+  _dir.subVectors(_pb, _pa);
+  if (_dir.lengthSq() < 1e-8) return;
+  _dir.normalize();
+  _qa.setFromUnitVectors(_dir, worldDir);
+  _qa.slerp(_qb.identity(), 1 - amount);
+  // world delta → bone-local: Pw⁻¹ · R · Pw · q
+  parent.getWorldQuaternion(_qb);
+  const pInv = _qb.clone().invert();
+  bone.quaternion.premultiply(_qb).premultiply(_qa).premultiply(pInv);
+  bone.updateMatrixWorld(true);
+}
 
 export type BoardType = 'skate' | 'hover';
 /** Head width in metres (body is ~1.15 m tall without it). */
@@ -447,9 +486,23 @@ export class NounCharacter {
    */
   update(
     dt: number,
-    opts: { lean: number; travelled: number; riding?: boolean; grounded?: boolean },
+    opts: {
+      lean: number;
+      travelled: number;
+      riding?: boolean;
+      grounded?: boolean;
+      /** Wall climb: gait phase + blend (0..1) for the procedural arm reach. */
+      climb?: { phase: number; amount: number };
+    },
   ) {
     this.mixer?.update(dt);
+    this.climbBlend = THREE.MathUtils.lerp(
+      this.climbBlend,
+      opts.climb !== undefined ? opts.climb.amount : 0,
+      1 - Math.exp(-12 * dt),
+    );
+    if (opts.climb !== undefined) this.climbPhase = opts.climb.phase;
+    if (this.climbBlend > 0.01) this.poseClimbArms(this.climbBlend, this.climbPhase);
     // Procedural lean on top of the clip (rider + board bank into the carve)
     const lean = THREE.MathUtils.clamp(opts.lean, -1, 1);
     this.body.rotation.z = -lean * 0.22;
@@ -480,6 +533,59 @@ export class NounCharacter {
       const ang = opts.travelled / this.wheelRadius;
       _q.setFromAxisAngle(this.wheelAxis, ang);
       for (const w of this.wheels) w.quaternion.multiply(_q);
+    }
+  }
+
+  private climbBlend = 0;
+  private climbPhase = 0;
+  private climbArms: ClimbArm[] | null = null;
+
+  /**
+   * Fake climb: no clip for it in the rig, so after the mixer has posed the
+   * body, swing both arms overhead toward the wall, alternating which hand
+   * reaches higher with the gait phase.
+   */
+  private poseClimbArms(amount: number, phase: number) {
+    if (this.climbArms === null) {
+      const find = (name: string) => {
+        let hit: THREE.Object3D | null = null;
+        this.body.traverse(o => {
+          if (hit === null && o.name.replace(/[.:_]/g, '').toLowerCase() === name) hit = o;
+        });
+        return hit as THREE.Object3D | null;
+      };
+      const arms: ClimbArm[] = [];
+      for (const s of ['l', 'r']) {
+        const upper = find(`upperarm${s}`);
+        const fore = find(`forearm${s}`);
+        const hand = find(`hand${s}`);
+        if (upper !== null && fore !== null && hand !== null) arms.push({ upper, fore, hand });
+      }
+      this.climbArms = arms;
+    }
+    if (this.climbArms.length === 0) return;
+    this.root.updateMatrixWorld(true);
+    const bodyQ = this.body.getWorldQuaternion(new THREE.Quaternion());
+    const bodyPos = this.body.getWorldPosition(new THREE.Vector3());
+    const sideAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(bodyQ);
+    for (const arm of this.climbArms) {
+      // Which side is this arm on (rig-agnostic)?
+      arm.upper.getWorldPosition(_pa);
+      const side = _pa.sub(bodyPos).dot(sideAxis) >= 0 ? 1 : -1;
+      const reach = 0.5 + 0.5 * Math.sin(phase + (side > 0 ? 0 : Math.PI));
+      // Upper arm: splayed out wide (the Noun head swallows anything overhead),
+      // rising on the reaching side; +Z = into the wall
+      _want
+        .set(side * 0.85, 0.12 + 0.5 * reach, 0.5)
+        .normalize()
+        .applyQuaternion(bodyQ);
+      aimBone(arm.upper, arm.fore, _want.clone(), amount);
+      // Forearm: up the wall on the reaching hand, low + bent on the other
+      _want
+        .set(side * 0.35, -0.15 + 0.95 * reach, 0.75)
+        .normalize()
+        .applyQuaternion(bodyQ);
+      aimBone(arm.fore, arm.hand, _want.clone(), amount);
     }
   }
 

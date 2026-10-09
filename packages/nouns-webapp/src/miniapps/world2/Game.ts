@@ -187,6 +187,7 @@ export class Game {
       });
     }
     this.world.build(level.collisionMeshes);
+    this.player.softBounds = level.softBounds ?? Infinity;
     this.placeIceCreamVan(level);
     this.rails.load(level.rails);
     this.graffiti = new Graffiti(
@@ -660,6 +661,14 @@ export class Game {
         case 'footLand':
           this.audio.land(e.impact * 0.5);
           break;
+        case 'climbStart':
+        case 'mantle':
+          this.audio.footstep();
+          break;
+        case 'wallJump':
+          this.audio.land(2.5);
+          this.particles.dustAt(p.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0.35);
+          break;
         default:
           break;
       }
@@ -675,6 +684,12 @@ export class Game {
     fade?: number;
   } {
     const p = this.player;
+    if (p.climb !== null) {
+      // No climb clip in the rig: the walk cycle's legs read as stepping up
+      // the wall; NounCharacter overrides the arms into an overhead reach.
+      if (p.climb.mantle !== null) return { clip: 'jump_air', fade: 0.12 };
+      return { clip: 'walk', fade: 0.15, timeScale: 0.05 + p.climb.moving * 1.15 };
+    }
     if (p.mode === 'foot') {
       if (!p.footGrounded) return { clip: p.vel.y > 0 ? 'jump_air' : 'fall', fade: 0.2 };
       const hs = Math.hypot(p.vel.x, p.vel.z);
@@ -722,7 +737,29 @@ export class Game {
 
     // Place rider frame
     me.root.position.copy(p.pos);
-    if (p.mode === 'foot') {
+    if (p.climb !== null) {
+      const c = p.climb;
+      me.root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.footYaw);
+      me.board.visible = false;
+      // Lean the chest into the wall, bob with each pull
+      const mantling = c.mantle !== null;
+      const lean = mantling ? 0.32 : 0.1 + Math.sin(c.phase * 2) * 0.03 * c.moving;
+      me.body.quaternion
+        .setFromAxisAngle(new THREE.Vector3(1, 0, 0), lean)
+        // Hips sway toward the reaching hand
+        .multiply(
+          new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1),
+            Math.sin(c.phase) * 0.09 * c.moving,
+          ),
+        );
+      me.body.position.set(0, Math.abs(Math.sin(c.phase)) * 0.05 * c.moving, -0.04);
+      this.footstepAcc += dt * c.moving * 2.4;
+      if (this.footstepAcc > 1) {
+        this.footstepAcc = 0;
+        this.audio.footstep();
+      }
+    } else if (p.mode === 'foot') {
       me.root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.footYaw);
       me.board.visible = false;
       me.body.position.set(0, 0, 0);
@@ -778,6 +815,10 @@ export class Game {
       travelled: p.mode === 'board' && p.state !== 'air' && p.state !== 'bail' ? travelled : 0,
       riding: p.mode === 'board' && p.state !== 'bail',
       grounded: p.state === 'ground' || p.state === 'manual',
+      climb:
+        p.climb !== null
+          ? { phase: p.climb.phase, amount: p.climb.mantle !== null ? 0.55 : 1 }
+          : undefined,
     });
 
     // Sparks while grinding metal
@@ -984,7 +1025,7 @@ export class Game {
     this.hud = {
       ...this.hud,
       mode: p.mode,
-      state: p.state,
+      state: p.climb !== null ? 'climb' : p.state,
       speed: p.speed,
       combo: c.entries.length
         ? { label: comboLabel(c), score: comboScore(c), multiplier: c.multiplier }
