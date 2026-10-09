@@ -39,6 +39,11 @@ export class RailSet {
 
   load(defs: RailDef[]) {
     this.rails = [];
+    this.add(defs);
+  }
+
+  /** Register more rails (streamed set pieces); ids should be unique. */
+  add(defs: RailDef[]) {
     for (const d of defs) {
       if (d.points.length < 2) continue;
       const points = d.points.map(p => new THREE.Vector3(p[0], p[1], p[2]));
@@ -57,6 +62,12 @@ export class RailSet {
         bounds,
       });
     }
+  }
+
+  /** Drop the rails with these ids (a streamed set piece unloading). */
+  remove(ids: Iterable<string>) {
+    const drop = new Set(ids);
+    if (drop.size > 0) this.rails = this.rails.filter(r => !drop.has(r.id));
   }
 
   /** Nearest rail point to p within maxDist (3D distance). */

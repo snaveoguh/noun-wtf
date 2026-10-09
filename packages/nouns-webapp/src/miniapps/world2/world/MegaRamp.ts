@@ -388,7 +388,7 @@ function scaffold(
   z1: number,
   width: number,
   out: THREE.BufferGeometry[],
-  opts: { bay?: number; lift?: number; foot?: number } = {},
+  opts: { bay?: number; lift?: number; foot?: number; ground?: (z: number) => number } = {},
 ) {
   const bay = opts.bay ?? 3.2;
   const lift = opts.lift ?? 3;
@@ -401,17 +401,23 @@ function scaffold(
   // Chunky tubes: thin ones turn into solid ink at distance
   const R = 0.11;
   const tops = zs.map(z => under(z) - 0.02);
+  // Ground under each frame (uneven: a hillside under an approach bridge)
+  const gy = zs.map(z => opts.ground?.(z) ?? 0);
   // Legs + base plates
   for (let i = 0; i < zs.length; i++) {
-    if (tops[i] < 0.3) continue;
+    if (tops[i] - gy[i] < 0.3) continue;
     for (const x of xs) {
-      out.push(strut(new THREE.Vector3(x, foot, zs[i]), new THREE.Vector3(x, tops[i], zs[i]), R));
-      out.push(box(0.36, 0.06, 0.36, x, 0.03, zs[i]));
+      out.push(
+        strut(new THREE.Vector3(x, gy[i] + foot, zs[i]), new THREE.Vector3(x, tops[i], zs[i]), R),
+      );
+      out.push(box(0.36, 0.06, 0.36, x, gy[i] + 0.03, zs[i]));
     }
   }
   // Ledgers + braces
   for (let i = 0; i < zs.length; i++) {
-    for (let y = lift; y < tops[i] - 0.4; y += lift) {
+    // (ledgers start one lift above the ground, on the same global grid)
+    const y0 = Math.max(1, Math.ceil((gy[i] + 0.6) / lift)) * lift;
+    for (let y = y0; y < tops[i] - 0.4; y += lift) {
       // across the frame (x)
       out.push(strut(new THREE.Vector3(-hw, y, zs[i]), new THREE.Vector3(hw, y, zs[i]), R * 0.8));
       if (i + 1 < zs.length && y < tops[i + 1] - 0.4) {
@@ -467,7 +473,22 @@ function noggles(s: number): THREE.Group {
 
 // ── Build ────────────────────────────────────────────────────────────────
 
-export function buildMegaRamp(opts: { seed?: number } = {}): MegaRamp {
+export interface MegaRampApproach {
+  /** Level bridge from the drop-in deck back to z = level (< 0)… */
+  level: number;
+  /** …then sloping down (going back) to z = foot ≤ level, where it meets the ground. */
+  foot: number;
+  /** Grade of the sloping part (rise over run). */
+  grade?: number;
+  /** Ground height (local y) under the centreline at local z. */
+  ground?: (z: number) => number;
+}
+
+/**
+ * `approach` adds a bridge behind the drop-in deck (a way up when the ramp
+ * stands in a terrace cut into a hillside) and opens the deck's back rail.
+ */
+export function buildMegaRamp(opts: { seed?: number; approach?: MegaRampApproach } = {}): MegaRamp {
   const D = MEGA_RAMP;
   const rng = new Rng(opts.seed ?? 1);
   const W = D.width;
@@ -625,14 +646,60 @@ export function buildMegaRamp(opts: { seed?: number } = {}): MegaRamp {
   scaffold(z => (z < qpLipZ ? b.yAt(z) : qpDeck.yAt(z)) - T, qpStartZ + 1.5, endZ - 0.15, W, scaf, {
     bay: 1.5,
   });
-  // Guard rails around the drop-in deck (visual tubes + invisible collision)
+  // ── Approach bridge (mountain terraces): deck, skirts, scaffold, rails ──
+  const ap = opts.approach;
+  if (ap !== undefined) {
+    const grade = ap.grade ?? 0.25;
+    const lvl = Math.min(0, ap.level);
+    const foot = Math.min(lvl, ap.foot);
+    // Start a little past the foot, under the hillside, so it grows out of it
+    const z0 = foot - 1.5;
+    const br = new Profile(z0, D.topY - (lvl - z0) * (lvl > foot ? grade : 0));
+    if (lvl > foot) {
+      br.a = Math.atan(grade);
+      br.line((lvl - z0) / Math.cos(br.a), 1.2);
+      br.pts[br.pts.length - 1][1] = D.topY;
+      br.a = 0;
+    }
+    br.line(-br.z, 1.5);
+    br.pts[br.pts.length - 1][0] = 0;
+    addDeck(br.pts, 'MegaRampBridge');
+    addSkirt(br.pts, { start: false, end: false });
+    const ground = ap.ground ?? (() => 0);
+    scaffold(z => br.yAt(z) - T, z0 + 0.2, -0.15, W, scaf, { ground });
+    // Guard rails along the level part (the drop-in deck's sides continue them)
+    const r0 = lvl + 3;
+    if (r0 < -1) {
+      const y0 = D.topY;
+      const h = 1.05;
+      const hw = W / 2 - 0.05;
+      for (const x of [-hw, hw]) {
+        const a = new THREE.Vector3(x, y0 + h, r0);
+        const b = new THREE.Vector3(x, y0 + h, 0.1);
+        scaf.push(strut(a, b, 0.04));
+        scaf.push(strut(a.clone().setY(y0 + h / 2), b.clone().setY(y0 + h / 2), 0.03));
+        for (let z = r0; z < 0.1; z += 3)
+          scaf.push(strut(new THREE.Vector3(x, y0, z), new THREE.Vector3(x, y0 + h, z), 0.04));
+        const m = new THREE.Mesh(box(0.2, h, 0.1 - r0, x, y0 + h / 2, (r0 + 0.1) / 2), invisible);
+        m.visible = false;
+        group.add(m);
+        collision.push(m);
+      }
+    }
+  }
+
+  // Guard rails around the drop-in deck (visual tubes + invisible collision;
+  // no back rail when a bridge comes in from behind)
   {
     const y0 = D.topY;
     const h = 1.05;
     const hw = W / 2 - 0.05;
     const L = D.topDeckLen - 0.3;
+    const back = ap === undefined;
     for (const [p, q] of [
-      [new THREE.Vector3(-hw, y0 + h, 0.1), new THREE.Vector3(hw, y0 + h, 0.1)],
+      ...(back
+        ? [[new THREE.Vector3(-hw, y0 + h, 0.1), new THREE.Vector3(hw, y0 + h, 0.1)] as const]
+        : []),
       [new THREE.Vector3(-hw, y0 + h, 0.1), new THREE.Vector3(-hw, y0 + h, L)],
       [new THREE.Vector3(hw, y0 + h, 0.1), new THREE.Vector3(hw, y0 + h, L)],
     ] as const) {
@@ -644,11 +711,11 @@ export function buildMegaRamp(opts: { seed?: number } = {}): MegaRamp {
       [hw, 0.1],
       [-hw, L],
       [hw, L],
-      [0, 0.1],
+      ...(back ? [[0, 0.1] as const] : []),
     ] as const)
       scaf.push(strut(new THREE.Vector3(x, y0, z), new THREE.Vector3(x, y0 + h, z), 0.04));
     for (const [w, d, x, z] of [
-      [W, 0.2, 0, 0.1],
+      ...(back ? [[W, 0.2, 0, 0.1] as const] : []),
       [0.2, L, -hw, L / 2],
       [0.2, L, hw, L / 2],
     ] as const) {
