@@ -337,9 +337,9 @@ export function CharacterSelect({
       </div>
 
       <div className="cs-help">
-        ↑↓ SELECT · ←→ CHANGE (SHIFT ×10) · R RANDOM · ENTER START
+        ↑↓ SELECT   ←→ CHANGE (SHIFT ×10)   R RANDOM   ENTER START
         <br />
-        PAD: D-PAD · LB/RB ×10 · X RANDOM · A START
+        PAD: D-PAD   LB/RB ×10   X RANDOM   A START
       </div>
     </div>
   );
