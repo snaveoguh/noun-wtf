@@ -344,10 +344,7 @@ const SettlersPage: FC = () => {
                   padding: '10px 16px',
                   borderRadius: '12px',
                   border: '1px solid transparent',
-                  background:
-                    rank < 3
-                      ? ['var(--theme-bg-card)', 'var(--theme-bg-card)', 'var(--theme-bg-card)'][rank]
-                      : 'var(--theme-bg-card)',
+                  background: 'var(--theme-bg-card)',
                   transition: 'transform 0.1s',
                 }}
                 onMouseEnter={e => {

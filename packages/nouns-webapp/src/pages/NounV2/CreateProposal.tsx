@@ -185,7 +185,13 @@ export default function CreateNounV2ProposalPage() {
             background: 'var(--theme-bg-card)',
           }}
         >
-          <h2 style={{ fontSize: '1.3rem', marginBottom: '0.75rem', color: 'var(--theme-text-primary)' }}>
+          <h2
+            style={{
+              fontSize: '1.3rem',
+              marginBottom: '0.75rem',
+              color: 'var(--theme-text-primary)',
+            }}
+          >
             Proposal Submitted On-Chain
           </h2>
           <p

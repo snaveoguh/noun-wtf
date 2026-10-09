@@ -155,7 +155,13 @@ export default function CreateGrantPage() {
           }}
         >
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{'\u2310\u25E8-\u25E8'}</div>
-          <h2 style={{ fontSize: '1.3rem', marginBottom: '0.75rem', color: 'var(--theme-text-primary)' }}>
+          <h2
+            style={{
+              fontSize: '1.3rem',
+              marginBottom: '0.75rem',
+              color: 'var(--theme-text-primary)',
+            }}
+          >
             Grant Submitted On-Chain
           </h2>
           <p
