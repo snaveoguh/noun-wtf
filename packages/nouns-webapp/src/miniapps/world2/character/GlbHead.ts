@@ -1,21 +1,148 @@
-// ── Hand-modelled 3D heads (3DNouns set) ─────────────────────────────────
+// ── Hand-modelled 3D heads ───────────────────────────────────────────────
 //
-// 224 of the 258 heads have a proper 3D model in /models/heads/3dnouns,
-// in Nouns pixel units. They replace the inflated pixel-art head once
-// loaded; heads without a model keep the generated one. Alignment reuses
-// the per-head nudges the auction page's 3D view was tuned with, which
-// put each model in the same centred pixel frame as the 2D art.
+// Two sets live in /models/heads, both in Nouns pixel units:
+//
+// • 3dnouns — 224 of the 258 heads. Aligned with the per-head nudges the
+//   auction page's 3D view was tuned with; each ships a glasses mesh whose
+//   texture we swap for this Noun's glasses.
+//
+// • noundry — Sebastien's VoxEdit voxel heads, exported with
+//   vengi-voxconvert 0.4. Same pixel frame as the 2D art (x columns match
+//   exactly, y up, front = +z); each file has its own vertical origin, so
+//   seating goes by bounding box. Load-time fixes, none of which touch the
+//   geometry's shape:
+//     - Every material is metallic (no metallicFactor → glTF default 1.0)
+//       with roughness 0.1 and KHR_materials_ior. three.js turns that into
+//       a mirror, which with no environment map renders black. We rebuild
+//       them as plain non-metallic materials.
+//     - Colour comes from 256×1 palette textures with UVs on texel centres
+//       and no sampler, so three.js would mipmap + linearly filter them.
+//       Palettes are sampled nearest, without mipmaps.
+//     - No normals are exported; per-face normals are computed (voxels are
+//       flat, and toon materials don't carry flatShading).
+//     - Hundreds of primitives/materials per file are merged per palette.
+//     - Each file includes a stock pair of red noggles left at the origin
+//       (under the chin): the exporter dropped node transforms. They're
+//       left out and the caller keeps this Noun's own voxel glasses.
+//   The dropped node transforms also collapsed parts of some models onto
+//   their origin. That can't be recovered from the files, so those heads
+//   are listed below and only shown with ?heads=noundry-all.
+//
+// Which set wins: 3dnouns first, noundry for heads it lacks. ?heads=noundry
+// prefers noundry wherever an intact model exists (to compare), and
+// ?heads=noundry-all also shows the damaged ones.
 
-import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import * as THREE from 'three';
+
 import { getHeadOffset } from '@/lib/headNudges';
+
+export type HeadSet = '3dnouns' | 'noundry';
 
 interface ManifestEntry {
   traitIndex: number;
   traitName: string;
   threeDNounsGlb?: string | null;
+  noundryGlb?: string | null;
 }
+
+export interface GlbHeadModel {
+  object: THREE.Object3D;
+  set: HeadSet;
+  /** False when the model has no glasses of its own (caller supplies them). */
+  hasGlasses: boolean;
+}
+
+/**
+ * Noundry files that match a head trait but aren't in manifest.json (the
+ * names differ). Each was checked side by side against the 2D art.
+ */
+const NOUNDRY_EXTRA: Record<string, string> = {
+  cassettetape: 'tape',
+  'star-sparkles': 'star',
+  'taco-classic': 'tacos',
+  'green-snake': 'snake',
+  'ghost-B': 'ghost',
+  'shrimp-tempura': 'tempura',
+  'crt-bsod': 'bsod',
+  porkbao: 'bao',
+  'burger-dollarmenu': 'burger',
+  camcorder: 'camerarecorder',
+  hardhat: 'constructionhat',
+  queencrown: 'crownqueen',
+  'horse-deepfried': 'deepfriedhorse',
+  'diamond-blue': 'diamond',
+  dictionary: 'dictionnary',
+  dino: 'dinosaur',
+  faberge: 'fabergeegg',
+  'console-handheld': 'handheldconsole',
+  'skeleton-hat': 'skeleton',
+  'bubble-speech': 'speechbubble',
+  thumbsup: 'thumb',
+  'ruler-triangular': 'triangularruler',
+  turing: 'turingmachine',
+  'bigfoot-yeti': 'yeti',
+};
+
+/**
+ * Noundry heads with parts visibly missing or out of place because the
+ * export dropped their node transforms (front/back renders reviewed
+ * against the 2D art). Shown only with ?heads=noundry-all.
+ */
+const NOUNDRY_DAMAGED = new Set([
+  'aardvark',
+  'abacus',
+  'bag',
+  'bank',
+  'beer',
+  'beet',
+  'bomb',
+  'box',
+  'cake',
+  'calendar',
+  'cash-register',
+  'cheese',
+  'chefhat',
+  'cherry',
+  'cloud',
+  'cookie',
+  'crab',
+  'duck',
+  'fan',
+  'film-35mm',
+  'flower',
+  'frog',
+  'ghost-B',
+  'hanger',
+  'jellyfish',
+  'ketchup',
+  'microwave',
+  'mirror',
+  'moon',
+  'moose',
+  'mouse',
+  'mustard',
+  'owl',
+  'paintbrush',
+  'pizza',
+  'pufferfish',
+  'pumpkin',
+  'raven',
+  'sailboat',
+  'saturn',
+  'shark',
+  'shrimp-tempura',
+  'skateboard',
+  'undead',
+  'unicorn',
+  'zebra',
+]);
+
+const HEADS_PARAM =
+  typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('heads');
+const PREFER_NOUNDRY = HEADS_PARAM === 'noundry' || HEADS_PARAM === 'noundry-all';
+const ALLOW_DAMAGED = HEADS_PARAM === 'noundry-all';
 
 let manifest: Promise<ManifestEntry[]> | null = null;
 function getManifest() {
@@ -25,6 +152,20 @@ function getManifest() {
   return manifest;
 }
 
+function noundryUrl(e: ManifestEntry): string | null {
+  if (NOUNDRY_DAMAGED.has(e.traitName) && !ALLOW_DAMAGED) return null;
+  if (e.noundryGlb) return e.noundryGlb;
+  const extra = NOUNDRY_EXTRA[e.traitName];
+  return extra ? `/models/heads/noundry/${extra}.glb` : null;
+}
+
+function pickModel(e: ManifestEntry): { url: string; set: HeadSet } | null {
+  const tdn = e.threeDNounsGlb ? { url: e.threeDNounsGlb, set: '3dnouns' as const } : null;
+  const nd = noundryUrl(e);
+  const ndm = nd !== null ? { url: nd, set: 'noundry' as const } : null;
+  return PREFER_NOUNDRY ? (ndm ?? tdn) : (tdn ?? ndm);
+}
+
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
 const glassesTex = new Map<number, Promise<THREE.Texture | null>>();
 
@@ -32,10 +173,13 @@ function isGlasses(o: THREE.Object3D) {
   return o.name === 'GlassesUV' || o.name.toLowerCase().includes('glasses');
 }
 
-async function loadTemplate(url: string, traitName: string): Promise<THREE.Object3D | null> {
+async function loadGltf(url: string): Promise<GLTF> {
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-  const gltf: GLTF = await new GLTFLoader().loadAsync(url);
-  const scene = gltf.scene;
+  return new GLTFLoader().loadAsync(url);
+}
+
+async function load3DNouns(url: string, traitName: string): Promise<THREE.Object3D | null> {
+  const scene = (await loadGltf(url)).scene;
   scene.updateMatrixWorld(true);
   const [ox, oy, oz] = getHeadOffset(traitName);
   const shift = new THREE.Matrix4().makeTranslation(ox, oy, oz);
@@ -71,6 +215,63 @@ async function loadTemplate(url: string, traitName: string): Promise<THREE.Objec
   return root.children.length > 0 ? root : null;
 }
 
+/** The stock noggles every Noundry file carries, by their exact extent. */
+function isStockNoggles(g: THREE.BufferGeometry) {
+  g.computeBoundingBox();
+  const b = g.boundingBox!;
+  return (
+    b.min.x === -6.5 &&
+    b.min.y === -3 &&
+    b.min.z === -0.5 &&
+    b.max.x === 9.5 &&
+    b.max.y === 3 &&
+    b.max.z === 0.5
+  );
+}
+
+async function loadNoundry(url: string): Promise<THREE.Object3D | null> {
+  const { mergeGeometries } = await import('three/examples/jsm/utils/BufferGeometryUtils.js');
+  const scene = (await loadGltf(url)).scene;
+  scene.updateMatrixWorld(true);
+  // Group every primitive by palette texture, then merge
+  const byPalette = new Map<THREE.Texture | null, THREE.BufferGeometry[]>();
+  scene.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.visible || isStockNoggles(m.geometry)) return;
+    const map = (m.material as THREE.MeshStandardMaterial).map ?? null;
+    // Same vertex data, new layout: per-face normals for flat voxel faces
+    const g = m.geometry.index !== null ? m.geometry.toNonIndexed() : m.geometry.clone();
+    g.applyMatrix4(m.matrixWorld);
+    for (const k of Object.keys(g.attributes))
+      if (k !== 'position' && k !== 'uv') g.deleteAttribute(k);
+    g.computeVertexNormals();
+    const list = byPalette.get(map) ?? [];
+    list.push(g);
+    byPalette.set(map, list);
+  });
+  const root = new THREE.Group();
+  for (const [map, geos] of byPalette) {
+    const g = mergeGeometries(geos, false);
+    if (g === null) continue;
+    if (map) {
+      map.magFilter = THREE.NearestFilter;
+      map.minFilter = THREE.NearestFilter;
+      map.generateMipmaps = false;
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.needsUpdate = true;
+    }
+    const out = new THREE.Mesh(
+      g,
+      new THREE.MeshStandardMaterial({ map, roughness: 0.6, metalness: 0 }),
+    );
+    out.name = 'noundry';
+    out.castShadow = true;
+    out.receiveShadow = true;
+    root.add(out);
+  }
+  return root.children.length > 0 ? root : null;
+}
+
 function loadGlassesTexture(i: number) {
   let p = glassesTex.get(i);
   if (p === undefined) {
@@ -89,21 +290,27 @@ function loadGlassesTexture(i: number) {
 }
 
 /**
- * The 3D model for a head with the given glasses, in the 2D art's centred
- * pixel frame (x right, y up, front = +z), or null if there's no model.
+ * The 3D model for a head with the given glasses, in Nouns pixel units
+ * (x right, y up, front = +z), or null if there's no model. 3dnouns models
+ * come with this Noun's glasses; noundry ones come without.
  */
-export async function loadGlbHead(head: number, glasses: number): Promise<THREE.Object3D | null> {
-  const entry = (await getManifest())[head];
-  const url = entry?.threeDNounsGlb;
-  if (!entry || !url) return null;
-  let t = templates.get(url);
+export async function loadGlbHead(head: number, glasses: number): Promise<GlbHeadModel | null> {
+  const entry = (await getManifest())[head] as ManifestEntry | undefined;
+  if (entry === undefined) return null;
+  const pick = pickModel(entry);
+  if (pick === null) return null;
+  let t = templates.get(pick.url);
   if (t === undefined) {
-    t = loadTemplate(url, entry.traitName).catch(() => null);
-    templates.set(url, t);
+    t = (
+      pick.set === 'noundry' ? loadNoundry(pick.url) : load3DNouns(pick.url, entry.traitName)
+    ).catch(() => null);
+    templates.set(pick.url, t);
   }
   const tpl = await t;
   if (!tpl) return null;
   const head3d = tpl.clone();
+  head3d.userData.headSet = pick.set;
+  if (pick.set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false };
   const tex = await loadGlassesTexture(glasses);
   head3d.traverse(o => {
     const m = o as THREE.Mesh;
@@ -122,5 +329,5 @@ export async function loadGlbHead(head: number, glasses: number): Promise<THREE.
     m.material = mat;
     m.renderOrder = 1;
   });
-  return head3d;
+  return { object: head3d, set: '3dnouns', hasGlasses: true };
 }
