@@ -203,6 +203,8 @@ export class Game {
     this.gfx.applyLevel(level);
     this.hud.baked = level.baked;
     this.buildNature(level);
+    if (new URLSearchParams(window.location.search).get('dressing') === '1')
+      this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
 
     this.me = new NounCharacter(this.seed, assets);
@@ -465,6 +467,24 @@ export class Game {
       console.warn('[world2] nature layer failed, continuing without it', err);
       this.nature = null;
     }
+  }
+
+  /** Dev (?dressing=1): mountain dressing on a standalone test patch east of the plaza. */
+  private buildDressingDemo(level: LevelData) {
+    void import('./world/mountain/DressingDemo')
+      .then(({ buildDressingDemo }) => {
+        if (this.disposed) return;
+        const demo = buildDressingDemo(this.gfx);
+        this.world.build([
+          ...level.collisionMeshes,
+          ...this.propCollision,
+          ...(this.nature?.collisionMeshes() ?? []),
+          ...demo.collisionMeshes,
+        ]);
+        (window as unknown as { __dressing?: unknown }).__dressing = demo;
+        console.info('[world2] dressing demo', demo.stats);
+      })
+      .catch(err => console.warn('[world2] dressing demo failed', err));
   }
 
   private static TOD: TimeOfDayPreset[] = ['afternoon', 'golden', 'blue', 'night'];
