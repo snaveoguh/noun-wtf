@@ -176,13 +176,9 @@ const num = (x: unknown): number => {
 };
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-/**
- * First line of a description, computed in SQL so we never ship whole bodies.
- * Skips a bare "# Noun" / "# noun.wtf" client tag line, which noun.wtf puts
- * above the real title (otherwise Prop 1000 reads as "Noun").
- */
+/** First line of a description, computed in SQL so we never ship whole bodies. */
 const firstLineOf = (col: SQL.Aliased | SQL | unknown) =>
-  sql<string>`split_part(regexp_replace(regexp_replace(${col}, '^\\s*#*\\s*noun(\\.wtf)?[ \\t]*\\r?\\n', '', 'i'), '^\\s+', ''), E'\\n', 1)`;
+  sql<string>`split_part(regexp_replace(${col}, '^\\s+', ''), E'\\n', 1)`;
 
 // ── Live proposal status ────────────────────────────────────────────────
 // The index only changes a proposal's status on events (created, queued,

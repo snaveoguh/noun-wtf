@@ -291,16 +291,17 @@ async function fetchLiveAuction(): Promise<LiveAuction | null> {
 // ─── Context Formatters ────────────────────────────────────────────────────
 
 /**
- * Proposal title: the first heading/line, skipping the bare "# Noun" client
- * tag noun.wtf puts at the top of proposals it submits (which made every
- * noun.wtf proposal read as "Noun" and hid what it was about).
+ * Proposal title: the first heading/line of the description, as written
+ * (Prop 1000's title really is "Noun").
  */
 export function proposalTitle(description: string): string {
-  const lines = (description || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = (description || '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
   for (const l of lines.slice(0, 6)) {
     const t = l.replace(/^#+\s*/, '').trim();
-    if (!t || /^noun(\.wtf)?$/i.test(t)) continue;
-    return t.slice(0, 100);
+    if (t) return t.slice(0, 100);
   }
   return 'Untitled';
 }
