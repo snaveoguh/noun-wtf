@@ -474,6 +474,7 @@ export class MountainDressing {
         const cl = fbm(x, z, 40, seed + 41);
         if (r > smoothstep(0.0, 0.55, cl) * 0.7 + near(x, z) * 0.35) continue;
         if (TD(x, z) < th + 6 || BL(x, z) || WD(x, z) < 1.2) continue;
+        if (T.keepOut?.(x, z) === true) continue;
         const y = H(x, z) - 0.18 * sc;
         if (inPond(x, z, y + 0.2)) continue;
         bushes.push(x - x0, y, z - z0, rot, sc, sc, sc);
@@ -503,6 +504,7 @@ export class MountainDressing {
         if (TD(x, z) < th + 11 || BL(x, z) || WD(x, z) < 2.5) continue;
         if (trunks.some(p => Math.hypot(p[0] - x, p[1] - z) < 6)) continue;
         if (T.trackDist(x, z) < th + 11) continue;
+        if (T.keepOut?.(x, z) === true) continue;
         const e = 0.6;
         const y =
           Math.min(
@@ -537,6 +539,7 @@ export class MountainDressing {
         if (WD(x, z) < (big ? 2 : -0.4)) continue;
         if (trunks.some(p => Math.hypot(p[0] - x, p[1] - z) < 3 + s)) continue;
         if (T.trackDist(x, z) < th + (big ? 14 : 8)) continue;
+        if (T.keepOut?.(x, z) === true) continue;
         const e = s * 0.8;
         const lo = Math.min(
           T.height(x + e, z),

@@ -46,6 +46,7 @@ import {
   terrainSurface,
 } from './world/mountain/terrain';
 import { MEGA_SITE } from './world/mountain/tracks';
+import { Wildlife } from './world/mountain/Wildlife';
 import { PipBillboards } from './world/PipBillboards';
 
 /** `?megaramp=` dev param: '1' = city boulevard ramp, 'mtn' = spawn on the hero mountain ramp. */
@@ -425,6 +426,13 @@ export class Game {
       const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
       setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
     }
+    if (this.wild !== null) {
+      // Local rider first (the creature name tag follows them), then remotes
+      this.riders.length = 0;
+      this.riders.push(this.player.pos);
+      for (const r of this.remotes.values()) this.riders.push(r.character.root.position);
+      this.wild.update(dt, this.gfx.camera, this.riders);
+    }
     this.nature?.update(dt, this.player.pos);
     this.billboards.update(dt);
     this.gfx.render(dt);
@@ -458,6 +466,9 @@ export class Game {
   nature: NatureSystem | null = null;
   /** Endless downhill terrain past the alleys (baked plaza only). */
   mountain: MountainStream | null = null;
+  /** Critters + hill houses + oddities on the mountain (animated per frame). */
+  wild: Wildlife | null = null;
+  private riders: THREE.Vector3[] = [];
   /** Drop-in deck of the hero mega ramp on the mountain (an R respawn spot). */
   mountainHero: { pos: THREE.Vector3; yaw: number } | null = null;
 
@@ -470,6 +481,11 @@ export class Game {
       m.addDecorator(rampDecorator);
       // Mega ramp set pieces: terrace + bridge + ramp, rails stream with the chunk
       m.addDecorator(megaRampDecorator(this.rails));
+      // Creatures, hill houses + oddities (also keeps trees out of the houses)
+      const wild = new Wildlife(this.gfx.quality);
+      m.addDecorator(wild.decorator());
+      this.gfx.scene.add(wild.group);
+      this.wild = wild;
       this.gfx.scene.add(m.group);
       this.mountain = m;
       this.player.mountain = level.mountain ?? null;
@@ -1251,6 +1267,7 @@ export class Game {
 
   dispose() {
     this.mountain?.dispose();
+    this.wild?.dispose();
     this.nature?.dispose();
     this.billboards.dispose();
     this.radio.dispose();

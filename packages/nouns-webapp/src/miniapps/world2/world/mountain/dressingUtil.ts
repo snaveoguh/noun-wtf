@@ -16,6 +16,12 @@ export interface TerrainQuery {
   trackDist(x: number, z: number): number;
   /** Optional mask: true where nothing may be placed (city, alley ramps…). */
   blocked?(x: number, z: number): boolean;
+  /**
+   * Optional mask for the big stuff only: true where a set piece stands
+   * (hill houses, oddities), so no tree / bush / rock grows through it.
+   * Grass + flowers still carpet right up to (and around) it.
+   */
+  keepOut?(x: number, z: number): boolean;
 }
 
 /** Deterministic [0, 1) hash of three integers + a seed. */
