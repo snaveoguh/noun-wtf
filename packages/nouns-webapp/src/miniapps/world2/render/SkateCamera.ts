@@ -90,6 +90,11 @@ export class SkateCamera {
         // Slightly off-square (3/4 view) so the reaching arms read past the big head
         this.yaw = lerpAngle(this.yaw, Math.atan2(-n.x, -n.z) + 0.42, 1 - Math.exp(-3.5 * dt));
       }
+      // Keyboard walking turns like the board: keep the camera in behind the
+      // heading once the player stops steering it themselves
+      else if (p.climb === null && p.footTank && now - this.lastInputAt > 600) {
+        this.yaw = lerpAngle(this.yaw, p.footYaw, 1 - Math.exp(-4 * dt));
+      }
     }
     this.climbK = THREE.MathUtils.lerp(
       this.climbK,

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ImageData } from '@noundry/nouns-assets';
 
+import { prefetchGlbHead } from '../character/GlbHead';
 import { randomSeed, type NounSeed } from '../character/NounAppearance';
 import { BUILDS } from '../character/NounCharacter';
 import { worldPause } from '../worldPause';
@@ -91,6 +92,12 @@ export function CharacterSelect({
 
   // Push the seed into the 3D preview (debounced so key-repeat stays smooth)
   useEffect(() => {
+    // Warm the next/previous heads and glasses so flipping through is instant
+    const nh = ImageData.images.heads.length;
+    const ng = ImageData.images.glasses.length;
+    for (const d of [1, -1, 2, -2])
+      prefetchGlbHead((((seed.head + d) % nh) + nh) % nh, seed.glasses);
+    for (const d of [1, -1]) prefetchGlbHead(seed.head, (((seed.glasses + d) % ng) + ng) % ng);
     const t = window.setTimeout(() => game.setSeed(seed), 60);
     return () => window.clearTimeout(t);
   }, [game, seed]);

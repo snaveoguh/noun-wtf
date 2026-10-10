@@ -11,7 +11,7 @@ import * as THREE from 'three';
 
 import { toonify } from '../render/Toon';
 
-import { loadGlbHead } from './GlbHead';
+import { glbHeadNow, headHasModel, loadGlbHead, type GlbHeadModel } from './GlbHead';
 import { buildSmoothHead, headProfile, type SmoothHead } from './SmoothHead';
 
 export interface NounSeed {
@@ -146,8 +146,12 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   // the generated ones). The generated head shows until it loads.
   if (USE_MODELS) {
     const generated = [...inner.children];
-    void loadGlbHead(seed.head, seed.glasses).then(loaded => {
-      if (loaded === null) return;
+    const apply = (loaded: GlbHeadModel | null) => {
+      if (loaded === null) {
+        // No model after all: the generated head stays
+        for (const o of generated) o.visible = true;
+        return;
+      }
       const model = loaded.object;
       // Match whatever look the character already has (toon or lit)
       const toon = generated.some(
@@ -177,7 +181,16 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
         const artMinY = geos.head?.boundingBox?.min.y ?? NECK_Y;
         seatGlasses(glassesMesh!, model, NECK_Y + NECK_GAP - artMinY);
       }
-    });
+    };
+    // Already loaded: swap in now, so switching heads never flashes the
+    // generated pillow head. Otherwise hide it while the model loads (it
+    // only stays for the few heads that have no model).
+    const now = glbHeadNow(seed.head, seed.glasses);
+    if (now !== undefined) apply(now);
+    else {
+      if (headHasModel(seed.head) !== false) for (const o of generated) o.visible = false;
+      void loadGlbHead(seed.head, seed.glasses).then(apply);
+    }
   }
 
   // Skin tone: most common head colour

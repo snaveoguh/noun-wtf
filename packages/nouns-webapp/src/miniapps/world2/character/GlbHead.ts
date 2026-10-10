@@ -148,7 +148,11 @@ let manifest: Promise<ManifestEntry[]> | null = null;
 function getManifest() {
   manifest ??= fetch('/models/heads/manifest.json')
     .then(r => (r.ok ? (r.json() as Promise<ManifestEntry[]>) : []))
-    .catch(() => []);
+    .catch(() => [] as ManifestEntry[])
+    .then(m => {
+      manifestNow = m;
+      return m;
+    });
   return manifest;
 }
 
@@ -167,6 +171,10 @@ function pickModel(e: ManifestEntry): { url: string; set: HeadSet } | null {
 }
 
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
+// Resolved copies, so already-loaded heads can be built without awaiting
+const templatesNow = new Map<string, THREE.Object3D | null>();
+const texNow = new Map<number, THREE.Texture | null>();
+let manifestNow: ManifestEntry[] | null = null;
 const glassesTex = new Map<number, Promise<THREE.Texture | null>>();
 
 /** Glasses index whose shape the 3dnouns glasses mesh can't show. */
@@ -286,7 +294,11 @@ function loadGlassesTexture(i: number) {
         t.colorSpace = THREE.SRGBColorSpace;
         return t;
       })
-      .catch(() => null);
+      .catch(() => null)
+      .then(t => {
+        texNow.set(i, t);
+        return t;
+      });
     glassesTex.set(i, p);
   }
   return p;
@@ -302,22 +314,70 @@ export async function loadGlbHead(head: number, glasses: number): Promise<GlbHea
   if (entry === undefined) return null;
   const pick = pickModel(entry);
   if (pick === null) return null;
-  let t = templates.get(pick.url);
-  if (t === undefined) {
-    t = (
-      pick.set === 'noundry' ? loadNoundry(pick.url) : load3DNouns(pick.url, entry.traitName)
-    ).catch(() => null);
-    templates.set(pick.url, t);
-  }
-  const tpl = await t;
+  const tpl = await loadTemplate(pick.url, pick.set, entry.traitName);
   if (!tpl) return null;
+  const tex = pick.set === '3dnouns' && glasses !== HIP_ROSE ? await loadGlassesTexture(glasses) : null;
+  return assemble(tpl, pick.set, glasses, tex);
+}
+
+/**
+ * The same model, synchronously, when everything it needs is already
+ * loaded: `undefined` means "not ready yet" (call loadGlbHead), `null`
+ * means this head has no model.
+ */
+export function glbHeadNow(head: number, glasses: number): GlbHeadModel | null | undefined {
+  if (manifestNow === null) return undefined;
+  const entry = manifestNow[head];
+  if (entry === undefined) return null;
+  const pick = pickModel(entry);
+  if (pick === null) return null;
+  if (!templatesNow.has(pick.url)) return undefined;
+  const tpl = templatesNow.get(pick.url) ?? null;
+  if (tpl === null) return null;
+  const needsTex = pick.set === '3dnouns' && glasses !== HIP_ROSE;
+  if (needsTex && !texNow.has(glasses)) return undefined;
+  return assemble(tpl, pick.set, glasses, needsTex ? (texNow.get(glasses) ?? null) : null);
+}
+
+/** Whether a head has a 3D model (`undefined` until the manifest loads). */
+export function headHasModel(head: number): boolean | undefined {
+  if (manifestNow === null) return undefined;
+  const entry = manifestNow[head];
+  return entry !== undefined && pickModel(entry) !== null;
+}
+
+/** Warm the caches for a head (e.g. its neighbours in the character select). */
+export function prefetchGlbHead(head: number, glasses: number) {
+  void loadGlbHead(head, glasses);
+}
+
+function loadTemplate(url: string, set: HeadSet, traitName: string) {
+  let t = templates.get(url);
+  if (t === undefined) {
+    t = (set === 'noundry' ? loadNoundry(url) : load3DNouns(url, traitName))
+      .catch(() => null)
+      .then(o => {
+        templatesNow.set(url, o);
+        return o;
+      });
+    templates.set(url, t);
+  }
+  return t;
+}
+
+function assemble(
+  tpl: THREE.Object3D,
+  set: HeadSet,
+  glasses: number,
+  tex: THREE.Texture | null,
+): GlbHeadModel {
   const head3d = tpl.clone();
-  head3d.userData.headSet = pick.set;
-  if (pick.set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false };
+  head3d.userData.headSet = set;
+  if (set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false };
   // The 3dnouns glasses mesh is the square-frame shape; textures can't turn
   // it into shapes it doesn't have. Hip-rose (2 px bridge, stepped arm)
   // drops it and wears the Noun's voxel glasses built from the art instead.
-  if (glasses === HIP_ROSE) {
+  if (glasses === HIP_ROSE || tex === null) {
     const drop: THREE.Object3D[] = [];
     head3d.traverse(o => {
       if ((o as THREE.Mesh).isMesh && isGlasses(o)) drop.push(o);
@@ -325,15 +385,10 @@ export async function loadGlbHead(head: number, glasses: number): Promise<GlbHea
     for (const o of drop) o.removeFromParent();
     return { object: head3d, set: '3dnouns', hasGlasses: false };
   }
-  const tex = await loadGlassesTexture(glasses);
   head3d.traverse(o => {
     const m = o as THREE.Mesh;
     if (!m.isMesh || !isGlasses(m)) return;
     // The model ships one pair of glasses; swap in this Noun's
-    if (tex === null) {
-      m.visible = false;
-      return;
-    }
     const mat = (m.material as THREE.MeshStandardMaterial).clone();
     tex.flipY = mat.map?.flipY ?? false;
     mat.map = tex;
@@ -345,3 +400,6 @@ export async function loadGlbHead(head: number, glasses: number): Promise<GlbHea
   });
   return { object: head3d, set: '3dnouns', hasGlasses: true };
 }
+
+// Fetch the manifest up front so the first head can tell it has a model
+if (typeof window !== 'undefined') void getManifest();

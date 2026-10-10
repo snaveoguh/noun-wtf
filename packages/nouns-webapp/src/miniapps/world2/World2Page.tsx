@@ -20,7 +20,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'SPACE', v: 'hold to crouch, release to ollie' },
   { k: 'J / L / K / U', v: 'kickflip, heelflip, shove-it, 360 flip' },
   { k: 'RMB drag', v: 'flick-it: pull down, flick up (diagonals = flips)' },
-  { k: 'SHIFT / Q', v: 'manual, nose manual' },
+  { k: 'SHIFT / Q', v: 'manual, nose manual (hold, W/S to keep the balance dot centred)' },
   { k: 'I / O', v: 'grab' },
   { k: 'F', v: 'get on / off board' },
   {
@@ -483,13 +483,20 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
           </div>
         )}
         {hud.manualBalance !== null && (
-          <div className="mt-2 h-2 w-48 rounded-full bg-white/20">
-            <div
-              className="h-2 w-2 rounded-full bg-[#ffd400]"
-              style={{
-                transform: `translateX(${(Math.max(-1, Math.min(1, hud.manualBalance)) + 1) * 92}px)`,
-              }}
-            />
+          <div className="mt-2 flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="text-[#ffd400]">W ◀</span>
+              <div className="h-2 w-48 rounded-full bg-white/20">
+                <div
+                  className="h-2 w-2 rounded-full bg-[#ffd400]"
+                  style={{
+                    transform: `translateX(${(Math.max(-1, Math.min(1, hud.manualBalance)) + 1) * 92}px)`,
+                  }}
+                />
+              </div>
+              <span className="text-[#ffd400]">▶ S</span>
+            </div>
+            <div className="text-xs opacity-80">W / S to balance, keep the dot centred</div>
           </div>
         )}
       </div>
