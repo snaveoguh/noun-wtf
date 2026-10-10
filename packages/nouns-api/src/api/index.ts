@@ -2287,24 +2287,20 @@ app.post('/api/grants/propose', async c => {
 // Terminal — Claude AI chat for Nouns governance
 // ============================================================
 
-// Noun World's fastest-of-all-time board (Netlify Blobs, via the webapp's
-// world-fastest function): one best per rider, fastest first.
-const WORLD_FASTEST_URL = 'https://noun.wtf/.netlify/functions/world-fastest';
+// Noun World's all-time stats (Netlify Blobs, via the webapp's world-stats
+// function): top speed board plus every other record and play counts.
+const WORLD_STATS_URL = 'https://noun.wtf/.netlify/functions/world-stats';
 
-async function fetchWorldFastest(): Promise<
-  { name: string; kmh: number; descendedM: number; at: string }[]
-> {
-  const res = await fetch(WORLD_FASTEST_URL, { signal: AbortSignal.timeout(6000) });
+interface WorldStatsBody {
+  riders?: number;
+  sessions?: number;
+  boards?: Record<string, { name: string; value: number; label?: string; at: number }[]>;
+}
+
+async function fetchWorldStats(): Promise<WorldStatsBody> {
+  const res = await fetch(WORLD_STATS_URL, { signal: AbortSignal.timeout(6000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as {
-    entries?: { name: string; kmh: number; downM: number; at: number }[];
-  };
-  return (body.entries ?? []).map(e => ({
-    name: e.name,
-    kmh: e.kmh,
-    descendedM: e.downM,
-    at: new Date(e.at).toISOString(),
-  }));
+  return (await res.json()) as WorldStatsBody;
 }
 
 // What the site itself has, shared by the chat bar and NounIRL. Keep this in
@@ -3743,7 +3739,7 @@ CRITICAL RULES:
         function: {
           name: 'world_fastest',
           description:
-            'Noun World fastest-of-all-time leaderboard (the skate game on noun.wtf). Returns the top riders by top speed in km/h with distance descended. Call this when asked about top speed, the speed record or who is fastest in Noun World.',
+            'Noun World all-time stats (the skate game on noun.wtf): players ever, sessions, and the top riders for top speed (km/h), best combo, best session, highest jump, longest hang time, longest grind and furthest downhill. Call this for any question about records, who is best or how many people play Noun World.',
           parameters: { type: 'object' as const, properties: {}, required: [] },
         },
       },
@@ -5113,10 +5109,19 @@ CRITICAL RULES:
 
             case 'world_fastest': {
               try {
-                const entries = await fetchWorldFastest();
-                result = entries.length
-                  ? { record: entries[0], leaderboard: entries.slice(0, 10) }
-                  : { leaderboard: [], note: 'No speeds on the board yet.' };
+                const st = await fetchWorldStats();
+                const top = (k: string) => (st.boards?.[k] ?? []).slice(0, 5);
+                result = {
+                  playersEver: st.riders ?? 0,
+                  sessions: st.sessions ?? 0,
+                  topSpeedKmh: top('kmh'),
+                  bestCombo: top('combo'),
+                  bestSession: top('session'),
+                  highestJumpM: top('airM'),
+                  longestHangS: top('airS'),
+                  longestGrindM: top('grindM'),
+                  furthestDownhillM: top('downM'),
+                };
               } catch (err) {
                 result = {
                   error: `Leaderboard unavailable: ${err instanceof Error ? err.message : String(err)}`,

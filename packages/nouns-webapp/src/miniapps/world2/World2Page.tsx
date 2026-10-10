@@ -9,6 +9,7 @@ import { useAppSelector } from '@/hooks';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
+import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { worldPause } from './worldPause';
@@ -377,7 +378,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         <div className="w2-chip">
           <b>{hud.session.toLocaleString()}</b> pts{' '}
           <span className="opacity-60">
-            best {Math.max(hud.best, hud.myBestCombo).toLocaleString()}
+            best {Math.max(hud.best, hud.mineCombo ?? 0).toLocaleString()}
           </span>
         </div>
         <div className="w2-chip text-xs opacity-80">
@@ -462,13 +463,12 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             </button>
           </>
         )}
-        <LeagueChip
-          fastest={hud.fastest}
-          combos={hud.combos}
-          myBestKmh={hud.myBestKmh}
-          myBestCombo={hud.myBestCombo}
+        <StatsChip
+          stats={hud.stats}
+          mine={hud.mine}
           me={game.name}
-          onOpen={() => void game.refreshFastest()}
+          players={hud.players}
+          onOpen={() => void game.refreshStats()}
         />
       </div>
 
@@ -590,37 +590,41 @@ const CSS = `
 `;
 
 /** Fastest of all time (room leaderboard): the record on the chip, top 10 on click. */
-function LeagueChip({
-  fastest,
-  combos,
-  myBestKmh,
-  myBestCombo,
+const STAT_TABS: StatKey[] = [
+  'kmh',
+  'combo',
+  'session',
+  'airM',
+  'airS',
+  'grindM',
+  'downM',
+  'km',
+  'tricks',
+  'playS',
+];
+
+function StatsChip({
+  stats,
+  mine,
   me,
+  players,
   onOpen,
 }: {
-  fastest: { name: string; kmh: number; downM: number }[];
-  combos: { name: string; points: number; label: string }[];
-  myBestKmh: number;
-  myBestCombo: number;
+  stats: WorldStats | null;
+  mine: MyBests;
   me: string;
+  players: number;
   onOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'speed' | 'combo'>('speed');
-  const top = fastest.length > 0 ? fastest[0] : undefined;
-  const rows =
-    tab === 'speed'
-      ? fastest.map(e => ({
-          name: e.name,
-          value: `${Math.round(e.kmh)} km/h`,
-          sub: e.downM > 0 ? `↓${(e.downM / 1000).toFixed(1)} km` : '',
-        }))
-      : combos.map(e => ({ name: e.name, value: e.points.toLocaleString(), sub: e.label }));
+  const [tab, setTab] = useState<StatKey>('kmh');
+  const speed = stats?.boards.kmh ?? [];
+  const top = speed.length > 0 ? speed[0] : undefined;
+  const rows = stats?.boards[tab] ?? [];
+  const info = STAT_INFO[tab];
   const myRank = rows.findIndex(e => e.name === me);
-  const mine =
-    tab === 'speed'
-      ? `${Math.round(myBestKmh)} km/h`
-      : `${Math.round(myBestCombo).toLocaleString()} pts`;
+  const myBest = tab in mine.best ? mine.best[tab as keyof MyBests['best']] : undefined;
+  const today = stats?.days[new Date().toISOString().slice(0, 10)] ?? 0;
   return (
     <div className="flex flex-col items-end gap-1">
       <button
@@ -630,51 +634,71 @@ function LeagueChip({
           if (!open) onOpen();
           setOpen(o => !o);
         }}
-        title="All-time league"
+        title="All-time stats"
       >
-        🏁{' '}
-        {top !== undefined ? `${Math.round(top.kmh)} km/h ${top.name}` : 'league: no records yet'}
+        🏁 {top !== undefined ? `${Math.round(top.value)} km/h ${top.name}` : 'stats & records'}
       </button>
       {open && (
-        <div className="w2-chip relative z-30 flex w-[280px] flex-col gap-1 text-xs">
-          <div className="flex items-center justify-between gap-2 font-bold">
-            <span>ALL-TIME LEAGUE</span>
-            <span className="flex gap-1">
-              {(['speed', 'combo'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  className={`rounded-full px-2 py-0.5 ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
-                >
-                  {t === 'speed' ? 'SPEED' : 'COMBO'}
-                </button>
-              ))}
-            </span>
+        <div className="w2-chip relative z-30 flex w-[300px] flex-col gap-1.5 text-xs">
+          <div className="flex items-baseline justify-between font-bold">
+            <span>NOUN WORLD STATS</span>
+            <span className="text-[10px] opacity-60">{players} online now</span>
           </div>
-          <div className="opacity-60">{rows.length} riders</div>
-          {rows.length === 0 && (
-            <div className="opacity-70">
-              {tab === 'speed' ? 'ride the mountain to set one' : 'land a combo to set one'}
+          {stats !== null && (
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div className="rounded-lg bg-white/10 p-1">
+                <b className="block text-sm">{stats.riders.toLocaleString()}</b>
+                <span className="text-[10px] opacity-60">players ever</span>
+              </div>
+              <div className="rounded-lg bg-white/10 p-1">
+                <b className="block text-sm">{stats.sessions.toLocaleString()}</b>
+                <span className="text-[10px] opacity-60">sessions</span>
+              </div>
+              <div className="rounded-lg bg-white/10 p-1">
+                <b className="block text-sm">{today.toLocaleString()}</b>
+                <span className="text-[10px] opacity-60">today</span>
+              </div>
             </div>
           )}
-          <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto pr-1">
+          <div className="flex flex-wrap gap-1">
+            {STAT_TABS.map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
+              >
+                {STAT_INFO[t].tab}
+              </button>
+            ))}
+          </div>
+          <div className="font-bold">{info.title}</div>
+          {stats === null && <div className="opacity-70">loading…</div>}
+          {stats !== null && rows.length === 0 && (
+            <div className="opacity-70">no records yet, go set one</div>
+          )}
+          <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto pr-1">
             {rows.map((e, i) => (
               <div key={i} className={e.name === me ? 'font-bold text-[#ffd400]' : ''}>
                 <div className="flex justify-between gap-3">
                   <span className="truncate">
                     {i + 1}. {e.name}
                   </span>
-                  <b className="shrink-0">{e.value}</b>
+                  <b className="shrink-0">{info.fmt(e.value)}</b>
                 </div>
-                {e.sub !== '' && (
-                  <div className="truncate pl-4 text-[10px] opacity-60">{e.sub}</div>
+                {e.label !== undefined && e.label !== '' && (
+                  <div className="truncate pl-4 text-[10px] opacity-60">{e.label}</div>
                 )}
               </div>
             ))}
           </div>
           <div className="mt-1 opacity-70">
-            your best: {mine}
+            you:{' '}
+            {myBest !== undefined
+              ? info.fmt(myBest)
+              : myRank >= 0
+                ? info.fmt(rows[myRank]!.value)
+                : '–'}
             {myRank >= 0 ? ` (#${myRank + 1})` : ''}
           </div>
         </div>

@@ -17,13 +17,6 @@ import { PARTYKIT_HOST } from '../../world/engine/types';
 import { Voice } from './Voice';
 
 export const V2_ROOM = 'nouns-world-v2';
-export interface SpeedEntry {
-  name: string;
-  kmh: number;
-  /** Metres downhill from the city at the time of the record. */
-  downM: number;
-  at: number;
-}
 const SEND_HZ = 15;
 
 export interface NetPose {

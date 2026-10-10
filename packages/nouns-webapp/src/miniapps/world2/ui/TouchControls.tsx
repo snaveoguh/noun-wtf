@@ -21,29 +21,34 @@ export function TouchControls({ game }: { game: Game }) {
   const rightRef = useRef<HTMLDivElement>(null);
   const [knobL, setKnobL] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const [knobR, setKnobR] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  // Drag state lives in a ref: the knob's setState re-renders on touch-down,
+  // and handler-local state would reset to "no finger" on every render, so
+  // every move after the first was ignored and the stick never moved
+  const drag = useRef({
+    L: { id: null as number | null, ox: 0, oy: 0 },
+    R: { id: null as number | null, ox: 0, oy: 0 },
+  });
 
   if (!isTouch) return null;
   const t = game.input.touch;
 
   const stickHandlers = (side: 'L' | 'R') => {
-    let id: number | null = null;
-    let ox = 0;
-    let oy = 0;
+    const d = drag.current[side];
     const set = side === 'L' ? setKnobL : setKnobR;
     return {
       onPointerDown: (e: React.PointerEvent) => {
-        id = e.pointerId;
+        d.id = e.pointerId;
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        ox = e.clientX;
-        oy = e.clientY;
-        set({ x: 0, y: 0, ox, oy });
+        d.ox = e.clientX;
+        d.oy = e.clientY;
+        set({ x: 0, y: 0, ox: d.ox, oy: d.oy });
         game.input.mode = 'touch';
         game.unlockAudio();
       },
       onPointerMove: (e: React.PointerEvent) => {
-        if (e.pointerId !== id) return;
-        let dx = (e.clientX - ox) / R;
-        let dy = -(e.clientY - oy) / R;
+        if (e.pointerId !== d.id) return;
+        let dx = (e.clientX - d.ox) / R;
+        let dy = -(e.clientY - d.oy) / R;
         const m = Math.hypot(dx, dy);
         if (m > 1) {
           dx /= m;
@@ -56,11 +61,11 @@ export function TouchControls({ game }: { game: Game }) {
           t.stickX = dx;
           t.stickY = dy;
         }
-        set({ x: dx, y: dy, ox, oy });
+        set({ x: dx, y: dy, ox: d.ox, oy: d.oy });
       },
       onPointerUp: (e: React.PointerEvent) => {
-        if (e.pointerId !== id) return;
-        id = null;
+        if (e.pointerId !== d.id) return;
+        d.id = null;
         if (side === 'L') t.moveX = t.moveY = 0;
         else t.stickX = t.stickY = 0;
         set(null);

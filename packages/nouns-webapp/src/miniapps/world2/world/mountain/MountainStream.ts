@@ -37,7 +37,8 @@ import {
 import { tracks } from './tracks';
 
 export const CHUNK = 128;
-const VIEW = 760;
+/** View radius; phones (low) stream a smaller ring: faster loads, fewer hitches. */
+const VIEW_BY_QUALITY: Record<Quality, number> = { low: 460, medium: 760, high: 760 };
 /** Distance (chunk centre → focus) under which each LOD is used. */
 const LOD_RANGE = [210, 420, Infinity];
 /** Props (and their colliders) exist on chunks at or below this LOD. */
@@ -194,6 +195,7 @@ export class MountainStream {
     const lookT = Math.min(4, 120 / Math.max(1, speed)) * Math.min(1, speed / 15);
     const lx = fx + (vel?.x ?? 0) * lookT;
     const lz = fz + (vel?.z ?? 0) * lookT;
+    const VIEW = VIEW_BY_QUALITY[this.quality];
     const aheadR = VIEW * 0.6;
     // More work per frame the faster we go (≈ one chunk row per second)
     const budget = this.budgetMs * (1 + Math.min(2, speed / 40));

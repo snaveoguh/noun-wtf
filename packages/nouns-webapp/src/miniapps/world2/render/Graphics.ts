@@ -118,8 +118,10 @@ export class Graphics {
     this.scene.add(this.sky);
 
     // Post stack
+    // Low (phones): 8-bit buffers halve the bandwidth of every pass; there's
+    // no tone mapping or grade on low for the extra range to matter
     this.composer = new EffectComposer(this.renderer, {
-      frameBufferType: THREE.HalfFloatType,
+      frameBufferType: quality === 'low' ? THREE.UnsignedByteType : THREE.HalfFloatType,
       multisampling: 0,
     });
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -190,8 +192,11 @@ export class Graphics {
     // grade turned dark toon surfaces white on Apple GPUs, and the ungraded
     // image read better anyway (?diag=1 on an M4, tile C). ?fx=…,tone,grade,
     // sat,bloom brings stages back for experiments.
+    // Low (phones) keeps just the ink: every full-screen pass costs there
     const want = (k: string) =>
-      fxParam === null ? k === 'vig' || k === 'ink' : fxParam.split(',').includes(k);
+      fxParam === null
+        ? k === 'ink' || (k === 'vig' && quality !== 'low')
+        : fxParam.split(',').includes(k);
     const effects: Effect[] = [
       // Clamp FIRST: on Apple GPUs the scene render can leave slightly negative
       // values in dark areas; NEUTRAL tone mapping's offset term
@@ -208,14 +213,17 @@ export class Graphics {
     // Ink in its own pass (merged with the grading effects it got dropped)
     if (this.outline !== null && want('ink'))
       this.composer.addPass((this.inkPass = new EffectPass(this.camera, this.outline)));
-    if (effects.length > 0)
+    // On low the clamps alone don't earn a pass (8-bit buffers clamp anyway)
+    if (effects.length > 0 && (quality !== 'low' || effects.length > 2))
       this.composer.addPass((this.gradePass = new EffectPass(this.camera, ...effects)));
-    this.composer.addPass(
-      new EffectPass(
-        this.camera,
-        new SMAAEffect({ preset: quality === 'high' ? SMAAPreset.HIGH : SMAAPreset.MEDIUM }),
-      ),
-    );
+    if (quality !== 'low') {
+      this.composer.addPass(
+        new EffectPass(
+          this.camera,
+          new SMAAEffect({ preset: quality === 'high' ? SMAAPreset.HIGH : SMAAPreset.MEDIUM }),
+        ),
+      );
+    }
   }
 
   applyLevel(level: LevelData) {

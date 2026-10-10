@@ -20,8 +20,8 @@ import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
-import { fetchCombos, fetchFastest, postCombo, postFastest, type ComboEntry } from './net/Fastest';
-import { Net, type NetPose, type SpeedEntry } from './net/Net';
+import { Net, type NetPose } from './net/Net';
+import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
@@ -82,11 +82,11 @@ export interface HudState {
   /** Out on the mountain: metres downhill from the city + current surface. */
   mountain: { down: number; surface: string; streak: number } | null;
   /** Fastest of all time (room leaderboard) and this player's best. */
-  fastest: { name: string; kmh: number; downM: number }[];
-  myBestKmh: number;
-  /** All-time best single combos, and this browser's own best. */
-  combos: ComboEntry[];
-  myBestCombo: number;
+  /** All-time boards + play counts (null until loaded). */
+  stats: WorldStats | null;
+  /** This browser's own records. */
+  mine: MyBests;
+  mineCombo: number | undefined;
 }
 
 interface RemoteAvatar {
@@ -181,10 +181,9 @@ export class Game {
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
       mountain: null,
-      fastest: [],
-      myBestKmh: loadBestKmh(),
-      combos: [],
-      myBestCombo: loadNumber(COMBO_KEY),
+      stats: null,
+      mine: { best: {}, comboLabel: '' },
+      mineCombo: undefined,
     };
   }
 
@@ -284,7 +283,7 @@ export class Game {
         this.graffiti?.loadAll();
       };
       this.net.connect();
-      void this.refreshFastest();
+      void this.refreshStats();
     }
 
     this.setLoading(null);
@@ -1226,117 +1225,35 @@ export class Game {
     this.gfx.scene.add(this.me.root);
   }
 
-  /** Top speed this session not yet submitted, and when we last checked. */
-  private speedRecord = { pending: 0, downM: 0, acc: 0 };
+  /** Records, lifetime totals and play counts (world-stats board). */
+  readonly stats = new StatsTracker(
+    () => this.name,
+    () => this.opts.offline === true,
+  );
+  private statsPolledAt = -Infinity;
 
-  private fastestPolledAt = 0;
-  private postingBest = false;
-  /** The local-best re-post waits until we're riding, when the name is final. */
-  private bestSynced = false;
-
-  private setFastest(entries: SpeedEntry[]) {
-    this.hud = { ...this.hud, fastest: entries };
+  /** Reload the all-time boards (opening the league, and once a minute). */
+  async refreshStats() {
+    this.statsPolledAt = performance.now();
+    this.stats.flush(false);
+    const s = await fetchStats();
+    if (s === null) return;
+    this.hud = { ...this.hud, stats: s };
     this.emit();
   }
 
-  /**
-   * Load the board. On the first load in the world, re-post this browser's
-   * best (records set while the board was on the party server were lost).
-   */
-  async refreshFastest(first = false) {
-    this.fastestPolledAt = performance.now();
-    void this.refreshCombos(first);
-    const entries = await fetchFastest();
-    if (entries === null) return;
-    this.setFastest(entries);
-    const best = this.hud.myBestKmh;
-    // The server only keeps it if it beats this rider's row, so just send it
-    if (first && best >= 40) {
-      const next = await postFastest(this.name, best, 0);
-      if (next) this.setFastest(next);
-    }
-  }
-
-  private setCombos(entries: ComboEntry[]) {
-    this.hud = { ...this.hud, combos: entries };
-    this.emit();
-  }
-
-  private async refreshCombos(first: boolean) {
-    const entries = await fetchCombos();
-    if (entries === null) return;
-    this.setCombos(entries);
-    const best = this.hud.myBestCombo;
-    if (first && best >= 100 && this.bestComboLabel !== null) {
-      const next = await postCombo(this.name, best, this.bestComboLabel);
-      if (next) this.setCombos(next);
-    }
-  }
-
-  /** Last banked combo already looked at, so each one is checked once. */
-  private lastBankedAt = -1;
-  private bestComboLabel: string | null = loadString(COMBO_LABEL_KEY);
-
-  /** A new personal-best combo goes straight to the all-time board. */
-  private trackBestCombo() {
-    const b = this.player.combo.lastBanked;
-    if (b === null || b.at === this.lastBankedAt) return;
-    this.lastBankedAt = b.at;
-    if (b.bailed || b.points < 100 || b.points <= this.hud.myBestCombo) return;
-    this.hud = { ...this.hud, myBestCombo: b.points };
-    this.bestComboLabel = b.label;
-    saveValue(COMBO_KEY, String(b.points));
-    saveValue(COMBO_LABEL_KEY, b.label);
+  private trackStats(dt: number) {
     if (this.opts.offline === true) return;
-    void postCombo(this.name, b.points, b.label).then(next => {
-      if (next) this.setCombos(next);
-    });
-  }
-
-  /** Personal bests go to the all-time board (a few seconds apart). */
-  private trackTopSpeed(dt: number) {
-    this.trackBestCombo();
-    if (!this.bestSynced && this.opts.offline !== true) {
-      this.bestSynced = true;
-      void this.refreshFastest(true);
-    }
-    const p = this.player;
-    if (p.mode === 'board' && p.state !== 'bail') {
-      const kmh = p.speed * 3.6;
-      if (kmh > Math.max(this.hud.myBestKmh, this.speedRecord.pending)) {
-        this.speedRecord.pending = kmh;
-        this.speedRecord.downM = this.hud.mountain?.down ?? 0;
-      }
-    }
-    this.speedRecord.acc += dt;
-    if (this.speedRecord.acc < 3) return;
-    this.speedRecord.acc = 0;
-    const kmh = this.speedRecord.pending;
-    if (
-      kmh >= 40 &&
-      kmh > this.hud.myBestKmh + 0.5 &&
-      !this.postingBest &&
-      this.opts.offline !== true
-    ) {
-      this.postingBest = true;
-      const downM = this.speedRecord.downM;
-      void postFastest(this.name, kmh, downM).then(next => {
-        this.postingBest = false;
-        // Failed: keep it pending so the next check tries again
-        if (next === null) return;
-        if (this.speedRecord.pending <= kmh) this.speedRecord.pending = 0;
-        saveBestKmh(Math.max(kmh, loadBestKmh()));
-        this.hud = { ...this.hud, myBestKmh: Math.max(kmh, this.hud.myBestKmh) };
-        this.setFastest(next);
-      });
-    } else if (performance.now() - this.fastestPolledAt > 60_000 && this.opts.offline !== true) {
-      // Keep other riders' records fresh while playing
-      void this.refreshFastest();
+    this.stats.update(dt, this.player, this.player.combo, this.hud.mountain?.down ?? 0);
+    if (performance.now() - this.statsPolledAt > 60_000) void this.refreshStats();
+    const mine = this.stats.mine;
+    if (mine !== this.hud.mine || mine.best.combo !== this.hud.mineCombo) {
+      this.hud = { ...this.hud, mine, mineCombo: mine.best.combo };
     }
   }
 
   private updateHud(dt: number, input: InputFrame) {
-    this.trackTopSpeed(dt);
+    this.trackStats(dt);
     this.fpsAcc += dt;
     this.fpsFrames++;
     this.hudAcc += dt;
@@ -1403,6 +1320,7 @@ export class Game {
   }
 
   dispose() {
+    this.stats.dispose();
     this.mountain?.dispose();
     this.nature?.dispose();
     this.billboards.dispose();
@@ -1434,39 +1352,4 @@ function escapeHtml(s: string) {
     /["&'<>]/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
-}
-
-const BEST_KEY = 'noun-world-fastest-kmh';
-const COMBO_KEY = 'noun-world-best-combo';
-const COMBO_LABEL_KEY = 'noun-world-best-combo-label';
-function loadNumber(key: string): number {
-  return Number(loadString(key)) || 0;
-}
-function loadString(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function saveValue(key: string, v: string) {
-  try {
-    localStorage.setItem(key, v);
-  } catch {
-    // private mode etc.
-  }
-}
-function loadBestKmh(): number {
-  try {
-    return Number(localStorage.getItem(BEST_KEY)) || 0;
-  } catch {
-    return 0;
-  }
-}
-function saveBestKmh(kmh: number) {
-  try {
-    localStorage.setItem(BEST_KEY, String(kmh));
-  } catch {
-    // private mode etc.
-  }
 }
