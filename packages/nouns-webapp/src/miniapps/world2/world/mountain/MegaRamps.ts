@@ -115,6 +115,8 @@ function buildSite(site: MegaSite, ctx: ChunkContext) {
   });
   // (textures are shared, cached procedural maps: materials only)
   disposables.push(...mats);
+  // Birthday balloons: instanced buffers, strings, ink-exclusion entry
+  if (ramp.decor !== null) disposables.push(ramp.decor);
   return { group: g, collision, rails, disposables };
 }
 
