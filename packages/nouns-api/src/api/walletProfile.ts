@@ -60,6 +60,7 @@ import { mainnet } from 'viem/chains';
 
 import { validateDelegationSubmission } from '../agent/autopilotDelegations.js';
 import {
+  NOUNS_GOVERNOR,
   listLilActiveProposals,
   listLilVotesBy,
   type ActiveProposal,
@@ -175,9 +176,94 @@ const num = (x: unknown): number => {
 };
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-/** First line of a description, computed in SQL so we never ship whole bodies. */
+/**
+ * First line of a description, computed in SQL so we never ship whole bodies.
+ * Skips a bare "# Noun" / "# noun.wtf" client tag line, which noun.wtf puts
+ * above the real title (otherwise Prop 1000 reads as "Noun").
+ */
 const firstLineOf = (col: SQL.Aliased | SQL | unknown) =>
-  sql<string>`split_part(regexp_replace(${col}, '^\\s+', ''), E'\\n', 1)`;
+  sql<string>`split_part(regexp_replace(regexp_replace(${col}, '^\\s*#*\\s*noun(\\.wtf)?[ \\t]*\\r?\\n', '', 'i'), '^\\s+', ''), E'\\n', 1)`;
+
+// ── Live proposal status ────────────────────────────────────────────────
+// The index only changes a proposal's status on events (created, queued,
+// executed, cancelled, vetoed). A vote opening or closing isn't an event,
+// so finished votes sat at PENDING forever, and the stored quorum is the
+// minimum (Nouns' dynamic quorum rises with against votes). For anything
+// not final we ask the governor's state() instead.
+
+const GOVERNOR_STATE_ABI = [
+  {
+    type: 'function',
+    name: 'state',
+    stateMutability: 'view',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
+] as const;
+const GOVERNOR_STATE_NAMES = [
+  'PENDING',
+  'ACTIVE',
+  'CANCELLED',
+  'DEFEATED',
+  'SUCCEEDED',
+  'QUEUED',
+  'EXPIRED',
+  'EXECUTED',
+  'VETOED',
+  'OBJECTION_PERIOD',
+  'UPDATABLE',
+] as const;
+/** Stored statuses the chain may have moved on from without an event. */
+const MAYBE_STALE = new Set(['PENDING', 'ACTIVE', 'QUEUED', 'OBJECTION_PERIOD', 'UPDATABLE']);
+/** Live states that can't change again (cached for good). */
+const FINAL_STATES = new Set(['CANCELLED', 'DEFEATED', 'EXPIRED', 'EXECUTED', 'VETOED']);
+const liveStateCache = new Map<string, { state: string; at: number }>();
+
+async function liveProposalStates(ids: Iterable<bigint>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const todo: bigint[] = [];
+  for (const id of new Set([...ids].map(String))) {
+    const hit = liveStateCache.get(id);
+    if (hit && (FINAL_STATES.has(hit.state) || Date.now() - hit.at < 60_000))
+      out.set(id, hit.state);
+    else todo.push(BigInt(id));
+  }
+  for (let i = 0; i < todo.length; i += 200) {
+    const chunk = todo.slice(i, i + 200);
+    const res = await client.multicall({
+      contracts: chunk.map(id => ({
+        address: NOUNS_GOVERNOR,
+        abi: GOVERNOR_STATE_ABI,
+        functionName: 'state' as const,
+        args: [id],
+      })),
+      allowFailure: true,
+    });
+    chunk.forEach((id, k) => {
+      const r = res[k];
+      const state = r?.status === 'success' ? GOVERNOR_STATE_NAMES[Number(r.result)] : undefined;
+      if (state === undefined) return;
+      liveStateCache.set(String(id), { state, at: Date.now() });
+      out.set(String(id), state);
+    });
+  }
+  return out;
+}
+
+/** Swap stale stored statuses for the governor's live state, in place. */
+async function applyLiveStatus(rows: { id: bigint; status: string }[]): Promise<void> {
+  const stale = rows.filter(r => MAYBE_STALE.has(r.status));
+  if (stale.length === 0) return;
+  const live = await safe(
+    'liveStatus',
+    liveProposalStates(stale.map(r => r.id)),
+    new Map<string, string>(),
+  );
+  for (const r of stale) {
+    const s = live.get(String(r.id));
+    if (s !== undefined) r.status = s;
+  }
+}
 
 /** Fault isolation: a failing table degrades to `fallback`, never the whole profile. */
 async function safe<T>(label: string, p: Promise<T>, fallback: T): Promise<T> {
@@ -1110,6 +1196,8 @@ export async function buildWalletProfile(db: Db, address: Hex): Promise<WalletPr
       .sort((a, b) => a - b),
     delegators: delegatorRows.map(r => lower(r.account)).filter(a => a !== A),
   };
+
+  await applyLiveStatus([...proposalMeta, ...authored] as { id: bigint; status: string }[]);
 
   // ── Voting ──────────────────────────────────────────────────────────────
   const metaById = new Map(proposalMeta.map(m => [Number(m.id), m]));

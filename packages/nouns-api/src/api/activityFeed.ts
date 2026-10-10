@@ -175,6 +175,10 @@ export function proposalResult(
   terminatedAtBlock?: bigint | null,
 ): ProposalResult {
   if (p.status === 'EXECUTED' || p.status === 'QUEUED') return 'succeeded';
+  // Live governor states (see applyLiveStatus) already account for the
+  // dynamic quorum, so trust them over the stored-tally check below
+  if (p.status === 'SUCCEEDED' || p.status === 'EXPIRED') return 'succeeded';
+  if (p.status === 'DEFEATED') return 'defeated';
   if (p.status === 'VETOED') return 'defeated';
   const effectiveEnd =
     p.objectionPeriodEndBlock && p.objectionPeriodEndBlock > p.endBlock
