@@ -2287,52 +2287,24 @@ app.post('/api/grants/propose', async c => {
 // Terminal — Claude AI chat for Nouns governance
 // ============================================================
 
-// Noun World's fastest board lives in the PartyKit room's storage, only
-// reachable over its socket: connect, ask, read the one reply, hang up.
-const WORLD_PARTY_URL = 'wss://noun-wtf-saber.snaveoguh.partykit.dev/parties/main/nouns-world-v2';
-const WORLD_SPEED_WAVE = 9001; // matches SPEED_WAVE in the webapp's world2/net/Net.ts
+// Noun World's fastest-of-all-time board (Netlify Blobs, via the webapp's
+// world-fastest function): one best per rider, fastest first.
+const WORLD_FASTEST_URL = 'https://noun.wtf/.netlify/functions/world-fastest';
 
 async function fetchWorldFastest(): Promise<
   { name: string; kmh: number; descendedM: number; at: string }[]
 > {
-  const raw = await new Promise<
-    { name: string; seconds: number; score: number; wave: number; timestamp: number }[]
-  >((resolve, reject) => {
-    const ws = new WebSocket(WORLD_PARTY_URL);
-    const timer = setTimeout(() => {
-      ws.close();
-      reject(new Error('timed out'));
-    }, 6000);
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'leaderboard_get' }));
-    ws.onerror = () => {
-      clearTimeout(timer);
-      reject(new Error('socket error'));
-    };
-    ws.onmessage = ev => {
-      try {
-        const msg = JSON.parse(String(ev.data));
-        if (msg?.type !== 'leaderboard') return;
-        clearTimeout(timer);
-        ws.close();
-        resolve(Array.isArray(msg.entries) ? msg.entries : []);
-      } catch {
-        // not ours
-      }
-    };
-  });
-  const best = new Map<string, { name: string; kmh: number; descendedM: number; at: string }>();
-  for (const e of raw) {
-    if (Number(e.wave) !== WORLD_SPEED_WAVE) continue;
-    const row = {
-      name: e.name,
-      kmh: e.seconds / 10,
-      descendedM: e.score,
-      at: new Date(e.timestamp).toISOString(),
-    };
-    const prev = best.get(e.name);
-    if (!prev || row.kmh > prev.kmh) best.set(e.name, row);
-  }
-  return [...best.values()].sort((a, b) => b.kmh - a.kmh);
+  const res = await fetch(WORLD_FASTEST_URL, { signal: AbortSignal.timeout(6000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = (await res.json()) as {
+    entries?: { name: string; kmh: number; downM: number; at: number }[];
+  };
+  return (body.entries ?? []).map(e => ({
+    name: e.name,
+    kmh: e.kmh,
+    descendedM: e.downM,
+    at: new Date(e.at).toISOString(),
+  }));
 }
 
 // What the site itself has, shared by the chat bar and NounIRL. Keep this in
