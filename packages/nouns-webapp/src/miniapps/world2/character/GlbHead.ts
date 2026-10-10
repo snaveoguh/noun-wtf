@@ -52,6 +52,29 @@ export interface GlbHeadModel {
   set: HeadSet;
   /** False when the model has no glasses of its own (caller supplies them). */
   hasGlasses: boolean;
+  /**
+   * Share of the model's height that is a power cord hanging below it.
+   * Seating goes by the appliance body, so the cord drops into the torso
+   * instead of propping the head up on a stalk.
+   */
+  cord: number;
+}
+
+// Cord length / model height in voxel layers (from the voxeldata scans:
+// bottom layers no thicker than a 2x2 cable). Only real cords: tapering
+// shapes and the noundry neck stubs keep seating on their lowest point.
+const CORD: Record<string, number> = {
+  HeadWashingMachine: 10 / 29,
+  microwaveHead: 10 / 25,
+  toasterHead: 11 / 30,
+  boomboxHead: 12 / 27,
+};
+
+function withCord(m: GlbHeadModel | null, url: string): GlbHeadModel | null {
+  if (m === null) return null;
+  const base = url.slice(url.lastIndexOf('/') + 1).replace(/\.glb$/, '');
+  m.cord = CORD[base] ?? 0;
+  return m;
 }
 
 /**
@@ -316,8 +339,9 @@ export async function loadGlbHead(head: number, glasses: number): Promise<GlbHea
   if (pick === null) return null;
   const tpl = await loadTemplate(pick.url, pick.set, entry.traitName);
   if (!tpl) return null;
-  const tex = pick.set === '3dnouns' && glasses !== HIP_ROSE ? await loadGlassesTexture(glasses) : null;
-  return assemble(tpl, pick.set, glasses, tex);
+  const tex =
+    pick.set === '3dnouns' && glasses !== HIP_ROSE ? await loadGlassesTexture(glasses) : null;
+  return withCord(assemble(tpl, pick.set, glasses, tex), pick.url);
 }
 
 /**
@@ -336,7 +360,10 @@ export function glbHeadNow(head: number, glasses: number): GlbHeadModel | null |
   if (tpl === null) return null;
   const needsTex = pick.set === '3dnouns' && glasses !== HIP_ROSE;
   if (needsTex && !texNow.has(glasses)) return undefined;
-  return assemble(tpl, pick.set, glasses, needsTex ? (texNow.get(glasses) ?? null) : null);
+  return withCord(
+    assemble(tpl, pick.set, glasses, needsTex ? (texNow.get(glasses) ?? null) : null),
+    pick.url,
+  );
 }
 
 /** Whether a head has a 3D model (`undefined` until the manifest loads). */
@@ -373,7 +400,7 @@ function assemble(
 ): GlbHeadModel {
   const head3d = tpl.clone();
   head3d.userData.headSet = set;
-  if (set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false };
+  if (set === 'noundry') return { object: head3d, set: 'noundry', hasGlasses: false, cord: 0 };
   // The 3dnouns glasses mesh is the square-frame shape; textures can't turn
   // it into shapes it doesn't have. Hip-rose (2 px bridge, stepped arm)
   // drops it and wears the Noun's voxel glasses built from the art instead.
@@ -383,7 +410,7 @@ function assemble(
       if ((o as THREE.Mesh).isMesh && isGlasses(o)) drop.push(o);
     });
     for (const o of drop) o.removeFromParent();
-    return { object: head3d, set: '3dnouns', hasGlasses: false };
+    return { object: head3d, set: '3dnouns', hasGlasses: false, cord: 0 };
   }
   head3d.traverse(o => {
     const m = o as THREE.Mesh;
@@ -398,7 +425,7 @@ function assemble(
     m.material = mat;
     m.renderOrder = 1;
   });
-  return { object: head3d, set: '3dnouns', hasGlasses: true };
+  return { object: head3d, set: '3dnouns', hasGlasses: true, cord: 0 };
 }
 
 // Fetch the manifest up front so the first head can tell it has a model
