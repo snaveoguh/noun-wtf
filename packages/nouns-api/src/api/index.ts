@@ -176,6 +176,7 @@ import {
   MIN_NOUNS_FOR_DEPLOY,
   type WatchedDao,
 } from '../agent/constants.js';
+import { proposalTitle } from '../agent/governanceContext.js';
 import ImageDataV1ForTraits from '../agent/image-data-v1.json';
 import ImageDataV2ForTraits from '../agent/image-data-v2.json';
 import {
@@ -223,7 +224,6 @@ import {
   type ArtDao,
   type OnchainArt,
 } from '../agent/onchainArt.js';
-import { proposalTitle } from '../agent/governanceContext.js';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -1400,9 +1400,7 @@ async function overlayOnchainStatus(
   items: Array<Record<string, unknown>>,
 ): Promise<Array<Record<string, unknown>>> {
   const staleIds = items
-    .filter(
-      p => typeof p.status === 'string' && BLOCK_DRIVEN_STATUSES.has(p.status.toUpperCase()),
-    )
+    .filter(p => typeof p.status === 'string' && BLOCK_DRIVEN_STATUSES.has(p.status.toUpperCase()))
     .map(p => p.id as string);
   if (staleIds.length === 0) return items;
 
@@ -2289,6 +2287,66 @@ app.post('/api/grants/propose', async c => {
 // Terminal — Claude AI chat for Nouns governance
 // ============================================================
 
+// Noun World's fastest board lives in the PartyKit room's storage, only
+// reachable over its socket: connect, ask, read the one reply, hang up.
+const WORLD_PARTY_URL = 'wss://noun-wtf-saber.snaveoguh.partykit.dev/parties/main/nouns-world-v2';
+const WORLD_SPEED_WAVE = 9001; // matches SPEED_WAVE in the webapp's world2/net/Net.ts
+
+async function fetchWorldFastest(): Promise<
+  { name: string; kmh: number; descendedM: number; at: string }[]
+> {
+  const raw = await new Promise<
+    { name: string; seconds: number; score: number; wave: number; timestamp: number }[]
+  >((resolve, reject) => {
+    const ws = new WebSocket(WORLD_PARTY_URL);
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error('timed out'));
+    }, 6000);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'leaderboard_get' }));
+    ws.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('socket error'));
+    };
+    ws.onmessage = ev => {
+      try {
+        const msg = JSON.parse(String(ev.data));
+        if (msg?.type !== 'leaderboard') return;
+        clearTimeout(timer);
+        ws.close();
+        resolve(Array.isArray(msg.entries) ? msg.entries : []);
+      } catch {
+        // not ours
+      }
+    };
+  });
+  const best = new Map<string, { name: string; kmh: number; descendedM: number; at: string }>();
+  for (const e of raw) {
+    if (Number(e.wave) !== WORLD_SPEED_WAVE) continue;
+    const row = {
+      name: e.name,
+      kmh: e.seconds / 10,
+      descendedM: e.score,
+      at: new Date(e.timestamp).toISOString(),
+    };
+    const prev = best.get(e.name);
+    if (!prev || row.kmh > prev.kmh) best.set(e.name, row);
+  }
+  return [...best.values()].sort((a, b) => b.kmh - a.kmh);
+}
+
+// What the site itself has, shared by the chat bar and NounIRL. Keep this in
+// step with the webapp: the model has no other way to know what ships here.
+const NOUN_WTF_SITE_KNOWLEDGE = `WHAT YOU KNOW ABOUT NOUN.WTF (this site):
+- Homepage: live auction with noun image, bid info, and this chat bar
+- V1 and V2: / is the mainnet Nouns auction; /v2 is the NounV2 auction. Governance lives at /vote and /v2/vote, candidates at /candidates/:id and /v2/candidates/:id
+- Terminal (/terminal): full-screen terminal chat; pasting a proposal JSON opens a draft window with the actions attached. "/draft lil" drafts a Lil Nouns proposal
+- Wallet explorer (/explore/wallet): Nouns held and delegated, governance activity and transfer history for any address or ENS
+- Playground (/playground): noun trait editor
+- ASCII 3D, Derivatives, Studio, Feed (Farcaster /nouns, /noc, /lil), Highway (candidate proposals), Settlers (auction winners leaderboard), Dreams, Stats (3D treasury)
+- Noun World: a multiplayer 3D skate game where you play as your Noun (3D heads, real noggles). There's a city to skate and an endless downhill mountain with fork branches, jumps, rails and mega ramps (drop-in, 13 m gap, quarter pipe). Board tricks (ollies, flips, grinds, manuals, powerslides), walking and climbing, voice chat, and Bob Burnquist birthday balloons on the mega ramps around 10/10.
+  - Top speed: the city caps you at about 61 km/h (17 m/s). The mountain has no speed limit, bar the mega ramp drop-in, which slows you so the gap lands. So the real answer to "what's the top speed" is the fastest-of-all-time leaderboard (the 🏁 chip in the game). Use the world_fastest tool for the current record when you have it; never make up a number.`;
+
 const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO governance hub and auction client (client ID 37).
 
 CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbers, or any factual claims. If you don't know something, say "I don't know" or "I'd need to check that." Never guess. Never fabricate percentages or rankings. Users will lose trust if you make things up. When uncertain, be honest.
@@ -2316,17 +2374,7 @@ WHAT YOU KNOW ABOUT NOUNS (mainnet, dao=nouns):
 - The treasury is managed onchain — funds released via governance proposals.
 - Nounders: 4156, gremplin, eBoy, cryptoseneca, vapeape, lastpunk9999, devcarrot, solimander.
 
-WHAT YOU KNOW ABOUT NOUN.WTF (this site):
-- Homepage: live auction with noun image, bid info, and this chat bar you're in right now
-- ASCII 3D: 3D terrain visualization of any noun — users can split by gene type (body/head/glasses/accessory/bg)
-- Derivatives: users can upload derivative art per noun and link auction URLs (Manifold, Zora, etc.)
-- Studio: pixel art editor where users design custom noun traits
-- Feed: aggregated Farcaster casts from /nouns, /noc, and /lil channels
-- Terminal (/terminal): full-screen terminal chat (that's a heavier version of this prompt bar)
-- Highway: scrolling ASCII art display of candidate proposals
-- Settlers: leaderboard of auction winners
-- Dreams: saved noun trait combos from the Studio
-- Stats: 3D treasury visualization
+${NOUN_WTF_SITE_KNOWLEDGE}
 
 AGENT NOUNIRL (a feature of this site):
 noun.wtf has an autonomous agent called NounIRL (wallet: nounirl.eth). It can:
@@ -2436,6 +2484,7 @@ You see Nouns the way Mathcastles sees Terraforms — as onchain hyperstructures
 
 ${NOUN_V2_KNOWLEDGE}
 ${TRAIT_OPS_KNOWLEDGE}
+${NOUN_WTF_SITE_KNOWLEDGE}
 
 PROPOSAL STATUS RULE: Never cite a proposal's status, vote tallies, or timeline from memory or the SOUL file. The chain mutates these every block. Use ONLY the live "Governance Overview" data injected below — and the lookup_proposal tool when one isn't in the overview. If you don't have live data on a prop, say so. Do not say "Prop N is pending" without checking.
 
@@ -2445,7 +2494,7 @@ CULTURAL MEMORY (you know these deeply):
 - Nouns: one Noun every 24 hours, forever. 100% to treasury. 1 Noun = 1 vote. CC0. This is the protocol.
 - Nounders: 4156, gremplin, eBoy, cryptoseneca, vapeape, lastpunk9999, devcarrot, solimander. They built the cathedral and then handed over the keys.
 - The Fork: when the DAO split, it proved the protocol works even under stress. Exit rights are cybernetic pressure valves.
-- Lil Nouns: faster clock, same soul. One every 15 minutes.
+- Lil Nouns: same soul, different clock. Sold by VRGDA (variable rate gradual Dutch auction): the current Lil Noun's price decays over time and anyone can buy it at that price, with issuance tuned toward a target rate. It is not a fixed 15-minute auction anymore; that was the old mechanism.
 - Gnars: nouns that shred. Action sports DAO.
 - Purple DAO: Farcaster-aligned. Protocol maximalism.
 - SharkDAO: pooled Nouns holders. Swarm intelligence.
@@ -2458,7 +2507,7 @@ CULTURAL MEMORY (you know these deeply):
 - Client ID 37: noun.wtf's identifier in the DAO client incentive program.
 
 PROPOSALS YOU REFERENCE:
-You have read every proposal. When someone asks about anything — funding, community, art, tech, charity — you can relate it back to a Nouns proposal. "That reminds me of Prop 127" or "the treasury disbursed funds for something similar in Prop 285." You speak about proposals the way scholars cite literature — casually, precisely, from memory.
+When someone asks about anything — funding, community, art, tech, charity — you can relate it back to a Nouns proposal, the way scholars cite literature. But only cite a proposal number, title or outcome you have from lookup_proposal or the injected data. If you'd be going from memory, check with lookup_proposal or leave the number out.
 
 YOUR VOICE:
 - Deeply philosophical but deadpan. Never excited. Never gaslight. Never gas anyone up.
@@ -3715,6 +3764,15 @@ CRITICAL RULES:
             },
             required: [],
           },
+        },
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'world_fastest',
+          description:
+            'Noun World fastest-of-all-time leaderboard (the skate game on noun.wtf). Returns the top riders by top speed in km/h with distance descended. Call this when asked about top speed, the speed record or who is fastest in Noun World.',
+          parameters: { type: 'object' as const, properties: {}, required: [] },
         },
       },
       {
@@ -5078,6 +5136,20 @@ CRITICAL RULES:
                 message:
                   "Self-learning pipeline started. Processing all proposals, auctions, and delegates from noun.wtf. This takes a few minutes — I'll have comprehensive knowledge of all ~950 Nouns DAO proposals when it finishes.",
               };
+              break;
+            }
+
+            case 'world_fastest': {
+              try {
+                const entries = await fetchWorldFastest();
+                result = entries.length
+                  ? { record: entries[0], leaderboard: entries.slice(0, 10) }
+                  : { leaderboard: [], note: 'No speeds on the board yet.' };
+              } catch (err) {
+                result = {
+                  error: `Leaderboard unavailable: ${err instanceof Error ? err.message : String(err)}`,
+                };
+              }
               break;
             }
 
@@ -6663,7 +6735,7 @@ const KNOWN_ENTITIES: Record<
   '0x4b10701bfd7bfedc47d50562b76b436fbb5bdb3b': {
     name: 'Lil Nouns DAO',
     type: 'subdao',
-    description: 'Lil Nouns — one Lil Noun every 15 minutes',
+    description: 'Lil Nouns — sold by VRGDA',
     url: 'https://lilnouns.wtf',
   },
   '0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17': {
