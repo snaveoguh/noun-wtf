@@ -78,6 +78,8 @@ export interface PlayerTerrain {
  * (1 + run / RUN_DRAG_K), so terminal velocity keeps rising the longer you
  * ride without bailing. No hard top speed.
  */
+/** On-foot keyboard turn rate (rad/s). */
+const FOOT_TURN_RATE = 3.2;
 const RUN_DRAG_K = 400;
 /** Extra acceleration (m/s²) per minute of unbroken mountain riding. */
 const STREAK_ACCEL = 0.35;
@@ -434,11 +436,27 @@ export class Player {
 
   // ── On foot ─────────────────────────────────────────────────────────
 
+  /** On foot with keyboard (board-style turning); the camera follows the heading. */
+  footTank = false;
+
   private updateFoot(dt: number, input: InputFrame, camYaw: number) {
     const t = this.tuning;
     const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const target = _v.set(0, 0, 0);
-    if (mag > 0.05) {
+    // Keyboard walks like the board rides: A/D turn, W/S forward/back, and
+    // the camera swings in behind the heading. Sticks stay camera-relative.
+    this.footTank = input.mode === 'keyboard';
+    if (this.footTank) {
+      if (Math.abs(input.moveX) > 0.05) this.footYaw -= input.moveX * FOOT_TURN_RATE * dt;
+      const fwdIn = input.moveY;
+      if (Math.abs(fwdIn) > 0.05) {
+        const base = input.sprint ? t.runSpeed * 1.25 : t.runSpeed;
+        const speed = base * Math.abs(fwdIn) * (fwdIn < 0 ? 0.55 : 1);
+        target
+          .set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw))
+          .multiplyScalar(speed * Math.sign(fwdIn));
+      }
+    } else if (mag > 0.05) {
       // Camera-relative: forward = camera look direction projected on ground
       const fx = Math.sin(camYaw);
       const fz = Math.cos(camYaw);
