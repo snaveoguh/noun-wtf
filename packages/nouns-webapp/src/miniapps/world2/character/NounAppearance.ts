@@ -170,16 +170,18 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
       // Thin models (cards, disks) would have the neck poke through their
       // face: sit them in front of it like flat generated heads
       const thinNudge = !flat && mb.max.z - mb.min.z <= 4 ? 0.08 / s : 0;
+      // Appliances seat on their body, not the tip of their power cord
+      const bottom = mb.min.y + loaded.cord * (mb.max.y - mb.min.y);
       model.position.set(
         cx - (mb.min.x + mb.max.x) / 2,
-        NECK_Y + NECK_GAP - mb.min.y,
+        NECK_Y + NECK_GAP - bottom,
         cz - (mb.min.z + mb.max.z) / 2 + thinNudge,
       );
       inner.add(model);
       if (keepGlasses) {
         geos.head?.computeBoundingBox();
         const artMinY = geos.head?.boundingBox?.min.y ?? NECK_Y;
-        seatGlasses(glassesMesh!, model, NECK_Y + NECK_GAP - artMinY);
+        seatGlasses(glassesMesh!, model, NECK_Y + NECK_GAP - artMinY - (bottom - mb.min.y));
       }
     };
     // Already loaded: swap in now, so switching heads never flashes the
