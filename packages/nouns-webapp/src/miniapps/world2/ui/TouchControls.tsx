@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const R = 56;
 
-function useIsTouch() {
+export function useIsTouch() {
   const [touch, setTouch] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia?.('(pointer: coarse)');
@@ -78,6 +78,32 @@ export function TouchControls({ game }: { game: Game }) {
     },
     onPointerUp: () => (t[key] = false),
     onPointerLeave: () => (t[key] = false),
+    onPointerCancel: () => (t[key] = false),
+  });
+
+  // Hold to crouch (load the pop), release to ollie, like Space on a keyboard
+  const ollie = {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.stopPropagation();
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      t.crouch = true;
+      game.input.mode = 'touch';
+      game.unlockAudio();
+    },
+    onPointerUp: () => {
+      if (!t.crouch) return;
+      t.crouch = false;
+      t.jump = true;
+      game.input.queueTrick('ollie');
+    },
+    onPointerCancel: () => (t.crouch = false),
+  };
+  const tap = (fn: () => void) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      e.stopPropagation();
+      game.input.mode = 'touch';
+      fn();
+    },
   });
 
   return (
@@ -96,48 +122,62 @@ export function TouchControls({ game }: { game: Game }) {
       />
       {knobL && <Knob k={knobL} />}
       {knobR && <Knob k={knobR} accent />}
-      {!knobR && (
-        <div className="pointer-events-none absolute bottom-40 right-10 text-center text-[11px] opacity-60">
-          swipe ↓ then ↑ to ollie
-          <br />↓ then ↖ / ↗ to flip
+      {!knobL && !knobR && (
+        <div className="w2-thint pointer-events-none absolute text-center text-[11px] opacity-60">
+          left: drag to steer · right: swipe ↓↑ to ollie, ↓↖ / ↓↗ to flip
         </div>
       )}
-      <div className="absolute bottom-6 right-4 flex gap-2">
+
+      {/* Board / spray: left edge, above the steering area */}
+      <div className="w2-tside absolute left-3 flex flex-col gap-2">
+        <button type="button" className="w2-tbtn" {...tap(() => (t.boardToggle = true))}>
+          🛹
+        </button>
         <button type="button" className="w2-tbtn" {...hold('spray')}>
           🎨
         </button>
-        <button className="w2-tbtn" {...hold('grab')}>
+      </div>
+
+      {/* Thumb cluster: everything the right thumb needs within reach */}
+      <div className="w2-tpad absolute">
+        <button
+          type="button"
+          className="w2-tbtn w2-t-flip"
+          {...tap(() => game.input.queueTrick('kickflip'))}
+        >
+          FLIP
+        </button>
+        <button type="button" className="w2-tbtn w2-t-grab" {...hold('grab')}>
           GRAB
         </button>
-        <button className="w2-tbtn" {...hold('brake')}>
+        <button type="button" className="w2-tbtn w2-t-stop" {...hold('brake')}>
           STOP
         </button>
-        <button className="w2-tbtn w2-tbtn-main" {...hold('push')}>
+        <button type="button" className="w2-tbtn w2-tbtn-main w2-t-push" {...hold('push')}>
           PUSH
         </button>
-      </div>
-      <div className="absolute right-4 top-28 flex flex-col gap-2">
-        <button
-          className="w2-tbtn"
-          onPointerDown={e => {
-            e.stopPropagation();
-            t.boardToggle = true;
-          }}
-        >
-          🛹
-        </button>
-        <button
-          className="w2-tbtn"
-          onPointerDown={e => {
-            e.stopPropagation();
-            t.jump = true;
-            game.input.queueTrick('ollie');
-          }}
-        >
-          ⤒
+        <button type="button" className="w2-tbtn w2-t-ollie" {...ollie}>
+          OLLIE
         </button>
       </div>
-      <style>{`.w2-tbtn{background:rgba(10,12,20,.55);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:16px;min-width:58px;height:58px;padding:0 10px;font-weight:800;font-size:13px;backdrop-filter:blur(6px)}.w2-tbtn:active{background:rgba(255,212,0,.5)}.w2-tbtn-main{background:rgba(210,34,9,.75)}`}</style>
+      <style>{`
+.w2-tbtn{position:relative;background:rgba(10,12,20,.55);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:16px;min-width:54px;height:54px;padding:0 8px;font-weight:800;font-size:12px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);touch-action:none;-webkit-user-select:none;user-select:none}
+.w2-tbtn:active{background:rgba(255,212,0,.5)}
+.w2-tbtn-main{background:rgba(210,34,9,.75)}
+.w2-tpad{right:calc(10px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:196px;height:178px}
+.w2-tpad .w2-tbtn{position:absolute}
+.w2-t-ollie{right:0;bottom:0;width:86px;height:86px;border-radius:50%;background:rgba(255,212,0,.82);color:#111;font-size:14px}
+.w2-t-ollie:active{background:#fff}
+.w2-t-push{right:96px;bottom:0;width:64px;height:64px;border-radius:50%}
+.w2-t-flip{right:14px;bottom:98px;width:58px;height:58px;border-radius:50%}
+.w2-t-stop{right:132px;bottom:72px;width:54px}
+.w2-t-grab{right:76px;bottom:120px;width:54px}
+.w2-tside{top:38%}
+.w2-thint{right:12px;left:50%;bottom:calc(196px + env(safe-area-inset-bottom))}
+@media (orientation:landscape) and (max-height:520px){
+  .w2-tside{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:calc(10px + env(safe-area-inset-left));flex-direction:row}
+  .w2-thint{display:none}
+}`}</style>
     </div>
   );
 }

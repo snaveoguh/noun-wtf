@@ -164,6 +164,8 @@ export class Input {
     lookY: 0,
     boardToggle: false,
     jump: false,
+    /** OLLIE button held: crouch to load, the release pops. */
+    crouch: false,
   };
 
   private el: HTMLElement;
@@ -440,7 +442,7 @@ export class Input {
         f.brake = this.touch.brake;
         f.grabR = this.touch.grab;
         f.spray = f.spray || this.touch.spray;
-        f.crouch = f.stickY < DOWN_T;
+        f.crouch = f.stickY < DOWN_T || this.touch.crouch;
         f.lookX += this.touch.lookX;
         f.lookY += this.touch.lookY;
         this.touch.lookX = this.touch.lookY = 0;

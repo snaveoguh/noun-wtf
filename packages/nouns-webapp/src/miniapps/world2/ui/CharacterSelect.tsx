@@ -344,9 +344,9 @@ export function CharacterSelect({
       </div>
 
       <div className="cs-help">
-        ↑↓ SELECT   ←→ CHANGE (SHIFT ×10)   R RANDOM   ENTER START
+        ↑↓ SELECT ←→ CHANGE (SHIFT ×10) R RANDOM ENTER START
         <br />
-        PAD: D-PAD   LB/RB ×10   X RANDOM   A START
+        PAD: D-PAD LB/RB ×10 X RANDOM A START
       </div>
     </div>
   );
@@ -386,6 +386,17 @@ const CSS = `
 .cs-btn:hover{border-color:#ffd400;color:#ffd400}
 .cs-start{font-family:inherit;margin-top:6px;flex-shrink:0;font-size:18px;color:#000;background:#ffd400;border:none;padding:16px;box-shadow:6px 6px 0 #d22209;cursor:pointer;animation:csblink 1.2s steps(1) infinite}
 .cs-start:hover{animation:none;background:#fff}
+/* Phones on their side: little height, so tighter rows and the header
+   tucked under the site tray; the list scrolls and START stays reachable */
+@media (orientation:landscape) and (max-height:520px){
+.cs-header{top:44px;font-size:12px}
+.cs-panel{top:72px;bottom:8px;gap:4px;width:min(520px,60vw)}
+.cs-row{padding:3px 8px;border-width:3px;box-shadow:4px 4px 0 #000}
+.cs-arrow{padding:5px 8px;font-size:12px}
+.cs-start{padding:10px;font-size:14px}
+.cs-help{display:none}
+}
+@media (max-width:700px){.cs-header{top:44px}}
 .cs-help{position:absolute;bottom:18px;right:28px;text-align:right;font-size:8px;line-height:1.9;color:#9c8cff;text-shadow:2px 2px 0 #000}
 @media (max-width:700px){.cs-root{background:linear-gradient(0deg,rgba(6,4,24,.94) 0%,rgba(6,4,24,.85) 52%,rgba(6,4,24,0) 70%)}
   .cs-panel{top:auto;bottom:70px;left:16px;width:calc(100vw - 32px);gap:6px}

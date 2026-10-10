@@ -10,7 +10,7 @@ import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppeara
 import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
-import { TouchControls } from './ui/TouchControls';
+import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { worldPause } from './worldPause';
 
 const CONTROLS: { k: string; v: string }[] = [
@@ -73,7 +73,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
-  const [showHelp, setShowHelp] = useState(true);
+  // Phones start without the keyboard controls sheet (it covers the screen)
+  const [showHelp, setShowHelp] = useState(
+    () => window.matchMedia?.('(pointer: coarse)').matches !== true,
+  );
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -360,6 +363,9 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
   const now = performance.now();
   const banked = hud.banked && now - hud.banked.at < 2600 ? hud.banked : null;
   const pad = hud.inputMode === 'gamepad';
+  // Phones: sit below the compact site tray and drop desktop-only chips
+  const touch = useIsTouch();
+  const top = touch ? 'top-12' : 'top-4';
   return (
     <div className="pointer-events-none absolute inset-0">
       {/* Speed lines once a mountain run outpaces the plaza (CSS only) */}
@@ -367,7 +373,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         <div className="w2-speedlines" style={{ opacity: Math.min(0.75, (hud.speed - 20) / 45) }} />
       )}
       {/* Top-left: session */}
-      <div className="absolute left-4 top-4 flex flex-col gap-1">
+      <div className={`absolute left-4 ${top} flex flex-col gap-1`}>
         <div className="w2-chip">
           <b>{hud.session.toLocaleString()}</b> pts{' '}
           <span className="opacity-60">best {hud.best.toLocaleString()}</span>
@@ -384,8 +390,10 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         )}
       </div>
 
-      {/* Top-centre: landmarks compass */}
-      <div className="absolute left-1/2 top-3 flex -translate-x-1/2 gap-3 text-xs">
+      {/* Top-centre: landmarks compass (no room for it on phones) */}
+      <div
+        className={`absolute left-1/2 top-3 -translate-x-1/2 gap-3 text-xs ${touch ? 'hidden' : 'flex'}`}
+      >
         {hud.landmarks.slice(0, 4).map(l => {
           const deg = (((((l.bearing * 180) / Math.PI) % 360) + 540) % 360) - 180;
           if (Math.abs(deg) > 70) return null;
@@ -398,7 +406,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
       </div>
 
       {/* Top-right: voice + system */}
-      <div className="pointer-events-auto absolute right-4 top-4 flex flex-col items-end gap-2">
+      <div className={`pointer-events-auto absolute right-4 ${top} flex flex-col items-end gap-2`}>
         <button
           className={`w2-chip ${hud.mic === 'on' ? (hud.speaking ? 'w2-live' : 'w2-on') : ''}`}
           onClick={() => void game.toggleMic()}
@@ -412,38 +420,46 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
                 ? '🔊 talking'
                 : '🎙️ live'}
         </button>
-        <div className="w2-chip text-[10px] opacity-60">
-          {hud.fps} fps, {hud.quality}
-          {hud.baked ? ', baked GI' : ''}, cam {hud.camMode}
-        </div>
-        <button className="w2-chip text-xs" onClick={onHelp}>
-          {showHelp ? 'hide controls (H)' : 'controls (H)'}
-        </button>
-        <button
-          type="button"
-          className="w2-chip text-xs"
-          onClick={() => game.cycleTimeOfDay()}
-          title="Time of day (P)"
-        >
-          {{
-            afternoon: '☀️ afternoon',
-            golden: '🌇 golden hour',
-            blue: '🌆 blue hour',
-            night: '🌙 night',
-          }[hud.timeOfDay] ?? hud.timeOfDay}
-        </button>
-        <button
-          type="button"
-          className={`w2-chip text-xs ${hud.radio.on ? 'w2-on' : ''}`}
-          onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
-          onContextMenu={e => {
-            e.preventDefault();
-            game.cycleRadio();
-          }}
-          title="Radio: M station, . next track (right-click: change station)"
-        >
-          📻 {hud.radio.on ? hud.radio.label : 'radio off'}
-        </button>
+        {!touch && (
+          <div className="w2-chip text-[10px] opacity-60">
+            {hud.fps} fps, {hud.quality}
+            {hud.baked ? ', baked GI' : ''}, cam {hud.camMode}
+          </div>
+        )}
+        {!touch && (
+          <button className="w2-chip text-xs" onClick={onHelp}>
+            {showHelp ? 'hide controls (H)' : 'controls (H)'}
+          </button>
+        )}
+        {!touch && (
+          <>
+            <button
+              type="button"
+              className="w2-chip text-xs"
+              onClick={() => game.cycleTimeOfDay()}
+              title="Time of day (P)"
+            >
+              {{
+                afternoon: '☀️ afternoon',
+                golden: '🌇 golden hour',
+                blue: '🌆 blue hour',
+                night: '🌙 night',
+              }[hud.timeOfDay] ?? hud.timeOfDay}
+            </button>
+            <button
+              type="button"
+              className={`w2-chip text-xs ${hud.radio.on ? 'w2-on' : ''}`}
+              onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
+              onContextMenu={e => {
+                e.preventDefault();
+                game.cycleRadio();
+              }}
+              title="Radio: M station, . next track (right-click: change station)"
+            >
+              📻 {hud.radio.on ? hud.radio.label : 'radio off'}
+            </button>
+          </>
+        )}
         <FastestChip
           entries={hud.fastest}
           myBest={hud.myBestKmh}
