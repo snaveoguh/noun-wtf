@@ -15,6 +15,7 @@ interface ProposalSummary {
   forVotes: number;
   againstVotes: number;
   abstainVotes: number;
+  quorumVotes?: number;
 }
 
 interface VoteSummary {
@@ -180,6 +181,13 @@ async function fetchProfileGQL(addr: string) {
         forVotes: number;
         againstVotes: number;
         abstainVotes: number;
+        quorumVotes?: string | number | null;
+        startBlock?: string;
+        endBlock?: string;
+        objectionPeriodEndBlock?: string | null;
+        executionETA?: string | null;
+        onTimelockV1?: boolean;
+        proposer?: string;
       }>;
     };
     votes: { items: VoteSummary[] };
@@ -188,7 +196,7 @@ async function fetchProfileGQL(addr: string) {
     auctions: { items: AuctionWinSummary[] };
   }>(`{
     proposals(where: { proposer: "${addr}" }, orderBy: "id", orderDirection: "desc", limit: 100) {
-      items { id, description, status, forVotes, againstVotes, abstainVotes }
+      items { id, description, status, forVotes, againstVotes, abstainVotes, quorumVotes, startBlock, endBlock, objectionPeriodEndBlock, executionETA, onTimelockV1, proposer }
     }
     votes(where: { voter: "${addr}" }, limit: 1000) {
       items { proposalId, support, votes, reason }
@@ -204,14 +212,32 @@ async function fetchProfileGQL(addr: string) {
     }
   }`);
 
+  // The stored status can lag (a vote ending isn't an event): derive it
+  const latestBlock = await getLatestBlock().catch(() => 0n);
   return {
     proposals: (d.proposals?.items || []).map(p => ({
       proposalId: p.id,
       description: p.description,
-      status: p.status,
+      status:
+        latestBlock > 0n && p.endBlock !== undefined
+          ? deriveProposalStatus(
+              {
+                ...p,
+                quorumVotes: String(p.quorumVotes ?? '0'),
+                startBlock: p.startBlock ?? '0',
+                endBlock: p.endBlock,
+                objectionPeriodEndBlock: p.objectionPeriodEndBlock ?? null,
+                executionETA: p.executionETA ?? null,
+                onTimelockV1: p.onTimelockV1 ?? false,
+                proposer: p.proposer ?? '',
+              },
+              latestBlock,
+            )
+          : p.status,
       forVotes: p.forVotes,
       againstVotes: p.againstVotes,
       abstainVotes: p.abstainVotes,
+      quorumVotes: p.quorumVotes == null ? undefined : Number(p.quorumVotes),
     })),
     votes: d.votes?.items || [],
     delegate: d.delegates?.items?.[0] || null,
@@ -264,9 +290,27 @@ async function fetchLiveAuction(): Promise<LiveAuction | null> {
 
 // ─── Context Formatters ────────────────────────────────────────────────────
 
-function extractTitle(description: string): string {
-  const firstLine = (description || '').split('\n')[0] || '';
-  return firstLine.replace(/^#\s*/, '').slice(0, 80) || 'Untitled';
+/**
+ * Proposal title: the first heading/line, skipping the bare "# Noun" client
+ * tag noun.wtf puts at the top of proposals it submits (which made every
+ * noun.wtf proposal read as "Noun" and hid what it was about).
+ */
+export function proposalTitle(description: string): string {
+  const lines = (description || '').split('\n').map(l => l.trim()).filter(Boolean);
+  for (const l of lines.slice(0, 6)) {
+    const t = l.replace(/^#+\s*/, '').trim();
+    if (!t || /^noun(\.wtf)?$/i.test(t)) continue;
+    return t.slice(0, 100);
+  }
+  return 'Untitled';
+}
+const extractTitle = proposalTitle;
+
+/** "quorum 136, not met" style note, so outcomes are never inferred from tallies alone. */
+function quorumNote(forVotes: number, quorum: number | string | null | undefined): string {
+  const q = Number(quorum);
+  if (!Number.isFinite(q) || q <= 0) return '';
+  return `; quorum ${q}: ${Number(forVotes) >= q ? 'met' : 'NOT met'}`;
 }
 
 function formatProposals(proposals: ProposalSummary[]): string {
@@ -277,9 +321,9 @@ function formatProposals(proposals: ProposalSummary[]): string {
     const totalVotes = p.forVotes + p.againstVotes + p.abstainVotes;
     const voteInfo =
       totalVotes > 0
-        ? ` (For: ${p.forVotes}, Against: ${p.againstVotes}, Abstain: ${p.abstainVotes})`
+        ? ` (For: ${p.forVotes}, Against: ${p.againstVotes}, Abstain: ${p.abstainVotes}${quorumNote(p.forVotes, p.quorumVotes)})`
         : '';
-    return `- Proposal ${p.proposalId}: "${title}" — ${p.status}${voteInfo}`;
+    return `- Proposal ${p.proposalId}: "${title}" — status ${p.status}${voteInfo}`;
   });
   let section = `\n### Proposals Created (${proposals.length})\n${lines.join('\n')}`;
   if (proposals.length > 10) section += `\n- ...and ${proposals.length - 10} more`;
@@ -657,7 +701,7 @@ export async function buildProposalsAndGrantsContext(): Promise<string> {
     if (recentCompleted.length > 0) {
       text += '\n\n### Recently Completed';
       for (const p of recentCompleted) {
-        text += `\n- #${p.id}: "${extractTitle(p.description)}" — ${p.derivedStatus} (${p.forVotes} for, ${p.againstVotes} against)`;
+        text += `\n- #${p.id}: "${extractTitle(p.description)}" — ${p.derivedStatus} (${p.forVotes} for, ${p.againstVotes} against${quorumNote(p.forVotes, p.quorumVotes)})`;
       }
     }
 

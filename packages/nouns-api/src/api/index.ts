@@ -223,6 +223,7 @@ import {
   type ArtDao,
   type OnchainArt,
 } from '../agent/onchainArt.js';
+import { proposalTitle } from '../agent/governanceContext.js';
 import {
   getPositions as getTradingPositions,
   getPerformance as getTradingPerformance,
@@ -2292,6 +2293,8 @@ const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO
 
 CRITICAL RULE: NEVER make up data, statistics, trait frequencies, proposal numbers, or any factual claims. If you don't know something, say "I don't know" or "I'd need to check that." Never guess. Never fabricate percentages or rankings. Users will lose trust if you make things up. When uncertain, be honest.
 
+PROPOSAL OUTCOME RULE: Only say a proposal passed, failed or is live if its status says so (from lookup_proposal or the injected data). DEFEATED with forVotes below quorumVotes means it failed to reach quorum; DEFEATED with more against than for means it was voted down. Never infer an outcome from vote counts alone, and when you don't have a status, call lookup_proposal (by number, or by keyword when the user describes it, e.g. "client incentives"). If you still can't verify, say so plainly instead of guessing. noun.wtf (client ID 37) asked the DAO for client incentives in Prop 1000.
+
 PROPOSAL STATUS RULE: Never cite a proposal's status from memory. Status, vote counts, queue/execution state, and timing change constantly. Only refer to proposal status using the live "Governance Overview" data injected below. If a proposal isn't in the injected data, say you'd need to look it up — do NOT guess from training data.
 
 VIEW CONTEXT RULE: A "Current View" block is injected below. It tells you which DAO and which noun the user is looking at right now. ALWAYS check this before referencing any noun by ID. dao=nouns means mainnet Nouns DAO; dao=nounv2 means the NounV2 fork (separate token, separate IDs starting at 0); dao=lil-nouns means Lil Nouns DAO (separate governor, separate proposal numbering). NounV2 #0 is NOT the same as mainnet Noun #0. Lil Prop #375 is NOT the same as mainnet Prop #375.
@@ -2937,11 +2940,7 @@ ${daoLines}
           return { handled: true, response: `Proposal #${proposalId} voting has ended.` };
       }
       const descText = (p.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = proposalTitle(descText);
       const action = { type: 'VOTE', proposalId, support, reason, title };
       return {
         handled: true,
@@ -2993,11 +2992,7 @@ ${daoLines}
       if (rows.length === 0)
         return { handled: true, response: `Proposal #${proposalId} not found.` };
       const descText = (rows[0].description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = proposalTitle(descText);
       const action = { type: 'PROPOSAL_FEEDBACK', proposalId, support, reason, title };
       return {
         handled: true,
@@ -3026,11 +3021,7 @@ ${daoLines}
         return { handled: true, response: `Proposal #${proposalId} not found.` };
       const p = rows[0];
       const descText = (p.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = proposalTitle(descText);
       const currentBlock = await getCurrentBlock();
       const voting = formatBlocksRemaining(currentBlock, p.endBlock);
       return {
@@ -3069,11 +3060,7 @@ ${daoLines}
       if (active.length === 0) return { handled: true, response: 'No active proposals right now.' };
       const lines = active.map(p => {
         const descText = (p.description ?? '').toString();
-        const title =
-          descText
-            .split('\n')[0]
-            ?.replace(/^#+\s*/, '')
-            .trim() || 'Untitled';
+        const title = proposalTitle(descText);
         const voting = formatBlocksRemaining(currentBlock, p.endBlock);
         return `#${p.id}: "${title}" [${p.status}] — ${voting.timeLeftFormatted}`;
       });
@@ -3366,11 +3353,7 @@ ${daoLines}
       if (rows.length === 0) return { handled: true, response: `Grant #${grantId} not found.` };
       const g = rows[0];
       const descText = (g.description ?? '').toString();
-      const title =
-        descText
-          .split('\n')[0]
-          ?.replace(/^#+\s*/, '')
-          .trim() || 'Untitled';
+      const title = proposalTitle(descText);
       return {
         handled: true,
         response: `Grant #${grantId}: "${title}"
@@ -3399,11 +3382,7 @@ ${daoLines}
       if (active.length === 0) return { handled: true, response: 'No active grants right now.' };
       const lines = active.map(g => {
         const descText = (g.description ?? '').toString();
-        const title =
-          descText
-            .split('\n')[0]
-            ?.replace(/^#+\s*/, '')
-            .trim() || 'Untitled';
+        const title = proposalTitle(descText);
         return `#${g.id}: "${title}" [${g.status}]`;
       });
       return { handled: true, response: `Active grants:\n${lines.join('\n')}` };
@@ -3717,6 +3696,27 @@ CRITICAL RULES:
 
     // NounIRL gets the full toolkit — every capability it needs to operate autonomously
     const nounIrlTools: HubChatRequest['tools'] = [
+      // Proposal lookup is back: without it the agent had no way to check a
+      // specific prop's final state and filled the gap with invented outcomes
+      {
+        type: 'function' as const,
+        function: {
+          name: 'lookup_proposal',
+          description:
+            'Look up a Nouns proposal by ID, or search by keyword (e.g. "client incentives"). Returns title, status (ACTIVE/PENDING/SUCCEEDED/QUEUED/EXECUTED/DEFEATED/CANCELLED/VETOED), vote counts, quorumVotes, quorumMet and time remaining. Call this before answering anything about a specific proposal\'s outcome, votes or timing.',
+          parameters: {
+            type: 'object' as const,
+            properties: {
+              proposalId: { type: 'number', description: 'Proposal ID, e.g. 1000.' },
+              keyword: {
+                type: 'string',
+                description: 'Search the proposal text when no ID is known.',
+              },
+            },
+            required: [],
+          },
+        },
+      },
       {
         type: 'function' as const,
         function: {
@@ -5096,11 +5096,7 @@ CRITICAL RULES:
                   } else {
                     const p = rows[0];
                     const descText = (p.description ?? '').toString();
-                    const title =
-                      descText
-                        .split('\n')[0]
-                        ?.replace(/^#+\s*/, '')
-                        .trim() || 'Untitled';
+                    const title = proposalTitle(descText);
                     const currentBlock = await getCurrentBlock();
                     const voting = formatBlocksRemaining(currentBlock, p.endBlock);
                     const updatePeriod = formatBlocksRemaining(
@@ -5120,6 +5116,10 @@ CRITICAL RULES:
                       againstVotes: p.againstVotes?.toString(),
                       abstainVotes: p.abstainVotes?.toString(),
                       quorumVotes: p.quorumVotes?.toString(),
+                      quorumMet:
+                        p?.quorumVotes == null
+                          ? null
+                          : BigInt(p?.forVotes ?? 0) >= BigInt(p?.quorumVotes ?? 0),
                       currentBlock: currentBlock.toString(),
                       startBlock: p.startBlock?.toString(),
                       endBlock: p.endBlock?.toString(),
@@ -5150,12 +5150,15 @@ CRITICAL RULES:
                   result = {
                     matches: matches.map(p => {
                       const descText = (p.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
-                      return { proposalId: p.id, title, status: p.status, proposer: p.proposer };
+                      const title = proposalTitle(descText);
+                      return {
+                        proposalId: p.id,
+                        title,
+                        status: p.status,
+                        proposer: p.proposer,
+                        forVotes: p.forVotes?.toString(),
+                        quorumVotes: p.quorumVotes?.toString(),
+                      };
                     }),
                     count: matches.length,
                   };
@@ -5184,11 +5187,7 @@ CRITICAL RULES:
                   } else {
                     const c = rows[0];
                     const descText = (c.description ?? '').toString();
-                    const title =
-                      descText
-                        .split('\n')[0]
-                        ?.replace(/^#+\s*/, '')
-                        .trim() || 'Untitled';
+                    const title = proposalTitle(descText);
                     result = {
                       slug: c.slug,
                       proposer: c.proposer,
@@ -5301,11 +5300,7 @@ CRITICAL RULES:
                       result = { error: rejectReason };
                     } else {
                       const descText = (p.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       pendingAction = {
                         type: 'VOTE',
                         proposalId: input.proposalId,
@@ -5348,11 +5343,7 @@ CRITICAL RULES:
                     result = { error: `Proposal #${input.proposalId} not found.` };
                   } else {
                     const descText = (rows[0].description ?? '').toString();
-                    const title =
-                      descText
-                        .split('\n')[0]
-                        ?.replace(/^#+\s*/, '')
-                        .trim() || 'Untitled';
+                    const title = proposalTitle(descText);
                     pendingAction = {
                       type: 'PROPOSAL_FEEDBACK',
                       proposalId: input.proposalId,
@@ -5399,11 +5390,7 @@ CRITICAL RULES:
                   } else {
                     const c = rows[0];
                     const descText = (c.description ?? '').toString();
-                    const title =
-                      descText
-                        .split('\n')[0]
-                        ?.replace(/^#+\s*/, '')
-                        .trim() || 'Untitled';
+                    const title = proposalTitle(descText);
                     pendingAction = {
                       type: 'CANDIDATE_FEEDBACK',
                       proposer: c.proposer as string,
@@ -5704,11 +5691,7 @@ CRITICAL RULES:
                       const txs = expanded.txs;
 
                       const descText = (p.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
 
                       // Determine update type: description-only, transactions-only, or both
                       const hasNewDesc = !!input.description;
@@ -5776,11 +5759,7 @@ CRITICAL RULES:
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
                       const descText = (c.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       pendingAction = {
                         type: 'SPONSOR',
                         proposer: c.proposer as string,
@@ -5886,11 +5865,7 @@ CRITICAL RULES:
                       result = { error: `Candidate "${input.slug}" has been canceled.` };
                     } else {
                       const descText = (c.description ?? '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
 
                       // Fetch signatures for this candidate.
                       // Match on candidateId (`${proposer}-${slug}` PK), not
@@ -5981,11 +5956,7 @@ CRITICAL RULES:
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     grants: rows.map((g: any) => {
                       const descText = (g.description || '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       const voting = formatBlocksRemaining(currentBlock, g.endBlock);
                       return {
                         id: g.id,
@@ -6037,11 +6008,7 @@ CRITICAL RULES:
                       };
                     } else {
                       const descText = (g.description || '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       pendingAction = {
                         type: 'GRANT_VOTE',
                         grantId: input.grantId,
@@ -6136,11 +6103,7 @@ CRITICAL RULES:
                       };
                     } else {
                       const descText = (p.description || '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       pendingAction = {
                         type: 'QUEUE_PROPOSAL',
                         proposalId: input.proposalId,
@@ -6191,11 +6154,7 @@ CRITICAL RULES:
                       result = { error: `Grant #${input.grantId} was cancelled.` };
                     } else {
                       const descText = (g.description || '').toString();
-                      const title =
-                        descText
-                          .split('\n')[0]
-                          ?.replace(/^#+\s*/, '')
-                          .trim() || 'Untitled';
+                      const title = proposalTitle(descText);
                       pendingAction = {
                         type: 'QUEUE_GRANT',
                         grantId: input.grantId,
@@ -6255,11 +6214,7 @@ CRITICAL RULES:
                         };
                       } else {
                         const descText = (p.description || '').toString();
-                        const title =
-                          descText
-                            .split('\n')[0]
-                            ?.replace(/^#+\s*/, '')
-                            .trim() || 'Untitled';
+                        const title = proposalTitle(descText);
                         pendingAction = {
                           type: 'EXECUTE_PROPOSAL',
                           proposalId: input.proposalId,
@@ -6320,11 +6275,7 @@ CRITICAL RULES:
                         };
                       } else {
                         const descText = (g.description || '').toString();
-                        const title =
-                          descText
-                            .split('\n')[0]
-                            ?.replace(/^#+\s*/, '')
-                            .trim() || 'Untitled';
+                        const title = proposalTitle(descText);
                         pendingAction = {
                           type: 'EXECUTE_GRANT',
                           grantId: input.grantId,
