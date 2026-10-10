@@ -455,6 +455,14 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         </div>
       )}
 
+      {/* One-off banner (secret spot found…) */}
+      {hud.toast !== null && now - hud.toast.at < 5000 && (
+        <div key={hud.toast.at} className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2">
+          <span>⌐◨-◨ 19 km out</span>
+          <b>{hud.toast.text}</b>
+        </div>
+      )}
+
       {/* Chat feed */}
       <div className="absolute bottom-28 left-4 flex max-w-[60vw] flex-col gap-1">
         {hud.chat
@@ -573,7 +581,8 @@ function FastestChip({
   return (
     <div className="flex flex-col items-end gap-1">
       <button type="button" className="w2-chip text-xs" onClick={() => setOpen(o => !o)}>
-        🏁 {top ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
+        🏁{' '}
+        {entries.length > 0 ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
       </button>
       {open && (
         <div className="w2-chip flex min-w-[220px] flex-col gap-1 text-xs">
