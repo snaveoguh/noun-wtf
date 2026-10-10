@@ -589,6 +589,7 @@ const CSS = `
 .w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
+.w2-panel{background:rgba(10,12,20,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;font-family:system-ui,sans-serif;white-space:normal;box-shadow:0 12px 40px rgba(0,0,0,.45)}
 .w2-pointer{position:absolute;left:0;top:0;display:none;text-align:center;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;white-space:nowrap;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .w2-pointer i{display:block;font-style:normal;color:#ffd400;font-size:14px;line-height:1}
 .w2-pointer span{background:rgba(0,0,0,.55);padding:1px 7px;border-radius:999px}
@@ -647,7 +648,7 @@ function StatsChip({
         🏁 {top !== undefined ? `${Math.round(top.value)} km/h ${top.name}` : 'stats & records'}
       </button>
       {open && (
-        <div className="w2-chip relative z-30 flex w-[300px] flex-col gap-1.5 text-xs">
+        <div className="w2-panel relative z-30 flex w-[300px] max-w-[calc(100vw-32px)] flex-col gap-1.5 text-xs">
           <div className="flex items-baseline justify-between font-bold">
             <span>NOUN WORLD STATS</span>
             <span className="text-[10px] opacity-60">{players} online now</span>
