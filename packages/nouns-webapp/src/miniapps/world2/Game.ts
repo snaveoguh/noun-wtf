@@ -20,7 +20,7 @@ import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
-import { fetchFastest, postFastest } from './net/Fastest';
+import { fetchCombos, fetchFastest, postCombo, postFastest, type ComboEntry } from './net/Fastest';
 import { Net, type NetPose, type SpeedEntry } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -84,11 +84,16 @@ export interface HudState {
   /** Fastest of all time (room leaderboard) and this player's best. */
   fastest: { name: string; kmh: number; downM: number }[];
   myBestKmh: number;
+  /** All-time best single combos, and this browser's own best. */
+  combos: ComboEntry[];
+  myBestCombo: number;
 }
 
 interface RemoteAvatar {
   character: NounCharacter;
   label: HTMLDivElement | null;
+  /** Fortnite-style marker: over far riders, or pinned to the screen edge. */
+  pointer: HTMLDivElement | null;
   seedKey: string;
   lastPos: THREE.Vector3;
 }
@@ -178,6 +183,8 @@ export class Game {
       mountain: null,
       fastest: [],
       myBestKmh: loadBestKmh(),
+      combos: [],
+      myBestCombo: loadNumber(COMBO_KEY),
     };
   }
 
@@ -1027,7 +1034,11 @@ export class Game {
       const label = document.createElement('div');
       label.className = 'w2-nametag';
       this.labelLayer.appendChild(label);
-      r = { character, label, seedKey: seedK, lastPos: new THREE.Vector3() };
+      const pointer = document.createElement('div');
+      pointer.className = 'w2-pointer';
+      pointer.innerHTML = '<i>▲</i><span></span>';
+      this.labelLayer.appendChild(pointer);
+      r = { character, label, pointer, seedKey: seedK, lastPos: new THREE.Vector3() };
       this.remotes.set(id, r);
     }
     return r;
@@ -1038,6 +1049,7 @@ export class Game {
     if (!r) return;
     r.character.dispose();
     r.label?.remove();
+    r.pointer?.remove();
     this.remotes.delete(id);
   }
 
@@ -1109,9 +1121,69 @@ export class Game {
           const trick = c.trick ? `<div class="w2-trick">${escapeHtml(c.trick)}</div>` : '';
           r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${talk}</span>`;
         }
+        if (r.pointer) {
+          const close = visible && dist < 60;
+          r.pointer.style.display = close ? 'none' : 'block';
+          if (!close)
+            this.placePointer(r.pointer, c.pos, v, visible, dist, rp.name || 'noun', w, h);
+        }
       }
     }
     for (const id of [...this.remotes.keys()]) if (!this.net.players.has(id)) this.removeRemote(id);
+  }
+
+  /**
+   * Point at a rider we can't see well: a marker over them when they're on
+   * screen but far off, otherwise an arrow pinned to the screen edge in
+   * their direction (behind you points down), with name and distance.
+   */
+  private placePointer(
+    el: HTMLDivElement,
+    pos: THREE.Vector3,
+    ndc: THREE.Vector3,
+    onScreen: boolean,
+    dist: number,
+    name: string,
+    w: number,
+    h: number,
+  ) {
+    const span = el.lastElementChild as HTMLSpanElement | null;
+    const text = `${name} ${dist >= 1000 ? `${(dist / 1000).toFixed(1)}km` : `${Math.round(dist)}m`}`;
+    if (span && span.textContent !== text) span.textContent = text;
+    const arrow = el.firstElementChild as HTMLElement | null;
+    if (onScreen) {
+      el.classList.remove('w2-edge');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+      el.style.transform = `translate(-50%, -100%) translate(${((ndc.x + 1) / 2) * w}px, ${((1 - ndc.y) / 2) * h}px)`;
+      return;
+    }
+    // Direction in camera space; behind the camera the projection flips,
+    // so steer by the camera-space x/y instead (straight behind → bottom)
+    const pc = pos
+      .clone()
+      .add(new THREE.Vector3(0, 1.5, 0))
+      .applyMatrix4(this.gfx.camera.matrixWorldInverse);
+    let dx = pc.x;
+    let dy = pc.y;
+    if (pc.z > 0) {
+      dy = -Math.abs(dy) - Math.abs(dx) * 0.25 - 1;
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    // Keep clear of the HUD up top and the site tray / touch pad below
+    const mx = 44;
+    const top = 90;
+    const bottom = 110;
+    const cy = (top + (h - bottom)) / 2;
+    const hw = w / 2 - mx;
+    const hh = (h - bottom - top) / 2;
+    const t = Math.min(hw / Math.max(1e-6, Math.abs(dx)), hh / Math.max(1e-6, Math.abs(dy)));
+    const x = w / 2 + dx * t;
+    const y = cy - dy * t;
+    el.classList.add('w2-edge');
+    if (arrow) arrow.style.transform = `rotate(${Math.atan2(dx, dy)}rad)`;
+    el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
   }
 
   private pushChat(id: string, text: string) {
@@ -1173,6 +1245,7 @@ export class Game {
    */
   async refreshFastest(first = false) {
     this.fastestPolledAt = performance.now();
+    void this.refreshCombos(first);
     const entries = await fetchFastest();
     if (entries === null) return;
     this.setFastest(entries);
@@ -1184,8 +1257,45 @@ export class Game {
     }
   }
 
+  private setCombos(entries: ComboEntry[]) {
+    this.hud = { ...this.hud, combos: entries };
+    this.emit();
+  }
+
+  private async refreshCombos(first: boolean) {
+    const entries = await fetchCombos();
+    if (entries === null) return;
+    this.setCombos(entries);
+    const best = this.hud.myBestCombo;
+    if (first && best >= 100 && this.bestComboLabel !== null) {
+      const next = await postCombo(this.name, best, this.bestComboLabel);
+      if (next) this.setCombos(next);
+    }
+  }
+
+  /** Last banked combo already looked at, so each one is checked once. */
+  private lastBankedAt = -1;
+  private bestComboLabel: string | null = loadString(COMBO_LABEL_KEY);
+
+  /** A new personal-best combo goes straight to the all-time board. */
+  private trackBestCombo() {
+    const b = this.player.combo.lastBanked;
+    if (b === null || b.at === this.lastBankedAt) return;
+    this.lastBankedAt = b.at;
+    if (b.bailed || b.points < 100 || b.points <= this.hud.myBestCombo) return;
+    this.hud = { ...this.hud, myBestCombo: b.points };
+    this.bestComboLabel = b.label;
+    saveValue(COMBO_KEY, String(b.points));
+    saveValue(COMBO_LABEL_KEY, b.label);
+    if (this.opts.offline === true) return;
+    void postCombo(this.name, b.points, b.label).then(next => {
+      if (next) this.setCombos(next);
+    });
+  }
+
   /** Personal bests go to the all-time board (a few seconds apart). */
   private trackTopSpeed(dt: number) {
+    this.trackBestCombo();
     if (!this.bestSynced && this.opts.offline !== true) {
       this.bestSynced = true;
       void this.refreshFastest(true);
@@ -1327,6 +1437,25 @@ function escapeHtml(s: string) {
 }
 
 const BEST_KEY = 'noun-world-fastest-kmh';
+const COMBO_KEY = 'noun-world-best-combo';
+const COMBO_LABEL_KEY = 'noun-world-best-combo-label';
+function loadNumber(key: string): number {
+  return Number(loadString(key)) || 0;
+}
+function loadString(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function saveValue(key: string, v: string) {
+  try {
+    localStorage.setItem(key, v);
+  } catch {
+    // private mode etc.
+  }
+}
 function loadBestKmh(): number {
   try {
     return Number(localStorage.getItem(BEST_KEY)) || 0;

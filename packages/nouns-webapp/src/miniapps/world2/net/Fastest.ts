@@ -1,4 +1,4 @@
-// ── Noun World fastest-of-all-time board ────────────────────────────────
+// ── Noun World all-time boards: fastest + best combo ────────────────────────────────────────────────────
 //
 // Stored by the world-fastest Netlify function (Netlify Blobs), one best
 // per name. It used to ride the PartyKit room's leaderboard, which the
@@ -66,6 +66,66 @@ export async function postFastest(
     });
     if (!res.ok) return null;
     return parse(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+// ── Best combo of all time ──────────────────────────────────────────────
+
+export interface ComboEntry {
+  name: string;
+  points: number;
+  /** The trick chain that scored it, e.g. "Kickflip + 50-50 + Manual". */
+  label: string;
+  at: number;
+}
+
+const COMBO_URL = '/.netlify/functions/world-combo';
+
+function parseCombos(body: unknown): ComboEntry[] {
+  const raw = (body as { entries?: unknown })?.entries;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(e => e as Record<string, unknown>)
+    .map(e => ({
+      name: String(e.name ?? 'anon').slice(0, 42),
+      points: Number(e.points) || 0,
+      label: String(e.label ?? ''),
+      at: Number(e.at) || 0,
+    }))
+    .sort((a, b) => b.points - a.points);
+}
+
+export async function fetchCombos(): Promise<ComboEntry[] | null> {
+  try {
+    const res = await fetch(COMBO_URL, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return parseCombos(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/** Post a personal-best combo; resolves to the updated board (null if it failed). */
+export async function postCombo(
+  name: string,
+  points: number,
+  label: string,
+): Promise<ComboEntry[] | null> {
+  try {
+    const res = await fetch(COMBO_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rider: riderId(),
+        name,
+        points: Math.round(points),
+        label: label.slice(0, 200),
+      }),
+    });
+    if (!res.ok) return null;
+    return parseCombos(await res.json());
   } catch {
     return null;
   }

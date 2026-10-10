@@ -376,7 +376,9 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
       <div className={`absolute left-4 ${top} flex flex-col gap-1`}>
         <div className="w2-chip">
           <b>{hud.session.toLocaleString()}</b> pts{' '}
-          <span className="opacity-60">best {hud.best.toLocaleString()}</span>
+          <span className="opacity-60">
+            best {Math.max(hud.best, hud.myBestCombo).toLocaleString()}
+          </span>
         </div>
         <div className="w2-chip text-xs opacity-80">
           {hud.connected ? '●' : '○'} {hud.players} online, {hud.mode === 'board' ? '🛹' : '🚶'}{' '}
@@ -460,9 +462,11 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             </button>
           </>
         )}
-        <FastestChip
-          entries={hud.fastest}
-          myBest={hud.myBestKmh}
+        <LeagueChip
+          fastest={hud.fastest}
+          combos={hud.combos}
+          myBestKmh={hud.myBestKmh}
+          myBestCombo={hud.myBestCombo}
           me={game.name}
           onOpen={() => void game.refreshFastest()}
         />
@@ -577,25 +581,46 @@ const CSS = `
 .w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
+.w2-pointer{position:absolute;left:0;top:0;display:none;text-align:center;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;white-space:nowrap;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.w2-pointer i{display:block;font-style:normal;color:#ffd400;font-size:14px;line-height:1}
+.w2-pointer span{background:rgba(0,0,0,.55);padding:1px 7px;border-radius:999px}
+.w2-pointer.w2-edge i{font-size:20px}
 .w2-said{background:#fff;color:#111;border-radius:10px;padding:3px 8px;margin-bottom:4px;max-width:220px;white-space:normal;font-size:12px}
 .w2-trick{color:#ffd400;font-style:italic;font-weight:700;margin-bottom:2px;text-shadow:0 1px 0 #000}
 `;
 
 /** Fastest of all time (room leaderboard): the record on the chip, top 10 on click. */
-function FastestChip({
-  entries,
-  myBest,
+function LeagueChip({
+  fastest,
+  combos,
+  myBestKmh,
+  myBestCombo,
   me,
   onOpen,
 }: {
-  entries: { name: string; kmh: number; downM: number }[];
-  myBest: number;
+  fastest: { name: string; kmh: number; downM: number }[];
+  combos: { name: string; points: number; label: string }[];
+  myBestKmh: number;
+  myBestCombo: number;
   me: string;
   onOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const top = entries.length > 0 ? entries[0] : undefined;
-  const myRank = entries.findIndex(e => e.name === me);
+  const [tab, setTab] = useState<'speed' | 'combo'>('speed');
+  const top = fastest.length > 0 ? fastest[0] : undefined;
+  const rows =
+    tab === 'speed'
+      ? fastest.map(e => ({
+          name: e.name,
+          value: `${Math.round(e.kmh)} km/h`,
+          sub: e.downM > 0 ? `↓${(e.downM / 1000).toFixed(1)} km` : '',
+        }))
+      : combos.map(e => ({ name: e.name, value: e.points.toLocaleString(), sub: e.label }));
+  const myRank = rows.findIndex(e => e.name === me);
+  const mine =
+    tab === 'speed'
+      ? `${Math.round(myBestKmh)} km/h`
+      : `${Math.round(myBestCombo).toLocaleString()} pts`;
   return (
     <div className="flex flex-col items-end gap-1">
       <button
@@ -605,38 +630,52 @@ function FastestChip({
           if (!open) onOpen();
           setOpen(o => !o);
         }}
-        title="Fastest of all time"
+        title="All-time league"
       >
         🏁{' '}
-        {top !== undefined ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
+        {top !== undefined ? `${Math.round(top.kmh)} km/h ${top.name}` : 'league: no records yet'}
       </button>
       {open && (
-        <div className="w2-chip relative z-30 flex w-[260px] flex-col gap-1 text-xs">
-          <div className="flex justify-between font-bold">
-            <span>FASTEST OF ALL TIME</span>
-            <span className="opacity-70">{entries.length} riders</span>
+        <div className="w2-chip relative z-30 flex w-[280px] flex-col gap-1 text-xs">
+          <div className="flex items-center justify-between gap-2 font-bold">
+            <span>ALL-TIME LEAGUE</span>
+            <span className="flex gap-1">
+              {(['speed', 'combo'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`rounded-full px-2 py-0.5 ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
+                >
+                  {t === 'speed' ? 'SPEED' : 'COMBO'}
+                </button>
+              ))}
+            </span>
           </div>
-          {entries.length === 0 && <div className="opacity-70">ride the mountain to set one</div>}
-          <div className="flex max-h-[50vh] flex-col gap-0.5 overflow-y-auto pr-1">
-            {entries.map((e, i) => (
-              <div
-                key={i}
-                className={`flex justify-between gap-3 ${e.name === me ? 'font-bold text-[#ffd400]' : ''}`}
-              >
-                <span className="truncate">
-                  {i + 1}. {e.name}
-                </span>
-                <span className="shrink-0">
-                  <b>{Math.round(e.kmh)} km/h</b>
-                  {e.downM > 0 && (
-                    <span className="opacity-60"> ↓{(e.downM / 1000).toFixed(1)} km</span>
-                  )}
-                </span>
+          <div className="opacity-60">{rows.length} riders</div>
+          {rows.length === 0 && (
+            <div className="opacity-70">
+              {tab === 'speed' ? 'ride the mountain to set one' : 'land a combo to set one'}
+            </div>
+          )}
+          <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto pr-1">
+            {rows.map((e, i) => (
+              <div key={i} className={e.name === me ? 'font-bold text-[#ffd400]' : ''}>
+                <div className="flex justify-between gap-3">
+                  <span className="truncate">
+                    {i + 1}. {e.name}
+                  </span>
+                  <b className="shrink-0">{e.value}</b>
+                </div>
+                {e.sub !== '' && (
+                  <div className="truncate pl-4 text-[10px] opacity-60">{e.sub}</div>
+                )}
               </div>
             ))}
           </div>
           <div className="mt-1 opacity-70">
-            your best: {Math.round(myBest)} km/h{myRank >= 0 ? ` (#${myRank + 1})` : ''}
+            your best: {mine}
+            {myRank >= 0 ? ` (#${myRank + 1})` : ''}
           </div>
         </div>
       )}
