@@ -193,6 +193,15 @@ export const NOS_CSS = `
   .nos-auction-card{display:none !important}
   .nos-win.is-mobile{bottom:46px}
 }
+/* Phones in the game (portrait, or landscape where the height is the
+   squeeze): the tray shrinks to the brand + DESK chips, top centre, so it
+   stops covering the game's HUD, touch buttons and character select. */
+@media (max-width:760px),(pointer:coarse) and (max-height:520px){
+  .mode-world .nos-tray{top:calc(6px + env(safe-area-inset-top));bottom:auto;left:50%;right:auto;transform:translateX(-50%);
+    width:max-content;max-width:none;padding:3px;gap:3px;border-radius:14px;overflow:visible;flex-wrap:nowrap}
+  .mode-world .nos-tray .nos-chip{padding:4px 8px;font-size:10px}
+  .mode-world .nos-tray > :not(.is-brand):not(.is-mode){display:none !important}
+}
 .nos-chip{font-size:12.5px;letter-spacing:.02em;font-weight:600;padding:7px 12px;border-radius:12px;border:0;
   background:rgba(255,255,255,.06);color:var(--paper);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;line-height:1.2;
   transition:background .15s,color .15s,border-color .15s}

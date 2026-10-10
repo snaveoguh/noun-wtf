@@ -11,6 +11,8 @@ import type { Player } from '../skate/Player';
 import * as THREE from 'three';
 
 const UP = new THREE.Vector3(0, 1, 0);
+const MIN_VIEW_ASPECT = 1.4;
+const MAX_PORTRAIT_FOV = 100;
 
 export type CamMode = 'follow' | 'low' | 'far';
 
@@ -187,9 +189,19 @@ export class SkateCamera {
     // as mountain runs build past the city's top speed — capped at 110°
     // (speed itself is unbounded)
     const fast = Math.max(0, p.speed - 17);
-    const targetFov = onBoard
+    let targetFov = onBoard
       ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
       : 62;
+    // These are vertical FOVs tuned on landscape screens. On a portrait phone
+    // the same vertical FOV leaves a sliver of the world either side, so
+    // keep at least the horizontal view a 1.4:1 screen would get (capped)
+    const aspect = this.camera.aspect;
+    if (aspect < MIN_VIEW_ASPECT) {
+      const half = Math.atan(
+        (Math.tan(THREE.MathUtils.degToRad(targetFov / 2)) * MIN_VIEW_ASPECT) / aspect,
+      );
+      targetFov = Math.min(MAX_PORTRAIT_FOV, THREE.MathUtils.radToDeg(half * 2));
+    }
     this.fov = THREE.MathUtils.lerp(this.fov, targetFov, 1 - Math.exp(-3 * dt));
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;
