@@ -13,6 +13,7 @@
 //          (+ alley ramps)         the alleys ramp from the street onto the slope
 //          (+ mega ramp terraces)  a level pad cut into the slope at every
 //                                  mega ramp site (see the section at the end)
+//          (+ Noun Jersey)         the secret spot's terrace (nounJersey.ts)
 //
 // Gradients stay ≲ 0.8, so the analytic heightfield doubles as the collision
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
@@ -28,6 +29,7 @@ import {
   vnoise,
   worldToAlley,
 } from './config';
+import { applyNjPad, njBlocked, njInCore, setNjNatural } from './nounJersey';
 import { INFLUENCE, MEGA_SITE, tracks, type MegaSite, type NearestTrack } from './tracks';
 
 export { ALLEYS, MOUNTAIN, hashInts, smoothstep, edgeDistance } from './config';
@@ -93,6 +95,7 @@ export function sampleTerrain(x: number, z: number, out: TerrainSample): Terrain
   sampleBase(x, z, out);
   // tracks.near still holds this point's lines (sampleBase's last query)
   if (out.dist < INFLUENCE) applyMegaPads(x, z, out);
+  applyNjPad(x, z, out);
   return out;
 }
 
@@ -160,6 +163,8 @@ function sampleBase(x: number, z: number, out: TerrainSample): TerrainSample {
 }
 
 const _s: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
+const _ns: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
+setNjNatural((x, z) => sampleBase(x, z, _ns).y);
 
 /** Terrain height at (x, z). */
 export function terrainHeight(x: number, z: number): number {
@@ -209,6 +214,8 @@ export function terrainSurface(x: number, z: number): 'track' | 'grass' | 'alley
   const s = sampleTerrain(x, z, _s);
   // The mega ramp (+ its bridge) rides like the dirt line, not like grass
   if (s.track <= 0.35 && s.alley <= 0.5 && megaAt(x, z, 0.5) !== null) return 'track';
+  // Noun Jersey's streets ride like concrete (the park's governor brings city physics anyway)
+  if (s.track <= 0.35 && njInCore(x, z, 2)) return 'alley';
   if (s.alley > 0.5) return 'alley';
   return s.track > 0.35 ? 'track' : 'grass';
 }
@@ -570,8 +577,12 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
   return found ? _hit : null;
 }
 
-/** Keep-out for the dressing (plants, water, rocks): terrace floor + bridge, with a margin. */
+/**
+ * Keep-out for the dressing (plants, water, rocks): terrace floor + bridge,
+ * with a margin — and the Noun Jersey terrace.
+ */
 export function megaBlocked(x: number, z: number): boolean {
+  if (njBlocked(x, z)) return true;
   return eachMega(
     x,
     z,

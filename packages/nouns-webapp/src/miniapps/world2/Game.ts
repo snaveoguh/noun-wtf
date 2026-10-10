@@ -36,6 +36,15 @@ import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaR
 import { dressingDecorator } from './world/mountain/DressingDecorator';
 import { megaRampDecorator } from './world/mountain/MegaRamps';
 import { MountainStream } from './world/mountain/MountainStream';
+import {
+  NJ,
+  njFrame,
+  njInCore,
+  njSpawn,
+  njSpeedLimit,
+  njToWorld,
+} from './world/mountain/nounJersey';
+import { nounJerseyDecorator } from './world/mountain/NounJerseyPark';
 import { rampDecorator, warmMountainProps } from './world/mountain/Props';
 import {
   edgeDistance,
@@ -52,6 +61,11 @@ import { PipBillboards } from './world/PipBillboards';
 /** `?megaramp=` dev param: '1' = city boulevard ramp, 'mtn' = spawn on the hero mountain ramp. */
 function megaParam(): string | null {
   return new URLSearchParams(window.location.search).get('megaramp');
+}
+
+/** `?spot=nj` dev param: spawn at the top of Main St in the secret Noun Jersey park. */
+function spotParam(): string | null {
+  return new URLSearchParams(window.location.search).get('spot');
 }
 
 export interface HudState {
@@ -81,12 +95,13 @@ export interface HudState {
   baked: boolean;
   /** Out on the mountain: metres downhill from the city + current surface. */
   mountain: { down: number; surface: string; streak: number } | null;
-  /** Fastest of all time (room leaderboard) and this player's best. */
   /** All-time boards + play counts (null until loaded). */
   stats: WorldStats | null;
   /** This browser's own records. */
   mine: MyBests;
   mineCombo: number | undefined;
+  /** One-off banner (e.g. finding the secret spot). */
+  toast: { text: string; at: number } | null;
 }
 
 interface RemoteAvatar {
@@ -184,6 +199,7 @@ export class Game {
       stats: null,
       mine: { best: {}, comboLabel: '' },
       mineCombo: undefined,
+      toast: null,
     };
   }
 
@@ -266,6 +282,11 @@ export class Game {
     // `?megaramp=mtn`: straight onto the hero mountain mega ramp's drop-in
     if (megaParam() === 'mtn' && this.mountainHero !== null)
       this.player.spawn(this.mountainHero.pos, this.mountainHero.yaw);
+    // `?spot=nj`: straight into the secret Noun Jersey park, ~19 km down
+    if (spotParam() === 'nj' && this.mountain !== null) {
+      const sp = njSpawn();
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -473,6 +494,8 @@ export class Game {
       m.addDecorator(rampDecorator);
       // Mega ramp set pieces: terrace + bridge + ramp, rails stream with the chunk
       m.addDecorator(megaRampDecorator(this.rails));
+      // The secret spot (Noun Jersey, ~19 km down the +Z line): same pattern
+      m.addDecorator(nounJerseyDecorator(this.rails));
       this.gfx.scene.add(m.group);
       this.mountain = m;
       this.player.mountain = level.mountain ?? null;
@@ -480,7 +503,7 @@ export class Game {
         height: terrainHeight,
         inDomain: terrainInDomain,
         surface: terrainSurface,
-        speedLimit: megaSpeedLimit,
+        speedLimit: (x, y, z) => Math.min(megaSpeedLimit(x, y, z), njSpeedLimit(x, y, z)),
       };
       // R respawn: the hero mega ramp's drop-in, a short way down the +Z line
       m.network.ensure(MEGA_SITE.heroS + 200);
@@ -1283,6 +1306,7 @@ export class Game {
       const bearing = Math.atan2(d.x, d.z) - this.cam.controlYaw;
       return { name: l.name, dist: Math.round(Math.hypot(d.x, d.z)), bearing };
     });
+    if (this.mountain !== null) this.updateSecretSpot(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
@@ -1317,6 +1341,33 @@ export class Game {
       },
     };
     this.emit();
+  }
+
+  /** Secret spot: no compass entry until you're close, a banner the first time in. */
+  private njFound = false;
+
+  private updateSecretSpot(lm: { name: string; dist: number; bearing: number }[]) {
+    const f = njFrame();
+    if (f === null) return;
+    const p = this.player.pos;
+    const c = njToWorld(f, NJ.W / 2, NJ.L / 2, { x: 0, z: 0 });
+    const dx = c.x - p.x;
+    const dz = c.z - p.z;
+    const dist = Math.hypot(dx, dz);
+    // (first: the compass only shows the first few)
+    if (dist < 420)
+      lm.unshift({
+        name: 'Noun Jersey',
+        dist: Math.round(dist),
+        bearing: Math.atan2(dx, dz) - this.cam.controlYaw,
+      });
+    if (!this.njFound && njInCore(p.x, p.z)) {
+      this.njFound = true;
+      this.hud = {
+        ...this.hud,
+        toast: { text: 'SECRET SPOT FOUND: NOUN JERSEY', at: performance.now() },
+      };
+    }
   }
 
   dispose() {

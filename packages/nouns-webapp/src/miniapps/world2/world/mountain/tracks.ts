@@ -67,6 +67,8 @@ export interface Track {
   megas: MegaSite[];
   /** Nominal along-track distance of the next mega ramp site to schedule. */
   nextMega: number;
+  /** Secret spots (only the Noun Jersey line has one), in along-track order. */
+  spots: SpotSite[];
 }
 
 export interface NearestTrack {
@@ -195,6 +197,43 @@ export interface MegaSite {
   az: number;
 }
 
+// ── Secret spot: Noun Jersey ──
+//
+// One hidden set piece in the whole world (world/mountain/nounJersey.ts +
+// NounJerseyPark.ts): a suburban street skatepark on a level terrace beside
+// the +Z DOWNHILL main, about 19 km out. Its stretch of line is reserved
+// exactly like a mega ramp site's (straight, no launch ramps, no forks), so
+// the terrace can level it; nothing within ~18 km of the city changes.
+
+export const SPOT_SITE = {
+  /** Main line (track id) the spot sits beside: 1 = the +Z DOWNHILL alley. */
+  track: 1,
+  /** Fixed once the line's frontier is this far from the city (m)… */
+  trigger: 18200,
+  /** …this far further along the line (so ≈ 19 km out). */
+  look: 800,
+  /** Reserved straight, ramp-free stretch before / after the site (m). */
+  pre: MEGA_SITE.pre,
+  post: MEGA_SITE.post,
+  forkClear: MEGA_SITE.forkClear,
+} as const;
+
+export interface SpotSite {
+  track: Track;
+  /** Hash salt (distinct from the mega ramp indices). */
+  k: number;
+  /** Along-track distance of the terrace's u = 0 (top of the level pad). */
+  s: number;
+  /** Lazily resolved placement (nounJersey.ts → njFrame). */
+  frame: unknown;
+}
+
+/** A reserved stretch of line (mega ramp site or secret spot). */
+interface Reserved {
+  s: number;
+  k: number;
+}
+
 class TrackNetwork {
   tracks: Track[] = [];
   private cells = new Map<number, number[]>();
@@ -260,6 +299,7 @@ class TrackNetwork {
             : MEGA_SITE.first + hashInts(o.id, 0, 61) * MEGA_SITE.firstJitter,
       nextRamp:
         o.s0 + (o.depth === 0 ? RAMP_FIRST : RAMP_FIRST_BRANCH) + hashInts(o.id, 0, 31) * 120,
+      spots: [],
     };
     this.tracks.push(t);
     return t;
@@ -280,6 +320,28 @@ class TrackNetwork {
     const ls = s - t.s0;
     const bias = t.bias * (1 - smoothstep(0, t.biasFade, ls));
     const diff = wrapAngle(Math.atan2(out.x, out.z) + bias - h);
+    // The secret spot: fixed `look` m ahead once the line is far enough out,
+    // clear of the last launch ramp's landing hill and of any mega terrace
+    if (
+      t.id === SPOT_SITE.track &&
+      t.spots.length === 0 &&
+      edgeDistance(x, z) >= SPOT_SITE.trigger
+    ) {
+      let sb = s + SPOT_SITE.look;
+      const lr = t.ramps[t.ramps.length - 1];
+      if (lr !== undefined)
+        sb = Math.max(sb, lr.s + lr.spec.land + lr.spec.recover + RAMP_GAP + SPOT_SITE.pre);
+      const lm = t.megas[t.megas.length - 1];
+      if (
+        lm !== undefined &&
+        sb < lm.s + MEGA_SITE.post + SPOT_SITE.pre &&
+        sb + SPOT_SITE.post + MEGA_SITE.pre > lm.s
+      )
+        sb = lm.s + MEGA_SITE.post + SPOT_SITE.pre;
+      t.spots.push({ track: t, k: 100, s: sb, frame: null });
+      const clear = sb + SPOT_SITE.post + MEGA_SITE.pre;
+      if (t.nextMega < clear) t.nextMega = clear + hashInts(t.id, 100, 61) * 400;
+    }
     // Fix the next mega ramp site well before the line gets there: clear of
     // the last launch ramp's landing hill, and far enough ahead that the
     // whole reserved stretch is still to be grown
@@ -288,6 +350,13 @@ class TrackNetwork {
       const lr = t.ramps[t.ramps.length - 1];
       if (lr !== undefined)
         sb = Math.max(sb, lr.s + lr.spec.land + lr.spec.recover + RAMP_GAP + MEGA_SITE.pre);
+      const sp = t.spots[t.spots.length - 1];
+      if (
+        sp !== undefined &&
+        sb < sp.s + SPOT_SITE.post + MEGA_SITE.pre &&
+        sb + MEGA_SITE.post + SPOT_SITE.pre > sp.s
+      )
+        sb = sp.s + SPOT_SITE.post + MEGA_SITE.pre;
       const k = t.megas.length;
       t.megas.push({
         track: t,
@@ -389,21 +458,43 @@ class TrackNetwork {
     }
   }
 
-  /** The mega site whose fork-free stretch contains s (or null). */
-  private megaNear(t: Track, s: number): MegaSite | null {
+  /**
+   * The mega site (or secret spot) whose fork-free stretch contains s, or
+   * null. Both reserve the same stretch around their site (SPOT_SITE
+   * shares MEGA_SITE's pre / post / forkClear).
+   */
+  private megaNear(t: Track, s: number): Reserved | null {
     for (let i = t.megas.length - 1; i >= 0; i--) {
       const m = t.megas[i];
       if (s >= m.s - MEGA_SITE.forkClear && s <= m.s + MEGA_SITE.post + 60) return m;
       if (s > m.s + MEGA_SITE.post + 60) break;
     }
+    for (const m of t.spots)
+      if (s >= m.s - SPOT_SITE.forkClear && s <= m.s + SPOT_SITE.post + 60) return m;
     return null;
   }
 
-  /** A mega site whose reserved stretch overlaps along-track [a, b], or null. */
-  private megaOverlap(t: Track, a: number, b: number): MegaSite | null {
+  /** A mega site / secret spot whose reserved stretch overlaps along-track [a, b], or null. */
+  private megaOverlap(t: Track, a: number, b: number): Reserved | null {
     for (const m of t.megas)
       if (b >= m.s - MEGA_SITE.pre - 20 && a <= m.s + MEGA_SITE.post) return m;
+    for (const m of t.spots)
+      if (b >= m.s - SPOT_SITE.pre - 20 && a <= m.s + SPOT_SITE.post) return m;
     return null;
+  }
+
+  /**
+   * The Noun Jersey site, growing its main line just far enough to fix it
+   * (only that line: growth is per-track sequential, so this never changes
+   * the network). Null only if the line somehow ends first.
+   */
+  spot(): SpotSite | null {
+    const t = this.tracks.find(q => q.id === SPOT_SITE.track)!;
+    while (t.spots.length === 0 && !t.done) {
+      const n = t.xs.length - 1;
+      this.ensureS(t, t.s0 + n * STEP + 600);
+    }
+    return t.spots[0] ?? null;
   }
 
   /** Mega ramp sites (on any main) whose anchor lies in the rectangle. */
