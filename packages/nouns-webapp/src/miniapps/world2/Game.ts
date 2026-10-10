@@ -80,6 +80,9 @@ export interface HudState {
   baked: boolean;
   /** Out on the mountain: metres downhill from the city + current surface. */
   mountain: { down: number; surface: string; streak: number } | null;
+  /** Fastest of all time (room leaderboard) and this player's best. */
+  fastest: { name: string; kmh: number; downM: number }[];
+  myBestKmh: number;
 }
 
 interface RemoteAvatar {
@@ -172,6 +175,8 @@ export class Game {
       spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
       baked: false,
       mountain: null,
+      fastest: [],
+      myBestKmh: loadBestKmh(),
     };
   }
 
@@ -267,7 +272,14 @@ export class Game {
       this.net.onLeave = id => this.removeRemote(id);
       this.net.onChat = (id, text) => this.pushChat(id, text);
       this.net.onGraffiti = (id, tags) => this.graffiti?.onTags(id, tags);
-      this.net.onOpen = () => this.graffiti?.loadAll();
+      this.net.onOpen = () => {
+        this.graffiti?.loadAll();
+        this.net.requestLeaderboard();
+      };
+      this.net.onLeaderboard = entries => {
+        this.hud = { ...this.hud, fastest: entries.slice(0, 10) };
+        this.emit();
+      };
       this.net.connect();
     }
 
@@ -1145,7 +1157,33 @@ export class Game {
     this.gfx.scene.add(this.me.root);
   }
 
+  /** Top speed this session not yet submitted, and when we last checked. */
+  private speedRecord = { pending: 0, downM: 0, acc: 0 };
+
+  /** Personal bests go to the room leaderboard (a few seconds apart). */
+  private trackTopSpeed(dt: number) {
+    const p = this.player;
+    if (p.mode === 'board' && p.state !== 'bail') {
+      const kmh = p.speed * 3.6;
+      if (kmh > Math.max(this.hud.myBestKmh, this.speedRecord.pending)) {
+        this.speedRecord.pending = kmh;
+        this.speedRecord.downM = this.hud.mountain?.down ?? 0;
+      }
+    }
+    this.speedRecord.acc += dt;
+    if (this.speedRecord.acc < 3) return;
+    this.speedRecord.acc = 0;
+    const kmh = this.speedRecord.pending;
+    if (kmh >= 40 && kmh > this.hud.myBestKmh + 0.5 && this.net.connected) {
+      this.net.submitSpeed(this.name, kmh, this.speedRecord.downM);
+      this.speedRecord.pending = 0;
+      saveBestKmh(kmh);
+      this.hud = { ...this.hud, myBestKmh: kmh };
+    }
+  }
+
   private updateHud(dt: number, input: InputFrame) {
+    this.trackTopSpeed(dt);
     this.fpsAcc += dt;
     this.fpsFrames++;
     this.hudAcc += dt;
@@ -1243,4 +1281,20 @@ function escapeHtml(s: string) {
     /["&'<>]/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
+}
+
+const BEST_KEY = 'noun-world-fastest-kmh';
+function loadBestKmh(): number {
+  try {
+    return Number(localStorage.getItem(BEST_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+function saveBestKmh(kmh: number) {
+  try {
+    localStorage.setItem(BEST_KEY, String(kmh));
+  } catch {
+    // private mode etc.
+  }
 }

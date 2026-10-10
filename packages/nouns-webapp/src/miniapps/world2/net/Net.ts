@@ -16,6 +16,16 @@ import { PARTYKIT_HOST } from '../../world/engine/types';
 import { Voice } from './Voice';
 
 export const V2_ROOM = 'nouns-world-v2';
+/** Tags our entries on the shared room leaderboard. */
+const SPEED_WAVE = 9001;
+
+export interface SpeedEntry {
+  name: string;
+  kmh: number;
+  /** Metres downhill from the city at the time of the record. */
+  downM: number;
+  at: number;
+}
 const SEND_HZ = 15;
 
 export interface NetPose {
@@ -87,6 +97,8 @@ export class Net {
   onChat?: (id: string, text: string) => void;
   onGraffiti?: (wallId: string, tags: { imageData: string }[]) => void;
   onOpen?: () => void;
+  /** Fastest-of-all-time board for this room (persisted by the party server). */
+  onLeaderboard?: (entries: SpeedEntry[]) => void;
   connected = false;
 
   connect() {
@@ -116,6 +128,24 @@ export class Net {
   private handle(d: Record<string, unknown>) {
     const type = d.type as string;
     if (typeof type !== 'string') return;
+    if (type === 'leaderboard') {
+      const raw = Array.isArray(d.entries) ? (d.entries as Record<string, unknown>[]) : [];
+      // Best run per name, fastest first
+      const best = new Map<string, SpeedEntry>();
+      for (const e of raw) {
+        if (Number(e.wave) !== SPEED_WAVE) continue;
+        const entry: SpeedEntry = {
+          name: String(e.name ?? 'anon').slice(0, 42),
+          kmh: Number(e.seconds) / 10 || 0,
+          downM: Number(e.score) || 0,
+          at: Number(e.timestamp) || 0,
+        };
+        const prev = best.get(entry.name);
+        if (!prev || entry.kmh > prev.kmh) best.set(entry.name, entry);
+      }
+      this.onLeaderboard?.([...best.values()].sort((a, b) => b.kmh - a.kmh));
+      return;
+    }
     if (type === 'world:sync') {
       const players = (d.players ?? {}) as Record<string, Record<string, unknown>>;
       for (const [id, p] of Object.entries(players)) {
@@ -335,6 +365,29 @@ export class Net {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'world:graffiti:save', wallId, imageData }));
     }
+  }
+
+  /**
+   * Speed records ride the party server's existing persistent leaderboard
+   * (the saber game's leaderboard_* messages, stored per room): km/h × 10
+   * goes in its descending sort key `seconds`, metres downhill in `score`,
+   * and `wave` tags the entry as a Noun World speed run.
+   */
+  submitSpeed(name: string, kmh: number, downM: number) {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({
+        type: 'leaderboard_submit',
+        name: name.slice(0, 42),
+        seconds: Math.round(kmh * 10),
+        score: Math.round(downM),
+        wave: SPEED_WAVE,
+      }),
+    );
+  }
+
+  requestLeaderboard() {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: 'leaderboard_get' }));
   }
 
   graffitiLoad(wallId: string) {
