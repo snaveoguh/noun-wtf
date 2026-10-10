@@ -21,6 +21,7 @@ import type { RailDef } from '../physics/Rails';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { addBdayBalloons, bobBdayActive, type BdayDecor } from './BdayBalloons';
 import { SURFACES } from './proceduralTextures';
 
 // ── Dimensions ───────────────────────────────────────────────────────────
@@ -106,6 +107,12 @@ export interface MegaRamp {
   /** Local-space bounds (incl. legs that dip below y = 0 for uneven terrain). */
   footprint: THREE.Box3;
   stations: MegaRampStations;
+  /**
+   * Bob Burnquist birthday balloons (Oct 9–11 or `?bday=bob`), a child of
+   * `group`, render-only and outside `footprint`. Call `dispose` when the
+   * ramp is torn down (releases instanced buffers + the ink-exclusion entry).
+   */
+  decor: BdayDecor | null;
 }
 
 export interface PlacedMegaRamp {
@@ -842,31 +849,44 @@ export function buildMegaRamp(opts: { seed?: number; approach?: MegaRampApproach
   const footprint = new THREE.Box3().setFromObject(group);
   footprint.min.y = Math.min(footprint.min.y, -1);
 
+  const stations: MegaRampStations = {
+    crestZ,
+    runStartZ,
+    kickerStartZ,
+    lipZ,
+    lipY,
+    landingStartZ,
+    landingY,
+    knuckleZ,
+    landingBottomZ,
+    runOutStartZ,
+    archStartZ,
+    archEndZ,
+    archApexY,
+    qpStartZ,
+    qpLipZ,
+    qpLipY,
+    endZ,
+  };
+  // Party dressing goes in after the footprint so terraces / placement ignore it
+  let decor: BdayDecor | null = null;
+  if (bobBdayActive()) {
+    try {
+      decor = addBdayBalloons(group, stations, D, opts.seed ?? 1);
+      decor.object.updateMatrixWorld(true);
+    } catch (err) {
+      console.warn('[world2] bday balloons failed', err);
+    }
+  }
+
   return {
     group,
     collision,
     rails,
     spawn: { position: new THREE.Vector3(0, D.topY, D.topDeckLen * 0.45), yaw: 0 },
     footprint,
-    stations: {
-      crestZ,
-      runStartZ,
-      kickerStartZ,
-      lipZ,
-      lipY,
-      landingStartZ,
-      landingY,
-      knuckleZ,
-      landingBottomZ,
-      runOutStartZ,
-      archStartZ,
-      archEndZ,
-      archApexY,
-      qpStartZ,
-      qpLipZ,
-      qpLipY,
-      endZ,
-    },
+    stations,
+    decor,
   };
 }
 
