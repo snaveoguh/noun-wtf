@@ -20,7 +20,8 @@ import { Input, type InputFrame } from './core/Input';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
-import { Net, type NetPose } from './net/Net';
+import { fetchFastest, postFastest } from './net/Fastest';
+import { Net, type NetPose, type SpeedEntry } from './net/Net';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
@@ -274,13 +275,9 @@ export class Game {
       this.net.onGraffiti = (id, tags) => this.graffiti?.onTags(id, tags);
       this.net.onOpen = () => {
         this.graffiti?.loadAll();
-        this.net.requestLeaderboard();
-      };
-      this.net.onLeaderboard = entries => {
-        this.hud = { ...this.hud, fastest: entries.slice(0, 10) };
-        this.emit();
       };
       this.net.connect();
+      void this.refreshFastest();
     }
 
     this.setLoading(null);
@@ -1160,8 +1157,39 @@ export class Game {
   /** Top speed this session not yet submitted, and when we last checked. */
   private speedRecord = { pending: 0, downM: 0, acc: 0 };
 
-  /** Personal bests go to the room leaderboard (a few seconds apart). */
+  private fastestPolledAt = 0;
+  private postingBest = false;
+  /** The local-best re-post waits until we're riding, when the name is final. */
+  private bestSynced = false;
+
+  private setFastest(entries: SpeedEntry[]) {
+    this.hud = { ...this.hud, fastest: entries };
+    this.emit();
+  }
+
+  /**
+   * Load the board. On the first load in the world, re-post this browser's
+   * best (records set while the board was on the party server were lost).
+   */
+  async refreshFastest(first = false) {
+    this.fastestPolledAt = performance.now();
+    const entries = await fetchFastest();
+    if (entries === null) return;
+    this.setFastest(entries);
+    const best = this.hud.myBestKmh;
+    // The server only keeps it if it beats this rider's row, so just send it
+    if (first && best >= 40) {
+      const next = await postFastest(this.name, best, 0);
+      if (next) this.setFastest(next);
+    }
+  }
+
+  /** Personal bests go to the all-time board (a few seconds apart). */
   private trackTopSpeed(dt: number) {
+    if (!this.bestSynced && this.opts.offline !== true) {
+      this.bestSynced = true;
+      void this.refreshFastest(true);
+    }
     const p = this.player;
     if (p.mode === 'board' && p.state !== 'bail') {
       const kmh = p.speed * 3.6;
@@ -1174,11 +1202,26 @@ export class Game {
     if (this.speedRecord.acc < 3) return;
     this.speedRecord.acc = 0;
     const kmh = this.speedRecord.pending;
-    if (kmh >= 40 && kmh > this.hud.myBestKmh + 0.5 && this.net.connected) {
-      this.net.submitSpeed(this.name, kmh, this.speedRecord.downM);
-      this.speedRecord.pending = 0;
-      saveBestKmh(kmh);
-      this.hud = { ...this.hud, myBestKmh: kmh };
+    if (
+      kmh >= 40 &&
+      kmh > this.hud.myBestKmh + 0.5 &&
+      !this.postingBest &&
+      this.opts.offline !== true
+    ) {
+      this.postingBest = true;
+      const downM = this.speedRecord.downM;
+      void postFastest(this.name, kmh, downM).then(next => {
+        this.postingBest = false;
+        // Failed: keep it pending so the next check tries again
+        if (next === null) return;
+        if (this.speedRecord.pending <= kmh) this.speedRecord.pending = 0;
+        saveBestKmh(Math.max(kmh, loadBestKmh()));
+        this.hud = { ...this.hud, myBestKmh: Math.max(kmh, this.hud.myBestKmh) };
+        this.setFastest(next);
+      });
+    } else if (performance.now() - this.fastestPolledAt > 60_000 && this.opts.offline !== true) {
+      // Keep other riders' records fresh while playing
+      void this.refreshFastest();
     }
   }
 

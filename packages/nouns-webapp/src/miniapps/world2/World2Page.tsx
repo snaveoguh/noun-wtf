@@ -444,7 +444,12 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         >
           📻 {hud.radio.on ? hud.radio.label : 'radio off'}
         </button>
-        <FastestChip entries={hud.fastest} myBest={hud.myBestKmh} />
+        <FastestChip
+          entries={hud.fastest}
+          myBest={hud.myBestKmh}
+          me={game.name}
+          onOpen={() => void game.refreshFastest()}
+        />
       </div>
 
       {/* Now playing toast (JSR-style station card) */}
@@ -564,30 +569,59 @@ const CSS = `
 function FastestChip({
   entries,
   myBest,
+  me,
+  onOpen,
 }: {
   entries: { name: string; kmh: number; downM: number }[];
   myBest: number;
+  me: string;
+  onOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const top = entries[0];
+  const top = entries.length > 0 ? entries[0] : undefined;
+  const myRank = entries.findIndex(e => e.name === me);
   return (
     <div className="flex flex-col items-end gap-1">
-      <button type="button" className="w2-chip text-xs" onClick={() => setOpen(o => !o)}>
-        🏁 {top ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
+      <button
+        type="button"
+        className="w2-chip text-xs"
+        onClick={() => {
+          if (!open) onOpen();
+          setOpen(o => !o);
+        }}
+        title="Fastest of all time"
+      >
+        🏁{' '}
+        {top !== undefined ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
       </button>
       {open && (
-        <div className="w2-chip flex min-w-[220px] flex-col gap-1 text-xs">
-          <div className="font-bold">FASTEST OF ALL TIME</div>
+        <div className="w2-chip relative z-30 flex w-[260px] flex-col gap-1 text-xs">
+          <div className="flex justify-between font-bold">
+            <span>FASTEST OF ALL TIME</span>
+            <span className="opacity-70">{entries.length} riders</span>
+          </div>
           {entries.length === 0 && <div className="opacity-70">ride the mountain to set one</div>}
-          {entries.map((e, i) => (
-            <div key={e.name} className="flex justify-between gap-3">
-              <span>
-                {i + 1}. {e.name}
-              </span>
-              <span className="font-bold">{Math.round(e.kmh)} km/h</span>
-            </div>
-          ))}
-          <div className="mt-1 opacity-70">your best: {Math.round(myBest)} km/h</div>
+          <div className="flex max-h-[50vh] flex-col gap-0.5 overflow-y-auto pr-1">
+            {entries.map((e, i) => (
+              <div
+                key={i}
+                className={`flex justify-between gap-3 ${e.name === me ? 'font-bold text-[#ffd400]' : ''}`}
+              >
+                <span className="truncate">
+                  {i + 1}. {e.name}
+                </span>
+                <span className="shrink-0">
+                  <b>{Math.round(e.kmh)} km/h</b>
+                  {e.downM > 0 && (
+                    <span className="opacity-60"> ↓{(e.downM / 1000).toFixed(1)} km</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 opacity-70">
+            your best: {Math.round(myBest)} km/h{myRank >= 0 ? ` (#${myRank + 1})` : ''}
+          </div>
         </div>
       )}
     </div>
