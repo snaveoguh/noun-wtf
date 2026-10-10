@@ -444,6 +444,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         >
           📻 {hud.radio.on ? hud.radio.label : 'radio off'}
         </button>
+        <FastestChip entries={hud.fastest} myBest={hud.myBestKmh} />
       </div>
 
       {/* Now playing toast (JSR-style station card) */}
@@ -558,3 +559,37 @@ const CSS = `
 .w2-said{background:#fff;color:#111;border-radius:10px;padding:3px 8px;margin-bottom:4px;max-width:220px;white-space:normal;font-size:12px}
 .w2-trick{color:#ffd400;font-style:italic;font-weight:700;margin-bottom:2px;text-shadow:0 1px 0 #000}
 `;
+
+/** Fastest of all time (room leaderboard): the record on the chip, top 10 on click. */
+function FastestChip({
+  entries,
+  myBest,
+}: {
+  entries: { name: string; kmh: number; downM: number }[];
+  myBest: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const top = entries[0];
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" className="w2-chip text-xs" onClick={() => setOpen(o => !o)}>
+        🏁 {top ? `${Math.round(top.kmh)} km/h ${top.name}` : 'fastest: no records yet'}
+      </button>
+      {open && (
+        <div className="w2-chip flex min-w-[220px] flex-col gap-1 text-xs">
+          <div className="font-bold">FASTEST OF ALL TIME</div>
+          {entries.length === 0 && <div className="opacity-70">ride the mountain to set one</div>}
+          {entries.map((e, i) => (
+            <div key={e.name} className="flex justify-between gap-3">
+              <span>
+                {i + 1}. {e.name}
+              </span>
+              <span className="font-bold">{Math.round(e.kmh)} km/h</span>
+            </div>
+          ))}
+          <div className="mt-1 opacity-70">your best: {Math.round(myBest)} km/h</div>
+        </div>
+      )}
+    </div>
+  );
+}
