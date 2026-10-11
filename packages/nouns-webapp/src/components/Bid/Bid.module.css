@@ -110,7 +110,11 @@
   color: rgba(255, 255, 255, 0.8) !important;
 }
 
-.bidBtnAuctionEnded {
+.bidBtnAuctionEnded,
+/* The site theme's [data-theme] .btn-primary rule (glass tint, white text,
+   also !important) out-specifies a single class, so pin the ink pill under
+   any theme too */
+:global([data-theme]) .bidBtnAuctionEnded.bidBtnAuctionEnded {
   width: 100%;
   height: 3rem;
   /* Solid ink pill: the auction page is pastel, so the global glass button
@@ -124,11 +128,13 @@
   border-radius: 999px !important;
 }
 
-.bidBtnAuctionEnded:hover:not(:disabled) {
+.bidBtnAuctionEnded:hover:not(:disabled),
+:global([data-theme]) .bidBtnAuctionEnded.bidBtnAuctionEnded:hover:not(:disabled) {
   background: #2a2a3a !important;
 }
 
-.bidBtnAuctionEnded:disabled {
+.bidBtnAuctionEnded:disabled,
+:global([data-theme]) .bidBtnAuctionEnded.bidBtnAuctionEnded:disabled {
   background: #14141f !important;
   color: rgba(255, 255, 255, 0.7) !important;
 }
