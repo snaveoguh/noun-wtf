@@ -1407,8 +1407,17 @@ export class Game {
 }
 
 function pickQuality(): Quality {
+  // Touch-first devices get the light path whatever their screen size.
+  // iPadOS Safari reports a Mac user agent and iPads are wider than any
+  // phone, so they used to fall through to high (2x pixels, 4K shadows,
+  // AO, half-float buffers), run out of memory and get the tab reloaded
+  // by Safari mid-game.
+  const ipad = /macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+  const touchFirst = window.matchMedia?.('(pointer: coarse)').matches === true;
   const mobile =
     /android|iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    ipad ||
+    touchFirst ||
     (navigator.maxTouchPoints > 1 && window.innerWidth < 1100);
   if (mobile) return 'low';
   const cores = navigator.hardwareConcurrency ?? 4;
