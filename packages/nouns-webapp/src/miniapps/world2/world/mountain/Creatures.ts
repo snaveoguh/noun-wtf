@@ -269,8 +269,11 @@ function buildHead(
   const front = cz + d / 2;
   // Snout / beak + nose / mouth
   let mouthZ = front;
+  /** Top of a snout / beak sticking out of the face (noggles sit above it). */
+  let muzzleTop = -Infinity;
   if (o.beak) {
     const bl = d * r.range(0.4, 0.9);
+    muzzleTop = cy - h * 0.1 + h * 0.11;
     b.box(cx, cy - h * 0.1, front + bl / 2, w * 0.32, h * 0.22, bl, pal.accent);
     b.box(
       cx,
@@ -286,6 +289,7 @@ function buildHead(
     const sw = w * r.range(0.45, 0.75);
     const sh = h * r.range(0.35, 0.5);
     const sy = cy - h / 2 + sh / 2 + h * 0.05;
+    muzzleTop = sy + sh / 2;
     b.box(cx, sy, front + sl / 2, sw, sh, sl, pal.belly);
     b.box(cx, sy + sh * 0.2, front + sl + 0.01, sw * 0.45, sh * 0.3, 0.04, pal.dark);
     mouthZ = front + sl;
@@ -302,21 +306,30 @@ function buildHead(
   }
   // Eyes (or noggles)
   if (noggles) {
-    const L = Math.min(w * 0.36, h * 0.5);
+    // Chunky enough to read at a distance through the ink pass, high on the
+    // face clear of any snout, and proper ◨ lenses: white left half, black
+    // right half, no frame showing between them
+    const L = Math.min(w * 0.42, h * 0.56);
     const frame = pick(r, NOGGLE);
-    const t = L * 0.16;
-    const ez = front + 0.04;
-    const ey = cy + h * 0.12;
+    const t = L * 0.18;
+    const fd = Math.max(0.08, L * 0.12);
+    const ez = front + fd / 2;
+    const ey = Math.max(cy + h / 2 - L / 2 - h * 0.06, muzzleTop + L / 2 + 0.02);
+    const lw = (L - t * 2) / 2;
+    const lh = L - t * 2;
     for (const s of [-1, 1]) {
-      const lx = cx + s * (L * 0.62);
-      b.box(lx, ey, ez, L, L, 0.05, frame);
-      b.box(lx - L * 0.17, ey, ez + 0.03, L * 0.34 - t * 0.5, L - t * 2, 0.04, WHITE);
-      b.box(lx + L * 0.17, ey, ez + 0.03, L * 0.34 - t * 0.5, L - t * 2, 0.04, INK);
+      const lx = cx + s * (L * 0.6);
+      b.box(lx, ey, ez, L, L, fd, frame);
+      b.box(lx - lw / 2, ey, ez + fd / 2 + 0.012, lw, lh, 0.024, WHITE);
+      b.box(lx + lw / 2, ey, ez + fd / 2 + 0.012, lw, lh, 0.024, INK);
     }
     // Bridge + the ⌐ arm round the side
-    b.box(cx, ey + L * 0.15, ez, L * 0.26, t, 0.05, frame);
-    b.box(cx - L * 1.2, ey + L * 0.15, ez - 0.02, L * 0.3, t, 0.05, frame);
-    b.box(cx - w / 2 - 0.02, ey + L * 0.15, cz + d * 0.1, t, t, d * 0.75, frame);
+    b.box(cx, ey + L * 0.15, ez, L * 0.2 + 0.02, t * 1.2, fd, frame);
+    b.box(cx - L * 1.25, ey + L * 0.15, ez, L * 0.3, t * 1.2, fd, frame);
+    // Noggles can be wider than the head (like on a Noun): the arm runs back
+    // from whichever is further out, the frame's end or the head's side
+    const armX = cx - Math.max(w / 2 + t * 0.5, L * 1.4 - t * 0.5);
+    b.box(armX, ey + L * 0.15, cz + d * 0.1, t, t * 1.2, d * 0.75, frame);
   } else {
     const n = pick(r, [1, 2, 2, 2, 2, 2, 3, 3, 4, 5]);
     const es = Math.min(w, h) * r.range(0.2, 0.34) * (n >= 4 ? 0.75 : 1);
