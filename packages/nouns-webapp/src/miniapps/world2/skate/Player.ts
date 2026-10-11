@@ -342,9 +342,35 @@ export class Player {
 
     this.clampBounds();
     this.terrainRescue();
-    // Fell out of the world → respawn
-    if (this.fellOut()) this.respawnSafe();
+    // Fell out of the world, or wedged in geometry mid-fall → respawn
+    if (this.fellOut() || this.wedged(dt)) this.respawnSafe();
     if (input.respawnPressed) this.respawnHome();
+  }
+
+  private wedgedFor = 0;
+  private wedgePos = new THREE.Vector3();
+
+  /**
+   * Stuck falling: in the air but going nowhere, because collision (or the
+   * terrain rescue under a raised bowl) keeps putting the rider back, so
+   * the fall plays forever on the spot. Real air always travels (gravity
+   * alone moves you metres a second); 1.5 s of this is a glitch.
+   */
+  private wedged(dt: number) {
+    if (this.state !== 'air') {
+      this.wedgedFor = 0;
+      this.wedgePos.copy(this.pos);
+      return false;
+    }
+    if (this.pos.distanceTo(this.wedgePos) > 0.6) {
+      this.wedgedFor = 0;
+      this.wedgePos.copy(this.pos);
+      return false;
+    }
+    this.wedgedFor += dt;
+    if (this.wedgedFor < 1.5) return false;
+    this.wedgedFor = 0;
+    return true;
   }
 
   /** Lowest walkable floor under (x, z): the terrain on the mountain, else the plaza. */
