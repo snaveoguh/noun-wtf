@@ -527,7 +527,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
       {/* One-off banner (secret spot found…) */}
       {hud.toast !== null && now - hud.toast.at < 5000 && (
         <div key={hud.toast.at} className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2">
-          <span>⌐◨-◨ 19 km out</span>
+          <span>{hud.toast.tag ?? '⌐◨-◨ 19 km out'}</span>
           <b>{hud.toast.text}</b>
         </div>
       )}

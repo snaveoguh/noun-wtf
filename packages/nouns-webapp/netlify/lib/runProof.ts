@@ -47,10 +47,12 @@ function baseHeight(de: number): number {
   return MOUNTAIN.topY - MOUNTAIN.slope * (de - L * (1 - Math.exp(-de / L)));
 }
 // Everything terrain.ts adds on top (hills, trench, rollers, terraces cut
-// for the mega ramps / Noun Jersey) stays inside this band of the gradient
+// for the mega ramps / Noun Jersey) stays inside this band of the gradient.
+// Only ground samples are held to it from above: at 600 km/h a kicker
+// throws you hundreds of metres over the slope, and air is already pinned
+// down by the energy budget (height costs speed) and the gravity fit.
 const BAND_BELOW = 70;
 const BAND_ABOVE = 55;
-const AIR_ABOVE = 260;
 
 const fail = (reason: string): RunCheck => ({ ok: false, reason, maxV: 0, airs: [] });
 
@@ -88,7 +90,7 @@ export function verifyRun(s: Float32Array): RunCheck {
     if (de > 150) {
       const b = baseHeight(de);
       if (y < b - BAND_BELOW) return fail('below the mountain');
-      if (y > b + (st === AIR ? AIR_ABOVE : BAND_ABOVE)) return fail('above the mountain');
+      if (st !== AIR && y > b + BAND_ABOVE) return fail('above the mountain');
     }
     if (i === 0) continue;
     const p = o - STRIDE;

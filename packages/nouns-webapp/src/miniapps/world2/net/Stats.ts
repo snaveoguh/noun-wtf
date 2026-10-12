@@ -280,6 +280,8 @@ export async function fetchStats(): Promise<WorldStats | null> {
 
 export class StatsTracker {
   mine: MyBests = loadBests();
+  /** A record the server wouldn't take (shown to the rider, never silent). */
+  onRejected?: (k: BestKey, value: number, reason: string) => void;
   /** Something new to post (a raised best or lifetime deltas). */
   private dirty = true;
   private sessionPosted = false;
@@ -467,9 +469,27 @@ export class StatsTracker {
         // Keep the link in step with the server (linked elsewhere, moved…)
         return res
           .json()
-          .then((out: { linked?: WalletLinkState | null }) => {
-            if (out.linked !== undefined) setLink(out.linked);
-          })
+          .then(
+            (out: {
+              linked?: WalletLinkState | null;
+              rejected?: Partial<Record<BestKey, string>>;
+              you?: { best?: Partial<Record<BestKey, number>> };
+            }) => {
+              if (out.linked !== undefined) setLink(out.linked);
+              // A refused record goes back to what the server holds, or a
+              // real ride below it would never be posted
+              for (const [k, reason] of Object.entries(out.rejected ?? {}) as [BestKey, string][]) {
+                const claimed = best[k] ?? 0;
+                const held = out.you?.best?.[k] ?? 0;
+                if ((this.mine.best[k] ?? 0) === claimed) {
+                  if (held > 0) this.mine.best[k] = held;
+                  else delete this.mine.best[k];
+                  save(BEST_KEY, JSON.stringify(this.mine));
+                }
+                this.onRejected?.(k, claimed, reason);
+              }
+            },
+          )
           .catch(() => undefined);
       })
       .catch(() => undefined)

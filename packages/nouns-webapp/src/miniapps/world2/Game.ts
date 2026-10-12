@@ -21,7 +21,14 @@ import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
-import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
+import {
+  fetchStats,
+  STAT_INFO,
+  StatsTracker,
+  type MyBests,
+  type StatKey,
+  type WorldStats,
+} from './net/Stats';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
@@ -111,7 +118,7 @@ export interface HudState {
   mine: MyBests;
   mineCombo: number | undefined;
   /** One-off banner (e.g. finding the secret spot). */
-  toast: { text: string; at: number } | null;
+  toast: { text: string; at: number; tag?: string } | null;
 }
 
 interface RemoteAvatar {
@@ -170,6 +177,7 @@ export class Game {
 
   constructor(opts: GameOptions) {
     this.opts = opts;
+    this.stats.onRejected = (k, value, reason) => this.statsRejected(k, value, reason);
     this.labelLayer = opts.labelLayer;
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
@@ -1287,6 +1295,19 @@ export class Game {
     () => this.name,
     () => this.opts.offline === true || devRun(),
   );
+
+  /** A record the server refused: say so, never drop it silently. */
+  private statsRejected(k: StatKey, value: number, reason: string) {
+    this.hud = {
+      ...this.hud,
+      toast: {
+        tag: '⚠ RECORD NOT SAVED',
+        text: `${STAT_INFO[k].fmt(value)}: ${reason}`,
+        at: performance.now(),
+      },
+    };
+    this.emit();
+  }
   private statsPolledAt = -Infinity;
 
   /** Reload the all-time boards (opening the league, and once a minute). */
