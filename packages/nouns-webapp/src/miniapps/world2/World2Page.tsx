@@ -7,11 +7,22 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAppSelector } from '@/hooks';
 
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
-import { BUILDS } from './character/NounCharacter';
+import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
-import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
+import {
+  shortAddr,
+  STAT_INFO,
+  walletLink,
+  type MyBests,
+  type StatKey,
+  type StatRow,
+  type WorldStats,
+} from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
+import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
+import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
+import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
 import { worldPause } from './worldPause';
 
@@ -91,7 +102,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     () => ({
       seed: urlSeed ?? saved?.seed ?? auctionSeed ?? randomSeed(),
       name: searchParams.get('name') ?? saved?.name ?? '',
-      board: searchParams.get('board') === 'hover' ? 'hover' : (saved?.board ?? 'skate'),
+      board: searchParams.has('board')
+        ? parseBoardType(searchParams.get('board'))
+        : parseBoardType(saved?.board),
       build: saved?.build ?? 2,
     }),
     // Only the first resolution matters; the select screen owns it after that.
@@ -158,6 +171,32 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     if (paused) setChatOpen(false);
   }, [game, paused]);
 
+  // Board shop (deck designer): from the Noun Jersey shop door or the select screen
+  useDeckWallet();
+  const [deckOpen, setDeckOpen] = useState(false);
+  const openDeck = () => {
+    gameRef.current?.setPaused(true);
+    setDeckOpen(true);
+  };
+  const closeDeck = () => {
+    setDeckOpen(false);
+    gameRef.current?.setPaused(pausedRef.current);
+  };
+  useEffect(() => {
+    if (!game || phase !== 'play' || deckOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyE' || !game.hud.shop || pausedRef.current) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      // Capture phase: the game's own E (board on/off) never sees it
+      e.stopPropagation();
+      e.preventDefault();
+      game.setPaused(true);
+      setDeckOpen(true);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [game, phase, deckOpen]);
+
   // Keyboard: chat + help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -213,9 +252,15 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && (
-        <Hud game={game} showHelp={showHelp} onHelp={() => setShowHelp(s => !s)} />
+        <Hud
+          game={game}
+          showHelp={showHelp}
+          onHelp={() => setShowHelp(s => !s)}
+          onShop={openDeck}
+        />
       )}
       {game && started && <TouchControls game={game} />}
+      {game?.drops && started && <DropClaim drops={game.drops} />}
 
       {chatOpen && (
         <form
@@ -245,8 +290,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           initial={initialChar}
           auctionSeed={auctionSeed ?? null}
           onConfirm={confirmCharacter}
+          onDesignDeck={openDeck}
         />
       )}
+      {game && deckOpen && <DeckDesigner game={game} onClose={closeDeck} />}
       {(phase === 'title' || !game) && !error && <SplashGate game={game} onStart={begin} />}
       {game && searchParams.get('diag') === '1' && <Diagnostics game={game} />}
 
@@ -364,7 +411,17 @@ function Splash({
   );
 }
 
-function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp: () => void }) {
+function Hud({
+  game,
+  showHelp,
+  onHelp,
+  onShop,
+}: {
+  game: Game;
+  showHelp: boolean;
+  onHelp: () => void;
+  onShop: () => void;
+}) {
   const hud = useHud(game);
   const now = performance.now();
   const banked = hud.banked && now - hud.banked.at < 2600 ? hud.banked : null;
@@ -518,9 +575,20 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
       {/* One-off banner (secret spot found…) */}
       {hud.toast !== null && now - hud.toast.at < 5000 && (
         <div key={hud.toast.at} className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2">
-          <span>⌐◨-◨ 19 km out</span>
+          <span>{hud.toast.tag ?? '⌐◨-◨ 19 km out'}</span>
           <b>{hud.toast.text}</b>
         </div>
+      )}
+
+      {/* Noun Jersey board shop door */}
+      {hud.shop && (
+        <button
+          type="button"
+          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
+          onClick={onShop}
+        >
+          ENTER BOARD SHOP — {touch ? 'TAP' : 'E / tap'}
+        </button>
       )}
 
       {/* GTA-style map: minimap bottom-left, opens the full map */}
@@ -671,7 +739,13 @@ function StatsChip({
   const top = speed.length > 0 ? speed[0] : undefined;
   const rows = stats?.boards[tab] ?? [];
   const info = STAT_INFO[tab];
-  const myRank = rows.findIndex(e => e.name === me);
+  // A linked rider is their address's row, whatever name they play under
+  const link = useSyncExternalStore(walletLink.subscribe, walletLink.get);
+  const isMe = (e: StatRow) =>
+    link !== null && e.addr !== undefined
+      ? e.addr.toLowerCase() === link.address.toLowerCase()
+      : link === null && e.name === me;
+  const myRank = rows.findIndex(isMe);
   const myBest = tab in mine.best ? mine.best[tab as keyof MyBests['best']] : undefined;
   const today = stats?.days[new Date().toISOString().slice(0, 10)] ?? 0;
   return (
@@ -728,10 +802,16 @@ function StatsChip({
           )}
           <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto pr-1">
             {rows.map((e, i) => (
-              <div key={i} className={e.name === me ? 'font-bold text-[#ffd400]' : ''}>
+              <div key={i} className={isMe(e) ? 'font-bold text-[#ffd400]' : ''}>
                 <div className="flex justify-between gap-3">
-                  <span className="truncate">
+                  <span className="truncate" title={e.addr}>
                     {i + 1}. {e.name}
+                    {e.addr !== undefined && (
+                      <span className="text-[10px] opacity-60">
+                        {' '}
+                        <span className="text-[#5be37d]">✓</span> {shortAddr(e.addr)}
+                      </span>
+                    )}
                   </span>
                   <b className="shrink-0">{info.fmt(e.value)}</b>
                 </div>
@@ -750,6 +830,7 @@ function StatsChip({
                 : '–'}
             {myRank >= 0 ? ` (#${myRank + 1})` : ''}
           </div>
+          <WalletLink me={me} />
         </div>
       )}
     </div>

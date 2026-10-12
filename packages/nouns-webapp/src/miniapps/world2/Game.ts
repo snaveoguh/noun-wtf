@@ -9,19 +9,30 @@ import * as THREE from 'three';
 
 import { PirateRadio } from './audio/PirateRadio';
 import { SkateAudio } from './audio/SkateAudio';
+import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
   loadCharacterAssets,
   NounCharacter,
+  rideTrickLabel,
   type BoardType,
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
+import { Drops } from './drops/Drops';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
-import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
+import {
+  fetchStats,
+  STAT_INFO,
+  StatsTracker,
+  type MyBests,
+  type StatKey,
+  type WorldStats,
+} from './net/Stats';
+import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
@@ -36,6 +47,8 @@ import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaR
 import { dressingDecorator } from './world/mountain/DressingDecorator';
 import { megaRampDecorator } from './world/mountain/MegaRamps';
 import { MountainStream } from './world/mountain/MountainStream';
+import { bowlCentre, bowlFrame, bowlSpawn, inBowl } from './world/mountain/noggleBowl';
+import { noggleBowlDecorator } from './world/mountain/NoggleBowlPark';
 import {
   NJ,
   njFrame,
@@ -44,7 +57,7 @@ import {
   njSpeedLimit,
   njToWorld,
 } from './world/mountain/nounJersey';
-import { nounJerseyDecorator } from './world/mountain/NounJerseyPark';
+import { nounJerseyDecorator, njShopDoor } from './world/mountain/NounJerseyPark';
 import { rampDecorator, warmMountainProps } from './world/mountain/Props';
 import {
   edgeDistance,
@@ -73,7 +86,7 @@ function devRun(): boolean {
   return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
 }
 
-/** `?spot=nj` dev param: spawn at the top of Main St in the secret Noun Jersey park. */
+/** `?spot=nj` / `?spot=bowl` dev params: spawn in a secret spot (Noun Jersey, the Noggle Bowl). */
 function spotParam(): string | null {
   return new URLSearchParams(window.location.search).get('spot');
 }
@@ -111,7 +124,9 @@ export interface HudState {
   mine: MyBests;
   mineCombo: number | undefined;
   /** One-off banner (e.g. finding the secret spot). */
-  toast: { text: string; at: number } | null;
+  toast: { text: string; at: number; tag?: string } | null;
+  /** At the Noun Jersey board shop's door (opens the deck designer). */
+  shop: boolean;
 }
 
 interface RemoteAvatar {
@@ -144,6 +159,8 @@ export class Game {
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
+  /** On-chain drop party pickups (null when VITE_WORLD_DROPS_ADDRESS is unset). */
+  readonly drops = Drops.create();
   level: LevelData | null = null;
   assets: CharacterAssets | null = null;
   me: NounCharacter | null = null;
@@ -151,6 +168,7 @@ export class Game {
   nounId: number;
   name: string;
   remotes = new Map<string, RemoteAvatar>();
+  crew: JerseyCrew | null = null;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -170,6 +188,7 @@ export class Game {
 
   constructor(opts: GameOptions) {
     this.opts = opts;
+    this.stats.onRejected = (k, value, reason) => this.statsRejected(k, value, reason);
     this.labelLayer = opts.labelLayer;
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
@@ -210,6 +229,7 @@ export class Game {
       mine: { best: {}, comboLabel: '' },
       mineCombo: undefined,
       toast: null,
+      shop: false,
     };
   }
 
@@ -267,6 +287,7 @@ export class Game {
           },
     );
     this.gfx.scene.add(this.graffiti.group);
+    if (this.drops !== null) this.gfx.scene.add(this.drops.group);
     // Paint is decals on walls: the normals pass would draw each canvas as a
     // solid panel and ink its edges as floating black frames
     inkExcluded.add(this.graffiti.group);
@@ -277,6 +298,18 @@ export class Game {
       this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
 
+    // Local-only NPC crew at the secret Noun Jersey park (spawns within ~400 m)
+    if (this.mountain !== null)
+      this.crew = new JerseyCrew({
+        scene: this.gfx.scene,
+        world: this.world,
+        assets,
+        quality: this.gfx.quality,
+        toon: this.gfx.toon,
+        labelLayer: this.labelLayer,
+        camera: this.gfx.camera,
+        canvas: this.opts.canvas,
+      });
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -295,6 +328,11 @@ export class Game {
     // `?spot=nj`: straight into the secret Noun Jersey park, ~19 km down
     if (spotParam() === 'nj' && this.mountain !== null) {
       const sp = njSpawn();
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
+    // `?spot=bowl`: the top of the Noggle Bowl's roll-in, ~42 km down the −X line
+    if (spotParam() === 'bowl' && this.mountain !== null) {
+      const sp = bowlSpawn();
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
     this.cam.snap(this.player);
@@ -400,7 +438,11 @@ export class Game {
   }
   showroomYaw = 0.5;
 
+  /** Custom deck graphics (board shop) on my board and everyone else's. */
+  private decks = new DeckSync();
+
   step(dt: number, now = performance.now()) {
+    this.decks.tick(this.me, this.net, this.remotes);
     if (this.showroom) {
       this.input.poll(now);
       this.updateShowroom(dt);
@@ -441,6 +483,8 @@ export class Game {
     this.updateAudio(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
+    this.drops?.update(dt, this.player);
+    this.crew?.update(dt, this.player.pos);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -516,6 +560,8 @@ export class Game {
       m.addDecorator(megaRampDecorator(this.rails));
       // The secret spot (Noun Jersey, ~19 km down the +Z line): same pattern
       m.addDecorator(nounJerseyDecorator(this.rails));
+      // …and the Noggle Bowl (~42 km down the −X line): walls, deck, coping
+      m.addDecorator(noggleBowlDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)
       const wild = new Wildlife(this.gfx.quality);
       m.addDecorator(wild.decorator());
@@ -906,6 +952,7 @@ export class Game {
       if (p.climb.mantle !== null) return { clip: 'jump_air', fade: 0.12 };
       return { clip: 'walk', fade: 0.15, timeScale: 0.05 + p.climb.moving * 1.15 };
     }
+    if (p.vault !== null) return { clip: 'jump_air', fade: 0.08 };
     if (p.mode === 'foot') {
       if (!p.footGrounded) return { clip: p.vel.y > 0 ? 'jump_air' : 'fall', fade: 0.2 };
       const hs = Math.hypot(p.vel.x, p.vel.z);
@@ -980,6 +1027,12 @@ export class Game {
       me.board.visible = false;
       me.body.position.set(0, 0, 0);
       me.body.quaternion.identity();
+      // Vault: tuck forward over the hands
+      if (p.vault !== null)
+        me.body.quaternion.setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0),
+          Math.sin(p.vault.k * Math.PI) * (p.vault.kind === 'over' ? 0.45 : 0.3),
+        );
       // Step sounds
       const hs = Math.hypot(p.vel.x, p.vel.z);
       if (p.footGrounded && hs > 0.5) {
@@ -1034,7 +1087,9 @@ export class Game {
       climb:
         p.climb !== null
           ? { phase: p.climb.phase, amount: p.climb.mantle !== null ? 0.55 : 1 }
-          : undefined,
+          : p.vault !== null
+            ? { phase: 0, amount: 0.6 * Math.sin(Math.min(1, p.vault.k * 1.6) * Math.PI) }
+            : undefined,
     });
 
     // Sparks while grinding metal
@@ -1062,6 +1117,7 @@ export class Game {
       p.grind?.rail.type ?? null,
       0.5,
       this.boardType === 'hover' && p.mode === 'board' && p.state !== 'bail',
+      this.boardType === 'scooter' ? 1.45 : this.boardType === 'blades' ? 1.2 : 1,
     );
     void dt;
   }
@@ -1118,7 +1174,9 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
-        trick: this.player.combo.entries.length ? comboLabel(this.player.combo).slice(-60) : '',
+        trick: this.player.combo.entries.length
+          ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
+          : '',
       };
       this.net.send(dt, pose, this.nounId);
       const fwd = new THREE.Vector3();
@@ -1278,6 +1336,19 @@ export class Game {
     () => this.name,
     () => this.opts.offline === true || devRun(),
   );
+
+  /** A record the server refused: say so, never drop it silently. */
+  private statsRejected(k: StatKey, value: number, reason: string) {
+    this.hud = {
+      ...this.hud,
+      toast: {
+        tag: '⚠ RECORD NOT SAVED',
+        text: `${STAT_INFO[k].fmt(value)}: ${reason}`,
+        at: performance.now(),
+      },
+    };
+    this.emit();
+  }
   private statsPolledAt = -Infinity;
 
   /** Reload the all-time boards (opening the league, and once a minute). */
@@ -1332,15 +1403,23 @@ export class Game {
       return { name: l.name, dist: Math.round(Math.hypot(d.x, d.z)), bearing };
     });
     if (this.mountain !== null) this.updateSecretSpot(lm);
+    if (this.mountain !== null) this.updateBowl(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
       state: p.climb !== null ? 'climb' : p.state,
       speed: p.speed,
       combo: c.entries.length
-        ? { label: comboLabel(c), score: comboScore(c), multiplier: c.multiplier }
+        ? {
+            label: rideTrickLabel(comboLabel(c), this.boardType),
+            score: comboScore(c),
+            multiplier: c.multiplier,
+          }
         : null,
-      banked: c.lastBanked,
+      banked:
+        c.lastBanked !== null
+          ? { ...c.lastBanked, label: rideTrickLabel(c.lastBanked.label, this.boardType) }
+          : null,
       session: c.session,
       best: c.best,
       players: this.net.players.size + 1,
@@ -1375,6 +1454,12 @@ export class Game {
     const f = njFrame();
     if (f === null) return;
     const p = this.player.pos;
+    const door = njShopDoor(f, { x: 0, z: 0 });
+    const shop =
+      Math.hypot(door.x - p.x, door.z - p.z) < 2.6 &&
+      Math.abs(p.y - f.P) < 2 &&
+      this.player.speed < 6;
+    if (shop !== this.hud.shop) this.hud = { ...this.hud, shop };
     const c = njToWorld(f, NJ.W / 2, NJ.L / 2, { x: 0, z: 0 });
     const dx = c.x - p.x;
     const dz = c.z - p.z;
@@ -1395,8 +1480,39 @@ export class Game {
     }
   }
 
+  /** The Noggle Bowl: same as the secret spot (compass when close, a banner the first time in). */
+  private bowlFound = false;
+
+  private updateBowl(lm: { name: string; dist: number; bearing: number }[]) {
+    const p = this.player.pos;
+    const f = bowlFrame(p.x, p.z);
+    if (f === null) return;
+    const c = bowlCentre(f, { x: 0, z: 0 });
+    const dx = c.x - p.x;
+    const dz = c.z - p.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 600)
+      lm.unshift({
+        name: 'Noggle Bowl',
+        dist: Math.round(dist),
+        bearing: Math.atan2(dx, dz) - this.cam.controlYaw,
+      });
+    if (!this.bowlFound && inBowl(p.x, p.z)) {
+      this.bowlFound = true;
+      this.hud = {
+        ...this.hud,
+        toast: {
+          tag: '⌐◨-◨ 42 km out',
+          text: 'SECRET SPOT FOUND: THE NOGGLE BOWL',
+          at: performance.now(),
+        },
+      };
+    }
+  }
+
   dispose() {
     this.stats.dispose();
+    this.drops?.dispose();
     this.mountain?.dispose();
     this.wild?.dispose();
     this.nature?.dispose();
@@ -1410,6 +1526,7 @@ export class Game {
     this.graffiti?.dispose();
     this.net.dispose();
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
+    this.crew?.dispose();
     this.gfx.dispose();
     this.world.dispose();
   }

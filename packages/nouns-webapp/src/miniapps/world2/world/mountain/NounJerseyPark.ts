@@ -1646,6 +1646,23 @@ export const njStats: NjBuildStats = {
   ms: 0,
 };
 
+/**
+ * Just outside the corner board shop's door (world x, z), for the game's
+ * "enter board shop" prompt. Mirrors the shop block in buildPark: origin at
+ * park (21, 61) facing Main St, door at local x ≈ 5, front face at z = 0.
+ */
+export function njShopDoor(f: NjFrame, out: { x: number; z: number }) {
+  const yaw = njYaw(f, -1, 0);
+  const o = njToWorld(f, 21, 61, out);
+  const lx = 5;
+  const lz = 0.9;
+  const x = o.x + lx * Math.cos(yaw) + lz * Math.sin(yaw);
+  const z = o.z - lx * Math.sin(yaw) + lz * Math.cos(yaw);
+  out.x = x;
+  out.z = z;
+  return out;
+}
+
 /** The park, in the chunk that holds the middle of the neighbourhood. */
 export function nounJerseyDecorator(rails: RailSet): ChunkDecorator {
   return {

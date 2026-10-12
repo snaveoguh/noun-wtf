@@ -104,6 +104,10 @@ const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _target = new THREE.Vector3();
+const _wn = new THREE.Vector3();
+const _wo = new THREE.Vector3();
+const _wd = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
 const BODY_RADIUS = 0.32;
@@ -122,6 +126,40 @@ const CLIMB_SIDE = 2.1;
 const MANTLE_TIME = 0.55;
 /** Seconds of walking into a wall before you grab it (jumping in is instant). */
 const WALL_PUSH_GRAB = 0.12;
+
+// ── Vaulting (on foot, knee-to-head-high walls) ──
+/** Wall-top heights (m above the floor you're on) that vault instead of block. */
+const VAULT_MIN = 0.35;
+const VAULT_MAX = 2.1;
+/** A top that continues at least this far is a step-up, not a hop over. */
+const VAULT_THICK = 1.5;
+/** How far past the near face we look for the wall top. */
+const VAULT_REACH = 1.0;
+
+export interface VaultState {
+  /** 'over': hop a thin wall to the far side; 'up': step up onto a thick top. */
+  kind: 'over' | 'up';
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  /** Unit horizontal direction of travel (into the wall). */
+  dir: THREE.Vector3;
+  /** Wall-top height (world y). */
+  top: number;
+  /** Over: horizontal distance (from `from`) to the near and far edges. */
+  near: number;
+  far: number;
+  /** Over: time fractions where the rise / crossing phases end. */
+  k1: number;
+  k2: number;
+  t: number;
+  dur: number;
+  /** 0..1 progress (for anim). */
+  k: number;
+  /** Horizontal speed carried out of the vault. */
+  exit: number;
+  /** Ends on the ground (else falls on, e.g. a ledge with a big drop behind). */
+  grounded: boolean;
+}
 
 export interface ClimbState {
   /** Horizontal unit wall normal (points out of the wall, toward the player). */
@@ -206,6 +244,10 @@ export class Player {
   sinceLand = 10;
   lastLandImpact = 0;
   vertLip = false;
+  /** Vert air: the face we left (the board stays square to it coming down). */
+  private vertNormal = new THREE.Vector3(0, 1, 0);
+  /** Vert air: height of the lip we left. */
+  private vertLipY = 0;
   fakie = false;
   /** Visual kickturn/revert spin remaining (radians), decays to 0. */
   kickturn = 0;
@@ -215,6 +257,9 @@ export class Player {
   /** Non-null while stuck to a wall (always on foot). */
   climb: ClimbState | null = null;
   private climbCooldown = 0;
+  /** Non-null while vaulting over / up onto a short wall (on foot). */
+  vault: VaultState | null = null;
+  private vaultCooldown = 0;
   private wallPush = 0;
   /** |x|, |z| clamp for the play area (replaces invisible boundary walls). */
   softBounds = Infinity;
@@ -258,6 +303,7 @@ export class Player {
     this.grind = null;
     this.flip = null;
     this.climb = null;
+    this.vault = null;
     this.crouch = 0;
     this.safePos.copy(p);
     this.safeFwd.copy(this.fwd);
@@ -285,6 +331,7 @@ export class Player {
     this.events.length = 0;
     this.grindCooldown = Math.max(0, this.grindCooldown - dt);
     this.climbCooldown = Math.max(0, this.climbCooldown - dt);
+    this.vaultCooldown = Math.max(0, this.vaultCooldown - dt);
     this.sinceLand += dt;
     if (this.emoteTimer > 0) {
       this.emoteTimer -= dt;
@@ -296,7 +343,8 @@ export class Player {
       this.state !== 'bail' &&
       this.state !== 'air' &&
       this.state !== 'grind' &&
-      this.climb === null
+      this.climb === null &&
+      this.vault === null
     ) {
       this.toggleBoard();
     }
@@ -445,6 +493,7 @@ export class Player {
     this.mode = 'board';
     this.state = 'ground';
     this.climb = null;
+    this.vault = null;
     this.pos.copy(this.safePos);
     this.vel.set(0, 0, 0);
     this.run = 0;
@@ -466,6 +515,10 @@ export class Player {
   footTank = false;
 
   private updateFoot(dt: number, input: InputFrame, camYaw: number) {
+    if (this.vault !== null) {
+      this.updateVault(dt);
+      return;
+    }
     const t = this.tuning;
     const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const target = _v.set(0, 0, 0);
@@ -508,8 +561,10 @@ export class Player {
     }
     this.vel.y -= t.gravity * dt;
     this.pos.addScaledVector(this.vel, dt);
+    // Speed carried into a vault (read before the wall eats it)
+    const carry = Math.max(Math.hypot(this.vel.x, this.vel.z), Math.hypot(target.x, target.z));
 
-    // Walls — walk or jump into one to grab it
+    // Walls — walk or jump into one to grab it (tall) or vault it (short)
     const wantX = target.x;
     const wantZ = target.z;
     const wall = this.resolveBody(1.4);
@@ -523,6 +578,8 @@ export class Player {
         this.tryStartClimb(wall)
       )
         return;
+      // Short wall: only off a jump (walking into one just blocks)
+      if (!this.footGrounded && into > 0.55 && this.tryStartVault(wall, carry)) return;
     } else {
       this.wallPush = 0;
     }
@@ -639,6 +696,208 @@ export class Player {
     this.emoteTimer = 0;
     this.events.push({ type: 'climbStart' });
     return true;
+  }
+
+  // ── Vaulting ────────────────────────────────────────────────────────
+
+  /** Straight-down probe at horizontal offset `s` along `d` from the player. */
+  private vaultDrop(d: THREE.Vector3, s: number, fromY: number, len: number) {
+    return this.world.raycast(
+      _v.set(this.pos.x + d.x * s, fromY, this.pos.z + d.z * s),
+      _v2.set(0, -1, 0),
+      len,
+    );
+  }
+
+  /** Would the body capsule fit standing at `p`? */
+  private bodyFits(p: THREE.Vector3) {
+    const corr = this.world.capsulePushout(
+      _v.copy(p).addScaledVector(UP, BODY_RADIUS + 0.28),
+      _v2.copy(p).addScaledVector(UP, 1.4 - BODY_RADIUS),
+      BODY_RADIUS - 0.04,
+    );
+    return corr.lengthSq() < 0.03 * 0.03;
+  }
+
+  /**
+   * Airborne into a short wall (top 0.35–2.1 m above the floor you left):
+   * hop it if it's thin, step up onto it if the top carries on. Tall walls
+   * (climbable, or with no top in reach) never vault.
+   */
+  private tryStartVault(wallN: THREE.Vector3, carry: number): boolean {
+    if (this.vaultCooldown > 0) return false;
+    const d = new THREE.Vector3(-wallN.x, 0, -wallN.z);
+    if (d.lengthSq() < 1e-4) return false;
+    d.normalize();
+    const p = this.pos;
+
+    // Heights are measured from the floor under you, not your feet mid-jump,
+    // so jumping at a tall wall doesn't make it vaultable.
+    const below = this.world.raycast(_v.copy(p).addScaledVector(UP, 0.3), _v2.set(0, -1, 0), 2.6);
+    const ref = below !== null && below.normal.y > 0.55 ? Math.min(p.y, below.point.y) : p.y;
+    // Probing from VAULT_MAX + 1.25 up guarantees that much headroom on top
+    const probeY = ref + VAULT_MAX + 1.25;
+
+    // Near edge: the first column that stands up off the floor
+    let near = -1;
+    let top = 0;
+    for (let s = 0.12; s <= VAULT_REACH + 1e-3; s += 0.08) {
+      const h = this.vaultDrop(d, s, probeY, probeY - ref + 0.3);
+      if (h === null || h.point.y < ref + 0.25) continue;
+      if (h.normal.y < 0.5) return false;
+      near = s;
+      top = h.point.y;
+      break;
+    }
+    const rise = top - ref;
+    if (near < 0 || rise < VAULT_MIN || rise > VAULT_MAX || top < p.y + 0.12) return false;
+
+    // Nothing overhead on our side (we go up before we go over)
+    const headroom = Math.max(0.2, top + 1.25 - p.y - 1.0);
+    if (this.world.raycast(_v.copy(p).addScaledVector(UP, 1.0), UP, headroom) !== null)
+      return false;
+
+    // How far does the top carry on?
+    let far = -1;
+    for (let s = near + 0.1; s <= near + VAULT_THICK + 1e-3; s += 0.1) {
+      const h = this.vaultDrop(d, s, top + 1.2, 1.55);
+      if (h === null || h.point.y < top - 0.3 || h.normal.y < 0.5) {
+        far = s;
+        break;
+      }
+      if (h.point.y > top + 0.35) return false; // steps up again: not a simple wall
+    }
+
+    const from = p.clone();
+    const fromRise = Math.max(0, top - p.y);
+    if (far < 0) {
+      // Thick top → quick step-up onto it
+      const land = this.vaultDrop(d, near + 0.5, top + 1.2, 1.6);
+      if (land === null || land.normal.y < 0.7 || Math.abs(land.point.y - top) > 0.35) return false;
+      const to = land.point.clone();
+      if (this.world.raycast(_v.copy(to).addScaledVector(UP, 0.1), UP, 1.6) !== null) return false;
+      if (!this.bodyFits(to)) return false;
+      this.vault = {
+        kind: 'up',
+        from,
+        to,
+        dir: d,
+        top,
+        near,
+        far: near,
+        k1: 0,
+        k2: 0,
+        t: 0,
+        dur: THREE.MathUtils.clamp(0.22 + 0.11 * fromRise, 0.26, 0.42),
+        k: 0,
+        exit: Math.min(carry, this.tuning.runSpeed) * 0.7,
+        grounded: true,
+      };
+    } else {
+      // Thin wall → arc over it onto the far side
+      const sl = far + 0.5;
+      // A clear lane over the top (rails, trees, a wall just behind…)
+      const lane = _v3.copy(p).addScaledVector(d, -0.1);
+      lane.y = top + 0.5;
+      if (this.world.raycast(lane, d, sl + 0.45) !== null) return false;
+      const floor = this.vaultDrop(d, sl, top + 1.2, 1.2 + 2.5);
+      const to = new THREE.Vector3(p.x + d.x * sl, top - 0.4, p.z + d.z * sl);
+      let grounded = false;
+      if (floor !== null && floor.normal.y > 0.55) {
+        if (floor.point.y > top + 0.1) return false;
+        to.y = floor.point.y;
+        grounded = true;
+      }
+      if (!this.bodyFits(to)) return false;
+      // Time split ≈ path length of each phase: rise, cross, drop
+      const w1 = Math.max(0.12, near - 0.05) + fromRise * 0.6;
+      const w2 = Math.max(0.12, far - near + 0.1);
+      const w3 = Math.max(0.15, sl - far) + Math.min(1.2, top + 0.15 - to.y) * 0.35;
+      const sum = w1 + w2 + w3;
+      this.vault = {
+        kind: 'over',
+        from,
+        to,
+        dir: d,
+        top,
+        near,
+        far,
+        k1: w1 / sum,
+        k2: (w1 + w2) / sum,
+        t: 0,
+        dur: THREE.MathUtils.clamp(0.36 + 0.05 * sl + 0.05 * fromRise, 0.4, 0.55),
+        k: 0,
+        exit: THREE.MathUtils.clamp(carry, 2.2, this.tuning.runSpeed * 1.25) * 0.85,
+        grounded,
+      };
+    }
+    this.vel.set(0, 0, 0);
+    this.footGrounded = false;
+    this.wallPush = 0;
+    this.footYaw = Math.atan2(d.x, d.z);
+    this.emote = 0;
+    this.emoteTimer = 0;
+    if (!this.events.some(e => e.type === 'footJump')) this.events.push({ type: 'footJump' });
+    return true;
+  }
+
+  private updateVault(dt: number) {
+    const v = this.vault!;
+    v.t += dt;
+    const k = Math.min(1, v.t / v.dur);
+    v.k = k;
+    const prev = _v3.copy(this.pos);
+    if (v.kind === 'up') {
+      // Like the mantle, shorter: up first, then in over the lip
+      const ky = Math.sin((Math.min(1, k / 0.6) * Math.PI) / 2);
+      const kh = easeInOut(Math.max(0, (k - 0.3) / 0.7));
+      this.pos.set(
+        THREE.MathUtils.lerp(v.from.x, v.to.x, kh),
+        THREE.MathUtils.lerp(v.from.y, v.to.y, ky),
+        THREE.MathUtils.lerp(v.from.z, v.to.z, kh),
+      );
+    } else {
+      // Rise to the near edge, skim the top, drop onto the far side
+      const peak = v.top + 0.15;
+      const total = Math.hypot(v.to.x - v.from.x, v.to.z - v.from.z);
+      const s1 = Math.max(0, v.near - 0.05);
+      const s2 = Math.min(total, v.far + 0.05);
+      let s: number;
+      let y: number;
+      if (k < v.k1) {
+        const u = k / v.k1;
+        s = s1 * u;
+        y = v.from.y + (peak - v.from.y) * Math.sin((u * Math.PI) / 2);
+      } else if (k < v.k2) {
+        const u = (k - v.k1) / (v.k2 - v.k1);
+        s = s1 + (s2 - s1) * u;
+        y = peak + Math.sin(u * Math.PI) * 0.06;
+      } else {
+        const u = (k - v.k2) / (1 - v.k2);
+        s = s2 + (total - s2) * u;
+        y = peak + (v.to.y - peak) * (1 - Math.cos((u * Math.PI) / 2));
+      }
+      this.pos.set(v.from.x + v.dir.x * s, y, v.from.z + v.dir.z * s);
+    }
+    this.vel.subVectors(this.pos, prev).divideScalar(Math.max(dt, 1e-4));
+    if (k < 1) return;
+
+    this.pos.copy(v.to);
+    this.vault = null;
+    this.vaultCooldown = 0.2;
+    this.climbCooldown = Math.max(this.climbCooldown, 0.15);
+    const fall = Math.min(0, this.vel.y);
+    this.vel.set(v.dir.x * v.exit, 0, v.dir.z * v.exit);
+    if (v.grounded) {
+      this.footGrounded = true;
+      this.safePos.copy(this.pos);
+      this.safeFwd.set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw));
+      this.events.push({ type: 'footLand', impact: v.kind === 'up' ? 2 : 3.5 });
+    } else {
+      // Over a ledge with a drop behind: carry on falling
+      this.footGrounded = false;
+      this.vel.y = Math.min(-2, fall);
+    }
   }
 
   /** Let go of the wall with a velocity. */
@@ -1085,6 +1344,8 @@ export class Player {
     // component that would carry us over the deck so we come back down.
     this.vertLip = this.up.y < 0.45;
     if (this.vertLip) {
+      this.vertNormal.copy(this.up);
+      this.vertLipY = this.pos.y;
       const nh = _v.set(this.up.x, 0, this.up.z).normalize();
       const into = this.vel.dot(nh);
       this.vel.addScaledVector(nh, -into);
@@ -1148,11 +1409,34 @@ export class Player {
       _v2.set(0, -1, 0).addScaledVector(this.vel, 0.05).normalize(),
       6,
     );
-    const targetUp = look && look.normal.y > 0.2 ? look.normal : UP;
+    const targetUp = _target.copy(look && look.normal.y > 0.2 ? look.normal : UP);
+    if (this.vertLip) {
+      // Vert air: stay square to the wall we left (in a deep bowl the floor
+      // straight below is 40 m down, and levelling to it flattens the board
+      // before it meets the wall), and only match a surface we're about to hit
+      const ahead = this.world.raycast(
+        _v.copy(this.pos),
+        _v2.copy(this.vel).normalize(),
+        4 + this.vel.length() * 0.6,
+      );
+      targetUp.copy(ahead !== null && ahead.normal.dot(this.vel) < 0 ? ahead.normal : this.vertNormal);
+      // Coming back in: swing the nose (or tail) onto the line of travel, so a
+      // carve along the wall doesn't meet it sideways
+      if (ahead !== null && this.vel.y < 0) {
+        const tdir = _wd.copy(this.vel).addScaledVector(targetUp, -this.vel.dot(targetUp));
+        if (tdir.lengthSq() > 1) {
+          tdir.normalize();
+          if (this.fwd.dot(tdir) < 0) tdir.negate();
+          this.fwd.lerp(tdir, 1 - Math.exp(-6 * dt)).normalize();
+        }
+      }
+    }
     if (!this.vertLip || this.vel.y < 0) {
       this.up.lerp(targetUp, 1 - Math.exp(-(this.vertLip ? 2.5 : 4) * dt)).normalize();
     }
     this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+
+    if (this.vertLip) this.followVertWall();
 
     // Walls — hold W into a wall mid-air to step off the board and grab it
     const wall = this.resolveBody(1.45);
@@ -1192,6 +1476,51 @@ export class Player {
     }
     if (hit && hit.normal.dot(this.vel) < 0 && hit.normal.y > -0.2) {
       this.land(hit.point, hit.normal, now);
+    }
+  }
+
+  /**
+   * Vert air: ride the wall's plane like a quarter pipe, curved or not. Off a
+   * curved wall (a bowl's end) the sideways speed would otherwise carry you
+   * in a straight line while the wall curves away, dropping you tens of
+   * metres onto flat. Each frame: find the face just under the lip, keep the
+   * rider a little on the open side of it, and turn the sideways speed to
+   * run along it (a turn, so speed never grows).
+   */
+  private followVertWall() {
+    const n0 = _wn.set(this.vertNormal.x, 0, this.vertNormal.z);
+    if (n0.lengthSq() < 1e-4) return;
+    n0.normalize();
+    // Probe just under the lip, then lower: carving along a rim that drops
+    // (a bowl's deep end into its shallow end) leaves the first probe above it
+    let hit: ReturnType<CollisionWorld['raycast']> = null;
+    for (const below of [1.5, 5, 10, 18]) {
+      const o = _wo.set(this.pos.x, Math.min(this.pos.y, this.vertLipY) - below, this.pos.z);
+      o.addScaledVector(n0, 3);
+      hit = this.world.raycast(o, _wd.copy(n0).negate(), 8);
+      if (hit !== null && Math.abs(hit.normal.y) <= 0.5) break;
+      hit = null;
+    }
+    if (hit === null) return;
+    const n = _wn.set(hit.normal.x, 0, hit.normal.z);
+    if (n.lengthSq() < 1e-4) return;
+    n.normalize();
+    this.vertNormal.set(n.x, this.vertNormal.y, n.z).normalize();
+    // Stay 0.1–1 m out from the face, on the open side
+    const d = (this.pos.x - hit.point.x) * n.x + (this.pos.z - hit.point.z) * n.z;
+    const want = THREE.MathUtils.clamp(d, 0.1, 1);
+    this.pos.x += n.x * (want - d);
+    this.pos.z += n.z * (want - d);
+    // Sideways speed runs along the face (same magnitude); a slight drift out
+    const vn = this.vel.x * n.x + this.vel.z * n.z;
+    const tx = this.vel.x - n.x * vn;
+    const tz = this.vel.z - n.z * vn;
+    const t = Math.hypot(tx, tz);
+    const h = Math.hypot(this.vel.x, this.vel.z);
+    const along = Math.sqrt(Math.max(0, h * h - 0.35 * 0.35));
+    if (t > 1e-4) {
+      this.vel.x = (tx / t) * along + n.x * 0.35;
+      this.vel.z = (tz / t) * along + n.z * 0.35;
     }
   }
 

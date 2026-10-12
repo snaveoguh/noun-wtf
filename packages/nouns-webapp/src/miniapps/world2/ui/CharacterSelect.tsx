@@ -12,8 +12,16 @@ import { ImageData } from '@noundry/nouns-assets';
 
 import { prefetchGlbHead } from '../character/GlbHead';
 import { randomSeed, type NounSeed } from '../character/NounAppearance';
-import { BUILDS } from '../character/NounCharacter';
+import {
+  BOARD_LABELS,
+  BOARD_TYPES,
+  BUILDS,
+  parseBoardType,
+  type BoardType,
+} from '../character/NounCharacter';
 import { worldPause } from '../worldPause';
+
+import { DeckGraphicRow } from './DeckDesigner';
 
 const STORAGE_KEY = 'noun-world-v2-character';
 
@@ -30,7 +38,7 @@ const TRAIT_KEY: Record<TraitRow, 'heads' | 'glasses' | 'bodies' | 'accessories'
 export interface SavedCharacter {
   seed: NounSeed;
   name: string;
-  board?: 'skate' | 'hover';
+  board?: BoardType;
   /** Index into BUILDS (skinny … clinically obese). */
   build?: number;
 }
@@ -41,7 +49,7 @@ export function loadSavedCharacter(): SavedCharacter | null {
     if (raw === null) return null;
     const v = JSON.parse(raw) as SavedCharacter;
     if (typeof v.seed?.head !== 'number') return null;
-    return v;
+    return { ...v, board: parseBoardType(v.board) };
   } catch {
     return null;
   }
@@ -74,15 +82,18 @@ export function CharacterSelect({
   initial,
   auctionSeed,
   onConfirm,
+  onDesignDeck,
 }: {
   game: Game;
   initial: SavedCharacter;
   auctionSeed: NounSeed | null;
   onConfirm: (c: SavedCharacter) => void;
+  /** Opens the board shop's deck designer. */
+  onDesignDeck?: () => void;
 }) {
   const [seed, setSeedState] = useState<NounSeed>(initial.seed);
   const [name, setName] = useState(initial.name);
-  const [board, setBoard] = useState<'skate' | 'hover'>(initial.board ?? 'skate');
+  const [board, setBoard] = useState<BoardType>(() => parseBoardType(initial.board));
   const [build, setBuild] = useState<number>(initial.build ?? 2);
   const [row, setRow] = useState(0);
   const [flash, setFlash] = useState(0);
@@ -118,7 +129,11 @@ export function CharacterSelect({
       return;
     }
     if (r === 'board') {
-      setBoard(b => (b === 'skate' ? 'hover' : 'skate'));
+      setBoard(b => {
+        const n = BOARD_TYPES.length;
+        const i = BOARD_TYPES.indexOf(b);
+        return BOARD_TYPES[(((i + Math.sign(dir)) % n) + n) % n] ?? 'skate';
+      });
       setFlash(f => f + 1);
       return;
     }
@@ -275,10 +290,11 @@ export function CharacterSelect({
                     ◀
                   </button>
                   <div className="cs-trait" key={`board-${board}-${flash}`}>
-                    <span className="cs-num">{board === 'skate' ? '01/02' : '02/02'}</span>
-                    <span className="cs-tname">
-                      {board === 'skate' ? 'SKATEBOARD' : 'HOVERBOARD ⚡'}
+                    <span className="cs-num">
+                      {String(BOARD_TYPES.indexOf(board) + 1).padStart(2, '0')}/
+                      {String(BOARD_TYPES.length).padStart(2, '0')}
                     </span>
+                    <span className="cs-tname">{BOARD_LABELS[board]}</span>
                   </div>
                   <button type="button" className="cs-arrow" onClick={() => cycle(r, 1)}>
                     ▶
@@ -320,6 +336,7 @@ export function CharacterSelect({
             </div>
           );
         })}
+        {onDesignDeck !== undefined && <DeckGraphicRow onDesign={onDesignDeck} />}
 
         <div className="cs-buttons">
           <button type="button" className="cs-btn" onClick={randomize}>

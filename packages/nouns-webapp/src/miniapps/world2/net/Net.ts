@@ -13,6 +13,8 @@ import PartySocket from 'partysocket';
 import * as THREE from 'three';
 
 import { PARTYKIT_HOST } from '../../world/engine/types';
+import { SHARE_RE } from '../character/deckSchema';
+import { parseBoardType, type BoardType } from '../character/NounCharacter';
 
 import { Voice } from './Voice';
 
@@ -32,7 +34,7 @@ export interface NetPose {
   name: string;
   seedKey: string;
   trick: string;
-  boardType: 'skate' | 'hover';
+  boardType: BoardType;
   weight: number;
 }
 
@@ -44,10 +46,12 @@ export interface RemotePlayer {
   samples: { t: number; pose: NetPose }[];
   current: NetPose;
   lastSeen: number;
+  /** Custom deck shared as `address:slot:savedAt` (board shop), '' = stock. */
+  deck?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
-  boardType: 'skate' | 'hover';
+  boardType: BoardType;
   weight: number;
 }
 
@@ -89,6 +93,8 @@ export class Net {
   onGraffiti?: (wallId: string, tags: { imageData: string; timestamp?: number }[]) => void;
   onOpen?: () => void;
   connected = false;
+  /** My custom deck's share key (see character/deckStore), sent with each pose. */
+  deck = '';
 
   connect() {
     if (this.ws) return;
@@ -196,7 +202,7 @@ export class Net {
     pose.speed = Number(blob.sp) || 0;
     pose.name = String(blob.n ?? '').slice(0, 24);
     pose.trick = String(blob.tr ?? '').slice(0, 60);
-    pose.boardType = blob.bt === 'hover' ? 'hover' : 'skate';
+    pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
@@ -228,6 +234,7 @@ export class Net {
     rp.lastSeen = now;
     rp.samples.push({ t: now, pose });
     if (rp.samples.length > 8) rp.samples.shift();
+    rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
   }
 
   /** Interpolate remote players ~120ms in the past. */
@@ -281,6 +288,7 @@ export class Net {
     );
     const blob = JSON.stringify({
       v: 2,
+      ...(this.deck !== '' ? { dk: this.deck } : {}),
       q: [r3(pose.quat.x), r3(pose.quat.y), r3(pose.quat.z), r3(pose.quat.w)],
       b: [r3(pose.boardQuat.x), r3(pose.boardQuat.y), r3(pose.boardQuat.z), r3(pose.boardQuat.w)],
       l: r3(pose.boardLift),

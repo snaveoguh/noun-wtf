@@ -9,6 +9,7 @@
 // Screen: +X right, +Z down (a true top-down view, -Z is "north").
 
 import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, edgeDistance } from '../world/mountain/config';
+import { bowlMapPoint, bowlOutline } from '../world/mountain/noggleBowl';
 import { NJ, njFrameNow, njToWorld, type NjFrame } from '../world/mountain/nounJersey';
 import { MEGA_SITE, tracks, type Track } from '../world/mountain/tracks';
 
@@ -34,6 +35,8 @@ export interface MapScene {
   waypoint: { x: number; z: number } | null;
   /** The endless mountain exists (the fallback park has no mountain). */
   mountain: boolean;
+  /** Drop party pickups (drops/Drops.ts). */
+  drops?: { x: number; z: number; kind: string; label: string }[];
 }
 
 const C = {
@@ -50,10 +53,18 @@ const C = {
   alley: '#c9bfa9',
   mega: '#ff7a1a',
   nj: '#ff3d8b',
+  bowl: '#8f6bff',
   me: '#ffd400',
   rider: '#22c7f0',
   way: '#b6ef3a',
   ink: '#111018',
+};
+
+const DROP_COLOR: Record<string, string> = {
+  eth: '#8f9cff',
+  erc20: '#ffc93c',
+  erc721: '#ff3d8b',
+  erc1155: '#22c7f0',
 };
 
 // ── Cached geometry ─────────────────────────────────────────────────────
@@ -318,6 +329,18 @@ export function drawMap(
     ctx.lineWidth = 3 * px;
     ctx.stroke();
   }
+  // The Noggle Bowl's rim + deck (once someone's been near enough to fix it)
+  const rim = scene.mountain ? bowlOutline() : null;
+  if (rim !== null) {
+    ctx.beginPath();
+    rim.forEach(([x, z], i) => (i === 0 ? ctx.moveTo(x, z) : ctx.lineTo(x, z)));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(143,107,255,.35)';
+    ctx.fill();
+    ctx.strokeStyle = C.bowl;
+    ctx.lineWidth = 3 * px;
+    ctx.stroke();
+  }
   ctx.restore();
 
   // ── Screen-space markers (never rotated) ──
@@ -396,6 +419,22 @@ export function drawMap(
     }
   }
 
+  // The Noggle Bowl (the second secret spot, ~42 km down the −X line)
+  const bowl = scene.mountain && (o.full || v.s > 0.05) ? bowlMapPoint() : null;
+  if (bowl !== null) {
+    let p = S(bowl.x, bowl.z);
+    const off = !inside(p, 14);
+    if (!off || o.full || o.edgeMarkers) {
+      if (off) p = edge(p, 14);
+      pin(ctx, p.x, p.y, C.bowl, '◎');
+      if (o.full)
+        label(ctx, off ? 'NOGGLE BOWL ◎ 42 km' : 'NOGGLE BOWL', p.x, p.y - 22, {
+          size: 11,
+          color: C.bowl,
+        });
+    }
+  }
+
   // Waypoint
   if (scene.waypoint !== null) {
     let p = S(scene.waypoint.x, scene.waypoint.z);
@@ -427,6 +466,32 @@ export function drawMap(
           },
         );
     }
+  }
+
+  // Drop party pickups: a glowing diamond, pinned to the edge on the minimap
+  for (const dr of scene.drops ?? []) {
+    let p = S(dr.x, dr.z);
+    const off = !inside(p, 10);
+    if (off && !o.full && !o.edgeMarkers) continue;
+    if (off) p = edge(p, 10);
+    const col = DROP_COLOR[dr.kind] ?? '#fff';
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = col;
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 9);
+    ctx.lineTo(p.x + 7, p.y);
+    ctx.lineTo(p.x, p.y + 9);
+    ctx.lineTo(p.x - 7, p.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
+    if (o.full) label(ctx, dr.label, p.x, p.y - 13, { size: 10, color: col });
   }
 
   // Other riders
