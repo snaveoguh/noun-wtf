@@ -906,6 +906,7 @@ export class Game {
       if (p.climb.mantle !== null) return { clip: 'jump_air', fade: 0.12 };
       return { clip: 'walk', fade: 0.15, timeScale: 0.05 + p.climb.moving * 1.15 };
     }
+    if (p.vault !== null) return { clip: 'jump_air', fade: 0.08 };
     if (p.mode === 'foot') {
       if (!p.footGrounded) return { clip: p.vel.y > 0 ? 'jump_air' : 'fall', fade: 0.2 };
       const hs = Math.hypot(p.vel.x, p.vel.z);
@@ -980,6 +981,12 @@ export class Game {
       me.board.visible = false;
       me.body.position.set(0, 0, 0);
       me.body.quaternion.identity();
+      // Vault: tuck forward over the hands
+      if (p.vault !== null)
+        me.body.quaternion.setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0),
+          Math.sin(p.vault.k * Math.PI) * (p.vault.kind === 'over' ? 0.45 : 0.3),
+        );
       // Step sounds
       const hs = Math.hypot(p.vel.x, p.vel.z);
       if (p.footGrounded && hs > 0.5) {
@@ -1034,7 +1041,9 @@ export class Game {
       climb:
         p.climb !== null
           ? { phase: p.climb.phase, amount: p.climb.mantle !== null ? 0.55 : 1 }
-          : undefined,
+          : p.vault !== null
+            ? { phase: 0, amount: 0.6 * Math.sin(Math.min(1, p.vault.k * 1.6) * Math.PI) }
+            : undefined,
     });
 
     // Sparks while grinding metal
