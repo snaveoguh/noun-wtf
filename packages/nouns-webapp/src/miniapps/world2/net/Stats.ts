@@ -12,6 +12,11 @@
 // Top speed, jump height and hang time are competition records, so each one
 // travels with a proof: the trace of the ride that set it (RunTrace below),
 // which the server checks against the game's physics (netlify/lib/runProof).
+//
+// A rider can link an ETH address (linkWallet below: a signed message, no
+// gas). The address then owns the row and its name: every browser linked to
+// it posts into the same row, and the board shows the address, so prize
+// winners can be paid. The server checks the signature (netlify/lib/walletAuth).
 
 import type { Player } from '../skate/Player';
 import type { ComboState } from '../skate/Tricks';
@@ -23,6 +28,7 @@ const BEST_KEY = 'noun-world-stats-best';
 const OLD_KMH_KEY = 'noun-world-fastest-kmh';
 const OLD_COMBO_KEY = 'noun-world-best-combo';
 const OLD_COMBO_LABEL_KEY = 'noun-world-best-combo-label';
+const LINK_KEY = 'noun-world-wallet-link';
 
 export type BestKey = 'kmh' | 'combo' | 'session' | 'airM' | 'airS' | 'grindM' | 'downM';
 export type AddKey = 'km' | 'tricks' | 'playS';
@@ -88,6 +94,14 @@ export interface StatRow {
   value: number;
   label?: string;
   at: number;
+  /** Linked rows only: the address that owns the row (pays out prizes). */
+  addr?: string;
+}
+
+/** This browser's wallet link, as the server last reported it. */
+export interface WalletLinkState {
+  address: string;
+  name: string;
 }
 
 export interface WorldStats {
@@ -95,6 +109,8 @@ export interface WorldStats {
   sessions: number;
   days: Record<string, number>;
   boards: Partial<Record<StatKey, StatRow[]>>;
+  /** Payouts: the top linked rider of each competition board. */
+  winners?: Partial<Record<BestKey, { name: string; address: string; value: number }>>;
 }
 
 export interface MyBests {
@@ -147,7 +163,7 @@ function save(key: string, v: string) {
 }
 
 /** Random id per browser: one row per rider, whatever their name. */
-function riderId(): string {
+export function riderId(): string {
   let id = load(RIDER_KEY);
   if (!id) {
     id = crypto.randomUUID();
@@ -169,6 +185,87 @@ function loadBests(): MyBests {
   const combo = Number(load(OLD_COMBO_KEY));
   if (combo > 0) best.combo = combo;
   return { best, comboLabel: load(OLD_COMBO_LABEL_KEY) ?? '' };
+}
+
+/**
+ * The text a rider signs to link (or rename) their row. The server rebuilds
+ * it from the posted fields, so keep it byte-for-byte in step with
+ * netlify/lib/walletAuth.ts (which imports it from here).
+ */
+export function linkMessage(rider: string, address: string, name: string, ts: number): string {
+  return `Noun World: link rider ${rider} to ${address} as ${name} · ${new Date(ts).toISOString()}`;
+}
+
+/** 0x1234…abcd */
+export const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+// The link lives in localStorage and a tiny store the UI subscribes to
+// (read on first use: the server imports linkMessage from this module)
+let link: WalletLinkState | null | undefined;
+function readLink(): WalletLinkState | null {
+  if (link !== undefined) return link;
+  try {
+    const v = JSON.parse(load(LINK_KEY) ?? 'null') as WalletLinkState | null;
+    link = v && typeof v.address === 'string' && typeof v.name === 'string' ? v : null;
+  } catch {
+    link = null;
+  }
+  return link;
+}
+const linkListeners = new Set<() => void>();
+export const walletLink = {
+  get: readLink,
+  subscribe(fn: () => void) {
+    linkListeners.add(fn);
+    return () => void linkListeners.delete(fn);
+  },
+};
+function setLink(next: WalletLinkState | null) {
+  const cur = readLink();
+  if (next?.address === cur?.address && next?.name === cur?.name) return;
+  link = next;
+  save(LINK_KEY, JSON.stringify(next));
+  for (const fn of linkListeners) fn();
+}
+
+/**
+ * Link this browser's rider to `address` as `name` (or rename a linked
+ * rider): sign the message with the wallet, the server checks it.
+ */
+export async function linkWallet(
+  address: string,
+  name: string,
+  sign: (message: string) => Promise<string>,
+): Promise<{ ok: true; link: WalletLinkState } | { ok: false; error: string }> {
+  const rider = riderId();
+  const ts = Date.now();
+  const clean = name
+    .replace(/[\u0000-\u001f]/g, '')
+    .trim()
+    .slice(0, 42);
+  if (!clean) return { ok: false, error: 'Pick a name first' };
+  let sig: string;
+  try {
+    sig = await sign(linkMessage(rider, address, clean, ts));
+  } catch {
+    return { ok: false, error: 'Signature cancelled' };
+  }
+  try {
+    const res = await fetch(URL_, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'link', rider, name: clean, address, ts, sig }),
+    });
+    const out = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      linked?: WalletLinkState | null;
+    };
+    if (!res.ok || !out.linked) return { ok: false, error: out.error ?? `Error ${res.status}` };
+    setLink(out.linked);
+    return { ok: true, link: out.linked };
+  } catch {
+    return { ok: false, error: 'Network error' };
+  }
 }
 
 export async function fetchStats(): Promise<WorldStats | null> {
@@ -365,7 +462,15 @@ export class StatsTracker {
     this.posting = true;
     void fetch(URL_, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
       .then(res => {
-        if (res.ok) sent();
+        if (!res.ok) return;
+        sent();
+        // Keep the link in step with the server (linked elsewhere, moved…)
+        return res
+          .json()
+          .then((out: { linked?: WalletLinkState | null }) => {
+            if (out.linked !== undefined) setLink(out.linked);
+          })
+          .catch(() => undefined);
       })
       .catch(() => undefined)
       .finally(() => {

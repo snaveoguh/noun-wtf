@@ -9,9 +9,18 @@ import { useAppSelector } from '@/hooks';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
-import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
+import {
+  shortAddr,
+  STAT_INFO,
+  walletLink,
+  type MyBests,
+  type StatKey,
+  type StatRow,
+  type WorldStats,
+} from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
+import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
 import { worldPause } from './worldPause';
 
@@ -671,7 +680,13 @@ function StatsChip({
   const top = speed.length > 0 ? speed[0] : undefined;
   const rows = stats?.boards[tab] ?? [];
   const info = STAT_INFO[tab];
-  const myRank = rows.findIndex(e => e.name === me);
+  // A linked rider is their address's row, whatever name they play under
+  const link = useSyncExternalStore(walletLink.subscribe, walletLink.get);
+  const isMe = (e: StatRow) =>
+    link !== null && e.addr !== undefined
+      ? e.addr.toLowerCase() === link.address.toLowerCase()
+      : link === null && e.name === me;
+  const myRank = rows.findIndex(isMe);
   const myBest = tab in mine.best ? mine.best[tab as keyof MyBests['best']] : undefined;
   const today = stats?.days[new Date().toISOString().slice(0, 10)] ?? 0;
   return (
@@ -728,10 +743,16 @@ function StatsChip({
           )}
           <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto pr-1">
             {rows.map((e, i) => (
-              <div key={i} className={e.name === me ? 'font-bold text-[#ffd400]' : ''}>
+              <div key={i} className={isMe(e) ? 'font-bold text-[#ffd400]' : ''}>
                 <div className="flex justify-between gap-3">
-                  <span className="truncate">
+                  <span className="truncate" title={e.addr}>
                     {i + 1}. {e.name}
+                    {e.addr !== undefined && (
+                      <span className="text-[10px] opacity-60">
+                        {' '}
+                        <span className="text-[#5be37d]">✓</span> {shortAddr(e.addr)}
+                      </span>
+                    )}
                   </span>
                   <b className="shrink-0">{info.fmt(e.value)}</b>
                 </div>
@@ -750,6 +771,7 @@ function StatsChip({
                 : '–'}
             {myRank >= 0 ? ` (#${myRank + 1})` : ''}
           </div>
+          <WalletLink me={me} />
         </div>
       )}
     </div>
