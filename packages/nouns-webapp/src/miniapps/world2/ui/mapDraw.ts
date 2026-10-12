@@ -9,7 +9,7 @@
 // Screen: +X right, +Z down (a true top-down view, -Z is "north").
 
 import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, edgeDistance } from '../world/mountain/config';
-import { bowlMapPoint } from '../world/mountain/noggleBowl';
+import { bowlMapPoint, bowlOutline } from '../world/mountain/noggleBowl';
 import { NJ, njFrameNow, njToWorld, type NjFrame } from '../world/mountain/nounJersey';
 import { MEGA_SITE, tracks, type Track } from '../world/mountain/tracks';
 
@@ -51,7 +51,7 @@ const C = {
   alley: '#c9bfa9',
   mega: '#ff7a1a',
   nj: '#ff3d8b',
-  bowl: '#2fb4ff',
+  bowl: '#8f6bff',
   me: '#ffd400',
   rider: '#22c7f0',
   way: '#b6ef3a',
@@ -317,6 +317,18 @@ export function drawMap(
     ctx.fillStyle = 'rgba(255,61,139,.35)';
     ctx.fill();
     ctx.strokeStyle = C.nj;
+    ctx.lineWidth = 3 * px;
+    ctx.stroke();
+  }
+  // The Noggle Bowl's rim + deck (once someone's been near enough to fix it)
+  const rim = scene.mountain ? bowlOutline() : null;
+  if (rim !== null) {
+    ctx.beginPath();
+    rim.forEach(([x, z], i) => (i === 0 ? ctx.moveTo(x, z) : ctx.lineTo(x, z)));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(143,107,255,.35)';
+    ctx.fill();
+    ctx.strokeStyle = C.bowl;
     ctx.lineWidth = 3 * px;
     ctx.stroke();
   }

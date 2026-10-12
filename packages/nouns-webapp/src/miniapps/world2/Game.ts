@@ -82,7 +82,7 @@ function devRun(): boolean {
   return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
 }
 
-/** `?spot=nj` dev param: spawn at the top of Main St in the secret Noun Jersey park. */
+/** `?spot=nj` / `?spot=bowl` dev params: spawn in a secret spot (Noun Jersey, the Noggle Bowl). */
 function spotParam(): string | null {
   return new URLSearchParams(window.location.search).get('spot');
 }
@@ -1439,9 +1439,9 @@ export class Game {
   private bowlFound = false;
 
   private updateBowl(lm: { name: string; dist: number; bearing: number }[]) {
-    const f = bowlFrame();
-    if (f === null) return;
     const p = this.player.pos;
+    const f = bowlFrame(p.x, p.z);
+    if (f === null) return;
     const c = bowlCentre(f, { x: 0, z: 0 });
     const dx = c.x - p.x;
     const dz = c.z - p.z;
@@ -1456,7 +1456,11 @@ export class Game {
       this.bowlFound = true;
       this.hud = {
         ...this.hud,
-        toast: { text: 'SECRET SPOT FOUND: THE NOGGLE BOWL', at: performance.now() },
+        toast: {
+          tag: '⌐◨-◨ 42 km out',
+          text: 'SECRET SPOT FOUND: THE NOGGLE BOWL',
+          at: performance.now(),
+        },
       };
     }
   }

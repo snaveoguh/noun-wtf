@@ -17,7 +17,7 @@
 import type { ChunkContext, ChunkDecoration, ChunkDecorator } from './MountainStream';
 
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import { inkExcluded, toonify } from '../../render/Toon';
 
@@ -200,10 +200,7 @@ function buildWalls(
   }
   if (rowsRef === null) return { pos, col, rimTop };
   const nR = rowsRef.length;
-  const push = (v: V, nx: number, nz: number, side: number) => {
-    void nx;
-    void nz;
-    void side;
+  const push = (v: V) => {
     pos.push(v.x, v.y, v.z);
     _c.setHex(v.c);
     col.push(_c.r, _c.g, _c.b);
@@ -241,14 +238,14 @@ function buildWalls(
         const nz = ux * vy - uy * vx;
         if (nx * nx + ny * ny + nz * nz < 1e-10) continue;
         const ok = nx * ex + ny * Math.hypot(ex, ez) * 0.5 + nz * ez >= 0;
+        // Wound to face into the bowl (the frame may be mirrored)
+        push(p);
         if (ok) {
-          push(p, nx, nz, 1);
-          push(q, nx, nz, 1);
-          push(r, nx, nz, 1);
+          push(q);
+          push(r);
         } else {
-          push(p, nx, nz, -1);
-          push(r, nx, nz, -1);
-          push(q, nx, nz, -1);
+          push(r);
+          push(q);
         }
       }
     }
@@ -305,10 +302,12 @@ function colourAll(geos: THREE.BufferGeometry[], hex: number): THREE.BufferGeome
  * fine, smooth-shaded skin draped a hair above it (render only; the
  * terrain stays the collider). Skipped wherever the wall mesh is.
  */
-function buildPool(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry {
-  const st = stations(2);
-  const ds = [-BOWL.deckW, -14, -9, -5, -2.5, -1, 0, 0.6, 1.5, 3, 5, 7.5, 10.5, 14, 18, 23, 29, 36];
-  for (let d = 44; d < BOWL.Rr; d += 8) ds.push(d);
+function buildPool(f: BowlFrame, origin: THREE.Vector3, step: number): THREE.BufferGeometry {
+  const st = stations(step);
+  // Rows ≤ 4 m apart down the transitions: a chord across a concave curve
+  // rides above it, and must stay under the floor paint (+0.1 m)
+  const ds = [-BOWL.deckW, -14, -9, -5, -2.5, -1, 0, 0.6, 1.5, 3, 5, 7.5, 10.5, 14, 17.5, 21];
+  for (let d = 24.5; d < BOWL.Rr; d += 3.5) ds.push(d);
   ds.push(BOWL.Rr);
   const nR = ds.length;
   const pos: number[] = [];
@@ -369,7 +368,8 @@ function indexed(pos: number[], col: number[], idx: number[]): THREE.BufferGeome
 
 /** The roll-in's skin: concrete with a red racing line down the middle. */
 function buildRollIn(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry {
-  const es = [-BOWL.half - 3, -BOWL.half, -6, -0.7, 0.7, 6, BOWL.half, BOWL.half + 3];
+  // Paired columns at the stripe's edges: a crisp line, not a smear
+  const es = [-BOWL.half - 3, -BOWL.half, -0.55, -0.55, 0.55, 0.55, BOWL.half, BOWL.half + 3];
   const cols = [
     C.concreteDark,
     C.concrete,
@@ -417,7 +417,8 @@ function buildRollIn(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry 
 function buildDecals(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry {
   const pos: number[] = [];
   const col: number[] = [];
-  const quad = (b0: number, b1: number, a0: number, a1: number, hex: number) => {
+  // `lift`: the lenses sit on the red frame, a few cm up so they never z-fight it
+  const quad = (b0: number, b1: number, a0: number, a1: number, hex: number, lift = 0.1) => {
     _c.setHex(hex);
     const nb = Math.max(1, Math.ceil((b1 - b0) / 3));
     const na = Math.max(1, Math.ceil((a1 - a0) / 3));
@@ -428,7 +429,7 @@ function buildDecals(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry 
         const b = b0 + ((b1 - b0) * i) / nb;
         const a = a0 + ((a1 - a0) * j) / na;
         bowlAxisToWorld(f, b, a, _o);
-        const y = terrainHeight(_o.x, _o.z) + 0.07;
+        const y = terrainHeight(_o.x, _o.z) + lift;
         row.push({ x: _o.x - origin.x, y: y - origin.y, z: _o.z - origin.z });
       }
       P.push(row);
@@ -461,8 +462,8 @@ function buildDecals(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry 
   const s = 1.7;
   const lens = (ac: number) => {
     quad(-9 * s, 9 * s, ac - 9 * s, ac + 9 * s, C.red);
-    quad(-6 * s, 6 * s, ac - 6 * s, ac, C.white);
-    quad(-6 * s, 6 * s, ac, ac + 6 * s, C.black);
+    quad(-6 * s, 6 * s, ac - 6 * s, ac, C.white, 0.16);
+    quad(-6 * s, 6 * s, ac, ac + 6 * s, C.black, 0.16);
   };
   lens(-10.5 * s);
   lens(10.5 * s);
@@ -570,8 +571,8 @@ function materials() {
       vertexColors: true,
       roughness: 0.9,
       polygonOffset: true,
-      polygonOffsetFactor: -4,
-      polygonOffsetUnits: -4,
+      polygonOffsetFactor: -6,
+      polygonOffsetUnits: -30,
     });
     const skin = new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -596,16 +597,24 @@ export const bowlStats = { drawCalls: 0, triangles: 0, collisionTriangles: 0, ms
 
 function build(f: BowlFrame, origin: THREE.Vector3, ctx: ChunkContext): Built {
   const w = buildWalls(f, origin);
-  const walls = new THREE.BufferGeometry();
-  walls.setAttribute('position', new THREE.Float32BufferAttribute(w.pos, 3));
-  walls.setAttribute('color', new THREE.Float32BufferAttribute(w.col, 3));
+  const flat = new THREE.BufferGeometry();
+  flat.setAttribute('position', new THREE.Float32BufferAttribute(w.pos, 3));
+  flat.setAttribute('color', new THREE.Float32BufferAttribute(w.col, 3));
+  // Shared vertices → smooth shading down the transitions (the colour
+  // bands keep their own rows, so the tile line stays crisp)
+  const walls = mergeVertices(flat, 1e-3);
+  flat.dispose();
   walls.computeVertexNormals();
   const collision = new THREE.BufferGeometry();
   collision.setAttribute('position', new THREE.Float32BufferAttribute(w.pos, 3));
   const coping = buildCoping(w.rimTop);
   const rich = ctx.quality !== 'low';
   const decals = buildDecals(f, origin);
-  const pool = mergeGeometries([buildPool(f, origin), buildRollIn(f, origin)], false)!;
+  // Render-only skin: coarser on phones (the collider is the same everywhere)
+  const pool = mergeGeometries(
+    [buildPool(f, origin, rich ? 2 : 3.5), buildRollIn(f, origin)],
+    false,
+  )!;
   const pr = rich ? buildProps(f, origin) : null;
   let tris =
     (w.pos.length + coping.attributes.position.count * 3 + decals.attributes.position.count * 3) /

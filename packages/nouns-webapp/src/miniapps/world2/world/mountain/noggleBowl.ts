@@ -30,9 +30,15 @@
 // becomes a raised ramp (an earth embankment, steepening to 45°) that runs
 // radially into the shallow end's bank, so the bank and the roll-in are a
 // single smooth surface along its centre.
+//
+// The records' proof check (netlify/lib/runProof.ts) holds ground samples
+// to 70 m below / 55 m above the mountain's base gradient. Everything here
+// rides inside that: the deep end's floor is the lowest point, ~58 m under
+// the gradient, the roll-in's top ~10 m over it. Deepen the bowl or move
+// the site and that band needs re-checking.
 
 import { MOUNTAIN, edgeDistance, smoothstep } from './config';
-import { BOWL_SITE, tracks, type SpotSite } from './tracks';
+import { BOWL_SITE, tracks, type SpotSite, type Track } from './tracks';
 
 export const BOWL = {
   /** Stadium: half-circle radius, half length of the straights. */
@@ -117,13 +123,44 @@ export function setBowlNatural(fn: (x: number, z: number) => number) {
 const _pp = { x: 0, z: 0, h: 0, k: 0 };
 let resolved: BowlFrame | null = null;
 
-/** The resolved frame, or null while the site isn't fixed yet (see njFrame). */
-export function bowlFrame(): BowlFrame | null {
+/** Conservative box round the site (both sides of the line, + `PRE_PAD`), before resolving. */
+let pre: { x0: number; z0: number; x1: number; z1: number } | null = null;
+let line: Track | undefined;
+const PRE_PAD = 700;
+
+/**
+ * The resolved frame, or null while the site isn't fixed yet (see njFrame).
+ * Resolving grows every line to ~43 km (otherLineNear), so it waits until
+ * something asks about a point near the site (the terrain under the bowl,
+ * a rider within PRE_PAD of it): the map pin alone (bowlMapPoint) fixes the
+ * site on its line early but must not make every player grow the whole
+ * network at start-up. The result is the same whenever it happens.
+ */
+export function bowlFrame(x: number, z: number): BowlFrame | null {
   if (resolved !== null) return resolved;
-  const t = tracks.tracks.find(q => q.id === BOWL_SITE.track);
-  const site = t?.bowls[0];
-  if (site === undefined) return null;
-  return resolve(site);
+  if (pre === null) {
+    // (every terrain sample comes through here: keep the miss cheap)
+    line ??= tracks.tracks.find(q => q.id === BOWL_SITE.track);
+    const site = line?.bowls[0];
+    if (site === undefined) return null;
+    const o = tracks.pointAt(site.track, site.s, _pp);
+    const fx = Math.sin(o.h);
+    const fz = Math.cos(o.h);
+    const ex = [o.x, o.x];
+    const ez = [o.z, o.z];
+    for (const u of [B.uM - 60, L_MIN + B.maxExtra + B.M_DN])
+      for (const v of [-(V_MAX + B.M_LAT), V_MAX + B.M_LAT]) {
+        const px = o.x + fx * u + fz * v;
+        const pz = o.z + fz * u - fx * v;
+        ex[0] = Math.min(ex[0], px);
+        ex[1] = Math.max(ex[1], px);
+        ez[0] = Math.min(ez[0], pz);
+        ez[1] = Math.max(ez[1], pz);
+      }
+    pre = { x0: ex[0] - PRE_PAD, x1: ex[1] + PRE_PAD, z0: ez[0] - PRE_PAD, z1: ez[1] + PRE_PAD };
+  }
+  if (x < pre.x0 || x > pre.x1 || z < pre.z0 || z > pre.z1) return null;
+  return resolve(line!.bowls[0]);
 }
 
 /** The frame, growing the line as far as needed (spawn, decorator). */
@@ -454,7 +491,7 @@ export function bowlSurface(
 
 /** terrain.ts → sampleTerrain: the pad, bowl and roll-in (after the other terraces). */
 export function applyBowl(x: number, z: number, out: { y: number; alley: number; track: number }) {
-  const f = bowlFrame();
+  const f = bowlFrame(x, z);
   if (f === null || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) return;
   const c = bowlCoords(f, x, z);
   if (c.u < B.uM - 60 || c.u > f.Lf + B.M_DN) return;
@@ -467,7 +504,7 @@ export function applyBowl(x: number, z: number, out: { y: number; alley: number;
 
 /** The bowl's design surface (what you ride) at world x, z, or null outside it. */
 export function bowlDesignAt(x: number, z: number): BowlSample | null {
-  const f = bowlFrame();
+  const f = bowlFrame(x, z);
   if (f === null || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) return null;
   const c = bowlCoords(f, x, z);
   const n = natural!(x, z);
@@ -476,7 +513,7 @@ export function bowlDesignAt(x: number, z: number): BowlSample | null {
 
 /** Inside the bowl itself (rim + `margin`)? */
 export function inBowl(x: number, z: number, margin = 0): boolean {
-  const f = bowlFrame();
+  const f = bowlFrame(x, z);
   if (f === null || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) return false;
   const c = bowlCoords(f, x, z);
   const b = c.u - U_B;
@@ -486,10 +523,13 @@ export function inBowl(x: number, z: number, margin = 0): boolean {
 
 /** Keep-out for the mountain dressing: the pad, bowl and roll-in, with a margin. */
 export function bowlBlocked(x: number, z: number): boolean {
-  const f = bowlFrame();
+  const f = bowlFrame(x, z);
   if (f === null || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) return false;
   const c = bowlCoords(f, x, z);
-  if (c.u >= -8 && c.u <= f.Lf + 8 && c.vp >= -B.vNear && c.vp <= V_MAX + 8) return true;
+  // The pad, and the run-out beside it: riders leave the bowl over the rim
+  // at any speed, so nothing to hit out there either
+  if (c.u >= -40 && c.u <= f.Lf + 40 && c.vp >= -B.vNear && c.vp <= V_MAX + B.M_LAT * 0.8)
+    return true;
   if (c.u < B.uM || c.u > U_UP) return false;
   return Math.abs(c.vp - chuteV(c.u)) < B.half + B.bankW + 6;
 }
@@ -518,6 +558,30 @@ export function bowlMapPoint(): { x: number; z: number } | null {
   return mapPt;
 }
 
+let outline: [number, number][] | null = null;
+
+/**
+ * Map: the bowl's outline (rim + deck) in world x, z once the frame is
+ * resolved (never grows the network itself; the pin covers it till then).
+ */
+export function bowlOutline(): [number, number][] | null {
+  if (resolved === null) return null;
+  if (outline === null) {
+    const f = resolved;
+    const R = B.Rr + B.deckW;
+    const o = { x: 0, z: 0 };
+    const pts: [number, number][] = [];
+    for (const end of [1, -1])
+      for (let k = 0; k <= 16; k++) {
+        const th = (Math.PI * k) / 16;
+        bowlAxisToWorld(f, end * (B.A + R * Math.sin(th)), end * R * Math.cos(th), o);
+        pts.push([o.x, o.z]);
+      }
+    outline = pts;
+  }
+  return outline;
+}
+
 /** `?spot=bowl` spawn: at the top of the roll-in, facing down it. */
 export function bowlSpawn(): { x: number; y: number; z: number; yaw: number } | null {
   const f = bowlFrameNow();
@@ -527,35 +591,4 @@ export function bowlSpawn(): { x: number; y: number; z: number; yaw: number } | 
   const dv = chuteV(u + 2) - chuteV(u - 2);
   const y = bowlSurface(f, u, chuteV(u), natural!(p.x, p.z)).t;
   return { x: p.x, y: y + 0.05, z: p.z, yaw: bowlYaw(f, 4, dv) };
-}
-
-/**
- * runProof.ts: the bowl's footprint without resolving the frame (no
- * terrain samples, no network growth beyond the −X line itself): the pad,
- * bowl and roll-in rectangle, on both sides of the line. The ground there
- * stays inside the verifier's band (floor ≈ 58 m under the base gradient
- * at worst), but straight-up airs off the vert go as high as the speed
- * carried in allows (still bounded by the energy check), so air may go up
- * to this far above the base gradient.
- */
-export const BOWL_AIR_ABOVE = 3000;
-
-let fp: { ox: number; oz: number; fx: number; fz: number } | null | undefined;
-
-export function inBowlFootprint(x: number, z: number): boolean {
-  if (Math.abs(edgeDistance(x, z) - 42400) > 3000) return false;
-  if (fp === undefined) {
-    const site = tracks.bowl();
-    if (site === null) fp = null;
-    else {
-      const o = tracks.pointAt(site.track, site.s, { x: 0, z: 0, h: 0, k: 0 });
-      fp = { ox: o.x, oz: o.z, fx: Math.sin(o.h), fz: Math.cos(o.h) };
-    }
-  }
-  if (fp === null) return false;
-  const dx = x - fp.ox;
-  const dz = z - fp.oz;
-  const u = dx * fp.fx + dz * fp.fz;
-  const v = Math.abs(dx * fp.fz - dz * fp.fx);
-  return u > B.uM - 60 && u < L_MIN + B.maxExtra + B.M_DN && v < V_MAX + B.M_LAT;
 }
