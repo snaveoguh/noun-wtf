@@ -31,6 +31,7 @@ import {
   type StatKey,
   type WorldStats,
 } from './net/Stats';
+import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { Graphics, type Quality } from './render/Graphics';
@@ -166,6 +167,7 @@ export class Game {
   nounId: number;
   name: string;
   remotes = new Map<string, RemoteAvatar>();
+  crew: JerseyCrew | null = null;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -295,6 +297,18 @@ export class Game {
       this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
 
+    // Local-only NPC crew at the secret Noun Jersey park (spawns within ~400 m)
+    if (this.mountain !== null)
+      this.crew = new JerseyCrew({
+        scene: this.gfx.scene,
+        world: this.world,
+        assets,
+        quality: this.gfx.quality,
+        toon: this.gfx.toon,
+        labelLayer: this.labelLayer,
+        camera: this.gfx.camera,
+        canvas: this.opts.canvas,
+      });
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -469,6 +483,7 @@ export class Game {
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.drops?.update(dt, this.player);
+    this.crew?.update(dt, this.player.pos);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -1500,6 +1515,7 @@ export class Game {
     this.graffiti?.dispose();
     this.net.dispose();
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
+    this.crew?.dispose();
     this.gfx.dispose();
     this.world.dispose();
   }
