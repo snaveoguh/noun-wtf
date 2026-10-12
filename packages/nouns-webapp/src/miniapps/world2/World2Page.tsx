@@ -11,6 +11,7 @@ import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
+import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WorldMap } from './ui/WorldMap';
 import { worldPause } from './worldPause';
@@ -158,6 +159,32 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     if (paused) setChatOpen(false);
   }, [game, paused]);
 
+  // Board shop (deck designer): from the Noun Jersey shop door or the select screen
+  useDeckWallet();
+  const [deckOpen, setDeckOpen] = useState(false);
+  const openDeck = () => {
+    gameRef.current?.setPaused(true);
+    setDeckOpen(true);
+  };
+  const closeDeck = () => {
+    setDeckOpen(false);
+    gameRef.current?.setPaused(pausedRef.current);
+  };
+  useEffect(() => {
+    if (!game || phase !== 'play' || deckOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyE' || !game.hud.shop || pausedRef.current) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      // Capture phase: the game's own E (board on/off) never sees it
+      e.stopPropagation();
+      e.preventDefault();
+      game.setPaused(true);
+      setDeckOpen(true);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [game, phase, deckOpen]);
+
   // Keyboard: chat + help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -213,7 +240,12 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && (
-        <Hud game={game} showHelp={showHelp} onHelp={() => setShowHelp(s => !s)} />
+        <Hud
+          game={game}
+          showHelp={showHelp}
+          onHelp={() => setShowHelp(s => !s)}
+          onShop={openDeck}
+        />
       )}
       {game && started && <TouchControls game={game} />}
 
@@ -245,8 +277,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           initial={initialChar}
           auctionSeed={auctionSeed ?? null}
           onConfirm={confirmCharacter}
+          onDesignDeck={openDeck}
         />
       )}
+      {game && deckOpen && <DeckDesigner game={game} onClose={closeDeck} />}
       {(phase === 'title' || !game) && !error && <SplashGate game={game} onStart={begin} />}
       {game && searchParams.get('diag') === '1' && <Diagnostics game={game} />}
 
@@ -364,7 +398,17 @@ function Splash({
   );
 }
 
-function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp: () => void }) {
+function Hud({
+  game,
+  showHelp,
+  onHelp,
+  onShop,
+}: {
+  game: Game;
+  showHelp: boolean;
+  onHelp: () => void;
+  onShop: () => void;
+}) {
   const hud = useHud(game);
   const now = performance.now();
   const banked = hud.banked && now - hud.banked.at < 2600 ? hud.banked : null;
@@ -521,6 +565,17 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
           <span>⌐◨-◨ 19 km out</span>
           <b>{hud.toast.text}</b>
         </div>
+      )}
+
+      {/* Noun Jersey board shop door */}
+      {hud.shop && (
+        <button
+          type="button"
+          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
+          onClick={onShop}
+        >
+          ENTER BOARD SHOP — {touch ? 'TAP' : 'E / tap'}
+        </button>
       )}
 
       {/* GTA-style map: minimap bottom-left, opens the full map */}
