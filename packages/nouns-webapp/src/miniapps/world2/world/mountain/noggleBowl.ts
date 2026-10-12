@@ -412,7 +412,7 @@ export function bowlSurface(
   const w = padWeight(f, u, vp);
   let t = y + w * (f.P - y);
   let d = t;
-  let paved = smoothstep(0.85, 1, w);
+  let paved = 0;
   let inBowl = false;
   const b = u - U_B;
   const a = vp - VC;

@@ -142,6 +142,7 @@ interface Built {
   collision: THREE.BufferGeometry;
   coping: THREE.BufferGeometry;
   decals: THREE.BufferGeometry | null;
+  pool: THREE.BufferGeometry;
   props: THREE.BufferGeometry | null;
   lamps: THREE.BufferGeometry | null;
   sign: { pos: THREE.Vector3; yaw: number } | null;
@@ -298,6 +299,118 @@ function colourAll(geos: THREE.BufferGeometry[], hex: number): THREE.BufferGeome
 }
 
 /**
+ * The concrete you see where the terrain itself is the surface (floor,
+ * transitions, bank, the deck around the bank): the mountain mesher only
+ * knows one flat concrete tint on a coarse grid, so the bowl gets its own
+ * fine, smooth-shaded skin draped a hair above it (render only; the
+ * terrain stays the collider). Skipped wherever the wall mesh is.
+ */
+function buildPool(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry {
+  const st = stations(2);
+  const ds = [-BOWL.deckW, -14, -9, -5, -2.5, -1, 0, 0.6, 1.5, 3, 5, 7.5, 10.5, 14, 18, 23, 29, 36];
+  for (let d = 44; d < BOWL.Rr; d += 8) ds.push(d);
+  ds.push(BOWL.Rr);
+  const nR = ds.length;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const gap: number[] = [];
+  const cLip = new THREE.Color(C.deck);
+  const cTop = new THREE.Color(C.concrete);
+  const cFloor = new THREE.Color(0x9f9a90);
+  for (const s of st) {
+    const H = wallH(s.bc);
+    for (const d of ds) {
+      const b = s.b - s.nb * d;
+      const a = s.a - s.na * d;
+      const sm = bowlSurface(f, b + BOWL_GEO.U_B, a + BOWL_GEO.VC, f.P);
+      bowlAxisToWorld(f, b, a, _o);
+      pos.push(_o.x - origin.x, sm.t + 0.03 - origin.y, _o.z - origin.z);
+      gap.push(sm.d - sm.t);
+      if (d <= 0) _c.copy(cLip);
+      else _c.copy(cTop).lerp(cFloor, Math.min(1, Math.max(0, (f.P - sm.t) / H)));
+      col.push(_c.r, _c.g, _c.b);
+    }
+  }
+  const idx: number[] = [];
+  const N = st.length;
+  for (let i = 0; i < N; i++) {
+    const i1 = (i + 1) % N;
+    for (let j = 0; j < nR - 1; j++) {
+      const a = i * nR + j;
+      const b = i * nR + j + 1;
+      const c = i1 * nR + j + 1;
+      const d = i1 * nR + j;
+      if (gap[a] > 0.004 || gap[b] > 0.004 || gap[c] > 0.004 || gap[d] > 0.004) continue;
+      pushUp(pos, idx, a, b, c);
+      pushUp(pos, idx, a, c, d);
+    }
+  }
+  return indexed(pos, col, idx);
+}
+
+/** Triangle p, q, r wound to face up. */
+function pushUp(pos: number[], idx: number[], p: number, q: number, r: number) {
+  const ux = pos[q * 3] - pos[p * 3];
+  const uz = pos[q * 3 + 2] - pos[p * 3 + 2];
+  const vx = pos[r * 3] - pos[p * 3];
+  const vz = pos[r * 3 + 2] - pos[p * 3 + 2];
+  if (uz * vx - ux * vz >= 0) idx.push(p, q, r);
+  else idx.push(p, r, q);
+}
+
+function indexed(pos: number[], col: number[], idx: number[]): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g.toNonIndexed();
+}
+
+/** The roll-in's skin: concrete with a red racing line down the middle. */
+function buildRollIn(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry {
+  const es = [-BOWL.half - 3, -BOWL.half, -6, -0.7, 0.7, 6, BOWL.half, BOWL.half + 3];
+  const cols = [
+    C.concreteDark,
+    C.concrete,
+    C.concrete,
+    C.red,
+    C.red,
+    C.concrete,
+    C.concrete,
+    C.concreteDark,
+  ];
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const u0 = BOWL.uM + 20;
+  const u1 = BOWL_GEO.U_RIM - 1;
+  const n = Math.ceil((u1 - u0) / 3);
+  for (let i = 0; i <= n; i++) {
+    const u = u0 + ((u1 - u0) * i) / n;
+    const vc = chuteV(u);
+    es.forEach((e, j) => {
+      bowlToWorld(f, u, vc + e, _o);
+      const y = terrainHeight(_o.x, _o.z) + 0.05;
+      pos.push(_o.x - origin.x, y - origin.y, _o.z - origin.z);
+      _c.setHex(cols[j]);
+      col.push(_c.r, _c.g, _c.b);
+    });
+  }
+  const m = es.length;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < m - 1; j++) {
+      const a = i * m + j;
+      const b = (i + 1) * m + j;
+      const c = (i + 1) * m + j + 1;
+      const d = i * m + j + 1;
+      pushUp(pos, idx, a, b, c);
+      pushUp(pos, idx, a, c, d);
+    }
+  return indexed(pos, col, idx);
+}
+
+/**
  * Giant noggles painted on the floor (and a ring round the deep end),
  * draped over the terrain, offset up a touch (polygon offset does the rest).
  */
@@ -315,7 +428,7 @@ function buildDecals(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry 
         const b = b0 + ((b1 - b0) * i) / nb;
         const a = a0 + ((a1 - a0) * j) / na;
         bowlAxisToWorld(f, b, a, _o);
-        const y = terrainHeight(_o.x, _o.z) + 0.04;
+        const y = terrainHeight(_o.x, _o.z) + 0.07;
         row.push({ x: _o.x - origin.x, y: y - origin.y, z: _o.z - origin.z });
       }
       P.push(row);
@@ -345,7 +458,7 @@ function buildDecals(f: BowlFrame, origin: THREE.Vector3): THREE.BufferGeometry 
       }
   };
   // Noggles across the floor, read from the roll-in (b = along, a = across)
-  const s = 1.15;
+  const s = 1.7;
   const lens = (ac: number) => {
     quad(-9 * s, 9 * s, ac - 9 * s, ac + 9 * s, C.red);
     quad(-6 * s, 6 * s, ac - 6 * s, ac, C.white);
@@ -446,6 +559,7 @@ let mats: {
   decal: THREE.MeshStandardMaterial;
   steel: THREE.MeshStandardMaterial;
   lamp: THREE.MeshBasicMaterial;
+  skin: THREE.MeshStandardMaterial;
 } | null = null;
 
 function materials() {
@@ -456,15 +570,23 @@ function materials() {
       vertexColors: true,
       roughness: 0.9,
       polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4,
+    });
+    const skin = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.95,
+      polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
     });
+    skin.name = 'NoggleBowlSkin';
     decal.name = 'NoggleBowlPaint';
     const steel = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 });
     steel.name = 'NoggleBowlSteel';
     const lamp = new THREE.MeshBasicMaterial({ color: C.lamp });
     lamp.name = 'NoggleBowlLamp';
-    mats = { walls, decal, steel, lamp };
+    mats = { walls, decal, steel, lamp, skin };
   }
   return mats;
 }
@@ -483,10 +605,12 @@ function build(f: BowlFrame, origin: THREE.Vector3, ctx: ChunkContext): Built {
   const coping = buildCoping(w.rimTop);
   const rich = ctx.quality !== 'low';
   const decals = buildDecals(f, origin);
+  const pool = mergeGeometries([buildPool(f, origin), buildRollIn(f, origin)], false)!;
   const pr = rich ? buildProps(f, origin) : null;
   let tris =
     (w.pos.length + coping.attributes.position.count * 3 + decals.attributes.position.count * 3) /
-    9;
+      9 +
+    pool.attributes.position.count / 3;
   if (pr !== null)
     tris += (pr.props.attributes.position.count + pr.lamps.attributes.position.count) / 3;
   return {
@@ -494,6 +618,7 @@ function build(f: BowlFrame, origin: THREE.Vector3, ctx: ChunkContext): Built {
     collision,
     coping,
     decals,
+    pool,
     props: pr?.props ?? null,
     lamps: pr?.lamps ?? null,
     sign: pr?.sign ?? null,
@@ -536,8 +661,10 @@ export function noggleBowlDecorator(): ChunkDecorator {
         return mesh;
       };
       add(p.walls, M.walls, 'NoggleBowlWalls', true);
+      add(p.pool, M.skin, 'NoggleBowlSkin', false);
+      disposables.push(p.pool);
       const coping = add(p.coping, M.steel, 'NoggleBowlCoping', false);
-      let calls = 2;
+      let calls = 3;
       if (p.decals !== null) {
         add(p.decals, M.decal, 'NoggleBowlPaint', false);
         disposables.push(p.decals);
