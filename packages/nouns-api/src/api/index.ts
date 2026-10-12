@@ -2297,10 +2297,45 @@ interface WorldStatsBody {
   boards?: Record<string, { name: string; value: number; label?: string; at: number }[]>;
 }
 
-async function fetchWorldStats(): Promise<WorldStatsBody> {
-  const res = await fetch(WORLD_STATS_URL, { signal: AbortSignal.timeout(6000) });
+async function fetchWorldStats(timeoutMs = 6000): Promise<WorldStatsBody> {
+  const res = await fetch(WORLD_STATS_URL, { signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as WorldStatsBody;
+}
+
+/** Chat messages about the game: these get the live board up front. */
+const WORLD_QUESTION =
+  /noun ?world|\bgame\b|skat|top ?speed|fastest|leaderboard|record|hang ?time|biggest air|\bjump|km\/?h|downhill|\bcomp(etition)?\b|\bbowl\b|noun jersey/i;
+
+/**
+ * The live Noun World board as a few lines of plain text. It goes at the very
+ * top of the system prompt, so the answer never hinges on the model calling
+ * world_fastest, or on a fallback model with a short context seeing the whole
+ * prompt (the hub falls back to smaller models when a provider is out).
+ */
+async function worldBrief(): Promise<string> {
+  try {
+    const st = await fetchWorldStats(2500);
+    const line = (k: string, unit: string, digits: number) => {
+      const seen = new Set<string>();
+      const rows = (st.boards?.[k] ?? [])
+        .filter(r => !seen.has(r.name.toLowerCase()) && seen.add(r.name.toLowerCase()))
+        .slice(0, 5)
+        .map((r, i) => `${i + 1}. ${r.name} ${r.value.toFixed(digits)}${unit}`);
+      return rows.length > 0 ? rows.join(', ') : 'nobody yet';
+    };
+    return `NOUN WORLD — LIVE LEADERBOARD (fetched just now; answer game questions from this, never say you have no data):
+Noun World is noun.wtf's multiplayer 3D skate game at noun.wtf/world.
+- Top speed: ${line('kmh', ' km/h', 1)}
+- Highest jump: ${line('airM', ' m', 1)}
+- Longest hang time: ${line('airS', ' s', 2)}
+- Furthest downhill: ${line('downM', ' m', 0)}
+- Best combo: ${line('combo', ' pts', 0)}
+- ${st.riders ?? 0} riders have played, ${st.sessions ?? 0} sessions.
+Competition: fastest top speed by Sat 31 Oct (midnight UTC) wins $67; biggest air and longest hang time win $33 each; best graffiti tag is a judges' pick. Records only count with a physics-checked ride.`;
+  } catch {
+    return '';
+  }
 }
 
 // What the site itself has, shared by the chat bar and NounIRL. Keep this in
@@ -3539,6 +3574,8 @@ app.post('/api/chat', async c => {
 
     // Build dynamic context (changes per request — not cached)
     let dynamicContext = '';
+    const gameBrief =
+      typeof message === 'string' && WORLD_QUESTION.test(message) ? await worldBrief() : '';
 
     // Inject current view context (which DAO + noun the user is looking at).
     // This is the FIRST thing we inject so the model anchors to it before
@@ -4777,7 +4814,7 @@ CRITICAL RULES:
     ]; // end _removedGovernanceTools
 
     // Build system prompt — combine static + dynamic context
-    const systemPrompt = dynamicContext ? `${staticPrompt}\n\n${dynamicContext}` : staticPrompt;
+    const systemPrompt = [gameBrief, staticPrompt, dynamicContext].filter(Boolean).join('\n\n');
 
     // First API call via agent-hub (both use Sonnet for quality)
     let response = await hubChat({
