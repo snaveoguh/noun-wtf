@@ -843,6 +843,7 @@ export class NounCharacter {
     if (this.scooter !== null) this.scooter.root.visible = t === 'scooter';
     for (const b of this.blades) b.visible = t === 'blades';
     if (!this.isRideMode()) {
+      this.restoreRidePose();
       this.stance.position.set(0, 0, 0);
       this.stance.quaternion.identity();
       this.ride.lift = 0;
@@ -923,16 +924,9 @@ export class NounCharacter {
       climb?: { phase: number; amount: number };
     },
   ) {
-    if (this.isRideMode()) {
-      this.readTrick();
-      // Undo last frame's procedural pose so it never accumulates on bones a clip doesn't key
-      if (this.posedLast)
-        for (const b of this.rideSnap) {
-          b.o.position.copy(b.p);
-          b.o.quaternion.copy(b.q);
-        }
-      this.posedLast = false;
-    }
+    if (this.isRideMode()) this.readTrick();
+    // Undo last frame's procedural pose so it never accumulates on bones a clip doesn't key
+    this.restoreRidePose();
     this.mixer?.update(dt);
     this.climbBlend = THREE.MathUtils.lerp(
       this.climbBlend,
@@ -1038,6 +1032,15 @@ export class NounCharacter {
     });
   }
 
+  private restoreRidePose() {
+    if (!this.posedLast) return;
+    for (const b of this.rideSnap) {
+      b.o.position.copy(b.p);
+      b.o.quaternion.copy(b.q);
+    }
+    this.posedLast = false;
+  }
+
   private baseQ = new THREE.Quaternion();
   /** Bone poses as the mixer left them, restored before the next frame. */
   private posedLast = false;
@@ -1051,6 +1054,13 @@ export class NounCharacter {
    */
   private readTrick() {
     this.baseQ.copy(this.body.quaternion);
+    // Flips only happen in the air. On the ground a remote rider's board pose
+    // also carries the powerslide / manual (their body pose isn't networked).
+    if (!/ollie|flip|air|grab/.test(this.requested)) {
+      this.ride.spin = 0;
+      this.ride.roll = 0;
+      return;
+    }
     // inverse flip = Rz(−roll)·Ry(−spin): its Y twist gives the spin
     _qa.copy(this.baseQ).invert().multiply(this.board.quaternion).invert();
     const n = Math.hypot(_qa.y, _qa.w);
@@ -1255,6 +1265,20 @@ export class NounCharacter {
       solveTwoBone(leg.thigh, leg.shin, leg.foot, target, pole, 1);
       setWorldQuat(leg.foot, footQ);
     });
+
+    // Blades on the ground: lean and crouch tilt the feet, so settle the
+    // rider until the lowest wheel just touches the surface
+    if (!scooter && !air && opts.grounded !== false && this.bladeWheels.length > 0) {
+      let low = Infinity;
+      for (const w of this.bladeWheels) {
+        this.root.worldToLocal(w.getWorldPosition(target));
+        low = Math.min(low, target.y - BLADE_R);
+      }
+      if (Number.isFinite(low) && Math.abs(low) < 0.25) {
+        this.stance.position.y -= low;
+        this.stance.updateMatrixWorld(true);
+      }
+    }
 
     // Arms
     bones.arms.forEach((arm, i) => {

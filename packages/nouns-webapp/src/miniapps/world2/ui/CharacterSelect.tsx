@@ -88,7 +88,7 @@ export function CharacterSelect({
 }) {
   const [seed, setSeedState] = useState<NounSeed>(initial.seed);
   const [name, setName] = useState(initial.name);
-  const [board, setBoard] = useState<BoardType>(parseBoardType(initial.board));
+  const [board, setBoard] = useState<BoardType>(() => parseBoardType(initial.board));
   const [build, setBuild] = useState<number>(initial.build ?? 2);
   const [row, setRow] = useState(0);
   const [flash, setFlash] = useState(0);
