@@ -83,6 +83,9 @@ const FOOT_TURN_RATE = 3.2;
 const RUN_DRAG_K = 400;
 /** Extra acceleration (m/s²) per minute of unbroken mountain riding. */
 const STREAK_ACCEL = 0.35;
+/** Blades backwards skating: acceleration and top speed (m/s²). */
+const BACK_SKATE_ACCEL = 4;
+const BACK_SKATE_SPEED = 6;
 
 export const DEFAULT_TUNING: PlayerTuning = {
   gravity: 12.5,
@@ -249,6 +252,12 @@ export class Player {
   /** Vert air: height of the lip we left. */
   private vertLipY = 0;
   fakie = false;
+  /**
+   * Blades: S skates backwards once you're nearly stopped (instead of only
+   * braking), W always pushes forwards, and rolling backwards doesn't kick
+   * the rider round. Set by the game from the ride mode.
+   */
+  backSkate = false;
   /** Visual kickturn/revert spin remaining (radians), decays to 0. */
   kickturn = 0;
   emote = 0;
@@ -1155,7 +1164,10 @@ export class Player {
     // Wheel grip: lateral velocity bleeds off (powerslide reduces grip)
     const side = this.side;
     const lat = this.vel.dot(side);
-    const brake = input.brake && this.state !== 'manual';
+    const wantBrake = input.brake && this.state !== 'manual';
+    const backing =
+      this.backSkate && wantBrake && this.state === 'ground' && this.forwardSpeed < 1.5;
+    const brake = wantBrake && !backing;
     const sliding = brake && speed > 3;
     this.powerslide = THREE.MathUtils.lerp(
       this.powerslide,
@@ -1170,7 +1182,7 @@ export class Player {
     // Auto kickturn: whenever we end up rolling backwards (stalled on a ramp,
     // pushed back off a wall, slow zero-crossing over several frames…) spin
     // the board 180 so the rider always faces the way they're travelling.
-    if (this.state === 'ground' && fs < -0.3) {
+    if (this.state === 'ground' && fs < -0.3 && !this.backSkate) {
       this.fwd.negate();
       this.kickturn = Math.PI;
       fs = -fs;
@@ -1189,7 +1201,7 @@ export class Player {
       this.pushTimer += dt;
       const ph = this.pushTimer / PUSH_CYCLE;
       if (ph > 0.25 && ph < 0.6 && Math.abs(fs) < t.maxPushSpeed) {
-        const dir = this.fakie ? -1 : 1;
+        const dir = this.fakie && !this.backSkate ? -1 : 1;
         // Standstill push still needs a direction
         this.vel.addScaledVector(this.fwd, dir * t.pushAccel * 2.6 * dt);
       }
@@ -1197,6 +1209,11 @@ export class Player {
         this.pushTimer = input.push && canPush ? 0 : -1;
         if (this.pushTimer === 0) this.events.push({ type: 'push' });
       }
+    }
+    // Blades, S held near a stop: skate backwards (a gentle stride, capped
+    // well under push speed, so it never outruns the push allowance)
+    if (backing && -fs < BACK_SKATE_SPEED) {
+      this.vel.addScaledVector(this.fwd, -BACK_SKATE_ACCEL * dt);
     }
 
     // Friction / braking. On the mountain the drag eases off the longer the
