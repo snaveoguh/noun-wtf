@@ -5,8 +5,10 @@
 // the same wall id from the same hit. Each cell owns a transparent canvas
 // decal. Tags are stored as compact vector dabs (5 bytes each), which keeps
 // them small enough for the existing PartyKit graffiti storage
-// (`world:graffiti:save/load`, last 20 tags per wall). A handful of index
-// buckets remember which walls have paint so late joiners can load them.
+// (`world:graffiti:save/load`), which carries tags live between players.
+// PartyKit only keeps the last 20 tags per wall and a few walls per index
+// bucket, so every tag is also written to the `world-graffiti` Netlify
+// function, which keeps them for good and is what a fresh visitor loads.
 
 import type { CollisionWorld } from '../physics/Collision';
 
@@ -38,6 +40,18 @@ const TEX_H = 256;
 const MAX_DABS = 900;
 const INDEX_BUCKETS = 8;
 const RANGE = 7;
+const STORE_URL = '/.netlify/functions/world-graffiti';
+const STORE_BATCH = 40;
+
+/** Post one tag to the permanent store (fire and forget). */
+function storeTag(wallId: string, data: string) {
+  void fetch(STORE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wallId, data }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
 
 export interface Dab {
   u: number; // 0..1 across the cell
@@ -130,6 +144,10 @@ export class Graffiti {
   private sinceSpray = 0;
   private dabAcc = 0;
   private indexed = new Set<string>();
+  /** Permanent-store load; PartyKit's index waits for it. */
+  private stored: Promise<void> | null = null;
+  private storedDone = false;
+  private readonly startedAt = Date.now();
   /** Aim point for the HUD crosshair (null when nothing in range). */
   aim: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
   private hiss: { gain: GainNode } | null = null;
@@ -142,10 +160,44 @@ export class Graffiti {
     this.group.name = 'graffiti';
   }
 
-  /** Ask the server which walls have paint (index buckets → walls). */
+  /**
+   * Load every wall with paint: the permanent store first, then PartyKit's
+   * index buckets (tags from before the store existed, carried over below).
+   */
   loadAll() {
     if (this.net === null) return;
-    for (let i = 0; i < INDEX_BUCKETS; i++) this.net.load(this.indexId(i));
+    this.stored ??= this.loadStored().finally(() => {
+      this.storedDone = true;
+    });
+    void this.stored.then(() => {
+      for (let i = 0; i < INDEX_BUCKETS; i++) this.net?.load(this.indexId(i));
+    });
+  }
+
+  private async loadStored() {
+    try {
+      const res = await fetch(`${STORE_URL}?level=${this.levelKey}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const { walls } = (await res.json()) as { walls: string[] };
+      for (const id of walls) this.indexed.add(id);
+      for (let i = 0; i < walls.length; i += STORE_BATCH) {
+        const ids = JSON.stringify(walls.slice(i, i + STORE_BATCH));
+        const r = await fetch(
+          `${STORE_URL}?level=${this.levelKey}&ids=${encodeURIComponent(ids)}`,
+          { cache: 'no-store' },
+        );
+        if (!r.ok) continue;
+        const got = (await r.json()) as { walls: Record<string, string[]> };
+        for (const [id, tags] of Object.entries(got.walls))
+          this.paintTags(
+            id,
+            tags.map(d => ({ imageData: d })),
+            false,
+          );
+      }
+    } catch {
+      // Offline or the function is down: PartyKit still has recent tags
+    }
   }
 
   private indexId(i: number) {
@@ -153,7 +205,7 @@ export class Graffiti {
   }
 
   /** Handle a `world:graffiti:tags` broadcast. */
-  onTags(wallId: string, tags: { imageData: string }[]) {
+  onTags(wallId: string, tags: { imageData: string; timestamp?: number }[]) {
     if (wallId.startsWith(`w2idx:${this.levelKey}:`)) {
       for (const t of tags) {
         const id = t.imageData;
@@ -163,6 +215,19 @@ export class Graffiti {
       }
       return;
     }
+    this.paintTags(wallId, tags, true);
+  }
+
+  /**
+   * Paint tags onto a wall. From PartyKit (`fromParty`), a tag the store
+   * didn't have that predates this visit is an old one from before the store
+   * existed: write it there so it survives PartyKit forgetting it.
+   */
+  private paintTags(
+    wallId: string,
+    tags: { imageData: string; timestamp?: number }[],
+    fromParty: boolean,
+  ) {
     if (!wallId.startsWith(`${this.levelKey}|`)) return;
     const cell = this.cellFromId(wallId);
     if (cell === null) return;
@@ -172,6 +237,8 @@ export class Graffiti {
       if (dabs === null) continue;
       cell.painted.add(t.imageData);
       for (const d of dabs) this.drawDab(cell, d);
+      if (fromParty && this.storedDone && (t.timestamp ?? Infinity) < this.startedAt)
+        storeTag(wallId, t.imageData);
     }
   }
 
@@ -366,6 +433,7 @@ export class Graffiti {
       const data = encodeDabs(dabs);
       this.cells.get(id)?.painted.add(data);
       this.net?.save(id, data);
+      if (this.net !== null) storeTag(id, data);
       if (!this.indexed.has(id)) {
         this.indexed.add(id);
         this.net?.save(this.indexId(hashStr(id) % INDEX_BUCKETS), id);
