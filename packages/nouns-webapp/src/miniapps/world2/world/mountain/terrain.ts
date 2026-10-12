@@ -14,6 +14,7 @@
 //          (+ mega ramp terraces)  a level pad cut into the slope at every
 //                                  mega ramp site (see the section at the end)
 //          (+ Noun Jersey)         the secret spot's terrace (nounJersey.ts)
+//          (+ the Noggle Bowl)     terrace, bowl + roll-in ~42 km out (noggleBowl.ts)
 //
 // Gradients stay ≲ 0.8, so the analytic heightfield doubles as the collision
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
@@ -29,6 +30,7 @@ import {
   vnoise,
   worldToAlley,
 } from './config';
+import { applyBowl, bowlBlocked, inBowl, setBowlNatural } from './noggleBowl';
 import { applyNjPad, njBlocked, njInCore, setNjNatural } from './nounJersey';
 import { INFLUENCE, MEGA_SITE, tracks, type MegaSite, type NearestTrack } from './tracks';
 
@@ -96,6 +98,7 @@ export function sampleTerrain(x: number, z: number, out: TerrainSample): Terrain
   // tracks.near still holds this point's lines (sampleBase's last query)
   if (out.dist < INFLUENCE) applyMegaPads(x, z, out);
   applyNjPad(x, z, out);
+  applyBowl(x, z, out);
   return out;
 }
 
@@ -165,6 +168,7 @@ function sampleBase(x: number, z: number, out: TerrainSample): TerrainSample {
 const _s: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
 const _ns: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
 setNjNatural((x, z) => sampleBase(x, z, _ns).y);
+setBowlNatural((x, z) => sampleBase(x, z, _ns).y);
 
 /** Terrain height at (x, z). */
 export function terrainHeight(x: number, z: number): number {
@@ -216,6 +220,8 @@ export function terrainSurface(x: number, z: number): 'track' | 'grass' | 'alley
   if (s.track <= 0.35 && s.alley <= 0.5 && megaAt(x, z, 0.5) !== null) return 'track';
   // Noun Jersey's streets ride like concrete (the park's governor brings city physics anyway)
   if (s.track <= 0.35 && njInCore(x, z, 2)) return 'alley';
+  // The Noggle Bowl's walls + deck are a mesh over the terrain: still concrete
+  if (s.track <= 0.35 && inBowl(x, z, 22)) return 'alley';
   if (s.alley > 0.5) return 'alley';
   return s.track > 0.35 ? 'track' : 'grass';
 }
@@ -582,7 +588,7 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
  * with a margin — and the Noun Jersey terrace.
  */
 export function megaBlocked(x: number, z: number): boolean {
-  if (njBlocked(x, z)) return true;
+  if (njBlocked(x, z) || bowlBlocked(x, z)) return true;
   return eachMega(
     x,
     z,

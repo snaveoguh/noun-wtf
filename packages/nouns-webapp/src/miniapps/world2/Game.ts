@@ -45,6 +45,8 @@ import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaR
 import { dressingDecorator } from './world/mountain/DressingDecorator';
 import { megaRampDecorator } from './world/mountain/MegaRamps';
 import { MountainStream } from './world/mountain/MountainStream';
+import { bowlCentre, bowlFrame, bowlSpawn, inBowl } from './world/mountain/noggleBowl';
+import { noggleBowlDecorator } from './world/mountain/NoggleBowlPark';
 import {
   NJ,
   njFrame,
@@ -82,7 +84,7 @@ function devRun(): boolean {
   return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
 }
 
-/** `?spot=nj` dev param: spawn at the top of Main St in the secret Noun Jersey park. */
+/** `?spot=nj` / `?spot=bowl` dev params: spawn in a secret spot (Noun Jersey, the Noggle Bowl). */
 function spotParam(): string | null {
   return new URLSearchParams(window.location.search).get('spot');
 }
@@ -313,6 +315,11 @@ export class Game {
       const sp = njSpawn();
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
+    // `?spot=bowl`: the top of the Noggle Bowl's roll-in, ~42 km down the −X line
+    if (spotParam() === 'bowl' && this.mountain !== null) {
+      const sp = bowlSpawn();
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -537,6 +544,8 @@ export class Game {
       m.addDecorator(megaRampDecorator(this.rails));
       // The secret spot (Noun Jersey, ~19 km down the +Z line): same pattern
       m.addDecorator(nounJerseyDecorator(this.rails));
+      // …and the Noggle Bowl (~42 km down the −X line): walls, deck, coping
+      m.addDecorator(noggleBowlDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)
       const wild = new Wildlife(this.gfx.quality);
       m.addDecorator(wild.decorator());
@@ -1375,6 +1384,7 @@ export class Game {
       return { name: l.name, dist: Math.round(Math.hypot(d.x, d.z)), bearing };
     });
     if (this.mountain !== null) this.updateSecretSpot(lm);
+    if (this.mountain !== null) this.updateBowl(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
@@ -1440,6 +1450,36 @@ export class Game {
       this.hud = {
         ...this.hud,
         toast: { text: 'SECRET SPOT FOUND: NOUN JERSEY', at: performance.now() },
+      };
+    }
+  }
+
+  /** The Noggle Bowl: same as the secret spot (compass when close, a banner the first time in). */
+  private bowlFound = false;
+
+  private updateBowl(lm: { name: string; dist: number; bearing: number }[]) {
+    const p = this.player.pos;
+    const f = bowlFrame(p.x, p.z);
+    if (f === null) return;
+    const c = bowlCentre(f, { x: 0, z: 0 });
+    const dx = c.x - p.x;
+    const dz = c.z - p.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 600)
+      lm.unshift({
+        name: 'Noggle Bowl',
+        dist: Math.round(dist),
+        bearing: Math.atan2(dx, dz) - this.cam.controlYaw,
+      });
+    if (!this.bowlFound && inBowl(p.x, p.z)) {
+      this.bowlFound = true;
+      this.hud = {
+        ...this.hud,
+        toast: {
+          tag: '⌐◨-◨ 42 km out',
+          text: 'SECRET SPOT FOUND: THE NOGGLE BOWL',
+          at: performance.now(),
+        },
       };
     }
   }
