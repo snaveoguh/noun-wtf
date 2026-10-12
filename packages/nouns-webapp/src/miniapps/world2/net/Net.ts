@@ -86,7 +86,7 @@ export class Net {
   onJoin?: (id: string) => void;
   onLeave?: (id: string) => void;
   onChat?: (id: string, text: string) => void;
-  onGraffiti?: (wallId: string, tags: { imageData: string }[]) => void;
+  onGraffiti?: (wallId: string, tags: { imageData: string; timestamp?: number }[]) => void;
   onOpen?: () => void;
   connected = false;
 
@@ -155,7 +155,9 @@ export class Net {
       const speaking = d.speaking === true;
       if (rp) rp.speaking = speaking;
     } else if (type === 'world:graffiti:tags') {
-      const tags = Array.isArray(d.tags) ? (d.tags as { imageData: string }[]) : [];
+      const tags = Array.isArray(d.tags)
+        ? (d.tags as { imageData: string; timestamp?: number }[])
+        : [];
       this.onGraffiti?.(String(d.wallId ?? ''), tags);
     } else if (type === 'world:voip:transcript') {
       const id = d.id as string;
