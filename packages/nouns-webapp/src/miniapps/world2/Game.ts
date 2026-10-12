@@ -474,6 +474,7 @@ export class Game {
               respawnPressed: false,
               emotePressed: 0,
             };
+      this.player.backSkate = this.boardType === 'blades';
       this.player.update(h, f, this.cam.controlYaw, now);
       this.handlePlayerEvents();
     }
