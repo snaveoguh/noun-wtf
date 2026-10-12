@@ -11,6 +11,7 @@ import { BUILDS } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
+import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WorldMap } from './ui/WorldMap';
 import { worldPause } from './worldPause';
@@ -216,6 +217,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         <Hud game={game} showHelp={showHelp} onHelp={() => setShowHelp(s => !s)} />
       )}
       {game && started && <TouchControls game={game} />}
+      {game?.drops && started && <DropClaim drops={game.drops} />}
 
       {chatOpen && (
         <form
