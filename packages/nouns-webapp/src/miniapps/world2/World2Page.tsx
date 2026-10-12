@@ -130,7 +130,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     }
     gameRef.current = g;
     setGame(g);
-    (window as unknown as { __w2?: Game }).__w2 = g;
+    // Console handle for local testing only (dev server, or ?debug, which
+    // also stops the session posting stats)
+    if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug'))
+      (window as unknown as { __w2?: Game }).__w2 = g;
     const resize = () => g.resize(canvas.clientWidth, canvas.clientHeight);
     resize();
     window.addEventListener('resize', resize);
