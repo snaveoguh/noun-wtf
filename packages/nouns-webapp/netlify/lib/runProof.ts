@@ -19,6 +19,10 @@
 // Keep PHYS in step with skate/Player.ts (DEFAULT_TUNING + STREAK_ACCEL).
 
 import { MOUNTAIN, edgeDistance } from '../../src/miniapps/world2/world/mountain/config';
+import {
+  BOWL_AIR_ABOVE,
+  inBowlFootprint,
+} from '../../src/miniapps/world2/world/mountain/noggleBowl';
 
 export const PHYS = {
   g: 12.5,
@@ -88,7 +92,11 @@ export function verifyRun(s: Float32Array): RunCheck {
     if (de > 150) {
       const b = baseHeight(de);
       if (y < b - BAND_BELOW) return fail('below the mountain');
-      if (y > b + (st === AIR ? AIR_ABOVE : BAND_ABOVE)) return fail('above the mountain');
+      // The Noggle Bowl's vert walls (~42 km out) send riders straight up
+      // as high as their speed takes them (the energy check still holds)
+      const top = st === AIR ? AIR_ABOVE : BAND_ABOVE;
+      if (y > b + top && !(st === AIR && y <= b + BOWL_AIR_ABOVE && inBowlFootprint(x, z)))
+        return fail('above the mountain');
     }
     if (i === 0) continue;
     const p = o - STRIDE;

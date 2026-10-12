@@ -69,6 +69,8 @@ export interface Track {
   nextMega: number;
   /** Secret spots (only the Noun Jersey line has one), in along-track order. */
   spots: SpotSite[];
+  /** The Noggle Bowl (only the −X GO DOWN line has one). */
+  bowls: SpotSite[];
 }
 
 export interface NearestTrack {
@@ -228,6 +230,30 @@ export interface SpotSite {
   frame: unknown;
 }
 
+// ── Secret spot: the Noggle Bowl ──
+//
+// A second hidden set piece (world/mountain/noggleBowl.ts + NoggleBowlPark.ts):
+// a huge concrete bowl on a terrace beside the −X GO DOWN main, about
+// 42 km out, with a raised roll-in that peels off the line upstream. Its
+// stretch of line is reserved like Noun Jersey's, only longer (the roll-in
+// starts ~480 m before the terrace), and nothing within ~41 km changes.
+// Out there the branches criss-cross the mains every few hundred metres;
+// the site is pinned (along-track) to a stretch none of them cross.
+
+export const BOWL_SITE = {
+  /** Main line (track id): 3 = the −X GO DOWN alley. */
+  track: 3,
+  /** Along-track distance of the site (≈ 42.4 km from the city)… */
+  at: 48400,
+  /** …fixed this far ahead of the growth frontier. */
+  look: 1200,
+  /** Reserved straight, ramp-free stretch before / after the site (m). */
+  pre: 560,
+  post: 460,
+  /** No forks this far before the site (branches must clear the roll-in). */
+  forkClear: 900,
+} as const;
+
 /** A reserved stretch of line (mega ramp site or secret spot). */
 interface Reserved {
   s: number;
@@ -289,6 +315,7 @@ class TrackNetwork {
       seedA: (MOUNTAIN.seed + o.id * 7919) | 0,
       seedB: (MOUNTAIN.seed + o.id * 104729 + 3) | 0,
       ramps: [],
+      bowls: [],
       parent: o.parent ?? null,
       megas: [],
       nextMega:
@@ -342,6 +369,23 @@ class TrackNetwork {
       const clear = sb + SPOT_SITE.post + MEGA_SITE.pre;
       if (t.nextMega < clear) t.nextMega = clear + hashInts(t.id, 100, 61) * 400;
     }
+    // The Noggle Bowl: same pattern on the −X line, ~42 km out
+    if (t.id === BOWL_SITE.track && t.bowls.length === 0 && s + BOWL_SITE.look >= BOWL_SITE.at) {
+      let sb = Math.max(BOWL_SITE.at, s + STEP);
+      const lr = t.ramps[t.ramps.length - 1];
+      if (lr !== undefined)
+        sb = Math.max(sb, lr.s + lr.spec.land + lr.spec.recover + RAMP_GAP + BOWL_SITE.pre);
+      const lm = t.megas[t.megas.length - 1];
+      if (
+        lm !== undefined &&
+        sb < lm.s + MEGA_SITE.post + BOWL_SITE.pre &&
+        sb + BOWL_SITE.post + MEGA_SITE.pre > lm.s
+      )
+        sb = lm.s + MEGA_SITE.post + BOWL_SITE.pre;
+      t.bowls.push({ track: t, k: 200, s: sb, frame: null });
+      const clear = sb + BOWL_SITE.post + MEGA_SITE.pre;
+      if (t.nextMega < clear) t.nextMega = clear + hashInts(t.id, 200, 61) * 400;
+    }
     // Fix the next mega ramp site well before the line gets there: clear of
     // the last launch ramp's landing hill, and far enough ahead that the
     // whole reserved stretch is still to be grown
@@ -357,6 +401,13 @@ class TrackNetwork {
         sb + MEGA_SITE.post + SPOT_SITE.pre > sp.s
       )
         sb = sp.s + SPOT_SITE.post + MEGA_SITE.pre;
+      const bw = t.bowls[0];
+      if (
+        bw !== undefined &&
+        sb < bw.s + BOWL_SITE.post + MEGA_SITE.pre &&
+        sb + MEGA_SITE.post + BOWL_SITE.pre > bw.s
+      )
+        sb = bw.s + BOWL_SITE.post + MEGA_SITE.pre;
       const k = t.megas.length;
       t.megas.push({
         track: t,
@@ -383,9 +434,16 @@ class TrackNetwork {
         t.nextRamp - spec.length - 40,
         t.nextRamp + spec.land + spec.recover,
       );
+      const bowl = this.bowlOverlap(
+        t,
+        t.nextRamp - spec.length - 40,
+        t.nextRamp + spec.land + spec.recover,
+      );
       if (blocker !== null) {
         // Keep launch ramps (and their landing hills) off a mega ramp terrace
         t.nextRamp = blocker.s + MEGA_SITE.post + RAMP_GAP + hashInts(t.id, blocker.k, 47) * 120;
+      } else if (bowl !== null) {
+        t.nextRamp = bowl.s + BOWL_SITE.post + RAMP_GAP + hashInts(t.id, bowl.k, 47) * 120;
       } else if (t.parent !== null && this.nearParent(t, x, z, h, t.nextRamp - s, spec)) {
         t.nextRamp += 150;
       } else {
@@ -398,7 +456,8 @@ class TrackNetwork {
       (pend !== undefined &&
         s >= pend.s - pend.spec.length - 40 &&
         s <= pend.s + pend.spec.land * 0.8) ||
-      (mega !== null && s >= mega.s - MEGA_SITE.pre && s <= mega.s + MEGA_SITE.post);
+      (mega !== null && s >= mega.s - MEGA_SITE.pre && s <= mega.s + MEGA_SITE.post) ||
+      this.bowlOverlap(t, s, s) !== null;
     if (pend !== undefined && s > pend.s + pend.spec.land * 0.8 && t.nextRamp <= pend.s) {
       t.nextRamp =
         pend.s +
@@ -437,7 +496,8 @@ class TrackNetwork {
         ns <= pend.s + pend.spec.land + pend.spec.recover) ||
       (megaN !== null &&
         ns >= megaN.s - MEGA_SITE.forkClear &&
-        ns <= megaN.s + MEGA_SITE.post + 60);
+        ns <= megaN.s + MEGA_SITE.post + 60) ||
+      t.bowls.some(b => ns >= b.s - BOWL_SITE.forkClear && ns <= b.s + BOWL_SITE.post + 60);
     if (t.depth === 0 && ns >= t.nextFork && !busy) {
       t.forks++;
       const side = hashInts(t.id, t.forks, 13) < 0.5 ? -1 : 1;
@@ -481,6 +541,23 @@ class TrackNetwork {
     for (const m of t.spots)
       if (b >= m.s - SPOT_SITE.pre - 20 && a <= m.s + SPOT_SITE.post) return m;
     return null;
+  }
+
+  /** The Noggle Bowl if its reserved stretch overlaps along-track [a, b], or null. */
+  private bowlOverlap(t: Track, a: number, b: number): SpotSite | null {
+    for (const m of t.bowls)
+      if (b >= m.s - BOWL_SITE.pre - 20 && a <= m.s + BOWL_SITE.post) return m;
+    return null;
+  }
+
+  /** The Noggle Bowl site, growing only its main line far enough to fix it (like spot()). */
+  bowl(): SpotSite | null {
+    const t = this.tracks.find(q => q.id === BOWL_SITE.track)!;
+    while (t.bowls.length === 0 && !t.done) {
+      const n = t.xs.length - 1;
+      this.ensureS(t, t.s0 + n * STEP + 600);
+    }
+    return t.bowls[0] ?? null;
   }
 
   /**
