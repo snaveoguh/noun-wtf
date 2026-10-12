@@ -77,14 +77,15 @@ export function verifyRun(s: Float32Array): RunCheck {
   if (s[4] > 25) return fail('starts at speed');
 
   const g = PHYS.g;
-  let maxV = 0;
+  // A speed only counts toward the record where the positions around it
+  // back it up (see the motion check below)
+  const backed = new Uint8Array(n);
   let excess = 0;
   let keGain = 0;
   for (let i = 0; i < n; i++) {
     const o = i * STRIDE;
     const [t, x, y, z, v, st] = [s[o], s[o + 1], s[o + 2], s[o + 3], s[o + 4], s[o + 5]];
     if (v < 0 || v > 600) return fail('impossible speed');
-    if (v > maxV) maxV = v;
     // Near the surface: the mountain only (the city has its own, capped speed)
     const de = edgeDistance(x, z);
     if (de > 150) {
@@ -102,8 +103,14 @@ export function verifyRun(s: Float32Array): RunCheck {
     // Positions move at the trace's own speeds (a fast, straight interval
     // covers its speed × time; turns and frame jitter shave a little)
     if (d > vavg * dt * 1.3 + 1.5) return fail('moves faster than its speed');
-    if (st !== AIR && s[p + 5] !== AIR && d < vavg * dt * 0.7 - 1.5)
-      return fail('speed without moving');
+    // ...and the other way: on the ground a speed with no matching motion
+    // isn't credited (a crash stops you dead a frame before the speed drops,
+    // so this can't fail the ride; a faked spike still fails on energy).
+    // Air is held by the gravity fit and the energy budget instead.
+    if (st === AIR || s[p + 5] === AIR || d >= vavg * dt * 0.7 - 1.5) {
+      backed[i - 1] = 1;
+      backed[i] = 1;
+    }
     // Energy
     const e0 = 0.5 * v0 * v0 + g * s[p + 2];
     const e1 = 0.5 * v * v + g * y;
@@ -129,6 +136,8 @@ export function verifyRun(s: Float32Array): RunCheck {
     if (seg !== null) airs.push(seg);
     i = j;
   }
+  let maxV = s[4];
+  for (let i = 0; i < n; i++) if (backed[i] === 1) maxV = Math.max(maxV, s[i * STRIDE + 4]);
   return { ok: true, maxV, airs };
 }
 
