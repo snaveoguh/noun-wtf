@@ -12,8 +12,9 @@ called it first, so a bot could take every drop without playing.
 2. **Place.** The game server (`packages/nouns-webapp/netlify/functions/world-drops.ts`)
    is told where that drop sits in the world.
 3. **Claim.** A player rides into the drop. The game sends the server the ride
-   trace. The server checks the physics (`netlify/lib/runProof.ts`) and that
-   the ride passes within 4 m of the drop. If both pass, it signs an EIP-712
+   trace. The server checks the physics (`netlify/lib/runProof.ts`), that
+   the ride passes within 4 m of the drop, that it rode in (at least 30 m
+   and 4 s before reaching it), and that the touch is in its last 10 s. If both pass, it signs an EIP-712
    voucher `Claim(dropId, claimer, deadline)` for that player's address and
    holds the drop for them for 5 minutes. The player sends
    `claim(dropId, deadline, signature)`.
@@ -65,6 +66,10 @@ function setSigner(address) / pause() / unpause()     // owner only
 cd packages/nouns-contracts
 forge test --match-path test/foundry/world/NounWorldDrops.t.sol
 ```
+
+`test_serverSignedVoucherClaims` replays a voucher signed by the
+`world-drops` function, so the server's EIP-712 encoding and the contract's
+are checked against each other.
 
 ## Deploying (owner checklist)
 

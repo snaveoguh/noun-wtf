@@ -8,8 +8,8 @@
 // [t, x, y, z, speed, state] samples, state 0 ground / 1 air / 2 grind /
 // 3 manual, every 0.4 s on the ground and every frame in the air, restarted
 // whenever energy could come from outside the physics (teleport, respawn,
-// getting on or off the board, climbing) — the same rules as the stats
-// tracker's RunTrace.
+// getting on or off the board, climbing or vaulting) — the same rules as
+// the stats tracker's RunTrace.
 
 import type { Player } from '../skate/Player';
 
@@ -28,6 +28,29 @@ const TOUCH_R = 2.6;
 const RETOUCH_R = 7;
 const REFRESH_S = 45;
 const STATE_CODE: Record<string, number> = { ground: 0, air: 1, grind: 2, manual: 3 };
+
+/** Distance from point c to segment a→b, and where along it (0..1) it's closest. */
+function segDist(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number,
+) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const dz = bz - az;
+  const len2 = dx * dx + dy * dy + dz * dz;
+  const u =
+    len2 < 1e-9
+      ? 1
+      : Math.min(1, Math.max(0, ((cx - ax) * dx + (cy - ay) * dy + (cz - az) * dz) / len2));
+  return { d: Math.hypot(ax + dx * u - cx, ay + dy * u - cy, az + dz * u - cz), u };
+}
 
 /** The ride since the last reset, in run-proof samples. */
 export class DropTrace {
@@ -455,7 +478,38 @@ export class Drops {
       this.refreshAcc = 0;
       void this.refresh();
     }
-    this.record(dt, player);
+    // Touch: from the rider's middle to the item, swept along this frame's
+    // path (at mountain speeds a frame covers more than the touch radius)
+    const L = this.last;
+    const ax = L.x;
+    const ay = L.y + 0.9;
+    const az = L.z;
+    const bx = player.pos.x;
+    const by = player.pos.y + 0.9;
+    const bz = player.pos.z;
+    let hit: { id: string; p: Pickup; u: number } | null = null;
+    for (const [id, p] of this.pickups) {
+      const { d, u } = L.on
+        ? segDist(ax, ay, az, bx, by, bz, p.drop.x, p.drop.y, p.drop.z)
+        : { d: Math.hypot(p.drop.x - bx, p.drop.y - by, p.drop.z - bz), u: 1 };
+      if (this.armedOff.has(id)) {
+        if (d > RETOUCH_R) this.armedOff.delete(id);
+        continue;
+      }
+      if (d <= TOUCH_R && this.touched === null && hit === null) hit = { id, p, u };
+    }
+
+    // The proof has to hold the moment of the touch: a sample at the
+    // closest point of this frame's path (it moves at the frame's own speed)
+    this.record(dt, player, hit?.u ?? null);
+    if (hit !== null) {
+      // Just respawned on top of it: no ride to show yet, keep rolling
+      if (this.trace.n >= 3) {
+        this.armedOff.add(hit.id);
+        this.touched = { drop: hit.p.drop, proof: this.trace.encode(), at: performance.now() };
+        this.emit();
+      }
+    }
 
     // Float + spin
     const t = this.clock;
@@ -465,35 +519,6 @@ export class Drops {
       const pulse = 1 + Math.sin(t * 3.3 + p.phase) * 0.12;
       p.glow.scale.setScalar(2.6 * pulse);
     }
-
-    // Touch: from the rider's middle to the item
-    const px = player.pos.x;
-    const py = player.pos.y + 0.9;
-    const pz = player.pos.z;
-    for (const [id, p] of this.pickups) {
-      const d = Math.hypot(p.drop.x - px, p.drop.y - py, p.drop.z - pz);
-      if (this.armedOff.has(id)) {
-        if (d > RETOUCH_R) this.armedOff.delete(id);
-        continue;
-      }
-      if (d > TOUCH_R || this.touched !== null) continue;
-      // The proof must hold this very moment: sample it now
-      const st = this.stateCode(player);
-      this.trace.sample(
-        this.clock,
-        player.pos.x,
-        player.pos.y,
-        player.pos.z,
-        player.speed,
-        st,
-        true,
-      );
-      // Just respawned on top of it: no ride to show yet, keep rolling
-      if (this.trace.n < 3) continue;
-      this.armedOff.add(id);
-      this.touched = { drop: p.drop, proof: this.trace.encode(), at: performance.now() };
-      this.emit();
-    }
   }
 
   private stateCode(p: Player) {
@@ -501,19 +526,39 @@ export class Drops {
     return STATE_CODE[p.state] ?? 0;
   }
 
-  /** Same reset rules as the stats tracker's RunTrace (net/Stats.ts). */
-  private record(dt: number, p: Player) {
+  /**
+   * Same reset rules as the stats tracker's RunTrace (net/Stats.ts), plus
+   * the on-foot ones. `touchU` (0..1): a drop was touched that far along
+   * this frame's path, so the proof gets a sample right there, then one
+   * where the rider is now.
+   */
+  private record(dt: number, p: Player, touchU: number | null = null) {
     const { x, y, z } = p.pos;
     const v = p.speed;
     const L = this.last;
     const moved = Math.hypot(x - L.x, y - L.y, z - L.z);
     const teleport = moved > 2 + 3 * Math.max(v, L.v) * dt;
     const respawned = L.v > 4 && v < 0.05;
-    // Getting on / off the board or climbing a wall: energy from outside
-    const switched = p.mode !== L.mode || p.climb !== null;
-    if (!L.on || teleport || respawned || switched) this.trace.reset(this.clock);
-    L.on = p.climb === null;
-    if (p.climb === null) this.trace.sample(this.clock, x, y, z, v, this.stateCode(p));
+    // Getting on / off the board, climbing or vaulting a wall: energy from outside
+    const outside = p.climb !== null || p.vault !== null;
+    const switched = p.mode !== L.mode || outside;
+    const reset = !L.on || teleport || respawned || switched;
+    if (reset) this.trace.reset(this.clock);
+    L.on = !outside;
+    if (!outside && !reset && touchU !== null && touchU < 0.999) {
+      const u = touchU;
+      const lerp = (a: number, b: number) => a + (b - a) * u;
+      this.trace.sample(
+        this.clock - (1 - u) * dt,
+        lerp(L.x, x),
+        lerp(L.y, y),
+        lerp(L.z, z),
+        lerp(L.v, v),
+        this.stateCode(p),
+        true,
+      );
+    }
+    if (!outside) this.trace.sample(this.clock, x, y, z, v, this.stateCode(p), touchU !== null);
     L.x = x;
     L.y = y;
     L.z = z;

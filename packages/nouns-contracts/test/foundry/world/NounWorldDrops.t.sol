@@ -145,6 +145,29 @@ contract NounWorldDropsTest is Test {
         assertEq(drops.hashClaim(1, player, 1234), keccak256(abi.encodePacked('\x19\x01', expected, structHash)));
     }
 
+    /// A voucher exactly as netlify/functions/world-drops.ts signs it (viem
+    /// signTypedData, signer key 0x11…11, chain 1, contract 0x5FbD…0aa3)
+    /// pays out on the contract.
+    function test_serverSignedVoucherClaims() public {
+        address c = 0x5FbDB2315678afecb367f032d93F642f64180aa3;
+        address serverSigner = vm.addr(uint256(0x1111111111111111111111111111111111111111111111111111111111111111));
+        address claimer = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        uint256 deadline = 1791838348;
+        bytes memory sig = hex'3d98951a759773fe4ea27628f3c562cad683b82df8c92ad95e792285e0cf4f54138606943df262f861c5784e10fcd82c1bcdfc43c2217d3a28dd2dd90c58b5771c';
+
+        vm.chainId(1);
+        deployCodeTo('NounWorldDrops.sol:NounWorldDrops', abi.encode(owner, serverSigner), c);
+        NounWorldDrops d = NounWorldDrops(payable(c));
+        assertEq(d.hashClaim(1, claimer, deadline), 0x7724e7653819465bb4b26e2cd6e18229f1a51cc79c3e160df92b855d3b310ad6);
+        vm.warp(deadline - 60);
+        vm.prank(depositor);
+        uint256 id = d.depositETH{ value: 1 ether }(DAY);
+        assertEq(id, 1);
+        vm.prank(claimer);
+        d.claim(id, deadline, sig);
+        assertEq(claimer.balance, 1 ether);
+    }
+
     // ── Happy paths ──
 
     function test_claimETH() public {

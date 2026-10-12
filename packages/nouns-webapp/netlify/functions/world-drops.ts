@@ -25,8 +25,9 @@ import { STRIDE, decodeTrace, verifyRun } from '../lib/runProof';
 // POST { action: 'claim', dropId, address, proof }
 //   proof: the ride that reached the drop (base64 Float32 samples of
 //   [t, x, y, z, speed, state], the run-proof format, ../lib/runProof.ts).
-//   It must pass the physics check and hold a sample within REACH m of the
-//   drop. Then the drop is reserved for `address` for a few minutes and the
+//   It must pass the physics check, hold a sample within REACH m of the
+//   drop, ride in to it (MIN_APPROACH_M / MIN_APPROACH_S) and touch it in
+//   its last FRESH_S seconds. Then the drop is reserved for `address` for a few minutes and the
 //   server's key signs an EIP-712 voucher, Claim(dropId, claimer, deadline),
 //   that only `address` can use. First valid claimer wins; anyone else gets
 //   409 { error: 'taken' } until the reservation (and so the voucher) lapses.
@@ -111,6 +112,11 @@ export interface PublicDrop {
 
 /** A trace sample this close to the drop counts as reaching it (m). */
 const REACH = 4;
+/** The ride has to come from somewhere: this far (m) and this long (s). */
+const MIN_APPROACH_M = 30;
+const MIN_APPROACH_S = 4;
+/** The touch has to be this recent in the trace (s). */
+const FRESH_S = 10;
 /** How long a voucher (and its reservation) lasts. */
 const VOUCHER_S = 5 * 60;
 /** A drop this close to expiry is no longer handed out (the tx needs time). */
@@ -340,13 +346,29 @@ export function traceReaches(
   const check = verifyRun(s);
   if (!check.ok) return { ok: false, reason: check.reason ?? 'bad ride' };
   const n = s.length / STRIDE;
-  let best = Infinity;
+  // The first and last samples that reach it, and the ride that led there
+  let first = -1;
+  let last = -1;
+  let path = 0;
   for (let i = 0; i < n; i++) {
     const o = i * STRIDE;
-    const d = Math.hypot(s[o + 1] - at.x, s[o + 2] - at.y, s[o + 3] - at.z);
-    if (d < best) best = d;
+    if (first < 0 && i > 0) path += Math.hypot(s[o + 1] - s[o - 5], s[o + 3] - s[o - 3]);
+    if (Math.hypot(s[o + 1] - at.x, s[o + 2] - at.y, s[o + 3] - at.z) <= REACH) {
+      if (first < 0) first = i;
+      last = i;
+    }
   }
-  if (best > REACH) return { ok: false, reason: 'never reached the drop' };
+  if (first < 0) return { ok: false, reason: 'never reached the drop' };
+  // A trace that just stands on the drop proves nothing: it has to ride in
+  const start = Math.hypot(s[1] - at.x, s[3] - at.z);
+  if (
+    path < MIN_APPROACH_M ||
+    start < MIN_APPROACH_M / 2 ||
+    s[first * STRIDE] - s[0] < MIN_APPROACH_S
+  )
+    return { ok: false, reason: 'ride in from further away' };
+  // Fresh: the game sends the trace the moment it touches the drop
+  if (s[(n - 1) * STRIDE] - s[last * STRIDE] > FRESH_S) return { ok: false, reason: 'stale ride' };
   return { ok: true };
 }
 

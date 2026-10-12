@@ -10,13 +10,8 @@ import type { Drops, TouchedDrop } from '../drops/Drops';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
-import {
-  useAccount,
-  useConnect,
-  useSwitchChain,
-  useWaitForTransactionReceipt,
-  useWriteContract,
-} from 'wagmi';
+import { ConnectKitButton } from 'connectkit';
+import { useAccount, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import { buildEtherscanTxLink } from '@/utils/etherscan';
 import { defaultChain } from '@/wagmi';
@@ -73,9 +68,8 @@ export function DropClaim({ drops }: { drops: Drops }) {
 
 function ClaimCard({ drops, touched }: { drops: Drops; touched: TouchedDrop }) {
   const { drop } = touched;
-  const [phase, setPhase] = useState<Phase>(() => (drop.taken ? { k: 'taken' } : { k: 'intro' }));
+  const [phase, setPhase] = useState<Phase>({ k: 'intro' });
   const { address, chainId, isConnected } = useAccount();
-  const { connectors, connectAsync, isPending: connecting } = useConnect();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const pendingHash = phase.k === 'pending' ? phase.hash : undefined;
@@ -200,23 +194,26 @@ function ClaimCard({ drops, touched }: { drops: Drops; touched: TouchedDrop }) {
         </div>
       </div>
 
+      {phase.k === 'intro' && drop.taken && (
+        <p className="w2-drop-note">
+          Someone is mid-claim on this one. It frees up if they don&apos;t finish.
+        </p>
+      )}
       {phase.k === 'intro' && !isConnected && (
         <div className="w2-drop-body">
           <p>Connect a wallet to pick it up. First rider to claim it keeps it.</p>
-          <div className="w2-drop-wallets">
-            {connectors
-              .filter(c => c.type !== 'safe')
-              .map(c => (
-                <button
-                  key={c.uid}
-                  type="button"
-                  disabled={connecting}
-                  onClick={() => void connectAsync({ connector: c }).catch(() => undefined)}
-                >
-                  {c.name}
-                </button>
-              ))}
-          </div>
+          <ConnectKitButton.Custom>
+            {({ show, isConnecting }) => (
+              <button
+                type="button"
+                className="w2-drop-go"
+                disabled={isConnecting}
+                onClick={() => show?.()}
+              >
+                CONNECT WALLET
+              </button>
+            )}
+          </ConnectKitButton.Custom>
         </div>
       )}
       {phase.k === 'intro' && isConnected && (
@@ -319,9 +316,8 @@ const style = (
 .w2-drop-body p{margin:0;font-size:14px;line-height:1.4}
 .w2-drop-body code{background:rgba(255,255,255,.12);padding:1px 6px;border-radius:5px}
 .w2-drop-body a{color:#22c7f0;font-size:13px;font-weight:700}
-.w2-drop-wallets{display:flex;flex-wrap:wrap;gap:8px}
-.w2-drop-wallets button{flex:1 1 40%;background:#fff;color:#111018;font:800 14px system-ui;padding:10px;border-radius:10px}
-.w2-drop-wallets button:disabled{opacity:.5}
+.w2-drop-go:disabled{opacity:.5}
+.w2-drop-note{margin:0 18px 10px;font-size:12px;color:#ffd400}
 .w2-drop-go{background:#d22209;color:#fff;font:900 24px 'Londrina Solid',system-ui;letter-spacing:.05em;padding:10px;border-radius:12px;box-shadow:0 5px 0 #7a1405}
 .w2-drop-go:active{transform:translateY(3px);box-shadow:0 2px 0 #7a1405}
 .w2-drop-win{font:900 28px 'Londrina Solid',system-ui !important;color:#b6ef3a}
