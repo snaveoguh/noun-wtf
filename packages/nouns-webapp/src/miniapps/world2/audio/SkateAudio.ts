@@ -137,6 +137,8 @@ export class SkateAudio {
     railType: string | null,
     surfaceRough: number,
     hover = false,
+    /** Wheel pitch: 1 = skateboard, higher for small hard scooter / blade wheels. */
+    pitch = 1,
   ) {
     const ctx = this.ctx;
     if (!ctx || !this.roll || !this.grind) return;
@@ -147,7 +149,7 @@ export class SkateAudio {
       ? Math.min(0.55, sp * 0.7 + (speed > 0.3 ? 0.04 : 0)) * (0.7 + surfaceRough * 0.5)
       : 0;
     this.roll.gain.gain.setTargetAtTime(rollGain, t, 0.05);
-    this.roll.rumble.gain.setTargetAtTime(wheels ? sp * 0.9 : 0, t, 0.05);
+    this.roll.rumble.gain.setTargetAtTime(wheels ? (sp * 0.9) / pitch : 0, t, 0.05);
     if (this.hum !== null) {
       this.hum.gain.gain.setTargetAtTime(hover ? 0.05 + sp * 0.08 : 0, t, 0.08);
       const f = 48 + sp * 70;
@@ -155,8 +157,8 @@ export class SkateAudio {
       this.hum.osc2.frequency.setTargetAtTime(f * 1.012, t, 0.1);
       this.hum.lp.frequency.setTargetAtTime(260 + sp * 1400, t, 0.1);
     }
-    this.roll.bp.frequency.setTargetAtTime(220 + sp * 900 + surfaceRough * 300, t, 0.08);
-    this.roll.src.playbackRate.setTargetAtTime(0.6 + sp * 0.8, t, 0.08);
+    this.roll.bp.frequency.setTargetAtTime((220 + sp * 900 + surfaceRough * 300) * pitch, t, 0.08);
+    this.roll.src.playbackRate.setTargetAtTime((0.6 + sp * 0.8) * pitch, t, 0.08);
     const gg = grinding ? 0.35 + sp * 0.3 : 0;
     this.grind.gain.gain.setTargetAtTime(gg, t, grinding ? 0.02 : 0.06);
     this.grind.bp.frequency.setTargetAtTime(

@@ -13,6 +13,7 @@ import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/No
 import {
   loadCharacterAssets,
   NounCharacter,
+  rideTrickLabel,
   type BoardType,
   type CharacterAssets,
 } from './character/NounCharacter';
@@ -1062,6 +1063,7 @@ export class Game {
       p.grind?.rail.type ?? null,
       0.5,
       this.boardType === 'hover' && p.mode === 'board' && p.state !== 'bail',
+      this.boardType === 'scooter' ? 1.45 : this.boardType === 'blades' ? 1.2 : 1,
     );
     void dt;
   }
@@ -1118,7 +1120,9 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
-        trick: this.player.combo.entries.length ? comboLabel(this.player.combo).slice(-60) : '',
+        trick: this.player.combo.entries.length
+          ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
+          : '',
       };
       this.net.send(dt, pose, this.nounId);
       const fwd = new THREE.Vector3();
@@ -1338,9 +1342,16 @@ export class Game {
       state: p.climb !== null ? 'climb' : p.state,
       speed: p.speed,
       combo: c.entries.length
-        ? { label: comboLabel(c), score: comboScore(c), multiplier: c.multiplier }
+        ? {
+            label: rideTrickLabel(comboLabel(c), this.boardType),
+            score: comboScore(c),
+            multiplier: c.multiplier,
+          }
         : null,
-      banked: c.lastBanked,
+      banked:
+        c.lastBanked !== null
+          ? { ...c.lastBanked, label: rideTrickLabel(c.lastBanked.label, this.boardType) }
+          : null,
       session: c.session,
       best: c.best,
       players: this.net.players.size + 1,
