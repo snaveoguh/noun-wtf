@@ -27,6 +27,7 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint']): MapScene {
     riders,
     waypoint,
     mountain: game.mountain !== null,
+    drops: game.drops?.mapPoints(),
   };
 }
 
@@ -184,6 +185,11 @@ export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
       <span>
         <i style={{ background: '#22c7f0' }} /> riders
       </span>
+      {game.drops !== null && (
+        <span>
+          <i style={{ background: '#8f9cff', borderRadius: 2, transform: 'rotate(45deg)' }} /> drops
+        </span>
+      )}
     </div>
   );
 
