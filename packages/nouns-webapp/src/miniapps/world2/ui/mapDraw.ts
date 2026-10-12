@@ -9,6 +9,7 @@
 // Screen: +X right, +Z down (a true top-down view, -Z is "north").
 
 import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, edgeDistance } from '../world/mountain/config';
+import { bowlMapPoint } from '../world/mountain/noggleBowl';
 import { NJ, njFrameNow, njToWorld, type NjFrame } from '../world/mountain/nounJersey';
 import { MEGA_SITE, tracks, type Track } from '../world/mountain/tracks';
 
@@ -50,6 +51,7 @@ const C = {
   alley: '#c9bfa9',
   mega: '#ff7a1a',
   nj: '#ff3d8b',
+  bowl: '#2fb4ff',
   me: '#ffd400',
   rider: '#22c7f0',
   way: '#b6ef3a',
@@ -392,6 +394,22 @@ export function drawMap(
         label(ctx, off ? 'NOUN JERSEY HIGH ★ 19 km' : 'NOUN JERSEY HIGH', p.x, p.y - 22, {
           size: 11,
           color: C.nj,
+        });
+    }
+  }
+
+  // The Noggle Bowl (the second secret spot, ~42 km down the −X line)
+  const bowl = scene.mountain && (o.full || v.s > 0.05) ? bowlMapPoint() : null;
+  if (bowl !== null) {
+    let p = S(bowl.x, bowl.z);
+    const off = !inside(p, 14);
+    if (!off || o.full || o.edgeMarkers) {
+      if (off) p = edge(p, 14);
+      pin(ctx, p.x, p.y, C.bowl, '◎');
+      if (o.full)
+        label(ctx, off ? 'NOGGLE BOWL ◎ 42 km' : 'NOGGLE BOWL', p.x, p.y - 22, {
+          size: 11,
+          color: C.bowl,
         });
     }
   }
