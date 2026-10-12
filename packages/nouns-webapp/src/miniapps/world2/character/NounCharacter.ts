@@ -594,4 +594,87 @@ export class NounCharacter {
     this.mixer?.stopAllAction();
     this.root.removeFromParent();
   }
+
+  private deckMats: {
+    model: THREE.Object3D | null;
+    graphic: THREE.MeshStandardMaterial[];
+    grip: THREE.MeshStandardMaterial[];
+    stock: Map<THREE.MeshStandardMaterial, { map: THREE.Texture | null; color: THREE.Color }>;
+  } | null = null;
+
+  /**
+   * Custom deck art (board shop): `tex` replaces the underside graphic and
+   * `grip` tints the grip tape; null restores the stock deck. The GLB's
+   * materials are shared between riders, so this board gets its own copies
+   * first. The procedural deck (no GLB) gets a grip top + graphic bottom.
+   */
+  setDeckGraphic(tex: THREE.Texture | null, grip: THREE.ColorRepresentation | null = null) {
+    // (Re)build when the board model is new or swapped (other board types)
+    if (this.deckMats === null || this.deckMats.model !== this.boardModel) {
+      const dm: NonNullable<NounCharacter['deckMats']> = {
+        model: this.boardModel,
+        graphic: [],
+        grip: [],
+        stock: new Map(),
+      };
+      const own = (m: THREE.Material) => {
+        const c = (m as THREE.MeshStandardMaterial).clone();
+        dm.stock.set(c, { map: c.map, color: c.color.clone() });
+        return c;
+      };
+      this.boardModel?.traverse(o => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const out = mats.map(m => {
+          if (/^deckgraphic/i.test(m.name)) {
+            const c = own(m);
+            dm.graphic.push(c);
+            return c;
+          }
+          if (/^grip/i.test(m.name)) {
+            const c = own(m);
+            dm.grip.push(c);
+            return c;
+          }
+          return m;
+        });
+        mesh.material = Array.isArray(mesh.material) ? out : out[0];
+      });
+      const deck = this.boardModel?.children[0] as THREE.Mesh | undefined;
+      if (
+        dm.graphic.length === 0 &&
+        deck?.isMesh === true &&
+        deck.geometry.type === 'BoxGeometry' &&
+        !Array.isArray(deck.material)
+      ) {
+        // BoxGeometry faces: +x −x +y −y +z −z. Flip the bottom's v so the
+        // nose is the top row of the graphic, as on the GLB deck.
+        const g = deck.geometry.clone();
+        const uv = g.attributes.uv as THREE.BufferAttribute;
+        const bottom = g.groups[3];
+        const verts = new Set<number>();
+        if (bottom !== undefined && g.index !== null)
+          for (let i = bottom.start; i < bottom.start + bottom.count; i++)
+            verts.add(g.index.getX(i));
+        for (const v of verts) uv.setY(v, 1 - uv.getY(v));
+        deck.geometry = g;
+        const side = deck.material;
+        const top = own(side);
+        const under = own(side);
+        dm.grip.push(top);
+        dm.graphic.push(under);
+        deck.material = [side, side, top, under, side, side];
+      }
+      this.deckMats = dm;
+    }
+    for (const m of this.deckMats.graphic) {
+      const stock = this.deckMats.stock.get(m)!;
+      m.map = tex ?? stock.map;
+      m.color.copy(tex !== null ? new THREE.Color(0xffffff) : stock.color);
+      m.needsUpdate = true;
+    }
+    for (const m of this.deckMats.grip) m.color.copy(this.deckMats.stock.get(m)!.color);
+    if (grip !== null) for (const m of this.deckMats.grip) m.color.set(grip);
+  }
 }

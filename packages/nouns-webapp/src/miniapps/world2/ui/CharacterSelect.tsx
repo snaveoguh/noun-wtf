@@ -15,6 +15,8 @@ import { randomSeed, type NounSeed } from '../character/NounAppearance';
 import { BUILDS } from '../character/NounCharacter';
 import { worldPause } from '../worldPause';
 
+import { DeckGraphicRow } from './DeckDesigner';
+
 const STORAGE_KEY = 'noun-world-v2-character';
 
 type Row = 'head' | 'glasses' | 'body' | 'accessory' | 'build' | 'board' | 'name';
@@ -74,11 +76,14 @@ export function CharacterSelect({
   initial,
   auctionSeed,
   onConfirm,
+  onDesignDeck,
 }: {
   game: Game;
   initial: SavedCharacter;
   auctionSeed: NounSeed | null;
   onConfirm: (c: SavedCharacter) => void;
+  /** Opens the board shop's deck designer. */
+  onDesignDeck?: () => void;
 }) {
   const [seed, setSeedState] = useState<NounSeed>(initial.seed);
   const [name, setName] = useState(initial.name);
@@ -320,6 +325,7 @@ export function CharacterSelect({
             </div>
           );
         })}
+        {onDesignDeck !== undefined && <DeckGraphicRow onDesign={onDesignDeck} />}
 
         <div className="cs-buttons">
           <button type="button" className="cs-btn" onClick={randomize}>

@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 import { PirateRadio } from './audio/PirateRadio';
 import { SkateAudio } from './audio/SkateAudio';
+import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
   loadCharacterAssets,
@@ -52,7 +53,7 @@ import {
   njSpeedLimit,
   njToWorld,
 } from './world/mountain/nounJersey';
-import { nounJerseyDecorator } from './world/mountain/NounJerseyPark';
+import { nounJerseyDecorator, njShopDoor } from './world/mountain/NounJerseyPark';
 import { rampDecorator, warmMountainProps } from './world/mountain/Props';
 import {
   edgeDistance,
@@ -120,6 +121,8 @@ export interface HudState {
   mineCombo: number | undefined;
   /** One-off banner (e.g. finding the secret spot). */
   toast: { text: string; at: number; tag?: string } | null;
+  /** At the Noun Jersey board shop's door (opens the deck designer). */
+  shop: boolean;
 }
 
 interface RemoteAvatar {
@@ -221,6 +224,7 @@ export class Game {
       mine: { best: {}, comboLabel: '' },
       mineCombo: undefined,
       toast: null,
+      shop: false,
     };
   }
 
@@ -412,7 +416,11 @@ export class Game {
   }
   showroomYaw = 0.5;
 
+  /** Custom deck graphics (board shop) on my board and everyone else's. */
+  private decks = new DeckSync();
+
   step(dt: number, now = performance.now()) {
+    this.decks.tick(this.me, this.net, this.remotes);
     if (this.showroom) {
       this.input.poll(now);
       this.updateShowroom(dt);
@@ -1410,6 +1418,12 @@ export class Game {
     const f = njFrame();
     if (f === null) return;
     const p = this.player.pos;
+    const door = njShopDoor(f, { x: 0, z: 0 });
+    const shop =
+      Math.hypot(door.x - p.x, door.z - p.z) < 2.6 &&
+      Math.abs(p.y - f.P) < 2 &&
+      this.player.speed < 6;
+    if (shop !== this.hud.shop) this.hud = { ...this.hud, shop };
     const c = njToWorld(f, NJ.W / 2, NJ.L / 2, { x: 0, z: 0 });
     const dx = c.x - p.x;
     const dz = c.z - p.z;
