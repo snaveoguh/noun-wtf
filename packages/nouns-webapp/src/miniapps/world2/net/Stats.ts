@@ -8,6 +8,10 @@
 //
 // StatsTracker watches the rider each frame, keeps this browser's bests in
 // localStorage, and posts what changed every ~20 s and when the page hides.
+//
+// Top speed, jump height and hang time are competition records, so each one
+// travels with a proof: the trace of the ride that set it (RunTrace below),
+// which the server checks against the game's physics (netlify/lib/runProof).
 
 import type { Player } from '../skate/Player';
 import type { ComboState } from '../skate/Tricks';
@@ -23,6 +27,61 @@ const OLD_COMBO_LABEL_KEY = 'noun-world-best-combo-label';
 export type BestKey = 'kmh' | 'combo' | 'session' | 'airM' | 'airS' | 'grindM' | 'downM';
 export type AddKey = 'km' | 'tricks' | 'playS';
 export type StatKey = BestKey | AddKey;
+
+/** Records the server only accepts with a run proof. */
+const PROVED: BestKey[] = ['kmh', 'airM', 'airS'];
+const STRIDE = 6;
+const MAX_SAMPLES = 60_000;
+
+/**
+ * One ride on the board since the last respawn / getting on:
+ * [t, x, y, z, speed, state] samples (state 0 ground, 1 air, 2 grind,
+ * 3 manual), every 0.4 s on the ground, every frame-ish in the air, and on
+ * every change of state or new top speed.
+ */
+class RunTrace {
+  private data = new Float32Array(STRIDE * 1024);
+  n = 0;
+  maxV = 0;
+  full = false;
+  private lastT = -Infinity;
+  private lastSt = -1;
+
+  constructor(private t0: number) {}
+
+  sample(clock: number, x: number, y: number, z: number, v: number, st: number) {
+    if (this.full) return;
+    const t = clock - this.t0;
+    const gap = t - this.lastT;
+    const due =
+      st !== this.lastSt || gap >= (st === 1 ? 1 / 30 : 0.4) || (v > this.maxV && gap >= 0.1);
+    if (!due) return;
+    if (this.n >= MAX_SAMPLES) {
+      this.full = true;
+      return;
+    }
+    if ((this.n + 1) * STRIDE > this.data.length) {
+      const next = new Float32Array(this.data.length * 2);
+      next.set(this.data);
+      this.data = next;
+    }
+    this.data.set([t, x, y, z, v, st], this.n * STRIDE);
+    this.n++;
+    this.lastT = t;
+    this.lastSt = st;
+    if (v > this.maxV) this.maxV = v;
+  }
+
+  encode(): string {
+    const bytes = new Uint8Array(this.data.buffer, 0, this.n * STRIDE * 4);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+}
+
+const STATE_CODE: Record<string, number> = { ground: 0, air: 1, grind: 2, manual: 3 };
 
 export interface StatRow {
   name: string;
@@ -138,6 +197,16 @@ export class StatsTracker {
   private airT = 0;
   private grindM = 0;
   private lastBankedAt = -1;
+  // Run proofs
+  private clock = 0;
+  private trace: RunTrace | null = null;
+  private lastX = 0;
+  private lastY = 0;
+  private lastZ = 0;
+  private lastV = 0;
+  /** Raised records waiting to be posted, with the ride that proves them. */
+  private proofs = new Map<BestKey, { trace: RunTrace; seq: number }>();
+  private proofSeq = 0;
   private disposers: (() => void)[] = [];
 
   constructor(
@@ -163,18 +232,46 @@ export class StatsTracker {
 
   private raise(k: BestKey, v: number) {
     if (!(v > (this.mine.best[k] ?? 0))) return false;
+    if (PROVED.includes(k)) {
+      if (this.trace === null || this.trace.full) return false;
+      this.proofs.set(k, { trace: this.trace, seq: ++this.proofSeq });
+      // Post soon, while the proof is fresh
+      this.flushAcc = Math.max(this.flushAcc, 17);
+    }
     this.mine.best[k] = v;
     this.dirty = true;
     return true;
+  }
+
+  /** Keep the current ride's trace (a new one after any reset). */
+  private record(dt: number, p: Player) {
+    this.clock += dt;
+    const { x, y, z } = p.pos;
+    const v = p.speed;
+    const moved = Math.hypot(x - this.lastX, y - this.lastY, z - this.lastZ);
+    // A new trace whenever energy could appear from outside the physics: a
+    // respawn (teleport, or stopped dead from speed) or stepping on the board.
+    // Bails carry on in the same trace: they only ever lose energy
+    const teleport = moved > 2 + 3 * Math.max(v, this.lastV) * dt;
+    const respawned = this.lastV > 4 && v < 0.05;
+    if (p.mode !== 'board') this.trace = null;
+    else if (this.trace === null || teleport || respawned) this.trace = new RunTrace(this.clock);
+    this.trace?.sample(this.clock, x, y, z, v, STATE_CODE[p.state] ?? 0);
+    this.lastX = x;
+    this.lastY = y;
+    this.lastZ = z;
+    this.lastV = v;
   }
 
   /** Call every frame while in the world. */
   update(dt: number, p: Player, combo: ComboState, downM: number) {
     this.started = true;
     this.add.playS += dt;
+    this.record(dt, p);
     if (p.mode === 'board' && p.state !== 'bail') {
       this.add.km += (p.speed * dt) / 1000;
-      this.raise('kmh', Math.round(p.speed * 3.6 * 10) / 10);
+      // Claim only a speed the trace itself holds
+      if (this.trace !== null) this.raise('kmh', Math.floor(this.trace.maxV * 36) / 10);
     }
     if (downM > 0) this.raise('downM', downM);
 
@@ -231,17 +328,32 @@ export class StatsTracker {
       tricks: this.add.tricks,
       playS: Math.round(this.add.playS),
     };
+    // Proofs ride along with a normal post (a beacon is capped at 64 KB)
+    const proven = beacon ? [] : [...this.proofs.keys()];
+    const sentSeq = new Map(proven.map(k => [k, this.proofs.get(k)!.seq]));
+    const byTrace = new Map<RunTrace, BestKey[]>();
+    for (const k of proven) {
+      const tr = this.proofs.get(k)!.trace;
+      byTrace.set(tr, [...(byTrace.get(tr) ?? []), k]);
+    }
+    const proofs = [...byTrace].map(([tr, keys]) => ({ keys, d: tr.encode() }));
+    const best = { ...this.mine.best };
+    // A record still waiting on its proof isn't claimed yet
+    for (const k of this.proofs.keys()) if (!proven.includes(k)) delete best[k];
     const body = JSON.stringify({
       rider: riderId(),
       name: this.getName(),
       session: !this.sessionPosted,
-      best: this.mine.best,
+      best,
       comboLabel: this.mine.comboLabel,
       add,
+      proofs,
     });
     const sent = () => {
       this.sessionPosted = true;
-      this.dirty = false;
+      // Raised again since this post was built: that one still needs sending
+      for (const [k, seq] of sentSeq) if (this.proofs.get(k)?.seq === seq) this.proofs.delete(k);
+      this.dirty = this.proofs.size > 0;
       this.add.km -= add.km;
       this.add.tricks -= add.tricks;
       this.add.playS -= add.playS;

@@ -64,6 +64,15 @@ function megaParam(): string | null {
   return new URLSearchParams(window.location.search).get('megaramp');
 }
 
+/**
+ * Dev / test URL params that teleport you or open the game up. Sessions
+ * with any of them never post stats (a `?spot=nj` start is 19 km "downhill").
+ */
+function devRun(): boolean {
+  const q = new URLSearchParams(window.location.search);
+  return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
+}
+
 /** `?spot=nj` dev param: spawn at the top of Main St in the secret Noun Jersey park. */
 function spotParam(): string | null {
   return new URLSearchParams(window.location.search).get('spot');
@@ -1267,7 +1276,7 @@ export class Game {
   /** Records, lifetime totals and play counts (world-stats board). */
   readonly stats = new StatsTracker(
     () => this.name,
-    () => this.opts.offline === true,
+    () => this.opts.offline === true || devRun(),
   );
   private statsPolledAt = -Infinity;
 

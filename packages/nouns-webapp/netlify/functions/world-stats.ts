@@ -1,5 +1,6 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import { decodeTrace, verifyRun } from '../lib/runProof';
 
 // Noun World stats: every rider's records and lifetime totals, plus how
 // many people have played. One blob holds the riders, one the counters.
@@ -11,6 +12,10 @@ import { connectLambda, getStore } from '@netlify/blobs';
 //
 // Replaces the earlier world-fastest / world-combo boards: their stores'
 // rows are imported the first time this one is empty.
+//
+// The competition records (top speed, highest jump, hang time) only rise
+// with a proof: `proofs: [{ keys, d }]`, the trace of the ride that set
+// them, checked against the game's physics (../lib/runProof.ts).
 
 interface HandlerEvent {
   body: string | null;
@@ -43,6 +48,40 @@ const ADD = {
   playS: 3600, // time in the world
 } as const;
 type BestKey = keyof typeof BEST;
+const PROVED = new Set<BestKey>(['kmh', 'airM', 'airS']);
+const MAX_PROOFS = 3;
+const MAX_PROOF_CHARS = 2_000_000;
+
+/** What the posted proofs back up: the highest value each proved key may take. */
+function provenCaps(raw: unknown): {
+  caps: Partial<Record<BestKey, number>>;
+  why: Record<string, string>;
+} {
+  const caps: Partial<Record<BestKey, number>> = {};
+  const why: Record<string, string> = {};
+  if (!Array.isArray(raw)) return { caps, why };
+  for (const p of raw.slice(0, MAX_PROOFS) as { keys?: unknown; d?: unknown }[]) {
+    const keys = (Array.isArray(p?.keys) ? p.keys : []).filter((k): k is BestKey =>
+      PROVED.has(k as BestKey),
+    );
+    if (keys.length === 0 || typeof p.d !== 'string' || p.d.length > MAX_PROOF_CHARS) continue;
+    const trace = decodeTrace(p.d);
+    const check = trace === null ? null : verifyRun(trace);
+    if (check === null || !check.ok) {
+      for (const k of keys) why[k] = check?.reason ?? 'unreadable proof';
+      continue;
+    }
+    const up = (k: BestKey, v: number) => {
+      if (keys.includes(k)) caps[k] = Math.max(caps[k] ?? 0, v);
+    };
+    up('kmh', check.maxV * 3.6 + 0.3);
+    for (const a of check.airs) {
+      up('airM', a.m + 0.2);
+      up('airS', a.s + 0.06);
+    }
+  }
+  return { caps, why };
+}
 type AddKey = keyof typeof ADD;
 
 interface Rider {
@@ -168,12 +207,14 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     return json(400, { error: 'Bad JSON' });
   }
   const name = clean(input.name, 42);
-  const rider = clean(input.rider, 64).replace(/[^a-zA-Z0-9-]/g, '');
+  const rider = clean(input.rider, 64).replace(/[^\dA-Za-z-]/g, '');
   if (!name || !rider) return json(400, { error: 'Missing name or rider' });
   const best = (input.best ?? {}) as Record<string, unknown>;
   const add = (input.add ?? {}) as Record<string, unknown>;
   const newSession = input.session === true;
   const now = Date.now();
+  const { caps, why } = provenCaps(input.proofs);
+  const rejected: Record<string, string> = {};
 
   for (let attempt = 0; attempt < 6; attempt++) {
     const cur = await store.getWithMetadata('riders', { type: 'json' });
@@ -190,6 +231,10 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       const v = Number(best[k]);
       if (!Number.isFinite(v) || v <= 0 || v > BEST[k]) continue;
       if (v > (r.best[k] ?? 0)) {
+        if (PROVED.has(k) && !(v <= (caps[k] ?? 0))) {
+          rejected[k] = why[k] ?? (caps[k] === undefined ? 'no proof' : 'beyond its proof');
+          continue;
+        }
         r.best[k] = Math.round(v * 100) / 100;
         if (k === 'combo') r.comboLabel = clean(input.comboLabel, 200);
       }
@@ -225,7 +270,11 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
         if (mr.modified) break;
       }
     }
-    return json(200, { ok: true, you: { best: r.best, add: r.add, sessions: r.sessions } });
+    return json(200, {
+      ok: true,
+      you: { best: r.best, add: r.add, sessions: r.sessions },
+      ...(Object.keys(rejected).length > 0 ? { rejected } : {}),
+    });
   }
   return json(409, { error: 'Busy, try again' });
 }
