@@ -34,6 +34,8 @@ export interface MapScene {
   waypoint: { x: number; z: number } | null;
   /** The endless mountain exists (the fallback park has no mountain). */
   mountain: boolean;
+  /** Drop party pickups (drops/Drops.ts). */
+  drops?: { x: number; z: number; kind: string; label: string }[];
 }
 
 const C = {
@@ -54,6 +56,13 @@ const C = {
   rider: '#22c7f0',
   way: '#b6ef3a',
   ink: '#111018',
+};
+
+const DROP_COLOR: Record<string, string> = {
+  eth: '#8f9cff',
+  erc20: '#ffc93c',
+  erc721: '#ff3d8b',
+  erc1155: '#22c7f0',
 };
 
 // ── Cached geometry ─────────────────────────────────────────────────────
@@ -427,6 +436,32 @@ export function drawMap(
           },
         );
     }
+  }
+
+  // Drop party pickups: a glowing diamond, pinned to the edge on the minimap
+  for (const dr of scene.drops ?? []) {
+    let p = S(dr.x, dr.z);
+    const off = !inside(p, 10);
+    if (off && !o.full && !o.edgeMarkers) continue;
+    if (off) p = edge(p, 10);
+    const col = DROP_COLOR[dr.kind] ?? '#fff';
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = col;
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 9);
+    ctx.lineTo(p.x + 7, p.y);
+    ctx.lineTo(p.x, p.y + 9);
+    ctx.lineTo(p.x - 7, p.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
+    if (o.full) label(ctx, dr.label, p.x, p.y - 13, { size: 10, color: col });
   }
 
   // Other riders

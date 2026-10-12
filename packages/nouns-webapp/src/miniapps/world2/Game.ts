@@ -17,6 +17,7 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
+import { Drops } from './drops/Drops';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
@@ -151,6 +152,8 @@ export class Game {
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
+  /** On-chain drop party pickups (null when VITE_WORLD_DROPS_ADDRESS is unset). */
+  readonly drops = Drops.create();
   level: LevelData | null = null;
   assets: CharacterAssets | null = null;
   me: NounCharacter | null = null;
@@ -275,6 +278,7 @@ export class Game {
           },
     );
     this.gfx.scene.add(this.graffiti.group);
+    if (this.drops !== null) this.gfx.scene.add(this.drops.group);
     // Paint is decals on walls: the normals pass would draw each canvas as a
     // solid panel and ink its edges as floating black frames
     inkExcluded.add(this.graffiti.group);
@@ -449,6 +453,7 @@ export class Game {
     this.updateAudio(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
+    this.drops?.update(dt, this.player);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -1427,6 +1432,7 @@ export class Game {
 
   dispose() {
     this.stats.dispose();
+    this.drops?.dispose();
     this.mountain?.dispose();
     this.wild?.dispose();
     this.nature?.dispose();

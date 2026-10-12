@@ -19,6 +19,7 @@ import {
   type WorldStats,
 } from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
+import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
@@ -225,6 +226,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         <Hud game={game} showHelp={showHelp} onHelp={() => setShowHelp(s => !s)} />
       )}
       {game && started && <TouchControls game={game} />}
+      {game?.drops && started && <DropClaim drops={game.drops} />}
 
       {chatOpen && (
         <form
