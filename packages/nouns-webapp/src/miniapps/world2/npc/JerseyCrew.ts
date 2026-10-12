@@ -19,16 +19,23 @@
 // Lifecycle: spawned (one character per frame, no hitch) only within
 // ~400 m of the park, disposed past ~480 m. 19 km out, so normally zero.
 
+import type { CollisionWorld } from '../physics/Collision';
+import type { Quality } from '../render/Graphics';
+
 import * as THREE from 'three';
 
 import { randomSeed } from '../character/NounAppearance';
 import { NounCharacter, type CharacterAssets } from '../character/NounCharacter';
 import { toonify } from '../render/Toon';
-import { NJ, njCoords, njFrame, njToWorld, njYaw, type NjFrame } from '../world/mountain/nounJersey';
+import {
+  NJ,
+  njCoords,
+  njFrame,
+  njToWorld,
+  njYaw,
+  type NjFrame,
+} from '../world/mountain/nounJersey';
 import { njStats } from '../world/mountain/NounJerseyPark';
-
-import type { CollisionWorld } from '../physics/Collision';
-import type { Quality } from '../render/Graphics';
 
 // ── Tunables ────────────────────────────────────────────────────────────
 
@@ -45,12 +52,11 @@ const DRAW_DIST = 200;
 const FULL_ANIM_DIST = 45;
 const LABEL_DIST = 32;
 
-const COUNTS: Record<Quality, { loops: [number, number, number]; mini: number; hang: number }> =
-  {
-    high: { loops: [3, 3, 3], mini: 1, hang: 2 },
-    medium: { loops: [2, 2, 2], mini: 1, hang: 1 },
-    low: { loops: [1, 1, 1], mini: 1, hang: 1 },
-  };
+const COUNTS: Record<Quality, { loops: [number, number, number]; mini: number; hang: number }> = {
+  high: { loops: [3, 3, 3], mini: 1, hang: 2 },
+  medium: { loops: [2, 2, 2], mini: 1, hang: 1 },
+  low: { loops: [1, 1, 1], mini: 1, hang: 1 },
+};
 
 const NAMES = [
   'Lil Kickflip',
@@ -632,7 +638,13 @@ export class JerseyCrew {
     if (h === undefined) return;
     const npc = this.makeNpc('hang', null, Math.random() < 0.3);
     const w = njToWorld(f, h.a, h.b, { x: 0, z: 0 });
-    npc.hang = { x: w.x, y: this.groundAt(w.x, w.z, f), z: w.z, yaw: njYaw(f, h.da, h.db), mood: h.mood };
+    npc.hang = {
+      x: w.x,
+      y: this.groundAt(w.x, w.z, f),
+      z: w.z,
+      yaw: njYaw(f, h.da, h.db),
+      mood: h.mood,
+    };
     npc.pos.set(w.x, npc.hang.y, w.z);
     npc.quat.setFromAxisAngle(Y, npc.hang.yaw);
     npc.ch.root.position.copy(npc.pos);
@@ -769,7 +781,8 @@ export class JerseyCrew {
       npc.v -= G_SLOPE * Math.max(-1.5, Math.min(1.5, slope)) * dt;
       if (npc.v < target) {
         if (Math.abs(slope) < 0.05) npc.v += 2.4 * dt;
-        npc.pushT = npc.v < target - 0.7 && npc.hover === false ? Math.max(npc.pushT, 0.9) : npc.pushT;
+        npc.pushT =
+          npc.v < target - 0.7 && npc.hover === false ? Math.max(npc.pushT, 0.9) : npc.pushT;
       } else {
         npc.v -= (npc.v - target > 1 ? 4.5 : 0.8) * dt;
       }
@@ -858,7 +871,7 @@ export class JerseyCrew {
       }
     }
     // Lean into the turn
-    const leanT = THREE.MathUtils.clamp((t.k[i] * npc.v * npc.v) / 9.8 * 0.7, -1, 1);
+    const leanT = THREE.MathUtils.clamp(((t.k[i] * npc.v * npc.v) / 9.8) * 0.7, -1, 1);
     npc.lean += (leanT - npc.lean) * (1 - Math.exp(-6 * dt));
     this.pickClip(npc);
   }
