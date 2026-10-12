@@ -1,6 +1,7 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
 import { decodeTrace, verifyRun } from '../lib/runProof';
+import { checkLink } from '../lib/walletAuth';
 
 // Noun World stats: every rider's records and lifetime totals, plus how
 // many people have played. One blob holds the riders, one the counters.
@@ -16,6 +17,19 @@ import { decodeTrace, verifyRun } from '../lib/runProof';
 // The competition records (top speed, highest jump, hang time) only rise
 // with a proof: `proofs: [{ keys, d }]`, the trace of the ride that set
 // them, checked against the game's physics (../lib/runProof.ts).
+//
+// Wallet links (one identity per ETH address, so prize winners can be paid):
+// POST { action: 'link', rider, name, address, ts, sig }
+//      `sig` signs linkMessage(rider, address, name, ts) (net/Stats.ts),
+//      checked in ../lib/walletAuth.ts and refused after 10 minutes. The
+//      address then owns the row and its name: the rider id becomes one of
+//      the row's `ids`, and linking the same address from another browser
+//      merges that browser's row in (records: max, totals: sum, only values
+//      the server already accepted). Linking again with a new name renames.
+// A linked row's name only changes with a fresh signature, and nobody else
+// can post a name a linked address holds (case-insensitive). Boards carry
+// `addr` (full address) on linked rows; `winners` is the top linked rider of
+// each competition board, for payouts. Posts answer with `linked`.
 
 interface HandlerEvent {
   body: string | null;
@@ -87,6 +101,12 @@ type AddKey = keyof typeof ADD;
 interface Rider {
   rider: string;
   name: string;
+  /** Linked rows: the owning address (checksummed)… */
+  addr?: string;
+  /** …every browser rider id posting into this row… */
+  ids?: string[];
+  /** …and the timestamp of the last accepted signature (no replays). */
+  linkTs?: number;
   best: Partial<Record<BestKey, number>>;
   add: Partial<Record<AddKey, number>>;
   comboLabel?: string;
@@ -122,15 +142,55 @@ const clean = (v: unknown, n: number) =>
     .trim()
     .slice(0, n);
 
+/** The row a browser posts into: its linked identity, else its own row. */
+const rowOf = (riders: Rider[], rider: string) =>
+  riders.find(x => (x.addr ? (x.ids ?? []).includes(rider) : x.rider === rider));
+
+/** Names held by linked addresses, lower-cased → address. */
+function claimedNames(riders: Rider[]) {
+  const out = new Map<string, string>();
+  for (const r of riders) if (r.addr) out.set(r.name.toLowerCase(), r.addr);
+  return out;
+}
+
+/** An unlinked rider whose name a linked address holds. */
+const fallbackName = (r: Rider) => `noun ${r.rider.slice(0, 4)}`;
+
+/** Two rows of one identity: records take the max, totals add up. */
+function mergeInto(into: Rider, from: Rider) {
+  for (const k of Object.keys(BEST) as BestKey[]) {
+    const v = from.best[k];
+    if (v === undefined || !(v > (into.best[k] ?? 0))) continue;
+    into.best[k] = v;
+    if (k === 'combo') into.comboLabel = from.comboLabel;
+  }
+  for (const k of Object.keys(ADD) as AddKey[]) {
+    const v = from.add[k];
+    if (v !== undefined && v > 0) into.add[k] = (into.add[k] ?? 0) + v;
+  }
+  into.sessions += from.sessions;
+  into.first = Math.min(into.first, from.first);
+  into.last = Math.max(into.last, from.last);
+}
+
+const linkedOf = (r: Rider) => (r.addr ? { address: r.addr, name: r.name } : null);
+
+type BoardRow = { name: string; value: number; label?: string; at: number; addr?: string };
+
 function boards(riders: Rider[]) {
-  const out: Record<string, { name: string; value: number; label?: string; at: number }[]> = {};
+  const claimed = claimedNames(riders);
+  const show = (r: Rider) => ({
+    name: !r.addr && claimed.has(r.name.toLowerCase()) ? fallbackName(r) : r.name,
+    ...(r.addr ? { addr: r.addr } : {}),
+  });
+  const out: Record<string, BoardRow[]> = {};
   for (const k of Object.keys(BEST) as BestKey[]) {
     out[k] = riders
       .filter(r => (r.best[k] ?? 0) > 0)
       .sort((a, b) => (b.best[k] ?? 0) - (a.best[k] ?? 0))
       .slice(0, TOP)
       .map(r => ({
-        name: r.name,
+        ...show(r),
         value: r.best[k]!,
         ...(k === 'combo' && r.comboLabel ? { label: r.comboLabel } : {}),
         at: r.last,
@@ -141,9 +201,101 @@ function boards(riders: Rider[]) {
       .filter(r => (r.add[k] ?? 0) > 0)
       .sort((a, b) => (b.add[k] ?? 0) - (a.add[k] ?? 0))
       .slice(0, TOP)
-      .map(r => ({ name: r.name, value: Math.round(r.add[k]! * 100) / 100, at: r.last }));
+      .map(r => ({ ...show(r), value: Math.round(r.add[k]! * 100) / 100, at: r.last }));
   }
   return out;
+}
+
+/** Payouts: the best linked rider on each competition board. */
+function winners(riders: Rider[]) {
+  const out: Record<string, { name: string; address: string; value: number }> = {};
+  for (const k of PROVED) {
+    let top: Rider | undefined;
+    for (const r of riders) {
+      if (r.addr && (r.best[k] ?? 0) > (top?.best[k] ?? 0)) top = r;
+    }
+    if (top !== undefined) out[k] = { name: top.name, address: top.addr!, value: top.best[k]! };
+  }
+  return out;
+}
+
+/** Put a riders list back, trimming the least-recently-seen unlinked rows. */
+async function saveRiders(
+  store: ReturnType<typeof getStore>,
+  riders: Rider[],
+  etag: string | undefined,
+) {
+  // Way past capacity: drop the least-recently-seen riders (linked ones stay)
+  const next =
+    riders.length > MAX_RIDERS
+      ? riders
+          .sort((a, b) => Number(!!b.addr) - Number(!!a.addr) || b.last - a.last)
+          .slice(0, MAX_RIDERS)
+      : riders;
+  const res = etag
+    ? await store.setJSON('riders', next, { onlyIfMatch: etag })
+    : await store.setJSON('riders', next, { onlyIfNew: true });
+  return res.modified;
+}
+
+/** POST action 'link': tie this browser's rider to a signing address. */
+async function link(
+  store: ReturnType<typeof getStore>,
+  input: Record<string, unknown>,
+): Promise<HandlerResponse> {
+  const rawName = typeof input.name === 'string' ? input.name : '';
+  const name = clean(rawName, 42);
+  const rider = clean(input.rider, 64).replace(/[^\dA-Za-z-]/g, '');
+  if (!name || name !== rawName) return json(400, { error: 'Bad name' });
+  if (!rider || rider !== input.rider) return json(400, { error: 'Bad rider' });
+  const check = await checkLink(rider, name, input.address, input.ts, input.sig);
+  if (!check.ok) return json(check.status, { error: check.error });
+  const { address, ts } = check;
+  const now = Date.now();
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const cur = await store.getWithMetadata('riders', { type: 'json' });
+    const riders = ((cur?.data as Rider[] | null) ?? (await imported())).slice();
+    const holder = claimedNames(riders).get(name.toLowerCase());
+    if (holder !== undefined && holder !== address) {
+      return json(409, { error: `"${name}" belongs to another wallet` });
+    }
+    let target = riders.find(x => x.addr === address);
+    if (target !== undefined && ts <= (target.linkTs ?? 0)) {
+      return json(401, { error: 'Signature already used, sign again' });
+    }
+    const source = rowOf(riders, rider);
+    if (source !== undefined && source !== target) {
+      if (source.addr) {
+        // This browser was linked to another wallet: it moves, that
+        // wallet's row (and its records) stays with that wallet
+        source.ids = (source.ids ?? []).filter(id => id !== rider);
+      } else if (target !== undefined) {
+        // Second browser of an identity: fold its row in
+        mergeInto(target, source);
+        riders.splice(riders.indexOf(source), 1);
+      } else {
+        // First link: this browser's row becomes the identity's
+        target = source;
+      }
+    }
+    if (target === undefined) {
+      target = { rider, name, best: {}, add: {}, sessions: 0, first: now, last: now };
+      riders.push(target);
+    }
+    target.addr = address;
+    target.ids = [...new Set([...(target.ids ?? []), rider])];
+    target.linkTs = ts;
+    target.name = name;
+    target.last = Math.max(target.last, now);
+    if (!(await saveRiders(store, riders, cur?.etag))) continue;
+    return json(200, {
+      ok: true,
+      linked: linkedOf(target),
+      you: { best: target.best, add: target.add, sessions: target.sessions },
+    });
+  }
+  return json(409, { error: 'Busy, try again' });
 }
 
 /** First run: bring over the rows from the old single-stat boards. */
@@ -196,6 +348,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       sessions: meta.sessions,
       days: meta.days,
       boards: boards(riders),
+      winners: winners(riders),
     });
   }
   if (method !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -206,6 +359,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   } catch {
     return json(400, { error: 'Bad JSON' });
   }
+  if (input.action === 'link') return link(store, input);
   const name = clean(input.name, 42);
   const rider = clean(input.rider, 64).replace(/[^\dA-Za-z-]/g, '');
   if (!name || !rider) return json(400, { error: 'Missing name or rider' });
@@ -219,12 +373,22 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   for (let attempt = 0; attempt < 6; attempt++) {
     const cur = await store.getWithMetadata('riders', { type: 'json' });
     const riders = ((cur?.data as Rider[] | null) ?? (await imported())).slice();
-    let r = riders.find(x => x.rider === rider);
+    let r = rowOf(riders, rider);
     if (!r) {
       r = { rider, name, best: {}, add: {}, sessions: 0, first: now, last: now };
       riders.push(r);
     }
-    r.name = name;
+    // A linked row's name only changes with a signature (action 'link'); an
+    // unlinked rider can't take a name a linked address holds
+    let nameTaken = false;
+    if (!r.addr) {
+      const claimed = claimedNames(riders);
+      if (!claimed.has(name.toLowerCase())) r.name = name;
+      else {
+        nameTaken = true;
+        if (claimed.has(r.name.toLowerCase())) r.name = fallbackName(r);
+      }
+    }
     r.last = now;
     if (newSession) r.sessions++;
     for (const k of Object.keys(BEST) as BestKey[]) {
@@ -244,15 +408,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       if (!Number.isFinite(v) || v <= 0) continue;
       r.add[k] = (r.add[k] ?? 0) + Math.min(v, ADD[k]);
     }
-    // Way past capacity: drop the least-recently-seen riders
-    const next =
-      riders.length > MAX_RIDERS
-        ? riders.sort((a, b) => b.last - a.last).slice(0, MAX_RIDERS)
-        : riders;
-    const res = cur?.etag
-      ? await store.setJSON('riders', next, { onlyIfMatch: cur.etag })
-      : await store.setJSON('riders', next, { onlyIfNew: true });
-    if (!res.modified) continue;
+    if (!(await saveRiders(store, riders, cur?.etag))) continue;
 
     if (newSession) {
       // Counters: same etag dance, best effort (a lost race costs one count)
@@ -273,6 +429,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     return json(200, {
       ok: true,
       you: { best: r.best, add: r.add, sessions: r.sessions },
+      linked: linkedOf(r),
+      ...(nameTaken ? { nameTaken: true } : {}),
       ...(Object.keys(rejected).length > 0 ? { rejected } : {}),
     });
   }
