@@ -12,6 +12,7 @@ import { Game, type HudState } from './Game';
 import { STAT_INFO, type MyBests, type StatKey, type WorldStats } from './net/Stats';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
+import { WorldMap } from './ui/WorldMap';
 import { worldPause } from './worldPause';
 
 const CONTROLS: { k: string; v: string }[] = [
@@ -30,6 +31,7 @@ const CONTROLS: { k: string; v: string }[] = [
   },
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
+  { k: 'B', v: 'map' },
   { k: 'M / .', v: 'radio station, next track' },
   { k: 'V', v: 'mic' },
   { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot), T colour' },
@@ -434,6 +436,36 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
             {showHelp ? 'hide controls (H)' : 'controls (H)'}
           </button>
         )}
+        {touch && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={`w2-chip text-base ${hud.radio.on ? 'w2-on' : ''}`}
+              onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
+              title="Radio: tap for the next track"
+            >
+              📻
+            </button>
+            {hud.radio.on && (
+              <button
+                type="button"
+                className="w2-chip text-xs"
+                onClick={() => game.cycleRadio()}
+                title="Change station"
+              >
+                {hud.radio.label}
+              </button>
+            )}
+            <button
+              type="button"
+              className="w2-chip text-base"
+              onClick={() => game.cycleTimeOfDay()}
+              title="Time of day"
+            >
+              {{ afternoon: '☀️', golden: '🌇', blue: '🌆', night: '🌙' }[hud.timeOfDay] ?? '☀️'}
+            </button>
+          </div>
+        )}
         {!touch && (
           <>
             <button
@@ -488,8 +520,13 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
         </div>
       )}
 
-      {/* Chat feed */}
-      <div className="absolute bottom-28 left-4 flex max-w-[60vw] flex-col gap-1">
+      {/* GTA-style map: minimap bottom-left, opens the full map */}
+      <WorldMap game={game} touch={touch} />
+
+      {/* Chat feed (above the minimap on desktop) */}
+      <div
+        className={`absolute left-4 flex max-w-[60vw] flex-col gap-1 ${touch ? 'bottom-28' : 'bottom-[210px]'}`}
+      >
         {hud.chat
           .filter(c => now - c.at < 12000)
           .map((c, i) => (
@@ -549,7 +586,7 @@ function Hud({ game, showHelp, onHelp }: { game: Game; showHelp: boolean; onHelp
 
       {/* Controls */}
       {showHelp && hud.inputMode !== 'touch' && (
-        <div className="absolute bottom-4 left-4 hidden rounded-xl bg-black/45 p-3 text-xs backdrop-blur md:block">
+        <div className="absolute bottom-4 left-[292px] hidden rounded-xl bg-black/45 p-3 text-xs backdrop-blur md:block">
           {(pad ? PAD : CONTROLS).map(c => (
             <div key={c.k} className="flex gap-3">
               <span className="w-24 text-right font-bold text-[#ffd400]">{c.k}</span>

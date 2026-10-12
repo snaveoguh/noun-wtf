@@ -164,6 +164,7 @@ export class Input {
     lookY: 0,
     boardToggle: false,
     jump: false,
+    respawn: false,
     /** OLLIE button held: crouch to load, the release pops. */
     crouch: false,
   };
@@ -448,8 +449,10 @@ export class Input {
         this.touch.lookX = this.touch.lookY = 0;
         if (this.touch.boardToggle) f.boardTogglePressed = true;
         if (this.touch.jump) f.jumpPressed = true;
+        if (this.touch.respawn) f.respawnPressed = true;
         this.touch.boardToggle = false;
         this.touch.jump = false;
+        this.touch.respawn = false;
       }
     }
 
