@@ -104,6 +104,10 @@ const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _target = new THREE.Vector3();
+const _wn = new THREE.Vector3();
+const _wo = new THREE.Vector3();
+const _wd = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
 const BODY_RADIUS = 0.32;
@@ -240,6 +244,10 @@ export class Player {
   sinceLand = 10;
   lastLandImpact = 0;
   vertLip = false;
+  /** Vert air: the face we left (the board stays square to it coming down). */
+  private vertNormal = new THREE.Vector3(0, 1, 0);
+  /** Vert air: height of the lip we left. */
+  private vertLipY = 0;
   fakie = false;
   /** Visual kickturn/revert spin remaining (radians), decays to 0. */
   kickturn = 0;
@@ -1336,6 +1344,8 @@ export class Player {
     // component that would carry us over the deck so we come back down.
     this.vertLip = this.up.y < 0.45;
     if (this.vertLip) {
+      this.vertNormal.copy(this.up);
+      this.vertLipY = this.pos.y;
       const nh = _v.set(this.up.x, 0, this.up.z).normalize();
       const into = this.vel.dot(nh);
       this.vel.addScaledVector(nh, -into);
@@ -1399,11 +1409,34 @@ export class Player {
       _v2.set(0, -1, 0).addScaledVector(this.vel, 0.05).normalize(),
       6,
     );
-    const targetUp = look && look.normal.y > 0.2 ? look.normal : UP;
+    const targetUp = _target.copy(look && look.normal.y > 0.2 ? look.normal : UP);
+    if (this.vertLip) {
+      // Vert air: stay square to the wall we left (in a deep bowl the floor
+      // straight below is 40 m down, and levelling to it flattens the board
+      // before it meets the wall), and only match a surface we're about to hit
+      const ahead = this.world.raycast(
+        _v.copy(this.pos),
+        _v2.copy(this.vel).normalize(),
+        4 + this.vel.length() * 0.6,
+      );
+      targetUp.copy(ahead !== null && ahead.normal.dot(this.vel) < 0 ? ahead.normal : this.vertNormal);
+      // Coming back in: swing the nose (or tail) onto the line of travel, so a
+      // carve along the wall doesn't meet it sideways
+      if (ahead !== null && this.vel.y < 0) {
+        const tdir = _wd.copy(this.vel).addScaledVector(targetUp, -this.vel.dot(targetUp));
+        if (tdir.lengthSq() > 1) {
+          tdir.normalize();
+          if (this.fwd.dot(tdir) < 0) tdir.negate();
+          this.fwd.lerp(tdir, 1 - Math.exp(-6 * dt)).normalize();
+        }
+      }
+    }
     if (!this.vertLip || this.vel.y < 0) {
       this.up.lerp(targetUp, 1 - Math.exp(-(this.vertLip ? 2.5 : 4) * dt)).normalize();
     }
     this.fwd.addScaledVector(this.up, -this.fwd.dot(this.up)).normalize();
+
+    if (this.vertLip) this.followVertWall();
 
     // Walls — hold W into a wall mid-air to step off the board and grab it
     const wall = this.resolveBody(1.45);
@@ -1443,6 +1476,51 @@ export class Player {
     }
     if (hit && hit.normal.dot(this.vel) < 0 && hit.normal.y > -0.2) {
       this.land(hit.point, hit.normal, now);
+    }
+  }
+
+  /**
+   * Vert air: ride the wall's plane like a quarter pipe, curved or not. Off a
+   * curved wall (a bowl's end) the sideways speed would otherwise carry you
+   * in a straight line while the wall curves away, dropping you tens of
+   * metres onto flat. Each frame: find the face just under the lip, keep the
+   * rider a little on the open side of it, and turn the sideways speed to
+   * run along it (a turn, so speed never grows).
+   */
+  private followVertWall() {
+    const n0 = _wn.set(this.vertNormal.x, 0, this.vertNormal.z);
+    if (n0.lengthSq() < 1e-4) return;
+    n0.normalize();
+    // Probe just under the lip, then lower: carving along a rim that drops
+    // (a bowl's deep end into its shallow end) leaves the first probe above it
+    let hit: ReturnType<CollisionWorld['raycast']> = null;
+    for (const below of [1.5, 5, 10, 18]) {
+      const o = _wo.set(this.pos.x, Math.min(this.pos.y, this.vertLipY) - below, this.pos.z);
+      o.addScaledVector(n0, 3);
+      hit = this.world.raycast(o, _wd.copy(n0).negate(), 8);
+      if (hit !== null && Math.abs(hit.normal.y) <= 0.5) break;
+      hit = null;
+    }
+    if (hit === null) return;
+    const n = _wn.set(hit.normal.x, 0, hit.normal.z);
+    if (n.lengthSq() < 1e-4) return;
+    n.normalize();
+    this.vertNormal.set(n.x, this.vertNormal.y, n.z).normalize();
+    // Stay 0.1–1 m out from the face, on the open side
+    const d = (this.pos.x - hit.point.x) * n.x + (this.pos.z - hit.point.z) * n.z;
+    const want = THREE.MathUtils.clamp(d, 0.1, 1);
+    this.pos.x += n.x * (want - d);
+    this.pos.z += n.z * (want - d);
+    // Sideways speed runs along the face (same magnitude); a slight drift out
+    const vn = this.vel.x * n.x + this.vel.z * n.z;
+    const tx = this.vel.x - n.x * vn;
+    const tz = this.vel.z - n.z * vn;
+    const t = Math.hypot(tx, tz);
+    const h = Math.hypot(this.vel.x, this.vel.z);
+    const along = Math.sqrt(Math.max(0, h * h - 0.35 * 0.35));
+    if (t > 1e-4) {
+      this.vel.x = (tx / t) * along + n.x * 0.35;
+      this.vel.z = (tz / t) * along + n.z * 0.35;
     }
   }
 
