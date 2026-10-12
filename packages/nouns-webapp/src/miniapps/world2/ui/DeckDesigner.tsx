@@ -940,7 +940,7 @@ export function DeckDesigner({ game, onClose }: { game: Game | null; onClose: ()
                     className={`dd-chip ${deck.selected === -1 ? 'dd-on' : ''}`}
                     onClick={() => deckStore.select(-1)}
                   >
-                    RIDE STOCK DECK
+                    RIDE DEFAULT DECK
                   </button>
                   <button
                     type="button"
@@ -1626,7 +1626,7 @@ function DecalsTab(props: {
 // ── Live 3D board ──
 
 function Preview3D({ game, design }: { game: Game | null; design: DeckDesign }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const live = useRef<{ tex: THREE.CanvasTexture; ch: NounCharacter | null } | null>(null);
   const [face, setFace] = useState<'spin' | 'under' | 'top'>('spin');
   const faceRef = useRef(face);
@@ -1635,12 +1635,17 @@ function Preview3D({ game, design }: { game: Game | null; design: DeckDesign }) 
   designRef.current = design;
 
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
+    const host = ref.current;
+    if (!host) return;
+    // A fresh canvas per mount: StrictMode's remount would otherwise reuse
+    // the one whose context the cleanup just lost
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     } catch {
+      canvas.remove();
       return;
     }
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -1713,6 +1718,7 @@ function Preview3D({ game, design }: { game: Game | null; design: DeckDesign }) 
       tex.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
+      canvas.remove();
       live.current = null;
     };
   }, [game]);
@@ -1732,7 +1738,7 @@ function Preview3D({ game, design }: { game: Game | null; design: DeckDesign }) 
       onClick={() => setFace(f => (f === 'spin' ? 'under' : f === 'under' ? 'top' : 'spin'))}
       title="Tap: spin / underside / grip"
     >
-      <canvas ref={ref} />
+      <div ref={ref} className="dd-preview-gl" />
       <span>{face === 'spin' ? '3D ⟳' : face === 'under' ? 'GRAPHIC' : 'GRIP'}</span>
     </button>
   );
@@ -1765,7 +1771,7 @@ export function DeckGraphicRow({ onDesign }: { onDesign: () => void }) {
             {at + 1}/{options.length}
           </span>
           <span className="cs-tname">
-            {slot !== null ? `${cur + 1}: ${slot.d.name || 'MY DECK'}` : 'STOCK'}
+            {slot !== null ? `${cur + 1}: ${slot.d.name || 'MY DECK'}` : 'DEFAULT'}
           </span>
         </div>
         {slot !== null && <img className="dd-csthumb" src={designThumb(slot.d)} alt="" />}
@@ -1812,6 +1818,7 @@ const CSS = `
 .dd-tabs button{flex:1;background:#160f40;border:none;border-bottom:4px solid #000;padding:12px 2px;font-size:9px;color:#9c8cff !important}
 .dd-tabs button.dd-on{background:#3a2a90;color:#ffd400 !important;border-bottom-color:#ffd400}
 .dd-tabbody{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+@media (min-width:761px){.dd-tabbody{padding-bottom:72px}}
 .dd-sec{padding:12px;display:flex;flex-direction:column;gap:9px}
 .dd-sec h4{margin:6px 0 0;font-size:8px;color:#9c8cff;letter-spacing:.08em;font-weight:400}
 .dd-rowc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -1862,7 +1869,7 @@ const CSS = `
 .dd-slot-btns button+button{background:#2b2160}
 .dd-status{flex-shrink:0;font-size:8px;line-height:1.7;padding:9px 12px;background:#ffd400;color:#000;border-top:4px solid #000}
 .dd-preview{position:absolute;right:calc(min(380px,36vw) + 14px);top:70px;width:150px;height:290px;background:rgba(0,0,0,.35);border:3px solid #3a2f7a;padding:0;box-shadow:4px 4px 0 #000}
-.dd-preview canvas{width:100%;height:100%;display:block}
+.dd-preview-gl,.dd-preview canvas{width:100%;height:100%;display:block}
 .dd-preview span{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-size:7px;color:#9c8cff}
 .dd-csrow .dd-csthumb{width:14px;height:52px;image-rendering:pixelated;border-radius:7px;border:2px solid #000}
 .dd-csrow .dd-csdesign{font-size:8px;background:#2b2160;border:2px solid #ffd400;color:#ffd400}

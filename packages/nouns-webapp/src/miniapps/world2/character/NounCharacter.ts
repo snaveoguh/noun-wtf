@@ -596,6 +596,7 @@ export class NounCharacter {
   }
 
   private deckMats: {
+    model: THREE.Object3D | null;
     graphic: THREE.MeshStandardMaterial[];
     grip: THREE.MeshStandardMaterial[];
     stock: Map<THREE.MeshStandardMaterial, { map: THREE.Texture | null; color: THREE.Color }>;
@@ -608,8 +609,10 @@ export class NounCharacter {
    * first. The procedural deck (no GLB) gets a grip top + graphic bottom.
    */
   setDeckGraphic(tex: THREE.Texture | null, grip: THREE.ColorRepresentation | null = null) {
-    if (this.deckMats === null) {
+    // (Re)build when the board model is new or swapped (other board types)
+    if (this.deckMats === null || this.deckMats.model !== this.boardModel) {
       const dm: NonNullable<NounCharacter['deckMats']> = {
+        model: this.boardModel,
         graphic: [],
         grip: [],
         stock: new Map(),
@@ -639,7 +642,12 @@ export class NounCharacter {
         mesh.material = Array.isArray(mesh.material) ? out : out[0];
       });
       const deck = this.boardModel?.children[0] as THREE.Mesh | undefined;
-      if (dm.graphic.length === 0 && deck?.isMesh === true && !Array.isArray(deck.material)) {
+      if (
+        dm.graphic.length === 0 &&
+        deck?.isMesh === true &&
+        deck.geometry.type === 'BoxGeometry' &&
+        !Array.isArray(deck.material)
+      ) {
         // BoxGeometry faces: +x −x +y −y +z −z. Flip the bottom's v so the
         // nose is the top row of the graphic, as on the GLB deck.
         const g = deck.geometry.clone();

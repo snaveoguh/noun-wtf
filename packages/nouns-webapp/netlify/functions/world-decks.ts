@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { connectLambda, getStore } from '@netlify/blobs';
 import { verifyMessage } from 'viem';
 
@@ -67,12 +69,8 @@ const deckKey = (address: string) => `deck/${address}`;
 
 const emptySlots = (): (DeckSlot | null)[] => Array.from({ length: DECK_SLOTS }, () => null);
 
-async function sha256Hex(s: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(digest))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+// node:crypto rather than WebCrypto: the global isn't there on every Lambda Node
+const sha256Hex = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 
 export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   const method = event.httpMethod || 'GET';
@@ -138,7 +136,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   // The signed message binds this address, this exact design and a time
   const m = MSG_RE.exec(message);
   if (m === null || m[1] !== address) return json(400, { error: 'Bad message' });
-  if (m[2] !== (await sha256Hex(designJson))) return json(400, { error: 'Design hash mismatch' });
+  if (m[2] !== sha256Hex(designJson)) return json(400, { error: 'Design hash mismatch' });
   const ts = Number(m[3]);
   const now = Date.now();
   if (now - ts > MAX_AGE_MS) return json(401, { error: 'Signature expired' });
