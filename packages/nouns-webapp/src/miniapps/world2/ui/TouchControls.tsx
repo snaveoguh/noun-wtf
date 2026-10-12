@@ -112,16 +112,18 @@ export function TouchControls({ game }: { game: Game }) {
   });
 
   return (
-    <div className="absolute inset-0" style={{ touchAction: 'none' }}>
+    // The layer itself lets taps through to the HUD (mic, stats, map…);
+    // only the stick areas and buttons catch touches
+    <div className="pointer-events-none absolute inset-0" style={{ touchAction: 'none' }}>
       <div
         ref={leftRef}
-        className="absolute bottom-0 left-0 h-[55%] w-1/2"
+        className="pointer-events-auto absolute bottom-0 left-0 h-[55%] w-1/2"
         {...L}
         onPointerCancel={L.onPointerUp}
       />
       <div
         ref={rightRef}
-        className="absolute bottom-0 right-0 h-[55%] w-1/2"
+        className="pointer-events-auto absolute bottom-0 right-0 h-[55%] w-1/2"
         {...Rh}
         onPointerCancel={Rh.onPointerUp}
       />
@@ -134,17 +136,20 @@ export function TouchControls({ game }: { game: Game }) {
       )}
 
       {/* Board / spray: left edge, above the steering area */}
-      <div className="w2-tside absolute left-3 flex flex-col gap-2">
+      <div className="w2-tside pointer-events-auto absolute left-3 flex flex-col gap-2">
         <button type="button" className="w2-tbtn" {...tap(() => (t.boardToggle = true))}>
           🛹
         </button>
         <button type="button" className="w2-tbtn" {...hold('spray')}>
           🎨
         </button>
+        <button type="button" className="w2-tbtn" {...tap(() => (t.respawn = true))}>
+          ↺
+        </button>
       </div>
 
       {/* Thumb cluster: everything the right thumb needs within reach */}
-      <div className="w2-tpad absolute">
+      <div className="w2-tpad pointer-events-auto absolute">
         <button
           type="button"
           className="w2-tbtn w2-t-flip"
@@ -180,7 +185,7 @@ export function TouchControls({ game }: { game: Game }) {
 .w2-tside{top:38%}
 .w2-thint{right:12px;left:50%;bottom:calc(196px + env(safe-area-inset-bottom))}
 @media (orientation:landscape) and (max-height:520px){
-  .w2-tside{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:calc(10px + env(safe-area-inset-left));flex-direction:row}
+  .w2-tside{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:calc(112px + env(safe-area-inset-left));flex-direction:row}
   .w2-thint{display:none}
 }`}</style>
     </div>
