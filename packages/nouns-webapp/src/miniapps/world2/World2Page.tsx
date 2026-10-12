@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAppSelector } from '@/hooks';
 
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
-import { BUILDS } from './character/NounCharacter';
+import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import {
   shortAddr,
@@ -102,7 +102,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     () => ({
       seed: urlSeed ?? saved?.seed ?? auctionSeed ?? randomSeed(),
       name: searchParams.get('name') ?? saved?.name ?? '',
-      board: searchParams.get('board') === 'hover' ? 'hover' : (saved?.board ?? 'skate'),
+      board: searchParams.has('board')
+        ? parseBoardType(searchParams.get('board'))
+        : parseBoardType(saved?.board),
       build: saved?.build ?? 2,
     }),
     // Only the first resolution matters; the select screen owns it after that.
