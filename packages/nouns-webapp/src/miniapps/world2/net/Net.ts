@@ -13,6 +13,7 @@ import PartySocket from 'partysocket';
 import * as THREE from 'three';
 
 import { PARTYKIT_HOST } from '../../world/engine/types';
+import { parseBoardType, type BoardType } from '../character/NounCharacter';
 
 import { Voice } from './Voice';
 
@@ -32,7 +33,7 @@ export interface NetPose {
   name: string;
   seedKey: string;
   trick: string;
-  boardType: 'skate' | 'hover';
+  boardType: BoardType;
   weight: number;
 }
 
@@ -47,7 +48,7 @@ export interface RemotePlayer {
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
-  boardType: 'skate' | 'hover';
+  boardType: BoardType;
   weight: number;
 }
 
@@ -196,7 +197,7 @@ export class Net {
     pose.speed = Number(blob.sp) || 0;
     pose.name = String(blob.n ?? '').slice(0, 24);
     pose.trick = String(blob.tr ?? '').slice(0, 60);
-    pose.boardType = blob.bt === 'hover' ? 'hover' : 'skate';
+    pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
