@@ -153,17 +153,16 @@ export function verifyRun(s: Float32Array, opts: { strict?: boolean } = {}): Run
   return { ok: true, maxV, airs };
 }
 
-/** Samples i..j are airborne; null unless they're a clean parabola. */
-function airSegment(s: Float32Array, i: number, j: number, n: number) {
-  if (j - i < 2) return null;
-  // y + ½g·t² is a straight line in t for a free fall
+/** Least-squares free fall over samples i..j: y = a + b·t − ½g·t² (t from i). */
+function fitFall(s: Float32Array, i: number, j: number) {
   let st = 0;
   let sw = 0;
   let stt = 0;
   let stw = 0;
   const m = j - i + 1;
+  const t0 = s[i * STRIDE];
   for (let k = i; k <= j; k++) {
-    const t = s[k * STRIDE] - s[i * STRIDE];
+    const t = s[k * STRIDE] - t0;
     const w = s[k * STRIDE + 2] + 0.5 * PHYS.g * t * t;
     st += t;
     sw += w;
@@ -175,14 +174,66 @@ function airSegment(s: Float32Array, i: number, j: number, n: number) {
   const b = (m * stw - st * sw) / den;
   const a = (sw - b * st) / m;
   let worst = 0;
-  let top = -Infinity;
   for (let k = i; k <= j; k++) {
-    const t = s[k * STRIDE] - s[i * STRIDE];
-    const y = s[k * STRIDE + 2];
-    worst = Math.max(worst, Math.abs(y + 0.5 * PHYS.g * t * t - (a + b * t)));
-    top = Math.max(top, y);
+    const t = s[k * STRIDE] - t0;
+    worst = Math.max(worst, Math.abs(s[k * STRIDE + 2] + 0.5 * PHYS.g * t * t - (a + b * t)));
   }
-  if (worst > 0.35) return null;
+  return { worst, vy0: b, vy1: b - PHYS.g * (s[j * STRIDE] - t0) };
+}
+
+const FIT_TOL = 0.35;
+/**
+ * A bump (tree, ledge, wall) can only slow a fall or stop a rise, never kick
+ * you up: the fits' noise is all the upward change allowed, summed over the
+ * whole air, so lots of small kicks can't add up to a hover.
+ */
+const BUMP_UP_TOL = 1.5;
+/** Samples a bump may take without fitting either arc (the frame or two of the hit). */
+const BUMP_MAX_S = 0.25;
+
+/**
+ * Samples i..j are airborne; null unless they fall at the game's gravity. A
+ * long air can clip something on the way (a tree, a ledge, a bowl wall):
+ * it's then several clean arcs joined at bumps, and counts as long as no
+ * bump sends you upward faster than you were going (an energy-free bump
+ * can't), so hovering or re-launching mid-air still fails.
+ */
+function airSegment(s: Float32Array, i: number, j: number, n: number) {
+  if (j - i < 2) return null;
+  // Greedy: grow each arc while it still fits a free fall
+  let k = i;
+  let prevVy: number | null = null;
+  let kicked = 0;
+  let arcs = 0;
+  while (k < j) {
+    let end = Math.min(k + 2, j);
+    const first = fitFall(s, k, end);
+    if (first === null) return null;
+    let best = first;
+    if (best.worst > FIT_TOL) {
+      // Not even three samples fit: a bump right here. Skip it if it's brief.
+      if (s[(k + 1) * STRIDE] - s[k * STRIDE] > BUMP_MAX_S) return null;
+      k++;
+      continue;
+    }
+    while (end < j) {
+      const f = fitFall(s, k, end + 1);
+      if (f === null || f.worst > FIT_TOL) break;
+      end++;
+      best = f;
+    }
+    if (prevVy !== null) {
+      kicked += Math.max(0, best.vy0 - Math.max(prevVy, 0));
+      if (kicked > BUMP_UP_TOL) return null;
+    }
+    prevVy = best.vy1;
+    arcs++;
+    if (end >= j) break;
+    k = end;
+  }
+  if (arcs === 0) return null;
+  let top = -Infinity;
+  for (let q = i; q <= j; q++) top = Math.max(top, s[q * STRIDE + 2]);
   const t0 = s[i * STRIDE];
   const t1 = j + 1 < n ? s[(j + 1) * STRIDE] : s[j * STRIDE];
   return { s: t1 - t0, m: top - s[i * STRIDE + 2] };
