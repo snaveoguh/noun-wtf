@@ -158,6 +158,19 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     if (!onWorldPath) navigate('/world');
   }, [navigate, onWorldPath]);
 
+  // Noun Hoops is Noun World dropped on the Jersey court with the lobby open.
+  // The game reads `?play=hoops` when it starts, so a running one reloads.
+  const goHoops = useCallback(() => {
+    const url = '/world?play=hoops&mode=3';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   const openEntry = useCallback(
     (e: Entry) => {
       if (e.path === '/world') {
@@ -275,6 +288,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           active={desk && visible.length === 0}
           gameLoaded={gameMounted}
           onEnterWorld={goWorld}
+          onEnterHoops={goHoops}
           onOpen={id => os.open(id)}
           onNavigate={openPath}
         />

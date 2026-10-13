@@ -3,10 +3,13 @@
 // The background of noun.wtf is a conversation with NounIRL (same /api/chat
 // agent as the terminal). Local verbs (play, index, readme, pip3, feed, bid)
 // drive the OS; anything else goes to the agent. The Noun World cover hangs
-// behind it as a poster — click it (or type `play`) to load the game.
+// behind it as a poster — click it (or type `play`) to load the game. The
+// other games (Noun Hoops, …) are stacked behind it like a deck: click a
+// back card (or its chip) to bring it forward, click the front one to play.
 
 import type { AppKind } from './osStore';
 
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAccount } from 'wagmi';
@@ -38,6 +41,25 @@ interface Line {
   shown: number;
 }
 
+export type GameId = 'world' | 'hoops';
+
+const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: string }[] = [
+  {
+    id: 'world',
+    name: 'Noun World',
+    cover: '/world2/cover-1200.webp',
+    cta: 'PRESS TO PLAY ▸',
+    loading: 'loading noun world. grab a board',
+  },
+  {
+    id: 'hoops',
+    name: 'Noun Hoops',
+    cover: '/world2/hoops-cover.webp',
+    cta: 'PLAY 3V3 ▸',
+    loading: 'lacing up. off to the noun jersey court',
+  },
+];
+
 const GREETING = [
   '⌐◨-◨ you made it',
   '',
@@ -48,6 +70,7 @@ const GREETING = [
   'say something, or type one of these',
   '',
   'play     skate noun world',
+  'hoops    3v3 on the jersey court',
   'index    everything else',
   'readme   what happened',
   'pip3     the art',
@@ -61,6 +84,7 @@ export default function AgentHome({
   active,
   gameLoaded = false,
   onEnterWorld,
+  onEnterHoops,
   onOpen,
   onNavigate,
 }: {
@@ -68,6 +92,7 @@ export default function AgentHome({
   /** Game already loaded once (play resumes instantly) */
   gameLoaded?: boolean;
   onEnterWorld: () => void;
+  onEnterHoops: () => void;
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
 }) {
@@ -76,6 +101,7 @@ export default function AgentHome({
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [action, setAction] = useState<GovernanceAction | null>(null);
+  const [front, setFront] = useState<GameId>('world');
   const history = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -129,6 +155,10 @@ export default function AgentHome({
       skate: onEnterWorld,
       world: onEnterWorld,
       'noun world': onEnterWorld,
+      hoops: onEnterHoops,
+      bball: onEnterHoops,
+      basketball: onEnterHoops,
+      'noun hoops': onEnterHoops,
       index: () => onOpen('directory'),
       menu: () => onOpen('directory'),
       help: () => onOpen('directory'),
@@ -151,6 +181,10 @@ export default function AgentHome({
         skate: 'loading noun world. grab a board',
         world: 'loading noun world. grab a board',
         'noun world': 'loading noun world. grab a board',
+        hoops: GAMES[1]!.loading,
+        bball: GAMES[1]!.loading,
+        basketball: GAMES[1]!.loading,
+        'noun hoops': GAMES[1]!.loading,
         readme: 'read it. then go make something',
         manifesto: 'read it. then go make something',
       };
@@ -229,20 +263,52 @@ export default function AgentHome({
       <div className="nos-poster" aria-hidden>
         <img src="/world2/cover-blur.webp" alt="" draggable={false} />
       </div>
-      <button
-        type="button"
-        className="nos-poster-card"
-        data-nos-reflect="poster"
-        onPointerDown={e => e.stopPropagation()}
-        onClick={() => {
-          say(gameLoaded ? 'back to the plaza' : 'loading noun world. grab a board');
-          onEnterWorld();
-        }}
-        aria-label="Play Noun World"
-      >
-        <img src="/world2/cover-1200.webp" alt="Noun World" draggable={false} />
-        <span className="nos-poster-cta">{gameLoaded ? 'RESUME ▸' : 'PRESS TO PLAY ▸'}</span>
-      </button>
+      {GAMES.map((g, i) => {
+        // Depth in the stack: 0 = front, then the rest in order behind it
+        const fi = GAMES.findIndex(x => x.id === front);
+        const d = (i - fi + GAMES.length) % GAMES.length;
+        const resume = g.id === 'world' && gameLoaded;
+        return (
+          <button
+            key={g.id}
+            type="button"
+            className={`nos-poster-card${d > 0 ? 'is-back' : ''}`}
+            style={{ '--d': d, zIndex: 10 - d } as CSSProperties}
+            data-nos-reflect={d === 0 ? 'poster' : undefined}
+            tabIndex={d === 0 ? 0 : -1}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => {
+              if (d > 0) {
+                setFront(g.id);
+                return;
+              }
+              if (g.id === 'hoops') {
+                say(g.loading);
+                onEnterHoops();
+              } else {
+                say(resume ? 'back to the plaza' : g.loading);
+                onEnterWorld();
+              }
+            }}
+            aria-label={d === 0 ? `Play ${g.name}` : `Show ${g.name}`}
+          >
+            <img src={g.cover} alt={g.name} draggable={false} />
+            {d === 0 && <span className="nos-poster-cta">{resume ? 'RESUME ▸' : g.cta}</span>}
+          </button>
+        );
+      })}
+      <div className="nos-game-tabs" onPointerDown={e => e.stopPropagation()}>
+        {GAMES.map(g => (
+          <button
+            key={g.id}
+            type="button"
+            className={g.id === front ? 'is-on' : undefined}
+            onClick={() => setFront(g.id)}
+          >
+            {g.name}
+          </button>
+        ))}
+      </div>
 
       <div className="nos-console">
         <div ref={logRef} className="nos-log">
