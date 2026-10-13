@@ -302,7 +302,11 @@ export class Player {
     private rails: RailSet,
   ) {}
 
+  /** Bumped on every spawn / rescue, so the ride recorder can start afresh. */
+  respawns = 0;
+
   spawn(p: THREE.Vector3, yaw: number) {
+    this.respawns++;
     this.pos.copy(p);
     this.vel.set(0, 0, 0);
     this.fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
@@ -499,6 +503,7 @@ export class Player {
   }
 
   respawnSafe() {
+    this.respawns++;
     this.mode = 'board';
     this.state = 'ground';
     this.climb = null;
