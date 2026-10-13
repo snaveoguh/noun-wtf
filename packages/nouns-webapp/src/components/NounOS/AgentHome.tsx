@@ -290,7 +290,7 @@ export default function AgentHome({
           <button
             key={g.id}
             type="button"
-            className={`nos-poster-card${d > 0 ? 'is-back' : ''}`}
+            className={d > 0 ? 'nos-poster-card is-back' : 'nos-poster-card'}
             style={{ '--d': d, zIndex: 10 - d } as CSSProperties}
             data-nos-reflect={d === 0 ? 'poster' : undefined}
             tabIndex={d === 0 ? 0 : -1}

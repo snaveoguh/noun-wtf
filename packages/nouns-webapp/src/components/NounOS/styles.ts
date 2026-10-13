@@ -140,7 +140,7 @@ export const NOS_CSS = `
 .nos-poster-card{position:absolute;z-index:2;right:clamp(16px,6vw,110px);top:clamp(24px,9vh,110px);width:min(46vw,620px);aspect-ratio:5/4;
   padding:0;border:0;border-radius:22px;overflow:hidden;background:#000;transform-style:preserve-3d;
   transform:rotateY(calc(-16deg + var(--ry,0deg) * 2)) rotateX(calc(5deg + var(--rx,0deg) * 2))
-    translate3d(calc(var(--d,0) * 34px),calc(var(--d,0) * -30px),calc(var(--d,0) * -70px));
+    translate3d(calc(var(--d,0) * 52px),calc(var(--d,0) * -46px),calc(var(--d,0) * -40px));
   box-shadow:0 50px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.3);
   animation:nos-float 7s ease-in-out infinite;transition:box-shadow .3s,transform .5s cubic-bezier(.2,.8,.2,1),filter .5s}
 .nos-poster-card.is-back{filter:brightness(.5) saturate(.8);cursor:pointer}
