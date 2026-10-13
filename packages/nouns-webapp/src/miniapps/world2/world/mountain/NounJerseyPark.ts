@@ -30,6 +30,7 @@ import type { RailDef, RailSet } from '../../physics/Rails';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { JERSEY_COURT } from '../../hoops/contract';
 import { inkExcluded, toonify } from '../../render/Toon';
 
 import { edgeDistance, hashInts } from './config';
@@ -455,13 +456,18 @@ function signMaterial(side: number) {
 
 // ── Park builder ────────────────────────────────────────────────────────
 
-type Bucket = 'solid' | 'ground' | 'thin';
+type Bucket = 'solid' | 'ground' | 'thin' | 'hoop';
 
 const _col = new THREE.Color();
 const _p = { x: 0, z: 0 };
 
 class Park {
-  readonly geo: Record<Bucket, THREE.BufferGeometry[]> = { solid: [], ground: [], thin: [] };
+  readonly geo: Record<Bucket, THREE.BufferGeometry[]> = {
+    solid: [],
+    ground: [],
+    thin: [],
+    hoop: [],
+  };
   readonly signs: THREE.BufferGeometry[] = [];
   readonly col: THREE.BufferGeometry[] = [];
   readonly rails: RailDef[] = [];
@@ -1135,22 +1141,169 @@ function fence(p: Park, a0: number, a1: number, b0: number, b1: number) {
   p.add(boxAt(-0.1, 0.1, 1.15, 1.25, -len / 2, len / 2), 0xd4cab4, m);
 }
 
+// ── Basketball court (Noun Hoops: hoops/contract.ts → JERSEY_COURT) ─────
+//
+// Markings and hoops to the contract's numbers: rims 1.15 m inside each
+// baseline at park (59, 7.15) / (59, 28.85), 3.05 m up, the backboard face
+// 0.8 m inside, each pole set back HOOP_POLE_BACK behind its baseline.
+// The backboard, rim and net ("hoop tops") are their own little mesh,
+// listed in njHoopTops, so Noun Hoops (hoops/view) can hide them and draw
+// its live, wobbling versions in exactly the same place.
+
+/** Pole: metres behind the baseline (outside the court). */
+export const HOOP_POLE_BACK = 1.4;
+
+/** Live hoop-top meshes of the built park (hoops/view hides them while it plays). */
+export const njHoopTops = new Set<THREE.Object3D>();
+
+/** Flat strip along a park-coords polyline (court markings), facing up. */
+function lineStrip(p: Park, pts: P2[], t: number, color: number, y: number) {
+  const pos: number[] = [];
+  const n = pts.length;
+  const off = (i: number): [P2, P2] => {
+    const q0 = pts[Math.max(0, i - 1)];
+    const q1 = pts[Math.min(n - 1, i + 1)];
+    const da = q1[0] - q0[0];
+    const db = q1[1] - q0[1];
+    const l = Math.hypot(da, db) || 1;
+    const na = (-db / l) * (t / 2);
+    const nb = (da / l) * (t / 2);
+    return [
+      [pts[i][0] + na, pts[i][1] + nb],
+      [pts[i][0] - na, pts[i][1] - nb],
+    ];
+  };
+  for (let i = 0; i < n - 1; i++) {
+    const [a, b] = off(i);
+    const [c, d] = off(i + 1);
+    for (const tri of [
+      [a, c, b],
+      [b, c, d],
+    ]) {
+      // Wind every triangle to face +y (park a, b → local x, z)
+      const [u, v, w] = tri;
+      const cy = (w[0] - u[0]) * (v[1] - u[1]) - (v[0] - u[0]) * (w[1] - u[1]);
+      const o = cy >= 0 ? [u, v, w] : [u, w, v];
+      for (const q of o) pos.push(q[0], y, q[1]);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const nrm = new Float32Array(pos.length);
+  for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  p.add(g, color, p.parkM, { bucket: 'ground' });
+}
+
+function arcPts(ca: number, cb: number, r: number, th0: number, th1: number, seg = 0): P2[] {
+  const n = seg > 0 ? seg : Math.max(6, Math.ceil((Math.abs(th1 - th0) * r) / 0.25));
+  const out: P2[] = [];
+  for (let i = 0; i <= n; i++) {
+    const th = th0 + ((th1 - th0) * i) / n;
+    out.push([ca + Math.cos(th) * r, cb + Math.sin(th) * r]);
+  }
+  return out;
+}
+
+/** Filled disc / annulus sector on the court (park coords). */
+function discDecal(
+  p: Park,
+  ca: number,
+  cb: number,
+  r0: number,
+  r1: number,
+  color: number,
+  y: number,
+) {
+  const g = new THREE.RingGeometry(Math.max(0.001, r0), r1, 40).rotateX(-Math.PI / 2);
+  p.add(g, color, p.at(ca, cb, y), { bucket: 'ground' });
+}
+
 function courtLines(p: Park, a0: number, a1: number, b0: number, b1: number) {
+  const K = JERSEY_COURT;
   const y = 0.034;
-  const t = 0.12;
+  const t = 0.1;
   const L = C.lineWhite;
   const am = (a0 + a1) / 2;
   const bm = (b0 + b1) / 2;
-  p.decal(am - 2.45, am + 2.45, b0, b0 + 5.8, C.courtKey, 0.028);
-  p.decal(am - 2.45, am + 2.45, b1 - 5.8, b1, C.courtKey, 0.028);
+  // Boundary, half-court line
   p.decal(a0, a1, b0, b0 + t, L, y);
   p.decal(a0, a1, b1 - t, b1, L, y);
   p.decal(a0, a0 + t, b0, b1, L, y);
   p.decal(a1 - t, a1, b0, b1, L, y);
   p.decal(a0, a1, bm - t / 2, bm + t / 2, L, y);
-  p.add(new THREE.RingGeometry(1.7, 1.82, 32).rotateX(-Math.PI / 2), L, p.at(am, bm, y), {
-    bucket: 'ground',
-  });
+  // Centre circle (painted) + tip-off ring + pixel noggles ⌐◨-◨
+  discDecal(p, am, bm, 0, 1.8 - t / 2, C.courtKey, 0.028);
+  lineStrip(p, arcPts(am, bm, 1.8, 0, Math.PI * 2, 64), t, L, y);
+  lineStrip(p, arcPts(am, bm, 0.6, 0, Math.PI * 2, 32), t, L, y);
+  {
+    const px = 0.13;
+    const cell = (cx: number, cy: number, w: number, h: number, c: number) => {
+      // Noggles read along the court's length (b): x → b, y → a
+      const bA = bm - 7.5 * px + cx * px;
+      const aA = am + 3 * px - cy * px;
+      p.decal(aA - h * px, aA, bA, bA + w * px, c, 0.031);
+    };
+    cell(-2, 2, 3, 1, C.noggleRed);
+    cell(-2, 2, 1, 2, C.noggleRed);
+    for (const fx of [1, 8]) {
+      cell(fx, 0, 6, 6, C.noggleRed);
+      cell(fx + 1, 1, 2, 4, 0xffffff);
+      cell(fx + 3, 1, 2, 4, 0x111111);
+    }
+    cell(7, 2, 1, 1, C.noggleRed);
+  }
+  for (const [bE, s] of [
+    [b0, 1],
+    [b1, -1],
+  ] as const) {
+    const bR = bE + s * K.rimFromBaseline;
+    const bK = bE + s * K.keyLength;
+    const kw = K.keyWidth / 2;
+    // Key: painted lane + outline
+    p.decal(am - kw, am + kw, Math.min(bE, bK), Math.max(bE, bK), C.courtKey, 0.028);
+    lineStrip(
+      p,
+      [
+        [am - kw, bE],
+        [am - kw, bK],
+        [am + kw, bK],
+        [am + kw, bE],
+      ],
+      t,
+      L,
+      y,
+    );
+    // Lane hash marks
+    for (const d of [2.0, 2.9, 3.8])
+      for (const side of [-1, 1]) {
+        const a = am + side * kw;
+        p.decal(
+          Math.min(a, a + side * 0.3),
+          Math.max(a, a + side * 0.3),
+          bE + s * d,
+          bE + s * d + s * t,
+          L,
+          y,
+        );
+      }
+    // Free-throw circle: solid outside the key, dashed inside it
+    const into = s > 0 ? Math.PI / 2 : -Math.PI / 2;
+    lineStrip(p, arcPts(am, bK, 1.8, into - Math.PI / 2, into + Math.PI / 2), t, L, y);
+    for (let k = 0; k < 6; k++) {
+      const th0 = into + Math.PI / 2 + (k * Math.PI) / 6;
+      lineStrip(p, arcPts(am, bK, 1.8, th0 + 0.06, th0 + Math.PI / 12, 4), t, L, y);
+    }
+    // Restricted area under the rim
+    lineStrip(p, arcPts(am, bR, 1.25, into - Math.PI / 2, into + Math.PI / 2), t, L, y);
+    // Three-point line: straight from the baseline to the rim's depth, then the arc
+    const r3 = K.threeRadius;
+    const arc = arcPts(am, bR, r3, into - Math.PI / 2, into + Math.PI / 2);
+    // arc runs from the +a side to the −a side (s > 0) or the reverse (s < 0)
+    const startA = arc[0][0];
+    const endA = arc[arc.length - 1][0];
+    lineStrip(p, [[startA, bE], ...arc, [endA, bE]], t, L, y);
+  }
 }
 
 // ── Layout ──────────────────────────────────────────────────────────────
@@ -1389,22 +1542,96 @@ function buildPark(f: NjFrame, origin: THREE.Vector3): Park {
     p.add(box(1.65, 1.15, 0.05, 0, 1.45, -0.02), C.trim, nm);
     p.sign('noskate', nm, 0, 1.45, 0.01);
   }
-  // Basketball hoops at both ends of the court (a 46–72, b 6–30)
-  for (const [b, dir] of [
-    [4.2, 1],
-    [31.8, -1],
+  // Basketball hoops at both ends of the court (a 46–72, b 6–30), to the
+  // Noun Hoops contract: the pole stands behind the baseline, the arm
+  // reaches in over it to the board, the rim hangs 1.15 m inside
+  for (const [bE, dir] of [
+    [6, 1],
+    [30, -1],
   ] as const) {
-    const m = p.at(59, b, 0, 0, dir);
-    p.add(new THREE.CylinderGeometry(0.09, 0.09, 3.3, 8).translate(0, 1.65, 0), C.darkSteel, m);
-    p.add(rod(v3(0, 3.2, 0), v3(0, 3.2, 1.0), 0.06), C.darkSteel, m, { bucket: 'thin' });
-    p.add(boxAt(-0.9, 0.9, 2.9, 4.0, 1.0, 1.08), C.trim, m);
+    const K = JERSEY_COURT;
+    const m = p.at(59, bE - dir * HOOP_POLE_BACK, 0, 0, dir);
+    // Local +Z = into the court; z = 0 at the pole
+    const zFace = HOOP_POLE_BACK + K.boardFromBaseline;
+    const zBack = zFace - 0.07;
+    const zRim = HOOP_POLE_BACK + K.rimFromBaseline;
+    const top = K.boardBottom + K.boardHeight * 0.55;
     p.add(
-      new THREE.TorusGeometry(0.23, 0.02, 6, 16).rotateX(Math.PI / 2).translate(0, 3.05, 1.35),
+      new THREE.CylinderGeometry(0.1, 0.12, top + 0.2, 10).translate(0, (top + 0.2) / 2, 0),
+      C.darkSteel,
+      m,
+    );
+    p.add(boxAt(-0.32, 0.32, 0, 0.06, -0.32, 0.32), C.concrete, m);
+    // Arm + brace to the back of the board
+    p.add(rod(v3(0, top, 0), v3(0, top, zBack - 0.12), 0.07, 8), C.darkSteel, m, {
+      bucket: 'thin',
+    });
+    p.add(rod(v3(0, top - 1.0, 0.06), v3(0, top - 0.05, zBack - 0.4), 0.05, 8), C.darkSteel, m, {
+      bucket: 'thin',
+    });
+    p.add(
+      boxAt(
+        -0.35,
+        0.35,
+        K.boardBottom + 0.1,
+        K.boardBottom + K.boardHeight - 0.1,
+        zBack - 0.12,
+        zBack,
+      ),
+      C.darkSteel,
+      m,
+    );
+    // Hoop tops (hidden while Noun Hoops draws its live ones)
+    const bw = K.boardWidth / 2;
+    const b0 = K.boardBottom;
+    const b1 = K.boardBottom + K.boardHeight;
+    p.add(boxAt(-bw, bw, b0, b1, zBack, zFace), C.trim, m, { bucket: 'hoop' });
+    const zP = zFace + 0.004;
+    const frame = (x0: number, x1: number, y0: number, y1: number, w: number, c: number) => {
+      p.add(boxAt(x0, x1, y0, y0 + w, zFace, zP), c, m, { bucket: 'hoop' });
+      p.add(boxAt(x0, x1, y1 - w, y1, zFace, zP), c, m, { bucket: 'hoop' });
+      p.add(boxAt(x0, x0 + w, y0, y1, zFace, zP), c, m, { bucket: 'hoop' });
+      p.add(boxAt(x1 - w, x1, y0, y1, zFace, zP), c, m, { bucket: 'hoop' });
+    };
+    frame(-bw, bw, b0, b1, 0.06, C.noggleRed);
+    frame(-0.295, 0.295, K.rimHeight + 0.15, K.rimHeight + 0.6, 0.05, C.noggleRed);
+    p.add(boxAt(-bw, bw, b0 - 0.08, b0, zBack - 0.02, zFace + 0.03), 0x2a2d35, m, {
+      bucket: 'hoop',
+    });
+    p.add(
+      new THREE.TorusGeometry(K.rimRadius, 0.018, 6, 20)
+        .rotateX(Math.PI / 2)
+        .translate(0, K.rimHeight, zRim),
       0xe86a2a,
       m,
-      { bucket: 'thin' },
+      { bucket: 'hoop' },
     );
-    p.col.push(posOnly(box(0.25, 3.3, 0.25), m));
+    p.add(
+      boxAt(-0.08, 0.08, K.rimHeight - 0.09, K.rimHeight + 0.01, zFace, zRim - K.rimRadius + 0.01),
+      0xe86a2a,
+      m,
+      {
+        bucket: 'hoop',
+      },
+    );
+    // Resting net: strands twisting down to a narrower ring
+    for (let i = 0; i < 12; i++) {
+      const a0 = (i / 12) * Math.PI * 2;
+      const a1 = a0 + Math.PI / 6;
+      const r0 = K.rimRadius - 0.01;
+      p.add(
+        rod(
+          v3(Math.cos(a0) * r0, K.rimHeight - 0.01, zRim + Math.sin(a0) * r0),
+          v3(Math.cos(a1) * 0.14, K.rimHeight - 0.42, zRim + Math.sin(a1) * 0.14),
+          0.008,
+          3,
+        ),
+        0xf4f1ea,
+        m,
+        { bucket: 'hoop' },
+      );
+    }
+    p.col.push(posOnly(box(0.3, top + 0.2, 0.3), m));
   }
   // Schoolyard street course: flat bar, manual pad, picnic tables, kicker
   handrail(p, dn(52, 42), v3(0, 0.38, -5), v3(0, 0.38, 5), () => 0);
@@ -1714,6 +1941,7 @@ export function nounJerseyDecorator(rails: RailSet): ChunkDecorator {
       addMesh(p.geo.solid, M.solid, 'NounJerseySolid', true);
       addMesh(p.geo.ground, M.ground, 'NounJerseyGround', false);
       const thin = addMesh(p.geo.thin, M.thin, 'NounJerseyThin', true);
+      const hoopTops = addMesh(p.geo.hoop, M.thin, 'NounJerseyHoopTops', true);
       addMesh(p.signs, signMaterial(f.side), 'NounJerseySigns', false);
       if (p.trees.length > 0) {
         const tg = treeGeometry();
@@ -1732,6 +1960,10 @@ export function nounJerseyDecorator(rails: RailSet): ChunkDecorator {
       if (ctx.toon) toonify(root);
       // Thin rods (handrails, hoop rims, poles) stay out of the ink normals pass
       if (thin !== null) inkExcluded.add(thin);
+      if (hoopTops !== null) {
+        inkExcluded.add(hoopTops);
+        njHoopTops.add(hoopTops);
+      }
       root.updateMatrixWorld(true);
       // Collision (chunk-local, position only)
       let n = 0;
@@ -1761,6 +1993,10 @@ export function nounJerseyDecorator(rails: RailSet): ChunkDecorator {
         dispose: () => {
           rails.remove(railIds);
           if (thin !== null) inkExcluded.delete(thin);
+          if (hoopTops !== null) {
+            inkExcluded.delete(hoopTops);
+            njHoopTops.delete(hoopTops);
+          }
           collision.dispose();
           for (const d of disposables) d.dispose();
         },

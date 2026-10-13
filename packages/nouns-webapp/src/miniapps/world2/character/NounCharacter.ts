@@ -119,7 +119,7 @@ interface ClimbArm {
  * (blended by `amount`). Works for any bone axis convention because it
  * measures the segment from the joint positions.
  */
-function aimBone(
+export function aimBone(
   bone: THREE.Object3D,
   child: THREE.Object3D,
   worldDir: THREE.Vector3,
@@ -153,7 +153,7 @@ const _ikQ = new THREE.Quaternion();
  * Two-bone IK (shoulder→elbow→wrist, hip→knee→ankle): swing `upper` and
  * `mid` so `end` lands on `target`, bending toward the world `pole`.
  */
-function solveTwoBone(
+export function solveTwoBone(
   upper: THREE.Object3D,
   mid: THREE.Object3D,
   end: THREE.Object3D,
@@ -190,7 +190,7 @@ function solveTwoBone(
 }
 
 /** Give `bone` this world orientation (slerped by `amount`). */
-function setWorldQuat(bone: THREE.Object3D, q: THREE.Quaternion, amount = 1) {
+export function setWorldQuat(bone: THREE.Object3D, q: THREE.Quaternion, amount = 1) {
   const parent = bone.parent;
   if (parent === null) return;
   parent.getWorldQuaternion(_ikQ);
@@ -200,7 +200,7 @@ function setWorldQuat(bone: THREE.Object3D, q: THREE.Quaternion, amount = 1) {
 }
 
 /** Rotate `bone` about a world axis by `angle`. */
-function turnBone(bone: THREE.Object3D, worldAxis: THREE.Vector3, angle: number) {
+export function turnBone(bone: THREE.Object3D, worldAxis: THREE.Vector3, angle: number) {
   const parent = bone.parent;
   if (parent === null || Math.abs(angle) < 1e-5) return;
   parent.getWorldQuaternion(_ikQ);
