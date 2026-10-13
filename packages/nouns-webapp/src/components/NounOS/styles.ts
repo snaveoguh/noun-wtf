@@ -139,9 +139,18 @@ export const NOS_CSS = `
 .nos-home{perspective:1400px}
 .nos-poster-card{position:absolute;z-index:2;right:clamp(16px,6vw,110px);top:clamp(24px,9vh,110px);width:min(46vw,620px);aspect-ratio:5/4;
   padding:0;border:0;border-radius:22px;overflow:hidden;background:#000;transform-style:preserve-3d;
-  transform:rotateY(calc(-16deg + var(--ry,0deg) * 2)) rotateX(calc(5deg + var(--rx,0deg) * 2)) translateZ(0);
+  transform:rotateY(calc(-16deg + var(--ry,0deg) * 2)) rotateX(calc(5deg + var(--rx,0deg) * 2))
+    translate3d(calc(var(--d,0) * 52px),calc(var(--d,0) * -46px),calc(var(--d,0) * -40px));
   box-shadow:0 50px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.3);
-  animation:nos-float 7s ease-in-out infinite;transition:box-shadow .3s}
+  animation:nos-float 7s ease-in-out infinite;transition:box-shadow .3s,transform .5s cubic-bezier(.2,.8,.2,1),filter .5s}
+.nos-poster-card.is-back{filter:brightness(.5) saturate(.8);cursor:pointer}
+.nos-poster-card.is-back:hover{filter:brightness(.8)}
+.nos-game-tabs{position:absolute;z-index:3;right:clamp(16px,6vw,110px);top:calc(clamp(24px,9vh,110px) + min(46vw,620px) * .8 + 26px);
+  width:min(46vw,620px);display:flex;justify-content:center;gap:8px;pointer-events:auto}
+.nos-game-tabs button{font:inherit;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  padding:7px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.45);color:rgba(236,235,228,.75)}
+.nos-game-tabs button:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.nos-game-tabs button.is-on{background:rgba(212,255,58,.92);border-color:transparent;color:#000}
 .nos-poster-card img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.08)}
 .nos-poster-card::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 32%,rgba(255,255,255,0) 70%,rgba(255,255,255,.08))}
@@ -149,7 +158,10 @@ export const NOS_CSS = `
 .nos-poster-cta{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:2;font-size:12px;letter-spacing:.16em;font-weight:800;
   padding:10px 18px;border-radius:999px;background:rgba(212,255,58,.92);color:#000;box-shadow:0 0 26px rgba(212,255,58,.4);white-space:nowrap}
 @keyframes nos-float{0%,100%{translate:0 0}50%{translate:0 -10px}}
-@media (max-width:760px){.nos-poster-card{left:16px;right:16px;width:auto;top:16px;transform:rotateX(6deg)}}
+@media (max-width:760px){.nos-poster-card{left:16px;right:16px;width:auto;top:16px;transform:rotateX(6deg)}
+  .nos-poster-card.is-back{opacity:0;pointer-events:none}
+  .nos-game-tabs{left:16px;right:16px;width:auto;top:calc(16px + (100vw - 32px) * .8 + 10px);gap:6px}
+  .nos-game-tabs button{font-size:10px;padding:6px 10px}}
 .nos-console{position:absolute;left:clamp(16px,4vw,56px);bottom:calc(26vh + 70px);width:min(680px,calc(100vw - 32px));z-index:2;
   display:flex;flex-direction:column;gap:10px;max-height:calc(74vh - 120px)}
 .nos-log{overflow-y:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px);mask-image:linear-gradient(to bottom,transparent 0,#000 40px);padding-top:40px}
