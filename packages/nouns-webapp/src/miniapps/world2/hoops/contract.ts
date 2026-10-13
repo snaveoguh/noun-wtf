@@ -88,7 +88,11 @@ export interface Baller {
 
 export interface GameConfig {
   size: TeamSize;
-  /** Half court (1v1, 2v2, 3v3 streetball) or full court (5v5). */
+  /**
+   * Half court (1v1, 2v2, 3v3 streetball) or full court (5v5). Half court:
+   * both teams attack the +z basket and z < 0 is out of bounds. Full court:
+   * team 0 attacks +z, team 1 attacks -z.
+   */
   halfCourt: boolean;
   /** First to this many points (win by 2 if `winBy2`). */
   target: number;
@@ -183,9 +187,33 @@ export interface BallerState {
   hasBall: boolean;
   /** 0..1 while gathering a shot; the sweet spot is SHOT_SWEET. */
   meter?: number;
+  /** While dunking (action 'dunk' / 'alleyoop'): which slam the view should play. */
+  dunkStyle?: DunkStyle;
   /** NBA Jam: three straight scores. */
   onFire: boolean;
   stamina: number;
+}
+
+/** Arcade dunk styles (hoops/sim picks one by situation). */
+export type DunkStyle = 'two-hand' | 'tomahawk' | 'windmill' | 'reverse' | '360';
+
+/** How a jump-shot release landed on the meter (for the HUD callout). */
+export type ShotRelease = 'perfect' | 'good' | 'early' | 'late';
+
+/** Per-baller box score (SimState.stats). */
+export interface BallerStats {
+  pts: number;
+  fgm: number;
+  fga: number;
+  tpm: number;
+  tpa: number;
+  reb: number;
+  oreb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  dunks: number;
+  tov: number;
 }
 
 /** Shot-meter value for a perfect release. */
@@ -221,6 +249,12 @@ export type SimEvent =
       value: number;
       quality: number;
       kind: 'jumper' | 'layup' | 'dunk' | 'alleyoop';
+      /** Jumpers: how the release landed on the meter. */
+      release?: ShotRelease;
+      /** Dunks / alley-oops: the slam style. */
+      style?: DunkStyle;
+      /** Beyond the arc (worth the higher value). */
+      three?: boolean;
     }
   | {
       type: 'score';
@@ -244,7 +278,18 @@ export type SimEvent =
   | { type: 'shotClock'; team: TeamId }
   | { type: 'outOfBounds'; team: TeamId }
   | { type: 'checkball'; team: TeamId }
-  | { type: 'final'; winner: TeamId; score: [number, number] };
+  | { type: 'final'; winner: TeamId; score: [number, number] }
+  /** Defender touched a ball on its way down to the rim: the basket counts. */
+  | { type: 'goaltend'; id: string; team: TeamId }
+  /** Half court: the new offense took the ball past the arc. */
+  | { type: 'cleared'; team: TeamId }
+  /**
+   * Dead-ball turnover other than shot clock / out of bounds: a basket made
+   * without clearing, or a held / stalled ball. `team` loses the ball.
+   */
+  | { type: 'violation'; team: TeamId; kind: 'clear' | 'held' }
+  /** A dunk slam (the moment the ball is thrown down, made or not). */
+  | { type: 'slam'; id: string; style: DunkStyle; made: boolean };
 
 export interface SimState {
   tick: number;
@@ -261,6 +306,16 @@ export interface SimState {
   ball: BallSimState;
   /** Events since the previous step (the view plays them once). */
   events: SimEvent[];
+  /** Box score per baller id. */
+  stats?: Record<string, BallerStats>;
+  /** Half court: the offense still has to take the ball past the arc. */
+  mustClear?: boolean;
+  /**
+   * Opaque sim internals (PRNG, action timers, bot brains): plain JSON, so
+   * load(state()) resumes bit-exactly. A snapshot without it still loads
+   * (internals are rebuilt), it just won't replay exactly.
+   */
+  sim?: unknown;
 }
 
 /** What hoops/sim exports (class HoopsSim implements this). */
