@@ -26,6 +26,11 @@ export interface HoopsViewOptions {
   /** The touch overlay writes its stick + buttons here (BallerInputReader merges it). */
   touch: TouchPad;
   audio: AudioContext | null;
+  /** For the real HoopsView (hoops/view): the renderer, quality, name-tag layer and the game's audio bus. */
+  renderer?: THREE.WebGLRenderer;
+  quality?: 'low' | 'medium' | 'high';
+  labelLayer?: HTMLElement;
+  audioOut?: AudioNode | null;
 }
 
 export interface HoopsViewLike {

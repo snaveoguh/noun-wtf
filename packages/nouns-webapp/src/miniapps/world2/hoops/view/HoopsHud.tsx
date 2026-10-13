@@ -17,9 +17,18 @@ export interface HoopsHudProps {
   touch?: boolean;
   onRematch?: () => void;
   onLeave?: () => void;
+  /** Draw the end-of-game board (off when hoops/net shows its own results card). */
+  showFinal?: boolean;
 }
 
-export function HoopsHud({ view, onInput, touch, onRematch, onLeave }: HoopsHudProps) {
+export function HoopsHud({
+  view,
+  onInput,
+  touch,
+  onRematch,
+  onLeave,
+  showFinal = true,
+}: HoopsHudProps) {
   const s = useSyncExternalStore(view.hud.subscribe, view.hud.get);
   const coarse = useCoarse();
   const showTouch = onInput !== undefined && (touch ?? coarse);
@@ -38,7 +47,9 @@ export function HoopsHud({ view, onInput, touch, onRematch, onLeave }: HoopsHudP
       >
         {s.cameraMode === 'broadcast' ? '📺 TV' : '🏃 CHASE'}
       </button>
-      {s.final !== null && <FinalBoard s={s} onRematch={onRematch} onLeave={onLeave} />}
+      {showFinal && s.final !== null && (
+        <FinalBoard s={s} onRematch={onRematch} onLeave={onLeave} />
+      )}
       {showTouch && s.final === null && <TouchPad view={view} onInput={onInput!} />}
     </div>
   );

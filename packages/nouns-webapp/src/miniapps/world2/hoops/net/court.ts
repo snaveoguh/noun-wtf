@@ -17,7 +17,7 @@ export interface Vec3Like {
 }
 
 export class CourtXform {
-  /** World unit vectors of court +x (park +a) and +z (park +b). */
+  /** World unit vectors of court +x (park +a × side) and +z (park +b). */
   readonly ax: number;
   readonly az: number;
   readonly bx: number;
@@ -28,8 +28,11 @@ export class CourtXform {
   readonly cz: number;
 
   constructor(readonly f: NjFrame) {
-    this.ax = f.rx * f.side;
-    this.az = f.rz * f.side;
+    // Court +x = the frame's r (park +a times side): a pure rotation, the
+    // same map as hoops/view's jerseyCourtToWorld (the court is symmetric
+    // across x, so nothing depends on which side of the line the park is)
+    this.ax = f.rx;
+    this.az = f.rz;
     this.bx = f.fx;
     this.bz = f.fz;
     const c = njToWorld(f, A_MID, B_MID, { x: 0, z: 0 });

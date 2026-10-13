@@ -690,6 +690,10 @@ export class HoopsMode {
         toon: g.gfx.toon,
         touch: this.reader.touch,
         audio: g.audio.ctx,
+        renderer: g.gfx.renderer,
+        quality: g.gfx.quality,
+        labelLayer: g.labelLayerEl,
+        audioOut: g.audio.master,
       });
     this.teleportT = teleport ? 1.4 : 0;
     this.lobbyAcc = 0;

@@ -23,6 +23,12 @@ export interface TouchPad {
   move: boolean;
   sprint: boolean;
   call: boolean;
+  /**
+   * The view's touch overlay already turns its stick into court space (it
+   * owns the camera): that movement comes in here and is used as is.
+   */
+  courtX?: number;
+  courtZ?: number;
 }
 
 const KEYS = {
@@ -114,7 +120,19 @@ export class BallerInputReader {
     };
     this.tapped.clear();
     const t = this.touch;
-    if (t.sx !== 0 || t.sy !== 0 || t.shoot || t.pass || t.move || t.sprint || t.call) {
+    const tcx = t.courtX ?? 0;
+    const tcz = t.courtZ ?? 0;
+    if (
+      t.sx !== 0 ||
+      t.sy !== 0 ||
+      tcx !== 0 ||
+      tcz !== 0 ||
+      t.shoot ||
+      t.pass ||
+      t.move ||
+      t.sprint ||
+      t.call
+    ) {
       this.device = 'touch';
       sx += t.sx;
       sy += t.sy;
@@ -157,6 +175,15 @@ export class BallerInputReader {
     } else {
       out.moveX = wx;
       out.moveZ = wz;
+    }
+    if (tcx !== 0 || tcz !== 0) {
+      out.moveX += tcx;
+      out.moveZ += tcz;
+      const m = Math.hypot(out.moveX, out.moveZ);
+      if (m > 1) {
+        out.moveX /= m;
+        out.moveZ /= m;
+      }
     }
     return out;
   }

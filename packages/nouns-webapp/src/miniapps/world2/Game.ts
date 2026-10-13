@@ -182,6 +182,10 @@ export class Game {
   private fpsFrames = 0;
   private listeners = new Set<() => void>();
   private labelLayer: HTMLElement;
+  /** The name-tag DOM layer (hoops/view puts its ballers' tags there). */
+  get labelLayerEl(): HTMLElement {
+    return this.labelLayer;
+  }
   private opts: GameOptions;
   private lastPos = new THREE.Vector3();
   private footstepAcc = 0;
