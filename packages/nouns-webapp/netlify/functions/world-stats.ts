@@ -70,10 +70,12 @@ const MAX_PROOF_CHARS = 2_000_000;
 function provenCaps(raw: unknown): {
   caps: Partial<Record<BestKey, number>>;
   why: Record<string, string>;
+  failed: { keys: BestKey[]; reason: string; d: string }[];
 } {
   const caps: Partial<Record<BestKey, number>> = {};
   const why: Record<string, string> = {};
-  if (!Array.isArray(raw)) return { caps, why };
+  const failed: { keys: BestKey[]; reason: string; d: string }[] = [];
+  if (!Array.isArray(raw)) return { caps, why, failed };
   for (const p of raw.slice(0, MAX_PROOFS) as { keys?: unknown; d?: unknown }[]) {
     const keys = (Array.isArray(p?.keys) ? p.keys : []).filter((k): k is BestKey =>
       PROVED.has(k as BestKey),
@@ -82,7 +84,9 @@ function provenCaps(raw: unknown): {
     const trace = decodeTrace(p.d);
     const check = trace === null ? null : verifyRun(trace);
     if (check === null || !check.ok) {
-      for (const k of keys) why[k] = check?.reason ?? 'unreadable proof';
+      const reason = check?.reason ?? 'unreadable proof';
+      for (const k of keys) why[k] = reason;
+      failed.push({ keys, reason, d: p.d });
       continue;
     }
     const up = (k: BestKey, v: number) => {
@@ -94,7 +98,36 @@ function provenCaps(raw: unknown): {
       up('airS', a.s + 0.06);
     }
   }
-  return { caps, why };
+  return { caps, why, failed };
+}
+
+/**
+ * Every refused proof is kept (the last 40, traces capped) so a false
+ * rejection can be replayed and fixed rather than guessed at. Best effort:
+ * a lost race just drops a log line.
+ */
+async function logRejections(
+  store: ReturnType<typeof getStore>,
+  entry: {
+    rider: string;
+    name: string;
+    claimed: Record<string, unknown>;
+    failed: { keys: string[]; reason: string; d: string }[];
+    rejected: Record<string, string>;
+  },
+) {
+  try {
+    const cur = ((await store.get('rejections', { type: 'json' })) as unknown[] | null) ?? [];
+    const failed = entry.failed.map(f => ({
+      keys: f.keys,
+      reason: f.reason,
+      d: f.d.length <= 400_000 ? f.d : null,
+    }));
+    const next = [...cur, { at: Date.now(), ...entry, failed }].slice(-40);
+    await store.setJSON('rejections', next);
+  } catch {
+    // logging must never break a post
+  }
 }
 type AddKey = keyof typeof ADD;
 
@@ -367,7 +400,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   const add = (input.add ?? {}) as Record<string, unknown>;
   const newSession = input.session === true;
   const now = Date.now();
-  const { caps, why } = provenCaps(input.proofs);
+  const { caps, why, failed } = provenCaps(input.proofs);
   const rejected: Record<string, string> = {};
 
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -425,6 +458,11 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
           : await store.setJSON('meta', meta, { onlyIfNew: true });
         if (mr.modified) break;
       }
+    }
+    if (Object.keys(rejected).length > 0) {
+      const claimed: Record<string, unknown> = {};
+      for (const k of Object.keys(rejected)) claimed[k] = best[k];
+      await logRejections(store, { rider, name: r.name, claimed, failed, rejected });
     }
     return json(200, {
       ok: true,

@@ -69,12 +69,21 @@ export function decodeTrace(b64: string): Float32Array | null {
   }
 }
 
-export function verifyRun(s: Float32Array): RunCheck {
+/**
+ * `strict` (drop claims, where a teleport would steal something) holds every
+ * sample to the motion and terrain checks. Records (the default) only reject
+ * what a cheat looks like: speed out of nowhere (the energy budget), starting
+ * fast, sinking into the ground. Speed records come from the speed values,
+ * and those are pinned by energy, so motion quirks (bumps, crashes, rescues,
+ * phone frame hitches) never void a real ride.
+ */
+export function verifyRun(s: Float32Array, opts: { strict?: boolean } = {}): RunCheck {
+  const strict = opts.strict === true;
   const n = s.length / STRIDE;
   if (!Number.isInteger(n) || n < 2) return fail('too short');
   if (n > 60_000) return fail('too long');
   for (let i = 0; i < s.length; i++) if (!Number.isFinite(s[i])) return fail('bad number');
-  if (s[4] > 25) return fail('starts at speed');
+  if (s[4] > (strict ? 25 : 40)) return fail('starts at speed');
 
   const g = PHYS.g;
   // A speed only counts toward the record where the positions around it
@@ -90,24 +99,24 @@ export function verifyRun(s: Float32Array): RunCheck {
     const de = edgeDistance(x, z);
     if (de > 150) {
       const b = baseHeight(de);
-      if (y < b - BAND_BELOW) return fail('below the mountain');
-      if (st !== AIR && y > b + BAND_ABOVE) return fail('above the mountain');
+      if (y < b - (strict ? BAND_BELOW : 2 * BAND_BELOW)) return fail('below the mountain');
+      if (strict && st !== AIR && y > b + BAND_ABOVE) return fail('above the mountain');
     }
     if (i === 0) continue;
     const p = o - STRIDE;
     const dt = t - s[p];
-    if (!(dt > 0 && dt <= 1.05)) return fail('bad timing');
+    if (!(dt > 0 && dt <= (strict ? 1.05 : 10))) return fail('bad timing');
     const v0 = s[p + 4];
     const d = Math.hypot(x - s[p + 1], y - s[p + 2], z - s[p + 3]);
     const vavg = (v0 + v) / 2;
     // Positions move at the trace's own speeds (a fast, straight interval
     // covers its speed × time; turns and frame jitter shave a little)
-    if (d > vavg * dt * 1.3 + 1.5) return fail('moves faster than its speed');
+    if (strict && d > vavg * dt * 1.3 + 1.5) return fail('moves faster than its speed');
     // ...and the other way: on the ground a speed with no matching motion
     // isn't credited (a crash stops you dead a frame before the speed drops,
     // so this can't fail the ride; a faked spike still fails on energy).
     // Air is held by the gravity fit and the energy budget instead.
-    if (st === AIR || s[p + 5] === AIR || d >= vavg * dt * 0.7 - 1.5) {
+    if (!strict || st === AIR || s[p + 5] === AIR || d >= vavg * dt * 0.7 - 1.5) {
       backed[i - 1] = 1;
       backed[i] = 1;
     }
@@ -124,7 +133,10 @@ export function verifyRun(s: Float32Array): RunCheck {
   }
   // Honest rides show a few tens of J/kg of sampling noise in total (frame
   // timing, ground snapping); a speed hack shows hundreds to thousands
-  if (excess > 60 + 0.002 * keGain) return fail('gains energy from nowhere');
+  // (records get a wide margin: phones' frame hitches are noisier, and a real
+  // speed hack still shows thousands)
+  const budget = strict ? 60 + 0.002 * keGain : 250 + 0.02 * keGain;
+  if (excess > budget) return fail('gains energy from nowhere');
 
   // Air: hang time + height of every segment that falls at the game's gravity
   const airs: { s: number; m: number }[] = [];

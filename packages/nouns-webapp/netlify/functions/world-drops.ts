@@ -343,7 +343,7 @@ export function traceReaches(
   if (b64.length > MAX_PROOF_CHARS) return { ok: false, reason: 'proof too long' };
   const s = decodeTrace(b64);
   if (s === null) return { ok: false, reason: 'unreadable proof' };
-  const check = verifyRun(s);
+  const check = verifyRun(s, { strict: true });
   if (!check.ok) return { ok: false, reason: check.reason ?? 'bad ride' };
   const n = s.length / STRIDE;
   // The first and last samples that reach it, and the ride that led there
