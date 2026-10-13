@@ -66,6 +66,8 @@ export class FpsInput {
   /** One-shot UI intents read by the game (V third person, Tab board). */
   viewTogglePressed = false;
   enabled = true;
+  /** Debug (headless tests): accept mouse buttons/look without pointer lock. */
+  unlockedMouse = false;
   private crouchToggle = false;
   private onKeyDown = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
@@ -81,13 +83,13 @@ export class FpsInput {
     this.keys.delete(e.code);
   };
   private onMouseMove = (e: MouseEvent) => {
-    if (!this.locked) return;
+    if (!this.locked && !this.unlockedMouse) return;
     this.mouseDX += e.movementX;
     this.mouseDY += e.movementY;
     this.mode = 'keyboard';
   };
   private onMouseDown = (e: MouseEvent) => {
-    if (!this.locked) return;
+    if (!this.locked && !this.unlockedMouse) return;
     if (e.button === 0) this.lmb = true;
     if (e.button === 2) this.rmb = true;
   };

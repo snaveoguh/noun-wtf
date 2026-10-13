@@ -126,6 +126,7 @@ export default function WarfarePage({
         /** Keep playing without pointer lock (headless tests). */
         noLock(on = true) {
           g.debugNoLock = on;
+          g.input.unlockedMouse = on;
         },
         step(n = 1, inp?: Record<string, unknown>) {
           g.stepTicks(n, inp);
