@@ -123,8 +123,11 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
   }
   // Head pixels: x across, y up, z depth (front = +z). Normalise.
   if (box.isEmpty()) box.set(new THREE.Vector3(-8, 0, -1), new THREE.Vector3(8, 12, 1));
-  const w = box.max.x - box.min.x;
-  const s = width / Math.max(1, w);
+  // Size by the art's width, but never narrower than the noggles: a head
+  // whose art builds to a sliver (the hanger's is 1 px) would otherwise
+  // scale up 20x and carry its 3D model to giant size with it
+  const w = Math.max(16, box.max.x - box.min.x);
+  const s = width / w;
   inner.scale.setScalar(s);
   // Anchor at the Nouns art's neck line (top of the body sprite, pixel row
   // y = 11 → -5 in centred coords) rather than the head's lowest pixel, so
