@@ -322,6 +322,11 @@ describe('bots', () => {
         expect(kills).toBeGreaterThan(3);
         expect(worst).toBeLessThan(mode === 'turf' ? 40 : 25);
         expect(unsticks).toBeLessThan(30);
+        // Turf bots actually take (and score from) zones
+        if (mode === 'turf') {
+          expect(sim.state.match.scores[0] + sim.state.match.scores[1]).toBeGreaterThan(30);
+          expect(sim.state.zones.some(z => z.owner !== -1)).toBe(true);
+        }
         // Everyone stays inside the arena
         for (const p of sim.state.players) {
           expect(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)).toBe(true);

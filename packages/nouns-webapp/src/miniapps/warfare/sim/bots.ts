@@ -622,11 +622,30 @@ export class BotBrain implements BotMem {
     const t = sim.time;
     const m = sim.state.match;
     this.repathAt = t + sim.rng.range(5, 9);
-    // Fresh intel first
-    if (this.hasKnown && t - this.lastSeenAt < 6 && sim.rng.chance(0.8)) {
+    const turf = m.mode === 'turf' && sim.state.zones.length > 0;
+    // Turf: standing in a zone that isn't fully ours yet (or is under
+    // attack) → hold it, shuffling between spots inside the circle.
+    if (turf) {
+      const here = sim.state.zones.find(
+        z => (p.x - z.x) ** 2 + (p.z - z.z) ** 2 < z.r * z.r && Math.abs(p.y - z.y) < 3,
+      );
+      const full = here !== undefined && (p.team === 0 ? here.progress <= -1 : here.progress >= 1);
+      const hold =
+        here !== undefined &&
+        (!full || here.contested || (this.role === 'defend' && sim.rng.chance(0.6)));
+      if (hold) {
+        const nodes = sim.nav.within(here.x, here.y, here.z, Math.max(1.2, here.r - 0.9), 2);
+        if (nodes.length > 0 && this.goToNode(sim, p, nodes[sim.rng.int(nodes.length)])) {
+          this.repathAt = t + sim.rng.range(1.2, 2.6);
+          return;
+        }
+      }
+    }
+    // Fresh intel first (zone players mostly stick to the objective)
+    if (this.hasKnown && t - this.lastSeenAt < 6 && sim.rng.chance(turf ? 0.3 : 0.8)) {
       if (this.goTo(sim, p, this.lastKnown.x, this.lastKnown.y, this.lastKnown.z)) return;
     }
-    if (m.mode === 'turf' && sim.state.zones.length > 0) {
+    if (turf) {
       const zones = sim.state.zones;
       const mine = zones.filter(z => z.owner === p.team);
       const theirs = zones.filter(z => z.owner !== p.team);
