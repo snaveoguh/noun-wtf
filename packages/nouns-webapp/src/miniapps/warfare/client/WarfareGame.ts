@@ -5,12 +5,15 @@
 // 60 Hz from a frame accumulator, rendering interpolated between ticks.
 // Everything the HUD shows is published as a plain snapshot (useSyncExternalStore).
 //
-// Phase 2 note: the only things that touch the sim are `stepSim` (local
-// input in, events out) and `onEvents`. A networked client would swap
-// `stepSim` for "send input, apply host snapshot + events", keeping the
-// rendering / HUD code as is.
+// Online (net/session.ts): the only things that touch the sim are `stepSim`
+// (local input in, events out) and `onEvents`. With a WarfareSession the
+// host steps the real sim through it; a client steps its predicted replica
+// (my movement now, everyone else ~100 ms back) and gets the host's events.
+// Rendering / HUD code reads `this.sim` either way.
 
 import type { MapVisual } from './MapVisual';
+import type { NetStatus } from '../net/protocol';
+import type { Toast, WarfareSession } from '../net/session';
 import type { LevelData } from '@/miniapps/world2/world/Level';
 
 import * as THREE from 'three';
@@ -81,6 +84,20 @@ export interface ScoreRow {
   me: boolean;
   bot: boolean;
   alive: boolean;
+  /** Round trip to the relay (ms), online humans only (-1 = n/a). */
+  ping: number;
+}
+
+export interface NetHud {
+  role: 'host' | 'client';
+  code: string;
+  pub: boolean;
+  status: NetStatus;
+  humans: { name: string; ping: number; me: boolean; host: boolean }[];
+  max: number;
+  ping: number;
+  toasts: Toast[];
+  ended: boolean;
 }
 
 export interface HudState {
@@ -124,6 +141,8 @@ export interface HudState {
   paused: boolean;
   touch: boolean;
   fps: number;
+  /** Online match info (null = solo). */
+  net: NetHud | null;
   results: {
     winner: string;
     won: boolean;
@@ -171,6 +190,8 @@ export class WarfareGame {
   readonly input: FpsInput;
   readonly audio = new WarfareAudio();
   sim: WarfareSim | null = null;
+  /** Online match (null = solo vs bots). */
+  net: WarfareSession | null = null;
   me = 0;
   mapId: MapId = 'nouncity';
   private canvas: HTMLCanvasElement;
@@ -226,6 +247,10 @@ export class WarfareGame {
   debugNoLock = false;
   /** Debug: the rAF loop renders but never steps the sim. */
   manual = false;
+  /** Debug: merged into every sampled input (headless e2e driving). */
+  devHold: Partial<PlayerInput> | null = null;
+  private rosterVer = -1;
+  private avatarKey = new Map<number, string>();
   hud: HudState;
   touch: boolean;
   /** Sensitivity multiplier (lobby setting). */
@@ -305,6 +330,7 @@ export class WarfareGame {
       paused: false,
       touch: this.touch,
       fps: 0,
+      net: null,
       results: null,
       now: 0,
     };
@@ -432,9 +458,26 @@ export class WarfareGame {
       seed,
       humans: [{ name: o.name, look: o.look, weapons: o.weapons }],
     });
+    this.begin(sim, 0);
+  }
+
+  /** Play an online match (host or client): the session owns the sim. */
+  startOnline(net: WarfareSession) {
+    if (this.assets === null) return;
+    this.endMatch(false);
+    this.setMap(net.cfg.map);
+    this.net = net;
+    this.begin(net.sim, net.mySlot);
+    this.rosterVer = net.rosterVer;
+    this.publish();
+  }
+
+  private begin(sim: WarfareSim, meId: number) {
+    const assets = this.assets!;
+    const o = { mode: sim.cfg.mode, map: sim.cfg.map };
     this.sim = sim;
-    this.me = 0;
-    const me = sim.state.players[0];
+    this.me = meId;
+    const me = sim.state.players[meId];
     this.input.yaw = me.yaw;
     this.input.pitch = 0;
     this.input.owned = [...me.weapons];
@@ -445,12 +488,13 @@ export class WarfareGame {
     for (const p of sim.state.players) {
       const a = new Avatar(
         p,
-        this.assets,
+        assets,
         this.labels,
         this.gfx.toon,
         teams && p.team === me.team && p.id !== me.id,
       );
       this.avatars.push(a);
+      this.avatarKey.set(p.id, `${p.name}|${p.look}`);
       this.matchRoot.add(a.root);
     }
     for (const z of sim.state.zones) {
@@ -478,6 +522,9 @@ export class WarfareGame {
 
   /** Tear down the current match (abandon = no "finished" rep). */
   endMatch(reportAbandon: boolean) {
+    this.net?.leave();
+    this.net = null;
+    this.avatarKey.clear();
     const sim = this.sim;
     if (sim !== null && reportAbandon && this.hud.results === null) {
       const me = sim.state.players[this.me];
@@ -514,9 +561,23 @@ export class WarfareGame {
 
   /** Advance the sim one fixed tick with the local input. */
   stepSim(inp: PlayerInput) {
+    if (this.sim === null) return [];
+    const net = this.net;
+    let events: SimEvent[];
+    if (net !== null) {
+      if (net.role === 'client') {
+        // Snapshot re-base + events about me first (a respawn turns my view)
+        const pre = net.pump();
+        if (pre.length > 0) this.onEvents(pre);
+        inp = { ...inp, yaw: this.input.yaw, pitch: this.input.pitch };
+        this.lastInput = inp;
+      }
+      events = net.tick(inp);
+      // Host left and I took over: render the real sim from here on
+      if (this.sim !== net.sim) this.sim = net.sim;
+      if (net.rosterVer !== this.rosterVer) this.refreshAvatars();
+    } else events = this.sim.step({ [this.me]: inp });
     const sim = this.sim;
-    if (sim === null) return [];
-    const events = sim.step({ [this.me]: inp });
     this.effects.tick(sim.state.projectiles);
     for (const a of this.avatars) a.tick(sim.state.players[a.id]);
     this.onEvents(events);
@@ -527,7 +588,7 @@ export class WarfareGame {
   stepTicks(n: number, inp?: Partial<PlayerInput>) {
     for (let i = 0; i < n; i++) {
       const base = this.input.sample(0);
-      const merged = { ...base, ...inp };
+      const merged = { ...base, ...this.devHold, ...inp };
       if (inp?.yaw !== undefined) this.input.yaw = inp.yaw;
       if (inp?.pitch !== undefined) this.input.pitch = inp.pitch;
       this.lastInput = merged;
@@ -825,8 +886,24 @@ export class WarfareGame {
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
     this.last = now;
-    if (this.paused) return;
+    if (this.paused) {
+      // Backgrounded online: the match can't wait for me (host keeps
+      // stepping for everyone, a client keeps its inputs flowing)
+      if (this.net !== null && this.sim !== null && this.hud.phase === 'play') {
+        this.net.update();
+        this.acc += dt;
+        let n = 0;
+        while (this.acc >= DT && n < 6 && this.net.canStep) {
+          this.stepSim(emptyInput(this.input.yaw, this.input.pitch));
+          this.acc -= DT;
+          n++;
+        }
+        if (n === 6 || !this.net.canStep) this.acc = 0;
+      }
+      return;
+    }
     this.t += dt;
+    this.net?.update();
     this.splatSounds = 0;
     this.fpsAcc += dt;
     this.fpsFrames++;
@@ -834,7 +911,12 @@ export class WarfareGame {
     if (sim !== null && this.hud.phase === 'play') {
       this.input.lookScale = this.lookScale() * this.sensitivity;
       this.input.assist = this.aimAssist();
-      const inp = this.input.sample(dt);
+      let inp = this.input.sample(dt);
+      if (this.devHold !== null) {
+        inp = { ...inp, ...this.devHold };
+        if (this.devHold.yaw !== undefined) this.input.yaw = this.devHold.yaw;
+        if (this.devHold.pitch !== undefined) this.input.pitch = this.devHold.pitch;
+      }
       if (this.input.viewTogglePressed) {
         this.input.viewTogglePressed = false;
         this.tp = !this.tp;
@@ -849,17 +931,22 @@ export class WarfareGame {
           this.input.mode !== 'gamepad' &&
           !wasLocked &&
           sim.state.players[this.me].alive &&
-          sim.phase !== 'matchEnd');
-      if (!this.manual && !this.menuPaused) {
+          sim.phase !== 'matchEnd' &&
+          this.net?.status !== 'waiting');
+      // Online, the match never pauses for one player: idle input instead
+      const net = this.net;
+      const stepping = !this.manual && (net !== null ? net.canStep : !this.menuPaused);
+      if (stepping) {
+        const use = this.menuPaused ? emptyInput(this.input.yaw, this.input.pitch) : inp;
         this.acc += dt;
         let n = 0;
         while (this.acc >= DT && n < 6) {
-          this.stepSim(inp);
+          this.stepSim(use);
           this.acc -= DT;
           n++;
         }
         if (n === 6) this.acc = 0;
-      }
+      } else if (net !== null) this.acc = 0;
       if (this.resultsAt > 0 && this.t >= this.resultsAt) {
         this.resultsAt = 0;
         this.finishMatch();
@@ -940,6 +1027,8 @@ export class WarfareGame {
     const sp = Math.hypot(me.vx, me.vz);
     const bob =
       me.grounded && me.alive ? Math.sin(me.stride * 2.2) * 0.03 * Math.min(1, sp / 6) : 0;
+    if (this.net !== null && this.net.role === 'client')
+      _v.add(_v2.set(this.net.corr.x, this.net.corr.y, this.net.corr.z));
     cam.position.set(_v.x, _v.y + this.eyeH - this.landDip + Math.abs(bob), _v.z);
     const shk = this.shake * 0.02;
     cam.rotation.set(
@@ -1229,10 +1318,12 @@ export class WarfareGame {
           me: p.id === this.me,
           bot: p.bot,
           alive: p.alive,
+          ping: this.net !== null && !p.bot ? (this.net.roster[p.id]?.ping ?? -1) : -1,
         }))
         .sort((a, b) => b.kills * 10 + b.score - (a.kills * 10 + a.score) || a.deaths - b.deaths);
       h.tp = this.tp;
       h.paused = this.menuPaused;
+      h.net = this.netHud();
       h.feed = h.feed.filter(f => this.t - f.t < 7);
       h.callouts = h.callouts.filter(c => this.t - c.t < 2.4);
       h.dmgDirs = h.dmgDirs.filter(d => this.t - d.t < 1.2);
@@ -1240,6 +1331,61 @@ export class WarfareGame {
       if (h.banner !== null && this.t - h.banner.t > 3.2) h.banner = null;
     }
     this.emit();
+  }
+
+  private netHud(): NetHud | null {
+    const net = this.net;
+    if (net === null) return null;
+    const now = performance.now();
+    return {
+      role: net.role,
+      code: net.code,
+      pub: net.pub,
+      status: net.status,
+      humans: net.roster
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => !r.bot)
+        .map(({ r, i }) => ({
+          name: r.name,
+          ping: i === this.me ? net.ping : r.ping,
+          me: i === this.me,
+          host: r.id === net.hostId,
+        })),
+      max: net.roster.length,
+      ping: net.ping,
+      toasts: net.toasts.filter(t => now - t.t < 4000),
+      ended: net.ended,
+    };
+  }
+
+  /** Someone joined / left online: rebuild the avatars whose head or name changed. */
+  private refreshAvatars() {
+    const sim = this.sim;
+    const net = this.net;
+    if (sim === null || net === null || this.assets === null) return;
+    this.rosterVer = net.rosterVer;
+    const me = sim.state.players[this.me];
+    const teams = MODES[sim.cfg.mode].teams;
+    for (const p of sim.state.players) {
+      const key = `${p.name}|${p.look}`;
+      if (this.avatarKey.get(p.id) === key) continue;
+      this.avatarKey.set(p.id, key);
+      const old = this.avatars[p.id];
+      if (old !== undefined) {
+        this.matchRoot.remove(old.root);
+        old.dispose();
+      }
+      const a = new Avatar(
+        p,
+        this.assets,
+        this.labels,
+        this.gfx.toon,
+        teams && p.team === me.team && p.id !== me.id,
+      );
+      this.avatars[p.id] = a;
+      this.matchRoot.add(a.root);
+      a.tick(p);
+    }
   }
 
   /** Hold-to-show scoreboard (Tab). */

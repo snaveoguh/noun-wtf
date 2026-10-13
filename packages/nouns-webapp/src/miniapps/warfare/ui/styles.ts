@@ -37,6 +37,21 @@ export const WF_CSS = `
 .wf-keys b{color:#ffd400;text-align:right;font-family:'Londrina Solid',system-ui}
 
 @media (max-height:900px){.wf-title{font-size:clamp(44px,7.5vw,92px)}.wf-lobby-inner{padding-top:12px}.wf-lobby-inner>.mt-5{margin-top:10px}.wf-card{padding:7px 10px}.wf-card b{font-size:19px}.wf-panel{padding:9px 11px}.wf-cards{gap:8px}.wf-gun{padding:4px 10px}}
+.wf-btn:disabled{opacity:.45;cursor:default}
+.wf-code{flex:1;min-width:0;background:#161a28;border:3px solid #2a3046;border-radius:12px;padding:4px 12px;font-size:20px;font-weight:900;letter-spacing:.2em;color:#ffd400;font-family:'Londrina Solid',system-ui;text-transform:uppercase;outline:none}
+.wf-code:focus{border-color:#ffd400}
+.wf-matches{display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto}
+.wf-match{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:10px;background:#141826;border:2px solid #232a40}
+.wf-match small{display:block;font-family:system-ui;font-size:11px;opacity:.75}
+.wf-status{font-size:11px;font-family:system-ui;font-weight:700;padding:1px 7px;border-radius:999px;background:#2a3046}
+.wf-status.live{background:#d22209}
+.wf-status.waiting{background:#1f6b3a}
+.wf-wait{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,94vw);pointer-events:auto;text-align:center}
+.wf-bigcode{font-size:clamp(44px,9vw,72px);font-weight:900;font-style:italic;letter-spacing:.14em;color:#ffd400;text-shadow:0 5px 0 #d22209;line-height:1}
+.wf-toasts{position:absolute;left:50%;top:128px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px}
+.wf-toasts div{background:rgba(8,10,18,.75);border:2px solid #ffd400;border-radius:10px;padding:3px 12px;font-size:15px;animation:wffeed .25s ease-out;white-space:nowrap}
+.wf-netchip{position:absolute;left:12px;top:12px;font-family:system-ui;font-size:12px;background:rgba(8,10,18,.6);border-radius:8px;padding:3px 9px;opacity:.85}
+.wf-hud.touch .wf-netchip{top:calc(40px + env(safe-area-inset-top))}
 .wf-hud{position:absolute;inset:0;pointer-events:none;user-select:none}
 .wf-cross{position:absolute;left:50%;top:50%;width:0;height:0}
 .wf-cross i{position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.65);border-radius:1px}

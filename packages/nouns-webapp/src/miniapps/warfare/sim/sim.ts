@@ -111,6 +111,12 @@ export class WarfareSim {
   private events: SimEvent[] = [];
   /** Players that fired recently (bots "hear" gunfire). */
   readonly noise: { pid: number; x: number; y: number; z: number; t: number }[] = [];
+  /**
+   * Network replica (online clients): a cosmetic copy that only moves
+   * players and flies paint. Match flow, damage, kills, respawns and zones
+   * belong to the host, so they're skipped here.
+   */
+  replica = false;
 
   constructor(cfg: MatchConfig) {
     this.cfg = cfg;
@@ -340,7 +346,8 @@ export class WarfareSim {
     this.events = [];
     st.tick++;
     st.time = st.tick * DT;
-    this.updatePhase();
+    const replica = this.replica;
+    if (!replica) this.updatePhase();
     const m = st.match;
     const live = m.phase === 'live';
     const frozen = m.phase === 'countdown' || m.phase === 'matchEnd';
@@ -356,6 +363,7 @@ export class WarfareSim {
       this.lastInputs.set(p.id, inp);
       if (!p.alive) {
         if (
+          !replica &&
           live &&
           st.time >= p.respawnAt &&
           Number.isFinite(p.respawnAt) &&
@@ -377,7 +385,7 @@ export class WarfareSim {
         p.grenades++;
         p.grenadeRegenAt = st.time + GRENADE.regen;
       }
-      if (p.y < this.map.killY) {
+      if (p.y < this.map.killY && !replica) {
         const recent = p.damagers.length > 0 ? p.damagers[p.damagers.length - 1] : null;
         const by = recent !== null && st.time - recent.t < 6 ? recent.id : p.id;
         this.kill(p, st.players[by], 'fall', false);
@@ -385,8 +393,10 @@ export class WarfareSim {
     }
     this.separatePlayers();
     this.stepProjectiles();
-    if (m.mode === 'turf' && live) this.stepZones();
-    this.checkEnd();
+    if (!replica) {
+      if (m.mode === 'turf' && live) this.stepZones();
+      this.checkEnd();
+    }
     while (this.noise.length > 0 && st.time - this.noise[0].t > 2.5) this.noise.shift();
     st.rngState = this.rng.s;
     return this.events;
@@ -774,7 +784,7 @@ export class WarfareSim {
     z: number,
   ) {
     const st = this.state;
-    if (!victim.alive || st.match.phase !== 'live') return;
+    if (this.replica || !victim.alive || st.match.phase !== 'live') return;
     if (st.time < victim.protectedUntil) return;
     if (attacker !== undefined && attacker !== victim && !isEnemy(attacker, victim)) return;
     victim.hp -= dmg;
@@ -817,7 +827,7 @@ export class WarfareSim {
   ) {
     const st = this.state;
     const m = st.match;
-    if (!victim.alive) return;
+    if (this.replica || !victim.alive) return;
     victim.alive = false;
     victim.hp = 0;
     victim.diedAt = st.time;
