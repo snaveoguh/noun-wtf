@@ -47,7 +47,7 @@ function crossing(
 ): { x: number; z: number } | null {
   const b = body(from, v, spin);
   let apex = false;
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 240; i++) {
     const px = b.x;
     const py = b.y;
     const pz = b.z;
@@ -58,7 +58,8 @@ function crossing(
       const f = (py - planeY) / Math.max(1e-9, py - b.y);
       return { x: px + (b.x - px) * f, z: pz + (b.z - pz) * f };
     }
-    if (b.y < 0.3) return null;
+    // Topped out below the plane (or fell back under it): it never gets there.
+    if ((apex && b.y < planeY) || b.y < 0.3) return null;
   }
   return null;
 }
@@ -77,6 +78,30 @@ export function solveShot(
   rimIdx: 0 | 1,
   spinRate = 9,
 ): Vec3 {
+  return solveAim(geo, from, target, elev, bank, rimIdx, null, 8, spinRate).v;
+}
+
+/** Launch speed + heading (a solve's result, reusable as a warm start). */
+export interface Aim {
+  speed: number;
+  yaw: number;
+}
+
+/**
+ * solveShot with a warm start: aim points a few cm apart need only a couple
+ * of Newton steps from a neighbouring solution.
+ */
+export function solveAim(
+  geo: CourtGeo,
+  from: Vec3,
+  target: Vec3,
+  elev: number,
+  bank: boolean,
+  rimIdx: 0 | 1,
+  init: Aim | null = null,
+  iters = 8,
+  spinRate = 9,
+): { v: Vec3; aim: Aim } {
   const ax = target.x;
   let az = target.z;
   if (bank) {
@@ -96,6 +121,10 @@ export function solveShot(
   const t = Math.tan(elev);
   const den = 2 * c * c * Math.max(0.05, D * t - H);
   let speed = Math.sqrt((GRAVITY * D * D) / den);
+  if (init !== null) {
+    speed = init.speed;
+    yaw = init.yaw;
+  }
   const spinOf = (y: number) => backspin(Math.sin(y), Math.cos(y), spinRate);
   const vel = (sp: number, y: number): Vec3 => ({
     x: Math.sin(y) * c * sp,
@@ -116,7 +145,7 @@ export function solveShot(
     // Off the glass the "along" axis flips; just use world x / z.
     return [ez * geo.sign[rimIdx] * -1, ex];
   };
-  for (let it = 0; it < 8; it++) {
+  for (let it = 0; it < iters; it++) {
     const r0 = resid(speed, yaw);
     if (r0 === null) {
       speed *= 1.08;
@@ -144,7 +173,7 @@ export function solveShot(
     speed += dS;
     yaw += dY;
   }
-  return vel(speed, yaw);
+  return { v: vel(speed, yaw), aim: { speed, yaw } };
 }
 
 export interface Prediction {

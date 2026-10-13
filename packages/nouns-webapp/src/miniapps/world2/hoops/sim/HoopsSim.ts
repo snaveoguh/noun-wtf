@@ -30,7 +30,7 @@ import { GRAVITY, newContacts, resetContacts, stepBall } from './ball';
 import { botInput, type BotWorld } from './bots';
 import { attackRim, type CourtGeo, inBounds, isThree, makeGeo, rimDist, type Vec3 } from './court';
 import { gauss, hashSeed, rand } from './rng';
-import { backspin, predict, solveShot } from './shot';
+import { backspin, predict, solveAim } from './shot';
 
 const DT = SIM_DT;
 
@@ -1232,25 +1232,29 @@ export class HoopsSim implements HoopsSimApi {
       y: rim.y,
       z: rim.z + az * along - ax * lat,
     });
+    // Solve the dead-centre shot once, then warm-start the offset aims from it.
+    const centre = solveAim(this.geo, from, aim(0, 0), elev, bank, rimIdx);
+    const near = (along: number, lat: number): Vec3 =>
+      solveAim(this.geo, from, aim(along, lat), elev, bank, rimIdx, centre.aim, 3).v;
     const tryAim = (along: number, lat: number, wantMake: boolean): Vec3 | null => {
-      const vv = solveShot(this.geo, from, aim(along, lat), elev, bank, rimIdx);
+      const vv = near(along, lat);
       const pr = predict(this.geo, from, vv, spin, rimIdx);
       return pr.made === wantMake ? vv : null;
     };
     if (make) {
       if (green) {
-        v = solveShot(this.geo, from, aim(0, 0), elev, bank, rimIdx);
+        v = centre.v;
       } else {
-        for (let k = 0; k < 3 && v === null; k++) {
+        for (let k = 0; k < 2 && v === null; k++) {
           const rattle = this.rand() < 0.35;
           const r = rattle ? 0.09 + 0.06 * this.rand() : 0.07 * this.rand();
           const th = this.rand() * Math.PI * 2;
           v = tryAim(Math.cos(th) * r, Math.sin(th) * r, true);
         }
-        if (v === null) v = solveShot(this.geo, from, aim(0, 0), elev, bank, rimIdx);
+        if (v === null) v = centre.v;
       }
     } else {
-      for (let k = 0; k < 4 && v === null; k++) {
+      for (let k = 0; k < 3 && v === null; k++) {
         const r = 0.15 + 0.2 * this.rand();
         const th = this.rand() * Math.PI * 2;
         // Misses mostly go long / short (front and back iron).
@@ -1258,7 +1262,7 @@ export class HoopsSim implements HoopsSimApi {
         const lat = Math.sin(th) * r * 0.7;
         v = tryAim(along, lat, false);
       }
-      if (v === null) v = solveShot(this.geo, from, aim(0.5, 0.1), elev, bank, rimIdx);
+      if (v === null) v = near(0.5, 0.1);
     }
     const b = s.ball;
     b.x = from.x;
