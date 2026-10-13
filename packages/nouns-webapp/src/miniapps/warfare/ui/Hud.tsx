@@ -3,7 +3,10 @@
 
 import type { HudState, WarfareGame } from '../client/WarfareGame';
 
+import { useState } from 'react';
+
 import { teamHex } from '../client/WarfareGame';
+import { shareUrl } from '../net/protocol';
 import { MODES, scoreLabel } from '../sim/modes';
 import { TEAM_NAMES } from '../sim/types';
 import { WEAPONS } from '../sim/weapons';
@@ -22,11 +25,14 @@ export function Hud({
   onLeave,
   onLobby,
   onAgain,
+  onNetStart,
 }: {
   game: WarfareGame;
   onLeave: () => void;
   onLobby: () => void;
   onAgain: () => void;
+  /** Host: start the online match from the waiting room. */
+  onNetStart?: () => void;
 }) {
   const h = useHud(game);
   if (h.phase !== 'play' && h.phase !== 'results') return null;
@@ -320,11 +326,31 @@ export function Hud({
         </div>
       )}
 
+      {/* Online: status chip, toasts, waiting room */}
+      {h.net !== null && (
+        <div className="wf-netchip" data-testid="wf-netchip">
+          ONLINE · {h.net.role === 'host' ? 'HOSTING' : 'JOINED'}
+          {h.net.code !== '' ? ` · ${h.net.code}` : ''} · {h.net.humans.length} human
+          {h.net.humans.length === 1 ? '' : 's'}
+          {h.net.ping >= 0 ? ` · ${Math.round(h.net.ping)} ms` : ''}
+        </div>
+      )}
+      {h.net !== null && h.net.toasts.length > 0 && (
+        <div className="wf-toasts" data-testid="wf-toasts">
+          {h.net.toasts.map(t => (
+            <div key={t.id}>{t.text}</div>
+          ))}
+        </div>
+      )}
+      {h.net !== null && h.net.status === 'waiting' && h.phase === 'play' && (
+        <WaitingRoom h={h} onStart={onNetStart} onLeave={onLeave} />
+      )}
+
       {/* Scoreboard */}
       {h.showBoard && h.phase !== 'results' && <Scoreboard h={h} />}
 
       {/* Paused */}
-      {h.paused && h.phase === 'play' && (
+      {h.paused && h.phase === 'play' && (h.net === null || h.net.status !== 'waiting') && (
         <div className="wf-overlay" data-testid="wf-paused">
           <div className="wf-title" style={{ fontSize: 'clamp(40px,7vw,80px)' }}>
             PAUSED
@@ -360,9 +386,11 @@ export function Hud({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button type="button" className="wf-btn" onClick={onAgain} data-testid="wf-again">
-                AGAIN
-              </button>
+              {h.net === null && (
+                <button type="button" className="wf-btn" onClick={onAgain} data-testid="wf-again">
+                  AGAIN
+                </button>
+              )}
               <button type="button" className="wf-btn alt" onClick={onLobby}>
                 LOBBY
               </button>
@@ -374,8 +402,88 @@ export function Hud({
   );
 }
 
+function WaitingRoom({
+  h,
+  onStart,
+  onLeave,
+}: {
+  h: HudState;
+  onStart?: () => void;
+  onLeave: () => void;
+}) {
+  const net = h.net!;
+  const [copied, setCopied] = useState(false);
+  const url = net.code !== '' ? shareUrl(net.code) : '';
+  const bots = net.max - net.humans.length;
+  return (
+    <div className="wf-wait wf-panel" data-testid="wf-waiting">
+      <div className="wf-h">{net.pub ? 'PUBLIC MATCH' : 'PRIVATE MATCH'} · JOIN CODE</div>
+      <div className="wf-bigcode" data-testid="wf-join-code">
+        {net.code !== '' ? net.code : '·····'}
+      </div>
+      {url !== '' && (
+        <div
+          className="mt-2 flex items-center justify-center gap-2 text-xs"
+          style={{ fontFamily: 'system-ui' }}
+        >
+          <span className="truncate opacity-75">{url}</span>
+          <button
+            type="button"
+            className="wf-btn alt sm"
+            style={{ fontSize: 13, padding: '2px 10px' }}
+            onClick={() => {
+              void navigator.clipboard
+                ?.writeText(url)
+                .then(() => setCopied(true))
+                .catch(() => undefined);
+            }}
+          >
+            {copied ? 'COPIED' : 'COPY LINK'}
+          </button>
+        </div>
+      )}
+      <div className="mt-3 flex flex-col gap-1 text-left" style={{ fontFamily: 'system-ui' }}>
+        {net.humans.map((p, i) => (
+          <div
+            key={`${p.name}-${i}`}
+            className="flex justify-between rounded-lg bg-white/5 px-3 py-1 text-sm"
+          >
+            <span>
+              {p.name}
+              {p.host ? <span className="text-[#ffd400]"> · host</span> : null}
+              {p.me ? <span className="opacity-60"> (you)</span> : null}
+            </span>
+            <span className="opacity-70">{p.ping >= 0 ? `${Math.round(p.ping)} ms` : '…'}</span>
+          </div>
+        ))}
+        <div className="px-3 text-xs opacity-60">
+          {bots} slot{bots === 1 ? '' : 's'} filled by bots — friends can still join mid-match
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-center gap-3">
+        {net.role === 'host' ? (
+          <button
+            type="button"
+            className="wf-btn wf-pulse"
+            onClick={onStart}
+            data-testid="wf-net-start"
+          >
+            START MATCH
+          </button>
+        ) : (
+          <div className="text-lg opacity-80">waiting for the host to start…</div>
+        )}
+        <button type="button" className="wf-btn alt sm" onClick={onLeave}>
+          LEAVE
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Scoreboard({ h, inline = false }: { h: HudState; inline?: boolean }) {
   const teams = MODES[h.mode].teams;
+  const online = h.net !== null;
   const groups = teams ? [0, 1] : [-1];
   return (
     <div className={`wf-board wf-panel ${inline ? 'inline' : ''}`} data-testid="wf-board">
@@ -394,6 +502,7 @@ function Scoreboard({ h, inline = false }: { h: HudState; inline?: boolean }) {
               <th>OUTS</th>
               <th>ASSISTS</th>
               <th>SCORE</th>
+              {online && <th>PING</th>}
             </tr>
           </thead>
           <tbody>
@@ -409,6 +518,11 @@ function Scoreboard({ h, inline = false }: { h: HudState; inline?: boolean }) {
                   <td>{r.deaths}</td>
                   <td>{r.assists}</td>
                   <td>{r.score + r.kills * 10}</td>
+                  {online && (
+                    <td className="opacity-70">
+                      {r.ping >= 0 ? Math.round(r.ping) : r.bot ? '' : '…'}
+                    </td>
+                  )}
                 </tr>
               ))}
           </tbody>

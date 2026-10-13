@@ -4,7 +4,10 @@
 // sim/     pure deterministic game state (modes, weapons, bots, nav, maps)
 // client/  three.js renderer, input, audio and the HUD store
 // ui/      React: lobby, HUD, touch controls
+// net/     online play: host-authoritative sessions over PartyKit
 
+import type { NetMatchCfg } from './net/protocol';
+import type { WarfareSession } from './net/session';
 import type { Difficulty, MapId, ModeId, TeamSize } from './sim/types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,6 +16,8 @@ import { seedKey } from '@/miniapps/world2/character/NounAppearance';
 import { loadSavedCharacter } from '@/miniapps/world2/ui/CharacterSelect';
 
 import { WarfareGame, isTouchDevice } from './client/WarfareGame';
+import { WarfareLobby } from './net/lobby';
+import { PartyTransport, warfarePartyHost } from './net/partyTransport';
 import { MAP_ORDER } from './sim/maps';
 import { MODE_ORDER } from './sim/modes';
 import {
@@ -22,7 +27,7 @@ import {
   type ProgressStore,
 } from './sim/progression';
 import { Hud } from './ui/Hud';
-import { Lobby, type LobbyChoice } from './ui/Lobby';
+import { Lobby, type LobbyChoice, type OnlineProps } from './ui/Lobby';
 import { WF_CSS } from './ui/styles';
 import { TouchControls } from './ui/TouchControls';
 import { useHud } from './ui/useHud';
@@ -76,6 +81,37 @@ export default function WarfarePage({
   }, []);
   const profileRef = useRef(profile);
   profileRef.current = profile;
+
+  // ── Online: one socket to the `noun-warfare` room while mounted ─────
+  const [lobby, setLobby] = useState<WarfareLobby | null>(null);
+  const [, setLobbyVer] = useState(0);
+  const [netBusy, setNetBusy] = useState<string | null>(null);
+  const [netError, setNetError] = useState<string | null>(null);
+  const autoJoin = useRef<string | null>(
+    (() => {
+      const c = new URLSearchParams(window.location.search).get('join');
+      return c !== null && /^[\dA-Za-z]{3,8}$/.test(c) ? c.toUpperCase() : null;
+    })(),
+  );
+  useEffect(() => {
+    const host = warfarePartyHost();
+    if (host === null) return;
+    const t = new PartyTransport(host);
+    const l = new WarfareLobby(t);
+    const bump = () => setLobbyVer(v => v + 1);
+    t.onStatus = () => {
+      if (t.connected) l.refresh();
+      bump();
+    };
+    const unsub = l.subscribe(bump);
+    setLobby(l);
+    return () => {
+      unsub();
+      l.dispose();
+      t.close();
+      setLobby(null);
+    };
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -131,6 +167,13 @@ export default function WarfarePage({
         step(n = 1, inp?: Record<string, unknown>) {
           g.stepTicks(n, inp);
         },
+        /** Merge a partial input into every frame (null clears). */
+        hold(inp: Record<string, unknown> | null) {
+          g.devHold = inp;
+        },
+        get net() {
+          return g.net;
+        },
       };
     }
     return () => {
@@ -180,6 +223,94 @@ export default function WarfarePage({
     };
   }, [game]);
 
+  const meInfo = useCallback(
+    () => ({ name: me.name, look: me.look, weapons: unlockedWeapons(profileRef.current.rep) }),
+    [me],
+  );
+
+  const netCfg = useCallback(
+    (): NetMatchCfg => ({
+      mode: choice.mode,
+      map: choice.map,
+      teamSize: choice.size,
+      difficulty: choice.difficulty,
+      seed: (Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0,
+    }),
+    [choice],
+  );
+
+  const goOnline = useCallback(
+    (s: WarfareSession) => {
+      if (game === null) return;
+      game.unlockAudio();
+      game.startOnline(s);
+      setNetBusy(null);
+      setNetError(null);
+    },
+    [game],
+  );
+
+  const netRun = useCallback(
+    (label: string, f: () => Promise<WarfareSession> | WarfareSession) => {
+      if (game === null || !game.ready || lobby === null) return;
+      setNetBusy(label);
+      setNetError(null);
+      Promise.resolve()
+        .then(f)
+        .then(goOnline)
+        .catch((e: Error) => {
+          setNetBusy(null);
+          setNetError(e.message || "couldn't join");
+        });
+    },
+    [game, lobby, goOnline],
+  );
+
+  const online: OnlineProps = {
+    state: lobby === null ? 'offline' : lobby.online ? 'online' : 'connecting',
+    matches: lobby?.matches ?? [],
+    busy: netBusy,
+    error: netError,
+    onQuick: () => netRun('finding a match…', () => lobby!.quickPlay(netCfg(), meInfo())),
+    onHost: pub => netRun('hosting…', () => lobby!.host(netCfg(), meInfo(), pub)),
+    onJoinCode: code => netRun(`joining ${code}…`, () => lobby!.join({ code }, meInfo())),
+    onJoinGid: gid => netRun('joining…', () => lobby!.join({ gid }, meInfo())),
+  };
+
+  // /warfare?join=CODE: straight in once the socket and the nouns are ready
+  const lobbyOnline = lobby?.online === true;
+  const gameReady = game?.ready === true && game.hud.phase === 'lobby';
+  useEffect(() => {
+    const code = autoJoin.current;
+    if (code === null || !lobbyOnline || !gameReady) return;
+    autoJoin.current = null;
+    online.onJoinCode(code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobbyOnline, gameReady]);
+
+  // Keep the open-match list fresh while browsing
+  useEffect(() => {
+    if (lobby === null || !lobbyOnline) return;
+    const id = setInterval(() => {
+      if (game?.net === null) lobby.refresh();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [lobby, lobbyOnline, game]);
+
+  const leaveOnline = useCallback(() => {
+    game?.toLobby();
+    lobby?.leave();
+    lobby?.refresh();
+  }, [game, lobby]);
+
+  const netStart = useCallback(() => {
+    const n = game?.net ?? null;
+    if (n === null || game === null) return;
+    n.start();
+    game.unlockAudio();
+    if (!touch) game.input.requestLock();
+  }, [game, touch]);
+
   const start = useCallback(() => {
     if (game === null || !game.ready) return;
     game.unlockAudio();
@@ -227,6 +358,9 @@ export default function WarfarePage({
           sens={sens}
           setSens={setSens}
           touch={touch}
+          online={online}
+          onLeaveOnline={leaveOnline}
+          onNetStart={netStart}
         />
       )}
       {error !== null && (
@@ -249,6 +383,9 @@ function Screens({
   sens,
   setSens,
   touch,
+  online,
+  onLeaveOnline,
+  onNetStart,
 }: {
   game: WarfareGame;
   choice: LobbyChoice;
@@ -259,8 +396,12 @@ function Screens({
   sens: number;
   setSens: (v: number) => void;
   touch: boolean;
+  online: OnlineProps;
+  onLeaveOnline: () => void;
+  onNetStart: () => void;
 }) {
   const h = useHud(game);
+  const isOnline = h.net !== null;
   return (
     <>
       {(h.phase === 'lobby' || h.phase === 'loading') && (
@@ -274,6 +415,7 @@ function Screens({
           sensitivity={sens}
           onSensitivity={setSens}
           touch={touch}
+          online={online}
         />
       )}
       {(h.phase === 'play' || h.phase === 'results') && (
@@ -281,9 +423,10 @@ function Screens({
           {touch && h.phase === 'play' && h.alive && <TouchControls game={game} />}
           <Hud
             game={game}
-            onLeave={() => game.toLobby()}
-            onLobby={() => game.toLobby()}
+            onLeave={isOnline ? onLeaveOnline : () => game.toLobby()}
+            onLobby={isOnline ? onLeaveOnline : () => game.toLobby()}
             onAgain={start}
+            onNetStart={onNetStart}
           />
           {h.phase === 'play' && (
             <div
