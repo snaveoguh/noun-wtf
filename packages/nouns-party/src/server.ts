@@ -1,6 +1,7 @@
 import type { Party, PartyKitServer, Connection } from 'partykit/server';
 
 import { HoopsRelay } from './hoopsRelay';
+import { WarfareRelay } from './warfareRelay';
 
 /**
  * noun.wtf — PartyKit real-time multiplayer server.
@@ -18,7 +19,13 @@ import { HoopsRelay } from './hoopsRelay';
  *
  * 3. Noun Hoops (hoops: prefix, world v2): relayed only to the players a
  *    message is for (see hoopsRelay.ts), nothing persisted.
+ *
+ * 4. Noun Warfare (room `noun-warfare` only, wf: prefix): lobby registry +
+ *    host-authoritative match relay (see warfareRelay.ts). That room skips
+ *    the saber / world traffic entirely, and other rooms ignore wf:.
  */
+
+const WARFARE_ROOM = 'noun-warfare';
 
 // ── Saber types ───────────────────────────────────────────────────────
 
@@ -70,6 +77,7 @@ interface RoomState {
   _worldPlayers?: Record<string, WorldPlayerState>;
   _leaderboard: LeaderboardEntry[];
   _hoops?: HoopsRelay;
+  _warfare?: WarfareRelay;
 }
 
 function getRoomState(room: Party): RoomState {
@@ -90,12 +98,19 @@ function broadcastExcept(room: Party, senderId: string, msg: string) {
 
 export default {
   async onStart(room: Party) {
+    if (room.id === WARFARE_ROOM) return;
     const stored = await room.storage.get<LeaderboardEntry[]>('leaderboard');
     const rs = getRoomState(room);
     rs._leaderboard = stored ?? [];
   },
 
   onConnect(connection: Connection, room: Party) {
+    if (room.id === WARFARE_ROOM) {
+      const rs = getRoomState(room);
+      rs._warfare ??= new WarfareRelay();
+      connection.send(JSON.stringify({ type: 'wf:matches', list: rs._warfare.listing() }));
+      return;
+    }
     const count = [...room.getConnections()].length;
     const rs = getRoomState(room);
 
@@ -126,7 +141,19 @@ export default {
     connection.send(JSON.stringify({ type: 'world:sync', players: worldPlayers, count }));
   },
 
-  async onMessage(message: string, connection: Connection, room: Party) {
+  async onMessage(
+    message: string | ArrayBuffer | ArrayBufferView,
+    connection: Connection,
+    room: Party,
+  ) {
+    // Every game here speaks JSON text
+    if (typeof message !== 'string') return;
+    if (room.id === WARFARE_ROOM) {
+      const rs = getRoomState(room);
+      rs._warfare ??= new WarfareRelay();
+      rs._warfare.message(message, connection, room.getConnections());
+      return;
+    }
     try {
       const data = JSON.parse(message as string);
       const rs = getRoomState(room);
@@ -354,28 +381,36 @@ export default {
           // Persist K/D ratio keyed by wallet address
           const wallet = (data.wallet ?? '').toLowerCase();
           if (wallet) {
-            const existing = (await room.storage.get<{ kills: number; deaths: number }>(`kd:${wallet}`)) ?? { kills: 0, deaths: 0 };
+            const existing = (await room.storage.get<{ kills: number; deaths: number }>(
+              `kd:${wallet}`,
+            )) ?? { kills: 0, deaths: 0 };
             existing.kills += data.addKills ?? 0;
             existing.deaths += data.addDeaths ?? 0;
             await room.storage.put(`kd:${wallet}`, existing);
             // Send updated stats back
-            connection.send(JSON.stringify({
-              type: 'world:kd:stats',
-              wallet,
-              kills: existing.kills,
-              deaths: existing.deaths,
-            }));
+            connection.send(
+              JSON.stringify({
+                type: 'world:kd:stats',
+                wallet,
+                kills: existing.kills,
+                deaths: existing.deaths,
+              }),
+            );
           }
         } else if (data.type === 'world:kd:load') {
           const wallet = (data.wallet ?? '').toLowerCase();
           if (wallet) {
-            const stats = (await room.storage.get<{ kills: number; deaths: number }>(`kd:${wallet}`)) ?? { kills: 0, deaths: 0 };
-            connection.send(JSON.stringify({
-              type: 'world:kd:stats',
-              wallet,
-              kills: stats.kills,
-              deaths: stats.deaths,
-            }));
+            const stats = (await room.storage.get<{ kills: number; deaths: number }>(
+              `kd:${wallet}`,
+            )) ?? { kills: 0, deaths: 0 };
+            connection.send(
+              JSON.stringify({
+                type: 'world:kd:stats',
+                wallet,
+                kills: stats.kills,
+                deaths: stats.deaths,
+              }),
+            );
           }
         } else if (data.type === 'world:voip:transcript') {
           // Broadcast speech-to-text transcript to all players
@@ -456,6 +491,10 @@ export default {
 
   onClose(connection: Connection, room: Party) {
     const rs = getRoomState(room);
+    if (room.id === WARFARE_ROOM) {
+      rs._warfare?.close(connection.id, room.getConnections());
+      return;
+    }
 
     // Clean up saber player
     if (rs._players) {
@@ -473,4 +512,4 @@ export default {
     room.broadcast(JSON.stringify({ type: 'leave', id: connection.id, count }));
     room.broadcast(JSON.stringify({ type: 'world:leave', id: connection.id, count }));
   },
-} satisfies PartyKitServer;
+} satisfies PartyKitServer & { onStart?: (room: Party) => Promise<void> };

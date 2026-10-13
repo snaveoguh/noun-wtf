@@ -1,8 +1,9 @@
 // ── Lobby: pick a mode, map, crew size and bot skill over a live flyover ──
 
+import type { WfListing } from '../net/protocol';
 import type { Difficulty, MapId, ModeId, TeamSize } from '../sim/types';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { MAPS, MAP_ORDER } from '../sim/maps';
 import { MODES, MODE_ORDER } from '../sim/modes';
@@ -14,6 +15,18 @@ export interface LobbyChoice {
   map: MapId;
   size: TeamSize;
   difficulty: Difficulty;
+}
+
+export interface OnlineProps {
+  /** offline = ?offline=1 / no relay configured (solo only). */
+  state: 'offline' | 'connecting' | 'online';
+  matches: WfListing[];
+  busy: string | null;
+  error: string | null;
+  onQuick: () => void;
+  onHost: (pub: boolean) => void;
+  onJoinCode: (code: string) => void;
+  onJoinGid: (gid: string) => void;
 }
 
 const SIZES: TeamSize[] = [2, 4, 6];
@@ -48,6 +61,7 @@ export function Lobby({
   sensitivity,
   onSensitivity,
   touch,
+  online,
 }: {
   choice: LobbyChoice;
   onChange: (c: LobbyChoice) => void;
@@ -58,6 +72,7 @@ export function Lobby({
   sensitivity: number;
   onSensitivity: (v: number) => void;
   touch: boolean;
+  online: OnlineProps;
 }) {
   const lp = levelProgress(profile.rep);
   useEffect(() => {
@@ -154,6 +169,7 @@ export function Lobby({
           </div>
 
           <div className="flex flex-col gap-4">
+            <OnlinePanel o={online} ready={ready} />
             <div className="wf-panel">
               <div className="wf-h">REP</div>
               <div className="flex items-baseline justify-between">
@@ -225,9 +241,140 @@ export function Lobby({
             disabled={!ready}
             data-testid="wf-start"
           >
-            {ready ? `SPLAT IN ⌐◨-◨` : 'LOADING NOUNS…'}
+            {ready ? `SOLO VS BOTS ⌐◨-◨` : 'LOADING NOUNS…'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const MODE_SHORT: Record<string, string> = {
+  tdm: 'TEAM SPLAT',
+  elim: 'ELIM',
+  turf: 'TURF',
+  ffa: 'FFA',
+};
+
+function OnlinePanel({ o, ready }: { o: OnlineProps; ready: boolean }) {
+  const [code, setCode] = useState('');
+  const can = ready && o.state === 'online' && o.busy === null;
+  if (o.state === 'offline')
+    return (
+      <div className="wf-panel" data-testid="wf-online">
+        <div className="wf-h">PLAY ONLINE</div>
+        <div className="text-sm opacity-70" style={{ fontFamily: 'system-ui' }}>
+          offline mode — solo vs bots only
+        </div>
+      </div>
+    );
+  return (
+    <div className="wf-panel" data-testid="wf-online">
+      <div className="flex items-center justify-between">
+        <div className="wf-h">PLAY ONLINE</div>
+        <div className="text-xs opacity-70" style={{ fontFamily: 'system-ui' }}>
+          {o.state === 'connecting' ? 'connecting…' : `${o.matches.length} open`}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="wf-btn sm flex-1"
+          disabled={!can}
+          onClick={o.onQuick}
+          data-testid="wf-quick"
+        >
+          QUICK PLAY
+        </button>
+        <button
+          type="button"
+          className="wf-btn alt sm"
+          disabled={!can}
+          onClick={() => o.onHost(true)}
+          data-testid="wf-host-public"
+          title="Anyone can join from the list"
+        >
+          HOST
+        </button>
+        <button
+          type="button"
+          className="wf-btn alt sm"
+          disabled={!can}
+          onClick={() => o.onHost(false)}
+          data-testid="wf-host-private"
+          title="Join code / link only"
+        >
+          PRIVATE
+        </button>
+      </div>
+      <form
+        className="mt-2 flex gap-2"
+        onSubmit={e => {
+          e.preventDefault();
+          if (can && code.trim() !== '') o.onJoinCode(code.trim().toUpperCase());
+        }}
+      >
+        <input
+          className="wf-code"
+          value={code}
+          maxLength={8}
+          placeholder="JOIN CODE"
+          onChange={e => setCode(e.target.value.toUpperCase().replace(/[^\dA-Z]/g, ''))}
+          onKeyDown={e => e.stopPropagation()}
+          data-testid="wf-code-input"
+        />
+        <button
+          type="submit"
+          className="wf-btn alt sm"
+          disabled={!can || code.trim() === ''}
+          data-testid="wf-code-join"
+        >
+          JOIN
+        </button>
+      </form>
+      {(o.busy !== null || o.error !== null) && (
+        <div
+          className={`mt-2 text-sm ${o.error !== null ? 'text-[#ff8a7a]' : 'text-[#ffd400]'}`}
+          style={{ fontFamily: 'system-ui' }}
+          data-testid="wf-online-status"
+        >
+          {o.busy ?? o.error}
+        </div>
+      )}
+      <div className="wf-matches mt-2" data-testid="wf-matches">
+        {o.matches.length === 0 ? (
+          <div className="py-2 text-xs opacity-60" style={{ fontFamily: 'system-ui' }}>
+            no open matches — host one, bots fill the empty slots
+          </div>
+        ) : (
+          o.matches.map(m => (
+            <div key={m.gid} className="wf-match">
+              <div className="min-w-0 flex-1">
+                <b className="block truncate">{m.host}</b>
+                <small>
+                  {MODE_SHORT[m.mode] ?? m.mode} ·{' '}
+                  {m.map === 'warehouse' ? 'Warehouse' : 'Noun City'} ·{' '}
+                  {m.mode === 'ffa' ? `${m.size * 2} FFA` : `${m.size}v${m.size}`}
+                </small>
+              </div>
+              <span className={`wf-status ${m.status}`}>
+                {m.status === 'live' ? 'LIVE' : 'LOBBY'}
+              </span>
+              <span className="w-10 text-right text-sm">
+                {m.humans}/{m.max}
+              </span>
+              <button
+                type="button"
+                className="wf-btn sm"
+                style={{ fontSize: 14, padding: '3px 12px' }}
+                disabled={!can}
+                onClick={() => o.onJoinGid(m.gid)}
+              >
+                JOIN
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
