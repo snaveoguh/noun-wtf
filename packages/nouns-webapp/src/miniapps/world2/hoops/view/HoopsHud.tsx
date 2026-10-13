@@ -456,4 +456,6 @@ const CSS = `
 .w2-hoops-sprint{right:104px;bottom:96px;width:62px;height:62px;background:#ffd400;color:#000;border:3px solid #000;font-size:13px}
 .w2-hoops-tag span{font-size:12px;background:rgba(0,0,0,.6);padding:2px 8px;border-radius:999px}
 @media (max-width:640px){.w2-hoops-callouts{top:20%}.w2-hoops-bug{top:6px}}
+/* Phones: the site's tray sits top-centre, so the score bug drops below it */
+@media (pointer:coarse){.w2-hoops-bug{top:46px}}
 `;

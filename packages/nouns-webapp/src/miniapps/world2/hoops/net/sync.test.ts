@@ -336,6 +336,7 @@ function fakeGame(name: string, others: Record<string, string>) {
       giveBack() {
         this.lent = 0;
       },
+      bench() {},
     },
     mountain: null,
     assets: null,

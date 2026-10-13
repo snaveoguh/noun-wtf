@@ -677,6 +677,8 @@ export class HoopsMode {
     });
     court.toWorld(0, 0, 0, this.focus);
     if (teleport) g.mountain?.prime(this.focus);
+    // The crew not playing would skate across the court mid-game
+    g.crew?.bench(true);
     if (this.hudLayer !== null)
       this.view = createView({
         scene: g.gfx.scene,

@@ -522,6 +522,21 @@ export class JerseyCrew {
     this.away.clear();
   }
 
+  /**
+   * While a hoops game is on, the rest of the crew stays off the court: their
+   * lines cross it, so they're hidden (the game owns the frame and doesn't
+   * step them). `bench(false)`, and the next update puts them back.
+   */
+  bench(on: boolean) {
+    for (const npc of this.npcs) {
+      if (this.away.has(npc)) continue;
+      if (on) {
+        npc.ch.root.visible = false;
+        npc.label.style.display = 'none';
+      }
+    }
+  }
+
   private spawn(f: NjFrame) {
     this.active = true;
     this.tracks = LINES.map(l => makeTrack(f, l.pts, true, l.cruise));
