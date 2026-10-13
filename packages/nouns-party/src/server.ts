@@ -1,5 +1,7 @@
 import type { Party, PartyKitServer, Connection } from 'partykit/server';
 
+import { HoopsRelay } from './hoopsRelay';
+
 /**
  * noun.wtf — PartyKit real-time multiplayer server.
  *
@@ -13,6 +15,9 @@ import type { Party, PartyKitServer, Connection } from 'partykit/server';
  *    Client → Server: world:move, world:attack, world:hit, world:force, world:wager
  *    Server → Client: world:sync, world:player, world:join, world:leave,
  *                      world:attack, world:hit, world:death, world:force, world:wager
+ *
+ * 3. Noun Hoops (hoops: prefix, world v2): relayed only to the players a
+ *    message is for (see hoopsRelay.ts), nothing persisted.
  */
 
 // ── Saber types ───────────────────────────────────────────────────────
@@ -64,6 +69,7 @@ interface RoomState {
   _players?: Record<string, PlayerState>;
   _worldPlayers?: Record<string, WorldPlayerState>;
   _leaderboard: LeaderboardEntry[];
+  _hoops?: HoopsRelay;
 }
 
 function getRoomState(room: Party): RoomState {
@@ -124,6 +130,14 @@ export default {
     try {
       const data = JSON.parse(message as string);
       const rs = getRoomState(room);
+
+      // ── Noun Hoops (hoops: prefix) ──────────────────────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('hoops:')) {
+        if (message.length > 8192) return;
+        rs._hoops ??= new HoopsRelay();
+        rs._hoops.handle(data, connection, room.getConnections());
+        return;
+      }
 
       // ── World messages (world: prefix) ──────────────────────────────
 
@@ -452,6 +466,8 @@ export default {
     if (rs._worldPlayers) {
       delete rs._worldPlayers[connection.id];
     }
+
+    rs._hoops?.close(connection.id, room.getConnections());
 
     const count = [...room.getConnections()].length;
     room.broadcast(JSON.stringify({ type: 'leave', id: connection.id, count }));

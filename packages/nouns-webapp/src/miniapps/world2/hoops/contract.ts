@@ -349,10 +349,45 @@ export type HoopsMsg =
     }
   | { type: 'hoops:reply'; gid: string; from: string; to: string; accept: boolean }
   /** Host → everyone in the game: roster + config, start (clients teleport to the court). */
-  | { type: 'hoops:start'; gid: string; host: string; config: GameConfig }
+  | {
+      type: 'hoops:start';
+      gid: string;
+      host: string;
+      config: GameConfig;
+      /** (net) Only to this player: a spectator / late watcher catching up. */
+      to?: string;
+    }
   /** Human → host, ~30 Hz. */
   | { type: 'hoops:input'; gid: string; id: string; seq: number; input: BallerInput }
   /** Host → game, ~20 Hz (quantised state). */
   | { type: 'hoops:snap'; gid: string; state: SimState }
   | { type: 'hoops:leave'; gid: string; id: string }
-  | { type: 'hoops:end'; gid: string; winner: TeamId; score: [number, number] };
+  | { type: 'hoops:end'; gid: string; winner: TeamId; score: [number, number] }
+  // ── Added by hoops/net (additive) ──
+  /** Host → game, ~20 Hz: the quantised snapshot actually sent (hoops/net/codec.ts), `e` = events since the last one. */
+  | { type: 'hoops:s'; gid: string; d: string; e?: unknown[] }
+  /** Host → room, every ~2 s while a court lobby is open or a game is live (join / watch discovery). */
+  | {
+      type: 'hoops:lobby';
+      gid: string;
+      host: string;
+      hostName: string;
+      size: TeamSize;
+      target: number;
+      live: boolean;
+      players: { id: string; name: string; team: TeamId }[];
+      /** false = closed (cancelled / game over): forget it. */
+      open: boolean;
+    }
+  /** Player at the court → lobby host: join (or `leave: true`). */
+  | {
+      type: 'hoops:join';
+      gid: string;
+      from: string;
+      to: string;
+      name: string;
+      seedKey: string;
+      leave?: boolean;
+    }
+  /** Player near the court → watch a live game (the relay adds them; the host sends them `hoops:start`). */
+  | { type: 'hoops:watch'; gid: string; from: string };

@@ -21,6 +21,8 @@ import {
 import { Input, type InputFrame } from './core/Input';
 import { Drops } from './drops/Drops';
 import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
+import { courtSpawn, hoopsEntry } from './hoops/net/court';
+import { HoopsMode } from './hoops/net/HoopsMode';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
@@ -169,6 +171,8 @@ export class Game {
   name: string;
   remotes = new Map<string, RemoteAvatar>();
   crew: JerseyCrew | null = null;
+  /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
+  readonly hoops: HoopsMode = new HoopsMode(this);
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -330,6 +334,11 @@ export class Game {
       const sp = njSpawn();
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
+    // `?play=hoops`: the homescreen's Noun Hoops entrance, onto the court (a normal session, not devRun)
+    if (hoopsEntry() !== null && this.mountain !== null) {
+      const sp = courtSpawn();
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
     // `?spot=bowl`: the top of the Noggle Bowl's roll-in, ~42 km down the −X line
     if (spotParam() === 'bowl' && this.mountain !== null) {
       const sp = bowlSpawn();
@@ -448,6 +457,19 @@ export class Game {
       this.updateShowroom(dt);
       return;
     }
+    // ── Noun Hoops: sim + view at the court; skater, skate camera and stats untouched ──
+    if (this.hoops.active) {
+      this.input.poll(now); // drain the skate controls so nothing fires on the way back
+      this.hoops.step(dt);
+      this.animTime += dt; // keeps my parked pose fresh for the room
+      this.updateNetwork(dt);
+      this.crew?.update(dt, this.hoops.focus);
+      this.mountain?.update(this.hoops.focus, this.hoops.focusVel);
+      this.nature?.update(dt, this.hoops.focus);
+      this.gfx.followShadow(this.hoops.focus);
+      this.gfx.render(dt);
+      return;
+    }
     const input = this.input.poll(now);
     // On foot (and on walls) the mouse is a free cursor for painting
     this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
@@ -515,6 +537,7 @@ export class Game {
     this.billboards.update(dt);
     this.gfx.render(dt);
     this.updateHud(dt, input);
+    this.hoops.idle(dt);
   }
 
   private updateShowroom(dt: number) {
@@ -1512,6 +1535,7 @@ export class Game {
   }
 
   dispose() {
+    this.hoops.dispose();
     this.stats.dispose();
     this.drops?.dispose();
     this.mountain?.dispose();
