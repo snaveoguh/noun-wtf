@@ -89,8 +89,11 @@ function provenCaps(raw: unknown): {
       failed.push({ keys, reason, d: p.d });
       continue;
     }
+    // Proof checked out but holds nothing for this key (e.g. no clean jump)
+    for (const k of keys) why[k] ??= 'not in its ride proof';
     const up = (k: BestKey, v: number) => {
-      if (keys.includes(k)) caps[k] = Math.max(caps[k] ?? 0, v);
+      if (!keys.includes(k)) return;
+      caps[k] = Math.max(caps[k] ?? 0, v);
     };
     up('kmh', check.maxV * 3.6 + 0.3);
     for (const a of check.airs) {
@@ -429,7 +432,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       if (!Number.isFinite(v) || v <= 0 || v > BEST[k]) continue;
       if (v > (r.best[k] ?? 0)) {
         if (PROVED.has(k) && !(v <= (caps[k] ?? 0))) {
-          rejected[k] = why[k] ?? (caps[k] === undefined ? 'no proof' : 'beyond its proof');
+          rejected[k] = caps[k] === undefined ? (why[k] ?? 'no proof') : 'beyond its proof';
           continue;
         }
         r.best[k] = Math.round(v * 100) / 100;
