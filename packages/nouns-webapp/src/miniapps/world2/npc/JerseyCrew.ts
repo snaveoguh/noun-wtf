@@ -24,7 +24,7 @@ import type { Quality } from '../render/Graphics';
 
 import * as THREE from 'three';
 
-import { randomSeed } from '../character/NounAppearance';
+import { randomSeed, type NounSeed } from '../character/NounAppearance';
 import { NounCharacter, type CharacterAssets } from '../character/NounCharacter';
 import { toonify } from '../render/Toon';
 import {
@@ -496,8 +496,45 @@ export class JerseyCrew {
     if (build !== undefined) build();
     this.refreshHeights(dt, f);
     const cam = this.o.camera.position;
-    for (const npc of this.npcs) this.step(npc, dt, player, cam);
+    for (const npc of this.npcs) if (!this.away.has(npc)) this.step(npc, dt, player, cam);
     this.updateLabels(cam);
+  }
+
+  /** Crew members off playing Noun Hoops (hoops/net): hidden, not stepped. */
+  private away = new Set<Npc>();
+
+  /** Lend up to `n` crew members (their seed + name) for a game; hidden until `giveBack`. */
+  borrow(n: number): { name: string; seed: NounSeed }[] {
+    const out: { name: string; seed: NounSeed }[] = [];
+    for (const npc of this.npcs) {
+      if (out.length >= n) break;
+      if (this.away.has(npc)) continue;
+      this.away.add(npc);
+      npc.ch.root.visible = false;
+      npc.label.style.display = 'none';
+      out.push({ name: npc.name, seed: npc.ch.seed });
+    }
+    return out;
+  }
+
+  giveBack() {
+    for (const npc of this.away) npc.ch.root.visible = true;
+    this.away.clear();
+  }
+
+  /**
+   * While a hoops game is on, the rest of the crew stays off the court: their
+   * lines cross it, so they're hidden (the game owns the frame and doesn't
+   * step them). `bench(false)`, and the next update puts them back.
+   */
+  bench(on: boolean) {
+    for (const npc of this.npcs) {
+      if (this.away.has(npc)) continue;
+      if (on) {
+        npc.ch.root.visible = false;
+        npc.label.style.display = 'none';
+      }
+    }
   }
 
   private spawn(f: NjFrame) {
@@ -530,6 +567,7 @@ export class JerseyCrew {
   private clear() {
     for (const npc of this.npcs) this.disposeNpc(npc);
     this.npcs = [];
+    this.away.clear();
     this.pending = [];
     this.tracks = [];
     this.mini = null;
@@ -1005,7 +1043,7 @@ export class JerseyCrew {
     const h = this.o.canvas.clientHeight;
     for (const npc of this.npcs) {
       const dist = cam.distanceTo(npc.pos);
-      let show = dist < LABEL_DIST;
+      let show = dist < LABEL_DIST && !this.away.has(npc);
       if (show) {
         const v = this._p.copy(npc.pos);
         v.y += 2.05;

@@ -9,6 +9,7 @@ import { useAppSelector } from '@/hooks';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
+import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import {
   shortAddr,
   STAT_INFO,
@@ -163,6 +164,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hoopsOn = useHoopsActive(game);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {
@@ -251,7 +253,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <style>{CSS}</style>
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
-      {game && started && (
+      {game && started && !hoopsOn && (
         <Hud
           game={game}
           showHelp={showHelp}
@@ -259,7 +261,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           onShop={openDeck}
         />
       )}
-      {game && started && <TouchControls game={game} />}
+      {game && started && !hoopsOn && <TouchControls game={game} />}
+      {game && started && <HoopsUi game={game} />}
       {game?.drops && started && <DropClaim drops={game.drops} />}
 
       {chatOpen && (

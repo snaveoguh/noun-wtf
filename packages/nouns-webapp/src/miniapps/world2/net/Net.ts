@@ -9,6 +9,8 @@
 //   state         → compact JSON blob (anim, rider quat, board pose, …)
 // Voice is a WebRTC mesh signalled over the same socket (see Voice.ts).
 
+import type { HoopsMsg } from '../hoops/contract';
+
 import PartySocket from 'partysocket';
 import * as THREE from 'three';
 
@@ -92,6 +94,8 @@ export class Net {
   onChat?: (id: string, text: string) => void;
   onGraffiti?: (wallId: string, tags: { imageData: string; timestamp?: number }[]) => void;
   onOpen?: () => void;
+  /** Noun Hoops (hoops/net): every `hoops:*` message goes here. */
+  onHoops?: (m: HoopsMsg) => void;
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -123,6 +127,10 @@ export class Net {
   private handle(d: Record<string, unknown>) {
     const type = d.type as string;
     if (typeof type !== 'string') return;
+    if (type.startsWith('hoops:')) {
+      this.onHoops?.(d as unknown as HoopsMsg);
+      return;
+    }
     if (type === 'world:sync') {
       const players = (d.players ?? {}) as Record<string, Record<string, unknown>>;
       for (const [id, p] of Object.entries(players)) {
@@ -354,6 +362,10 @@ export class Net {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'world:graffiti:load', wallId }));
     }
+  }
+
+  sendHoops(m: HoopsMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
   sendChat(text: string) {
