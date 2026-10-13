@@ -574,7 +574,9 @@ export class WarfareGame {
           if (e.on >= 0) {
             const victim = ps[e.on];
             this.avatars[e.on]?.addPaint(victim, e.x, e.y, e.z, e.color);
-            this.effects.burst(e.x, e.y, e.z, e.nx, e.ny, e.nz, e.color, 7, 3.5);
+            // Paint on yourself shows as visor splats, not a burst inside the camera
+            if (e.on !== this.me || this.tp)
+              this.effects.burst(e.x, e.y, e.z, e.nx, e.ny, e.nz, e.color, 7, 3.5);
           } else {
             this.splats.add(e.x, e.y, e.z, e.nx, e.ny, e.nz, e.color, e.size);
             this.effects.burst(e.x, e.y, e.z, e.nx, e.ny, e.nz, e.color, 4, 2.5);
@@ -603,14 +605,16 @@ export class WarfareGame {
                 { id: this.nextId++, angle: -rel, t: this.t },
               ].slice(-4);
               // Screen paint on the side it came from
+              // (kept off the crosshair: it's juice, not a blindfold)
               const side = Math.sin(-rel);
+              const dir = Math.abs(side) > 0.2 ? Math.sign(side) : Math.random() < 0.5 ? -1 : 1;
               this.hud.screenPaint = [
                 ...this.hud.screenPaint.filter(s => this.t - s.t < 2.5),
                 {
                   id: this.nextId++,
                   color: hex(a.color),
-                  x: 50 + side * 28 + (Math.random() - 0.5) * 30,
-                  y: 35 + Math.random() * 35,
+                  x: 50 + dir * (24 + Math.random() * 20),
+                  y: 22 + Math.random() * 50,
                   r: 9 + Math.min(14, e.dmg * 0.25) + Math.random() * 6,
                   t: this.t,
                 },
@@ -1042,9 +1046,13 @@ export class WarfareGame {
     this.vmThrowT += dt;
     const g = this.vm.group;
     const ads = me.scoped;
-    let x = ads ? 0 : 0.2;
-    let y = ads ? -0.12 : -0.2;
-    let z = ads ? -0.3 : -0.36;
+    // Portrait phones have a narrow horizontal FOV: tuck the blaster inward + shrink it
+    const aspect = this.gfx.camera.aspect;
+    const narrow = Math.max(0, Math.min(1, (1.2 - aspect) / 0.7));
+    g.scale.setScalar(0.78 - narrow * 0.2);
+    let x = ads ? 0 : 0.21 - narrow * 0.09;
+    let y = ads ? -0.15 : -0.25 + narrow * 0.03;
+    let z = ads ? -0.32 : -0.38;
     let rx = 0;
     let ry = 0;
     let rz = 0;

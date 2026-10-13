@@ -155,7 +155,7 @@ export function TouchControls({ game }: { game: WarfareGame }) {
       ))}
       <div
         className="wf-tbtn"
-        style={{ left: 14, top: 64, width: 46, height: 46, borderRadius: 12, fontSize: 12 }}
+        style={{ left: 8, top: 88, width: 40, height: 40, borderRadius: 12, fontSize: 11 }}
         onPointerDown={e => {
           e.stopPropagation();
           game.setBoard(!game.hud.showBoard);
@@ -165,7 +165,7 @@ export function TouchControls({ game }: { game: WarfareGame }) {
       </div>
       <div
         className="wf-tbtn"
-        style={{ left: 66, top: 64, width: 46, height: 46, borderRadius: 12, fontSize: 12 }}
+        style={{ left: 54, top: 88, width: 40, height: 40, borderRadius: 12, fontSize: 11 }}
         onPointerDown={e => {
           e.stopPropagation();
           game.toggleView();
@@ -175,7 +175,7 @@ export function TouchControls({ game }: { game: WarfareGame }) {
       </div>
       <div
         className="wf-tbtn"
-        style={{ left: 118, top: 64, width: 46, height: 46, borderRadius: 12, fontSize: 14 }}
+        style={{ left: 100, top: 88, width: 40, height: 40, borderRadius: 12, fontSize: 13 }}
         onPointerDown={e => {
           e.stopPropagation();
           game.pause();

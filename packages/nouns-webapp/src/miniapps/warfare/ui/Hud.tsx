@@ -38,7 +38,7 @@ export function Hud({
   const lowHp = h.alive && h.hp < 40;
 
   return (
-    <div className="wf-hud" data-testid="wf-hud">
+    <div className={`wf-hud ${h.touch ? 'touch' : ''}`} data-testid="wf-hud">
       {/* Scope */}
       {sniperScope && (
         <div className="wf-scope">
@@ -165,7 +165,7 @@ export function Hud({
         )}
       </div>
       {h.zones.length > 0 && (
-        <div className="absolute left-1/2 top-[74px] flex -translate-x-1/2 gap-2">
+        <div className="wf-zones absolute left-1/2 top-[74px] flex -translate-x-1/2 gap-2">
           {h.zones.map(z => {
             const fill = Math.abs(z.progress);
             const col = z.progress < 0 ? teamHex(0) : teamHex(1);
@@ -287,7 +287,7 @@ export function Hud({
               <i style={{ width: `${Math.min(100, h.reload * 100)}%` }} />
             </div>
           )}
-          <div className="mt-1 text-sm">
+          <div className="wf-nades mt-1 text-sm">
             {'●'.repeat(h.grenades)}
             <span className="opacity-30">{'●'.repeat(Math.max(0, 2 - h.grenades))}</span>{' '}
             <span className="text-xs opacity-70">GRENADE</span>
@@ -321,7 +321,7 @@ export function Hud({
       )}
 
       {/* Scoreboard */}
-      {(h.showBoard || h.phase === 'results') && <Scoreboard h={h} />}
+      {h.showBoard && h.phase !== 'results' && <Scoreboard h={h} />}
 
       {/* Paused */}
       {h.paused && h.phase === 'play' && (
@@ -338,35 +338,35 @@ export function Hud({
         </div>
       )}
 
-      {/* Results */}
+      {/* Results: banner, final board, rep, again / lobby */}
       {h.phase === 'results' && h.results !== null && (
-        <div
-          className="absolute bottom-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
-          style={{ pointerEvents: 'auto' }}
-        >
+        <div className="wf-results" data-testid="wf-results">
           <div className="wf-banner" style={{ animation: 'none' }}>
             <b>{h.results.winner}</b>
             <span>{h.results.won ? 'YOU WON' : h.results.draw ? 'DRAW' : 'GOOD GAME'}</span>
           </div>
-          <div className="wf-panel min-w-[260px] text-sm" style={{ fontFamily: 'system-ui' }}>
-            {h.results.rep.lines.map(l => (
-              <div key={l.label} className="flex justify-between gap-6">
-                <span className="opacity-80">{l.label}</span>
-                <b className="text-[#ffd400]">+{l.rep}</b>
+          <Scoreboard h={h} inline />
+          <div className="flex flex-wrap items-stretch justify-center gap-3">
+            <div className="wf-panel min-w-[240px] text-sm" style={{ fontFamily: 'system-ui' }}>
+              {h.results.rep.lines.map(l => (
+                <div key={l.label} className="flex justify-between gap-6">
+                  <span className="opacity-80">{l.label}</span>
+                  <b className="text-[#ffd400]">+{l.rep}</b>
+                </div>
+              ))}
+              <div className="mt-1 flex justify-between border-t border-white/20 pt-1 text-base">
+                <span>REP</span>
+                <b className="text-[#ffd400]">+{h.results.rep.total}</b>
               </div>
-            ))}
-            <div className="mt-1 flex justify-between border-t border-white/20 pt-1 text-base">
-              <span>REP</span>
-              <b className="text-[#ffd400]">+{h.results.rep.total}</b>
             </div>
-          </div>
-          <div className="flex gap-3">
-            <button type="button" className="wf-btn" onClick={onAgain} data-testid="wf-again">
-              AGAIN
-            </button>
-            <button type="button" className="wf-btn alt" onClick={onLobby}>
-              LOBBY
-            </button>
+            <div className="flex items-center gap-3">
+              <button type="button" className="wf-btn" onClick={onAgain} data-testid="wf-again">
+                AGAIN
+              </button>
+              <button type="button" className="wf-btn alt" onClick={onLobby}>
+                LOBBY
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -374,11 +374,11 @@ export function Hud({
   );
 }
 
-function Scoreboard({ h }: { h: HudState }) {
+function Scoreboard({ h, inline = false }: { h: HudState; inline?: boolean }) {
   const teams = MODES[h.mode].teams;
   const groups = teams ? [0, 1] : [-1];
   return (
-    <div className="wf-board wf-panel" data-testid="wf-board">
+    <div className={`wf-board wf-panel ${inline ? 'inline' : ''}`} data-testid="wf-board">
       <div className="mb-2 flex items-center justify-between">
         <b className="text-2xl italic">{MODES[h.mode].name}</b>
         <span className="text-sm opacity-70">
