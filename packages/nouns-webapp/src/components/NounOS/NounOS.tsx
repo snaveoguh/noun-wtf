@@ -33,11 +33,14 @@ import { NOS_CSS } from './styles';
 import WaterGarden, { waterHeight, type WaterHandle } from './WaterGarden';
 
 const World2Page = lazy(() => import('@/miniapps/world2/World2Page'));
+const WarfarePage = lazy(() => import('@/miniapps/warfare/WarfarePage'));
 const TerminalFeedShell = lazy(() => import('@/components/TerminalFeed/TerminalFeedShell'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 
 const README_KEY = 'nounos-readme-seen';
 const WORLD_PATHS = new Set(['/world', '/world/']);
+// Noun Warfare gets the same full-screen game layer as Noun World
+const WARFARE_PATHS = new Set(['/warfare', '/warfare/']);
 const HOME_PATHS = new Set(['/', '']);
 
 const APP_TITLES: Record<Exclude<AppKind, 'navigator'>, string> = {
@@ -65,7 +68,10 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const path = location.pathname;
   const onWorldPath = WORLD_PATHS.has(path);
+  const onWarfarePath = WARFARE_PATHS.has(path);
   const [gameMounted, setGameMounted] = useState(onWorldPath);
+  // Which game owns the world layer (only one WebGL game is mounted at a time)
+  const [arena, setArena] = useState<'world' | 'warfare'>(onWarfarePath ? 'warfare' : 'world');
   const [readmeSeen, setReadmeSeen] = useState(() => {
     try {
       return localStorage.getItem(README_KEY) === '1';
@@ -86,7 +92,12 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     if (onWorldPath) {
       os.close('navigator');
       os.setMode('world');
+      setArena('world');
       setGameMounted(true);
+    } else if (onWarfarePath) {
+      os.close('navigator');
+      os.setMode('world');
+      setArena('warfare');
     } else if (HOME_PATHS.has(path)) {
       // Home = the agent console over the poster; the game only loads on demand
       os.close('navigator');
@@ -94,11 +105,11 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     } else {
       os.open('navigator');
     }
-  }, [path, onWorldPath]);
+  }, [path, onWorldPath, onWarfarePath]);
 
   useEffect(() => {
-    if (mode === 'world') setGameMounted(true);
-  }, [mode]);
+    if (mode === 'world' && arena === 'world') setGameMounted(true);
+  }, [mode, arena]);
 
   useEffect(() => {
     const t = window.setInterval(() => setClock(new Date()), 15000);
@@ -152,16 +163,27 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     };
   }, []);
 
-  const goWorld = useCallback(() => {
+  const goNounWorld = useCallback(() => {
+    setArena('world');
     setGameMounted(true);
     os.setMode('world');
     if (!onWorldPath) navigate('/world');
   }, [navigate, onWorldPath]);
 
+  // WORLD ↗ / backdrop: back into whichever game is loaded
+  const goWorld = useCallback(() => {
+    if (arena === 'warfare') {
+      os.setMode('world');
+      if (!onWarfarePath) navigate('/warfare');
+      return;
+    }
+    goNounWorld();
+  }, [arena, goNounWorld, navigate, onWarfarePath]);
+
   const openEntry = useCallback(
     (e: Entry) => {
       if (e.path === '/world') {
-        goWorld();
+        goNounWorld();
         return;
       }
       if (e.app !== undefined) {
@@ -174,15 +196,15 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       }
       navigate(e.path);
     },
-    [goWorld, navigate],
+    [goNounWorld, navigate],
   );
 
   const openPath = useCallback(
     (p: string) => {
-      if (WORLD_PATHS.has(p)) goWorld();
+      if (WORLD_PATHS.has(p)) goNounWorld();
       else navigate(p);
     },
-    [goWorld, navigate],
+    [goNounWorld, navigate],
   );
 
   const closeNavigator = useCallback(() => {
@@ -262,18 +284,24 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
 
       {/* 1. the world */}
       <div className="nos-world" aria-hidden={desk}>
-        {gameMounted && (
+        {arena === 'warfare' ? (
           <Suspense fallback={<div className="nos-world-fallback" />}>
-            <World2Page paused={desk} />
+            <WarfarePage paused={desk} />
           </Suspense>
+        ) : (
+          gameMounted && (
+            <Suspense fallback={<div className="nos-world-fallback" />}>
+              <World2Page paused={desk} />
+            </Suspense>
+          )
         )}
       </div>
 
       {/* 1b. home: the agent, over the Noun World poster (hidden while skating) */}
-      {!gameMounted || desk ? (
+      {(!gameMounted && arena !== 'warfare') || desk ? (
         <AgentHome
           active={desk && visible.length === 0}
-          gameLoaded={gameMounted}
+          gameLoaded={gameMounted || arena === 'warfare'}
           onEnterWorld={goWorld}
           onOpen={id => os.open(id)}
           onNavigate={openPath}
