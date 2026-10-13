@@ -186,6 +186,7 @@ export class HoopsView {
   private disposed = false;
   private rimsCourt: [THREE.Vector3, THREE.Vector3];
   private time = 0;
+  private fov0 = 70;
 
   constructor(o: HoopsViewOptions) {
     this.o = o;
@@ -212,6 +213,7 @@ export class HoopsView {
     this.fx = new HoopsFx(this.low);
     this.court.add(this.fx.group);
     inkExcluded.add(this.fx.group);
+    this.fov0 = o.camera.fov;
     this.cam = new HoopsCamera(o.camera, this.spec);
     this.cam.side = this.sunSide();
     this.audio = new HoopsAudio(o.audio ?? null);
@@ -369,6 +371,8 @@ export class HoopsView {
     this.fx.dispose();
     this.audio.dispose();
     this.court.removeFromParent();
+    this.o.camera.fov = this.fov0;
+    this.o.camera.updateProjectionMatrix();
   }
 
   // ── clock + buffer ────────────────────────────────────────────────────
@@ -726,7 +730,12 @@ export class HoopsView {
 
   private callout(text: string, tone: CalloutTone, size: 0 | 1 | 2 = 1, sub?: string) {
     const c: Callout = { id: ++this.calloutId, text, sub, tone, size, at: performance.now() };
-    const keep = this.hud.state.callouts.filter(x => c.at - x.at < 1600).slice(-2);
+    // One headline at a time: a big call replaces the other big / medium ones
+    const keep = this.hud.state.callouts
+      .filter(
+        x => c.at - x.at < 1600 && (size < 2 || x.size === 0) && !(size === 1 && x.size === 1),
+      )
+      .slice(-1);
     this.hud.set({ callouts: [...keep, c] });
   }
 

@@ -29,7 +29,7 @@ export function HoopsHud({ view, onInput, touch, onRematch, onLeave }: HoopsHudP
       {s.slowmo && <div className="w2-hoops-letterbox" />}
       <ScoreBug s={s} />
       <Meter view={view} />
-      <Callouts list={s.callouts} />
+      {s.final === null && <Callouts list={s.callouts} />}
       <button
         type="button"
         className="w2-hoops-cam pointer-events-auto"

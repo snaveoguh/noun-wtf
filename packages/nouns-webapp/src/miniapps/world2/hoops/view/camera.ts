@@ -85,8 +85,8 @@ export class HoopsCamera {
       _d.subVectors(f.rim, me).setY(0);
       if (_d.lengthSq() < 0.5) _d.set(Math.sin(f.meYaw), 0, Math.cos(f.meYaw));
       _d.normalize();
-      _p.copy(me).addScaledVector(_d, -6.2);
-      _p.y = 3.4 + Math.max(0, me.y) * 0.5;
+      _p.copy(me).addScaledVector(_d, -5.4);
+      _p.y = 3.0 + Math.max(0, me.y) * 0.5;
       _t.copy(me).addScaledVector(_d, 3.2);
       _t.y = 1.6;
       // Keep the ball in shot when it's away from you
