@@ -42,7 +42,7 @@ const MAX_SAMPLES = 60_000;
 /**
  * One ride on the board since the last respawn / getting on:
  * [t, x, y, z, speed, state] samples (state 0 ground, 1 air, 2 grind,
- * 3 manual), every 0.4 s on the ground, every frame-ish in the air, and on
+ * 3 manual, 4 bail), every 0.4 s on the ground, every frame-ish in the air, and on
  * every change of state or new top speed.
  */
 class RunTrace {
@@ -52,6 +52,7 @@ class RunTrace {
   full = false;
   private lastT = -Infinity;
   private lastSt = -1;
+  private lastV = 0;
 
   constructor(private t0: number) {}
 
@@ -59,8 +60,13 @@ class RunTrace {
     if (this.full) return;
     const t = clock - this.t0;
     const gap = t - this.lastT;
+    // Also on any sharp change of speed (a bail or crash between two ground
+    // samples would otherwise leave distance the endpoint speeds can't cover)
+    const jolt = Math.abs(v - this.lastV) > 1 + 0.1 * this.lastV;
     const due =
-      st !== this.lastSt || gap >= (st === 1 ? 1 / 30 : 0.4) || (v > this.maxV && gap >= 0.1);
+      st !== this.lastSt ||
+      gap >= (st === 1 ? 1 / 30 : 0.4) ||
+      ((v > this.maxV || jolt) && gap >= 1 / 30);
     if (!due) return;
     if (this.n >= MAX_SAMPLES) {
       this.full = true;
@@ -75,6 +81,7 @@ class RunTrace {
     this.n++;
     this.lastT = t;
     this.lastSt = st;
+    this.lastV = v;
     if (v > this.maxV) this.maxV = v;
   }
 
@@ -87,7 +94,7 @@ class RunTrace {
   }
 }
 
-const STATE_CODE: Record<string, number> = { ground: 0, air: 1, grind: 2, manual: 3 };
+const STATE_CODE: Record<string, number> = { ground: 0, air: 1, grind: 2, manual: 3, bail: 4 };
 
 export interface StatRow {
   name: string;
@@ -303,6 +310,7 @@ export class StatsTracker {
   private lastY = 0;
   private lastZ = 0;
   private lastV = 0;
+  private lastRespawns = 0;
   /** Raised records waiting to be posted, with the ride that proves them. */
   private proofs = new Map<BestKey, { trace: RunTrace; seq: number }>();
   private proofSeq = 0;
@@ -352,7 +360,10 @@ export class StatsTracker {
     // respawn (teleport, or stopped dead from speed) or stepping on the board.
     // Bails carry on in the same trace: they only ever lose energy
     const teleport = moved > 2 + 3 * Math.max(v, this.lastV) * dt;
-    const respawned = this.lastV > 4 && v < 0.05;
+    // A rescue at speed puts you back only metres away and re-accelerates you
+    // within the frame, so the jump + stop alone can miss it: count them too
+    const respawned = (this.lastV > 4 && v < 0.05) || p.respawns !== this.lastRespawns;
+    this.lastRespawns = p.respawns;
     if (p.mode !== 'board') this.trace = null;
     else if (this.trace === null || teleport || respawned) this.trace = new RunTrace(this.clock);
     this.trace?.sample(this.clock, x, y, z, v, STATE_CODE[p.state] ?? 0);
