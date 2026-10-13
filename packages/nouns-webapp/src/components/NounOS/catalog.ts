@@ -37,6 +37,12 @@ export const CATALOG: Section[] = [
         blurb: 'skate the plaza. voice, graffiti, pirate radio.',
         hot: true,
       },
+      {
+        path: '/warfare',
+        name: 'NOUN WARFARE',
+        blurb: 'paintball arena shooter. red noggles vs blue noggles.',
+        hot: true,
+      },
       { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun, dream one up.' },
       { path: '/studio', name: 'STUDIO', blurb: 'make things with noun parts.' },
       { path: '/traits', name: 'TRAITS', blurb: 'every head, body, accessory, glasses.' },

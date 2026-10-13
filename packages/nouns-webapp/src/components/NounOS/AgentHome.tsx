@@ -41,7 +41,7 @@ interface Line {
   shown: number;
 }
 
-export type GameId = 'world' | 'hoops';
+export type GameId = 'world' | 'hoops' | 'warfare';
 
 const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: string }[] = [
   {
@@ -58,6 +58,13 @@ const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: st
     cta: 'PLAY 3V3 ▸',
     loading: 'lacing up. off to the noun jersey court',
   },
+  {
+    id: 'warfare',
+    name: 'Noun Warfare',
+    cover: '/warfare/cover.webp',
+    cta: 'LOCK & LOAD ▸',
+    loading: 'loading noun warfare. paint up',
+  },
 ];
 
 const GREETING = [
@@ -71,6 +78,7 @@ const GREETING = [
   '',
   'play     skate noun world',
   'hoops    3v3 on the jersey court',
+  'warfare  paintball. red noggles vs blue',
   'index    everything else',
   'readme   what happened',
   'pip3     the art',
@@ -82,17 +90,21 @@ const SEEN_KEY = 'nounos-home-seen';
 
 export default function AgentHome({
   active,
-  gameLoaded = false,
+  worldLoaded = false,
+  warfareLoaded = false,
   onEnterWorld,
   onEnterHoops,
+  onEnterWarfare,
   onOpen,
   onNavigate,
 }: {
   active: boolean;
-  /** Game already loaded once (play resumes instantly) */
-  gameLoaded?: boolean;
+  /** Game already running (play resumes instantly) */
+  worldLoaded?: boolean;
+  warfareLoaded?: boolean;
   onEnterWorld: () => void;
   onEnterHoops: () => void;
+  onEnterWarfare: () => void;
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
 }) {
@@ -159,6 +171,9 @@ export default function AgentHome({
       bball: onEnterHoops,
       basketball: onEnterHoops,
       'noun hoops': onEnterHoops,
+      warfare: onEnterWarfare,
+      paintball: onEnterWarfare,
+      'noun warfare': onEnterWarfare,
       index: () => onOpen('directory'),
       menu: () => onOpen('directory'),
       help: () => onOpen('directory'),
@@ -185,6 +200,9 @@ export default function AgentHome({
         bball: GAMES[1]!.loading,
         basketball: GAMES[1]!.loading,
         'noun hoops': GAMES[1]!.loading,
+        warfare: GAMES[2]!.loading,
+        paintball: GAMES[2]!.loading,
+        'noun warfare': GAMES[2]!.loading,
         readme: 'read it. then go make something',
         manifesto: 'read it. then go make something',
       };
@@ -267,7 +285,7 @@ export default function AgentHome({
         // Depth in the stack: 0 = front, then the rest in order behind it
         const fi = GAMES.findIndex(x => x.id === front);
         const d = (i - fi + GAMES.length) % GAMES.length;
-        const resume = g.id === 'world' && gameLoaded;
+        const resume = (g.id === 'world' && worldLoaded) || (g.id === 'warfare' && warfareLoaded);
         return (
           <button
             key={g.id}
@@ -285,6 +303,9 @@ export default function AgentHome({
               if (g.id === 'hoops') {
                 say(g.loading);
                 onEnterHoops();
+              } else if (g.id === 'warfare') {
+                say(resume ? 'back in the arena' : g.loading);
+                onEnterWarfare();
               } else {
                 say(resume ? 'back to the plaza' : g.loading);
                 onEnterWorld();
