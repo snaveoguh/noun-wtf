@@ -165,7 +165,7 @@ export function Hud({
         )}
       </div>
       {h.zones.length > 0 && (
-        <div className="wf-zones absolute left-1/2 top-[74px] flex -translate-x-1/2 gap-2">
+        <div className="wf-zones absolute left-1/2 top-[82px] flex -translate-x-1/2 gap-2">
           {h.zones.map(z => {
             const fill = Math.abs(z.progress);
             const col = z.progress < 0 ? teamHex(0) : teamHex(1);

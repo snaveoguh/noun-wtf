@@ -17,6 +17,24 @@ import { letterBadge } from './textures';
 
 const S = 256;
 
+let fadeTex: THREE.CanvasTexture | null = null;
+/** Vertical alpha ramp (bright at the floor, gone at the top), shared. */
+function wallFade(): THREE.CanvasTexture {
+  if (fadeTex !== null) return fadeTex;
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  const gr = g.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,0)');
+  gr.addColorStop(0.7, 'rgba(255,255,255,0.35)');
+  gr.addColorStop(1, 'rgba(255,255,255,0.9)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 4, 64);
+  fadeTex = new THREE.CanvasTexture(c);
+  return fadeTex;
+}
+
 export class ZoneVisual {
   group = new THREE.Group();
   private canvas: HTMLCanvasElement;
@@ -27,6 +45,9 @@ export class ZoneVisual {
   private badge: THREE.Sprite;
   private badgeMat: THREE.SpriteMaterial;
   private painted: [number, number] = [0, 0];
+  /** Soft light wall around the circle so zones read from across the map. */
+  private wall: THREE.Mesh;
+  private wallMat: THREE.MeshBasicMaterial;
   private mats: THREE.Material[] = [];
 
   constructor(z: ZoneState) {
@@ -67,9 +88,24 @@ export class ZoneVisual {
     this.badge.position.set(z.x, z.y + 3.4, z.z);
     this.badge.scale.set(0.9, 0.9, 0.9);
     this.badge.renderOrder = 10;
-    this.group.add(disc, this.ring, this.badge);
-    for (const o of [disc, this.ring, this.badge]) inkExcluded.add(o);
-    this.mats.push(discMat, this.ringMat, this.badgeMat);
+    this.badge.scale.set(1.3, 1.3, 1.3);
+    this.wallMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: wallFade(),
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
+    const wallGeo = new THREE.CylinderGeometry(z.r, z.r, 2.4, 48, 1, true);
+    this.wall = new THREE.Mesh(wallGeo, this.wallMat);
+    this.wall.position.set(z.x, z.y + 1.2, z.z);
+    this.wall.renderOrder = 3;
+    this.group.add(disc, this.ring, this.badge, this.wall);
+    for (const o of [disc, this.ring, this.badge, this.wall]) inkExcluded.add(o);
+    this.mats.push(discMat, this.ringMat, this.badgeMat, this.wallMat);
   }
 
   private reset() {
@@ -141,6 +177,12 @@ export class ZoneVisual {
     this.ringMat.color.setHex(col);
     this.ringMat.opacity = z.contested ? 0.5 + 0.5 * Math.abs(Math.sin(t * 8)) : 0.95;
     this.badgeMat.color.setHex(owner === -1 ? 0xdddddd : col);
+    // Wall leans toward whoever is taking it
+    const lean = z.progress < 0 ? TEAM_COLORS[0] : TEAM_COLORS[1];
+    this.wallMat.color.setHex(owner !== -1 ? col : Math.abs(z.progress) > 0.05 ? lean : 0xbfc6ff);
+    this.wallMat.opacity =
+      (owner === -1 ? 0.3 + Math.abs(z.progress) * 0.25 : 0.5) *
+      (z.contested ? 0.6 + 0.4 * Math.abs(Math.sin(t * 8)) : 1);
     this.badge.position.y = z.y + 3.4 + Math.sin(t * 2 + z.x) * 0.12;
   }
 

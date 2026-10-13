@@ -97,9 +97,9 @@ export function buildBlaster(id: WeaponId, paintColor: number, toon = true): Bla
       add(boxGeo(0.07, 0.1, 0.2), trim, 0, 0.02, 0.18);
       add(cylGeo(0.025, 0.28), black, 0, 0.07, -0.58);
       // Hopper drum full of paint
-      const drum = add(cylGeo(0.09, 0.16, 14), paint, 0, 0.22, -0.12);
+      const drum = add(cylGeo(0.07, 0.13, 14), paint, 0, 0.19, -0.12);
       drum.rotation.x = 0;
-      add(sphGeo(0.04), trim, 0, 0.3, -0.12);
+      add(sphGeo(0.032), trim, 0, 0.255, -0.12);
       add(boxGeo(0.06, 0.05, 0.08), body, 0, -0.04, -0.3);
       noggles(0, 0.13, -0.42, 0.6);
       muzzle = new THREE.Vector3(0, 0.07, -0.73);
