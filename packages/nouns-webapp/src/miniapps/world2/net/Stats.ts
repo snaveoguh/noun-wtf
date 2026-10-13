@@ -24,6 +24,8 @@ import type { ComboState } from '../skate/Tricks';
 const URL_ = '/.netlify/functions/world-stats';
 const RIDER_KEY = 'noun-world-rider-id';
 const BEST_KEY = 'noun-world-stats-best';
+/** Records raised but not yet posted, with their proofs, kept across a reload. */
+const PENDING_KEY = 'noun-world-stats-pending';
 // Bests kept before the stats board existed
 const OLD_KMH_KEY = 'noun-world-fastest-kmh';
 const OLD_COMBO_KEY = 'noun-world-best-combo';
@@ -312,7 +314,13 @@ export class StatsTracker {
   private lastV = 0;
   private lastRespawns = 0;
   /** Raised records waiting to be posted, with the ride that proves them. */
-  private proofs = new Map<BestKey, { trace: RunTrace; seq: number }>();
+  // `base` is the value before the raise: what's saved locally until the
+  // server has the proof (a reload must never leave an unproven claim behind).
+  // `d` is a proof restored from a previous page load (already encoded).
+  private proofs = new Map<
+    BestKey,
+    { trace: RunTrace | null; d?: string; seq: number; base: number | undefined }
+  >();
   private proofSeq = 0;
   private disposers: (() => void)[] = [];
 
@@ -324,12 +332,61 @@ export class StatsTracker {
     const onHide = () => {
       if (document.visibilityState === 'hidden') this.flush(true);
     };
+    this.restorePending();
     document.addEventListener('visibilitychange', onHide);
     window.addEventListener('pagehide', onHide);
     this.disposers.push(
       () => document.removeEventListener('visibilitychange', onHide),
       () => window.removeEventListener('pagehide', onHide),
     );
+  }
+
+  /** Raised records whose proof a previous page load never got to post. */
+  private restorePending() {
+    let pending: { k: BestKey; v: number; d: string }[] = [];
+    try {
+      pending = JSON.parse(load(PENDING_KEY) ?? '[]') as typeof pending;
+    } catch {
+      return;
+    }
+    for (const p of Array.isArray(pending) ? pending : []) {
+      if (!PROVED.includes(p?.k) || typeof p.d !== 'string' || !(p.v > 0)) continue;
+      if (!(p.v > (this.mine.best[p.k] ?? 0))) continue;
+      this.proofs.set(p.k, {
+        trace: null,
+        d: p.d,
+        seq: ++this.proofSeq,
+        base: this.mine.best[p.k],
+      });
+      this.mine.best[p.k] = p.v;
+      this.dirty = true;
+    }
+  }
+
+  /** Local bests as far as the server can know them: pending raises held back. */
+  private persist(keepPending: boolean) {
+    const best = { ...this.mine.best };
+    const pending: { k: BestKey; v: number; d: string }[] = [];
+    const enc = new Map<RunTrace, string>();
+    for (const [k, p] of this.proofs) {
+      if (p.base === undefined) delete best[k];
+      else best[k] = p.base;
+      if (!keepPending) continue;
+      let d = p.d;
+      if (d === undefined && p.trace !== null) {
+        d = enc.get(p.trace) ?? p.trace.encode();
+        enc.set(p.trace, d);
+      }
+      if (d !== undefined) pending.push({ k, v: this.mine.best[k] ?? 0, d });
+    }
+    save(BEST_KEY, JSON.stringify({ ...this.mine, best }));
+    if (this.proofs.size === 0) {
+      try {
+        localStorage.removeItem(PENDING_KEY);
+      } catch {
+        // private mode etc.
+      }
+    } else if (keepPending) save(PENDING_KEY, JSON.stringify(pending));
   }
 
   dispose() {
@@ -341,7 +398,12 @@ export class StatsTracker {
     if (!(v > (this.mine.best[k] ?? 0))) return false;
     if (PROVED.includes(k)) {
       if (this.trace === null || this.trace.full) return false;
-      this.proofs.set(k, { trace: this.trace, seq: ++this.proofSeq });
+      const prev = this.proofs.get(k);
+      this.proofs.set(k, {
+        trace: this.trace,
+        seq: ++this.proofSeq,
+        base: prev ? prev.base : this.mine.best[k],
+      });
       // Post soon, while the proof is fresh
       this.flushAcc = Math.max(this.flushAcc, 17);
     }
@@ -431,7 +493,8 @@ export class StatsTracker {
   /** Post records + lifetime deltas. `beacon` for page hide (fire and forget). */
   flush(beacon: boolean) {
     if (!this.started) return;
-    save(BEST_KEY, JSON.stringify(this.mine));
+    // Leaving the page: a pending proof is stored so the next load posts it
+    this.persist(beacon);
     if (this.isOffline() || this.posting || (!this.dirty && this.sessionPosted)) return;
     const add = {
       km: Math.round(this.add.km * 1000) / 1000,
@@ -441,12 +504,16 @@ export class StatsTracker {
     // Proofs ride along with a normal post (a beacon is capped at 64 KB)
     const proven = beacon ? [] : [...this.proofs.keys()];
     const sentSeq = new Map(proven.map(k => [k, this.proofs.get(k)!.seq]));
-    const byTrace = new Map<RunTrace, BestKey[]>();
+    const byTrace = new Map<RunTrace | string, BestKey[]>();
     for (const k of proven) {
-      const tr = this.proofs.get(k)!.trace;
-      byTrace.set(tr, [...(byTrace.get(tr) ?? []), k]);
+      const p = this.proofs.get(k)!;
+      const src = p.trace ?? p.d ?? '';
+      byTrace.set(src, [...(byTrace.get(src) ?? []), k]);
     }
-    const proofs = [...byTrace].map(([tr, keys]) => ({ keys, d: tr.encode() }));
+    const proofs = [...byTrace].map(([src, keys]) => ({
+      keys,
+      d: typeof src === 'string' ? src : src.encode(),
+    }));
     const best = { ...this.mine.best };
     // A record still waiting on its proof isn't claimed yet
     for (const k of this.proofs.keys()) if (!proven.includes(k)) delete best[k];
@@ -464,6 +531,7 @@ export class StatsTracker {
       // Raised again since this post was built: that one still needs sending
       for (const [k, seq] of sentSeq) if (this.proofs.get(k)?.seq === seq) this.proofs.delete(k);
       this.dirty = this.proofs.size > 0;
+      this.persist(false);
       this.add.km -= add.km;
       this.add.tricks -= add.tricks;
       this.add.playS -= add.playS;
@@ -495,7 +563,7 @@ export class StatsTracker {
                 if ((this.mine.best[k] ?? 0) === claimed) {
                   if (held > 0) this.mine.best[k] = held;
                   else delete this.mine.best[k];
-                  save(BEST_KEY, JSON.stringify(this.mine));
+                  this.persist(false);
                 }
                 this.onRejected?.(k, claimed, reason);
               }
