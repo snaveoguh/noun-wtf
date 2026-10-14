@@ -20,6 +20,10 @@ import {
   type WorldStats,
 } from './net/Stats';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
+import { bindSettings } from './settings/bind';
+import { SETTINGS_CSS } from './settings/hudCss';
+import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
+import { bootQuality } from './settings/store';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
@@ -138,7 +142,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         labelLayer: labels,
         seed: seedRef.current,
         offline: searchParams.get('offline') === '1',
-        quality: (searchParams.get('q') as 'low' | 'medium' | 'high' | null) ?? undefined,
+        quality: bootQuality(searchParams.get('q')),
         name: initialChar.name !== '' ? initialChar.name : undefined,
       });
       g.showroom = searchParams.get('skip') !== '1';
@@ -151,6 +155,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     }
     gameRef.current = g;
     setGame(g);
+    const unbindSettings = bindSettings(g);
     // Console handle for local testing only (dev server, or ?debug, which
     // also stops the session posting stats)
     if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug'))
@@ -163,6 +168,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     });
     return () => {
       disposed = true;
+      unbindSettings();
       window.removeEventListener('resize', resize);
       g.dispose();
       canvas.remove();
@@ -273,7 +279,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS + FM_CSS}</style>
+      <style>{CSS + FM_CSS + SETTINGS_CSS}</style>
+      <HudPrefsStyle />
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && (
@@ -498,6 +505,7 @@ function Hud({
 
       {/* Top-centre: landmarks compass (no room for it on phones) */}
       <div
+        data-w2hud="compass"
         className={`absolute left-1/2 top-3 -translate-x-1/2 gap-3 text-xs ${touch ? 'hidden' : 'flex'}`}
       >
         {hud.landmarks.slice(0, 4).map(l => {
@@ -513,21 +521,24 @@ function Hud({
 
       {/* Top-right: voice + system */}
       <HudDrag id="system" className={`absolute right-4 ${top} flex flex-col items-end gap-2`}>
-        <button
-          className={`w2-chip ${hud.mic === 'on' ? (hud.speaking ? 'w2-live' : 'w2-on') : ''}`}
-          onClick={() => void game.toggleMic()}
-          title="Toggle mic (V)"
-        >
-          {hud.mic === 'off'
-            ? '🎙️ join voice'
-            : hud.mic === 'muted'
-              ? '🔇 muted'
-              : hud.speaking
-                ? '🔊 talking'
-                : '🎙️ live'}
-        </button>
+        <div data-w2cogrow="" className="flex items-center gap-2">
+          <button
+            className={`w2-chip ${hud.mic === 'on' ? (hud.speaking ? 'w2-live' : 'w2-on') : ''}`}
+            onClick={() => void game.toggleMic()}
+            title="Toggle mic (V)"
+          >
+            {hud.mic === 'off'
+              ? '🎙️ join voice'
+              : hud.mic === 'muted'
+                ? '🔇 muted'
+                : hud.speaking
+                  ? '🔊 talking'
+                  : '🎙️ live'}
+          </button>
+          <SettingsCog game={game} />
+        </div>
         {!touch && (
-          <div className="w2-chip text-[10px] opacity-60">
+          <div data-w2hud="fps" className="w2-chip text-[10px] opacity-60">
             {hud.fps} fps, {hud.quality}
             {hud.baked ? ', baked GI' : ''}, cam {hud.camMode}
           </div>
@@ -607,7 +618,11 @@ function Hud({
 
       {/* Now playing toast (JSR-style station card) */}
       {hud.radio.on && now - hud.radio.at < 4500 && (
-        <div key={hud.radio.at} className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2">
+        <div
+          key={hud.radio.at}
+          data-w2hud="toasts"
+          className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2"
+        >
           <span>📻 NOW PLAYING{hud.radio.label.startsWith('NOUN FM') ? ' ON NOUN FM' : ''}</span>
           <b>{hud.radio.label}</b>
         </div>
@@ -615,7 +630,11 @@ function Hud({
 
       {/* One-off banner (secret spot found…) */}
       {hud.toast !== null && now - hud.toast.at < 5000 && (
-        <div key={hud.toast.at} className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2">
+        <div
+          key={hud.toast.at}
+          data-w2hud="toasts"
+          className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2"
+        >
           <span>{hud.toast.tag ?? '⌐◨-◨ 19 km out'}</span>
           <b>{hud.toast.text}</b>
         </div>
@@ -649,6 +668,7 @@ function Hud({
 
       {/* Chat feed (above the minimap on desktop) */}
       <div
+        data-w2hud="chat"
         className={`absolute left-4 flex max-w-[60vw] flex-col gap-1 ${touch ? 'bottom-28' : 'bottom-[210px]'}`}
       >
         {hud.chat
@@ -661,7 +681,10 @@ function Hud({
       </div>
 
       {/* Combo */}
-      <div className="absolute bottom-16 left-1/2 flex w-[90vw] -translate-x-1/2 flex-col items-center text-center">
+      <div
+        data-w2hud="combo"
+        className="absolute bottom-16 left-1/2 flex w-[90vw] -translate-x-1/2 flex-col items-center text-center"
+      >
         {hud.combo && (
           <>
             <div className="w2-combo-label">{hud.combo.label}</div>

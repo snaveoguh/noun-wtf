@@ -43,6 +43,7 @@ import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
 import { inkExcluded, toonify } from './render/Toon';
+import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import {
@@ -167,6 +168,8 @@ export class Game {
   player: Player;
   cam: SkateCamera;
   audio = new SkateAudio();
+  /** Per-bus volumes (settings/mixer.ts): sfx, radio, voice under one master. */
+  readonly mixer = new AudioMixer();
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
@@ -388,12 +391,14 @@ export class Game {
 
   /** Call from a user gesture (click/tap/key) to unlock audio. */
   unlockAudio() {
+    this.audio.out ??= ctx => this.mixer.attach(ctx).bus('sfx');
     this.audio.start();
     const ctx = this.audio.ctx;
     if (ctx !== null && !this.radioAttached) {
       this.radioAttached = true;
-      this.radio.attach(ctx, ctx.destination, this.audio.noise);
-      this.fm.attach(ctx, ctx.destination, this.audio.noise);
+      const radioBus = this.mixer.attach(ctx).bus('radio') ?? ctx.destination;
+      this.radio.attach(ctx, radioBus, this.audio.noise);
+      this.fm.attach(ctx, radioBus, this.audio.noise);
       this.radio.onNowPlaying = label => {
         this.hud = {
           ...this.hud,
