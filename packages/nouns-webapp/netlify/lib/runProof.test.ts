@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { PHYS, STRIDE, verifyRun } from './runProof';
+import { MOUNTAIN } from '../../src/miniapps/world2/world/mountain/config';
+
+import { MAX_V, PHYS, STRIDE, verifyRun } from './runProof';
 
 const AIR = 1;
 /** A trace from samples [t, x, y, z, v, state]. */
@@ -58,4 +60,82 @@ describe('run proof: hang time', () => {
   });
 
   it('STRIDE matches the sample layout', () => expect(STRIDE).toBe(6));
+});
+
+/** Terrain gradient (terrain.ts baseHeight) and its slope, for honest fixtures. */
+const base = (de: number) =>
+  MOUNTAIN.topY - MOUNTAIN.slope * (de - MOUNTAIN.slopeEase * (1 - Math.exp(-de / MOUNTAIN.slopeEase)));
+const baseSlope = (de: number) => MOUNTAIN.slope * (1 - Math.exp(-de / MOUNTAIN.slopeEase));
+
+/**
+ * An unbroken mountain run straight down the +Z line, simulated with the
+ * game's rules: gravity along the slope, the streak's push (+0.35 m/s² per
+ * minute), rolling friction and the run-thinned air drag. Sampled like
+ * RunTrace (every 0.4 s on the ground) until it reaches `vTop` m/s.
+ */
+function longRun(vTop: number) {
+  const rows: number[][] = [];
+  const h = 0.02;
+  let t = 0;
+  let de = 200;
+  let v = 0;
+  let run = 0;
+  let next = 0;
+  while (v < vTop) {
+    if (t >= next) {
+      rows.push([t, 0, base(de), MOUNTAIN.wallZ + de, v, 0]);
+      next += 0.4;
+    }
+    const k = baseSlope(de);
+    const sin = k / Math.hypot(1, k);
+    const cos = 1 / Math.hypot(1, k);
+    const a =
+      PHYS.g * sin +
+      (v > 3 ? PHYS.streak * (t / 60) : 0) -
+      0.65 * (0.1 + (0.0035 / (1 + run / 400)) * v * v);
+    v = Math.max(0, v + a * h);
+    de += v * h * cos;
+    run += v * h;
+    t += h;
+  }
+  rows.push([t, 0, base(de), MOUNTAIN.wallZ + de, v, 0]);
+  return rows;
+}
+
+describe('run proof: top speed', () => {
+  const rows = longRun(2800);
+
+  it('credits an honest ~16 minute streak to 2,800 m/s (over 10,000 km/h)', () => {
+    expect(rows.length).toBeLessThan(60_000);
+    const r = verifyRun(trace(rows));
+    expect(r.reason).toBeUndefined();
+    expect(r.maxV * 3.6).toBeGreaterThan(10_000);
+  });
+
+  it('refuses the same ride with every speed ×1.15', () => {
+    const r = verifyRun(trace(rows.map(([t, x, y, z, v, st]) => [t, x, y, z, v * 1.15, st])));
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('gains energy from nowhere');
+  });
+
+  it('refuses a sped-up tail (the last 5% of samples ×1.15)', () => {
+    const cut = Math.floor(rows.length * 0.95);
+    const r = verifyRun(
+      trace(rows.map(([t, x, y, z, v, st], i) => [t, x, y, z, i >= cut ? v * 1.15 : v, st])),
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('refuses a spike at the top (one sample ×1.15)', () => {
+    const i = rows.length - 2;
+    const r = verifyRun(
+      trace(rows.map(([t, x, y, z, v, st], k) => [t, x, y, z, k === i ? v * 1.15 : v, st])),
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('still refuses speeds past the sanity ceiling', () => {
+    const r = verifyRun(trace([[0, 0, 0, 0, 0, 0], [1, 0, 0, MAX_V + 10, MAX_V + 10, 0]]));
+    expect(r.reason).toBe('impossible speed');
+  });
 });

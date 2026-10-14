@@ -47,7 +47,7 @@ interface HandlerResponse {
 
 /** Records: higher is better, a post can only raise them. */
 const BEST = {
-  kmh: 2000, // top speed, km/h
+  kmh: 20_000, // top speed, km/h (the streak has no top speed)
   combo: 100_000_000, // best single banked combo, points
   session: 1_000_000_000, // best session score, points
   airM: 500, // highest jump above take-off, m
