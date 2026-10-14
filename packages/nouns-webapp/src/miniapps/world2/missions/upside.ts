@@ -29,7 +29,7 @@ export const UD_GRAVITY = 0.2;
 const CEILING = 32;
 const SPORES = 420;
 const SPORE_BOX = 70;
-const FILTER = 'saturate(0.35) sepia(0.45) hue-rotate(-35deg) contrast(1.12) brightness(1.08)';
+const FILTER = 'saturate(0.4) sepia(0.4) hue-rotate(-35deg) contrast(1.05) brightness(1.3)';
 
 interface Saved {
   fog: THREE.Scene['fog'];
@@ -47,7 +47,7 @@ interface Saved {
 export class UpsideDown {
   active = false;
   private saved: Saved | null = null;
-  private fog = new THREE.FogExp2(0x5a1018, 0.0035);
+  private fog = new THREE.FogExp2(0x6a1a22, 0.0025);
   private bg = new THREE.Color(0x3a0a10);
   private spores: THREE.Points | null = null;
   private sporeVel: Float32Array | null = null;
@@ -78,8 +78,8 @@ export class UpsideDown {
     g.stats.suspended = true;
     g.player.tuning.gravity = this.saved.gravity * UD_GRAVITY;
     gfx.sky.visible = false;
-    gfx.sun.color.set(0xff4a3a);
-    gfx.sun.intensity = this.saved.sunIntensity * 0.7;
+    gfx.sun.color.set(0xff7a60);
+    gfx.sun.intensity = this.saved.sunIntensity;
     gfx.hemi.color.set(0xb04050);
     gfx.hemi.groundColor.set(0x120004);
     gfx.renderer.domElement.style.filter = FILTER;
@@ -137,7 +137,7 @@ export class UpsideDown {
       this.flickT = 0.05 + Math.random() * (Math.random() < 0.15 ? 0.1 : 1.6);
       this.flick = Math.random() < 0.18 ? 0.15 + Math.random() * 0.35 : 0.8 + Math.random() * 0.3;
     }
-    gfx.hemi.intensity = this.saved.hemiIntensity * 1.2 * this.flick;
+    gfx.hemi.intensity = this.saved.hemiIntensity * 1.8 * this.flick;
     // Soft ceiling on airs (low gravity would otherwise throw you for ever)
     const p = g.player;
     if (p.state === 'air') {

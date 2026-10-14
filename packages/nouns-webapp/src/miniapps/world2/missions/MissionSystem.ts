@@ -151,6 +151,13 @@ export class MissionSystem {
   private lastPos = new THREE.Vector3();
   private njSeen = false;
   private bowlSeen = false;
+  /**
+   * Places only count when you got there under your own steam: a session
+   * that started somewhere by URL (?spot=, ?play=hoops, ?megaramp=) doesn't
+   * count them until you've been back up to the city.
+   */
+  private placesOk = true;
+  private respawns = 0;
 
   constructor(private game: Game) {
     this.ud = new UpsideDown(game);
@@ -191,6 +198,9 @@ export class MissionSystem {
     g.stats.extras = () => ({ missions: postable(this.state), title: this.state.title });
     g.stats.onYou = you => this.fromServer(you);
     if (g.level?.baked === true) this.placePlaza();
+    const q = new URLSearchParams(window.location.search);
+    this.placesOk = !['spot', 'megaramp'].some(k => q.has(k)) && q.get('play') === null;
+    this.respawns = g.player.respawns;
     this.lastPos.copy(g.player.pos);
     this.refreshFlags();
     this.emit();
@@ -403,12 +413,15 @@ export class MissionSystem {
     }
     this.hoopsPhase = phase;
     if (g.hoops.active) return;
-    // Places
-    if (!this.njSeen && njInCore(p.pos.x, p.pos.z)) {
+    // Places (back in the city after a URL start: they count from here on)
+    if (!this.placesOk && p.respawns !== this.respawns && edgeDistance(p.pos.x, p.pos.z) === 0)
+      this.placesOk = true;
+    this.respawns = p.respawns;
+    if (this.placesOk && !this.njSeen && njInCore(p.pos.x, p.pos.z)) {
       this.njSeen = true;
       this.signal({ t: 'spot', spot: 'nj' }, now);
     }
-    if (!this.bowlSeen && g.mountain !== null && inBowl(p.pos.x, p.pos.z)) {
+    if (this.placesOk && !this.bowlSeen && g.mountain !== null && inBowl(p.pos.x, p.pos.z)) {
       this.bowlSeen = true;
       this.signal({ t: 'spot', spot: 'bowl' }, now);
     }
@@ -706,7 +719,8 @@ export class MissionSystem {
     const s = this.state;
     return (
       s.done['deepest-door'] !== undefined ||
-      (s.met.keymaker !== undefined &&
+      (this.placesOk &&
+        s.met.keymaker !== undefined &&
         MISSION_BY_ID['deepest-door']!.after.every(a => s.done[a] !== undefined))
     );
   }

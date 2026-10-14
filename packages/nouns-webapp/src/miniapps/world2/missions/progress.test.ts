@@ -72,9 +72,9 @@ describe('mission progress', () => {
 
   it('chains: one signal finishes one step, not the next one too', () => {
     const s = withDone('wake-up');
-    expect(apply(s, { t: 'tag', color: '#F3322C' }, NOW).map(m => m.id)).toEqual(['leave-a-mark']);
-    expect(apply(s, { t: 'tag', color: '#ffffff' }, NOW)).toEqual([]);
-    expect(apply(s, { t: 'tag', color: '#F3322C' }, NOW).map(m => m.id)).toEqual(['paint-it-red']);
+    expect(apply(s, { t: 'tag', color: '#4BEA69' }, NOW).map(m => m.id)).toEqual(['leave-a-mark']);
+    expect(apply(s, { t: 'tag', color: '#f3322c' }, NOW)).toEqual([]);
+    expect(apply(s, { t: 'tag', color: '#4BEA69' }, NOW).map(m => m.id)).toEqual(['code-green']);
   });
 
   it('running totals add up; bests keep the max', () => {
@@ -184,7 +184,7 @@ describe('persistence', () => {
     expect(fresh.map(m => m.id)).toEqual(['leave-a-mark']);
     expect(s.done).toEqual({ 'wake-up': NOW - 5, 'leave-a-mark': NOW - 1 });
     expect(s.met.writer).toBe(NOW - 1);
-    expect(activeMissions(s).map(m => m.id)).toContain('paint-it-red');
+    expect(activeMissions(s).map(m => m.id)).toContain('code-green');
     expect(unlockedFor(s, 'dj')?.id).toBe('hear-the-signal');
   });
 });
@@ -192,12 +192,12 @@ describe('persistence', () => {
 describe('server validation (validateMissions)', () => {
   it('keeps known ids with sane times and complete chains', () => {
     const out = validateMissions(
-      { 'wake-up': NOW, 'leave-a-mark': NOW + 1, 'paint-it-red': NOW + 2 },
+      { 'wake-up': NOW, 'leave-a-mark': NOW + 1, 'code-green': NOW + 2 },
       undefined,
       {},
       NOW + 10,
     );
-    expect(Object.keys(out).sort()).toEqual(['leave-a-mark', 'paint-it-red', 'wake-up']);
+    expect(Object.keys(out).sort()).toEqual(['code-green', 'leave-a-mark', 'wake-up']);
   });
 
   it('drops unknown ids, future / ancient / fractional times, broken chains', () => {
@@ -207,7 +207,7 @@ describe('server validation (validateMissions)', () => {
         'wake-up': NOW + 3_600_000,
         'leave-a-mark': 5,
         'hear-the-signal': NOW + 0.5,
-        'paint-it-red': NOW,
+        'code-green': NOW,
       },
       undefined,
       {},

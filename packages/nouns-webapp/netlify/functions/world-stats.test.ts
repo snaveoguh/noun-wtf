@@ -205,7 +205,7 @@ describe('world-stats: missions', () => {
     const r = await call({
       rider: 'm1',
       name: 'M',
-      missions: { 'wake-up': T, 'leave-a-mark': T + 1, 'made-up': T, 'paint-it-red': 'x' },
+      missions: { 'wake-up': T, 'leave-a-mark': T + 1, 'made-up': T, 'code-green': 'x' },
     });
     expect(r.out.you.missions).toEqual({ 'wake-up': T, 'leave-a-mark': T + 1 });
     const again = await call({ rider: 'm1', name: 'M', missions: {} });

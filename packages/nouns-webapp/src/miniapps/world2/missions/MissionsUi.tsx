@@ -36,7 +36,8 @@ const nameOf = (t: Talkable) => (t === 'door' ? 'the door' : NPCS[t].name);
 
 export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
   const sys = useMissions(game.missions);
-  const [hidden, setHidden] = useState(false);
+  // Phones start folded (the left edge holds the touch buttons)
+  const [hidden, setHidden] = useState(touch);
   const ticking = sys.parcel !== null || sys.race !== null || sys.toast !== null;
   useTick(250, ticking);
 
@@ -80,7 +81,7 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
       {/* Tracker */}
       <div
         data-w2hud="missions"
-        className={`w2-mtrack pointer-events-auto absolute ${touch ? 'left-2 top-[92px] w-[200px]' : 'left-3 top-[30%] w-[250px]'}`}
+        className={`w2-mtrack pointer-events-auto absolute ${touch ? 'left-2 top-[212px] w-[190px]' : 'left-3 top-[30%] w-[250px]'}`}
       >
         <button type="button" className="w2-mhead" onClick={() => sys.openPanel('journal')}>
           <span>⌐◨-◨ MISSIONS</span>
@@ -103,7 +104,7 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
                 📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
               </div>
             )}
-            {tracked.slice(0, touch ? 2 : 4).map(m => (
+            {tracked.slice(0, touch ? 1 : 4).map(m => (
               <TrackRow key={m.id} sys={sys} m={m} />
             ))}
             {toMeet.slice(0, touch ? 1 : 2).map(n => (
