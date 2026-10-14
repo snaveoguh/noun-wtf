@@ -4,6 +4,8 @@ import type { Game } from '../Game';
 
 import { useEffect, useRef, useState } from 'react';
 
+import { SprayTouch } from '../graffiti/SprayPanel';
+
 const R = 56;
 
 export function useIsTouch() {
@@ -146,6 +148,8 @@ export function TouchControls({ game }: { game: Game }) {
         <button type="button" className="w2-tbtn" {...tap(() => (t.respawn = true))}>
           ↺
         </button>
+        {/* Last, so in the landscape row it sits clear of the NOUN FM deck screen */}
+        <SprayTouch game={game} />
       </div>
 
       {/* Thumb cluster: everything the right thumb needs within reach */}

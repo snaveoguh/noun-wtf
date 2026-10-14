@@ -9,6 +9,7 @@ import { useAppSelector } from '@/hooks';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
+import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import {
   shortAddr,
@@ -57,7 +58,11 @@ const CONTROLS: { k: string; v: string }[] = [
     v: 'free the mouse: drag the HUD (speedometer, chips) anywhere, double-click resets',
   },
   { k: 'V', v: 'mic' },
-  { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot), T colour' },
+  { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot)' },
+  {
+    k: 'SPRAY TOOLS',
+    v: 'T / ⇧T colour, 1–0 swatch (aiming at a wall), [ ] or wheel while spraying nozzle, ⇧click straight line, Ctrl/⌘Z undo, ALT+click pick colour',
+  },
   { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
   {
     k: 'MOUNTAIN',
@@ -719,17 +724,7 @@ function Hud({
         )}
       </div>
 
-      {(hud.mode === 'foot' || hud.spray.active) && (
-        <div className="w2-chip absolute bottom-4 right-4 flex items-center gap-2 text-xs">
-          <span
-            className="inline-block h-4 w-4 rounded-full border border-white/50"
-            style={{ background: hud.spray.color }}
-          />
-          {hud.spray.aiming
-            ? 'click and drag to spray, T colour'
-            : 'point at a wall to tag it, right-drag to look'}
-        </div>
-      )}
+      {!touch && <SprayPanel game={game} />}
 
       {/* Controls */}
       {showHelp && hud.inputMode !== 'touch' && (
