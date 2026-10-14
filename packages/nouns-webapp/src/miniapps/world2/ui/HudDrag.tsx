@@ -91,7 +91,7 @@ export function HudDrag({
       ref={ref}
       className={`${className} pointer-events-auto`}
       style={{ ...style, translate: `${off.x * W}px ${off.y * H}px`, touchAction: 'none' }}
-      title="Drag to move · double-click to reset"
+      title="Drag to move (hold Alt to free the mouse) · double-click to reset"
       onPointerDown={e => {
         if (e.button !== 0) return;
         drag.current = { sx: e.clientX, sy: e.clientY, ox: off.x, oy: off.y, moved: false };
