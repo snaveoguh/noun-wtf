@@ -28,7 +28,8 @@ description: How Noun World's anti-cheat for speed / air height / hang-time reco
 
 | Check | Rule | Catches |
 |---|---|---|
-| Energy budget | `½v² + g·y` may only grow by push (below 8.6 m/s), pop (one ollie per take-off) and the streak (0.35 m/s² per minute × distance). Budget: records `250 + 0.02·keGain`, strict `60 + 0.002·keGain` | speed hacks, steeper-hill fakes |
+| Energy budget | `½v² + g·y` may only grow by push (below 8.6 m/s), pop (one ollie per take-off) and the streak (0.35 m/s² per minute × distance, minus 80% of the least drag + friction a rolling interval loses: tucked, dirt line, `run` = all distance so far). Budget: records `250 + 0.02·keGain`, strict `60 + 0.002·keGain` | speed hacks, steeper-hill fakes |
+| Ceiling | any sample over `MAX_V` (6,000 m/s; records go to 20,000 km/h) | broken numbers |
 | Start | first sample ≤ 40 m/s (strict 25) | starting fast |
 | Terrain band | below `baseHeight − 140 m` fails (strict also above-band on the ground) | sinking or noclip |
 | Motion (strict only) | distance ≤ `vavg·dt·1.3 + 1.5` | teleports in drop claims |

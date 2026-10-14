@@ -164,4 +164,11 @@ describe('HUD stylesheet', () => {
     expect(css).toContain('[data-w2hud="session"]{scale:1.25;transform-origin:top left}');
     expect(css).not.toContain('[data-w2hud="chat"]{display');
   });
+
+  it('has a Missions toggle that hides the tracker', () => {
+    const s = defaultSettings(false);
+    expect(s.hud.missions).toBe(true);
+    s.hud.missions = false;
+    expect(hudCss(s)).toContain('[data-w2hud="missions"]{display:none!important}');
+  });
 });

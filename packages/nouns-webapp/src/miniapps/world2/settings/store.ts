@@ -21,6 +21,7 @@ export const HUD_ITEMS = [
   { id: 'toasts', label: 'Now-playing toasts' },
   { id: 'fps', label: 'FPS / quality' },
   { id: 'nametags', label: 'Name tags' },
+  { id: 'missions', label: 'Missions tracker' },
 ] as const;
 export type HudItem = (typeof HUD_ITEMS)[number]['id'];
 

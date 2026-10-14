@@ -23,6 +23,7 @@ import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
+import { MissionSystem } from './missions/MissionSystem';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
@@ -178,6 +179,8 @@ export class Game {
   name: string;
   remotes = new Map<string, RemoteAvatar>();
   crew: JerseyCrew | null = null;
+  /** Missions: the Oracle and the cast, progress, the Upside Down (missions/). */
+  readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
   hud: HudState;
@@ -333,6 +336,7 @@ export class Game {
     if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
+    this.missions.start();
     const spawn = level.spawns[Math.floor(Math.random() * level.spawns.length)] ?? {
       position: new THREE.Vector3(),
       yaw: 0,
@@ -529,6 +533,7 @@ export class Game {
       this.animTime += dt; // keeps my parked pose fresh for the room
       this.updateNetwork(dt);
       this.crew?.update(dt, this.hoops.focus);
+      this.missions.update(dt);
       this.mountain?.update(this.hoops.focus, this.hoops.focusVel);
       this.nature?.update(dt, this.hoops.focus);
       this.gfx.followShadow(this.hoops.focus);
@@ -543,8 +548,9 @@ export class Game {
 
     // Physics in fixed-ish substeps for stability at low FPS — and short
     // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
+    // (up to ~2.8 km/s at 60 fps; past that steps stretch to ~0.6 m at 30 fps)
     const steps = Math.min(
-      64,
+      160,
       Math.max(1, Math.ceil(dt / (1 / 90)), Math.ceil((this.player.speed * dt) / 0.5)),
     );
     const h = dt / steps;
@@ -575,6 +581,7 @@ export class Game {
     this.updateNetwork(dt);
     this.drops?.update(dt, this.player);
     this.crew?.update(dt, this.player.pos);
+    this.missions.update(dt);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -1661,6 +1668,7 @@ export class Game {
   }
 
   dispose() {
+    this.missions.dispose();
     this.hoops.dispose();
     this.stats.dispose();
     this.drops?.dispose();

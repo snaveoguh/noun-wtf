@@ -16,6 +16,10 @@
 // and every air segment must fall at the game's gravity. Faking all of that
 // at once means simulating the game's physics, not editing a number.
 //
+// On the ground some of the streak always goes to drag and rolling friction:
+// at kilometres a second the drag eats nearly all of it, so the streak only
+// counts for what's left over (else a sped-up trace hides inside it).
+//
 // Keep PHYS in step with skate/Player.ts (DEFAULT_TUNING + STREAK_ACCEL).
 
 import { MOUNTAIN, edgeDistance } from '../../src/miniapps/world2/world/mountain/config';
@@ -26,9 +30,17 @@ export const PHYS = {
   pop: 4.3,
   pushAccel: 5.2,
   pushMax: 8.6,
+  // The least a ground interval can lose (the mountain's thinned drag, on
+  // the dirt line, fully tucked): what the streak's push has to beat first
+  drag: 0.0035,
+  runDragK: 400,
+  friction: 0.1,
+  tuck: 0.65,
 } as const;
 
 export const STRIDE = 6;
+/** Sanity ceiling on any sample's speed (m/s), ~21,600 km/h. */
+export const MAX_V = 6000;
 const AIR = 1;
 
 export interface RunCheck {
@@ -91,10 +103,15 @@ export function verifyRun(s: Float32Array, opts: { strict?: boolean } = {}): Run
   const backed = new Uint8Array(n);
   let excess = 0;
   let keGain = 0;
+  // Distance so far: never less than the game's run (which only grows on the
+  // mountain and resets on bails), so the drag bound below stays a lower bound
+  let run = 0;
   for (let i = 0; i < n; i++) {
     const o = i * STRIDE;
     const [t, x, y, z, v, st] = [s[o], s[o + 1], s[o + 2], s[o + 3], s[o + 4], s[o + 5]];
-    if (v < 0 || v > 600) return fail('impossible speed');
+    // Far above any ride yet (the streak has no top speed: ~2.8 km/s takes
+    // about 16 unbroken minutes); energy, not this, is what pins a speed
+    if (v < 0 || v > MAX_V) return fail('impossible speed');
     // Near the surface: the mountain only (the city has its own, capped speed)
     const de = edgeDistance(x, z);
     if (de > 150) {
@@ -123,7 +140,17 @@ export function verifyRun(s: Float32Array, opts: { strict?: boolean } = {}): Run
     // Energy
     const e0 = 0.5 * v0 * v0 + g * s[p + 2];
     const e1 = 0.5 * v * v + g * y;
+    run += d;
     let allow = PHYS.streak * (t / 60) * d;
+    const st0 = s[p + 5];
+    if ((st === 0 || st === 3) && (st0 === 0 || st0 === 3)) {
+      // Rolling the whole interval: drag + friction took at least this (80%
+      // of the bound, for the odd unsampled hop inside a frame)
+      const vmin = Math.min(v0, v);
+      const drag = PHYS.drag / (1 + run / PHYS.runDragK);
+      const loss = 0.8 * PHYS.tuck * (PHYS.friction + drag * vmin * vmin) * d;
+      allow = Math.max(0, allow - loss);
+    }
     if (Math.min(v0, v) < PHYS.pushMax + 0.5) allow += PHYS.pushAccel * d;
     if (st === AIR && s[p + 5] !== AIR) allow += 0.5 * PHYS.pop * PHYS.pop * 1.3;
     const over = e1 - e0 - allow;

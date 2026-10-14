@@ -187,3 +187,38 @@ describe('StatsTracker: long rides', () => {
     for (const pr of last.proofs) expect(pr.d.length).toBeLessThanOrEqual(PROOF_CHARS);
   });
 });
+
+describe('StatsTracker: missions ride along, the Upside Down never counts', () => {
+  it('posts the extras and hands the server’s answer back', async () => {
+    const t = tracker();
+    const you: unknown[] = [];
+    t.extras = () => ({ missions: { 'wake-up': 1 }, title: 'wake-up' });
+    t.onYou = y => you.push(y);
+    const p = rider();
+    ride(t, p, 2);
+    t.flush(false);
+    await settle();
+    await settle();
+    expect((posts.at(-1) as unknown as { missions: unknown }).missions).toEqual({ 'wake-up': 1 });
+    expect(you.length).toBeGreaterThan(0);
+    expect(you.at(-1)).toMatchObject({ best: { kmh: expect.any(Number) } });
+  });
+
+  it('suspended: no records and no ride trace; a fresh trace starts once it is lifted', async () => {
+    const t = tracker();
+    const p = rider();
+    t.suspended = true;
+    ride(t, p, 20, 6);
+    expect(t.mine.best.kmh).toBeUndefined();
+    expect(t.runs()).toEqual([]);
+    t.flush(false);
+    await settle();
+    await settle();
+    for (const b of posts) expect(b.best.kmh).toBeUndefined();
+    // Back out: the ride starts again from here (speed carried in can't count)
+    t.suspended = false;
+    p.speed = 0;
+    ride(t, p, 2, 3);
+    expect(t.mine.best.kmh).toBeLessThan(30);
+  });
+});

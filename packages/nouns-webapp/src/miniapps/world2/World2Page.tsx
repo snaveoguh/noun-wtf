@@ -11,6 +11,7 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { Game, type HudState } from './Game';
 import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
+import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import {
   shortAddr,
   STAT_INFO,
@@ -70,6 +71,8 @@ const CONTROLS: { k: string; v: string }[] = [
     v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you keep riding fast (30 km/h+) the faster you go (a bail resets it)',
   },
   { k: 'R', v: 'respawn at the fountain or ice cream van (back up from the mountain)' },
+  { k: 'E (by a character)', v: 'talk: the Oracle by the fountain hands out missions' },
+  { k: 'X', v: 'missions journal' },
   { k: 'Y', v: 'replay your last run in slow motion (Esc to come back)' },
   { k: 'ENTER', v: 'chat' },
 ];
@@ -287,7 +290,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS + FM_CSS + SETTINGS_CSS}</style>
+      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS}</style>
       <HudPrefsStyle />
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
@@ -303,6 +306,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <FmScreen fm={game.fm} touch={touchPage} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && <TouchControls game={game} />}
+      {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
