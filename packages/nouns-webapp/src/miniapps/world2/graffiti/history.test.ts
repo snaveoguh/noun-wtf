@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { SprayHistory, WallLog } from './history';
-import { encodeDabs, encodeRemoval, encodeStrokes, hash48, type Stroke } from './strokes';
+import {
+  encodeDabs,
+  encodeRemoval,
+  encodeStrokes,
+  hash48,
+  MAX_TAG_CHARS,
+  type Stroke,
+  validTag,
+} from './strokes';
 
 const stroke = (color: number, r = 10): Stroke => ({
   color,
@@ -129,5 +137,26 @@ describe('SprayHistory undo', () => {
     for (let i = 0; i < 20; i++) sent += h.addStroke('w', { ...stroke(i), pts }).out.length;
     expect(sent).toBeGreaterThan(0);
     for (const o of h.flush()) expect(o.data.length).toBeLessThan(8200);
+  });
+
+  it('never sends a tag past the cap, even for jumpy fat-cap strokes', () => {
+    // Big point-to-point jumps cost 4 bytes a point: every tag that goes out
+    // (early or on flush) must still be within MAX_TAG_CHARS and valid
+    const h = new SprayHistory();
+    const pts: number[] = [];
+    for (let i = 0; i < 399; i++) pts.push(i % 2 ? 6500 : -900, i % 3 ? 3900 : -900);
+    const out: string[] = [];
+    for (let k = 0; k < 30; k++)
+      for (const o of h.addStroke('w', { ...stroke(k, 160), pts }).out) out.push(o.data);
+    for (const o of h.flush()) out.push(o.data);
+    expect(out.length).toBeGreaterThan(5);
+    for (const d of out) {
+      expect(d.length).toBeLessThanOrEqual(MAX_TAG_CHARS);
+      expect(validTag(d)).toBe(true);
+    }
+    // Every stroke made it out exactly once
+    const log = new WallLog();
+    for (const d of out) log.add(d);
+    expect(log.items()).toHaveLength(30);
   });
 });

@@ -55,8 +55,8 @@ export const MAX_STROKES = 48;
 export const MAX_REMOVALS = 64;
 /** Encoded tag ceiling (≈ the old 900-dab tag), keeps PartyKit frames small. */
 export const MAX_TAG_CHARS = 8200;
-/** Client flushes a wall early once its pending tag passes this many bytes. */
-export const SOFT_TAG_BYTES = 5600;
+/** Client sends a wall's pending strokes early once their tag passes this. */
+export const SOFT_TAG_CHARS = 6000;
 const VERSION = 1;
 
 export interface Dab {
@@ -267,11 +267,6 @@ function writeStroke(w: Writer, s: Stroke) {
     pu = u;
     pv = v;
   }
-}
-
-/** Rough encoded size of a stroke in bytes (for early flushing). */
-export function strokeBytes(s: Stroke) {
-  return 11 + Math.max(0, s.pts.length / 2 - 1) * 2.6;
 }
 
 export function encodeStrokes(tag: StrokeTag): string {

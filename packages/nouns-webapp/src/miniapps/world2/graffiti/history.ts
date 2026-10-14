@@ -15,11 +15,15 @@ import {
   encodeStrokes,
   hash48,
   newNonce,
-  SOFT_TAG_BYTES,
   MAX_STROKES,
+  MAX_TAG_CHARS,
+  SOFT_TAG_CHARS,
   type Stroke,
-  strokeBytes,
 } from './strokes';
+
+/** Length of the tag these strokes would encode to. */
+const encodedChars = (list: LocalStroke[]) =>
+  encodeStrokes({ id: '000000000000', strokes: list.map(s => s.stroke) }).length;
 
 export type DrawItem =
   | { kind: 'dabs'; dabs: Dab[]; seed: number }
@@ -149,6 +153,13 @@ export class SprayHistory {
       undone: false,
       sent: null,
     };
+    const out: Outgoing[] = [];
+    // Sized by the real encoding (point deltas vary from 1 to 4 bytes), so
+    // no tag ever goes past MAX_TAG_CHARS: if this stroke wouldn't fit with
+    // the wall's pending ones, those go out first and it starts a new tag
+    const before = this.pendingOn(wallId);
+    if (before.length > 0 && encodedChars([...before, local]) > MAX_TAG_CHARS)
+      out.push(...this.flush(wallId));
     let list = this.pending.get(wallId);
     if (list === undefined) {
       list = [];
@@ -157,8 +168,8 @@ export class SprayHistory {
     list.push(local);
     (this.current ?? (this.current = [])).push(local);
     const live = list.filter(s => !s.undone);
-    const bytes = live.reduce((n, s) => n + strokeBytes(s.stroke), 7);
-    const out = live.length >= MAX_STROKES || bytes > SOFT_TAG_BYTES ? this.flush(wallId) : [];
+    if (live.length >= MAX_STROKES || encodedChars(live) > SOFT_TAG_CHARS)
+      out.push(...this.flush(wallId));
     return { local, out };
   }
 

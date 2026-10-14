@@ -1,13 +1,17 @@
 // ── Spray-can HUD: colour, nozzle, cap, opacity, undo, eyedropper ───────
 //
-// Desktop: a panel bottom-right while on foot. Phones: a colour button in
-// the touch column that opens a sheet across the top of the screen (clear
-// of the stick, the thumb cluster and the site tray).
+// Desktop: a panel bottom-right while on foot (it steps left of the NOUN FM
+// deck screen when that's up). Phones: a colour button in the touch column
+// opens a compact strip under the site tray: swatches, nozzles, undo, pick.
+// It stays open while you spray and is sized to end above the steering
+// stick's area and the deck screen (which sits on the left on phones).
 
 import type { Game } from '../Game';
 import type { Graffiti, SprayTools } from './Graffiti';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+
+import { useFm } from '../radio/FmPanel';
 
 import { NOZZLES, SPRAY_PALETTE } from './Graffiti';
 import { intToHex } from './strokes';
@@ -74,11 +78,19 @@ function CustomColour({ g, t, big }: { g: Graffiti; t: SprayTools; big: number }
   );
 }
 
-function Nozzles({ g, t, dot }: { g: Graffiti; t: SprayTools; dot: number }) {
+function Nozzles({ g, t, dot, gap }: { g: Graffiti; t: SprayTools; dot: number; gap?: number }) {
+  // Trackpads send a stream of small deltas: one step per notch's worth
+  const acc = useRef(0);
   return (
     <div
       className="sp-row"
-      onWheel={e => g.stepSize(e.deltaY < 0 ? 1 : -1)}
+      style={gap !== undefined ? { gap } : undefined}
+      onWheel={e => {
+        acc.current += e.deltaY;
+        if (Math.abs(acc.current) < 60) return;
+        g.stepSize(acc.current < 0 ? 1 : -1);
+        acc.current = 0;
+      }}
       title="nozzle: [ / ] or wheel while spraying"
     >
       {NOZZLES.map((n, i) => (
@@ -161,10 +173,16 @@ export function SprayPanel({ game }: { game: Game }) {
   const hud = useHudSpray(game);
   const g = game.graffiti;
   const t = useTools(g);
+  // The NOUN FM deck screen owns bottom-right on desktop: sit left of it
+  const fmScreen = useFm(game.fm).screen;
   if (g === null || t === null) return null;
   if (hud.mode !== 'foot' && !hud.spray.active) return null;
   return (
-    <div className="sp-panel pointer-events-auto absolute bottom-24 right-4">
+    <div
+      className="sp-panel pointer-events-auto absolute bottom-24"
+      style={{ right: fmScreen ? 264 : 16 }}
+      data-spray="panel"
+    >
       <style>{CSS}</style>
       <div className="sp-head">
         <CustomColour g={g} t={t} big={46} />
@@ -224,13 +242,40 @@ export function SprayPanel({ game }: { game: Game }) {
   );
 }
 
-/** Phone: colour button for the touch column + the sheet it opens. */
+/** Phone: colour button for the touch column + the strip it opens. */
 export function SprayTouch({ game }: { game: Game }) {
   const hud = useHudSpray(game);
   const g = game.graffiti;
   const t = useTools(g);
+  const fmScreen = useFm(game.fm).screen;
   const [open, setOpen] = useState(false);
+  const [room, setRoom] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
   const foot = hud.mode === 'foot';
+
+  // Room below the strip's top before the stick's area (bottom 55% of the
+  // screen) or the deck screen, whichever comes first: the opacity row only
+  // shows when it fits
+  useEffect(() => {
+    if (!open || !foot) return;
+    const measure = () => {
+      const el = ref.current;
+      if (el === null) return;
+      const top = el.getBoundingClientRect().top;
+      let limit = window.innerHeight * 0.45;
+      const fm = document.querySelector('[data-fm="screen"]')?.getBoundingClientRect();
+      if (fm !== undefined && fm.height > 0) limit = Math.min(limit, fm.top);
+      setRoom(Math.floor(limit - top - 6));
+    };
+    measure();
+    const id = window.setInterval(measure, 800);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('resize', measure);
+    };
+  }, [open, foot, fmScreen]);
+
   if (g === null || t === null || !foot) return null;
   const tap = (fn: () => void) => ({
     onPointerDown: (e: React.PointerEvent) => {
@@ -238,66 +283,109 @@ export function SprayTouch({ game }: { game: Game }) {
       fn();
     },
   });
+  const recent = t.recent.filter(c => !SPRAY_PALETTE.some(h => h === intToHex(c)));
+  const roomy = room >= 124;
   return (
     <>
       <style>{CSS}</style>
       <button
         type="button"
-        className="w2-tbtn sp-tcan"
+        className={`w2-tbtn sp-tcan ${open ? 'sp-tcan-on' : ''}`}
         aria-label="spray colour and nozzle"
+        data-spray="can"
         {...tap(() => setOpen(o => !o))}
       >
         <i style={{ background: t.hex, width: 10 + t.size * 4, height: 10 + t.size * 4 }} />
       </button>
       {open && (
         <div
+          ref={ref}
           className="sp-panel sp-sheet pointer-events-auto"
+          data-spray="sheet"
           onPointerDown={e => e.stopPropagation()}
         >
-          <div className="sp-head">
-            <CustomColour g={g} t={t} big={44} />
-            <div className="sp-meta">
-              <b>{t.hex.toUpperCase()}</b>
-              <small>
-                {NOZZLES[t.size].label} {(NOZZLES[t.size].r * 2) / 10} cm · hold 🎨 to spray
-              </small>
+          <div className="sp-row">
+            <CustomColour g={g} t={t} big={32} />
+            <div className="sp-strip">
+              {recent.map(c => (
+                <Swatch
+                  key={`r${c}`}
+                  hex={intToHex(c)}
+                  size={30}
+                  on={c === t.color}
+                  onPick={() => g.setColor(c)}
+                />
+              ))}
+              {recent.length > 0 && <span className="sp-sep" />}
+              {SPRAY_PALETTE.map((hex, i) => (
+                <Swatch
+                  key={hex}
+                  hex={hex}
+                  size={30}
+                  on={intToHex(t.color) === hex}
+                  onPick={() => g.pickSwatch(i)}
+                />
+              ))}
             </div>
-            <button type="button" className="sp-chip sp-x" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              className="sp-chip sp-ico"
+              aria-label="close spray tools"
+              onClick={() => setOpen(false)}
+            >
               ✕
             </button>
           </div>
-          <div className="sp-grid sp-grid-touch">
-            {SPRAY_PALETTE.map((hex, i) => (
-              <Swatch
-                key={hex}
-                hex={hex}
-                size={32}
-                on={intToHex(t.color) === hex}
-                onPick={() => g.pickSwatch(i)}
-              />
-            ))}
-          </div>
-          <Recent g={g} t={t} size={26} />
-          <Nozzles g={g} t={t} dot={42} />
-          <CapAndOpacity g={g} t={t} />
           <div className="sp-row">
+            <Nozzles g={g} t={t} dot={34} gap={4} />
             <button
               type="button"
-              className="sp-chip"
+              className="sp-chip sp-ico"
+              aria-label="undo"
               disabled={!t.canUndo}
               onClick={() => g.undo()}
             >
-              ↶ UNDO
+              ↶
             </button>
             <button
               type="button"
-              className={`sp-chip ${t.picking ? 'sp-chip-on' : ''}`}
+              className={`sp-chip sp-ico ${t.picking ? 'sp-chip-on' : ''}`}
+              aria-label="pick a colour off the wall"
               onClick={() => g.setPicking(!t.picking)}
             >
-              ⌖ PICK
+              ⌖
             </button>
-            <Note t={t} />
+            <button
+              type="button"
+              className={`sp-chip sp-ico ${t.hard ? 'sp-chip-on' : ''}`}
+              aria-label={t.hard ? 'hard cap' : 'soft cap'}
+              onClick={() => g.setHard(!t.hard)}
+            >
+              {t.hard ? '●' : '◌'}
+            </button>
           </div>
+          {roomy && (
+            <div className="sp-row">
+              <small className="sp-meta-line">
+                {t.hex.toUpperCase()} · {NOZZLES[t.size].label} {(NOZZLES[t.size].r * 2) / 10} cm
+              </small>
+              <input
+                className="sp-range"
+                type="range"
+                min={1}
+                max={16}
+                value={t.opacity}
+                onChange={e => g.setOpacity(Number(e.target.value))}
+                aria-label="opacity"
+              />
+              <span className="sp-pct">{Math.round((t.opacity / 16) * 100)}%</span>
+            </div>
+          )}
+          {t.picking ? (
+            <div className="sp-note">aim at paint, hold 🎨 to pick</div>
+          ) : (
+            <Note t={t} />
+          )}
         </div>
       )}
     </>
@@ -332,9 +420,14 @@ const CSS = `
 .sp-hint{opacity:.72;line-height:1.35}
 .sp-tcan{display:flex;align-items:center;justify-content:center}
 .sp-tcan i{display:block;border-radius:999px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
-.sp-sheet{position:fixed;left:50%;transform:translateX(-50%);top:calc(52px + env(safe-area-inset-top));width:min(360px,calc(100vw - 24px));font-size:12px;z-index:30}
-.sp-sheet .sp-chip{font-size:12px;padding:8px 12px}
-.sp-sheet .sp-range{height:28px}
-.sp-x{margin-left:auto}
-@media (orientation:landscape) and (max-height:520px){.sp-sheet{top:8px;left:auto;right:calc(220px + env(safe-area-inset-right));transform:none;width:min(340px,calc(100vw - 340px));max-height:calc(100vh - 16px);overflow:auto}}
+.sp-tcan-on{border-color:#ffd400}
+.sp-sheet{position:fixed;left:50%;transform:translateX(-50%);top:calc(50px + env(safe-area-inset-top));width:min(380px,calc(100vw - 20px));padding:6px;gap:6px;border-radius:14px;font-size:12px;z-index:30}
+.sp-sheet .sp-now{border-radius:9px}
+.sp-strip{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;overscroll-behavior:contain;touch-action:pan-x;scrollbar-width:none;padding:2px 3px}
+.sp-strip::-webkit-scrollbar{display:none}
+.sp-sep{flex:none;width:1px;align-self:stretch;background:rgba(255,255,255,.35);margin:0 2px}
+.sp-ico{width:34px;height:34px;padding:0;font-size:16px;flex:none;display:flex;align-items:center;justify-content:center}
+.sp-sheet .sp-range{height:24px}
+.sp-sheet .sp-note{position:absolute;left:8px;top:100%;margin-top:4px;padding:2px 8px;border-radius:8px;background:rgba(10,12,20,.7);font-size:11px}
+.sp-meta-line{opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums}
 `;

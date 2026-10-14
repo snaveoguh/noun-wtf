@@ -187,7 +187,8 @@ function drawDabs(ctx: CanvasRenderingContext2D, W: number, H: number, item: Dra
   for (const d of item.dabs) {
     const x = d.u * W;
     const y = (1 - d.v) * H;
-    const r = Math.max(1.5, d.r * H);
+    // Same look on any canvas tier as on the original 512-wide one
+    const r = Math.max((1.5 * W) / 512, d.r * H);
     const col = hexToInt(LEGACY_COLORS[d.c] ?? '#ffffff') ?? 0xffffff;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, rgba(col, 0.55));
