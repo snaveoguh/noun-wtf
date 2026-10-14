@@ -603,7 +603,8 @@ function bellowsMaterial(text: boolean): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     map: t,
     roughness: 0.8,
-    side: THREE.DoubleSide,
+    // the call sign reads from outside only; the inside gets plain stripes
+    side: text ? THREE.FrontSide : THREE.DoubleSide,
     emissive: 0x2a2a2a,
   });
 }
@@ -682,16 +683,18 @@ function buildStation(v: THREE.Group, M: Mats) {
   const top = ROOF + RAISE;
   // bellows: sides + front, between the old roof line and the lifted roof
   const side = bellowsMaterial(true);
+  const plain = bellowsMaterial(false);
   for (const sgn of [-1, 1]) {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(POP_D - 0.1, RAISE), side);
     p.rotation.y = (sgn * Math.PI) / 2;
     p.position.set(sgn * (W - 0.03), ROOF + RAISE / 2, -(POP_D / 2 + 0.02));
     v.add(p);
+    const inner = new THREE.Mesh(new THREE.PlaneGeometry(POP_D - 0.1, RAISE), plain);
+    inner.rotation.y = (-sgn * Math.PI) / 2;
+    inner.position.set(sgn * (W - 0.06), ROOF + RAISE / 2, -(POP_D / 2 + 0.02));
+    v.add(inner);
   }
-  const front = new THREE.Mesh(
-    new THREE.PlaneGeometry(2 * W - 0.06, RAISE),
-    bellowsMaterial(false),
-  );
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(2 * W - 0.06, RAISE), plain);
   front.position.set(0, ROOF + RAISE / 2, -(POP_D - 0.03));
   v.add(front);
   // scissor struts at the rear corners

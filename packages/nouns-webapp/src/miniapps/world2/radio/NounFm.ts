@@ -647,7 +647,7 @@ export class NounFm {
     if (exp > (Number.isFinite(el.duration) ? el.duration : FM_MAX_TRACK_S)) return;
     if (el.paused) {
       if (this.playing !== null) return;
-      el.currentTime = exp;
+      if (seekable(el, exp)) el.currentTime = exp;
       el.playbackRate = 1;
       const p = el.play();
       this.playing = p;
@@ -663,7 +663,8 @@ export class NounFm {
       return;
     }
     const fix = audioDriftFix(exp, el.currentTime);
-    if (fix.seek !== null) el.currentTime = fix.seek;
+    // (a host without byte ranges can't seek: let it play rather than thrash)
+    if (fix.seek !== null && seekable(el, fix.seek)) el.currentTime = fix.seek;
     el.playbackRate = fix.rate;
   }
 
@@ -696,6 +697,12 @@ export class NounFm {
       document.removeEventListener('visibilitychange', this.onVisibility);
     this.listeners.clear();
   }
+}
+
+function seekable(el: HTMLMediaElement, t: number): boolean {
+  const r = el.seekable;
+  for (let i = 0; i < r.length; i++) if (t >= r.start(i) && t <= r.end(i)) return true;
+  return false;
 }
 
 function okText(op: string): string {
