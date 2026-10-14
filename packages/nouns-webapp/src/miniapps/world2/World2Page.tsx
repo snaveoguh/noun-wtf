@@ -19,6 +19,7 @@ import {
   type StatRow,
   type WorldStats,
 } from './net/Stats';
+import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
@@ -45,7 +46,8 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
   { k: 'B', v: 'map' },
-  { k: 'M / .', v: 'radio station, next track' },
+  { k: 'M / .', v: 'radio station (pirate, NOUN FM, off), next track' },
+  { k: 'E (in the van)', v: 'NOUN FM decks: queue a track, book a DJ set' },
   {
     k: 'ALT hold',
     v: 'free the mouse: drag the HUD (speedometer, chips) anywhere, double-click resets',
@@ -204,6 +206,22 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => document.removeEventListener('keydown', onKey, true);
   }, [game, phase, deckOpen]);
 
+  // NOUN FM decks (inside the ice cream van)
+  const [fmOpen, setFmOpen] = useState(false);
+  const touchPage = useIsTouch();
+  useEffect(() => {
+    if (!game || phase !== 'play' || fmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyE' || !game.hud.fmDecks || pausedRef.current) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      e.stopPropagation();
+      e.preventDefault();
+      setFmOpen(true);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [game, phase, fmOpen]);
+
   // Keyboard: chat + help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -255,7 +273,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS}</style>
+      <style>{CSS + FM_CSS}</style>
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && (
@@ -264,8 +282,11 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           showHelp={showHelp}
           onHelp={() => setShowHelp(s => !s)}
           onShop={openDeck}
+          onFm={() => setFmOpen(true)}
         />
       )}
+      {game && started && <FmScreen fm={game.fm} touch={touchPage} />}
+      {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && <TouchControls game={game} />}
       {game && started && <HoopsUi game={game} />}
       {game?.drops && started && <DropClaim drops={game.drops} />}
@@ -424,11 +445,13 @@ function Hud({
   showHelp,
   onHelp,
   onShop,
+  onFm,
 }: {
   game: Game;
   showHelp: boolean;
   onHelp: () => void;
   onShop: () => void;
+  onFm: () => void;
 }) {
   const hud = useHud(game);
   const now = performance.now();
@@ -585,7 +608,7 @@ function Hud({
       {/* Now playing toast (JSR-style station card) */}
       {hud.radio.on && now - hud.radio.at < 4500 && (
         <div key={hud.radio.at} className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2">
-          <span>📻 NOW PLAYING</span>
+          <span>📻 NOW PLAYING{hud.radio.label.startsWith('NOUN FM') ? ' ON NOUN FM' : ''}</span>
           <b>{hud.radio.label}</b>
         </div>
       )}
@@ -606,6 +629,18 @@ function Hud({
           onClick={onShop}
         >
           ENTER BOARD SHOP — {touch ? 'TAP' : 'E / tap'}
+        </button>
+      )}
+
+      {/* NOUN FM decks in the ice cream van */}
+      {hud.fmDecks && (
+        <button
+          type="button"
+          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
+          onClick={onFm}
+          data-fm="open"
+        >
+          NOUN FM DECKS — {touch ? 'TAP' : 'E / tap'}
         </button>
       )}
 

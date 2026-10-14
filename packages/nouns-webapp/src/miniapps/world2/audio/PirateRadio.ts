@@ -18,7 +18,14 @@ export interface StreamStation {
 /** Add live internet-radio streams here (direct mp3/aac/icecast URLs). */
 export const RADIO_STREAMS: StreamStation[] = [];
 
-export type RadioMode = 'off' | 'pirate' | 'stream';
+export type RadioMode = 'off' | 'pirate' | 'fm' | 'stream';
+
+/** NOUN FM (radio/NounFm.ts), the shared station in the ice cream van. */
+export interface FmStation {
+  setTuned(on: boolean): void;
+  next(): void;
+  readonly label: string;
+}
 
 /** Load the worklet module into a context (once per context). */
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -42,14 +49,24 @@ export class PirateRadio {
   private audioEl: HTMLAudioElement | null = null;
   /** Called with a "now playing" label whenever the track/station changes. */
   onNowPlaying?: (label: string) => void;
+  /** NOUN FM joins the cycle after the pirate station when set. */
+  fm: FmStation | null = null;
+  /** The pirate worklet is playing as NOUN FM's fallback. */
+  private fmFallback = false;
+
+  get songLabel(): string {
+    return this.songName;
+  }
 
   get label(): string {
     if (this.mode === 'pirate') return `pirate radio: ${this.songName}`;
+    if (this.mode === 'fm') return this.fm?.label ?? 'NOUN FM';
     if (this.mode === 'stream') return RADIO_STREAMS[this.streamIndex]?.name ?? 'stream';
     return 'radio off';
   }
 
   /** Attach to an existing AudioContext + destination (the game mix). */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   attach(ctx: BaseAudioContext, destination: AudioNode, _noise?: AudioBuffer | null) {
     if (this.ctx !== null) return;
     this.ctx = ctx;
@@ -68,13 +85,14 @@ export class PirateRadio {
           const m = e.data as { type: string; name?: string };
           if (m.type === 'song' && m.name !== undefined) {
             this.songName = m.name;
-            if (this.mode === 'pirate') this.onNowPlaying?.(this.label);
+            if (this.mode === 'pirate' || (this.mode === 'fm' && this.fmFallback))
+              this.onNowPlaying?.(this.label);
           }
         };
         node.connect(this.out);
         this.node = node;
         // Mode may have been chosen while the module was loading
-        if (this.mode === 'pirate') this.post('play');
+        if (this.mode === 'pirate' || (this.mode === 'fm' && this.fmFallback)) this.post('play');
       })
       .catch((err: unknown) => {
         console.warn('[radio] worklet failed to load', err);
@@ -93,10 +111,11 @@ export class PirateRadio {
     if (this.audioEl !== null) this.audioEl.volume = Math.min(1, v * 1.4);
   }
 
-  /** off → pirate → each stream → off */
+  /** off → pirate → NOUN FM → each stream → off */
   cycle() {
     if (this.mode === 'off') this.setMode('pirate');
-    else if (this.mode === 'pirate') {
+    else if (this.mode === 'pirate' && this.fm !== null) this.setMode('fm');
+    else if (this.mode === 'pirate' || this.mode === 'fm') {
       if (RADIO_STREAMS.length > 0) {
         this.streamIndex = 0;
         this.setMode('stream');
@@ -109,6 +128,10 @@ export class PirateRadio {
 
   /** Skip to a freshly generated song. */
   nextTrack() {
+    if (this.mode === 'fm') {
+      this.fm?.next();
+      return;
+    }
     if (this.mode !== 'pirate') {
       this.setMode('pirate');
       return;
@@ -119,10 +142,29 @@ export class PirateRadio {
   setMode(m: RadioMode) {
     if (m !== 'pirate') this.post('stop');
     this.stopStream();
+    if (this.mode === 'fm' && m !== 'fm') {
+      this.fmFallback = false;
+      this.fm?.setTuned(false);
+    }
     this.mode = m;
     if (m === 'pirate') this.post('play');
+    if (m === 'fm') this.fm?.setTuned(true);
     if (m === 'stream') this.startStream();
     this.onNowPlaying?.(this.label);
+  }
+
+  /** NOUN FM has nothing on air: the pirate station fills in (or stops). */
+  setFmFallback(on: boolean) {
+    if (this.mode !== 'fm' || this.fmFallback === on) return;
+    this.fmFallback = on;
+    this.post(on ? 'play' : 'stop');
+    // (switching off: NOUN FM announces the track that replaces it)
+    if (on) this.onNowPlaying?.(this.label);
+  }
+
+  /** Next song on the fallback. */
+  nextFallback() {
+    if (this.mode === 'fm' && this.fmFallback) this.post('next');
   }
 
   // ── Live streams ──────────────────────────────────────────────────────
