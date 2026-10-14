@@ -32,7 +32,7 @@ const store = {
 };
 vi.mock('@netlify/blobs', () => ({ connectLambda: () => undefined, getStore: () => store }));
 
-const { handler } = await import('./world-stats');
+const { handler } = await import('../functions/world-stats');
 
 const TOKEN = 'test-admin-token-0123456789';
 
