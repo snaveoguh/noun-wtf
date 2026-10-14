@@ -1,5 +1,7 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import { MAX_TAG_CHARS, validTag } from '../../src/miniapps/world2/graffiti/strokes';
+
 // Noun World graffiti that stays up. PartyKit still carries tags live
 // between players, but its room storage forgets old tags (last 20 per wall)
 // and only a few walls fit its index, so every tag is also written here.
@@ -7,10 +9,16 @@ import { connectLambda, getStore } from '@netlify/blobs';
 // GET  ?level=plaza            → { walls: string[] }   walls with paint
 // GET  ?level=plaza&ids=[...]  → { walls: { [wallId]: string[] } }
 //                                 tags per wall, oldest first (≤ 40 ids)
-// POST { wallId, data }        → append one tag (vector dabs, `g2:` base64)
+// POST { wallId, data }        → append one tag: `g3:` strokes, a `g3r:`
+//                                 undo, or a legacy `g2:` dab tag
+//
+// Tags are decoded with the game's own codec (graffiti/strokes.ts) before
+// they're kept: colour bytes, nozzle size range, point and stroke caps, and
+// coordinates within the wall cell are all checked there.
 //
 // One blob per wall plus one index per level. A wall keeps every tag until
-// it holds ~400 KB of paint, then sheds its oldest (long since painted over).
+// it holds ~400 KB of paint (or 1500 tags), then sheds its oldest (long
+// since painted over).
 
 interface HandlerEvent {
   body: string | null;
@@ -32,7 +40,7 @@ interface Wall {
 }
 
 const LEVELS = new Set(['plaza', 'park']);
-const MAX_TAG = 6100; // 900 dabs × 5 bytes, base64, plus prefix
+const MAX_TAGS = 1500;
 const MAX_WALL = 400_000;
 const MAX_WALLS = 20_000;
 const MAX_IDS = 40;
@@ -100,8 +108,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   const wallId = String(input.wallId ?? '');
   const data = String(input.data ?? '');
   if (!WALL_RE.test(wallId)) return json(400, { error: 'Bad wall' });
-  if (!/^g2:[\d+/A-Za-z]+=*$/.test(data) || data.length > MAX_TAG)
-    return json(400, { error: 'Bad tag' });
+  if (data.length > MAX_TAG_CHARS || !validTag(data)) return json(400, { error: 'Bad tag' });
   const level = wallId.split('|')[0];
 
   let created = false;
@@ -113,7 +120,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     if (wall.tags.some(t => t.d === data)) return json(200, { ok: true });
     wall.tags.push({ d: data, at: Date.now() });
     let size = wall.tags.reduce((n, t) => n + t.d.length, 0);
-    while (size > MAX_WALL && wall.tags.length > 1) size -= wall.tags.shift()!.d.length;
+    while ((size > MAX_WALL || wall.tags.length > MAX_TAGS) && wall.tags.length > 1)
+      size -= wall.tags.shift()!.d.length;
     const res =
       typeof cur?.etag === 'string'
         ? await store.setJSON(wallKey(wallId), wall, { onlyIfMatch: cur.etag })
