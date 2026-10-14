@@ -9,7 +9,8 @@ dist
 .DS_Store
 *.tsbuildinfo
 *.log
-.claude
+.claude/*
+!.claude/skills/
 .grapevine
 
 # Local promo-video skill scratch (per-render frame dumps + ffmpeg intermediates)
