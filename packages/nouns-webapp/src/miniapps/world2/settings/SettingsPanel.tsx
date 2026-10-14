@@ -210,7 +210,7 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
               <span>Quality changes on reload (running {game.hud.quality}).</span>
               <button
                 type="button"
-                className="rounded-full bg-[#ffd400] px-3 py-1 font-bold text-black"
+                className="w2-sel rounded-full bg-[#ffd400] px-3 py-1 font-bold"
                 onClick={() => {
                   // A ?q= param would override the saved choice
                   const u = new URL(window.location.href);
@@ -345,7 +345,7 @@ function Choice<T extends string>({
             type="button"
             role="radio"
             aria-checked={o === value}
-            className={`min-h-[34px] flex-1 rounded-xl px-2 text-xs font-bold ${o === value ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
+            className={`min-h-[34px] flex-1 rounded-xl px-2 text-xs font-bold ${o === value ? 'w2-sel bg-[#ffd400]' : 'bg-white/10'}`}
             onClick={() => onChange(o)}
           >
             {o}

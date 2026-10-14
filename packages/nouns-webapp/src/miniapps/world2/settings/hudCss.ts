@@ -8,6 +8,8 @@ import type { WorldSettings } from './store';
 /** The settings panel's own bits (sliders sized for thumbs). */
 export const SETTINGS_CSS = `
 .w2-settings{font-family:system-ui,sans-serif}
+/* site themes recolour buttons: keep text dark on the yellow picks */
+.w2-settings .w2-sel{color:#111!important}
 .w2-range{width:100%;height:28px;accent-color:#ffd400;touch-action:pan-x;cursor:pointer}
 `;
 
