@@ -45,6 +45,8 @@ export class PirateRadio {
   private songName = 'tuning in';
   mode: RadioMode = 'off';
   volume = 0.6;
+  /** Mixer gain for the stream <audio> element (it bypasses the WebAudio graph). */
+  extGain = 1;
   streamIndex = 0;
   private audioEl: HTMLAudioElement | null = null;
   /** Called with a "now playing" label whenever the track/station changes. */
@@ -108,7 +110,7 @@ export class PirateRadio {
   setVolume(v: number) {
     this.volume = v;
     if (this.out !== null) this.out.gain.value = v;
-    if (this.audioEl !== null) this.audioEl.volume = Math.min(1, v * 1.4);
+    if (this.audioEl !== null) this.audioEl.volume = Math.min(1, v * 1.4 * this.extGain);
   }
 
   /** off → pirate → NOUN FM → each stream → off */
@@ -175,7 +177,7 @@ export class PirateRadio {
     const el = new Audio();
     el.crossOrigin = 'anonymous';
     el.src = st.url;
-    el.volume = Math.min(1, this.volume * 1.4);
+    el.volume = Math.min(1, this.volume * 1.4 * this.extGain);
     void el.play().catch(() => {
       // Autoplay blocked or stream down: fall back to the pirate station
       this.setMode('pirate');

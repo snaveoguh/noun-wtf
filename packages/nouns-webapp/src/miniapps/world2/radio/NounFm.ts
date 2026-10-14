@@ -121,6 +121,8 @@ export class NounFm {
   /** The van's speaker position (world), set once the van is placed. */
   vanPos: THREE.Vector3 | null = null;
   volume = 0.6;
+  /** Mixer gain for outputs outside the WebAudio graph (YouTube, an unrouted <audio>, the spoken ident). */
+  extGain = 1;
   /** Light pulse 0..1 (analyser, or a synthetic beat when we can't measure). */
   level = 0;
   /** A track (not the fallback) is on air. */
@@ -527,7 +529,7 @@ export class NounFm {
     if (this.ctx === null || this.bus === null || this.noise === null) return;
     const r = playIdent(this.ctx, this.bus, this.noise, key, {
       speech: this.tuned,
-      volume: this.volume,
+      volume: this.volume * this.extGain,
     });
     this.identUntil = this.time + r.seconds;
   }
@@ -636,13 +638,15 @@ export class NounFm {
           this.lastSeekAt = this.time;
         }
       }
-      this.yt.setVolume(this.volume * fade * this.distGain(dist) * 1.3);
+      this.yt.setVolume(this.volume * this.extGain * fade * this.distGain(dist) * 1.3);
       return;
     }
     const el = this.el;
     if (el === null) return;
     this.set(this.music?.gain, fade, 0.08);
-    el.volume = this.elRouted ? 1 : Math.min(1, this.volume * 1.4 * fade * this.distGain(dist));
+    el.volume = this.elRouted
+      ? 1
+      : Math.min(1, this.volume * this.extGain * 1.4 * fade * this.distGain(dist));
     if (before || el.readyState < 1) return;
     if (exp > (Number.isFinite(el.duration) ? el.duration : FM_MAX_TRACK_S)) return;
     if (el.paused) {

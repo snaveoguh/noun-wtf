@@ -40,8 +40,11 @@ export class SkateCamera {
     private world: CollisionWorld,
   ) {}
 
+  /** 0 turns camera shake off (reduce motion). */
+  shakeScale = 1;
+
   addShake(a: number) {
-    this.shake = Math.min(1, this.shake + a);
+    this.shake = Math.min(1, this.shake + a * this.shakeScale);
   }
 
   cycleMode() {
