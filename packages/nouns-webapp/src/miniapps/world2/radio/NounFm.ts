@@ -259,7 +259,9 @@ export class NounFm {
   // ── Wire ─────────────────────────────────────────────────────────────
 
   private send(m: Record<string, unknown>) {
-    this.transport.send(m);
+    // The key rides on every message so the server can re-identify us
+    // after it forgets the connection (restart / eviction)
+    this.transport.send({ ...m, key: this.key });
   }
 
   private handle(m: Record<string, unknown>) {

@@ -20,6 +20,7 @@ import {
 } from '../../../../../nouns-party/src/fmStation';
 
 import { type FmView, type NounFm } from './NounFm';
+import { forgetSet, loadSetHistory, rememberSet, type SavedSet } from './setHistory';
 import { YouTubeDeck, YT_MIN_PX } from './YouTubeDeck';
 
 export function useFm(fm: NounFm): FmView {
@@ -302,6 +303,7 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   });
   const [tracks, setTracks] = useState<FmTrack[]>([]);
+  const [history, setHistory] = useState<SavedSet[]>(() => loadSetHistory());
   const sets = view.state?.sets ?? [];
   const startAt = nextAt(time, fm.serverNow());
   const len = setLength(tracks);
@@ -339,6 +341,48 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
           )}
         </div>
       ))}
+      {history.length > 0 && (
+        <>
+          <div className="mt-1 font-bold">YOUR SAVED SETS</div>
+          <div className="flex max-h-[18vh] flex-col gap-1 overflow-y-auto pr-1">
+            {history.map((h, i) => (
+              <div
+                key={`${h.at}-${i}`}
+                className="flex items-center gap-2 rounded-lg bg-white/5 p-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">
+                    <b>{h.name || 'untitled set'}</b> · {h.dj}
+                  </div>
+                  <div className="text-[10px] opacity-60">
+                    {h.tracks.length} tracks · {fmtDur(setLength(h.tracks) / 1000)} · last booked{' '}
+                    {new Date(h.at).toLocaleDateString()}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="rounded bg-[#ffd400] px-2 py-0.5 text-[10px] font-black text-black"
+                  onClick={() => {
+                    setDj(h.dj);
+                    setTitle(h.name);
+                    setTracks(h.tracks.slice(0, FM_SET_MAX_TRACKS));
+                  }}
+                >
+                  LOAD
+                </button>
+                <button
+                  type="button"
+                  className="text-[#ff6b5b]"
+                  title="Forget this set"
+                  onClick={() => setHistory(forgetSet(i))}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       <div className="mt-1 font-bold">BOOK YOUR SET</div>
       <div className="grid grid-cols-[auto_1fr] items-center gap-1.5 text-[11px]">
         <label htmlFor="fm-dj">DJ</label>
@@ -403,7 +447,10 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
         type="button"
         disabled={tracks.length === 0}
         className="rounded-lg bg-[#d22209] px-3 py-2 text-sm font-black disabled:opacity-40"
-        onClick={() => fm.bookSet(dj, title, startAt, tracks)}
+        onClick={() => {
+          fm.bookSet(dj, title, startAt, tracks);
+          setHistory(rememberSet({ dj, name: title, tracks }));
+        }}
       >
         BOOK SET · {tracks.length} tracks
       </button>

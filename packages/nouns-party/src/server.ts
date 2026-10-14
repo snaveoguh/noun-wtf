@@ -84,8 +84,6 @@ interface RoomState {
   _leaderboard: LeaderboardEntry[];
   _hoops?: HoopsRelay;
   _warfare?: WarfareRelay;
-  _fm?: FmRelay;
-  _fmLoading?: Promise<FmRelay>;
 }
 
 function getRoomState(room: Party): RoomState {
@@ -102,26 +100,34 @@ function broadcastExcept(room: Party, senderId: string, msg: string) {
   }
 }
 
+/**
+ * NOUN FM relays by room id. Module-level, not on the room object: the
+ * runtime doesn't promise the same room object on every event, and a relay
+ * hung off it was being rebuilt per message (forgetting who said hello).
+ */
+const fmRelays = new Map<string, Promise<FmRelay>>();
+
 /** The NOUN FM relay for this room, created (and its station loaded) once. */
 async function ensureFm(room: Party): Promise<FmRelay> {
-  const rs = getRoomState(room);
-  if (rs._fm) return rs._fm;
-  rs._fmLoading ??= (async () => {
-    const token = room.env.FM_ADMIN_TOKEN;
-    const fm = new FmRelay({
-      conns: () => room.getConnections(),
-      adminToken: typeof token === 'string' ? token : undefined,
-      save: snap => void room.storage.put('fm', snap).catch(() => undefined),
-    });
-    try {
-      fm.load(await room.storage.get('fm'));
-    } catch {
-      // a bad stored station just starts empty
-    }
-    rs._fm = fm;
-    return fm;
-  })();
-  return rs._fmLoading;
+  let p = fmRelays.get(room.id);
+  if (p === undefined) {
+    p = (async () => {
+      const token = room.env.FM_ADMIN_TOKEN;
+      const fm = new FmRelay({
+        conns: () => room.getConnections(),
+        adminToken: typeof token === 'string' ? token : undefined,
+        save: snap => void room.storage.put('fm', snap).catch(() => undefined),
+      });
+      try {
+        fm.load(await room.storage.get('fm'));
+      } catch {
+        // a bad stored station just starts empty
+      }
+      return fm;
+    })();
+    fmRelays.set(room.id, p);
+  }
+  return p;
 }
 
 // ── Server ────────────────────────────────────────────────────────────
@@ -202,7 +208,7 @@ export default {
         if (room.id !== FM_ROOM) return;
         // Set up on first use too: onStart can't be relied on to have run
         // (or to have run on this same room object) before the first message
-        const fm = rs._fm ?? (await ensureFm(room));
+        const fm = await ensureFm(room);
         fm.handle(data, message.length, connection);
         return;
       }
@@ -548,7 +554,7 @@ export default {
     }
 
     rs._hoops?.close(connection.id, room.getConnections());
-    rs._fm?.close(connection.id);
+    void fmRelays.get(room.id)?.then(fm => fm.close(connection.id));
 
     const count = [...room.getConnections()].length;
     room.broadcast(JSON.stringify({ type: 'leave', id: connection.id, count }));
