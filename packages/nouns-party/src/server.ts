@@ -85,6 +85,7 @@ interface RoomState {
   _hoops?: HoopsRelay;
   _warfare?: WarfareRelay;
   _fm?: FmRelay;
+  _fmLoading?: Promise<FmRelay>;
 }
 
 function getRoomState(room: Party): RoomState {
@@ -101,6 +102,28 @@ function broadcastExcept(room: Party, senderId: string, msg: string) {
   }
 }
 
+/** The NOUN FM relay for this room, created (and its station loaded) once. */
+async function ensureFm(room: Party): Promise<FmRelay> {
+  const rs = getRoomState(room);
+  if (rs._fm) return rs._fm;
+  rs._fmLoading ??= (async () => {
+    const token = room.env.FM_ADMIN_TOKEN;
+    const fm = new FmRelay({
+      conns: () => room.getConnections(),
+      adminToken: typeof token === 'string' ? token : undefined,
+      save: snap => void room.storage.put('fm', snap).catch(() => undefined),
+    });
+    try {
+      fm.load(await room.storage.get('fm'));
+    } catch {
+      // a bad stored station just starts empty
+    }
+    rs._fm = fm;
+    return fm;
+  })();
+  return rs._fmLoading;
+}
+
 // ── Server ────────────────────────────────────────────────────────────
 
 export default {
@@ -109,15 +132,7 @@ export default {
     const stored = await room.storage.get<LeaderboardEntry[]>('leaderboard');
     const rs = getRoomState(room);
     rs._leaderboard = stored ?? [];
-    if (room.id === FM_ROOM) {
-      const token = room.env.FM_ADMIN_TOKEN;
-      rs._fm = new FmRelay({
-        conns: () => room.getConnections(),
-        adminToken: typeof token === 'string' ? token : undefined,
-        save: snap => void room.storage.put('fm', snap).catch(() => undefined),
-      });
-      rs._fm.load(await room.storage.get('fm'));
-    }
+    if (room.id === FM_ROOM) await ensureFm(room);
   },
 
   onConnect(connection: Connection, room: Party) {
@@ -184,7 +199,11 @@ export default {
 
       // ── NOUN FM (fm: prefix, world v2 room only) ────────────────────
       if (typeof data.type === 'string' && data.type.startsWith('fm:')) {
-        rs._fm?.handle(data, message.length, connection);
+        if (room.id !== FM_ROOM) return;
+        // Set up on first use too: onStart can't be relied on to have run
+        // (or to have run on this same room object) before the first message
+        const fm = rs._fm ?? (await ensureFm(room));
+        fm.handle(data, message.length, connection);
         return;
       }
 
