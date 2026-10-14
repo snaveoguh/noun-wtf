@@ -100,9 +100,13 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
+          # Empty functions dir: otherwise the repo's netlify.toml makes it
+          # ship noun.wtf's serverless functions to this site too
+          mkdir -p "$RUNNER_TEMP/no-functions"
           npx netlify deploy \
             --filter @nouns/webapp \
             --site "$SITE_ID" \
+            --functions "$RUNNER_TEMP/no-functions" \
             --prod \
             --dir packages/nouns-webapp/dist-rush \
             --no-build \
