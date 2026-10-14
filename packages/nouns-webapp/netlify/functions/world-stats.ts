@@ -10,6 +10,7 @@ import {
   validateAppeal,
 } from '../lib/appeals';
 import { capsOf, decodeTrace, verifyRun, type ProvedKey } from '../lib/runProof';
+import { titleFor, validateMissions } from '../../src/miniapps/world2/missions/defs';
 import { checkLink } from '../lib/walletAuth';
 
 // Noun World stats: every rider's records and lifetime totals, plus how
@@ -19,6 +20,12 @@ import { checkLink } from '../lib/walletAuth';
 // POST { rider, name, session?: true, best?: {...}, add?: {...}, comboLabel? }
 //      `best` values only ever raise a record; `add` values are deltas
 //      since the client's last post, added to lifetime totals.
+//      Optional `missions: { [id]: ms }` (finished missions, see
+//      src/miniapps/world2/missions/defs.ts) and `title` (a done mission's
+//      id): only known ids with sane times and complete chains are kept, and
+//      record missions only if this row's *accepted* records back them (so
+//      a mission can never vouch for a record). Missions are never removed.
+//      Answers carry `you.missions` + `you.title`; board rows carry `title`.
 //
 // Replaces the earlier world-fastest / world-combo boards: their stores'
 // rows are imported the first time this one is empty.
@@ -186,6 +193,10 @@ interface Rider {
   best: Partial<Record<BestKey, number>>;
   add: Partial<Record<AddKey, number>>;
   comboLabel?: string;
+  /** Finished missions (id → ms), validated on the way in. */
+  missions?: Record<string, number>;
+  /** Equipped title: the id of a finished mission. */
+  title?: string;
   sessions: number;
   first: number;
   last: number;
@@ -244,6 +255,12 @@ function mergeInto(into: Rider, from: Rider) {
     const v = from.add[k];
     if (v !== undefined && v > 0) into.add[k] = (into.add[k] ?? 0) + v;
   }
+  if (from.missions !== undefined) {
+    const m = { ...(into.missions ?? {}) };
+    for (const [id, t] of Object.entries(from.missions)) m[id] = Math.min(m[id] ?? t, t);
+    into.missions = m;
+  }
+  into.title ??= from.title;
   into.sessions += from.sessions;
   into.first = Math.min(into.first, from.first);
   into.last = Math.max(into.last, from.last);
@@ -251,13 +268,24 @@ function mergeInto(into: Rider, from: Rider) {
 
 const linkedOf = (r: Rider) => (r.addr ? { address: r.addr, name: r.name } : null);
 
-type BoardRow = { name: string; value: number; label?: string; at: number; addr?: string };
+type BoardRow = {
+  name: string;
+  value: number;
+  label?: string;
+  at: number;
+  addr?: string;
+  title?: string;
+};
+
+/** A rider's equipped mission title, if it's one they finished. */
+const titleOf = (r: Rider) => titleFor(r.missions, r.title);
 
 function boards(riders: Rider[]) {
   const claimed = claimedNames(riders);
   const show = (r: Rider) => ({
     name: !r.addr && claimed.has(r.name.toLowerCase()) ? fallbackName(r) : r.name,
     ...(r.addr ? { addr: r.addr } : {}),
+    ...(titleOf(r) !== null ? { title: titleOf(r)! } : {}),
   });
   const out: Record<string, BoardRow[]> = {};
   for (const k of Object.keys(BEST) as BestKey[]) {
@@ -583,6 +611,15 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       if (!Number.isFinite(v) || v <= 0) continue;
       r.add[k] = (r.add[k] ?? 0) + Math.min(v, ADD[k]);
     }
+    // Missions after records: a record mission is checked against what
+    // this very post may just have raised (with its proof)
+    if (input.missions !== undefined) {
+      const m = validateMissions(input.missions, r.missions, r.best, now);
+      if (Object.keys(m).length > 0) r.missions = m;
+    }
+    if (input.title === null) delete r.title;
+    else if (typeof input.title === 'string' && titleFor(r.missions, input.title) !== null)
+      r.title = input.title;
     if (!(await saveRiders(store, riders, cur?.etag))) continue;
 
     if (newSession) {
@@ -608,7 +645,13 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     }
     return json(200, {
       ok: true,
-      you: { best: r.best, add: r.add, sessions: r.sessions },
+      you: {
+        best: r.best,
+        add: r.add,
+        sessions: r.sessions,
+        missions: r.missions ?? {},
+        title: r.title ?? null,
+      },
       linked: linkedOf(r),
       ...(nameTaken ? { nameTaken: true } : {}),
       ...(Object.keys(rejected).length > 0 ? { rejected } : {}),

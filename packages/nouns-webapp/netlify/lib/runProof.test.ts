@@ -68,6 +68,21 @@ describe('run proof: hang time', () => {
     expect(Math.max(0, ...r.airs.map(a => a.s))).toBeLessThan(1);
   });
 
+  it('credits nothing from a low-gravity air (the Upside Down, 20% g)', () => {
+    // Pop off flat ground at 20% of the game's gravity: a floaty 10 s air
+    const g = PHYS.g * 0.2;
+    const rows: number[][] = [];
+    for (let k = 0; k <= 10; k++) rows.push([k * 0.4, k * 2, 0, 0, 5, 0]);
+    const t0 = 4.4;
+    const vy = 0.5 * g * 10;
+    for (let a = 0; a <= 10; a += 1 / 30)
+      rows.push([t0 + a, 22 + 5 * a, vy * a - 0.5 * g * a * a, 0, Math.hypot(5, vy - g * a), AIR]);
+    rows.push([t0 + 10 + 1 / 30, 72, 0, 0, 5, 0]);
+    const r = verifyRun(trace(rows));
+    expect(Math.max(0, ...r.airs.map(a => a.s))).toBeLessThan(1);
+    expect(Math.max(0, ...r.airs.map(a => a.m))).toBeLessThan(1);
+  });
+
   it('STRIDE matches the sample layout', () => expect(STRIDE).toBe(6));
 });
 

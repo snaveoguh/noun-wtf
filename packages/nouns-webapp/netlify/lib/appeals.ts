@@ -44,7 +44,7 @@ export const MAX_OPEN_APPEALS = 100;
 /** Closed appeals kept (their traces go with them). */
 export const MAX_CLOSED_APPEALS = 200;
 
-const MAX_VALUE: Record<AppealKey, number> = { kmh: 2000, airM: 500, airS: 120 };
+const MAX_VALUE: Record<AppealKey, number> = { kmh: 20_000, airM: 500, airS: 120 };
 
 /** The subset of a Netlify Blobs store this module uses. */
 export interface AppealStore {

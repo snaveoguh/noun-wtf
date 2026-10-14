@@ -93,7 +93,7 @@ describe('world-stats: appeals', () => {
   it('validates: a proved record, a sane value, a trace of bounded size', async () => {
     const base = { action: 'appeal', rider: 'r1', name: 'A', value: 900, d };
     expect((await call({ ...base, key: 'combo' })).status).toBe(400);
-    expect((await call({ ...base, key: 'kmh', value: 5000 })).status).toBe(400);
+    expect((await call({ ...base, key: 'kmh', value: 50_000 })).status).toBe(400);
     expect((await call({ ...base, key: 'kmh', d: '' })).status).toBe(400);
     const big = await call({ ...base, key: 'kmh', d: 'A'.repeat(MAX_APPEAL_CHARS + 4) });
     expect(big.status).toBe(400);
@@ -195,5 +195,48 @@ describe('world-stats: appeals', () => {
     expect(list).toHaveLength(MAX_CLOSED_APPEALS);
     const traces = [...blobs.keys()].filter(k => k.startsWith('appeal-trace/'));
     expect(traces).toHaveLength(MAX_CLOSED_APPEALS);
+  });
+});
+
+describe('world-stats: missions', () => {
+  const T = Date.UTC(2026, 9, 1);
+
+  it('keeps valid missions, drops junk, answers with them, and never removes any', async () => {
+    const r = await call({
+      rider: 'm1',
+      name: 'M',
+      missions: { 'wake-up': T, 'leave-a-mark': T + 1, 'made-up': T, 'paint-it-red': 'x' },
+    });
+    expect(r.out.you.missions).toEqual({ 'wake-up': T, 'leave-a-mark': T + 1 });
+    const again = await call({ rider: 'm1', name: 'M', missions: {} });
+    expect(again.out.you.missions).toEqual({ 'wake-up': T, 'leave-a-mark': T + 1 });
+  });
+
+  it('a record mission only lands when the row holds the record (its proof accepted)', async () => {
+    const chain = { 'wake-up': T, 'free-your-mind': T, 'deja-vu': T, 'the-one': T };
+    // Claimed without the records: only the starter sticks
+    const bare = await call({ rider: 'm2', name: 'M', missions: chain });
+    expect(Object.keys(bare.out.you.missions)).toEqual(['wake-up']);
+    // A refused speed claim doesn't open a speed mission either
+    const fake = await call({ rider: 'm2', name: 'M', best: { kmh: 12_000 }, missions: chain });
+    expect(fake.out.rejected.kmh).toBeDefined();
+    expect(Object.keys(fake.out.you.missions)).toEqual(['wake-up']);
+  });
+
+  it('a title must be a finished mission; boards show it', async () => {
+    const { d, kmh } = ride();
+    const early = await call({ rider: 'm3', name: 'Neo', missions: { 'wake-up': T }, title: 'the-one' });
+    expect(early.out.you.title).toBeNull();
+    const r = await call({
+      rider: 'm3',
+      name: 'Neo',
+      best: { kmh },
+      proofs: [{ keys: ['kmh'], d }],
+      title: 'wake-up',
+    });
+    expect(r.out.you.title).toBe('wake-up');
+    expect((await board('kmh')).find(x => x.name === 'Neo')).toMatchObject({ title: 'Awake' });
+    const off = await call({ rider: 'm3', name: 'Neo', title: null });
+    expect(off.out.you.title).toBeNull();
   });
 });
