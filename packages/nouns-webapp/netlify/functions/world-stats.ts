@@ -1,6 +1,15 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
-import { decodeTrace, verifyRun } from '../lib/runProof';
+import {
+  adminCheck,
+  appealTrace,
+  decideAppeal,
+  fileAppeal,
+  listAppeals,
+  riderAppeals,
+  validateAppeal,
+} from '../lib/appeals';
+import { capsOf, decodeTrace, verifyRun, type ProvedKey } from '../lib/runProof';
 import { checkLink } from '../lib/walletAuth';
 
 // Noun World stats: every rider's records and lifetime totals, plus how
@@ -16,7 +25,20 @@ import { checkLink } from '../lib/walletAuth';
 //
 // The competition records (top speed, highest jump, hang time) only rise
 // with a proof: `proofs: [{ keys, d }]`, the trace of the ride that set
-// them, checked against the game's physics (../lib/runProof.ts).
+// them, checked against the game's physics (../lib/runProof.ts). A refusal
+// always says why: "no proof sent with the claim", "proof too big", "proof
+// dropped", "beyond its proof", "not in its ride proof" or the check that
+// failed.
+//
+// Appeals (../lib/appeals.ts):
+// POST { action: 'appeal', rider, name, key, value, d, reason }
+//      a refused record and its ride. Re-checked first (saved: true if the
+//      ride proves it), else filed for review (one open per rider per record).
+// POST { action: 'appeals', rider } → that rider's appeals and their status.
+// POST { action: 'admin-appeals' | 'admin-appeal' (id) | 'admin-decide'
+//      (id, decision: 'approve' | 'reject', note) } with header
+//      X-World-Admin: WORLD_ADMIN_TOKEN (Netlify env; unset = admin off).
+//      Approving writes the record to the rider's row.
 //
 // Wallet links (one identity per ETH address, so prize winners can be paid):
 // POST { action: 'link', rider, name, address, ts, sig }
@@ -76,32 +98,50 @@ function provenCaps(raw: unknown): {
   const why: Record<string, string> = {};
   const failed: { keys: BestKey[]; reason: string; d: string }[] = [];
   if (!Array.isArray(raw)) return { caps, why, failed };
-  for (const p of raw.slice(0, MAX_PROOFS) as { keys?: unknown; d?: unknown }[]) {
+  raw.forEach((p: { keys?: unknown; d?: unknown } | null, i) => {
     const keys = (Array.isArray(p?.keys) ? p.keys : []).filter((k): k is BestKey =>
       PROVED.has(k as BestKey),
     );
-    if (keys.length === 0 || typeof p.d !== 'string' || p.d.length > MAX_PROOF_CHARS) continue;
-    const trace = decodeTrace(p.d);
+    if (keys.length === 0) return;
+    // A proof that arrived but can't be used says so (never a bare "no proof")
+    const skip =
+      i >= MAX_PROOFS
+        ? `proof dropped (more than ${MAX_PROOFS} in one post)`
+        : typeof p?.d !== 'string'
+          ? 'proof unreadable'
+          : p.d.length > MAX_PROOF_CHARS
+            ? `proof too big (${Math.round(p.d.length / 1000)}k chars, max ${MAX_PROOF_CHARS / 1000}k)`
+            : null;
+    if (skip !== null) {
+      for (const k of keys) why[k] ??= skip;
+      return;
+    }
+    const d = p!.d as string;
+    const trace = decodeTrace(d);
     const check = trace === null ? null : verifyRun(trace);
     if (check === null || !check.ok) {
       const reason = check?.reason ?? 'unreadable proof';
       for (const k of keys) why[k] = reason;
-      failed.push({ keys, reason, d: p.d });
-      continue;
+      failed.push({ keys, reason, d });
+      return;
     }
     // Proof checked out but holds nothing for this key (e.g. no clean jump)
     for (const k of keys) why[k] ??= 'not in its ride proof';
-    const up = (k: BestKey, v: number) => {
-      if (!keys.includes(k)) return;
-      caps[k] = Math.max(caps[k] ?? 0, v);
-    };
-    up('kmh', check.maxV * 3.6 + 0.3);
-    for (const a of check.airs) {
-      up('airM', a.m + 0.2);
-      up('airS', a.s + 0.06);
-    }
-  }
+    const c = capsOf(check);
+    for (const k of keys)
+      if (c[k as ProvedKey] > 0) caps[k] = Math.max(caps[k] ?? 0, c[k as ProvedKey]);
+  });
   return { caps, why, failed };
+}
+
+/** Why a proved claim was refused, as the rider reads it. */
+export function refusal(
+  caps: Partial<Record<BestKey, number>>,
+  why: Record<string, string>,
+  k: BestKey,
+): string {
+  if (caps[k] !== undefined) return 'beyond its proof';
+  return why[k] ?? 'no proof sent with the claim';
 }
 
 /**
@@ -163,7 +203,7 @@ const headers = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-World-Admin',
   'Cache-Control': 'no-store',
 };
 const json = (status: number, body: unknown): HandlerResponse => ({
@@ -334,6 +374,97 @@ async function link(
   return json(409, { error: 'Busy, try again' });
 }
 
+/** Raise one record on a rider's row (an approved appeal). */
+async function applyBest(
+  store: ReturnType<typeof getStore>,
+  rider: string,
+  name: string,
+  k: BestKey,
+  v: number,
+): Promise<{ best: Partial<Record<BestKey, number>> } | null> {
+  const now = Date.now();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const cur = await store.getWithMetadata('riders', { type: 'json' });
+    const riders = ((cur?.data as Rider[] | null) ?? (await imported())).slice();
+    let r = rowOf(riders, rider);
+    if (!r) {
+      r = { rider, name, best: {}, add: {}, sessions: 0, first: now, last: now };
+      riders.push(r);
+    }
+    if (v > (r.best[k] ?? 0)) r.best[k] = Math.round(v * 100) / 100;
+    r.last = Math.max(r.last, now);
+    if (await saveRiders(store, riders, cur?.etag)) return { best: r.best };
+  }
+  return null;
+}
+
+/**
+ * POST action 'appeal' { rider, name, key, value, d, reason }: a refused
+ * record with the ride that set it. Checked again first (a claim that only
+ * lacked its proof goes straight on the board); otherwise filed for review.
+ */
+async function appeal(
+  store: ReturnType<typeof getStore>,
+  rider: string,
+  name: string,
+  input: Record<string, unknown>,
+): Promise<HandlerResponse> {
+  const v = validateAppeal(input);
+  if (!v.ok) return json(400, { error: v.error });
+  const { caps, why } = provenCaps([{ keys: [v.key], d: v.d }]);
+  if (v.value <= (caps[v.key] ?? 0)) {
+    const done = await applyBest(store, rider, name, v.key, v.value);
+    if (done === null) return json(409, { error: 'Busy, try again' });
+    return json(200, { ok: true, saved: true, you: { best: done.best } });
+  }
+  const reason = refusal(caps, why, v.key);
+  const filed = await fileAppeal(store, {
+    rider,
+    name,
+    key: v.key,
+    value: v.value,
+    reason,
+    d: v.d,
+  });
+  if (!filed.ok) return json(filed.status, { error: filed.error });
+  return json(200, { ok: true, saved: false, reason, appeal: filed.appeal });
+}
+
+/** Admin review of appeals (X-World-Admin: WORLD_ADMIN_TOKEN). */
+async function admin(
+  store: ReturnType<typeof getStore>,
+  input: Record<string, unknown>,
+  hdrs: Record<string, string> | undefined,
+): Promise<HandlerResponse> {
+  const auth = adminCheck(hdrs);
+  if (!auth.ok) return json(auth.status, { error: auth.error });
+  const id = typeof input.id === 'string' ? input.id : '';
+  switch (input.action) {
+    case 'admin-appeals':
+      return json(200, { appeals: await listAppeals(store) });
+    case 'admin-appeal': {
+      const d = await appealTrace(store, id);
+      return d === null ? json(404, { error: 'No such appeal' }) : json(200, { id, d });
+    }
+    case 'admin-decide': {
+      const approve = input.decision === 'approve';
+      if (!approve && input.decision !== 'reject') return json(400, { error: 'Bad decision' });
+      const note = clean(input.note, 200);
+      const out = await decideAppeal(
+        store,
+        id,
+        approve,
+        note,
+        async a => (await applyBest(store, a.rider, a.name, a.key, a.value)) !== null,
+      );
+      if (!out.ok) return json(out.status, { error: out.error });
+      return json(200, { ok: true, appeal: out.appeal });
+    }
+    default:
+      return json(400, { error: 'Unknown action' });
+  }
+}
+
 /** First run: bring over the rows from the old single-stat boards. */
 async function imported(): Promise<Rider[]> {
   const out = new Map<string, Rider>();
@@ -396,9 +527,17 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     return json(400, { error: 'Bad JSON' });
   }
   if (input.action === 'link') return link(store, input);
+  if (typeof input.action === 'string' && input.action.startsWith('admin-')) {
+    return admin(store, input, event.headers);
+  }
   const name = clean(input.name, 42);
   const rider = clean(input.rider, 64).replace(/[^\dA-Za-z-]/g, '');
+  if (input.action === 'appeals') {
+    if (!rider) return json(400, { error: 'Missing rider' });
+    return json(200, { appeals: await riderAppeals(store, rider) });
+  }
   if (!name || !rider) return json(400, { error: 'Missing name or rider' });
+  if (input.action === 'appeal') return appeal(store, rider, name, input);
   const best = (input.best ?? {}) as Record<string, unknown>;
   const add = (input.add ?? {}) as Record<string, unknown>;
   const newSession = input.session === true;
@@ -432,7 +571,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       if (!Number.isFinite(v) || v <= 0 || v > BEST[k]) continue;
       if (v > (r.best[k] ?? 0)) {
         if (PROVED.has(k) && !(v <= (caps[k] ?? 0))) {
-          rejected[k] = caps[k] === undefined ? (why[k] ?? 'no proof') : 'beyond its proof';
+          rejected[k] = refusal(caps, why, k);
           continue;
         }
         r.best[k] = Math.round(v * 100) / 100;

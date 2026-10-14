@@ -21,6 +21,7 @@ import {
   type WorldStats,
 } from './net/Stats';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
+import { RecordsUi, useReplayActive } from './replay/RecordsUi';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
@@ -66,9 +67,10 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
   {
     k: 'MOUNTAIN',
-    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you stay on the faster you go (a bail resets it)',
+    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you keep riding fast (30 km/h+) the faster you go (a bail resets it)',
   },
   { k: 'R', v: 'respawn at the fountain or ice cream van (back up from the mountain)' },
+  { k: 'Y', v: 'replay your last run in slow motion (Esc to come back)' },
   { k: 'ENTER', v: 'chat' },
 ];
 
@@ -183,6 +185,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, []);
 
   const hoopsOn = useHoopsActive(game);
+  const replaying = useReplayActive(game);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {
@@ -288,7 +291,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <HudPrefsStyle />
       <div ref={hostRef} className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
-      {game && started && !hoopsOn && (
+      {game && started && !hoopsOn && !replaying && (
         <Hud
           game={game}
           showHelp={showHelp}
@@ -301,6 +304,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && <TouchControls game={game} />}
       {game && started && <HoopsUi game={game} />}
+      {game && started && !hoopsOn && (
+        <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
+      )}
       {game?.drops && started && <DropClaim drops={game.drops} />}
 
       {chatOpen && (
