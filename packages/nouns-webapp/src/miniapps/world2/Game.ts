@@ -26,14 +26,7 @@ import { HoopsMode } from './hoops/net/HoopsMode';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
 import { Net, type NetPose } from './net/Net';
-import {
-  fetchStats,
-  STAT_INFO,
-  StatsTracker,
-  type MyBests,
-  type StatKey,
-  type WorldStats,
-} from './net/Stats';
+import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -43,6 +36,8 @@ import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
 import { inkExcluded, toonify } from './render/Toon';
+import { RecordsHub } from './replay/Records';
+import { ReplayView } from './replay/ReplayView';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import {
@@ -205,7 +200,7 @@ export class Game {
 
   constructor(opts: GameOptions) {
     this.opts = opts;
-    this.stats.onRejected = (k, value, reason) => this.statsRejected(k, value, reason);
+    this.stats.onRecord = e => this.records.onRecord(e);
     this.labelLayer = opts.labelLayer;
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
@@ -514,6 +509,7 @@ export class Game {
   private decks = new DeckSync();
 
   step(dt: number, now = performance.now()) {
+    if (this.replay.active) return this.stepReplay(dt, now);
     this.decks.tick(this.me, this.net, this.remotes);
     if (this.showroom) {
       this.input.poll(now);
@@ -603,6 +599,18 @@ export class Game {
     this.gfx.render(dt);
     this.updateHud(dt, input);
     this.hoops.idle(dt);
+  }
+
+  /** Replaying: the ride plays back, the world streams around the ghost, nothing else moves. */
+  private stepReplay(dt: number, now: number) {
+    this.input.poll(now); // drained, so nothing fires on the way back
+    this.replay.step(dt);
+    const f = this.replay.focus;
+    this.mountain?.update(f, this.replay.focusVel);
+    this.nature?.update(dt, f);
+    this.gfx.followShadow(f);
+    this.updateNetwork(dt);
+    this.gfx.render(dt);
   }
 
   private updateShowroom(dt: number) {
@@ -1429,18 +1437,21 @@ export class Game {
     () => this.opts.offline === true || devRun(),
   );
 
-  /** A record the server refused: say so, never drop it silently. */
-  private statsRejected(k: StatKey, value: number, reason: string) {
-    this.hud = {
-      ...this.hud,
-      toast: {
-        tag: '⚠ RECORD NOT SAVED',
-        text: `${STAT_INFO[k].fmt(value)}: ${reason}`,
-        at: performance.now(),
-      },
-    };
-    this.emit();
-  }
+  /** Instant replay of a recorded ride (a slow-mo ghost); the game pauses meanwhile. */
+  readonly replay = new ReplayView({
+    // Read late: field initialisers run before the constructor makes gfx
+    scene: () => this.gfx.scene,
+    camera: () => this.gfx.camera,
+    makeRider: () => {
+      if (!this.assets) return null;
+      const r = new NounCharacter(this.seed, this.assets);
+      r.setBoardType(this.boardType);
+      if (this.gfx.toon) toonify(r.root);
+      return r;
+    },
+  });
+  /** Record cards (saved / refused, REPLAY, APPEAL), told by the stats tracker. */
+  readonly records = new RecordsHub(this.stats, this.replay, () => this.name);
   private statsPolledAt = -Infinity;
 
   /** Reload the all-time boards (opening the league, and once a minute). */
@@ -1454,7 +1465,9 @@ export class Game {
   }
 
   private trackStats(dt: number) {
-    if (this.opts.offline === true) return;
+    // Offline the ride is still kept for replays, just never posted
+    if (this.opts.offline === true && !this.stats.devLive)
+      return this.stats.recordOnly(dt, this.player);
     this.stats.update(dt, this.player, this.player.combo, this.hud.mountain?.down ?? 0);
     if (performance.now() - this.statsPolledAt > 60_000) void this.refreshStats();
     const mine = this.stats.mine;
