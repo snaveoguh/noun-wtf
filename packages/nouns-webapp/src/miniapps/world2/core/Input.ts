@@ -136,6 +136,8 @@ export class Input {
   cursorX = 0;
   cursorY = 0;
   private _freeCursor = false;
+  /** Alt / Option held: mouse released (to drag HUD pieces), no re-lock. */
+  private altFree = false;
   /**
    * On foot the mouse is a free cursor: left-drag paints where it points,
    * right-drag turns the camera, and the pointer is never locked.
@@ -200,6 +202,13 @@ export class Input {
     this.disposers.push(() => document.removeEventListener('visibilitychange', onVis));
     on(window, 'keydown', e => {
       syncModifiers(e);
+      // Hold Alt / Option: give the mouse back (move the HUD, click chips)
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        this.altFree = true;
+        if (document.pointerLockElement === this.el) document.exitPointerLock?.();
+        return;
+      }
       if (!this.enabled || isTyping(e)) return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code))
         e.preventDefault();
@@ -209,11 +218,13 @@ export class Input {
     });
     on(window, 'keyup', e => {
       syncModifiers(e);
+      if (e.key === 'Alt') this.altFree = false;
       if (e.key === 'Meta') this.keys.clear();
       this.keys.delete(e.code);
       this.released.add(e.code);
     });
     on(window, 'blur', () => {
+      this.altFree = false;
       this.keys.clear();
       this.rmb = false;
       this.lmb = false;
@@ -229,6 +240,7 @@ export class Input {
         e.button === 0 &&
         this.enabled &&
         !this._freeCursor &&
+        !this.altFree &&
         !this.pointerLocked &&
         !('ontouchstart' in window)
       ) {

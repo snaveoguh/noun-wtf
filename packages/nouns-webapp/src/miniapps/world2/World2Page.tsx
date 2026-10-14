@@ -46,6 +46,10 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'P', v: 'time of day' },
   { k: 'B', v: 'map' },
   { k: 'M / .', v: 'radio station, next track' },
+  {
+    k: 'ALT hold',
+    v: 'free the mouse: drag the HUD (speedometer, chips) anywhere, double-click resets',
+  },
   { k: 'V', v: 'mic' },
   { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot), T colour' },
   { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
