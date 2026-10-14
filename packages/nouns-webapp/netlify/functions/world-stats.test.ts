@@ -225,7 +225,12 @@ describe('world-stats: missions', () => {
 
   it('a title must be a finished mission; boards show it', async () => {
     const { d, kmh } = ride();
-    const early = await call({ rider: 'm3', name: 'Neo', missions: { 'wake-up': T }, title: 'the-one' });
+    const early = await call({
+      rider: 'm3',
+      name: 'Neo',
+      missions: { 'wake-up': T },
+      title: 'the-one',
+    });
     expect(early.out.you.title).toBeNull();
     const r = await call({
       rider: 'm3',

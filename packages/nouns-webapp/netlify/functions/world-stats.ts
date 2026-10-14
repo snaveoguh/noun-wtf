@@ -1,5 +1,6 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import { titleFor, validateMissions } from '../../src/miniapps/world2/missions/defs';
 import {
   adminCheck,
   appealTrace,
@@ -10,7 +11,6 @@ import {
   validateAppeal,
 } from '../lib/appeals';
 import { capsOf, decodeTrace, verifyRun, type ProvedKey } from '../lib/runProof';
-import { titleFor, validateMissions } from '../../src/miniapps/world2/missions/defs';
 import { checkLink } from '../lib/walletAuth';
 
 // Noun World stats: every rider's records and lifetime totals, plus how

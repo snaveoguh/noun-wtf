@@ -23,13 +23,23 @@ const SCALED: [string, string][] = [
   ['[data-w2hud="combo"]', 'bottom center'],
   ['[data-w2hud="toasts"]', 'top center'],
   ['.w2-minimap', 'bottom left'],
+  ['[data-w2hud="missions"]', 'top left'],
 ];
 
 /** The stylesheet that applies the HUD settings. */
 export function hudCss(s: WorldSettings): string {
   const out: string[] = [];
   const hide = (sel: string) => out.push(`${sel}{display:none!important}`);
-  for (const id of ['speed', 'session', 'compass', 'chat', 'combo', 'toasts', 'fps'] as const)
+  for (const id of [
+    'speed',
+    'session',
+    'compass',
+    'chat',
+    'combo',
+    'toasts',
+    'fps',
+    'missions',
+  ] as const)
     if (!s.hud[id]) hide(`[data-w2hud="${id}"]`);
   if (!s.hud.minimap) hide('.w2-minimap');
   // The cog itself always stays

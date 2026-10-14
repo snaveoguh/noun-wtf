@@ -46,7 +46,7 @@ export function emptyState(): MissionState {
 export type Signal =
   | { t: 'met'; npc: NpcId }
   /** A banked combo (no bail): its trick names, and where it was landed. */
-  | { t: 'combo'; tricks: string[]; nj: boolean; ud: boolean }
+  | { t: 'combo'; tricks: readonly string[]; nj: boolean; ud: boolean }
   | { t: 'tag'; color: string }
   | { t: 'fm' }
   | { t: 'fmRide'; dt: number }

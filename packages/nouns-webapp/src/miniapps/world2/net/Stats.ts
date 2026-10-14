@@ -387,7 +387,11 @@ interface SentClaim {
 interface PostAnswer {
   linked?: WalletLinkState | null;
   rejected?: Partial<Record<BestKey, string>>;
-  you?: { best?: Partial<Record<BestKey, number>> };
+  you?: {
+    best?: Partial<Record<BestKey, number>>;
+    missions?: Record<string, number>;
+    title?: string | null;
+  };
 }
 
 export class StatsTracker {
@@ -396,6 +400,15 @@ export class StatsTracker {
   onRecord?: (e: RecordEvent) => void;
   /** Dev / test only: post even though the game is offline. */
   devLive = false;
+  /** Extra fields for every post (missions: see missions/MissionSystem). */
+  extras?: () => Record<string, unknown>;
+  /** The server's view of this rider after each post (accepted records, missions). */
+  onYou?: (you: NonNullable<PostAnswer['you']>) => void;
+  /**
+   * Nothing counts while set (the Upside Down: low gravity): no records, no
+   * ride trace (a fresh one starts when it's cleared), only time played.
+   */
+  suspended = false;
   /** Something new to post (a raised best or lifetime deltas). */
   private dirty = true;
   private sessionPosted = false;
@@ -581,9 +594,21 @@ export class StatsTracker {
     return true;
   }
 
+  /** Something else to post soon (a finished mission). */
+  markDirty() {
+    this.dirty = true;
+    this.flushAcc = Math.max(this.flushAcc, 15);
+  }
+
   /** Keep the current ride's trace (a new one after any reset). */
   private record(dt: number, p: Player) {
     this.clock += dt;
+    if (this.suspended) {
+      // Drop the ride: the next one starts fresh once we're back
+      if (this.trace !== null) this.keepRun(this.trace);
+      this.trace = null;
+      return;
+    }
     const { x, y, z } = p.pos;
     const v = p.speed;
     const moved = Math.hypot(x - this.lastX, y - this.lastY, z - this.lastZ);
@@ -631,6 +656,14 @@ export class StatsTracker {
     this.started = true;
     this.add.playS += dt;
     this.record(dt, p);
+    if (this.suspended) {
+      // Nothing in here is a record: forget any air / grind / combo in progress
+      this.airStartY = null;
+      this.grindM = 0;
+      this.lastBankedAt = combo.lastBanked?.at ?? -1;
+      this.tickFlush(dt);
+      return;
+    }
     if (p.mode === 'board' && p.state !== 'bail') {
       this.add.km += (p.speed * dt) / 1000;
       // Claim only a speed the trace itself holds
@@ -678,7 +711,10 @@ export class StatsTracker {
       }
     }
     this.raise('session', combo.session);
+    this.tickFlush(dt);
+  }
 
+  private tickFlush(dt: number) {
     this.flushAcc += dt;
     if (this.flushAcc >= 20) {
       this.flushAcc = 0;
@@ -733,6 +769,7 @@ export class StatsTracker {
       comboLabel: this.mine.comboLabel,
       add,
       proofs,
+      ...this.extras?.(),
     });
     if (beacon && navigator.sendBeacon?.(URL_, body)) {
       this.postedTotals(add);
@@ -775,6 +812,7 @@ export class StatsTracker {
     }
     if (out === null || typeof out !== 'object') return this.again();
     if (out.linked !== undefined) setLink(out.linked);
+    if (out.you && typeof out.you === 'object') this.onYou?.(out.you);
     const you = out.you?.best;
     for (const c of sent) {
       const p = this.proofs.get(c.k);

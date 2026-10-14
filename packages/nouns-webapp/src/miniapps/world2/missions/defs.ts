@@ -171,7 +171,7 @@ export const MISSIONS: MissionDef[] = [
     tier: 1,
     title: 'Wake up',
     flavour: 'Before you can see the hill for what it is, you have to flip it. Just once.',
-    goal: 'Land a kickflip (J, or flick the right stick down then up-left).',
+    goal: 'Land a kickflip (J on a keyboard).',
     obj: { k: 'trick', re: 'kickflip' },
     after: [],
     reward: 'Awake',
