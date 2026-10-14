@@ -96,6 +96,8 @@ export class Net {
   onOpen?: () => void;
   /** Noun Hoops (hoops/net): every `hoops:*` message goes here. */
   onHoops?: (m: HoopsMsg) => void;
+  /** NOUN FM (radio/): every `fm:*` message goes here. */
+  onFm?: (m: Record<string, unknown>) => void;
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -129,6 +131,10 @@ export class Net {
     if (typeof type !== 'string') return;
     if (type.startsWith('hoops:')) {
       this.onHoops?.(d as unknown as HoopsMsg);
+      return;
+    }
+    if (type.startsWith('fm:')) {
+      this.onFm?.(d);
       return;
     }
     if (type === 'world:sync') {
@@ -365,6 +371,10 @@ export class Net {
   }
 
   sendHoops(m: HoopsMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendFm(m: Record<string, unknown>) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 

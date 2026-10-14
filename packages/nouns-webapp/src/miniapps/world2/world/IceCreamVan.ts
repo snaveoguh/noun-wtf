@@ -24,6 +24,17 @@ const FRONT_U = 6.42; // front bumper
 const MID_U = (REAR_U + FRONT_U) / 2;
 const HL = ROOF + 0.04 - FLOOR; // hatch length
 
+// NOUN FM station: the box section's roof pops up this far so a Noun can
+// stand inside, from the rear opening to the cab partition at POP_D.
+const RAISE = 1.15;
+const POP_D = 4.9;
+/** The decks' front edge and the spot a DJ stands at (distance from rear). */
+const DECK_D0 = 3.5;
+const DECK_D1 = 4.1;
+const DJ_D = 2.75;
+/** Rear ramp under the stairs (metres out behind the van). */
+const RAMP_RUN = 1.7;
+
 /** Collision body in van-local space (group origin / axes). */
 const BODY_BOX = {
   w: 2 * W,
@@ -371,7 +382,8 @@ function wall(v: THREE.Group, M: Mats, side: -1 | 1, wins: Win[]) {
  *   (to z ≈ −5.4, at 2.9 m height) on two ground stays, and the slide-out
  *   stairs ~0.8 m (to z ≈ −4.0)
  */
-export function buildIceCreamVan(): THREE.Group {
+export function buildIceCreamVan(opts: { station?: boolean } = {}): THREE.Group {
+  const station = opts.station === true;
   const M = makeMats();
   const root = new THREE.Group();
   root.name = 'IceCreamVan';
@@ -388,10 +400,13 @@ export function buildIceCreamVan(): THREE.Group {
   box(v, W + 0.015, W + 0.05, 1.25, 1.33, 4.3, 4.4, M.chrome);
 
   // roof, front cap, A/C pods, marker lights
-  box(v, -W, W, ROOF, ROOF + 0.06, 0, 6.08, M.roof);
+  // (NOUN FM: the box section's roof pops up on striped bellows, see buildStation)
+  const lift = station ? RAISE : 0;
+  if (station) box(v, -W, W, ROOF, ROOF + 0.06, POP_D, 6.08, M.roof);
+  box(v, -W, W, ROOF + lift, ROOF + lift + 0.06, 0, station ? POP_D : 6.08, M.roof);
   box(v, -W, W, 2.6, ROOF + 0.06, 5.95, 6.31, M.skin);
-  box(v, -0.42, 0.42, ROOF + 0.06, ROOF + 0.32, 1.3, 2.2, M.roof);
-  box(v, -0.38, 0.38, ROOF + 0.06, ROOF + 0.22, 2.9, 3.6, M.roof);
+  box(v, -0.42, 0.42, ROOF + lift + 0.06, ROOF + lift + 0.32, 1.3, 2.2, M.roof);
+  box(v, -0.38, 0.38, ROOF + lift + 0.06, ROOF + lift + 0.22, 2.9, 3.6, M.roof);
   for (const x of [-0.9, 0, 0.9]) box(v, x - 0.05, x + 0.05, 2.72, 2.79, 6.31, 6.34, M.amber);
 
   // front: lower panel, painted face, chrome bumper
@@ -425,7 +440,7 @@ export function buildIceCreamVan(): THREE.Group {
   // ── rear: ring frame, lower panel, lights, bumper ──
   box(v, -W, -1.1, FLOOR, ROOF, 0, 0.08, M.steel);
   box(v, 1.1, W, FLOOR, ROOF, 0, 0.08, M.steel);
-  box(v, -W, W, 2.72, ROOF, 0, 0.08, M.steel);
+  if (!station) box(v, -W, W, 2.72, ROOF, 0, 0.08, M.steel);
   box(v, -W, W, 0.42, FLOOR, 0, 0.04, M.skin);
   const rs = new THREE.Mesh(new THREE.PlaneGeometry(2 * W, 0.08), M.pink);
   rs.position.set(0, 0.65, 0.002);
@@ -474,12 +489,12 @@ export function buildIceCreamVan(): THREE.Group {
   }
 
   // ── slide-out stairs ──
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 3 && !station; i++) {
     const tr = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.25), M.alu);
     tr.position.set(0, FLOOR - 0.2 * i, 0.25 * i - 0.11);
     v.add(tr);
   }
-  for (const x of [-0.42, 0.42]) {
+  for (const x of station ? [] : [-0.42, 0.42]) {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 1.15), M.steel);
     st.position.set(x, 0.38, 0.5);
     st.rotation.x = Math.atan2(FLOOR - 0.02, 0.95);
@@ -488,27 +503,44 @@ export function buildIceCreamVan(): THREE.Group {
 
   // ── interior (what you see through the open back) ──
   box(v, -IN, IN, FLOOR - 0.03, FLOOR + 0.003, 0, 6.2, M.vinyl);
-  box(v, -IN, IN, 2.76, 2.78, 0, 6.06, M.cab);
+  if (station) {
+    box(v, -IN, IN, 2.76, 2.78, POP_D, 6.06, M.cab);
+    buildStation(v, M);
+  } else box(v, -IN, IN, 2.76, 2.78, 0, 6.06, M.cab);
   // driver-side sink unit with a copper basin and brass tap
-  box(v, -IN, -0.58, FLOOR, FLOOR + 0.1, 0.95, 2.1, M.dark);
-  box(v, -IN, -0.58, FLOOR + 0.1, 1.7, 0.9, 2.1, M.cab);
-  box(v, -IN, -0.55, 1.7, 1.735, 0.88, 2.12, M.teak);
-  const basin = cyl(v, 0.2, 0.02, 16, M.copper);
-  basin.position.set(-0.87, 1.74, -1.5);
-  rod(v, new THREE.Vector3(-1.12, 1.735, -1.5), new THREE.Vector3(-1.12, 2.1, -1.5), 0.02, M.brass);
-  rod(v, new THREE.Vector3(-1.12, 2.1, -1.5), new THREE.Vector3(-0.94, 2.02, -1.5), 0.02, M.brass);
-  // serving counter across the back, walk-in gap on the driver side
-  box(v, -0.42, IN, FLOOR + 0.003, FLOOR + 0.11, 0.15, 0.7, M.dark);
-  box(v, -0.42, IN, FLOOR + 0.11, 1.75, 0.1, 0.7, M.cab);
-  box(v, -0.46, IN, 1.75, 1.785, 0.05, 0.72, M.teak);
-  box(v, 0.1, 0.45, 1.785, 1.81, 0.25, 0.55, M.teak);
-  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.16, 10), M.pot);
-  pot.position.set(0.95, 1.865, -0.45);
-  v.add(pot);
-  const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 0), M.plant);
-  bush.scale.set(1, 1.35, 1);
-  bush.position.set(0.95, 2.06, -0.45);
-  v.add(bush);
+  if (!station) {
+    box(v, -IN, -0.58, FLOOR, FLOOR + 0.1, 0.95, 2.1, M.dark);
+    box(v, -IN, -0.58, FLOOR + 0.1, 1.7, 0.9, 2.1, M.cab);
+    box(v, -IN, -0.55, 1.7, 1.735, 0.88, 2.12, M.teak);
+    const basin = cyl(v, 0.2, 0.02, 16, M.copper);
+    basin.position.set(-0.87, 1.74, -1.5);
+    rod(
+      v,
+      new THREE.Vector3(-1.12, 1.735, -1.5),
+      new THREE.Vector3(-1.12, 2.1, -1.5),
+      0.02,
+      M.brass,
+    );
+    rod(
+      v,
+      new THREE.Vector3(-1.12, 2.1, -1.5),
+      new THREE.Vector3(-0.94, 2.02, -1.5),
+      0.02,
+      M.brass,
+    );
+    // serving counter across the back, walk-in gap on the driver side
+    box(v, -0.42, IN, FLOOR + 0.003, FLOOR + 0.11, 0.15, 0.7, M.dark);
+    box(v, -0.42, IN, FLOOR + 0.11, 1.75, 0.1, 0.7, M.cab);
+    box(v, -0.46, IN, 1.75, 1.785, 0.05, 0.72, M.teak);
+    box(v, 0.1, 0.45, 1.785, 1.81, 0.25, 0.55, M.teak);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.16, 10), M.pot);
+    pot.position.set(0.95, 1.865, -0.45);
+    v.add(pot);
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 0), M.plant);
+    bush.scale.set(1, 1.35, 1);
+    bush.position.set(0.95, 2.06, -0.45);
+    v.add(bush);
+  }
   // cab: seats, dash, wheel
   for (const [x0, x1] of [
     [-0.85, -0.35],
@@ -546,4 +578,354 @@ export function iceCreamVanCollisionBox(group: THREE.Object3D): THREE.Mesh {
   group.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);
   mesh.updateMatrixWorld(true);
   return mesh;
+}
+
+// ── NOUN FM station interior ────────────────────────────────────────────
+
+const STRIPES = ['#f2a2b6', '#fbfaf5'];
+
+/** Striped pop-top bellows, with the call sign painted on the sides. */
+function bellowsMaterial(text: boolean): THREE.MeshStandardMaterial {
+  const t = canvasTex(512, 128, (g, w, h) => {
+    for (let x = 0; x < w; x += 32) {
+      g.fillStyle = STRIPES[(x / 32) % 2]!;
+      g.fillRect(x, 0, 32, h);
+    }
+    if (!text) return;
+    g.fillStyle = '#111619';
+    g.fillRect(96, 22, 320, 84);
+    g.fillStyle = '#ffd400';
+    g.font = 'italic 900 64px Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('NOUN FM', 256, 66);
+  });
+  return new THREE.MeshStandardMaterial({
+    map: t,
+    roughness: 0.8,
+    side: THREE.DoubleSide,
+    emissive: 0x2a2a2a,
+  });
+}
+
+/** The glowing "NOUN FM ⌐◨-◨" sign behind the decks. */
+function signMaterial(): THREE.MeshStandardMaterial {
+  const t = canvasTex(512, 160, (g, w, h) => {
+    g.fillStyle = '#111619';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#f2a2b6';
+    g.lineWidth = 10;
+    g.strokeRect(8, 8, w - 16, h - 16);
+    g.fillStyle = '#ffd400';
+    g.font = 'italic 900 86px Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('NOUN FM', w / 2 - 50, h / 2 + 4);
+    // noggles
+    g.fillStyle = '#d22209';
+    g.fillRect(392, 58, 26, 40);
+    g.fillRect(436, 58, 26, 40);
+    g.fillRect(380, 70, 12, 6);
+    g.fillRect(418, 70, 18, 6);
+    g.fillStyle = '#fff';
+    g.fillRect(398, 64, 8, 28);
+    g.fillRect(442, 64, 8, 28);
+  });
+  return new THREE.MeshStandardMaterial({
+    map: t,
+    emissiveMap: t,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.6,
+    roughness: 0.6,
+  });
+}
+
+function checkerMaterial(): THREE.MeshStandardMaterial {
+  const t = canvasTex(64, 64, g => {
+    for (let y = 0; y < 4; y++)
+      for (let x = 0; x < 4; x++) {
+        g.fillStyle = (x + y) % 2 === 0 ? '#1b1f22' : '#efece4';
+        g.fillRect(x * 16, y * 16, 16, 16);
+      }
+  });
+  t.magFilter = THREE.NearestFilter;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2.4, 3.5);
+  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, emissive: 0x181818 });
+}
+
+/** A lamp with its own material (pulsed by name after toonify). */
+function lamp(color: number): THREE.MeshStandardMaterial {
+  return flat(color, { emissive: color, emissiveIntensity: 0.4 });
+}
+
+/** Speaker cone facing the entrance (−d), named for the pulse. */
+function cone(v: THREE.Group, M: Mats, x: number, y: number, d: number, r: number, i: number) {
+  const ring = cyl(v, r + 0.03, 0.02, 16, M.chrome);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(x, y, -(d - 0.012));
+  const c = cyl(v, r, 0.03, 16, M.tyre);
+  c.rotation.x = Math.PI / 2;
+  c.position.set(x, y, -(d - 0.03));
+  c.name = `fm-cone-${i}`;
+  const cap = cyl(c, r * 0.32, 0.05, 10, M.alu);
+  cap.position.set(0, 0.02, 0);
+}
+
+/**
+ * Pop-top bellows, rear ramp + stairs, and the station inside: DJ table
+ * with two turntables and a mixer, speaker stacks, the NOUN FM sign, a
+ * ceiling light bar and roof horns. Boxes and flat colours only (cheap on
+ * phones); the moving parts are found by name in `vanStation`.
+ */
+function buildStation(v: THREE.Group, M: Mats) {
+  const top = ROOF + RAISE;
+  // bellows: sides + front, between the old roof line and the lifted roof
+  const side = bellowsMaterial(true);
+  for (const sgn of [-1, 1]) {
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(POP_D - 0.1, RAISE), side);
+    p.rotation.y = (sgn * Math.PI) / 2;
+    p.position.set(sgn * (W - 0.03), ROOF + RAISE / 2, -(POP_D / 2 + 0.02));
+    v.add(p);
+  }
+  const front = new THREE.Mesh(
+    new THREE.PlaneGeometry(2 * W - 0.06, RAISE),
+    bellowsMaterial(false),
+  );
+  front.position.set(0, ROOF + RAISE / 2, -(POP_D - 0.03));
+  v.add(front);
+  // scissor struts at the rear corners
+  for (const sgn of [-1, 1]) {
+    const x = sgn * 1.12;
+    rod(v, new THREE.Vector3(x, ROOF, -0.1), new THREE.Vector3(x, top, -0.5), 0.02, M.chrome);
+    rod(v, new THREE.Vector3(x, ROOF, -0.5), new THREE.Vector3(x, top, -0.1), 0.02, M.chrome);
+  }
+  // lifted ceiling lining
+  box(v, -IN, IN, top - 0.04, top - 0.02, 0, POP_D, M.cab);
+
+  // dance floor
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * IN, DECK_D0), checkerMaterial());
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, FLOOR + 0.006, -DECK_D0 / 2);
+  v.add(floor);
+
+  // stairs down to the ramp (4 treads, 0.16 m rise)
+  for (let i = 1; i <= 4; i++) {
+    const tr = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.44), M.alu);
+    tr.position.set(0, FLOOR - 0.16 * i, (RAMP_RUN / 4.4) * i - 0.12);
+    v.add(tr);
+  }
+  for (const x of [-0.68, 0.68]) {
+    const a = new THREE.Vector3(x, FLOOR, 0.02);
+    rod(v, a, new THREE.Vector3(x, 0.02, RAMP_RUN), 0.03, M.steel);
+    rod(v, a.setY(FLOOR + 0.85), new THREE.Vector3(x, 0.85, RAMP_RUN), 0.02, M.chrome);
+    rod(
+      v,
+      new THREE.Vector3(x, 0.02, RAMP_RUN),
+      new THREE.Vector3(x, 0.87, RAMP_RUN),
+      0.02,
+      M.chrome,
+    );
+  }
+
+  // DJ table: dark body, teak top, pink stripe on the front
+  box(v, -1.0, 1.0, FLOOR, FLOOR + 0.9, DECK_D0, DECK_D1, M.dark);
+  box(v, -1.04, 1.04, FLOOR + 0.9, FLOOR + 0.94, DECK_D0 - 0.04, DECK_D1 + 0.02, M.teak);
+  const stripe = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.12), M.pink);
+  stripe.rotation.y = Math.PI;
+  stripe.position.set(0, FLOOR + 0.6, -(DECK_D0 - 0.003));
+  v.add(stripe);
+  const deckTop = FLOOR + 0.94;
+  const mid = (DECK_D0 + DECK_D1) / 2;
+  // two turntables: plinth, platter (spins), off-centre label, tonearm
+  [-0.56, 0.56].forEach((x, i) => {
+    box(v, x - 0.3, x + 0.3, deckTop, deckTop + 0.07, mid - 0.24, mid + 0.24, M.alu);
+    const platter = cyl(v, 0.19, 0.025, 20, M.tyre);
+    platter.position.set(x - 0.04, deckTop + 0.085, -mid);
+    platter.name = `fm-platter-${i}`;
+    const label = cyl(platter, 0.065, 0.03, 12, i === 0 ? M.red : M.amber);
+    label.position.set(0.08, 0.002, 0);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, 0.3), M.chrome);
+    arm.position.set(x + 0.2, deckTop + 0.1, -(mid - 0.05));
+    arm.rotation.y = 0.35;
+    v.add(arm);
+  });
+  // mixer with faders and two level meters
+  box(v, -0.17, 0.17, deckTop, deckTop + 0.09, mid - 0.2, mid + 0.2, M.dark);
+  for (const x of [-0.09, 0, 0.09])
+    box(v, x - 0.015, x + 0.015, deckTop + 0.09, deckTop + 0.13, mid - 0.12, mid - 0.06, M.amber);
+  [-0.06, 0.06].forEach((x, i) => {
+    const meter = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.015, 0.16), lamp(0x3ddc84));
+    meter.position.set(x, deckTop + 0.095, -(mid + 0.08));
+    meter.name = `fm-meter-${i}`;
+    v.add(meter);
+  });
+
+  // speaker stacks either side, behind the table
+  let ci = 0;
+  for (const sgn of [-1, 1]) {
+    const x0 = sgn < 0 ? -IN + 0.02 : 0.58;
+    const x1 = sgn < 0 ? -0.58 : IN - 0.02;
+    const xc = (x0 + x1) / 2;
+    box(v, x0, x1, FLOOR, FLOOR + 0.78, 4.2, 4.78, M.dark);
+    box(v, x0 + 0.04, x1 - 0.04, FLOOR + 0.8, FLOOR + 1.45, 4.25, 4.78, M.dark);
+    cone(v, M, xc, FLOOR + 0.39, 4.2, 0.23, ci++);
+    cone(v, M, xc, FLOOR + 1.2, 4.25, 0.13, ci++);
+    cone(v, M, xc, FLOOR + 0.98, 4.25, 0.07, ci++);
+  }
+  // cab partition with the glowing sign
+  box(v, -IN, IN, FLOOR, top, 4.8, 4.84, M.cab);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.36), signMaterial());
+  sign.rotation.y = Math.PI;
+  sign.position.set(0, FLOOR + 1.85, -4.79);
+  sign.name = 'fm-sign';
+  v.add(sign);
+
+  // ceiling light bar: pink / yellow / cyan pods
+  const cols = [0xf2a2b6, 0xffd400, 0x48d6ff, 0xf2a2b6, 0xffd400];
+  cols.forEach((c, i) => {
+    const d = 0.6 + i * 0.85;
+    box(v, -0.5, 0.5, top - 0.1, top - 0.04, d - 0.05, d + 0.05, M.dark);
+    for (const x of [-0.38, 0.38]) {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.16), lamp(c));
+      l.position.set(x, top - 0.14, -d);
+      l.name = `fm-light-${i}`;
+      v.add(l);
+    }
+  });
+
+  // roof: two ice-cream-van horn speakers + an ON AIR lamp
+  for (const sgn of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.05, 0.42, 12, 1, true), M.chrome);
+    horn.rotation.x = -Math.PI / 2;
+    horn.rotation.z = sgn * 0.5;
+    horn.position.set(sgn * 0.62, top + 0.3, -3.7);
+    v.add(horn);
+    box(v, sgn * 0.62 - 0.04, sgn * 0.62 + 0.04, top + 0.06, top + 0.3, 3.86, 3.94, M.steel);
+  }
+  const onAir = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.12), lamp(0xff3020));
+  onAir.position.set(0, top + 0.16, -0.4);
+  onAir.name = 'fm-onair';
+  v.add(onAir);
+}
+
+/** Collision boxes in the van's source frame (x, y, d from the rear). */
+function stationColliders(v: THREE.Group, m: THREE.Material) {
+  const top = ROOF + RAISE;
+  box(v, -W, W, 0, FLOOR, 0, FRONT_U, m); // chassis: its top is the floor
+  box(v, -W, -IN, FLOOR, top + 0.06, 0, POP_D, m);
+  box(v, IN, W, FLOOR, top + 0.06, 0, POP_D, m);
+  box(v, -W, W, FLOOR, ROOF + 0.06, 4.8, FRONT_U, m); // partition + cab
+  box(v, -W, W, top, top + 0.06, 0, POP_D, m); // lifted roof
+  box(v, -1.04, 1.04, FLOOR, FLOOR + 0.94, DECK_D0 - 0.04, DECK_D1, m); // decks
+  box(v, -IN, IN, FLOOR, FLOOR + 1.45, 4.2, 4.8, m); // speaker stacks
+  // ramp up to the floor under the stairs
+  const len = Math.hypot(RAMP_RUN, FLOOR);
+  const a = Math.atan2(FLOOR, RAMP_RUN);
+  const r = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, len), m);
+  r.rotation.x = a;
+  r.position.set(0, FLOOR / 2 - 0.15 * Math.cos(a), RAMP_RUN / 2 - 0.15 * Math.sin(a));
+  v.add(r);
+}
+
+/**
+ * Walk-in collision for the station van (floor, walls, lifted roof, decks,
+ * speakers, rear ramp), baked to world space like iceCreamVanCollisionBox.
+ */
+export function iceCreamVanStationCollision(group: THREE.Object3D): THREE.Mesh[] {
+  group.updateWorldMatrix(true, false);
+  const v = new THREE.Group();
+  v.rotation.y = Math.PI;
+  v.position.z = -MID_U;
+  const m = new THREE.MeshBasicMaterial({ visible: false });
+  stationColliders(v, m);
+  v.updateMatrix();
+  const mw = new THREE.Matrix4();
+  return v.children.map((c, i) => {
+    const mesh = c as THREE.Mesh;
+    mesh.updateMatrix();
+    mw.multiplyMatrices(group.matrixWorld, v.matrix).multiply(mesh.matrix);
+    const o = new THREE.Mesh(mesh.geometry, m);
+    o.name = `col_IceCreamVan_${i}`;
+    mw.decompose(o.position, o.quaternion, o.scale);
+    o.updateMatrixWorld(true);
+    return o;
+  });
+}
+
+/** Source-frame (x, y, d) → van-local (group) coordinates. */
+function local(x: number, y: number, d: number): THREE.Vector3 {
+  return new THREE.Vector3(-x, y, d - MID_U);
+}
+
+export interface VanStation {
+  group: THREE.Object3D;
+  /** Where a DJ stands at the decks (van-local). */
+  deckSpot: THREE.Vector3;
+  /** The speakers (van-local), for spatial audio. */
+  speakers: THREE.Vector3;
+  /** Is this world point (feet) in the booth, in front of the decks? */
+  atDecks(p: THREE.Vector3): boolean;
+  /** Pulse the lights / cones and spin the platters. `level` 0..1. */
+  animate(dt: number, level: number, live: boolean): void;
+}
+
+/** Hook up the station van's moving parts (call after toonify). */
+export function vanStation(group: THREE.Object3D): VanStation {
+  const lights: THREE.Mesh[] = [];
+  const cones: THREE.Mesh[] = [];
+  const platters: THREE.Mesh[] = [];
+  const meters: THREE.Mesh[] = [];
+  const singles: Record<string, THREE.Mesh> = {};
+  group.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (m.name.startsWith('fm-light-')) lights.push(m);
+    else if (m.name.startsWith('fm-cone-')) cones.push(m);
+    else if (m.name.startsWith('fm-platter-')) platters.push(m);
+    else if (m.name.startsWith('fm-meter-')) meters.push(m);
+    else if (m.name === 'fm-onair' || m.name === 'fm-sign') singles[m.name] = m;
+  });
+  type Glow = THREE.Material & { emissiveIntensity?: number };
+  const glow = (m: THREE.Mesh | undefined, k: number) => {
+    const mat = m?.material as Glow | undefined;
+    if (mat !== undefined && mat.emissiveIntensity !== undefined) mat.emissiveIntensity = k;
+  };
+  const deckSpot = local(0, FLOOR, DJ_D);
+  const speakers = local(0, FLOOR + 1.2, 2.5);
+  const inv = new THREE.Matrix4();
+  const tmp = new THREE.Vector3();
+  let t = 0;
+  let smooth = 0;
+  return {
+    group,
+    deckSpot,
+    speakers,
+    atDecks(p) {
+      group.updateWorldMatrix(true, false);
+      inv.copy(group.matrixWorld).invert();
+      tmp.copy(p).applyMatrix4(inv);
+      return (
+        Math.abs(tmp.x) < IN - 0.1 &&
+        tmp.z > deckSpot.z - 1.6 &&
+        tmp.z < deckSpot.z + 0.9 &&
+        Math.abs(tmp.y - FLOOR) < 0.7
+      );
+    },
+    animate(dt, level, live) {
+      t += dt;
+      smooth += (level - smooth) * Math.min(1, dt * 18);
+      const k = live ? smooth : 0;
+      lights.forEach((l, i) => {
+        // chase the pulse down the bar
+        const wave = 0.5 + 0.5 * Math.sin(t * 5 - i * 0.9);
+        glow(l, live ? 0.25 + 1.6 * k * (0.4 + 0.6 * wave) : 0.15);
+      });
+      meters.forEach((m, i) => glow(m, live ? 0.2 + 2 * k * (i === 0 ? 1 : 0.8) : 0.05));
+      cones.forEach(c => c.scale.setScalar(1 + 0.12 * k));
+      if (live) for (const p of platters) p.rotation.y -= dt * 3.49; // 33⅓ rpm
+      glow(singles['fm-onair'], live ? (Math.sin(t * 3) > -0.3 ? 1.6 : 0.4) : 0.1);
+      glow(singles['fm-sign'], 0.45 + 0.6 * k);
+    },
+  };
 }

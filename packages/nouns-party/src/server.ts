@@ -1,5 +1,6 @@
 import type { Party, PartyKitServer, Connection } from 'partykit/server';
 
+import { FmRelay } from './fmRelay';
 import { HoopsRelay } from './hoopsRelay';
 import { WarfareRelay } from './warfareRelay';
 
@@ -23,9 +24,14 @@ import { WarfareRelay } from './warfareRelay';
  * 4. Noun Warfare (room `noun-warfare` only, wf: prefix): lobby registry +
  *    host-authoritative match relay (see warfareRelay.ts). That room skips
  *    the saber / world traffic entirely, and other rooms ignore wf:.
+ *
+ * 5. NOUN FM (world v2 room only, fm: prefix): the ice cream van's radio
+ *    station, queue + today's DJ sets (see fmRelay.ts). Persisted under
+ *    storage key `fm`; optional admin token in env FM_ADMIN_TOKEN.
  */
 
 const WARFARE_ROOM = 'noun-warfare';
+const FM_ROOM = 'nouns-world-v2';
 
 // ── Saber types ───────────────────────────────────────────────────────
 
@@ -78,6 +84,7 @@ interface RoomState {
   _leaderboard: LeaderboardEntry[];
   _hoops?: HoopsRelay;
   _warfare?: WarfareRelay;
+  _fm?: FmRelay;
 }
 
 function getRoomState(room: Party): RoomState {
@@ -102,6 +109,15 @@ export default {
     const stored = await room.storage.get<LeaderboardEntry[]>('leaderboard');
     const rs = getRoomState(room);
     rs._leaderboard = stored ?? [];
+    if (room.id === FM_ROOM) {
+      const token = room.env.FM_ADMIN_TOKEN;
+      rs._fm = new FmRelay({
+        conns: () => room.getConnections(),
+        adminToken: typeof token === 'string' ? token : undefined,
+        save: snap => void room.storage.put('fm', snap).catch(() => undefined),
+      });
+      rs._fm.load(await room.storage.get('fm'));
+    }
   },
 
   onConnect(connection: Connection, room: Party) {
@@ -163,6 +179,12 @@ export default {
         if (message.length > 8192) return;
         rs._hoops ??= new HoopsRelay();
         rs._hoops.handle(data, connection, room.getConnections());
+        return;
+      }
+
+      // ── NOUN FM (fm: prefix, world v2 room only) ────────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('fm:')) {
+        rs._fm?.handle(data, message.length, connection);
         return;
       }
 
@@ -507,6 +529,7 @@ export default {
     }
 
     rs._hoops?.close(connection.id, room.getConnections());
+    rs._fm?.close(connection.id);
 
     const count = [...room.getConnections()].length;
     room.broadcast(JSON.stringify({ type: 'leave', id: connection.id, count }));

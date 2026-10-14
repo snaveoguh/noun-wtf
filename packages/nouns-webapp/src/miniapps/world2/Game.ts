@@ -37,13 +37,20 @@ import {
 import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { NounFm } from './radio/NounFm';
+import { localTransport, netTransport } from './radio/transport';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
 import { inkExcluded, toonify } from './render/Toon';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
-import { buildIceCreamVan, iceCreamVanCollisionBox } from './world/IceCreamVan';
+import {
+  buildIceCreamVan,
+  iceCreamVanStationCollision,
+  vanStation,
+  type VanStation,
+} from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { dressingDecorator } from './world/mountain/DressingDecorator';
@@ -129,6 +136,8 @@ export interface HudState {
   toast: { text: string; at: number; tag?: string } | null;
   /** At the Noun Jersey board shop's door (opens the deck designer). */
   shop: boolean;
+  /** At the NOUN FM decks inside the ice cream van (opens the station panel). */
+  fmDecks: boolean;
 }
 
 interface RemoteAvatar {
@@ -238,7 +247,10 @@ export class Game {
       mineCombo: undefined,
       toast: null,
       shop: false,
+      fmDecks: false,
     };
+    this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
+    this.wireFm();
   }
 
   subscribe(fn: () => void) {
@@ -381,6 +393,7 @@ export class Game {
     if (ctx !== null && !this.radioAttached) {
       this.radioAttached = true;
       this.radio.attach(ctx, ctx.destination, this.audio.noise);
+      this.fm.attach(ctx, ctx.destination, this.audio.noise);
       this.radio.onNowPlaying = label => {
         this.hud = {
           ...this.hud,
@@ -395,6 +408,51 @@ export class Game {
 
   radio = new PirateRadio();
   private radioAttached = false;
+  /** NOUN FM, the shared station in the ice cream van (radio/). */
+  readonly fm: NounFm;
+  /** The van's station bits (decks zone, lights), once it's parked. */
+  van: VanStation | null = null;
+  private fmFwd = new THREE.Vector3();
+
+  /** NOUN FM joins the radio cycle; its fallback is the pirate worklet. */
+  private wireFm() {
+    const fm = this.fm;
+    this.radio.fm = fm;
+    fm.volume = this.radio.volume;
+    fm.onFallback = on => this.radio.setFmFallback(on);
+    fm.onFallbackNext = () => this.radio.nextFallback();
+    fm.fallbackSong = () => this.radio.songLabel;
+    fm.onTrackChange = (label, tuned) => {
+      if (tuned) this.radio.onNowPlaying?.(label);
+      else {
+        this.hud = {
+          ...this.hud,
+          toast: {
+            tag: '📻 NOW PLAYING ON NOUN FM',
+            text: label.replace(/^NOUN FM · /, ''),
+            at: performance.now(),
+          },
+        };
+        this.emit();
+      }
+    };
+  }
+
+  private updateFm(dt: number) {
+    const cam = this.gfx.camera;
+    cam.getWorldDirection(this.fmFwd);
+    this.fm.update(dt, cam.position, this.fmFwd);
+    this.van?.animate(dt, this.fm.level, this.fm.live);
+    const decks =
+      this.van !== null &&
+      !this.hoops.active &&
+      this.player.speed < 4 &&
+      this.van.atDecks(this.player.pos);
+    if (decks !== this.hud.fmDecks) {
+      this.hud = { ...this.hud, fmDecks: decks };
+      this.emit();
+    }
+  }
   billboards = new PipBillboards();
 
   /** off → pirate radio → live streams → off */
@@ -419,6 +477,7 @@ export class Game {
     if (this.paused === p) return;
     this.paused = p;
     this.input.setEnabled(!p);
+    this.fm.setHidden(p);
   }
 
   private frame = (now: number) => {
@@ -465,6 +524,7 @@ export class Game {
     if (this.hoops.active) {
       this.input.poll(now); // drain the skate controls so nothing fires on the way back
       this.hoops.step(dt);
+      this.updateFm(dt);
       this.animTime += dt; // keeps my parked pose fresh for the room
       this.updateNetwork(dt);
       this.crew?.update(dt, this.hoops.focus);
@@ -508,6 +568,7 @@ export class Game {
     this.cam.update(dt, this.player, input.lookX, input.lookY, now);
     this.updateMyCharacter(dt);
     this.updateAudio(dt);
+    this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.drops?.update(dt, this.player);
@@ -657,13 +718,16 @@ export class Game {
       for (const [x, z, yaw] of candidates) {
         const y = isClear(x, z, yaw);
         if (y === null) continue;
-        const van = buildIceCreamVan();
+        // Parked for good, so NOUN FM broadcasts from it: pop-top, decks, walk-in
+        const van = buildIceCreamVan({ station: true });
         van.position.set(x, y, z);
         van.rotation.y = yaw;
         van.updateMatrixWorld(true);
         if (this.gfx.toon) toonify(van);
         this.gfx.scene.add(van);
-        this.propCollision.push(iceCreamVanCollisionBox(van));
+        this.propCollision.push(...iceCreamVanStationCollision(van));
+        this.van = vanStation(van);
+        this.fm.vanPos = van.localToWorld(this.van.speakers.clone());
         // Respawn spot: beside the serving hatch, facing out
         const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         this.player.homeSpots.push({
@@ -1547,6 +1611,7 @@ export class Game {
     this.nature?.dispose();
     this.billboards.dispose();
     this.radio.dispose();
+    this.fm.dispose();
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);
