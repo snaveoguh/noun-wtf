@@ -12,6 +12,9 @@
 // Top speed, jump height and hang time are competition records, so each one
 // travels with a proof: the trace of the ride that set it (RunTrace below),
 // which the server checks against the game's physics (netlify/lib/runProof).
+// A claim and its proof always go in the same post (a proved record is never
+// posted on its own), a proof is kept until the server has said what it did
+// with the claim, and a long ride's proof is trimmed to fit (trimTrace).
 //
 // A rider can link an ETH address (linkWallet below: a signed message, no
 // gas). The address then owns the row and its name: every browser linked to
@@ -20,6 +23,16 @@
 
 import type { Player } from '../skate/Player';
 import type { ComboState } from '../skate/Tricks';
+
+import {
+  decimate,
+  decodeTrace,
+  encodeTrace,
+  STRIDE,
+  TRIM_LEVELS,
+  trimTrace,
+  type ProvedKey,
+} from '../../../../netlify/lib/runProof';
 
 const URL_ = '/.netlify/functions/world-stats';
 const RIDER_KEY = 'noun-world-rider-id';
@@ -35,31 +48,69 @@ const LINK_KEY = 'noun-world-wallet-link';
 export type BestKey = 'kmh' | 'combo' | 'session' | 'airM' | 'airS' | 'grindM' | 'downM';
 export type AddKey = 'km' | 'tricks' | 'playS';
 export type StatKey = BestKey | AddKey;
+export type { ProvedKey };
 
 /** Records the server only accepts with a run proof. */
-const PROVED: BestKey[] = ['kmh', 'airM', 'airS'];
-const STRIDE = 6;
+const PROVED: readonly ProvedKey[] = ['kmh', 'airM', 'airS'];
+const isProved = (k: BestKey): k is ProvedKey => (PROVED as readonly string[]).includes(k);
+/** A live trace thins its older part when it reaches this many samples. */
 const MAX_SAMPLES = 60_000;
+/**
+ * Samples per proof sent (≈ 640k chars). Longer rides are trimmed to this
+ * (trimTrace: the start, the claimed moment at full rate, thinner between).
+ */
+export const PROOF_SAMPLES = 20_000;
+/** Proof chars in one post: three full proofs, well under Netlify's 6 MB. */
+const MAX_BODY_PROOF_CHARS = 2_000_000;
+/** Finished rides kept in memory for "replay last run". */
+const RECENT_RUNS = 4;
+
+const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** A ride's trace, for proofs and replays. */
+export interface RideRun {
+  id: string;
+  /** When the ride started (ms since epoch). */
+  at: number;
+  /** [t, x, y, z, speed, state] × n */
+  samples: Float32Array;
+  /** The record it set or claimed, if any. */
+  key?: ProvedKey;
+  value?: number;
+  status?: 'saved' | 'refused';
+  reason?: string;
+}
+
+/** A proved record the server answered: saved, or refused (with why). */
+export interface RecordEvent {
+  kind: 'saved' | 'refused';
+  key: ProvedKey;
+  value: number;
+  reason?: string;
+  run: RideRun;
+}
 
 /**
  * One ride on the board since the last respawn / getting on:
  * [t, x, y, z, speed, state] samples (state 0 ground, 1 air, 2 grind,
  * 3 manual, 4 bail), every 0.4 s on the ground, every frame-ish in the air, and on
- * every change of state or new top speed.
+ * every change of state or new top speed. It never fills up: at
+ * MAX_SAMPLES everything but the last minute is thinned (decimate keeps the
+ * start, the fastest sample and both sides of every change of state).
  */
 class RunTrace {
   private data = new Float32Array(STRIDE * 1024);
   n = 0;
   maxV = 0;
-  full = false;
   private lastT = -Infinity;
   private lastSt = -1;
   private lastV = 0;
+  readonly id = newId();
+  readonly at = Date.now();
 
-  constructor(private t0: number) {}
+  constructor(readonly t0: number) {}
 
   sample(clock: number, x: number, y: number, z: number, v: number, st: number) {
-    if (this.full) return;
     const t = clock - this.t0;
     const gap = t - this.lastT;
     // Also on any sharp change of speed (a bail or crash between two ground
@@ -70,10 +121,7 @@ class RunTrace {
       gap >= (st === 1 ? 1 / 30 : 0.4) ||
       ((v > this.maxV || jolt) && gap >= 1 / 30);
     if (!due) return;
-    if (this.n >= MAX_SAMPLES) {
-      this.full = true;
-      return;
-    }
+    if (this.n >= MAX_SAMPLES) this.compact(t);
     if ((this.n + 1) * STRIDE > this.data.length) {
       const next = new Float32Array(this.data.length * 2);
       next.set(this.data);
@@ -87,12 +135,22 @@ class RunTrace {
     if (v > this.maxV) this.maxV = v;
   }
 
-  encode(): string {
-    const bytes = new Uint8Array(this.data.buffer, 0, this.n * STRIDE * 4);
-    let bin = '';
-    for (let i = 0; i < bytes.length; i += 0x8000)
-      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(bin);
+  /** Thin everything older than a minute, coarser until it's under 60 % full. */
+  private compact(now: number) {
+    const cur = this.samples();
+    let next = cur;
+    for (const [g, a] of TRIM_LEVELS.slice(1)) {
+      next = decimate(cur, g, a, [[now - 60, Infinity]]);
+      if (next.length / STRIDE <= MAX_SAMPLES * 0.6) break;
+    }
+    this.data = new Float32Array(Math.max(next.length * 2, STRIDE * 1024));
+    this.data.set(next);
+    this.n = next.length / STRIDE;
+  }
+
+  /** The samples so far (a view: later samples and compaction never change it). */
+  samples(): Float32Array {
+    return this.data.subarray(0, this.n * STRIDE);
   }
 }
 
@@ -287,10 +345,57 @@ export async function fetchStats(): Promise<WorldStats | null> {
   }
 }
 
+/** A raised proved record waiting for the server, with the ride that proves it. */
+interface Proof {
+  /**
+   * The ride. A speed record keeps its live trace (still growing until it's
+   * sent); a jump keeps the trace as it was on landing; a proof restored
+   * after a reload is the decoded samples.
+   */
+  src: RunTrace | Float32Array;
+  /** Trace-time range kept at full rate when the proof is trimmed (the jump). */
+  keep?: [number, number];
+  seq: number;
+  /** The value before the raise: what's saved locally until the server has it. */
+  base: number | undefined;
+  runId: string;
+  runAt: number;
+  /** Answers that neither took nor refused it. */
+  tries: number;
+}
+
+/** A pending proof as stored across a reload. */
+interface PendingEntry {
+  k: ProvedKey;
+  v: number;
+  d: string;
+  keep?: [number, number];
+  /** The tab (tracker) that stored it: tabs never drop each other's. */
+  tab?: string;
+}
+
+/** One claim in a post: the record, its proof's seq and the samples sent. */
+interface SentClaim {
+  k: ProvedKey;
+  v: number;
+  seq: number;
+  samples: Float32Array;
+  runId: string;
+  runAt: number;
+}
+
+interface PostAnswer {
+  linked?: WalletLinkState | null;
+  rejected?: Partial<Record<BestKey, string>>;
+  you?: { best?: Partial<Record<BestKey, number>> };
+}
+
 export class StatsTracker {
   mine: MyBests = loadBests();
-  /** A record the server wouldn't take (shown to the rider, never silent). */
-  onRejected?: (k: BestKey, value: number, reason: string) => void;
+  /** A proved record the server answered (saved, or refused: shown, never silent). */
+  onRecord?: (e: RecordEvent) => void;
+  /** Dev / test only: post even though the game is offline. */
+  devLive = false;
   /** Something new to post (a raised best or lifetime deltas). */
   private dirty = true;
   private sessionPosted = false;
@@ -301,6 +406,7 @@ export class StatsTracker {
   private add = { km: 0, tricks: 0, playS: 0 };
   // Air / grind in progress
   private airStartY: number | null = null;
+  private airStartClock = 0;
   private airMaxY = 0;
   private airT = 0;
   private grindM = 0;
@@ -308,21 +414,24 @@ export class StatsTracker {
   // Run proofs
   private clock = 0;
   private trace: RunTrace | null = null;
+  private recent: RideRun[] = [];
   private lastX = 0;
   private lastY = 0;
   private lastZ = 0;
   private lastV = 0;
   private lastRespawns = 0;
-  /** Raised records waiting to be posted, with the ride that proves them. */
-  // `base` is the value before the raise: what's saved locally until the
-  // server has the proof (a reload must never leave an unproven claim behind).
-  // `d` is a proof restored from a previous page load (already encoded).
-  private proofs = new Map<
-    BestKey,
-    { trace: RunTrace | null; d?: string; seq: number; base: number | undefined }
-  >();
+  /** Raised proved records waiting on the server. */
+  private proofs = new Map<ProvedKey, Proof>();
   private proofSeq = 0;
+  /** Encoded proofs, so a page hide doesn't trim + encode the same ride twice. */
+  private encoded = new WeakMap<
+    object,
+    { n: number; claims: string; d: string; s: Float32Array }
+  >();
   private disposers: (() => void)[] = [];
+  /** This tracker's id in the pending store, and the entries it took over. */
+  private tab = newId();
+  private adopted = new Set<string>();
 
   constructor(
     private getName: () => string,
@@ -341,52 +450,107 @@ export class StatsTracker {
     );
   }
 
+  private live() {
+    return this.devLive || !this.isOffline();
+  }
+
+  /** Does this session post stats? */
+  isLive() {
+    return this.live();
+  }
+
+  /** A record the server now holds (an approved appeal). */
+  adopt(k: ProvedKey, v: number) {
+    if (this.proofs.has(k) || !(v > (this.mine.best[k] ?? 0))) return;
+    this.mine.best[k] = v;
+    this.persist(false);
+  }
+
+  private readPending(): PendingEntry[] {
+    try {
+      const v = JSON.parse(load(PENDING_KEY) ?? '[]') as PendingEntry[];
+      return Array.isArray(v)
+        ? v.filter(p => isProved(p?.k) && typeof p.d === 'string' && p.v > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
   /** Raised records whose proof a previous page load never got to post. */
   private restorePending() {
-    let pending: { k: BestKey; v: number; d: string }[] = [];
-    try {
-      pending = JSON.parse(load(PENDING_KEY) ?? '[]') as typeof pending;
-    } catch {
-      return;
-    }
-    for (const p of Array.isArray(pending) ? pending : []) {
-      if (!PROVED.includes(p?.k) || typeof p.d !== 'string' || !(p.v > 0)) continue;
+    for (const p of this.readPending()) {
+      this.adopted.add(`${p.tab}:${p.k}`);
       if (!(p.v > (this.mine.best[p.k] ?? 0))) continue;
+      const s = decodeTrace(p.d);
+      if (s === null) continue;
+      const prev = this.proofs.get(p.k);
       this.proofs.set(p.k, {
-        trace: null,
-        d: p.d,
+        src: s,
+        keep: p.keep,
         seq: ++this.proofSeq,
-        base: this.mine.best[p.k],
+        base: prev ? prev.base : this.mine.best[p.k],
+        runId: newId(),
+        runAt: Date.now(),
+        tries: 0,
       });
       this.mine.best[p.k] = p.v;
       this.dirty = true;
     }
   }
 
+  /** The proof for some keys of one ride, trimmed to size and encoded. */
+  private proofFor(src: RunTrace | Float32Array, keys: ProvedKey[]) {
+    const s = src instanceof RunTrace ? src.samples() : src;
+    const claims: Partial<Record<ProvedKey, number>> = {};
+    const keep: [number, number][] = [];
+    for (const k of keys) {
+      claims[k] = this.mine.best[k];
+      const r = this.proofs.get(k)?.keep;
+      if (r) keep.push(r);
+    }
+    const tag = JSON.stringify(claims);
+    const hit = this.encoded.get(src);
+    if (hit && hit.n === s.length && hit.claims === tag) return hit;
+    const trimmed = trimTrace(s, { maxSamples: PROOF_SAMPLES, keep, claims });
+    const out = { n: s.length, claims: tag, d: encodeTrace(trimmed), s: trimmed };
+    this.encoded.set(src, out);
+    return out;
+  }
+
   /** Local bests as far as the server can know them: pending raises held back. */
   private persist(keepPending: boolean) {
     const best = { ...this.mine.best };
-    const pending: { k: BestKey; v: number; d: string }[] = [];
-    const enc = new Map<RunTrace, string>();
     for (const [k, p] of this.proofs) {
       if (p.base === undefined) delete best[k];
       else best[k] = p.base;
-      if (!keepPending) continue;
-      let d = p.d;
-      if (d === undefined && p.trace !== null) {
-        d = enc.get(p.trace) ?? p.trace.encode();
-        enc.set(p.trace, d);
-      }
-      if (d !== undefined) pending.push({ k, v: this.mine.best[k] ?? 0, d });
     }
     save(BEST_KEY, JSON.stringify({ ...this.mine, best }));
-    if (this.proofs.size === 0) {
+    // Another live tab's pending records stay (for keys this one has nothing on)
+    const others = this.readPending().filter(
+      e =>
+        e.tab !== this.tab &&
+        !this.adopted.has(`${e.tab}:${e.k}`) &&
+        !this.proofs.has(e.k) &&
+        e.v > (this.mine.best[e.k] ?? 0),
+    );
+    if (this.proofs.size === 0 && others.length === 0) {
       try {
         localStorage.removeItem(PENDING_KEY);
       } catch {
         // private mode etc.
       }
-    } else if (keepPending) save(PENDING_KEY, JSON.stringify(pending));
+      return;
+    }
+    if (!keepPending) return;
+    const mine: PendingEntry[] = [];
+    for (const [k, p] of this.proofs) {
+      const v = this.mine.best[k];
+      if (v === undefined) continue;
+      const d = this.proofFor(p.src, [k]).d;
+      mine.push({ k, v, d, tab: this.tab, ...(p.keep ? { keep: p.keep } : {}) });
+    }
+    save(PENDING_KEY, JSON.stringify([...others, ...mine]));
   }
 
   dispose() {
@@ -394,15 +558,20 @@ export class StatsTracker {
     for (const d of this.disposers) d();
   }
 
-  private raise(k: BestKey, v: number) {
+  private raise(k: BestKey, v: number, src?: Float32Array, keep?: [number, number]) {
     if (!(v > (this.mine.best[k] ?? 0))) return false;
-    if (PROVED.includes(k)) {
-      if (this.trace === null || this.trace.full) return false;
+    if (isProved(k)) {
+      const trace = this.trace;
+      if (trace === null) return false;
       const prev = this.proofs.get(k);
       this.proofs.set(k, {
-        trace: this.trace,
+        src: src ?? trace,
+        keep,
         seq: ++this.proofSeq,
         base: prev ? prev.base : this.mine.best[k],
+        runId: trace.id,
+        runAt: trace.at,
+        tries: 0,
       });
       // Post soon, while the proof is fresh
       this.flushAcc = Math.max(this.flushAcc, 17);
@@ -426,13 +595,35 @@ export class StatsTracker {
     // within the frame, so the jump + stop alone can miss it: count them too
     const respawned = (this.lastV > 4 && v < 0.05) || p.respawns !== this.lastRespawns;
     this.lastRespawns = p.respawns;
+    const prev = this.trace;
     if (p.mode !== 'board') this.trace = null;
     else if (this.trace === null || teleport || respawned) this.trace = new RunTrace(this.clock);
+    if (prev !== null && prev !== this.trace) this.keepRun(prev);
     this.trace?.sample(this.clock, x, y, z, v, STATE_CODE[p.state] ?? 0);
     this.lastX = x;
     this.lastY = y;
     this.lastZ = z;
     this.lastV = v;
+  }
+
+  /** A finished ride goes into the recent list (replays). */
+  private keepRun(t: RunTrace) {
+    if (t.n < 30) return;
+    this.recent.unshift({ id: t.id, at: t.at, samples: t.samples() });
+    this.recent.length = Math.min(this.recent.length, RECENT_RUNS);
+  }
+
+  /** Recent rides, newest first (the one in progress included). */
+  runs(): RideRun[] {
+    const cur = this.trace;
+    const now =
+      cur !== null && cur.n >= 30 ? [{ id: cur.id, at: cur.at, samples: cur.samples() }] : [];
+    return [...now, ...this.recent];
+  }
+
+  /** Offline (or anywhere stats aren't posted): keep the ride for replays, nothing else. */
+  recordOnly(dt: number, p: Player) {
+    this.record(dt, p);
   }
 
   /** Call every frame while in the world. */
@@ -451,15 +642,20 @@ export class StatsTracker {
     if (p.state === 'air') {
       if (this.airStartY === null) {
         this.airStartY = p.pos.y;
+        this.airStartClock = this.clock;
         this.airMaxY = p.pos.y;
         this.airT = 0;
       }
       this.airT += dt;
       this.airMaxY = Math.max(this.airMaxY, p.pos.y);
     } else if (this.airStartY !== null) {
-      if (p.state !== 'bail') {
-        this.raise('airM', Math.round((this.airMaxY - this.airStartY) * 100) / 100);
-        this.raise('airS', Math.round(this.airT * 100) / 100);
+      if (p.state !== 'bail' && this.trace !== null) {
+        // The ride up to this landing proves the jump (kept at full rate)
+        const t0 = this.trace.t0;
+        const jump: [number, number] = [this.airStartClock - t0 - 0.5, this.clock - t0 + 0.1];
+        const snap = this.trace.samples();
+        this.raise('airM', Math.round((this.airMaxY - this.airStartY) * 100) / 100, snap, jump);
+        this.raise('airS', Math.round(this.airT * 100) / 100, snap, jump);
       }
       this.airStartY = null;
     }
@@ -490,33 +686,45 @@ export class StatsTracker {
     }
   }
 
-  /** Post records + lifetime deltas. `beacon` for page hide (fire and forget). */
+  /**
+   * Post records + lifetime deltas. `beacon` for page hide (fire and forget).
+   *
+   * A proved record (speed, air, hang time) only ever goes out in the same
+   * post as its proof: never on its own, never on a beacon (capped at 64 KB),
+   * and never when the proof doesn't fit this post (it waits for the next).
+   */
   flush(beacon: boolean) {
     if (!this.started) return;
     // Leaving the page: a pending proof is stored so the next load posts it
     this.persist(beacon);
-    if (this.isOffline() || this.posting || (!this.dirty && this.sessionPosted)) return;
+    if (!this.live() || this.posting || (!this.dirty && this.sessionPosted)) return;
     const add = {
       km: Math.round(this.add.km * 1000) / 1000,
       tricks: this.add.tricks,
       playS: Math.round(this.add.playS),
     };
-    // Proofs ride along with a normal post (a beacon is capped at 64 KB)
-    const proven = beacon ? [] : [...this.proofs.keys()];
-    const sentSeq = new Map(proven.map(k => [k, this.proofs.get(k)!.seq]));
-    const byTrace = new Map<RunTrace | string, BestKey[]>();
-    for (const k of proven) {
-      const p = this.proofs.get(k)!;
-      const src = p.trace ?? p.d ?? '';
-      byTrace.set(src, [...(byTrace.get(src) ?? []), k]);
-    }
-    const proofs = [...byTrace].map(([src, keys]) => ({
-      keys,
-      d: typeof src === 'string' ? src : src.encode(),
-    }));
     const best = { ...this.mine.best };
-    // A record still waiting on its proof isn't claimed yet
-    for (const k of this.proofs.keys()) if (!proven.includes(k)) delete best[k];
+    for (const k of PROVED) delete best[k];
+    const proofs: { keys: ProvedKey[]; d: string }[] = [];
+    const sent: SentClaim[] = [];
+    if (!beacon) {
+      const bySrc = new Map<RunTrace | Float32Array, ProvedKey[]>();
+      for (const [k, p] of this.proofs) bySrc.set(p.src, [...(bySrc.get(p.src) ?? []), k]);
+      let room = MAX_BODY_PROOF_CHARS;
+      for (const [src, keys] of bySrc) {
+        const pr = this.proofFor(src, keys);
+        if (pr.d.length > room) continue;
+        room -= pr.d.length;
+        proofs.push({ keys, d: pr.d });
+        for (const k of keys) {
+          const v = this.mine.best[k];
+          const p = this.proofs.get(k)!;
+          if (v === undefined) continue;
+          best[k] = v;
+          sent.push({ k, v, seq: p.seq, samples: pr.s, runId: p.runId, runAt: p.runAt });
+        }
+      }
+    }
     const body = JSON.stringify({
       rider: riderId(),
       name: this.getName(),
@@ -526,54 +734,150 @@ export class StatsTracker {
       add,
       proofs,
     });
-    const sent = () => {
-      this.sessionPosted = true;
-      // Raised again since this post was built: that one still needs sending
-      for (const [k, seq] of sentSeq) if (this.proofs.get(k)?.seq === seq) this.proofs.delete(k);
-      this.dirty = this.proofs.size > 0;
-      this.persist(false);
-      this.add.km -= add.km;
-      this.add.tricks -= add.tricks;
-      this.add.playS -= add.playS;
-    };
     if (beacon && navigator.sendBeacon?.(URL_, body)) {
-      sent();
+      this.postedTotals(add);
+      this.persist(false);
       return;
     }
     this.posting = true;
-    void fetch(URL_, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
-      .then(res => {
-        if (!res.ok) return;
-        sent();
-        // Keep the link in step with the server (linked elsewhere, moved…)
-        return res
-          .json()
-          .then(
-            (out: {
-              linked?: WalletLinkState | null;
-              rejected?: Partial<Record<BestKey, string>>;
-              you?: { best?: Partial<Record<BestKey, number>> };
-            }) => {
-              if (out.linked !== undefined) setLink(out.linked);
-              // A refused record goes back to what the server holds, or a
-              // real ride below it would never be posted
-              for (const [k, reason] of Object.entries(out.rejected ?? {}) as [BestKey, string][]) {
-                const claimed = best[k] ?? 0;
-                const held = out.you?.best?.[k] ?? 0;
-                if ((this.mine.best[k] ?? 0) === claimed) {
-                  if (held > 0) this.mine.best[k] = held;
-                  else delete this.mine.best[k];
-                  this.persist(false);
-                }
-                this.onRejected?.(k, claimed, reason);
-              }
-            },
-          )
-          .catch(() => undefined);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        this.posting = false;
+    void this.post(body, add, sent).finally(() => {
+      this.posting = false;
+    });
+  }
+
+  private postedTotals(add: { km: number; tricks: number; playS: number }) {
+    this.sessionPosted = true;
+    this.add.km -= add.km;
+    this.add.tricks -= add.tricks;
+    this.add.playS -= add.playS;
+  }
+
+  private async post(
+    body: string,
+    add: { km: number; tricks: number; playS: number },
+    sent: SentClaim[],
+  ) {
+    // A proof is only let go once the server has said what it did with the
+    // claim: no answer (network, an error, a body that never arrives) keeps
+    // it for the next post. Re-sending is harmless: a record only rises.
+    let out: PostAnswer | null = null;
+    try {
+      const res = await fetch(URL_, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
       });
+      if (!res.ok) return this.again();
+      this.postedTotals(add);
+      out = (await res.json().catch(() => null)) as PostAnswer | null;
+    } catch {
+      return this.again();
+    }
+    if (out === null || typeof out !== 'object') return this.again();
+    if (out.linked !== undefined) setLink(out.linked);
+    const you = out.you?.best;
+    for (const c of sent) {
+      const p = this.proofs.get(c.k);
+      const current = p?.seq === c.seq;
+      const reason = out.rejected?.[c.k];
+      if (reason !== undefined) {
+        if (current) this.proofs.delete(c.k);
+        this.settle(c, 'refused', reason, you);
+      } else if ((you?.[c.k] ?? 0) >= c.v - 0.005) {
+        if (current) this.proofs.delete(c.k);
+        this.settle(c, 'saved');
+      } else if (current && ++p.tries >= 3) {
+        // Neither taken nor refused, three times over (out of range…)
+        this.proofs.delete(c.k);
+        this.settle(c, 'refused', 'not taken by the server', you);
+      }
+    }
+    // Proved bests with nothing pending follow the server: a value it
+    // doesn't hold can never be posted again without its ride
+    if (you && typeof you === 'object') {
+      for (const k of PROVED) {
+        if (this.proofs.has(k)) continue;
+        const h = you[k];
+        if (h === undefined) delete this.mine.best[k];
+        else this.mine.best[k] = h;
+      }
+    }
+    this.dirty = this.proofs.size > 0;
+    if (this.dirty) this.flushAcc = Math.max(this.flushAcc, 17);
+    this.persist(false);
+  }
+
+  /** No answer: keep everything for the next post. */
+  private again() {
+    this.dirty = true;
+  }
+
+  /** The server's answer on one claim: tell the game, roll a refusal back. */
+  private settle(
+    c: SentClaim,
+    kind: 'saved' | 'refused',
+    reason?: string,
+    you?: Partial<Record<BestKey, number>>,
+  ) {
+    // A refused record goes back to what the server holds, or a real ride
+    // below it would never be posted (unless it was raised again since)
+    if (kind === 'refused' && (this.mine.best[c.k] ?? 0) === c.v) {
+      const held = you?.[c.k] ?? 0;
+      if (held > 0) this.mine.best[c.k] = held;
+      else delete this.mine.best[c.k];
+    }
+    const run: RideRun = {
+      id: c.runId,
+      at: c.runAt,
+      samples: c.samples,
+      key: c.k,
+      value: c.v,
+      status: kind,
+      ...(reason !== undefined ? { reason } : {}),
+    };
+    this.onRecord?.({
+      kind,
+      key: c.k,
+      value: c.v,
+      ...(reason !== undefined ? { reason } : {}),
+      run,
+    });
+  }
+
+  /**
+   * Send one record again with its ride (an appeal's first step: most
+   * refusals were a proof that never arrived). Saved or why not.
+   */
+  async resubmit(
+    k: ProvedKey,
+    v: number,
+    samples: Float32Array,
+  ): Promise<{ saved: boolean; reason?: string; d: string }> {
+    const d = encodeTrace(trimTrace(samples, { maxSamples: PROOF_SAMPLES, claims: { [k]: v } }));
+    if (!this.live()) return { saved: false, reason: 'offline', d };
+    try {
+      const res = await fetch(URL_, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rider: riderId(),
+          name: this.getName(),
+          best: { [k]: v },
+          add: {},
+          proofs: [{ keys: [k], d }],
+        }),
+      });
+      const out = (await res.json().catch(() => null)) as PostAnswer | null;
+      if (!res.ok || out === null) return { saved: false, reason: `Error ${res.status}`, d };
+      const held = out.you?.best?.[k] ?? 0;
+      if (held >= v - 0.005) {
+        if (!this.proofs.has(k)) this.mine.best[k] = Math.max(this.mine.best[k] ?? 0, held);
+        this.persist(false);
+        return { saved: true, d };
+      }
+      return { saved: false, reason: out.rejected?.[k] ?? 'not taken by the server', d };
+    } catch {
+      return { saved: false, reason: 'Network error', d };
+    }
   }
 }
