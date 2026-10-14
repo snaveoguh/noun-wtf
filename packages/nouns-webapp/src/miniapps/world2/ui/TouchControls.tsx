@@ -145,10 +145,11 @@ export function TouchControls({ game }: { game: Game }) {
         <button type="button" className="w2-tbtn" {...hold('spray')}>
           🎨
         </button>
-        <SprayTouch game={game} />
         <button type="button" className="w2-tbtn" {...tap(() => (t.respawn = true))}>
           ↺
         </button>
+        {/* Last, so in the landscape row it sits clear of the NOUN FM deck screen */}
+        <SprayTouch game={game} />
       </div>
 
       {/* Thumb cluster: everything the right thumb needs within reach */}
