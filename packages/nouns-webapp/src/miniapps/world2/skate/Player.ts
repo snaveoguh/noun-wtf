@@ -83,6 +83,8 @@ const FOOT_TURN_RATE = 3.2;
 const RUN_DRAG_K = 400;
 /** Extra acceleration (m/s²) per minute of unbroken mountain riding. */
 const STREAK_ACCEL = 0.35;
+/** Riding time only builds the streak above this speed (30 km/h). */
+const STREAK_MIN_SPEED = 30 / 3.6;
 /** Blades backwards skating: acceleration and top speed (m/s²). */
 const BACK_SKATE_ACCEL = 4;
 const BACK_SKATE_SPEED = 6;
@@ -388,14 +390,16 @@ export class Player {
         break;
     }
 
-    // Ride streak on the mountain (anything but a bail keeps it going)
+    // Ride streak on the mountain (anything but a bail keeps it going).
+    // Distance always counts; time only counts while actually riding fast,
+    // so crawling or parking on the board can't bank the push.
     if (
       this.state !== 'bail' &&
       this.terrain !== null &&
       this.terrain.inDomain(this.pos.x, this.pos.z)
     ) {
       this.run += this.speed * dt;
-      this.runTime += dt;
+      if (this.speed >= STREAK_MIN_SPEED) this.runTime += dt;
     }
 
     // Board flip visuals
@@ -1240,7 +1244,7 @@ export class Player {
     let brakeK = 1;
     if (!cityRide) {
       // Ride streak: drag eases off with distance ridden, and a push from
-      // behind grows with time on (+0.35 m/s² per minute), both since the
+      // behind grows with time riding at 30 km/h+ (+0.35 m/s² per minute), both since the
       // last bail. No top speed — only the emergent drag terminal velocity,
       // which keeps rising as the streak does.
       if (!brake && speed > 3) {
@@ -1441,7 +1445,9 @@ export class Player {
         _v2.copy(this.vel).normalize(),
         4 + this.vel.length() * 0.6,
       );
-      targetUp.copy(ahead !== null && ahead.normal.dot(this.vel) < 0 ? ahead.normal : this.vertNormal);
+      targetUp.copy(
+        ahead !== null && ahead.normal.dot(this.vel) < 0 ? ahead.normal : this.vertNormal,
+      );
       // Coming back in: swing the nose (or tail) onto the line of travel, so a
       // carve along the wall doesn't meet it sideways
       if (ahead !== null && this.vel.y < 0) {

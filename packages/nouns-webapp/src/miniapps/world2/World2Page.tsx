@@ -67,7 +67,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
   {
     k: 'MOUNTAIN',
-    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you stay on the faster you go (a bail resets it)',
+    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you keep riding fast (30 km/h+) the faster you go (a bail resets it)',
   },
   { k: 'R', v: 'respawn at the fountain or ice cream van (back up from the mountain)' },
   { k: 'Y', v: 'replay your last run in slow motion (Esc to come back)' },
