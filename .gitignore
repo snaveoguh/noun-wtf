@@ -2,6 +2,7 @@ node_modules
 .vscode
 build/
 dist
+dist-rush
 /**/sha.ts
 /**/sha.h
 *.tgz

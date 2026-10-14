@@ -19,6 +19,8 @@ Netlify's site metadata is legacy/manual-ish, so treat GitHub as the source of t
 
 GitHub Actions handles publishing to the existing Netlify sites. Do not create duplicate Netlify sites.
 
+**Noun Rush has its own Netlify site** (`noun-rush` → `https://noun-rush.netlify.app`, created by the user's request 2026-10-14). `.github/workflows/rush-deploy.yml` builds only the standalone game page (`vite.rush.config.ts`) and deploys it there on pushes to `main` that touch Rush files; it creates the site via the Netlify API if it's missing. Head models aren't copied — `/models/*` proxies to noun.wtf.
+
 **API deploys are separate.** The Ponder indexer/API lives on Railway project `spirited-flexibility` and does **not** auto-deploy on git push. After any change under `packages/nouns-api/`, run `railway up` **from the repo root** (`/Users/hugo/noun-wtf`) — NOT from `packages/nouns-api`. The service builds from the root `Dockerfile`, which `COPY`s `packages/nouns-api`, `packages/nouns-sdk`, and `packages/nouns-contracts` into the image. Running `railway up` from `packages/nouns-api` uploads a context with no Dockerfile and the build dies with `couldn't locate the dockerfile at path Dockerfile` (hit 2026-05-30). The repo root is linked to `spirited-flexibility / production / spirited-flexibility`; the live service uses the root `railway.json` (healthcheck `/health`) — the `packages/nouns-api/railway.json` (healthcheck `/ready`) is stale/unused. Pushing to GitHub only updates Netlify (the webapp), never Railway.
 
 `VITE_*` env vars for the webapp are baked at build time and are hardcoded in `.github/workflows/netlify-deploy.yml`, not in the Netlify UI. Edit the workflow to change bundled values.

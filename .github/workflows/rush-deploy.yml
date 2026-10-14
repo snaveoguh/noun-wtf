@@ -1,0 +1,110 @@
+name: Noun Rush Deploy
+
+# Noun Rush on its own Netlify site (noun-rush.netlify.app), separate from
+# the noun.wtf sites. Builds only the standalone game page
+# (packages/nouns-webapp/rush-app → vite.rush.config.ts). The Noun head
+# models (163 MB) aren't copied: /models/* proxies to noun.wtf.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/eager-galileo-5tx3la
+    paths:
+      - 'packages/nouns-webapp/src/miniapps/rush/**'
+      - 'packages/nouns-webapp/src/miniapps/world2/character/**'
+      - 'packages/nouns-webapp/src/rush-main.tsx'
+      - 'packages/nouns-webapp/rush-app/**'
+      - 'packages/nouns-webapp/public/rush/**'
+      - 'packages/nouns-webapp/vite.rush.config.ts'
+      - '.github/workflows/rush-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: rush-deploy
+  cancel-in-progress: true
+
+env:
+  SITE_NAME: noun-rush
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        run: pnpm --filter @nouns/assets build
+
+      - name: Build Noun Rush
+        working-directory: packages/nouns-webapp
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npx vite build -c vite.rush.config.ts
+
+      - name: Assemble site
+        working-directory: packages/nouns-webapp
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=dist-rush
+          mv "$out/rush-app/index.html" "$out/index.html"
+          rmdir "$out/rush-app"
+          cp -r public/rush "$out/rush"
+          cp public/favicon.ico public/apple-touch-icon.png "$out/"
+          cat > "$out/_redirects" <<'REDIRECTS'
+          # Noun head models live on noun.wtf; proxy so they stay same-origin
+          /models/*  https://noun.wtf/models/:splat  200
+          /*         /index.html                    200
+          REDIRECTS
+          sed -i 's/^          //' "$out/_redirects"
+          cat "$out/_redirects"
+          ls -la "$out"
+
+      - name: Create the Netlify site if it doesn't exist
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api=https://api.netlify.com/api/v1
+          auth="Authorization: Bearer ${NETLIFY_AUTH_TOKEN}"
+          id=$(curl -sf -H "$auth" "$api/sites?name=${SITE_NAME}&filter=all" \
+            | jq -r --arg n "$SITE_NAME" '[.[] | select(.name == $n)][0].id // empty')
+          if [ -z "$id" ]; then
+            echo "Creating Netlify site ${SITE_NAME}"
+            id=$(curl -sf -X POST -H "$auth" -H 'Content-Type: application/json' \
+              -d "{\"name\":\"${SITE_NAME}\"}" "$api/sites" | jq -r .id)
+          fi
+          echo "site id: $id"
+          echo "SITE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          npx netlify deploy \
+            --filter @nouns/webapp \
+            --site "$SITE_ID" \
+            --prod \
+            --dir packages/nouns-webapp/dist-rush \
+            --no-build \
+            --message "Noun Rush ${GITHUB_SHA}"
+          echo "Live at https://${SITE_NAME}.netlify.app"
