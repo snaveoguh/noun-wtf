@@ -156,7 +156,7 @@ Shared:
 - `/playground` - Noun trait playground (2D editor; has a "Save as Dream" backlog item)
 - `/fork/:id` - Fork-specific pages
 - `/explore/wallet`, `/explore/wallet/:identity` - Wallet explorer (Nouns held + delegated, governance activity, transfer history)
-- `/rush` - Noun Rush: snowboard → drive (car/moto/tractor by lane) → run → fly (heli/plane) → dance-floor finish. Pure race rules in `src/miniapps/rush/course.ts` (tested); ground textures in `public/rush/tex` are Poly Haven CC0
+- `/rush` - Noun Rush: snowboard → drive (car/moto/tractor by lane) → run → fly (heli/plane) → dance-floor finish. Pure race rules in `src/miniapps/rush/course.ts` (tested); ground textures in `public/rush/tex` are Poly Haven CC0. Also builds standalone (no OS shell/wallet) as a second Vite input, `rush-app/index.html` → `src/rush-main.tsx`, served at `/rush-app/` and meant for its own domain via the host rule in `public/_redirects` (same Netlify site, like probe.wtf — no new site)
 
 ### AuctionHouse + Indexer Notes
 

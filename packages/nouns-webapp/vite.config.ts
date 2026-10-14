@@ -61,6 +61,12 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      // rush-app/ is Noun Rush standalone, served on its own domain via a
+      // host rule in public/_redirects
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        rush: path.resolve(__dirname, 'rush-app/index.html'),
+      },
       external: ['fs'],
       output: {
         format: 'esm',

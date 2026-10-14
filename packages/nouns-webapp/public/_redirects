@@ -5,6 +5,16 @@
 https://probe.wtf/*      https://noun.wtf/probe  301!
 https://www.probe.wtf/*  https://noun.wtf/probe  301!
 
+# Noun Rush on its own domain: the standalone game page (rush-app/, built
+# from src/rush-main.tsx). To switch on: add the domain as an alias on this
+# Netlify site, point its DNS at Netlify, swap in the real name below and
+# uncomment. "/" is forced because the root would otherwise serve noun.wtf's
+# index.html; the splat is NOT forced so /assets, /rush/tex and /models
+# (the Noun head models) still serve as real files.
+# https://nounrush.example/     /rush-app/index.html  200!
+# https://nounrush.example/*    /rush-app/index.html  200
+# https://www.nounrush.example/*  https://nounrush.example/:splat  301!
+
 # Return proper 404 for missing static assets (prevents serving index.html as JS)
 /assets/*  /404.html  404
 
