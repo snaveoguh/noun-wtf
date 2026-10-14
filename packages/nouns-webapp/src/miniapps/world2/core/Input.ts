@@ -132,6 +132,9 @@ export class Input {
   private gamepadPrev: boolean[] = [];
   mode: InputMode = 'keyboard';
   pointerLocked = false;
+  /** Mouse-look multiplier and Y flip (settings panel). */
+  lookSensitivity = 1;
+  invertY = false;
   /** Mouse cursor in normalised device coords (-1..1, y up). */
   cursorX = 0;
   cursorY = 0;
@@ -314,8 +317,8 @@ export class Input {
     const f: InputFrame = {
       moveX: 0,
       moveY: 0,
-      lookX: this.mouseDX * 0.0022,
-      lookY: this.mouseDY * 0.0022,
+      lookX: this.mouseDX * 0.0022 * this.lookSensitivity,
+      lookY: this.mouseDY * 0.0022 * this.lookSensitivity * (this.invertY ? -1 : 1),
       stickX: 0,
       stickY: 0,
       push: false,

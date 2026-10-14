@@ -1,0 +1,357 @@
+// ── Settings cog + panel ─────────────────────────────────────────────────
+//
+// The ⚙ sits in the top-right HUD group (it stays when the rest of that
+// group is hidden). The panel is portalled to <body> so the draggable HUD
+// group around the cog can't drag it or clip it; while it's open the game
+// gets no keys and Esc closes it. HUD show/hide and scale are a generated
+// stylesheet over `data-w2hud` blocks, so the HUD code only tags its blocks.
+
+import type { Game } from '../Game';
+
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+
+import { createPortal } from 'react-dom';
+
+import { resetHudPositions } from '../ui/HudDrag';
+import { worldPause } from '../worldPause';
+
+import { hudCss } from './hudCss';
+import {
+  CAM_MODES,
+  HUD_ITEMS,
+  HUD_SCALE_MAX,
+  HUD_SCALE_MIN,
+  LOOK_SENS_MAX,
+  LOOK_SENS_MIN,
+  QUALITIES,
+  bootedQuality,
+  settings,
+  type AudioLevels,
+  type WorldSettings,
+} from './store';
+
+function useSettings(): WorldSettings {
+  return useSyncExternalStore(settings.subscribe, settings.get);
+}
+
+export function HudPrefsStyle() {
+  const s = useSettings();
+  return <style>{hudCss(s)}</style>;
+}
+
+export function SettingsCog({ game }: { game: Game }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        data-w2cog=""
+        className={`w2-chip text-base leading-none ${open ? 'w2-on' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        title="Settings"
+        aria-label="Settings"
+        aria-expanded={open}
+      >
+        ⚙
+      </button>
+      {open && createPortal(<Panel game={game} onClose={() => setOpen(false)} />, document.body)}
+    </>
+  );
+}
+
+const label = (v: number) => `${Math.round(v * 100)}%`;
+
+function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
+  const s = useSettings();
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  const lastPreview = useRef(0);
+
+  // Keys belong to the panel: the game's input is off, Esc closes
+  useEffect(() => {
+    game.input.setEnabled(false);
+    ref.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close.current();
+        return;
+      }
+      if (!(e.target instanceof Node) || ref.current?.contains(e.target) !== true)
+        e.stopPropagation();
+    };
+    window.addEventListener('keydown', onKey, true);
+    // Backgrounded behind the NounOS desk: get out of the way
+    const iv = window.setInterval(() => {
+      if (worldPause.get()) close.current();
+    }, 400);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.clearInterval(iv);
+      game.input.setEnabled(!worldPause.get());
+    };
+  }, [game]);
+
+  const setAudio = (patch: Partial<AudioLevels>, preview: boolean) => {
+    settings.update({ audio: patch });
+    // Live preview: a board pop through the SFX bus (throttled while dragging)
+    const now = performance.now();
+    if (preview && now - lastPreview.current > 140) {
+      lastPreview.current = now;
+      game.unlockAudio();
+      game.audio.pop(0.7);
+    }
+  };
+
+  const a = s.audio;
+  return (
+    <div
+      className="pointer-events-auto fixed inset-0 z-[900]"
+      onPointerDown={e => {
+        // (React bubbles portal events through the HUD drag handle: stop here)
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="dialog"
+        aria-label="Noun World settings"
+        data-w2settings=""
+        className="w2-panel w2-settings absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col gap-3 overflow-y-auto rounded-b-none text-sm text-white outline-none sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-16 sm:max-h-[calc(100vh-80px)] sm:w-[380px] sm:rounded-b-[14px]"
+        style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-between">
+          <b className="text-base tracking-wide">⚙ SETTINGS</b>
+          <button
+            type="button"
+            className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold"
+            onClick={onClose}
+          >
+            close <span className="opacity-60">esc</span>
+          </button>
+        </div>
+
+        <Section title="AUDIO">
+          <Slider
+            name="Master"
+            value={a.master}
+            fmt={label}
+            onChange={v => setAudio({ master: v }, true)}
+          />
+          <Slider
+            name="Skate SFX"
+            value={a.sfx}
+            fmt={label}
+            onChange={v => setAudio({ sfx: v }, true)}
+          />
+          <Slider
+            name="Radio / NOUN FM"
+            value={a.radio}
+            fmt={label}
+            onChange={v => setAudio({ radio: v }, false)}
+          />
+          <Slider
+            name="Voice chat"
+            value={a.voice}
+            fmt={label}
+            onChange={v => setAudio({ voice: v }, false)}
+          />
+          <Toggle
+            name={a.muted ? '🔇 Muted' : '🔊 Mute all'}
+            on={a.muted}
+            onClick={() => setAudio({ muted: !a.muted }, false)}
+          />
+        </Section>
+
+        <Section title="HUD">
+          <div className="grid grid-cols-2 gap-1.5">
+            {HUD_ITEMS.map(h => (
+              <Toggle
+                key={h.id}
+                name={h.label}
+                on={s.hud[h.id]}
+                onClick={() => settings.update({ hud: { [h.id]: !s.hud[h.id] } })}
+              />
+            ))}
+          </div>
+          <Slider
+            name="HUD scale"
+            value={s.hudScale}
+            min={HUD_SCALE_MIN}
+            max={HUD_SCALE_MAX}
+            step={0.05}
+            fmt={v => `${v.toFixed(2)}×`}
+            onChange={v => settings.update({ hudScale: v })}
+          />
+          <button
+            type="button"
+            className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold"
+            onClick={() => resetHudPositions()}
+            data-w2reset=""
+          >
+            Reset HUD positions
+          </button>
+        </Section>
+
+        <Section title="GAMEPLAY & GRAPHICS">
+          <Choice
+            name="Quality"
+            options={QUALITIES}
+            value={s.quality}
+            onChange={q => settings.update({ quality: q })}
+          />
+          {s.quality !== (bootedQuality.param ?? bootedQuality.setting) && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-[#ffd400]/15 px-3 py-2 text-xs">
+              <span>Quality changes on reload (running {game.hud.quality}).</span>
+              <button
+                type="button"
+                className="w2-sel rounded-full bg-[#ffd400] px-3 py-1 font-bold"
+                onClick={() => {
+                  // A ?q= param would override the saved choice
+                  const u = new URL(window.location.href);
+                  u.searchParams.delete('q');
+                  window.location.replace(u.toString());
+                }}
+              >
+                reload
+              </button>
+            </div>
+          )}
+          <Choice
+            name="Camera (C)"
+            options={CAM_MODES}
+            value={s.camMode}
+            onChange={m => settings.update({ camMode: m })}
+          />
+          <Slider
+            name="Mouse sensitivity"
+            value={s.lookSens}
+            min={LOOK_SENS_MIN}
+            max={LOOK_SENS_MAX}
+            step={0.05}
+            fmt={v => `${v.toFixed(2)}×`}
+            onChange={v => settings.update({ lookSens: v })}
+          />
+          <div className="grid grid-cols-2 gap-1.5">
+            <Toggle
+              name="Invert mouse Y"
+              on={s.invertY}
+              onClick={() => settings.update({ invertY: !s.invertY })}
+            />
+            <Toggle
+              name="Reduce motion"
+              on={s.reduceMotion}
+              onClick={() => settings.update({ reduceMotion: !s.reduceMotion })}
+            />
+          </div>
+        </Section>
+
+        <button
+          type="button"
+          className="self-start text-xs underline opacity-60"
+          onClick={() => settings.reset()}
+        >
+          reset all settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[10px] font-bold tracking-[0.2em] opacity-60">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function Slider({
+  name,
+  value,
+  min = 0,
+  max = 1,
+  step = 0.01,
+  fmt,
+  onChange,
+}: {
+  name: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  fmt: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="flex justify-between text-xs">
+        <span>{name}</span>
+        <b className="tabular-nums">{fmt(value)}</b>
+      </span>
+      <input
+        type="range"
+        className="w2-range"
+        aria-label={name}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+      />
+    </label>
+  );
+}
+
+function Toggle({ name, on, onClick }: { name: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      className={`flex min-h-[36px] items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-bold ${on ? 'bg-[#3ddc84]/25 ring-1 ring-[#3ddc84]' : 'bg-white/10 opacity-70'}`}
+      onClick={onClick}
+    >
+      <span>{name}</span>
+      <span className="text-[10px]">{on ? 'ON' : 'OFF'}</span>
+    </button>
+  );
+}
+
+function Choice<T extends string>({
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  options: readonly T[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs">{name}</span>
+      <div className="flex gap-1" role="radiogroup" aria-label={name}>
+        {options.map(o => (
+          <button
+            key={o}
+            type="button"
+            role="radio"
+            aria-checked={o === value}
+            className={`min-h-[34px] flex-1 rounded-xl px-2 text-xs font-bold ${o === value ? 'w2-sel bg-[#ffd400]' : 'bg-white/10'}`}
+            onClick={() => onChange(o)}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

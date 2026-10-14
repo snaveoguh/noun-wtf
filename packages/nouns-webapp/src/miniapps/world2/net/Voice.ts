@@ -58,6 +58,8 @@ export class Voice {
   private vadBuf: Uint8Array<ArrayBuffer> | null = null;
   isMuted = false;
   isSpeaking = false;
+  /** Playback volume for everyone else's voice (the mixer's voice bus). */
+  private outVolume = 1;
   get micOn() {
     return this.track !== null;
   }
@@ -66,7 +68,8 @@ export class Voice {
     // Autoplay can block remote audio until the page has a gesture: retry
     // any paused element on the next interaction.
     const kick = () => {
-      for (const p of this.peers.values()) if (p.audio?.paused === true) void p.audio.play().catch(() => undefined);
+      for (const p of this.peers.values())
+        if (p.audio?.paused === true) void p.audio.play().catch(() => undefined);
       if (this.ctx?.state === 'suspended') void this.ctx.resume();
     };
     window.addEventListener('pointerdown', kick);
@@ -82,14 +85,20 @@ export class Voice {
   ensurePeer(id: string) {
     if (!this.ws || !this.myId || id === this.myId) return;
     const existing = this.peers.get(id);
-    if (existing && existing.pc.connectionState !== 'closed' && existing.pc.connectionState !== 'failed') return;
+    if (
+      existing &&
+      existing.pc.connectionState !== 'closed' &&
+      existing.pc.connectionState !== 'failed'
+    )
+      return;
     if (existing) this.dropPeer(id);
     const peer = this.createPeer(id, this.myId < id);
     if (peer.polite) {
       // The leader normally calls us. If it hasn't noticed us yet, call it.
       peer.restartTimer = window.setTimeout(() => {
         peer.restartTimer = null;
-        if (peer.pc.remoteDescription === null && peer.pc.signalingState === 'stable') this.addAudio(peer);
+        if (peer.pc.remoteDescription === null && peer.pc.signalingState === 'stable')
+          this.addAudio(peer);
       }, 2500);
     }
   }
@@ -108,12 +117,21 @@ export class Voice {
    */
   private adoptAudio(peer: Peer) {
     const trs = peer.pc.getTransceivers().filter(t => t.receiver.track.kind === 'audio');
-    const live = trs.find(t => t.mid !== null && t.currentDirection !== 'stopped' && t.direction !== 'stopped');
+    const live = trs.find(
+      t => t.mid !== null && t.currentDirection !== 'stopped' && t.direction !== 'stopped',
+    );
     if (!live) return;
     live.direction = 'sendrecv';
     peer.sender = live.sender;
     if (this.track && live.sender.track !== this.track) void live.sender.replaceTrack(this.track);
-    for (const t of trs) if (t !== live && t.mid === null && t.currentDirection !== 'stopped' && t.direction !== 'stopped') t.stop();
+    for (const t of trs)
+      if (
+        t !== live &&
+        t.mid === null &&
+        t.currentDirection !== 'stopped' &&
+        t.direction !== 'stopped'
+      )
+        t.stop();
   }
 
   dropPeer(id: string) {
@@ -130,7 +148,8 @@ export class Voice {
   }
 
   private send(msg: Record<string, unknown>) {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ ...msg, from: this.myId }));
+    if (this.ws?.readyState === WebSocket.OPEN)
+      this.ws.send(JSON.stringify({ ...msg, from: this.myId }));
   }
 
   private createPeer(id: string, initiate: boolean): Peer {
@@ -161,7 +180,8 @@ export class Voice {
     };
 
     pc.onicecandidate = e => {
-      if (e.candidate) this.send({ type: 'world:voip:ice', to: id, candidate: JSON.stringify(e.candidate) });
+      if (e.candidate)
+        this.send({ type: 'world:voip:ice', to: id, candidate: JSON.stringify(e.candidate) });
     };
 
     pc.ontrack = e => {
@@ -174,6 +194,7 @@ export class Voice {
         document.body.appendChild(a);
         peer.audio = a;
       }
+      peer.audio.volume = this.outVolume;
       peer.audio.srcObject = stream;
       void peer.audio.play().catch(() => undefined);
     };
@@ -289,7 +310,7 @@ export class Voice {
       return 'denied';
     }
     this.track = this.stream.getAudioTracks()[0] ?? null;
-    if (!this.track) return 'denied';
+    if (this.track === null) return 'denied';
     this.isMuted = false;
     const src = this.ctx.createMediaStreamSource(this.stream);
     this.analyser = this.ctx.createAnalyser();
@@ -299,6 +320,12 @@ export class Voice {
     this.vadBuf = new Uint8Array(this.analyser.frequencyBinCount);
     for (const p of this.peers.values()) if (p.sender) void p.sender.replaceTrack(this.track);
     return 'on';
+  }
+
+  /** Volume (0..1) for incoming voices. */
+  setVolume(v: number) {
+    this.outVolume = Math.min(1, Math.max(0, Number.isFinite(v) ? v : 1));
+    for (const p of this.peers.values()) if (p.audio) p.audio.volume = this.outVolume;
   }
 
   /** Update and return local voice activity. */
@@ -316,7 +343,9 @@ export class Voice {
 
   /** Debug lines for the voice HUD / console. */
   debug(): string[] {
-    const lines = [`mic ${this.micOn ? (this.isMuted ? 'muted' : 'on') : 'off'}, peers ${this.peers.size}`];
+    const lines = [
+      `mic ${this.micOn ? (this.isMuted ? 'muted' : 'on') : 'off'}, peers ${this.peers.size}`,
+    ];
     for (const [id, p] of this.peers)
       lines.push(
         `${id.slice(0, 6)} ${p.pc.connectionState}/${p.pc.iceConnectionState} ${p.audio?.paused === false ? 'playing' : 'silent'}`,

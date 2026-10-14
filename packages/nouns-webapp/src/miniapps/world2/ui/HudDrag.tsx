@@ -30,6 +30,18 @@ function save(all: Offsets) {
   }
 }
 
+const RESET_EVENT = 'noun-world-hud-reset';
+
+/** Put every dragged HUD block back where it started (settings panel). */
+export function resetHudPositions() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // nothing stored
+  }
+  window.dispatchEvent(new Event(RESET_EVENT));
+}
+
 export function HudDrag({
   id,
   className,
@@ -62,6 +74,12 @@ export function HudDrag({
     [id],
   );
 
+  useEffect(() => {
+    const reset = () => setOff({ x: 0, y: 0 });
+    window.addEventListener(RESET_EVENT, reset);
+    return () => window.removeEventListener(RESET_EVENT, reset);
+  }, []);
+
   // Keep a moved block on screen after a resize / rotation
   useEffect(() => {
     const fit = () => {
@@ -89,6 +107,7 @@ export function HudDrag({
   return (
     <div
       ref={ref}
+      data-w2hud={id}
       className={`${className} pointer-events-auto`}
       style={{ ...style, translate: `${off.x * W}px ${off.y * H}px`, touchAction: 'none' }}
       title="Drag to move (hold Alt to free the mouse) · double-click to reset"

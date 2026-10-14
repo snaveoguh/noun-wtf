@@ -22,6 +22,8 @@ export class SkateAudio {
   } | null = null;
   private grind: { src: AudioBufferSourceNode; gain: GainNode; bp: BiquadFilterNode } | null = null;
   volume = 0.8;
+  /** Where the SFX mix goes (the game mixer's sfx bus); default: the speakers. */
+  out: ((ctx: AudioContext) => AudioNode | null) | null = null;
 
   /** Must be called from a user gesture. */
   start() {
@@ -42,7 +44,7 @@ export class SkateAudio {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.ratio.value = 3;
-    this.master.connect(comp).connect(ctx.destination);
+    this.master.connect(comp).connect(this.out?.(ctx) ?? ctx.destination);
 
     // 2s noise buffer (pink-ish)
     const len = ctx.sampleRate * 2;
