@@ -215,13 +215,46 @@ function tracePath(ctx: CanvasRenderingContext2D, pts: number[], s: number, H: n
   for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i] * s, H - pts[i + 1] * s);
 }
 
-/** Soft cap: stacked passes narrowing to a dense core, plus overspray. */
+/**
+ * Soft cap: stacked passes narrowing to a dense core, plus overspray.
+ * Thin lines keep the original 4 passes; fat ones (many pixels wide) get
+ * more, finer steps so the falloff reads as haze rather than rings. Every
+ * set builds to the same core density as the 4-pass one.
+ */
 const SOFT_PASSES: [number, number][] = [
   [1, 0.2],
   [0.8, 0.26],
   [0.58, 0.34],
   [0.36, 0.5],
 ];
+const SOFT_CORE = 1 - SOFT_PASSES.reduce((a, [, x]) => a * (1 - x), 1);
+const softCache = new Map<number, [number, number][]>([[4, SOFT_PASSES]]);
+
+export function softPasses(widthPx: number): [number, number][] {
+  const n = Math.max(4, Math.min(12, Math.round(widthPx / 6)));
+  const hit = softCache.get(n);
+  if (hit !== undefined) return hit;
+  const ramp = (i: number) => 0.2 + (0.3 * i) / (n - 1);
+  const core = (k: number) => {
+    let clear = 1;
+    for (let i = 0; i < n; i++) clear *= 1 - ramp(i) * k;
+    return 1 - clear;
+  };
+  // Scale the alpha ramp down until the core matches
+  let lo = 0;
+  let hi = 1;
+  for (let it = 0; it < 24; it++) {
+    const mid = (lo + hi) / 2;
+    if (core(mid) < SOFT_CORE) lo = mid;
+    else hi = mid;
+  }
+  const out = Array.from({ length: n }, (_, i): [number, number] => [
+    1 - (0.64 * i) / (n - 1),
+    ramp(i) * lo,
+  ]);
+  softCache.set(n, out);
+  return out;
+}
 
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
@@ -243,7 +276,7 @@ export function drawStroke(
     ctx.lineWidth = width;
     ctx.stroke();
   } else {
-    for (const [wf, a] of SOFT_PASSES) {
+    for (const [wf, a] of softPasses(width)) {
       ctx.globalAlpha = a * op;
       ctx.lineWidth = Math.max(1, width * wf);
       ctx.stroke();
