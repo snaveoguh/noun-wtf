@@ -4,6 +4,8 @@ import type { Game } from '../Game';
 
 import { useEffect, useRef, useState } from 'react';
 
+import { SprayTouch } from '../graffiti/SprayPanel';
+
 const R = 56;
 
 export function useIsTouch() {
@@ -143,6 +145,7 @@ export function TouchControls({ game }: { game: Game }) {
         <button type="button" className="w2-tbtn" {...hold('spray')}>
           🎨
         </button>
+        <SprayTouch game={game} />
         <button type="button" className="w2-tbtn" {...tap(() => (t.respawn = true))}>
           ↺
         </button>

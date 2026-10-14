@@ -20,7 +20,7 @@ import {
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
 import { Drops } from './drops/Drops';
-import { Graffiti, SPRAY_COLORS } from './graffiti/Graffiti';
+import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
@@ -239,7 +239,7 @@ export class Game {
       camMode: 'follow',
       timeOfDay: 'afternoon',
       radio: { on: false, label: 'radio off', at: 0 },
-      spray: { color: SPRAY_COLORS[2], aiming: false, active: false },
+      spray: { color: '#f3322c', aiming: false, active: false },
       baked: false,
       mountain: null,
       stats: null,
@@ -538,6 +538,7 @@ export class Game {
     // On foot (and on walls) the mouse is a free cursor for painting
     this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
+    this.handleSprayKeys(input);
 
     // Physics in fixed-ish substeps for stability at low FPS — and short
     // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
@@ -960,21 +961,60 @@ export class Game {
 
   private sprayRay = new THREE.Raycaster();
 
+  private sprayWheel = 0;
+
+  /**
+   * Spray-can keys, before the player sees the frame: T / Shift+T colour,
+   * [ / ] or wheel (while spraying) nozzle, Ctrl/Cmd+Z undo, Alt+click pick,
+   * and 1–9, 0 swatches while pointing at a wall (emotes otherwise).
+   */
+  private handleSprayKeys(input: InputFrame) {
+    const g = this.graffiti;
+    if (g === null) return;
+    if (input.colorCyclePressed) g.cycleColor(input.sprint && input.mode === 'keyboard' ? -1 : 1);
+    if ((input.sizeStep ?? 0) !== 0) g.stepSize(input.sizeStep!);
+    this.sprayWheel += input.wheel ?? 0;
+    if (Math.abs(this.sprayWheel) >= 60) {
+      g.stepSize(this.sprayWheel < 0 ? 1 : -1);
+      this.sprayWheel = 0;
+    }
+    if (input.undoPressed === true) g.undo();
+    const onFoot = this.player.mode === 'foot';
+    if (input.pickPressed === true && onFoot) g.pickAt();
+    const d = input.digitPressed ?? -1;
+    if (d >= 0 && onFoot && (g.aim !== null || g.spraying)) {
+      g.pickSwatch(d);
+      input.emotePressed = 0;
+    }
+  }
+
   private updateGraffiti(dt: number, input: InputFrame) {
     const g = this.graffiti;
     if (g === null) return;
-    if (input.colorCyclePressed) g.cycleColor(1);
     const p = this.player;
     // Gamepad: right trigger sprays only on foot (it's a grab on the board)
     const active = input.spray && (p.mode === 'foot' || input.mode !== 'gamepad');
     const cam = this.gfx.camera;
-    const dir = new THREE.Vector3();
+    const dirs: THREE.Vector3[] = [];
+    const trail = this.input.cursorTrail.splice(0);
     if (this.input.freeCursor) {
-      // Paint exactly where the mouse points
-      this.sprayRay.setFromCamera(new THREE.Vector2(this.input.cursorX, this.input.cursorY), cam);
-      dir.copy(this.sprayRay.ray.direction);
-    } else cam.getWorldDirection(dir);
-    g.update(dt, active, cam.position, dir, p.pos);
+      // Paint exactly where the mouse points, through every position since
+      // last frame (smooth curves even at a low frame rate)
+      if (!active || trail.length === 0) trail.length = 0;
+      trail.push([this.input.cursorX, this.input.cursorY]);
+      for (const [x, y] of trail) {
+        this.sprayRay.setFromCamera(new THREE.Vector2(x, y), cam);
+        dirs.push(this.sprayRay.ray.direction.clone());
+      }
+    } else {
+      const dir = new THREE.Vector3();
+      cam.getWorldDirection(dir);
+      dirs.push(dir);
+    }
+    g.update(dt, active, cam.position, dirs, p.pos, {
+      line: input.mode === 'keyboard' && input.sprint,
+      cursor: p.mode === 'foot' || active,
+    });
     g.updateAudio(this.audio.ctx, this.audio.master, this.audio.noise);
   }
 
@@ -1531,7 +1571,7 @@ export class Game {
             }
           : null,
       spray: {
-        color: SPRAY_COLORS[this.graffiti?.color ?? 2],
+        color: this.graffiti?.colorHex ?? '#f3322c',
         aiming: this.graffiti?.aim !== null && this.graffiti?.aim !== undefined,
         active: this.graffiti?.spraying === true,
       },

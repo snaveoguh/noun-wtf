@@ -48,6 +48,14 @@ export interface InputFrame {
   /** Hold to spray paint. */
   spray: boolean;
   colorCyclePressed: boolean;
+  /** Spray tools (keyboard / mouse): [ / ] nozzle step, wheel delta, 1–9,0 → 0..9. */
+  sizeStep?: number;
+  wheel?: number;
+  digitPressed?: number;
+  /** Ctrl/Cmd+Z. */
+  undoPressed?: boolean;
+  /** Alt+click on a wall (eyedropper). */
+  pickPressed?: boolean;
   tricks: TrickInput[];
   mode: InputMode;
 }
@@ -135,6 +143,11 @@ export class Input {
   /** Mouse cursor in normalised device coords (-1..1, y up). */
   cursorX = 0;
   cursorY = 0;
+  /** Cursor positions (NDC) since the last drain, for smooth spray strokes. */
+  cursorTrail: [number, number][] = [];
+  private wheelAcc = 0;
+  private undoQueued = false;
+  private pickQueued = false;
   private _freeCursor = false;
   /** Alt / Option held: mouse released (to drag HUD pieces), no re-lock. */
   private altFree = false;
@@ -210,6 +223,11 @@ export class Input {
         return;
       }
       if (!this.enabled || isTyping(e)) return;
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+        e.preventDefault();
+        this.undoQueued = true;
+        return;
+      }
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code))
         e.preventDefault();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
@@ -234,6 +252,11 @@ export class Input {
       if (e.button === 2) {
         this.rmb = true;
         this.mouseStick.x = this.mouseStick.y = 0;
+      }
+      // Alt+click on foot: eyedropper instead of paint
+      if (e.button === 0 && this.enabled && e.altKey && this._freeCursor) {
+        this.pickQueued = true;
+        return;
       }
       if (e.button === 0 && this.enabled) this.lmb = true;
       if (
@@ -260,6 +283,10 @@ export class Input {
       this.cursorX = ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1;
       this.cursorY = -(((e.clientY - r.top) / Math.max(1, r.height)) * 2 - 1);
       if (this._freeCursor) {
+        this.cursorTrail.push([this.cursorX, this.cursorY]);
+        if (this.cursorTrail.length > 48) this.cursorTrail.shift();
+      }
+      if (this._freeCursor) {
         // Free cursor: only a right-drag turns the camera
         if (this.rmb) {
           this.mouseDX += e.movementX;
@@ -276,6 +303,17 @@ export class Input {
         this.mouseDY += e.movementY;
       }
     });
+    on(
+      el,
+      'wheel',
+      e => {
+        if (!this._freeCursor || !this.enabled) return;
+        // Wheel sizes the nozzle while the spray is held (page never scrolls here)
+        if (this.lmb || this.keys.has('KeyG')) e.preventDefault();
+        this.wheelAcc += e.deltaY;
+      },
+      { passive: false },
+    );
     const plc = () => {
       this.pointerLocked = document.pointerLockElement === el;
     };
@@ -359,6 +397,16 @@ export class Input {
     f.respawnPressed = this.keyPressed('KeyR');
     f.spray = this.key('KeyG') || this.lmb;
     f.colorCyclePressed = this.keyPressed('KeyT');
+    f.sizeStep =
+      (this.keyPressed('BracketRight') ? 1 : 0) - (this.keyPressed('BracketLeft') ? 1 : 0);
+    f.wheel = this.lmb || this.key('KeyG') ? this.wheelAcc : 0;
+    this.wheelAcc = 0;
+    f.digitPressed = -1;
+    for (let d = 0; d <= 9; d++)
+      if (this.keyPressed(`Digit${d}`)) f.digitPressed = d === 0 ? 9 : d - 1;
+    f.undoPressed = this.undoQueued;
+    f.pickPressed = this.pickQueued;
+    this.undoQueued = this.pickQueued = false;
     f.emotePressed = this.keyPressed('Digit1')
       ? 1
       : this.keyPressed('Digit2')
