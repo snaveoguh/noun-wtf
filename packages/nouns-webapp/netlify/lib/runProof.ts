@@ -238,3 +238,126 @@ function airSegment(s: Float32Array, i: number, j: number, n: number) {
   const t1 = j + 1 < n ? s[(j + 1) * STRIDE] : s[j * STRIDE];
   return { s: t1 - t0, m: top - s[i * STRIDE + 2] };
 }
+
+// ── Caps and trimming (shared by the server and the client) ──
+
+export type ProvedKey = 'kmh' | 'airM' | 'airS';
+
+/** The highest record each key may take on a checked proof (the server's caps). */
+export function capsOf(check: RunCheck): Record<ProvedKey, number> {
+  let airM = 0;
+  let airS = 0;
+  for (const a of check.airs) {
+    airM = Math.max(airM, a.m + 0.2);
+    airS = Math.max(airS, a.s + 0.06);
+  }
+  return { kmh: check.maxV * 3.6 + 0.3, airM, airS };
+}
+
+/** Does a checked proof back every claim (same margins as the server)? */
+export function proves(check: RunCheck, claims: Partial<Record<ProvedKey, number>>): boolean {
+  if (!check.ok) return false;
+  const caps = capsOf(check);
+  return (Object.keys(claims) as ProvedKey[]).every(k => (claims[k] ?? 0) <= caps[k]);
+}
+
+/**
+ * Thinning steps: [ground spacing, air spacing] in seconds. The first is
+ * what the trace records anyway minus the extra samples taken at every new
+ * top speed; later ones are coarser. Energy telescopes (½v² + g·y at the
+ * kept samples is unchanged), so thinning drops detail and never adds any.
+ */
+export const TRIM_LEVELS: readonly (readonly [number, number])[] = [
+  [0.4, 1 / 30],
+  [0.4, 0.1],
+  [1, 0.25],
+  [2, 0.5],
+  [4, 1],
+  [8, 2],
+];
+
+/**
+ * Keep a sample every `ground` / `air` seconds, plus: the first and last,
+ * both sides of every change of state (take-offs keep their pop, landings
+ * end the hang time), the fastest sample (the speed record), every sample
+ * inside `keep` (time ranges such as the record jump, kept at full rate)
+ * and, with `jolts`, every sharp change of speed.
+ */
+export function decimate(
+  s: Float32Array,
+  ground: number,
+  air: number,
+  keep: readonly (readonly [number, number])[] = [],
+  jolts = true,
+): Float32Array {
+  const n = Math.floor(s.length / STRIDE);
+  if (n <= 2) return s.slice(0, n * STRIDE);
+  let iMax = 0;
+  for (let i = 1; i < n; i++) if (s[i * STRIDE + 4] > s[iMax * STRIDE + 4]) iMax = i;
+  const idx: number[] = [];
+  let lastT = -Infinity;
+  let lastV = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * STRIDE;
+    const t = s[o];
+    const v = s[o + 4];
+    const st = s[o + 5];
+    const must =
+      i === 0 ||
+      i === n - 1 ||
+      i === iMax ||
+      st !== s[o - STRIDE + 5] ||
+      st !== s[o + STRIDE + 5] ||
+      keep.some(([a, b]) => t >= a && t <= b);
+    const due = t - lastT >= (st === AIR ? air : ground) - 1e-6;
+    const jolt = jolts && Math.abs(v - lastV) > 1 + 0.1 * lastV;
+    if (!must && !due && !jolt) continue;
+    idx.push(i);
+    lastT = t;
+    lastV = v;
+  }
+  const out = new Float32Array(idx.length * STRIDE);
+  idx.forEach((i, j) => out.set(s.subarray(i * STRIDE, i * STRIDE + STRIDE), j * STRIDE));
+  return out;
+}
+
+/**
+ * A proof small enough to send: the trace itself if it fits in `maxSamples`,
+ * else the finest thinning that fits and (given `claims`) still checks out
+ * and backs every claim. The start always stays (a proof has to begin slow,
+ * so the run-up can't be cut) and so do the claimed moments, at full rate.
+ * This can't make a cheat pass: the server checks whatever it's sent.
+ */
+export function trimTrace(
+  s: Float32Array,
+  opts: {
+    maxSamples: number;
+    keep?: readonly (readonly [number, number])[];
+    claims?: Partial<Record<ProvedKey, number>>;
+  },
+): Float32Array {
+  const n = Math.floor(s.length / STRIDE);
+  if (n <= opts.maxSamples) return s;
+  let fallback: Float32Array | null = null;
+  for (const [ground, air] of TRIM_LEVELS) {
+    for (const jolts of [true, false]) {
+      const d = decimate(s, ground, air, opts.keep ?? [], jolts);
+      if (d.length / STRIDE > opts.maxSamples) continue;
+      if (opts.claims === undefined) return d;
+      if (proves(verifyRun(d), opts.claims)) return d;
+      fallback ??= d;
+    }
+  }
+  // Nothing both fits and proves: send the smallest honest attempt (the
+  // server says why), never a claim without any proof
+  return fallback ?? decimate(s, 8, 2, opts.keep ?? [], false);
+}
+
+/** Base64 of the samples (a proof's `d`). */
+export function encodeTrace(s: Float32Array): string {
+  const bytes = new Uint8Array(s.buffer, s.byteOffset, s.length * 4);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
