@@ -22,6 +22,7 @@ import {
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
+import { HudDrag } from './ui/HudDrag';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
@@ -438,8 +439,18 @@ function Hud({
       {hud.mode === 'board' && hud.speed > 20 && (
         <div className="w2-speedlines" style={{ opacity: Math.min(0.75, (hud.speed - 20) / 45) }} />
       )}
+      {/* Speedometer: just under the rider by default, drag it anywhere */}
+      {hud.mode === 'board' && (
+        <HudDrag id="speed" className="absolute left-1/2 top-[64%] -translate-x-1/2">
+          <div className="w2-speedo">
+            <b>{Math.round(hud.speed * 3.6)}</b>
+            <span>km/h</span>
+          </div>
+        </HudDrag>
+      )}
+
       {/* Top-left: session */}
-      <div className={`absolute left-4 ${top} flex flex-col gap-1`}>
+      <HudDrag id="session" className={`absolute left-4 ${top} flex flex-col gap-1`}>
         <div className="w2-chip">
           <b>{hud.session.toLocaleString()}</b> pts{' '}
           <span className="opacity-60">
@@ -456,7 +467,7 @@ function Hud({
             {hud.mountain.streak}s
           </div>
         )}
-      </div>
+      </HudDrag>
 
       {/* Top-centre: landmarks compass (no room for it on phones) */}
       <div
@@ -474,7 +485,7 @@ function Hud({
       </div>
 
       {/* Top-right: voice + system */}
-      <div className={`pointer-events-auto absolute right-4 ${top} flex flex-col items-end gap-2`}>
+      <HudDrag id="system" className={`absolute right-4 ${top} flex flex-col items-end gap-2`}>
         <button
           className={`w2-chip ${hud.mic === 'on' ? (hud.speaking ? 'w2-live' : 'w2-on') : ''}`}
           onClick={() => void game.toggleMic()}
@@ -565,7 +576,7 @@ function Hud({
           players={hud.players}
           onOpen={() => void game.refreshStats()}
         />
-      </div>
+      </HudDrag>
 
       {/* Now playing toast (JSR-style station card) */}
       {hud.radio.on && now - hud.radio.at < 4500 && (
@@ -676,6 +687,10 @@ function Hud({
 const CSS = `
 .w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
 @keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
+.w2-speedo{display:flex;align-items:baseline;gap:6px;padding:4px 14px 6px;border-radius:14px;background:rgba(10,12,20,.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);font-family:system-ui,sans-serif;cursor:grab;user-select:none}
+.w2-speedo b{font-size:30px;font-weight:900;font-style:italic;line-height:1;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.w2-speedo span{font-size:11px;font-weight:700;letter-spacing:.12em;opacity:.7}
+@media (pointer:coarse){.w2-speedo b{font-size:22px}}
 .w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
 .w2-on{border-color:#3ddc84}
 .w2-live{border-color:#3ddc84;background:rgba(61,220,132,.35)}
