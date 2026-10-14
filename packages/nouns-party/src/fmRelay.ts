@@ -156,6 +156,10 @@ export class FmRelay {
       from.send(this.stateMsg());
       return true;
     }
+    // Every client message carries its key too, so a connection the relay
+    // has forgotten (room restart, eviction) re-identifies itself in place
+    if (!this.keys.has(from.id) && typeof d.key === 'string' && KEY_RE.test(d.key))
+      this.keys.set(from.id, d.key);
     const key = this.keys.get(from.id);
     if (key === undefined) {
       err('say fm:hello first');
