@@ -41,7 +41,7 @@ interface Line {
   shown: number;
 }
 
-export type GameId = 'world' | 'hoops' | 'warfare';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'rush';
 
 const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: string }[] = [
   {
@@ -65,6 +65,13 @@ const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: st
     cta: 'LOCK & LOAD ▸',
     loading: 'loading noun warfare. paint up',
   },
+  {
+    id: 'rush',
+    name: 'Noun Rush',
+    cover: '/rush/cover.webp',
+    cta: 'RACE ▸',
+    loading: 'loading noun rush. strap in',
+  },
 ];
 
 const GREETING = [
@@ -79,6 +86,7 @@ const GREETING = [
   'play     skate noun world',
   'hoops    3v3 on the jersey court',
   'warfare  paintball. red noggles vs blue',
+  'rush     snowboard, drive, fly, dance. a race',
   'index    everything else',
   'readme   what happened',
   'pip3     the art',
@@ -92,9 +100,11 @@ export default function AgentHome({
   active,
   worldLoaded = false,
   warfareLoaded = false,
+  rushLoaded = false,
   onEnterWorld,
   onEnterHoops,
   onEnterWarfare,
+  onEnterRush,
   onOpen,
   onNavigate,
 }: {
@@ -102,9 +112,11 @@ export default function AgentHome({
   /** Game already running (play resumes instantly) */
   worldLoaded?: boolean;
   warfareLoaded?: boolean;
+  rushLoaded?: boolean;
   onEnterWorld: () => void;
   onEnterHoops: () => void;
   onEnterWarfare: () => void;
+  onEnterRush: () => void;
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
 }) {
@@ -174,6 +186,9 @@ export default function AgentHome({
       warfare: onEnterWarfare,
       paintball: onEnterWarfare,
       'noun warfare': onEnterWarfare,
+      rush: onEnterRush,
+      race: onEnterRush,
+      'noun rush': onEnterRush,
       index: () => onOpen('directory'),
       menu: () => onOpen('directory'),
       help: () => onOpen('directory'),
@@ -203,6 +218,9 @@ export default function AgentHome({
         warfare: GAMES[2]!.loading,
         paintball: GAMES[2]!.loading,
         'noun warfare': GAMES[2]!.loading,
+        rush: GAMES[3]!.loading,
+        race: GAMES[3]!.loading,
+        'noun rush': GAMES[3]!.loading,
         readme: 'read it. then go make something',
         manifesto: 'read it. then go make something',
       };
@@ -285,7 +303,10 @@ export default function AgentHome({
         // Depth in the stack: 0 = front, then the rest in order behind it
         const fi = GAMES.findIndex(x => x.id === front);
         const d = (i - fi + GAMES.length) % GAMES.length;
-        const resume = (g.id === 'world' && worldLoaded) || (g.id === 'warfare' && warfareLoaded);
+        const resume =
+          (g.id === 'world' && worldLoaded) ||
+          (g.id === 'warfare' && warfareLoaded) ||
+          (g.id === 'rush' && rushLoaded);
         return (
           <button
             key={g.id}
@@ -306,6 +327,9 @@ export default function AgentHome({
               } else if (g.id === 'warfare') {
                 say(resume ? 'back in the arena' : g.loading);
                 onEnterWarfare();
+              } else if (g.id === 'rush') {
+                say(resume ? 'back on the course' : g.loading);
+                onEnterRush();
               } else {
                 say(resume ? 'back to the plaza' : g.loading);
                 onEnterWorld();

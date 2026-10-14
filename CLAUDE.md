@@ -156,6 +156,7 @@ Shared:
 - `/playground` - Noun trait playground (2D editor; has a "Save as Dream" backlog item)
 - `/fork/:id` - Fork-specific pages
 - `/explore/wallet`, `/explore/wallet/:identity` - Wallet explorer (Nouns held + delegated, governance activity, transfer history)
+- `/rush` - Noun Rush: snowboard → drive (car/moto/tractor by lane) → run → fly (heli/plane) → dance-floor finish. Pure race rules in `src/miniapps/rush/course.ts` (tested); ground textures in `public/rush/tex` are Poly Haven CC0
 
 ### AuctionHouse + Indexer Notes
 

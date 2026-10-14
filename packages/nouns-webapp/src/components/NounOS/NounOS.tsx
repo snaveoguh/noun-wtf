@@ -34,6 +34,7 @@ import WaterGarden, { waterHeight, type WaterHandle } from './WaterGarden';
 
 const World2Page = lazy(() => import('@/miniapps/world2/World2Page'));
 const WarfarePage = lazy(() => import('@/miniapps/warfare/WarfarePage'));
+const RushPage = lazy(() => import('@/miniapps/rush/RushPage'));
 const TerminalFeedShell = lazy(() => import('@/components/TerminalFeed/TerminalFeedShell'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 
@@ -41,6 +42,7 @@ const README_KEY = 'nounos-readme-seen';
 const WORLD_PATHS = new Set(['/world', '/world/']);
 // Noun Warfare gets the same full-screen game layer as Noun World
 const WARFARE_PATHS = new Set(['/warfare', '/warfare/']);
+const RUSH_PATHS = new Set(['/rush', '/rush/']);
 const HOME_PATHS = new Set(['/', '']);
 
 const APP_TITLES: Record<Exclude<AppKind, 'navigator'>, string> = {
@@ -69,9 +71,12 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
   const path = location.pathname;
   const onWorldPath = WORLD_PATHS.has(path);
   const onWarfarePath = WARFARE_PATHS.has(path);
+  const onRushPath = RUSH_PATHS.has(path);
   const [gameMounted, setGameMounted] = useState(onWorldPath);
   // Which game owns the world layer (only one WebGL game is mounted at a time)
-  const [arena, setArena] = useState<'world' | 'warfare'>(onWarfarePath ? 'warfare' : 'world');
+  const [arena, setArena] = useState<'world' | 'warfare' | 'rush'>(
+    onWarfarePath ? 'warfare' : onRushPath ? 'rush' : 'world',
+  );
   const [readmeSeen, setReadmeSeen] = useState(() => {
     try {
       return localStorage.getItem(README_KEY) === '1';
@@ -98,6 +103,10 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       os.close('navigator');
       os.setMode('world');
       setArena('warfare');
+    } else if (onRushPath) {
+      os.close('navigator');
+      os.setMode('world');
+      setArena('rush');
     } else if (HOME_PATHS.has(path)) {
       // Home = the agent console over the poster; the game only loads on demand
       os.close('navigator');
@@ -105,7 +114,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     } else {
       os.open('navigator');
     }
-  }, [path, onWorldPath, onWarfarePath]);
+  }, [path, onWorldPath, onWarfarePath, onRushPath]);
 
   useEffect(() => {
     if (mode === 'world' && arena === 'world') setGameMounted(true);
@@ -190,6 +199,12 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     if (!onWarfarePath) navigate('/warfare');
   }, [navigate, onWarfarePath]);
 
+  const goRush = useCallback(() => {
+    setArena('rush');
+    os.setMode('world');
+    if (!onRushPath) navigate('/rush');
+  }, [navigate, onRushPath]);
+
   // WORLD ↗ / backdrop: back into whichever game is loaded
   const goWorld = useCallback(() => {
     if (arena === 'warfare') {
@@ -197,8 +212,13 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       if (!onWarfarePath) navigate('/warfare');
       return;
     }
+    if (arena === 'rush') {
+      os.setMode('world');
+      if (!onRushPath) navigate('/rush');
+      return;
+    }
     goNounWorld();
-  }, [arena, goNounWorld, navigate, onWarfarePath]);
+  }, [arena, goNounWorld, navigate, onWarfarePath, onRushPath]);
 
   const openEntry = useCallback(
     (e: Entry) => {
@@ -308,6 +328,10 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           <Suspense fallback={<div className="nos-world-fallback" />}>
             <WarfarePage paused={desk} />
           </Suspense>
+        ) : arena === 'rush' ? (
+          <Suspense fallback={<div className="nos-world-fallback" />}>
+            <RushPage paused={desk} />
+          </Suspense>
         ) : (
           gameMounted && (
             <Suspense fallback={<div className="nos-world-fallback" />}>
@@ -318,14 +342,16 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
       </div>
 
       {/* 1b. home: the agent, over the Noun World poster (hidden while skating) */}
-      {(!gameMounted && arena !== 'warfare') || desk ? (
+      {(!gameMounted && arena === 'world') || desk ? (
         <AgentHome
           active={desk && visible.length === 0}
           worldLoaded={gameMounted && arena === 'world'}
           warfareLoaded={arena === 'warfare'}
+          rushLoaded={arena === 'rush'}
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
           onEnterWarfare={goWarfare}
+          onEnterRush={goRush}
           onOpen={id => os.open(id)}
           onNavigate={openPath}
         />
