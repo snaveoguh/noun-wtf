@@ -208,8 +208,9 @@ export class MissionSystem {
 
   // ── Placement ──
 
+  /** Ground under (x, z), casting down 100 m from height `from` (a world y, not a range). */
   private ground(x: number, z: number, from = 30): number | null {
-    const hit = this.game.world.raycast(_o.set(x, from, z), _down, from + 60);
+    const hit = this.game.world.raycast(_o.set(x, from, z), _down, 100);
     return hit !== null && hit.normal.y > 0.9 ? hit.point.y : null;
   }
 
@@ -239,6 +240,7 @@ export class MissionSystem {
               : null;
     const npc = new StandingNpc(NPCS[id], this.host, {
       props,
+      fixedProps: id === 'twins',
       board: id === 'twins',
       spread: id === 'twins' ? 1.8 : 1.3,
     });
@@ -277,6 +279,7 @@ export class MissionSystem {
     const y = this.ground(TWINS_GATE.x, TWINS_GATE.z) ?? 0;
     const npc = this.npcs.get('twins') ?? this.spawnNpc('twins', 0, 0, 0, 0);
     npc?.place(TWINS_GATE.x, y, TWINS_GATE.z, -Math.PI / 2);
+    npc?.placeProps(TWINS_GATE.x, y, TWINS_GATE.z, -Math.PI / 2);
   }
 
   /** Noun Jersey's two and the bowl's door, once you're near and the ground is in. */
@@ -619,7 +622,11 @@ export class MissionSystem {
       over: null,
     };
     const tw = this.npcs.get('twins');
-    if (tw) tw.driven = true;
+    if (tw) {
+      tw.driven = true;
+      // They may have turned to greet you; race facing down the line
+      tw.faceForward();
+    }
     this.openPanel(null);
   }
 
