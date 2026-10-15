@@ -53,6 +53,7 @@ export class StandingNpc {
   flag = false;
   /** Kinematic riders (the Twins) drive their own characters. */
   driven = false;
+  private fixedProps: THREE.Object3D | null = null;
   private waveT = 0;
   private waved = false;
   private lastFlag: boolean | null = null;
@@ -61,7 +62,13 @@ export class StandingNpc {
   constructor(
     readonly def: NpcDef,
     private host: NpcHost,
-    opts: { props?: THREE.Object3D | null; board?: boolean; spread?: number } = {},
+    opts: {
+      props?: THREE.Object3D | null;
+      /** Props stay where `placeProps` puts them instead of following the character. */
+      fixedProps?: boolean;
+      board?: boolean;
+      spread?: number;
+    } = {},
   ) {
     def.seeds.forEach((s, i) => {
       const ch = new NounCharacter(seedOf(s), host.assets);
@@ -75,7 +82,10 @@ export class StandingNpc {
     });
     if (opts.props) {
       if (host.toon) toonify(opts.props);
-      this.root.add(opts.props);
+      if (opts.fixedProps === true) {
+        this.fixedProps = opts.props;
+        host.scene.add(opts.props);
+      } else this.root.add(opts.props);
     }
     host.scene.add(this.root);
     const label = document.createElement('div');
@@ -91,6 +101,18 @@ export class StandingNpc {
     const bang = this.flag ? '<b class="w2-npcbang">!</b> ' : '';
     this.label.innerHTML = `<span>${bang}${this.def.name} <i>Noun ${ids}</i></span>`;
     this.lastFlag = this.flag;
+  }
+
+  /** Put fixed props (the Twins' start banner) in the world; they don't ride along. */
+  placeProps(x: number, y: number, z: number, yaw: number) {
+    if (this.fixedProps === null) return;
+    this.fixedProps.position.set(x, y, z);
+    this.fixedProps.quaternion.setFromAxisAngle(Y, yaw);
+  }
+
+  /** Characters face the root's forward (undo any turn towards the player). */
+  faceForward() {
+    for (const ch of this.chars) ch.root.quaternion.identity();
   }
 
   place(x: number, y: number, z: number, yaw: number) {
