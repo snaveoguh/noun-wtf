@@ -1,7 +1,7 @@
 // ── icecreamvan.eth: 1970s Midland on a Dodge chassis, as a static prop ──
 //
 // Low-fi port of the procedural three.js model on /icecreamvan (public/
-// icecreamvan/index.html). Same silhouette, proportions and livery (white
+// icecreamvan-scene/index.html). Same silhouette, proportions and livery (white
 // ribbed body, pink stripes, DOGE star grille, six headlights, chrome
 // bumpers), but flat colours and chunky shapes so it cel-shades and inks like
 // the rest of the world. Shown "open for business": rear hatch raised as an
