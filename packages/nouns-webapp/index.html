@@ -64,11 +64,12 @@
         var transform = 'none';
         var id = 'figtree';
         try {
-          var f = JSON.parse(localStorage.getItem('noun-wtf-font') || 'null');
+          var f = JSON.parse(localStorage.getItem('noun-wtf-font-v2') || 'null');
           if (f && typeof f.stack === 'string' && f.stack) {
             stack = f.stack;
             transform = f.transform === 'uppercase' ? 'uppercase' : 'none';
             id = typeof f.id === 'string' ? f.id : id;
+            root.setAttribute('data-font-all', '');
             if (typeof f.google === 'string' && f.google) {
               var l = document.createElement('link');
               l.id = 'site-font-' + id;
@@ -78,9 +79,12 @@
             }
           }
         } catch (_) {}
-        root.style.setProperty('--site-font', stack);
-        root.style.setProperty('--site-transform', transform);
-        root.setAttribute('data-font', id);
+        // Nothing picked: leave the native default in index.css alone
+        if (root.hasAttribute('data-font-all')) {
+          root.style.setProperty('--site-font', stack);
+          root.style.setProperty('--site-transform', transform);
+          root.setAttribute('data-font', id);
+        }
       })();
     </script>
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#e04639" />

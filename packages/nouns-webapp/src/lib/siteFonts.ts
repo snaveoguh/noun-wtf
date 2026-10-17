@@ -173,14 +173,14 @@ export const SITE_FONTS: readonly SiteFont[] = [
   gf('Ubuntu Mono', 'mono', '400;700'),
 ];
 
-export const DEFAULT_SITE_FONT_ID = 'figtree';
+export const DEFAULT_SITE_FONT_ID = 'system';
 
 /**
  * Single JSON key. Storing the *resolved* stack/transform/google params (not
  * just the id) is what lets the pre-paint bootstrap in index.html apply the
  * choice without knowing this registry.
  */
-export const SITE_FONT_STORAGE_KEY = 'noun-wtf-font';
+export const SITE_FONT_STORAGE_KEY = 'noun-wtf-font-v2';
 
 interface StoredSiteFont {
   id: string;
@@ -234,6 +234,8 @@ export function applySiteFont(id: string): SiteFont {
     root.style.setProperty('--site-font', font.stack);
     root.style.setProperty('--site-transform', transform);
     root.setAttribute('data-font', font.id);
+    // A picked font reaches every part of the site (index.css, site-font-all)
+    root.setAttribute('data-font-all', '');
   }
   ensureFontLoaded(font);
   try {
