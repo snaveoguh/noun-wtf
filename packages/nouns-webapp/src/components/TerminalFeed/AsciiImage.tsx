@@ -18,8 +18,9 @@ interface Props {
   cols?: number;
 }
 
-const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
+const API_BASE =
+  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ||
+  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // Module-level cache to avoid refetching
 const asciiCache = new Map<string, AsciiData>();
@@ -58,7 +59,9 @@ export default function AsciiImage({ imageUrl, cols = 70 }: Props) {
         setLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [imageUrl, cols]);
 
   if (loading) {
@@ -96,7 +99,7 @@ export default function AsciiImage({ imageUrl, cols = 70 }: Props) {
           spans.push(
             <span key={runStart} style={{ color: runColor }}>
               {runChars}
-            </span>
+            </span>,
           );
         }
         runStart = x;
@@ -110,12 +113,13 @@ export default function AsciiImage({ imageUrl, cols = 70 }: Props) {
     rows.push(
       <div key={y} style={{ height: '10px', lineHeight: '10px' }}>
         {spans}
-      </div>
+      </div>,
     );
   }
 
   return (
     <div
+      data-keep-font
       style={{
         fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",
         fontSize: '8px',

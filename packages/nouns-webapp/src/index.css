@@ -1,5 +1,23 @@
 @import './liquid-sand/tokens.css';
 
+
+/* ─── Site font everywhere. Once a font is picked in the switcher
+   (data-font-all on <html>, set by siteFonts.ts and index.html's pre-paint
+   bootstrap) it replaces every font on the site, including the ~770 places
+   that set their own. Important declarations in a cascade layer beat every
+   unlayered one whatever its specificity, and React inline styles can't be
+   !important, so this wins everywhere. Code, ASCII art and anything marked
+   data-keep-font keep their own (monospace alignment). ─── */
+@layer site-font-all {
+  html[data-font-all] *:not(code, kbd, samp, [data-keep-font], [data-keep-font] *) {
+    font-family: var(--site-font, 'Figtree', system-ui, sans-serif) !important;
+  }
+  /* Pip3 has no lowercase glyphs */
+  html[data-font-all][data-font='pip3'] *:not(code, kbd, samp, [data-keep-font], [data-keep-font] *) {
+    text-transform: uppercase !important;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -61,9 +79,10 @@
    index.html sets these on <html> before first paint from localStorage; the
    defaults below cover a fresh visitor. Both theme blocks read them instead
    of hard-coding Pip3. Default Figtree. */
-:root {
-  /* Native UI font on every platform: SF (Apple), Segoe UI (Windows), Roboto
-     (Android/ChromeOS). !important beats a font saved by the old switcher. */
+/* Native UI font on every platform: SF (Apple), Segoe UI (Windows), Roboto
+   (Android/ChromeOS) until a font is picked; then <html>'s inline vars win.
+   Saves from the old switcher (key noun-wtf-font) are ignored. */
+:root:not([data-font-all]) {
   --site-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', system-ui,
     sans-serif !important;
   --site-transform: none !important;
