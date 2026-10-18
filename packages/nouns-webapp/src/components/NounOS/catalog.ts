@@ -94,6 +94,11 @@ export const CATALOG: Section[] = [
     tag: 'one noun a day, forever',
     entries: [
       { path: '/marketplace', name: 'MARKETPLACE', blurb: 'buy and sell nouns.' },
+      {
+        path: '/exchange',
+        name: 'GRAND EXCHANGE',
+        blurb: 'noun trade order book. bots and riders, in-game coin.',
+      },
       { path: '/predictions', name: 'PREDICTIONS', blurb: 'bet on governance outcomes.' },
       { path: '/crystal-ball', name: 'CRYSTAL BALL', blurb: 'see the next noun before it mints.' },
       { path: '/settlers', name: 'SETTLERS', blurb: 'who settles the auctions.' },
