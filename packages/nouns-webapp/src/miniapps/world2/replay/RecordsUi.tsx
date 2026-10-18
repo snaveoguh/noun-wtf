@@ -78,69 +78,71 @@ export function RecordsUi({ game, admin }: { game: Game; admin: boolean }) {
   );
 }
 
+/** How long a record toast stays (ms): good news is quick, a refusal lingers so APPEAL can be tapped. */
+const TOAST_MS = { saved: 3500, appeal: 6000, refused: 9000 } as const;
+const FADE_MS = 600;
+
+/**
+ * Record news as a small toast bottom-left that fades on its own: it never
+ * covers the road or needs closing (a dialogue on every new top speed made
+ * phones unplayable). A newer record replaces it. Refused rides keep tiny
+ * REPLAY / APPEAL taps; every kept ride is also in the ⟲ REPLAY menu.
+ */
 function RecordCardView({ game }: { game: Game }) {
   const card = useCard(game);
+  const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const [now, setNow] = useState(() => performance.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(performance.now()), 500);
+    if (card === null) return;
+    const id = setInterval(() => setNow(performance.now()), 200);
     return () => clearInterval(id);
-  }, []);
+  }, [card]);
   if (card === null) return null;
-  // Good news fades after 12 s; a refusal stays until it's dismissed
-  if (card.kind !== 'refused' && now - card.at > 12_000) return null;
+  const age = Math.max(0, now - card.at);
+  // An appeal in flight stays until it has an answer
+  const busy = card.appeal?.state === 'sending';
+  const life = TOAST_MS[card.kind];
+  if (!busy && age > life) return null;
+  const opacity = busy ? 1 : Math.min(1, Math.max(0, (life - age) / FADE_MS));
   const refused = card.kind === 'refused';
+  const bad = refused || card.appeal?.state === 'rejected';
   const what = fmtRecord(card.key, card.value);
-  const tag =
-    card.kind === 'saved' ? '★ NEW RECORD' : refused ? '⚠ RECORD NOT SAVED' : '⚖ YOUR APPEAL';
+  const tag = card.kind === 'saved' ? '★ NEW RECORD' : refused ? '⚠ NOT SAVED' : '⚖ APPEAL';
   return (
     <div
       key={card.id}
       data-testid="record-card"
-      className={`pointer-events-auto absolute left-1/2 top-[10.5rem] z-20 w-[min(440px,92vw)] -translate-x-1/2 px-4 py-3 text-black shadow-[6px_6px_0_#000] ${
-        refused || card.appeal?.state === 'rejected' ? 'bg-[#ff5a4a]' : 'bg-[#ffd400]'
-      }`}
+      style={{ opacity, transition: 'opacity 200ms linear' }}
+      className={`pointer-events-none absolute z-20 rounded-lg border-2 border-black px-2.5 py-1.5 text-xs text-black shadow-[3px_3px_0_#000] ${
+        touch ? 'bottom-[156px] left-3 max-w-[180px]' : 'bottom-[60px] left-[292px] max-w-[300px]'
+      } ${bad ? 'bg-[#ff5a4a]' : 'bg-[#ffd400]'}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs font-black tracking-widest">{tag}</div>
-          <div className="text-xl font-black italic leading-tight">
-            {what}
-            {card.reason ? (
-              <span className="text-base font-bold not-italic">: {card.reason}</span>
-            ) : null}
-          </div>
-        </div>
-        <button
-          type="button"
-          className="text-lg font-black leading-none"
-          aria-label="Dismiss"
-          onClick={() => game.records.dismiss()}
-        >
-          ×
-        </button>
+      <div className="font-black leading-tight">
+        <span className="tracking-wider">{tag}</span> <span className="italic">{what}</span>
+        {card.reason ? <span className="font-bold">: {card.reason}</span> : null}
       </div>
-      {card.appeal && <div className="mt-1 text-sm font-bold">{card.appeal.text}</div>}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {card.run && (
+      {card.appeal && <div className="mt-0.5 font-bold leading-tight">{card.appeal.text}</div>}
+      {refused && card.run && (
+        <div className="mt-1 flex gap-1.5">
           <button
             type="button"
-            className="bg-black px-3 py-1 text-sm font-black italic text-[#ffd400]"
+            className="pointer-events-auto rounded bg-black px-2 py-0.5 font-black italic text-[#ffd400]"
             onClick={() => game.records.replayCard()}
           >
             ▶ REPLAY
           </button>
-        )}
-        {refused && card.run && (!card.appeal || card.appeal.state === 'error') && (
-          <button
-            type="button"
-            className="bg-white px-3 py-1 text-sm font-black italic text-black"
-            title="Send it again with its ride; if it's still refused, an admin reviews it"
-            onClick={() => void game.records.appeal()}
-          >
-            ⚖ APPEAL
-          </button>
-        )}
-      </div>
+          {(!card.appeal || card.appeal.state === 'error') && (
+            <button
+              type="button"
+              className="pointer-events-auto rounded bg-white px-2 py-0.5 font-black italic text-black"
+              title="Send it again with its ride; if it's still refused, an admin reviews it"
+              onClick={() => void game.records.appeal()}
+            >
+              ⚖ APPEAL
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
