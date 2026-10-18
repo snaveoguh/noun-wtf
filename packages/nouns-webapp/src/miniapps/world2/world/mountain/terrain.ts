@@ -15,9 +15,12 @@
 //                                  mega ramp site (see the section at the end)
 //          (+ Noun Jersey)         the secret spot's terrace (nounJersey.ts)
 //          (+ the Noggle Bowl)     terrace, bowl + roll-in ~42 km out (noggleBowl.ts)
+//          (+ Noun Trade towns)    level pads around the +X line (towns/site.ts)
 //
 // Gradients stay ≲ 0.8, so the analytic heightfield doubles as the collision
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
+
+import { applyTownPads, setTownNatural, townBlocked } from '../../towns/site';
 
 import {
   ALLEYS,
@@ -99,6 +102,8 @@ export function sampleTerrain(x: number, z: number, out: TerrainSample): Terrain
   if (out.dist < INFLUENCE) applyMegaPads(x, z, out);
   applyNjPad(x, z, out);
   applyBowl(x, z, out);
+  // Noun Trade towns (towns/site.ts): last, resolving one may re-query the network
+  applyTownPads(x, z, out);
   return out;
 }
 
@@ -169,6 +174,7 @@ const _s: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
 const _ns: TerrainSample = { y: 0, track: 0, alley: 0, side: 0, dist: 0 };
 setNjNatural((x, z) => sampleBase(x, z, _ns).y);
 setBowlNatural((x, z) => sampleBase(x, z, _ns).y);
+setTownNatural((x, z) => sampleBase(x, z, _ns).y);
 
 /** Terrain height at (x, z). */
 export function terrainHeight(x: number, z: number): number {
@@ -588,7 +594,7 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
  * with a margin — and the Noun Jersey terrace.
  */
 export function megaBlocked(x: number, z: number): boolean {
-  if (njBlocked(x, z) || bowlBlocked(x, z)) return true;
+  if (njBlocked(x, z) || bowlBlocked(x, z) || townBlocked(x, z)) return true;
   return eachMega(
     x,
     z,

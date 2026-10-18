@@ -15,7 +15,7 @@ import { drawMap, secretSpot, toWorld, type MapScene, type MapView } from './map
 const S_MIN = 0.012;
 const S_MAX = 10;
 
-function sceneOf(game: Game, waypoint: MapScene['waypoint']): MapScene {
+function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapScene {
   const p = game.player.pos;
   const riders = [];
   for (const [id, r] of game.remotes) {
@@ -28,6 +28,7 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint']): MapScene {
     waypoint,
     mountain: game.mountain !== null,
     drops: game.drops?.mapPoints(),
+    towns: game.towns?.mapPoints(full),
   };
 }
 
@@ -89,7 +90,7 @@ export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
     const tick = () => {
       raf = requestAnimationFrame(tick);
       frame++;
-      const scene = sceneOf(game, way.current);
+      const scene = sceneOf(game, way.current, open);
       const mini = miniRef.current;
       if (!open && mini !== null && (!touch || frame % 2 === 0)) {
         const ctx = mini.getContext('2d');

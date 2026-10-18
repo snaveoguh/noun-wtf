@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 1`] = `
+[
+  9606,
+  -3754,
+  1,
+  -1450,
+  235,
+]
+`;
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 2`] = `
+[
+  23404,
+  -11045,
+  -1,
+  -3629,
+  235,
+]
+`;

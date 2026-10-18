@@ -43,6 +43,9 @@ import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { TradeClient } from './trade/TradeClient';
+import { townsDecorator } from './towns/build';
+import { townSpawn } from './towns/site';
+import { TownSystem } from './towns/TownSystem';
 import {
   buildIceCreamVan,
   iceCreamVanStationCollision,
@@ -180,6 +183,8 @@ export class Game {
   name: string;
   remotes = new Map<string, RemoteAvatar>();
   crew: JerseyCrew | null = null;
+  /** Noun Trade towns + their customers (towns/): the TownsApi (trade/contract.ts). */
+  towns: TownSystem | null = null;
   /** Missions: the Oracle and the cast, progress, the Upside Down (missions/). */
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -335,6 +340,23 @@ export class Game {
         camera: this.gfx.camera,
         canvas: this.opts.canvas,
       });
+    if (this.mountain !== null)
+      this.towns = new TownSystem({
+        scene: this.gfx.scene,
+        camera: this.gfx.camera,
+        canvas: this.opts.canvas,
+        labelLayer: this.labelLayer,
+        toon: this.gfx.toon,
+        quality: this.gfx.quality,
+        assets: () => this.assets,
+        player: this.player,
+        controlYaw: () => this.cam.controlYaw,
+        toast: (text, tag) => {
+          this.hud = { ...this.hud, toast: { text, tag, at: performance.now() } };
+          this.emit();
+        },
+        game: this,
+      });
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -364,6 +386,12 @@ export class Game {
     // `?spot=bowl`: the top of the Noggle Bowl's roll-in, ~42 km down the −X line
     if (spotParam() === 'bowl' && this.mountain !== null) {
       const sp = bowlSpawn();
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
+    // `?spot=cowboy` / `?spot=beach`: top of main street in a Noun Trade town (dev; no stats)
+    const ts = spotParam();
+    if ((ts === 'cowboy' || ts === 'beach') && this.mountain !== null) {
+      const sp = townSpawn(ts);
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
     this.cam.snap(this.player);
@@ -587,6 +615,7 @@ export class Game {
     this.drops?.update(dt, this.player);
     this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
+    this.towns?.update(dt);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -677,6 +706,8 @@ export class Game {
       m.addDecorator(nounJerseyDecorator(this.rails));
       // …and the Noggle Bowl (~42 km down the −X line): walls, deck, coping
       m.addDecorator(noggleBowlDecorator());
+      // Noun Trade towns (Dry Gulch ~10 km, Puerto Noun ~25 km down the +X line)
+      m.addDecorator(townsDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)
       const wild = new Wildlife(this.gfx.quality);
       m.addDecorator(wild.decorator());
@@ -1566,6 +1597,7 @@ export class Game {
     });
     if (this.mountain !== null) this.updateSecretSpot(lm);
     if (this.mountain !== null) this.updateBowl(lm);
+    this.towns?.landmarks(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
@@ -1692,6 +1724,7 @@ export class Game {
     this.net.dispose();
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     this.crew?.dispose();
+    this.towns?.dispose();
     this.gfx.dispose();
     this.world.dispose();
   }
