@@ -89,7 +89,7 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
       <div
         data-w2hud="trade"
         data-trade="chip"
-        className={`pointer-events-auto absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'bottom-[118px]' : 'top-[124px]'}`}
+        className={`pointer-events-none absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'bottom-[118px]' : 'top-[124px]'}`}
       >
         {st !== null && (
           <CargoChip st={st} town={town} short={touch} onMarket={() => setOpen('market')} />
@@ -149,7 +149,7 @@ function CargoChip({
 }) {
   const used = usedSlots(st.cargo);
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="pointer-events-auto flex items-center gap-1.5">
       <div className="w2-chip text-xs" title="Coin and van cargo">
         <b className="text-[#ffd400]">{st.coin.toLocaleString()}</b> COIN
         <span className="opacity-50"> · </span>
