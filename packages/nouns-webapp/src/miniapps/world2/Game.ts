@@ -42,6 +42,7 @@ import { ReplayView } from './replay/ReplayView';
 import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
+import { TradeClient } from './trade/TradeClient';
 import {
   buildIceCreamVan,
   iceCreamVanStationCollision,
@@ -183,6 +184,8 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
+  /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
+  readonly trade: TradeClient;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -251,6 +254,7 @@ export class Game {
       fmDecks: false,
     };
     this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
+    this.trade = new TradeClient({ offline: opts.offline === true || devRun() });
     this.wireFm();
   }
 
@@ -381,6 +385,7 @@ export class Game {
       this.net.connect();
       void this.refreshStats();
     }
+    void this.trade.load();
 
     this.setLoading(null);
     this.running = true;

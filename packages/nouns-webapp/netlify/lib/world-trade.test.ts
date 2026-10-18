@@ -18,18 +18,21 @@ const store = {
   async get(k: string, o?: { type?: string }) {
     await yieldMany();
     const b = blobs.get(k);
-    if (!b) return null;
+    if (b === undefined) return null;
     return o?.type === 'json' ? JSON.parse(b.v) : b.v;
   },
   async getWithMetadata(k: string) {
     await yieldMany();
     const b = blobs.get(k);
-    return b ? { data: JSON.parse(b.v), etag: b.etag } : null;
+    return b !== undefined ? { data: JSON.parse(b.v), etag: b.etag } : null;
   },
   async setJSON(k: string, v: unknown, o: { onlyIfMatch?: string; onlyIfNew?: boolean } = {}) {
     await yieldMany();
     const b = blobs.get(k);
-    if ((o.onlyIfNew && b) || (o.onlyIfMatch && b?.etag !== o.onlyIfMatch)) {
+    if (
+      (o.onlyIfNew === true && b !== undefined) ||
+      (o.onlyIfMatch !== undefined && b?.etag !== o.onlyIfMatch)
+    ) {
       conflicts++;
       return { modified: false };
     }
@@ -85,7 +88,12 @@ describe('world-trade: reads', () => {
 
   it("GET a new rider: the starter purse, one town's quotes, and nothing written", async () => {
     const { out } = await get({ rider: R1, town: 'cowboy' });
-    expect(out.state).toMatchObject({ rider: R1, coin: RULES.STARTER_COIN, cargo: {}, capacity: 40 });
+    expect(out.state).toMatchObject({
+      rider: R1,
+      coin: RULES.STARTER_COIN,
+      cargo: {},
+      capacity: 40,
+    });
     expect(out.quotes.every((q: { town: string }) => q.town === 'cowboy')).toBe(true);
     expect(blobs.has(`rider/${R1}`)).toBe(false);
     expect((await get({ rider: 'x' })).status).toBe(400);
@@ -134,7 +142,9 @@ describe('world-trade: the server holds the books', () => {
     expect((await post({ rider: 'short', action: {} })).status).toBe(400);
     expect((await post({ rider: `${R1}!`, action: {} })).status).toBe(400);
     expect((await post({ rider: R1, id: 'x'.repeat(80), action: {} })).status).toBe(400);
-    expect((await post({ rider: R1, action: { t: 'buy', pad: 'x'.repeat(3000) } })).status).toBe(413);
+    expect((await post({ rider: R1, action: { t: 'buy', pad: 'x'.repeat(3000) } })).status).toBe(
+      413,
+    );
     const bad = await act(R1, { t: 'buy', town: 'city', good: 'FISH', qty: -2 });
     expect(bad.status).toBe(400);
     expect(rejections().at(-1)).toMatchObject({ kind: 'invalid' });
@@ -188,7 +198,7 @@ describe('world-trade: concurrency', () => {
       act(R1, { t: 'buy', town: 'city', good: 'NOGGLES', qty: 1 }),
       act(R1, { t: 'buy', town: 'city', good: 'FRIES', qty: 2 }),
     ]);
-    expect(a.out.ok && b.out.ok).toBe(true);
+    expect([a.out.ok, b.out.ok]).toEqual([true, true]);
     expect(conflicts).toBeGreaterThan(0); // they really raced
     const after = row(R1);
     expect(after.held).toEqual({ FRIES: 3, NOGGLES: 1 });
@@ -202,14 +212,14 @@ describe('world-trade: concurrency', () => {
     const res = await Promise.all(
       [1, 2, 3].map(() => act(R2, { t: 'buy', town: 'city', good: 'FRIES', qty: 1 })),
     );
-    expect(res.every(r => r.out.ok)).toBe(true);
+    expect(res.map(r => r.out.ok)).toEqual([true, true, true]);
     const r = row(R2);
     expect(r.book.granted).toBe(RULES.STARTER_COIN);
     expect(r.held).toEqual({ FRIES: 3 });
     expect(audit(r)).toBe(true);
   });
 
-  it("two riders trading one town at once: both stock moves land in the markets", async () => {
+  it('two riders trading one town at once: both stock moves land in the markets', async () => {
     await act(R1, { t: 'buy', town: 'city', good: 'WATER', qty: 1 }); // markets exist
     const s0 = markets().city.stock.WATER;
     conflicts = 0;

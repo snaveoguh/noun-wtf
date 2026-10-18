@@ -23,7 +23,7 @@ const T0 = Date.UTC(2026, 9, 18, 12);
 const MIN = 60_000;
 
 /** A little world: one rider, the markets, a clock. */
-function world(coin = RULES.STARTER_COIN) {
+function world(coin: number = RULES.STARTER_COIN) {
   let row = newRow('r1', T0);
   row = { ...row, coin, book: { ...row.book, granted: coin } };
   let markets: Markets = freshMarkets(T0);

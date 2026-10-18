@@ -1,6 +1,6 @@
-import { connectLambda, getStore } from '@netlify/blobs';
-
 import type { TownId, TradeResult } from '../../src/miniapps/world2/trade/contract';
+
+import { connectLambda, getStore } from '@netlify/blobs';
 
 import {
   allQuotes,
@@ -87,7 +87,10 @@ function riderOf(v: unknown): string | null {
 
 async function readRow(store: Store, rider: string, now: number) {
   const cur = await store.getWithMetadata(riderKey(rider), { type: 'json' });
-  return { row: cur ? normalizeRow(cur.data, rider, now) : newRow(rider, now), etag: cur?.etag };
+  return {
+    row: cur !== null ? normalizeRow(cur.data, rider, now) : newRow(rider, now),
+    etag: cur?.etag,
+  };
 }
 
 async function readMarkets(store: Store, now: number) {
@@ -96,7 +99,9 @@ async function readMarkets(store: Store, now: number) {
 }
 
 const put = (store: Store, key: string, v: unknown, etag: string | undefined) =>
-  etag ? store.setJSON(key, v, { onlyIfMatch: etag }) : store.setJSON(key, v, { onlyIfNew: true });
+  etag !== undefined
+    ? store.setJSON(key, v, { onlyIfMatch: etag })
+    : store.setJSON(key, v, { onlyIfNew: true });
 
 /**
  * After the rider's row is committed, move the town's stock. First try the
@@ -127,7 +132,10 @@ async function logRejection(
   try {
     const cur = ((await store.get('rejections', { type: 'json' })) as unknown[] | null) ?? [];
     const action = JSON.stringify(entry.action ?? null).slice(0, 300);
-    await store.setJSON('rejections', [...cur, { at: Date.now(), ...entry, action }].slice(-LOG_KEEP));
+    await store.setJSON(
+      'rejections',
+      [...cur, { at: Date.now(), ...entry, action }].slice(-LOG_KEEP),
+    );
   } catch {
     // logging must never break a trade
   }
@@ -138,7 +146,10 @@ async function get(store: Store, q: Record<string, string | undefined>) {
   const { markets } = await readMarkets(store, now);
   const town = q.town;
   if (town !== undefined && !isTown(town)) return json(400, { ok: false, reason: 'unknown town' });
-  const quotes = town !== undefined ? townQuotes(town as TownId, markets[town as TownId], now) : allQuotes(markets, now);
+  const quotes =
+    town !== undefined
+      ? townQuotes(town as TownId, markets[town as TownId], now)
+      : allQuotes(markets, now);
   if (q.rider === undefined) return json(200, { quotes, at: now });
   const rider = riderOf(q.rider);
   if (rider === null) return json(400, { ok: false, reason: 'bad rider' });
@@ -193,7 +204,14 @@ async function post(store: Store, body: string | null): Promise<HandlerResponse>
 
     const town = 'town' in action ? action.town : null;
     const quotes = (mk: Markets) => (town !== null ? townQuotes(town, mk[town], now) : undefined);
-    if (out.dup) return json(200, { ok: true, dup: true, state: stateOf(out.row), quotes: quotes(m.markets), at: now });
+    if (out.dup)
+      return json(200, {
+        ok: true,
+        dup: true,
+        state: stateOf(out.row),
+        quotes: quotes(m.markets),
+        at: now,
+      });
 
     // The rider's books first: this write is what makes coin safe
     if (!(await put(store, riderKey(rider), out.row, r.etag)).modified) continue;

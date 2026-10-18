@@ -27,6 +27,7 @@ import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
+import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
@@ -307,6 +308,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && <TouchControls game={game} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
