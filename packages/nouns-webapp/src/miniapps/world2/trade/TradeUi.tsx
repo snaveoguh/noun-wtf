@@ -89,9 +89,11 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
       <div
         data-w2hud="trade"
         data-trade="chip"
-        className={`pointer-events-auto absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'top-[152px]' : 'top-[124px]'}`}
+        className={`pointer-events-auto absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'bottom-[118px]' : 'top-[124px]'}`}
       >
-        {st !== null && <CargoChip st={st} town={town} onMarket={() => setOpen('market')} />}
+        {st !== null && (
+          <CargoChip st={st} town={town} short={touch} onMarket={() => setOpen('market')} />
+        )}
         {notice !== null && (
           <div
             className={`w2-chip text-xs ${notice.ok ? 'w2-on' : ''}`}
@@ -136,10 +138,13 @@ function useTickWhile(on: boolean, ms: number) {
 function CargoChip({
   st,
   town,
+  short,
   onMarket,
 }: {
   st: TradeState;
   town: TownId | null;
+  /** Phones: no town name (the touch buttons sit right of it). */
+  short: boolean;
   onMarket: () => void;
 }) {
   const used = usedSlots(st.cargo);
@@ -152,7 +157,7 @@ function CargoChip({
           {used}/{st.capacity}
         </b>{' '}
         cargo
-        {town !== null && <span className="opacity-60"> · {TOWN_SPECS[town].name}</span>}
+        {town !== null && !short && <span className="opacity-60"> · {TOWN_SPECS[town].name}</span>}
       </div>
       {town !== null && (
         <button
@@ -296,7 +301,7 @@ function MarketRows({ trade, town, st }: { trade: TradeClient; town: TownId; st:
           >
             <div className="min-w-0">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-xs">{GOOD_ICON[g]}</span>
+                <span className="shrink-0 whitespace-nowrap text-xs">{GOOD_ICON[g]}</span>
                 <b className="truncate">{GOODS[g].name}</b>
               </div>
               <div className="truncate text-[10px] opacity-70">
