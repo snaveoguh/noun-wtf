@@ -58,12 +58,21 @@ export const maker: Strategy = c => {
     const t = c.top(g);
     if (t.ask !== null && bid >= t.ask) bid = t.ask - 1;
     if (t.bid !== null && ask <= t.bid) ask = t.bid + 1;
-    const sz = Math.min(c.def.maxQty, randInt(c.rng, p.minSz, p.maxSz));
-    if (bid >= 1 && coin >= sz * bid) {
-      actions.push({ t: 'place', good: g, side: 'buy', qty: sz, price: bid });
+    // A small ladder: the touch, then deeper levels a step further out
+    const step = Math.max(1, Math.round(mid * p.half));
+    for (let k = 0; k < (p.levels ?? 1); k++) {
+      const sz = Math.min(c.def.maxQty, randInt(c.rng, p.minSz, p.maxSz) + k * 2);
+      const b = bid - k * step;
+      if (b >= 1 && coin >= sz * b) {
+        actions.push({ t: 'place', good: g, side: 'buy', qty: sz, price: b });
+        coin -= sz * b;
+      }
+      const askSz = Math.min(sz, free);
+      if (askSz > 0) {
+        actions.push({ t: 'place', good: g, side: 'sell', qty: askSz, price: ask + k * step });
+        free -= askSz;
+      }
     }
-    const askSz = Math.min(sz, free);
-    if (askSz > 0) actions.push({ t: 'place', good: g, side: 'sell', qty: askSz, price: ask });
     if (say === null && c.rng() < (p.talk ?? 0.2)) {
       sayGood = g;
       say =

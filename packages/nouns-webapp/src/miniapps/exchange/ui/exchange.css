@@ -1,0 +1,620 @@
+/* Grand Exchange: a dark trading-floor terminal. Everything is scoped under .gx-root. */
+.gx-root {
+  --gx-bg: #0b0f0c;
+  --gx-panel: #111813;
+  --gx-line: #223026;
+  --gx-text: #d9e6db;
+  --gx-muted: #75897a;
+  --gx-up: #3ddc84;
+  --gx-down: #ff6363;
+  --gx-amber: #ffcf4a;
+  --gx-mine: #6fb6ff;
+  background: var(--gx-bg);
+  color: var(--gx-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  min-height: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  /* Lay out by the window it sits in (a NounOS window), not the viewport */
+  container: gx / inline-size;
+}
+.gx-root *,
+.gx-root *::before,
+.gx-root *::after {
+  box-sizing: border-box;
+}
+.gx-root button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.gx-root button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.gx-muted {
+  color: var(--gx-muted);
+}
+.gx-up {
+  color: var(--gx-up);
+}
+.gx-down {
+  color: var(--gx-down);
+}
+
+.gx-head {
+  margin-bottom: 8px;
+}
+.gx-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--gx-amber);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gx-logo {
+  color: #ff3b3b;
+}
+.gx-mode {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border: 1px solid var(--gx-up);
+  color: var(--gx-up);
+  border-radius: 3px;
+}
+.gx-mode-off {
+  border-color: var(--gx-amber);
+  color: var(--gx-amber);
+}
+.gx-sub {
+  font-size: 12px;
+  color: var(--gx-text);
+  opacity: 0.85;
+}
+
+.gx-tickers {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  scrollbar-width: thin;
+}
+.gx-tk {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: 'i g' 'p c';
+  column-gap: 6px;
+  text-align: left;
+  padding: 5px 8px;
+  border: 1px solid var(--gx-line) !important;
+  background: var(--gx-panel) !important;
+  border-radius: 4px;
+  min-width: 96px;
+}
+.gx-tk.gx-on {
+  border-color: var(--gx-amber) !important;
+  box-shadow: inset 0 -2px 0 var(--gx-amber);
+}
+.gx-tk-i {
+  grid-area: i;
+}
+.gx-tk-g {
+  grid-area: g;
+  font-weight: 700;
+  font-size: 11px;
+}
+.gx-tk-p {
+  grid-area: p;
+  font-size: 15px;
+  font-weight: 700;
+}
+.gx-tk-c {
+  grid-area: c;
+  font-size: 11px;
+  align-self: center;
+}
+
+.gx-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'chart' 'ticket' 'book' 'orders' 'floor' 'tape' 'bots';
+}
+@container gx (min-width: 700px) {
+  .gx-grid {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    grid-template-areas:
+      'chart chart'
+      'book ticket'
+      'book orders'
+      'floor floor'
+      'tape bots';
+  }
+}
+@container gx (min-width: 1080px) {
+  .gx-grid {
+    grid-template-columns: 250px minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'book chart ticket'
+      'book floor orders'
+      'tape floor bots';
+  }
+}
+.gx-a-chart {
+  grid-area: chart;
+}
+.gx-a-ticket {
+  grid-area: ticket;
+}
+.gx-a-book {
+  grid-area: book;
+}
+.gx-a-orders {
+  grid-area: orders;
+}
+.gx-a-floor {
+  grid-area: floor;
+}
+.gx-a-tape {
+  grid-area: tape;
+}
+.gx-a-bots {
+  grid-area: bots;
+}
+
+.gx-panel {
+  background: var(--gx-panel);
+  border: 1px solid var(--gx-line);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+}
+.gx-ph {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gx-muted);
+  margin-bottom: 6px;
+}
+.gx-a-chart .gx-ph {
+  font-size: 13px;
+  color: var(--gx-text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.gx-ph-stats {
+  font-size: 12px;
+}
+.gx-tf {
+  margin-left: auto;
+}
+.gx-empty {
+  color: var(--gx-muted);
+  padding: 6px 2px;
+  font-size: 12px;
+}
+
+/* chart */
+.gx-chart {
+  width: 100%;
+  overflow: hidden;
+}
+.gx-chart svg {
+  display: block;
+}
+.gx-grid-line {
+  stroke: var(--gx-line);
+  stroke-width: 1;
+}
+.gx-axis {
+  fill: var(--gx-muted);
+  font-size: 10px;
+  font-family: inherit;
+}
+.gx-fair {
+  stroke: var(--gx-amber);
+  stroke-dasharray: 4 4;
+  opacity: 0.6;
+}
+.gx-fair-label {
+  fill: var(--gx-amber);
+  font-size: 10px;
+  opacity: 0.8;
+}
+.gx-c-up line,
+.gx-c-up rect {
+  stroke: var(--gx-up);
+  fill: var(--gx-up);
+}
+.gx-c-down line,
+.gx-c-down rect {
+  stroke: var(--gx-down);
+  fill: var(--gx-down);
+}
+.gx-c-flat line,
+.gx-c-flat rect {
+  stroke: #2f4034;
+  fill: #2f4034;
+}
+.gx-root .gx-vol {
+  opacity: 0.35;
+  stroke: none;
+}
+.gx-last-tag {
+  fill: var(--gx-amber);
+}
+.gx-last-text {
+  fill: #111;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ladder */
+.gx-ladder {
+  font-size: 13px;
+}
+.gx-lv {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr 44px;
+  width: 100%;
+  padding: 2px 4px;
+  text-align: right;
+  overflow: hidden;
+}
+.gx-lv:hover {
+  background: #1a241d !important;
+}
+.gx-lv-head {
+  color: var(--gx-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.gx-lv-bar {
+  position: absolute;
+  right: 0;
+  top: 1px;
+  bottom: 1px;
+  opacity: 0.18;
+  pointer-events: none;
+}
+.gx-lv-ask .gx-lv-bar {
+  background: var(--gx-down);
+}
+.gx-lv-bid .gx-lv-bar {
+  background: var(--gx-up);
+}
+.gx-lv-px {
+  text-align: left;
+  font-weight: 700;
+}
+.gx-lv-ask .gx-lv-px {
+  color: var(--gx-down);
+}
+.gx-lv-bid .gx-lv-px {
+  color: var(--gx-up);
+}
+.gx-lv-m {
+  color: var(--gx-mine);
+  font-size: 11px;
+}
+.gx-lv-mine {
+  outline: 1px dashed var(--gx-mine);
+  outline-offset: -1px;
+}
+.gx-spread {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px;
+  margin: 3px 0;
+  border-top: 1px solid var(--gx-line);
+  border-bottom: 1px solid var(--gx-line);
+  color: var(--gx-amber);
+  font-size: 12px;
+}
+
+/* tape */
+.gx-tape {
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.gx-tp {
+  display: grid;
+  grid-template-columns: 34px 40px 40px minmax(0, 1fr);
+  gap: 4px;
+  padding: 1px 2px;
+}
+.gx-tp-t {
+  color: var(--gx-muted);
+}
+.gx-tp-px {
+  font-weight: 700;
+}
+.gx-tp-up .gx-tp-px {
+  color: var(--gx-up);
+}
+.gx-tp-down .gx-tp-px {
+  color: var(--gx-down);
+}
+.gx-tp-who {
+  color: var(--gx-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gx-tp-mine {
+  background: rgba(111, 182, 255, 0.12);
+}
+
+/* floor feed */
+.gx-floor {
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gx-fl {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  animation: gx-in 1.2s ease-out;
+  border-radius: 4px;
+}
+/* New lines flash amber (never hidden, so a frozen frame still shows them) */
+@keyframes gx-in {
+  from {
+    background: rgba(255, 207, 74, 0.18);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gx-fl {
+    animation: none;
+  }
+}
+.gx-fl-me .gx-fl-text {
+  color: var(--gx-mine);
+}
+.gx-fl-av {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  flex: 0 0 28px;
+  image-rendering: pixelated;
+  background: #222;
+}
+.gx-fl-gx {
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #111;
+  background: var(--gx-amber);
+}
+.gx-fl-body {
+  min-width: 0;
+  flex: 1;
+}
+.gx-fl-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.gx-fl-top b {
+  color: var(--gx-amber);
+}
+.gx-fl-t {
+  margin-left: auto;
+  color: var(--gx-muted);
+  font-size: 11px;
+}
+.gx-fl-text {
+  overflow-wrap: anywhere;
+}
+.gx-chip {
+  font-size: 10px !important;
+  padding: 0 5px !important;
+  border: 1px solid var(--gx-line) !important;
+  border-radius: 8px;
+  color: var(--gx-muted) !important;
+}
+
+/* roster */
+.gx-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gx-bot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.gx-bot img {
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+.gx-bot-body {
+  flex: 1;
+  min-width: 0;
+}
+.gx-bot-style {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.gx-bot-pnl {
+  font-weight: 700;
+}
+
+/* ticket */
+.gx-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.gx-seg {
+  display: flex;
+  border: 1px solid var(--gx-line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.gx-seg button {
+  flex: 1;
+  padding: 7px 6px;
+  font-weight: 700;
+  color: var(--gx-muted) !important;
+}
+.gx-seg button.gx-on {
+  background: #1d2a21 !important;
+  color: var(--gx-text) !important;
+}
+.gx-seg button.gx-on.gx-buy {
+  background: var(--gx-up) !important;
+  color: #08130c !important;
+}
+.gx-seg button.gx-on.gx-sell {
+  background: var(--gx-down) !important;
+  color: #1a0707 !important;
+}
+.gx-seg-sm button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.gx-field {
+  display: grid;
+  grid-template-columns: 44px 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 4px;
+}
+.gx-field.gx-muted {
+  display: block;
+  font-size: 12px;
+}
+.gx-field span {
+  color: var(--gx-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.gx-field button {
+  height: 34px;
+  border: 1px solid var(--gx-line) !important;
+  border-radius: 4px;
+  font-size: 16px;
+}
+.gx-field input {
+  height: 34px;
+  min-width: 0;
+  background: #070a08;
+  color: var(--gx-text);
+  border: 1px solid var(--gx-line);
+  border-radius: 4px;
+  text-align: center;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+.gx-quick {
+  display: flex;
+  gap: 4px;
+}
+.gx-quick button {
+  flex: 1;
+  border: 1px solid var(--gx-line) !important;
+  border-radius: 4px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.gx-sum {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.gx-go {
+  padding: 10px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.gx-go.gx-buy {
+  background: var(--gx-up) !important;
+  color: #08130c !important;
+}
+.gx-go.gx-sell {
+  background: var(--gx-down) !important;
+  color: #1a0707 !important;
+}
+.gx-msg {
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 4px;
+}
+.gx-bal {
+  border-top: 1px solid var(--gx-line);
+  padding-top: 7px;
+}
+.gx-bal-coin b {
+  font-size: 16px;
+  color: var(--gx-amber);
+}
+.gx-holdings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.gx-hold {
+  border: 1px solid var(--gx-line) !important;
+  border-radius: 10px;
+  padding: 1px 7px !important;
+  font-size: 11px;
+}
+.gx-hold.gx-on {
+  border-color: var(--gx-amber) !important;
+}
+
+/* my orders */
+.gx-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gx-or {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.gx-or-side {
+  font-weight: 700;
+}
+.gx-or-buy .gx-or-side {
+  color: var(--gx-up);
+}
+.gx-or-sell .gx-or-side {
+  color: var(--gx-down);
+}
+.gx-x {
+  border: 1px solid var(--gx-line) !important;
+  border-radius: 4px;
+  padding: 2px 6px !important;
+  font-size: 11px;
+  color: var(--gx-down) !important;
+}

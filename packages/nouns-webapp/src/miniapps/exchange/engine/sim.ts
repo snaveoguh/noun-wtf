@@ -47,7 +47,7 @@ export const BOT_BAND = 0.5;
 const MIN = 60_000;
 const HOUR = 3_600_000;
 /** Most actions one bot turn may apply. */
-const MAX_TURN_ACTIONS = 10;
+const MAX_TURN_ACTIONS = 30;
 
 export interface SimOpts {
   roster?: readonly BotDef[];

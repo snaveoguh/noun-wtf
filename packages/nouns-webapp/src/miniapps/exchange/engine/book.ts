@@ -34,7 +34,7 @@ export const MAX_PRICE = 1_000_000;
 /** Open orders per owner (players and bots alike). */
 export const MAX_OPEN = 12;
 /** Bots quote several goods at once. */
-export const MAX_OPEN_BOT = 16;
+export const MAX_OPEN_BOT = 32;
 /** Resting orders per book side; past this the worst-priced one is evicted. */
 export const MAX_SIDE = 80;
 export const KEEP_FILLS = 400;
