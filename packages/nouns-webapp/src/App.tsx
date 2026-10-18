@@ -25,6 +25,7 @@ import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 const AuctionPage = lazy(() => import('@/pages/Auction'));
 const CandidatePage = lazy(() => import('@/pages/Candidate'));
 const IceCreamVanPage = lazy(() => import('@/pages/IceCreamVan'));
+const ExchangePage = lazy(() => import('@/pages/Exchange'));
 const CreateCandidatePage = lazy(() => import('@/pages/CreateCandidate'));
 const CreateProposalPage = lazy(() => import('@/pages/CreateProposal'));
 const DelegatePage = lazy(() => import('@/pages/DelegatePage'));
@@ -255,6 +256,14 @@ function SiteRoutes() {
         element={
           <Suspense fallback={<GenericSkeleton />}>
             <IceCreamVanPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="exchange"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <ExchangePage />
           </Suspense>
         }
       />
