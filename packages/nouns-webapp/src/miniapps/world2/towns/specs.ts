@@ -38,7 +38,7 @@ export const TOWNS: Record<TownId, TownSpec> = {
     style: 'suburb',
     // The +Z DOWNHILL main, ~19 km out (tracks.ts SPOT_SITE; the exact s is fixed as the line grows)
     track: 1,
-    s: 21000,
+    s: 21656,
     market: {
       bias: { FRIES: 1.35, ICECREAM: 1.3, NOGGLES: 1.2, DRIP: 0.75, PIZZA: 0.85, FISH: 1.3 },
       makes: ['DRIP', 'PIZZA'],

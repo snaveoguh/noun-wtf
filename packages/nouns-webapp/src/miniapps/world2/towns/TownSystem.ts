@@ -402,6 +402,7 @@ export class TownSystem implements TownsApi {
     const ev = lt.board.serve(c.def.id, this.t, speed, price);
     if (ev === null || ev.t !== 'served') return;
     this.serveCool = 0.35;
+    this.hint.dataset.until = '0';
     this.served++;
     c.waveT = 2.2;
     this.throwItem(o.good, src, c.pos);
@@ -677,8 +678,30 @@ export class TownSystem implements TownsApi {
   }
 
   /** Debug / tests: world positions of a town's spawned customers. */
-  customersOf(id: GrownTown): { id: string; pos: THREE.Vector3 }[] {
-    return (this.live.get(id)?.customers ?? []).map(c => ({ id: c.def.id, pos: c.pos }));
+  customersOf(id: GrownTown): { id: string; pos: THREE.Vector3; vp: number; u: number }[] {
+    return (this.live.get(id)?.customers ?? []).map(c => ({
+      id: c.def.id,
+      pos: c.pos,
+      vp: c.def.vp,
+      u: c.def.u,
+    }));
+  }
+
+  /** Debug / browser checks: town coords → world (x, y on the pad, z) + yaw down the line. */
+  debugAt(id: GrownTown, vp: number, u: number) {
+    const f = townFrame(id);
+    if (f === null) return null;
+    const w = townToWorld(f, vp, u, { x: 0, z: 0 });
+    return {
+      x: w.x,
+      y: f.P,
+      z: w.z,
+      yaw: townYaw(f, 0, 1),
+      fx: f.fx,
+      fz: f.fz,
+      Lf: f.Lf,
+      side: f.side,
+    };
   }
 
   dispose() {

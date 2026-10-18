@@ -91,18 +91,14 @@ export function setTownNatural(fn: (x: number, z: number) => number) {
 const resolved = new Map<GrownTown, TownFrame>();
 let frameList: TownFrame[] = [];
 const _pp = { x: 0, z: 0, h: 0, k: 0 };
-const siteDef = (id: GrownTown) => TOWN_SITES.find(t => t.town === id)!;
 let townTrack: (typeof tracks.tracks)[number] | null = null;
 
 /** The resolved frame, or null while its site isn't fixed yet (never grows the network). */
 export function townFrame(id: GrownTown): TownFrame | null {
   const hit = resolved.get(id);
   if (hit !== undefined) return hit;
-  const def = siteDef(id);
-  const t = tracks.tracks.find(q => q.id === def.track);
-  const site = t?.towns.find(q => q.k === def.k);
-  if (site === undefined) return null;
-  return resolve(id, site);
+  liveFrames();
+  return resolved.get(id) ?? null;
 }
 
 /** The frame, growing its line as far as needed (spawn, map, tests). */
@@ -286,8 +282,12 @@ export function townGround(f: TownFrame, u: number, vp: number): number {
 function liveFrames(): TownFrame[] {
   if (resolved.size === GROWN_TOWNS.length) return frameList;
   townTrack ??= tracks.tracks.find(q => q.id === TOWN_SITES[0].track) ?? null;
-  if (townTrack === null || townTrack.towns.length === 0) return frameList;
-  for (const id of GROWN_TOWNS) if (!resolved.has(id)) townFrame(id);
+  // (both towns sit on one line: only resolve when it has fixed a new site)
+  if (townTrack === null || townTrack.towns.length <= resolved.size) return frameList;
+  for (const site of townTrack.towns) {
+    const id = site.town as GrownTown;
+    if (!resolved.has(id)) resolve(id, site);
+  }
   return frameList;
 }
 
