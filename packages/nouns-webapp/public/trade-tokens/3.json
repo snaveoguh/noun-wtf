@@ -1,0 +1,23 @@
+{
+  "name": "Fish",
+  "symbol": "FISH",
+  "description": "Cheap at the beach, wanted inland. A Noun Trade good from the ice cream van game in Noun World. Cashed out of the game with a server-signed voucher; burn it to deposit it back. CC0.",
+  "image": "https://noun.wtf/trade-tokens/img/fish.svg",
+  "external_url": "https://noun.wtf/world",
+  "decimals": 0,
+  "attributes": [
+    {
+      "trait_type": "Good",
+      "value": "FISH"
+    },
+    {
+      "trait_type": "Token id",
+      "value": 3,
+      "display_type": "number"
+    },
+    {
+      "trait_type": "Game",
+      "value": "Noun Trade"
+    }
+  ]
+}

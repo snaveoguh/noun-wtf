@@ -1,0 +1,7 @@
+{
+  "name": "Noun Trade Goods",
+  "symbol": "NTGOODS",
+  "description": "Every good in Noun Trade, the ice cream van trading game in Noun World on noun.wtf, as an ERC-1155 token on Base. Ids: 1 ICECREAM, 2 FRIES, 3 FISH, 4 DRIP, 5 NOGGLES, 6 PIZZA, 7 WATER. CC0.",
+  "image": "https://noun.wtf/trade-tokens/img/icecream.svg",
+  "external_link": "https://noun.wtf/world"
+}
