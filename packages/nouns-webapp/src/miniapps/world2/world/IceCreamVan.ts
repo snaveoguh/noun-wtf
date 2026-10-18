@@ -148,13 +148,20 @@ function rod(
   b: THREE.Vector3,
   r: number,
   m: THREE.Material,
-) {
+): THREE.Mesh {
   const d = new THREE.Vector3().subVectors(b, a);
   const me = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 8), m);
   me.scale.set(1, d.length(), 1);
   me.position.copy(a).addScaledVector(d, 0.5);
   me.quaternion.setFromUnitVectors(UP, d.normalize());
   parent.add(me);
+  return me;
+}
+
+/** Parked-only parts (ground stays, stairs): the drivable van (van/) hides them on the road. */
+function parkedOnly<T extends THREE.Object3D>(o: T): T {
+  o.userData.parkedOnly = true;
+  return o;
 }
 
 function canvasTex(
@@ -429,9 +436,11 @@ export function buildIceCreamVan(opts: { station?: boolean } = {}): THREE.Group 
   ] as const) {
     for (const s of [-1, 1]) {
       const t = cyl(v, 0.37, 0.26, 14, M.tyre);
+      t.name = 'van-tyre';
       t.rotation.z = Math.PI / 2;
       t.position.set(s * x, 0.37, -u);
       const hb = cyl(v, 0.21, 0.32, 12, M.hub);
+      hb.name = 'van-hub';
       hb.rotation.z = Math.PI / 2;
       hb.position.copy(t.position);
     }
@@ -485,20 +494,20 @@ export function buildIceCreamVan(opts: { station?: boolean } = {}): THREE.Group 
     rod(v, a, b, 0.025, M.chrome);
     // ground stays at the awning's outer corners
     const c = hinge.localToWorld(new THREE.Vector3(s * 1.18, -HL + 0.06, 0));
-    rod(v, c, new THREE.Vector3(c.x, 0, c.z), 0.03, M.chrome);
+    parkedOnly(rod(v, c, new THREE.Vector3(c.x, 0, c.z), 0.03, M.chrome));
   }
 
   // ── slide-out stairs ──
   for (let i = 1; i <= 3 && !station; i++) {
     const tr = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.25), M.alu);
     tr.position.set(0, FLOOR - 0.2 * i, 0.25 * i - 0.11);
-    v.add(tr);
+    v.add(parkedOnly(tr));
   }
   for (const x of station ? [] : [-0.42, 0.42]) {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 1.15), M.steel);
     st.position.set(x, 0.38, 0.5);
     st.rotation.x = Math.atan2(FLOOR - 0.02, 0.95);
-    v.add(st);
+    v.add(parkedOnly(st));
   }
 
   // ── interior (what you see through the open back) ──
@@ -716,18 +725,20 @@ function buildStation(v: THREE.Group, M: Mats) {
   for (let i = 1; i <= 4; i++) {
     const tr = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.44), M.alu);
     tr.position.set(0, FLOOR - 0.16 * i, (RAMP_RUN / 4.4) * i - 0.12);
-    v.add(tr);
+    v.add(parkedOnly(tr));
   }
   for (const x of [-0.68, 0.68]) {
     const a = new THREE.Vector3(x, FLOOR, 0.02);
-    rod(v, a, new THREE.Vector3(x, 0.02, RAMP_RUN), 0.03, M.steel);
-    rod(v, a.setY(FLOOR + 0.85), new THREE.Vector3(x, 0.85, RAMP_RUN), 0.02, M.chrome);
-    rod(
-      v,
-      new THREE.Vector3(x, 0.02, RAMP_RUN),
-      new THREE.Vector3(x, 0.87, RAMP_RUN),
-      0.02,
-      M.chrome,
+    parkedOnly(rod(v, a, new THREE.Vector3(x, 0.02, RAMP_RUN), 0.03, M.steel));
+    parkedOnly(rod(v, a.setY(FLOOR + 0.85), new THREE.Vector3(x, 0.85, RAMP_RUN), 0.02, M.chrome));
+    parkedOnly(
+      rod(
+        v,
+        new THREE.Vector3(x, 0.02, RAMP_RUN),
+        new THREE.Vector3(x, 0.87, RAMP_RUN),
+        0.02,
+        M.chrome,
+      ),
     );
   }
 

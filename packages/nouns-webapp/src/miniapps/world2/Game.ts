@@ -46,12 +46,8 @@ import { TradeClient } from './trade/TradeClient';
 import { townsDecorator } from './towns/build';
 import { townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
-import {
-  buildIceCreamVan,
-  iceCreamVanStationCollision,
-  vanStation,
-  type VanStation,
-} from './world/IceCreamVan';
+import { VanDrive } from './van/VanDrive';
+import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { dressingDecorator } from './world/mountain/DressingDecorator';
@@ -191,6 +187,8 @@ export class Game {
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
+  /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
+  readonly van2: VanDrive;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -224,6 +222,7 @@ export class Game {
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
     this.cam = new SkateCamera(this.gfx.camera, this.world);
+    this.van2 = new VanDrive(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -483,6 +482,7 @@ export class Game {
     const decks =
       this.van !== null &&
       !this.hoops.active &&
+      !this.van2.driving &&
       this.player.speed < 4 &&
       this.van.atDecks(this.player.pos);
     if (decks !== this.hud.fmDecks) {
@@ -574,8 +574,10 @@ export class Game {
       return;
     }
     const input = this.input.poll(now);
+    // Driving the ice cream van: E / R / spray are the van's this frame
+    const driving = this.van2.preStep(input);
     // On foot (and on walls) the mouse is a free cursor for painting
-    this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
+    this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
     this.handleSprayKeys(input);
 
@@ -587,7 +589,7 @@ export class Game {
       Math.max(1, Math.ceil(dt / (1 / 90)), Math.ceil((this.player.speed * dt) / 0.5)),
     );
     const h = dt / steps;
-    for (let i = 0; i < steps; i++) {
+    for (let i = 0; i < steps && !driving; i++) {
       // Only consume one-shot inputs on the first substep
       const f =
         i === 0
@@ -606,13 +608,18 @@ export class Game {
       this.handlePlayerEvents();
     }
 
-    this.cam.update(dt, this.player, input.lookX, input.lookY, now);
-    this.updateMyCharacter(dt);
+    if (driving) this.van2.drive(dt, input, now);
+    else {
+      this.cam.update(dt, this.player, input.lookX, input.lookY, now);
+      this.updateMyCharacter(dt);
+    }
     this.updateAudio(dt);
     this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
-    this.drops?.update(dt, this.player);
+    this.van2.update(dt);
+    // A van ride can't touch a drop (its proof would be a 140 km/h walk)
+    if (!driving) this.drops?.update(dt, this.player);
     this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
     this.towns?.update(dt);
@@ -782,16 +789,14 @@ export class Game {
         van.updateMatrixWorld(true);
         if (this.gfx.toon) toonify(van);
         this.gfx.scene.add(van);
-        this.propCollision.push(...iceCreamVanStationCollision(van));
         this.van = vanStation(van);
         this.fm.vanPos = van.localToWorld(this.van.speakers.clone());
-        // Respawn spot: beside the serving hatch, facing out
+        // Respawn spot: beside the serving hatch, facing out (moves with the van)
         const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        this.player.homeSpots.push({
-          pos: new THREE.Vector3(x, y, z).add(side),
-          yaw: yaw + Math.PI / 2,
-        });
-        this.world.build([...level.collisionMeshes, ...this.propCollision]);
+        const home = { pos: new THREE.Vector3(x, y, z).add(side), yaw: yaw + Math.PI / 2 };
+        this.player.homeSpots.push(home);
+        // Drivable (van/): its walk-in collision is a dynamic body that moves with it
+        this.van2.attach(van, home);
         return;
       }
     } catch (err) {
@@ -1362,6 +1367,7 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
+        vehicle: this.van2.driving ? 'van' : undefined,
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -1707,6 +1713,7 @@ export class Game {
   dispose() {
     this.missions.dispose();
     this.hoops.dispose();
+    this.van2.dispose();
     this.stats.dispose();
     this.drops?.dispose();
     this.mountain?.dispose();

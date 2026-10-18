@@ -35,6 +35,8 @@ import { HudDrag } from './ui/HudDrag';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
+import { useVanDriving } from './van/useVan';
+import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
 
 const CONTROLS: { k: string; v: string }[] = [
@@ -56,6 +58,10 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'B', v: 'map' },
   { k: 'M / .', v: 'radio station (pirate, NOUN FM, off), next track' },
   { k: 'E (in the van)', v: 'NOUN FM decks: queue a track, book a DJ set' },
+  {
+    k: 'E (cab door)',
+    v: 'drive the ice cream van: W/S gas, brake, A/D steer, SPACE drift, SHIFT boost, H horn, R flip, E out',
+  },
   {
     k: 'ALT hold',
     v: 'free the mouse: drag the HUD (speedometer, chips) anywhere, double-click resets',
@@ -189,6 +195,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, []);
 
   const hoopsOn = useHoopsActive(game);
+  const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
@@ -306,7 +313,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       )}
       {game && started && <FmScreen fm={game.fm} touch={touchPage} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
-      {game && started && !hoopsOn && <TouchControls game={game} />}
+      {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
+      {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}

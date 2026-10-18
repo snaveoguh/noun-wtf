@@ -38,6 +38,8 @@ export interface NetPose {
   trick: string;
   boardType: BoardType;
   weight: number;
+  /** Driving a vehicle (Noun Trade's ice cream van): pos/quat are the van's. */
+  vehicle?: 'van';
 }
 
 export interface RemotePlayer {
@@ -218,6 +220,7 @@ export class Net {
     pose.trick = String(blob.tr ?? '').slice(0, 60);
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
+    pose.vehicle = blob.vh === 'van' ? 'van' : undefined;
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
     const now = performance.now();
@@ -287,6 +290,7 @@ export class Net {
       c.trick = b.pose.trick;
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
+      c.vehicle = b.pose.vehicle;
     }
     void dt;
   }
@@ -315,6 +319,8 @@ export class Net {
       tr: pose.trick,
       bt: pose.boardType,
       w: r3(pose.weight),
+      // Only while driving, so older clients' blobs are unchanged otherwise
+      ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
