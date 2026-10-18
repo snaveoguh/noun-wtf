@@ -37,6 +37,8 @@ export interface MapScene {
   mountain: boolean;
   /** Drop party pickups (drops/Drops.ts). */
   drops?: { x: number; z: number; kind: string; label: string }[];
+  /** Noun Trade towns (towns/TownSystem.ts → mapPoints). */
+  towns?: { x: number; z: number; name: string; km: number }[];
 }
 
 const C = {
@@ -54,6 +56,7 @@ const C = {
   mega: '#ff7a1a',
   nj: '#ff3d8b',
   bowl: '#8f6bff',
+  town: '#ffb000',
   me: '#ffd400',
   rider: '#22c7f0',
   way: '#b6ef3a',
@@ -433,6 +436,26 @@ export function drawMap(
           color: C.bowl,
         });
     }
+  }
+
+  // Noun Trade towns (the ice cream van's trade stops)
+  for (const t of scene.towns ?? []) {
+    let p = S(t.x, t.z);
+    const off = !inside(p, 14);
+    if (off && !o.full && !o.edgeMarkers) continue;
+    if (off) p = edge(p, 14);
+    pin(ctx, p.x, p.y, C.town, '🍦');
+    if (o.full)
+      label(
+        ctx,
+        off ? `${t.name.toUpperCase()} 🍦 ${t.km} km` : t.name.toUpperCase(),
+        p.x,
+        p.y - 22,
+        {
+          size: 11,
+          color: C.town,
+        },
+      );
   }
 
   // Waypoint

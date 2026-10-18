@@ -111,34 +111,50 @@ export class CollisionWorld {
 
   /** Closest hit along a ray, or null. Back faces count (two-sided level). */
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, far: number): RayHit | null {
+    const out: RayHit = { point: new THREE.Vector3(), normal: new THREE.Vector3(), distance: 0 };
+    return this.raycastInto(origin, dir, far, out) ? out : null;
+  }
+
+  /**
+   * `raycast` writing into `out` instead of allocating a hit, for per-frame
+   * callers (the drivable van). Returns whether anything was hit; `out` only
+   * means something when it returns true.
+   */
+  raycastInto(origin: THREE.Vector3, dir: THREE.Vector3, far: number, out: RayHit): boolean {
     _ray.origin.copy(origin);
     _ray.direction.copy(dir).normalize();
-    let best: RayHit | null = null;
+    let hitAny = false;
+    let bestD = far;
     if (this.bvh) {
       const hit = this.bvh.raycastFirst(_ray, THREE.DoubleSide, 0, far);
       if (hit !== null && hit.distance <= far) {
-        const n = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 1, 0);
+        if (hit.face) out.normal.copy(hit.face.normal);
+        else out.normal.set(0, 1, 0);
         // Faces are stored in world space already; flip toward the ray origin.
-        if (n.dot(_ray.direction) > 0) n.negate();
-        best = { point: hit.point.clone(), normal: n, distance: hit.distance };
+        if (out.normal.dot(_ray.direction) > 0) out.normal.negate();
+        out.point.copy(hit.point);
+        out.distance = bestD = hit.distance;
+        hitAny = true;
       }
     }
     if (this.dynamic.size > 0) {
-      const lim = best?.distance ?? far;
       _segBox.makeEmpty();
       _segBox.expandByPoint(_ray.origin);
-      _segBox.expandByPoint(_e.copy(_ray.origin).addScaledVector(_ray.direction, lim));
+      _segBox.expandByPoint(_e.copy(_ray.origin).addScaledVector(_ray.direction, bestD));
       for (const d of this.dynamic.values()) {
         if (!d.box.intersectsBox(_segBox)) continue;
         // Ray in the body's local frame
         _o.copy(_ray.origin);
         _ray.origin.sub(d.offset);
-        const hit = d.bvh.raycastFirst(_ray, THREE.DoubleSide, 0, best?.distance ?? far);
+        const hit = d.bvh.raycastFirst(_ray, THREE.DoubleSide, 0, bestD);
         _ray.origin.copy(_o);
-        if (hit === null || hit.distance > (best?.distance ?? far)) continue;
-        const n = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 1, 0);
-        if (n.dot(_ray.direction) > 0) n.negate();
-        best = { point: hit.point.clone().add(d.offset), normal: n, distance: hit.distance };
+        if (hit === null || hit.distance > bestD) continue;
+        if (hit.face) out.normal.copy(hit.face.normal);
+        else out.normal.set(0, 1, 0);
+        if (out.normal.dot(_ray.direction) > 0) out.normal.negate();
+        out.point.copy(hit.point).add(d.offset);
+        out.distance = bestD = hit.distance;
+        hitAny = true;
       }
     }
     if (this.terrain !== null) {
@@ -150,20 +166,19 @@ export class CollisionWorld {
         r.direction.x,
         r.direction.y,
         r.direction.z,
-        best?.distance ?? far,
+        bestD,
       );
-      if (t >= 0 && (best === null || t < best.distance)) {
-        const p = r.origin.clone().addScaledVector(r.direction, t);
+      if (t >= 0 && (!hitAny || t < bestD)) {
+        const p = out.point.copy(r.origin).addScaledVector(r.direction, t);
         this.terrain.normal(p.x, p.z, _n);
         // Started underground: report the surface right above us
-        if (t === 0) {
-          const h = this.terrainHeightAt(p.x, p.z, p.y);
-          p.y = h;
-        }
-        best = { point: p, normal: new THREE.Vector3(_n.x, _n.y, _n.z), distance: t };
+        if (t === 0) p.y = this.terrainHeightAt(p.x, p.z, p.y);
+        out.normal.set(_n.x, _n.y, _n.z);
+        out.distance = t;
+        hitAny = true;
       }
     }
-    return best;
+    return hitAny;
   }
 
   /** Surface height by a short downward trace from above (terrain only). */
@@ -184,8 +199,10 @@ export class CollisionWorld {
     end: THREE.Vector3,
     radius: number,
     outNormal?: THREE.Vector3,
+    /** Write the correction here instead of allocating one (per-frame callers). */
+    out?: THREE.Vector3,
   ): THREE.Vector3 {
-    const correction = new THREE.Vector3();
+    const correction = out?.set(0, 0, 0) ?? new THREE.Vector3();
     _seg.start.copy(start);
     _seg.end.copy(end);
     let bestDepth = 0;

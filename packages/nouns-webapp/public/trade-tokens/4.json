@@ -1,0 +1,23 @@
+{
+  "name": "Drip",
+  "symbol": "DRIP",
+  "description": "Noun-trait fashion: clothes off the rack. A Noun Trade good from the ice cream van game in Noun World. Cashed out of the game with a server-signed voucher; burn it to deposit it back. CC0.",
+  "image": "https://noun.wtf/trade-tokens/img/drip.svg",
+  "external_url": "https://noun.wtf/world",
+  "decimals": 0,
+  "attributes": [
+    {
+      "trait_type": "Good",
+      "value": "DRIP"
+    },
+    {
+      "trait_type": "Token id",
+      "value": 4,
+      "display_type": "number"
+    },
+    {
+      "trait_type": "Game",
+      "value": "Noun Trade"
+    }
+  ]
+}

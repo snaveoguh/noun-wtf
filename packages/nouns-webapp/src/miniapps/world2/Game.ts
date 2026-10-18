@@ -42,12 +42,12 @@ import { ReplayView } from './replay/ReplayView';
 import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
-import {
-  buildIceCreamVan,
-  iceCreamVanStationCollision,
-  vanStation,
-  type VanStation,
-} from './world/IceCreamVan';
+import { TradeClient } from './trade/TradeClient';
+import { townsDecorator } from './towns/build';
+import { townSpawn } from './towns/site';
+import { TownSystem } from './towns/TownSystem';
+import { VanDrive } from './van/VanDrive';
+import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { dressingDecorator } from './world/mountain/DressingDecorator';
@@ -179,10 +179,16 @@ export class Game {
   name: string;
   remotes = new Map<string, RemoteAvatar>();
   crew: JerseyCrew | null = null;
+  /** Noun Trade towns + their customers (towns/): the TownsApi (trade/contract.ts). */
+  towns: TownSystem | null = null;
   /** Missions: the Oracle and the cast, progress, the Upside Down (missions/). */
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
+  /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
+  readonly trade: TradeClient;
+  /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
+  readonly van2: VanDrive;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -216,6 +222,7 @@ export class Game {
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
     this.cam = new SkateCamera(this.gfx.camera, this.world);
+    this.van2 = new VanDrive(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -251,6 +258,7 @@ export class Game {
       fmDecks: false,
     };
     this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
+    this.trade = new TradeClient({ offline: opts.offline === true || devRun() });
     this.wireFm();
   }
 
@@ -331,6 +339,23 @@ export class Game {
         camera: this.gfx.camera,
         canvas: this.opts.canvas,
       });
+    if (this.mountain !== null)
+      this.towns = new TownSystem({
+        scene: this.gfx.scene,
+        camera: this.gfx.camera,
+        canvas: this.opts.canvas,
+        labelLayer: this.labelLayer,
+        toon: this.gfx.toon,
+        quality: this.gfx.quality,
+        assets: () => this.assets,
+        player: this.player,
+        controlYaw: () => this.cam.controlYaw,
+        toast: (text, tag) => {
+          this.hud = { ...this.hud, toast: { text, tag, at: performance.now() } };
+          this.emit();
+        },
+        game: this,
+      });
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -362,6 +387,12 @@ export class Game {
       const sp = bowlSpawn();
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
+    // `?spot=cowboy` / `?spot=beach`: top of main street in a Noun Trade town (dev; no stats)
+    const ts = spotParam();
+    if ((ts === 'cowboy' || ts === 'beach') && this.mountain !== null) {
+      const sp = townSpawn(ts);
+      if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
+    }
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -381,6 +412,7 @@ export class Game {
       this.net.connect();
       void this.refreshStats();
     }
+    void this.trade.load();
 
     this.setLoading(null);
     this.running = true;
@@ -450,6 +482,7 @@ export class Game {
     const decks =
       this.van !== null &&
       !this.hoops.active &&
+      !this.van2.driving &&
       this.player.speed < 4 &&
       this.van.atDecks(this.player.pos);
     if (decks !== this.hud.fmDecks) {
@@ -541,8 +574,10 @@ export class Game {
       return;
     }
     const input = this.input.poll(now);
+    // Driving the ice cream van: E / R / spray are the van's this frame
+    const driving = this.van2.preStep(input);
     // On foot (and on walls) the mouse is a free cursor for painting
-    this.input.freeCursor = this.player.mode === 'foot' && input.mode !== 'gamepad';
+    this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
     this.handleSprayKeys(input);
 
@@ -554,7 +589,7 @@ export class Game {
       Math.max(1, Math.ceil(dt / (1 / 90)), Math.ceil((this.player.speed * dt) / 0.5)),
     );
     const h = dt / steps;
-    for (let i = 0; i < steps; i++) {
+    for (let i = 0; i < steps && !driving; i++) {
       // Only consume one-shot inputs on the first substep
       const f =
         i === 0
@@ -573,15 +608,21 @@ export class Game {
       this.handlePlayerEvents();
     }
 
-    this.cam.update(dt, this.player, input.lookX, input.lookY, now);
-    this.updateMyCharacter(dt);
+    if (driving) this.van2.drive(dt, input, now);
+    else {
+      this.cam.update(dt, this.player, input.lookX, input.lookY, now);
+      this.updateMyCharacter(dt);
+    }
     this.updateAudio(dt);
     this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
-    this.drops?.update(dt, this.player);
+    this.van2.update(dt);
+    // A van ride can't touch a drop (its proof would be a 140 km/h walk)
+    if (!driving) this.drops?.update(dt, this.player);
     this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
+    this.towns?.update(dt);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -672,6 +713,8 @@ export class Game {
       m.addDecorator(nounJerseyDecorator(this.rails));
       // …and the Noggle Bowl (~42 km down the −X line): walls, deck, coping
       m.addDecorator(noggleBowlDecorator());
+      // Noun Trade towns (Dry Gulch ~10 km, Puerto Noun ~25 km down the +X line)
+      m.addDecorator(townsDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)
       const wild = new Wildlife(this.gfx.quality);
       m.addDecorator(wild.decorator());
@@ -746,16 +789,14 @@ export class Game {
         van.updateMatrixWorld(true);
         if (this.gfx.toon) toonify(van);
         this.gfx.scene.add(van);
-        this.propCollision.push(...iceCreamVanStationCollision(van));
         this.van = vanStation(van);
         this.fm.vanPos = van.localToWorld(this.van.speakers.clone());
-        // Respawn spot: beside the serving hatch, facing out
+        // Respawn spot: beside the serving hatch, facing out (moves with the van)
         const side = new THREE.Vector3(3.2, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        this.player.homeSpots.push({
-          pos: new THREE.Vector3(x, y, z).add(side),
-          yaw: yaw + Math.PI / 2,
-        });
-        this.world.build([...level.collisionMeshes, ...this.propCollision]);
+        const home = { pos: new THREE.Vector3(x, y, z).add(side), yaw: yaw + Math.PI / 2 };
+        this.player.homeSpots.push(home);
+        // Drivable (van/): its walk-in collision is a dynamic body that moves with it
+        this.van2.attach(van, home);
         return;
       }
     } catch (err) {
@@ -1326,6 +1367,7 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
+        vehicle: this.van2.driving ? 'van' : undefined,
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -1561,6 +1603,7 @@ export class Game {
     });
     if (this.mountain !== null) this.updateSecretSpot(lm);
     if (this.mountain !== null) this.updateBowl(lm);
+    this.towns?.landmarks(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
@@ -1670,6 +1713,7 @@ export class Game {
   dispose() {
     this.missions.dispose();
     this.hoops.dispose();
+    this.van2.dispose();
     this.stats.dispose();
     this.drops?.dispose();
     this.mountain?.dispose();
@@ -1687,6 +1731,7 @@ export class Game {
     this.net.dispose();
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     this.crew?.dispose();
+    this.towns?.dispose();
     this.gfx.dispose();
     this.world.dispose();
   }

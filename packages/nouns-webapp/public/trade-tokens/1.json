@@ -1,0 +1,23 @@
+{
+  "name": "Ice Cream",
+  "symbol": "ICECREAM",
+  "description": "Made at the van and the depots. Melts in transit, so sell it fast. A Noun Trade good from the ice cream van game in Noun World. Cashed out of the game with a server-signed voucher; burn it to deposit it back. CC0.",
+  "image": "https://noun.wtf/trade-tokens/img/icecream.svg",
+  "external_url": "https://noun.wtf/world",
+  "decimals": 0,
+  "attributes": [
+    {
+      "trait_type": "Good",
+      "value": "ICECREAM"
+    },
+    {
+      "trait_type": "Token id",
+      "value": 1,
+      "display_type": "number"
+    },
+    {
+      "trait_type": "Game",
+      "value": "Noun Trade"
+    }
+  ]
+}

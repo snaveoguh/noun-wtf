@@ -71,6 +71,8 @@ export interface Track {
   spots: SpotSite[];
   /** The Noggle Bowl (only the −X GO DOWN line has one). */
   bowls: SpotSite[];
+  /** Noun Trade towns on this line (towns/site.ts), in along-track order. */
+  towns: SpotSite[];
 }
 
 export interface NearestTrack {
@@ -228,7 +230,33 @@ export interface SpotSite {
   s: number;
   /** Lazily resolved placement (nounJersey.ts → njFrame). */
   frame: unknown;
+  /** Towns only: which town (towns/specs.ts TownId). */
+  town?: string;
 }
+
+// ── Noun Trade towns ──
+//
+// The ice cream van's towns (towns/site.ts + towns/build.ts): Dry Gulch, a
+// western town ~10 km down the +X MOUNTAIN main, and Puerto Noun, a beach
+// town ~25 km down the same line. Each reserves its stretch of line exactly
+// like Noun Jersey (straight, no launch ramps, no forks, no mega ramp), with
+// the line running down the middle as the main street. Sites are pinned
+// along-track like the Noggle Bowl, so nothing before ~8.5 km out changes
+// and the other two mains (Noun Jersey's, the Bowl's) are untouched.
+
+export const TOWN_SITES = [
+  { town: 'cowboy', track: 2, at: 11400, k: 300 },
+  { town: 'beach', track: 2, at: 28800, k: 301 },
+] as const;
+
+export const TOWN_SITE = {
+  /** Fixed this far ahead of the growth frontier. */
+  look: 1400,
+  /** Same reserved stretch as a secret spot (towns/site.ts keeps within it). */
+  pre: MEGA_SITE.pre,
+  post: MEGA_SITE.post,
+  forkClear: MEGA_SITE.forkClear,
+} as const;
 
 // ── Secret spot: the Noggle Bowl ──
 //
@@ -316,6 +344,7 @@ class TrackNetwork {
       seedB: (MOUNTAIN.seed + o.id * 104729 + 3) | 0,
       ramps: [],
       bowls: [],
+      towns: [],
       parent: o.parent ?? null,
       megas: [],
       nextMega:
@@ -386,6 +415,28 @@ class TrackNetwork {
       const clear = sb + BOWL_SITE.post + MEGA_SITE.pre;
       if (t.nextMega < clear) t.nextMega = clear + hashInts(t.id, 200, 61) * 400;
     }
+    // Noun Trade towns: pinned along-track like the Bowl, clear of the last
+    // launch ramp's landing hill, the last mega terrace and the town before
+    for (const ts of TOWN_SITES) {
+      if (ts.track !== t.id || s + TOWN_SITE.look < ts.at || t.towns.some(q => q.k === ts.k))
+        continue;
+      let sb = Math.max(ts.at, s + TOWN_SITE.pre + STEP);
+      const lr = t.ramps[t.ramps.length - 1];
+      if (lr !== undefined)
+        sb = Math.max(sb, lr.s + lr.spec.land + lr.spec.recover + RAMP_GAP + TOWN_SITE.pre);
+      const lm = t.megas[t.megas.length - 1];
+      if (
+        lm !== undefined &&
+        sb < lm.s + MEGA_SITE.post + TOWN_SITE.pre &&
+        sb + TOWN_SITE.post + MEGA_SITE.pre > lm.s
+      )
+        sb = lm.s + MEGA_SITE.post + TOWN_SITE.pre;
+      const lt = t.towns[t.towns.length - 1];
+      if (lt !== undefined) sb = Math.max(sb, lt.s + TOWN_SITE.post + TOWN_SITE.pre);
+      t.towns.push({ track: t, k: ts.k, s: sb, frame: null, town: ts.town });
+      const clear = sb + TOWN_SITE.post + MEGA_SITE.pre;
+      if (t.nextMega < clear) t.nextMega = clear + hashInts(t.id, ts.k, 61) * 400;
+    }
     // Fix the next mega ramp site well before the line gets there: clear of
     // the last launch ramp's landing hill, and far enough ahead that the
     // whole reserved stretch is still to be grown
@@ -408,6 +459,12 @@ class TrackNetwork {
         sb + MEGA_SITE.post + BOWL_SITE.pre > bw.s
       )
         sb = bw.s + BOWL_SITE.post + MEGA_SITE.pre;
+      for (const tw of t.towns)
+        if (
+          sb < tw.s + TOWN_SITE.post + MEGA_SITE.pre &&
+          sb + MEGA_SITE.post + TOWN_SITE.pre > tw.s
+        )
+          sb = tw.s + TOWN_SITE.post + MEGA_SITE.pre;
       const k = t.megas.length;
       t.megas.push({
         track: t,
@@ -457,7 +514,9 @@ class TrackNetwork {
         s >= pend.s - pend.spec.length - 40 &&
         s <= pend.s + pend.spec.land * 0.8) ||
       (mega !== null && s >= mega.s - MEGA_SITE.pre && s <= mega.s + MEGA_SITE.post) ||
-      this.bowlOverlap(t, s, s) !== null;
+      this.bowlOverlap(t, s, s) !== null ||
+      // (explicit: megaNear may return a mega whose fork-clear zone overlaps the town)
+      t.towns.some(m => s >= m.s - TOWN_SITE.pre && s <= m.s + TOWN_SITE.post);
     if (pend !== undefined && s > pend.s + pend.spec.land * 0.8 && t.nextRamp <= pend.s) {
       t.nextRamp =
         pend.s +
@@ -531,6 +590,8 @@ class TrackNetwork {
     }
     for (const m of t.spots)
       if (s >= m.s - SPOT_SITE.forkClear && s <= m.s + SPOT_SITE.post + 60) return m;
+    for (const m of t.towns)
+      if (s >= m.s - TOWN_SITE.forkClear && s <= m.s + TOWN_SITE.post + 60) return m;
     return null;
   }
 
@@ -540,6 +601,8 @@ class TrackNetwork {
       if (b >= m.s - MEGA_SITE.pre - 20 && a <= m.s + MEGA_SITE.post) return m;
     for (const m of t.spots)
       if (b >= m.s - SPOT_SITE.pre - 20 && a <= m.s + SPOT_SITE.post) return m;
+    for (const m of t.towns)
+      if (b >= m.s - TOWN_SITE.pre - 20 && a <= m.s + TOWN_SITE.post) return m;
     return null;
   }
 
@@ -572,6 +635,19 @@ class TrackNetwork {
       this.ensureS(t, t.s0 + n * STEP + 600);
     }
     return t.spots[0] ?? null;
+  }
+
+  /** A Noun Trade town's site, growing only its main line far enough to fix it (like spot()). */
+  town(town: string): SpotSite | null {
+    const def = TOWN_SITES.find(q => q.town === town);
+    if (def === undefined) return null;
+    const t = this.tracks.find(q => q.id === def.track)!;
+    const find = () => t.towns.find(q => q.k === def.k);
+    while (find() === undefined && !t.done) {
+      const n = t.xs.length - 1;
+      this.ensureS(t, t.s0 + n * STEP + 600);
+    }
+    return find() ?? null;
   }
 
   /** Mega ramp sites (on any main) whose anchor lies in the rectangle. */
