@@ -160,13 +160,15 @@ export class TradeClient implements TradeApi {
       return;
     }
     try {
+      const town = this.town;
       const q = new URLSearchParams({ rider: this.rider });
-      if (this.town !== null) q.set('town', this.town);
+      if (town !== null) q.set('town', town);
       const res = await this.fetchFn(`${URL_}?${q}`, { cache: 'no-store' });
       if (!res.ok) return;
       const out = (await res.json()) as { state?: TradeState; quotes?: Quote[] };
       if (out.state) this.state = out.state;
       this.takeQuotes(out.quotes);
+      if (town !== null && out.quotes) this.markSeen(town, out.quotes);
       this.emit();
     } catch {
       // offline for now; the next action or town will try again
