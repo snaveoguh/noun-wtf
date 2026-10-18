@@ -11,7 +11,9 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import {
   FM_MAX_TRACK_S,
+  FM_MIN_TRACK_S,
   FM_PER_RIDER,
+  FM_SET_MAX_MS,
   FM_SET_MAX_TRACKS,
   setEnd,
   setLength,
@@ -87,6 +89,176 @@ function YtPreview({ id, onInfo }: { id: string; onInfo: (t: Omit<FmTrack, 'src'
       className="overflow-hidden rounded-lg bg-black"
       style={{ width: YT_MIN_PX, height: YT_MIN_PX }}
     />
+  );
+}
+
+/**
+ * Look a YouTube video up through the official embed (cued, muted, never
+ * played): its title + length, or why it can't go on air.
+ */
+function probeYouTube(
+  id: string,
+  host: HTMLElement,
+  timeoutMs = 15_000,
+): Promise<{ ok: true; info: Omit<FmTrack, 'src'> } | { ok: false; reason: string }> {
+  return new Promise(resolve => {
+    const el = document.createElement('div');
+    el.style.cssText = `width:${YT_MIN_PX}px;height:${YT_MIN_PX}px`;
+    host.appendChild(el);
+    const deck = new YouTubeDeck();
+    deck.mount(el);
+    deck.setVolume(0);
+    let started = false;
+    const t0 = performance.now();
+    const done = (r: Parameters<typeof resolve>[0]) => {
+      window.clearInterval(iv);
+      deck.unmount();
+      el.remove();
+      resolve(r);
+    };
+    const iv = window.setInterval(() => {
+      if (!started) started = deck.play(id, 0, true);
+      if (deck.error !== null)
+        return done({
+          ok: false,
+          reason:
+            deck.error === 101 || deck.error === 150
+              ? 'the owner blocks embedding'
+              : deck.error === 100
+                ? 'video not found'
+                : "YouTube wouldn't load it",
+        });
+      const i = deck.info();
+      if (i.dur > 0)
+        return done({
+          ok: true,
+          info: {
+            title: i.title || 'YouTube video',
+            artist: i.artist || 'YouTube',
+            dur: Math.round(i.dur),
+          },
+        });
+      if (performance.now() - t0 > timeoutMs) done({ ok: false, reason: 'timed out loading' });
+    }, 400);
+  });
+}
+
+/** Every link in a pasted block (newlines, spaces or commas between them). */
+export function linksIn(text: string): string[] {
+  return [...new Set(text.match(/https?:\/\/[^\s"',<>]+/g) ?? [])];
+}
+
+/**
+ * Paste a whole list of links: each is checked in turn and added to the set,
+ * anything that won't play (blocked embed, gone, too long) is skipped and
+ * listed, and it stops when the set is full (tracks or 2 hours).
+ */
+function BulkAdder({
+  fm,
+  tracks,
+  onTrack,
+}: {
+  fm: NounFm;
+  tracks: FmTrack[];
+  onTrack: (t: FmTrack) => void;
+}) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState<{ at: number; of: number } | null>(null);
+  const [skipped, setSkipped] = useState<{ url: string; reason: string }[]>([]);
+  const [added, setAdded] = useState(0);
+  const probeHost = useRef<HTMLDivElement>(null);
+  const live = useRef(tracks);
+  live.current = tracks;
+  const links = linksIn(text);
+  const run = async () => {
+    const host = probeHost.current;
+    if (host === null) return;
+    setSkipped([]);
+    setAdded(0);
+    let ms = setLength(live.current);
+    let n = live.current.length;
+    for (let i = 0; i < links.length; i++) {
+      const url = links[i]!;
+      setBusy({ at: i + 1, of: links.length });
+      const skip = (reason: string) => setSkipped(x => [...x, { url, reason }]);
+      if (n >= FM_SET_MAX_TRACKS) {
+        skip(`set is full (${FM_SET_MAX_TRACKS} tracks)`);
+        continue;
+      }
+      const r = await fm.inspect(url);
+      let track: FmTrack | null = null;
+      if (!r.ok) skip(r.reason);
+      else if ('preview' in r) {
+        const p = await probeYouTube(r.preview.id, host);
+        if (p.ok) track = { src: r.preview, ...p.info };
+        else skip(p.reason);
+      } else track = r.track;
+      if (track === null) continue;
+      if (track.dur > FM_MAX_TRACK_S) {
+        skip(`too long (${fmtDur(track.dur)}, max ${fmtDur(FM_MAX_TRACK_S)})`);
+        continue;
+      }
+      if (track.dur < FM_MIN_TRACK_S) {
+        skip('too short');
+        continue;
+      }
+      const next = ms + setLength([track]);
+      if (next > FM_SET_MAX_MS) {
+        skip('set would pass 2 hours');
+        continue;
+      }
+      ms = next;
+      n++;
+      onTrack(track);
+      setAdded(a => a + 1);
+    }
+    setBusy(null);
+    setText('');
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        disabled={busy !== null}
+        rows={3}
+        placeholder="or paste a whole list of links, one per line: the ones that won't play get skipped"
+        className="rounded-lg border border-white/20 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+        data-fm="bulk"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy !== null || links.length === 0}
+          className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
+          onClick={() => void run()}
+        >
+          {busy !== null ? `CHECKING ${busy.at}/${busy.of}…` : `ADD ALL · ${links.length} links`}
+        </button>
+        {(added > 0 || skipped.length > 0) && busy === null && (
+          <span className="text-[11px] opacity-80">
+            added {added}
+            {skipped.length > 0 ? ` · skipped ${skipped.length}` : ''}
+          </span>
+        )}
+      </div>
+      {skipped.length > 0 && (
+        <div className="max-h-[10vh] overflow-y-auto text-[10px] text-[#ff6b5b]">
+          {skipped.map(x => (
+            <div key={x.url} className="truncate">
+              skipped {x.url.replace(/^https?:\/\/(www\.)?/, '')}: {x.reason}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Hidden embeds used to look videos up (YouTube needs them on the page) */}
+      <div
+        ref={probeHost}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 overflow-hidden opacity-0"
+        style={{ width: YT_MIN_PX, height: YT_MIN_PX }}
+      />
+    </div>
   );
 }
 
@@ -418,7 +590,10 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
         </div>
       </div>
       {tracks.length < FM_SET_MAX_TRACKS && (
-        <LinkAdder fm={fm} cta="ADD" onTrack={t => setTracks(ts => [...ts, t])} />
+        <>
+          <LinkAdder fm={fm} cta="ADD" onTrack={t => setTracks(ts => [...ts, t])} />
+          <BulkAdder fm={fm} tracks={tracks} onTrack={t => setTracks(ts => [...ts, t])} />
+        </>
       )}
       <div className="flex max-h-[24vh] flex-col gap-1 overflow-y-auto pr-1">
         {tracks.map((t, i) => (
