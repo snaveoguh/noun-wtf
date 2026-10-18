@@ -10,8 +10,10 @@
 // Tags travel live over PartyKit (`world:graffiti:save/load`). PartyKit only
 // keeps the last 20 tags per wall and a few walls per index bucket, so every
 // tag is also written to the `world-graffiti` Netlify function, which keeps
-// them for good and is what a fresh visitor loads. Offline (dev) runs keep
-// paint in localStorage instead.
+// them for good. A fresh visitor loads that store, then asks PartyKit about
+// every wall too, so a tag the store never got still shows up on arrival
+// (and is carried over into the store). Offline (dev) runs keep paint in
+// localStorage instead.
 //
 // Detail: a cell's canvas starts at 512×256 (~12 mm a pixel) and steps up
 // to 1024 or 2048 wide when it holds fine-tip strokes, with a cap on how
@@ -22,6 +24,7 @@ import type { CollisionWorld } from '../physics/Collision';
 import * as THREE from 'three';
 
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
+import { postTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
   CELL_W_MM,
@@ -94,15 +97,9 @@ const PREFS_KEY = 'w2-spray-v1';
 const OFFLINE_KEY = 'w2-graffiti-offline';
 const OFFLINE_MAX_CHARS = 1_500_000;
 
-/** Post one tag to the permanent store (fire and forget). */
-function storeTag(wallId: string, data: string) {
-  void fetch(STORE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ wallId, data }),
-    keepalive: true,
-  }).catch(() => undefined);
-}
+/** Tags on their way to the permanent store (one at a time, retried). */
+const storeQueue = new StoreQueue(t => postTag(STORE_URL, t));
+const storeTag = (wallId: string, data: string) => storeQueue.push(wallId, data);
 
 interface Cell {
   id: string;
@@ -337,6 +334,8 @@ export class Graffiti {
   private prevWorld: THREE.Vector3 | null = null;
   private sinceSpray = 0;
   private indexed = new Set<string>();
+  /** Walls asked of PartyKit on this connection. */
+  private asked = new Set<string>();
   /** Permanent-store load; PartyKit's index waits for it. */
   private stored: Promise<void> | null = null;
   private storedDone = false;
@@ -572,16 +571,29 @@ export class Graffiti {
 
   /**
    * Load every wall with paint: the permanent store first, then PartyKit's
-   * index buckets (tags from before the store existed, carried over below).
+   * copy of every wall the store or PartyKit's index buckets know of. The
+   * store can lack tags PartyKit has (from before it existed, or a write
+   * that never landed), and those used to stay hidden until somebody
+   * sprayed the wall and PartyKit rebroadcast it. Missing ones are carried
+   * over into the store (see paintTags). Runs again on every reconnect.
    */
   loadAll() {
     if (this.net === null) return;
+    this.asked.clear();
     this.stored ??= this.loadStored().finally(() => {
       this.storedDone = true;
     });
     void this.stored.then(() => {
       for (let i = 0; i < INDEX_BUCKETS; i++) this.net?.load(this.indexId(i));
+      for (const id of this.indexed) this.askParty(id);
     });
+  }
+
+  /** Ask PartyKit for a wall's tags (once per connection). */
+  private askParty(id: string) {
+    if (this.net === null || !id.startsWith(`${this.levelKey}|`) || this.asked.has(id)) return;
+    this.asked.add(id);
+    this.net.load(id);
   }
 
   private async loadStored() {
@@ -658,12 +670,7 @@ export class Graffiti {
   /** Handle a `world:graffiti:tags` broadcast. */
   onTags(wallId: string, tags: { imageData: string; timestamp?: number }[]) {
     if (wallId.startsWith(`w2idx:${this.levelKey}:`)) {
-      for (const t of tags) {
-        const id = t.imageData;
-        if (typeof id === 'string' && id.startsWith(`${this.levelKey}|`) && !this.cells.has(id)) {
-          this.net?.load(id);
-        }
-      }
+      for (const t of tags) if (typeof t.imageData === 'string') this.askParty(t.imageData);
       return;
     }
     this.paintTags(wallId, tags, true);
