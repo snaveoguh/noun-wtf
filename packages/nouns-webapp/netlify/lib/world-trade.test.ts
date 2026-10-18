@@ -163,9 +163,9 @@ describe('world-trade: anti-cheat', () => {
     expect(tp.out).toMatchObject({ ok: false, kind: 'travel' });
     expect(tp.out.state.cargo).toEqual({ ICECREAM: 8 });
     expect(rejections().at(-1)).toMatchObject({ kind: 'travel' });
-    expect(rejections().at(-1)!.reason).toMatch(/too fast: 8\.0 km from city in 5 s/);
-    // 8 km at 30 m/s ≈ 4.4 min
-    advance(267_000);
+    expect(rejections().at(-1)!.reason).toMatch(/too fast: 11\.4 km from city in 5 s/);
+    // 11.4 km at 45 m/s ≈ 4.2 min
+    advance(260_000);
     const sold = await act(R1, { t: 'sell', town: 'cowboy', good: 'ICECREAM', qty: 7 });
     expect(sold.out.ok).toBe(true);
     expect(row(R1).last).toEqual({ town: 'cowboy', at: Date.now() });

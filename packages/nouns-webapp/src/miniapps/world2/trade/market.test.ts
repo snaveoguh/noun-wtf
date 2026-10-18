@@ -38,9 +38,12 @@ describe('goods + towns tables', () => {
 
   it('towns: the city is the hub, road distance goes through it between lines', () => {
     expect(TOWN_SPECS.city.s).toBe(0);
-    expect(travelMetres('city', 'cowboy')).toBe(8000);
-    expect(travelMetres('cowboy', 'beach')).toBe(20_000);
-    expect(travelMetres('beach', 'cowboy')).toBe(20_000);
+    expect(travelMetres('city', 'cowboy')).toBe(11_400);
+    // Same line: straight on down, not back through the city
+    expect(travelMetres('cowboy', 'beach')).toBe(17_400);
+    expect(travelMetres('beach', 'cowboy')).toBe(17_400);
+    // Different lines: through the city
+    expect(travelMetres('jersey', 'beach')).toBe(21_656 + 28_800);
     expect(travelMetres('jersey', 'jersey')).toBe(0);
   });
 

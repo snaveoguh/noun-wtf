@@ -100,7 +100,7 @@ describe('buy / sell / books', () => {
     const w = world(1_000_000);
     ok(w.act({ t: 'upgrade', town: 'city', up: 'bigbox' }));
     const have = targetStock('cowboy', 'WATER'); // 34
-    w.drive(8000);
+    w.drive(11_400);
     const o = no(w.act({ t: 'buy', town: 'cowboy', good: 'WATER', qty: have + 1 }));
     expect(o.kind).toBe('stock');
   });
@@ -175,7 +175,7 @@ describe('upgrades', () => {
       const w = world(5000);
       if (horn) ok(w.act({ t: 'upgrade', town: 'city', up: 'horn' }));
       ok(w.act({ t: 'buy', town: 'city', good: 'ICECREAM', qty: 1 }));
-      w.drive(8000);
+      w.drive(11_400);
       return ok(w.act({ t: 'serve', town: 'cowboy', good: 'ICECREAM', customer: 'noun:42' })).coin;
     };
     expect(run(true)).toBeGreaterThan(run(false));
@@ -186,7 +186,7 @@ describe('street sales (serve)', () => {
   it('pays a premium over the bid, once per customer per cooldown, one at a time', () => {
     const w = world(5000);
     ok(w.act({ t: 'buy', town: 'city', good: 'ICECREAM', qty: 6 }));
-    w.drive(8000);
+    w.drive(11_400);
     const bid = Math.floor(27.6 * Math.pow(52 / 53, 0.7) * 0.94);
     const s = ok(w.act({ t: 'serve', town: 'cowboy', good: 'ICECREAM', customer: 'noun:1' }));
     expect(s.coin).toBeGreaterThan(bid);
@@ -214,27 +214,27 @@ describe('anti-cheat: travel time', () => {
     // Straight to the desert 8 km away, 0.6 s later: teleport
     const tp = no(w.act({ t: 'sell', town: 'cowboy', good: 'ICECREAM', qty: 10 }));
     expect(tp.kind).toBe('travel');
-    expect(tp.reason).toMatch(/too fast: 8\.0 km from city/);
-    // A real drive at 30 m/s (~4.4 min) is fine
-    w.drive(8000);
+    expect(tp.reason).toMatch(/too fast: 11\.4 km from city/);
+    // A real drive at 30 m/s (~6.3 min) is fine
+    w.drive(11_400);
     ok(w.act({ t: 'sell', town: 'cowboy', good: 'ICECREAM', qty: 9 }));
   });
 
-  it('cowboy → beach goes back through the city (20 km), not straight across', () => {
+  it('cowboy → beach runs on down the same line (17.4 km), not back through the city', () => {
     const w = world(5000);
     ok(w.act({ t: 'buy', town: 'city', good: 'NOGGLES', qty: 2 }));
-    w.drive(8000);
+    w.drive(11_400);
     ok(w.act({ t: 'sell', town: 'cowboy', good: 'NOGGLES', qty: 1 }));
-    w.drive(12_000); // only the city → beach leg
+    w.drive(10_000); // not far enough yet
     expect(no(w.act({ t: 'sell', town: 'beach', good: 'NOGGLES', qty: 1 })).kind).toBe('travel');
-    w.drive(8000);
+    w.drive(7_400);
     ok(w.act({ t: 'sell', town: 'beach', good: 'NOGGLES', qty: 1 }));
   });
 
   it('the limit: just under the minimum fails, the minimum passes; the engine allows 10% faster', () => {
     const r: TradeRow = { ...newRow('r', T0), last: { town: 'city', at: T0 } };
     const need = minTravelMs('city', 'beach', []);
-    expect(need).toBeCloseTo((12_000 / 45 - RULES.TRAVEL_GRACE_S) * 1000);
+    expect(need).toBeCloseTo((28_800 / 45 - RULES.TRAVEL_GRACE_S) * 1000);
     expect(travelCheck(r, 'beach', T0 + need - 1000)).toMatch(/too fast/);
     expect(travelCheck(r, 'beach', T0 + need)).toBeNull();
     expect(minTravelMs('city', 'beach', ['engine'])).toBeLessThan(need);
@@ -323,10 +323,10 @@ describe('arbitrage sanity', () => {
     )
       qty--;
     ok(w.act({ t: 'buy', town: 'city', good: 'ICECREAM', qty }));
-    w.drive(8000);
+    w.drive(11_400);
     const have = stateOf(age(w.row, w.now + 600)).cargo.ICECREAM ?? 0;
     ok(w.act({ t: 'sell', town: 'cowboy', good: 'ICECREAM', qty: have }));
-    w.drive(8000);
+    w.drive(11_400);
     return w.row.coin - before;
   }
 
@@ -348,7 +348,7 @@ describe('arbitrage sanity', () => {
     const w = world(1_000_000);
     ok(w.act({ t: 'upgrade', town: 'city', up: 'bigbox' }));
     ok(w.act({ t: 'buy', town: 'city', good: 'NOGGLES', qty: 80 }));
-    w.drive(12_000);
+    w.drive(28_800);
     const small = applyAction(
       w.row,
       w.markets,
@@ -380,7 +380,7 @@ describe('arbitrage sanity', () => {
     const w = world(1000);
     ok(w.act({ t: 'buy', town: 'city', good: 'WATER', qty: 20 }));
     const spent = -w.row.coin + 1000;
-    w.drive(8000);
+    w.drive(11_400);
     const got = ok(w.act({ t: 'sell', town: 'cowboy', good: 'WATER', qty: 20 })).coin;
     expect(got).toBeGreaterThan(spent * 1.5);
   });
@@ -398,7 +398,7 @@ describe('determinism', () => {
       ];
       let at: TownId = 'city';
       for (const [town, a] of acts) {
-        if (town !== at) w.drive(19_000);
+        if (town !== at) w.drive(60_000);
         at = town;
         w.act(a);
       }

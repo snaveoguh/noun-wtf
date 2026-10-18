@@ -21,7 +21,7 @@ describe('TradeClient offline (the same ledger, in memory)', () => {
     const tp = await c.act({ t: 'sell', town: 'beach', good: 'ICECREAM', qty: 4 });
     expect(tp).toMatchObject({ ok: false });
     expect(tp.reason).toMatch(/too fast/);
-    now += 10 * 60_000;
+    now += 12 * 60_000; // 28.8 km at 45 m/s ≈ 10.7 min
     expect((await c.act({ t: 'sell', town: 'beach', good: 'ICECREAM', qty: 3 })).ok).toBe(true);
     expect(c.seen.beach?.quotes.ICECREAM).toBeDefined();
     expect(c.notice).toMatchObject({ ok: true, text: 'Sold 3 ICECREAM' });

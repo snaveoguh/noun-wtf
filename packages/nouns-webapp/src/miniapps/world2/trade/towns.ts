@@ -5,8 +5,9 @@
 // its market wants. The towns/ part places them in the world from this
 // table; the economy and the server ledger price and police trades with it.
 //
-// Main lines: 1 = +Z DOWNHILL (Noun Jersey ≈ 19 km out), 2 = +X MOUNTAIN,
-// 3 = −X GO DOWN (the Noggle Bowl is ≈ 48 km out, well past the beach).
+// Main lines: 1 = +Z DOWNHILL (Noun Jersey ≈ 19 km out), 2 = +X MOUNTAIN
+// (Dry Gulch then Puerto Noun further down the same line; their sites are
+// TOWN_SITES in world/mountain/tracks.ts, kept equal by towns.test.ts).
 // The city is the hub: s = 0, every line starts there.
 //
 // Biases: > 1 the town pays more than the reference price (it wants it),
@@ -17,7 +18,7 @@ import type { TownId, TownSpec } from './contract';
 export const TOWN_SPECS: Record<TownId, TownSpec> = {
   city: {
     id: 'city',
-    name: 'Noun City',
+    name: 'The Plaza',
     style: 'city',
     track: 0,
     s: 0,
@@ -32,7 +33,7 @@ export const TOWN_SPECS: Record<TownId, TownSpec> = {
     name: 'Noun Jersey',
     style: 'suburb',
     track: 1,
-    s: 19_000,
+    s: 21_656,
     market: {
       // Suburbs: malls (drip), fryers; hungry for pizza and ice cream
       bias: {
@@ -49,10 +50,10 @@ export const TOWN_SPECS: Record<TownId, TownSpec> = {
   },
   cowboy: {
     id: 'cowboy',
-    name: 'Dusty Gulch',
+    name: 'Dry Gulch',
     style: 'cowboy',
     track: 2,
-    s: 8_000,
+    s: 11_400,
     market: {
       // Hot and dry: ice cream and water sell high, fish is a luxury
       bias: { ICECREAM: 2.3, WATER: 3.5, FISH: 1.6, NOGGLES: 1.4, PIZZA: 1.2, FRIES: 0.8, DRIP: 1 },
@@ -61,10 +62,10 @@ export const TOWN_SPECS: Record<TownId, TownSpec> = {
   },
   beach: {
     id: 'beach',
-    name: 'Noun Beach',
+    name: 'Puerto Noun',
     style: 'beach',
-    track: 3,
-    s: 12_000,
+    track: 2,
+    s: 28_800,
     market: {
       // Fish is cheap off the boats; drip and shades fetch a fortune
       bias: {
