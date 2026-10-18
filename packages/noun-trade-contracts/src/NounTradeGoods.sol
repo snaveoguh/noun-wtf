@@ -3,8 +3,9 @@ pragma solidity 0.8.24;
 
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
-import {AccessControlDefaultAdminRules} from
-    "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import {
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -53,9 +54,8 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    bytes32 public constant CLAIM_TYPEHASH = keccak256(
-        "Claim(address player,uint256[] ids,uint256[] amounts,uint256 coin,uint256 nonce,uint256 expiry)"
-    );
+    bytes32 public constant CLAIM_TYPEHASH =
+        keccak256("Claim(address player,uint256[] ids,uint256[] amounts,uint256 coin,uint256 nonce,uint256 expiry)");
 
     /// @notice Cap-table key for NTCOIN (token id 0 is never minted).
     uint256 public constant COIN_KEY = 0;

@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 import {NounTradeGoods} from "../src/NounTradeGoods.sol";
 import {TradeConfig} from "./TradeConfig.sol";
@@ -9,7 +10,8 @@ import {TradeConfig} from "./TradeConfig.sol";
 /// @notice Deploys NounTradeGoods (which deploys NounTradeCoin) with the launch caps.
 ///
 /// Env (nothing is hard-coded, no key is ever generated here):
-///   PRIVATE_KEY      deployer key (pays gas only; gets NO role)
+///   PRIVATE_KEY      deployer key (pays gas only; gets NO role). Optional: omit it and
+///                    pass `--account <keystore> --sender <addr>` to use a Foundry keystore.
 ///   ADMIN_ADDRESS    DEFAULT_ADMIN_ROLE (a Safe on mainnet)
 ///   SIGNER_ADDRESS   SIGNER_ROLE: the address of the server's TRADE_SIGNER_KEY
 ///   PAUSER_ADDRESS   optional, PAUSER_ROLE (defaults to ADMIN_ADDRESS)
@@ -24,7 +26,9 @@ contract Deploy is Script {
 
     function run() external returns (NounTradeGoods goods) {
         uint256 chainId = block.chainid;
-        require(chainId == BASE || chainId == BASE_SEPOLIA || chainId == ANVIL, "Deploy: Base, Base Sepolia or anvil only");
+        require(
+            chainId == BASE || chainId == BASE_SEPOLIA || chainId == ANVIL, "Deploy: Base, Base Sepolia or anvil only"
+        );
         if (chainId == BASE) {
             require(
                 keccak256(bytes(vm.envOr("CONFIRM_MAINNET", string("")))) == keccak256("yes"),
@@ -32,7 +36,7 @@ contract Deploy is Script {
             );
         }
 
-        uint256 pk = vm.envUint("PRIVATE_KEY");
+        uint256 pk = vm.envOr("PRIVATE_KEY", uint256(0));
         address admin = vm.envAddress("ADMIN_ADDRESS");
         address signer = vm.envAddress("SIGNER_ADDRESS");
         address pauser = vm.envOr("PAUSER_ADDRESS", admin);
@@ -42,7 +46,8 @@ contract Deploy is Script {
 
         (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global) = TradeConfig.caps();
 
-        vm.startBroadcast(pk);
+        if (pk != 0) vm.startBroadcast(pk);
+        else vm.startBroadcast(); // --account <keystore> --sender <addr>
         goods = new NounTradeGoods(
             admin,
             chainId == ANVIL ? 0 : TradeConfig.ADMIN_DELAY,
@@ -68,6 +73,10 @@ contract Deploy is Script {
         console2.log("signer                 ", signer);
         console2.log("pauser                 ", pauser);
 
+        // Only a real broadcast records addresses (a dry run would write simulated ones).
+        if (!vm.isContext(VmSafe.ForgeContext.ScriptBroadcast) && !vm.isContext(VmSafe.ForgeContext.ScriptResume)) {
+            return;
+        }
         string memory obj = "deployment";
         vm.serializeUint(obj, "chainId", block.chainid);
         vm.serializeUint(obj, "block", block.number);

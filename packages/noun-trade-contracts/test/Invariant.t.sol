@@ -35,7 +35,9 @@ contract Handler is Test {
         goods = g;
         coin = g.coin();
         signerPk = pk;
-        for (uint256 i; i < 4; ++i) actors.push(makeAddr(string.concat("actor", vm.toString(i))));
+        for (uint256 i; i < 4; ++i) {
+            actors.push(makeAddr(string.concat("actor", vm.toString(i))));
+        }
     }
 
     function actorCount() external view returns (uint256) {
@@ -217,11 +219,15 @@ contract NounTradeInvariantTest is TradeBase {
         uint256 n = handler.actorCount();
         for (uint256 id = 1; id <= TradeConfig.GOOD_COUNT; ++id) {
             uint256 sum;
-            for (uint256 i; i < n; ++i) sum += goods.balanceOf(handler.actors(i), id);
+            for (uint256 i; i < n; ++i) {
+                sum += goods.balanceOf(handler.actors(i), id);
+            }
             assertEq(sum, goods.totalSupply(id));
         }
         uint256 csum;
-        for (uint256 i; i < n; ++i) csum += coin.balanceOf(handler.actors(i));
+        for (uint256 i; i < n; ++i) {
+            csum += coin.balanceOf(handler.actors(i));
+        }
         assertEq(csum, coin.totalSupply());
     }
 }

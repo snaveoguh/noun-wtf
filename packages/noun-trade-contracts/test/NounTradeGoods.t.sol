@@ -2,8 +2,9 @@
 pragma solidity 0.8.24;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {IAccessControlDefaultAdminRules} from
-    "@openzeppelin/contracts/access/extensions/IAccessControlDefaultAdminRules.sol";
+import {
+    IAccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/IAccessControlDefaultAdminRules.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC1155Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -475,9 +476,7 @@ contract NounTradeGoodsTest is TradeBase {
     function test_deposit_cannotBurnMoreThanYouHold() public {
         _claimAs(alice, _voucher(alice, _ids1(1), _amts1(2), 5));
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(IERC1155Errors.ERC1155InsufficientBalance.selector, alice, 2, 3, 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IERC1155Errors.ERC1155InsufficientBalance.selector, alice, 2, 3, 1));
         goods.deposit(_ids1(1), _amts1(3), 0, bytes32(0));
         vm.prank(alice);
         vm.expectRevert();

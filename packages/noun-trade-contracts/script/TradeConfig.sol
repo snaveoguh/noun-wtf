@@ -29,7 +29,11 @@ library TradeConfig {
     string internal constant BASE_URI = "https://noun.wtf/trade-tokens/";
     string internal constant CONTRACT_URI = "https://noun.wtf/trade-tokens/collection.json";
 
-    function caps() internal pure returns (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global) {
+    function caps()
+        internal
+        pure
+        returns (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global)
+    {
         keys = new uint256[](GOOD_COUNT + 1);
         perAddress = new uint128[](GOOD_COUNT + 1);
         global = new uint128[](GOOD_COUNT + 1);
