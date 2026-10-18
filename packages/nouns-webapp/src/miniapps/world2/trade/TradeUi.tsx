@@ -89,7 +89,7 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
       <div
         data-w2hud="trade"
         data-trade="chip"
-        className={`pointer-events-auto absolute left-4 flex flex-col items-start gap-1 ${touch ? 'top-[152px]' : 'top-[124px]'}`}
+        className={`pointer-events-auto absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'top-[152px]' : 'top-[124px]'}`}
       >
         {st !== null && <CargoChip st={st} town={town} onMarket={() => setOpen('market')} />}
         {notice !== null && (
@@ -295,22 +295,23 @@ function MarketRows({ trade, town, st }: { trade: TradeClient; town: TownId; st:
             className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-2 rounded-lg bg-white/5 px-1.5 py-1"
           >
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5 truncate">
+              <div className="flex items-baseline gap-1.5">
                 <span className="text-xs">{GOOD_ICON[g]}</span>
                 <b className="truncate">{GOODS[g].name}</b>
-                <span className="text-xs opacity-70">×{have}</span>
               </div>
-              <div className="truncate text-[10px] opacity-60">
-                {q !== null ? `stock ${q.stock}` : 'no quote yet'}
+              <div className="truncate text-[10px] opacity-70">
+                have <b>{have}</b> · {q !== null ? `stock ${q.stock}` : 'no quote yet'}
                 {GOODS[g].spoil > 0 ? ' · melts' : ''}
-                {margin !== null && best !== null && (
-                  <span className={margin > 0 ? 'text-[#3ddc84]' : 'text-[#ff8a7a]'}>
-                    {' '}
-                    · {TOWN_SPECS[best.town].name} bid {best.bid} ({margin > 0 ? '+' : ''}
-                    {margin}/u, {ago(now - best.at)})
-                  </span>
-                )}
               </div>
+              {margin !== null && best !== null && (
+                <div
+                  data-trade-hint={g}
+                  className={`text-[10px] leading-tight ${margin > 0 ? 'text-[#3ddc84]' : 'text-[#ff8a7a]'}`}
+                >
+                  {TOWN_SPECS[best.town].name} bid {best.bid} ({margin > 0 ? '+' : ''}
+                  {margin}/u, {ago(now - best.at)})
+                </div>
+              )}
             </div>
             <b className="w-9 text-right tabular-nums text-[#3ddc84]">
               {q !== null && q.bid > 0 ? q.bid : '–'}
