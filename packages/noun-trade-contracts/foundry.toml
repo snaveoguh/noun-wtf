@@ -1,0 +1,40 @@
+# Noun Trade on-chain token layer (standalone Foundry project).
+# Deps are vendored under lib/ (forge install --no-git, pruned to sources):
+#   OpenZeppelin Contracts v5.1.0, forge-std v1.9.4.
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+cache_path = "cache"
+libs = ["lib"]
+solc_version = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10_000
+bytecode_hash = "none"
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+]
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[profile.default.fuzz]
+runs = 512
+
+[profile.default.invariant]
+runs = 128
+depth = 64
+fail_on_revert = false
+
+[rpc_endpoints]
+base_sepolia = "${BASE_SEPOLIA_RPC}"
+base = "${BASE_RPC}"
+
+[etherscan]
+base_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 84532 }
+base = { key = "${ETHERSCAN_API_KEY}", chain = 8453 }
+
+[lint]
+# forge-lint style notes are advisory; run `forge lint` to see them.
+lint_on_build = false
