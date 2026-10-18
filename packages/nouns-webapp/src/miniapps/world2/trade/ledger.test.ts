@@ -41,7 +41,7 @@ function world(coin: number = RULES.STARTER_COIN) {
     wait(ms: number) {
       now += ms;
     },
-    /** Drive honestly at a real van speed (30 m/s, under the 45 m/s cap). */
+    /** Drive honestly at a real van speed (30 m/s, under the 52 m/s cap). */
     drive(metres: number) {
       now += (metres / 30) * 1000;
     },
@@ -225,18 +225,18 @@ describe('anti-cheat: travel time', () => {
     ok(w.act({ t: 'buy', town: 'city', good: 'NOGGLES', qty: 2 }));
     w.drive(11_400);
     ok(w.act({ t: 'sell', town: 'cowboy', good: 'NOGGLES', qty: 1 }));
-    w.drive(10_000); // not far enough yet
+    w.drive(5_000); // not far enough yet
     expect(no(w.act({ t: 'sell', town: 'beach', good: 'NOGGLES', qty: 1 })).kind).toBe('travel');
-    w.drive(7_400);
+    w.drive(12_400);
     ok(w.act({ t: 'sell', town: 'beach', good: 'NOGGLES', qty: 1 }));
   });
 
   it('the limit: just under the minimum fails, the minimum passes; the engine allows 10% faster', () => {
     const r: TradeRow = { ...newRow('r', T0), last: { town: 'city', at: T0 } };
     const need = minTravelMs('city', 'beach', []);
-    expect(need).toBeCloseTo((28_800 / 45 - RULES.TRAVEL_GRACE_S) * 1000);
+    expect(need).toBeCloseTo((28_800 / RULES.VAN_MAX_SPEED - RULES.TRAVEL_GRACE_S) * 1000);
     expect(travelCheck(r, 'beach', T0 + need - 1000)).toMatch(/too fast/);
-    expect(travelCheck(r, 'beach', T0 + need)).toBeNull();
+    expect(travelCheck(r, 'beach', T0 + Math.ceil(need))).toBeNull();
     expect(minTravelMs('city', 'beach', ['engine'])).toBeLessThan(need);
     expect(travelCheck({ ...r, upgrades: ['engine'] }, 'beach', T0 + need - 1000)).toBeNull();
     // Same town / first ever trade: nothing to check

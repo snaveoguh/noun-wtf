@@ -39,7 +39,7 @@ export const RULES = {
   /** One-off starter purse for a new rider. */
   STARTER_COIN: 150,
   /** Fastest the van can cover road, m/s (keep ≥ the van's real top speed). */
-  VAN_MAX_SPEED: 45,
+  VAN_MAX_SPEED: 52, // the van's boost (~180 km/h, van/physics.ts) with a little headroom
   /** Clock / latency slack on the travel check (s). */
   TRAVEL_GRACE_S: 15,
   /** Largest single buy / sell. */
