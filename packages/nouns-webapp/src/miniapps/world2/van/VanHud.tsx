@@ -176,7 +176,7 @@ function TouchDrive({ game }: { game: Game }) {
 const VAN_CSS = `
 .w2-van-enter{background:#ffd400;color:#111;padding:12px 20px;font-size:18px;font-weight:900;font-style:italic;box-shadow:6px 6px 0 #f2a2b6;white-space:nowrap}
 .w2-van-enter span{margin-left:8px;padding:2px 7px;background:#111;color:#ffd400;font-style:normal;font-size:13px}
-.w2-van-speedo{bottom:calc(26px + env(safe-area-inset-bottom));min-width:170px;padding:6px 14px 8px;border-radius:14px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);font-family:system-ui,sans-serif}
+.w2-van-speedo{bottom:calc(82px + env(safe-area-inset-bottom));min-width:170px;padding:6px 14px 8px;border-radius:14px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);font-family:system-ui,sans-serif}
 .w2-van-row{display:flex;align-items:baseline;gap:6px}
 .w2-van-row b{font-size:36px;font-weight:900;font-style:italic;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(0,0,0,.5)}
 .w2-van-row span{font-size:11px;font-weight:700;letter-spacing:.12em;opacity:.7}
@@ -187,9 +187,9 @@ const VAN_CSS = `
 .w2-van-rpm div{background:linear-gradient(90deg,#3ddc84,#ffd400 70%,#ff5d5d)}
 .w2-van-boost div{background:#48d6ff}
 .w2-van-boost.w2-on div{background:#f2a2b6;box-shadow:0 0 10px #f2a2b6}
-.w2-van-hint{bottom:calc(6px + env(safe-area-inset-bottom));font-size:11px;opacity:.75;white-space:nowrap;text-shadow:0 1px 2px #000}
+.w2-van-hint{bottom:calc(60px + env(safe-area-inset-bottom));font-size:11px;opacity:.75;white-space:nowrap;text-shadow:0 1px 2px #000}
 .w2-van-hint b{color:#ffd400}
-.w2-van-status{top:24%;font-size:30px;font-weight:900;font-style:italic;color:#ffd400;text-shadow:3px 3px 0 #d22209;animation:w2vanpop .35s ease-out;white-space:nowrap}
+.w2-van-status{top:34%;font-size:30px;font-weight:900;font-style:italic;color:#ffd400;text-shadow:3px 3px 0 #d22209;animation:w2vanpop .35s ease-out;white-space:nowrap}
 @keyframes w2vanpop{from{transform:translate(-50%,0) scale(1.5);opacity:0}to{transform:translate(-50%,0) scale(1);opacity:1}}
 .w2-vbtn{background:rgba(10,12,20,.55);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:16px;width:64px;height:64px;font-weight:900;font-size:13px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);touch-action:none;-webkit-user-select:none;user-select:none}
 .w2-vbtn:active{background:rgba(255,212,0,.55);color:#111}

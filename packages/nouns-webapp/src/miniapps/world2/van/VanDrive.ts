@@ -35,9 +35,9 @@ import { VanCamera } from './VanCamera';
 /** CollisionWorld dynamic-body id for the parked van. */
 export const VAN_COLLIDER = 'icecream-van';
 /** Cab doors (van-local, either side) where E gets you in. */
-const DOOR_Z = 1.7;
+const DOOR_Z = 2.2;
 const DOOR_X = 1.24;
-const DOOR_R = 2.4;
+const DOOR_R = 2.0;
 /** Above this speed E brakes to a stop first, then lets you out. */
 const EXIT_SPEED = 4;
 

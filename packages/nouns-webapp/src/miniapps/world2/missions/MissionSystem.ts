@@ -526,7 +526,10 @@ export class MissionSystem {
     const p = this.game.player;
     let best: Talkable | null = null;
     let bd = Infinity;
-    if (p.speed < 7 && !this.game.hoops.active) {
+    // At the ice cream van's cab door (or driving it) E is the van's, not a chat
+    const van = this.game.van2;
+    const vanE = van !== undefined && (van.driving || van.nearDoor());
+    if (p.speed < 7 && !this.game.hoops.active && !vanE) {
       for (const [id, npc] of this.npcs) {
         if (this.race !== null && id === 'twins') continue;
         const d = Math.hypot(p.pos.x - npc.pos.x, p.pos.z - npc.pos.z);

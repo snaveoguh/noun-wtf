@@ -744,7 +744,7 @@ function Hud({
         )}
       </div>
 
-      {!touch && <SprayPanel game={game} />}
+      {!touch && !game.van2.driving && <SprayPanel game={game} />}
 
       {/* Controls */}
       {showHelp && hud.inputMode !== 'touch' && (
