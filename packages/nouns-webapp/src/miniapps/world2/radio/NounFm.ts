@@ -60,6 +60,8 @@ export interface FmView {
   trackError: string | null;
 }
 
+export type FmResult = { ok: true } | { ok: false; msg: string };
+
 export type FmInspect =
   | { ok: true; track: FmTrack }
   /** YouTube: title + duration come from a visible preview player in the panel. */
@@ -160,6 +162,8 @@ export class NounFm {
   private trackError: string | null = null;
   private error: FmView['error'] = null;
   private notice: FmView['notice'] = null;
+  /** Callers waiting on the server's answer to an op (oldest first). */
+  private waiters: { op: string; done: (r: FmResult) => void }[] = [];
 
   // audio graph
   private ctx: AudioContext | null = null;
@@ -284,10 +288,12 @@ export class NounFm {
         break;
       }
       case 'fm:err':
+        this.settle(String(m.op ?? ''), { ok: false, msg: String(m.msg ?? 'error').slice(0, 140) });
         this.error = { msg: String(m.msg ?? 'error').slice(0, 140), at: performance.now() };
         this.publish(this.view.air, this.view.phase, true);
         break;
       case 'fm:ok':
+        this.settle(String(m.op ?? ''), { ok: true });
         this.error = null;
         this.notice = { msg: okText(String(m.op ?? '')), at: performance.now() };
         this.publish(this.view.air, this.view.phase, true);
@@ -357,8 +363,40 @@ export class NounFm {
     this.send({ type: 'fm:skip', ...(token !== undefined && token !== '' ? { token } : {}) });
   }
 
-  bookSet(dj: string, name: string, startAt: number, tracks: FmTrack[]) {
+  /** Book (or replace) your set; resolves with the station's answer. */
+  bookSet(dj: string, name: string, startAt: number, tracks: FmTrack[]): Promise<FmResult> {
+    const r = this.wait('fm:set');
     this.send({ type: 'fm:set', dj, name, startAt, tracks });
+    return r;
+  }
+
+  /** The private rider key, for the set library (it stores only the public tag). */
+  libraryKey(): string {
+    return this.key;
+  }
+
+  private wait(op: string, ms = 8000): Promise<FmResult> {
+    return new Promise(resolve => {
+      const w = {
+        op,
+        done: (r: FmResult) => {
+          clearTimeout(timer);
+          resolve(r);
+        },
+      };
+      const timer = setTimeout(() => {
+        this.waiters = this.waiters.filter(x => x !== w);
+        resolve({ ok: false, msg: 'no answer from the station, try again' });
+      }, ms);
+      this.waiters.push(w);
+    });
+  }
+
+  private settle(op: string, r: FmResult) {
+    const i = this.waiters.findIndex(w => w.op === op);
+    if (i < 0) return;
+    const [w] = this.waiters.splice(i, 1);
+    w!.done(r);
   }
 
   cancelSet(id: string, token?: string) {

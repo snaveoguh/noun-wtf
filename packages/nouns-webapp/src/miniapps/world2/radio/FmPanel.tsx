@@ -2,8 +2,10 @@
 //
 // Opened at the decks inside the ice cream van. Paste an Audius, YouTube
 // or direct audio link, see what it is (title, artist, length), queue it,
-// move or drop your own entries; or book a DJ set for today. The deck
-// screen is the one visible YouTube player NOUN FM plays through.
+// move or drop your own entries; book a DJ set for today; or pick any set
+// from the shared library and put it on air (FmLibrary.tsx). Today's
+// schedule sits at the top for everyone. The deck screen is the one
+// visible YouTube player NOUN FM plays through.
 
 import type { Game } from '../Game';
 
@@ -15,12 +17,14 @@ import {
   FM_PER_RIDER,
   FM_SET_MAX_MS,
   FM_SET_MAX_TRACKS,
-  setEnd,
   setLength,
   type FmSrc,
   type FmTrack,
 } from '../../../../../nouns-party/src/fmStation';
 
+import { clock, fmtDur, KIND } from './fmFormat';
+import { LibraryTab, ScheduleBoard } from './FmLibrary';
+import { inLibrary, shareSet, type SetDraft } from './libraryStore';
 import { type FmView, type NounFm } from './NounFm';
 import { forgetSet, loadSetHistory, rememberSet, type SavedSet } from './setHistory';
 import { YouTubeDeck, YT_MIN_PX } from './YouTubeDeck';
@@ -29,28 +33,10 @@ export function useFm(fm: NounFm): FmView {
   return useSyncExternalStore(fm.subscribe, fm.getView);
 }
 
-export function fmtDur(s: number): string {
-  const t = Math.max(0, Math.round(s));
-  const h = Math.floor(t / 3600);
-  const m = Math.floor((t % 3600) / 60);
-  const sec = String(t % 60).padStart(2, '0');
-  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
-}
-
 function parseDur(v: string): number {
   const p = v.trim().split(':').map(Number);
   if (p.some(n => !Number.isFinite(n))) return 0;
   return p.reduce((a, n) => a * 60 + n, 0);
-}
-
-const KIND: Record<FmSrc['kind'], string> = {
-  youtube: 'YouTube',
-  audius: 'Audius',
-  direct: 'file',
-};
-
-function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 /** The visible preview player that reads a YouTube video's title + length. */
@@ -467,16 +453,32 @@ function nextAt(hhmm: string, now: number): number {
   return t;
 }
 
-function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) {
-  const [dj, setDj] = useState(name);
-  const [title, setTitle] = useState('');
+function SetTab({
+  fm,
+  name,
+  preset,
+  history,
+  setHistory,
+}: {
+  fm: NounFm;
+  name: string;
+  preset: SetDraft | null;
+  history: SavedSet[];
+  setHistory: (h: SavedSet[]) => void;
+}) {
+  const [dj, setDj] = useState(preset?.dj ?? name);
+  const [title, setTitle] = useState(preset?.name ?? '');
   const [time, setTime] = useState(() => {
     const d = new Date(Date.now() + 15 * 60_000);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   });
-  const [tracks, setTracks] = useState<FmTrack[]>([]);
-  const [history, setHistory] = useState<SavedSet[]>(() => loadSetHistory());
-  const sets = view.state?.sets ?? [];
+  const [tracks, setTracks] = useState<FmTrack[]>(() =>
+    (preset?.tracks ?? []).slice(0, FM_SET_MAX_TRACKS),
+  );
+  const [share, setShare] = useState(true);
+  const [booking, setBooking] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [shared, setShared] = useState<Record<number, string>>({});
   const startAt = nextAt(time, fm.serverNow());
   const len = setLength(tracks);
   const move = (i: number, d: number) =>
@@ -489,33 +491,9 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
     });
   return (
     <div className="flex flex-col gap-2">
-      <div className="font-bold">TODAY&apos;S SCHEDULE</div>
-      {sets.length === 0 && <div className="opacity-60">no sets booked, the slot&apos;s yours</div>}
-      {sets.map(x => (
-        <div key={x.id} className="flex items-center gap-2 rounded-lg bg-white/5 p-1.5">
-          <div className="min-w-0 flex-1">
-            <div className="truncate">
-              <b>{x.dj}</b> · {x.name}
-            </div>
-            <div className="text-[10px] opacity-60">
-              {clock(x.startAt)}–{clock(setEnd(x))} · {x.tracks.length} tracks
-              {x.startAt <= fm.serverNow() ? ' · LIVE' : ''}
-            </div>
-          </div>
-          {x.owner === view.myTag && (
-            <button
-              type="button"
-              className="rounded bg-white/15 px-1.5 text-[10px] font-bold text-[#ff6b5b]"
-              onClick={() => fm.cancelSet(x.id)}
-            >
-              cancel
-            </button>
-          )}
-        </div>
-      ))}
       {history.length > 0 && (
         <>
-          <div className="mt-1 font-bold">YOUR SAVED SETS</div>
+          <div className="font-bold">YOUR SAVED SETS</div>
           <div className="flex max-h-[18vh] flex-col gap-1 overflow-y-auto pr-1">
             {history.map((h, i) => (
               <div
@@ -542,6 +520,25 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
                 >
                   LOAD
                 </button>
+                {shared[h.at] !== undefined || inLibrary(h) ? (
+                  <span className="text-[10px] text-[#3ddc84]" title={shared[h.at]}>
+                    ✓ shared
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="rounded bg-white/15 px-2 py-0.5 text-[10px] font-bold"
+                    title="Share to the library so anyone can play it"
+                    onClick={() =>
+                      void shareSet(fm, h).then(r => {
+                        if (r.ok) setShared(x => ({ ...x, [h.at]: r.msg }));
+                        else setResult(r);
+                      })
+                    }
+                  >
+                    SHARE
+                  </button>
+                )}
                 <button
                   type="button"
                   className="text-[#ff6b5b]"
@@ -618,17 +615,45 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
           </div>
         ))}
       </div>
+      <label className="flex items-center gap-1.5 text-[11px]">
+        <input
+          type="checkbox"
+          checked={share}
+          onChange={e => setShare(e.target.checked)}
+          data-fm="share"
+        />
+        share to the library (anyone in Noun World can play it)
+      </label>
       <button
         type="button"
-        disabled={tracks.length === 0}
+        disabled={tracks.length === 0 || booking}
         className="rounded-lg bg-[#d22209] px-3 py-2 text-sm font-black disabled:opacity-40"
         onClick={() => {
-          fm.bookSet(dj, title, startAt, tracks);
           setHistory(rememberSet({ dj, name: title, tracks }));
+          setBooking(true);
+          setResult(null);
+          void (async () => {
+            const r = await fm.bookSet(dj, title, startAt, tracks);
+            if (!r.ok) {
+              setResult({ ok: false, msg: `not booked: ${r.msg}` });
+            } else if (share) {
+              const p = await shareSet(fm, { dj, name: title, tracks });
+              setResult({ ok: p.ok, msg: `booked · ${p.msg}` });
+            } else setResult({ ok: true, msg: 'booked' });
+            setBooking(false);
+          })();
         }}
       >
-        BOOK SET · {tracks.length} tracks
+        {booking ? 'BOOKING…' : `BOOK SET · ${tracks.length} tracks`}
       </button>
+      {result !== null && (
+        <div
+          className={`text-[11px] ${result.ok ? 'text-[#3ddc84]' : 'text-[#ff6b5b]'}`}
+          data-fm="book-result"
+        >
+          {result.msg}
+        </div>
+      )}
       <div className="text-[10px] opacity-60">
         one set per DJ, no overlaps, up to {FM_SET_MAX_TRACKS} tracks / 2 hours. Sets take over the
         station at their time; the queue carries on after.
@@ -640,7 +665,9 @@ function SetTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }) 
 export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) {
   const fm = game.fm;
   const view = useFm(fm);
-  const [tab, setTab] = useState<'queue' | 'set'>('queue');
+  const [tab, setTab] = useState<'queue' | 'set' | 'library'>('queue');
+  const [preset, setPreset] = useState<SetDraft | null>(null);
+  const [history, setHistory] = useState<SavedSet[]>(() => loadSetHistory());
   const [token, setToken] = useState('');
   const name = useMemo(() => game.name, [game]);
   // Keys type into the panel, not the skater
@@ -702,22 +729,35 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
         <div className="text-[11px] text-[#ff6b5b]">{view.trackError}</div>
       )}
       {!view.ready && <div className="opacity-70">connecting to the station…</div>}
-      <div className="flex gap-1">
-        {(['queue', 'set'] as const).map(t => (
+      <ScheduleBoard fm={fm} view={view} />
+      <div className="flex flex-wrap gap-1">
+        {(['queue', 'set', 'library'] as const).map(t => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             className={`rounded-full px-3 py-1 text-[11px] font-bold ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
+            data-fm={`tab-${t}`}
           >
-            {t === 'queue' ? 'QUEUE' : 'DJ SET FOR TODAY'}
+            {t === 'queue' ? 'QUEUE' : t === 'set' ? 'DJ SET FOR TODAY' : 'LIBRARY'}
           </button>
         ))}
       </div>
-      {tab === 'queue' ? (
-        <QueueTab fm={fm} view={view} name={name} />
-      ) : (
-        <SetTab fm={fm} view={view} name={name} />
+      {tab === 'queue' && <QueueTab fm={fm} view={view} name={name} />}
+      {tab === 'set' && (
+        <SetTab fm={fm} name={name} preset={preset} history={history} setHistory={setHistory} />
+      )}
+      {tab === 'library' && (
+        <LibraryTab
+          fm={fm}
+          view={view}
+          name={name}
+          history={history}
+          onLoad={d => {
+            setPreset(d);
+            setTab('set');
+          }}
+        />
       )}
       {view.error !== null && now - view.error.at < 8000 && (
         <div className="text-[11px] text-[#ff6b5b]" data-fm="error">
