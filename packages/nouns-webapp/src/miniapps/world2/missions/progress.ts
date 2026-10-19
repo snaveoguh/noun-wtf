@@ -23,6 +23,9 @@ import {
 
 export const MISSIONS_VERSION = 1;
 
+/** Cutscene ids whose seen-flags persist (cutscene/scenes.ts SCENE_IDS; kept here so this stays dependency-free). */
+export const SEEN_IDS = ['oracle', 'keymaker', 'twins', 'door', 'one'] as const;
+
 export interface MissionState {
   v: typeof MISSIONS_VERSION;
   /** Characters talked to (ms). */
@@ -37,10 +40,21 @@ export interface MissionState {
   grassKmh: number;
   /** Server-accepted records last seen (shown as progress on record missions). */
   server: Partial<Record<RecordKey, number>>;
+  /** Story cutscenes already played for this rider (scene id → ms). Local only. */
+  seen: Record<string, number>;
 }
 
 export function emptyState(): MissionState {
-  return { v: MISSIONS_VERSION, met: {}, done: {}, prog: {}, title: null, grassKmh: 0, server: {} };
+  return {
+    v: MISSIONS_VERSION,
+    met: {},
+    done: {},
+    prog: {},
+    title: null,
+    grassKmh: 0,
+    server: {},
+    seen: {},
+  };
 }
 
 export type Signal =
@@ -261,6 +275,12 @@ export function sanitizeState(raw: unknown, now = Date.now()): MissionState {
     const v = num(server[k], 0, 1e6);
     if (v !== undefined) s.server[k] = v;
   }
+  const seen = (o.seen ?? {}) as Record<string, unknown>;
+  if (typeof seen === 'object' && !Array.isArray(seen))
+    for (const id of SEEN_IDS) {
+      const ts = num(seen[id], 0, now + 86_400_000);
+      if (ts !== undefined) s.seen[id] = ts;
+    }
   return s;
 }
 

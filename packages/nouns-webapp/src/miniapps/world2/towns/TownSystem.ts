@@ -78,7 +78,21 @@ export interface TownHost {
   toast(text: string, tag: string): void;
   /** The Game itself: `van2` / `trade` are read off it when those parts exist. */
   game: object;
+  /** A customer speaks (their Noun seed's voice; the host decides if it's in earshot). */
+  say?: (seed: readonly number[], text: string, at: THREE.Vector3) => void;
+  /** A sound effect on the sfx bus (the till on a sale). */
+  sound?: (id: 'coins' | 'chips', gain: number) => void;
 }
+
+/** What customers say (by town). */
+const THANKS: Record<GrownTown, string[]> = {
+  cowboy: ['Much obliged!', 'Well, I’ll be!', 'Yee-haw!', 'Thank ya kindly.'],
+  beach: ['Pura vida!', '¡Gracias!', 'Sweet!', 'Perfecto!'],
+};
+const TOO_SLOW = ['Too slow…', 'Forget it.', 'Melted.'];
+
+/** Speech bubbles stay up this long (s). */
+const SAY_S = 1.8;
 
 const SPAWN_R = 380;
 const DESPAWN_R = 480;
@@ -96,6 +110,9 @@ interface Customer {
   bubbleKey: string;
   waveT: number;
   sadT: number;
+  /** A line they just said (shown in their bubble for SAY_S). */
+  sayText: string;
+  sayT: number;
 }
 
 interface LiveTown {
@@ -373,6 +390,7 @@ export class TownSystem implements TownsApi {
       c.ch.root.quaternion.slerp(_q, 1 - Math.exp(-4 * dt));
       c.waveT -= dt;
       c.sadT -= dt;
+      c.sayT -= dt;
       c.ch.play({ clip: c.waveT > 0 ? 'wave' : 'idle', fade: 0.3 });
       c.ch.update(dt, { lean: 0, travelled: 0, riding: false, grounded: true });
     }
@@ -381,8 +399,21 @@ export class TownSystem implements TownsApi {
   private onOrderEvent(lt: LiveTown, ev: OrderEvent) {
     const c = lt.customers.find(q => q.def.id === ev.order.customer);
     if (c === undefined) return;
-    if (ev.t === 'open') c.waveT = 1.6;
-    else if (ev.t === 'expire') c.sadT = 2.5;
+    if (ev.t === 'open') {
+      c.waveT = 1.6;
+      this.speak(c, `${GOOD_LABEL[ev.order.good].name.toLowerCase()}, please!`);
+    } else if (ev.t === 'expire') {
+      c.sadT = 2.5;
+      this.speak(c, TOO_SLOW[Math.floor(Math.random() * TOO_SLOW.length)]!);
+    }
+  }
+
+  /** A customer says something: babble in their voice, words in their bubble. */
+  private speak(c: Customer, text: string) {
+    c.sayText = text;
+    c.sayT = SAY_S;
+    c.bubbleKey = '';
+    this.host.say?.(c.def.seed, text, c.pos);
   }
 
   private tryServe(src: THREE.Vector3, speed: number) {
@@ -406,6 +437,11 @@ export class TownSystem implements TownsApi {
     this.served++;
     c.waveT = 2.2;
     this.throwItem(o.good, src, c.pos);
+    // The till, and a thank-you
+    this.host.sound?.('coins', 0.8);
+    this.host.sound?.('chips', 0.4);
+    const lines = THANKS[lt.id];
+    this.speak(c, lines[Math.floor(Math.random() * lines.length)]!);
     this.popText(c.pos, `+${ev.tip.total} ${ev.tip.grade}`, ev.tip.grade !== 'SERVED');
     if (trade !== null) {
       trade
@@ -454,7 +490,7 @@ export class TownSystem implements TownsApi {
     bubble.className = 'nt-bubble';
     bubble.style.display = 'none';
     this.host.labelLayer.appendChild(bubble);
-    return { def, ch, pos, yaw, bubble, bubbleKey: '', waveT: 0, sadT: 0 };
+    return { def, ch, pos, yaw, bubble, bubbleKey: '', waveT: 0, sadT: 0, sayText: '', sayT: 0 };
   }
 
   private disposeCustomer(c: Customer) {
@@ -488,7 +524,8 @@ export class TownSystem implements TownsApi {
 
   private renderBubble(c: Customer, o: Order | undefined, dist: number) {
     const b = c.bubble;
-    let show = (o !== undefined || c.sadT > 0) && dist < BUBBLE_DIST;
+    const saying = c.sayT > 0 && dist < 40;
+    let show = (o !== undefined || c.sadT > 0 || saying) && dist < BUBBLE_DIST;
     const sp = show ? this.project(c.pos, 2.45) : null;
     show = sp !== null;
     if (!show) {
@@ -499,7 +536,10 @@ export class TownSystem implements TownsApi {
     b.style.transform = `translate(-50%, -100%) translate(${sp!.x}px, ${sp!.y}px)`;
     let key: string;
     let html: string;
-    if (o === undefined) {
+    if (saying) {
+      key = `say:${c.sayText}`;
+      html = `<div class="nt-b nt-say">${escapeHtml(c.sayText)}</div>`;
+    } else if (o === undefined) {
       key = 'sad';
       html = `<div class="nt-b nt-sad">😞 too slow</div>`;
     } else {
@@ -743,6 +783,7 @@ function injectCss() {
 .nt-b{position:relative;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#111;border:2px solid #111;border-radius:12px;padding:3px 10px 6px;box-shadow:3px 3px 0 #d22209;font-weight:900;overflow:hidden}
 .nt-b:after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;border-top-color:#111}
 .nt-b b{font-size:20px;line-height:1}
+.nt-say{font-size:14px;font-style:italic;padding:3px 10px 4px}
 .nt-b span{font-size:15px;font-style:italic}
 .nt-b u{position:absolute;left:0;bottom:0;height:4px;background:#2fbf71;text-decoration:none}
 .nt-b.nt-hurry u{background:#f3322c}
