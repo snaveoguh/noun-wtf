@@ -9,8 +9,9 @@
 //     otherwise played straight with distance volume only.
 //   - YouTube: the official IFrame player in a visible deck screen
 //     (YouTubeDeck.ts), never hidden, ads untouched.
-//   - between tracks: one of the owner's recorded Noun F-M stings or a
-//     procedural ident (idents.ts), picked by the play key (fmAssets.ts).
+//   - between tracks: a procedural ident (idents.ts). The owner's recorded
+//     jingles are never squeezed into that gap; they play in full as house
+//     breaks and in the start-of-game intro.
 //   - nothing queued and no set on: the house programme (house.ts): the
 //     owner's songs + library tracks, cut-offs, jingles and WORLDWIDE
 //     ALERT news breaks, on a shared deterministic schedule.
@@ -40,7 +41,6 @@ import { getDjUpdate, speakDj } from './djUpdate';
 import {
   loadBuffer,
   loadFmManifests,
-  pickGapSound,
   playBuffer,
   type HouseSong,
   type Interlude,
@@ -219,7 +219,6 @@ export class NounFm {
 
   // recordings + house programme
   private interludes: Interlude[] = [];
-  private stings: (AudioBuffer | null)[] = [];
   private songs: HouseSong[] = [];
   private libSets: LibSet[] = [];
   private libAt = -Infinity;
@@ -543,10 +542,6 @@ export class NounFm {
       this.interludes = m.interludes;
       this.songs = m.songs;
       this.houseKey = ''; // rebuild with the songs
-      // stings are tiny: decode them all up front so a gap never waits
-      void Promise.all(m.interludes.map(i => loadBuffer(ctx, i.sting))).then(b => {
-        this.stings = b;
-      });
     });
   }
 
@@ -762,15 +757,6 @@ export class NounFm {
 
   private ident(key: string) {
     if (this.ctx === null || this.bus === null || this.noise === null) return;
-    const pick = pickGapSound(key, this.interludes.length);
-    const buf = pick.kind === 'file' ? this.stings[pick.index] : null;
-    if (pick.kind === 'file' && buf !== undefined && buf !== null) {
-      const h = playBuffer(this.ctx, this.bus, buf, { gain: 0.9 });
-      this.identUntil = this.time + h.seconds;
-      this.lastGap = { kind: 'file', id: this.interludes[pick.index]?.id ?? '', key };
-      if (import.meta.env.DEV) console.info('[fm] gap: recorded sting', this.lastGap.id, key);
-      return;
-    }
     this.lastGap = { kind: 'synth', id: '', key };
     if (import.meta.env.DEV) console.info('[fm] gap: synth ident', key);
     const r = playIdent(this.ctx, this.bus, this.noise, key, {
