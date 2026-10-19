@@ -11,8 +11,9 @@ the tokens with it. To deposit, the player burns tokens and the server credits t
 
 ## Token ids
 
-These ids never change. New goods are added at the end (8, 9, …) by giving the new id
-a cap with `setCap` and adding its metadata JSON.
+These ids never change. New goods are added at the end (8, 9, …), once each, with
+`launchGood(id, perAddress, global, maxSupply)`, plus their metadata JSON. ICECREAM (1)
+has no cap and no supply: it melts, so it never leaves the game.
 
 | id | good | metadata |
 | --- | --- | --- |
@@ -68,27 +69,30 @@ past its expiry plus 60 s. After that point the contract can never accept it.
 
 | Role | Can | Recommended holder |
 | --- | --- | --- |
-| `DEFAULT_ADMIN_ROLE` | set caps, set URIs, `rotateSigner`, `cancelNonces`, `unpause`, grant/revoke roles. The hand-over takes two steps and waits `ADMIN_DELAY` (2 days). | A Safe multisig |
+| `DEFAULT_ADMIN_ROLE` | lower caps and max supplies (never raise), `launchGood` a new id, set URIs, `rotateSigner`, `cancelNonces`, `unpause`, grant/revoke roles. The hand-over takes two steps and waits `ADMIN_DELAY` (2 days). | A Safe multisig |
 | `SIGNER_ROLE` | make vouchers valid by signing them. It sends no txs and needs no ETH. | The server's `TRADE_SIGNER_KEY` address |
 | `PAUSER_ROLE` | pause claims and deposits (it cannot unpause) | The admin, or an ops key |
 
 What each party can and can't do:
 - **Minting.** Nothing mints except `claim` with a valid voucher. There's no owner mint and no mint role on the coin.
-- **The admin.** The admin can grant `SIGNER_ROLE` (to itself too), so the admin can always issue vouchers. The daily caps limit how fast any signer can mint, honest or compromised.
+- **The admin.** The admin can grant `SIGNER_ROLE` (to itself too), so the admin can always issue vouchers. The daily caps limit how fast any signer can mint, honest or compromised, and each key's lifetime `maxSupply` limits how much ever can. The admin can raise neither.
 - **Holders' tokens.** No one can burn or move a holder's tokens except the holder (or an operator they approved for transfers).
 - **Pausing.** Pausing stops `claim` and `deposit` only. Transfers keep working.
 - **A leaked signer key.** Call `rotateSigner(old, new)`. Vouchers signed by the old key fail straight away. Then set the new key in Netlify.
 - **A leaked voucher.** `cancelNonces([nonce])`. The server refunds a cancelled voucher after its expiry.
 
-Launch caps (UTC day, set in the constructor from `script/TradeConfig.sol`):
+Launch supply (set in the constructor from `script/TradeConfig.sol`; the full model,
+with a 12-month projection, is in [SUPPLY.md](SUPPLY.md)):
 
-| key | per address / day | global / day |
-| --- | --- | --- |
-| each good (ids 1–7) | 500 | 50,000 |
-| NTCOIN (key 0) | 50,000 | 5,000,000 |
+| key | per address / day | global / day at launch (halves every 180 d, 4x) | lifetime max supply |
+| --- | --- | --- | --- |
+| NTCOIN (key 0) | 5,000 | 500,000 | 210,000,000 |
+| ICECREAM (1) | 0 | 0 | 0 (melts) |
+| each other good (ids 2–7) | 200 | 20,000 | 20,000,000 |
 
 The server enforces the same caps in `src/miniapps/world2/trade/onchain/tokens.ts`
-(`CLAIM_CAPS`). If you change a cap on-chain with `setCap`, change it there too.
+(`CLAIM_CAPS`, `globalCapOn`). If you lower a cap on-chain with `setCap`, lower it there
+too.
 
 ## Develop
 
@@ -99,7 +103,7 @@ Foundry:
 ```sh
 cd packages/noun-trade-contracts
 forge build
-forge test            # 42 tests: unit, fuzz, invariant (supply only moves via vouchers/burns)
+forge test            # 51 tests: unit, fuzz, invariant (supply only moves via vouchers/burns, never past a ceiling)
 forge test --gas-report
 ```
 
@@ -111,6 +115,10 @@ TRADE_E2E=1 npx vitest run netlify/lib/tradeOnchain.e2e.test.ts
 ```
 
 ## Deploy (the owner runs this; nothing in the repo holds a key)
+
+**Base mainnet: follow [DEPLOY.md](DEPLOY.md)** (`script/DeployBase.s.sol`, a Safe as
+owner, hardware wallet or keystore). The steps below are the general / testnet flow
+with `script/Deploy.s.sol`.
 
 ### 0. Prepare three addresses
 

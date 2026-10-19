@@ -120,6 +120,8 @@ export class TradeClient implements TradeApi {
   private queue: Promise<unknown> = Promise.resolve();
   private listeners = new Set<() => void>();
   private version = 0;
+  /** Bumped whenever the books change locally (an action starts or lands). */
+  private epoch = 0;
   private fetchFn: typeof fetch;
   private clock: () => number;
 
@@ -161,12 +163,15 @@ export class TradeClient implements TradeApi {
     }
     try {
       const town = this.town;
+      const epoch = this.epoch;
       const q = new URLSearchParams({ rider: this.rider });
       if (town !== null) q.set('town', town);
       const res = await this.fetchFn(`${URL_}?${q}`, { cache: 'no-store' });
       if (!res.ok) return;
       const out = (await res.json()) as { state?: TradeState; quotes?: Quote[] };
-      if (out.state) this.state = out.state;
+      // A trade went out (or landed) while this was in flight: its answer is
+      // newer than these books, so they'd roll it back. Keep the quotes only.
+      if (out.state && epoch === this.epoch && this.pending === 0) this.state = out.state;
       this.takeQuotes(out.quotes);
       if (town !== null && out.quotes) this.markSeen(town, out.quotes);
       this.emit();
@@ -202,6 +207,9 @@ export class TradeClient implements TradeApi {
     return qs ? GOOD_IDS.flatMap(g => (qs[g] ? [qs[g]!] : [])) : [];
   }
 
+  /** Every finished action, ok or not (the game plays the till sounds off it). */
+  onActed?: (a: TradeAction, r: TradeResult) => void;
+
   act(a: TradeAction): Promise<TradeResult> {
     const run = this.queue.then(() => this.run(a));
     this.queue = run.catch(() => undefined);
@@ -229,6 +237,7 @@ export class TradeClient implements TradeApi {
     const before = this.state;
     const id = nonce();
     this.pending++;
+    this.epoch++;
     const guess = this.optimistic(a);
     if (guess !== null) {
       this.state = guess;
@@ -241,6 +250,7 @@ export class TradeClient implements TradeApi {
         body: JSON.stringify({ rider: this.rider, id, action: a }),
       });
       const out = (await res.json()) as Partial<TradeResult>;
+      this.epoch++;
       if (out.state) this.state = out.state;
       else this.state = before;
       this.takeQuotes(out.quotes);
@@ -286,6 +296,7 @@ export class TradeClient implements TradeApi {
 
   private finish(r: TradeResult, a: TradeAction): TradeResult {
     this.notice = { text: r.ok ? doneText(a) : (r.reason ?? 'refused'), ok: r.ok, at: Date.now() };
+    this.onActed?.(a, r);
     this.emit();
     return r;
   }

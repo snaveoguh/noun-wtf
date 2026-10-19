@@ -136,3 +136,40 @@ describe('TradeClient online', () => {
     expect(order).toEqual(['buy:1', 'buy:2', 'sell:3']);
   });
 });
+
+describe('TradeClient: a slow GET never rolls a trade back', () => {
+  it('books from a load that was in flight when a buy landed are ignored', async () => {
+    const st = (fries: number, coin: number): TradeState => ({
+      rider: RIDER,
+      coin,
+      cargo: fries > 0 ? { FRIES: fries } : {},
+      capacity: 40,
+      upgrades: [],
+      last: null,
+    });
+    const reply = (body: unknown) =>
+      ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
+    let finishGet!: (r: Response) => void;
+    const fetchFn = vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? Promise.resolve(reply({ ok: true, state: st(2, 140) }))
+        : new Promise<Response>(r => {
+            finishGet = r;
+          }),
+    );
+    const c = new TradeClient({
+      offline: false,
+      rider: RIDER,
+      now: () => T0,
+      fetchFn: fetchFn as never,
+    });
+    c.state = st(0, 150);
+    const load = c.load(); // e.g. entering town
+    await c.act({ t: 'buy', town: 'city', good: 'FRIES', qty: 2 });
+    expect(c.state!.cargo.FRIES).toBe(2);
+    finishGet(reply({ state: st(0, 150), quotes: [] })); // the stale snapshot
+    await load;
+    expect(c.state!.cargo.FRIES).toBe(2);
+    expect(c.state!.coin).toBe(140);
+  });
+});

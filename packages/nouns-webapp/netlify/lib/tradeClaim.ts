@@ -12,16 +12,19 @@
 // resumed. Once its expiry has passed on-chain unused, the debit is refunded
 // (opId `refund:<nonce>`): the contract can never accept it after that.
 //
-// The ledger is reached only through LedgerPort, so the economy's real store plugs in
-// with an adapter (see blobLedger + the TODO below).
+// The ledger is reached only through LedgerPort. The functions use rowLedger
+// (./tradeLedger.ts: the game's own rider rows); blobLedger below is a minimal
+// stand-alone ledger the tests use for the claim logic on its own.
 
 import type { ChainPort, TradeChainConfig, VoucherSigner } from './tradeOnchain';
 
 import { getAddress, isAddress, type Address, type Hex } from 'viem';
 
 import { COIN, type GoodId, type TradeState } from '../../src/miniapps/world2/trade/contract';
+import { CHAIN_LOCKED } from '../../src/miniapps/world2/trade/ledger';
 import {
   CLAIM_CAPS,
+  globalCapOn,
   COIN_CAP_KEY,
   MAX_BATCH,
   NONCE_CLAIMED,
@@ -86,12 +89,7 @@ const CAS_TRIES = 8;
 /**
  * A LedgerPort over one blob per rider holding a TradeState, updated with etag
  * compare-and-swap. Goods are taken from / added to `cargo`.
- *
- * TODO(economy integration): netlify/functions/world-trade.ts owns the real ledger.
- * Swap this for an adapter over that store (same atomic CAS on the rider's TradeState,
- * plus an applied-op list for idempotency), or point `key` at its blob layout if it
- * stores a `{ state, ops }` doc per rider. Deposits may push cargo over `capacity`;
- * the economy decides whether that spills into storage or is allowed.
+ * Used by the tests; the live functions use rowLedger (./tradeLedger.ts).
  */
 export function blobLedger(
   store: KV,
@@ -209,6 +207,8 @@ export function parseClaimRequest(input: Record<string, unknown>): ClaimRequest 
   for (const [g, n] of Object.entries(goodsIn)) {
     if (!(g in TRADE_TOKEN_IDS)) return `Unknown good ${g.slice(0, 20)}`;
     if (n === 0) continue;
+    // (its on-chain cap is 0, so the contract would refuse it anyway)
+    if (CHAIN_LOCKED.has(g as GoodId)) return `${g} melts: it can't leave the game`;
     if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0) return `Bad amount for ${g}`;
     if (n > CLAIM_CAPS.goodPerAddress) return `Over the daily cap for ${g}`;
     goods[g as GoodId] = n;
@@ -344,7 +344,11 @@ export function claimService(deps: ClaimDeps) {
     for (const [k, n] of Object.entries(wanted)) {
       const isCoin = k === String(COIN_CAP_KEY);
       const per = isCoin ? CLAIM_CAPS.coinPerAddress : CLAIM_CAPS.goodPerAddress;
-      const glob = isCoin ? CLAIM_CAPS.coinGlobal : CLAIM_CAPS.goodGlobal;
+      const glob = globalCapOn(
+        isCoin ? CLAIM_CAPS.coinGlobal : CLAIM_CAPS.goodGlobal,
+        cfg.launchDay ?? null,
+        day,
+      );
       if ((mine[k] ?? 0) + n > per)
         return { status: 429, body: { error: 'Over the daily cash-out cap for this wallet' } };
       if ((all[k] ?? 0) + n > glob)

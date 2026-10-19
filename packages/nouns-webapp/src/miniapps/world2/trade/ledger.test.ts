@@ -6,7 +6,11 @@ import {
   age,
   applyAction,
   audit,
+  CHAIN_LOCKED,
+  claimableCoin,
+  maxBuy,
   minTravelMs,
+  moveForChain,
   newRow,
   normalizeRow,
   parseAction,
@@ -405,5 +409,50 @@ describe('determinism', () => {
       return { row: w.row, markets: w.markets };
     };
     expect(run()).toEqual(run());
+  });
+});
+
+describe('maxBuy: the MAX button', () => {
+  it('is the most you can afford, carry and find in stock', () => {
+    const stock = targetStock('beach', 'FISH');
+    const n = maxBuy('beach', 'FISH', stock, 150, 40);
+    expect(n).toBeGreaterThan(0);
+    expect(world(150).act({ t: 'buy', town: 'beach', good: 'FISH', qty: n }).ok).toBe(true);
+    expect(world(150).act({ t: 'buy', town: 'beach', good: 'FISH', qty: n + 1 }).ok).toBe(false);
+    expect(maxBuy('beach', 'FISH', stock, 1_000_000, 7)).toBe(3); // cargo room (fish take 2 slots)
+    expect(maxBuy('beach', 'FISH', 2, 1_000_000, 40)).toBe(2); // stock
+    expect(maxBuy('beach', 'FISH', stock, 0, 40)).toBe(0); // broke
+  });
+});
+
+describe('moveForChain: cash-out / deposit against the real books', () => {
+  const funded = (): TradeRow => {
+    const r = newRow('r1', T0);
+    return { ...r, coin: 500, held: { FISH: 4, ICECREAM: 2 }, book: { ...r.book, earned: 350 } };
+  };
+  it('the starter purse never leaves the game; earned coin does', () => {
+    const r = funded();
+    expect(claimableCoin(r)).toBe(500 - RULES.STARTER_COIN);
+    expect(moveForChain(r, { goods: {}, coin: 351 }, 'claim:1', -1, T0).ok).toBe(false);
+    const yes = moveForChain(r, { goods: { FISH: 3 }, coin: 350 }, 'claim:1', -1, T0);
+    if (!yes.ok) throw new Error(yes.reason);
+    expect(yes.row.coin).toBe(150);
+    expect(yes.row.held.FISH).toBe(1);
+    expect(audit(yes.row)).toBe(true);
+  });
+  it('ice cream melts: it can never be cashed out', () => {
+    expect(CHAIN_LOCKED.has('ICECREAM')).toBe(true);
+    const out = moveForChain(funded(), { goods: { ICECREAM: 1 }, coin: 0 }, 'claim:2', -1, T0);
+    expect(out).toMatchObject({ ok: false });
+  });
+  it('is idempotent by op id, and deposits balance the books', () => {
+    const a = moveForChain(funded(), { goods: { PIZZA: 2 }, coin: 40 }, 'dep:0xabc', 1, T0);
+    if (!a.ok) throw new Error(a.reason);
+    expect(a.applied).toBe(true);
+    expect(a.row.coin).toBe(540);
+    expect(audit(a.row)).toBe(true);
+    const b = moveForChain(a.row, { goods: { PIZZA: 2 }, coin: 40 }, 'dep:0xabc', 1, T0);
+    expect(b.ok && b.applied).toBe(false);
+    expect(b.ok && b.row.coin).toBe(540);
   });
 });

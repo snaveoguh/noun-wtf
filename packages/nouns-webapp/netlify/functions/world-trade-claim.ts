@@ -1,13 +1,11 @@
-import { connectLambda, getStore } from '@netlify/blobs';
-
 import {
-  blobLedger,
   claimService,
   cleanRider,
   parseClaimRequest,
   type ClaimDeps,
   type KV,
 } from '../lib/tradeClaim';
+import { rowLedger, strongStore, TRADE_LEDGER_STORE } from '../lib/tradeLedger';
 import { readTradeConfig, signerFromKey, TRADE_STORE, viemChainPort } from '../lib/tradeOnchain';
 
 // Noun Trade cash-out: turn game balance into tokens on Base (../lib/tradeClaim.ts).
@@ -25,14 +23,13 @@ import { readTradeConfig, signerFromKey, TRADE_STORE, viemChainPort } from '../l
 // Off unless TRADE_ONCHAIN=on; needs TRADE_SIGNER_KEY and TRADE_GOODS_ADDRESS
 // (see ../lib/tradeOnchain.ts for every env var).
 //
-// TODO(economy integration): rider auth follows the economy's world-trade function
-// (today a rider id is a bearer id, like world-stats); swap blobLedger for an adapter
-// over its store so cash-outs debit the same balance the game shows.
+// The ledger is the game's own (rowLedger over world-trade's rider rows): a cash-out
+// debits exactly the balance the HUD shows. The starter purse and ICECREAM (it melts)
+// can't be cashed out. Rider auth follows world-trade (a rider id is a bearer id, like
+// world-stats).
 
 interface HandlerEvent {
   body: string | null;
-  blobs?: string;
-  headers?: Record<string, string>;
   httpMethod: string;
 }
 
@@ -68,8 +65,7 @@ export function makeHandler(over: Partial<ClaimDeps> = {}) {
       return json(400, { error: 'Bad JSON' });
     }
 
-    connectLambda({ blobs: event.blobs ?? '', headers: event.headers ?? {} });
-    const store = over.store ?? (getStore(TRADE_STORE) as unknown as KV);
+    const store = over.store ?? (strongStore(TRADE_STORE) as unknown as KV);
     const cfg = over.cfg ?? readTradeConfig();
     let chain = over.chain ?? null;
     if (!chain && cfg.goods && cfg.rpc) {
@@ -81,7 +77,7 @@ export function makeHandler(over: Partial<ClaimDeps> = {}) {
     }
     const svc = claimService({
       store,
-      ledger: over.ledger ?? blobLedger(store),
+      ledger: over.ledger ?? rowLedger(strongStore(TRADE_LEDGER_STORE)),
       signer: over.signer !== undefined ? over.signer : signerFromKey(process.env.TRADE_SIGNER_KEY),
       chain,
       cfg,
@@ -110,4 +106,14 @@ export function makeHandler(over: Partial<ClaimDeps> = {}) {
   };
 }
 
-export const handler = makeHandler();
+/** The Netlify v2 entry (v2 so the Blobs stores can read their own writes). */
+export default async (req: Request): Promise<Response> => {
+  const out = await makeHandler()({
+    httpMethod: req.method,
+    body: req.method === 'POST' ? await req.text() : null,
+  });
+  return new Response(out.statusCode === 204 ? null : out.body, {
+    status: out.statusCode,
+    headers: out.headers,
+  });
+};

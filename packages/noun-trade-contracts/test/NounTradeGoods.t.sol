@@ -48,17 +48,24 @@ contract NounTradeGoodsTest is TradeBase {
         assertTrue(goods.hasRole(goods.PAUSER_ROLE(), pauser));
         assertEq(goods.uri(1), "https://noun.wtf/trade-tokens/1.json");
         assertEq(goods.contractURI(), "https://noun.wtf/trade-tokens/collection.json");
-        (uint128 pa, uint128 gl) = goods.caps(TradeConfig.ICECREAM);
+        (uint128 pa, uint128 gl) = goods.caps(TradeConfig.FRIES);
         assertEq(pa, TradeConfig.GOOD_CAP_PER_ADDRESS);
         assertEq(gl, TradeConfig.GOOD_CAP_GLOBAL);
+        assertEq(goods.maxSupply(TradeConfig.FRIES), TradeConfig.GOOD_MAX_SUPPLY);
         (pa, gl) = goods.caps(TradeConfig.COIN_KEY);
         assertEq(pa, TradeConfig.COIN_CAP_PER_ADDRESS);
+        assertEq(goods.maxSupply(TradeConfig.COIN_KEY), TradeConfig.COIN_MAX_SUPPLY);
+        // ice cream melts: never claimable, no supply
+        (pa, gl) = goods.caps(TradeConfig.ICECREAM);
+        assertEq(gl, 0);
+        assertEq(goods.maxSupply(TradeConfig.ICECREAM), 0);
         (pa, gl) = goods.caps(8);
-        assertEq(gl, 0); // id 8 not claimable until the admin caps it
+        assertEq(gl, 0); // id 8 not claimable until the admin launches it
+        assertEq(goods.launchDay(), block.timestamp / 1 days);
     }
 
     function test_digest_matchesContract() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(3), 10);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(3), 10);
         assertEq(goods.claimDigest(c), _digest(c));
     }
 
@@ -67,7 +74,7 @@ contract NounTradeGoodsTest is TradeBase {
     function test_claim_happyPath() public {
         uint256[] memory ids = new uint256[](3);
         uint256[] memory amts = new uint256[](3);
-        (ids[0], ids[1], ids[2]) = (TradeConfig.ICECREAM, TradeConfig.FISH, TradeConfig.WATER);
+        (ids[0], ids[1], ids[2]) = (TradeConfig.FRIES, TradeConfig.FISH, TradeConfig.WATER);
         (amts[0], amts[1], amts[2]) = (5, 2, 40);
         NounTradeGoods.Claim memory c = _voucher(alice, ids, amts, 1234);
         bytes memory sig = _sign(signerPk, c);
@@ -77,14 +84,14 @@ contract NounTradeGoodsTest is TradeBase {
         vm.prank(alice);
         goods.claim(c, sig);
 
-        assertEq(goods.balanceOf(alice, 1), 5);
+        assertEq(goods.balanceOf(alice, 2), 5);
         assertEq(goods.balanceOf(alice, 3), 2);
         assertEq(goods.balanceOf(alice, 7), 40);
-        assertEq(goods.totalSupply(1), 5);
+        assertEq(goods.totalSupply(2), 5);
         assertEq(coin.balanceOf(alice), 1234);
         assertEq(coin.totalSupply(), 1234);
         assertEq(uint8(goods.nonceState(c.nonce)), uint8(NounTradeGoods.NonceState.Claimed));
-        (uint256 left,) = goods.remainingToday(alice, 1);
+        (uint256 left,) = goods.remainingToday(alice, 2);
         assertEq(left, TradeConfig.GOOD_CAP_PER_ADDRESS - 5);
     }
 
@@ -103,7 +110,7 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_revert_badSigner() public {
         (address mallory, uint256 malloryPk) = makeAddrAndKey("mallory");
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(malloryPk, c);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.BadSigner.selector, mallory));
@@ -111,7 +118,7 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_revert_tamperedVoucher() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         c.amounts[0] = 400; // player edits the amount after signing
         vm.prank(alice);
@@ -120,14 +127,14 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_revert_garbageSignature() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         vm.prank(alice);
         vm.expectRevert();
         goods.claim(c, hex"1234");
     }
 
     function test_revert_replay() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 5);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 5);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
         goods.claim(c, sig);
@@ -137,7 +144,7 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_revert_sameNonceDifferentVoucher() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         _claimAs(alice, c);
         NounTradeGoods.Claim memory c2 = _voucher(alice, _ids1(2), _amts1(1), 0);
         c2.nonce = c.nonce; // server bug: reuses a nonce
@@ -148,7 +155,7 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_revert_notPlayer() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(bob); // front-runner who saw the voucher in the mempool
         vm.expectRevert(NounTradeGoods.NotPlayer.selector);
@@ -156,7 +163,7 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_revert_expired() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.warp(c.expiry + 1);
         vm.prank(alice);
@@ -165,16 +172,16 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_claim_atExpiryOk() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.warp(c.expiry);
         vm.prank(alice);
         goods.claim(c, sig);
-        assertEq(goods.balanceOf(alice, 1), 1);
+        assertEq(goods.balanceOf(alice, 2), 1);
     }
 
     function test_revert_expiryTooFar() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         c.expiry = block.timestamp + goods.MAX_VOUCHER_TTL() + 1;
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
@@ -184,7 +191,7 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_revert_shapes() public {
         // length mismatch
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), new uint256[](2), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), new uint256[](2), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
         vm.expectRevert(NounTradeGoods.LengthMismatch.selector);
@@ -202,7 +209,7 @@ contract NounTradeGoodsTest is TradeBase {
         vm.expectRevert(NounTradeGoods.BatchTooBig.selector);
         goods.claim(c, sig);
         // zero amount
-        c = _voucher(alice, _ids1(1), _amts1(0), 0);
+        c = _voucher(alice, _ids1(2), _amts1(0), 0);
         sig = _sign(signerPk, c);
         vm.prank(alice);
         vm.expectRevert(NounTradeGoods.ZeroAmount.selector);
@@ -224,30 +231,30 @@ contract NounTradeGoodsTest is TradeBase {
     // ── Caps ──
 
     function test_cap_perAddress() public {
-        _claimAs(alice, _voucher(alice, _ids1(1), _amts1(TradeConfig.GOOD_CAP_PER_ADDRESS), 0));
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        _claimAs(alice, _voucher(alice, _ids1(2), _amts1(TradeConfig.GOOD_CAP_PER_ADDRESS), 0));
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.AddressCapExceeded.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.AddressCapExceeded.selector, 2));
         goods.claim(c, sig);
         // other ids and other players are unaffected
-        _claimAs(alice, _voucher(alice, _ids1(2), _amts1(1), 0));
-        _claimAs(bob, _voucher(bob, _ids1(1), _amts1(1), 0));
+        _claimAs(alice, _voucher(alice, _ids1(3), _amts1(1), 0));
+        _claimAs(bob, _voucher(bob, _ids1(2), _amts1(1), 0));
         // and it resets at the next UTC day
         vm.warp(block.timestamp + 1 days);
-        _claimAs(alice, _voucher(alice, _ids1(1), _amts1(1), 0));
-        assertEq(goods.balanceOf(alice, 1), TradeConfig.GOOD_CAP_PER_ADDRESS + 1);
+        _claimAs(alice, _voucher(alice, _ids1(2), _amts1(1), 0));
+        assertEq(goods.balanceOf(alice, 2), TradeConfig.GOOD_CAP_PER_ADDRESS + 1);
     }
 
     function test_cap_duplicateIdsInOneVoucherCount() public {
         uint256[] memory ids = new uint256[](2);
         uint256[] memory amts = new uint256[](2);
-        (ids[0], ids[1]) = (1, 1);
+        (ids[0], ids[1]) = (2, 2);
         (amts[0], amts[1]) = (TradeConfig.GOOD_CAP_PER_ADDRESS, 1);
         NounTradeGoods.Claim memory c = _voucher(alice, ids, amts, 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.AddressCapExceeded.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.AddressCapExceeded.selector, 2));
         goods.claim(c, sig);
     }
 
@@ -275,7 +282,7 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_cap_adminCanLaunchNewGood() public {
         vm.prank(admin);
-        goods.setCap(8, 100, 1000);
+        goods.launchGood(8, 100, 1000, 1_000_000);
         _claimAs(alice, _voucher(alice, _ids1(8), _amts1(3), 0));
         assertEq(goods.balanceOf(alice, 8), 3);
         assertEq(goods.uri(8), "https://noun.wtf/trade-tokens/8.json");
@@ -283,19 +290,19 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_cap_disableId() public {
         vm.prank(admin);
-        goods.setCap(1, 0, 0);
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        goods.setCap(2, 0, 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.NotClaimable.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.NotClaimable.selector, 2));
         goods.claim(c, sig);
     }
 
     // ── Pause ──
 
     function test_pause_blocksClaimAndDeposit_notTransfers() public {
-        _claimAs(alice, _voucher(alice, _ids1(1), _amts1(4), 10));
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        _claimAs(alice, _voucher(alice, _ids1(2), _amts1(4), 10));
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
 
         vm.prank(pauser);
@@ -307,13 +314,13 @@ contract NounTradeGoodsTest is TradeBase {
 
         vm.prank(alice);
         vm.expectRevert(Pausable.EnforcedPause.selector);
-        goods.deposit(_ids1(1), _amts1(1), 0, keccak256("rider"));
+        goods.deposit(_ids1(2), _amts1(1), 0, keccak256("rider"));
 
         vm.prank(alice);
-        goods.safeTransferFrom(alice, bob, 1, 1, "");
+        goods.safeTransferFrom(alice, bob, 2, 1, "");
         vm.prank(alice);
         coin.transfer(bob, 1);
-        assertEq(goods.balanceOf(bob, 1), 1);
+        assertEq(goods.balanceOf(bob, 2), 1);
 
         // the pauser cannot unpause; the admin can
         bytes32 adminRole = goods.DEFAULT_ADMIN_ROLE();
@@ -338,7 +345,7 @@ contract NounTradeGoodsTest is TradeBase {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, bob, adminRole);
         vm.startPrank(bob);
         vm.expectRevert(denied);
-        goods.setCap(1, 1, 1);
+        goods.setCap(2, 1, 1);
         vm.expectRevert(denied);
         goods.rotateSigner(signer, bob);
         vm.expectRevert(denied);
@@ -346,7 +353,7 @@ contract NounTradeGoodsTest is TradeBase {
         vm.expectRevert(denied);
         goods.setContractURI("x");
         vm.expectRevert(denied);
-        goods.cancelNonces(_ids1(1));
+        goods.cancelNonces(_ids1(2));
         vm.expectRevert(denied);
         goods.grantRole(signerRole, bob);
         vm.expectRevert(
@@ -359,7 +366,7 @@ contract NounTradeGoodsTest is TradeBase {
     function test_roles_signerHasNoAdminPowers() public {
         vm.startPrank(signer);
         vm.expectRevert();
-        goods.setCap(1, type(uint128).max, type(uint128).max);
+        goods.setCap(2, type(uint128).max, type(uint128).max);
         vm.expectRevert();
         goods.pause();
         vm.stopPrank();
@@ -388,7 +395,7 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_rotateSigner() public {
         (address newSigner, uint256 newPk) = makeAddrAndKey("signer2");
-        NounTradeGoods.Claim memory oldV = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory oldV = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory oldSig = _sign(signerPk, oldV);
 
         vm.prank(admin);
@@ -401,15 +408,15 @@ contract NounTradeGoodsTest is TradeBase {
         vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.BadSigner.selector, signer));
         goods.claim(oldV, oldSig);
 
-        NounTradeGoods.Claim memory newV = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory newV = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory newSig = _sign(newPk, newV);
         vm.prank(alice);
         goods.claim(newV, newSig);
-        assertEq(goods.balanceOf(alice, 1), 1);
+        assertEq(goods.balanceOf(alice, 2), 1);
     }
 
     function test_cancelNonces() public {
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 0);
         bytes memory sig = _sign(signerPk, c);
         vm.prank(admin);
         goods.cancelNonces(_ids1(c.nonce));
@@ -418,7 +425,7 @@ contract NounTradeGoodsTest is TradeBase {
         vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.NonceNotUnused.selector, c.nonce));
         goods.claim(c, sig);
         // a claimed nonce cannot be "cancelled" after the fact
-        NounTradeGoods.Claim memory c2 = _voucher(alice, _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory c2 = _voucher(alice, _ids1(2), _amts1(1), 0);
         _claimAs(alice, c2);
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(NounTradeGoods.NonceNotUnused.selector, c2.nonce));
@@ -447,7 +454,7 @@ contract NounTradeGoodsTest is TradeBase {
     function test_deposit_burnsAndEmits() public {
         uint256[] memory ids = new uint256[](2);
         uint256[] memory amts = new uint256[](2);
-        (ids[0], ids[1]) = (1, 6);
+        (ids[0], ids[1]) = (2, 6);
         (amts[0], amts[1]) = (10, 3);
         _claimAs(alice, _voucher(alice, ids, amts, 100));
 
@@ -458,9 +465,9 @@ contract NounTradeGoodsTest is TradeBase {
         vm.prank(alice);
         goods.deposit(ids, amts, 60, account);
 
-        assertEq(goods.balanceOf(alice, 1), 6);
+        assertEq(goods.balanceOf(alice, 2), 6);
         assertEq(goods.balanceOf(alice, 6), 0);
-        assertEq(goods.totalSupply(1), 6);
+        assertEq(goods.totalSupply(2), 6);
         assertEq(goods.totalSupply(6), 0);
         assertEq(coin.balanceOf(alice), 40);
         assertEq(coin.totalSupply(), 40);
@@ -474,17 +481,17 @@ contract NounTradeGoodsTest is TradeBase {
     }
 
     function test_deposit_cannotBurnMoreThanYouHold() public {
-        _claimAs(alice, _voucher(alice, _ids1(1), _amts1(2), 5));
+        _claimAs(alice, _voucher(alice, _ids1(2), _amts1(2), 5));
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IERC1155Errors.ERC1155InsufficientBalance.selector, alice, 2, 3, 1));
-        goods.deposit(_ids1(1), _amts1(3), 0, bytes32(0));
+        vm.expectRevert(abi.encodeWithSelector(IERC1155Errors.ERC1155InsufficientBalance.selector, alice, 2, 3, 2));
+        goods.deposit(_ids1(2), _amts1(3), 0, bytes32(0));
         vm.prank(alice);
         vm.expectRevert();
         goods.deposit(new uint256[](0), new uint256[](0), 6, bytes32(0));
         // nor someone else's
         vm.prank(bob);
         vm.expectRevert();
-        goods.deposit(_ids1(1), _amts1(1), 0, bytes32(0));
+        goods.deposit(_ids1(2), _amts1(1), 0, bytes32(0));
     }
 
     function test_deposit_shapes() public {
@@ -492,9 +499,9 @@ contract NounTradeGoodsTest is TradeBase {
         vm.expectRevert(NounTradeGoods.EmptyBatch.selector);
         goods.deposit(new uint256[](0), new uint256[](0), 0, bytes32(0));
         vm.expectRevert(NounTradeGoods.LengthMismatch.selector);
-        goods.deposit(_ids1(1), new uint256[](0), 0, bytes32(0));
+        goods.deposit(_ids1(2), new uint256[](0), 0, bytes32(0));
         vm.expectRevert(NounTradeGoods.ZeroAmount.selector);
-        goods.deposit(_ids1(1), _amts1(0), 0, bytes32(0));
+        goods.deposit(_ids1(2), _amts1(0), 0, bytes32(0));
         vm.stopPrank();
     }
 
@@ -502,8 +509,8 @@ contract NounTradeGoodsTest is TradeBase {
 
     function test_reentrancy_receiverCannotReenter() public {
         Reenterer r = new Reenterer(goods);
-        NounTradeGoods.Claim memory first = _voucher(address(r), _ids1(1), _amts1(1), 0);
-        NounTradeGoods.Claim memory second = _voucher(address(r), _ids1(1), _amts1(1), 0);
+        NounTradeGoods.Claim memory first = _voucher(address(r), _ids1(2), _amts1(1), 0);
+        NounTradeGoods.Claim memory second = _voucher(address(r), _ids1(2), _amts1(1), 0);
         r.arm(second, _sign(signerPk, second));
         bytes memory sig = _sign(signerPk, first);
         vm.prank(address(r));
@@ -560,7 +567,7 @@ contract NounTradeGoodsTest is TradeBase {
     function testFuzz_anyOtherSignerFails(uint256 pk) public {
         pk = bound(pk, 1, 115792089237316195423570985008687907852837564279074904382605163141518161494336);
         vm.assume(pk != signerPk);
-        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(1), _amts1(1), 1);
+        NounTradeGoods.Claim memory c = _voucher(alice, _ids1(2), _amts1(1), 1);
         bytes memory sig = _sign(pk, c);
         vm.prank(alice);
         vm.expectPartialRevert(NounTradeGoods.BadSigner.selector);

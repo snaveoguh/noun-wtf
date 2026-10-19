@@ -11,6 +11,7 @@
 // records the server returns as accepted (`you.best`), never from what this
 // client measured; the server re-checks every mission it's sent anyway.
 
+import type { SceneId } from '../cutscene/scenes';
 import type { Game } from '../Game';
 
 import * as THREE from 'three';
@@ -126,6 +127,10 @@ export class MissionSystem {
   toast: MissionToast | null = null;
   race: Race | null = null;
   parcel: { id: string; until: number } | null = null;
+  /** The next dialogue line was just heard in a cutscene: show it without speaking it again. */
+  quietLine = false;
+  /** Seconds the door glows brighter (its cutscene). */
+  doorBoost = 0;
   readonly ud: UpsideDown;
   private npcs = new Map<NpcId, StandingNpc>();
   private door: { group: THREE.Group; glow: THREE.MeshBasicMaterial; pos: THREE.Vector3 } | null =
@@ -340,7 +345,18 @@ export class MissionSystem {
     for (const npc of this.npcs.values()) npc.update(dt, p.pos);
     if (this.door !== null) {
       const k = 0.75 + 0.25 * Math.sin(performance.now() / 300);
-      this.door.glow.opacity = this.ud.active ? 0.5 + 0.3 * k : 0.6 + 0.35 * k;
+      this.doorBoost = Math.max(0, this.doorBoost - dt);
+      this.door.glow.opacity = Math.min(
+        1,
+        (this.ud.active ? 0.5 + 0.3 * k : 0.6 + 0.35 * k) + (this.doorBoost > 0 ? 0.4 : 0),
+      );
+      this.door.glow.color.setHex(this.doorBoost > 0 ? 0xff2a3a : 0x9a0f1c);
+    }
+    // The crystal ball hums when you're near her table
+    const oracle = this.npcs.get('oracle');
+    if (oracle !== undefined) {
+      const d = oracle.pos.distanceTo(p.pos);
+      g.sfx.loop('crystal-hum', d < 9 ? 0.12 * (1 - d / 9) : 0);
     }
     this.ud.update(dt);
     this.updateRace(dt);
@@ -362,6 +378,10 @@ export class MissionSystem {
     for (const m of done) {
       this.toast = { at: performance.now(), title: m.title, reward: m.reward, kind: 'done' };
     }
+    this.game.sfx.play('mission-complete', { gain: 0.8 });
+    this.game.sfx.play('sparkle', { gain: 0.5, delay: 0.15 });
+    // 10,000 km/h: The One (once; it waits until nothing's in the way)
+    if (done.some(m => m.id === 'the-one') && !this.seen('one')) this.game.cutscene.request('one');
     this.game.stats.markDirty();
     this.refreshFlags();
     this.save();
@@ -560,7 +580,51 @@ export class MissionSystem {
       this.parcel = null;
       this.signal({ t: 'delivered', id });
     }
+    // Meeting the Oracle for the first time is a scene; her panel opens after it
+    if (
+      who === 'oracle' &&
+      this.state.met.oracle === undefined &&
+      !this.seen('oracle') &&
+      this.game.cutscene.play('oracle', {
+        then: () => {
+          this.quietLine = true;
+          this.openPanel('oracle');
+        },
+      })
+    )
+      return;
+    this.game.sfx.play('ui-confirm', { gain: 0.5 });
     this.openPanel(who);
+  }
+
+  // ── Cutscenes ──
+
+  /** Has this rider seen a story scene? */
+  seen(id: SceneId) {
+    return this.state.seen[id] !== undefined;
+  }
+
+  markSeen(id: SceneId) {
+    if (this.seen(id)) return;
+    this.state.seen[id] = Date.now();
+    this.save();
+    this.emit();
+  }
+
+  /** Replay a seen scene from the journal (nothing in the world changes). */
+  replayScene(id: SceneId) {
+    this.openPanel(null);
+    this.game.cutscene.play(id, { replay: true });
+  }
+
+  /** A character (for cutscenes), if they're in the world. */
+  npcOf(id: string): StandingNpc | null {
+    return this.npcs.get(id as NpcId) ?? null;
+  }
+
+  /** Where the deepest door stands, once it's been placed. */
+  doorAt(): THREE.Vector3 | null {
+    return this.door?.pos ?? null;
   }
 
   openPanel(p: Talkable | 'journal' | null) {
@@ -576,9 +640,15 @@ export class MissionSystem {
     const m = unlockedFor(this.state, npc);
     if (first && m !== null)
       this.toast = { at: performance.now(), title: `New mission: ${m.title}`, kind: 'info' };
+    this.game.sfx.play('mission-accept', { gain: 0.8 });
     this.refreshFlags();
     this.save();
     this.emit();
+    // Taking the Keymaker's line is a scene (the panel closes for it)
+    if (npc === 'keymaker' && first && !this.seen('keymaker')) {
+      this.openPanel(null);
+      this.game.cutscene.play('keymaker');
+    }
   }
 
   /** The courier's parcel: the clock starts now. */
@@ -631,6 +701,8 @@ export class MissionSystem {
       tw.faceForward();
     }
     this.openPanel(null);
+    // The first race opens on a scene that runs exactly as long as the countdown
+    if (!this.seen('twins')) this.game.cutscene.play('twins');
   }
 
   /** Down distance of a point on the Twins' line (+X from the gate). */
@@ -742,10 +814,22 @@ export class MissionSystem {
       return;
     }
     if (!this.doorOpen()) return;
+    this.openPanel(null);
+    // The first time through is a scene (it calls enterUpsideDown at the flash)
+    if (!this.seen('door') && this.game.cutscene.play('door')) return;
+    this.game.sfx.play('door-creak', { gain: 0.8 });
+    this.game.sfx.play('cut-boom', { gain: 0.6, delay: 0.3 });
+    this.game.sfx.play('ud-accent', { gain: 0.6, delay: 0.4 });
+    this.enterUpsideDown();
+  }
+
+  /** Into the Upside Down (the door's scene calls this at its flash). */
+  enterUpsideDown() {
+    if (this.ud.active) return;
     this.ud.enter();
     this.signal({ t: 'door' });
     this.toast = { at: performance.now(), title: 'The Upside Down', kind: 'info' };
-    this.openPanel(null);
+    this.emit();
   }
 
   leaveUpsideDown() {

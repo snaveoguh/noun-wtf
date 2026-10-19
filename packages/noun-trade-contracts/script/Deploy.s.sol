@@ -24,7 +24,7 @@ contract Deploy is Script {
     uint256 internal constant BASE_SEPOLIA = 84532;
     uint256 internal constant ANVIL = 31337;
 
-    function run() external returns (NounTradeGoods goods) {
+    function run() external virtual returns (NounTradeGoods goods) {
         uint256 chainId = block.chainid;
         require(
             chainId == BASE || chainId == BASE_SEPOLIA || chainId == ANVIL, "Deploy: Base, Base Sepolia or anvil only"
@@ -44,7 +44,8 @@ contract Deploy is Script {
         require(admin != address(0) && signer != address(0), "Deploy: ADMIN_ADDRESS / SIGNER_ADDRESS unset");
         require(signer != admin, "Deploy: the server signer must not be the admin");
 
-        (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global) = TradeConfig.caps();
+        (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global, uint256[] memory maxSupply) =
+            TradeConfig.caps();
 
         if (pk != 0) vm.startBroadcast(pk);
         else vm.startBroadcast(); // --account <keystore> --sender <addr>
@@ -57,7 +58,8 @@ contract Deploy is Script {
             TradeConfig.CONTRACT_URI,
             keys,
             perAddress,
-            global
+            global,
+            maxSupply
         );
         vm.stopBroadcast();
 
@@ -72,6 +74,7 @@ contract Deploy is Script {
         console2.log("admin                  ", admin);
         console2.log("signer                 ", signer);
         console2.log("pauser                 ", pauser);
+        console2.log("launchDay (UTC day)    ", goods.launchDay());
 
         // Only a real broadcast records addresses (a dry run would write simulated ones).
         if (!vm.isContext(VmSafe.ForgeContext.ScriptBroadcast) && !vm.isContext(VmSafe.ForgeContext.ScriptResume)) {
@@ -83,6 +86,7 @@ contract Deploy is Script {
         vm.serializeAddress(obj, "admin", admin);
         vm.serializeAddress(obj, "signer", signer);
         vm.serializeAddress(obj, "pauser", pauser);
+        vm.serializeUint(obj, "launchDay", goods.launchDay());
         vm.serializeAddress(obj, "coin", coinAddr);
         string memory json = vm.serializeAddress(obj, "goods", address(goods));
         vm.writeJson(json, string.concat("./deployments/", vm.toString(block.chainid), ".json"));

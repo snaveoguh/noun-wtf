@@ -1,10 +1,12 @@
 // ── Game mixer: one WebAudio gain per bus ────────────────────────────────
 //
 //   SkateAudio master ─ comp ─┐                (skate SFX, graffiti hiss,
-//                             ├─ sfx  ──┐        hoops one-shots + crowd)
-//   PirateRadio out ──────────┤         │
-//   NOUN FM direct/spatial ───┴─ radio ─┼─ master ─ destination
-//                                voice ─┘   (mute-all zeroes this one)
+//   Sfx (samples, ambience) ──┼─ sfx  ──┐        hoops one-shots + crowd)
+//   PirateRadio out ──────────┐         │
+//   NOUN FM direct/spatial ───┼─ radio ─┤
+//   cutscene music cues ──────┘         ├─ master ─ destination
+//                                voice ─┤   (mute-all zeroes this one)
+//   VoiceBox (NPC babble) ─────── npc ──┘
 //
 // Sounds keep their own internal gains; the mixer only scales whole buses.
 // Outputs that never enter WebAudio (NOUN FM's YouTube iframe and unrouted
@@ -13,7 +15,7 @@
 
 import type { AudioLevels } from './store';
 
-export const BUSES = ['sfx', 'radio', 'voice'] as const;
+export const BUSES = ['sfx', 'radio', 'voice', 'npc'] as const;
 export type Bus = (typeof BUSES)[number];
 
 /** Slider position (0..1) → linear gain. Squared so the bottom half of the slider is usable. */
@@ -29,6 +31,7 @@ export function nodeGains(l: AudioLevels): { master: number } & Record<Bus, numb
     sfx: sliderToGain(l.sfx),
     radio: sliderToGain(l.radio),
     voice: sliderToGain(l.voice),
+    npc: sliderToGain(l.npc),
   };
 }
 
@@ -38,7 +41,7 @@ export function busGain(l: AudioLevels, bus: Bus): number {
   return g.master * g[bus];
 }
 
-const DEFAULT_LEVELS: AudioLevels = { master: 1, sfx: 1, radio: 1, voice: 1, muted: false };
+const DEFAULT_LEVELS: AudioLevels = { master: 1, sfx: 1, radio: 1, voice: 1, npc: 1, muted: false };
 
 export class AudioMixer {
   levels: AudioLevels = { ...DEFAULT_LEVELS };
@@ -61,7 +64,7 @@ export class AudioMixer {
       n.connect(master);
       return n;
     };
-    this.nodes = { master, sfx: mk('sfx'), radio: mk('radio'), voice: mk('voice') };
+    this.nodes = { master, sfx: mk('sfx'), radio: mk('radio'), voice: mk('voice'), npc: mk('npc') };
     return this;
   }
 

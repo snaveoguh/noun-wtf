@@ -17,11 +17,16 @@ library TradeConfig {
     uint256 internal constant WATER = 7;
     uint256 internal constant GOOD_COUNT = 7;
 
-    // Daily caps (UTC day). Goods are units; COIN is whole coins (0 decimals).
-    uint128 internal constant GOOD_CAP_PER_ADDRESS = 500;
-    uint128 internal constant GOOD_CAP_GLOBAL = 50_000;
-    uint128 internal constant COIN_CAP_PER_ADDRESS = 50_000;
-    uint128 internal constant COIN_CAP_GLOBAL = 5_000_000;
+    // Supply (SUPPLY.md; regenerate its tables with scripts/supply-sim.ts after a change).
+    // Daily caps are per UTC day; the global ones halve every 180 days after launch (4x
+    // at most). Goods are units; COIN is whole coins (0 decimals). No premine: nothing
+    // exists until a player cashes out what they earned in the game.
+    uint128 internal constant GOOD_CAP_PER_ADDRESS = 200;
+    uint128 internal constant GOOD_CAP_GLOBAL = 20_000;
+    uint256 internal constant GOOD_MAX_SUPPLY = 20_000_000;
+    uint128 internal constant COIN_CAP_PER_ADDRESS = 5_000;
+    uint128 internal constant COIN_CAP_GLOBAL = 500_000;
+    uint256 internal constant COIN_MAX_SUPPLY = 210_000_000;
 
     /// @notice Two days before an admin hand-over completes (OZ AccessControlDefaultAdminRules).
     uint48 internal constant ADMIN_DELAY = 2 days;
@@ -29,21 +34,31 @@ library TradeConfig {
     string internal constant BASE_URI = "https://noun.wtf/trade-tokens/";
     string internal constant CONTRACT_URI = "https://noun.wtf/trade-tokens/collection.json";
 
+    /// @notice Launch caps. ICECREAM gets none (and no supply): it melts, so it stays in the game.
     function caps()
         internal
         pure
-        returns (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global)
+        returns (
+            uint256[] memory keys,
+            uint128[] memory perAddress,
+            uint128[] memory global,
+            uint256[] memory maxSupply
+        )
     {
         keys = new uint256[](GOOD_COUNT + 1);
         perAddress = new uint128[](GOOD_COUNT + 1);
         global = new uint128[](GOOD_COUNT + 1);
+        maxSupply = new uint256[](GOOD_COUNT + 1);
         keys[0] = COIN_KEY;
         perAddress[0] = COIN_CAP_PER_ADDRESS;
         global[0] = COIN_CAP_GLOBAL;
+        maxSupply[0] = COIN_MAX_SUPPLY;
         for (uint256 i = 1; i <= GOOD_COUNT; ++i) {
             keys[i] = i;
+            if (i == ICECREAM) continue;
             perAddress[i] = GOOD_CAP_PER_ADDRESS;
             global[i] = GOOD_CAP_GLOBAL;
+            maxSupply[i] = GOOD_MAX_SUPPLY;
         }
     }
 }

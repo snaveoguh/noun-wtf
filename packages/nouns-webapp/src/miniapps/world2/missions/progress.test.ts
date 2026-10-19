@@ -6,6 +6,7 @@ import {
   apply,
   emptyState,
   mergeServer,
+  postable,
   sanitizeState,
   unlockedFor,
   waitingToMeet,
@@ -236,5 +237,36 @@ describe('server validation (validateMissions)', () => {
     expect(validateMissions({ 'wake-up': NOW }, prev, {}, NOW)).toEqual(prev);
     expect(validateMissions('junk', prev, {}, NOW)).toEqual(prev);
     expect(validateMissions([1, 2], prev, {}, NOW)).toEqual(prev);
+  });
+});
+
+describe('cutscene seen-flags', () => {
+  it('persist through storage, junk and unknown scenes dropped', () => {
+    const s = emptyState();
+    expect(s.seen).toEqual({});
+    s.seen.oracle = NOW;
+    s.seen.door = NOW + 5;
+    const back = sanitizeState(JSON.parse(JSON.stringify(s)), NOW);
+    expect(back.seen).toEqual({ oracle: NOW, door: NOW + 5 });
+    const junk = sanitizeState(
+      { ...s, seen: { oracle: 'yes', twins: -4, 'made-up': NOW, one: NOW } },
+      NOW,
+    );
+    expect(junk.seen).toEqual({ one: NOW });
+    expect(sanitizeState({ ...s, seen: [1, 2] }, NOW).seen).toEqual({});
+  });
+
+  it('older saves without them load with none seen', () => {
+    const old: Partial<MissionState> = { ...emptyState() };
+    delete old.seen;
+    expect(sanitizeState(old, NOW).seen).toEqual({});
+  });
+
+  it('never ride along with the missions posted to the server', () => {
+    const s = emptyState();
+    s.seen.oracle = NOW;
+    s.done['wake-up'] = NOW;
+    s.met.oracle = NOW;
+    expect(Object.keys(postable(s))).toEqual(['wake-up']);
   });
 });

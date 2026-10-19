@@ -1,4 +1,4 @@
-// ── Noun Trade: CASH OUT / DEPOSIT panel (stub, not yet in the HUD) ──
+// ── Noun Trade: CASH OUT / DEPOSIT panel (the market's BASE tab) ──
 //
 // CASH OUT: pick goods / coin from the game balance → the server debits it and signs a
 // voucher → the player's wallet submits NounTradeGoods.claim on Base.
@@ -6,8 +6,9 @@
 // → the server reads the receipt and credits the game balance.
 //
 // Renders nothing unless VITE_TRADE_ONCHAIN=true and a contract address is configured.
-// Usage (economy agent, later): <CashOutPanel rider={riderId} balance={trade.state}
-//   onLedgerChange={() => trade.refresh()} />
+// Mounted by TradeUi's market panel; onLedgerChange reloads the van's books. Starter
+// coins and ICECREAM (it melts) can't be cashed out, so their maxima here are what the
+// server will actually take.
 
 import type { GoodId, TradeState } from '../contract';
 import type { Address, Hash } from 'viem';
@@ -15,6 +16,8 @@ import type { Address, Hash } from 'viem';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAccount } from 'wagmi';
+
+import { CHAIN_LOCKED, RULES } from '../ledger';
 
 import {
   fetchPending,
@@ -189,7 +192,11 @@ export function CashOutPanel({ rider, balance, onLedgerChange }: CashOutPanelPro
     });
 
   const outMax = (k: GoodId | 'COIN') =>
-    k === 'COIN' ? (balance?.coin ?? 0) : (balance?.cargo[k] ?? 0);
+    k === 'COIN'
+      ? Math.max(0, (balance?.coin ?? 0) - RULES.STARTER_COIN)
+      : CHAIN_LOCKED.has(k)
+        ? 0
+        : (balance?.cargo[k] ?? 0);
   const inMax = (k: GoodId | 'COIN') => (k === 'COIN' ? (held?.coin ?? 0) : (held?.goods[k] ?? 0));
   const keys: (GoodId | 'COIN')[] = [...ALL_GOODS, 'COIN'];
   const label = (k: GoodId | 'COIN') => (k === 'COIN' ? TRADE_COIN.symbol : k);
@@ -213,9 +220,18 @@ export function CashOutPanel({ rider, balance, onLedgerChange }: CashOutPanelPro
       </div>
       <p className="mb-2 text-[10px] opacity-70">
         {tab === 'out'
-          ? `Van stock → tokens on ${tradeChain().name}. Leaves your game balance now.`
+          ? `Van stock → tokens on ${tradeChain().name}. Leaves your game balance now. Starter coins and ice cream (it melts) stay in the game.`
           : `Tokens on ${tradeChain().name} → back into your van (burned on-chain).`}
       </p>
+      {held !== null && (
+        <p data-trade="onchain-held" className="mb-2 text-[10px]">
+          In your wallet:{' '}
+          {[
+            ...ALL_GOODS.filter(g => (held.goods[g] ?? 0) > 0).map(g => `${held.goods[g]} ${g}`),
+            ...(held.coin > 0 ? [`${held.coin} ${TRADE_COIN.symbol}`] : []),
+          ].join(' · ') || 'nothing yet'}
+        </p>
+      )}
       {!isConnected ? (
         <p className="text-xs font-bold">Connect a wallet to use this.</p>
       ) : (
