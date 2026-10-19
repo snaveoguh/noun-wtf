@@ -9,6 +9,8 @@
 //   TRADE_RPC                   optional RPC override (default: the public Base RPC)
 //   TRADE_VOUCHER_TTL_S         optional voucher lifetime, seconds (default 1800)
 //   TRADE_DEPOSIT_CONFIRMATIONS optional blocks before a deposit counts (default 3)
+//   TRADE_LAUNCH_DAY            NounTradeGoods.launchDay() (deployments/<chainId>.json), so
+//                               the server's global-cap check halves when the contract's does
 
 import {
   createPublicClient,
@@ -44,6 +46,8 @@ export interface TradeChainConfig {
   rpc: string;
   ttlS: number;
   confirmations: number;
+  /** NounTradeGoods.launchDay() (UTC day number): the halving schedule's epoch 0. */
+  launchDay?: number | null;
 }
 
 export function readTradeConfig(
@@ -53,7 +57,9 @@ export function readTradeConfig(
   const goodsRaw = env.TRADE_GOODS_ADDRESS ?? '';
   const ttl = Number(env.TRADE_VOUCHER_TTL_S || 1800);
   const conf = Number(env.TRADE_DEPOSIT_CONFIRMATIONS || 3);
+  const launch = Number(env.TRADE_LAUNCH_DAY);
   return {
+    launchDay: Number.isSafeInteger(launch) && launch > 0 ? launch : null,
     enabled: env.TRADE_ONCHAIN === 'on',
     chainId,
     goods: isAddress(goodsRaw) ? getAddress(goodsRaw) : null,

@@ -23,7 +23,8 @@ abstract contract TradeBase is Test {
 
     function setUp() public virtual {
         (signer, signerPk) = makeAddrAndKey("signer");
-        (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global) = TradeConfig.caps();
+        (uint256[] memory keys, uint128[] memory perAddress, uint128[] memory global, uint256[] memory maxSupply) =
+            TradeConfig.caps();
         vm.warp(1_800_000_000);
         goods = new NounTradeGoods(
             admin,
@@ -34,7 +35,8 @@ abstract contract TradeBase is Test {
             TradeConfig.CONTRACT_URI,
             keys,
             perAddress,
-            global
+            global,
+            maxSupply
         );
         coin = goods.coin();
     }

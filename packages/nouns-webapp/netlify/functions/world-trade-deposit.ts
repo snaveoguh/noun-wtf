@@ -1,7 +1,6 @@
-import { connectLambda, getStore } from '@netlify/blobs';
-
-import { blobLedger, cleanRider, type KV } from '../lib/tradeClaim';
+import { cleanRider, type KV } from '../lib/tradeClaim';
 import { depositService, type DepositDeps } from '../lib/tradeDeposit';
+import { rowLedger, strongStore, TRADE_LEDGER_STORE } from '../lib/tradeLedger';
 import { readTradeConfig, TRADE_STORE, viemChainPort } from '../lib/tradeOnchain';
 
 // Noun Trade deposit: credit tokens burned on Base back into the game
@@ -11,12 +10,11 @@ import { readTradeConfig, TRADE_STORE, viemChainPort } from '../lib/tradeOnchain
 //   → 200 { ok, already, credited: { goods, coin }, unknownIds }
 //   → 202 { retry: true } not deep enough yet; 404 { retry: true } not mined yet
 //   → 400 / 403 / 503 { error }
-// Idempotent by tx hash: posting the same tx again credits nothing.
+// Idempotent by tx hash: posting the same tx again credits nothing. Credits land in
+// the game's own books (rowLedger over world-trade's rider rows).
 
 interface HandlerEvent {
   body: string | null;
-  blobs?: string;
-  headers?: Record<string, string>;
   httpMethod: string;
 }
 
@@ -53,8 +51,7 @@ export function makeHandler(over: Partial<DepositDeps> = {}) {
     const rider = cleanRider(input.rider);
     if (!rider) return json(400, { error: 'Bad rider' });
 
-    connectLambda({ blobs: event.blobs ?? '', headers: event.headers ?? {} });
-    const store = over.store ?? (getStore(TRADE_STORE) as unknown as KV);
+    const store = over.store ?? (strongStore(TRADE_STORE) as unknown as KV);
     const cfg = over.cfg ?? readTradeConfig();
     let chain = over.chain ?? null;
     if (!chain && cfg.goods && cfg.rpc) {
@@ -66,7 +63,7 @@ export function makeHandler(over: Partial<DepositDeps> = {}) {
     }
     const svc = depositService({
       store,
-      ledger: over.ledger ?? blobLedger(store),
+      ledger: over.ledger ?? rowLedger(strongStore(TRADE_LEDGER_STORE)),
       chain,
       cfg,
       now: over.now,
@@ -81,4 +78,14 @@ export function makeHandler(over: Partial<DepositDeps> = {}) {
   };
 }
 
-export const handler = makeHandler();
+/** The Netlify v2 entry (v2 so the Blobs stores can read their own writes). */
+export default async (req: Request): Promise<Response> => {
+  const out = await makeHandler()({
+    httpMethod: req.method,
+    body: req.method === 'POST' ? await req.text() : null,
+  });
+  return new Response(out.statusCode === 204 ? null : out.body, {
+    status: out.statusCode,
+    headers: out.headers,
+  });
+};

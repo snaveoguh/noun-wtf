@@ -72,6 +72,14 @@ jobs:
           VITE_NOUNV2_TOKEN_ADDRESS: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9'
           VITE_NOUNV2_AUCTION_HOUSE_ADDRESS: '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc'
           VITE_NOUNV2_TREASURY_ADDRESS: '0x2cdeb0d251674710840d9fa990d1de138dfe7c00'
+          # Noun Trade tokens on Base (packages/noun-trade-contracts/DEPLOY.md).
+          # Off until deployed: after the deploy, set VITE_TRADE_ONCHAIN to 'true'
+          # and paste the NounTradeGoods address from deployments/8453.json. The
+          # server side (TRADE_ONCHAIN=on, TRADE_SIGNER_KEY, TRADE_GOODS_ADDRESS,
+          # TRADE_CHAIN_ID=8453) goes in Netlify's environment variables, never here.
+          VITE_TRADE_ONCHAIN: ''
+          VITE_TRADE_CHAIN_ID: '8453'
+          VITE_TRADE_GOODS_ADDRESS: ''
         run: npx netlify build --filter @nouns/webapp --context "${{ steps.site.outputs.context }}"
 
       - name: Deploy to Netlify

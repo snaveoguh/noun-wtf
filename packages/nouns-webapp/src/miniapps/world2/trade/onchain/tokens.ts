@@ -34,13 +34,29 @@ export const TRADE_COIN = { name: 'Noun Trade Coin', symbol: 'NTCOIN', decimals:
 /** Cap-table key the contract uses for NTCOIN (token id 0 is never minted). */
 export const COIN_CAP_KEY = 0;
 
-/** Daily (UTC) claim caps, mirrored from TradeConfig.sol; the server refuses before the chain would. */
+/**
+ * Daily (UTC) claim caps, mirrored from TradeConfig.sol; the server refuses before the
+ * chain would. The global ones are launch-epoch values: they halve every HALVING_DAYS
+ * (globalCapOn). ICECREAM has none: it melts, so it never leaves the game. Supply model:
+ * packages/noun-trade-contracts/SUPPLY.md.
+ */
 export const CLAIM_CAPS = {
-  goodPerAddress: 500,
-  goodGlobal: 50_000,
-  coinPerAddress: 50_000,
-  coinGlobal: 5_000_000,
+  goodPerAddress: 200,
+  goodGlobal: 20_000,
+  coinPerAddress: 5_000,
+  coinGlobal: 500_000,
 } as const;
+
+/** NounTradeGoods.HALVING_DAYS / MAX_HALVINGS. */
+export const HALVING_DAYS = 180;
+export const MAX_HALVINGS = 4;
+
+/** NounTradeGoods.globalCapOn: the launch-epoch global cap, halved once per HALVING_DAYS. */
+export function globalCapOn(base: number, launchDay: number | null, day: number): number {
+  if (launchDay === null || day <= launchDay) return base;
+  const epochs = Math.min(MAX_HALVINGS, Math.floor((day - launchDay) / HALVING_DAYS));
+  return Math.floor(base / 2 ** epochs);
+}
 
 /** Most distinct ids in one voucher / deposit (NounTradeGoods.MAX_BATCH). */
 export const MAX_BATCH = 16;

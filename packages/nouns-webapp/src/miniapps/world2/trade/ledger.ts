@@ -5,10 +5,18 @@
 // (netlify/functions/world-trade.ts) is the authority and runs exactly this;
 // the client's offline mode runs the same code in memory.
 //
-// COIN only ever enters a rider's books two ways: the one-off starter purse
-// (STARTER_COIN, booked as `granted`) and modelled sales to a town (sell /
-// serve, booked as `earned`). It leaves through buys and upgrades (`spent`).
-// So `coin === granted + earned − spent` always holds (see `audit`).
+// COIN enters a rider's books three ways: the one-off starter purse
+// (STARTER_COIN, booked as `granted`), modelled sales to a town (sell /
+// serve, `earned`) and tokens deposited back from Base (`in`). It leaves
+// through buys and upgrades (`spent`) and cash-outs to Base (`out`). So
+// `coin === granted + earned + in − spent − out` always holds (see `audit`).
+//
+// Cash-out / deposit (moveForChain) are the only ledger moves the on-chain
+// layer makes (netlify/lib/tradeLedger.ts wraps them for the claim and
+// deposit functions; anything else that needs to take or give COIN or goods,
+// say a dragon dealer, should go through the same function with its own opId
+// prefix). Two rules hold there: the starter purse never leaves the game
+// (claimableCoin), and ICECREAM can't either, it melts (CHAIN_LOCKED).
 //
 // Anti-cheat lives here too, so it's tested once and enforced everywhere:
 //  • travel: a trade in town B after one in town A needs at least
@@ -56,6 +64,9 @@ export const RULES = {
   IDS_KEEP: 32,
 } as const;
 
+/** Ledger op ids kept per rider (cash-outs, deposits, refunds). */
+const OPS_KEEP = 200;
+
 export interface TradeBook {
   /** Starter purse. */
   granted: number;
@@ -64,6 +75,10 @@ export interface TradeBook {
   /** On buys + upgrades. */
   spent: number;
   trades: number;
+  /** Cashed out to Base (NTCOIN claims). */
+  out: number;
+  /** Deposited back from Base. */
+  in: number;
 }
 
 /** A rider's server-side row: TradeState plus the bookkeeping it's derived from. */
@@ -90,6 +105,8 @@ export interface TradeRow {
   serveAt: number;
   /** Recent action ids (a retried request is answered, not repeated). */
   ids: string[];
+  /** Recent ledger op ids (cash-outs, deposits, refunds): applied once each. */
+  ops: string[];
   book: TradeBook;
 }
 
@@ -143,7 +160,8 @@ export function newRow(rider: string, now: number): TradeRow {
     served: {},
     serveAt: 0,
     ids: [],
-    book: { granted: RULES.STARTER_COIN, earned: 0, spent: 0, trades: 0 },
+    ops: [],
+    book: { granted: RULES.STARTER_COIN, earned: 0, spent: 0, trades: 0, out: 0, in: 0 },
   };
 }
 
@@ -187,11 +205,14 @@ export function normalizeRow(raw: unknown, rider: string, now: number): TradeRow
     ids: Array.isArray(r.ids)
       ? r.ids.filter(x => typeof x === 'string').slice(-RULES.IDS_KEEP)
       : [],
+    ops: Array.isArray(r.ops) ? r.ops.filter(x => typeof x === 'string').slice(-OPS_KEEP) : [],
     book: {
       granted: finite(r.book?.granted, base.book.granted),
       earned: finite(r.book?.earned, 0),
       spent: finite(r.book?.spent, 0),
       trades: finite(r.book?.trades, 0),
+      out: finite(r.book?.out, 0),
+      in: finite(r.book?.in, 0),
     },
   };
 }
@@ -444,7 +465,102 @@ export function applyDelta(markets: Markets, d: StockDelta, now: number): Market
 
 /** The books balance: every coin is accounted for. */
 export function audit(row: TradeRow): boolean {
-  return row.coin === row.book.granted + row.book.earned - row.book.spent && row.coin >= 0;
+  const b = row.book;
+  return row.coin === b.granted + b.earned + b.in - b.spent - b.out && row.coin >= 0;
+}
+
+// ── Cash-out / deposit (the on-chain layer's only ledger moves) ──
+
+/** Goods that can't leave the game: ice cream melts (it's never a token in a wallet). */
+export const CHAIN_LOCKED: ReadonlySet<GoodId> = new Set(['ICECREAM']);
+
+/** COIN a rider may cash out: everything but the starter purse. */
+export function claimableCoin(row: TradeRow): number {
+  return Math.max(0, row.coin - row.book.granted);
+}
+
+export interface ChainDelta {
+  goods: Partial<Record<GoodId, number>>;
+  coin: number;
+}
+
+export type ChainMove =
+  | { ok: true; row: TradeRow; applied: boolean }
+  | { ok: false; reason: string };
+
+/**
+ * Take `d` out of the books (`dir` −1: a cash-out) or put it in (+1: a
+ * deposit or a refund), once per `opId`. Melt is settled first, so a debit
+ * only takes goods that are still there. Deposits may overfill the van:
+ * the goods are yours, you just can't buy more until you sell some.
+ */
+export function moveForChain(
+  row0: TradeRow,
+  d: ChainDelta,
+  opId: string,
+  dir: 1 | -1,
+  now: number,
+): ChainMove {
+  if (row0.ops.includes(opId)) return { ok: true, row: row0, applied: false };
+  if (!Number.isSafeInteger(d.coin) || d.coin < 0) return { ok: false, reason: 'bad coin' };
+  const goods = Object.entries(d.goods) as [GoodId, number][];
+  for (const [g, n] of goods)
+    if (!isGood(g) || !Number.isSafeInteger(n) || n < 0) return { ok: false, reason: `bad ${g}` };
+  const row = age(row0, now);
+  const held = { ...row.held };
+  if (dir < 0) {
+    if (d.coin > claimableCoin(row))
+      return {
+        ok: false,
+        reason: `only ${claimableCoin(row)} COIN can be cashed out (the ${row.book.granted} starter coins stay in the game)`,
+      };
+    for (const [g, n] of goods) {
+      if (n > 0 && CHAIN_LOCKED.has(g))
+        return { ok: false, reason: `${g} melts: it can't leave the game` };
+      if ((held[g] ?? 0) < n) return { ok: false, reason: `Not enough ${g}` };
+    }
+  }
+  for (const [g, n] of goods) {
+    const next = (held[g] ?? 0) + dir * n;
+    if (next > 0) held[g] = next;
+    else delete held[g];
+  }
+  const book = { ...row.book };
+  if (dir < 0) book.out += d.coin;
+  else book.in += d.coin;
+  return {
+    ok: true,
+    applied: true,
+    row: {
+      ...row,
+      coin: row.coin + dir * d.coin,
+      held,
+      book,
+      ops: [...row.ops, opId].slice(-OPS_KEEP),
+    },
+  };
+}
+
+/**
+ * Most units of `good` you can buy here right now: limited by the coin you
+ * have (prices climb as stock drains), free cargo slots, stock and MAX_QTY.
+ */
+export function maxBuy(
+  town: TownId,
+  good: GoodId,
+  stock: number,
+  coin: number,
+  room: number,
+): number {
+  let hi = Math.min(RULES.MAX_QTY, Math.floor(room / GOODS[good].bulk), Math.floor(stock));
+  let lo = 0;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const cost = buyCost(town, good, stock, mid);
+    if (cost !== null && cost <= coin) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
 }
 
 /** Every town's quotes at `now`. */

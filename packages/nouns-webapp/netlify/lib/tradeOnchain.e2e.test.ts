@@ -177,13 +177,13 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     const RIDER = 'rider-e2e-1';
 
     // The game ledger starts with some van stock.
-    await ledger.credit(RIDER, { goods: { ICECREAM: 10, FISH: 4 }, coin: 500 }, 'seed');
+    await ledger.credit(RIDER, { goods: { FRIES: 10, FISH: 4 }, coin: 500 }, 'seed');
 
     // 1. server: debit + sign
     const c = await claims.claim({
       rider: RIDER,
       address: player.address,
-      goods: { ICECREAM: 3, FISH: 4 },
+      goods: { FRIES: 3, FISH: 4 },
       coin: 120,
     });
     expect(c.status).toBe(200);
@@ -209,7 +209,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
       functionName: 'balanceOfBatch',
       args: [
         [player.address, player.address],
-        [1n, 3n],
+        [2n, 3n],
       ],
     });
     const coinBal = await pub.readContract({
@@ -220,7 +220,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     });
     expect(bal).toEqual([3n, 4n]);
     expect(coinBal).toBe(120n);
-    out.onchainAfterClaim = { ICECREAM: bal[0], FISH: bal[1], NTCOIN: coinBal };
+    out.onchainAfterClaim = { FRIES: bal[0], FISH: bal[1], NTCOIN: coinBal };
 
     // replaying the same voucher reverts
     await expect(
@@ -231,11 +231,11 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     // pending clears once the chain shows the nonce claimed
     expect((await claims.pending(RIDER)).body.pending).toBeNull();
 
-    // 3. player: burn 2 ICECREAM + 50 NTCOIN back into the game
+    // 3. player: burn 2 FRIES + 50 NTCOIN back into the game
     const depData = encodeFunctionData({
       abi: NOUN_TRADE_GOODS_ABI,
       functionName: 'deposit',
-      args: [[1n], [2n], 50n, riderTag(RIDER)],
+      args: [[2n], [2n], 50n, riderTag(RIDER)],
     });
     const depTx = await wallet.sendTransaction({ to: goods, data: depData });
     const depRc = await pub.waitForTransactionReceipt({ hash: depTx });
@@ -248,7 +248,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     await rpc('evm_mine');
     const credit = await deposits.verify(RIDER, depTx);
     expect(credit.status).toBe(200);
-    expect(credit.body.credited).toEqual({ goods: { ICECREAM: 2 }, coin: 50 });
+    expect(credit.body.credited).toEqual({ goods: { FRIES: 2 }, coin: 50 });
     out.depositCredit = credit.body;
     const again = await deposits.verify(RIDER, depTx);
     expect(again.body.already).toBe(true);
@@ -259,7 +259,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     const c2 = await claims.claim({
       rider: RIDER,
       address: player.address,
-      goods: { ICECREAM: 1 },
+      goods: { FRIES: 1 },
       coin: 0,
     });
     expect(c2.status).toBe(200);
@@ -267,7 +267,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
     await rpc('evm_mine');
     chainNow += (1800 + 120) * 1000;
     const p = await claims.pending(RIDER);
-    expect(p.body.refunded).toEqual({ goods: { ICECREAM: 1 }, coin: 0 });
+    expect(p.body.refunded).toEqual({ goods: { FRIES: 1 }, coin: 0 });
     // and that expired voucher can no longer be used on-chain
     const v2 = c2.body.claim as SignedClaim;
     await expect(
@@ -297,7 +297,7 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
         },
       ] as const,
       functionName: 'totalSupply',
-      args: [1n],
+      args: [2n],
     });
     out.finalLedger = (final as { state: unknown }).state;
     out.icecreamSupply = supply;
@@ -306,9 +306,8 @@ describe.skipIf(!RUN)('Noun Trade on anvil: deploy → claim → burn → credit
       (final as { state: { cargo: Record<string, number>; coin: number } }).state,
     ).toMatchObject({
       coin: 500 - 120 + 50,
-      cargo: { ICECREAM: 9 },
+      cargo: { FRIES: 9 },
     });
     expect(supply).toBe(1n);
   }, 120_000);
 });
-

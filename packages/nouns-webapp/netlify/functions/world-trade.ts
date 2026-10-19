@@ -1,7 +1,5 @@
 import type { TownId, TradeResult } from '../../src/miniapps/world2/trade/contract';
 
-import { connectLambda, getStore } from '@netlify/blobs';
-
 import {
   allQuotes,
   applyAction,
@@ -17,6 +15,7 @@ import {
 } from '../../src/miniapps/world2/trade/ledger';
 import { normalizeMarkets, townQuotes, type Markets } from '../../src/miniapps/world2/trade/market';
 import { isTown } from '../../src/miniapps/world2/trade/towns';
+import { riderKey, strongStore, TRADE_LEDGER_STORE } from '../lib/tradeLedger';
 
 // Noun Trade ledger: every rider's coin + van cargo, and every town's stock.
 // The server is the authority: a client never reports a balance, it asks for
@@ -35,7 +34,11 @@ import { isTown } from '../../src/miniapps/world2/trade/towns';
 //      actions answer 200 { ok: false, reason, kind, state } (429 when rate
 //      limited, 400 when malformed).
 //
-// Storage (Netlify Blobs store `noun-world-trade`):
+// Storage (Netlify Blobs store `noun-world-trade`, STRONG consistency: this is
+// a v2 function so the store can read its own writes. The old Lambda-compat
+// handler could only read the cached edge, up to ~60 s stale, so its
+// compare-and-swap kept losing to its own last write ("busy, try again") and a
+// GET could hand back the books from a minute ago: the buy-then-reset bug):
 //   rider/<id>  one TradeRow per rider (etag-guarded, so concurrent posts
 //               from one rider can't lose or double coin: the loser retries
 //               on the fresh row)
@@ -43,21 +46,13 @@ import { isTown } from '../../src/miniapps/world2/trade/towns';
 //               just this action's stock move to the fresh markets)
 //   rejections  the last 100 suspicious refusals (teleports, rate, junk)
 
-interface HandlerEvent {
-  body: string | null;
-  blobs?: string;
-  headers?: Record<string, string>;
-  httpMethod: string;
-  queryStringParameters?: Record<string, string | undefined> | null;
-}
-
 interface HandlerResponse {
   body: string;
   headers: Record<string, string>;
   statusCode: number;
 }
 
-type Store = ReturnType<typeof getStore>;
+type Store = ReturnType<typeof strongStore>;
 
 const MAX_BODY = 2000;
 const ATTEMPTS = 8;
@@ -75,8 +70,6 @@ const json = (status: number, body: unknown): HandlerResponse => ({
   headers,
   body: JSON.stringify(body),
 });
-
-const riderKey = (rider: string) => `rider/${rider}`;
 
 /** A rider id as world-stats takes it (a browser UUID). */
 function riderOf(v: unknown): string | null {
@@ -227,12 +220,29 @@ async function post(store: Store, body: string | null): Promise<HandlerResponse>
   return json(409, { ok: false, reason: 'busy, try again' });
 }
 
-export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
-  const method = event.httpMethod || 'GET';
+/** One request against a store (the default export opens the real one). */
+export async function handleTrade(
+  store: Store,
+  method: string,
+  query: Record<string, string | undefined>,
+  body: string | null,
+): Promise<HandlerResponse> {
   if (method === 'OPTIONS') return json(204, {});
-  connectLambda({ blobs: event.blobs ?? '', headers: event.headers ?? {} });
-  const store = getStore('noun-world-trade');
-  if (method === 'GET') return get(store, event.queryStringParameters ?? {});
-  if (method === 'POST') return post(store, event.body);
+  if (method === 'GET') return get(store, query);
+  if (method === 'POST') return post(store, body);
   return json(405, { ok: false, reason: 'method not allowed' });
 }
+
+export default async (req: Request): Promise<Response> => {
+  const url = new URL(req.url);
+  const out = await handleTrade(
+    strongStore(TRADE_LEDGER_STORE),
+    req.method,
+    Object.fromEntries(url.searchParams),
+    req.method === 'POST' ? await req.text() : null,
+  );
+  return new Response(out.statusCode === 204 ? null : out.body, {
+    status: out.statusCode,
+    headers: out.headers,
+  });
+};
