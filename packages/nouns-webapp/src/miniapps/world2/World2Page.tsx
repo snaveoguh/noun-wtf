@@ -22,6 +22,8 @@ import {
   type WorldStats,
 } from './net/Stats';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
+import { introAllowed, introEnabled } from './radio/FmSpots';
+import { FmSpotsUi } from './radio/FmSpotsUi';
 import { RecordsUi, useReplayActive } from './replay/RecordsUi';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
@@ -197,6 +199,21 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const hoopsOn = useHoopsActive(game);
   const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
+
+  // NOUN FM's start-of-game intro (once per page load; ?fmintro=1 forces it offline)
+  useEffect(() => {
+    if (!game || phase !== 'play') return;
+    const ok = introAllowed({
+      enabled: introEnabled(),
+      played: game.spots.introPlayed,
+      offline: searchParams.get('offline') === '1',
+      forced: searchParams.get('fmintro') === '1',
+      replay: game.replay.active,
+      fmMode: game.radio.mode === 'fm',
+    });
+    game.spots.introPlayed = true;
+    if (ok) void game.spots.intro();
+  }, [game, phase, searchParams]);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {
@@ -312,6 +329,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         />
       )}
       {game && started && <FmScreen fm={game.fm} touch={touchPage} />}
+      {game && started && <FmSpotsUi spots={game.spots} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
       {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}

@@ -9,8 +9,12 @@
 //     otherwise played straight with distance volume only.
 //   - YouTube: the official IFrame player in a visible deck screen
 //     (YouTubeDeck.ts), never hidden, ads untouched.
-//   - between tracks: a procedural station ident (idents.ts).
-//   - nothing queued: the procedural pirate station (PirateRadio).
+//   - between tracks: one of the owner's recorded Noun F-M stings or a
+//     procedural ident (idents.ts), picked by the play key (fmAssets.ts).
+//   - nothing queued and no set on: the house programme (house.ts): the
+//     owner's songs + library tracks, cut-offs, jingles and WORLDWIDE
+//     ALERT news breaks, on a shared deterministic schedule.
+//   - nothing at all to play: the procedural pirate station (PirateRadio).
 // Tuned in (radio cycle → NOUN FM) you hear it anywhere; otherwise it only
 // plays out of the van's speakers when you're within FM_NEAR of it.
 
@@ -30,8 +34,29 @@ import {
   type FmTrack,
 } from '../../../../../nouns-party/src/fmStation';
 
+import { alertSting } from './alertSting';
 import { audiusHost, audiusStreamUrl, resolveAudius } from './audius';
-import { playIdent } from './idents';
+import { getDjUpdate, speakDj } from './djUpdate';
+import {
+  loadBuffer,
+  loadFmManifests,
+  pickGapSound,
+  playBuffer,
+  type HouseSong,
+  type Interlude,
+} from './fmAssets';
+import {
+  catalogPrint,
+  dayStart,
+  houseSlot,
+  houseDay,
+  libraryTracks,
+  normCatalog,
+  type HouseCatalog,
+  type HouseItem,
+} from './house';
+import { playIdent, talkbox } from './idents';
+import { fetchLibrary, type LibSet } from './library';
 import { audioDriftFix, ClockSync, expectedPosition, youTubeDriftFix } from './sync';
 import { type FmTransport } from './transport';
 import { YouTubeDeck, YT_PLAYING } from './YouTubeDeck';
@@ -47,7 +72,9 @@ export interface FmView {
   offline: boolean;
   state: FmState | null;
   air: FmOnAir;
-  phase: 'off' | 'fallback' | 'ident' | 'track';
+  phase: 'off' | 'fallback' | 'ident' | 'track' | 'break';
+  /** The house programme's item on air (nothing queued, no set on), else null. */
+  house: { kind: 'song' | 'break'; label: string; cut: boolean } | null;
   label: string;
   myTag: string;
   error: { msg: string; at: number } | null;
@@ -137,6 +164,14 @@ export class NounFm {
   fallbackSong?: () => string;
   /** A new track came on air (tuned: through the radio toast; near: a banner). */
   onTrackChange?: (label: string, tuned: boolean) => void;
+  /** A house break started (a WORLDWIDE ALERT / a jingle), for the toast. */
+  onBreak?: (tag: string, text: string) => void;
+  /**
+   * Something else owns the radio for a moment (the start-of-game intro,
+   * Dry Gulch's theme): the station goes quiet here, then rejoins the live
+   * programme at its current position.
+   */
+  hold = false;
 
   private key: string;
   private transport: FmTransport;
@@ -153,6 +188,8 @@ export class NounFm {
   private airKey = '';
   private curAir: FmOnAir = OFF_AIR;
   private identKey = '';
+  /** What filled the last gap (dev checks / tests). */
+  lastGap: { kind: 'file' | 'synth'; id: string; key: string } | null = null;
   private identUntil = 0;
   private mediaKey = '';
   private screenDismissedFor: string | null = null;
@@ -179,6 +216,20 @@ export class NounFm {
   private elSrc: MediaElementAudioSourceNode | null = null;
   private elRouted = false;
   private playing: Promise<void> | null = null;
+
+  // recordings + house programme
+  private interludes: Interlude[] = [];
+  private stings: (AudioBuffer | null)[] = [];
+  private songs: HouseSong[] = [];
+  private libSets: LibSet[] = [];
+  private libAt = -Infinity;
+  private djAt = -Infinity;
+  private alertLine = '';
+  private houseItems: HouseItem[] = [];
+  private houseKey = '';
+  private houseNow: HouseItem | null = null;
+  private breakKey = '';
+  private breakStop: (() => void) | null = null;
 
   constructor(transport: FmTransport) {
     this.transport = transport;
@@ -215,10 +266,22 @@ export class NounFm {
       error: this.error,
       notice: this.notice,
       screen:
-        yt && (this.tuned || this.near) && !this.hidden && this.screenDismissedFor !== air.key,
+        yt &&
+        (this.tuned || this.near) &&
+        !this.hidden &&
+        !this.hold &&
+        this.screenDismissedFor !== air.key,
       near: this.near,
       synced: this.clock.synced || this.transport.offline,
       trackError: this.trackError,
+      house:
+        this.houseNow !== null
+          ? {
+              kind: this.houseNow.kind,
+              label: this.houseLabel(this.houseNow),
+              cut: this.houseNow.kind === 'song' && this.houseNow.cut,
+            }
+          : null,
     };
   }
 
@@ -238,7 +301,9 @@ export class NounFm {
       o.screen === v.screen &&
       o.near === v.near &&
       o.synced === v.synced &&
-      o.trackError === v.trackError
+      o.trackError === v.trackError &&
+      o.house?.label === v.house?.label &&
+      o.house?.kind === v.house?.kind
     )
       return;
     this.view = v;
@@ -247,6 +312,9 @@ export class NounFm {
 
   labelFor(air: FmOnAir): string {
     const t = air.track;
+    const h = this.houseNow;
+    if (h !== null && (t === null || air.key === h.key))
+      return `NOUN FM · house mix: ${this.houseLabel(h)}`;
     if (t === null) {
       const song = this.fallbackSong?.() ?? '';
       return `NOUN FM · pirate relay${song !== '' ? `: ${song}` : ''}`;
@@ -471,6 +539,133 @@ export class NounFm {
     this.spatial = ctx.createGain();
     this.spatial.gain.value = 0;
     this.bus.connect(this.panner).connect(this.spatial).connect(destination);
+    void loadFmManifests().then(m => {
+      this.interludes = m.interludes;
+      this.songs = m.songs;
+      this.houseKey = ''; // rebuild with the songs
+      // stings are tiny: decode them all up front so a gap never waits
+      void Promise.all(m.interludes.map(i => loadBuffer(ctx, i.sting))).then(b => {
+        this.stings = b;
+      });
+    });
+  }
+
+  /** The owner's recordings (for the intro / panel). */
+  get recordings(): { interludes: Interlude[]; songs: HouseSong[] } {
+    return { interludes: this.interludes, songs: this.songs };
+  }
+
+  // ── House programme ──────────────────────────────────────────────────
+
+  /** Refresh the library (every 30 min) and the alert line (every 10 min). */
+  private refreshHouse() {
+    if (this.time - this.libAt > 1800) {
+      this.libAt = this.time;
+      void fetchLibrary().then(r => {
+        if (r.ok) {
+          this.libSets = r.sets;
+          this.houseKey = '';
+        }
+      });
+    }
+    if (this.time - this.djAt > 600) {
+      this.djAt = this.time;
+      void getDjUpdate().then(d => {
+        if (d !== null) this.alertLine = d.alert;
+      });
+    }
+  }
+
+  private houseCatalog(day: number): HouseCatalog {
+    return {
+      owner: this.songs.map(s => ({
+        src: { kind: 'direct' as const, url: s.url },
+        title: s.title,
+        artist: s.artist,
+        dur: s.dur,
+        origin: 'owner' as const,
+      })),
+      library: libraryTracks(this.libSets, day),
+      breaks: this.interludes.map(i => i.fullDur),
+    };
+  }
+
+  /** Today's programme (rebuilt at midnight UTC or when the catalogue changes). */
+  private houseItemsFor(now: number): HouseItem[] {
+    const day = dayStart(now);
+    const cat = this.houseCatalog(day);
+    const key = `${day}|${catalogPrint(normCatalog(cat))}`;
+    if (key !== this.houseKey) {
+      this.houseKey = key;
+      this.houseItems = houseDay(cat, day);
+    }
+    return this.houseItems;
+  }
+
+  private houseLabel(it: HouseItem): string {
+    if (it.kind === 'break')
+      return it.brk.type === 'alert'
+        ? '⚠ WORLDWIDE ALERT'
+        : (this.interludes[it.brk.index]?.title ?? 'Noun F-M');
+    const t = it.track;
+    const from = t.dj !== undefined ? ` (from ${t.dj}'s set)` : '';
+    return `${t.title.slice(0, 40)} — ${t.artist.slice(0, 24)}${from}`;
+  }
+
+  private stopBreak() {
+    this.breakStop?.();
+    this.breakStop = null;
+  }
+
+  /** A house break: a full Noun F-M jingle, or a WORLDWIDE ALERT (sting + the DJ's line). */
+  private playBreak(it: HouseItem & { kind: 'break' }, now: number) {
+    const ctx = this.ctx;
+    const bus = this.bus;
+    if (ctx === null || bus === null) return;
+    const into = Math.max(0, (now - it.at) / 1000);
+    const alert = it.brk.type === 'alert' && this.alertLine !== '';
+    const tag = alert ? '⚠ WORLDWIDE ALERT' : '📻 NOUN FM';
+    const text = alert ? this.alertLine : this.houseLabel(it);
+    this.onBreak?.(tag, text);
+    if (!alert) {
+      // (an alert with no news to read plays a jingle instead)
+      const n = this.interludes.length;
+      if (n === 0) return;
+      const idx = it.brk.type === 'interlude' ? it.brk.index % n : 0;
+      const il = this.interludes[idx]!;
+      let stopped = false;
+      let h: { stop: (f?: number) => void } | null = null;
+      this.breakStop = () => {
+        stopped = true;
+        h?.stop(0.3);
+      };
+      void loadBuffer(ctx, il.full).then(b => {
+        if (b !== null && !stopped) h = playBuffer(ctx, bus, b, { gain: 0.9, offset: into });
+      });
+      this.identUntil = this.time + il.fullDur - into;
+      return;
+    }
+    if (into > 3) return; // joined mid-alert: just the toast
+    const sting = alertSting(ctx, bus, ctx.currentTime + 0.05);
+    const signal = { cancelled: false };
+    this.breakStop = () => {
+      signal.cancelled = true;
+    };
+    setTimeout(() => {
+      if (signal.cancelled || this.ctx === null || this.bus === null) return;
+      const c = this.ctx;
+      const b = this.bus;
+      if (this.tuned)
+        void speakDj(this.alertLine, {
+          volume: this.volume * this.extGain,
+          urgent: true,
+          signal,
+        }).then(ok => {
+          if (!ok && !signal.cancelled) talkbox(c, b, c.currentTime + 0.05, 1.1);
+        });
+      else talkbox(c, b, c.currentTime + 0.05, 1.1);
+    }, sting * 1000);
+    this.identUntil = this.time + sting + 4;
   }
 
   private set(p: AudioParam | undefined, v: number, tc = 0.2) {
@@ -567,6 +762,15 @@ export class NounFm {
 
   private ident(key: string) {
     if (this.ctx === null || this.bus === null || this.noise === null) return;
+    const pick = pickGapSound(key, this.interludes.length);
+    const buf = pick.kind === 'file' ? this.stings[pick.index] : null;
+    if (pick.kind === 'file' && buf !== undefined && buf !== null) {
+      const h = playBuffer(this.ctx, this.bus, buf, { gain: 0.9 });
+      this.identUntil = this.time + h.seconds;
+      this.lastGap = { kind: 'file', id: this.interludes[pick.index]?.id ?? '', key };
+      return;
+    }
+    this.lastGap = { kind: 'synth', id: '', key };
     const r = playIdent(this.ctx, this.bus, this.noise, key, {
       speech: this.tuned,
       volume: this.volume * this.extGain,
@@ -588,12 +792,36 @@ export class NounFm {
 
     const dist = this.vanPos !== null ? listener.distanceTo(this.vanPos) : Infinity;
     this.near = dist < FM_NEAR;
-    const audible = this.tuned || this.near;
+    const audible = (this.tuned || this.near) && !this.hold;
     const now = this.clock.serverNow(Date.now());
     let air = OFF_AIR;
     if (this.state !== null) {
       advance(this.state, now);
       air = onAir(this.state, now);
+    }
+    // Nothing queued, no set on: the house programme
+    this.refreshHouse();
+    const house = houseSlot(air.track !== null, this.houseItemsFor(now), now);
+    this.houseNow = house;
+    if (house !== null && house.kind === 'song')
+      air = {
+        source: 'fallback',
+        key: house.key,
+        track: house.track,
+        startAt: house.startAt,
+        endAt: house.endAt,
+        set: null,
+      };
+    const brk = house !== null && house.kind === 'break' ? house : null;
+    if (brk === null || !audible) {
+      if (this.breakKey !== '') {
+        this.stopBreak();
+        this.breakKey = '';
+      }
+    } else if (this.breakKey !== brk.key) {
+      this.stopBreak();
+      this.breakKey = brk.key;
+      this.playBreak(brk, now);
     }
     this.live = air.track !== null;
     this.curAir = air;
@@ -604,13 +832,14 @@ export class NounFm {
       if (air.track !== null && audible) this.onTrackChange?.(this.labelFor(air), this.tuned);
     }
 
-    const fb = this.tuned && air.track === null;
+    // the pirate generator only when the house has nothing at all
+    const fb = this.tuned && air.track === null && house === null && !this.hold;
     if (fb !== this.fbOn) {
       this.fbOn = fb;
       this.onFallback?.(fb);
     }
 
-    let phase: FmView['phase'] = this.tuned ? 'fallback' : 'off';
+    let phase: FmView['phase'] = brk !== null ? 'break' : this.tuned ? 'fallback' : 'off';
     const tr = air.track;
     if (!audible || tr === null) {
       if (this.mediaKey !== '') this.stopMedia();
@@ -638,8 +867,15 @@ export class NounFm {
   /** Fade in after the ident, out over the last second and a half. */
   private fade(air: FmOnAir, now: number): number {
     const into = (now - air.startAt) / 400;
-    const left = (air.endAt - now) / 1500;
+    // a house cut-off drops out fast (the tape-stop does the rest)
+    const left = (air.endAt - now) / (this.cutting(air) ? 450 : 1500);
     return Math.max(0, Math.min(1, into, left));
+  }
+
+  /** This play is a house song cut short. */
+  private cutting(air: FmOnAir): boolean {
+    const h = this.houseNow;
+    return h !== null && h.kind === 'song' && h.cut && h.key === air.key;
   }
 
   private distGain(dist: number): number {
@@ -704,6 +940,13 @@ export class NounFm {
           if (this.playing === p) this.playing = null;
         },
       );
+      return;
+    }
+    // house cut-off: a tape-stop over the last 0.7 s
+    const left = air.endAt - now;
+    if (this.cutting(air) && left < 700) {
+      el.preservesPitch = false;
+      el.playbackRate = Math.max(0.25, left / 700);
       return;
     }
     const fix = audioDriftFix(exp, el.currentTime);

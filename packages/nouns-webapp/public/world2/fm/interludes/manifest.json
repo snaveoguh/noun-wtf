@@ -1,0 +1,69 @@
+{
+  "interludes": [
+    {
+      "id": "noun-fm-jingle",
+      "title": "Noun F-M",
+      "file": "noun-fm-jingle-sting.mp3",
+      "duration": 4.336,
+      "full": "noun-fm-jingle.mp3",
+      "fullDuration": 18.051,
+      "intro": 1,
+      "cut": {
+        "start": 0.04,
+        "length": 4.3
+      }
+    },
+    {
+      "id": "noun-fm-interlude-1",
+      "title": "Noun F-M interlude I",
+      "file": "noun-fm-interlude-1-sting.mp3",
+      "duration": 4.336,
+      "full": "noun-fm-interlude-1.mp3",
+      "fullDuration": 9.587,
+      "intro": 1,
+      "cut": {
+        "start": 0,
+        "length": 4.3
+      }
+    },
+    {
+      "id": "noun-fm-interlude-2",
+      "title": "Noun F-M interlude II",
+      "file": "noun-fm-interlude-2-sting.mp3",
+      "duration": 4.336,
+      "full": "noun-fm-interlude-2.mp3",
+      "fullDuration": 16.797,
+      "intro": 1,
+      "cut": {
+        "start": 0.02,
+        "length": 4.3
+      }
+    },
+    {
+      "id": "noun-fm-interlude-5",
+      "title": "Noun F-M interlude V",
+      "file": "noun-fm-interlude-5-sting.mp3",
+      "duration": 4.336,
+      "full": "noun-fm-interlude-5.mp3",
+      "fullDuration": 12.33,
+      "intro": 1,
+      "cut": {
+        "start": 0.241,
+        "length": 4.3
+      }
+    },
+    {
+      "id": "noun-fm-interlude-6",
+      "title": "Noun F-M interlude VI",
+      "file": "noun-fm-interlude-6-sting.mp3",
+      "duration": 4.336,
+      "full": "noun-fm-interlude-6.mp3",
+      "fullDuration": 16.353,
+      "intro": 1,
+      "cut": {
+        "start": 3.929,
+        "length": 4.3
+      }
+    }
+  ]
+}

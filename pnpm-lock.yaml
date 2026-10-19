@@ -589,6 +589,9 @@ importers:
       '@a16z/helios':
         specifier: ^0.11.1
         version: 0.11.1
+      '@anthropic-ai/sdk':
+        specifier: ^0.78.0
+        version: 0.78.0(zod@3.25.76)
       '@apollo/client':
         specifier: ^3.3.21
         version: 3.13.8(@types/react@19.1.8)(graphql-ws@6.0.5(crossws@0.3.4)(graphql@16.11.0)(ws@8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.7)))(graphql@16.11.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)

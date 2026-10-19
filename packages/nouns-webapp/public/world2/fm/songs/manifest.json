@@ -1,0 +1,18 @@
+{
+  "songs": [
+    {
+      "id": "sell-it-cold",
+      "title": "Sell It Cold",
+      "artist": "NOUN FM",
+      "file": "sell-it-cold.mp3",
+      "duration": 67.631
+    },
+    {
+      "id": "noun-city",
+      "title": "Noun City",
+      "artist": "NOUN FM",
+      "file": "noun-city.mp3",
+      "duration": 39.602
+    }
+  ]
+}
