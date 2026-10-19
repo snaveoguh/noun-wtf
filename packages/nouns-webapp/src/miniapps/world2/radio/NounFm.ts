@@ -768,9 +768,11 @@ export class NounFm {
       const h = playBuffer(this.ctx, this.bus, buf, { gain: 0.9 });
       this.identUntil = this.time + h.seconds;
       this.lastGap = { kind: 'file', id: this.interludes[pick.index]?.id ?? '', key };
+      if (import.meta.env.DEV) console.info('[fm] gap: recorded sting', this.lastGap.id, key);
       return;
     }
     this.lastGap = { kind: 'synth', id: '', key };
+    if (import.meta.env.DEV) console.info('[fm] gap: synth ident', key);
     const r = playIdent(this.ctx, this.bus, this.noise, key, {
       speech: this.tuned,
       volume: this.volume * this.extGain,

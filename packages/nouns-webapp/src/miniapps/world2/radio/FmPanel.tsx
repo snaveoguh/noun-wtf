@@ -406,7 +406,12 @@ function QueueTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }
         )}
         {s !== null && s.queue.length === 0 && air.source !== 'set' && (
           <div className="opacity-60">
-            queue&apos;s empty{air.track === null ? ', the pirate relay is filling in' : ''}
+            queue&apos;s empty
+            {view.house !== null
+              ? ', the house mix is on'
+              : air.track === null
+                ? ', the pirate relay is filling in'
+                : ''}
           </div>
         )}
         {s?.queue.map((e, i) => (
