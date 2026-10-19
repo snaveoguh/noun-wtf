@@ -157,7 +157,8 @@ function keymaker(): Script {
   );
   const [, l2, l3] = lines.starts as [number, number, number];
   const end = lines.end + 1.2;
-  const front = pose([1.0, 1.9, 3.6], [0, 1.5, -0.2], 44);
+  // Off to the side, so a rider standing in front of him doesn't block the shot
+  const front = pose([2.0, 2.0, 4.0], [0, 1.5, -0.2], 44);
   const crane0 = pose([0.2, 2.6, 1.6], [-2, 1.7, -12], 48);
   // GO DOWN alley runs out behind him, a little to his left (local -x)
   const crane1 = pose([-4.5, 4.5, -4], [-5, 0, -120], 52);
