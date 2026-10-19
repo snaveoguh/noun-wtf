@@ -2,9 +2,8 @@
 //
 // Things that take the radio over for one rider, locally (not the shared
 // station timeline):
-//   - the start-of-game intro: the main Noun F-M jingle → "Noun City" (the
-//     first song) → a different Noun F-M jingle → the DJ's on-chain update,
-//     then the live programme carries on at its current position,
+//   - the start-of-game intro: the main Noun F-M jingle, then the live
+//     programme carries on at its current position (a random tune),
 //   - "▶ intro" / "▶ latest DJ update" replays from the FM panel,
 //   - Dry Gulch's theme (townTheme.ts).
 // While a spot plays, NOUN FM holds (goes quiet here) and the pirate radio
@@ -14,13 +13,7 @@
 import type { NounFm } from './NounFm';
 
 import { getDjUpdate, speakDj } from './djUpdate';
-import {
-  loadBuffer,
-  loadFmManifests,
-  pickSecondJingle,
-  playBuffer,
-  type HouseSong,
-} from './fmAssets';
+import { loadBuffer, loadFmManifests, playBuffer, type HouseSong } from './fmAssets';
 import { talkbox } from './idents';
 
 export type SpotStage = 'jingle' | 'dj' | 'song' | 'town';
@@ -39,7 +32,6 @@ export interface SpotView {
 const IDLE: SpotView = { stage: null, title: '', subtitle: null, intro: false, at: 0 };
 
 const INTRO_STORE = 'noun-fm-intro';
-export const FIRST_SONG = 'noun-city';
 
 /** "Station intro on start" (default on). */
 export function introEnabled(): boolean {
@@ -277,18 +269,13 @@ export class FmSpots {
 
   // ── Programmes ───────────────────────────────────────────────────────
 
-  /** Main jingle → the first song → another jingle → the DJ update. */
+  /** The main Noun F-M jingle, then straight into the station (a random tune). */
   async intro(): Promise<void> {
     this.introPlayed = true;
     const token = this.begin(true);
     const m = await loadFmManifests();
     const main = m.interludes[0];
     if (main !== undefined) await this.file(token, main.title, main.full, 'jingle');
-    const s = m.songs.find(x => x.id === FIRST_SONG) ?? m.songs[0];
-    if (s !== undefined) await this.song(token, s, 'song');
-    const second = pickSecondJingle(m.interludes, Math.random());
-    if (second !== null) await this.file(token, second.title, second.full, 'jingle');
-    await this.dj(token);
     this.end(token);
   }
 

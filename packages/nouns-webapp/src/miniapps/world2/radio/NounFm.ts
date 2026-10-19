@@ -13,7 +13,7 @@
 //     jingles are never squeezed into that gap; they play in full as house
 //     breaks and in the start-of-game intro.
 //   - nothing queued and no set on: the house programme (house.ts): the
-//     owner's songs + library tracks, cut-offs, jingles and WORLDWIDE
+//     library tracks (the owner's songs stay out), cut-offs, jingles and WORLDWIDE
 //     ALERT news breaks, on a shared deterministic schedule.
 //   - nothing at all to play: the procedural pirate station (PirateRadio).
 // Tuned in (radio cycle → NOUN FM) you hear it anywhere; otherwise it only
@@ -573,13 +573,8 @@ export class NounFm {
 
   private houseCatalog(day: number): HouseCatalog {
     return {
-      owner: this.songs.map(s => ({
-        src: { kind: 'direct' as const, url: s.url },
-        title: s.title,
-        artist: s.artist,
-        dur: s.dur,
-        origin: 'owner' as const,
-      })),
+      // the owner's songs stay out of the mix (Sell It Cold is Dry Gulch's theme)
+      owner: [],
       library: libraryTracks(this.libSets, day),
       breaks: this.interludes.map(i => i.fullDur),
     };
