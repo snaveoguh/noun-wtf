@@ -7,7 +7,15 @@ import { targetStock } from '../../src/miniapps/world2/trade/market';
 // file there as a function and break the deploy.)
 
 // ── An in-memory Netlify Blobs store (etags and all) ──
+// Like the real one, a store opened WITHOUT `consistency: 'strong'` reads a
+// cached copy: here, every key as it was before its latest write (the edge
+// cache lags up to ~60 s). That's what lost buys before world-trade moved to
+// a strong store.
 const blobs = new Map<string, { v: string; etag: string }>();
+const before = new Map<string, { v: string; etag: string } | undefined>();
+let strongReads = true;
+const opened: unknown[] = [];
+const read = (k: string) => (strongReads ? blobs.get(k) : before.get(k));
 let etags = 0;
 let conflicts = 0;
 /** Let other in-flight requests run between every store call (forces races). */
@@ -17,13 +25,13 @@ const yieldMany = async () => {
 const store = {
   async get(k: string, o?: { type?: string }) {
     await yieldMany();
-    const b = blobs.get(k);
+    const b = read(k);
     if (b === undefined) return null;
     return o?.type === 'json' ? JSON.parse(b.v) : b.v;
   },
   async getWithMetadata(k: string) {
     await yieldMany();
-    const b = blobs.get(k);
+    const b = read(k);
     return b !== undefined ? { data: JSON.parse(b.v), etag: b.etag } : null;
   },
   async setJSON(k: string, v: unknown, o: { onlyIfMatch?: string; onlyIfNew?: boolean } = {}) {
@@ -36,13 +44,35 @@ const store = {
       conflicts++;
       return { modified: false };
     }
+    before.set(k, b);
     blobs.set(k, { v: JSON.stringify(v), etag: `e${++etags}` });
     return { modified: true };
   },
 };
-vi.mock('@netlify/blobs', () => ({ connectLambda: () => undefined, getStore: () => store }));
+vi.mock('@netlify/blobs', () => ({
+  getStore: (opts: unknown) => {
+    opened.push(opts);
+    strongReads =
+      typeof opts === 'object' && (opts as { consistency?: string }).consistency === 'strong';
+    return store;
+  },
+}));
 
-const { handler } = await import('../functions/world-trade');
+const { default: fn } = await import('../functions/world-trade');
+
+/** The v2 function, Lambda-shaped for the tests below. */
+async function handler(e: {
+  httpMethod: string;
+  body: string | null;
+  queryStringParameters?: Record<string, string>;
+}) {
+  const url = new URL('https://noun.wtf/.netlify/functions/world-trade');
+  for (const [k, v] of Object.entries(e.queryStringParameters ?? {})) url.searchParams.set(k, v);
+  const res = await fn(
+    new Request(url, { method: e.httpMethod, body: e.httpMethod === 'POST' ? e.body : undefined }),
+  );
+  return { statusCode: res.status, body: await res.text() };
+}
 
 const T0 = Date.UTC(2026, 9, 18, 12);
 const R1 = '0f8e0c1a-1111-4aaa-8bbb-000000000001';
@@ -72,6 +102,8 @@ const advance = (ms: number) => vi.setSystemTime(Date.now() + ms);
 
 beforeEach(() => {
   blobs.clear();
+  before.clear();
+  opened.length = 0;
   conflicts = 0;
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(T0);
@@ -98,6 +130,40 @@ describe('world-trade: reads', () => {
     expect(blobs.has(`rider/${R1}`)).toBe(false);
     expect((await get({ rider: 'x' })).status).toBe(400);
     expect((await get({ rider: R1, town: 'mars' })).status).toBe(400);
+  });
+});
+
+describe('world-trade: buying again and again (the "keeps resetting" bug)', () => {
+  it('opens its store with strong consistency', async () => {
+    await get({ rider: R1 });
+    expect(opened).toContainEqual({ name: 'noun-world-trade', consistency: 'strong' });
+  });
+
+  it('five buys in a row all land, and a GET right after shows all of them', async () => {
+    for (let i = 1; i <= 5; i++) {
+      advance(600);
+      const b = await act(R1, { t: 'buy', town: 'beach', good: 'FISH', qty: 2 });
+      expect(b.status).toBe(200);
+      expect(b.out.ok).toBe(true);
+      expect(b.out.state.cargo.FISH).toBe(2 * i);
+    }
+    const g = await get({ rider: R1, town: 'beach' });
+    expect(g.out.state.cargo.FISH).toBe(10);
+    expect(audit(row(R1))).toBe(true);
+  });
+
+  it('with stale reads (the old Lambda-compat store) the same buys get lost', async () => {
+    // What the eventually-consistent edge did to the old handler: prove the
+    // mock reproduces it, so the test above is guarding something real.
+    const results: number[] = [];
+    for (let i = 1; i <= 3; i++) {
+      advance(600);
+      await act(R1, { t: 'buy', town: 'beach', good: 'FISH', qty: 2 });
+      strongReads = false;
+      results.push((await store.getWithMetadata(`rider/${R1}`))?.data?.held?.FISH ?? 0);
+      strongReads = true;
+    }
+    expect(results).toEqual([0, 2, 4]); // a stale read always trails one write behind
   });
 });
 

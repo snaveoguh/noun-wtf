@@ -13,7 +13,7 @@ import type { TradeClient } from './TradeClient';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { GOOD_ICON, GOOD_IDS, GOODS } from './goods';
-import { usedSlots } from './ledger';
+import { maxBuy, RULES, usedSlots } from './ledger';
 import { locate } from './locate';
 import { isTown, TOWN_IDS, TOWN_SPECS } from './towns';
 import { UPGRADE_IDS, UPGRADES } from './upgrades';
@@ -22,6 +22,9 @@ function useTrade(trade: TradeClient) {
   useSyncExternalStore(trade.subscribe, trade.getVersion);
   return trade;
 }
+
+/** Tracker ticks (250 ms) out of town before you count as gone. */
+const LEAVE_TICKS = 4;
 
 const ago = (ms: number) => {
   const m = Math.round(ms / 60_000);
@@ -39,13 +42,16 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
     if (isTown(t)) trade.devTown = t;
   }, [trade]);
 
-  // Town tracker
+  // Town tracker. Leaving needs LEAVE_TICKS misses in a row: a one-tick
+  // flicker at the edge of town used to close the market (and reset it).
   useEffect(() => {
+    let misses = 0;
     const id = setInterval(() => {
       const at = locate(game, trade);
-      trade.setTown(at.town);
+      misses = at.town === null ? misses + 1 : 0;
+      if (at.town !== null || misses >= LEAVE_TICKS) trade.setTown(at.town);
       setStall(at.stall);
-      if (at.town === null) setOpen(null);
+      if (at.town === null && misses >= LEAVE_TICKS) setOpen(null);
     }, 250);
     return () => clearInterval(id);
   }, [game, trade]);
@@ -292,7 +298,10 @@ function MarketRows({ trade, town, st }: { trade: TradeClient; town: TownId; st:
         const n = qty[g] ?? 1;
         const best = bestElsewhere(trade, town, g);
         const margin = best !== null && q !== null && q.ask > 0 ? best.bid - q.ask : null;
-        const set = (v: number) => setQty(o => ({ ...o, [g]: Math.max(1, Math.min(200, v)) }));
+        const set = (v: number) =>
+          setQty(o => ({ ...o, [g]: Math.max(1, Math.min(RULES.MAX_QTY, v)) }));
+        const canBuy =
+          q !== null ? maxBuy(town, g, q.stock, st.coin, st.capacity - usedSlots(st.cargo)) : 0;
         return (
           <div
             key={g}
@@ -317,6 +326,29 @@ function MarketRows({ trade, town, st }: { trade: TradeClient; town: TownId; st:
                   {margin}/u, {ago(now - best.at)})
                 </div>
               )}
+              <div className="mt-0.5 flex gap-1 text-[10px] font-bold">
+                {[1, 5].map(k => (
+                  <button
+                    key={k}
+                    type="button"
+                    data-trade-preset={`${g}:${k}`}
+                    className={`rounded px-1.5 py-px ${n === k ? 'bg-white/30' : 'bg-white/10'}`}
+                    onClick={() => set(k)}
+                  >
+                    ×{k}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  data-trade-preset={`${g}:max`}
+                  title="as many as you can afford and carry (or sell everything you have)"
+                  disabled={Math.max(canBuy, have) < 1}
+                  className="rounded bg-white/10 px-1.5 py-px disabled:opacity-30"
+                  onClick={() => set(Math.max(canBuy, have))}
+                >
+                  MAX
+                </button>
+              </div>
             </div>
             <b className="w-9 text-right tabular-nums text-[#3ddc84]">
               {q !== null && q.bid > 0 ? q.bid : '–'}
