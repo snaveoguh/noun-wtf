@@ -70,7 +70,7 @@ export function rowLedger(store: RowStore, now: () => number = Date.now): Ledger
         out.row,
         cur?.etag !== undefined ? { onlyIfMatch: cur.etag } : { onlyIfNew: true },
       );
-      if (res === undefined || res.modified)
+      if (res === undefined || res.modified === true)
         return { ok: true, state: stateOf(out.row), applied: true };
     }
     return { ok: false, reason: 'Ledger busy, try again' };

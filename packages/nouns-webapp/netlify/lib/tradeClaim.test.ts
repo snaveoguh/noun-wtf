@@ -44,7 +44,7 @@ const store = {
     blobs.delete(k);
   },
 };
-vi.mock('@netlify/blobs', () => ({ connectLambda: () => undefined, getStore: () => store }));
+vi.mock('@netlify/blobs', () => ({ getStore: () => store }));
 
 const { makeHandler } = await import('../functions/world-trade-claim');
 const { blobLedger } = await import('./tradeClaim');
@@ -78,6 +78,7 @@ const cfg = {
 };
 let nextNonce = 1n;
 const handler = makeHandler({
+  ledger: blobLedger(store),
   store,
   chain,
   cfg,
@@ -116,14 +117,14 @@ beforeEach(() => {
 
 describe('world-trade-claim', () => {
   it('debits the ledger and returns a voucher signed by the server key', async () => {
-    await fund('r1', { ICECREAM: 10, FISH: 4 }, 500);
-    const { status, out } = await claim('r1', { ICECREAM: 3, FISH: 4 }, 120);
+    await fund('r1', { FRIES: 10, FISH: 4 }, 500);
+    const { status, out } = await claim('r1', { FRIES: 3, FISH: 4 }, 120);
     expect(status).toBe(200);
     const c = out.claim as SignedClaim;
     expect(c.chainId).toBe(CHAIN_ID);
     expect(c.contract).toBe(GOODS);
     expect(c.voucher.player).toBe(PLAYER);
-    expect(c.voucher.ids).toEqual(['1', '3']);
+    expect(c.voucher.ids).toEqual(['2', '3']);
     expect(c.voucher.amounts).toEqual(['3', '4']);
     expect(c.voucher.coin).toBe('120');
     expect(Number(c.voucher.expiry)).toBe(Math.floor(clock / 1000) + 1800);
@@ -137,7 +138,7 @@ describe('world-trade-claim', () => {
     });
     expect(recovered).toBe(signer.address);
 
-    expect(await ledgerState('r1')).toMatchObject({ coin: 380, cargo: { ICECREAM: 7 } });
+    expect(await ledgerState('r1')).toMatchObject({ coin: 380, cargo: { FRIES: 7 } });
     expect((await ledgerState('r1'))!.cargo.FISH).toBeUndefined();
   });
 
@@ -236,18 +237,18 @@ describe('world-trade-claim', () => {
   });
 
   it('enforces the daily per-wallet caps the contract will', async () => {
-    await fund('r9', { ICECREAM: 2000 }, 0);
-    await fund('r10', { ICECREAM: 2000 }, 0);
-    const a = await claim('r9', { ICECREAM: CLAIM_CAPS.goodPerAddress });
+    await fund('r9', { FRIES: 2000 }, 0);
+    await fund('r10', { FRIES: 2000 }, 0);
+    const a = await claim('r9', { FRIES: CLAIM_CAPS.goodPerAddress });
     expect(a.status).toBe(200);
     nonceStates.set(BigInt(a.out.claim.voucher.nonce), NONCE_CLAIMED);
     // same wallet, a different rider: still capped
-    const b = await claim('r10', { ICECREAM: 1 });
+    const b = await claim('r10', { FRIES: 1 });
     expect(b.status).toBe(429);
     // tomorrow it resets
     clock += 86_400_000;
     chainTime += 86_400;
-    const c = await claim('r10', { ICECREAM: 1 });
+    const c = await claim('r10', { FRIES: 1 });
     expect(c.status).toBe(200);
   });
 
@@ -260,13 +261,19 @@ describe('world-trade-claim', () => {
     expect((await claim('r', { FISH: CLAIM_CAPS.goodPerAddress + 1 })).status).toBe(400);
     expect((await call({ action: 'nope', rider: 'r' })).status).toBe(400);
 
-    const off = makeHandler({ store, chain, cfg: { ...cfg, enabled: false }, signer });
+    const off = makeHandler({
+      store,
+      chain,
+      cfg: { ...cfg, enabled: false },
+      signer,
+      ledger: blobLedger(store),
+    });
     let res = await off({
       httpMethod: 'POST',
       body: JSON.stringify({ action: 'claim', rider: 'r', address: PLAYER, goods: { FISH: 1 } }),
     });
     expect(res.statusCode).toBe(503);
-    const keyless = makeHandler({ store, chain, cfg, signer: null });
+    const keyless = makeHandler({ store, chain, cfg, signer: null, ledger: blobLedger(store) });
     res = await keyless({
       httpMethod: 'POST',
       body: JSON.stringify({ action: 'claim', rider: 'r', address: PLAYER, goods: { FISH: 1 } }),

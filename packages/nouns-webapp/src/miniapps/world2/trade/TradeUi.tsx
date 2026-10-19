@@ -10,11 +10,13 @@ import type { Game } from '../Game';
 import type { GoodId, TownId, TradeState } from './contract';
 import type { TradeClient } from './TradeClient';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { GOOD_ICON, GOOD_IDS, GOODS } from './goods';
 import { maxBuy, RULES, usedSlots } from './ledger';
 import { locate } from './locate';
+import { CashOutPanel } from './onchain/CashOutPanel';
+import { TRADE_GOODS_ADDRESS, TRADE_ONCHAIN_ENABLED } from './onchain/flags';
 import { isTown, TOWN_IDS, TOWN_SPECS } from './towns';
 import { UPGRADE_IDS, UPGRADES } from './upgrades';
 
@@ -22,6 +24,13 @@ function useTrade(trade: TradeClient) {
   useSyncExternalStore(trade.subscribe, trade.getVersion);
   return trade;
 }
+
+/** Market tabs (BASE only when the on-chain layer is configured for this build). */
+const TABS = [
+  'market',
+  'garage',
+  ...(TRADE_ONCHAIN_ENABLED && TRADE_GOODS_ADDRESS !== null ? (['base'] as const) : []),
+] as const;
 
 /** Tracker ticks (250 ms) out of town before you count as gone. */
 const LEAVE_TICKS = 4;
@@ -33,7 +42,7 @@ const ago = (ms: number) => {
 
 export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
   const trade = useTrade(game.trade);
-  const [want, setOpen] = useState<null | 'market' | 'garage'>(null);
+  const [want, setOpen] = useState<null | 'market' | 'garage' | 'base'>(null);
   const [stall, setStall] = useState(false);
 
   // Dev override: ?town=cowboy
@@ -203,12 +212,13 @@ function MarketPanel({
   trade: TradeClient;
   town: TownId;
   st: TradeState;
-  tab: 'market' | 'garage';
-  onTab: (t: 'market' | 'garage') => void;
+  tab: 'market' | 'garage' | 'base';
+  onTab: (t: 'market' | 'garage' | 'base') => void;
   onClose: () => void;
 }) {
   const spec = TOWN_SPECS[town];
   const used = usedSlots(st.cargo);
+  const reload = useCallback(() => void trade.load(), [trade]);
   return (
     <div
       className="pointer-events-auto absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 px-2 pb-4 pt-14"
@@ -247,7 +257,7 @@ function MarketPanel({
           </button>
         </div>
         <div className="flex gap-1 text-xs font-bold">
-          {(['market', 'garage'] as const).map(t => (
+          {TABS.map(t => (
             <button
               key={t}
               type="button"
@@ -255,14 +265,18 @@ function MarketPanel({
               className={`flex-1 rounded-lg px-3 py-1.5 uppercase tracking-wider ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
               onClick={() => onTab(t)}
             >
-              {t === 'market' ? 'Market' : 'Garage · upgrades'}
+              {t === 'market' ? 'Market' : t === 'garage' ? 'Garage · upgrades' : 'Base ⛓'}
             </button>
           ))}
         </div>
         {tab === 'market' ? (
           <MarketRows trade={trade} town={town} st={st} />
-        ) : (
+        ) : tab === 'garage' ? (
           <Garage trade={trade} town={town} st={st} />
+        ) : (
+          <div className="flex justify-center">
+            <CashOutPanel rider={trade.rider} balance={st} onLedgerChange={reload} />
+          </div>
         )}
         {trade.notice !== null && Date.now() - trade.notice.at < 6000 && (
           <div

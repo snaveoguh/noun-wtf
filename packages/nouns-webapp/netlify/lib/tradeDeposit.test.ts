@@ -28,9 +28,10 @@ const store = {
     blobs.delete(k);
   },
 };
-vi.mock('@netlify/blobs', () => ({ connectLambda: () => undefined, getStore: () => store }));
+vi.mock('@netlify/blobs', () => ({ getStore: () => store }));
 
 const { makeHandler } = await import('../functions/world-trade-deposit');
+const { blobLedger } = await import('./tradeClaim');
 
 const GOODS: Address = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 const PLAYER: Address = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
@@ -74,7 +75,7 @@ const chain = {
   head: vi.fn(async () => head),
 };
 const cfg = { enabled: true, chainId: 84532, goods: GOODS, rpc: 'x', ttlS: 1800, confirmations: 3 };
-const handler = makeHandler({ store, chain, cfg });
+const handler = makeHandler({ store, chain, cfg, ledger: blobLedger(store) });
 
 async function call(body: Record<string, unknown>) {
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });

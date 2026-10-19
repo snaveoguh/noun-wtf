@@ -59,7 +59,7 @@ contract Handler is Test {
     {
         uint256[] memory ids = new uint256[](1);
         uint256[] memory amts = new uint256[](1);
-        ids[0] = bound(idSeed, 1, TradeConfig.GOOD_COUNT);
+        ids[0] = bound(idSeed, 2, TradeConfig.GOOD_COUNT); // ICECREAM (1) never mints
         amts[0] = amt;
         c = NounTradeGoods.Claim(who, ids, amts, coinAmt, nonce++, block.timestamp + 1 hours);
     }
@@ -207,12 +207,22 @@ contract NounTradeInvariantTest is TradeBase {
     /// The handler's valid paths really mint and burn (so the invariants are not vacuous;
     /// forge's per-selector call table shows how often each ran in the campaign).
     function test_handlerPathsWork() public {
-        handler.claim(0, 1, 5, 100);
-        handler.deposit(0, 1, 2, 50);
+        handler.claim(0, 2, 5, 100);
+        handler.deposit(0, 2, 2, 50);
         assertEq(handler.okClaims(), 1);
         assertEq(handler.okDeposits(), 1);
-        assertEq(goods.totalSupply(1), 3);
+        assertEq(goods.totalSupply(2), 3);
         assertEq(coin.totalSupply(), 50);
+    }
+
+    /// Nothing ever mints past a key's lifetime ceiling, burns never lift supply above
+    /// what was minted, and ice cream never exists on-chain.
+    function invariant_mintedNeverPastCeiling() public view {
+        for (uint256 id = 0; id <= TradeConfig.GOOD_COUNT; ++id) {
+            assertLe(goods.totalMinted(id), goods.maxSupply(id));
+        }
+        assertLe(coin.totalSupply(), goods.totalMinted(TradeConfig.COIN_KEY));
+        assertEq(goods.totalSupply(TradeConfig.ICECREAM), 0);
     }
 
     function invariant_balancesSumToSupply() public view {

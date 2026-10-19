@@ -27,7 +27,13 @@ import {NounTradeCoin} from "./NounTradeCoin.sol";
 ///  NTCOIN, the ERC-20 deployed by this contract) are minted to them. Vouchers are
 ///  bound to the player (msg.sender must be `player`), single-use (nonce), short-lived
 ///  (expiry, at most MAX_VOUCHER_TTL ahead) and limited by per-address and global
-///  daily caps per id. A token id is only claimable once the admin gives it a cap.
+///  daily caps per id. A token id is only claimable once it has a cap.
+///
+///  SUPPLY (see SUPPLY.md): every key (NTCOIN = 0, goods 1..) has a lifetime
+///  `maxSupply` of mints that can never be raised, only lowered. The global daily cap
+///  halves every HALVING_DAYS after launch (MAX_HALVINGS times, then stays). Caps can
+///  only go down; a brand-new good id is launched once with `launchGood`. ICECREAM
+///  (id 1) launches with no cap and no supply: it melts, so it never leaves the game.
 ///
 ///  DEPOSIT (back into the game): the holder burns their own tokens here, tagged with
 ///  `account` (keccak256 of their game rider id); the server reads the `Deposited` event
@@ -43,7 +49,8 @@ import {NounTradeCoin} from "./NounTradeCoin.sol";
 ///
 ///  Documented trust: no address can mint except through a signed voucher. The admin can
 ///  grant SIGNER_ROLE (including to itself), so the admin can always issue vouchers;
-///  caps bound how fast any signer, honest or compromised, can mint. Nobody can burn or
+///  caps bound how fast any signer, honest or compromised, can mint, and maxSupply bounds
+///  how much ever can (the admin can raise neither). Nobody can burn or
 ///  move a holder's tokens except the holder (or their ERC-1155 approved operator for
 ///  transfers). Pausing stops claims and deposits only, never transfers.
 contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausable, ReentrancyGuard, EIP712 {
@@ -63,6 +70,10 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
     uint256 public constant MAX_BATCH = 16;
     /// @notice A voucher may not expire further than this ahead of the block it lands in.
     uint256 public constant MAX_VOUCHER_TTL = 7 days;
+    /// @notice The global daily cap halves this often (days since launch) ...
+    uint256 public constant HALVING_DAYS = 180;
+    /// @notice ... this many times at most, then stays (a small tail emission).
+    uint256 public constant MAX_HALVINGS = 4;
 
     string public constant name = "Noun Trade Goods";
     string public constant symbol = "NTGOODS";
@@ -71,6 +82,8 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
 
     /// @notice The ERC-20 COIN, minted / burned only by this contract.
     NounTradeCoin public immutable coin;
+    /// @notice UTC day (block.timestamp / 1 days) the contract was deployed: halving epoch 0.
+    uint256 public immutable launchDay;
 
     struct Cap {
         uint128 perAddress; // per address per UTC day
@@ -98,6 +111,10 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
     mapping(uint256 day => mapping(address who => mapping(uint256 key => uint256))) public mintedBy;
     /// @notice Running deposit counter (the `depositId` of the next deposit is this + 1).
     uint256 public depositCount;
+    /// @notice Lifetime mint ceiling per key (0 = never launched). Only ever lowered.
+    mapping(uint256 key => uint256) public maxSupply;
+    /// @notice Everything ever minted per key (burns don't give headroom back).
+    mapping(uint256 key => uint256) public totalMinted;
 
     string private _base;
     string private _contractURI;
@@ -121,6 +138,8 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
         uint256 coin
     );
     event CapSet(uint256 indexed key, uint128 perAddress, uint128 global);
+    event MaxSupplySet(uint256 indexed key, uint256 maxSupply);
+    event GoodLaunched(uint256 indexed key, uint128 perAddress, uint128 global, uint256 maxSupply);
     event SignerRotated(address indexed oldSigner, address indexed newSigner);
     event NonceCancelled(uint256 indexed nonce);
     event BaseURISet(string base);
@@ -142,6 +161,10 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
     error GlobalCapExceeded(uint256 key);
     error AddressCapExceeded(uint256 key);
     error ZeroAddress();
+    error MaxSupplyExceeded(uint256 key);
+    error CapCanOnlyGoDown(uint256 key);
+    error AlreadyLaunched(uint256 key);
+    error BadMaxSupply(uint256 key);
 
     // ── Construction ──
 
@@ -153,7 +176,8 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
     /// @param contractURI_    collection metadata URL
     /// @param capKeys         initial caps: keys (COIN_KEY = 0, goods 1..7)
     /// @param capPerAddress   ... per address per day
-    /// @param capGlobal       ... global per day
+    /// @param capGlobal       ... global per day (epoch 0; halves every HALVING_DAYS)
+    /// @param capMaxSupply    ... lifetime mint ceiling (0 = not launched)
     constructor(
         address admin,
         uint48 adminDelay,
@@ -163,19 +187,26 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
         string memory contractURI_,
         uint256[] memory capKeys,
         uint128[] memory capPerAddress,
-        uint128[] memory capGlobal
+        uint128[] memory capGlobal,
+        uint256[] memory capMaxSupply
     ) ERC1155("") AccessControlDefaultAdminRules(adminDelay, admin) EIP712("NounTradeGoods", "1") {
         if (signer == address(0) || pauser == address(0)) revert ZeroAddress();
         coin = new NounTradeCoin(address(this));
+        launchDay = block.timestamp / 1 days;
         _grantRole(SIGNER_ROLE, signer);
         _grantRole(PAUSER_ROLE, pauser);
         _base = baseURI;
         _contractURI = contractURI_;
         emit BaseURISet(baseURI);
         emit ContractURISet(contractURI_);
-        if (capKeys.length != capPerAddress.length || capKeys.length != capGlobal.length) revert LengthMismatch();
+        if (
+            capKeys.length != capPerAddress.length || capKeys.length != capGlobal.length
+                || capKeys.length != capMaxSupply.length
+        ) revert LengthMismatch();
         for (uint256 i; i < capKeys.length; ++i) {
             _setCap(capKeys[i], capPerAddress[i], capGlobal[i]);
+            maxSupply[capKeys[i]] = capMaxSupply[i];
+            emit MaxSupplySet(capKeys[i], capMaxSupply[i]);
         }
     }
 
@@ -264,8 +295,32 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
 
     // ── Admin ──
 
+    /// @notice Lower a key's daily caps (a 0 global stops that id's claims). Never raises.
     function setCap(uint256 key, uint128 perAddress, uint128 global) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Cap memory cur = caps[key];
+        if (perAddress > cur.perAddress || global > cur.global) revert CapCanOnlyGoDown(key);
         _setCap(key, perAddress, global);
+    }
+
+    /// @notice Launch a good id that has never had a supply (new goods append: 8, 9, ...).
+    function launchGood(uint256 key, uint128 perAddress, uint128 global, uint256 maxSupply_)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (key == COIN_KEY) revert BadId(key);
+        if (maxSupply[key] != 0 || totalMinted[key] != 0) revert AlreadyLaunched(key);
+        if (maxSupply_ == 0) revert BadMaxSupply(key);
+        maxSupply[key] = maxSupply_;
+        _setCap(key, perAddress, global);
+        emit MaxSupplySet(key, maxSupply_);
+        emit GoodLaunched(key, perAddress, global, maxSupply_);
+    }
+
+    /// @notice Lower a key's lifetime ceiling (never below what's already minted). Never raises.
+    function lowerMaxSupply(uint256 key, uint256 newMax) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newMax > maxSupply[key] || newMax < totalMinted[key]) revert BadMaxSupply(key);
+        maxSupply[key] = newMax;
+        emit MaxSupplySet(key, newMax);
     }
 
     /// @notice Replace `oldSigner` with `newSigner` in one tx (either may be zero to only add / remove).
@@ -313,14 +368,25 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
         return _contractURI;
     }
 
-    /// @notice How much more `who` (and everyone) can claim of `key` today.
+    /// @notice How much more `who` (and everyone) can claim of `key` today (lifetime ceiling included).
     function remainingToday(address who, uint256 key) external view returns (uint256 forAddress, uint256 global) {
         uint256 day = block.timestamp / 1 days;
         Cap memory cap = caps[key];
+        uint256 todayCap = globalCapOn(key, day);
         uint256 a = mintedBy[day][who][key];
         uint256 g = mintedOn[day][key];
+        uint256 life = maxSupply[key] > totalMinted[key] ? maxSupply[key] - totalMinted[key] : 0;
         forAddress = a >= cap.perAddress ? 0 : cap.perAddress - a;
-        global = g >= cap.global ? 0 : cap.global - g;
+        global = g >= todayCap ? 0 : todayCap - g;
+        if (global > life) global = life;
+        if (forAddress > global) forAddress = global;
+    }
+
+    /// @notice The global daily cap of `key` on UTC `day`: halved once per HALVING_DAYS since launch.
+    function globalCapOn(uint256 key, uint256 day) public view returns (uint256) {
+        uint256 epochs = day > launchDay ? (day - launchDay) / HALVING_DAYS : 0;
+        if (epochs > MAX_HALVINGS) epochs = MAX_HALVINGS;
+        return uint256(caps[key].global) >> epochs;
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -343,10 +409,13 @@ contract NounTradeGoods is ERC1155Supply, AccessControlDefaultAdminRules, Pausab
         Cap memory cap = caps[key];
         if (cap.global == 0) revert NotClaimable(key);
         uint256 g = mintedOn[day][key] + amount;
-        if (g > cap.global) revert GlobalCapExceeded(key);
+        if (g > globalCapOn(key, day)) revert GlobalCapExceeded(key);
         uint256 a = mintedBy[day][who][key] + amount;
         if (a > cap.perAddress) revert AddressCapExceeded(key);
+        uint256 t = totalMinted[key] + amount;
+        if (t > maxSupply[key]) revert MaxSupplyExceeded(key);
         mintedOn[day][key] = g;
         mintedBy[day][who][key] = a;
+        totalMinted[key] = t;
     }
 }
