@@ -252,7 +252,7 @@ export class CutscenePlayer {
     const cam = h.camera;
     cam.position.copy(_a);
     cam.lookAt(_b);
-    const fov = f.cam.fov + (live.fov - f.cam.fov) * f.blend;
+    const fov = portraitFov(f.cam.fov, cam.aspect) * (1 - f.blend) + live.fov * f.blend;
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
@@ -360,4 +360,15 @@ export class CutscenePlayer {
     this.emit();
     if (handBack) then?.();
   }
+}
+
+/**
+ * Scenes are framed for landscape. On a portrait phone keep at least the
+ * horizontal view a 1.4:1 screen would get (as the gameplay camera does).
+ */
+export function portraitFov(fov: number, aspect: number): number {
+  const MIN_ASPECT = 1.4;
+  if (!(aspect > 0) || aspect >= MIN_ASPECT) return fov;
+  const half = Math.atan((Math.tan(((fov / 2) * Math.PI) / 180) * MIN_ASPECT) / aspect);
+  return Math.min(100, (half * 2 * 180) / Math.PI);
 }

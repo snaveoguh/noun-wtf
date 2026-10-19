@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CutscenePlayer, type CutsceneHost, type Directable } from './CutscenePlayer';
+import { CutscenePlayer, portraitFov, type CutsceneHost, type Directable } from './CutscenePlayer';
 import { sceneLength } from './scenes';
 
 function fakeHost(over: Partial<CutsceneHost> = {}) {
@@ -166,5 +166,15 @@ describe('CutscenePlayer', () => {
     run(p, 1);
     expect(p.timeScale).toBe(0);
     expect(new CutscenePlayer(host).timeScale).toBe(1);
+  });
+});
+
+describe('portraitFov', () => {
+  it('leaves landscape alone and widens portrait, capped', () => {
+    expect(portraitFov(44, 1.6)).toBe(44);
+    const p = portraitFov(44, 390 / 844);
+    expect(p).toBeGreaterThan(44);
+    expect(p).toBeLessThanOrEqual(100);
+    expect(portraitFov(80, 0.3)).toBe(100);
   });
 });

@@ -234,8 +234,8 @@ export class StandingNpc {
     sp.position.copy(this.glowLocal);
     this.root.localToWorld(sp.position);
     const pulse = 1 + 0.08 * Math.sin(this.t * 5.3) + 0.04 * Math.sin(this.t * 13.1);
-    sp.scale.setScalar(2.4 * pulse * (0.6 + 0.4 * k));
-    (sp.material as THREE.SpriteMaterial).opacity = 0.7 * k;
+    sp.scale.setScalar(2.1 * pulse * (0.6 + 0.4 * k));
+    (sp.material as THREE.SpriteMaterial).opacity = 0.45 * k;
   }
 
   /** Feet within talk range? */
