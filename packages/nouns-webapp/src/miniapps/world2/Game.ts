@@ -1815,7 +1815,8 @@ function escapeHtml(s: string) {
   );
 }
 
-const RADIO_MODE_STORE = 'noun-world-radio';
+// v2: NOUN FM became the default, so older picks (mostly pirate) are dropped once
+const RADIO_MODE_STORE = 'noun-world-radio-v2';
 
 /** The radio mode the rider last picked (null: never picked, NOUN FM by default). */
 function savedRadioMode(): 'off' | 'pirate' | 'fm' | null {

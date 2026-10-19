@@ -1,13 +1,13 @@
 // ── Dry Gulch's theme: "Sell It Cold" when you ride into the cowboy town ──
 //
 // Pure rules (the playing lives in FmSpots): the theme starts on entering
-// Dry Gulch, once per visit, not again if you rode in within the last five
+// Dry Gulch, once per visit, not again if you rode in within the last twenty
 // minutes, never while something else owns the moment (a replay, the Upside
 // Down, a cutscene, the start-of-game intro). Leaving town fades it out.
 
 export const TOWN_THEME_TOWN = 'cowboy';
 export const TOWN_THEME_SONG = 'sell-it-cold';
-export const TOWN_THEME_COOLDOWN_MS = 5 * 60_000;
+export const TOWN_THEME_COOLDOWN_MS = 20 * 60_000;
 export const TOWN_THEME_FADE_S = 2;
 
 export interface TownThemeState {

@@ -7,7 +7,10 @@ import {
   HOUSE_CUT_MIN_S,
   HOUSE_CUT_RANGE,
   HOUSE_DAY_MS,
+  HOUSE_JINGLE_P,
   HOUSE_NO_REPEAT_MS,
+  HOUSE_PIRATE_MAX_MS,
+  HOUSE_PIRATE_MIN_MS,
   houseAt,
   houseDay,
   houseSlot,
@@ -57,19 +60,42 @@ describe('house programme', () => {
     expect(b).toEqual(a);
     const t = DAY + 5 * 3600_000 + 12_345;
     expect(houseAt(a, t)).toEqual(houseAt(b, t));
-    expect(houseAt(a, t)).not.toBeNull();
     // another day is a different running order
     expect(
       houseDay(CAT, DAY + HOUSE_DAY_MS).map(x => x.kind === 'song' && srcKey(x.track.src)),
     ).not.toEqual(a.map(x => x.kind === 'song' && srcKey(x.track.src)));
   });
 
-  it('covers the whole day back to back', () => {
+  it('runs all day, with only pirate-block holes between items', () => {
     const a = houseDay(CAT, DAY);
     expect(a[0]!.at).toBe(DAY);
-    for (let i = 1; i < a.length; i++) expect(a[i]!.at).toBe(a[i - 1]!.endAt);
-    expect(a[a.length - 1]!.endAt).toBeGreaterThanOrEqual(DAY + HOUSE_DAY_MS);
-    for (let t = DAY; t < DAY + HOUSE_DAY_MS; t += 997_331) expect(houseAt(a, t)).not.toBeNull();
+    let holes = 0;
+    for (let i = 1; i < a.length; i++) {
+      const gap = a[i]!.at - a[i - 1]!.endAt;
+      if (gap === 0) continue;
+      holes++;
+      expect(gap).toBeGreaterThanOrEqual(HOUSE_PIRATE_MIN_MS);
+      expect(gap).toBeLessThanOrEqual(HOUSE_PIRATE_MAX_MS);
+    }
+    expect(holes).toBeGreaterThan(0);
+    // (the day can end inside a pirate block)
+    expect(a[a.length - 1]!.endAt).toBeGreaterThanOrEqual(DAY + HOUSE_DAY_MS - HOUSE_PIRATE_MAX_MS);
+  });
+
+  it('never cuts the owner songs short', () => {
+    for (const s of songs(houseDay(CAT, DAY)))
+      if (s.track.origin === 'owner') expect(s.cut).toBe(false);
+  });
+
+  it('a tiny catalogue gets a pirate block after every song (no looping the same two)', () => {
+    const a = houseDay({ owner: CAT.owner, library: [], breaks: CAT.breaks }, DAY);
+    for (let i = 0; i < a.length - 1; i++) {
+      if (a[i]!.kind !== 'song') continue;
+      // the song (and its jingle, if any) then a hole before the next song
+      const nextSong = a.slice(i + 1).find(x => x.kind === 'song');
+      if (nextSong === undefined) continue;
+      expect(nextSong.at - a[i]!.endAt).toBeGreaterThanOrEqual(HOUSE_PIRATE_MIN_MS);
+    }
   });
 
   it('never repeats a track within an hour when the catalogue allows it', () => {
@@ -113,7 +139,9 @@ describe('house programme', () => {
           }
           // the song after a break starts straight away
           const after = a[i + 2];
-          if (after?.kind === 'song') expect(after.startAt).toBe(after.at);
+          // (unless a pirate block came in between)
+          if (after?.kind === 'song' && after.at === next.endAt)
+            expect(after.startAt).toBe(after.at);
         }
       } else {
         expect(len).toBeCloseTo(it.track.dur, 2);
@@ -127,6 +155,25 @@ describe('house programme', () => {
     const breaks = a.filter(x => x.kind === 'break');
     expect(breaks.some(x => x.kind === 'break' && x.brk.type === 'alert')).toBe(true);
     expect(breaks.some(x => x.kind === 'break' && x.brk.type === 'interlude')).toBe(true);
+  });
+
+  it('plays full jingles between songs that play out, never inside the short gap', () => {
+    const a = houseDay(CAT, DAY);
+    let jingles = 0;
+    let outs = 0;
+    for (let i = 0; i < a.length - 1; i++) {
+      const it = a[i]!;
+      if (it.kind !== 'song' || it.cut) continue;
+      outs++;
+      const next = a[i + 1]!;
+      if (next.kind !== 'break') continue;
+      jingles++;
+      expect(next.brk.type).toBe('interlude');
+      if (next.brk.type === 'interlude')
+        expect((next.endAt - next.at) / 1000).toBeCloseTo(CAT.breaks[next.brk.index]!, 2);
+    }
+    expect(jingles / outs).toBeGreaterThan(HOUSE_JINGLE_P - 0.1);
+    expect(jingles / outs).toBeLessThan(HOUSE_JINGLE_P + 0.1);
   });
 
   it('works with just the owner songs (tiny catalogue: least-recently-played)', () => {

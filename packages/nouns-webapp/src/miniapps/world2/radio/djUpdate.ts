@@ -54,17 +54,19 @@ export function getDjUpdate(maxAgeMs = 10 * 60_000): Promise<DjUpdate | null> {
 /** Best voice for a radio DJ: English, a known "male"/deeper voice first. */
 export function pickDjVoice(voices: { name: string; lang: string }[]): number {
   const en = voices.map((v, i) => ({ v, i })).filter(x => /^en[_-]/i.test(x.v.lang));
-  const prefs = [
-    /daniel/i,
-    /google uk english male/i,
-    /alex/i,
-    /fred/i,
-    /arthur/i,
-    /male/i,
-    /aaron/i,
+  // a human-sounding woman: the neural / enhanced voices first, then the
+  // best stock female voice each platform ships
+  const female =
+    /aria|jenny|sonia|libby|natasha|ava|samantha|serena|kate|moira|tessa|karen|victoria|allison|susan|zira|female/i;
+  const natural = /natural|neural|premium|enhanced|online/i;
+  const prefs: ((name: string) => boolean)[] = [
+    n => natural.test(n) && female.test(n),
+    n => /google uk english female/i.test(n),
+    n => /google us english/i.test(n),
+    n => female.test(n) && !/\bmale\b/i.test(n),
   ];
-  for (const re of prefs) {
-    const hit = en.find(x => re.test(x.v.name));
+  for (const ok of prefs) {
+    const hit = en.find(x => ok(x.v.name));
     if (hit !== undefined) return hit.i;
   }
   return en[0]?.i ?? -1;
@@ -112,9 +114,10 @@ export function speakDj(
       const i = pickDjVoice(voices);
       if (i >= 0) u.voice = voices[i]!;
       u.lang = u.voice?.lang ?? 'en-US';
-      // a touch quick and low: late-night pirate DJ (urgent: faster, higher)
-      u.rate = opts.urgent === true ? 1.12 : 1.04;
-      u.pitch = opts.urgent === true ? 1 : 0.8;
+      // natural pitch (bending it is what makes browser voices sound robotic);
+      // urgent: a touch quicker
+      u.rate = opts.urgent === true ? 1.08 : 1;
+      u.pitch = 1;
       u.volume = Math.max(0, Math.min(1, opts.volume));
       u.onend = () => finish(true);
       u.onerror = () => finish(false);

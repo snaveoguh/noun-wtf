@@ -200,9 +200,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
 
-  // NOUN FM's start-of-game intro (once per page load; ?fmintro=1 forces it offline)
+  // NOUN FM's start-of-game intro: from PRESS START, so it plays over character
+  // select (once per page load; ?fmintro=1 forces it offline)
   useEffect(() => {
-    if (!game || phase !== 'play') return;
+    if (!game || phase === 'title') return;
     const ok = introAllowed({
       enabled: introEnabled(),
       played: game.spots.introPlayed,

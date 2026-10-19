@@ -314,7 +314,7 @@ export async function renderVoice(
         },
         body: JSON.stringify({
           model: env.OPENAI_TTS_MODEL ?? 'gpt-4o-mini-tts',
-          voice: env.OPENAI_TTS_VOICE ?? 'ash',
+          voice: env.OPENAI_TTS_VOICE ?? 'nova',
           input,
           instructions: TTS_STYLE,
           response_format: 'mp3',
@@ -323,7 +323,7 @@ export async function renderVoice(
       return r.ok ? await r.arrayBuffer() : null;
     }
     if (env.ELEVENLABS_API_KEY !== undefined && env.ELEVENLABS_API_KEY !== '') {
-      const voice = env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB';
+      const voice = env.ELEVENLABS_VOICE_ID ?? '21m00Tcm4TlvDq8ikWAM';
       const r = await f(
         `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_64`,
         {
