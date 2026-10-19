@@ -24,6 +24,8 @@ import {
 
 import { clock, fmtDur, KIND } from './fmFormat';
 import { LibraryTab, ScheduleBoard } from './FmLibrary';
+import { introEnabled, setIntroEnabled } from './FmSpots';
+import { useSpots } from './FmSpotsUi';
 import { inLibrary, shareSet, type SetDraft } from './libraryStore';
 import { type FmView, type NounFm } from './NounFm';
 import { forgetSet, loadSetHistory, rememberSet, type SavedSet } from './setHistory';
@@ -404,7 +406,12 @@ function QueueTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }
         )}
         {s !== null && s.queue.length === 0 && air.source !== 'set' && (
           <div className="opacity-60">
-            queue&apos;s empty{air.track === null ? ', the pirate relay is filling in' : ''}
+            queue&apos;s empty
+            {view.house !== null
+              ? ', the house mix is on'
+              : air.track === null
+                ? ', the pirate relay is filling in'
+                : ''}
           </div>
         )}
         {s?.queue.map((e, i) => (
@@ -662,6 +669,50 @@ function SetTab({
   );
 }
 
+/** Replay the station intro / the latest DJ update; the "intro on start" toggle. */
+function SpotControls({ game }: { game: Game }) {
+  const [introOn, setIntroOn] = useState(introEnabled);
+  const v = useSpots(game.spots);
+  const btn = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold disabled:opacity-40';
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-fm="spots">
+      <button
+        type="button"
+        className={btn}
+        disabled={v.stage !== null}
+        onClick={() => {
+          game.unlockAudio();
+          void game.spots.intro();
+        }}
+      >
+        ▶ intro
+      </button>
+      <button
+        type="button"
+        className={btn}
+        disabled={v.stage !== null}
+        onClick={() => {
+          game.unlockAudio();
+          void game.spots.djUpdate();
+        }}
+      >
+        ▶ latest DJ update
+      </button>
+      <label className="ml-auto flex items-center gap-1 text-[11px] opacity-80">
+        <input
+          type="checkbox"
+          checked={introOn}
+          onChange={e => {
+            setIntroEnabled(e.target.checked);
+            setIntroOn(e.target.checked);
+          }}
+        />
+        station intro on start
+      </label>
+    </div>
+  );
+}
+
 export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) {
   const fm = game.fm;
   const view = useFm(fm);
@@ -685,6 +736,7 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
   const tune = () => {
     game.unlockAudio();
     game.radio.setMode(view.tuned ? 'pirate' : 'fm');
+    game.saveRadioMode();
   };
   const now = performance.now();
   return (
@@ -712,9 +764,16 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
             </span>
           )}
           {view.phase === 'ident' ? '📣 ident, then: ' : ''}
-          {view.air.track !== null
-            ? `${view.air.track.title} — ${view.air.track.artist}`
-            : 'nothing queued: pirate relay'}
+          {view.house !== null ? (
+            <span data-fm="house">
+              <span className="text-[#3ddc84]">house mix · </span>
+              {view.house.label}
+            </span>
+          ) : view.air.track !== null ? (
+            `${view.air.track.title} — ${view.air.track.artist}`
+          ) : (
+            'nothing queued: pirate relay'
+          )}
         </div>
         <button
           type="button"
@@ -729,6 +788,7 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
         <div className="text-[11px] text-[#ff6b5b]">{view.trackError}</div>
       )}
       {!view.ready && <div className="opacity-70">connecting to the station…</div>}
+      <SpotControls game={game} />
       <ScheduleBoard fm={fm} view={view} />
       <div className="flex flex-wrap gap-1">
         {(['queue', 'set', 'library'] as const).map(t => (

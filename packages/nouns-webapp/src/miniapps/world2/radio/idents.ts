@@ -142,7 +142,7 @@ function airhorn(ctx: BaseAudioContext, out: AudioNode, t: number, p: number) {
 }
 
 /** Formant "talkbox": a buzzy saw through two moving bandpass filters saying the call sign. */
-function talkbox(ctx: BaseAudioContext, out: AudioNode, t: number, p: number) {
+export function talkbox(ctx: BaseAudioContext, out: AudioNode, t: number, p: number) {
   // (vowel formants F1/F2, length): "noun" "ef" "em"
   const syl: [number, number, number][] = [
     [300, 870, 0.32],

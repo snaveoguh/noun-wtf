@@ -1,0 +1,59 @@
+{
+  "source": "memevalue.eth vote reasons on the Nouns DAO governor (on-chain VoteCast), distilled; see djVoice.md",
+  "openers": [
+    "noun f-m, quick one from the van.",
+    "yo riders, noun f-m chain report.",
+    "noun f-m on the wire, keep it brief.",
+    "gm from the ice cream van, here's the tape.",
+    "noun f-m. the chain, the vibes, the update."
+  ],
+  "verdicts": [
+    "looks legit imo.",
+    "banger imo.",
+    "quite nice actually.",
+    "hell yeh.",
+    "nounish imo.",
+    "s-tier.",
+    "send it."
+  ],
+  "bidHype": [
+    "bullish.",
+    "fomo is a fun shared experience.",
+    "the auction is cooking.",
+    "hear, hear."
+  ],
+  "openHype": ["go bid.", "who's bidding?", "your move, riders.", "bid with your heart."],
+  "executed": [
+    "is through and executed. send it.",
+    "just executed. now that is what i call a roadmap.",
+    "executed. hear, hear."
+  ],
+  "created": [
+    "just landed on chain. read it, vote it.",
+    "is up for a vote. go read it, gl.",
+    "dropped on chain. interesting imo."
+  ],
+  "queued": ["is queued in the timelock.", "passed and queued. almost there."],
+  "canceled": ["got canceled. thanks for playing.", "is off. gl next time."],
+  "votes": ["good turnout.", "governance is alive.", "the people have spoken."],
+  "quiet": [
+    "quiet day on chain. no settles, no props, just vibes.",
+    "chain's been quiet. nothing settled, nothing passed. touch grass, skate the plaza.",
+    "slow one on chain today. the van's still open though."
+  ],
+  "closers": [
+    "keep nouns weird.",
+    "gl.",
+    "send it.",
+    "nouns eats everything.",
+    "fund stuff that feels alive.",
+    "thanks for playing.",
+    "noggles on."
+  ],
+  "alert": ["worldwide alert.", "breaking, worldwide alert.", "worldwide alert, this just in."],
+  "alertQuiet": [
+    "the chain is quiet. no settles, no props. stay weird.",
+    "nothing moved on chain. the van stays open."
+  ],
+  "anon": "an anon wallet"
+}

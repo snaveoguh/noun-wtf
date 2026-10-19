@@ -31,7 +31,14 @@ import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/S
 import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { FmSpots } from './radio/FmSpots';
 import { NounFm } from './radio/NounFm';
+import {
+  TOWN_THEME_FADE_S,
+  TOWN_THEME_SONG,
+  townThemeStep,
+  type TownThemeState,
+} from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
@@ -42,10 +49,10 @@ import { ReplayView } from './replay/ReplayView';
 import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
-import { TradeClient } from './trade/TradeClient';
 import { townsDecorator } from './towns/build';
 import { townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
+import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
@@ -258,6 +265,10 @@ export class Game {
       fmDecks: false,
     };
     this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
+    this.spots = new FmSpots(this.fm, {
+      duck: on => this.duckRadio(on),
+      volume: () => this.mixer.gain('radio') * this.radio.volume,
+    });
     this.trade = new TradeClient({ offline: opts.offline === true || devRun() });
     this.wireFm();
   }
@@ -356,6 +367,9 @@ export class Game {
         },
         game: this,
       });
+    // Dry Gulch's theme ("Sell It Cold") on riding into the cowboy town
+    this.towns?.on('enter', t => this.onTownTheme('enter', t));
+    this.towns?.on('leave', t => this.onTownTheme('leave', t));
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -428,8 +442,13 @@ export class Game {
     if (ctx !== null && !this.radioAttached) {
       this.radioAttached = true;
       const radioBus = this.mixer.attach(ctx).bus('radio') ?? ctx.destination;
-      this.radio.attach(ctx, radioBus, this.audio.noise);
-      this.fm.attach(ctx, radioBus, this.audio.noise);
+      // the station + pirate radio duck under the rider's own spots (intro,
+      // town themes), which go straight into the radio bus
+      this.radioDuck = ctx.createGain();
+      this.radioDuck.connect(radioBus);
+      this.radio.attach(ctx, this.radioDuck, this.audio.noise);
+      this.fm.attach(ctx, this.radioDuck, this.audio.noise);
+      this.spots.attach(ctx, radioBus);
       this.radio.onNowPlaying = label => {
         this.hud = {
           ...this.hud,
@@ -437,8 +456,37 @@ export class Game {
         };
         this.emit();
       };
-      // The plaza needs a soundtrack: start the pirate station on drop-in
-      this.radio.setMode('pirate');
+      // The plaza needs a soundtrack: NOUN FM on drop-in (or the rider's own pick)
+      this.radio.setMode(savedRadioMode() ?? 'fm');
+    }
+  }
+
+  /** The rider's own spots on the radio (the start-of-game intro, town themes). */
+  readonly spots: FmSpots;
+  private radioDuck: GainNode | null = null;
+  private townTheme: TownThemeState = { lastStart: -Infinity, playing: false };
+
+  private duckRadio(on: boolean) {
+    const g = this.radioDuck;
+    const ctx = this.audio.ctx;
+    if (g === null || ctx === null) return;
+    g.gain.setTargetAtTime(on ? 0.12 : 1, ctx.currentTime, on ? 0.15 : 0.4);
+  }
+
+  private onTownTheme(ev: 'enter' | 'leave', town: string) {
+    const blocked = this.replay.active || this.missions.ud.active || this.spots.view.intro;
+    const r = townThemeStep(this.townTheme, ev, town, performance.now(), blocked);
+    this.townTheme = r.state;
+    if (r.action === 'play') void this.spots.town(TOWN_THEME_SONG);
+    else if (r.action === 'stop') this.spots.stopTown(TOWN_THEME_FADE_S);
+  }
+
+  /** Remember the rider's radio pick (M / the FM panel) for next time. */
+  saveRadioMode() {
+    try {
+      localStorage.setItem(RADIO_MODE_STORE, this.radio.mode);
+    } catch {
+      // no storage
     }
   }
 
@@ -458,6 +506,10 @@ export class Game {
     fm.onFallback = on => this.radio.setFmFallback(on);
     fm.onFallbackNext = () => this.radio.nextFallback();
     fm.fallbackSong = () => this.radio.songLabel;
+    fm.onBreak = (tag, text) => {
+      this.hud = { ...this.hud, toast: { tag, text, at: performance.now() } };
+      this.emit();
+    };
     fm.onTrackChange = (label, tuned) => {
       if (tuned) this.radio.onNowPlaying?.(label);
       else {
@@ -496,6 +548,7 @@ export class Game {
   cycleRadio() {
     this.unlockAudio();
     this.radio.cycle();
+    this.saveRadioMode();
   }
 
   nextRadioTrack() {
@@ -1760,4 +1813,16 @@ function escapeHtml(s: string) {
     /["&'<>]/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
+}
+
+const RADIO_MODE_STORE = 'noun-world-radio';
+
+/** The radio mode the rider last picked (null: never picked, NOUN FM by default). */
+function savedRadioMode(): 'off' | 'pirate' | 'fm' | null {
+  try {
+    const m = localStorage.getItem(RADIO_MODE_STORE);
+    return m === 'off' || m === 'pirate' || m === 'fm' ? m : null;
+  } catch {
+    return null;
+  }
 }
