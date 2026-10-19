@@ -10,9 +10,14 @@ import type { MissionSystem, Talkable } from './MissionSystem';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { npcVoice } from '../audio/voice/cast';
+import { lineDuration } from '../audio/voice/voiceParams';
+import { SCENE_IDS, SCENE_TITLES } from '../cutscene/scenes';
+
 import { MISSIONS, NPCS, TIER_NAMES, type MissionDef, type NpcId } from './defs';
 import { DONE_LINE, GREETING, LOCKED_LINE, ORACLE_RIDDLES } from './dialogue';
 import { progressOf, unlockedFor } from './progress';
+import { Spoken } from './Spoken';
 
 function useMissions(sys: MissionSystem) {
   useSyncExternalStore(sys.subscribe, sys.getVersion);
@@ -188,7 +193,7 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
         </div>
       )}
 
-      {sys.panel !== null && <Panel sys={sys} who={sys.panel} />}
+      {sys.panel !== null && <Panel game={game} sys={sys} who={sys.panel} />}
     </>
   );
 }
@@ -209,7 +214,7 @@ function TrackRow({ sys, m }: { sys: MissionSystem; m: MissionDef }) {
   );
 }
 
-function Panel({ sys, who }: { sys: MissionSystem; who: Talkable | 'journal' }) {
+function Panel({ game, sys, who }: { game: Game; sys: MissionSystem; who: Talkable | 'journal' }) {
   return (
     <div className="w2-mpanel-wrap pointer-events-auto absolute inset-0 z-40 flex items-center justify-center p-3">
       <div className="w2-panel w2-mpanel flex max-h-[86vh] w-[440px] max-w-full flex-col gap-2 overflow-y-auto">
@@ -231,7 +236,7 @@ function Panel({ sys, who }: { sys: MissionSystem; who: Talkable | 'journal' }) 
         ) : who === 'door' ? (
           <Door sys={sys} />
         ) : (
-          <Talk sys={sys} npc={who} />
+          <Talk game={game} sys={sys} npc={who} />
         )}
       </div>
     </div>
@@ -268,8 +273,14 @@ function MissionCard({ sys, m }: { sys: MissionSystem; m: MissionDef }) {
   );
 }
 
-function Talk({ sys, npc }: { sys: MissionSystem; npc: NpcId }) {
+function Talk({ game, sys, npc }: { game: Game; sys: MissionSystem; npc: NpcId }) {
   const s = sys.state;
+  // Just heard in a cutscene: show the line, don't say it again
+  const [quiet] = useState(() => {
+    const q = sys.quietLine;
+    sys.quietLine = false;
+    return q;
+  });
   const met = s.met[npc] !== undefined;
   const open = unlockedFor(s, npc);
   const line = MISSIONS.filter(m => m.npc === npc);
@@ -277,25 +288,30 @@ function Talk({ sys, npc }: { sys: MissionSystem; npc: NpcId }) {
   const [plain, setPlain] = useState(false);
   const locked = open === null && line.some(m => s.done[m.id] === undefined);
   const r = ORACLE_RIDDLES[riddle % ORACLE_RIDDLES.length]!;
+  // The riddle waits for her opening line (only the first time the panel opens)
+  const [firstRiddle] = useState(riddle);
+  const [riddleDelay] = useState(() =>
+    quiet ? 0 : lineDuration(lineFor(npc, met, open !== null, locked).text, npcVoice(npc), 0.3),
+  );
 
   return (
     <>
-      <div className="w2-mline">
-        {npc === 'oracle'
-          ? met
-            ? open === null
-              ? DONE_LINE.oracle
-              : 'Back again. Good. Here’s something to chew on with your cookie.'
-            : GREETING.oracle
-          : locked
-            ? LOCKED_LINE[npc]
-            : open === null
-              ? DONE_LINE[npc]
-              : GREETING[npc]}
-      </div>
+      <Spoken
+        className="w2-mline"
+        game={game}
+        who={npc}
+        quiet={quiet}
+        {...lineFor(npc, met, open !== null, locked)}
+      />
       {npc === 'oracle' && met && (
         <div className="w2-mriddle">
-          <div>“{r.text}”</div>
+          <Spoken
+            game={game}
+            who="oracle"
+            lineId={`oracle.riddle.${riddle % ORACLE_RIDDLES.length}`}
+            text={`“${r.text}”`}
+            delay={riddle === firstRiddle ? riddleDelay : 0}
+          />
           {plain && <div className="w2-mplain">{r.plain}</div>}
           <div className="mt-1 flex gap-2">
             <button type="button" className="w2-chip text-xs" onClick={() => setRiddle(n => n + 1)}>
@@ -347,6 +363,26 @@ function Talk({ sys, npc }: { sys: MissionSystem; npc: NpcId }) {
       </button>
     </>
   );
+}
+
+/** What a character says when you walk up (and its id, for recorded lines). */
+function lineFor(
+  npc: NpcId,
+  met: boolean,
+  open: boolean,
+  locked: boolean,
+): { lineId: string; text: string } {
+  if (npc === 'oracle') {
+    if (!met) return { lineId: 'oracle.greeting', text: GREETING.oracle };
+    if (!open) return { lineId: 'oracle.done', text: DONE_LINE.oracle };
+    return {
+      lineId: 'oracle.back',
+      text: 'Back again. Good. Here’s something to chew on with your cookie.',
+    };
+  }
+  if (locked) return { lineId: `${npc}.locked`, text: LOCKED_LINE[npc] };
+  if (!open) return { lineId: `${npc}.done`, text: DONE_LINE[npc] };
+  return { lineId: `${npc}.greeting`, text: GREETING[npc] };
 }
 
 /** The Oracle points you at the rest of the cast. */
@@ -428,6 +464,25 @@ function Journal({ sys }: { sys: MissionSystem }) {
               {m.reward}
             </button>
           ))}
+        </div>
+      )}
+      {SCENE_IDS.some(id => sys.seen(id)) && (
+        <div className="w2-mnpc">
+          <div className="text-sm font-bold">
+            Scenes <span className="text-[11px] font-normal opacity-60">watch again</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {SCENE_IDS.filter(id => sys.seen(id)).map(id => (
+              <button
+                key={id}
+                type="button"
+                className="w2-chip text-xs"
+                onClick={() => sys.replayScene(id)}
+              >
+                ▶ {SCENE_TITLES[id]}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {npcs.map(n => {

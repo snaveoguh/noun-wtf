@@ -40,7 +40,10 @@ export interface AudioLevels {
   master: number;
   sfx: number;
   radio: number;
+  /** Voice chat (other riders). */
   voice: number;
+  /** Character voices (the NPCs' babble, cutscene lines). */
+  npc: number;
   muted: boolean;
 }
 
@@ -71,7 +74,7 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
   for (const h of HUD_ITEMS) hud[h.id] = true;
   return {
     v: SETTINGS_VERSION,
-    audio: { master: 1, sfx: 1, radio: 1, voice: 1, muted: false },
+    audio: { master: 1, sfx: 1, radio: 1, voice: 1, npc: 1, muted: false },
     hud,
     hudScale: 1,
     quality: 'auto',
@@ -131,6 +134,7 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
       sfx: clamp(a.sfx, 0, 1, base.audio.sfx),
       radio: clamp(a.radio, 0, 1, base.audio.radio),
       voice: clamp(a.voice, 0, 1, base.audio.voice),
+      npc: clamp(a.npc, 0, 1, base.audio.npc),
       muted: bool(a.muted, base.audio.muted),
     },
     hud,

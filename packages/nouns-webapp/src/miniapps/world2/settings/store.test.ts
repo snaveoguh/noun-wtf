@@ -23,7 +23,7 @@ describe('defaults', () => {
   it('leave the mix and the HUD as they were', () => {
     const d = defaultSettings(false);
     expect(d.v).toBe(SETTINGS_VERSION);
-    expect(d.audio).toEqual({ master: 1, sfx: 1, radio: 1, voice: 1, muted: false });
+    expect(d.audio).toEqual({ master: 1, sfx: 1, radio: 1, voice: 1, npc: 1, muted: false });
     for (const h of HUD_ITEMS) expect(d.hud[h.id]).toBe(true);
     expect(d.hudScale).toBe(1);
     expect(d.quality).toBe('auto');
@@ -71,7 +71,7 @@ describe('clamping', () => {
       },
       base,
     );
-    expect(s.audio).toEqual({ master: 1, sfx: 0, radio: 1, voice: 1, muted: false });
+    expect(s.audio).toEqual({ master: 1, sfx: 0, radio: 1, voice: 1, npc: 1, muted: false });
     expect(s.hudScale).toBe(1.5);
     expect(s.lookSens).toBe(0.25);
     expect(s.quality).toBe('auto');

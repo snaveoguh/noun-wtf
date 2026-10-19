@@ -202,6 +202,9 @@ export class TradeClient implements TradeApi {
     return qs ? GOOD_IDS.flatMap(g => (qs[g] ? [qs[g]!] : [])) : [];
   }
 
+  /** Every finished action, ok or not (the game plays the till sounds off it). */
+  onActed?: (a: TradeAction, r: TradeResult) => void;
+
   act(a: TradeAction): Promise<TradeResult> {
     const run = this.queue.then(() => this.run(a));
     this.queue = run.catch(() => undefined);
@@ -286,6 +289,7 @@ export class TradeClient implements TradeApi {
 
   private finish(r: TradeResult, a: TradeAction): TradeResult {
     this.notice = { text: r.ok ? doneText(a) : (r.reason ?? 'refused'), ok: r.ok, at: Date.now() };
+    this.onActed?.(a, r);
     this.emit();
     return r;
   }

@@ -9,6 +9,7 @@ const L = (p: Partial<AudioLevels> = {}): AudioLevels => ({
   sfx: 1,
   radio: 1,
   voice: 1,
+  npc: 1,
   muted: false,
   ...p,
 });
@@ -24,7 +25,7 @@ describe('bus math', () => {
   });
 
   it('defaults are unity (the existing mix is unchanged)', () => {
-    expect(nodeGains(L())).toEqual({ master: 1, sfx: 1, radio: 1, voice: 1 });
+    expect(nodeGains(L())).toEqual({ master: 1, sfx: 1, radio: 1, voice: 1, npc: 1 });
   });
 
   it('end-to-end gain is master × bus', () => {
@@ -72,18 +73,18 @@ function fakeCtx(state: AudioContextState = 'suspended') {
 }
 
 describe('AudioMixer', () => {
-  it('builds sfx / radio / voice → master → destination', () => {
+  it('builds sfx / radio / voice / npc → master → destination', () => {
     const { ctx, made, destination } = fakeCtx();
     const m = new AudioMixer().attach(ctx);
-    expect(made).toHaveLength(4);
+    expect(made).toHaveLength(5);
     const n = m.nodes!;
     expect((n.master as unknown as { to: unknown[] }).to).toEqual([destination]);
-    for (const b of ['sfx', 'radio', 'voice'] as const)
+    for (const b of ['sfx', 'radio', 'voice', 'npc'] as const)
       expect((n[b] as unknown as { to: unknown[] }).to).toEqual([n.master]);
     expect(m.bus('radio')).toBe(n.radio);
     // attaching again is a no-op
     m.attach(ctx);
-    expect(made).toHaveLength(4);
+    expect(made).toHaveLength(5);
   });
 
   it('levels set before attach apply when the graph is built', () => {

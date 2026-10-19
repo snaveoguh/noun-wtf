@@ -46,6 +46,8 @@ interface Saved {
 
 export class UpsideDown {
   active = false;
+  /** The canvas filter inside (the door's cutscene eases into it). */
+  readonly filter = FILTER;
   private saved: Saved | null = null;
   private fog = new THREE.FogExp2(0x6a1a22, 0.0025);
   private bg = new THREE.Color(0x3a0a10);

@@ -8,7 +8,10 @@ import type { TimeOfDayPreset } from './nature/TimeOfDay';
 import * as THREE from 'three';
 
 import { PirateRadio } from './audio/PirateRadio';
+import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
+import { seedVoice } from './audio/voice/cast';
+import { VoiceBox } from './audio/voice/VoiceBox';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -19,6 +22,8 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
+import { CutscenePlayer } from './cutscene/CutscenePlayer';
+import { gameHost } from './cutscene/host';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
@@ -42,10 +47,10 @@ import { ReplayView } from './replay/ReplayView';
 import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
-import { TradeClient } from './trade/TradeClient';
 import { townsDecorator } from './towns/build';
 import { townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
+import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { loadLevel, type LevelData } from './world/Level';
@@ -166,6 +171,26 @@ export class Game {
   audio = new SkateAudio();
   /** Per-bus volumes (settings/mixer.ts): sfx, radio, voice under one master. */
   readonly mixer = new AudioMixer();
+  /** Sampled + synthesized one-shots, loops and town ambience (audio/sfx), on the sfx bus. */
+  readonly sfx = new Sfx(
+    () => this.audio.ctx,
+    () => this.bus('sfx'),
+    () => this.audio.noise,
+    () => this.bus('radio'),
+  );
+  /** Character voices (audio/voice): every NPC line is spoken, on the npc bus. */
+  readonly voice = new VoiceBox(
+    () => this.audio.ctx,
+    () => this.bus('npc'),
+    () => this.audio.noise,
+  );
+  /** In-engine cutscenes (cutscene/): while one plays it owns the camera and the clock. */
+  readonly cutscene: CutscenePlayer = new CutscenePlayer(gameHost(this));
+
+  private bus(b: 'sfx' | 'radio' | 'npc'): AudioNode | null {
+    const ctx = this.audio.ctx;
+    return ctx === null ? null : this.mixer.attach(ctx).bus(b);
+  }
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
@@ -259,6 +284,13 @@ export class Game {
     };
     this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
     this.trade = new TradeClient({ offline: opts.offline === true || devRun() });
+    // The till: coins for a sale, chips stacking for a buy
+    this.trade.onActed = (a, r) => {
+      if (!r.ok) return this.sfx.play('ui-cancel', { gain: 0.5 });
+      if (a.t === 'sell') this.sfx.play('coins', { gain: 0.8 });
+      else if (a.t === 'buy') this.sfx.play('chips', { gain: 0.8 });
+      else if (a.t === 'upgrade') this.sfx.play('mission-accept', { gain: 0.6 });
+    };
     this.wireFm();
   }
 
@@ -355,7 +387,16 @@ export class Game {
           this.emit();
         },
         game: this,
+        say: (seed, text, at) => {
+          // Customers speak up within earshot
+          const d = at.distanceTo(this.player.pos);
+          if (d < 32) this.voice.speak({ text, voice: seedVoice(seed), gain: 1 - (d / 32) * 0.75 });
+        },
+        sound: (id, gain) => this.sfx.play(id, { gain }),
       });
+    // Town ambience: wind in Dry Gulch, waves and gulls in Puerto Noun
+    this.towns?.on('enter', t => this.sfx.setBed(t === 'cowboy' || t === 'beach' ? t : null));
+    this.towns?.on('leave', () => this.sfx.setBed(null));
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
     if (this.gfx.toon) toonify(this.me.root);
@@ -551,7 +592,11 @@ export class Game {
   private decks = new DeckSync();
 
   step(dt: number, now = performance.now()) {
-    if (this.replay.active) return this.stepReplay(dt, now);
+    if (this.replay.active) {
+      // Scenes never run in replays
+      if (this.cutscene.active) this.cutscene.abort();
+      return this.stepReplay(dt, now);
+    }
     this.decks.tick(this.me, this.net, this.remotes);
     if (this.showroom) {
       this.input.poll(now);
@@ -573,6 +618,8 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    if (this.cutscene.active) return this.stepCutscene(dt, now);
+    this.cutscene.tick();
     const input = this.input.poll(now);
     // Driving the ice cream van: E / R / spray are the van's this frame
     const driving = this.van2.preStep(input);
@@ -653,6 +700,33 @@ export class Game {
     this.gfx.render(dt);
     this.updateHud(dt, input);
     this.hoops.idle(dt);
+  }
+
+  /**
+   * A cutscene: the rider's physics and input wait; the world runs on the
+   * scene's clock (slow-mo / frozen), the scene owns the camera.
+   */
+  private stepCutscene(dt: number, now: number) {
+    const input = this.input.poll(now); // drained, so nothing fires on the way back
+    const cs = this.cutscene;
+    cs.update(dt);
+    const wdt = dt * cs.timeScale;
+    this.updateMyCharacter(wdt);
+    this.updateFm(dt);
+    this.updateNetwork(dt);
+    this.van2.update(wdt);
+    this.crew?.update(wdt, this.player.pos);
+    this.missions.update(wdt);
+    this.towns?.update(wdt);
+    this.particles.update(wdt, () => null);
+    this.sfx.update(dt, { upsideDown: this.missions.ud.active });
+    this.gfx.followShadow(this.player.pos);
+    this.mountain?.update(this.player.pos, this.player.vel);
+    this.nature?.update(wdt, this.player.pos);
+    this.billboards.update(wdt);
+    this.gfx.render(dt);
+    // Stats see the scene like the Upside Down: suspended (only time played counts)
+    this.updateHud(dt, input);
   }
 
   /** Replaying: the ride plays back, the world streams around the ghost, nothing else moves. */
@@ -1312,7 +1386,7 @@ export class Game {
       this.boardType === 'hover' && p.mode === 'board' && p.state !== 'bail',
       this.boardType === 'scooter' ? 1.45 : this.boardType === 'blades' ? 1.2 : 1,
     );
-    void dt;
+    this.sfx.update(dt, { upsideDown: this.missions.ud.active });
   }
 
   private ensureRemote(id: string, seedK: string): RemoteAvatar | null {
@@ -1711,6 +1785,9 @@ export class Game {
   }
 
   dispose() {
+    this.cutscene.abort();
+    this.voice.stopAll();
+    this.sfx.dispose();
     this.missions.dispose();
     this.hoops.dispose();
     this.van2.dispose();

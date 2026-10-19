@@ -53,6 +53,15 @@ export class StandingNpc {
   flag = false;
   /** Kinematic riders (the Twins) drive their own characters. */
   driven = false;
+  /**
+   * A cutscene's direction (cutscene/CutscenePlayer): face a point and hold a
+   * clip instead of the usual turn-and-wave. Null = normal behaviour.
+   */
+  direct: { look: THREE.Vector3 | null; clip: string | null } | null = null;
+  private glowSprite: THREE.Sprite | null = null;
+  private glowLocal = new THREE.Vector3();
+  private glowK = 0;
+  private glowTarget = 0;
   private fixedProps: THREE.Object3D | null = null;
   private waveT = 0;
   private waved = false;
@@ -143,7 +152,21 @@ export class StandingNpc {
     }
     const disp = show ? 'block' : 'none';
     if (this.label.style.display !== disp) this.label.style.display = disp;
+    this.updateGlow(dt);
     if (!this.root.visible || this.driven) return;
+    const dir = this.direct;
+    if (dir !== null) {
+      for (const ch of this.chars) {
+        if (dir.look !== null) {
+          const want = Math.atan2(dir.look.x - this.pos.x, dir.look.z - this.pos.z) - this.yaw;
+          _q.setFromAxisAngle(Y, want);
+          ch.root.quaternion.slerp(_q, 1 - Math.exp(-5 * dt));
+        }
+        ch.play({ clip: dir.clip ?? 'idle', fade: 0.3 });
+        ch.update(dt, { lean: 0, travelled: 0, riding: false, grounded: true });
+      }
+      return;
+    }
     // Face the player when they're close, wave once
     const dx = player.x - this.pos.x;
     const dz = player.z - this.pos.z;
@@ -162,12 +185,73 @@ export class StandingNpc {
     }
   }
 
+  /** Light the crystal ball (the Oracle's head) towards k (0..1); it eases there. */
+  glowTo(k: number) {
+    this.glowTarget = Math.max(0, Math.min(1, k));
+    if (this.glowTarget > 0 && this.glowSprite === null) this.makeGlow();
+  }
+
+  private makeGlow() {
+    const head = this.chars[0]?.head;
+    const box = new THREE.Box3();
+    this.root.updateMatrixWorld(true);
+    if (head) box.setFromObject(head);
+    if (box.isEmpty()) this.glowLocal.set(0, 1.8, 0);
+    else this.root.worldToLocal(box.getCenter(this.glowLocal));
+    const tex = canvasTex(128, 128, c => {
+      const g = c.createRadialGradient(64, 64, 4, 64, 64, 64);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.25, 'rgba(190,150,255,0.85)');
+      g.addColorStop(0.6, 'rgba(110,80,255,0.25)');
+      g.addColorStop(1, 'rgba(80,40,200,0)');
+      c.fillStyle = g;
+      c.fillRect(0, 0, 128, 128);
+    });
+    const m = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      // A halo over the whole ball, not hidden inside it
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+    });
+    const sp = new THREE.Sprite(m);
+    sp.renderOrder = 5;
+    inkExcluded.add(sp);
+    this.host.scene.add(sp);
+    this.glowSprite = sp;
+  }
+
+  private updateGlow(dt: number) {
+    const sp = this.glowSprite;
+    if (sp === null) return;
+    this.glowK += (this.glowTarget - this.glowK) * (1 - Math.exp(-2.2 * dt));
+    const k = this.glowK;
+    sp.visible = k > 0.01 && this.root.visible;
+    if (!sp.visible) return;
+    sp.position.copy(this.glowLocal);
+    this.root.localToWorld(sp.position);
+    const pulse = 1 + 0.08 * Math.sin(this.t * 5.3) + 0.04 * Math.sin(this.t * 13.1);
+    sp.scale.setScalar(2.4 * pulse * (0.6 + 0.4 * k));
+    (sp.material as THREE.SpriteMaterial).opacity = 0.7 * k;
+  }
+
   /** Feet within talk range? */
   inRange(p: THREE.Vector3, r = TALK_R) {
     return Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < r && Math.abs(p.y - this.pos.y) < 3;
   }
 
   dispose() {
+    if (this.glowSprite !== null) {
+      this.host.scene.remove(this.glowSprite);
+      inkExcluded.delete(this.glowSprite);
+      const m = this.glowSprite.material as THREE.SpriteMaterial;
+      m.map?.dispose();
+      m.dispose();
+      this.glowSprite = null;
+    }
     for (const ch of this.chars) ch.dispose();
     this.host.scene.remove(this.root);
     this.root.traverse(o => {

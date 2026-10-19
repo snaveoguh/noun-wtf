@@ -6,8 +6,10 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { useAppSelector } from '@/hooks';
 
+import { bindUiSounds } from './audio/sfx/uiSounds';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
+import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { Game, type HudState } from './Game';
 import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
@@ -109,6 +111,13 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const labelsRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [game, setGame] = useState<Game | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Every HUD / panel button clicks (audio/sfx/uiSounds)
+  useEffect(() => {
+    const root = rootRef.current;
+    if (game === null || root === null) return;
+    return bindUiSounds(root, game.sfx);
+  }, [game]);
   // title → select (character select over the live showroom) → play
   const [phase, setPhase] = useState<'title' | 'select' | 'play'>('title');
   const started = phase === 'play';
@@ -291,16 +300,17 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
 
   return (
     <div
-      className="fixed inset-0 select-none overflow-hidden bg-[#0d1117] text-white"
+      ref={rootRef}
+      className="w2-root fixed inset-0 select-none overflow-hidden bg-[#0d1117] text-white"
       style={{
         touchAction: 'none',
         fontFamily: "'Londrina Solid', 'PT Root UI', system-ui, sans-serif",
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS}</style>
+      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS + CUTSCENE_CSS}</style>
       <HudPrefsStyle />
-      <div ref={hostRef} className="absolute inset-0" />
+      <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && !replaying && (
         <Hud
@@ -322,6 +332,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}
       {game?.drops && started && <DropClaim drops={game.drops} />}
+      {game && started && <CutsceneUi game={game} touch={touchPage} />}
 
       {chatOpen && (
         <form

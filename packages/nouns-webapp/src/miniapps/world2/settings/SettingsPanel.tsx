@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 
 import { createPortal } from 'react-dom';
 
+import { npcVoice } from '../audio/voice/cast';
 import { resetHudPositions } from '../ui/HudDrag';
 import { worldPause } from '../worldPause';
 
@@ -94,14 +95,16 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
     };
   }, [game]);
 
-  const setAudio = (patch: Partial<AudioLevels>, preview: boolean) => {
+  const setAudio = (patch: Partial<AudioLevels>, preview: boolean | 'npc') => {
     settings.update({ audio: patch });
-    // Live preview: a board pop through the SFX bus (throttled while dragging)
+    // Live preview through the bus being set (throttled while dragging): a
+    // board pop for SFX, a word from the Oracle for character voices
     const now = performance.now();
-    if (preview && now - lastPreview.current > 140) {
+    if (preview !== false && now - lastPreview.current > (preview === 'npc' ? 700 : 140)) {
       lastPreview.current = now;
       game.unlockAudio();
-      game.audio.pop(0.7);
+      if (preview === 'npc') game.voice.speak({ text: 'Hello.', voice: npcVoice('oracle') });
+      else game.audio.pop(0.7);
     }
   };
 
@@ -160,6 +163,12 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
             value={a.voice}
             fmt={label}
             onChange={v => setAudio({ voice: v }, false)}
+          />
+          <Slider
+            name="Character voices"
+            value={a.npc}
+            fmt={label}
+            onChange={v => setAudio({ npc: v }, 'npc')}
           />
           <Toggle
             name={a.muted ? '🔇 Muted' : '🔊 Mute all'}
