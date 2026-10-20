@@ -1,4 +1,4 @@
-import type { TownId } from '../../../world2/trade/contract';
+import type { TownId } from '../goods';
 import type { Account, BotMemory, BotStyle, GeOrder, GoodId, Goods, Side } from '../types';
 
 /** A bot's identity and budget. Seeds are the exact on-chain Noun seeds. */

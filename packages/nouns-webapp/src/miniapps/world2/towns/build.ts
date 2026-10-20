@@ -24,7 +24,7 @@ import { TOWN_SITES } from '../world/mountain/tracks';
 
 import { beachSigns, buildBeach, palmGeometry, BEACH_C } from './beach';
 import { buildCowboy, cactusGeometry, cowboySigns, tumbleweedGeometry } from './cowboy';
-import { buildAtlas, TownBuilder, type Atlas } from './kit';
+import { buildAtlas, TownBuilder, type Atlas, type SignSpec } from './kit';
 import {
   GROWN_TOWNS,
   LAGOON,
@@ -34,6 +34,7 @@ import {
   type GrownTown,
   type TownFrame,
 } from './site';
+import { WEIRD_TOWNS, type TownExtras } from './weird';
 
 export interface TownBuildStats {
   drawCalls: number;
@@ -55,7 +56,25 @@ const blank = (): TownBuildStats => ({
 });
 
 /** Last build's numbers per town. */
-export const townStats: Record<GrownTown, TownBuildStats> = { cowboy: blank(), beach: blank() };
+export const townStats = Object.fromEntries(GROWN_TOWNS.map(id => [id, blank()])) as Record<
+  GrownTown,
+  TownBuildStats
+>;
+
+/** Each town's look: its signs, its build, its instanced plant. */
+export interface TownLook {
+  signs(): SignSpec[];
+  build(b: TownBuilder, ground: (vp: number, u: number) => number): void;
+  plant(): THREE.BufferGeometry;
+  /** Animated / special parts (the weird towns). */
+  extras?: (b: TownBuilder, ctx: ChunkContext, root: THREE.Group) => TownExtras;
+}
+
+const LOOKS: Record<GrownTown, TownLook> = {
+  cowboy: { signs: cowboySigns, build: buildCowboy, plant: cactusGeometry },
+  beach: { signs: beachSigns, build: buildBeach, plant: palmGeometry },
+  ...WEIRD_TOWNS,
+};
 
 /** Per-frame animation hooks of the built towns (tumbleweeds); TownSystem runs them. */
 export const townAnimators = new Set<(dt: number) => void>();
@@ -67,6 +86,7 @@ let mats: {
   ground: THREE.MeshStandardMaterial;
   thin: THREE.MeshStandardMaterial;
   water: THREE.MeshStandardMaterial;
+  glow: THREE.MeshBasicMaterial;
 } | null = null;
 
 function materials() {
@@ -92,7 +112,9 @@ function materials() {
       depthWrite: false,
     });
     water.name = 'TownWater';
-    mats = { solid, ground, thin, water };
+    const glow = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    glow.name = 'TownGlow';
+    mats = { solid, ground, thin, water, glow };
   }
   return mats;
 }
@@ -102,7 +124,7 @@ const atlases = new Map<GrownTown, { atlas: Atlas; mat: THREE.MeshStandardMateri
 function signsFor(id: GrownTown) {
   let a = atlases.get(id);
   if (a === undefined) {
-    const atlas = buildAtlas(id === 'cowboy' ? cowboySigns() : beachSigns());
+    const atlas = buildAtlas(LOOKS[id].signs());
     const mat = new THREE.MeshStandardMaterial({ map: atlas.texture, roughness: 0.8 });
     mat.name = 'TownSigns';
     a = { atlas, mat };
@@ -115,7 +137,7 @@ const plantGeo = new Map<GrownTown, THREE.BufferGeometry>();
 function plantGeometry(id: GrownTown) {
   let g = plantGeo.get(id);
   if (g === undefined) {
-    g = id === 'cowboy' ? cactusGeometry() : palmGeometry();
+    g = LOOKS[id].plant();
     plantGeo.set(id, g);
   }
   return g;
@@ -139,8 +161,7 @@ function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration 
     townToWorld(f, vp, u, _w);
     return terrainHeight(_w.x, _w.z);
   };
-  if (id === 'cowboy') buildCowboy(b, ground);
-  else buildBeach(b, ground);
+  LOOKS[id].build(b, ground);
   const root = new THREE.Group();
   root.name = `Town:${id}`;
   const M = materials();
@@ -171,6 +192,7 @@ function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration 
   addMesh(b.geo.solid, M.solid, `${id}Solid`, ctx.quality !== 'low');
   addMesh(b.geo.ground, M.ground, `${id}Ground`, false);
   const thin = addMesh(b.geo.thin, M.thin, `${id}Thin`, false);
+  const glow = addMesh(b.geo.glow, M.glow, `${id}Glow`, false);
   addMesh(b.signs, signMat, `${id}Signs`, false);
   if (b.plants.length > 0) {
     const pg = plantGeometry(id);
@@ -199,6 +221,14 @@ function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration 
     calls++;
     animate = tumbleweeds(f, ctx.origin, im);
     animate(0);
+  } else if (id !== 'beach') {
+    const ex = LOOKS[id].extras?.(b, ctx, root);
+    if (ex !== undefined) {
+      animate = ex.animate;
+      disposables.push(...ex.disposables);
+      tris += ex.triangles;
+      calls += ex.drawCalls;
+    }
   } else {
     // The lagoon: one plane at the waterline, its edges hidden under the sand rim
     const v0 = LAGOON.v0 + 2;
@@ -219,6 +249,7 @@ function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration 
   }
   if (ctx.toon) toonify(root);
   if (thin !== null) inkExcluded.add(thin);
+  if (glow !== null) inkExcluded.add(glow);
   root.updateMatrixWorld(true);
   // Collision (chunk-local, position only)
   let n = 0;
@@ -247,6 +278,7 @@ function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration 
     dispose: () => {
       if (animate !== null) townAnimators.delete(animate);
       if (thin !== null) inkExcluded.delete(thin);
+      if (glow !== null) inkExcluded.delete(glow);
       collision.dispose();
       for (const d of disposables) d.dispose();
       townStats[id].live = false;

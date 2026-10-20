@@ -8,7 +8,7 @@
 // economy lands, swap `townQuote` for an adapter over its quotes (the
 // `TownFeed` interface below is the seam) and the bots' fair value follows.
 
-import type { GoodId, Quote, TownId } from '../../world2/trade/contract';
+import type { GoodId, Quote, TownId as WorldTownId } from '../../world2/trade/contract';
 
 import { hashNoise } from './rng';
 
@@ -34,6 +34,9 @@ export const GOOD_INFO: Record<GoodId, { name: string; icon: string; base: numbe
 
 export const isGood = (g: unknown): g is GoodId =>
   typeof g === 'string' && (GOODS as readonly string[]).includes(g);
+
+/** The standalone Exchange models the four original towns only. */
+export type TownId = Extract<WorldTownId, 'city' | 'jersey' | 'cowboy' | 'beach'>;
 
 export const TOWNS: readonly TownId[] = ['city', 'jersey', 'cowboy', 'beach'];
 

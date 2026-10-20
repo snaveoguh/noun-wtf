@@ -29,8 +29,11 @@ import type { TownPlacement } from '../trade/contract';
 import { MOUNTAIN, edgeDistance, smoothstep } from '../world/mountain/config';
 import { TOWN_SITES, tracks, type SpotSite } from '../world/mountain/tracks';
 
-export type GrownTown = 'cowboy' | 'beach';
-export const GROWN_TOWNS: GrownTown[] = ['cowboy', 'beach'];
+export type GrownTown = 'cowboy' | 'beach' | 'noggle' | 'shroom' | 'neon' | 'crater';
+export const GROWN_TOWNS: GrownTown[] = ['cowboy', 'beach', 'noggle', 'shroom', 'neon', 'crater'];
+
+export const isGrownTown = (v: unknown): v is GrownTown =>
+  typeof v === 'string' && (GROWN_TOWNS as string[]).includes(v);
 
 export const TOWN = {
   /** Uphill cut wall, downhill lip, side blends (m). */
@@ -49,6 +52,11 @@ export const TOWN = {
 export const LAYOUT: Record<GrownTown, { near: number; far: number; lagoon: boolean }> = {
   cowboy: { near: 46, far: 46, lagoon: false },
   beach: { near: 44, far: 118, lagoon: true },
+  // The weird towns are wider: blocks two deep either side of main street
+  noggle: { near: 64, far: 64, lagoon: false },
+  shroom: { near: 56, far: 72, lagoon: false },
+  neon: { near: 66, far: 66, lagoon: false },
+  crater: { near: 60, far: 84, lagoon: false },
 };
 
 /** Lagoon extent (v', and u inset from the pad ends). */
@@ -91,7 +99,8 @@ export function setTownNatural(fn: (x: number, z: number) => number) {
 const resolved = new Map<GrownTown, TownFrame>();
 let frameList: TownFrame[] = [];
 const _pp = { x: 0, z: 0, h: 0, k: 0 };
-let townTrack: (typeof tracks.tracks)[number] | null = null;
+/** Main lines with towns, and how many of their sites have been resolved. */
+const TOWN_TRACK_IDS = [...new Set(TOWN_SITES.map(q => q.track as number))];
 
 /** The resolved frame, or null while its site isn't fixed yet (never grows the network). */
 export function townFrame(id: GrownTown): TownFrame | null {
@@ -278,15 +287,27 @@ export function townGround(f: TownFrame, u: number, vp: number): number {
   return f.P - lagoonDepth(f, u, vp);
 }
 
+let fixedSites = 0;
+let townLines: (typeof tracks.tracks)[number][] | null = null;
+
 /** Frames resolved so far (cheap: checked on every terrain sample). */
 function liveFrames(): TownFrame[] {
   if (resolved.size === GROWN_TOWNS.length) return frameList;
-  townTrack ??= tracks.tracks.find(q => q.id === TOWN_SITES[0].track) ?? null;
-  // (both towns sit on one line: only resolve when it has fixed a new site)
-  if (townTrack === null || townTrack.towns.length <= resolved.size) return frameList;
-  for (const site of townTrack.towns) {
-    const id = site.town as GrownTown;
-    if (!resolved.has(id)) resolve(id, site);
+  if (townLines === null) {
+    const found = TOWN_TRACK_IDS.map(id => tracks.tracks.find(q => q.id === id));
+    if (found.some(q => q === undefined)) return frameList;
+    townLines = found as (typeof tracks.tracks)[number][];
+  }
+  // Only resolve when some line has fixed a new site
+  let n = 0;
+  for (const t of townLines) n += t.towns.length;
+  if (n <= fixedSites) return frameList;
+  fixedSites = n;
+  for (const t of townLines) {
+    for (const site of t.towns) {
+      const id = site.town as GrownTown;
+      if (!resolved.has(id)) resolve(id, site);
+    }
   }
   return frameList;
 }
@@ -332,7 +353,7 @@ export function placementOf(f: TownFrame): TownPlacement {
 /** The city plaza: the summit square inside the ring of buildings. */
 export const CITY_PLACEMENT: TownPlacement = { id: 'city', x: 0, z: 0, y: 0, r: MOUNTAIN.wallZ };
 
-/** `?spot=cowboy` / `?spot=beach` spawn: top of main street, on the line, facing down it. */
+/** `?spot=<town>` spawn: top of main street, on the line, facing down it. */
 export function townSpawn(id: GrownTown): { x: number; y: number; z: number; yaw: number } | null {
   const f = townFrameNow(id);
   if (f === null) return null;

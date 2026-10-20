@@ -4,7 +4,7 @@ import { MOUNTAIN, edgeDistance } from '../world/mountain/config';
 import { bowlFrameNow } from '../world/mountain/noggleBowl';
 import { njFrameNow } from '../world/mountain/nounJersey';
 import { TERRAIN_LIPSCHITZ, terrainHeight } from '../world/mountain/terrain';
-import { TOWN_SITE, tracks } from '../world/mountain/tracks';
+import { TOWN_SITE, TOWN_SITES, tracks } from '../world/mountain/tracks';
 
 import {
   GROWN_TOWNS,
@@ -26,11 +26,11 @@ const frames = {} as Record<(typeof GROWN_TOWNS)[number], TownFrame>;
 for (const id of GROWN_TOWNS) frames[id] = townFrameNow(id)!;
 
 describe('town sites', () => {
-  it('both towns resolve on the +X main, with no other line in reach', () => {
+  it('every town resolves on its main line, with no other line in reach', () => {
     for (const id of GROWN_TOWNS) {
       const f = frames[id];
       expect(f).not.toBeNull();
-      expect(f.site.track.id).toBe(2);
+      expect(f.site.track.id).toBe(TOWN_SITES.find(q => q.town === id)!.track);
       expect(f.site.track.depth).toBe(0);
     }
     expect(warn.mock.calls.some(c => String(c[0]).includes('town'))).toBe(false);
@@ -43,6 +43,12 @@ describe('town sites', () => {
     expect(Math.round(b.site.s)).toBe(28800);
     expect([Math.round(c.ox), Math.round(c.oz), c.side, Math.round(c.P), c.Lf]).toMatchSnapshot();
     expect([Math.round(b.ox), Math.round(b.oz), b.side, Math.round(b.P), b.Lf]).toMatchSnapshot();
+    // The weird towns: pinned along-track like the others
+    for (const id of ['noggle', 'shroom', 'neon', 'crater'] as const) {
+      const f = frames[id];
+      expect(Math.round(f.site.s)).toBe(TOWN_SITES.find(q => q.town === id)!.at);
+      expect([Math.round(f.ox), Math.round(f.oz), f.side, Math.round(f.P), f.Lf]).toMatchSnapshot();
+    }
   });
 
   it('sits ~10 km and ~25 km out, nowhere near the city', () => {

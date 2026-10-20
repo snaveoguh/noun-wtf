@@ -41,8 +41,24 @@ export const COIN = 'COIN' as const;
 
 // ── Towns ──
 
-export type TownId = 'city' | 'jersey' | 'cowboy' | 'beach';
-export type TownStyle = 'city' | 'suburb' | 'cowboy' | 'beach';
+export type TownId =
+  | 'city'
+  | 'jersey'
+  | 'cowboy'
+  | 'beach'
+  | 'noggle'
+  | 'shroom'
+  | 'neon'
+  | 'crater';
+export type TownStyle =
+  | 'city'
+  | 'suburb'
+  | 'cowboy'
+  | 'beach'
+  | 'noggle'
+  | 'shroom'
+  | 'neon'
+  | 'crater';
 
 export interface TownMarketSpec {
   /** Per good: multiplier on GoodSpec.base for this town (demand > 1, supply < 1). */
@@ -100,7 +116,8 @@ export interface TradeState {
   last: { town: TownId; at: number } | null;
 }
 
-export type VanUpgrade = 'freezer' | 'bigbox' | 'engine' | 'horn' | 'neon';
+/** 'dragon' isn't fitted to the van: it's the Dragon Roost's mount (dragon/), bought the same way. */
+export type VanUpgrade = 'freezer' | 'bigbox' | 'engine' | 'horn' | 'neon' | 'dragon';
 
 // ── Client → server (netlify/functions/world-trade) ──
 

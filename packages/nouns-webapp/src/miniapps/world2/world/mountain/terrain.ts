@@ -21,6 +21,7 @@
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
 
 import { applyTownPads, setTownNatural, townBlocked } from '../../towns/site';
+import { landmarkBlocked } from '../landmarks/sites';
 
 import {
   ALLEYS,
@@ -594,7 +595,8 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
  * with a margin — and the Noun Jersey terrace.
  */
 export function megaBlocked(x: number, z: number): boolean {
-  if (njBlocked(x, z) || bowlBlocked(x, z) || townBlocked(x, z)) return true;
+  if (njBlocked(x, z) || bowlBlocked(x, z) || townBlocked(x, z) || landmarkBlocked(x, z))
+    return true;
   return eachMega(
     x,
     z,

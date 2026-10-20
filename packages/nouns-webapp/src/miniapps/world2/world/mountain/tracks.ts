@@ -31,6 +31,8 @@ import {
 } from './config';
 
 const STEP = 12;
+/** Point spacing along a track (m). */
+export const TRACK_STEP = STEP;
 const CELL = 64;
 /** Max distance at which a track still shapes the terrain (m). */
 export const INFLUENCE = 96;
@@ -247,6 +249,16 @@ export interface SpotSite {
 export const TOWN_SITES = [
   { town: 'cowboy', track: 2, at: 11400, k: 300 },
   { town: 'beach', track: 2, at: 28800, k: 301 },
+  // The weird towns, each past every older pinned site on its line (so
+  // Puerto Noun, Noun Jersey and the Noggle Bowl stay exactly where they
+  // were), at stretches where no other line comes within reach of their
+  // wider pads (searched; site.test.ts checks it): Noggle City and Neon
+  // Nouns past Puerto Noun, Shroom Hollow past Noun Jersey, Crater Lil
+  // past the Bowl.
+  { town: 'noggle', track: 2, at: 33250, k: 302 },
+  { town: 'neon', track: 2, at: 40250, k: 303 },
+  { town: 'shroom', track: 1, at: 27500, k: 304 },
+  { town: 'crater', track: 3, at: 53650, k: 305 },
 ] as const;
 
 export const TOWN_SITE = {
