@@ -38,8 +38,19 @@ export interface NetPose {
   trick: string;
   boardType: BoardType;
   weight: number;
-  /** Driving a vehicle (Noun Trade's ice cream van): pos/quat are the van's. */
-  vehicle?: 'van';
+  /**
+   * Riding something: 'van' (Noun Trade's ice cream van: pos/quat are the
+   * van's) or 'dragon' (pos is the rider's seat, quat the dragon's; the
+   * dragon itself is placed from those, see dragon/mesh.ts).
+   */
+  vehicle?: Vehicle;
+}
+
+export type Vehicle = 'van' | 'dragon';
+
+/** A blob's `vh` → the vehicle (anything else, or nothing: on foot / board). */
+export function parseVehicle(v: unknown): Vehicle | undefined {
+  return v === 'van' || v === 'dragon' ? v : undefined;
 }
 
 export interface RemotePlayer {
@@ -220,7 +231,7 @@ export class Net {
     pose.trick = String(blob.tr ?? '').slice(0, 60);
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
-    pose.vehicle = blob.vh === 'van' ? 'van' : undefined;
+    pose.vehicle = parseVehicle(blob.vh);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     let rp = this.players.get(id);
     const now = performance.now();
@@ -319,7 +330,8 @@ export class Net {
       tr: pose.trick,
       bt: pose.boardType,
       w: r3(pose.weight),
-      // Only while driving, so older clients' blobs are unchanged otherwise
+      // Only while riding, so older clients' blobs are unchanged otherwise
+      // (an older client reads 'dragon' as nothing: the rider, no dragon)
       ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
     });
     const msg = JSON.stringify({

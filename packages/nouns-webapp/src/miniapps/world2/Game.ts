@@ -107,6 +107,12 @@ function devRun(): boolean {
   return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
 }
 
+/** `?purse=5000` (offline / dev runs only): a bigger starting purse, to try the dragon. */
+function purseParam(): number | undefined {
+  const n = Number(new URLSearchParams(window.location.search).get('purse'));
+  return Number.isInteger(n) && n > 0 && n <= 1_000_000 ? n : undefined;
+}
+
 /** `?spot=nj` / `?spot=bowl` dev params: spawn in a secret spot (Noun Jersey, the Noggle Bowl). */
 function spotParam(): string | null {
   return new URLSearchParams(window.location.search).get('spot');
@@ -302,7 +308,11 @@ export class Game {
       duck: on => this.duckRadio(on),
       volume: () => this.mixer.gain('radio') * this.radio.volume,
     });
-    this.trade = new TradeClient({ offline: opts.offline === true || devRun() });
+    const tradeOffline = opts.offline === true || devRun();
+    this.trade = new TradeClient({
+      offline: tradeOffline,
+      devPurse: tradeOffline ? purseParam() : undefined,
+    });
     // The till: coins for a sale, chips stacking for a buy
     this.trade.onActed = (a, r) => {
       if (!r.ok) return this.sfx.play('ui-cancel', { gain: 0.5 });
@@ -1296,6 +1306,8 @@ export class Game {
     fade?: number;
   } {
     const p = this.player;
+    // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
+    if (this.dragon.riding) return { clip: 'idle', fade: 0.3 };
     if (p.climb !== null) {
       // No climb clip in the rig: the walk cycle's legs read as stepping up
       // the wall; NounCharacter overrides the arms into an overhead reach.
@@ -1524,7 +1536,7 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
-        vehicle: this.van2.driving ? 'van' : undefined,
+        vehicle: this.van2.driving ? 'van' : this.dragon.riding ? 'dragon' : undefined,
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
