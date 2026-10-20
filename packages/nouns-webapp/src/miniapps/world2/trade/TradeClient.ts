@@ -61,6 +61,12 @@ export interface TradeClientOptions {
   fetchFn?: typeof fetch;
   /** Clock (ms); tests inject one. */
   now?: () => number;
+  /**
+   * Offline only (dev / tests, `?offline=1&purse=N`): start with this much
+   * coin instead of the starter purse, to try the things that cost more
+   * (the dragon). Ignored online: the server holds the real books.
+   */
+  devPurse?: number;
 }
 
 function load<T>(key: string, fallback: T): T {
@@ -133,7 +139,13 @@ export class TradeClient implements TradeApi {
     this.seen = load<Partial<Record<TownId, SeenPrices>>>(SEEN_KEY, {});
     if (this.offline) {
       const now = this.now();
-      this.local = { row: newRow(this.rider, now), markets: freshMarkets(now) };
+      const row = newRow(this.rider, now);
+      const purse = opts.devPurse;
+      if (purse !== undefined && Number.isInteger(purse) && purse > 0) {
+        row.coin = purse;
+        row.book.granted = purse;
+      }
+      this.local = { row, markets: freshMarkets(now) };
       this.state = stateOf(this.local.row);
     }
   }

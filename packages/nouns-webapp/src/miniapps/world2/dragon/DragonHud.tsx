@@ -11,6 +11,7 @@ import type { Game } from '../Game';
 import { useEffect } from 'react';
 
 import { DRAGON_COST } from './pay';
+import { fmtRaceMs } from './race';
 import { useDragonUi } from './useDragon';
 
 export function DragonHud({ game, touch }: { game: Game; touch: boolean }) {
@@ -72,6 +73,27 @@ export function DragonHud({ game, touch }: { game: Game; touch: boolean }) {
           {ui.riding ? 'OFF' : '🐉'}
         </button>
       )}
+      {ui.riding && ui.race !== null && (ui.race.on || ui.race.hint) && (
+        <div
+          data-dragon="race"
+          className="w2-dragon-race pointer-events-none absolute left-1/2 -translate-x-1/2"
+        >
+          {ui.race.on ? (
+            <>
+              <b>{fmtRaceMs(ui.race.ms)}</b>
+              <span>
+                RING {ui.race.ring}/{ui.race.total} · {ui.race.label ?? 'NEXT'} {ui.race.dist} m
+              </span>
+              {ui.race.best !== null && <em>BEST {fmtRaceMs(ui.race.best)}</em>}
+            </>
+          ) : (
+            <>
+              <span>🐉 DRAGON RUN · FLY THROUGH THE GREEN RING AT THE ROOST</span>
+              {ui.race.best !== null && <em>BEST {fmtRaceMs(ui.race.best)}</em>}
+            </>
+          )}
+        </div>
+      )}
       {ui.riding && (
         <div className="w2-dragon-readout pointer-events-none absolute left-1/2 -translate-x-1/2">
           <b>{ui.kmh}</b>
@@ -109,6 +131,10 @@ const DRAGON_CSS = `
 .w2-dragon-readout b{font-size:30px;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums}
 .w2-dragon-readout span{font-size:11px;font-weight:700;letter-spacing:.12em;opacity:.7;margin-right:8px}
 .w2-dragon-readout i{width:100%;text-align:center;font-style:normal;font-size:10px;letter-spacing:.06em;opacity:.65}
+.w2-dragon-race{top:calc(12px + env(safe-area-inset-top));display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;justify-content:center;padding:6px 14px;border-radius:14px;background:rgba(10,12,20,.6);color:#fff;font-family:system-ui,sans-serif;max-width:calc(100vw - 32px)}
+.w2-dragon-race b{font-size:26px;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;color:#4bea69}
+.w2-dragon-race span{font-size:11px;font-weight:800;letter-spacing:.08em}
+.w2-dragon-race em{font-size:11px;font-style:normal;font-weight:800;color:#ff5fd2;letter-spacing:.06em}
 .w2-dragon-pad{right:calc(14px + env(safe-area-inset-right));top:calc(46% + env(safe-area-inset-top));display:flex;flex-direction:column;gap:10px}
 .w2-dragon-pad button{width:64px;height:58px;border-radius:14px;background:rgba(17,16,24,.6);color:#fff;border:2px solid rgba(255,255,255,.35);font:900 20px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none}
 .w2-dragon-pad small{font-size:9px;letter-spacing:.08em;opacity:.8}
