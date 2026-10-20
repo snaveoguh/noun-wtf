@@ -1,5 +1,7 @@
 packages:
   - packages/*
+  # native app shells: own lockfile, installed on the developer's Mac (see its README)
+  - '!packages/noun-world-app'
 
 catalog:
   '@wagmi/core': ^2.18.0

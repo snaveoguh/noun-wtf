@@ -10,3 +10,12 @@
 
 /stupidfont/sw.js
   Cache-Control: no-cache
+
+# Noun World service worker: always revalidated so a deploy's new worker is seen
+/world-sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /world
+
+/world-app/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600

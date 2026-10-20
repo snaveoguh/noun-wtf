@@ -15,16 +15,17 @@ import type { InputFrame } from '../core/Input';
 import type { Game } from '../Game';
 
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import { toonify } from '../render/Toon';
 import { ROOST } from '../towns/noggle';
 import { townCoords, townFrame } from '../towns/site';
 import { VanCamera } from '../van/VanCamera';
-import { PartBuilder } from '../world/landmarks/parts';
 
-import { dragonBody, dragonWing, SADDLE, WING_ROOT } from './model';
+import { dragonCourse } from './courseWorld';
+import { buildDragonMesh, disposeDragonMeshes, flapRate, flapWings, type DragonMesh } from './mesh';
+import { SADDLE } from './model';
 import { buyDragon, coinOf, DRAGON_COST, dragonOwned } from './pay';
+import { DragonRace, type RaceUi } from './race';
+import { RemoteDragons } from './remote';
 
 export const DRAGON = {
   minSpeed: 10,
@@ -52,6 +53,8 @@ export interface DragonUi {
   alt: number;
   /** Last buy attempt's message. */
   notice: string | null;
+  /** The Dragon Run (race.ts) while flying. */
+  race: RaceUi | null;
 }
 
 const IDLE: DragonUi = {
@@ -62,12 +65,13 @@ const IDLE: DragonUi = {
   kmh: 0,
   alt: 0,
   notice: null,
+  race: null,
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
 const _v = new THREE.Vector3();
-const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
+const _from = new THREE.Vector3();
 
 export class DragonRide {
   ui: DragonUi = IDLE;
@@ -75,10 +79,7 @@ export class DragonRide {
   /** Touch controls (DragonHud): climb / dive held, boost. */
   readonly touch = { up: false, down: false, boost: false };
   private listeners = new Set<() => void>();
-  private group: THREE.Group | null = null;
-  private wingL: THREE.Object3D | null = null;
-  private wingR: THREE.Object3D | null = null;
-  private disposables: { dispose(): void }[] = [];
+  private mesh: DragonMesh | null = null;
   private camera: VanCamera;
   readonly pos = new THREE.Vector3();
   private camTarget = new THREE.Vector3();
@@ -94,8 +95,23 @@ export class DragonRide {
   private noticeAt = 0;
   private uiT = 0;
 
+  /** Other riders' dragons (remote.ts). */
+  private remotes: RemoteDragons;
+  /** The Dragon Run: rings, clock, ghost (race.ts). */
+  readonly race: DragonRace;
+
   constructor(private game: Game) {
     this.camera = new VanCamera(game.gfx.camera, game.world);
+    this.remotes = new RemoteDragons({
+      scene: game.gfx.scene,
+      toon: game.gfx.toon,
+      hidden: () => game.missions.ud.active || game.replay.active,
+    });
+    this.race = new DragonRace({
+      scene: game.gfx.scene,
+      notice: text => this.notice(text),
+      sound: id => game.sfx.play(id, { gain: 0.7 }),
+    });
     window.addEventListener('keydown', this.onKey);
   }
 
@@ -187,39 +203,8 @@ export class DragonRide {
   }
 
   private build() {
-    if (this.group !== null) return;
-    const g = new THREE.Group();
-    g.name = 'NounDragon';
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 });
-    mat.name = 'Dragon';
-    this.disposables.push(mat);
-    const mesh = (k: PartBuilder) => {
-      const parts = [...k.geo.solid, ...k.geo.thin, ...k.geo.glow];
-      const geo = mergeGeometries(parts, false)!;
-      for (const q of parts) q.dispose();
-      geo.computeBoundingSphere();
-      this.disposables.push(geo);
-      const m = new THREE.Mesh(geo, mat);
-      m.castShadow = true;
-      return m;
-    };
-    const body = new PartBuilder();
-    dragonBody(body, new THREE.Matrix4());
-    g.add(mesh(body));
-    for (const side of [1, -1] as const) {
-      const k = new PartBuilder();
-      dragonWing(k, new THREE.Matrix4(), side);
-      const pivot = new THREE.Object3D();
-      pivot.position.set(side * WING_ROOT.x, WING_ROOT.y, WING_ROOT.z);
-      pivot.add(mesh(k));
-      g.add(pivot);
-      if (side === 1) this.wingL = pivot;
-      else this.wingR = pivot;
-    }
-    // A touch bigger than life: 1.35×
-    g.scale.setScalar(1.35);
-    if (this.game.gfx.toon) toonify(g);
-    this.group = g;
+    if (this.mesh !== null) return;
+    this.mesh = buildDragonMesh(this.game.gfx.toon);
   }
 
   private mount() {
@@ -234,7 +219,9 @@ export class DragonRide {
     this.vel.set(0, 0, 0);
     this.bank = this.pitch = 0;
     this.riding = true;
-    g.gfx.scene.add(this.group!);
+    g.gfx.scene.add(this.mesh!.group);
+    const course = dragonCourse((x, z) => p.floorAt(x, z));
+    if (course !== null) this.race.setCourse(course);
     g.stats.suspended = true;
     this.camera.snap(this.heading);
     this.sync();
@@ -245,7 +232,8 @@ export class DragonRide {
     const g = this.game;
     const p = g.player;
     this.riding = false;
-    if (this.group !== null) g.gfx.scene.remove(this.group);
+    this.race.stop();
+    if (this.mesh !== null) g.gfx.scene.remove(this.mesh.group);
     // Off onto the ground under the dragon, facing its way
     const floor = p.floorAt(this.pos.x, this.pos.z);
     const spot = _v.set(this.pos.x, floor + 0.05, this.pos.z);
@@ -302,6 +290,7 @@ export class DragonRide {
     const fx = Math.sin(this.heading);
     const fz = Math.cos(this.heading);
     this.vel.set(fx * this.speed, vy, fz * this.speed);
+    _from.copy(this.pos);
     this.pos.addScaledVector(this.vel, dt);
     // Ground + ceiling (sampled a little ahead too, so hills lift it early)
     const floor = Math.max(
@@ -314,18 +303,18 @@ export class DragonRide {
     }
     this.pos.y = Math.min(this.pos.y, floor + DRAGON.ceiling);
     // Wings: big slow beats climbing, a glide when diving
-    const rate = up > 0 ? 9 : down > 0 ? 1.2 : 4 + this.speed * 0.05;
-    this.flap += dt * rate;
+    this.flap += dt * flapRate(this.speed, vy);
     this.sync();
+    this.race.step(dt, _from, this.pos, this.heading);
     // The rider sits in the saddle; the world streams and the network follow
     const p = g.player;
-    const seat = this.group!.localToWorld(_v.copy(SADDLE));
+    const seat = this.mesh!.group.localToWorld(_v.copy(SADDLE));
     p.pos.copy(seat);
     p.vel.copy(this.vel);
     p.footYaw = this.heading;
     if (g.me !== null) {
       g.me.root.position.copy(seat);
-      g.me.root.quaternion.copy(this.group!.quaternion);
+      g.me.root.quaternion.copy(this.mesh!.group.quaternion);
     }
     g.stats.suspended = true;
     // Aimed at the saddle, so the chase camera looks over the rider's shoulder
@@ -351,20 +340,17 @@ export class DragonRide {
   }
 
   private sync() {
-    const grp = this.group;
-    if (grp === null) return;
-    grp.position.copy(this.pos);
-    grp.quaternion.setFromEuler(_e.set(-this.pitch, this.heading, this.bank, 'YXZ'));
-    const beat = Math.sin(this.flap) * 0.7;
-    if (this.wingL !== null) this.wingL.rotation.z = 0.15 + beat;
-    if (this.wingR !== null) this.wingR.rotation.z = -0.15 - beat;
-    grp.updateMatrixWorld(true);
-    void _q;
+    const m = this.mesh;
+    if (m === null) return;
+    m.group.position.copy(this.pos);
+    m.group.quaternion.setFromEuler(_e.set(-this.pitch, this.heading, this.bank, 'YXZ'));
+    flapWings(m, this.flap);
+    m.group.updateMatrixWorld(true);
   }
 
   /** Every frame: the BUY prompt at the Roost, notices fading, HUD numbers. */
   update(dt: number) {
-    void dt;
+    this.remotes.update(dt, this.game.net.players, this.game.gfx.camera.position);
     if (!this.riding) {
       const shop = !this.blocked() && !dragonOwned(this.game) && this.atShop();
       const owned = dragonOwned(this.game);
@@ -387,6 +373,7 @@ export class DragonRide {
       kmh: Math.round(this.riding ? this.speed * 3.6 : 0),
       alt: Math.round(this.riding ? this.pos.y - floor : 0),
       notice: this.ui.notice,
+      race: this.riding ? this.race.ui : null,
     };
     const o = this.ui;
     if (
@@ -395,7 +382,10 @@ export class DragonRide {
       o.riding === next.riding &&
       o.atShop === next.atShop &&
       o.kmh === next.kmh &&
-      o.alt === next.alt
+      o.alt === next.alt &&
+      o.race?.ms === next.race?.ms &&
+      o.race?.ring === next.race?.ring &&
+      o.race?.dist === next.race?.dist
     )
       return;
     this.ui = next;
@@ -408,8 +398,10 @@ export class DragonRide {
 
   dispose() {
     window.removeEventListener('keydown', this.onKey);
-    if (this.group !== null) this.game.gfx.scene.remove(this.group);
-    for (const d of this.disposables) d.dispose();
+    if (this.mesh !== null) this.game.gfx.scene.remove(this.mesh.group);
+    this.remotes.dispose();
+    this.race.dispose();
+    disposeDragonMeshes();
   }
 }
 
