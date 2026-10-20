@@ -341,8 +341,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           onFm={() => setFmOpen(true)}
         />
       )}
-      {game && started && <FmScreen fm={game.fm} touch={touchPage} />}
-      {game && started && <FmSpotsUi spots={game.spots} />}
+      {/* NOUN FM from PRESS START: its screen and the intro's skip chip show over character select too */}
+      {game && phase !== 'title' && <FmScreen fm={game.fm} touch={touchPage} />}
+      {game && phase !== 'title' && <FmSpotsUi spots={game.spots} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
       {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}
