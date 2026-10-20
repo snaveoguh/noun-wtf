@@ -39,7 +39,9 @@ export function dragonBody(k: Parts, m: THREE.Matrix4) {
     k.add(new THREE.ConeGeometry(0.22, 0.6, 4).translate(0, 3.65, z), C.dark, m);
   }
   // Neck + head
-  k.add(boxAt(-0.6, 0.6, 2.9, 4.6, 1.6, 2.8).rotateX(-0.45), C.body, m);
+  // (tilted about its own centre, leaning forward from the torso's front-top
+  // into the head; rotating a translated box swings it about the origin)
+  k.add(new THREE.BoxGeometry(1.2, 2.3, 1.1).rotateX(0.62).translate(0, 3.75, 2.15), C.body, m);
   k.add(boxAt(-0.95, 0.95, 4.2, 5.8, 2.2, 4.0), C.body, m);
   k.add(boxAt(-0.7, 0.7, 4.25, 5.0, 4.0, 5.1), C.body, m); // snout
   k.add(boxAt(-0.72, 0.72, 4.15, 4.4, 4.0, 5.1), C.belly, m); // jaw line
