@@ -1,0 +1,33 @@
+{
+  "name": "noun-world-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Noun World native shells (iOS + Android) via Capacitor. Kept OUT of the pnpm workspace: see README.md.",
+  "type": "module",
+  "scripts": {
+    "assets": "capacitor-assets generate --iconBackgroundColor '#c8ec40' --iconBackgroundColorDark '#181230' --splashBackgroundColor '#181230' --splashBackgroundColorDark '#181230'",
+    "add:ios": "cap add ios && node scripts/patch-native.mjs ios",
+    "add:android": "cap add android && node scripts/patch-native.mjs android",
+    "patch": "node scripts/patch-native.mjs ios android",
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android",
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/splash-screen": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2",
+    "typescript": "5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
+  }
+}

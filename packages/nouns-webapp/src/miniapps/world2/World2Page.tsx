@@ -24,6 +24,8 @@ import {
   type StatRow,
   type WorldStats,
 } from './net/Stats';
+import { applyWorldManifest, registerWorldSw } from './pwa/install';
+import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
@@ -115,6 +117,11 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const gameRef = useRef<Game | null>(null);
   const [game, setGame] = useState<Game | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Installable as an app on /world: Noun World's manifest + offline worker
+  useEffect(() => {
+    registerWorldSw(window.location.pathname);
+    return applyWorldManifest(window.location.pathname);
+  }, []);
   // Every HUD / panel button clicks (audio/sfx/uiSounds)
   useEffect(() => {
     const root = rootRef.current;
@@ -499,6 +506,7 @@ function Splash({
           </div>
         )}
       </div>
+      <InstallButton className="mt-6" />
       <div className="absolute bottom-6 text-xs opacity-50">
         gamepad recommended, headphones on, mic optional
       </div>

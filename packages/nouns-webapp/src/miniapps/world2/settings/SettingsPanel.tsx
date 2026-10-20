@@ -13,6 +13,8 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { createPortal } from 'react-dom';
 
 import { npcVoice } from '../audio/voice/cast';
+import { installState, subscribeInstall } from '../pwa/install';
+import { InstallButton } from '../pwa/InstallButton';
 import { resetHudPositions } from '../ui/HudDrag';
 import { worldPause } from '../worldPause';
 
@@ -260,6 +262,8 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
           </div>
         </Section>
 
+        <AppSection />
+
         <button
           type="button"
           className="self-start text-xs underline opacity-60"
@@ -269,6 +273,21 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Install Noun World as an app (only when the browser can, or on iOS Safari). */
+function AppSection() {
+  const state = useSyncExternalStore(subscribeInstall, installState, () => 'none' as const);
+  if (state === 'none') return null;
+  return (
+    <Section title="APP">
+      {state === 'installed' ? (
+        <div className="text-xs opacity-70">Running as an installed app.</div>
+      ) : (
+        <InstallButton className="self-start" />
+      )}
+    </Section>
   );
 }
 

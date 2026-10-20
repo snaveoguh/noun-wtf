@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Noun World · offline</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #181230;
+        color: #fff;
+        font: 600 16px/1.4 -apple-system, system-ui, sans-serif;
+      }
+      main {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 0 max(24px, env(safe-area-inset-left)) 0 max(24px, env(safe-area-inset-right));
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: 44px;
+        letter-spacing: 0.04em;
+      }
+      h1 span {
+        color: #ffd400;
+      }
+      .noggles {
+        font-size: 40px;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        background: #ffd400;
+        color: #000;
+        font: inherit;
+        padding: 12px 22px;
+      }
+      p {
+        max-width: 30ch;
+        opacity: 0.75;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="noggles">⌐◨-◨</div>
+      <h1>NOUN <span>WORLD</span></h1>
+      <p>Noun World is an online game. Connect to the internet and try again.</p>
+      <button type="button" onclick="location.reload()">TRY AGAIN</button>
+    </main>
+  </body>
+</html>

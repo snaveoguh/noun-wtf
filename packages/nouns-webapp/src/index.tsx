@@ -16,6 +16,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SiteThemeProvider } from '@/contexts/SiteThemeContext';
 import { queryClient } from '@/lib/queryClient';
+import { initWorldApp } from '@/miniapps/world2/pwa/install';
 import { store } from '@/store';
 import { execute } from '@/subgraphs/execute';
 
@@ -96,7 +97,7 @@ const SWALLOW_LIMIT = 5;
 const CHUNK_RELOAD_KEY = 'nounwtf-chunk-reload';
 const isChunkLoadError = (e: unknown) =>
   e instanceof Error &&
-  /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk/i.test(
+  /dynamically imported module|importing a module script failed|error loading dynamically imported module|loading chunk/i.test(
     e.message,
   );
 function reloadForNewBuild(): boolean {
@@ -435,6 +436,9 @@ const MissingAuctionFetcher: React.FC = () => {
 
   return <></>;
 };
+
+// Noun World's install prompt can fire before the game's chunk loads
+initWorldApp();
 
 createRoot(document.getElementById('root')!).render(
   <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">

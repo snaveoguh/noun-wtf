@@ -7,6 +7,8 @@ import svgr from 'vite-plugin-svgr';
 import Inspect from 'vite-plugin-inspect';
 import checker from 'vite-plugin-checker';
 
+import { worldPwa } from './vite/worldPwa';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -37,6 +39,8 @@ export default defineConfig({
       // },
       overlay: false,
     }),
+    // Noun World's service worker (/world-sw.js), built per deploy
+    worldPwa(),
   ],
   server: {
     port: 5173,
