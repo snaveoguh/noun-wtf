@@ -83,9 +83,20 @@ function loadGlb(loader: GLTFLoader, url: string): Promise<THREE.Group> {
   );
 }
 
+/** `plaza.glb` → `plaza.lite.glb` (scripts/lite-assets.py writes the phone copies). */
+export function liteName(file: string): string {
+  return file.replace(/\.(glb|webp|png|jpe?g)$/i, '.lite.$1');
+}
+
+/**
+ * `lite`: the 'low' tier's half-size copies of the plaza and its lightmaps
+ * (~3 MB instead of ~12 MB on first load); any missing copy falls back to the
+ * full file.
+ */
 export async function loadLevel(
   renderer: THREE.WebGLRenderer,
   onProgress?: (msg: string) => void,
+  opts: { lite?: boolean } = {},
 ): Promise<LevelData> {
   try {
     onProgress?.('fetching level');
@@ -96,16 +107,31 @@ export async function loadLevel(
     const json = (await res.json()) as LevelJson;
     const loader = new GLTFLoader();
     onProgress?.('loading plaza');
-    const scene = await loadGlb(loader, BASE + (json.glb ?? 'plaza.glb'));
+    const glb = json.glb ?? 'plaza.glb';
+    const scene =
+      opts.lite === true
+        ? await loadGlb(loader, BASE + liteName(glb)).catch(() => loadGlb(loader, BASE + glb))
+        : await loadGlb(loader, BASE + glb);
 
     // Lightmaps (uv1 / TEXCOORD_1)
     const lmIntensity = json.lightMapIntensity ?? 1;
     const texLoader = new THREE.TextureLoader();
     const lmCache = new Map<string, THREE.Texture>();
+    const loadLm = (file: string): THREE.Texture => {
+      if (opts.lite !== true) return texLoader.load(BASE + file);
+      const t = texLoader.load(BASE + liteName(file), undefined, undefined, () => {
+        // no lite copy: the full lightmap into the same texture
+        texLoader.load(BASE + file, full => {
+          t.image = full.image;
+          t.needsUpdate = true;
+        });
+      });
+      return t;
+    };
     const getLm = (file: string) => {
       let t = lmCache.get(file);
       if (!t) {
-        t = texLoader.load(BASE + file);
+        t = loadLm(file);
         t.channel = 1;
         t.flipY = false;
         t.colorSpace = THREE.LinearSRGBColorSpace;
@@ -123,10 +149,13 @@ export async function loadLevel(
         hidden.push(mesh);
         return;
       }
-      mesh.castShadow = true;
+      const lmFile = json.lightmaps?.[mesh.name] ?? json.lightmaps?.[mesh.parent?.name ?? ''];
+      // Lite (phones): baked-lit meshes already have their shadows in the
+      // lightmap, so they skip the realtime shadow pass (~90 draw calls)
+      const baked = lmFile !== undefined && mesh.geometry.attributes.uv1 !== undefined;
+      mesh.castShadow = !(opts.lite === true && baked);
       mesh.receiveShadow = true;
       renderMeshes.push(mesh);
-      const lmFile = json.lightmaps?.[mesh.name] ?? json.lightmaps?.[mesh.parent?.name ?? ''];
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const out = mats.map(m => {
         const mat = (m as THREE.MeshStandardMaterial).clone();
