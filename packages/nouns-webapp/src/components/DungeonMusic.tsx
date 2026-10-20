@@ -18,7 +18,9 @@ const DungeonMusic: FC = () => {
     const audio = new Audio('/audio/dungeon.mp3');
     audio.loop = true;
     audio.volume = 1;
-    audio.preload = 'auto';
+    // 2 MB: only fetched once torch mode actually plays it (play() loads it),
+    // not on every page load
+    audio.preload = 'none';
     audioRef.current = audio;
 
     return () => {

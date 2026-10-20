@@ -28,7 +28,7 @@ import {
 } from '../contract';
 
 import { CourtXform, hoopsEntry } from './court';
-import { createSim, createView } from './factory';
+import { createSim, createView, preloadHoopsView } from './factory';
 import { BallerInputReader } from './input';
 import { HoopsSession, type HoopsRole } from './sync';
 import { NetTransport, type HoopsTransport } from './transport';
@@ -203,6 +203,8 @@ export class HoopsMode {
     if (court !== null && this.ui.phase === 'idle') {
       const p = this.game.player.pos;
       if (court.onCourt(p.x, p.y, p.z)) {
+        // on the court: fetch the hoops view now so a game opens straight away
+        void preloadHoopsView();
         const l = [...this.remoteLobbies.values()].find(q => q.m.open);
         prompt =
           l !== undefined
@@ -281,6 +283,7 @@ export class HoopsMode {
   // ── Lobby (host side) ──
 
   openLobby() {
+    void preloadHoopsView();
     if (this.ensureCourt() === null || this.ui.phase !== 'idle') return;
     const size: TeamSize = 1;
     this.lobbyAcc = LOBBY_EVERY;
@@ -442,6 +445,7 @@ export class HoopsMode {
   }
 
   joinLobby() {
+    void preloadHoopsView();
     const l = this.ui.lobby;
     if (!l || l.mine) return;
     const host = this.remoteLobbies.get(l.gid)?.m.host;
@@ -466,6 +470,7 @@ export class HoopsMode {
   }
 
   watch(gid: string) {
+    void preloadHoopsView();
     const l = this.remoteLobbies.get(gid)?.m;
     if (!l || this.ensureCourt() === null) return;
     this.expect = { host: l.host, watch: gid };
@@ -476,6 +481,7 @@ export class HoopsMode {
   // ── Challenges ──
 
   challenge(to: string, size: TeamSize = 1) {
+    void preloadHoopsView();
     if (this.ensureCourt() === null || this.ui.phase !== 'idle' || !this.transport.online) return;
     const gid = gidNew();
     const toName = this.game.net.players.get(to)?.name || 'noun';
@@ -495,6 +501,7 @@ export class HoopsMode {
   }
 
   acceptInvite() {
+    void preloadHoopsView();
     const inv = this.ui.invite;
     if (!inv) return;
     if (this.ensureCourt() === null) {
@@ -649,6 +656,7 @@ export class HoopsMode {
   // ── In and out ──
 
   private enter(config: GameConfig, role: HoopsRole, hostId: string, teleport: boolean) {
+    void preloadHoopsView();
     const court = this.ensureCourt();
     if (court === null) return;
     const g = this.game;

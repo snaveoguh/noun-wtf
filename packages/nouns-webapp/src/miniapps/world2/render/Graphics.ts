@@ -1,8 +1,9 @@
 // ── Renderer, lighting, sky + post-processing stack ─────────────────────
 
+import type { LiteState } from './deviceTier';
 import type { LevelData } from '../world/Level';
+import type { N8AOPostPass } from 'n8ao';
 
-import { N8AOPostPass } from 'n8ao';
 import {
   BloomEffect,
   BrightnessContrastEffect,
@@ -37,6 +38,11 @@ export class Graphics {
   inkPass: EffectPass | null = null;
   /** Bypass the composer entirely (?diag=1) */
   rawRender = false;
+  /**
+   * The low tier's step-down state (render scale, shadows, post). Only the
+   * 'low' tier ever leaves the defaults; medium/high are untouched.
+   */
+  lite: LiteState;
   gradePass: EffectPass | null = null;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
@@ -65,6 +71,7 @@ export class Graphics {
       window.devicePixelRatio || 1,
       quality === 'high' ? 2 : quality === 'medium' ? 1.5 : 1,
     );
+    this.lite = { scale: this.pixelRatio, shadows: true, post: true };
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -149,18 +156,28 @@ export class Graphics {
     // Toon mode skips SSAO: cel shading doesn't want it, and N8AO clobbers the
     // depth the ink pass reads.
     if (quality !== 'low' && (aoParam === null ? !this.toon : aoParam.split(',').includes('ao'))) {
-      this.ao = new N8AOPostPass(this.scene, this.camera, 1, 1);
-      const c = this.ao.configuration;
-      c.aoRadius = 1.6;
-      c.distanceFalloff = 0.6;
-      c.intensity = this.toon ? 1.3 : 2.2;
-      c.aoSamples = quality === 'high' ? 16 : 8;
-      c.denoiseSamples = quality === 'high' ? 8 : 4;
-      c.halfRes = quality !== 'high';
-      c.depthAwareUpsampling = true;
-      c.gammaCorrection = false;
-      c.color = new THREE.Color(0x0b0d18);
-      this.composer.addPass(this.ao);
+      // N8AO (~140 KB) only loads when it's used (never in the default toon
+      // look); it slots in ahead of the effect passes once it arrives
+      void import('n8ao').then(({ N8AOPostPass: AO }) => {
+        const ao = new AO(this.scene, this.camera, 1, 1);
+        const c = ao.configuration;
+        c.aoRadius = 1.6;
+        c.distanceFalloff = 0.6;
+        c.intensity = this.toon ? 1.3 : 2.2;
+        c.aoSamples = quality === 'high' ? 16 : 8;
+        c.denoiseSamples = quality === 'high' ? 8 : 4;
+        c.halfRes = quality !== 'high';
+        c.depthAwareUpsampling = true;
+        c.gammaCorrection = false;
+        c.color = new THREE.Color(0x0b0d18);
+        const at = this.composer.passes.findIndex(p => p instanceof EffectPass);
+        this.composer.addPass(ao, at < 0 ? undefined : at);
+        ao.setSize(
+          this.renderer.domElement.clientWidth * this.pixelRatio,
+          this.renderer.domElement.clientHeight * this.pixelRatio,
+        );
+        this.ao = ao;
+      });
     }
     this.bloom = new BloomEffect({
       mipmapBlur: true,
@@ -291,23 +308,40 @@ export class Graphics {
 
   /** Keep the shadow frustum centred on the player, snapped to texels. */
   followShadow(center: THREE.Vector3) {
+    if (!this.sun.castShadow) return;
     const ext = SHADOW_EXTENT[this.quality];
     const texel = (ext * 2) / this.sun.shadow.mapSize.x;
     const dist = 90;
-    // Snap in light space to stop shimmering
-    const lightRot = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(),
-      this.sunDir,
-      new THREE.Vector3(0, 1, 0),
-    );
-    const inv = lightRot.clone().invert();
-    const c = center.clone().applyMatrix4(inv);
+    // Snap in light space to stop shimmering (scratch objects: runs every frame)
+    const lightRot = this.shRot.lookAt(this.shZero, this.sunDir, this.shUp);
+    const inv = this.shInv.copy(lightRot).invert();
+    const c = this.shC.copy(center).applyMatrix4(inv);
     c.x = Math.round(c.x / texel) * texel;
     c.y = Math.round(c.y / texel) * texel;
     c.applyMatrix4(lightRot);
     this.sun.target.position.copy(c);
     this.sun.position.copy(c).addScaledVector(this.sunDir, -dist);
     this.sun.target.updateMatrixWorld();
+  }
+
+  private shRot = new THREE.Matrix4();
+  private shInv = new THREE.Matrix4();
+  private shC = new THREE.Vector3();
+  private readonly shZero = new THREE.Vector3();
+  private readonly shUp = new THREE.Vector3(0, 1, 0);
+
+  /**
+   * Apply a low-tier step-down state: render scale sets the pixel ratio (the
+   * caller resizes), shadows off stops the sun casting (three recompiles the
+   * lit materials once), post off renders straight to the screen.
+   */
+  applyLite(s: LiteState) {
+    if (s.scale !== this.lite.scale) {
+      this.pixelRatio = s.scale;
+      this.renderer.setPixelRatio(s.scale);
+    }
+    if (s.shadows !== this.lite.shadows) this.sun.castShadow = s.shadows;
+    this.lite = { ...s };
   }
 
   resize(w: number, h: number) {
@@ -319,7 +353,7 @@ export class Graphics {
   }
 
   render(dt: number) {
-    if (this.rawRender) {
+    if (this.rawRender || !this.lite.post) {
       this.renderer.render(this.scene, this.camera);
       return;
     }

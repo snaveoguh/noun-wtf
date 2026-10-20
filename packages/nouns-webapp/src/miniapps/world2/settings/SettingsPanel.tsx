@@ -211,14 +211,17 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
 
         <Section title="GAMEPLAY & GRAPHICS">
           <Choice
-            name="Quality"
+            name="Performance"
             options={QUALITIES}
             value={s.quality}
             onChange={q => settings.update({ quality: q })}
           />
+          <p className="text-xs opacity-70">
+            Auto picks for your device and steps down if it struggles. Running {perfLabel(game)}.
+          </p>
           {s.quality !== (bootedQuality.param ?? bootedQuality.setting) && (
             <div className="flex items-center justify-between gap-2 rounded-xl bg-[#ffd400]/15 px-3 py-2 text-xs">
-              <span>Quality changes on reload (running {game.hud.quality}).</span>
+              <span>Performance changes on reload (running {game.hud.quality}).</span>
               <button
                 type="button"
                 className="w2-sel rounded-full bg-[#ffd400] px-3 py-1 font-bold"
@@ -274,6 +277,16 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+/** "low · 75% res · no shadows": the tier plus any step-downs it's taken. */
+function perfLabel(game: Game): string {
+  const l = game.gfx.lite;
+  const parts: string[] = [game.gfx.quality];
+  if (game.gfx.quality === 'low' && l.scale < 1) parts.push(`${Math.round(l.scale * 100)}% res`);
+  if (!l.shadows) parts.push('no shadows');
+  if (!l.post) parts.push('no outlines');
+  return parts.join(' · ');
 }
 
 /** Install Noun World as an app (only when the browser can, or on iOS Safari). */

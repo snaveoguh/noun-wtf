@@ -215,6 +215,8 @@ export interface TreeOptions {
   /** Multiplier on leaf-card count (quality tiers scale this). */
   leafDensity?: number;
   leafSize?: number;
+  /** Fewer sides / segments on trunk and branches (phones): ~half the wood triangles, same shape. */
+  lowWood?: boolean;
 }
 
 const CARD_COUNT: Record<NatureQuality, number> = { low: 0.55, medium: 1, high: 1.45 };
@@ -228,6 +230,11 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
   const leafSize = o.leafSize ?? 1.75;
   const wood = new GeoBuilder();
   const leaves = new GeoBuilder();
+  // [sides, segments] for trunk, main branches, sub-branches
+  const lw = o.lowWood === true;
+  const trunkSeg: [number, number] = lw ? [6, 8] : [9, 12];
+  const mainSeg: [number, number] = lw ? [4, 5] : [6, 7];
+  const subSeg: [number, number] = lw ? [3, 2] : [4, 3];
 
   const split = H * rng.range(0.36, 0.46);
   const lean = new THREE.Vector3(rng.range(-0.3, 0.3), 0, rng.range(-0.3, 0.3));
@@ -251,8 +258,7 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
       new THREE.Vector3(C.x, split + Ry * 0.5, C.z),
     ],
     t => tr * (1 - 0.45 * t) * (1 + 0.7 * Math.exp(-t * 18)),
-    9,
-    12,
+    ...trunkSeg,
     windAt,
   );
 
@@ -282,7 +288,7 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
     );
     const pts = branchPts(start, end, rng.range(0.3, 0.8));
     const r0 = tr * rng.range(0.42, 0.55);
-    const curve = tube(wood, pts, t => r0 * (1 - 0.82 * t) + 0.012, 6, 7, windAt);
+    const curve = tube(wood, pts, t => r0 * (1 - 0.82 * t) + 0.012, ...mainSeg, windAt);
     tips.push({ p: end.clone(), r: rng.range(0.85, 1.1) });
     // Sub-branches
     const nSub = rng.int(2, 3);
@@ -304,8 +310,7 @@ export function generateBroadleaf(o: TreeOptions = {}): PlantAsset {
         wood,
         [s, s.clone().lerp(e, 0.5).addScaledVector(UP, 0.12), e],
         t => sr * (1 - 0.8 * t) + 0.006,
-        4,
-        3,
+        ...subSeg,
         windAt,
       );
       tips.push({ p: e, r: rng.range(0.65, 0.9) });
@@ -953,7 +958,8 @@ export class FoliageSystem {
     if (a === undefined) {
       const dens = CARD_COUNT[this.quality];
       const seed = this.seed * 101 + variant * 17 + 3;
-      if (kind === 'broadleaf') a = generateBroadleaf({ seed, leafDensity: dens });
+      if (kind === 'broadleaf')
+        a = generateBroadleaf({ seed, leafDensity: dens, lowWood: this.quality === 'low' });
       else if (kind === 'palm')
         a = generatePalm({ seed, fronds: this.quality === 'low' ? 12 : 16 });
       else {
