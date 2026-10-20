@@ -5,9 +5,10 @@
 // its market wants. The towns/ part places them in the world from this
 // table; the economy and the server ledger price and police trades with it.
 //
-// Main lines: 1 = +Z DOWNHILL (Noun Jersey ≈ 19 km out), 2 = +X MOUNTAIN
-// (Dry Gulch then Puerto Noun further down the same line; their sites are
-// TOWN_SITES in world/mountain/tracks.ts, kept equal by towns.test.ts).
+// Main lines: 1 = +Z DOWNHILL (Noun Jersey ≈ 19 km out, Shroom Hollow past
+// it), 2 = +X MOUNTAIN (Dry Gulch, Puerto Noun, Noggle City, Neon Nouns),
+// 3 = −X GO DOWN (Crater Lil, past the Noggle Bowl). The grown towns' sites
+// are TOWN_SITES in world/mountain/tracks.ts, kept equal by specs.test.ts.
 // The city is the hub: s = 0, every line starts there.
 //
 // Biases: > 1 the town pays more than the reference price (it wants it),
@@ -80,9 +81,102 @@ export const TOWN_SPECS: Record<TownId, TownSpec> = {
       makes: ['FISH'],
     },
   },
+  noggle: {
+    id: 'noggle',
+    name: 'Noggle City',
+    style: 'noggle',
+    track: 2,
+    s: 33_250,
+    market: {
+      // Built inside the giant noggles: lens works make shades by the crate;
+      // landlocked, so fish and anything cold fetch a premium
+      bias: {
+        NOGGLES: 0.45,
+        DRIP: 0.85,
+        FISH: 1.55,
+        ICECREAM: 1.45,
+        WATER: 1.3,
+        PIZZA: 1.1,
+        FRIES: 1,
+      },
+      makes: ['NOGGLES'],
+    },
+  },
+  shroom: {
+    id: 'shroom',
+    name: 'Shroom Hollow',
+    style: 'shroom',
+    track: 1,
+    s: 27_500,
+    market: {
+      // Forest folk: spring water and mushroom pizza are local; they crave
+      // shades, drip and anything fried
+      bias: {
+        WATER: 0.5,
+        PIZZA: 0.6,
+        DRIP: 1.8,
+        NOGGLES: 1.7,
+        FRIES: 1.55,
+        ICECREAM: 1.2,
+        FISH: 1.1,
+      },
+      makes: ['WATER', 'PIZZA'],
+    },
+  },
+  neon: {
+    id: 'neon',
+    name: 'Neon Nouns',
+    style: 'neon',
+    track: 2,
+    s: 40_250,
+    market: {
+      // The city that never sleeps: drip is made here, and the night crowd
+      // pays double for pizza and fries
+      bias: {
+        DRIP: 0.5,
+        PIZZA: 2.0,
+        FRIES: 1.9,
+        ICECREAM: 1.6,
+        NOGGLES: 1.4,
+        WATER: 1.2,
+        FISH: 1.3,
+      },
+      makes: ['DRIP'],
+    },
+  },
+  crater: {
+    id: 'crater',
+    name: 'Crater Lil',
+    style: 'crater',
+    track: 3,
+    s: 53_650,
+    market: {
+      // Out past the Bowl in a meteor crater: meteor-glass lenses are cheap,
+      // water and anything cold are worth a fortune
+      bias: {
+        NOGGLES: 0.6,
+        WATER: 3.8,
+        ICECREAM: 2.6,
+        FISH: 2.1,
+        DRIP: 1.3,
+        PIZZA: 1.4,
+        FRIES: 1.2,
+      },
+      makes: ['NOGGLES'],
+    },
+  },
 };
 
-export const TOWN_IDS: TownId[] = ['city', 'jersey', 'cowboy', 'beach'];
+export const TOWN_IDS: TownId[] = [
+  'city',
+  'jersey',
+  'cowboy',
+  'beach',
+  'noggle',
+  'neon',
+  'shroom',
+  'crater',
+];
 
 export const isTown = (v: unknown): v is TownId =>
   typeof v === 'string' && Object.prototype.hasOwnProperty.call(TOWN_SPECS, v);

@@ -20,7 +20,6 @@ import type {
   Side,
   Ticker,
 } from './types';
-import type { TownId } from '../../world2/trade/contract';
 
 import {
   account,
@@ -37,7 +36,15 @@ import {
 } from './book';
 import { BOT_BY_ID, isBot, ROSTER } from './bots/roster';
 import { STRATEGIES } from './bots/strategies';
-import { fairValue, GOODS, modelTownFeed, TOWN_INFO, TOWNS, type TownFeed } from './goods';
+import {
+  fairValue,
+  GOODS,
+  modelTownFeed,
+  TOWN_INFO,
+  TOWNS,
+  type TownFeed,
+  type TownId,
+} from './goods';
 import { rngFrom, type Rng } from './rng';
 
 export const STEP_MS = 5_000;

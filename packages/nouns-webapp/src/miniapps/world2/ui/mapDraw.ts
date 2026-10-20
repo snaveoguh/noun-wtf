@@ -39,6 +39,8 @@ export interface MapScene {
   drops?: { x: number; z: number; kind: string; label: string }[];
   /** Noun Trade towns (towns/TownSystem.ts → mapPoints). */
   towns?: { x: number; z: number; name: string; km: number }[];
+  /** Nounish landmarks (world/landmarks/LandmarkSystem.ts → mapPoints). */
+  landmarks?: { x: number; z: number; name: string; icon: string; found: boolean }[];
 }
 
 const C = {
@@ -57,6 +59,8 @@ const C = {
   nj: '#ff3d8b',
   bowl: '#8f6bff',
   town: '#ffb000',
+  landmark: '#ff4fd8',
+  landmarkUnseen: '#c9c4d6',
   me: '#ffd400',
   rider: '#22c7f0',
   way: '#b6ef3a',
@@ -456,6 +460,23 @@ export function drawMap(
           color: C.town,
         },
       );
+  }
+
+  // Landmarks: small pins, coloured once found (edge markers only on the full map)
+  for (const l of scene.landmarks ?? []) {
+    let p = S(l.x, l.z);
+    const off = !inside(p, 12);
+    if (off && !o.full) continue;
+    if (off) p = edge(p, 12);
+    ctx.save();
+    ctx.globalAlpha = l.found ? 1 : 0.55;
+    pin(ctx, p.x, p.y, l.found ? C.landmark : C.landmarkUnseen, l.icon.length > 2 ? '⌐◨' : l.icon);
+    ctx.restore();
+    if (o.full && !off)
+      label(ctx, l.found ? l.name.toUpperCase() : '???', p.x, p.y - 22, {
+        size: 10,
+        color: l.found ? C.landmark : C.landmarkUnseen,
+      });
   }
 
   // Waypoint

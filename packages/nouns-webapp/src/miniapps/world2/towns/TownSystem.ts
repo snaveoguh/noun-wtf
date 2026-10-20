@@ -54,6 +54,7 @@ import {
   CITY_PLACEMENT,
   GROWN_TOWNS,
   IN_TOWN_R,
+  isGrownTown,
   placementOf,
   townFrame,
   townFrameNow,
@@ -88,6 +89,10 @@ export interface TownHost {
 const THANKS: Record<GrownTown, string[]> = {
   cowboy: ['Much obliged!', 'Well, I’ll be!', 'Yee-haw!', 'Thank ya kindly.'],
   beach: ['Pura vida!', '¡Gracias!', 'Sweet!', 'Perfecto!'],
+  noggle: ['Noggles on!', 'Clear as day!', 'Lens-tastic!', 'Seeing double!'],
+  shroom: ['Far out…', 'Spore-tacular!', 'Grow on, friend.', 'Mmm, earthy.'],
+  neon: ['Glowing!', 'Lit!', 'Pixel perfect!', 'Bzzzt, thanks!'],
+  crater: ['Out of this world!', 'Lil but mighty!', 'Moon-ready!', 'Gravity, who?'],
 };
 const TOO_SLOW = ['Too slow…', 'Forget it.', 'Melted.'];
 
@@ -321,7 +326,7 @@ export class TownSystem implements TownsApi {
     if (prev !== null) for (const fn of this.listeners.leave) fn(prev);
     if (now !== null) {
       for (const fn of this.listeners.enter) fn(now);
-      if (now === 'cowboy' || now === 'beach') {
+      if (isGrownTown(now)) {
         const hot = hotGoods(now)
           .slice(0, 2)
           .map(g => `${GOOD_LABEL[g].name} ↑`)
@@ -644,10 +649,7 @@ export class TownSystem implements TownsApi {
 
   private updateHud(src: THREE.Vector3) {
     // Compass arrow to the nearest waiting customer while in a grown town
-    const lt =
-      this.current === 'cowboy' || this.current === 'beach'
-        ? this.live.get(this.current)
-        : undefined;
+    const lt = isGrownTown(this.current) ? this.live.get(this.current) : undefined;
     let best: { c: Customer; o: Order; d: number } | null = null;
     if (lt !== undefined)
       for (const c of lt.customers) {

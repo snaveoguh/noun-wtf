@@ -188,14 +188,20 @@ function drawSign(
 
 // ── Builder ─────────────────────────────────────────────────────────────
 
-export type Bucket = 'solid' | 'ground' | 'thin';
+/** glow: unlit neon (Neon Nouns' strips, lanterns, windows at night). */
+export type Bucket = 'solid' | 'ground' | 'thin' | 'glow';
 
 const _col = new THREE.Color();
 const _p = { x: 0, z: 0 };
 const Y = new THREE.Vector3(0, 1, 0);
 
 export class TownBuilder {
-  readonly geo: Record<Bucket, THREE.BufferGeometry[]> = { solid: [], ground: [], thin: [] };
+  readonly geo: Record<Bucket, THREE.BufferGeometry[]> = {
+    solid: [],
+    ground: [],
+    thin: [],
+    glow: [],
+  };
   readonly signs: THREE.BufferGeometry[] = [];
   readonly col: THREE.BufferGeometry[] = [];
   /** Instanced plants: kind → matrices (chunk-local). */

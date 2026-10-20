@@ -29,6 +29,7 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
     mountain: game.mountain !== null,
     drops: game.drops?.mapPoints(),
     towns: game.towns?.mapPoints(full),
+    landmarks: game.landmarks?.mapPoints(full),
   };
 }
 

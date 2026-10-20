@@ -47,15 +47,36 @@ describe('goods + towns tables', () => {
     expect(travelMetres('jersey', 'jersey')).toBe(0);
   });
 
-  it('the design: cowboy pays most for ICECREAM and WATER, beach makes FISH cheap and pays most for DRIP', () => {
+  it('the design: the deserts pay most for cold, beach makes FISH cheap and pays most for DRIP', () => {
     const at = (t: TownId, g: GoodId) => quoteAt(t, g, targetStock(t, g));
-    const best = (g: GoodId) => TOWN_IDS.slice().sort((a, b) => at(b, g).bid - at(a, g).bid)[0];
+    const best = (g: GoodId, ts = TOWN_IDS) =>
+      ts.slice().sort((a, b) => at(b, g).bid - at(a, g).bid)[0];
     const cheapest = (g: GoodId) => TOWN_IDS.slice().sort((a, b) => at(a, g).ask - at(b, g).ask)[0];
-    expect(best('ICECREAM')).toBe('cowboy');
-    expect(best('WATER')).toBe('cowboy');
+    // Crater Lil (out past the Bowl) tops them; Dry Gulch is the near desert
+    expect(best('ICECREAM')).toBe('crater');
+    expect(best('WATER')).toBe('crater');
+    const near: TownId[] = ['city', 'jersey', 'cowboy', 'beach', 'noggle'];
+    expect(best('ICECREAM', near)).toBe('cowboy');
+    expect(best('WATER', near)).toBe('cowboy');
     expect(best('DRIP')).toBe('beach');
     expect(cheapest('FISH')).toBe('beach');
     expect(cheapest('ICECREAM')).toBe('city');
+  });
+
+  it('the weird towns: each makes something cheap that another pays well for', () => {
+    const at = (t: TownId, g: GoodId) => quoteAt(t, g, targetStock(t, g));
+    const cheapest = (g: GoodId) => TOWN_IDS.slice().sort((a, b) => at(a, g).ask - at(b, g).ask)[0];
+    expect(cheapest('NOGGLES')).toBe('noggle');
+    expect(cheapest('WATER')).toBe('shroom');
+    expect(cheapest('DRIP')).toBe('neon');
+    // A haul from where it's made to where it's wanted clears the spread
+    for (const [from, to, g] of [
+      ['noggle', 'shroom', 'NOGGLES'],
+      ['shroom', 'crater', 'WATER'],
+      ['neon', 'beach', 'DRIP'],
+      ['shroom', 'neon', 'PIZZA'],
+    ] as [TownId, TownId, GoodId][])
+      expect(at(to, g).bid).toBeGreaterThan(at(from, g).ask * 1.5);
   });
 });
 
@@ -165,6 +186,6 @@ describe('mean reversion', () => {
     expect(m.cowboy.stock.ICECREAM).toBe(targetStock('cowboy', 'ICECREAM'));
     expect(m.cowboy.stock.WATER).toBe(10);
     expect(m.beach.stock.FISH).toBe(240);
-    expect(Object.keys(m).sort()).toEqual(['beach', 'city', 'cowboy', 'jersey']);
+    expect(Object.keys(m).sort()).toEqual(TOWN_IDS.slice().sort());
   });
 });

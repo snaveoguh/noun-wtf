@@ -27,10 +27,11 @@ export function gameHost(game: Game): CutsceneHost {
       !g.replay.active &&
       !g.hoops.active &&
       !g.van2.driving &&
+      !g.dragon.riding &&
       !g.showroom &&
       !g.paused &&
       g.me !== null,
-    suspendedAfter: () => g.missions.ud.active || g.van2.driving,
+    suspendedAfter: () => g.missions.ud.active || g.van2.driving || g.dragon.riding,
     inputAfter: () => !g.paused && g.missions.panel === null,
     anchorOf: what => {
       if (what === 'rider') {

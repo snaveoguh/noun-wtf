@@ -21,7 +21,7 @@
 import type { GoodId, Quote, TownId } from './contract';
 
 import { GOOD_IDS, GOODS } from './goods';
-import { TOWN_SPECS } from './towns';
+import { TOWN_IDS, TOWN_SPECS } from './towns';
 
 export const ELASTICITY = 0.7;
 /** Stock a town settles at for a good it makes. */
@@ -93,12 +93,9 @@ export function freshMarket(town: TownId, now: number): TownMarket {
 }
 
 export function freshMarkets(now: number): Markets {
-  return {
-    city: freshMarket('city', now),
-    jersey: freshMarket('jersey', now),
-    cowboy: freshMarket('cowboy', now),
-    beach: freshMarket('beach', now),
-  };
+  // Every town in the table (a store written before a town existed gets it
+  // fresh through normalizeMarkets)
+  return Object.fromEntries(TOWN_IDS.map(t => [t, freshMarket(t, now)])) as Markets;
 }
 
 /** The market brought up to `now` (a copy; time never runs backwards). */
