@@ -8,6 +8,7 @@ import { useAppSelector } from '@/hooks';
 
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
+import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
 import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
@@ -197,6 +198,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, []);
 
   const hoopsOn = useHoopsActive(game);
+  // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
 
@@ -334,6 +336,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
       {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <DragonHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}

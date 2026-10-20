@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { audit, RULES, type TradeRow } from '../../src/miniapps/world2/trade/ledger';
 import { targetStock } from '../../src/miniapps/world2/trade/market';
+import { TOWN_IDS } from '../../src/miniapps/world2/trade/towns';
 
 // (Lives in netlify/lib, not netlify/functions: Netlify would bundle a test
 // file there as a function and break the deploy.)
@@ -82,7 +83,7 @@ describe('world-trade: reads', () => {
   it('GET with no rider: every town × good quote', async () => {
     const { status, out } = await get();
     expect(status).toBe(200);
-    expect(out.quotes).toHaveLength(4 * 7);
+    expect(out.quotes).toHaveLength(TOWN_IDS.length * 7);
     expect(out.quotes[0]).toMatchObject({ town: 'city' });
   });
 

@@ -15,6 +15,9 @@ export const UPGRADES: Record<VanUpgrade, UpgradeSpec> = {
   freezer: { id: 'freezer', name: 'Deep freezer', cost: 300, blurb: 'Cargo spoils 4× slower' },
   bigbox: { id: 'bigbox', name: 'Big box', cost: 500, blurb: '+40 cargo slots' },
   engine: { id: 'engine', name: 'Hot engine', cost: 800, blurb: '+10% top speed' },
+  // Not a van part (not in UPGRADE_IDS, so the van garage never lists it):
+  // the Dragon Roost in Noggle City sells it (dragon/pay.ts)
+  dragon: { id: 'dragon', name: 'Noun dragon', cost: 2500, blurb: 'A rideable, flying dragon' },
 };
 
 export const UPGRADE_IDS: VanUpgrade[] = ['horn', 'neon', 'freezer', 'bigbox', 'engine'];

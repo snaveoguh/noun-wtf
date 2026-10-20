@@ -54,6 +54,7 @@ import {
   CITY_PLACEMENT,
   GROWN_TOWNS,
   IN_TOWN_R,
+  isGrownTown,
   placementOf,
   townFrame,
   townFrameNow,
@@ -304,7 +305,7 @@ export class TownSystem implements TownsApi {
     if (prev !== null) for (const fn of this.listeners.leave) fn(prev);
     if (now !== null) {
       for (const fn of this.listeners.enter) fn(now);
-      if (now === 'cowboy' || now === 'beach') {
+      if (isGrownTown(now)) {
         const hot = hotGoods(now)
           .slice(0, 2)
           .map(g => `${GOOD_LABEL[g].name} ↑`)
@@ -604,10 +605,7 @@ export class TownSystem implements TownsApi {
 
   private updateHud(src: THREE.Vector3) {
     // Compass arrow to the nearest waiting customer while in a grown town
-    const lt =
-      this.current === 'cowboy' || this.current === 'beach'
-        ? this.live.get(this.current)
-        : undefined;
+    const lt = isGrownTown(this.current) ? this.live.get(this.current) : undefined;
     let best: { c: Customer; o: Order; d: number } | null = null;
     if (lt !== undefined)
       for (const c of lt.customers) {

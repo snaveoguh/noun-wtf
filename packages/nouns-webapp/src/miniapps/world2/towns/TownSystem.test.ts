@@ -91,9 +91,18 @@ describe('TownsApi', () => {
   it('map pins carry names and rough distances', () => {
     const sys = new TownSystem(host(new THREE.Vector3(), []));
     const pts = sys.mapPoints(true);
-    expect(pts.map(p => p.name)).toEqual(['Dry Gulch', 'Puerto Noun']);
+    expect(pts.map(p => p.name)).toEqual([
+      'Dry Gulch',
+      'Puerto Noun',
+      'Noggle City',
+      'Shroom Hollow',
+      'Neon Nouns',
+      'Crater Lil',
+    ]);
     expect(pts[0].km).toBeGreaterThanOrEqual(9);
     expect(pts[1].km).toBeGreaterThanOrEqual(23);
+    // The weird towns are all 22+ km out
+    for (const p of pts.slice(2)) expect(p.km).toBeGreaterThanOrEqual(22);
     sys.dispose();
   });
 });

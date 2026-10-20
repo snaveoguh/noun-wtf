@@ -19,3 +19,43 @@ exports[`town sites > placement is deterministic (fixed numbers: every client mu
   235,
 ]
 `;
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 3`] = `
+[
+  26398,
+  -13336,
+  1,
+  -4144,
+  235,
+]
+`;
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 4`] = `
+[
+  4827,
+  23497,
+  -1,
+  -3371,
+  235,
+]
+`;
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 5`] = `
+[
+  31234,
+  -16632,
+  -1,
+  -4961,
+  235,
+]
+`;
+
+exports[`town sites > placement is deterministic (fixed numbers: every client must agree) 6`] = `
+[
+  -44095,
+  -17002,
+  1,
+  -6630,
+  235,
+]
+`;

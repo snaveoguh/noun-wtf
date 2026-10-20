@@ -19,6 +19,7 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { Input, type InputFrame } from './core/Input';
+import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
@@ -50,11 +51,13 @@ import { AudioMixer } from './settings/mixer';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { townsDecorator } from './towns/build';
-import { townSpawn } from './towns/site';
+import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
+import { landmarksDecorator } from './world/landmarks/decorator';
+import { LandmarkSystem } from './world/landmarks/LandmarkSystem';
 import { loadLevel, type LevelData } from './world/Level';
 import { buildMegaRamp, placeMegaRamp, type PlacedMegaRamp } from './world/MegaRamp';
 import { dressingDecorator } from './world/mountain/DressingDecorator';
@@ -188,6 +191,8 @@ export class Game {
   crew: JerseyCrew | null = null;
   /** Noun Trade towns + their customers (towns/): the TownsApi (trade/contract.ts). */
   towns: TownSystem | null = null;
+  /** Nounish landmarks (world/landmarks/): discoveries, compass, map pins. */
+  landmarks: LandmarkSystem | null = null;
   /** Missions: the Oracle and the cast, progress, the Upside Down (missions/). */
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -196,6 +201,8 @@ export class Game {
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
   readonly van2: VanDrive;
+  /** The Noun dragon (dragon/): bought at the Dragon Roost, called with Z, flown. */
+  readonly dragon: DragonRide;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -230,6 +237,7 @@ export class Game {
     this.player = new Player(this.world, this.rails);
     this.cam = new SkateCamera(this.gfx.camera, this.world);
     this.van2 = new VanDrive(this);
+    this.dragon = new DragonRide(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -367,6 +375,15 @@ export class Game {
         },
         game: this,
       });
+    if (this.mountain !== null)
+      this.landmarks = new LandmarkSystem({
+        player: this.player,
+        controlYaw: () => this.cam.controlYaw,
+        toast: (text, tag) => {
+          this.hud = { ...this.hud, toast: { text, tag, at: performance.now() } };
+          this.emit();
+        },
+      });
     // Dry Gulch's theme ("Sell It Cold") on riding into the cowboy town
     this.towns?.on('enter', t => this.onTownTheme('enter', t));
     this.towns?.on('leave', t => this.onTownTheme('leave', t));
@@ -401,9 +418,10 @@ export class Game {
       const sp = bowlSpawn();
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
-    // `?spot=cowboy` / `?spot=beach`: top of main street in a Noun Trade town (dev; no stats)
+    // `?spot=cowboy` / `beach` / `noggle` / `shroom` / `neon` / `crater`: top of
+    // main street in a Noun Trade town (dev; no stats)
     const ts = spotParam();
-    if ((ts === 'cowboy' || ts === 'beach') && this.mountain !== null) {
+    if (isGrownTown(ts) && this.mountain !== null) {
       const sp = townSpawn(ts);
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
@@ -628,7 +646,7 @@ export class Game {
     }
     const input = this.input.poll(now);
     // Driving the ice cream van: E / R / spray are the van's this frame
-    const driving = this.van2.preStep(input);
+    const driving = this.van2.preStep(input) || this.dragon.preStep(input);
     // On foot (and on walls) the mouse is a free cursor for painting
     this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
@@ -661,7 +679,8 @@ export class Game {
       this.handlePlayerEvents();
     }
 
-    if (driving) this.van2.drive(dt, input, now);
+    if (this.van2.driving) this.van2.drive(dt, input, now);
+    else if (this.dragon.riding) this.dragon.fly(dt, input, now);
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
       this.updateMyCharacter(dt);
@@ -671,11 +690,13 @@ export class Game {
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.van2.update(dt);
+    this.dragon.update(dt);
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving) this.drops?.update(dt, this.player);
     this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
     this.towns?.update(dt);
+    this.landmarks?.update(dt);
     this.particles.update(dt, p => {
       const hit = this.world.raycast(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
@@ -766,8 +787,11 @@ export class Game {
       m.addDecorator(nounJerseyDecorator(this.rails));
       // …and the Noggle Bowl (~42 km down the −X line): walls, deck, coping
       m.addDecorator(noggleBowlDecorator());
-      // Noun Trade towns (Dry Gulch ~10 km, Puerto Noun ~25 km down the +X line)
+      // Noun Trade towns (Dry Gulch, Noggle City, Puerto Noun, Neon Nouns down
+      // the +X line; Shroom Hollow down +Z; Crater Lil down −X)
       m.addDecorator(townsDecorator());
+      // Wild landmarks (the Big Noun, Meltdown, the Noggle Wheel, …)
+      m.addDecorator(landmarksDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)
       const wild = new Wildlife(this.gfx.quality);
       m.addDecorator(wild.decorator());
@@ -1657,6 +1681,7 @@ export class Game {
     if (this.mountain !== null) this.updateSecretSpot(lm);
     if (this.mountain !== null) this.updateBowl(lm);
     this.towns?.landmarks(lm);
+    this.landmarks?.compass(lm);
     this.hud = {
       ...this.hud,
       mode: p.mode,
@@ -1767,6 +1792,7 @@ export class Game {
     this.missions.dispose();
     this.hoops.dispose();
     this.van2.dispose();
+    this.dragon.dispose();
     this.stats.dispose();
     this.drops?.dispose();
     this.mountain?.dispose();
