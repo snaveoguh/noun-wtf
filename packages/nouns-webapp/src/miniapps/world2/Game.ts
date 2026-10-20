@@ -676,6 +676,8 @@ export class Game {
     if (this.showroom) {
       this.input.poll(now);
       this.updateShowroom(dt);
+      // NOUN FM keeps playing over character select
+      this.updateFm(dt);
       return;
     }
     // ── Noun Hoops: sim + view at the court; skater, skate camera and stats untouched ──
