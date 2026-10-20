@@ -11,6 +11,17 @@ import type { Player } from '../skate/Player';
 import * as THREE from 'three';
 
 const UP = new THREE.Vector3(0, 1, 0);
+const DOWN = new THREE.Vector3(0, -1, 0);
+// Per-frame scratch (update runs every frame; no garbage on weak phones)
+const _hv = new THREE.Vector3();
+const _f = new THREE.Vector3();
+const _target = new THREE.Vector3();
+const _back = new THREE.Vector3();
+const _desired = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _probe = new THREE.Vector3();
+const _moved = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
 const MIN_VIEW_ASPECT = 1.4;
 const MAX_PORTRAIT_FOV = 100;
 
@@ -70,13 +81,13 @@ export class SkateCamera {
         this.orbitPitch *= 1 - k;
       }
       // Travel heading (horizontal velocity), falls back to board nose
-      const hv = new THREE.Vector3(p.vel.x, 0, p.vel.z);
+      const hv = _hv.set(p.vel.x, 0, p.vel.z);
       const hs = hv.length();
       let targetYaw = this.yaw;
       if (p.state === 'grind' || p.state === 'ground' || p.state === 'manual') {
         if (hs > 0.8) targetYaw = Math.atan2(hv.x, hv.z);
         else {
-          const f = new THREE.Vector3(p.fwd.x, 0, p.fwd.z);
+          const f = _f.set(p.fwd.x, 0, p.fwd.z);
           if (f.lengthSq() > 0.1) targetYaw = Math.atan2(f.x, f.z) + (p.fakie ? Math.PI : 0);
         }
       } else if (p.state === 'air' && !p.vertLip && hs > 2) {
@@ -120,36 +131,32 @@ export class SkateCamera {
     // Climbing pulls the camera below the climber, looking up the facade
     const pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
 
-    const target = new THREE.Vector3().copy(p.pos);
+    const target = _target.copy(p.pos);
     // On vert, frame the ramp + rider instead of chasing straight up
     if (onBoard && p.state === 'air' && p.vertLip) target.y = Math.min(target.y, this.look.y + 0.5);
     target.y += onBoard ? preset.la : 1.25 + ck * 0.9;
 
-    const back = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const desired = target
-      .clone()
+    const back = _back.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const desired = _desired
+      .copy(target)
       .addScaledVector(back, dist * Math.cos(pitch))
       .addScaledVector(UP, (onBoard ? preset.h - preset.la + 0.35 : 0.2) + dist * Math.sin(pitch));
 
     // Collision: pull in toward the target
     const blocked = this.world.obstruction(target, desired);
     if (blocked >= 0) {
-      const dir = desired.clone().sub(target).normalize();
+      const dir = _dir.copy(desired).sub(target).normalize();
       desired.copy(target).addScaledVector(dir, Math.max(0.6, blocked - 0.25));
     }
     // Keep above the ground under the camera
-    const g = this.world.raycast(
-      desired.clone().add(new THREE.Vector3(0, 2, 0)),
-      new THREE.Vector3(0, -1, 0),
-      4,
-    );
+    const g = this.world.raycast(_probe.copy(desired).addScaledVector(UP, 2), DOWN, 4);
     if (g && desired.y < g.point.y + 0.25) desired.y = g.point.y + 0.25;
 
     // Feed-forward: carry the camera along with the rider at mountain speeds
     // so the spring doesn't trail metres behind (a critically damped spring
     // lags 2v/ω). At city speeds (≤ 17 m/s) the original chase feel is untouched.
     if (this.hasLastRider && this.initialized) {
-      const moved = new THREE.Vector3().subVectors(p.pos, this.lastRider);
+      const moved = _moved.subVectors(p.pos, this.lastRider);
       if (moved.lengthSq() > 60 * 60) this.initialized = false;
       else if (onBoard) {
         const k = THREE.MathUtils.smoothstep(p.speed, 17, 35);
@@ -167,22 +174,17 @@ export class SkateCamera {
     // Critically damped spring for position, tighter for look target
     const stiffness = onBoard ? (p.state === 'air' ? 7 : 11) : 10;
     springTo(this.pos, this.vel, desired, stiffness, dt);
-    const lookAhead = onBoard
-      ? new THREE.Vector3(p.vel.x, 0, p.vel.z).multiplyScalar(0.12)
-      : new THREE.Vector3();
-    const lookTarget = target.clone().add(lookAhead);
+    const lookTarget = _lookTarget.copy(target);
+    if (onBoard) lookTarget.x += p.vel.x * 0.12;
+    if (onBoard) lookTarget.z += p.vel.z * 0.12;
     this.look.lerp(lookTarget, 1 - Math.exp(-14 * dt));
 
     this.camera.position.copy(this.pos);
     if (this.shake > 0.001) {
       const s = this.shake * 0.08;
-      this.camera.position.add(
-        new THREE.Vector3(
-          (Math.random() - 0.5) * s,
-          (Math.random() - 0.5) * s,
-          (Math.random() - 0.5) * s,
-        ),
-      );
+      this.camera.position.x += (Math.random() - 0.5) * s;
+      this.camera.position.y += (Math.random() - 0.5) * s;
+      this.camera.position.z += (Math.random() - 0.5) * s;
       this.shake *= Math.exp(-7 * dt);
     }
     this.camera.lookAt(this.look);
@@ -227,11 +229,13 @@ function springTo(
 ) {
   // Exact critically damped spring step
   const exp = Math.exp(-omega * dt);
-  const dx = new THREE.Vector3().subVectors(x, target);
-  const temp = v.clone().addScaledVector(dx, omega).multiplyScalar(dt);
-  v.sub(temp.clone().multiplyScalar(omega)).multiplyScalar(exp);
+  const dx = _springDx.subVectors(x, target);
+  const temp = _springTemp.copy(v).addScaledVector(dx, omega).multiplyScalar(dt);
+  v.addScaledVector(temp, -omega).multiplyScalar(exp);
   x.copy(target).add(dx.add(temp).multiplyScalar(exp));
 }
+const _springDx = new THREE.Vector3();
+const _springTemp = new THREE.Vector3();
 
 function lerpAngle(a: number, b: number, t: number) {
   let d = b - a;

@@ -31,7 +31,8 @@ const CandleGate: FC = () => {
     const audio = new Audio('/audio/dungeon.mp3');
     audio.loop = true;
     audio.volume = 0;
-    audio.preload = 'auto';
+    // 2 MB: fetched when the candle is lit (play() loads it), not on page load
+    audio.preload = 'none';
     audioRef.current = audio;
 
     return () => {
@@ -95,18 +96,21 @@ const CandleGate: FC = () => {
     const audio = audioRef.current;
     if (audio) {
       audio.volume = 0;
-      audio.play().then(() => {
-        // Fade in over 2s
-        let vol = 0;
-        const fadeIn = setInterval(() => {
-          vol += 0.05;
-          if (vol >= 1) {
-            vol = 1;
-            clearInterval(fadeIn);
-          }
-          if (audioRef.current) audioRef.current.volume = vol;
-        }, 100);
-      }).catch(() => {});
+      audio
+        .play()
+        .then(() => {
+          // Fade in over 2s
+          let vol = 0;
+          const fadeIn = setInterval(() => {
+            vol += 0.05;
+            if (vol >= 1) {
+              vol = 1;
+              clearInterval(fadeIn);
+            }
+            if (audioRef.current) audioRef.current.volume = vol;
+          }, 100);
+        })
+        .catch(() => {});
     }
 
     // After flame animation, dissolve gate
@@ -114,7 +118,11 @@ const CandleGate: FC = () => {
       setDissolving(true);
       setTimeout(() => {
         setGateDismissed(true);
-        try { localStorage.setItem(CANDLE_LIT_KEY, '1'); } catch { /* noop */ }
+        try {
+          localStorage.setItem(CANDLE_LIT_KEY, '1');
+        } catch {
+          /* noop */
+        }
       }, 1200);
     }, 1500);
   }, [candleLit]);

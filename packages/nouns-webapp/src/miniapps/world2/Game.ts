@@ -46,6 +46,15 @@ import {
   type TownThemeState,
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
+import {
+  autoQuality,
+  type FpsLadder,
+  isWeakDevice,
+  ladderTick,
+  readDevice,
+  stepDown,
+  WEAK_BOOT_SCALE,
+} from './render/deviceTier';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
@@ -102,6 +111,20 @@ function megaParam(): string | null {
  * Dev / test URL params that teleport you or open the game up. Sessions
  * with any of them never post stats (a `?spot=nj` start is 19 km "downhill").
  */
+// Per-frame scratch (the rider pose and particle ground checks run every
+// frame; fresh vectors there were steady GC churn on weak phones)
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const AXIS_Y = new THREE.Vector3(0, 1, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const DOWN = new THREE.Vector3(0, -1, 0);
+const _v = new THREE.Vector3();
+const _pivot = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _qInv = new THREE.Quaternion();
+const _manualQ = new THREE.Quaternion();
+const _slideQ = new THREE.Quaternion();
+const _boardQ = new THREE.Quaternion();
+
 function devRun(): boolean {
   const q = new URLSearchParams(window.location.search);
   return ['megaramp', 'spot', 'debug', 'diag'].some(k => q.has(k));
@@ -254,6 +277,10 @@ export class Game {
   private sparkAcc = 0;
   private animTime = 0;
   private lowFpsTime = 0;
+  /** The low tier's step-down ladder (auto quality on 'low' only). */
+  private ladder: FpsLadder | null = null;
+  /** A weak phone (booted at a lower render scale). */
+  weakDevice = false;
 
   constructor(opts: GameOptions) {
     this.opts = opts;
@@ -262,8 +289,21 @@ export class Game {
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
     this.name = opts.name ?? `noun ${seedKey(this.seed).split('-')[3]}`;
-    const quality = opts.quality ?? pickQuality();
+    const quality = opts.quality ?? autoQuality(readDevice());
     this.gfx = new Graphics(opts.canvas, quality);
+    // Low: only the rider's own Noun casts a shadow (NPCs, customers, remotes don't)
+    NounCharacter.castShadows = quality !== 'low';
+    // 'low' picked automatically: a weak phone boots lighter and the ladder
+    // may keep stepping down (an explicit Low / ?q=low stays as chosen)
+    if (quality === 'low' && opts.quality === undefined) {
+      this.ladder = { bad: 0, age: 0 };
+      this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
+      if (this.weakDevice)
+        this.gfx.applyLite({
+          ...this.gfx.lite,
+          scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
+        });
+    }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
     this.cam = new SkateCamera(this.gfx.camera, this.world);
@@ -340,7 +380,7 @@ export class Game {
   async start() {
     this.setLoading('loading level');
     const [level, assets] = await Promise.all([
-      loadLevel(this.gfx.renderer, m => this.setLoading(m)),
+      loadLevel(this.gfx.renderer, m => this.setLoading(m), { lite: this.gfx.quality === 'low' }),
       loadCharacterAssets(),
     ]);
     if (this.disposed) return;
@@ -440,6 +480,7 @@ export class Game {
     this.towns?.on('leave', () => this.sfx.setBed(null));
     this.me = new NounCharacter(this.seed, assets);
     this.me.setBoardType(this.boardType);
+    this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
@@ -761,11 +802,7 @@ export class Game {
     this.towns?.update(dt);
     this.landmarks?.update(dt);
     this.particles.update(dt, p => {
-      const hit = this.world.raycast(
-        new THREE.Vector3(p.x, p.y + 0.5, p.z),
-        new THREE.Vector3(0, -1, 0),
-        1,
-      );
+      const hit = this.world.raycast(_v.set(p.x, p.y + 0.5, p.z), DOWN, 1);
       return hit ? hit.point.y : null;
     });
     this.gfx.followShadow(this.player.pos);
@@ -1364,20 +1401,15 @@ export class Game {
     me.root.position.copy(p.pos);
     if (p.climb !== null) {
       const c = p.climb;
-      me.root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.footYaw);
+      me.root.quaternion.setFromAxisAngle(AXIS_Y, p.footYaw);
       me.board.visible = false;
       // Lean the chest into the wall, bob with each pull
       const mantling = c.mantle !== null;
       const lean = mantling ? 0.32 : 0.1 + Math.sin(c.phase * 2) * 0.03 * c.moving;
       me.body.quaternion
-        .setFromAxisAngle(new THREE.Vector3(1, 0, 0), lean)
+        .setFromAxisAngle(AXIS_X, lean)
         // Hips sway toward the reaching hand
-        .multiply(
-          new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1),
-            Math.sin(c.phase) * 0.09 * c.moving,
-          ),
-        );
+        .multiply(_q.setFromAxisAngle(AXIS_Z, Math.sin(c.phase) * 0.09 * c.moving));
       me.body.position.set(0, Math.abs(Math.sin(c.phase)) * 0.05 * c.moving, -0.04);
       this.footstepAcc += dt * c.moving * 2.4;
       if (this.footstepAcc > 1) {
@@ -1385,14 +1417,14 @@ export class Game {
         this.audio.footstep();
       }
     } else if (p.mode === 'foot') {
-      me.root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.footYaw);
+      me.root.quaternion.setFromAxisAngle(AXIS_Y, p.footYaw);
       me.board.visible = false;
       me.body.position.set(0, 0, 0);
       me.body.quaternion.identity();
       // Vault: tuck forward over the hands
       if (p.vault !== null)
         me.body.quaternion.setFromAxisAngle(
-          new THREE.Vector3(1, 0, 0),
+          AXIS_X,
           Math.sin(p.vault.k * Math.PI) * (p.vault.kind === 'over' ? 0.45 : 0.3),
         );
       // Step sounds
@@ -1409,34 +1441,28 @@ export class Game {
       me.board.visible = true;
       // Board flies loose in world space
       me.board.position.copy(p.looseBoard.pos).sub(p.pos);
-      me.board.position.applyQuaternion(me.root.quaternion.clone().invert());
-      me.board.quaternion.copy(me.root.quaternion.clone().invert().multiply(p.looseBoard.quat));
+      _qInv.copy(me.root.quaternion).invert();
+      me.board.position.applyQuaternion(_qInv);
+      me.board.quaternion.copy(_qInv).multiply(p.looseBoard.quat);
     } else {
       p.getRiderQuaternion(me.root.quaternion);
       // Kickturn/revert: start facing the old way and whip round
       if (p.kickturn > 0) {
-        me.root.quaternion.multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.kickturn),
-        );
+        me.root.quaternion.multiply(_q.setFromAxisAngle(AXIS_Y, p.kickturn));
       }
       me.board.visible = true;
       // Powerslide: board + rider rotate sideways
       const slideYaw = p.powerslide * 1.25 * (p.lean >= 0 ? 1 : -1);
-      const manualQ = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(1, 0, 0),
-        -p.manualPitch,
-      );
-      const slideQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), slideYaw);
-      const grindYaw = p.state === 'grind' && p.grind ? 0 : 0;
-      void grindYaw;
+      const manualQ = _manualQ.setFromAxisAngle(AXIS_X, -p.manualPitch);
+      const slideQ = _slideQ.setFromAxisAngle(AXIS_Y, slideYaw);
       // Flip rotates about the board centre (half deck height)
-      const pivot = new THREE.Vector3(0, me.deckTop * 0.6, 0);
-      const boardQ = slideQ.clone().multiply(manualQ).multiply(p.boardFlipQuat);
+      const pivot = _pivot.set(0, me.deckTop * 0.6, 0);
+      const boardQ = _boardQ.copy(slideQ).multiply(manualQ).multiply(p.boardFlipQuat);
       me.board.quaternion.copy(boardQ);
       me.board.position
         .copy(pivot)
-        .sub(pivot.clone().applyQuaternion(boardQ))
-        .add(new THREE.Vector3(0, p.boardLift, 0));
+        .sub(_v.copy(pivot).applyQuaternion(boardQ))
+        .add(_v.set(0, p.boardLift, 0));
       me.body.quaternion.copy(slideQ).multiply(manualQ);
       // Manual pitch pivots around the back wheels: raise the body a touch
       me.body.position.set(0, Math.abs(p.manualPitch) * 0.12, 0);
@@ -1689,6 +1715,7 @@ export class Game {
     }
     this.me = new NounCharacter(seed, this.assets);
     this.me.setBoardType(this.boardType);
+    this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
@@ -1748,16 +1775,32 @@ export class Game {
     this.hudAcc = 0;
     let fps = this.hud.fps;
     if (this.fpsAcc > 0.5) {
+      const window_ = this.fpsAcc;
       fps = Math.round(this.fpsFrames / this.fpsAcc);
       this.fpsAcc = 0;
       this.fpsFrames = 0;
+      // Low tier on auto: the step-down ladder (render scale → shadows → post)
+      if (this.ladder !== null) {
+        if (ladderTick(this.ladder, fps, window_)) {
+          const next = stepDown(this.gfx.lite);
+          if (next !== null) {
+            this.gfx.applyLite(next);
+            this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
+            if (import.meta.env.DEV) console.info('[perf] stepped down', next, `${fps} fps`);
+          } else this.ladder = null; // nothing left to drop
+        }
+      }
       // Adaptive quality: sustained low FPS on high → drop pixel ratio
       if (fps < 40) this.lowFpsTime += 0.5;
       else this.lowFpsTime = 0;
       // Gentle steps with a floor: dropping a Retina screen to 1x is what
       // made the whole game read as blurry.
       const floor = window.devicePixelRatio >= 2 ? 1.25 : 1;
-      if (this.lowFpsTime > 4 && this.gfx.renderer.getPixelRatio() > floor) {
+      if (
+        this.gfx.quality !== 'low' &&
+        this.lowFpsTime > 4 &&
+        this.gfx.renderer.getPixelRatio() > floor
+      ) {
         this.gfx.renderer.setPixelRatio(Math.max(floor, this.gfx.renderer.getPixelRatio() - 0.25));
         this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
         this.lowFpsTime = 0;
@@ -1766,9 +1809,10 @@ export class Game {
     const p = this.player;
     const c = p.combo;
     const lm = (this.level?.landmarks ?? []).map(l => {
-      const d = new THREE.Vector3().subVectors(l.position, p.pos);
-      const bearing = Math.atan2(d.x, d.z) - this.cam.controlYaw;
-      return { name: l.name, dist: Math.round(Math.hypot(d.x, d.z)), bearing };
+      const dx = l.position.x - p.pos.x;
+      const dz = l.position.z - p.pos.z;
+      const bearing = Math.atan2(dx, dz) - this.cam.controlYaw;
+      return { name: l.name, dist: Math.round(Math.hypot(dx, dz)), bearing };
     });
     if (this.mountain !== null) this.updateSecretSpot(lm);
     if (this.mountain !== null) this.updateBowl(lm);
@@ -1909,24 +1953,6 @@ export class Game {
     this.gfx.dispose();
     this.world.dispose();
   }
-}
-
-function pickQuality(): Quality {
-  // Touch-first devices get the light path whatever their screen size.
-  // iPadOS Safari reports a Mac user agent and iPads are wider than any
-  // phone, so they used to fall through to high (2x pixels, 4K shadows,
-  // AO, half-float buffers), run out of memory and get the tab reloaded
-  // by Safari mid-game.
-  const ipad = /macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
-  const touchFirst = window.matchMedia?.('(pointer: coarse)').matches === true;
-  const mobile =
-    /android|iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    ipad ||
-    touchFirst ||
-    (navigator.maxTouchPoints > 1 && window.innerWidth < 1100);
-  if (mobile) return 'low';
-  const cores = navigator.hardwareConcurrency ?? 4;
-  return cores >= 8 ? 'high' : 'medium';
 }
 
 function escapeHtml(s: string) {

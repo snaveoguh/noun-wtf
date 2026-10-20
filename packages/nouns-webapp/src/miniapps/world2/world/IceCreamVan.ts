@@ -12,6 +12,8 @@
 
 import * as THREE from 'three';
 
+import { batchStatic } from '../render/batchStatic';
+
 // Source-model constants (metres). The builder works in the source frame —
 // x across (negative = driver side seen from behind), y up, z = -distance
 // from the rear opening — and the finished body is turned to face +Z.
@@ -569,6 +571,10 @@ export function buildIceCreamVan(opts: { station?: boolean } = {}): THREE.Group 
   v.rotation.y = Math.PI;
   v.position.z = -MID_U;
   shade(root);
+  // ~150 boxes and cylinders → one mesh per material (the parked station van
+  // was ~300 draw calls with its shadow). Wheels, the NOUN FM lights, cones,
+  // platters and meters stay separate: they move or glow on their own.
+  batchStatic(root, m => /^(fm-|van-tyre|van-hub|col_)/.test(m.name));
   return root;
 }
 

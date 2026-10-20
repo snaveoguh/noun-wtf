@@ -598,6 +598,13 @@ export class NounCharacter {
     grab: 0,
   };
 
+  /**
+   * Do new characters cast shadows? The low tier turns this off so only the
+   * rider's own Noun (setCastShadows(true)) does: ~20 shadow draw calls per
+   * NPC / remote / customer in view.
+   */
+  static castShadows = true;
+
   constructor(seed: NounSeed, assets: CharacterAssets) {
     this.seed = seed;
     this.assets = assets;
@@ -608,6 +615,22 @@ export class NounCharacter {
     this.buildBody();
     this.buildBoard();
     this.buildRideKit();
+    if (!NounCharacter.castShadows) this.setCastShadows(false);
+  }
+
+  /** Switch this character's shadow casting (parts that never cast stay off). */
+  setCastShadows(on: boolean) {
+    this.root.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      if (!on && m.castShadow) {
+        m.castShadow = false;
+        m.userData.castOff = true;
+      } else if (on && m.userData.castOff === true) {
+        m.castShadow = true;
+        delete m.userData.castOff;
+      }
+    });
   }
 
   private buildBody() {

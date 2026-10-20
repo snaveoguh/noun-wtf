@@ -199,7 +199,7 @@ export function warmDressing(quality: Quality = 'medium'): DressingAssets {
   const foliage = foliageMaterials(q);
   const grassFade: [number, number] = q === 'low' ? [24, 36] : q === 'medium' ? [36, 54] : [46, 68];
   const flowerFade: [number, number] =
-    q === 'low' ? [40, 60] : q === 'medium' ? [60, 90] : [75, 110];
+    q === 'low' ? [28, 44] : q === 'medium' ? [60, 90] : [75, 110];
 
   const grassMat = toonMaterial({ vertexColors: true, side: THREE.DoubleSide });
   grassMat.name = 'DressingGrass';
@@ -227,9 +227,15 @@ export function warmDressing(quality: Quality = 'medium'): DressingAssets {
     leafDensity: dens,
     blossom: FLOWER_CELLS.whiteBlossom,
   });
-  const tree = generateBroadleaf({ seed: 777, leafDensity: dens });
+  const tree = generateBroadleaf({ seed: 777, leafDensity: dens, lowWood: q === 'low' });
 
-  const rockGeo = generateBoulder({ seed: 9101, detail: 2, squash: 0.7, lumpiness: 0.45 });
+  // Low: a 4x lighter boulder (they're instanced by the hundred per chunk)
+  const rockGeo = generateBoulder({
+    seed: 9101,
+    detail: q === 'low' ? 1 : 2,
+    squash: 0.7,
+    lumpiness: 0.45,
+  });
   const rockCollider = generateBoulder({ seed: 9101, detail: 1, squash: 0.7, lumpiness: 0.45 });
   const trunk = new THREE.CylinderGeometry(0.3, 0.38, 3, 6, 1, false);
   trunk.translate(0, 1.5, 0);

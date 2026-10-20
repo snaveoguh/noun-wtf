@@ -409,7 +409,9 @@ export class MountainDressing {
     // ── Grass tufts ──
     const grass = new Inst(true);
     {
-      const n = Math.round(2600 * q);
+      // Low: grass is culled per chunk but faded out past ~36 m in the
+      // shader, so most of a chunk's tufts draw unseen: thinner on phones
+      const n = Math.round(2600 * q * (this.quality === 'low' ? 0.65 : 1));
       for (let i = 0; i < n; i++) {
         const x = x0 + rnd.next() * size;
         const z = z0 + rnd.next() * size;
@@ -435,7 +437,7 @@ export class MountainDressing {
     // ── Flower patches (punk palette, one colour per patch with strays) ──
     const flowers = new Inst(true);
     {
-      const n = Math.round(1500 * q);
+      const n = Math.round(1500 * q * (this.quality === 'low' ? 0.6 : 1));
       for (let i = 0; i < n; i++) {
         const x = x0 + rnd.next() * size;
         const z = z0 + rnd.next() * size;
@@ -567,7 +569,13 @@ export class MountainDressing {
       if (far0 > 0) root.tiers.push({ mesh: m, full: m.count, near: near0, far: far0, min });
     };
     const shadowsLow = this.quality !== 'low';
-    add(instanced(A.rockGeo, A.rockMat, rocks, 'dressing-rocks', sphere, true), 0, 0, 1);
+    // Low (phones): trees and rocks thin out with distance too. They were
+    // full count to the horizon, ~250k triangles of the ~550k in view.
+    // Wood and leaves share a tier so a tree never loses half of itself.
+    const low = this.quality === 'low';
+    const treeTier: [number, number, number] = low ? [140, 380, 0.4] : [0, 0, 1];
+    const rockTier: [number, number, number] = low ? [100, 300, 0.3] : [0, 0, 1];
+    add(instanced(A.rockGeo, A.rockMat, rocks, 'dressing-rocks', sphere, true), ...rockTier);
     add(
       instanced(A.grassGeo, A.grassMat, grass, 'dressing-grass', sphere, false),
       A.grassFade[0] * 0.6,
@@ -594,15 +602,11 @@ export class MountainDressing {
     );
     add(
       instanced(A.treeWood, F.bark, trees, 'dressing-tree-wood', sphere, true, F.barkDepth),
-      0,
-      0,
-      1,
+      ...treeTier,
     );
     add(
       instanced(A.treeLeaves, F.leaf, trees, 'dressing-tree-leaves', sphere, true, F.leafDepth),
-      0,
-      0,
-      1,
+      ...treeTier,
     );
     for (const m of meshes) {
       m.updateMatrix();
