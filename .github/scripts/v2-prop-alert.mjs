@@ -67,7 +67,8 @@ async function gh(path, init = {}) {
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     },
   });
-  if (!res.ok) throw new Error(`GitHub ${init.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(`GitHub ${init.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
@@ -75,7 +76,9 @@ async function alertedIds() {
   const ids = new Set();
   if (DRY_RUN && !GITHUB_TOKEN) return ids;
   for (let page = 1; page <= 5; page++) {
-    const issues = await gh(`/issues?state=all&per_page=100&page=${page}&sort=created&direction=desc`);
+    const issues = await gh(
+      `/issues?state=all&per_page=100&page=${page}&sort=created&direction=desc`,
+    );
     for (const issue of issues) {
       const m = /^\[V2 Prop #(\d+)\]/.exec(issue.title);
       if (m) ids.add(m[1]);
@@ -85,7 +88,8 @@ async function alertedIds() {
   return ids;
 }
 
-const eth = wei => `${Number(formatEther(wei)).toLocaleString('en-US', { maximumFractionDigits: 6 })} ETH`;
+const eth = wei =>
+  `${Number(formatEther(wei)).toLocaleString('en-US', { maximumFractionDigits: 6 })} ETH`;
 const short = a => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const addrLink = a => `[\`${short(a)}\`](https://etherscan.io/address/${a})`;
 function inHours(seconds) {
@@ -97,9 +101,24 @@ function inHours(seconds) {
 async function describe(id, head, ctx) {
   const [stateIdx, p, actions, description] = await Promise.all([
     client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'state', args: [id] }),
-    client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'proposals', args: [id] }),
-    client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'getActions', args: [id] }),
-    client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'getDescription', args: [id] }),
+    client.readContract({
+      address: TREASURY,
+      abi: treasuryAbi,
+      functionName: 'proposals',
+      args: [id],
+    }),
+    client.readContract({
+      address: TREASURY,
+      abi: treasuryAbi,
+      functionName: 'getActions',
+      args: [id],
+    }),
+    client.readContract({
+      address: TREASURY,
+      abi: treasuryAbi,
+      functionName: 'getDescription',
+      args: [id],
+    }),
   ]);
   const [proposer, snapshotBlock, , endBlock, eta, forVotes, againstVotes, abstainVotes] = p;
   const [targets, values, signatures, calldatas] = actions;
@@ -121,7 +140,8 @@ async function describe(id, head, ctx) {
   if (proposerVotes < 3n) flags.push(`proposer held only **${proposerVotes}** vote(s) at snapshot`);
   if (setsAdmin) flags.push('calls **setAdmin** (admin takeover)');
   else if (callsTreasury) flags.push('calls the treasury contract itself');
-  if (againstVotes === 0n && forVotes > 0n && forVotes < 3n) flags.push(`passing on **${forVotes}** FOR vote(s) — there is no quorum`);
+  if (againstVotes === 0n && forVotes > 0n && forVotes < 3n)
+    flags.push(`passing on **${forVotes}** FOR vote(s) — there is no quorum`);
 
   const nowTs = Number(head.timestamp);
   let deadline;
@@ -136,7 +156,12 @@ async function describe(id, head, ctx) {
     deadline = `State: ${state}.`;
   }
 
-  const title0 = description.replace(/^\s+/, '').split('\n')[0].replace(/^#+\s*/, '').slice(0, 80) || 'Untitled';
+  const title0 =
+    description
+      .replace(/^\s+/, '')
+      .split('\n')[0]
+      .replace(/^#+\s*/, '')
+      .slice(0, 80) || 'Untitled';
   const actionRows = targets
     .map(
       (t, i) =>
@@ -159,7 +184,11 @@ async function describe(id, head, ctx) {
 ${actionRows || '| – | – | – | – | – |'}
 
 ### Description
-${description.slice(0, 3000).split('\n').map(l => `> ${l}`).join('\n')}
+${description
+  .slice(0, 3000)
+  .split('\n')
+  .map(l => `> ${l}`)
+  .join('\n')}
 
 ### Links
 - noun.wtf: https://noun.wtf/v2/vote/${id}
@@ -182,17 +211,28 @@ const [count, balance, token, timelockDelay, head] = await Promise.all([
   client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'TIMELOCK_DELAY' }),
   client.getBlock({ blockTag: 'latest' }),
 ]);
-const supply = await client.readContract({ address: token, abi: tokenAbi, functionName: 'totalSupply' });
+const supply = await client.readContract({
+  address: token,
+  abi: tokenAbi,
+  functionName: 'totalSupply',
+});
 const ctx = { balance, token, timelockDelay, supply };
 const seen = await alertedIds();
 
-console.log(`proposalCount=${count} treasury=${eth(balance)} alreadyAlerted=[${[...seen].join(',')}]`);
+console.log(
+  `proposalCount=${count} treasury=${eth(balance)} alreadyAlerted=[${[...seen].join(',')}]`,
+);
 
 const from = count > BigInt(SCAN_LAST) ? count - BigInt(SCAN_LAST) + 1n : 1n;
 for (let id = count; id >= from; id--) {
   if (seen.has(String(id))) continue;
   const forced = FORCE_IDS.has(String(id));
-  const stateIdx = await client.readContract({ address: TREASURY, abi: treasuryAbi, functionName: 'state', args: [id] });
+  const stateIdx = await client.readContract({
+    address: TREASURY,
+    abi: treasuryAbi,
+    functionName: 'state',
+    args: [id],
+  });
   if (!forced && !LIVE.has(STATES[stateIdx])) continue;
 
   const { title, body } = await describe(id, head, ctx);
