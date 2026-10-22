@@ -1,32 +1,29 @@
+import type { ActivityEvent } from './useActivityFeed';
+
 import { getPublicClient } from '@wagmi/core';
 
 import {
   nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
 } from '@/contracts/nouns-auction-house.gen';
-import {
-  nounsGovernorAbi,
-  nounsGovernorAddress,
-} from '@/contracts/nouns-governor.gen';
+import { nounsGovernorAbi, nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
 import { config as wagmiConfig, defaultChain } from '@/wagmi';
-
-import type { ActivityEvent } from './useActivityFeed';
 
 /** Pull a clean title from a markdown-ish proposal description (drops
  *  HTML comments + leading whitespace, then takes the first line). */
 function descriptionToTitle(desc: string | undefined): string {
   if (!desc) return 'Untitled';
-  const stripped = desc.replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\r\n]+/, '');
+  const stripped = desc.replace(/<!--[\S\s]*?-->/g, '').replace(/^\s+/, '');
   const first = stripped.split('\n')[0] ?? '';
   return first.replace(/^#+\s*/, '').slice(0, 120) || 'Untitled';
 }
 
 const MAX_EVENTS = 50;
-// publicnode (the default fallback RPC in src/wagmi.ts) caps eth_getLogs
-// at 50_000 blocks. Querying any wider returns -32701 and the whole
-// fallback returns []. 49_000 keeps a safe margin while still covering
-// ~6.8 days @ 12s blocks (one auction/day → ~6 settlements visible).
-const LOOKBACK_BLOCKS = 49_000n;
+// publicnode (the default RPC in src/wagmi.ts) only serves eth_getLogs for
+// roughly the last 10k blocks — older ranges are 403 "Archive requests
+// require a personal token" (it allowed 50k until ~Oct 2026), and then the
+// whole fallback returned []. 9k blocks ≈ 30h.
+const LOOKBACK_BLOCKS = 9_000n;
 
 // V1 governor's `ProposalCreatedWithRequirements` is overloaded — two ABI
 // items share the name. The post-clients variant (the one with `clientId`)
@@ -50,7 +47,7 @@ const PROPOSAL_CREATED_WITH_CLIENT_ID_EVENT = {
  * Fallback: read v1 AuctionHouse events directly from chain when the
  * `/api/activity` endpoint isn't available (Railway redeploy issues post-
  * NounV2 launch). Returns recent BID, SETTLED, AUCTION_CREATED events
- * sorted block-desc, last ~7 days.
+ * sorted block-desc, last ~30h.
  *
  * Mirrors v2ChainFallback. We only fetch events when `/api/activity` has
  * already failed, so the cost only applies in the dead-Railway path.
@@ -222,7 +219,8 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       votes?: bigint;
       reason?: string;
     };
-    const clientId = ev.transactionHash != null ? voteClientByTx.get(ev.transactionHash) : undefined;
+    const clientId =
+      ev.transactionHash != null ? voteClientByTx.get(ev.transactionHash) : undefined;
     events.push({
       type: 'VOTE',
       blockNumber: Number(ev.blockNumber),
@@ -245,7 +243,8 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
       proposer?: string;
       description?: string;
     };
-    const clientId = ev.transactionHash != null ? propClientByTx.get(ev.transactionHash) : undefined;
+    const clientId =
+      ev.transactionHash != null ? propClientByTx.get(ev.transactionHash) : undefined;
     events.push({
       type: 'PROPOSAL_CREATED',
       blockNumber: Number(ev.blockNumber),

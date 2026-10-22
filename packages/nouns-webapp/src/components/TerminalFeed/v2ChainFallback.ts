@@ -1,26 +1,29 @@
+import type { ActivityEvent } from './useActivityFeed';
+
 import { getPublicClient } from '@wagmi/core';
 
 import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
+import { NOUNV2_TREASURY_ADDRESS, nounV2TreasuryAbi } from '@/contracts/nounv2-treasury';
 import { config as wagmiConfig } from '@/wagmi';
-
-import type { ActivityEvent } from './useActivityFeed';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const V2_DEPLOY_BLOCK = 24951808n;
 const MAX_EVENTS = 50;
-// publicnode (the default fallback RPC in src/wagmi.ts) caps eth_getLogs
-// at 50_000 blocks. v2 currently lives within that window from deploy →
-// head, but in ~3.5 days the range will exceed 50k and the fallback would
-// silently 502. Trail the head with a max window so this keeps working.
-const LOOKBACK_BLOCKS = 49_000n;
+// publicnode (the default RPC in src/wagmi.ts) only serves eth_getLogs for
+// roughly the last 10k blocks — anything older is 403 "Archive requests
+// require a personal token" (verified 2026-10-22; it used to allow 50k).
+// 9k blocks ≈ 30h, which still covers a V2 proposal's whole 12h vote + 12h
+// timelock, so a live treasury proposal is always visible from chain.
+const LOOKBACK_BLOCKS = 9_000n;
 
 /**
- * Fallback: read v2 AuctionHouse events directly from chain when the
- * `/api/nounv2-feed` endpoint isn't available (Railway redeploy issues).
- * Returns recent V2_BID, V2_SETTLED, V2_AUCTION events sorted block-desc.
+ * Fallback: read v2 AuctionHouse + Treasury events directly from chain when
+ * the `/api/nounv2-feed` endpoint is down or its indexer has stalled.
+ * Returns recent V2_BID, V2_SETTLED, V2_AUCTION, V2_PROP, V2_VOTE and
+ * V2_PROP_{QUEUED,EXECUTED,CANCELED} events sorted block-desc.
  */
 export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
   if (NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS) return [];
@@ -45,7 +48,28 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
     return new Date(seconds * 1000).toISOString();
   };
 
-  const [bids, settles, creates] = await Promise.all([
+  const hasTreasury = NOUNV2_TREASURY_ADDRESS !== ZERO_ADDRESS;
+  const treasuryEvents = <
+    N extends
+      | 'ProposalCreated'
+      | 'VoteCast'
+      | 'ProposalQueued'
+      | 'ProposalExecuted'
+      | 'ProposalCanceled',
+  >(
+    eventName: N,
+  ) =>
+    hasTreasury
+      ? client.getContractEvents({
+          address: NOUNV2_TREASURY_ADDRESS,
+          abi: nounV2TreasuryAbi,
+          eventName,
+          fromBlock,
+          toBlock: 'latest',
+        })
+      : Promise.resolve([]);
+
+  const [bids, settles, creates, props, votes, queued, executed, canceled] = await Promise.all([
     client.getContractEvents({
       address: NOUNV2_AUCTION_HOUSE_ADDRESS,
       abi: nounV2AuctionHouseAbi,
@@ -67,6 +91,11 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
       fromBlock,
       toBlock: 'latest',
     }),
+    treasuryEvents('ProposalCreated'),
+    treasuryEvents('VoteCast'),
+    treasuryEvents('ProposalQueued'),
+    treasuryEvents('ProposalExecuted'),
+    treasuryEvents('ProposalCanceled'),
   ]);
 
   const events: ActivityEvent[] = [];
@@ -114,6 +143,101 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
     });
   }
 
+  const titleById = new Map<string, string>();
+  for (const ev of props) {
+    const args = ev.args as { id?: bigint; proposer?: string; description?: string };
+    const id = String(args.id ?? 0n);
+    const description = args.description ?? '';
+    const title = titleFromDescription(description);
+    titleById.set(id, title);
+    events.push({
+      type: 'V2_PROP',
+      blockNumber: Number(ev.blockNumber),
+      timestamp: tsForBlock(ev.blockNumber),
+      txHash: ev.transactionHash ?? '',
+      data: {
+        proposalId: id,
+        proposer: args.proposer ?? '',
+        title,
+        description: description.slice(0, 4000),
+      },
+    });
+  }
+
+  for (const ev of votes) {
+    const args = ev.args as {
+      voter?: string;
+      proposalId?: bigint;
+      support?: number;
+      votes?: bigint;
+      reason?: string;
+    };
+    events.push({
+      type: 'V2_VOTE',
+      blockNumber: Number(ev.blockNumber),
+      timestamp: tsForBlock(ev.blockNumber),
+      txHash: ev.transactionHash ?? '',
+      data: {
+        voter: args.voter ?? '',
+        proposalId: String(args.proposalId ?? 0n),
+        support: args.support ?? 0,
+        votes: String(args.votes ?? 0n),
+        reason: args.reason ?? '',
+      },
+    });
+  }
+
+  // Status changes can outlive the lookback window's ProposalCreated (a
+  // queued prop executes up to 7 days later), so fetch missing titles.
+  const statusLogs = [
+    ...queued.map(ev => ({ ev, type: 'V2_PROP_QUEUED' })),
+    ...executed.map(ev => ({ ev, type: 'V2_PROP_EXECUTED' })),
+    ...canceled.map(ev => ({ ev, type: 'V2_PROP_CANCELED' })),
+  ];
+  const missingIds = [
+    ...new Set(
+      statusLogs
+        .map(({ ev }) => (ev.args as { id?: bigint }).id)
+        .filter((id): id is bigint => id != null && !titleById.has(String(id))),
+    ),
+  ];
+  await Promise.all(
+    missingIds.map(async id => {
+      try {
+        const description = await client.readContract({
+          address: NOUNV2_TREASURY_ADDRESS,
+          abi: nounV2TreasuryAbi,
+          functionName: 'getDescription',
+          args: [id],
+        });
+        titleById.set(String(id), titleFromDescription(description));
+      } catch {
+        // untitled is fine
+      }
+    }),
+  );
+
+  for (const { ev, type } of statusLogs) {
+    const args = ev.args as { id?: bigint; eta?: bigint };
+    const id = String(args.id ?? 0n);
+    events.push({
+      type,
+      blockNumber: Number(ev.blockNumber),
+      timestamp: tsForBlock(ev.blockNumber),
+      txHash: ev.transactionHash ?? '',
+      data: {
+        proposalId: id,
+        title: titleById.get(id) ?? `Prop ${id}`,
+        ...(args.eta != null ? { eta: Number(args.eta) } : {}),
+      },
+    });
+  }
+
   events.sort((a, b) => b.blockNumber - a.blockNumber);
   return events.slice(0, MAX_EVENTS);
+}
+
+function titleFromDescription(description: string): string {
+  const first = description.replace(/^\s+/, '').split('\n')[0] ?? '';
+  return first.replace(/^#+\s*/, '').slice(0, 120) || 'Untitled';
 }

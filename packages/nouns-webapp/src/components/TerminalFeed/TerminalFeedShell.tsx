@@ -38,7 +38,7 @@ export default function TerminalFeedShell({ windowed = false }: { windowed?: boo
   const isChatTab = activeFilter === '_CHAT';
   const isTradingTab = activeFilter === '_TRADING';
   // Only pass filter to activity feed when it's showing an event filter
-  const { events, loading, hasMore, error, loadMore } = useActivityFeed(
+  const { events, loading, hasMore, error, indexerLag, loadMore } = useActivityFeed(
     isChatTab || isTradingTab ? '' : activeFilter,
   );
 
@@ -261,6 +261,7 @@ export default function TerminalFeedShell({ windowed = false }: { windowed?: boo
           hasMore={hasMore}
           error={error}
           onLoadMore={loadMore}
+          indexerLag={indexerLag}
         />
       )}
 

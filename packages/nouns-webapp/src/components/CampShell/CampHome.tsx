@@ -41,11 +41,7 @@ const NOISY_EVENT_TYPES = new Set<string>([
   'LIL_AUCTION_SETTLED',
 ]);
 
-function ProposalsBrowse({
-  search,
-}: {
-  search: string;
-}) {
+function ProposalsBrowse({ search }: { search: string }) {
   const { data, loading } = useAllProposals();
 
   const sorted = useMemo(() => {
@@ -171,9 +167,7 @@ function DigestView() {
         title: s.title,
         description: s.description,
         count: s.proposals.length,
-        children: s.proposals.map(p => (
-          <ProposalListItem key={p.id} proposal={p} showVotingBar />
-        )),
+        children: s.proposals.map(p => <ProposalListItem key={p.id} proposal={p} showVotingBar />),
       });
     }
     for (const s of candidateSections) {
@@ -227,7 +221,7 @@ export default function CampHome() {
   const [activeTab, setActiveTab] = useState<TabId>('digest');
   const [hideNoisy, setHideNoisy] = useState(true);
 
-  const { events, loading, hasMore, error, loadMore } = useActivityFeed('');
+  const { events, loading, hasMore, error, indexerLag, loadMore } = useActivityFeed('');
 
   const filteredEvents = useMemo(() => {
     if (!hideNoisy) return events;
@@ -354,6 +348,7 @@ export default function CampHome() {
               hasMore={hasMore}
               error={error}
               onLoadMore={loadMore}
+              indexerLag={indexerLag}
             />
           </div>
         </section>
