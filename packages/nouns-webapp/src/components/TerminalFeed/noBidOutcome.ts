@@ -8,11 +8,12 @@ const ownerOfAbi = parseAbi(['function ownerOf(uint256) view returns (address)']
 const ZERO = '0x0000000000000000000000000000000000000000';
 
 /**
- * A no-bid settle emits `winner = 0x000…0` on chain for both outcomes: V4
- * (and the NounV2 AuctionHouse) send the noun to the treasury, pre-V4 burned
+ * A V1 no-bid settle emits `winner = 0x000…0` on chain for both outcomes:
+ * the V4 AuctionHouse sends the noun to the nouns.eth treasury, pre-V4 burned
  * it. The feed's settle describer reads a raw zero winner as a burn, so the
- * chain fallbacks must say which one happened. Mirrors the indexer
+ * V1 chain fallback must say which one happened. Mirrors the indexer
  * (nouns-api/src/NounsAuctionHouseV2.ts): burned only if `ownerOf` reverts.
+ * (NounV2 always burns a no-bid noun, so v2ChainFallback doesn't need this.)
  *
  * Any other failure (RPC flake) counts as treasury — V4 never burns.
  *

@@ -2259,10 +2259,10 @@ export async function buildNounV2Feed(params: {
           winner: a.winner || '',
           amount: String(a.amount || '0'),
           settler: a.settler ?? null,
-          // NounV2 AH has no burn / treasury-routing path we index; a zero
-          // winner is the closest signal we have.
-          burned: false,
-          treasury: noWinner,
+          // NounV2AuctionHouse._settleAuction burns the noun when nobody bid
+          // (there is no treasury-routing path, unlike the V1 V4 AH).
+          burned: noWinner,
+          treasury: false,
         },
       });
     } else {

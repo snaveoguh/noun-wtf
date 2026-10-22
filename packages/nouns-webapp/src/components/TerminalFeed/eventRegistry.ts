@@ -367,6 +367,16 @@ function describeSettled(data: EventData, ctx: DescribeCtx, dao = ''): string {
   return `${noun} won by ${ctx.addr(data.winner)} for ${ethFromWei(data.amount)}${settler}`;
 }
 
+/**
+ * NounV2AuctionHouse burns a no-bid noun — it has no treasury path. The
+ * indexer flagged those settles `treasury: true` until 2026-10-22, so ignore
+ * the flags here and decide from the winner alone.
+ */
+function v2SettleData(data: EventData): EventData {
+  const noWinner = !str(data.winner) || isZeroAddr(data.winner);
+  return { ...data, treasury: false, burned: noWinner };
+}
+
 function settledVariant(data: EventData) {
   const outcome = settleOutcome(data);
   if (outcome === 'treasury') return { key: 'TREASURY', label: 'TREASURY', color: C.treasury };
@@ -515,9 +525,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     icon: '🔔',
     describe: (d, ctx) => {
       const curator =
-        isAddress(d.curator) && !isZeroAddr(d.curator)
-          ? `, curated by ${ctx.addr(d.curator)}`
-          : '';
+        isAddress(d.curator) && !isZeroAddr(d.curator) ? `, curated by ${ctx.addr(d.curator)}` : '';
       return `Auction for Noun ${str(d.nounId, '?')} started${curator}`;
     },
     link: nounLink('/noun'),
@@ -996,8 +1004,8 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     color: C.v2Dark,
     filterKey: 'V2_SETTLED',
     icon: '🔥',
-    describe: (d, ctx) => describeSettled(d, ctx, 'V2 '),
-    variant: settledVariant,
+    describe: (d, ctx) => describeSettled(v2SettleData(d), ctx, 'V2 '),
+    variant: d => settledVariant(v2SettleData(d)),
     link: nounLink('/v2/noun'),
   }),
   V2_AUCTION: def({
@@ -1007,9 +1015,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
     icon: '🔔',
     describe: (d, ctx) => {
       const curator =
-        isAddress(d.curator) && !isZeroAddr(d.curator)
-          ? `, curated by ${ctx.addr(d.curator)}`
-          : '';
+        isAddress(d.curator) && !isZeroAddr(d.curator) ? `, curated by ${ctx.addr(d.curator)}` : '';
       return `V2 Noun ${str(d.nounId, '?')} auction started${curator}`;
     },
     link: nounLink('/v2/noun'),
