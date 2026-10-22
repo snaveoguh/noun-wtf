@@ -1,0 +1,49 @@
+name: V2 Prop Alert
+
+# Opens an issue (→ email) for every live NounV2 treasury proposal.
+# See .github/scripts/v2-prop-alert.mjs for why.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: v2-prop-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Outside the pnpm workspace so this doesn't install the monorepo.
+      - name: Install viem
+        run: |
+          mkdir -p "$RUNNER_TEMP/alert"
+          cp .github/scripts/v2-prop-alert.mjs "$RUNNER_TEMP/alert/"
+          cd "$RUNNER_TEMP/alert"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund viem@2.33.0
+
+      - name: Check proposals
+        working-directory: ${{ runner.temp }}/alert
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_MENTIONS: '@snaveoguh'
+        run: node v2-prop-alert.mjs
