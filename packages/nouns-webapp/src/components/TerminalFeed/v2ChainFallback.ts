@@ -6,11 +6,8 @@ import {
   NOUNV2_AUCTION_HOUSE_ADDRESS,
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
-import { NOUNV2_TOKEN_ADDRESS } from '@/contracts/nounv2-token';
 import { NOUNV2_TREASURY_ADDRESS, nounV2TreasuryAbi } from '@/contracts/nounv2-treasury';
 import { config as wagmiConfig } from '@/wagmi';
-
-import { noBidFlags } from './noBidOutcome';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const V2_DEPLOY_BLOCK = 24951808n;
@@ -118,17 +115,7 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
     });
   }
 
-  const hasToken = NOUNV2_TOKEN_ADDRESS !== ZERO_ADDRESS;
-  const settleFlags = await Promise.all(
-    settles.map(ev => {
-      const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
-      return hasToken
-        ? noBidFlags(client, NOUNV2_TOKEN_ADDRESS, args.nounId ?? 0n, args.winner, args.amount)
-        : {};
-    }),
-  );
-
-  for (const [i, ev] of settles.entries()) {
+  for (const ev of settles) {
     const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
     events.push({
       type: 'V2_SETTLED',
@@ -139,7 +126,10 @@ export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
         nounId: String(args.nounId ?? 0n),
         winner: args.winner ?? '',
         amount: String(args.amount ?? 0n),
-        ...settleFlags[i],
+        // NounV2AuctionHouse burns the noun when nobody bid — no treasury path.
+        ...(args.winner == null || args.winner.toLowerCase() === ZERO_ADDRESS
+          ? { burned: true }
+          : {}),
       },
     });
   }
