@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fixturesForFilter } from './feedFixtures';
+import { fetchIndexerHealth, isStale } from './indexerHealth';
 import { fetchV1ChainEvents } from './v1ChainFallback';
 import { fetchV2ChainEvents } from './v2ChainFallback';
 
@@ -18,6 +19,8 @@ interface FeedState {
   hasMore: boolean;
   oldestBlock: number;
   error: string | null;
+  /** Blocks the indexer is behind chain head, when stale enough to matter; else null. */
+  indexerLag: number | null;
 }
 
 const API_BASE: string =
@@ -26,6 +29,10 @@ const API_BASE: string =
 
 const POLL_INTERVAL = 12_000; // 12 seconds (1 Ethereum block)
 const PAGE_SIZE = 50;
+// While the indexer is stale, re-read recent events from chain every Nth
+// poll (~1 min) — the chain fallbacks fire ~8 getLogs each, too heavy for
+// every 12s tick.
+const STALE_CHAIN_POLL_EVERY = 5;
 
 // V2 event types — when activeFilter equals one of these (or contains them as a CSV),
 // only the v2 endpoint is queried. The "_V2" sentinel is the all-v2 filter pill.
@@ -66,6 +73,7 @@ export function useActivityFeed(activeFilter: string) {
     hasMore: true,
     oldestBlock: 0,
     error: null,
+    indexerLag: null,
   });
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -79,9 +87,15 @@ export function useActivityFeed(activeFilter: string) {
       events: ActivityEvent[];
       hasMore: boolean;
       oldestBlock: number;
+      /** Only set on the first page (before == null). */
+      indexerLag?: number | null;
     } | null> => {
       const v2Only = isV2OnlyFilter(activeFilter);
       const v2Excluded = isV2Excluded(activeFilter);
+      // Ponder can stall while its API keeps serving stale rows (2026-10-20),
+      // which the empty-response fallback below never notices. Check its
+      // head against the chain's in parallel with the feed fetches.
+      const healthPromise = before == null ? fetchIndexerHealth(API_BASE) : Promise.resolve(null);
 
       // Prefer the API over the chain reader: the API enriches events with
       // `clientId` (used for ClientBadge emojis) which the chain fallback
@@ -97,7 +111,12 @@ export function useActivityFeed(activeFilter: string) {
         setTimeout(() => ac.abort(), API_TIMEOUT_MS);
       };
 
-      type FetchResult = { events: ActivityEvent[]; hasMore: boolean; oldestBlock: number };
+      type FetchResult = {
+        events: ActivityEvent[];
+        hasMore: boolean;
+        oldestBlock: number;
+        fromApi?: boolean;
+      };
 
       const fetchMainnet = async (): Promise<FetchResult | null> => {
         if (v2Only) return { events: [], hasMore: false, oldestBlock: 0 };
@@ -125,7 +144,7 @@ export function useActivityFeed(activeFilter: string) {
           new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
         ]);
         const apiResult = await apiWithDeadline;
-        if (apiResult && apiResult.events.length > 0) return apiResult;
+        if (apiResult && apiResult.events.length > 0) return { ...apiResult, fromApi: true };
 
         // API was empty/slow/errored — only NOW kick off the chain fallback.
         try {
@@ -143,7 +162,8 @@ export function useActivityFeed(activeFilter: string) {
 
         // Chain didn't produce anything either; give the API one last chance
         // in case it's still in flight (between API_PREFER_MS and API_TIMEOUT_MS).
-        return apiPromise;
+        const apiLate = await apiPromise;
+        return apiLate ? { ...apiLate, fromApi: true } : null;
       };
 
       const fetchV2 = async (): Promise<FetchResult | null> => {
@@ -170,7 +190,7 @@ export function useActivityFeed(activeFilter: string) {
           new Promise<null>(resolve => setTimeout(() => resolve(null), API_PREFER_MS)),
         ]);
         const apiResult = await apiWithDeadline;
-        if (apiResult && apiResult.events.length > 0) return apiResult;
+        if (apiResult && apiResult.events.length > 0) return { ...apiResult, fromApi: true };
 
         // Only run the V2 chain fallback after the API gives up — it
         // saturates the RPC budget if fired in parallel.
@@ -188,13 +208,28 @@ export function useActivityFeed(activeFilter: string) {
         }
 
         const apiLate = await apiPromise;
-        return apiLate ?? { events: [], hasMore: false, oldestBlock: 0 };
+        return apiLate
+          ? { ...apiLate, fromApi: true }
+          : { events: [], hasMore: false, oldestBlock: 0 };
       };
 
       const [mainnet, v2] = await Promise.all([fetchMainnet(), fetchV2()]);
       if (!mainnet && !v2) return null;
       const mainnetData = mainnet ?? { events: [], hasMore: false, oldestBlock: 0 };
       const v2Data = v2 ?? { events: [], hasMore: false, oldestBlock: 0 };
+
+      // Indexer stalled: the API pages above end at its frozen head. Fill the
+      // gap with what the chain readers can see past it (last ~30h).
+      const health = await healthPromise;
+      const stale = isStale(health);
+      let gapEvents: ActivityEvent[] = [];
+      if (stale) {
+        const [v1Gap, v2Gap] = await Promise.all([
+          mainnet?.fromApi === true ? fetchV1ChainEvents().catch(() => []) : Promise.resolve([]),
+          v2?.fromApi === true ? fetchV2ChainEvents().catch(() => []) : Promise.resolve([]),
+        ]);
+        gapEvents = [...v1Gap, ...v2Gap].filter(e => e.blockNumber > health.indexedBlock);
+      }
 
       // If a specific filter is active, narrow BOTH mainnet and v2 events to
       // only the wanted types. Without this, the chain fallback (which returns
@@ -203,13 +238,15 @@ export function useActivityFeed(activeFilter: string) {
       // type the API starts emitting passes through as long as a tab lists it.
       let mainnetFiltered = mainnetData.events;
       let v2Filtered = v2Data.events;
+      let gapFiltered = gapEvents;
       if (activeFilter && activeFilter !== V2_ALL_FILTER) {
         const wanted = new Set(activeFilter.split(',').map(p => p.trim()));
         mainnetFiltered = mainnetFiltered.filter(e => wanted.has(e.type));
         v2Filtered = v2Filtered.filter(e => wanted.has(e.type));
+        gapFiltered = gapFiltered.filter(e => wanted.has(e.type));
       }
 
-      const merged = [...mainnetFiltered, ...v2Filtered].sort(
+      const merged = [...gapFiltered, ...mainnetFiltered, ...v2Filtered].sort(
         (a, b) => b.blockNumber - a.blockNumber,
       );
 
@@ -217,6 +254,7 @@ export function useActivityFeed(activeFilter: string) {
         events: merged,
         hasMore: mainnetData.hasMore || v2Data.hasMore,
         oldestBlock: merged.length > 0 ? merged[merged.length - 1]!.blockNumber : 0,
+        ...(before == null ? { indexerLag: stale ? health.lag : null } : {}),
       };
     },
     [activeFilter],
@@ -249,6 +287,7 @@ export function useActivityFeed(activeFilter: string) {
         hasMore: result.hasMore,
         oldestBlock: result.oldestBlock,
         error: null,
+        indexerLag: result.indexerLag ?? null,
       });
     });
 
@@ -261,7 +300,9 @@ export function useActivityFeed(activeFilter: string) {
   useEffect(() => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
 
+    let tick = 0;
     pollTimerRef.current = setInterval(async () => {
+      tick++;
       const v2Only = isV2OnlyFilter(activeFilter);
       const v2Excluded = isV2Excluded(activeFilter);
       const params = new URLSearchParams({ limit: '20' });
@@ -281,9 +322,24 @@ export function useActivityFeed(activeFilter: string) {
                 .catch(() => null),
         ]);
 
+        const health = await fetchIndexerHealth(API_BASE);
+        const stale = isStale(health);
+        const lag = stale ? health.lag : null;
+        setState(prev => (prev.indexerLag === lag ? prev : { ...prev, indexerLag: lag }));
+
+        let chainEvents: ActivityEvent[] = [];
+        if (stale && tick % STALE_CHAIN_POLL_EVERY === 0) {
+          const [v1Chain, v2Chain] = await Promise.all([
+            v2Only ? Promise.resolve([]) : fetchV1ChainEvents().catch(() => []),
+            v2Excluded ? Promise.resolve([]) : fetchV2ChainEvents().catch(() => []),
+          ]);
+          chainEvents = [...v1Chain, ...v2Chain];
+        }
+
         const incoming: ActivityEvent[] = [
           ...((mainnetRes?.events as ActivityEvent[] | undefined) ?? []),
           ...((v2Res?.events as ActivityEvent[] | undefined) ?? []),
+          ...chainEvents,
         ];
         if (!incoming.length) return;
 
@@ -330,6 +386,7 @@ export function useActivityFeed(activeFilter: string) {
     }
 
     setState(prev => ({
+      ...prev,
       events: [...prev.events, ...result.events],
       loading: false,
       hasMore: result.hasMore,
@@ -343,6 +400,7 @@ export function useActivityFeed(activeFilter: string) {
     loading: state.loading,
     hasMore: state.hasMore,
     error: state.error,
+    indexerLag: state.indexerLag,
     loadMore,
   };
 }

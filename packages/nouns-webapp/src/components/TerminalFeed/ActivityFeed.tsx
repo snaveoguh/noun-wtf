@@ -12,9 +12,24 @@ interface Props {
   hasMore: boolean;
   error: string | null;
   onLoadMore: () => void;
+  /** Blocks the indexer is behind chain head (null when healthy). */
+  indexerLag?: number | null;
 }
 
-export default function ActivityFeed({ events, loading, hasMore, error, onLoadMore }: Props) {
+/** "~43h" / "~35m" from a block count at 12s/block. */
+function lagDuration(blocks: number): string {
+  const minutes = Math.round((blocks * 12) / 60);
+  return minutes >= 120 ? `~${Math.round(minutes / 60)}h` : `~${minutes}m`;
+}
+
+export default function ActivityFeed({
+  events,
+  loading,
+  hasMore,
+  error,
+  onLoadMore,
+  indexerLag,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +94,22 @@ export default function ActivityFeed({ events, loading, hasMore, error, onLoadMo
       }}
       className="terminal-scrollbar"
     >
+      {indexerLag != null && (
+        <div
+          role="status"
+          style={{
+            color: 'var(--theme-negative)',
+            padding: '8px 0',
+            fontSize: '12px',
+            borderBottom: '1px solid var(--theme-border)',
+          }}
+        >
+          ⚠ indexer is {indexerLag.toLocaleString()} blocks ({lagDuration(indexerLag)}) behind
+          chain — events from the last ~30h are read straight from chain; anything older in that gap
+          is missing.
+        </div>
+      )}
+
       {error && (
         <div style={{ color: 'var(--theme-negative)', padding: '16px 0', fontSize: '13px' }}>
           {error}
