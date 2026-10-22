@@ -7,7 +7,10 @@ import {
   nounsAuctionHouseAddress,
 } from '@/contracts/nouns-auction-house.gen';
 import { nounsGovernorAbi, nounsGovernorAddress } from '@/contracts/nouns-governor.gen';
+import { nounsTokenAddress } from '@/contracts/nouns-token.gen';
 import { config as wagmiConfig, defaultChain } from '@/wagmi';
+
+import { noBidFlags } from './noBidOutcome';
 
 /** Pull a clean title from a markdown-ish proposal description (drops
  *  HTML comments + leading whitespace, then takes the first line). */
@@ -196,7 +199,17 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
     });
   }
 
-  for (const ev of settles) {
+  const tokenAddress = nounsTokenAddress[chainId];
+  const settleFlags = await Promise.all(
+    settles.map(ev => {
+      const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
+      return tokenAddress == null
+        ? {}
+        : noBidFlags(client, tokenAddress, args.nounId ?? 0n, args.winner, args.amount);
+    }),
+  );
+
+  for (const [i, ev] of settles.entries()) {
     const args = ev.args as { nounId?: bigint; winner?: string; amount?: bigint };
     events.push({
       type: 'AUCTION_SETTLED',
@@ -207,6 +220,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
         nounId: String(args.nounId ?? 0n),
         winner: args.winner ?? '',
         amount: String(args.amount ?? 0n),
+        ...settleFlags[i],
       },
     });
   }
