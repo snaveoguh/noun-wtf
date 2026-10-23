@@ -434,8 +434,17 @@ const state: WatcherState = {
   errors: [],
 };
 
+/**
+ * RPC errors quote the request URL, and paid RPC URLs carry their API key in
+ * the path; these errors are served publicly by /api/agent/status. Keep the
+ * host, drop the rest.
+ */
+export function redactUrls(msg: string): string {
+  return msg.replace(/(https?|wss?):\/\/([^\s"'/]+)[^\s"']*/g, '$1://$2/…');
+}
+
 function pushError(msg: string): void {
-  state.errors.push(msg);
+  state.errors.push(redactUrls(msg));
   if (state.errors.length > 50) state.errors.shift();
 }
 

@@ -1,6 +1,8 @@
 /* eslint-disable unicorn/no-nested-ternary */
 import { metricsMiddleware, getMetrics, getRecentErrors, getBufferSize } from './metrics.js';
 
+import { startSyncWatchdog } from '../syncWatchdog.js';
+
 // Agent Hub client — replaces direct Anthropic SDK calls
 const AGENT_HUB_URL = process.env.AGENT_HUB_URL || 'http://localhost:3100';
 const AGENT_HUB_SECRET = process.env.AGENT_HUB_SECRET || '';
@@ -633,6 +635,9 @@ try {
 } catch (err) {
   console.error('[NounIRL] Agent init failed (non-fatal):', err);
 }
+
+// Exit (→ Railway restart) if Ponder's sync freezes while HTTP stays up.
+startSyncWatchdog();
 
 // CORS — allow noun.wtf and localhost
 app.use(
