@@ -3,7 +3,6 @@ import type { Address } from '@/utils/types';
 
 import { useEffect, useState } from 'react';
 
-import { useQuery } from '@apollo/client';
 import { zeroAddress } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -19,6 +18,7 @@ import {
   useWriteNounsTokenDelegate,
   useWriteNounsTokenSetApprovalForAll,
 } from '@/contracts';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { defaultChain } from '@/wagmi';
 
 import { cache, cacheKey, CHAIN_ID } from '../config';
@@ -350,7 +350,7 @@ export const useNounTokenBalance = (address: Address): number | undefined => {
 export const useUserOwnedNounIds = (pollInterval: number) => {
   const { address } = useAccount();
   const { query, variables } = ownedNounsQuery(address?.toLowerCase() ?? '');
-  const { loading, data, error, refetch } = useQuery<{
+  const { loading, data, error, refetch } = useSubgraphQuery<{
     nouns: { items: Array<{ id: string }> };
   }>(query, {
     pollInterval,
@@ -364,7 +364,7 @@ export const useUserOwnedNounIds = (pollInterval: number) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useUserEscrowedNounIds = (pollInterval: number, _forkId: string) => {
   const { query, variables } = accountEscrowedNounsQuery('');
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true, // always skip — not indexed
@@ -423,7 +423,7 @@ export const useDelegateNounsAtBlockQuery = (signers: string[], block: bigint) =
     loading,
     data: rawData,
     error,
-  } = useQuery<{
+  } = useSubgraphQuery<{
     delegates: { items: Array<{ id: string; delegatedVotes: number }> };
   }>(query, { variables });
 

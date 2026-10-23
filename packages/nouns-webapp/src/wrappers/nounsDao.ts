@@ -38,7 +38,6 @@ interface GraphQLProposal {
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { useQuery } from '@apollo/client';
 import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { filter, flatMap, forEach, isBigInt, isNonNullish, isNullish, map, pipe } from 'remeda';
 import {
@@ -82,6 +81,7 @@ import {
   useWriteNounsGovernorWithdrawFromForkEscrow,
 } from '@/contracts';
 import { useBlockTimestamp } from '@/hooks/useBlockTimestamp';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { getSubgraphUrl } from '@/lib/subgraphSettings';
 import { defaultChain } from '@/wagmi';
 
@@ -1226,7 +1226,7 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
 
   // Also try GraphQL as fallback
   const { query, variables } = proposalQuery(id);
-  const { data } = useQuery<{
+  const { data } = useSubgraphQuery<{
     proposal: Maybe<{
       id: string;
       description: string;
@@ -1357,7 +1357,7 @@ export const useProposal = (id: string | number, toUpdate?: boolean) => {
 
 export const useProposalTitles = (ids: number[]): ProposalTitle[] | undefined => {
   const { query, variables } = proposalTitlesQuery(ids);
-  const { data } = useQuery<{
+  const { data } = useSubgraphQuery<{
     proposals: { items: Array<{ id: string; description: string }> };
   }>(query, { variables });
 
@@ -1372,7 +1372,7 @@ export const useProposalTitles = (ids: number[]): ProposalTitle[] | undefined =>
 export const useProposalVersions = (id: string | number): ProposalVersion[] | undefined => {
   // Proposal versions not indexed by Ponder — return empty
   const { query, variables } = proposalVersionsQuery(id);
-  useQuery(query, { variables, skip: true });
+  useSubgraphQuery(query, { variables, skip: true });
   return [];
 };
 
@@ -1716,7 +1716,7 @@ export function useNumTokensInForkEscrow(): number | undefined {
 export const useEscrowDepositEvents = (pollInterval: number, forkId: string) => {
   // Not indexed by Ponder — return empty
   const { query, variables } = escrowDepositEventsQuery(forkId);
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true,
@@ -1728,7 +1728,7 @@ export const useEscrowDepositEvents = (pollInterval: number, forkId: string) => 
 export const useEscrowWithdrawalEvents = (pollInterval: number, forkId: string) => {
   // Not indexed by Ponder — return empty
   const { query, variables } = escrowWithdrawEventsQuery(forkId);
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true,
@@ -1766,7 +1766,7 @@ const eventsWithforkCycleEvents = (events: EscrowEvent[], forkDetails: Fork) => 
 export const useForkJoins = (pollInterval: number, forkId: string) => {
   // Not indexed by Ponder — return empty
   const { query, variables } = forkJoinsQuery(forkId);
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true,
@@ -1824,7 +1824,7 @@ export const useEscrowEvents = (pollInterval: number, forkId: string) => {
 export const useForkDetails = (pollInterval: number, id: string) => {
   // Not indexed by Ponder — return empty fork
   const { query, variables } = forkDetailsQuery(id.toString());
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true,
@@ -1847,7 +1847,7 @@ export const useForkDetails = (pollInterval: number, id: string) => {
 export const useForks = (pollInterval: number = 0) => {
   // Not indexed by Ponder — return empty
   const { query, variables } = forksQuery();
-  const { loading, error, refetch } = useQuery(query, {
+  const { loading, error, refetch } = useSubgraphQuery(query, {
     pollInterval,
     variables,
     skip: true,
@@ -1860,7 +1860,7 @@ export const useIsForkActive = () => {
   // Not indexed by Ponder — always return false
   const timestamp = Number((new Date().getTime() / 1000).toFixed(0));
   const { query, variables } = isForkActiveQuery(timestamp);
-  const { loading, error } = useQuery(query, { variables, skip: true });
+  const { loading, error } = useSubgraphQuery(query, { variables, skip: true });
   return {
     loading,
     data: false,
@@ -1909,7 +1909,7 @@ export const useActivePendingUpdatableProposers = (blockNumber: bigint = 0n) => 
     loading,
     data: rawData,
     error,
-  } = useQuery<{
+  } = useSubgraphQuery<{
     proposals: {
       items: Array<{
         proposer: string;
@@ -1948,7 +1948,7 @@ export function useUpdatableProposalIds(blockNumber?: bigint) {
     loading,
     data: rawData,
     error,
-  } = useQuery<{
+  } = useSubgraphQuery<{
     proposals: { items: Array<{ id: string }> };
   }>(query, { variables });
 

@@ -1,10 +1,10 @@
 import React from 'react';
 
-import { useQuery } from '@apollo/client';
 import { ScaleIcon } from '@heroicons/react/solid';
 import { Trans } from '@lingui/react/macro';
 import { Spinner } from 'react-bootstrap';
 import ShortAddress from '@/components/ShortAddress';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { Address } from '@/utils/types';
 import { currentlyDelegatedNouns } from '@/wrappers/subgraph';
 
@@ -28,7 +28,7 @@ const ByLineHoverCard: React.FC<ByLineHoverCardProps> = props => {
   const { proposerAddress } = props;
 
   const { query, variables } = currentlyDelegatedNouns(proposerAddress);
-  const { data, loading, error } = useQuery<PonderDelegateResponse>(query, { variables });
+  const { data, loading, error } = useSubgraphQuery<PonderDelegateResponse>(query, { variables });
 
   const delegate = data?.delegates?.items?.[0];
 

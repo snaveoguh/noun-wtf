@@ -1,7 +1,7 @@
-import { gql } from '@apollo/client';
 import { useQuery } from '@tanstack/react-query';
 import { useEnsAvatar, useEnsName, usePublicClient } from 'wagmi';
 
+import { gql } from '@/lib/gql';
 import { execute } from '@/subgraphs/execute';
 import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 import { resolveNounContractAddress } from '@/utils/resolveNounsContractAddress';
@@ -255,8 +255,7 @@ export function useVoterHoverData(address: Address | undefined): VoterHoverData 
     proposalCount: data?.proposerProposals?.totalCount ?? 0,
     voteCount: data?.voterVotes?.totalCount ?? 0,
     feedbackCount:
-      (data?.proposalFeedbacks?.totalCount ?? 0) +
-      (data?.candidateFeedbacks?.totalCount ?? 0),
+      (data?.proposalFeedbacks?.totalCount ?? 0) + (data?.candidateFeedbacks?.totalCount ?? 0),
     candidateCount: data?.proposerCandidates?.totalCount ?? 0,
     sponsoredCount: data?.candidateSignatures?.totalCount ?? 0,
     multisig: multisig ?? null,

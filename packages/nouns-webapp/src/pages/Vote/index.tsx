@@ -2,7 +2,6 @@ import type { VoteWithReason } from '@/components/ProposalVoteActivity';
 
 import { Fragment, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useQuery } from '@apollo/client';
 import { i18n } from '@lingui/core';
 import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -35,6 +34,7 @@ import VotingOverview from '@/components/VotingOverview';
 import { useReadNounsGovernorQuorumVotes } from '@/contracts';
 import { useAppSelector } from '@/hooks';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { SUPPORTED_LOCALE_TO_DAYSJS_LOCALE, SupportedLocale } from '@/i18n/locales';
 import { AVERAGE_BLOCK_TIME_IN_SECS } from '@/utils/constants';
 import { buildEtherscanAddressLink, buildEtherscanTxLink } from '@/utils/etherscan';
@@ -278,7 +278,7 @@ const VotePage = () => {
     loading,
     error,
     data: votersRaw,
-  } = useQuery<{
+  } = useSubgraphQuery<{
     votes: {
       items: Array<{
         support: number;
@@ -298,7 +298,7 @@ const VotePage = () => {
     voterIds ?? [],
     BigInt(proposal?.voteSnapshotBlock ?? 0),
   );
-  useQuery<{
+  useSubgraphQuery<{
     delegates: {
       items: Array<{ id: string; delegatedVotes: number }>;
     };

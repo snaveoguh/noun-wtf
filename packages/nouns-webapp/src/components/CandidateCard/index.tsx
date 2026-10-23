@@ -1,11 +1,11 @@
 import React from 'react';
 
-import { useQuery } from '@apollo/client';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { Link } from 'react-router';
 
 import ShortAddress from '@/components/ShortAddress';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { relativeTimestamp } from '@/utils/timeUtils';
 import { PartialProposal } from '@/wrappers/nounsDao';
 import { ProposalCandidate } from '@/wrappers/nounsData';
@@ -31,10 +31,7 @@ const CandidateCard: React.FC<Readonly<CandidateCardProps>> = ({
   const nowSec = Math.floor(Date.now() / 1000);
   const activeSigners =
     signers?.filter(
-      s =>
-        s.signer?.id &&
-        s.canceled !== true &&
-        Number(s.expirationTimestamp ?? 0) > nowSec,
+      s => s.signer?.id && s.canceled !== true && Number(s.expirationTimestamp ?? 0) > nowSec,
     ) ?? [];
   const signerIds = activeSigners.map(s => s.signer.id.toLowerCase());
   const proposerLower = candidate.proposer?.toLowerCase() ?? '';
@@ -44,7 +41,7 @@ const CandidateCard: React.FC<Readonly<CandidateCardProps>> = ({
     queryAddresses,
     currentBlock ? currentBlock - 1n : 0n,
   );
-  const { data: delegateData } = useQuery<{
+  const { data: delegateData } = useSubgraphQuery<{
     delegates: { items: Array<{ id: string; delegatedVotes: number }> };
   }>(query, { variables, skip: queryAddresses.length === 0 });
 

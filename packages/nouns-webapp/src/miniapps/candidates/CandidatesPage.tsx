@@ -7,11 +7,11 @@ import type { ProposalCandidate } from '@/wrappers/nounsData';
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 
-import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
 import { useBlockNumber } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { relativeTimestamp } from '@/utils/timeUtils';
 import { useProposalThreshold } from '@/wrappers/nounsDao';
 import { useCandidateProposals } from '@/wrappers/nounsData';
@@ -234,7 +234,7 @@ const CandidateCardMini: React.FC<{
     queryAddresses,
     currentBlock ? currentBlock - 1n : 0n,
   );
-  const { data: delegateData } = useQuery<{
+  const { data: delegateData } = useSubgraphQuery<{
     delegates: { items: Array<{ id: string; delegatedVotes: number }> };
   }>(query, { variables, skip: queryAddresses.length === 0 });
 

@@ -2,7 +2,6 @@ import type { Address } from './utils/types';
 
 import React, { useEffect } from 'react';
 
-import { ApolloProvider } from '@apollo/client';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRoot } from 'react-dom/client';
@@ -15,13 +14,14 @@ import { CustomConnectkitProvider } from '@/components/CustomConnectkitProvider'
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SiteThemeProvider } from '@/contexts/SiteThemeContext';
+import { installBigIntJsonSerialization } from '@/lib/bigintJson';
 import { queryClient } from '@/lib/queryClient';
 import { initWorldApp } from '@/miniapps/world2/pwa/install';
 import { store } from '@/store';
 import { execute } from '@/subgraphs/execute';
 
 import App from './App';
-import config, { CHAIN_ID } from './config';
+import { CHAIN_ID } from './config';
 import {
   nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
@@ -45,7 +45,7 @@ import { setLastAuctionNounId, setOnDisplayAuctionNounId } from './state/slices/
 import { addPastAuctions, upsertPastAuction } from './state/slices/pastAuctions';
 import { nounPath } from './utils/history';
 import { defaultChain, config as wagmiConfig } from './wagmi';
-import { clientFactory, latestAuctionsQuery, singleAuctionQuery } from './wrappers/subgraph';
+import { latestAuctionsQuery, singleAuctionQuery } from './wrappers/subgraph';
 
 /**
  * Catch React render errors so the whole page doesn't go white.
@@ -160,7 +160,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const client = clientFactory(config.app.subgraphApiUri);
+installBigIntJsonSerialization();
 
 const ChainSubscriber: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -451,19 +451,17 @@ createRoot(document.getElementById('root')!).render(
                 <ReactQueryDevtools initialIsOpen={false} />
               )}
               <ChainSubscriber />
-              <ApolloProvider client={client}>
-                <PastAuctions />
-                <MissingAuctionFetcher />
-                <LanguageProvider>
-                  <CustomConnectkitProvider>
-                    <SiteThemeProvider>
-                      <ErrorBoundary>
-                        <App />
-                      </ErrorBoundary>
-                    </SiteThemeProvider>
-                  </CustomConnectkitProvider>
-                </LanguageProvider>
-              </ApolloProvider>
+              <PastAuctions />
+              <MissingAuctionFetcher />
+              <LanguageProvider>
+                <CustomConnectkitProvider>
+                  <SiteThemeProvider>
+                    <ErrorBoundary>
+                      <App />
+                    </ErrorBoundary>
+                  </SiteThemeProvider>
+                </CustomConnectkitProvider>
+              </LanguageProvider>
             </QueryClientProvider>
           </WagmiProvider>
         </React.StrictMode>

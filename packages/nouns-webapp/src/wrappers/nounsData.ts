@@ -2,7 +2,6 @@ import type { Address, Hash, Hex } from '@/utils/types';
 
 import { useMemo } from 'react';
 
-import { useQuery } from '@apollo/client';
 import {
   useReadNounsDataCreateCandidateCost,
   useReadNounsDataUpdateCandidateCost,
@@ -21,6 +20,7 @@ import {
   useCandidateFeedbackFromLogs,
   useProposalFeedbackFromLogs,
 } from '@/hooks/useFeedbackFromLogs';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 
 import {
   formatProposalTransactionDetails,
@@ -159,7 +159,12 @@ function ponderCandidateToProposalCandidate(p: Record<string, unknown>): Proposa
   const sigs = JSON.parse((p.signatures as string) || '[]') as string[];
   const calldatas = JSON.parse((p.calldatas as string) || '[]') as Hex[];
 
-  const details = formatProposalTransactionDetails({ targets, signatures: sigs, values, calldatas });
+  const details = formatProposalTransactionDetails({
+    targets,
+    signatures: sigs,
+    values,
+    calldatas,
+  });
 
   const rawSigs = (p.candidateSignatures as { items?: Record<string, unknown>[] })?.items ?? [];
   const contentSignatures: CandidateSignature[] = rawSigs.map((s: Record<string, unknown>) => ({
@@ -211,12 +216,22 @@ function ponderCandidateToProposalCandidate(p: Record<string, unknown>): Proposa
 export const useCandidateProposals = (blockNumber?: bigint) => {
   // Primary: fetch candidates from Ponder GraphQL (fast, indexed)
   const { query, variables } = candidateProposalsQuery();
-  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+  const {
+    loading: gqlLoading,
+    data: gqlData,
+    error: gqlError,
+    refetch: gqlRefetch,
+  } = useSubgraphQuery<{
     candidates: { items: Record<string, unknown>[] };
   }>(query, { variables });
 
   // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
-  const { data: logCandidates, isLoading: logLoading, error: logError, refetch: logRefetch } = useCandidatesFromLogs(!!gqlError);
+  const {
+    data: logCandidates,
+    isLoading: logLoading,
+    error: logError,
+    refetch: logRefetch,
+  } = useCandidatesFromLogs(!!gqlError);
 
   // Keep dependent hooks to avoid conditional hook call violations
   useDelegateNounsAtBlockQuery([], blockNumber ?? 0n);
@@ -250,12 +265,22 @@ export const useCandidateProposal = (
 ) => {
   // Primary: fetch single candidate from Ponder GraphQL
   const { query, variables } = candidateProposalQuery(id);
-  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+  const {
+    loading: gqlLoading,
+    data: gqlData,
+    error: gqlError,
+    refetch: gqlRefetch,
+  } = useSubgraphQuery<{
     candidate: Record<string, unknown> | null;
   }>(query, { variables, skip: !id });
 
   // Fallback: raw eth_getLogs — only fires if Ponder GraphQL fails
-  const { data: logCandidate, isLoading: logLoading, error: logError, refetch: logRefetch } = useCandidateFromLogs(id, !!gqlError);
+  const {
+    data: logCandidate,
+    isLoading: logLoading,
+    error: logError,
+    refetch: logRefetch,
+  } = useCandidateFromLogs(id, !!gqlError);
 
   // Keep dependent hooks to avoid conditional hook call violations
   useActivePendingUpdatableProposers(blockNumber);
@@ -281,7 +306,7 @@ export const useCandidateProposal = (
 export const useCandidateProposalVersions = (id: string) => {
   // Candidates not indexed by Ponder — return empty
   const { query, variables } = candidateProposalVersionsQuery(id);
-  const { loading, error } = useQuery(query, { variables, skip: true });
+  const { loading, error } = useSubgraphQuery(query, { variables, skip: true });
   return { loading, data: undefined as ProposalCandidateVersions | undefined, error };
 };
 
@@ -437,7 +462,12 @@ export const useSendFeedback = () => {
 export const useProposalFeedback = (id: string, pollInterval: number = 0) => {
   // Primary: fetch from Ponder GraphQL
   const { query, variables } = proposalFeedbacksQuery(id);
-  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+  const {
+    loading: gqlLoading,
+    data: gqlData,
+    error: gqlError,
+    refetch: gqlRefetch,
+  } = useSubgraphQuery<{
     proposalFeedbacks: { items: Record<string, unknown>[] };
   }>(query, { variables, skip: !id });
 
@@ -469,7 +499,12 @@ export const useProposalFeedback = (id: string, pollInterval: number = 0) => {
 export const useCandidateFeedback = (id: string, pollInterval?: number) => {
   // Primary: fetch from Ponder GraphQL
   const { query, variables } = candidateFeedbacksQuery(id);
-  const { loading: gqlLoading, data: gqlData, error: gqlError, refetch: gqlRefetch } = useQuery<{
+  const {
+    loading: gqlLoading,
+    data: gqlData,
+    error: gqlError,
+    refetch: gqlRefetch,
+  } = useSubgraphQuery<{
     candidateFeedbacks: { items: Record<string, unknown>[] };
   }>(query, { variables, skip: !id });
 

@@ -1,6 +1,5 @@
 import React from 'react';
 
-import { useQuery } from '@apollo/client';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import { useReadContract } from 'wagmi';
@@ -10,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
 import { useAppSelector } from '@/hooks';
 import useDaoContext from '@/hooks/useDaoContext';
+import { useSubgraphQuery } from '@/hooks/useSubgraphQuery';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
 import { nounQuery } from '@/wrappers/subgraph';
 
@@ -33,7 +33,9 @@ const Holder: React.FC<HolderProps> = props => {
   // mainnet subgraph doesn't index v2 tokens, so for v2 noun 0 it'd
   // hand back the mainnet nounders multisig instead of the v2 holder.
   const { query, variables } = nounQuery(nounId.toString());
-  const { loading, error, data } = useQuery(query, {
+  const { loading, error, data } = useSubgraphQuery<{
+    noun: { owner: string | { id: string } | null } | null;
+  }>(query, {
     variables,
     errorPolicy: 'ignore',
     skip: dao.isV2,
