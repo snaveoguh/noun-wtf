@@ -338,7 +338,8 @@ function VoiceStatus({ game }: { game: Game }) {
   else text = `Voices failed to load (${st.error}). Babbling instead.`;
   return (
     <p className="text-xs opacity-70" data-w2voices={st.state}>
-      {text} Piper neural TTS, runs on your device.
+      {text} Piper neural TTS, runs on your device. Voices from the LibriTTS-R dataset (CC BY 4.0)
+      via the Piper libritts_r model.
     </p>
   );
 }
