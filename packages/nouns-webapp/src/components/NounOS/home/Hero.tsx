@@ -23,7 +23,7 @@ export const GAME_ACCENT: Record<GameId, string> = {
 export function GameTitle({ name, accent }: { name: string; accent: string }) {
   const [first, ...rest] = name.toUpperCase().split(' ');
   return (
-    <span className="nh-gtitle" style={{ '--acc': accent } as CSSProperties}>
+    <span className="nh-gtitle" data-keep-font style={{ '--acc': accent } as CSSProperties}>
       <span>{first}</span>
       <span className="is-acc">{rest.join(' ')}</span>
     </span>
