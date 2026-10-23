@@ -1,8 +1,11 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG } from '../catalog';
 
-import { buildRows, CLIENTS, GAMES, HERO_SLIDES, searchItems } from './rows';
+import { buildRows, CLIENTS, coverForPath, GAMES, HERO_SLIDES, searchItems } from './rows';
 
 describe('buildRows', () => {
   const rows = buildRows(CATALOG, [
@@ -49,7 +52,7 @@ describe('buildRows', () => {
     const art = rows.find(r => r.id === 'art')!;
     const world = art.items.find(i => i.key === 'art:/world')!;
     expect(world.action).toEqual({ t: 'game', id: 'world' });
-    expect(world.cover).toBe(GAMES[0]!.cover);
+    expect(world.cover).toBe(GAMES[0]!.card);
   });
 
   it('opens clients externally, https only', () => {
@@ -74,6 +77,39 @@ describe('buildRows', () => {
 
   it('has unique keys within each row', () => {
     for (const r of rows) expect(new Set(r.items.map(i => i.key)).size).toBe(r.items.length);
+  });
+});
+
+describe('covers', () => {
+  const rows = buildRows(CATALOG, [
+    {
+      id: 'c1',
+      at: 1,
+      name: 'Noun Kart',
+      url: 'https://nounkart.xyz/',
+      blurb: 'kart',
+      kind: 'game',
+    },
+  ]);
+  const publicDir = resolve(__dirname, '../../../../public');
+
+  it('gives every catalog entry and game a portrait poster that exists on disk', () => {
+    const items = rows
+      .filter(r => r.id !== 'clients' && r.id !== 'community')
+      .flatMap(r => r.items);
+    for (const it of items) {
+      expect(it.cover, it.key).toMatch(/\.webp$/);
+      expect(existsSync(resolve(publicDir, `.${it.cover}`)), it.cover).toBe(true);
+    }
+    for (const g of GAMES) expect(existsSync(resolve(publicDir, `.${g.card}`)), g.card).toBe(true);
+  });
+
+  it('names posters after the path and leaves unknown pages to the generated box art', () => {
+    expect(coverForPath('/world/classic')).toBe('/home/covers/world-classic.webp');
+    expect(coverForPath('/explore/wallet')).toBe('/home/covers/explore-wallet.webp');
+    expect(coverForPath('/not-a-page')).toBeUndefined();
+    const community = rows.find(r => r.id === 'community')!;
+    expect(community.items.every(i => i.cover === undefined)).toBe(true);
   });
 });
 
