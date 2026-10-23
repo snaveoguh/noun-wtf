@@ -4,17 +4,13 @@ import { formatEther, parseEther } from 'viem';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import { Noun } from '@/components/Noun';
+import { apiFetch } from '@/lib/api';
 import {
   AUCTION_PRICE_MARKET_ABI,
   AUCTION_PRICE_MARKET_ADDRESS,
   PREDICTION_MARKET_CHAIN_ID,
   ZERO_ADDRESS,
 } from '@/lib/marketplace/contracts';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
 
 interface AuctionStats {
   current: { nounId: string; amount: string | null; endTime: number; settled: boolean } | null;
@@ -40,9 +36,7 @@ export function AuctionMarketCard() {
     let cancelled = false;
     async function load() {
       try {
-        const r = await fetch(`${API_BASE}/api/auction-stats`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = (await r.json()) as AuctionStats;
+        const data = await apiFetch<AuctionStats>('/api/auction-stats');
         if (!cancelled) setStats(data);
       } catch {
         if (!cancelled) setStatsError('Auction stats endpoint unavailable.');
@@ -217,7 +211,7 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
         {(market?.higherStakers ?? 0) + (market?.lowerStakers ?? 0)} stakers
         {!auctionEnded && (
           <span className="ml-2">
-           , Closes in {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m
+            , Closes in {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m
           </span>
         )}
         {market?.exists !== true && !auctionEnded && (

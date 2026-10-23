@@ -9,6 +9,8 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
+import { REST_API_BASE } from '@/lib/api';
+
 // ─── Types (API contract) ─────────────────────────────────────────────────────
 
 export type FeedSource = 'nouns' | 'nounv2' | 'punks' | 'ens' | 'toadz';
@@ -40,10 +42,6 @@ export interface FeedResponse {
   /** address(lowercase) -> display name (ENS etc.) */
   resolved: Record<string, string>;
 }
-
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -440,7 +438,7 @@ export function useOnchainFeed() {
     queryKey: ['onchainFeed'],
     queryFn: async (): Promise<OnchainFeedData> => {
       try {
-        const res = await fetch(`${API_URL}/api/onchain-feed?limit=120`);
+        const res = await fetch(`${REST_API_BASE}/api/onchain-feed?limit=120`);
         if (!res.ok) throw new Error(`onchain-feed ${res.status}`);
         const json = (await res.json()) as FeedResponse;
         if (!Array.isArray(json.items)) throw new Error('onchain-feed: bad shape');

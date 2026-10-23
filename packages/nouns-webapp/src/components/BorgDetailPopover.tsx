@@ -3,6 +3,7 @@ import { FC, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Borg, BorgAttribute, BORGS_ADDRESS, isBlankAttribute, renderBorgImage } from '@/lib/borgs';
+import { shortAddr } from '@/lib/format';
 
 // Labels derived from each layer's on-chain pixel placement (24x24 grid):
 // letter tats sit on the cheek, stitches on the chin, X/diamond on the
@@ -31,8 +32,6 @@ interface Props {
   onClose: () => void;
   onNavigate: (borgId: number) => void;
 }
-
-const shortAddr = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
 
 const BorgDetailPopover: FC<Props> = ({
   borg,
@@ -195,7 +194,9 @@ const BorgDetailPopover: FC<Props> = ({
               style={{ fontSize: '0.75rem', display: 'flex', gap: 6 }}
             >
               <span style={{ color: '#9ca3af', width: 62, flexShrink: 0 }}>{t.layer}</span>
-              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)', flexGrow: 1 }}>{t.name}</span>
+              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)', flexGrow: 1 }}>
+                {t.name}
+              </span>
               <span style={{ color: '#9ca3af' }} title={`${t.used} borgs have this`}>
                 {t.pct < 1 ? t.pct.toFixed(1) : Math.round(t.pct)}%
               </span>

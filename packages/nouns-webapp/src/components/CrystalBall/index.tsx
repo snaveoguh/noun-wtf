@@ -13,6 +13,8 @@ import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { REST_API_BASE } from '@/lib/api';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface NounSeed {
@@ -286,10 +288,7 @@ const CrystalBall: FC<CrystalBallProps> = ({
   // Poll the fast predict endpoint
   const fetchPrediction = useCallback(async () => {
     try {
-      const apiUrl =
-        (import.meta.env.VITE_API_URL as string | undefined) ??
-        'https://spirited-flexibility-production-3c30.up.railway.app';
-      const res = await fetch(`${apiUrl}/api/agent/predict`);
+      const res = await fetch(`${REST_API_BASE}/api/agent/predict`);
       if (res.ok) {
         const data: PredictResponse = await res.json();
         setPrediction(data);
@@ -465,13 +464,17 @@ const CrystalBall: FC<CrystalBallProps> = ({
       >
         {prediction && (
           <>
-            <div style={{ fontSize: 12, color: 'var(--theme-text-muted)', letterSpacing: '0.05em' }}>
+            <div
+              style={{ fontSize: 12, color: 'var(--theme-text-muted)', letterSpacing: '0.05em' }}
+            >
               <span style={{ color: prediction.running ? '#4ade80' : '#ef4444' }}>
                 {prediction.running ? '\u25CF' : '\u25CB'}
               </span>{' '}
               NOUN #{prediction.nextNounId}
               {prediction.block > 0 && (
-                <span style={{ color: 'var(--theme-text-muted)', marginLeft: 6 }}>BLK {prediction.block}</span>
+                <span style={{ color: 'var(--theme-text-muted)', marginLeft: 6 }}>
+                  BLK {prediction.block}
+                </span>
               )}
             </div>
             {countdown && (

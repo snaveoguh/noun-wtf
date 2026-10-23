@@ -6,6 +6,8 @@ import { useQuery as useReactQuery } from '@tanstack/react-query';
 import { type Log, decodeAbiParameters, parseAbiParameters } from 'viem';
 import { usePublicClient } from 'wagmi';
 
+import { API_BASE } from '@/lib/api';
+
 // ─── Contract Config ──────────────────────────────────────────────────────────
 
 const PROPDATES_ADDRESS = '0xa5Bf9A9b8f60CFD98b1cCB592f2F9F37Bb0033a4' as Address;
@@ -20,9 +22,6 @@ const MAX_PARALLEL = 8;
 
 // The API keeps the full propdates history cached server-side; the chain scan
 // below is only a fallback for when it's unreachable.
-const API_BASE: string =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 const API_TIMEOUT_MS = 8_000;
 
 // Timestamp estimation

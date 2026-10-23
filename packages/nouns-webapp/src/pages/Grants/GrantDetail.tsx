@@ -17,16 +17,12 @@ import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
 } from '@/contracts/small-grants-treasury';
+import { API_BASE } from '@/lib/api';
 
 import classes from './Grants.module.css';
 import { fetchGrantsFromChain } from './grantsChainFallback';
 
 const RELAYER_ADDRESS = '0xacc74b39976d50522621f54c18dc85e2822ec22c';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
 
 interface GrantData {
   id: number;

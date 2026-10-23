@@ -3,9 +3,9 @@ import { FC, useEffect, useMemo, useRef } from 'react';
 import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 import { createPortal } from 'react-dom';
-import { formatEther } from 'viem';
 
 import { useNounHoverData } from '@/components/NounHoverCard/useNounHoverData';
+import { formatEth } from '@/lib/format';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -104,8 +104,10 @@ const NounDetailPopover: FC<Props> = ({ nounId, seed: providedSeed, anchorRect, 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Noun {nounId.toString()}</span>
           {auction?.amount && (
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--theme-text-muted)' }}>
-              {parseFloat(formatEther(auction.amount)).toFixed(2)} ETH
+            <span
+              style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--theme-text-muted)' }}
+            >
+              {formatEth(auction.amount, 2)} ETH
             </span>
           )}
         </div>

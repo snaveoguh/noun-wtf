@@ -14,7 +14,7 @@
  */
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { formatEther, type PublicClient } from 'viem';
+import { type PublicClient } from 'viem';
 import { useAccount, useWriteContract } from 'wagmi';
 
 import {
@@ -29,6 +29,7 @@ import {
   type PoolItem,
 } from '@/components/LilNounsGrid';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import { formatEth } from '@/lib/format';
 
 /** How many mintable lils to fetch. Small on purpose — this is a teaser band. */
 const ROW_SIZE = 14;
@@ -143,7 +144,7 @@ const LilNounsMintRow: FC = () => {
   // Render nothing rather than an empty band.
   if (failed || items.length === 0) return null;
 
-  const priceLabel = price != null ? `${parseFloat(formatEther(price)).toFixed(4)} Ξ` : '—';
+  const priceLabel = price != null ? `${formatEth(price)} Ξ` : '—';
 
   return (
     <div

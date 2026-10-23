@@ -5,6 +5,8 @@ import ReactDOM from 'react-dom';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { REST_API_BASE } from '@/lib/api';
+import { timeAgo } from '@/lib/format';
 
 // ─── Types (matches Neynar v2 response) ─────────────────────────────────────
 
@@ -61,10 +63,6 @@ interface FarcasterCast {
   };
   embeds?: CastEmbed[];
 }
-
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // ─── Inline Embed Renderer ──────────────────────────────────────────────────
 
@@ -437,7 +435,9 @@ const CastModal: FC<{
               @{cast.author.username}
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
+          <div
+            style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}
+          >
             {dateStr}
           </div>
         </div>
@@ -697,7 +697,7 @@ const NocTicker: FC = () => {
 
   const fetchCasts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/feed/noc`);
+      const res = await fetch(`${REST_API_BASE}/api/feed/noc`);
       if (!res.ok) return;
       const data = await res.json();
       setCasts(data.casts ?? []);
@@ -744,15 +744,6 @@ const NocTicker: FC = () => {
     animRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animRef.current);
   }, [casts]);
-
-  const timeAgo = (timestamp: string) => {
-    const diff = Date.now() - new Date(timestamp).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
-  };
 
   if (!loaded || casts.length === 0) return null;
 
@@ -878,7 +869,7 @@ const NocTicker: FC = () => {
                   flexShrink: 0,
                 }}
               >
-                {timeAgo(cast.timestamp)}
+                {timeAgo(cast.timestamp, { seconds: false, clamp: false })}
               </span>
               <span
                 style={{

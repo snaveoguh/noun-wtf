@@ -1,4 +1,4 @@
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 
 import nounDerivativesABI from '@/contracts/nounDerivatives.abi.json';
@@ -175,8 +175,4 @@ export const useCancelDerivativeAuction = () => {
 
 export const minBidAmount = (currentAmount: bigint, incrementPct = 5): bigint => {
   return currentAmount + (currentAmount * BigInt(incrementPct)) / 100n;
-};
-
-export const formatBidEth = (amount: bigint): string => {
-  return parseFloat(formatEther(amount)).toFixed(4);
 };

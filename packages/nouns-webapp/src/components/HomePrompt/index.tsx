@@ -4,22 +4,20 @@
  * Shows a mysterious, poetic line about the current noun that invites engagement.
  * The input doubles as search (type a noun # to jump) and chat reply.
  */
+import type { INounSeed } from '@/wrappers/nounToken';
+
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useNavigate } from 'react-router';
 import { useAccount } from 'wagmi';
 
 import useActiveDao from '@/hooks/useActiveDao';
+import { REST_API_BASE } from '@/lib/api';
 import { isMissingNoun } from '@/lib/missingNoun';
 import { traitName } from '@/lib/traitName';
 import { nounPath, nounV2Path } from '@/utils/history';
-import type { INounSeed } from '@/wrappers/nounToken';
 
 import classes from './HomePrompt.module.css';
-
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 interface Message {
   id: string;
@@ -117,7 +115,7 @@ const HomePrompt: FC<Props> = ({ nounId, seed, isV2 = false }) => {
       setIsLoading(true);
 
       try {
-        const res = await fetch(`${API_URL}/api/chat`, {
+        const res = await fetch(`${REST_API_BASE}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

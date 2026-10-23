@@ -133,58 +133,6 @@ export async function fetchNounOrderByTokenId(
 }
 
 // ============================================================================
-// ONCHAIN DATA — NounsToken contract reads
-// ============================================================================
-
-/** NounsToken minimal ABI for marketplace reads (ERC721Enumerable) */
-export const NOUNS_TOKEN_ABI = [
-  {
-    type: 'function',
-    name: 'ownerOf',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'seeds',
-    inputs: [{ name: 'nounId', type: 'uint256' }],
-    outputs: [
-      { name: 'background', type: 'uint48' },
-      { name: 'body', type: 'uint48' },
-      { name: 'accessory', type: 'uint48' },
-      { name: 'head', type: 'uint48' },
-      { name: 'glasses', type: 'uint48' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'totalSupply',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'tokenOfOwnerByIndex',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'index', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const;
-
-// ============================================================================
 // TRAIT NAMES — human-readable labels for Noun traits
 // ============================================================================
 

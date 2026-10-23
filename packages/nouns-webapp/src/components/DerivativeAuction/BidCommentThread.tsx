@@ -11,6 +11,7 @@ import { FC } from 'react';
 import { formatEther } from 'viem';
 
 import { useDerivativeBidComments, type BidComment } from '@/hooks/useDerivativeBidComments';
+import { shortAddr } from '@/lib/format';
 import { useReverseENSLookUp } from '@/utils/ensLookup';
 
 interface Props {
@@ -18,8 +19,6 @@ interface Props {
   isSettled: boolean;
   winnerAddress?: string;
 }
-
-const truncAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 const fmtEth = (wei: bigint): string => {
   const n = parseFloat(formatEther(wei));
@@ -40,7 +39,7 @@ const CommentRow: FC<{
   isWinner: boolean;
 }> = ({ comment, isWinner }) => {
   const ens = useReverseENSLookUp(comment.bidder as Address);
-  const displayName = ens || truncAddr(comment.bidder);
+  const displayName = ens || shortAddr(comment.bidder, { sep: '…' });
   const hasReason = comment.reason.trim().length > 0;
 
   return (

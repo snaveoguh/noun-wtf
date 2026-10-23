@@ -13,6 +13,8 @@
  */
 import type { ReactNode } from 'react';
 
+import { shortAddr as baseShortAddr } from '@/lib/format';
+
 export type EventData = Record<string, unknown>;
 
 export type EnsLookup = (addr: string) => string | null;
@@ -133,8 +135,8 @@ export function prettifyCandidateId(candidateId: string): string {
 }
 
 export function shortAddr(addr: string): string {
-  if (!addr || addr.length < 10) return addr || '???';
-  return `${addr.slice(0, 6)}..${addr.slice(-4)}`;
+  if (!addr) return '???';
+  return baseShortAddr(addr, { sep: '..', minLength: 10 });
 }
 
 function trimZeros(s: string): string {
@@ -1268,27 +1270,3 @@ export const FILTER_TABS: { key: string; label: string; color: string | null }[]
   { key: '_TRADING', label: 'TRADING', color: '#fbbf24' },
   { key: '_CHAT', label: 'CHAT', color: '#a5f3fc' },
 ];
-
-// ─── Time Ago ──────────────────────────────────────────────────────────────
-
-export function timeAgo(timestamp: string): string {
-  const now = Date.now();
-  const then = new Date(timestamp).getTime();
-  if (!Number.isFinite(then)) return '?';
-  const diff = Math.max(0, now - then);
-
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s`;
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d`;
-
-  const months = Math.floor(days / 30);
-  return `${months}mo`;
-}

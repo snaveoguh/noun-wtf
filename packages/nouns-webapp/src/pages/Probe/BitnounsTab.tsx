@@ -16,6 +16,7 @@ import {
   orderTraitsForDisplay,
   parseBuilderTraitsFromImage,
 } from '@/lib/builderTraits';
+import { shortAddr } from '@/lib/format';
 import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
 
 // ─── ENS resolution ────────────────────────────────────────────────────────
@@ -145,11 +146,6 @@ async function fetchAllTokens(): Promise<BitnounsToken[]> {
 
 // ─── Owner helpers ──────────────────────────────────────────────────────────
 
-function shortenAddress(addr: string): string {
-  if (addr === '' || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
 function displayName(addr: string, names: Map<string, string>): string {
   if (addr === '') return '';
   const ens = names.get(addr.toLowerCase());
@@ -157,7 +153,7 @@ function displayName(addr: string, names: Map<string, string>): string {
     const stripped = stripNoggles(ens);
     if (stripped !== '') return stripped;
   }
-  return shortenAddress(addr);
+  return shortAddr(addr, { minLength: 10 });
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────

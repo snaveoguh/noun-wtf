@@ -7,11 +7,9 @@ import { FC, lazy, Suspense, useEffect, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
 
-const Nounsweeper = lazy(() => import('./index'));
+import { REST_API_BASE } from '@/lib/api';
 
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+const Nounsweeper = lazy(() => import('./index'));
 
 const ReindexingBanner: FC = () => {
   const [playing, setPlaying] = useState(false);
@@ -20,7 +18,7 @@ const ReindexingBanner: FC = () => {
   const { data } = useQuery({
     queryKey: ['indexer-health'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/health`);
+      const res = await fetch(`${REST_API_BASE}/api/health`);
       if (!res.ok) throw new Error('health failed');
       return (await res.json()) as { indexing?: boolean; proposalCount?: number | null };
     },
@@ -55,7 +53,8 @@ const ReindexingBanner: FC = () => {
         }}
       >
         <span>
-          <span style={{ color: '#c54e38' }}>⌐◨-◨</span> reindexing — data&apos;s back in a few minutes
+          <span style={{ color: '#c54e38' }}>⌐◨-◨</span> reindexing — data&apos;s back in a few
+          minutes
         </span>
         <button
           onClick={() => setPlaying(true)}
@@ -73,7 +72,13 @@ const ReindexingBanner: FC = () => {
         </button>
         <button
           onClick={() => setDismissed(true)}
-          style={{ border: 0, background: 'none', color: '#79809c', cursor: 'pointer', font: 'inherit' }}
+          style={{
+            border: 0,
+            background: 'none',
+            color: '#79809c',
+            cursor: 'pointer',
+            font: 'inherit',
+          }}
           aria-label="dismiss"
         >
           ×

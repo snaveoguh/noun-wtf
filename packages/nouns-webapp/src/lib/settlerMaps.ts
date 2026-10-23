@@ -1,3 +1,4 @@
+import { API_BASE } from '@/lib/api';
 /**
  * Settler / curator maps for the probe dropdowns + filters.
  *
@@ -9,10 +10,6 @@
  *   settler(N) = tx.from of AuctionSettled(N)  (V1 nounder nouns inherit N-1)
  *   curated(N) = settler(N-1)
  */
-
-const API_BASE: string =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 export type SettlerDao = 'v1' | 'v2';
 

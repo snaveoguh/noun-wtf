@@ -5,9 +5,9 @@
 import { FC, useEffect, useState } from 'react';
 
 import { Link } from 'react-router';
-import { formatEther } from 'viem';
 
 import { baseClient } from '@/lib/baseClient';
+import { formatEth } from '@/lib/format';
 import { fetchSpaceProposals, SnapshotProposal } from '@/lib/snapshot';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ async function fetchYCProposals(): Promise<YCProposal[]> {
 async function fetchYCTreasuryBalance(): Promise<string | null> {
   try {
     const balance = await baseClient.getBalance({ address: YC_TREASURY as `0x${string}` });
-    return Number(formatEther(balance)).toFixed(2);
+    return formatEth(balance, 2);
   } catch {
     return null;
   }

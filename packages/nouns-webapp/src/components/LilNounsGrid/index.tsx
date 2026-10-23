@@ -17,7 +17,6 @@ import { buildSVG } from '@nouns/sdk';
 import { createPortal } from 'react-dom';
 import {
   createPublicClient,
-  formatEther,
   http,
   keccak256,
   encodePacked,
@@ -28,6 +27,7 @@ import { mainnet } from 'viem/chains';
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import { useAppSelector } from '@/hooks';
+import { formatEth } from '@/lib/format';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -315,7 +315,7 @@ const MintPopover: FC<{
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
 
-  const priceLabel = price != null ? `${parseFloat(formatEther(price)).toFixed(5)} ETH` : '—';
+  const priceLabel = price != null ? `${formatEth(price, 5)} ETH` : '—';
 
   const handleBuy = () => {
     if (price == null) return;
@@ -373,7 +373,13 @@ const MintPopover: FC<{
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ec4899' }}>
             Lil Noun #{nounId.toString()}
           </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', fontFamily: 'monospace' }}>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--theme-text-muted)',
+              fontFamily: 'monospace',
+            }}
+          >
             Block {item.blockNumber.toString().slice(-6)}
           </span>
         </div>
@@ -852,7 +858,7 @@ const LilNounsGrid: FC = () => {
     setPopover(prev => (prev?.index === index ? null : { index, rect }));
   }, []);
 
-  const priceLabel = price != null ? `${parseFloat(formatEther(price)).toFixed(4)} ETH` : '—';
+  const priceLabel = price != null ? `${formatEth(price)} ETH` : '—';
 
   // ── Compute active pool + grayscale fill ─────────────────────────────────
   const activePool = pool.slice(0, POOL_SIZE);

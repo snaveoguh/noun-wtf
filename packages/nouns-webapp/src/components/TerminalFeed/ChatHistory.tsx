@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { API_BASE } from '@/lib/api';
+
 import type { ChatMessage } from './TerminalPrompt';
 
 interface Props {
@@ -32,12 +34,6 @@ function formatTime(ts: number): string {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
-const API_BASE =
-  typeof apiBaseEnv === 'string' && apiBaseEnv.length > 0
-    ? apiBaseEnv
-    : 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 /**
  * Compact live status of the agent-nounirl block watcher (ported from the

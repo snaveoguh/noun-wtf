@@ -16,12 +16,9 @@ import { ChevronDown, Lock, Pause, Play, Search, Unlock, X } from 'lucide-react'
 import ReactDOM from 'react-dom';
 
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { API_BASE, apiFetch } from '@/lib/api';
 
 import TreasuryScene from './Scene';
-
-const SUBGRAPH_URL =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // ─── Entity Type Definitions ────────────────────────────────────────────────
 
@@ -167,11 +164,7 @@ interface FlowData {
 function useTreasuryFlows() {
   return useReactQuery<FlowData>({
     queryKey: ['treasuryFlows'],
-    queryFn: async () => {
-      const res = await fetch(`${SUBGRAPH_URL}/api/treasury/flows`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: () => apiFetch<FlowData>('/api/treasury/flows'),
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000,
     retry: 2,
@@ -645,7 +638,7 @@ const TreasuryFlowSection: FC = () => {
               items { id description }
             }
           }`;
-          const res = await fetch(`${SUBGRAPH_URL}/graphql`, {
+          const res = await fetch(`${API_BASE}/graphql`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query }),

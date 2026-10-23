@@ -21,12 +21,10 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 
 import { SettlersSkeleton } from '@/components/Skeleton';
+import { API_BASE } from '@/lib/api';
+import { shortAddr } from '@/lib/format';
 import { loadSettlerMaps, type SettlerMaps } from '@/lib/settlerMaps';
 import { isBurnedSeed, useNounSeeds, type INounSeed } from '@/wrappers/nounToken';
-
-const API_URL: string =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 interface AuctionData {
   nounId: string;
@@ -68,10 +66,6 @@ interface BoardRow {
   count: number;
   /** Winners only — total ETH paid across their wins. */
   totalEth?: bigint;
-}
-
-function shortenAddress(addr: string) {
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 function formatEth(wei: bigint) {
@@ -119,7 +113,7 @@ const SettlersPage: FC = () => {
     setError(null);
     try {
       const [auctionRes, settlerMaps] = await Promise.all([
-        fetch(API_URL, {
+        fetch(API_BASE, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -437,7 +431,7 @@ const SettlersPage: FC = () => {
                     textTransform: 'none' as const,
                   }}
                 >
-                  {shortenAddress(row.address)}
+                  {shortAddr(row.address)}
                 </a>
 
                 {/* Stats */}

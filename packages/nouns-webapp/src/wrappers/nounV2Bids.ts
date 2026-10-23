@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import config from '@/config';
 import { NOUNV2_AUCTION_HOUSE_ADDRESS } from '@/contracts/nounv2-auction-house';
+import { API_BASE } from '@/lib/api';
 import { Address, Bid } from '@/utils/types';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-const PONDER_BASE =
-  config.app.subgraphApiUri || 'https://spirited-flexibility-production-3c30.up.railway.app';
+const PONDER_BASE = config.app.subgraphApiUri || API_BASE;
 
 interface PonderBid {
   bidder: Address;

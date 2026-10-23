@@ -8,6 +8,7 @@ import { mainnet } from 'viem/chains';
 
 import LilNounDetailPopover from '@/components/LilNounDetailPopover';
 import { Button } from '@/components/ui/button';
+import { API_BASE } from '@/lib/api';
 
 const IMAGE_DATA_URL = 'https://assets.noundry.wtf/lil-nouns/image-data.json';
 const LIL_SEEDS_URL = '/probe-dreams/lil-seeds.json';
@@ -15,8 +16,6 @@ const LIL_OWNERS_URL = '/probe-dreams/lil-owners.json';
 const LIL_NOUNS_TOKEN = '0x4b10701Bfd7BFEdc47d50562b76b436fbB5BdB3B' as const;
 const MIN_CELL = 72;
 const GAP = 6;
-
-const ENS_API = import.meta.env.VITE_MAINNET_SUBGRAPH || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 interface LilImageData {
   bgcolors: string[];
@@ -191,7 +190,7 @@ const LilNounsTab: FC = () => {
         for (let i = 0; i < entries.length; i += batchSize) {
           const batch = entries.slice(i, i + batchSize);
           try {
-            const res = await fetch(`${ENS_API}/api/ens?addresses=${batch.map(e => e.address).join(',')}`);
+            const res = await fetch(`${API_BASE}/api/ens?addresses=${batch.map(e => e.address).join(',')}`);
             if (!res.ok) continue;
             const { names } = await res.json() as { names: Record<string, string | null> };
             for (let j = 0; j < batch.length; j++) {

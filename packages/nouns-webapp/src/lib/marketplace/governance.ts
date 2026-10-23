@@ -9,10 +9,7 @@
 import { createPublicClient, http, type Address } from 'viem';
 import { mainnet } from 'viem/chains';
 
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
+import { API_BASE } from '@/lib/api';
 
 const MAINNET_RPC_URL =
   (import.meta.env.VITE_MAINNET_JSONRPC as string | undefined) ??

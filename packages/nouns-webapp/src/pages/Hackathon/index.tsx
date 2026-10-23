@@ -1,7 +1,8 @@
-import { formatEther } from 'viem';
 import { useBalance } from 'wagmi';
 
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
+import { DEFAULT_API_BASE } from '@/lib/api';
+import { formatEth, shortAddr } from '@/lib/format';
 
 import classes from './Hackathon.module.css';
 
@@ -103,17 +104,17 @@ const CONTRACTS = [
 const APIS = [
   {
     name: 'GraphQL API (Ponder)',
-    url: 'https://spirited-flexibility-production-3c30.up.railway.app/graphql',
+    url: `${DEFAULT_API_BASE}/graphql`,
     desc: 'Nouns indexer. Auctions, proposals, grants, delegates, transfers. Full GraphQL.',
   },
   {
     name: 'NounV2 Auctions (REST)',
-    url: 'https://spirited-flexibility-production-3c30.up.railway.app/api/nounv2-auctions',
+    url: `${DEFAULT_API_BASE}/api/nounv2-auctions`,
     desc: 'All NounV2 auctions since launch. Current auction + full bid history. JSON REST.',
   },
   {
     name: 'NounV2 Proposals (REST)',
-    url: 'https://spirited-flexibility-production-3c30.up.railway.app/api/nounv2-proposals',
+    url: `${DEFAULT_API_BASE}/api/nounv2-proposals`,
     desc: 'NounV2 treasury proposals with vote tallies + execution status. JSON REST.',
   },
   {
@@ -222,10 +223,6 @@ const PHYSICAL_IDEAS = [
   },
 ];
 
-function shortAddr(addr: string) {
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
 export default function HackathonPage() {
   const { data: balance } = useBalance({ address: TREASURY_ADDRESS });
 
@@ -235,8 +232,7 @@ export default function HackathonPage() {
       <div className={classes.hero}>
         <h1 className={classes.heroTitle}>Hack the Treasury</h1>
         <p className={classes.heroSub}>
-          {balance ? `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH` : '0.42 ETH'}{' '}
-          permissionless grants
+          {balance ? `${formatEth(balance.value)} ETH` : '0.42 ETH'} permissionless grants
         </p>
         <p className={classes.heroDesc}>
           0.42 ETH sitting in a SmallGrantsTreasury contract on Ethereum mainnet.
@@ -255,7 +251,7 @@ export default function HackathonPage() {
             {shortAddr(TREASURY_ADDRESS)}
           </a>
           <span className={classes.treasuryBal}>
-            {balance ? `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH` : '...'}
+            {balance ? `${formatEth(balance.value)} ETH` : '...'}
           </span>
         </div>
 
@@ -442,7 +438,7 @@ export default function HackathonPage() {
             <span className={classes.comment}># GraphQL API (no setup needed)</span>
           </div>
           <div>
-            <span className={classes.prompt}>$</span> curl -s 'https://spirited-flexibility-production-3c30.up.railway.app/graphql' -H 'Content-Type: application/json' -d '&#123;"query":"&#123; nouns(limit:1) &#123; items &#123; id &#125; &#125; &#125;"&#125;'
+            <span className={classes.prompt}>$</span> curl -s '{DEFAULT_API_BASE}/graphql' -H 'Content-Type: application/json' -d '&#123;"query":"&#123; nouns(limit:1) &#123; items &#123; id &#125; &#125; &#125;"&#125;'
           </div>
           <div style={{ marginTop: '0.5rem' }}>
             <span className={classes.comment}># Free LLM (no API key)</span>

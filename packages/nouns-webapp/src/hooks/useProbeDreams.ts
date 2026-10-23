@@ -4,6 +4,7 @@ import { ImageData, getNounData } from '@noundry/nouns-assets';
 import { buildSVG } from '@nouns/sdk';
 import { useQuery } from '@tanstack/react-query';
 
+import { API_BASE } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 export interface ProbeDream {
@@ -44,7 +45,7 @@ export interface ProbeDreamWithPreview extends ProbeDream {
 
 // Live source: dream-nouns API on Railway (nouns-api) — migrated off the
 // probe.wtf DigitalOcean droplet 2026-07-19. Same Laravel paginator shape.
-const PROBE_API = 'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns';
+const PROBE_API = `${API_BASE}/api/dream-nouns`;
 
 // Fallback: static JSON bundled with the webapp (frozen snapshot).
 const STATIC_URL = '/probe-dreams/dreams.json';

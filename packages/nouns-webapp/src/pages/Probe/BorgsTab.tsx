@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { API_BASE } from '@/lib/api';
 import {
   Borg,
   BorgAttribute,
@@ -35,10 +36,6 @@ import { playTada, startSlowJam } from '@/lib/chiptune';
 const MIN_CELL = 72;
 const GAP = 6;
 const CELL_BG = '#f4f4f5';
-
-const ENS_API =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 type SortOption = 'id-desc' | 'id-asc' | 'rarest' | 'common';
 type StatusFilter = 'alive' | 'burned' | 'all';
@@ -137,7 +134,7 @@ const BorgsTab: FC = () => {
         const batch = entries.slice(i, i + batchSize);
         try {
           const res = await fetch(
-            `${ENS_API}/api/ens?addresses=${batch.map(e => e.address).join(',')}`,
+            `${API_BASE}/api/ens?addresses=${batch.map(e => e.address).join(',')}`,
           );
           if (!res.ok) continue;
           const { names } = (await res.json()) as { names: Record<string, string | null> };
@@ -310,7 +307,7 @@ const BorgsTab: FC = () => {
           <span className="text-sm font-bold">Borgs, fully onchain, Polygon</span>
           <span className="text-muted-foreground text-xs">
             {data.meta.generated.toLocaleString()} / {BORGS_SUPPLY_LIMIT.toLocaleString()} generated
-           , {data.meta.bred.toLocaleString()} bred, {aliveCount.toLocaleString()} alive
+            , {data.meta.bred.toLocaleString()} bred, {aliveCount.toLocaleString()} alive
           </span>
         </div>
         <div className="ml-auto flex gap-2">

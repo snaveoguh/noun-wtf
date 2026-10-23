@@ -17,6 +17,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Bone } from '@/components/Skeleton';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { FeedItem, FeedSource, useOnchainFeed } from '@/hooks/useOnchainFeed';
+import { timeAgo } from '@/lib/format';
 
 import { displayNameFor } from './addressBook';
 import AddressTag, { SOURCE_COLOR, SOURCE_LABEL, SourceGlyph } from './AddressTag';
@@ -39,16 +40,6 @@ function formatEth(weiStr: string | null): string | null {
   if (v >= 1) return v.toFixed(2);
   if (v >= 0.001) return v.toFixed(3);
   return '<0.001';
-}
-
-function timeAgo(unixSec: number): string {
-  const diff = Math.max(0, Math.floor(Date.now() / 1000) - unixSec);
-  if (diff < 60) return `${diff}s`;
-  const mins = Math.floor(diff / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 function thingLabel(item: FeedItem): string {

@@ -7,9 +7,11 @@ import { useReadNounsTreasuryBalancesInEth } from '@nouns/sdk/react/treasury';
 import { formatEther } from 'viem';
 
 import config from '@/config';
+import { API_BASE } from '@/lib/api';
+import { formatEth } from '@/lib/format';
 
 const SUBGRAPH_URL =
-  config.app.subgraphApiUri || 'https://spirited-flexibility-production-3c30.up.railway.app';
+  config.app.subgraphApiUri || API_BASE;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -265,7 +267,7 @@ export function useStatsData(): StatsData {
 
   const recentAuctions: AuctionItem[] = auctionItems.slice(0, 20).map(a => ({
     nounId: Number(a.nounId),
-    amount: parseFloat(formatEther(BigInt(a.amount || '0'))).toFixed(4),
+    amount: formatEth(BigInt(a.amount || '0')),
     date: new Date(Number(a.startTime) * 1000).toLocaleDateString(),
   }));
 

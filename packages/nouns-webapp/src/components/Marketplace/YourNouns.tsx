@@ -5,7 +5,8 @@ import { useMemo } from 'react';
 import { mainnet } from 'viem/chains';
 import { useAccount, useReadContract, useReadContracts } from 'wagmi';
 
-import { NOUNS_CONTRACT, NOUNS_TOKEN_ABI } from '@/lib/marketplace/nouns-marketplace';
+import { nounsTokenAbi } from '@/contracts';
+import { NOUNS_CONTRACT } from '@/lib/marketplace/nouns-marketplace';
 
 import { NounCard } from './NounCard';
 
@@ -19,7 +20,7 @@ export function YourNouns() {
   // 1. Get balance (how many Nouns does this wallet own?)
   const { data: balanceData } = useReadContract({
     address: NOUNS_CONTRACT,
-    abi: NOUNS_TOKEN_ABI,
+    abi: nounsTokenAbi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     chainId: mainnet.id,
@@ -33,7 +34,7 @@ export function YourNouns() {
     if (address == null || balance === 0) return [];
     return Array.from({ length: balance }, (_, i) => ({
       address: NOUNS_CONTRACT,
-      abi: NOUNS_TOKEN_ABI,
+      abi: nounsTokenAbi,
       functionName: 'tokenOfOwnerByIndex' as const,
       args: [address, BigInt(i)] as const,
       chainId: mainnet.id,

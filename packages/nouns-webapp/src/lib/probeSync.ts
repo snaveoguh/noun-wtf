@@ -6,7 +6,9 @@
 
 import type { SavedDream } from '@/lib/dreamStorage';
 
-const PROBE_API = 'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns';
+import { API_BASE } from '@/lib/api';
+
+const PROBE_API = `${API_BASE}/api/dream-nouns`;
 
 /**
  * Post a new dream to probe.wtf's Laravel API.

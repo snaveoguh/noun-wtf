@@ -19,16 +19,14 @@ import { useCallback } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSignMessage } from 'wagmi';
 
+import { API_BASE } from '@/lib/api';
+
 import {
   FIXTURE_ACTIVITY,
   FIXTURE_AUTOPILOT,
   FIXTURE_PROFILE,
   profileFixtureEnabled,
 } from './walletProfileFixtures';
-
-export const API_BASE: string =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const STALE = 60_000;
 
