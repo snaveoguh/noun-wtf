@@ -2,15 +2,13 @@ import { useEffect, useRef } from 'react';
 
 import { useLocation } from 'react-router';
 
+import { REST_API_BASE } from '@/lib/api';
+
 /**
  * First-party pageview beacon (replaces Plausible). Posts one tiny record per
  * route change to the nouns-api, which stores it without cookies or raw IPs.
  * Skipped on localhost unless VITE_PAGEVIEW_BEACON=true.
  */
-
-const API_URL: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -24,7 +22,7 @@ export function sendPageview(path: string, referrer: string): void {
   if (!beaconEnabled()) return;
   const width = window.innerWidth || window.screen?.width || 0;
   const payload = JSON.stringify({ p: path, r: referrer, w: width });
-  const url = `${API_URL}/api/pv`;
+  const url = `${REST_API_BASE}/api/pv`;
   try {
     // text/plain keeps this a "simple" request: no CORS preflight, so the
     // beacon survives tab close / navigation away.

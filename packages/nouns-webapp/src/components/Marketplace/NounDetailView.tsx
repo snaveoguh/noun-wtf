@@ -6,7 +6,8 @@ import { Link } from 'react-router';
 import { mainnet } from 'viem/chains';
 import { useAccount, useReadContract } from 'wagmi';
 
-import { NOUNS_CONTRACT, NOUNS_TOKEN_ABI } from '@/lib/marketplace/nouns-marketplace';
+import { nounsTokenAbi } from '@/contracts';
+import { NOUNS_CONTRACT } from '@/lib/marketplace/nouns-marketplace';
 import {
   buildNounSvg,
   traitFilename,
@@ -25,7 +26,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
   // Fetch seed from the NounsToken contract
   const { data: seedData } = useReadContract({
     address: NOUNS_CONTRACT,
-    abi: NOUNS_TOKEN_ABI,
+    abi: nounsTokenAbi,
     functionName: 'seeds',
     args: [BigInt(nounId)],
     chainId: mainnet.id,
@@ -34,7 +35,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
   // Fetch owner from the NounsToken contract
   const { data: ownerData } = useReadContract({
     address: NOUNS_CONTRACT,
-    abi: NOUNS_TOKEN_ABI,
+    abi: nounsTokenAbi,
     functionName: 'ownerOf',
     args: [BigInt(nounId)],
     chainId: mainnet.id,

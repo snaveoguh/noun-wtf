@@ -32,6 +32,8 @@ import { useAccount, useBlock, useReadContract, useWriteContract } from 'wagmi';
 import {
   nounsAuctionHouseAbi,
   nounsAuctionHouseAddress,
+  nounsDescriptorAbi,
+  nounsTokenAbi,
   useWriteNounsAuctionHouseSettleCurrentAndCreateNewAuction,
 } from '@/contracts';
 import {
@@ -40,6 +42,7 @@ import {
 } from '@/contracts/nounv2-auction-house';
 import { NOUNV2_TOKEN_ADDRESS } from '@/contracts/nounv2-token';
 import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
+import { REST_API_BASE } from '@/lib/api';
 import { traitName } from '@/lib/traitName';
 import { defaultChain } from '@/wagmi';
 
@@ -57,10 +60,6 @@ const TRAIT_LABELS: Record<string, string> = {
 };
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
-
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // ─── View mode ─────────────────────────────────────────────────────────
 type ViewMode = '2d' | '3d' | 'ascii';
@@ -188,58 +187,6 @@ function predictSeed(
   };
 }
 
-// Minimal descriptor ABI — only the count getters used for seed prediction.
-const descriptorCountsAbi = [
-  {
-    type: 'function',
-    name: 'backgroundCount',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'bodyCount',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'accessoryCount',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'headCount',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'glassesCount',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const;
-
-// Minimal token ABI — used to read each token's `descriptor()` so we don't
-// have to hardcode the V1/V2 descriptor addresses (the V2 descriptor was
-// deployed alongside the V2 token and isn't the same instance as V1's).
-const tokenDescriptorAbi = [
-  {
-    type: 'function',
-    name: 'descriptor',
-    inputs: [],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view',
-  },
-] as const;
-
 const NOUNS_TOKEN_MAINNET = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
 
 /**
@@ -255,7 +202,9 @@ function useDescriptorTraitCounts(
 ): TraitCounts {
   const { data: descriptorAddress } = useReadContract({
     address: tokenAddress,
-    abi: tokenDescriptorAbi,
+    // Read each token's `descriptor()` rather than hardcoding V1/V2 descriptor
+    // addresses (the V2 descriptor isn't the same instance as V1's).
+    abi: nounsTokenAbi,
     functionName: 'descriptor',
     query: {
       enabled: enabled && tokenAddress != null && tokenAddress !== ZERO_ADDRESS,
@@ -268,7 +217,7 @@ function useDescriptorTraitCounts(
 
   const countsQuery = {
     address: descriptorAddress,
-    abi: descriptorCountsAbi,
+    abi: nounsDescriptorAbi,
     query: {
       enabled: enabled && descriptorAddress != null && descriptorAddress !== ZERO_ADDRESS,
       // Counts only change when admin uploads new art (rare). 5 min is
@@ -356,7 +305,7 @@ function useNounSeeds() {
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
-    fetch(`${API_BASE}/api/nouns/seeds`)
+    fetch(`${REST_API_BASE}/api/nouns/seeds`)
       .then(r => r.json())
       .then((data: NounSeedWithId[]) => setSeeds(data))
       .catch(() => {});
@@ -1155,7 +1104,9 @@ export default function CrystalBallPage() {
     try {
       // The agent watches both DAOs — tell it which auction to settle.
       const daoParam = activeDao === 'nounv2' ? 'v2' : 'v1';
-      const res = await fetch(`${API_BASE}/api/agent/settle?dao=${daoParam}`, { method: 'POST' });
+      const res = await fetch(`${REST_API_BASE}/api/agent/settle?dao=${daoParam}`, {
+        method: 'POST',
+      });
       const data = (await res.json()) as { txHash?: string };
       if (typeof data.txHash === 'string' && data.txHash.length > 0) {
         setSettleTx(data.txHash);

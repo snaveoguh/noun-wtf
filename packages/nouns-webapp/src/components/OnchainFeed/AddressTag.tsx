@@ -11,8 +11,9 @@ import { CSSProperties, FC } from 'react';
 import { Link } from 'react-router';
 
 import NogglesLogo from '@/assets/noggles.svg?react';
+import { shortAddr } from '@/lib/format';
 
-import { displayNameFor, truncateAddress } from './addressBook';
+import { displayNameFor } from './addressBook';
 
 // ─── Source glyphs ────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ interface AddressTagProps {
 const AddressTag: FC<AddressTagProps> = ({ address, resolved, source, dark, style }) => {
   const isDark = dark === true;
   const name = displayNameFor(address, resolved);
-  const label = name ?? truncateAddress(address);
+  const label = name ?? shortAddr(address, { sep: '…', minLength: 13 });
   const isRaw = name === null;
 
   return (

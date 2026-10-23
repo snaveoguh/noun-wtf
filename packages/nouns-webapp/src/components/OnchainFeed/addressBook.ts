@@ -26,9 +26,3 @@ export function displayNameFor(
   const key = address.toLowerCase();
   return ADDRESS_BOOK[key] ?? resolved?.[key] ?? null;
 }
-
-/** 0x1234…abcd */
-export function truncateAddress(address: string): string {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}

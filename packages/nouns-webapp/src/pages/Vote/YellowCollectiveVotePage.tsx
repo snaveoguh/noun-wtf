@@ -8,6 +8,7 @@ import { FC, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAccount } from 'wagmi';
 
+import { shortAddr } from '@/lib/format';
 import {
   fetchProposalVotes,
   fetchSpaceProposals,
@@ -16,11 +17,6 @@ import {
 } from '@/lib/snapshot';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function shortenAddress(addr: string): string {
-  if (!addr || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 function choiceLabel(choice: number, choices: string[]): string {
   return choices[choice - 1] || `Choice ${choice}`;
@@ -220,7 +216,7 @@ const YellowCollectiveVotePage: FC = () => {
         </h1>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
-          by {shortenAddress(proposal.author)}, {timeString(proposal.start)} →{' '}
+          by {shortAddr(proposal.author, { minLength: 10 })}, {timeString(proposal.start)} →{' '}
           {timeString(proposal.end)}
         </div>
       </div>
@@ -327,7 +323,7 @@ const YellowCollectiveVotePage: FC = () => {
                     }}
                   />
                   <span style={{ fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>
-                    {shortenAddress(v.voter)}
+                    {shortAddr(v.voter, { minLength: 10 })}
                   </span>
                   <span
                     style={{

@@ -8,6 +8,7 @@ import { decodeFunctionResult, encodeFunctionData, multicall3Abi } from 'viem';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { API_BASE } from '@/lib/api';
 
 type ComputedStatus = 'Upcoming' | 'Active' | 'Passed' | 'Failed' | 'Cancelled';
 
@@ -21,10 +22,6 @@ interface CurrentProp {
   abstainVotes: number;
   status: ComputedStatus;
 }
-
-const SUBGRAPH_URL =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const RPC_URL =
   (import.meta.env.VITE_MAINNET_JSONRPC as string | undefined) ??
@@ -502,7 +499,7 @@ const CurrentPropsBanner: FC = () => {
   const fetchProps = useCallback(async () => {
     try {
       // Fetch recent proposals from Ponder
-      const gqlRes = await fetch(SUBGRAPH_URL, {
+      const gqlRes = await fetch(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

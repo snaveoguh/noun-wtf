@@ -7,14 +7,10 @@ import { useBalance, useBlockNumber } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
 import { SMALL_GRANTS_TREASURY_ADDRESS } from '@/contracts/small-grants-treasury';
+import { apiFetch } from '@/lib/api';
 
 import classes from './Grants.module.css';
 import { fetchGrantsFromChain } from './grantsChainFallback';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
 
 interface Grant {
   id: number;
@@ -108,9 +104,7 @@ export default function GrantsPage() {
     // SmallGrantsTreasury contract directly via wagmi/viem multicall.
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/grants`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const items: Grant[] = await res.json();
+        const items = await apiFetch<Grant[]>('/api/grants');
         if (cancelled) return;
         if (items.length > 0) {
           setGrants(normalize(items));

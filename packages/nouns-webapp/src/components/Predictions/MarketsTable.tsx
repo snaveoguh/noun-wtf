@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
+import { API_BASE } from '@/lib/api';
 import {
   AUCTION_PRICE_MARKET_ABI,
   AUCTION_PRICE_MARKET_ADDRESS,
@@ -11,11 +12,6 @@ import {
   PREDICTION_MARKET_CHAIN_ID,
 } from '@/lib/marketplace/contracts';
 import { formatEth } from '@/lib/marketplace/market-utils';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
 
 interface MarketEntry {
   kind: 'auction' | 'proposal';
@@ -139,10 +135,7 @@ export function MarketsTable() {
       {/* Mobile: stacked cards. Desktop (md+): legacy table layout. */}
       <div className="block space-y-2 md:hidden">
         {paged.map(entry => (
-          <div
-            key={entry.id}
-            className="rounded border border-[var(--rule)] p-3 font-mono text-xs"
-          >
+          <div key={entry.id} className="rounded border border-[var(--rule)] p-3 font-mono text-xs">
             <div className="mb-2 flex items-center justify-between gap-2">
               <span
                 className="border px-1.5 py-0.5 text-xs uppercase tracking-wider"
@@ -162,10 +155,7 @@ export function MarketsTable() {
                     ? 'LIL'
                     : 'NOUNS'}
               </span>
-              <span
-                className="text-xs uppercase"
-                style={{ color: statusColor(entry.status) }}
-              >
+              <span className="text-xs uppercase" style={{ color: statusColor(entry.status) }}>
                 {statusLabel(entry.status)}
                 {entry.status === 'resolved' && OUTCOME_LABEL[entry.outcome] != null && (
                   <span className="ml-1 text-xs text-[var(--ink-faint)]">

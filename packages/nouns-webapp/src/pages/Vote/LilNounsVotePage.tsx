@@ -18,12 +18,8 @@ import { mainnet } from 'viem/chains';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import ShortAddress from '@/components/ShortAddress';
+import { API_BASE } from '@/lib/api';
 import { LIL_NOUNS_GOVERNOR, LIL_NOUNS_GOVERNOR_ABI } from '@/lib/marketplace/governance';
-
-const API_BASE = (
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app'
-).replace(/\/graphql\/?$/, '');
 
 interface LilProposalVote {
   id: string;
@@ -572,7 +568,11 @@ const LilNounsVotePage: FC = () => {
                   href={`https://etherscan.io/address/${target}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: 'var(--theme-text-primary)', fontWeight: 600, textDecoration: 'none' }}
+                  style={{
+                    color: 'var(--theme-text-primary)',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
                 >
                   {target}
                 </a>
@@ -758,7 +758,9 @@ const CastVotePanel: FC<{ proposalId: bigint }> = ({ proposalId }) => {
 
   if (isSuccess) {
     return (
-      <div style={{ ...panelStyle, borderColor: 'transparent', background: 'var(--theme-surface)' }}>
+      <div
+        style={{ ...panelStyle, borderColor: 'transparent', background: 'var(--theme-surface)' }}
+      >
         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--theme-free)' }}>
           ✓ Vote cast on-chain. Receipt updating…
         </div>

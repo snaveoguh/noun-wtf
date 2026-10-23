@@ -1,6 +1,8 @@
 /** Formatting helpers for the wallet profile — all tolerant of junk input. */
 import type { Timestampish } from './types';
 
+import { shortAddr as baseShortAddr } from '@/lib/format';
+
 export function toDate(v: Timestampish): Date | null {
   if (v == null || v === '') return null;
   if (typeof v === 'number') {
@@ -69,10 +71,10 @@ export function fmtPct(v: unknown): string {
   return `${n.toFixed(n >= 10 ? 0 : 1)}%`;
 }
 
+/** `0x1234…abcd`; `???` for a missing address, short strings unchanged. */
 export function shortAddr(addr: string | null | undefined): string {
   if (!addr) return '???';
-  if (addr.length <= 12) return addr;
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return baseShortAddr(addr, { sep: '…', minLength: 13 });
 }
 
 export const SUPPORT_LABEL: Record<number, string> = { 0: 'AGAINST', 1: 'FOR', 2: 'ABSTAIN' };

@@ -1,10 +1,11 @@
 import type { getPublicClient } from '@wagmi/core';
 
-import { BaseError, ContractFunctionRevertedError, parseAbi } from 'viem';
+import { BaseError, ContractFunctionRevertedError } from 'viem';
+
+import { nounsTokenAbi } from '@/contracts';
 
 type Client = NonNullable<ReturnType<typeof getPublicClient>>;
 
-const ownerOfAbi = parseAbi(['function ownerOf(uint256) view returns (address)']);
 const ZERO = '0x0000000000000000000000000000000000000000';
 
 /**
@@ -30,7 +31,7 @@ export async function noBidFlags(
   try {
     await client.readContract({
       address: token,
-      abi: ownerOfAbi,
+      abi: nounsTokenAbi,
       functionName: 'ownerOf',
       args: [nounId],
     });

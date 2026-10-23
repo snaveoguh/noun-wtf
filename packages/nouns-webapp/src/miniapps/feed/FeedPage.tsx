@@ -5,6 +5,8 @@ import Hls from 'hls.js';
 
 import { FeedSkeleton } from '@/components/Skeleton';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
+import { REST_API_BASE } from '@/lib/api';
+import { timeAgo } from '@/lib/format';
 
 // ─── Notification Sound (Web Audio API — no external file) ───────────────────
 
@@ -116,23 +118,11 @@ const TAB_LABELS: Record<FeedTab, string> = {
   lil: '/LIL',
 };
 
-const API_URL =
-  import.meta.env.VITE_API_URL || 'https://spirited-flexibility-production-3c30.up.railway.app';
-
 const fetchChannel = async (channel: string): Promise<FarcasterCast[]> => {
-  const res = await fetch(`${API_URL}/api/feed/${channel}`);
+  const res = await fetch(`${REST_API_BASE}/api/feed/${channel}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return data.casts ?? [];
-};
-
-const timeAgo = (timestamp: string) => {
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 };
 
 // ─── HLS Video Player ─────────────────────────────────────────────────────────
@@ -491,7 +481,9 @@ const CastCard: React.FC<{
           <span className="text-sm font-bold">{cast.author.display_name}</span>
           <span className="text-xs text-gray-400">@{cast.author.username}</span>
         </div>
-        <span className="ml-auto text-xs text-gray-400">{timeAgo(cast.timestamp)}</span>
+        <span className="ml-auto text-xs text-gray-400">
+          {timeAgo(cast.timestamp, { seconds: false, clamp: false })}
+        </span>
       </div>
 
       {/* Cast text */}

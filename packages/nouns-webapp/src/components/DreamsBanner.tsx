@@ -16,6 +16,8 @@ import ReactDOM from 'react-dom';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { API_BASE } from '@/lib/api';
+import { shortAddr } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,10 +63,6 @@ function traitName(filename: string): string {
     .replace(/^(body|accessory|head|glasses)-/, '')
     .replace(/-/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function shortenAddress(addr: string): string {
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 // Clamp a seed index to the valid range for a given image array. Some dreams
@@ -193,9 +191,7 @@ export function useDreams() {
   return useReactQuery({
     queryKey: ['probeDreams'],
     queryFn: async (): Promise<DreamCard[]> => {
-      const res = await fetch(
-        'https://spirited-flexibility-production-3c30.up.railway.app/api/dream-nouns?page=1&per_page=40',
-      );
+      const res = await fetch(`${API_BASE}/api/dream-nouns?page=1&per_page=40`);
       if (!res.ok) throw new Error(`Dreams API ${res.status}`);
       const json = await res.json();
       const dreams: DreamNoun[] = json.data || [];
@@ -471,7 +467,7 @@ const DreamModal: FC<{
         >
           Dreamer:{' '}
           <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
-            {shortenAddress(dream.dreamer)}
+            {shortAddr(dream.dreamer)}
           </span>
         </div>
 

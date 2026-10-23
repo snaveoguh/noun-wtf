@@ -1,16 +1,13 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import { useEffect, useState } from 'react';
 
+import { API_BASE, DEFAULT_API_BASE } from '@/lib/api';
 import { countByAddress, loadSettlerMaps } from '@/lib/settlerMaps';
-
-const API_BASE =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 /** Direct GraphQL fetch to Ponder */
 async function ponderQuery<T>(query: string): Promise<T> {
-  // Hardcode URL to avoid env var issues
-  const url = 'https://spirited-flexibility-production-3c30.up.railway.app';
+  // Always the production indexer, not the env override (avoids env var issues)
+  const url = DEFAULT_API_BASE;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

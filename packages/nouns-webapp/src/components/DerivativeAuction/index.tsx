@@ -12,6 +12,7 @@ import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEther } from 'viem';
 import { useAccount } from 'wagmi';
 
+import { shortAddr } from '@/lib/format';
 import {
   useDerivativeAuction,
   useCreateDerivativeBid,
@@ -34,8 +35,6 @@ const fmt = (wei: bigint): string => {
 };
 
 const MAX_BID_REASON_LENGTH = 280;
-
-const truncAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 const useCountdown = (endTime: number) => {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -121,7 +120,9 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontWeight: 700, color: '#22c55e' }}>SOLD</span>
           <span>{fmt(auction.amount)} ETH</span>
-          <span style={{ color: 'rgba(255,255,255,0.5)' }}>→ {truncAddr(auction.bidder)}</span>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+            → {shortAddr(auction.bidder, { sep: '…' })}
+          </span>
         </div>
         {auction.supportsBidReason && (
           <BidCommentThread tokenId={tokenId} isSettled={true} winnerAddress={auction.bidder} />
@@ -168,7 +169,7 @@ const DerivativeAuction: FC<Props> = ({ tokenId }) => {
           <span>
             <span style={{ fontWeight: 700 }}>{fmt(auction.amount)} ETH</span>
             <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
-              by {truncAddr(auction.bidder)}
+              by {shortAddr(auction.bidder, { sep: '…' })}
             </span>
           </span>
           <span style={{ color: '#fbbf24', fontWeight: 600 }}>{countdown}</span>

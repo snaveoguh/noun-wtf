@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { DEFAULT_API_BASE as API } from '@/lib/api';
+
 import styles from './Underground.module.css';
 
-const API = 'https://spirited-flexibility-production-3c30.up.railway.app';
 const TREASURY = '0xBAc9233725440c595b19d975309CC98cb259253a';
 
 // ── sections ────────────────────────────────────────────────────────────
@@ -430,7 +431,7 @@ cd packages/nouns-webapp
 cat > .env << 'EOF'
 VITE_CHAIN_ID=1
 VITE_MAINNET_JSONRPC=https://ethereum-rpc.publicnode.com
-VITE_MAINNET_SUBGRAPH=https://spirited-flexibility-production-3c30.up.railway.app
+VITE_MAINNET_SUBGRAPH=${API}
 EOF
 
 CI=true pnpm dev    # runs at localhost:5173`}</Code>

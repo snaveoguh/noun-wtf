@@ -6,6 +6,7 @@ import { formatEther } from 'viem';
 
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { API_BASE } from '@/lib/api';
 
 interface FundedProp {
   id: string;
@@ -257,10 +258,6 @@ const FundedPropModal: FC<{ prop: FundedProp; onClose: () => void }> = ({ prop, 
   );
 };
 
-const SUBGRAPH_URL =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
-
 /**
  * Scrolling banner of funded (EXECUTED) Nouns DAO proposals.
  * "Nouns World" — stories of what the DAO has funded.
@@ -278,7 +275,7 @@ const FundedPropsBanner: FC = () => {
 
   const fetchProps = useCallback(async () => {
     try {
-      const res = await fetch(SUBGRAPH_URL, {
+      const res = await fetch(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

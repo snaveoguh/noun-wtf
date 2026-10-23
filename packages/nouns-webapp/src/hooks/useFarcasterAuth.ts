@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { REST_API_BASE } from '@/lib/api';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface FarcasterUser {
@@ -21,12 +23,7 @@ const STORAGE_KEY = 'noun_wtf_farcaster_auth';
 const NEYNAR_LOGIN_URL = 'https://app.neynar.com/login';
 const NEYNAR_AUTH_ORIGIN = 'https://app.neynar.com';
 
-const NEYNAR_CLIENT_ID =
-  import.meta.env.VITE_NEYNAR_CLIENT_ID || '';
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+const NEYNAR_CLIENT_ID = import.meta.env.VITE_NEYNAR_CLIENT_ID || '';
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
@@ -110,7 +107,7 @@ export function useFarcasterAuth() {
   const publishCast = useCallback(
     async (text: string, opts?: { channel_id?: string; parent?: string }) => {
       if (!auth) throw new Error('Not authenticated');
-      const res = await fetch(`${API_URL}/api/farcaster/cast`, {
+      const res = await fetch(`${REST_API_BASE}/api/farcaster/cast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,7 +128,7 @@ export function useFarcasterAuth() {
   const react = useCallback(
     async (target: string, reaction_type: 'like' | 'recast') => {
       if (!auth) throw new Error('Not authenticated');
-      const res = await fetch(`${API_URL}/api/farcaster/reaction`, {
+      const res = await fetch(`${REST_API_BASE}/api/farcaster/reaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,7 +149,7 @@ export function useFarcasterAuth() {
   const unreact = useCallback(
     async (target: string, reaction_type: 'like' | 'recast') => {
       if (!auth) throw new Error('Not authenticated');
-      const res = await fetch(`${API_URL}/api/farcaster/reaction`, {
+      const res = await fetch(`${REST_API_BASE}/api/farcaster/reaction`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

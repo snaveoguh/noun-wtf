@@ -1,9 +1,9 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+import { API_BASE } from '@/lib/api';
+import { shortAddr } from '@/lib/format';
+
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || API_BASE;
 
 type GasAction =
   | 'bidding'
@@ -65,10 +65,6 @@ interface GasLeaderboardData {
 }
 
 type SortField = 'netGas' | 'totalGas' | 'refunds' | 'txCount';
-
-function shortenAddress(addr: string) {
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 function formatEth(eth: number) {
   if (eth >= 1)
@@ -510,7 +506,7 @@ const GasLeaderboardPage: FC = () => {
                       }}
                       title={entry.address}
                     >
-                      {ens || shortenAddress(entry.address)}
+                      {ens || shortAddr(entry.address)}
                     </a>
 
                     {/* Total Gas */}

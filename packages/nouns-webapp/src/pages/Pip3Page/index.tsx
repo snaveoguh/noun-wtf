@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import useModalBodyLock from '@/hooks/useModalBodyLock';
+import { API_BASE } from '@/lib/api';
 
 // ─── Giphy channel feed (no API key needed) ─────────────────────────────────
 
@@ -12,9 +13,6 @@ interface GifItem {
   w: number;
   h: number;
 }
-
-const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 async function fetchPage(offset: number): Promise<{ gifs: GifItem[]; hasNext: boolean }> {
   try {

@@ -1,11 +1,11 @@
 import { FC } from 'react';
 
-import { formatEther } from 'viem';
 import { ExternalLink, Landmark, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router';
 
 import NounPalette from '@/components/NounPalette';
 import ShortAddress from '@/components/ShortAddress';
+import { formatEth } from '@/lib/format';
 import { Address } from '@/utils/types';
 import { INounSeed } from '@/wrappers/nounToken';
 
@@ -21,19 +21,14 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
   nounId,
   seed: providedSeed,
 }) => {
-  const { traits, owner, auction, seed, isLoading } = useNounHoverData(
-    nounId,
-    providedSeed,
-  );
+  const { traits, owner, auction, seed, isLoading } = useNounHoverData(nounId, providedSeed);
 
   return (
     <div className="relative">
       {/* ── Header ── */}
       <div className="border-b-2 border-black px-3 py-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight">
-            Noun {nounId.toString()}
-          </h3>
+          <h3 className="text-base font-bold tracking-tight">Noun {nounId.toString()}</h3>
           <Link
             to={`/noun/${nounId}`}
             className="flex items-center gap-0.5 text-xs font-semibold text-red-600 no-underline hover:text-red-800"
@@ -44,8 +39,7 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
         </div>
         {owner && (
           <div className="mt-0.5 text-xs text-gray-500">
-            Held by{' '}
-            <ShortAddress address={owner as Address} />
+            Held by <ShortAddress address={owner as Address} />
           </div>
         )}
       </div>
@@ -84,20 +78,14 @@ export const NounHoverCardContent: FC<NounHoverCardContentProps> = ({
           ) : (
             <div className="flex items-center justify-between text-xs">
               <div>
-                <span className="font-mono text-xs uppercase text-gray-400">
-                  Winning Bid
-                </span>
+                <span className="font-mono text-xs uppercase text-gray-400">Winning Bid</span>
                 <br />
                 <span className="font-bold">
-                  {auction.amount
-                    ? `${parseFloat(formatEther(auction.amount)).toFixed(2)} ETH`
-                    : '--'}
+                  {auction.amount ? `${formatEth(auction.amount, 2)} ETH` : '--'}
                 </span>
               </div>
               <div className="text-right">
-                <span className="font-mono text-xs uppercase text-gray-400">
-                  Bids
-                </span>
+                <span className="font-mono text-xs uppercase text-gray-400">Bids</span>
                 <br />
                 <span className="font-semibold">{auction.bidCount}</span>
               </div>

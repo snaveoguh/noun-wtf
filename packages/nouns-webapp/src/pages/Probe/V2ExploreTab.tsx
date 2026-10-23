@@ -24,6 +24,7 @@ import { useReadContracts } from 'wagmi';
 import { getNoun } from '@/components/StandaloneNoun';
 import { TraitFilterPanel } from '@/components/TraitFilterPanel';
 import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
+import { shortAddr } from '@/lib/format';
 import { countByAddress, loadSettlerMaps } from '@/lib/settlerMaps';
 import { nounV2Path } from '@/utils/history';
 import useV2OnDisplayAuction from '@/wrappers/onDisplayAuctionV2';
@@ -51,11 +52,6 @@ interface V2Noun {
   image: string;
   owner: string; // '' when burned / unresolved
   burned: boolean;
-}
-
-function shortenAddress(addr: string): string {
-  if (addr === '' || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 /** Searchable address filter dropdown (Settler / Curated), mirrors the inline Owner one. */
@@ -99,7 +95,7 @@ function AddressFilterDropdown({
             : 'border-gray-200 bg-white text-gray-600'
         }`}
       >
-        {value !== '' ? shortenAddress(value) : label}
+        {value !== '' ? shortAddr(value, { minLength: 10 }) : label}
         {value !== '' ? (
           <XIcon
             size={12}
@@ -137,7 +133,7 @@ function AddressFilterDropdown({
                 }}
                 className="flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50"
               >
-                <span className="font-mono">{shortenAddress(addr)}</span>
+                <span className="font-mono">{shortAddr(addr, { minLength: 10 })}</span>
                 <span className="text-gray-400">{c}</span>
               </button>
             ))
@@ -393,7 +389,7 @@ const V2ExploreTab: FC = () => {
                 : 'border-gray-200 bg-white text-gray-600'
             }`}
           >
-            {ownerFilter !== '' ? shortenAddress(ownerFilter) : 'Owner'}
+            {ownerFilter !== '' ? shortAddr(ownerFilter, { minLength: 10 }) : 'Owner'}
             {ownerFilter !== '' ? (
               <XIcon
                 size={12}
@@ -431,7 +427,7 @@ const V2ExploreTab: FC = () => {
                     }}
                     className="flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50"
                   >
-                    <span className="font-mono">{shortenAddress(addr)}</span>
+                    <span className="font-mono">{shortAddr(addr, { minLength: 10 })}</span>
                     <span className="text-gray-400">{ownerCount}</span>
                   </button>
                 ))

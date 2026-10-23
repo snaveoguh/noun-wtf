@@ -23,10 +23,7 @@ import { useAccount, useReadContract } from 'wagmi';
 
 import TreasuryScene from '@/components/TreasuryFlow/Scene';
 import { nounsTokenAbi } from '@/contracts';
-
-const SUBGRAPH_URL =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+import { API_BASE } from '@/lib/api';
 
 const NOUNS_TOKEN_ADDRESS = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as const;
 const REQUIRED_NOUNS = 4n;
@@ -99,7 +96,7 @@ const WalletExplorer: FC = () => {
   const { data, isFetching, error } = useQuery<WalletMapResponse>({
     queryKey: ['wallet-map', paramIdentity],
     queryFn: async () => {
-      const r = await fetch(`${SUBGRAPH_URL}/api/wallet-map/${paramIdentity}`);
+      const r = await fetch(`${API_BASE}/api/wallet-map/${paramIdentity}`);
       if (!r.ok) throw new Error(`API ${r.status}`);
       return r.json();
     },

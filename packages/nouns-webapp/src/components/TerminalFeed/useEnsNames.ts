@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { API_BASE } from '@/lib/api';
 import { stripNoggles } from '@/utils/addressAndENSDisplayUtils';
-
-const API_BASE = import.meta.env.VITE_MAINNET_SUBGRAPH
-  || 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // Module-level cache shared across all hook instances
 const ensNameCache = new Map<string, string | null>();
@@ -25,7 +23,7 @@ async function resolveBatch() {
   try {
     const res = await fetch(`${API_BASE}/api/ens?addresses=${addrs.join(',')}`);
     if (!res.ok) return;
-    const { names } = await res.json() as { names: Record<string, string | null> };
+    const { names } = (await res.json()) as { names: Record<string, string | null> };
 
     for (const [addr, name] of Object.entries(names)) {
       // Strip `.noggles` namespace so the terminal feed never surfaces it.

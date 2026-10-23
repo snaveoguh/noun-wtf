@@ -1,15 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 
-const API_URL: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+import { REST_API_BASE } from '@/lib/api';
 
 const DASHBOARD_KEY: string =
   (import.meta.env.VITE_DASHBOARD_API_KEY as string | undefined) ||
   'ef468c49f5725aab5c9fb5ccb6e66874dca03eec6bf6b077989ff09da83b754d';
 
 function statsUrl(path: string, params?: Record<string, string>) {
-  const url = new URL(`${API_URL}${path}`);
+  const url = new URL(`${REST_API_BASE}${path}`);
   url.searchParams.set('key', DASHBOARD_KEY);
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);

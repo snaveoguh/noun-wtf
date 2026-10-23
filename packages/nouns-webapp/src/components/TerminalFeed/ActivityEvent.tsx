@@ -9,16 +9,11 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
 import ClientBadge from '@/components/ClientBadge';
+import { timeAgo } from '@/lib/format';
 import { getClientInfo } from '@/utils/clientRegistry';
 
 import AsciiImage from './AsciiImage';
-import {
-  describeEvent,
-  getEventDef,
-  getEventLink,
-  getExpandableText,
-  timeAgo,
-} from './eventRegistry';
+import { describeEvent, getEventDef, getEventLink, getExpandableText } from './eventRegistry';
 
 interface Props {
   event: ActivityEventType;
@@ -51,7 +46,7 @@ export default function ActivityEvent({ event, ensLookup, candidateTitleLookup }
   const def = getEventDef(event.type, data);
   const { color, label } = def;
   const description = describeEvent(event.type, data, ensLookup, candidateTitleLookup);
-  const age = timeAgo(event.timestamp);
+  const age = timeAgo(event.timestamp, { months: true });
   // Derived events (state transitions the indexer infers from block height —
   // voting started, objection period, ended…) have no tx of their own.
   const isDerived = !event.txHash;

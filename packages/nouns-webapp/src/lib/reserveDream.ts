@@ -10,12 +10,9 @@
 //   packages/nouns-api/src/agent/tipVerifier.ts     (verifies a MINED tip tx)
 //   packages/nouns-api/src/agent/traitPredictor.ts  (matchesTraits — substring/AND)
 
+import { REST_API_BASE } from '@/lib/api';
 import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
-
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // nounirl.eth — the agent wallet that receives reservation tips and settles
 // matching Nouns. Same address on every EVM chain. Mirrors NOUNIRL_ADDRESS on
@@ -89,7 +86,7 @@ export async function reserveDream(params: {
   dao?: ReserveDao;
   settleFor?: string;
 }): Promise<ReserveResult> {
-  const res = await fetch(`${API_BASE}/api/agent/reserve`, {
+  const res = await fetch(`${REST_API_BASE}/api/agent/reserve`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(params),

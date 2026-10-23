@@ -208,6 +208,7 @@ import {
   getCurrentTranscript,
 } from './engine/voip';
 import { useNounSeed, type INounSeed } from '@/wrappers/nounToken';
+import { REST_API_BASE } from '@/lib/api';
 import { useWorldStore } from './shared/useWorldStore';
 import { GlitchEntry } from './shared/GlitchEntry';
 import { TransitionOverlay } from './shared/TransitionOverlay';
@@ -2134,12 +2135,9 @@ export default function WorldPage() {
   // Poll /api/agent/predict for the NEXT noun that would be settled right now
   const [predictedSeed, setPredictedSeed] = useState<INounSeed | null>(null);
   useEffect(() => {
-    const apiUrl =
-      (import.meta.env.VITE_API_URL as string | undefined) ??
-      'https://spirited-flexibility-production-3c30.up.railway.app';
     const fetchPrediction = async () => {
       try {
-        const res = await fetch(`${apiUrl}/api/agent/predict`);
+        const res = await fetch(`${REST_API_BASE}/api/agent/predict`);
         if (res.ok) {
           const data = await res.json();
           // The watcher can be pointed at either DAO (NOUNIRL_WATCH_DAO); the

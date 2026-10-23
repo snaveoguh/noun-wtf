@@ -4,7 +4,8 @@ import { Link } from 'react-router';
 import { mainnet } from 'viem/chains';
 import { useReadContract } from 'wagmi';
 
-import { NOUNS_CONTRACT, NOUNS_TOKEN_ABI } from '@/lib/marketplace/nouns-marketplace';
+import { nounsTokenAbi } from '@/contracts';
+import { NOUNS_CONTRACT } from '@/lib/marketplace/nouns-marketplace';
 import { buildNounSvg, type NounSeed } from '@/lib/marketplace/nouns-svg';
 
 import { NounsBuyButton } from './NounsBuyButton';
@@ -13,7 +14,7 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
   // Fetch seed from the NounsToken contract
   const { data: seedData } = useReadContract({
     address: NOUNS_CONTRACT,
-    abi: NOUNS_TOKEN_ABI,
+    abi: nounsTokenAbi,
     functionName: 'seeds',
     args: [BigInt(noun.nounId)],
     chainId: mainnet.id,

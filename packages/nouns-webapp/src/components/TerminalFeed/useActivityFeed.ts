@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { API_BASE } from '@/lib/api';
+
 import { fixturesForFilter } from './feedFixtures';
 import { fetchIndexerHealth, isStale } from './indexerHealth';
 import { fetchV1ChainEvents } from './v1ChainFallback';
@@ -22,10 +24,6 @@ interface FeedState {
   /** Blocks the indexer is behind chain head, when stale enough to matter; else null. */
   indexerLag: number | null;
 }
-
-const API_BASE: string =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 const POLL_INTERVAL = 12_000; // 12 seconds (1 Ethereum block)
 const PAGE_SIZE = 50;

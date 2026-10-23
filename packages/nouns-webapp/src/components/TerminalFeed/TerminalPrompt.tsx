@@ -12,6 +12,7 @@ import {
   type ProposalDraftPrefill,
 } from '@/components/GameShell/openProposalDraft';
 import useActiveDao from '@/hooks/useActiveDao';
+import { API_BASE } from '@/lib/api';
 
 import { normalizeTerminalErrorMessage } from './errorMessages';
 import GovernanceActionConfirm from './GovernanceActionConfirm';
@@ -27,12 +28,6 @@ interface Props {
   onNewMessages: (userMsg: ChatMessage, assistantMsg: ChatMessage) => void;
   onError: (userMsg: ChatMessage, errorMsg: string) => void;
 }
-
-const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
-const API_BASE =
-  typeof apiBaseEnv === 'string' && apiBaseEnv.length > 0
-    ? apiBaseEnv
-    : 'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // Tailwind `md` breakpoint is 768px; treat anything below as mobile so we can
 // use a fixed-position overlay anchored above the on-screen keyboard.

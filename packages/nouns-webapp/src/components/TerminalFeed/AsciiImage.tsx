@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
+import { API_BASE } from '@/lib/api';
+
 interface AsciiPixel {
   ch: string;
   r: number;
@@ -17,10 +19,6 @@ interface Props {
   imageUrl: string;
   cols?: number;
 }
-
-const API_BASE =
-  (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
 
 // Module-level cache to avoid refetching
 const asciiCache = new Map<string, AsciiData>();

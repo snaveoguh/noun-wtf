@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { isAddress } from 'viem';
 
-const API_BASE =
-  import.meta.env.VITE_MAINNET_SUBGRAPH ||
-  'https://spirited-flexibility-production-3c30.up.railway.app';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Fetches noun IDs owned by a given address.
