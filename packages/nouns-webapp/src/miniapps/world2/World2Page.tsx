@@ -63,8 +63,8 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
   { k: 'B', v: 'map' },
-  { k: 'M / .', v: 'radio (NOUN FM from the van, off), next track' },
-  { k: 'E (in the van)', v: 'NOUN FM decks: queue a track, book a DJ set' },
+  { k: 'M / .', v: 'radio (COMMUNITY RADIO, NOUN BEATS, off), next track' },
+  { k: 'E (in the van)', v: 'COMMUNITY RADIO decks: queue a track, book a DJ set' },
   {
     k: 'E (cab door)',
     v: 'drive the ice cream van: W/S gas, brake, A/D steer, SPACE drift, SHIFT boost, H horn, R flip, E out',
@@ -690,7 +690,10 @@ function Hud({
           data-w2hud="toasts"
           className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2"
         >
-          <span>📻 NOW PLAYING{hud.radio.label.startsWith('NOUN FM') ? ' ON NOUN FM' : ''}</span>
+          <span>
+            📻 NOW PLAYING
+            {hud.radio.label.startsWith('COMMUNITY RADIO') ? ' ON COMMUNITY RADIO' : ''}
+          </span>
           <b>{hud.radio.label}</b>
         </div>
       )}
@@ -726,7 +729,7 @@ function Hud({
           onClick={onFm}
           data-fm="open"
         >
-          NOUN FM DECKS — {touch ? 'TAP' : 'E / tap'}
+          COMMUNITY RADIO DECKS — {touch ? 'TAP' : 'E / tap'}
         </button>
       )}
 

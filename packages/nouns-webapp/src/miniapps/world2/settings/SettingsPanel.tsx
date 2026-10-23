@@ -155,7 +155,7 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
             onChange={v => setAudio({ sfx: v }, true)}
           />
           <Slider
-            name="Radio / NOUN FM"
+            name="Radio / COMMUNITY RADIO"
             value={a.radio}
             fmt={label}
             onChange={v => setAudio({ radio: v }, false)}

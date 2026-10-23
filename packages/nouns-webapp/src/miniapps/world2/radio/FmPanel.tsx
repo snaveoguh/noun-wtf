@@ -746,7 +746,7 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
       onPointerDown={e => e.stopPropagation()}
     >
       <div className="flex items-center gap-2">
-        <div className="w2-fm-logo">NOUN FM</div>
+        <div className="w2-fm-logo">COMMUNITY RADIO</div>
         <div className="text-[10px] opacity-60">
           live from the ice cream van{view.offline ? ' · offline (local station)' : ''}
         </div>

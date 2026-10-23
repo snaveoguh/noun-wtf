@@ -624,7 +624,7 @@ function bellowsMaterial(text: boolean): THREE.MeshStandardMaterial {
   });
 }
 
-/** The glowing "NOUN FM ⌐◨-◨" sign behind the decks. */
+/** The glowing "COMMUNITY RADIO ⌐◨-◨" sign behind the decks (the station; the van livery stays NOUN FM). */
 function signMaterial(): THREE.MeshStandardMaterial {
   const t = canvasTex(512, 160, (g, w, h) => {
     g.fillStyle = '#111619';
@@ -633,10 +633,11 @@ function signMaterial(): THREE.MeshStandardMaterial {
     g.lineWidth = 10;
     g.strokeRect(8, 8, w - 16, h - 16);
     g.fillStyle = '#ffd400';
-    g.font = 'italic 900 86px Arial, sans-serif';
+    g.font = 'italic 900 50px Arial, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText('NOUN FM', w / 2 - 50, h / 2 + 4);
+    g.fillText('COMMUNITY', w / 2 - 70, h / 2 - 22);
+    g.fillText('RADIO', w / 2 - 70, h / 2 + 30);
     // noggles
     g.fillStyle = '#d22209';
     g.fillRect(392, 58, 26, 40);
