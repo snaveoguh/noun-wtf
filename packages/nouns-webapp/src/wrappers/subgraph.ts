@@ -1,70 +1,9 @@
-import { ApolloClient, ApolloLink, gql, HttpLink, InMemoryCache } from '@apollo/client';
-
-import {
-  clearUnavailableSubgraphUrl,
-  getSubgraphRequestUrls,
-  markSubgraphUrlUnavailable,
-} from '@/lib/subgraphSettings';
+import { gql } from '@/lib/gql';
 import { BigNumberish } from '@/utils/types';
 
-export const clientFactory = (uri: string) => {
-  // patch BigInt JSON serialization (runs once)
-  if (
-    typeof BigInt !== 'undefined' &&
-    !(BigInt.prototype as unknown as { toJSON?: () => string }).toJSON
-  ) {
-    (BigInt.prototype as unknown as { toJSON?: () => string }).toJSON = function () {
-      return this.toString();
-    };
-  }
-
-  // scrub nested BigInts even before cache
-  const scrubBigIntLink = new ApolloLink((operation, forward) =>
-    forward(operation)!.map(result =>
-      JSON.parse(JSON.stringify(result, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))),
-    ),
-  );
-
-  const fetchWithFallback: typeof fetch = async (_input, init) => {
-    const requestUrls = getSubgraphRequestUrls();
-    const urls = requestUrls.length > 0 ? requestUrls : [uri];
-    let lastError: Error | null = null;
-
-    for (const [index, url] of urls.entries()) {
-      try {
-        const response = await fetch(url, init);
-        if (!response.ok) {
-          throw new Error(`Subgraph request failed: HTTP ${response.status}`);
-        }
-
-        clearUnavailableSubgraphUrl(url);
-        return response;
-      } catch (error) {
-        markSubgraphUrlUnavailable(url);
-        lastError = error instanceof Error ? error : new Error('Subgraph request failed');
-
-        if (index === urls.length - 1) {
-          throw lastError;
-        }
-      }
-    }
-
-    throw lastError ?? new Error('Subgraph request failed');
-  };
-
-  return new ApolloClient({
-    link: ApolloLink.from([scrubBigIntLink, new HttpLink({ uri, fetch: fetchWithFallback })]),
-    cache: new InMemoryCache(),
-    defaultOptions: {
-      watchQuery: {
-        fetchPolicy: 'cache-and-network',
-      },
-      query: {
-        fetchPolicy: 'network-only',
-      },
-    },
-  });
-};
+// GraphQL documents for the Ponder API. Run them with `execute()` from
+// `@/subgraphs/execute` (imperatively / inside a TanStack `queryFn`) or with
+// the `useSubgraphQuery` hook.
 
 export interface IBid {
   id: string;

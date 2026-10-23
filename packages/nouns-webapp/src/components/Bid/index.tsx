@@ -1,15 +1,16 @@
 import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { Trans, useLingui } from '@lingui/react/macro';
-import { Button, Col, FormControl, Spinner } from 'react-bootstrap';
+import { Col, FormControl, Spinner } from 'react-bootstrap';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
 import { useWaitForTransactionReceipt } from 'wagmi';
 
+import BsButton from '@/components/BsButton';
 import { NOUN_WTF_CLIENT_ID } from '@/config';
-import useDaoContext from '@/hooks/useDaoContext';
 import { useAppSelector } from '@/hooks';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
+import useDaoContext from '@/hooks/useDaoContext';
 import {
   useDaoCreateBidWriter,
   useDaoMinBidIncrementPercentage,
@@ -82,13 +83,13 @@ const Bid: React.FC<BidProps> = props => {
   // subsequent bids the min increment rule takes over. v2 defaults to 0.
   const reservePriceRaw = useDaoReservePrice(dao);
   const reservePrice = reservePriceRaw ?? 0n;
-  const currentBidAmount =
-    auction.amount !== undefined ? BigInt(auction.amount.toString()) : 0n;
+  const currentBidAmount = auction.amount !== undefined ? BigInt(auction.amount.toString()) : 0n;
   const incrementMin = computeMinimumNextBid(currentBidAmount, minBidIncPercentage);
   // On a fresh auction (no qualifying bid yet) the effective floor is the
   // reserve price. Once someone bids, the increment rule kicks in. We take
   // whichever is larger so we never advertise a sub-reserve minimum.
-  const minBid = currentBidAmount === 0n && reservePrice > incrementMin ? reservePrice : incrementMin;
+  const minBid =
+    currentBidAmount === 0n && reservePrice > incrementMin ? reservePrice : incrementMin;
 
   const {
     writeContract: placeBid,
@@ -251,18 +252,17 @@ const Bid: React.FC<BidProps> = props => {
           {/* Bottom row: VIEW ALL BIDS left, BID button right */}
           <div className={classes.bidActionRow}>
             {bottomLeft}
-            {/* @ts-expect-error TS2590: react-bootstrap Button union type too complex */}
-            <Button className={classes.bidBtn} onClick={placeBidHandler} disabled={isDisabled}>
+            <BsButton className={classes.bidBtn} onClick={placeBidHandler} disabled={isDisabled}>
               {isPlacingBid ? <Spinner animation="border" size="sm" /> : <Trans>Bid</Trans>}
-            </Button>
+            </BsButton>
           </div>
         </>
       ) : (
         <>
           <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
-            <Button className={classes.bidBtnAuctionEnded} onClick={crytalBallBtnOnClickHandler}>
+            <BsButton className={classes.bidBtnAuctionEnded} onClick={crytalBallBtnOnClickHandler}>
               <Trans>Pick the next Noun</Trans> 🥽
-            </Button>
+            </BsButton>
           </Col>
           {/* User-driven settle: visible only while the auction is ended-but-
               unsettled. Reuses `useDaoSettleWriter` so the same primary button
@@ -270,7 +270,7 @@ const Bid: React.FC<BidProps> = props => {
               the underlying hook picks the right contract from `useDaoContext`. */}
           {isWalletConnected && !auction.settled && (
             <Col lg={12} className={classes.voteForNextNounBtnWrapper}>
-              <Button
+              <BsButton
                 className={classes.bidBtnAuctionEnded}
                 onClick={settleAuctionHandler}
                 disabled={isSettlingAuction}
@@ -280,7 +280,7 @@ const Bid: React.FC<BidProps> = props => {
                 ) : (
                   <Trans>Settle auction</Trans>
                 )}
-              </Button>
+              </BsButton>
             </Col>
           )}
         </>
