@@ -34,7 +34,8 @@ export const HOME_CSS = `
 .nh.is-scrolled .nh-head{background:rgba(7,7,10,.88);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
   box-shadow:0 1px 0 rgba(255,255,255,.06),0 12px 30px rgba(0,0,0,.4)}
 .nh-brand{display:flex;align-items:baseline;gap:9px;color:var(--tx);text-decoration:none;flex-shrink:0}
-.nh-wordmark{font-size:27px;line-height:1;letter-spacing:.02em;color:var(--tx);text-shadow:2px 2px 0 #1c1c20,3px 3px 0 #111114}
+.nh-wordmark{font-size:14px;line-height:1;letter-spacing:.06em;color:#34343b;text-shadow:none;transition:color .2s ease}
+.nh-brand:hover .nh-wordmark,.nh-brand:focus-visible .nh-wordmark{color:#5a5a63}
 .nh-nav{display:flex;gap:2px;flex:1;min-width:0}
 .nh-nav button{border:0;background:none;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;color:rgba(244,242,234,.78);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s}
 .nh-nav button:hover{color:#fff;background:rgba(255,255,255,.08)}
@@ -86,7 +87,7 @@ export const HOME_CSS = `
 @media (max-width:760px){
   .nh{--hh:60px;--cw:clamp(118px,33vw,150px)}
   .nh-head{padding:0 12px 0 72px;gap:10px}
-  .nh-wordmark{font-size:22px}
+  .nh-wordmark{font-size:12px}
   .nh-ask{width:auto;position:static}
   .nh-ask-toggle{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;border:0;background:rgba(12,12,16,.6);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);cursor:pointer}
