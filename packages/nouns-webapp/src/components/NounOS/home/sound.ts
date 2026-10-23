@@ -189,13 +189,14 @@ export function ident(soft = false): void {
   const c = ctx;
   if (!o || !c) return;
   const t0 = c.currentTime + 0.05;
-  const tu = t0 + (soft ? 0 : 0.18);
-  const dum = tu + 0.44;
+  // timed to the intro: tu as the lenses swing open, DUM as the pupils snap in
+  const tu = t0 + (soft ? 0 : 0.36);
+  const dum = tu + (soft ? 0.44 : 1.38);
 
   // tu: tight kick + muted stab + a vinyl tick
-  kick(c, o.dry, tu, 160, 55, 0.22, 0.7);
-  stab(c, o.dry, tu, [hz(53), hz(60), hz(63)], 0.16, 0.08, [1400, 300]);
-  noiseHit(c, o.dry, tu - 0.02, 0.03, 0.15, 'highpass', 5000);
+  kick(c, o.dry, tu, 110, 38, 0.3, 0.75);
+  stab(c, o.dry, tu, [hz(41), hz(48), hz(51)], 0.24, 0.08, [900, 220]);
+  noiseHit(c, o.dry, tu - 0.02, 0.04, 0.12, 'highpass', 2600);
 
   // DUM: sub drop with warmth, Fm9 stab, snare-ish crack, crackle bed
   const sub = c.createOscillator();
@@ -203,19 +204,19 @@ export function ident(soft = false): void {
   const shaper = c.createWaveShaper();
   shaper.curve = warmCurve(2.2);
   sub.type = 'sine';
-  sub.frequency.setValueAtTime(98, dum);
-  sub.frequency.exponentialRampToValueAtTime(41, dum + 0.9);
+  sub.frequency.setValueAtTime(65, dum);
+  sub.frequency.exponentialRampToValueAtTime(30, dum + 1.4);
   subG.gain.setValueAtTime(0.0001, dum);
   subG.gain.exponentialRampToValueAtTime(0.95, dum + 0.01);
-  subG.gain.exponentialRampToValueAtTime(0.0001, dum + 1.7);
+  subG.gain.exponentialRampToValueAtTime(0.0001, dum + 2.6);
   sub.connect(shaper).connect(subG).connect(o.dry);
   sub.start(dum);
-  sub.stop(dum + 1.8);
+  sub.stop(dum + 2.7);
 
-  // F2 Ab3 C4 Eb4 G4: F minor 9, low and warm
-  stab(c, o.dry, dum, [hz(41), hz(56), hz(60), hz(63), hz(67)], 1.6, 0.11, [2600, 420]);
-  noiseHit(c, o.dry, dum, 0.18, 0.22, 'bandpass', 1800, 0.8);
-  noiseHit(c, o.dry, dum, 1.4, 0.035, 'bandpass', 3200, 0.5);
+  // F1 Ab2 C3 Eb3 G3: F minor 9 an octave down, dark and warm
+  stab(c, o.dry, dum, [hz(29), hz(44), hz(48), hz(51), hz(55)], 2.4, 0.12, [1500, 260]);
+  noiseHit(c, o.dry, dum, 0.24, 0.2, 'bandpass', 800, 0.8);
+  noiseHit(c, o.dry, dum, 2.0, 0.035, 'bandpass', 1500, 0.5);
 }
 
 /** Hover stingers for the hero, one per game. */

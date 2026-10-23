@@ -1,10 +1,11 @@
-// The noun.wtf ident: noggles unfold on black (lenses swing open from the
-// bridge, the arm flicks out, the eyes snap in), then the camera dives
-// through the right lens into the homescreen. Under 2 s, once per browser
-// session, skippable with any click or key. Reduced motion: no fold, just a
-// short fade of the still noggles.
+// The noun.wtf ident, Netflix style: the canonical noggles alone on black.
+// The red frame slams in pixel by pixel (the "tu"), the eyes punch in (the
+// "DUM"), a glint runs across, then red light streaks rush out as the camera
+// dives into the right pupil and through to the homescreen. About 5.5 s,
+// once per browser session, skippable with any click or key. Reduced
+// motion: a short fade of the still noggles.
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -13,7 +14,7 @@ import { cx } from '../osStore';
 import { ident } from './sound';
 
 export const INTRO_KEY = 'nounwtf-intro-v1';
-const DURATION = 1850;
+const DURATION = 5550;
 const REDUCED = 700;
 
 export function shouldPlayIntro(): boolean {
@@ -27,16 +28,19 @@ export function shouldPlayIntro(): boolean {
   }
 }
 
-/** One lens: a red frame, white on the left, black pupil on the right. */
-function Lens() {
-  return (
-    <svg viewBox="0 0 8 6" className="nh-lens" shapeRendering="crispEdges" aria-hidden>
-      <rect width="8" height="6" fill="var(--nog)" />
-      <rect x="1" y="1" width="6" height="4" fill="#fff" />
-      <rect className="nh-pupil" x="4" y="1" width="3" height="4" fill="#000" />
-    </svg>
-  );
-}
+// Pixel-for-pixel the real noggles (nouns-assets glasses-square-red, 16x5):
+// R = frame (#f3322c), W = white, B = pupil, . = empty.
+const NOGGLES = [
+  '...RRRRRR.RRRRRR',
+  '...RWWBBR.RWWBBR',
+  'RRRRWWBBRRRWWBBR',
+  'R..RWWBBR.RWWBBR',
+  'R..RWWBBR.RWWBBR',
+];
+const PIXELS = NOGGLES.flatMap((row, y) =>
+  [...row].flatMap((k, x) => (k === '.' ? [] : [{ x, y, k }])),
+);
+const STREAKS = Array.from({ length: 24 }, (_, i) => i);
 
 export default function Intro({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
@@ -92,27 +96,21 @@ export default function Intro({ onDone }: { onDone: () => void }) {
       }}
       role="presentation"
     >
+      <div className="nh-intro-streaks" aria-hidden>
+        {STREAKS.map(i => (
+          <i key={i} style={{ '--i': i } as CSSProperties} />
+        ))}
+      </div>
       <div className="nh-intro-stage">
-        <div className="nh-nog" aria-label="noun.wtf">
-          <span className="nh-nog-arm">
-            <svg viewBox="0 0 4 4" shapeRendering="crispEdges" aria-hidden>
-              <rect x="0" y="0" width="4" height="1" fill="var(--nog)" />
-              <rect x="0" y="0" width="1" height="3" fill="var(--nog)" />
-            </svg>
-          </span>
-          <span className="nh-nog-l">
-            <Lens />
-          </span>
-          <span className="nh-nog-bridge">
-            <svg viewBox="0 0 2 1" shapeRendering="crispEdges" aria-hidden>
-              <rect width="2" height="1" fill="var(--nog)" />
-            </svg>
-          </span>
-          <span className="nh-nog-r">
-            <Lens />
-          </span>
+        <div className="nh-nog" role="img" aria-label="noun.wtf">
+          {PIXELS.map(({ x, y, k }) => (
+            <i
+              key={`${x}-${y}`}
+              className={`is-${k}`}
+              style={{ gridColumn: x + 1, gridRow: y + 1, '--x': x, '--y': y } as CSSProperties}
+            />
+          ))}
         </div>
-        <div className="nh-intro-word">NOUN.WTF</div>
       </div>
       <span className="nh-intro-skip">click or press any key to skip</span>
     </div>,

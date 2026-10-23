@@ -184,10 +184,9 @@ export default function AgentHome({
           }}
           aria-label="noun.wtf home"
         >
-          <span className="nh-brand-nog" aria-hidden>
-            ⌐◨-◨
+          <span className="nh-wordmark" data-keep-font>
+            NOUN.WTF
           </span>
-          <span className="nh-wordmark">NOUN.WTF</span>
         </a>
         <nav className="nh-nav" aria-label="Sections">
           {JUMPS.map(([id, label]) => (
