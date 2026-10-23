@@ -172,3 +172,23 @@ describe('HUD stylesheet', () => {
     expect(hudCss(s)).toContain('[data-w2hud="missions"]{display:none!important}');
   });
 });
+
+describe('voices', () => {
+  it('real voices default to auto with callouts on and clean mode off', () => {
+    const d = defaultSettings(false);
+    expect(d.voices).toBe('auto');
+    expect(d.callouts).toBe(true);
+    expect(d.cleanVoices).toBe(false);
+  });
+
+  it('junk voice settings fall back; good ones stick', () => {
+    const s = sanitize({ v: 1, voices: 'loud', callouts: 'yes', cleanVoices: 1 });
+    expect(s.voices).toBe('auto');
+    expect(s.callouts).toBe(true);
+    expect(s.cleanVoices).toBe(false);
+    settings.update({ voices: 'off', cleanVoices: true });
+    settings._reload();
+    expect(settings.get().voices).toBe('off');
+    expect(settings.get().cleanVoices).toBe(true);
+  });
+});

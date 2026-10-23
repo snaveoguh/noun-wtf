@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { createPortal } from 'react-dom';
 
 import { npcVoice } from '../audio/voice/cast';
+import { PIPER_MODEL_BYTES } from '../audio/voice/ttsVoice';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
 import { resetHudPositions } from '../ui/HudDrag';
@@ -27,6 +28,7 @@ import {
   LOOK_SENS_MAX,
   LOOK_SENS_MIN,
   QUALITIES,
+  VOICE_MODES,
   bootedQuality,
   settings,
   type AudioLevels,
@@ -179,6 +181,40 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
           />
         </Section>
 
+        <Section title="VOICES">
+          <Choice
+            name="Real character voices"
+            options={VOICE_MODES}
+            value={s.voices}
+            onChange={m => {
+              settings.update({ voices: m });
+              // Picked by hand: load now (the click is the opt-in), then say hello
+              game.unlockAudio();
+              if (m !== 'off' && game.realVoicesOn()) {
+                game.tts.load();
+                void game.tts
+                  .whenReady()
+                  .then(() =>
+                    game.voice.speak({ text: 'Hello there.', voice: npcVoice('oracle') }),
+                  );
+              }
+            }}
+          />
+          <VoiceStatus game={game} />
+          <div className="grid grid-cols-2 gap-1.5">
+            <Toggle
+              name="Rider callouts"
+              on={s.callouts}
+              onClick={() => settings.update({ callouts: !s.callouts })}
+            />
+            <Toggle
+              name="Clean mode"
+              on={s.cleanVoices}
+              onClick={() => settings.update({ cleanVoices: !s.cleanVoices })}
+            />
+          </div>
+        </Section>
+
         <Section title="HUD">
           <div className="grid grid-cols-2 gap-1.5">
             {HUD_ITEMS.map(h => (
@@ -276,6 +312,34 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Where the real voices are: off, waiting, downloading, ready or failed. */
+function VoiceStatus({ game }: { game: Game }) {
+  const st = useSyncExternalStore(game.tts.subscribe.bind(game.tts), game.tts.getStatus);
+  useSettings(); // re-render on a mode change
+  const mb = (b: number) => `${Math.round(b / 1e6)} MB`;
+  let text: string;
+  if (!game.realVoicesOn())
+    text =
+      game.voiceMode === 'off'
+        ? 'Off: characters babble.'
+        : `Babble on this device. Pick "on" for real voices (${mb(PIPER_MODEL_BYTES)} download, once).`;
+  else if (st.state === 'idle')
+    text = `Real voices load the first time someone speaks (${mb(PIPER_MODEL_BYTES)}, once, then cached).`;
+  else if (st.state === 'loading')
+    text =
+      st.total > 0
+        ? `Downloading voices… ${Math.round((st.loaded / st.total) * 100)}% of ${mb(st.total)}`
+        : 'Loading voices…';
+  else if (st.state === 'ready')
+    text = `Real voices ready${st.cached ? ' (cached)' : ''}: every Noun has their own.`;
+  else text = `Voices failed to load (${st.error}). Babbling instead.`;
+  return (
+    <p className="text-xs opacity-70" data-w2voices={st.state}>
+      {text} Piper neural TTS, runs on your device.
+    </p>
   );
 }
 

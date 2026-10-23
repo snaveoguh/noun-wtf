@@ -398,6 +398,8 @@ export class StatsTracker {
   mine: MyBests = loadBests();
   /** A proved record the server answered (saved, or refused: shown, never silent). */
   onRecord?: (e: RecordEvent) => void;
+  /** A best just went up on this device (the rider's "new record" callout). */
+  onRaise?: (k: BestKey, v: number, prev: number | undefined) => void;
   /** Dev / test only: post even though the game is offline. */
   devLive = false;
   /** Extra fields for every post (missions: see missions/MissionSystem). */
@@ -589,8 +591,10 @@ export class StatsTracker {
       // Post soon, while the proof is fresh
       this.flushAcc = Math.max(this.flushAcc, 17);
     }
+    const prev = this.mine.best[k];
     this.mine.best[k] = v;
     this.dirty = true;
+    this.onRaise?.(k, v, prev);
     return true;
   }
 

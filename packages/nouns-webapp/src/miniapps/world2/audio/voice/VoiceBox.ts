@@ -14,8 +14,21 @@
 // Recorded lines: `files` maps a line id to an audio URL. If a line has one,
 // it plays the file instead of babbling (and the typewriter stretches to the
 // file's length, see `speak`). Nothing ships with files yet.
+//
+// Real voices: when `realVoice()` hands back a TtsEngine (the player has them
+// on), a line is spoken by the neural voice for that character instead
+// (ttsVoice.ts: speaker + pitch + pace from their seed). The whole line is
+// synthesized up front, then the typewriter is stretched to the audio's
+// length so letters land roughly with the words. While the model loads, or if
+// a line takes too long or fails, the babble plays as before.
 
+import type { TtsEngine } from './TtsEngine';
+
+import { pitchFactor, ttsVoiceOf, type TtsVoice } from './ttsVoice';
 import { syllablePlan, VOWELS, type Plan, type VoiceParams } from './voiceParams';
+
+/** How long a line waits for its synthesis before babbling instead (ms). */
+const TTS_WAIT_MS = 2200;
 
 export interface VoiceLine {
   text: string;
@@ -24,6 +37,8 @@ export interface VoiceLine {
   lineId?: string;
   /** Extra gain for this line (distance falloff etc.). */
   gain?: number;
+  /** Real voice override (default: derived from `voice`). */
+  tts?: TtsVoice;
 }
 
 export interface VoiceHandle {
@@ -41,15 +56,22 @@ export interface VoiceLog {
   lines: number;
   syllables: number;
   files: number;
+  /** Lines spoken with a real voice, and the last one's audio length (s). */
+  tts: number;
+  ttsDur: number;
   last: string;
 }
 
 export class VoiceBox {
   /** lineId → audio URL. A line with a file plays it instead of babbling. */
   readonly files = new Map<string, string>();
-  readonly log: VoiceLog = { lines: 0, syllables: 0, files: 0, last: '' };
+  readonly log: VoiceLog = { lines: 0, syllables: 0, files: 0, tts: 0, ttsDur: 0, last: '' };
+  /** Real voices: the engine when the player has them on (null: babble). */
+  realVoice: (() => TtsEngine | null) | null = null;
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
   private live = new Set<VoiceHandle>();
+  /** Real voices: when each speaker finishes their current line (ctx time), so nobody talks over themselves. */
+  private until = new Map<number, number>();
 
   constructor(
     private ctx: () => AudioContext | null,
@@ -66,6 +88,11 @@ export class VoiceBox {
     if (ctx === null || out === null || ctx.state === 'closed') return h;
     const url = line.lineId !== undefined ? this.files.get(line.lineId) : undefined;
     if (url !== undefined) return this.playFile(ctx, out, url, h, line);
+    const eng = this.realVoice?.() ?? null;
+    if (eng !== null) {
+      if (eng.ready) return this.playTts(ctx, out, eng, h, line);
+      eng.load(); // first time: start the download, babble meanwhile
+    }
     return this.babble(ctx, out, plan, line, h);
   }
 
@@ -213,6 +240,128 @@ export class VoiceBox {
     this.log.syllables += plan.syllables.length;
     this.log.last = line.text.slice(0, 60);
     return h;
+  }
+
+  private playTts(
+    ctx: AudioContext,
+    out: AudioNode,
+    eng: TtsEngine,
+    h: VoiceHandle,
+    line: VoiceLine,
+  ): VoiceHandle {
+    const tv = line.tts ?? ttsVoiceOf(line.voice);
+    let stopped = false;
+    let settled = false;
+    this.live.add(h);
+    h.stop = () => {
+      stopped = true;
+      this.live.delete(h);
+    };
+    const fallback = () => {
+      settled = true;
+      this.live.delete(h);
+      if (!stopped) this.babble(ctx, out, h.plan, line, h);
+    };
+    const cached = eng.peek(line.text, tv);
+    if (cached !== null) {
+      this.playBuffer(ctx, out, cached, tv, h, line);
+      return h;
+    }
+    // Hold the typewriter until the voice starts
+    h.startedAt = Infinity;
+    const timer = setTimeout(() => {
+      if (!settled) fallback();
+    }, TTS_WAIT_MS);
+    void eng.synth(ctx, line.text, tv, 'now').then(buf => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (stopped) return;
+      if (buf === null) return fallback();
+      this.playBuffer(ctx, out, buf, tv, h, line);
+    });
+    return h;
+  }
+
+  /** Play a synthesized line: pitch-shifted, plus the Twins' unison and the Oracle's echo. */
+  private playBuffer(
+    ctx: AudioContext,
+    out: AudioNode,
+    buf: AudioBuffer,
+    tv: TtsVoice,
+    h: VoiceHandle,
+    line: VoiceLine,
+  ) {
+    const dur = buf.duration / pitchFactor(tv.pitch);
+    const t0 = Math.max(ctx.currentTime + 0.02, this.until.get(tv.speaker) ?? 0);
+    const end = t0 + dur + 0.15;
+    this.until.set(tv.speaker, end);
+    const master = ctx.createGain();
+    master.gain.value = Math.max(0, Math.min(1.5, 0.95 * (line.gain ?? 1)));
+    master.connect(out);
+    const nodes: AudioNode[] = [master];
+    const srcs: AudioBufferSourceNode[] = [];
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.detune.value = tv.pitch;
+    src.connect(master);
+    srcs.push(src);
+    if (tv.unison > 0) {
+      const g2 = ctx.createGain();
+      g2.gain.value = 0.55;
+      const s2 = ctx.createBufferSource();
+      s2.buffer = buf;
+      s2.detune.value = tv.pitch + tv.unison;
+      // (detune resamples, so the higher twin runs a touch ahead: two people, not a chorus)
+      s2.connect(g2).connect(master);
+      nodes.push(g2);
+      srcs.push(s2);
+    }
+    let tail = 0.05;
+    if (tv.echo > 0) {
+      const dl = ctx.createDelay(0.5);
+      dl.delayTime.value = 0.13;
+      const fb = ctx.createGain();
+      fb.gain.value = 0.45;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.35 * tv.echo;
+      master.connect(dl);
+      dl.connect(fb).connect(dl);
+      dl.connect(wet).connect(out);
+      nodes.push(dl, fb, wet);
+      tail = 0.9;
+    }
+    for (const s of srcs) s.start(t0);
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      this.live.delete(h);
+      for (const n of nodes) n.disconnect();
+      for (const s of srcs) s.disconnect();
+    };
+    src.onended = () => setTimeout(cleanup, tail * 1000);
+    h.startedAt = t0;
+    h.stretch = h.plan.total > 0 ? Math.max(0.25, Math.min(4, dur / h.plan.total)) : 1;
+    h.stop = () => {
+      if (done) return;
+      const now = ctx.currentTime;
+      if (this.until.get(tv.speaker) === end) this.until.set(tv.speaker, now);
+      master.gain.cancelScheduledValues(now);
+      master.gain.setTargetAtTime(0, now, 0.02);
+      for (const s of srcs) {
+        try {
+          s.stop(now + 0.1);
+        } catch {
+          // not started
+        }
+      }
+      setTimeout(cleanup, 250);
+    };
+    this.live.add(h);
+    this.log.tts++;
+    this.log.ttsDur = Math.round(dur * 100) / 100;
+    this.log.last = line.text.slice(0, 60);
   }
 
   private playFile(

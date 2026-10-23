@@ -1,0 +1,89 @@
+// ── Real voices: which Piper speaker a character gets, and how they talk ──
+//
+// Pure (no WebAudio, no worker). The neural voice is Piper's LibriTTS-R
+// "medium" model (MIT code, CC-BY-4.0 data): one 78 MB ONNX file holding 904
+// different speakers. Every character's voice already comes from their Noun
+// seed (voiceParams.deriveVoice); this maps that to a speaker id plus a pitch
+// and pace, so the same Noun always sounds the same and two Nouns almost
+// never share a voice (904 speakers × pitch × pace).
+//
+// Pitch is shifted at playback (the buffer's detune), which also speeds the
+// clip up by the same factor, so synthesis is slowed by that factor first
+// (Piper's length_scale): the pitch moves, the pace stays what we asked for.
+
+import { hashSeed, type VoiceParams } from './voiceParams';
+
+/** The model: Piper en_US LibriTTS-R medium, pinned to a revision of rhasspy/piper-voices. */
+export const PIPER_REV = '5041a7a49ae5b3a0f30e6837769eb03fdbb231bd';
+const PIPER_BASE = `https://huggingface.co/rhasspy/piper-voices/resolve/${PIPER_REV}/en/en_US/libritts_r/medium/en_US-libritts_r-medium.onnx`;
+export const PIPER_MODEL_URL = PIPER_BASE;
+export const PIPER_CONFIG_URL = `${PIPER_BASE}.json`;
+/** Size of the model download (bytes), for the settings panel before it's fetched. */
+export const PIPER_MODEL_BYTES = 78_580_914;
+/** Speakers in the model (ids 0..903). */
+export const SPEAKERS = 904;
+
+export interface TtsVoice {
+  /** Piper speaker id. */
+  speaker: number;
+  /** Playback pitch shift (cents). */
+  pitch: number;
+  /** Speaking pace (1 = the speaker's own; above is faster). */
+  rate: number;
+  /** Piper noise_scale (expressiveness) and noise_w (rhythm wobble). */
+  noise: number;
+  noiseW: number;
+  /** Twins: a second voice in unison, this many cents above. 0 = none. */
+  unison: number;
+  /** The Oracle's crystal echo (0..1). */
+  echo: number;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * A character's real voice from their babble voice (which comes from their
+ * seed). Deterministic: the same params always give the same voice.
+ */
+export function ttsVoiceOf(v: VoiceParams): TtsVoice {
+  const h = hashSeed([
+    Math.round(v.base * 10),
+    Math.round(v.speed * 100),
+    Math.round(v.formant * 1000),
+    Math.round(v.breath * 1000),
+    v.wave.length + Math.round(v.range * 100),
+  ]);
+  // Higher babble pitch → a higher real voice (a few semitones at most: the
+  // speaker already carries most of the character, big shifts sound processed)
+  const pitch = clamp(Math.log2(v.base / 185) * 400, -300, 220);
+  // 12..23 chars/s babble → 0.86..1.14 pace
+  const rate = clamp(0.86 + ((v.speed - 12) / 11) * 0.28, 0.8, 1.2);
+  return {
+    speaker: h % SPEAKERS,
+    pitch: Math.round(pitch),
+    rate: Math.round(rate * 1000) / 1000,
+    noise: Math.round(clamp(0.5 + v.breath * 0.9, 0.5, 0.8) * 1000) / 1000,
+    noiseW: Math.round((0.6 + ((h >>> 12) % 300) / 1000) * 1000) / 1000,
+    unison: v.unison > 1 ? Math.max(60, v.detune * 6) : 0,
+    echo: clamp(v.shimmer, 0, 1),
+  };
+}
+
+/** The same voice, revved up (the rider shouting a callout). */
+export function hyped(t: TtsVoice, k = 1.06): TtsVoice {
+  return { ...t, rate: Math.round(clamp(t.rate * k, 0.8, 1.35) * 1000) / 1000 };
+}
+
+/** Playback rate the pitch shift implies. */
+export const pitchFactor = (cents: number) => 2 ** (cents / 1200);
+
+/** Piper's inference scales for a voice: [noise_scale, length_scale, noise_w]. */
+export function modelScales(t: TtsVoice): [number, number, number] {
+  // Slow synthesis by the pitch factor: playback speeds it back up
+  return [t.noise, pitchFactor(t.pitch) / t.rate, t.noiseW];
+}
+
+/** Cache key for one synthesized line. */
+export function lineKey(text: string, t: TtsVoice): string {
+  return `${t.speaker}|${t.pitch}|${t.rate}|${t.noise}|${t.noiseW}|${text}`;
+}

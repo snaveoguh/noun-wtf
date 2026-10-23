@@ -14,6 +14,9 @@ export function applySettings(game: Game, s: WorldSettings) {
   game.input.invertY = s.invertY;
   game.cam.shakeScale = s.reduceMotion ? 0 : 1;
   if (game.cam.mode !== s.camMode) game.cam.mode = s.camMode;
+  game.voiceMode = s.voices;
+  game.rider.enabled = s.callouts;
+  game.rider.brain.clean = s.cleanVoices;
 }
 
 /** Bind the store to a game; returns the unbind. */

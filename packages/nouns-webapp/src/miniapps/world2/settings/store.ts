@@ -30,6 +30,10 @@ export type QualitySetting = (typeof QUALITIES)[number];
 export const CAM_MODES = ['follow', 'low', 'far'] as const;
 export type CamModeSetting = (typeof CAM_MODES)[number];
 
+/** Real (neural) character voices: auto = on where the download is cheap, else babble. */
+export const VOICE_MODES = ['auto', 'on', 'off'] as const;
+export type VoiceMode = (typeof VOICE_MODES)[number];
+
 export const HUD_SCALE_MIN = 0.75;
 export const HUD_SCALE_MAX = 1.5;
 export const LOOK_SENS_MIN = 0.25;
@@ -59,6 +63,12 @@ export interface WorldSettings {
   invertY: boolean;
   /** No speed lines, no camera shake. */
   reduceMotion: boolean;
+  /** Real character voices (a one-off model download) or the babble. */
+  voices: VoiceMode;
+  /** The rider shouts on bails, speed and records. */
+  callouts: boolean;
+  /** No swearing in the rider's callouts. */
+  cleanVoices: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -82,6 +92,9 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
     lookSens: 1,
     invertY: false,
     reduceMotion,
+    voices: 'auto',
+    callouts: true,
+    cleanVoices: false,
   };
 }
 
@@ -144,6 +157,9 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
     lookSens: clamp(o.lookSens, LOOK_SENS_MIN, LOOK_SENS_MAX, base.lookSens),
     invertY: bool(o.invertY, base.invertY),
     reduceMotion: bool(o.reduceMotion, base.reduceMotion),
+    voices: oneOf(o.voices, VOICE_MODES, base.voices),
+    callouts: bool(o.callouts, base.callouts),
+    cleanVoices: bool(o.cleanVoices, base.cleanVoices),
   };
 }
 
