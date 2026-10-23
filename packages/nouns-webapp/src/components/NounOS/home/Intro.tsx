@@ -1,7 +1,7 @@
 // The noun.wtf ident, Netflix style: the canonical noggles alone on black.
 // The red frame slams in pixel by pixel (the "tu"), the eyes punch in (the
 // "DUM"), a glint runs across, then red light streaks rush out as the camera
-// dives into the right pupil and through to the homescreen. About 5.5 s,
+// dives into the right pupil and through to the homescreen. About 4 s,
 // once per browser session, skippable with any click or key. Reduced
 // motion: a short fade of the still noggles.
 
@@ -14,7 +14,7 @@ import { cx } from '../osStore';
 import { ident } from './sound';
 
 export const INTRO_KEY = 'nounwtf-intro-v1';
-const DURATION = 5550;
+const DURATION = 4200;
 const REDUCED = 700;
 
 export function shouldPlayIntro(): boolean {

@@ -17,37 +17,45 @@
   width: 100%;
 }
 
-.bidInput {
+/* The auction page is always pastel (the Noun's own background), so the
+   field uses dark ink whatever the site theme says; the dark theme's light
+   --theme-text-primary made typed bids invisible. */
+.bidInput,
+:global([data-theme]) .bidInput.bidInput {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   height: 54px;
-  color: var(--theme-text-primary);
+  color: #151c3b !important;
+  -webkit-text-fill-color: #151c3b;
+  caret-color: #151c3b;
   border-radius: 14px !important;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  border: 2px solid rgba(21, 28, 59, 0.14) !important;
   outline: none !important;
   box-shadow: none !important;
   font-family: 'PT Root UI';
   font-weight: bold;
   font-size: 22px;
-  border: 0;
   padding-left: 2rem;
   transition: border-color 0.2s ease-in-out;
 }
 
-.bidInput:focus {
-  background-color: rgba(255, 255, 255, 0.12);
+.bidInput:focus,
+:global([data-theme]) .bidInput.bidInput:focus {
+  background-color: #fff !important;
+  border-color: rgba(21, 28, 59, 0.4) !important;
   box-shadow: none !important;
 }
 
 .customPlaceholderBidAmt {
   position: absolute;
-  opacity: 0.35;
+  opacity: 0.45;
   top: 50%;
   left: 2rem;
   transform: translateY(-50%);
   max-width: calc(100% - 3rem);
-  color: var(--brand-cool-light-text);
+  color: #151c3b;
   font-family: 'PT Root UI';
   font-weight: bold;
   font-size: 22px;
@@ -77,7 +85,10 @@
   justify-content: space-between;
 }
 
-.bidBtn {
+/* Pinned under any theme: the site's [data-theme] .btn-primary glass rule
+   (white text, !important) otherwise turns this into white-on-white. */
+.bidBtn,
+:global([data-theme]) .bidBtn.bidBtn {
   font-family: 'PT Root UI';
   border-radius: 999px !important;
   width: auto;
@@ -93,18 +104,22 @@
   white-space: nowrap;
 }
 
-.bidBtn:hover {
+.bidBtn:hover,
+:global([data-theme]) .bidBtn.bidBtn:hover {
   background-color: #38a05c !important;
 }
 
 .bidBtn:active,
-.bidBtn:focus {
+.bidBtn:focus,
+:global([data-theme]) .bidBtn.bidBtn:active,
+:global([data-theme]) .bidBtn.bidBtn:focus {
   outline: none !important;
   box-shadow: none !important;
   background-color: #2f8a4f !important;
 }
 
-.bidBtn:disabled {
+.bidBtn:disabled,
+:global([data-theme]) .bidBtn.bidBtn:disabled {
   cursor: not-allowed;
   background-color: #8cc9a0 !important;
   color: rgba(255, 255, 255, 0.8) !important;

@@ -185,13 +185,34 @@ const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
  * (noggles lock in).
  */
 export function ident(soft = false): void {
-  const o = outs(soft ? 0.45 : 0.9);
+  const base = outs(soft ? 0.45 : 0.9);
   const c = ctx;
-  if (!o || !c) return;
+  if (!base || !c || !master) return;
+  // Its own long hall + a dark echo so the DUM rings out (like a held piano
+  // note) instead of stopping dead; built per play, it's a one-off.
+  const hall = c.createConvolver();
+  hall.buffer = impulse(c, 4.5, 2.2);
+  const hallG = c.createGain();
+  hallG.gain.value = soft ? 0.35 : 0.55;
+  const echo = c.createDelay(1);
+  echo.delayTime.value = 0.38;
+  const fb = c.createGain();
+  fb.gain.value = 0.34;
+  const echoTone = c.createBiquadFilter();
+  echoTone.type = 'lowpass';
+  echoTone.frequency.value = 1400;
+  const echoG = c.createGain();
+  echoG.gain.value = 0.3;
+  base.dry.connect(hall).connect(hallG).connect(master);
+  base.dry.connect(echo).connect(echoTone).connect(fb).connect(echo);
+  echoTone.connect(echoG);
+  echoG.connect(hall);
+  echoG.connect(master);
+  const o = base;
   const t0 = c.currentTime + 0.05;
   // timed to the intro: tu as the lenses swing open, DUM as the pupils snap in
-  const tu = t0 + (soft ? 0 : 0.36);
-  const dum = tu + (soft ? 0.44 : 1.38);
+  const tu = t0 + (soft ? 0 : 0.27);
+  const dum = tu + (soft ? 0.44 : 1.05);
 
   // tu: tight kick + muted stab + a vinyl tick
   kick(c, o.dry, tu, 110, 38, 0.3, 0.75);
