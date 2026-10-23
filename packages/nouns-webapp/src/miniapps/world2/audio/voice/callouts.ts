@@ -69,8 +69,18 @@ export const GAP = 30;
 export const SPEED_UP_KMH = 50;
 export const SPEED_DOWN_KMH = 28;
 
+/** One fired callout: which event, which line of its bank, in which mode. */
+export interface CalloutPick {
+  ev: CalloutEvent;
+  index: number;
+  clean: boolean;
+  text: string;
+}
+
 export class CalloutBrain {
   clean = false;
+  /** The last line fired (its index in the bank: the Voice Booth keys recordings by it). */
+  lastPick: CalloutPick | null = null;
   private last: Record<CalloutEvent, number> = {
     bail: -Infinity,
     speed: -Infinity,
@@ -92,7 +102,9 @@ export class CalloutBrain {
     this.lastLine[ev] = i;
     this.last[ev] = now;
     this.lastAny = now;
-    return lineText(lines[i]!, this.clean);
+    const text = lineText(lines[i]!, this.clean);
+    this.lastPick = { ev, index: i, clean: this.clean, text };
+    return text;
   }
 
   /** Feed the rider's speed every frame: fires once on crossing the threshold. */

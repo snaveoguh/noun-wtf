@@ -69,6 +69,12 @@ export interface WorldSettings {
   callouts: boolean;
   /** No swearing in the rider's callouts. */
   cleanVoices: boolean;
+  /** Voice Booth: the rider says lines in the player's own recordings. */
+  myVoice: boolean;
+  /** Hear other players' recorded voices (off: their callouts fall back to TTS). */
+  hearVoices: boolean;
+  /** Voice Booth in clean mode: also list the swear versions to record. */
+  boothSwears: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -95,6 +101,9 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
     voices: 'auto',
     callouts: true,
     cleanVoices: false,
+    myVoice: true,
+    hearVoices: true,
+    boothSwears: false,
   };
 }
 
@@ -160,6 +169,9 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
     voices: oneOf(o.voices, VOICE_MODES, base.voices),
     callouts: bool(o.callouts, base.callouts),
     cleanVoices: bool(o.cleanVoices, base.cleanVoices),
+    myVoice: bool(o.myVoice, base.myVoice),
+    hearVoices: bool(o.hearVoices, base.hearVoices),
+    boothSwears: bool(o.boothSwears, base.boothSwears),
   };
 }
 
