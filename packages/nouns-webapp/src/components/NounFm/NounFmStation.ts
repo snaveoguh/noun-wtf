@@ -291,7 +291,10 @@ export class NounFmStation {
     }
     if (!this.deck.play(item.id, at)) {
       if (tries > 20) {
-        this.startBreak(true);
+        // the screen never became playable: say so and retry, rather than
+        // looping jingle → refused track → jingle
+        this.set({ phase: 'blocked', label: 'NOUN FM · the video screen is hidden or too small' });
+        this.retry = setTimeout(() => this.load(gen, item, 0, at), YT_RETRY_MS);
         return;
       }
       this.retry = setTimeout(() => this.load(gen, item, tries + 1, at), 250);

@@ -47,7 +47,9 @@ export default function NounFmWidget() {
 
   return (
     <div
-      className="fixed bottom-[72px] right-3 z-[9000] flex flex-col overflow-hidden rounded-md border border-white/20 bg-black/90 text-white shadow-xl"
+      // box-content: the border sits outside the 200px, or the video slot
+      // ends up 198px and YouTubeDeck refuses to play (YouTube's minimum)
+      className="fixed bottom-[72px] right-3 z-[9000] box-content flex flex-col overflow-hidden rounded-md border border-white/20 bg-black/90 text-white shadow-xl"
       style={{ width: TILE }}
       data-nounfm={v.phase}
     >
