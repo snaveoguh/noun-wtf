@@ -1,6 +1,6 @@
 ---
 name: ship-noun-wtf
-description: Ship a noun.wtf change to production — commit, push, PR, merge, and the separate manual deploys (Railway API, PartyKit server) that a push does NOT do. Use whenever finishing work on noun.wtf, when the user says "ship it", "deploy", "is it live", or after touching packages/nouns-api, packages/nouns-party, or netlify functions.
+description: Ship a noun.wtf change to production — commit, push, PR, merge, and the separate manual deploys (Railway API, Cloudflare multiplayer worker) that a push does NOT do. Use whenever finishing work on noun.wtf, when the user says "ship it", "deploy", "is it live", or after touching packages/nouns-api, packages/nouns-party, or netlify functions.
 ---
 
 # Shipping noun.wtf
@@ -16,7 +16,8 @@ description: Ship a noun.wtf change to production — commit, push, PR, merge, a
 4. **PR and merge:** open a PR to `main` with the GitHub MCP tools, then merge with the `merge` method. The user approves this flow for routine work.
    - **The `Build (22.x)` check fails** in `@nouns/contracts#build` on every PR. It's an upstream contracts job and doesn't affect Netlify. Confirm the PR touches nothing under `packages/nouns-contracts`, then merge anyway. Leave one comment on the PR the first time it shows up.
    - If `main` moved on: `git fetch origin main && git merge origin/main` (never rebase a shared branch).
-5. **Netlify:** deploys `main` automatically through GitHub Actions ("Netlify Deploy" workflow, about 5 min). Check it with `actions_list` (`list_workflow_runs`, branch `main`) and look for `conclusion: success`.
+5. **Batch deploys.** Every merge to `main` is a Netlify build, and builds cost credits. Commit each fix separately on the branch, but merge one PR per batch of finished work rather than one per fix, unless something is broken in production.
+6. **Netlify:** deploys `main` automatically through GitHub Actions ("Netlify Deploy" workflow, about 5 min). Check it with `actions_list` (`list_workflow_runs`, branch `main`) and look for `conclusion: success`.
 
 ## Deploys a push does NOT do
 
@@ -24,10 +25,12 @@ description: Ship a noun.wtf change to production — commit, push, PR, merge, a
 |---|---|---|
 | `packages/nouns-webapp/**` incl. `netlify/functions` | automatic | merge to main |
 | `packages/nouns-api/**` (Ponder + `/api/chat`) | **manual** | `cd /Users/hugo/noun-wtf && git pull && railway up`, **from the repo root**, never from `packages/nouns-api` (that has no Dockerfile in its upload context) |
-| `packages/nouns-party/**` (PartyKit: world room, hoops relay, `noun-warfare` room) | **manual** | `cd /Users/hugo/noun-wtf && git pull && cd packages/nouns-party && npx partykit deploy` |
+| `packages/nouns-party/**` (PartyServer on Cloudflare: world room, hoops relay, `noun-warfare` room) | **manual** | `cd /Users/hugo/noun-wtf/packages/nouns-party && git pull && npx wrangler deploy` (live at `noun-wtf-party.hugoevans92.workers.dev`; hosted PartyKit shut down 2026-10-23) |
 | Contracts (`packages/nouns-contracts`) | **user only** | Give exact `forge script ... --broadcast` steps. Never handle keys or broadcast for them. |
 
-After merging anything in the manual rows, tell the user the exact command. Until they run it, say which features won't work, e.g. "online hoops/warfare needs the PartyKit deploy; bots work meanwhile".
+After merging anything in the manual rows, tell the user the exact command. Until they run it, say which features won't work, e.g. "online hoops/warfare needs the multiplayer worker deploy; bots work meanwhile".
+
+Give commands one per line with **no `#` comments**: the user pastes them into zsh, which passes the comment text through as arguments.
 
 ## Webapp env
 
