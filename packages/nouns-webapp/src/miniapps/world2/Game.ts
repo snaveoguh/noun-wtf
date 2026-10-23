@@ -12,9 +12,13 @@ import { claimAudio } from '@/lib/nounFmBus';
 import { GameRadio, type RadioMode } from './audio/GameRadio';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
+import { resolveCallout } from './audio/voice/booth/clips';
+import { HEAR_RANGE, PlayerVoices, type RemoteHear } from './audio/voice/booth/runtime';
+import { myTag, voiceNet } from './audio/voice/booth/voiceSync';
 import { seedVoice } from './audio/voice/cast';
 import { RiderVoice } from './audio/voice/RiderVoice';
 import { TtsEngine } from './audio/voice/TtsEngine';
+import { hyped, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
 import { DeckSync } from './character/deckStore';
@@ -37,8 +41,8 @@ import { HoopsMode } from './hoops/net/HoopsMode';
 import { MissionSystem } from './missions/MissionSystem';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
-import { Net, type NetPose } from './net/Net';
-import { fetchStats, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
+import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net';
+import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
@@ -67,6 +71,7 @@ import { inkExcluded, toonify } from './render/Toon';
 import { RecordsHub } from './replay/Records';
 import { ReplayView } from './replay/ReplayView';
 import { AudioMixer } from './settings/mixer';
+import { settings } from './settings/store';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { townsDecorator } from './towns/build';
@@ -240,7 +245,14 @@ export class Game {
   realVoicesOn(): boolean {
     return realVoicesOn(this.voiceMode, this.deviceNet);
   }
-  /** The rider's own callouts (bails, speed, records), in their seed's voice. */
+  /**
+   * Voice Booth (audio/voice/booth/): the player's own recordings and trained
+   * model, and other riders' shared voices.
+   */
+  readonly voices = new PlayerVoices(() => this.audio.ctx, this.voice);
+  private calloutSeq = 0;
+  private chatVoiceSeq = 0;
+  /** The rider's own callouts (bails, speed, records): their recordings, model or seed voice. */
   readonly rider: RiderVoice = new RiderVoice({
     voice: this.voice,
     tts: this.tts,
@@ -251,6 +263,16 @@ export class Game {
     audioCtx: () => this.audio.ctx,
     realOn: () => this.realVoicesOn(),
     busy: () => this.cutscene.id !== null,
+    own: this.voices.own,
+    onSay: pick => {
+      // Relay the event + line only (never audio): others play my clip or my TTS
+      this.net.callout = [
+        ++this.calloutSeq,
+        CALLOUT_CODES.indexOf(pick.ev),
+        pick.index,
+        pick.clean ? 1 : 0,
+      ];
+    },
   });
   /** In-engine cutscenes (cutscene/): while one plays it owns the camera and the clock. */
   readonly cutscene: CutscenePlayer = new CutscenePlayer(gameHost(this));
@@ -560,7 +582,14 @@ export class Game {
     // Precompile shaders so the first frames don't hitch
     this.gfx.renderer.compile(this.gfx.scene, this.gfx.camera);
 
+    if (this.opts.offline === true) voiceNet.enabled = false;
     if (this.opts.offline !== true) {
+      this.net.onCallout = (id, c) => void this.remoteCallout(id, c);
+      this.net.onChatVoice = (id, tag, clip) => {
+        const rp = this.net.players.get(id);
+        if (rp === undefined) return;
+        void this.voices.playRemoteChat(tag, clip, rp.transcript, this.hearOf(rp.current.pos));
+      };
       this.net.onLeave = id => this.removeRemote(id);
       this.net.onChat = (id, text) => this.pushChat(id, text);
       this.net.onGraffiti = (id, tags) => this.graffiti?.onTags(id, tags);
@@ -1594,8 +1623,55 @@ export class Game {
     this.remotes.delete(id);
   }
 
+  /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
+  hearOf(pos: THREE.Vector3): RemoteHear {
+    const cam = this.gfx.camera;
+    const d = cam.position.distanceTo(pos);
+    const gain = Math.max(0, 1 - d / HEAR_RANGE) ** 1.3;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
+    const dir = pos.clone().sub(cam.position);
+    const len = dir.length();
+    const pan = len > 0.5 ? Math.max(-0.85, Math.min(0.85, right.dot(dir) / len)) : 0;
+    return { gain, pan };
+  }
+
+  /** A remote rider's callout: their recording, else their stock voice. */
+  private async remoteCallout(id: string, c: RemoteCallout) {
+    const rp = this.net.players.get(id);
+    if (rp === undefined) return;
+    const hear = this.hearOf(rp.current.pos);
+    if (hear.gain <= 0.02) return;
+    const tag = rp.voiceTag;
+    const manifest = await this.voices.manifest(tag);
+    const res = resolveCallout({
+      ...c,
+      listenerClean: this.rider.brain.clean,
+      clips: manifest,
+      allowClip: this.voices.canHear(tag),
+      tts: this.realVoicesOn(),
+    });
+    if (res === null || res.source === null) return;
+    if (res.source === 'recording') {
+      const ok = await this.voices.playRemoteClip(tag, res.key, manifest[res.key]!, hear, res.text);
+      if (ok) return;
+      if (!this.realVoicesOn()) return;
+    }
+    const seed = parseSeedKey(rp.seedKey) ?? randomSeed();
+    const sv = seedVoice([seed.background, seed.body, seed.accessory, seed.head, seed.glasses]);
+    this.voices.log.remoteFallbacks++;
+    this.voice.speak({
+      text: res.text,
+      voice: sv,
+      tts: hyped(ttsVoiceOf(sv)),
+      gain: hear.gain,
+      pan: hear.pan,
+    });
+  }
+
   private updateNetwork(dt: number) {
     const p = this.player;
+    // Share my voice tag only while sharing recordings is on
+    this.net.voiceTag = settings.get().shareRecordings ? (myTag() ?? '') : '';
     const me = this.me;
     if (me) {
       const pose: NetPose = {
@@ -1741,6 +1817,10 @@ export class Game {
     const t = text.trim();
     if (!t) return;
     this.net.sendChat(t);
+    // My own words in my own voice (Voice Booth model), if that's on
+    void this.voices.speakChat(t, riderId()).then(r => {
+      if (r !== null) this.net.chatVoice = [r.tag, r.id, ++this.chatVoiceSeq];
+    });
     const chat = [
       ...this.hud.chat,
       { id: 'me', name: this.name, text: t, at: performance.now() },
@@ -1979,6 +2059,7 @@ export class Game {
     this.cutscene.abort();
     this.voice.stopAll();
     this.tts.dispose();
+    this.voices.dispose();
     this.sfx.dispose();
     this.missions.dispose();
     this.hoops.dispose();

@@ -1,20 +1,40 @@
 // ── The rider talks: callouts on bails, speed and new records ────────────
 //
-// The rider's real voice is one hand-picked deep male speaker (ttsVoice's
-// RIDER_VOICE), revved up a little; the babble fallback still comes from their
-// Noun seed. Lines are picked and rate-limited by CalloutBrain
-// (callouts.ts); once real voices are ready the whole bank for the current
-// mode is synthesized in the background, so a bail is heard the instant it
-// happens. Callouts only play when real voices are on (babbling while the
-// model loads); with voices off the rider stays quiet as before.
+// Lines are picked and rate-limited by CalloutBrain (callouts.ts: at least
+// 30 s between any two). Who says the picked line (booth/clips.ts pickSource):
+//   1. the player's own recording of it (Voice Booth, "use my voice" on)
+//   2. the player's own trained voice model, if they loaded one and turned
+//      "use my voice model" on (sentence pauses as RIDER_VOICE: MODEL_VOICE)
+//   3. the rider's real voice: one hand-picked deep male speaker (ttsVoice's
+//      RIDER_VOICE), revved up a little; the babble fallback still comes from
+//      their Noun seed
+// Recordings play even with real voices off (nothing to download); the TTS
+// sources only when real voices are on, as before. Once voices are ready the
+// whole bank for the current mode is synthesized in the background, so a
+// bail is heard the instant it happens.
 
 import type { TtsEngine } from './TtsEngine';
-import type { VoiceBox } from './VoiceBox';
+import type { ClipPlay, VoiceBox } from './VoiceBox';
 
-import { bank, CalloutBrain, type CalloutEvent } from './callouts';
+import { clipKey, pickSource, type VoiceSource } from './booth/clips';
+import { bank, CalloutBrain, type CalloutEvent, type CalloutPick } from './callouts';
 import { seedVoice } from './cast';
-import { hyped, lineKey, RIDER_VOICE, type TtsVoice } from './ttsVoice';
+import { hyped, lineKey, MODEL_VOICE, RIDER_VOICE, type TtsVoice } from './ttsVoice';
 import { type SeedLike } from './voiceParams';
+
+/** The player's own voice, as the rider sees it (Game wires it to booth/myVoice). */
+export interface OwnVoice {
+  /** "Use my voice" (recordings) is on. */
+  useClips(): boolean;
+  /** A recording exists for this line key. */
+  has(key: string): boolean;
+  /** Any recordings at all (callouts may fire with real voices off). */
+  any(): boolean;
+  /** The decoded recording (null: none, or decoding failed). */
+  clip(key: string): Promise<{ buf: AudioBuffer; play: ClipPlay } | null>;
+  /** The player's own model engine when "use my voice model" is on (else null). */
+  model(): TtsEngine | null;
+}
 
 export interface RiderVoiceHost {
   voice: VoiceBox;
@@ -25,20 +45,32 @@ export interface RiderVoiceHost {
   realOn(): boolean;
   /** Something else owns the soundstage (a cutscene). */
   busy(): boolean;
+  own?: OwnVoice;
+  /** A callout fired (Game relays it so other players hear it too). */
+  onSay?: (pick: CalloutPick) => void;
 }
 
 export class RiderVoice {
   readonly brain = new CalloutBrain();
   /** Settings: callouts on. */
   enabled = true;
-  /** Dev / browser checks: what the rider said. */
-  readonly log: { said: number; last: string; ev: CalloutEvent | '' } = {
+  /** Dev / browser checks: what the rider said, and with which source. */
+  readonly log: {
+    said: number;
+    last: string;
+    ev: CalloutEvent | '';
+    source: VoiceSource | '';
+    key: string;
+  } = {
     said: 0,
     last: '',
     ev: '',
+    source: '',
+    key: '',
   };
   private t = 0;
   private warmed = '';
+  private warmedModel = '';
 
   constructor(private host: RiderVoiceHost) {}
 
@@ -74,24 +106,68 @@ export class RiderVoice {
   }
 
   private active(): boolean {
-    return this.enabled && this.host.realOn() && !this.host.busy();
+    if (!this.enabled || this.host.busy()) return false;
+    const own = this.host.own;
+    return (
+      this.host.realOn() ||
+      (own !== undefined && ((own.useClips() && own.any()) || own.model() !== null))
+    );
+  }
+
+  /** Which source says a line right now. */
+  sourceFor(key: string): VoiceSource | null {
+    const own = this.host.own;
+    return pickSource({
+      hasClip: own?.has(key) === true,
+      allowClip: own?.useClips() === true,
+      localModel: own?.model() != null,
+      tts: this.host.realOn(),
+    });
   }
 
   private say(ev: CalloutEvent, text: string) {
+    const pick = this.brain.lastPick;
+    const key = pick !== null ? clipKey(ev, pick.index, pick.clean) : '';
+    const source = this.sourceFor(key);
+    if (source === null) return;
     const seed = this.host.seed();
-    this.host.voice.speak({ text, voice: seedVoice(seed), tts: this.ttsVoice() });
+    const own = this.host.own;
+    if (source === 'recording' && own !== undefined) {
+      void own.clip(key).then(c => {
+        if (c !== null) this.host.voice.playClip(c.buf, c.play, { text });
+        else if (this.host.realOn())
+          this.host.voice.speak({ text, voice: seedVoice(seed), tts: this.ttsVoice() });
+      });
+    } else if (source === 'local-model' && own !== undefined) {
+      const engine = own.model()!;
+      this.host.voice.speak({ text, voice: seedVoice(seed), tts: MODEL_VOICE, engine });
+    } else {
+      this.host.voice.speak({ text, voice: seedVoice(seed), tts: this.ttsVoice() });
+    }
     this.log.said++;
     this.log.last = text;
     this.log.ev = ev;
+    this.log.source = source;
+    this.log.key = key;
+    if (pick !== null) this.host.onSay?.(pick);
   }
 
   /** Once voices are ready: synthesize this rider's whole bank (again if the seed or mode changes). */
   private prewarm() {
-    const tts = this.host.tts;
     const ctx = this.host.audioCtx();
-    if (!tts.ready || ctx === null) return;
+    if (ctx === null) return;
+    const mode = this.brain.clean ? 'clean' : 'spicy';
+    const model = this.host.own?.model() ?? null;
+    if (model?.ready === true && this.warmedModel !== mode) {
+      this.warmedModel = mode;
+      for (const ev of ['bail', 'record', 'speed'] as const)
+        for (const text of bank(ev, this.brain.clean))
+          void model.synth(ctx, text, MODEL_VOICE, 'bg');
+    }
+    const tts = this.host.tts;
+    if (!tts.ready || !this.host.realOn()) return;
     const tv = this.ttsVoice();
-    const key = `${lineKey('', tv)}|${this.brain.clean ? 'clean' : 'spicy'}`;
+    const key = `${lineKey('', tv)}|${mode}`;
     if (key === this.warmed) return;
     this.warmed = key;
     for (const ev of ['bail', 'record', 'speed'] as const)

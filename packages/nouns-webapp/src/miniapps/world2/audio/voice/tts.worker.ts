@@ -13,17 +13,11 @@ import type { TtsIn, TtsOut } from './ttsProtocol';
 import * as ort from 'onnxruntime-web/wasm';
 import { phonemize } from 'phonemizer';
 
+import { validatePiperConfig, type PiperConfig } from './booth/piperConfig';
 import { sentences, toIds, toPhonemes } from './piperText';
 
 const ORT_VERSION = '1.22.0';
 const CACHE = 'noun-world-voices-v1';
-
-interface PiperConfig {
-  audio: { sample_rate: number };
-  espeak: { voice: string };
-  phoneme_id_map: Record<string, number[]>;
-  num_speakers: number;
-}
 
 let session: ort.InferenceSession | null = null;
 let config: PiperConfig | null = null;
@@ -85,19 +79,24 @@ async function fetchCached(
   return { buf, cached: false };
 }
 
-async function init(modelUrl: string, configUrl: string) {
-  const t0 = performance.now();
+function setupOrt() {
   ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
   ort.env.wasm.numThreads = self.crossOriginIsolated
     ? Math.min(4, navigator.hardwareConcurrency || 1)
     : 1;
   ort.env.logLevel = 'error';
-  const cfg = await fetchCached(configUrl);
-  config = JSON.parse(new TextDecoder().decode(cfg.buf)) as PiperConfig;
-  const model = await fetchCached(modelUrl, (loaded, total) =>
-    post({ t: 'progress', loaded, total }),
-  );
-  session = await ort.InferenceSession.create(new Uint8Array(model.buf), {
+}
+
+/** Config text → checked config (throws with the reason). */
+function parseConfig(text: string): PiperConfig {
+  const c = validatePiperConfig(text);
+  if (!c.ok) throw new Error(c.error);
+  return c.config;
+}
+
+async function start(t0: number, cfg: PiperConfig, model: ArrayBuffer, cached: boolean) {
+  config = cfg;
+  session = await ort.InferenceSession.create(new Uint8Array(model), {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
   });
@@ -106,10 +105,28 @@ async function init(modelUrl: string, configUrl: string) {
   post({
     t: 'ready',
     ms: Math.round(performance.now() - t0),
-    bytes: model.buf.byteLength,
-    cached: model.cached,
-    speakers: config.num_speakers,
+    bytes: model.byteLength,
+    cached,
+    speakers: cfg.num_speakers,
   });
+}
+
+async function init(modelUrl: string, configUrl: string) {
+  const t0 = performance.now();
+  setupOrt();
+  const cfg = await fetchCached(configUrl);
+  const parsed = parseConfig(new TextDecoder().decode(cfg.buf));
+  const model = await fetchCached(modelUrl, (loaded, total) =>
+    post({ t: 'progress', loaded, total }),
+  );
+  await start(t0, parsed, model.buf, model.cached);
+}
+
+/** A player's own model (Voice Booth): bytes from IndexedDB, only the runtime is fetched. */
+async function initBytes(model: ArrayBuffer, configText: string) {
+  const t0 = performance.now();
+  setupOrt();
+  await start(t0, parseConfig(configText), model, true);
 }
 
 async function synth(
@@ -171,8 +188,10 @@ async function synthLine(
 
 self.onmessage = (e: MessageEvent<TtsIn>) => {
   const m = e.data;
-  if (m.t === 'init') {
-    loading ??= init(m.modelUrl, m.configUrl).catch((err: unknown) => {
+  if (m.t === 'init' || m.t === 'init-bytes') {
+    loading ??= (
+      m.t === 'init' ? init(m.modelUrl, m.configUrl) : initBytes(m.model, m.config)
+    ).catch((err: unknown) => {
       loading = null;
       post({ t: 'error', message: err instanceof Error ? err.message : String(err) });
     });

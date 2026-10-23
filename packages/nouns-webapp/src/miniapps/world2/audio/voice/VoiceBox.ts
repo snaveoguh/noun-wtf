@@ -25,7 +25,10 @@
 import type { TtsEngine } from './TtsEngine';
 
 import { pitchFactor, ttsVoiceOf, type TtsVoice } from './ttsVoice';
-import { syllablePlan, VOWELS, type Plan, type VoiceParams } from './voiceParams';
+import { deriveVoice, syllablePlan, VOWELS, type Plan, type VoiceParams } from './voiceParams';
+
+/** Any voice, just to time a recording's (unused) typewriter plan. */
+const DUMMY_PLAN_VOICE: VoiceParams = deriveVoice([0, 0, 0, 0, 0]);
 
 /** How long a line waits for its synthesis before babbling instead (ms). */
 const TTS_WAIT_MS = 2200;
@@ -39,6 +42,17 @@ export interface VoiceLine {
   gain?: number;
   /** Real voice override (default: derived from `voice`). */
   tts?: TtsVoice;
+  /** Speak with this (ready) engine instead: a player's own trained voice model. */
+  engine?: TtsEngine;
+  /** Stereo position -1..1 (a remote rider to the left / right). */
+  pan?: number;
+}
+
+/** A recording's playback trim + level (Voice Booth clips). */
+export interface ClipPlay {
+  t0: number;
+  t1: number;
+  gain: number;
 }
 
 export interface VoiceHandle {
@@ -53,6 +67,8 @@ export interface VoiceHandle {
 
 /** Dev / browser checks: what the voice box has played. */
 export interface VoiceLog {
+  /** Player recordings played (Voice Booth clips). */
+  clips: number;
   lines: number;
   syllables: number;
   files: number;
@@ -65,7 +81,15 @@ export interface VoiceLog {
 export class VoiceBox {
   /** lineId → audio URL. A line with a file plays it instead of babbling. */
   readonly files = new Map<string, string>();
-  readonly log: VoiceLog = { lines: 0, syllables: 0, files: 0, tts: 0, ttsDur: 0, last: '' };
+  readonly log: VoiceLog = {
+    clips: 0,
+    lines: 0,
+    syllables: 0,
+    files: 0,
+    tts: 0,
+    ttsDur: 0,
+    last: '',
+  };
   /** Real voices: the engine when the player has them on (null: babble). */
   realVoice: (() => TtsEngine | null) | null = null;
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -88,7 +112,7 @@ export class VoiceBox {
     if (ctx === null || out === null || ctx.state === 'closed') return h;
     const url = line.lineId !== undefined ? this.files.get(line.lineId) : undefined;
     if (url !== undefined) return this.playFile(ctx, out, url, h, line);
-    const eng = this.realVoice?.() ?? null;
+    const eng = line.engine?.ready === true ? line.engine : (this.realVoice?.() ?? null);
     if (eng !== null) {
       if (eng.ready) return this.playTts(ctx, out, eng, h, line);
       eng.load(); // first time: start the download, babble meanwhile
@@ -298,8 +322,8 @@ export class VoiceBox {
     this.until.set(tv.speaker, end);
     const master = ctx.createGain();
     master.gain.value = Math.max(0, Math.min(1.5, 0.95 * (line.gain ?? 1)));
-    master.connect(out);
     const nodes: AudioNode[] = [master];
+    master.connect(this.panned(ctx, out, line.pan, nodes));
     const srcs: AudioBufferSourceNode[] = [];
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -362,6 +386,70 @@ export class VoiceBox {
     this.log.tts++;
     this.log.ttsDur = Math.round(dur * 100) / 100;
     this.log.last = line.text.slice(0, 60);
+  }
+
+  /** `out`, or a stereo panner in front of it (added to `nodes` for cleanup). */
+  private panned(ctx: AudioContext, out: AudioNode, pan: number | undefined, nodes: AudioNode[]) {
+    if (pan === undefined || pan === 0 || typeof ctx.createStereoPanner !== 'function') return out;
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.connect(out);
+    nodes.push(p);
+    return p;
+  }
+
+  /**
+   * Play a player's own recording (Voice Booth): just the trimmed speech, at
+   * its normalised level, optionally panned. Returns null when audio isn't
+   * unlocked yet.
+   */
+  playClip(
+    buf: AudioBuffer,
+    clip: ClipPlay,
+    opts: { text?: string; gain?: number; pan?: number } = {},
+  ): VoiceHandle | null {
+    const ctx = this.ctx();
+    const out = this.out();
+    if (ctx === null || out === null || ctx.state === 'closed') return null;
+    const t0 = Math.max(0, Math.min(buf.duration, clip.t0));
+    const len = Math.max(0.05, Math.min(buf.duration, clip.t1) - t0);
+    const g = ctx.createGain();
+    g.gain.value = Math.max(0, Math.min(8, clip.gain)) * Math.max(0, Math.min(1.5, opts.gain ?? 1));
+    const nodes: AudioNode[] = [g];
+    g.connect(this.panned(ctx, out, opts.pan, nodes));
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(g);
+    const start = ctx.currentTime + 0.02;
+    // Tiny fades so a trim never clicks
+    g.gain.setValueAtTime(0, start);
+    g.gain.linearRampToValueAtTime(g.gain.value, start + 0.01);
+    g.gain.setValueAtTime(g.gain.value, start + len - 0.02);
+    g.gain.linearRampToValueAtTime(0, start + len);
+    src.start(start, t0, len);
+    const plan = syllablePlan(opts.text ?? '', { ...DUMMY_PLAN_VOICE });
+    const h: VoiceHandle = { plan, startedAt: start, stretch: 1, stop: () => undefined };
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      this.live.delete(h);
+      src.disconnect();
+      for (const n of nodes) n.disconnect();
+    };
+    src.onended = cleanup;
+    h.stop = () => {
+      try {
+        src.stop();
+      } catch {
+        // not started
+      }
+      cleanup();
+    };
+    this.live.add(h);
+    this.log.clips++;
+    this.log.last = (opts.text ?? '').slice(0, 60);
+    return h;
   }
 
   private playFile(

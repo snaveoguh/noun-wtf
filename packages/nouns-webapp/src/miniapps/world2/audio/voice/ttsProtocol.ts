@@ -2,6 +2,8 @@
 
 export type TtsIn =
   | { t: 'init'; modelUrl: string; configUrl: string }
+  /** A player's own trained voice (Voice Booth), from bytes held in this browser. */
+  | { t: 'init-bytes'; model: ArrayBuffer; config: string }
   | {
       t: 'synth';
       id: number;

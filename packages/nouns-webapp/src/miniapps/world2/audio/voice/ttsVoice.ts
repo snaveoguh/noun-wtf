@@ -99,6 +99,17 @@ export const RIDER_VOICE: TtsVoice = {
   gap: 0.6,
 };
 
+/**
+ * A player's own trained model (Voice Booth): single speaker (id ignored by
+ * single-speaker models), their natural pitch, the rider's callout pace and
+ * the rider's pause between sentences (same rules as RIDER_VOICE).
+ */
+export const MODEL_VOICE: TtsVoice = {
+  ...RIDER_VOICE,
+  speaker: 0,
+  rate: 1.04,
+};
+
 /** The same voice, revved up (the rider shouting a callout). */
 export function hyped(t: TtsVoice, k = 1.06): TtsVoice {
   return { ...t, rate: Math.round(clamp(t.rate * k, 0.8, 1.35) * 1000) / 1000 };

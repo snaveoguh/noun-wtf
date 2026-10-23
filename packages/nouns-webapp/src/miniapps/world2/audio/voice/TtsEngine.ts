@@ -9,7 +9,7 @@
 // cached per (voice, text) as AudioBuffers, so a repeated line or a
 // pre-warmed callout plays instantly.
 
-import type { TtsOut } from './ttsProtocol';
+import type { TtsIn, TtsOut } from './ttsProtocol';
 
 import {
   lineKey,
@@ -86,7 +86,19 @@ export class TtsEngine {
   private nextId = 1;
   private readyWaiters: (() => void)[] = [];
 
-  constructor(private makeWorker: () => Worker = defaultWorker) {}
+  /**
+   * `init` makes the worker's first message: the stock model by default, or
+   * (Voice Booth) a player's own model from bytes. If it throws or gives
+   * null the engine fails, and callers fall back to the stock voice.
+   */
+  constructor(
+    private makeWorker: () => Worker = defaultWorker,
+    private init: () => TtsIn | null | Promise<TtsIn | null> = () => ({
+      t: 'init',
+      modelUrl: PIPER_MODEL_URL,
+      configUrl: PIPER_CONFIG_URL,
+    }),
+  ) {}
 
   get ready(): boolean {
     return this.status.state === 'ready';
@@ -106,7 +118,14 @@ export class TtsEngine {
     this.set({ state: 'loading', error: '', loaded: 0 });
     w.onmessage = (e: MessageEvent<TtsOut>) => this.onMessage(e.data);
     w.onerror = e => this.fail(e.message || 'worker error');
-    w.postMessage({ t: 'init', modelUrl: PIPER_MODEL_URL, configUrl: PIPER_CONFIG_URL });
+    void Promise.resolve()
+      .then(() => this.init())
+      .then(m => {
+        if (this.worker !== w) return; // disposed meanwhile
+        if (m === null) return this.fail('no model');
+        w.postMessage(m, m.t === 'init-bytes' ? [m.model] : []);
+      })
+      .catch((err: unknown) => this.fail(err instanceof Error ? err.message : 'init failed'));
   }
 
   /** Resolves when ready (or never, if it fails: race it with a timeout). */
@@ -258,6 +277,6 @@ export class TtsEngine {
   }
 }
 
-function defaultWorker(): Worker {
+export function defaultWorker(): Worker {
   return new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' });
 }
