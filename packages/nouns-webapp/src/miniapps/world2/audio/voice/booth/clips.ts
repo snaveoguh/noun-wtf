@@ -101,7 +101,7 @@ export function boothLines(clean: boolean, withSwears: boolean): BoothLine[] {
         ev,
         index,
         text: lineText(l, clean),
-        swear: !clean && l.clean !== undefined,
+        swear: false,
       });
       if (clean && withSwears && l.clean !== undefined)
         out.push({ key: clipKey(ev, index, false), ev, index, text: l.say, swear: true });
