@@ -204,17 +204,22 @@ export default function AgentHome({
         />
       </header>
 
-      <Hero
-        slides={HERO_SLIDES}
-        active={active && !intro && sheet === null}
-        sound={sound}
-        resumable={resumable}
-        ctaFor={ctaFor}
-        onToggleSound={() => void toggleSound()}
-        onPlay={play}
-        onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
-        onBrowse={() => jump('play')}
-      />
+      {/* The hero (video) and the shelves (dozens of posters) mount once the
+          intro is done: mounting them under it kept the main thread so busy
+          the noggles froze half built on real machines. */}
+      {!intro && (
+        <Hero
+          slides={HERO_SLIDES}
+          active={active && !intro && sheet === null}
+          sound={sound}
+          resumable={resumable}
+          ctaFor={ctaFor}
+          onToggleSound={() => void toggleSound()}
+          onPlay={play}
+          onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
+          onBrowse={() => jump('play')}
+        />
+      )}
 
       <div className="nh-manifesto">
         <p>
@@ -243,9 +248,7 @@ export default function AgentHome({
       </nav>
 
       <main className="nh-rows">
-        {rows.map(r => (
-          <Shelf key={r.id} row={r} onActivate={activate} sound={sound} />
-        ))}
+        {!intro && rows.map(r => <Shelf key={r.id} row={r} onActivate={activate} sound={sound} />)}
       </main>
 
       <footer className="nh-foot">
