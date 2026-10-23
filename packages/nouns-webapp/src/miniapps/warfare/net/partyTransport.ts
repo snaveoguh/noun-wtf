@@ -1,7 +1,7 @@
 // ── The real socket: PartyKit room `noun-warfare` ──────────────────────
 //
 // Host: VITE_PARTYKIT_HOST (e.g. `localhost:1999` for `npx partykit dev`),
-// else the deployed noun-wtf PartyKit. `?offline=1` never opens a socket,
+// else the deployed PartyServer worker (packages/nouns-party). `?offline=1` never opens a socket,
 // and neither do dev builds / automated browsers unless a host is set
 // explicitly or the URL says `?online=1` — so local checks and tests can't
 // wander into the live room.
@@ -10,7 +10,7 @@ import PartySocket from 'partysocket';
 
 import { WF_ROOM, type WfMsg, type WfTransport } from './protocol';
 
-const LIVE_HOST = 'noun-wtf-saber.snaveoguh.partykit.dev';
+const LIVE_HOST = 'noun-wtf-party.hugoevans92.workers.dev';
 
 export function warfarePartyHost(search: string = window.location.search): string | null {
   const q = new URLSearchParams(search);
