@@ -12,7 +12,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { cx } from '../osStore';
 
-import { motif } from './sound';
+import { motif, playFile, unlockAudio, type Playback } from './sound';
+import { DUCKED, shouldStartVo, shouldStopVo, VO_CREDIT } from './voiceOver';
 
 export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
@@ -50,15 +51,22 @@ export function ClipVideo({
   focus,
   className,
   onPlaying,
+  duck = false,
 }: {
   clip: Clip;
   onPlaying?: () => void;
   playing: boolean;
   withSound: boolean;
+  /** Something is talking over it: its own soundtrack drops right down. */
+  duck?: boolean;
   focus?: string;
   className?: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (v) v.volume = duck ? DUCKED : 1;
+  }, [duck]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -142,11 +150,64 @@ export default function Hero({
     return () => document.removeEventListener('visibilitychange', on);
   }, []);
 
+  // The brand slide's voice-over (voiceOver.ts): once per page view, only
+  // once the visitor has sound on and audio is unlocked by a gesture; it stops
+  // if they mute, the slide changes or the hero goes off screen / the tab
+  // hides. While it talks the carousel holds and the clip's own track ducks.
+  const [voOn, setVoOn] = useState(false);
+  const [voTail, setVoTail] = useState(-1); // the slide whose voice-over just ended
+  const voPlayed = useRef(false);
+  const vo = useRef<Playback | null>(null);
+  const idxRef = useRef(idx);
+  idxRef.current = idx;
+  const voSrc = s.vo;
   useEffect(() => {
-    if (paused) return;
-    const t = window.setTimeout(() => setIdx(i => (i + 1) % slides.length), s.ms);
+    const state = { sound, slideHasVo: voSrc !== undefined, live };
+    if (shouldStopVo(state)) {
+      vo.current?.stop();
+      return;
+    }
+    if (voSrc === undefined || !shouldStartVo({ ...state, played: voPlayed.current })) return;
+    let cancelled = false;
+    const go = () => {
+      void unlockAudio().then(ok => {
+        if (!ok || cancelled || voPlayed.current) return;
+        const p = playFile(voSrc, 0.95);
+        if (p === null) return;
+        const at = idxRef.current;
+        voPlayed.current = true;
+        vo.current = p;
+        setVoOn(true);
+        void p.done.then(() => {
+          if (vo.current !== p) return;
+          vo.current = null;
+          setVoOn(false);
+          setVoTail(at);
+        });
+      });
+    };
+    go();
+    // Sound remembered from a past visit: nothing plays until a gesture
+    window.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go);
+    };
+  }, [sound, voSrc, live]);
+  useEffect(() => () => vo.current?.stop(), []);
+
+  useEffect(() => {
+    if (paused || voOn) return;
+    // Just finished the voice-over: a beat, then move on
+    const ms = voTail === idx ? 2500 : s.ms;
+    const t = window.setTimeout(() => {
+      setVoTail(-1);
+      setIdx(i => (i + 1) % slides.length);
+    }, ms);
     return () => window.clearTimeout(t);
-  }, [idx, paused, slides.length, s.ms]);
+  }, [idx, paused, voOn, voTail, slides.length, s.ms]);
 
   const onEnter = () => {
     setHeld(true);
@@ -181,7 +242,13 @@ export default function Hero({
               aria-hidden={!on}
             >
               {x.clip && motion && on ? (
-                <ClipVideo clip={x.clip} playing={live} withSound={sound} focus={x.focus} />
+                <ClipVideo
+                  clip={x.clip}
+                  playing={live}
+                  withSound={sound}
+                  duck={voOn}
+                  focus={x.focus}
+                />
               ) : (
                 <img
                   key={on ? `on-${idx}` : 'off'}
@@ -227,7 +294,7 @@ export default function Hero({
             onClick={onToggleSound}
             aria-pressed={sound}
             aria-label={sound ? 'Turn sound off' : 'Turn sound on'}
-            title={sound ? 'sound on' : 'sound off'}
+            title={`${sound ? 'sound on' : 'sound off'}\n${VO_CREDIT}`}
           >
             {sound ? (
               <svg viewBox="0 0 24 24" aria-hidden>

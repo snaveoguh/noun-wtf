@@ -11,7 +11,14 @@
 
 import type { TtsOut } from './ttsProtocol';
 
-import { lineKey, modelScales, PIPER_CONFIG_URL, PIPER_MODEL_URL, type TtsVoice } from './ttsVoice';
+import {
+  lineKey,
+  modelScales,
+  PIPER_CONFIG_URL,
+  PIPER_MODEL_URL,
+  sentenceGap,
+  type TtsVoice,
+} from './ttsVoice';
 
 export type TtsState = 'idle' | 'loading' | 'ready' | 'failed';
 
@@ -183,6 +190,7 @@ export class TtsEngine {
       text: job.text,
       speaker: job.voice.speaker,
       scales: modelScales(job.voice),
+      gap: sentenceGap(job.voice),
     });
   }
 

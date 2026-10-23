@@ -19,7 +19,7 @@ Netlify's site metadata is legacy/manual-ish, so treat GitHub as the source of t
 
 GitHub Actions handles publishing to the existing Netlify sites. Do not create duplicate Netlify sites.
 
-**API deploys are separate.** The Ponder indexer/API lives on Railway project `spirited-flexibility` and does **not** auto-deploy on git push. After any change under `packages/nouns-api/`, run `railway up` **from the repo root** (`/Users/hugo/noun-wtf`) — NOT from `packages/nouns-api`. The service builds from the root `Dockerfile`, which `COPY`s `packages/nouns-api`, `packages/nouns-sdk`, and `packages/nouns-contracts` into the image. Running `railway up` from `packages/nouns-api` uploads a context with no Dockerfile and the build dies with `couldn't locate the dockerfile at path Dockerfile` (hit 2026-05-30). The repo root is linked to `spirited-flexibility / production / spirited-flexibility`; the live service uses the root `railway.json` (healthcheck `/health`) — the `packages/nouns-api/railway.json` (healthcheck `/ready`) is stale/unused. Pushing to GitHub only updates Netlify (the webapp), never Railway.
+**API deploys are separate.** The Ponder indexer/API lives on Railway project `spirited-flexibility` and does **not** auto-deploy on git push. After any change under `packages/nouns-api/`, run `railway up` **from the repo root** (`/Users/hugo/noun-wtf`) — NOT from `packages/nouns-api`. The service builds from the root `Dockerfile`, which `COPY`s `packages/nouns-api`, `packages/nouns-sdk`, and `packages/nouns-contracts` into the image. Running `railway up` from `packages/nouns-api` uploads a context with no Dockerfile and the build dies with `couldn't locate the dockerfile at path Dockerfile` (hit 2026-05-30). The repo root is linked to `spirited-flexibility / production / spirited-flexibility`; the live service uses the root `railway.json` (healthcheck `/health`) — the `packages/nouns-api/railway.json` (healthcheck `/ready`) is stale/unused. Pushing to GitHub only updates Netlify (the webapp), never Railway. The indexer reads mainnet through `PONDER_RPC_URL_1` (optional; dRPC's free plan froze it in October 2026 and was removed) plus the fallbacks hardcoded in `packages/nouns-api/ponder.config.ts` (Tenderly's public gateway, MEV Blocker; publicnode can't serve its historical `eth_getLogs`). An in-process watchdog (`src/syncWatchdog.ts`) restarts it if the sync stalls.
 
 `VITE_*` env vars for the webapp are baked at build time and are hardcoded in `.github/workflows/netlify-deploy.yml`, not in the Netlify UI. Edit the workflow to change bundled values.
 
@@ -174,6 +174,26 @@ Lil Nouns drafts: `/draft lil` (or `/lil draft`, "open a lil nouns proposal wind
 ### Terminal / Disco Default
 
 The terminal feed's 🪩 disco mode (animated rainbow rows; CSS architecture documented in `nounwtf_v4_disco_ship_2026-05-25.md`) is **off by default** as of 2026-09-20 — it was a photosensitivity hazard on by default. Visitors opt in with the 🪩 toggle; the choice persists under `noun-wtf-disco-v2`.
+
+### Multiplayer (packages/nouns-party)
+
+Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops relay, `noun-warfare`) now run as a PartyServer worker on Cloudflare Durable Objects, `noun-wtf-party.hugoevans92.workers.dev`, at the same `/parties/main/<room>` paths. The webapp's default host lives in `src/miniapps/world/engine/types.ts` (`PARTYKIT_HOST`) and `src/miniapps/warfare/net/partyTransport.ts`; `VITE_PARTYKIT_HOST` overrides both. The worker does not deploy on push: `cd packages/nouns-party && npx wrangler deploy` (the user runs it, logged into their Cloudflare account).
+
+### Homepage (NounOS home)
+
+- **Intro ident** (`home/Intro.tsx`, once per browser session, `?intro=1` forces it, `?intro=hold` freezes it): the canonical noggles alone, built pixel for pixel from `glasses-square-red` (16x5, `#f3322c`); never redraw them by hand. About 4.2 s, with the sound (`ident()` in `home/sound.ts`) timed to the frame build and the eyes landing.
+- **Hero voice-over:** `public/home/vo-intro.mp3` (Piper, LibriTTS-R CC BY 4.0) plays once per page view on the brand slide when sound is on; the rules are in `home/voiceOver.ts`.
+- **Shelf covers:** portrait posters in `public/home/covers/*.webp`, wired in `home/rows.ts`. Pages without one get generated box art (`boxArt.ts`).
+- Brand lettering (hero titles, header wordmark) carries `data-keep-font` so the site font switcher can't replace Pip3 there.
+
+### Noun World audio
+
+- **Radio stations** (`world2/audio/GameRadio.ts`): COMMUNITY RADIO (the shared ice-cream-van station: real music from `public/fm/playlist.json` plus jingles), NOUN BEATS (generated hip hop, an AudioWorklet) and optional live streams. The site-wide player outside the game is NOUN FM (`src/components/NounFm`).
+- **Rider callouts** (`world2/audio/voice/callouts.ts`): at least 30 s between any two lines, and lines inside that gap are dropped. The rider uses one fixed deep male Piper voice (`RIDER_VOICE` in `ttsVoice.ts`); each sentence is synthesised separately so "Who's the goat?... Me." keeps its pause.
+
+### Security headers
+
+`public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
 
 ## Image System
 

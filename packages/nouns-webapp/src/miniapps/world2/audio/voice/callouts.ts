@@ -41,7 +41,9 @@ export const CALLOUTS: Record<CalloutEvent, readonly CalloutLine[]> = {
     { say: 'New record, baby!' },
     { say: 'Hell yeah! Personal best!', clean: 'Oh yeah! Personal best!' },
     { say: 'Write that down!' },
-    { say: "Who's the goat? Me." },
+    // Two beats: each sentence is synthesized on its own with a real pause
+    // between (piperText.sentences); the "..." makes it the long one
+    { say: "Who's the goat?... Me." },
     { say: 'Fuck yes! Fuck yes!', clean: 'Yes! Yes! Yes!' },
   ],
 };

@@ -25,7 +25,8 @@ export const ACCENT: Record<string, string> = {
 function titleSize(title: string): string {
   const longest = Math.max(...title.split(' ').map(w => w.length));
   if (title.length <= 5) return 'is-xl';
-  if (longest <= 6 && title.length <= 12) return 'is-l';
+  // 6+ letter words overflow the card at is-l and break mid-word ("SUBMI/T")
+  if (longest <= 5 && title.length <= 12) return 'is-l';
   if (longest <= 9) return 'is-m';
   return 'is-s';
 }

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 
 import { claimAudio } from '@/lib/nounFmBus';
 
-import { GameRadio } from './audio/GameRadio';
+import { GameRadio, type RadioMode } from './audio/GameRadio';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
 import { seedVoice } from './audio/voice/cast';
@@ -167,7 +167,7 @@ export interface HudState {
   quality: Quality;
   camMode: string;
   timeOfDay: TimeOfDayPreset;
-  radio: { on: boolean; label: string; at: number };
+  radio: { on: boolean; mode: RadioMode; label: string; at: number };
   /** Spray colour + whether the crosshair is on a paintable surface. */
   spray: { color: string; aiming: boolean; active: boolean };
   baked: boolean;
@@ -366,7 +366,7 @@ export class Game {
       quality,
       camMode: 'follow',
       timeOfDay: 'afternoon',
-      radio: { on: false, label: 'radio off', at: 0 },
+      radio: { on: false, mode: 'off', label: 'radio off', at: 0 },
       spray: { color: '#f3322c', aiming: false, active: false },
       baked: false,
       mountain: null,
@@ -596,7 +596,12 @@ export class Game {
       this.radio.onNowPlaying = label => {
         this.hud = {
           ...this.hud,
-          radio: { on: this.radio.mode !== 'off', label, at: performance.now() },
+          radio: {
+            on: this.radio.mode !== 'off',
+            mode: this.radio.mode,
+            label,
+            at: performance.now(),
+          },
         };
         this.emit();
       };

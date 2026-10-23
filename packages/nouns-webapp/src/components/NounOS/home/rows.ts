@@ -122,6 +122,8 @@ export interface Slide {
   cta?: string;
   /** Brand slide: the second button browses the shelves instead of MORE INFO */
   browse?: boolean;
+  /** A voice-over read over it, once per page view, sound on only (voiceOver.ts) */
+  vo?: string;
   /** How long it stays up, ms */
   ms: number;
 }
@@ -140,6 +142,7 @@ export const HERO_SLIDES: Slide[] = [
     game: 'world',
     cta: 'PLAY NOUN WORLD',
     browse: true,
+    vo: '/home/vo-intro.mp3',
     ms: 16900,
   },
   {
@@ -184,6 +187,8 @@ export interface Client {
   url: string;
   name: string;
   blurb: string;
+  /** 2:3 portrait poster (a tilted screenshot of the site + a Noun) */
+  card: string;
 }
 
 /** Other Nouns clients (each checked live before it was listed). Open in a new tab. */
@@ -192,23 +197,32 @@ export const CLIENTS: Client[] = [
     url: 'https://nouns.wtf',
     name: 'NOUNS.WTF',
     blurb: 'the original. daily auction and the dao.',
+    card: '/home/covers/client-nouns-wtf.webp',
   },
   {
     url: 'https://www.nouns.camp',
     name: 'NOUNS CAMP',
     blurb: 'governance client. read props, vote, propose.',
+    card: '/home/covers/client-nouns-camp.webp',
   },
   {
     url: 'https://nouns.game',
     name: 'NOUNS GAME',
     blurb: 'another nounish corner of the internet. go play.',
+    card: '/home/covers/client-nouns-game.webp',
   },
   {
     url: 'https://lilnouns.wtf',
     name: 'LIL NOUNS',
     blurb: 'the lil sibling dao. lil nouns, lil auctions, own treasury.',
+    card: '/home/covers/client-lilnouns.webp',
   },
-  { url: 'https://nouns.build', name: 'NOUNS BUILDER', blurb: 'spin up your own nouns-style dao.' },
+  {
+    url: 'https://nouns.build',
+    name: 'NOUNS BUILDER',
+    blurb: 'spin up your own nouns-style dao.',
+    card: '/home/covers/client-nouns-build.webp',
+  },
 ];
 
 /**
@@ -367,6 +381,8 @@ export function buildRows(catalog: Section[], community: CommunityEntry[] = []):
       blurb: c.blurb,
       group: 'clients',
       label: hostOf(c.url),
+      cover: c.card,
+      coverFocus: '50% 50%',
       action: { t: 'external', url: c.url },
       external: true,
     })),

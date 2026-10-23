@@ -37,7 +37,12 @@ export interface TtsVoice {
   unison: number;
   /** The Oracle's crystal echo (0..1). */
   echo: number;
+  /** Silence between sentences, as heard (s). */
+  gap: number;
 }
+
+/** Between an NPC's sentences: about native Piper's sentence_silence. */
+export const NPC_GAP = 0.25;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -66,8 +71,33 @@ export function ttsVoiceOf(v: VoiceParams): TtsVoice {
     noiseW: Math.round((0.6 + ((h >>> 12) % 300) / 1000) * 1000) / 1000,
     unison: v.unison > 1 ? Math.max(60, v.detune * 6) : 0,
     echo: clamp(v.shimmer, 0, 1),
+    gap: NPC_GAP,
   };
 }
+
+/**
+ * The player's own voice: one hand-picked LibriTTS-R speaker, not a seed
+ * lottery. Seed-picked speakers were half women, and the seed's babble pitch
+ * pushed many up to +220 cents, which (pitched by resampling) is what made the
+ * rider sound robotic. RIDER_SPEAKER was picked by rendering all 904 speakers
+ * and pitch-tracking the callout bank: a male read with a clean, unbroken pitch
+ * contour and a lively range (median F0 ~91 Hz calm, ~101 Hz shouting). No
+ * pitch shift (a deeper speaker beats resampling down: that's slow and muddy),
+ * Piper's own expressive noise defaults (lower
+ * noise_scale / noise_w is what sounds flat and robotic), natural pace, and a
+ * real beat between a callout's sentences ("Who's the goat? ... Me.").
+ */
+export const RIDER_SPEAKER = 479; // LibriTTS-R speaker "8875"
+export const RIDER_VOICE: TtsVoice = {
+  speaker: RIDER_SPEAKER,
+  pitch: 0,
+  rate: 1,
+  noise: 0.667,
+  noiseW: 0.8,
+  unison: 0,
+  echo: 0,
+  gap: 0.6,
+};
 
 /** The same voice, revved up (the rider shouting a callout). */
 export function hyped(t: TtsVoice, k = 1.06): TtsVoice {
@@ -77,6 +107,9 @@ export function hyped(t: TtsVoice, k = 1.06): TtsVoice {
 /** Playback rate the pitch shift implies. */
 export const pitchFactor = (cents: number) => 2 ** (cents / 1200);
 
+/** The gap to put in the synthesized clip so it's `t.gap` once pitch playback speeds it up. */
+export const sentenceGap = (t: TtsVoice) => t.gap * pitchFactor(t.pitch);
+
 /** Piper's inference scales for a voice: [noise_scale, length_scale, noise_w]. */
 export function modelScales(t: TtsVoice): [number, number, number] {
   // Slow synthesis by the pitch factor: playback speeds it back up
@@ -85,5 +118,5 @@ export function modelScales(t: TtsVoice): [number, number, number] {
 
 /** Cache key for one synthesized line. */
 export function lineKey(text: string, t: TtsVoice): string {
-  return `${t.speaker}|${t.pitch}|${t.rate}|${t.noise}|${t.noiseW}|${text}`;
+  return `${t.speaker}|${t.pitch}|${t.rate}|${t.noise}|${t.noiseW}|${t.gap}|${text}`;
 }

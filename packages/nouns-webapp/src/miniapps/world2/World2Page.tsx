@@ -46,6 +46,12 @@ import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
 
+/** The radio stations in M-cycle order, for the HUD's station strip. */
+const RADIO_STATIONS: { mode: 'fm' | 'beats'; name: string }[] = [
+  { mode: 'fm', name: 'COMMUNITY RADIO' },
+  { mode: 'beats', name: 'NOUN BEATS (hip-hop)' },
+];
+
 const CONTROLS: { k: string; v: string }[] = [
   { k: 'W', v: 'push' },
   { k: 'A / D', v: 'carve, spin in air' },
@@ -63,7 +69,8 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
   { k: 'B', v: 'map' },
-  { k: 'M / .', v: 'radio (COMMUNITY RADIO, NOUN BEATS, off), next track' },
+  { k: 'M', v: 'radio station: COMMUNITY RADIO → NOUN BEATS (hip-hop) → off' },
+  { k: '.', v: 'next track (NOUN BEATS: a fresh beat)' },
   { k: 'E (in the van)', v: 'COMMUNITY RADIO decks: queue a track, book a DJ set' },
   {
     k: 'E (cab door)',
@@ -663,15 +670,25 @@ function Hud({
             <button
               type="button"
               className={`w2-chip text-xs ${hud.radio.on ? 'w2-on' : ''}`}
-              onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
+              onClick={() => game.cycleRadio()}
               onContextMenu={e => {
                 e.preventDefault();
-                game.cycleRadio();
+                game.nextRadioTrack();
               }}
-              title="Radio: M station, . next track (right-click: change station)"
+              title={`Change station (M): ${RADIO_STATIONS.map(r => r.name).join(' → ')} → off`}
             >
               📻 {hud.radio.on ? hud.radio.label : 'radio off'}
             </button>
+            {hud.radio.on && (
+              <button
+                type="button"
+                className="w2-chip text-xs"
+                onClick={() => game.nextRadioTrack()}
+                title={hud.radio.mode === 'beats' ? 'Fresh beat (.)' : 'Next track (.)'}
+              >
+                ⏭
+              </button>
+            )}
           </>
         )}
         <StatsChip
@@ -695,6 +712,14 @@ function Hud({
             {hud.radio.label.startsWith('COMMUNITY RADIO') ? ' ON COMMUNITY RADIO' : ''}
           </span>
           <b>{hud.radio.label}</b>
+          <span className="w2-np-stations">
+            {RADIO_STATIONS.map(r => (
+              <i key={r.mode} className={r.mode === hud.radio.mode ? 'w2-np-cur' : ''}>
+                {r.name}
+              </i>
+            ))}
+            <i>{touch ? 'tap the station to switch' : 'M to switch'}</i>
+          </span>
         </div>
       )}
 
@@ -834,7 +859,7 @@ const CSS = `
 .w2-banked{font-size:clamp(30px,5vw,60px);font-weight:900;color:#3ddc84;font-style:italic;text-shadow:0 3px 0 #0b5a2f;animation:w2bank 2.6s ease-out forwards}
 .w2-bailed{color:#ff4d3d;text-shadow:0 3px 0 #6a0f06}
 @keyframes w2bank{0%{transform:scale(.6);opacity:0}10%{transform:scale(1.1);opacity:1}20%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-20px)}}
-.w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
+.w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}.w2-np-stations{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;margin-top:2px}.w2-np-stations i{font-style:normal;opacity:.55}.w2-np-stations i.w2-np-cur{opacity:1;font-weight:800;text-decoration:underline}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-panel{background:rgba(10,12,20,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;font-family:system-ui,sans-serif;white-space:normal;box-shadow:0 12px 40px rgba(0,0,0,.45)}

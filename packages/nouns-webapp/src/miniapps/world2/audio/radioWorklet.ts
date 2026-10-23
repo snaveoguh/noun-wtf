@@ -4,9 +4,14 @@
 // AudioWorklet, so the music can't drop out when the 3D frame loop stalls
 // on shader compiles, level loads or GC.
 //
+// Boom bap: 85-95 BPM, swung 16ths (56-62%), a heavy kick and a fat
+// backbeat snare on 2 and 4, dusty Rhodes chords or chopped stabs, a
+// round bass under the kick, vocal chops and a vinyl crackle bed, with the
+// whole music bus rolled off like a sampled record.
+//
 // Every song is generated from scratch: key, tempo, scale, progression,
-// drum programming, 808 line, motif, lead instruments and song form. Within
-// a song, patterns keep mutating (hat rolls, kick variants, motif
+// drum programming, bass line, motif, lead instruments and song form.
+// Within a song, patterns keep mutating (kick variants, ghost notes, motif
 // inversions, fills, drops), so it can run for hours without repeating.
 
 declare const sampleRate: number;
@@ -238,10 +243,10 @@ class Kick extends Voice {
     this.penv *= this.pc;
     this.ph += f / SR;
     let s = Math.sin(TAU * this.ph) * this.env;
-    if (this.age < SR * 0.004) s += noise() * 0.35 * (1 - this.age / (SR * 0.004));
+    if (this.age < SR * 0.006) s += noise() * 0.5 * (1 - this.age / (SR * 0.006));
     this.env *= this.ec;
     if (++this.age > SR * 1.5 || this.env < 1e-4) this.done = true;
-    return Math.tanh(s * this.drive) * 0.5 * this.vel;
+    return Math.tanh(s * this.drive) * 0.62 * this.vel;
   }
 }
 
@@ -249,7 +254,7 @@ class Snare extends Voice {
   private ph = 0;
   private tone = 1;
   private nz = 1;
-  private tc = decayCoef(0.07);
+  private tc = decayCoef(0.1);
   private nc: number;
   private f: SVF;
   private bursts: number;
@@ -267,8 +272,8 @@ class Snare extends Voice {
     this.bursts = clap ? 3 : 0;
   }
   tick() {
-    this.ph += (175 + 40 * this.tone) / SR;
-    const t = Math.sin(TAU * this.ph) * this.tone * 0.5;
+    this.ph += (180 + 60 * this.tone) / SR;
+    const t = Math.sin(TAU * this.ph) * this.tone * 0.9;
     this.tone *= this.tc;
     // Clap: a few retriggered bursts before the body
     let amp = this.nz;
@@ -277,10 +282,10 @@ class Snare extends Voice {
       if (ms < 30) amp = Math.exp(-(ms % 10) / 2.2);
     }
     this.f.tick(noise());
-    const s = (this.f.bp * 1.6 + this.f.hp * 0.35) * amp + (this.bursts > 0 ? 0 : t);
+    const s = (this.f.bp * 1.6 + this.f.hp * 0.35) * amp + t;
     this.nz *= this.nc;
     if (++this.age > SR * 2 || this.nz < 1e-4) this.done = true;
-    return s * this.vel * 0.85;
+    return Math.tanh(s * 1.5) * this.vel * 0.7;
   }
 }
 
@@ -469,6 +474,41 @@ class Bell extends Voice {
     this.idx *= this.ic;
     if (++this.age > SR * 6 || this.env < 1e-4) this.done = true;
     return s * this.vel * 0.26;
+  }
+}
+
+/** Electric piano (Rhodes-ish): 2-op FM tine with a bark that fades, tremolo. */
+class Rhodes extends Voice {
+  private ph = 0;
+  private env = 1;
+  private ec = decayCoef(2.4);
+  private idx: number;
+  private ic = decayCoef(0.25);
+  private rel = 1;
+  private relC = decayCoef(0.09);
+  private trem = Math.random() * TAU;
+  constructor(
+    private hz: number,
+    private len: number,
+    private vel: number,
+  ) {
+    super();
+    this.idx = 1.1 + vel * 1.4;
+  }
+  tick() {
+    this.ph += this.hz / SR;
+    if (this.ph > 1) this.ph -= 1;
+    this.trem += (4.6 * TAU) / SR;
+    // 1:1 FM: a warm sine with a bright bark on the attack
+    const s =
+      Math.sin(TAU * this.ph + (0.35 + this.idx) * Math.sin(TAU * this.ph)) *
+      this.env *
+      (1 + 0.12 * Math.sin(this.trem));
+    this.env *= this.ec;
+    this.idx *= this.ic;
+    if (this.age > this.len) this.rel *= this.relC;
+    if (++this.age > SR * 5 || this.rel < 1e-3) this.done = true;
+    return s * this.rel * this.vel * 0.09;
   }
 }
 
@@ -685,7 +725,8 @@ interface Song {
   prog: number[];
   swing: number;
   kicks: number[][];
-  snareFull: boolean;
+  ghostSnares: number[];
+  ghostHats: number;
   hatDiv: number;
   openHats: number[];
   percSteps: number[];
@@ -695,10 +736,15 @@ interface Song {
   counter: Note[];
   lead: Lead;
   lead2: Lead;
-  pad: 'saw' | 'choir' | 'glass';
+  keys: 'rhodes' | 'stab' | 'pad';
+  /** The keys loop: [step, length in steps] hits per bar. */
+  comp: [number, number][];
   padCutoff: number;
   kickTune: number;
   kickDecay: number;
+  kickDrive: number;
+  /** Music-bus rolloff (Hz): the sampled-off-a-record dust. */
+  dust: number;
   drive: number;
   snareColor: number;
   snareDecay: number;
@@ -735,6 +781,12 @@ const WORDS_A = [
   'cloud',
   'bleach',
   'paper',
+  'dusty',
+  'smoky',
+  'golden',
+  'late',
+  'basement',
+  'boom',
 ];
 const WORDS_B = [
   'noggles',
@@ -762,6 +814,12 @@ const WORDS_B = [
   'reserve',
   'basement',
   'halo',
+  'breaks',
+  'crates',
+  'cypher',
+  'stoop',
+  'loops',
+  'block',
 ];
 
 function genMotif(len: number, density: number, lo: number, hi: number): Note[] {
@@ -857,27 +915,76 @@ function genSong(): Song {
   const prog = pick(progs).slice();
   if (chance(0.3)) prog[prog.length - 1] = pick([4, 6, 1]);
 
-  const kickPool = [3, 6, 7, 10, 11, 13, 14];
-  const base = [0];
-  const nExtra = irange(1, 3);
-  for (let i = 0; i < nExtra; i++) {
-    const s = pick(kickPool);
-    if (!base.includes(s)) base.push(s);
-  }
+  // Boom-bap kick patterns (16ths): the "boom" on 1, pushes around beat 3
+  const kickPats = [
+    [0, 10],
+    [0, 7, 10],
+    [0, 3, 10],
+    [0, 10, 11],
+    [0, 6, 10],
+    [0, 2, 10],
+    [0, 7, 9],
+    [0, 3, 7, 10],
+  ];
+  const base = pick(kickPats).slice();
   const vary = (k: number[]) => {
     const v = k.slice();
-    if (chance(0.5) && v.length > 1) v.splice(irange(1, v.length - 1), 1);
-    const s = pick(kickPool);
+    const s = pick([2, 6, 11, 14, 15]);
     if (!v.includes(s)) v.push(s);
+    if (chance(0.35) && v.length > 2) v.splice(irange(1, v.length - 1), 1);
     return v.sort((a, b) => a - b);
   };
-  const kicks = [base.sort((a, b) => a - b), vary(base), vary(base)];
+  const kicks = [base, vary(base), vary(base)];
 
-  const leads: Lead[] = ['bell', 'musicbox', 'glass', 'pluck', 'flute', 'chop', 'saw'];
+  // Rhodes comping loops ([step, length]) and dusty chord stabs
+  const comps: [number, number][][] = [
+    [[0, 14]],
+    [
+      [0, 6],
+      [6, 4],
+      [10, 6],
+    ],
+    [
+      [0, 3],
+      [3, 7],
+      [10, 6],
+    ],
+    [
+      [0, 10],
+      [10, 6],
+    ],
+    [
+      [0, 4],
+      [7, 2],
+      [10, 5],
+    ],
+  ];
+  const stabs: [number, number][][] = [
+    [
+      [0, 1],
+      [3, 1],
+      [10, 2],
+    ],
+    [
+      [0, 2],
+      [6, 1],
+      [11, 1],
+    ],
+    [
+      [0, 1],
+      [7, 1],
+      [10, 1],
+      [14, 1],
+    ],
+  ];
+  const keys = pick(['rhodes', 'rhodes', 'rhodes', 'stab', 'stab', 'pad'] as const);
+
+  // Sample-chop flavour up front; the shiny synths only now and then
+  const leads: Lead[] = ['chop', 'chop', 'chop', 'pluck', 'flute', 'musicbox', 'bell', 'saw'];
   const lead = pick(leads);
   let lead2 = pick(leads);
   if (lead2 === lead) lead2 = pick(leads);
-  const bpm = Math.round(range(128, 152));
+  const bpm = Math.round(range(85, 95));
   const beat = 60 / bpm;
 
   return {
@@ -886,30 +993,35 @@ function genSong(): Song {
     root: irange(36, 46),
     scale: SCALES[scaleName]!,
     prog,
-    swing: chance(0.5) ? range(0, 0.12) : 0,
+    // 56-62% swing: the off 16th lands this far (in 16ths) behind the grid
+    swing: range(0.12, 0.24),
     kicks,
-    snareFull: chance(0.18),
-    hatDiv: chance(0.6) ? 2 : 1,
-    openHats: chance(0.5) ? [pick([6, 14, 10])] : [],
-    percSteps: [pick([3, 5, 7, 11, 13, 15]), pick([3, 5, 7, 11, 13, 15])],
-    percHz: pick([800, 1200, 1600, 2400, 520]),
+    ghostSnares: chance(0.7) ? [pick([7, 9]), pick([15, 13])] : [pick([7, 15])],
+    ghostHats: range(0.1, 0.45),
+    hatDiv: chance(0.8) ? 2 : 1,
+    openHats: chance(0.6) ? [pick([14, 6, 10])] : [],
+    percSteps: [pick([3, 5, 11, 13]), pick([7, 15])],
+    percHz: pick([520, 800, 1200]),
     bassNotes: [0, 0, 0, pick([4, 7, -3]), pick([0, 7, 2])],
-    motif: genMotif(32, range(0.22, 0.42), 0, 11),
-    counter: genMotif(32, range(0.1, 0.2), -2, 7),
+    motif: genMotif(32, range(0.18, 0.34), 0, 11),
+    counter: genMotif(32, range(0.08, 0.16), -2, 7),
     lead,
     lead2,
-    pad: pick(['saw', 'saw', 'choir', 'glass']),
-    padCutoff: range(700, 2000),
-    kickTune: range(42, 55),
-    kickDecay: range(0.25, 0.5),
-    drive: range(1.4, 3.2),
-    snareColor: range(1300, 2600),
-    snareDecay: range(0.12, 0.28),
-    clap: chance(0.45),
-    hatTone: range(0.85, 1.3),
-    rain: chance(0.5) ? range(0.2, 1) : 0,
+    keys,
+    comp: keys === 'stab' ? pick(stabs) : pick(comps),
+    padCutoff: range(600, 1300),
+    kickTune: range(47, 56),
+    kickDecay: range(0.3, 0.48),
+    kickDrive: range(2.2, 3.2),
+    dust: range(4200, 7000),
+    drive: range(1.1, 1.8),
+    snareColor: range(1500, 2400),
+    snareDecay: range(0.14, 0.22),
+    clap: chance(0.35),
+    hatTone: range(0.7, 0.95),
+    rain: range(0.35, 0.8),
     form: genForm(),
-    glide: range(35, 110) * (beat / 0.43),
+    glide: range(35, 80) * (beat / 0.43),
   };
 }
 
@@ -993,7 +1105,12 @@ class NounRadio extends AudioWorkletProcessor {
     this.delay.fb = range(0.3, 0.55);
     this.reverb.setSize(range(0.82, 0.9), range(0.25, 0.5));
     this.newBarPatterns();
-    this.port.postMessage({ type: 'song', name: s.name, bpm: s.bpm });
+    this.port.postMessage({
+      type: 'song',
+      name: s.name,
+      bpm: s.bpm,
+      swing: Math.round((50 + s.swing * 50) * 10) / 10,
+    });
   }
 
   private get kind(): SectionKind {
@@ -1008,18 +1125,19 @@ class NounRadio extends AudioWorkletProcessor {
     // Fresh hat rolls every bar: where, and what kind
     this.hatRolls.clear();
     const k = this.kind;
-    const n = k === 'hook' ? irange(1, 3) : k === 'verse' ? irange(0, 2) : 0;
-    for (let i = 0; i < n; i++)
-      this.hatRolls.set(pick([3, 6, 7, 10, 11, 14, 15]), pick([2, 3, 4, 6]));
+    const n = k === 'hook' && this.bar % 4 === 3 ? irange(0, 1) : 0;
+    for (let i = 0; i < n; i++) this.hatRolls.set(pick([7, 15]), 2);
     if (this.bar % 4 === 0) this.kickVar = chance(0.6) ? 0 : irange(1, 2);
     if (this.bar % 4 === 0)
       this.motifOp = this.kind === 'hook' ? pick([0, 0, 0, 1, 2, 3]) : pick([0, 1, 2, 3, 4, 5]);
     // Section filter
     const lastOfSection = this.sectionBar === (this.song.form[this.section]?.bars ?? 1) - 1;
-    if (k === 'intro') this.musicCutTarget = 1600 + 6000 * (this.sectionBar / 8);
-    else if (k === 'break') this.musicCutTarget = lastOfSection ? 6000 : 1100;
-    else if (k === 'outro') this.musicCutTarget = Math.max(500, 6000 - this.sectionBar * 1200);
-    else this.musicCutTarget = 18000;
+    const dust = this.song.dust;
+    if (k === 'intro')
+      this.musicCutTarget = Math.min(dust, 900 + (dust - 900) * (this.sectionBar / 4));
+    else if (k === 'break') this.musicCutTarget = lastOfSection ? dust : 1100;
+    else if (k === 'outro') this.musicCutTarget = Math.max(500, dust - this.sectionBar * 1000);
+    else this.musicCutTarget = dust;
   }
 
   private at(offset: number, fn: () => void) {
@@ -1136,30 +1254,45 @@ class NounRadio extends AudioWorkletProcessor {
     if (st === 0 && lastBar && (this.nextKind === 'hook' || k === 'break'))
       this.add(new Riser(Math.round(sixteenth * 16), k === 'break' ? 1 : 0.6).sends(0.5).pan(0));
 
-    // Pads: a chord per bar
-    if (st === 0) {
-      const padVel = k === 'hook' ? 0.8 : k === 'verse' ? 0.6 : 1;
-      const tones = [0, 2, 4, 6, chance(0.5) ? 8 : 9];
-      const barLen = sixteenth * 16;
-      tones.forEach((t, i) => {
-        const hz = midiHz(this.noteMidi(chord + t, 1));
-        if (s.pad === 'glass') {
-          if (i < 4)
-            this.add(new Bell(hz, 1, 1.2, 2.6, 0.2 * padVel).sends(0.85).pan(i % 2 ? 0.5 : -0.5));
-        } else
-          this.add(
-            new PadNote(
-              hz,
-              barLen * 1.02,
-              s.padCutoff,
-              s.pad === 'choir' ? 0.5 : 0.35,
-              padVel,
-              s.pad === 'choir',
-            )
-              .sends(0.75)
-              .pan(i % 2 ? 0.55 : -0.55),
+    // Keys: a Rhodes loop, dusty chord stabs or a dark pad, on the chord
+    if (k !== 'outro' || this.sectionBar < sectionBars - 1) {
+      const keysVel = k === 'hook' ? 0.85 : k === 'verse' ? 0.7 : 0.8;
+      // rootless voicing: 3rd, 5th, 7th, 9th
+      const tones = [2, 4, 6, 8];
+      if (s.keys === 'pad') {
+        if (st === 0)
+          tones.forEach((t, i) =>
+            this.add(
+              new PadNote(
+                midiHz(this.noteMidi(chord + t, 1)),
+                sixteenth * 16 * 1.02,
+                s.padCutoff,
+                0.35,
+                keysVel,
+                false,
+              )
+                .sends(0.6)
+                .pan(i % 2 ? 0.45 : -0.45),
+            ),
           );
-      });
+      } else {
+        for (const [cs, cl] of s.comp) {
+          if (cs !== st) continue;
+          const stab = s.keys === 'stab';
+          const vel = keysVel * (cs === 0 ? 1 : 0.8) * range(0.85, 1);
+          tones.forEach((t, i) => {
+            const hz = midiHz(this.noteMidi(chord + t, 1));
+            // a hair of strum, like fingers on real keys
+            this.at(swing + i * SR * 0.004, () =>
+              this.add(
+                new Rhodes(hz, Math.round(cl * sixteenth * (stab ? 0.7 : 0.95)), vel)
+                  .sends(stab ? 0.35 : 0.25, stab ? 0.25 : 0.05)
+                  .pan(i % 2 ? 0.35 : -0.35),
+              ),
+            );
+          });
+        }
+      }
     }
 
     // Lead / motif
@@ -1193,14 +1326,14 @@ class NounRadio extends AudioWorkletProcessor {
       const fillBar = this.bar % 4 === 3;
       if (kickPat.includes(st) || (fillBar && st === 14 && chance(0.5))) {
         this.at(swing, () => {
-          this.add(new Kick(160, s.kickTune, s.kickDecay, 1.6, 1).pan(0));
+          this.add(new Kick(140, s.kickTune, s.kickDecay, s.kickDrive, st === 0 ? 1 : 0.88).pan(0));
           this.duckEnv = 1;
         });
         // 808 rides the kick
         const bn = pick(s.bassNotes);
         let len = 1;
         while (len < 16 && !kickPat.includes((st + len) % 16)) len++;
-        const slide = chance(fillBar ? 0.5 : 0.18);
+        const slide = chance(fillBar ? 0.25 : 0.06);
         const hz = midiHz(this.noteMidi(chord + bn, -1));
         this.at(swing, () =>
           this.bass.trigger(hz, Math.round(len * sixteenth * 0.95), false, s.glide),
@@ -1210,8 +1343,8 @@ class NounRadio extends AudioWorkletProcessor {
             this.bass.trigger(hz * pick([2, 1.5, 0.75]), Math.round(sixteenth * 2), true, s.glide),
           );
       }
-      const snareSteps = s.snareFull ? [4, 12] : [8];
-      if (snareSteps.includes(st))
+      // The backbeat: 2 and 4
+      if (st === 4 || st === 12)
         this.at(swing, () =>
           this.add(new Snare(1, s.snareDecay, s.snareColor, s.clap).sends(0.35).pan(0)),
         );
@@ -1221,8 +1354,10 @@ class NounRadio extends AudioWorkletProcessor {
           this.at(swing + (r * sixteenth) / 2, () =>
             this.add(new Snare(0.35 + 0.15 * r, 0.08, s.snareColor, false).sends(0.3).pan(0.1)),
           );
-      else if (chance(0.06))
-        this.at(swing, () => this.add(new Snare(0.25, 0.06, s.snareColor, false).sends(0.2)));
+      else if (s.ghostSnares.includes(st) && chance(0.55))
+        this.at(swing, () =>
+          this.add(new Snare(range(0.16, 0.26), 0.06, s.snareColor, false).sends(0.2)),
+        );
 
       // Hats
       const roll = this.hatRolls.get(st);
@@ -1236,13 +1371,16 @@ class NounRadio extends AudioWorkletProcessor {
             ),
           );
       } else if (st % s.hatDiv === 0) {
-        const vel = st % 4 === 0 ? 0.95 : 0.6 + rng() * 0.2;
+        // offbeat 8ths a touch louder: the head-nod
+        const vel = (st % 4 === 2 ? 0.8 : st % 4 === 0 ? 0.65 : 0.4) + rng() * 0.15;
         this.at(swing, () => {
           this.openHat?.choke();
-          this.add(new Hat(vel, 0.04, s.hatTone).sends(0.08).pan(0.25));
+          this.add(new Hat(vel, 0.05, s.hatTone).sends(0.08).pan(0.25));
         });
+      } else if (chance(s.ghostHats)) {
+        this.at(swing, () => this.add(new Hat(0.25, 0.03, s.hatTone).sends(0.05).pan(0.3)));
       }
-      if (s.openHats.includes(st) && k === 'hook')
+      if (s.openHats.includes(st) && (k === 'hook' || this.bar % 2 === 1))
         this.at(swing, () => {
           const h = new Hat(0.6, 0.35, s.hatTone * 0.9);
           this.openHat = h;
@@ -1297,7 +1435,7 @@ class NounRadio extends AudioWorkletProcessor {
       this.now += n;
       return true;
     }
-    const rainLvl = this.song.rain * 0.035;
+    const rainLvl = this.song.rain * 0.012;
     for (let i = 0; i < n; i++) {
       if (this.playing) {
         while (this.now >= this.nextStep) this.advance();
@@ -1334,12 +1472,13 @@ class NounRadio extends AudioWorkletProcessor {
       const b = this.bass.tick();
       dl += b;
       dr += b;
-      // Rain / vinyl bed
+      // Vinyl bed: surface hiss, crackle and the odd pop
       if (rainLvl > 0) {
         this.rainF.tick(noise());
-        const crackle = noise() > 0.9996 ? noise() * 0.4 : 0;
-        ml += (this.rainF.bp * rainLvl + crackle * 0.08) * duck;
-        mr += (this.rainF.bp * rainLvl * 0.9 - crackle * 0.08) * duck;
+        const r = noise();
+        const crackle = r > 0.9975 ? noise() * 0.5 : r < -0.99993 ? noise() * 2.5 : 0;
+        ml += this.rainF.bp * rainLvl + crackle * 0.06;
+        mr += this.rainF.bp * rainLvl * 0.9 - crackle * 0.06;
       }
       this.delay.tick(dly);
       this.reverb.tick(rev + (this.delay.l + this.delay.r) * 0.25);

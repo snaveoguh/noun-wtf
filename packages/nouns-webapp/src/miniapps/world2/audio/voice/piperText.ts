@@ -48,6 +48,32 @@ export function clauses(text: string): { words: string; punct: string }[] {
   return out;
 }
 
+export interface Sentence {
+  text: string;
+  /** Silence after it (s); 0 after the last. */
+  pause: number;
+}
+
+/**
+ * Text → sentences, each synthesized on its own with a real pause after it.
+ * In one ONNX run Piper barely breathes at a "." or "?" ("who's the goat me");
+ * native Piper splits sentences and adds silence between them, so we do too.
+ * An ellipsis ("...", "…") is a longer, dramatic beat.
+ */
+export function sentences(text: string, gap: number): Sentence[] {
+  const t = cleanText(text);
+  const out: Sentence[] = [];
+  // Cut after a run of . ! ? that ends a word ("3.5" and "e.g" stay whole)
+  for (const part of t.split(/(?<=[!.?])\s+/)) {
+    const s = part.trim();
+    if (!/[\p{L}\p{N}]/u.test(s)) continue;
+    const beat = /\.{3}[!.?]*$/.test(s) ? 1.4 : 1;
+    out.push({ text: s, pause: Math.round(gap * beat * 1000) / 1000 });
+  }
+  if (out.length > 0) out[out.length - 1]!.pause = 0;
+  return out;
+}
+
 export type Phonemize = (text: string) => Promise<string>;
 
 /** Clause list → one IPA string with the punctuation put back. */

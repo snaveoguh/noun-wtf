@@ -13,7 +13,7 @@ import type { TtsIn, TtsOut } from './ttsProtocol';
 import * as ort from 'onnxruntime-web/wasm';
 import { phonemize } from 'phonemizer';
 
-import { toIds, toPhonemes } from './piperText';
+import { sentences, toIds, toPhonemes } from './piperText';
 
 const ORT_VERSION = '1.22.0';
 const CACHE = 'noun-world-voices-v1';
@@ -140,6 +140,35 @@ async function synth(
   return { pcm, sampleRate: config.audio.sample_rate };
 }
 
+/** A line, one sentence per run with real silence between (Piper's own sentence_silence). */
+async function synthLine(
+  text: string,
+  speaker: number,
+  scales: [number, number, number],
+  gap: number,
+): Promise<{ pcm: Float32Array; sampleRate: number }> {
+  const parts = sentences(text, gap);
+  if (parts.length <= 1) return synth(parts[0]?.text ?? text, speaker, scales);
+  const clips: Float32Array[] = [];
+  let sampleRate = 22050;
+  let n = 0;
+  for (const s of parts) {
+    const r = await synth(s.text, speaker, scales);
+    sampleRate = r.sampleRate;
+    clips.push(r.pcm);
+    const silence = new Float32Array(Math.round(s.pause * sampleRate));
+    clips.push(silence);
+    n += r.pcm.length + silence.length;
+  }
+  const pcm = new Float32Array(n);
+  let o = 0;
+  for (const c of clips) {
+    pcm.set(c, o);
+    o += c.length;
+  }
+  return { pcm, sampleRate };
+}
+
 self.onmessage = (e: MessageEvent<TtsIn>) => {
   const m = e.data;
   if (m.t === 'init') {
@@ -151,7 +180,7 @@ self.onmessage = (e: MessageEvent<TtsIn>) => {
   }
   if (m.t === 'synth') {
     const t0 = performance.now();
-    synth(m.text, m.speaker, m.scales)
+    synthLine(m.text, m.speaker, m.scales, m.gap)
       .then(({ pcm, sampleRate }) =>
         post({ t: 'audio', id: m.id, pcm, sampleRate, ms: Math.round(performance.now() - t0) }, [
           pcm.buffer,

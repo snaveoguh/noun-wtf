@@ -104,6 +104,16 @@ describe('covers', () => {
     for (const g of GAMES) expect(existsSync(resolve(publicDir, `.${g.card}`)), g.card).toBe(true);
   });
 
+  it('gives every Nouns client its own poster on disk, community stays on generated art', () => {
+    const clients = rows.find(r => r.id === 'clients')!;
+    expect(clients.items).toHaveLength(CLIENTS.length);
+    for (const it of clients.items) {
+      expect(it.cover, it.key).toMatch(/^\/home\/covers\/client-.+\.webp$/);
+      expect(existsSync(resolve(publicDir, `.${it.cover}`)), it.cover).toBe(true);
+    }
+    expect(new Set(CLIENTS.map(c => c.card)).size).toBe(CLIENTS.length);
+  });
+
   it('names posters after the path and leaves unknown pages to the generated box art', () => {
     expect(coverForPath('/world/classic')).toBe('/home/covers/world-classic.webp');
     expect(coverForPath('/explore/wallet')).toBe('/home/covers/explore-wallet.webp');

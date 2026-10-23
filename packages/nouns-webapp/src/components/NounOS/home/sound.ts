@@ -3,6 +3,7 @@
 //   ident()      the "tu-DUM": a boom-bap kick + muted stab, then a warm sub
 //                drop under a dusty minor-9 chord through a short room.
 //   motif(game)  a short hover stinger per featured game.
+//   playFile()   the one file: the hero's voice-over (voiceOver.ts).
 //
 // Browsers only let audio start after the visitor interacts with the page,
 // so on a cold first load the intro is silent; that's fine. Nothing here
@@ -185,13 +186,34 @@ const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
  * (noggles lock in).
  */
 export function ident(soft = false): void {
-  const o = outs(soft ? 0.45 : 0.9);
+  const base = outs(soft ? 0.45 : 0.9);
   const c = ctx;
-  if (!o || !c) return;
+  if (!base || !c || !master) return;
+  // Its own long hall + a dark echo so the DUM rings out (like a held piano
+  // note) instead of stopping dead; built per play, it's a one-off.
+  const hall = c.createConvolver();
+  hall.buffer = impulse(c, 4.5, 2.2);
+  const hallG = c.createGain();
+  hallG.gain.value = soft ? 0.35 : 0.55;
+  const echo = c.createDelay(1);
+  echo.delayTime.value = 0.38;
+  const fb = c.createGain();
+  fb.gain.value = 0.34;
+  const echoTone = c.createBiquadFilter();
+  echoTone.type = 'lowpass';
+  echoTone.frequency.value = 1400;
+  const echoG = c.createGain();
+  echoG.gain.value = 0.3;
+  base.dry.connect(hall).connect(hallG).connect(master);
+  base.dry.connect(echo).connect(echoTone).connect(fb).connect(echo);
+  echoTone.connect(echoG);
+  echoG.connect(hall);
+  echoG.connect(master);
+  const o = base;
   const t0 = c.currentTime + 0.05;
   // timed to the intro: tu as the lenses swing open, DUM as the pupils snap in
-  const tu = t0 + (soft ? 0 : 0.36);
-  const dum = tu + (soft ? 0.44 : 1.38);
+  const tu = t0 + (soft ? 0 : 0.27);
+  const dum = tu + (soft ? 0.44 : 1.05);
 
   // tu: tight kick + muted stab + a vinyl tick
   kick(c, o.dry, tu, 110, 38, 0.3, 0.75);
@@ -254,6 +276,76 @@ export function motif(game: GameId): void {
     });
     stab(c, o.dry, t + 0.32, [hz(50), hz(57), hz(62)], 0.5, 0.07, [2200, 400]);
   }
+}
+
+const files = new Map<string, Promise<AudioBuffer | null>>();
+
+/** A decoded audio file (fetched once per page view). */
+function loadFile(c: Ctx, url: string): Promise<AudioBuffer | null> {
+  let p = files.get(url);
+  if (p === undefined) {
+    p = fetch(url)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then(b => c.decodeAudioData(b))
+      .catch(() => {
+        files.delete(url); // try again next time
+        return null;
+      });
+    files.set(url, p);
+  }
+  return p;
+}
+
+export interface Playback {
+  /** Fade out and stop (safe to call any time, any number of times). */
+  stop(): void;
+  /** Resolves when it finishes, is stopped, or couldn't play. */
+  done: Promise<void>;
+}
+
+/**
+ * Play a voice-over file through the master bus (dry: the file carries its own
+ * room). Only while audio is already running, so it can never be the thing
+ * that makes a page start talking before the visitor turned sound on.
+ */
+export function playFile(url: string, level = 1): Playback | null {
+  const c = audio();
+  if (!c || !master || c.state !== 'running') return null;
+  const g = c.createGain();
+  g.gain.value = level;
+  g.connect(master);
+  let src: AudioBufferSourceNode | null = null;
+  let stopped = false;
+  let finish: () => void = () => undefined;
+  const done = new Promise<void>(r => (finish = r));
+  const end = () => {
+    finish();
+    setTimeout(() => g.disconnect(), 400);
+  };
+  void loadFile(c, url).then(buf => {
+    if (stopped || buf === null || c.state !== 'running') return end();
+    src = c.createBufferSource();
+    src.buffer = buf;
+    src.connect(g);
+    src.onended = end;
+    src.start(c.currentTime + 0.05);
+  });
+  return {
+    done,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      if (src === null) return end();
+      const now = c.currentTime;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setTargetAtTime(0, now, 0.08);
+      try {
+        src.stop(now + 0.35);
+      } catch {
+        end();
+      }
+    },
+  };
 }
 
 /** A tiny tick for focusing cards with the keyboard (sound on only). */

@@ -253,6 +253,8 @@ export const HOME_CSS = `
   background:linear-gradient(180deg,rgba(6,6,9,0) 0%,rgba(6,6,9,.86) 34%,rgba(6,6,9,.97) 100%);
   transform:translateY(102%);transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 .nh-card:hover .nh-info,.nh-card:focus-visible .nh-info{transform:none}
+.nh-title{transition:opacity .25s ease}
+.nh-card:hover .nh-art .nh-title,.nh-card:focus-visible .nh-art .nh-title{opacity:0}
 .nh-info b{font-size:max(12px,8cqw);font-weight:800;line-height:1.05;color:#fff;letter-spacing:.01em}
 .nh-info span{font-size:max(11px,6.6cqw);line-height:1.35;color:rgba(244,242,234,.82);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .nh-info em{font-style:normal;align-self:flex-start;margin-top:2cqw;font-size:max(10px,5.6cqw);font-weight:900;letter-spacing:.1em;color:#000;background:var(--acc);
@@ -362,21 +364,21 @@ body .nh-intro{position:fixed;inset:0;z-index:10000;background:radial-gradient(e
   --nog:#f3322c;--px:min(4.6vw,36px);transition:opacity .26s ease}
 body .nh-intro.is-leaving{opacity:0}
 /* the dive lands in the right pupil (columns 13-14, rows 2-5 of 16x5) */
-body .nh-intro-stage{position:relative;transform-origin:87.5% 60%;animation:nh-dive 5.55s cubic-bezier(.75,0,.9,.2) forwards}
+body .nh-intro-stage{position:relative;transform-origin:87.5% 60%;animation:nh-dive 4.2s cubic-bezier(.75,0,.9,.2) forwards}
 body .nh-nog{display:grid;grid-template-columns:repeat(16,var(--px));grid-template-rows:repeat(5,var(--px));
-  animation:nh-hit .55s cubic-bezier(.2,1.8,.4,1) 1.74s both}
+  animation:nh-hit .5s cubic-bezier(.2,1.8,.4,1) 1.32s both}
 body .nh-nog i{display:block;width:calc(100% + 1px);height:calc(100% + 1px)}
 body .nh-nog .is-R{background:var(--nog);box-shadow:0 0 calc(var(--px) * .6) rgba(243,50,44,.45);
-  animation:nh-px-in .42s cubic-bezier(.2,1.7,.45,1) calc(.3s + var(--x) * 72ms + var(--y) * 24ms) both,
-    nh-glint .5s ease-in-out calc(2.5s + var(--x) * 45ms) both}
+  animation:nh-px-in .36s cubic-bezier(.2,1.7,.45,1) calc(.23s + var(--x) * 55ms + var(--y) * 18ms) both,
+    nh-glint .45s ease-in-out calc(1.9s + var(--x) * 34ms) both}
 body .nh-nog .is-W{background:#fff}
 body .nh-nog .is-B{background:#000}
-body .nh-nog .is-W,body .nh-nog .is-B{animation:nh-eye-in .24s cubic-bezier(.3,1.5,.5,1) calc(1.74s + var(--y) * 18ms) both}
+body .nh-nog .is-W,body .nh-nog .is-B{animation:nh-eye-in .22s cubic-bezier(.3,1.5,.5,1) calc(1.32s + var(--y) * 14ms) both}
 body .nh-intro-streaks{position:absolute;inset:-10% 0;display:flex;justify-content:center;gap:.6vw;pointer-events:none}
 body .nh-intro-streaks i{flex:0 0 2.4vw;height:100%;opacity:0;
   background:linear-gradient(180deg,transparent,hsl(calc(346 + var(--i) * 1.2) 95% calc(48% + var(--i) * .8%)) 28%,hsl(calc(2 + var(--i) * .6) 98% 60%) 72%,transparent);
   box-shadow:0 0 1.2vw hsl(358 95% 55% / .6);
-  animation:nh-streak 1.5s cubic-bezier(.6,0,.9,.4) calc(3.5s + var(--i) * 26ms) both}
+  animation:nh-streak 1.15s cubic-bezier(.6,0,.9,.4) calc(2.65s + var(--i) * 20ms) both}
 body .nh-intro-streaks i:nth-child(3n){filter:brightness(1.5)}
 body .nh-intro-streaks i:nth-child(4n){flex-basis:.6vw}
 body .nh-intro-skip{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-family:${MONO} !important;font-size:11px;letter-spacing:.14em !important;
