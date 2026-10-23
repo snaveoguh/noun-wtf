@@ -253,6 +253,8 @@ export const HOME_CSS = `
   background:linear-gradient(180deg,rgba(6,6,9,0) 0%,rgba(6,6,9,.86) 34%,rgba(6,6,9,.97) 100%);
   transform:translateY(102%);transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 .nh-card:hover .nh-info,.nh-card:focus-visible .nh-info{transform:none}
+.nh-title{transition:opacity .25s ease}
+.nh-card:hover .nh-art .nh-title,.nh-card:focus-visible .nh-art .nh-title{opacity:0}
 .nh-info b{font-size:max(12px,8cqw);font-weight:800;line-height:1.05;color:#fff;letter-spacing:.01em}
 .nh-info span{font-size:max(11px,6.6cqw);line-height:1.35;color:rgba(244,242,234,.82);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .nh-info em{font-style:normal;align-self:flex-start;margin-top:2cqw;font-size:max(10px,5.6cqw);font-weight:900;letter-spacing:.1em;color:#000;background:var(--acc);
