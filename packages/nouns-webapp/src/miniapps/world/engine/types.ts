@@ -375,4 +375,4 @@ export const SEND_INTERVAL = 3;
 export const REMOTE_STALE_MS = 5000;
 export const PARTYKIT_HOST =
   (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_PARTYKIT_HOST) ||
-  'noun-wtf-saber.snaveoguh.partykit.dev';
+  'noun-wtf-party.hugoevans92.workers.dev';
