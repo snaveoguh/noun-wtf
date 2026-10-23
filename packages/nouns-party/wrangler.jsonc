@@ -1,0 +1,14 @@
+// noun.wtf multiplayer: PartyServer on Cloudflare (replaces hosted PartyKit,
+// shut down 2026-10-23). Deploy with `npx wrangler deploy` from this folder.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "noun-wtf-party",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "Main", "class_name": "Main" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Main"] }],
+  "observability": { "enabled": true }
+}
