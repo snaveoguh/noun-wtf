@@ -35,13 +35,12 @@ export interface Game {
   /** Hover preview on its card (Netflix-style) */
   preview?: Clip;
   name: string;
+  /** Wide poster: the hero slide and the MORE INFO sheet */
   cover: string;
+  /** 2:3 portrait box art for its shelf card */
+  card: string;
   /** Where the interesting part of the cover is when it's cropped wide */
   focus: string;
-  /** Same, for the tall 2:3 card */
-  cardFocus: string;
-  /** 5:4 cover (vs the 4:5 Noun World one): the card shows it whole */
-  wide: boolean;
   teaser: string;
   tagline: string;
   facts: string[];
@@ -54,10 +53,9 @@ export const GAMES: Game[] = [
     id: 'world',
     name: 'Noun World',
     cover: '/world2/cover-1200.webp',
+    card: '/home/covers/world.webp',
     preview: CLIPS.worldVhs,
     focus: '50% 62%',
-    cardFocus: '50% 30%',
-    wide: false,
     teaser:
       'Skate a pixel plaza with everyone online. Spray graffiti, talk on voice, chase records and tune into NOUN FM.',
     tagline: 'SKATE · SPRAY · TALK',
@@ -73,9 +71,8 @@ export const GAMES: Game[] = [
     id: 'hoops',
     name: 'Noun Hoops',
     cover: '/world2/hoops-cover.webp',
+    card: '/home/covers/hoops.webp',
     focus: '72% 58%',
-    cardFocus: '50% 50%',
-    wide: true,
     teaser:
       'Three on three at the Noun Jersey court. Cross them up, break ankles, dunk on a Noun with a toaster for a head.',
     tagline: 'DUNK · CROSS · SWISH',
@@ -87,9 +84,8 @@ export const GAMES: Game[] = [
     id: 'warfare',
     name: 'Noun Warfare',
     cover: '/warfare/cover.webp',
+    card: '/home/covers/warfare.webp',
     focus: '72% 58%',
-    cardFocus: '50% 50%',
-    wide: true,
     teaser:
       'Red noggles versus blue noggles. A paintball arena shooter: splat the other team, paint the turf, be the last one dry.',
     tagline: 'SPLAT · CAPTURE · REPEAT',
@@ -215,6 +211,48 @@ export const CLIENTS: Client[] = [
   { url: 'https://nouns.build', name: 'NOUNS BUILDER', blurb: 'spin up your own nouns-style dao.' },
 ];
 
+/**
+ * Catalog pages that have their own 2:3 poster in /home/covers (named after
+ * the path, slashes as dashes). Anything else, community submissions
+ * included, falls back to the generated box art.
+ */
+const COVERED_PATHS = new Set([
+  '/icecreamvan',
+  '/playground',
+  '/crystal-ball',
+  '/pip3',
+  '/studio',
+  '/traits',
+  '/terraforms',
+  '/nonsense',
+  '/world/classic',
+  '/nounv2',
+  '/v2',
+  '/grants',
+  '/hackathons',
+  '/vote',
+  '/candidates',
+  '/create-proposal',
+  '/delegate',
+  '/nounders',
+  '/marketplace',
+  '/exchange',
+  '/predictions',
+  '/settlers',
+  '/gas',
+  '/probe',
+  '/explore/wallet',
+  '/feed',
+  '/dashboard',
+  '/underground',
+]);
+
+/** The poster for a catalog path, if it has one. */
+export function coverForPath(path: string): string | undefined {
+  if (!COVERED_PATHS.has(path)) return undefined;
+  return `/home/covers/${path.replace(/^\//, '').replace(/\//g, '-')}.webp`;
+}
+
 /** Extra things to play, from the catalog, after the three games. */
 const PLAY_PATHS = ['/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
 
@@ -266,10 +304,8 @@ function gameItem(g: Game, group: string, label: string): Item {
     group,
     label,
     hot: true,
-    cover: g.cover,
-    coverFocus: g.cardFocus,
-    coverWide: g.wide,
-    coverTag: g.tagline,
+    cover: g.card,
+    coverFocus: '50% 50%',
     preview: g.preview,
     action: { t: 'game', id: g.id },
   };
@@ -286,6 +322,8 @@ function entryItem(e: Entry, s: Section, group = s.id): Item {
     group,
     label: SHORT_LABEL[s.id] ?? s.title,
     hot: e.hot,
+    cover: coverForPath(e.path),
+    coverFocus: '50% 50%',
     action: { t: 'entry', entry: e },
   };
 }
