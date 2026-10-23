@@ -323,6 +323,47 @@ export function playableClips(m: unknown): Record<string, ClipMeta> {
   return out;
 }
 
+// ── Chat lines in the player's own (trained) voice ───────────────────────
+//
+// With "Let other players hear my voice" on, a typed chat line the player's
+// local model speaks is also recorded as a short clip and uploaded as an
+// *ephemeral* clip: it expires after CHAT_TTL_MS and is only ever the
+// sender's own chat text (there is no "say this" box that speaks for others).
+
+/** Longest chat clip (s). */
+export const CHAT_CLIP_MAX_S = 8;
+/** How long a chat clip is served (ms). */
+export const CHAT_TTL_MS = 10 * 60_000;
+/** Chat text cap (the chat box's own maxLength). */
+export const CHAT_MAX_CHARS = 140;
+export const CHAT_ID_RE = /^[\da-f]{16}$/;
+
+/** A chat clip upload's fields (not the bytes). */
+export function validateChatClip(
+  raw: unknown,
+): Check<{ mime: ClipMime; dur: number; text: string }> {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const mime = baseMime(o.mime);
+  if (mime === null) return { ok: false, error: 'audio must be webm, mp4 or ogg' };
+  const dur = num(o.dur);
+  if (!(dur > 0 && dur <= CHAT_CLIP_MAX_S + 0.6))
+    return { ok: false, error: `chat clips are ${CHAT_CLIP_MAX_S} s at most` };
+  const text = typeof o.text === 'string' ? o.text.trim() : '';
+  if (text === '' || text.length > CHAT_MAX_CHARS) return { ok: false, error: 'bad chat text' };
+  return { ok: true, value: { mime, dur: Math.round(dur * 1000) / 1000, text } };
+}
+
+const BLEEP_RE =
+  /\b(shit\w*|fuck\w*|damn\w*|bitch\w*|bollocks|crap\w*|piss\w*|cunt\w*|dick\w*|cock\w*|asshole\w*)\b/gi;
+
+/** Does chat text swear? (clean listeners skip voiced chat that does) */
+export const chatSwears = (text: string) => new RegExp(BLEEP_RE.source, 'i').test(text);
+
+/** Clean mode for chat said aloud: each swear becomes "bleep". */
+export function bleep(text: string): string {
+  return text.replace(BLEEP_RE, 'bleep');
+}
+
 /** "X of N recorded" for the lines the booth lists. */
 export function progress(lines: readonly BoothLine[], have: ReadonlySet<string>) {
   const done = lines.filter(l => have.has(l.key)).length;

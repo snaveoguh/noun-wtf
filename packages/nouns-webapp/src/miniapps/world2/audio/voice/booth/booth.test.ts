@@ -5,6 +5,8 @@ import { CALLOUTS, CalloutBrain } from '../callouts';
 import {
   allClipKeys,
   analyseClip,
+  bleep,
+  chatSwears,
   boothLines,
   CLIP_MAX_BYTES,
   clipKey,
@@ -181,6 +183,15 @@ describe('who says a line: recording > local model > TTS', () => {
     });
     expect(Object.keys(m)).toEqual(['bail.0']);
     expect(playableClips(null)).toEqual({});
+  });
+});
+
+describe('chat said aloud', () => {
+  it('clean mode bleeps swears before synthesis', () => {
+    expect(bleep('holy shit that was fucking sick')).toBe('holy bleep that was bleep sick');
+    expect(bleep('nice line')).toBe('nice line');
+    expect(chatSwears('Shit!')).toBe(true);
+    expect(chatSwears('scrap metal')).toBe(false);
   });
 });
 
