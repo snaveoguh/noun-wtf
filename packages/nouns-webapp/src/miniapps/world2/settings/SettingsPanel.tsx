@@ -12,8 +12,11 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 
 import { createPortal } from 'react-dom';
 
+import { voiceMutes } from '../audio/voice/booth/runtime';
+import { report as reportVoice } from '../audio/voice/booth/voiceSync';
 import { npcVoice } from '../audio/voice/cast';
 import { PIPER_MODEL_BYTES } from '../audio/voice/ttsVoice';
+import VoiceBooth from '../booth/VoiceBooth';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
 import { resetHudPositions } from '../ui/HudDrag';
@@ -213,6 +216,7 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
               onClick={() => settings.update({ cleanVoices: !s.cleanVoices })}
             />
           </div>
+          <VoiceBoothEntry game={game} />
         </Section>
 
         <Section title="HUD">
@@ -311,6 +315,122 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
           reset all settings
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Voice Booth: the way in, the voice switches, and other riders' voices (mute / report). */
+function VoiceBoothEntry({ game }: { game: Game }) {
+  const s = useSettings();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        data-w2booth=""
+        className="w2-sel min-h-[40px] rounded-xl bg-[#ffd400] px-3 text-xs font-bold text-black"
+        onClick={() => {
+          game.unlockAudio();
+          setOpen(true);
+        }}
+      >
+        🎙 VOICE BOOTH: record your rider’s callouts
+      </button>
+      <div className="grid grid-cols-2 gap-1.5">
+        <Toggle
+          name="Use my voice"
+          on={s.myVoice}
+          onClick={() => settings.update({ myVoice: !s.myVoice })}
+        />
+        <Toggle
+          name="Hear other players' voices"
+          on={s.hearVoices}
+          onClick={() => settings.update({ hearVoices: !s.hearVoices })}
+        />
+        <Toggle
+          name="Use my voice model"
+          on={s.modelVoice}
+          onClick={() => settings.update({ modelVoice: !s.modelVoice })}
+        />
+        <Toggle
+          name="Others hear my model voice"
+          on={s.modelShare}
+          onClick={() => settings.update({ modelShare: !s.modelShare })}
+        />
+      </div>
+      <OtherVoices game={game} />
+      {open &&
+        createPortal(
+          <div
+            className="pointer-events-auto fixed inset-0 z-[950] flex justify-center overflow-y-auto bg-black/70 p-0 sm:p-6"
+            onPointerDown={e => {
+              e.stopPropagation();
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
+          >
+            <div
+              className="w2-panel h-fit min-h-full w-full max-w-[680px] rounded-none sm:min-h-0 sm:rounded-[14px]"
+              style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+            >
+              <VoiceBooth
+                onClose={() => setOpen(false)}
+                modelState={() => game.voices.modelState()}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** Riders here who share a voice: mute it, or report it to the moderators. */
+function OtherVoices({ game }: { game: Game }) {
+  const [, tick] = useState(0);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    const iv = window.setInterval(() => tick(n => n + 1), 1500);
+    return () => window.clearInterval(iv);
+  }, []);
+  const riders = [...game.net.players.values()].filter(p => p.voiceTag !== '');
+  if (riders.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1" data-w2voices-list="">
+      <span className="text-xs">Riders with their own voice</span>
+      {riders.map(p => {
+        const muted = voiceMutes.has(p.voiceTag);
+        return (
+          <div
+            key={p.id}
+            className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 text-xs"
+          >
+            <span className="flex-1 truncate">{p.name || 'noun'}</span>
+            <button
+              type="button"
+              className="rounded-full bg-white/10 px-2 py-1 font-bold"
+              onClick={() => {
+                voiceMutes.set(p.voiceTag, !muted);
+                tick(n => n + 1);
+              }}
+            >
+              {muted ? 'unmute' : 'mute'}
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-white/10 px-2 py-1 font-bold text-[#ff8080]"
+              onClick={() => {
+                voiceMutes.set(p.voiceTag, true);
+                void reportVoice(p.voiceTag, { reason: 'reported in game' })
+                  .then(() => setNote(`Reported ${p.name || 'noun'}'s voice and muted it.`))
+                  .catch(() => setNote(`Muted ${p.name || 'noun'} (report didn't send).`));
+              }}
+            >
+              report
+            </button>
+          </div>
+        );
+      })}
+      {note !== '' && <span className="text-[11px] opacity-70">{note}</span>}
     </div>
   );
 }
