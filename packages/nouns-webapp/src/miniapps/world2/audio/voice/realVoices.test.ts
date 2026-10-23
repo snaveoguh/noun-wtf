@@ -129,20 +129,22 @@ describe('rider callouts', () => {
     expect(bank('record', true)).toContain('Heck yeah, baby!');
   });
 
-  it('cooldowns: one bail per cooldown, a gap between any two callouts', () => {
+  it('cooldowns: one bail per cooldown, at least 30 s between any two callouts', () => {
+    expect(GAP).toBeGreaterThanOrEqual(30);
     const b = new CalloutBrain(fixed(0));
     expect(b.fire('bail', 10)).not.toBeNull();
     expect(b.fire('bail', 10 + COOLDOWN.bail - 0.1)).toBeNull();
     expect(b.fire('speed', 10 + GAP - 0.1)).toBeNull(); // too soon after the bail
     expect(b.fire('speed', 10 + GAP + 0.1)).not.toBeNull();
-    expect(b.fire('bail', 10 + COOLDOWN.bail + 0.1)).not.toBeNull();
+    const speedAt = 10 + GAP + 0.1;
+    expect(b.fire('bail', Math.max(10 + COOLDOWN.bail, speedAt + GAP) + 0.1)).not.toBeNull();
   });
 
-  it('a record cuts through the gap (but not its own cooldown)', () => {
+  it('a record waits out the gap too (dropped, not queued)', () => {
     const b = new CalloutBrain(fixed(0));
     expect(b.fire('bail', 5)).not.toBeNull();
-    expect(b.fire('record', 5.5)).not.toBeNull();
-    expect(b.fire('record', 5.5 + COOLDOWN.record - 1)).toBeNull();
+    expect(b.fire('record', 5.5)).toBeNull();
+    expect(b.fire('record', 5 + GAP + 0.1)).not.toBeNull();
   });
 
   it('never says the same line twice running', () => {

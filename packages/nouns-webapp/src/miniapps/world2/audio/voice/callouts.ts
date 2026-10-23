@@ -2,7 +2,7 @@
 //
 // Pure. A bank of lines per event (a bail, going fast, a new personal best),
 // each with a clean alternative where it swears. CalloutBrain decides when a
-// callout fires: one cooldown per event, a short gap between any two, never
+// callout fires: one cooldown per event, at least 30 s between any two, never
 // the same line twice running, and speed only once per run (it re-arms after
 // you slow right down).
 
@@ -60,9 +60,9 @@ export function bank(ev: CalloutEvent, clean: boolean): string[] {
 }
 
 /** Seconds before the same event may fire again. */
-export const COOLDOWN: Record<CalloutEvent, number> = { bail: 6, speed: 30, record: 12 };
-/** Seconds between any two callouts. */
-export const GAP = 2.5;
+export const COOLDOWN: Record<CalloutEvent, number> = { bail: 45, speed: 60, record: 30 };
+/** Seconds between any two callouts (the rider talks rarely; lines inside it are dropped). */
+export const GAP = 30;
 /** Speed callout fires crossing UP km/h, re-arms below DOWN. */
 export const SPEED_UP_KMH = 50;
 export const SPEED_DOWN_KMH = 28;
@@ -83,8 +83,7 @@ export class CalloutBrain {
   /** Try an event at time `now` (s). Returns the line to say, or null. */
   fire(ev: CalloutEvent, now: number): string | null {
     if (now - this.last[ev] < COOLDOWN[ev]) return null;
-    // A record beats the gap (it's the one you want to hear)
-    if (ev !== 'record' && now - this.lastAny < GAP) return null;
+    if (now - this.lastAny < GAP) return null;
     const lines = CALLOUTS[ev];
     let i = Math.floor(this.rand() * lines.length) % lines.length;
     if (lines.length > 1 && i === this.lastLine[ev]) i = (i + 1) % lines.length;
