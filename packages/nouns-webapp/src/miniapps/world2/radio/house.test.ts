@@ -9,8 +9,8 @@ import {
   HOUSE_DAY_MS,
   HOUSE_JINGLE_P,
   HOUSE_NO_REPEAT_MS,
-  HOUSE_PIRATE_MAX_MS,
-  HOUSE_PIRATE_MIN_MS,
+  HOUSE_GAP_MAX_MS,
+  HOUSE_GAP_MIN_MS,
   houseAt,
   houseDay,
   houseSlot,
@@ -66,7 +66,7 @@ describe('house programme', () => {
     ).not.toEqual(a.map(x => x.kind === 'song' && srcKey(x.track.src)));
   });
 
-  it('runs all day, with only pirate-block holes between items', () => {
+  it('runs all day, with only off-air holes between items', () => {
     const a = houseDay(CAT, DAY);
     expect(a[0]!.at).toBe(DAY);
     let holes = 0;
@@ -74,12 +74,12 @@ describe('house programme', () => {
       const gap = a[i]!.at - a[i - 1]!.endAt;
       if (gap === 0) continue;
       holes++;
-      expect(gap).toBeGreaterThanOrEqual(HOUSE_PIRATE_MIN_MS);
-      expect(gap).toBeLessThanOrEqual(HOUSE_PIRATE_MAX_MS);
+      expect(gap).toBeGreaterThanOrEqual(HOUSE_GAP_MIN_MS);
+      expect(gap).toBeLessThanOrEqual(HOUSE_GAP_MAX_MS);
     }
     expect(holes).toBeGreaterThan(0);
-    // (the day can end inside a pirate block)
-    expect(a[a.length - 1]!.endAt).toBeGreaterThanOrEqual(DAY + HOUSE_DAY_MS - HOUSE_PIRATE_MAX_MS);
+    // (the day can end inside a off-air gap)
+    expect(a[a.length - 1]!.endAt).toBeGreaterThanOrEqual(DAY + HOUSE_DAY_MS - HOUSE_GAP_MAX_MS);
   });
 
   it('never cuts the owner songs short', () => {
@@ -87,14 +87,14 @@ describe('house programme', () => {
       if (s.track.origin === 'owner') expect(s.cut).toBe(false);
   });
 
-  it('a tiny catalogue gets a pirate block after every song (no looping the same two)', () => {
+  it('a tiny catalogue gets a off-air gap after every song (no looping the same two)', () => {
     const a = houseDay({ owner: CAT.owner, library: [], breaks: CAT.breaks }, DAY);
     for (let i = 0; i < a.length - 1; i++) {
       if (a[i]!.kind !== 'song') continue;
       // the song (and its jingle, if any) then a hole before the next song
       const nextSong = a.slice(i + 1).find(x => x.kind === 'song');
       if (nextSong === undefined) continue;
-      expect(nextSong.at - a[i]!.endAt).toBeGreaterThanOrEqual(HOUSE_PIRATE_MIN_MS);
+      expect(nextSong.at - a[i]!.endAt).toBeGreaterThanOrEqual(HOUSE_GAP_MIN_MS);
     }
   });
 
@@ -139,7 +139,7 @@ describe('house programme', () => {
           }
           // the song after a break starts straight away
           const after = a[i + 2];
-          // (unless a pirate block came in between)
+          // (unless a off-air gap came in between)
           if (after?.kind === 'song' && after.at === next.endAt)
             expect(after.startAt).toBe(after.at);
         }

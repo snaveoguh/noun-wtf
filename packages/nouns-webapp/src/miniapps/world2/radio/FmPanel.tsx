@@ -410,7 +410,7 @@ function QueueTab({ fm, view, name }: { fm: NounFm; view: FmView; name: string }
             {view.house !== null
               ? ', the house mix is on'
               : air.track === null
-                ? ', the pirate relay is filling in'
+                ? ', the station is off air'
                 : ''}
           </div>
         )}
@@ -735,7 +735,7 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
   }, [game, onClose]);
   const tune = () => {
     game.unlockAudio();
-    game.radio.setMode(view.tuned ? 'pirate' : 'fm');
+    game.radio.setMode(view.tuned ? 'off' : 'fm');
     game.saveRadioMode();
   };
   const now = performance.now();
@@ -772,7 +772,7 @@ export function FmPanel({ game, onClose }: { game: Game; onClose: () => void }) 
           ) : view.air.track !== null ? (
             `${view.air.track.title} — ${view.air.track.artist}`
           ) : (
-            'nothing queued: pirate relay'
+            'nothing queued: off air'
           )}
         </div>
         <button

@@ -1,7 +1,7 @@
 // ── NOUN FM house programme: what's on when nothing's queued ─────────────
 //
 // When no DJ set is on and nobody has queued a track, NOUN FM runs its own
-// programme instead of falling back to the pirate generator: the owner's own
+// programme instead of going quiet: the owner's own
 // songs (public/world2/fm/songs/manifest.json) randomly interleaved with
 // tracks from DJ sets in the shared set library (~50/50), never the same
 // track twice within an hour. Like a real station it sometimes cuts a song
@@ -30,16 +30,16 @@ export const HOUSE_ALERT_P = 0.5;
 /** Chance a song that plays out is followed by a full Noun F-M jingle. */
 export const HOUSE_JINGLE_P = 0.35;
 /**
- * Pirate blocks: between house songs the procedural pirate station takes
- * over for a while (the house leaves a hole, NounFm falls back to it), so a
+ * Off-air gaps: between house songs the house leaves a hole for a while
+ * (the van goes quiet and the site-wide NOUN FM player plays on), so a
  * small catalogue doesn't loop the same few songs.
  */
-export const HOUSE_PIRATE_MIN_MS = 6 * 60_000;
-export const HOUSE_PIRATE_MAX_MS = 12 * 60_000;
-/** With at least this many tracks, pirate blocks get rarer. */
+export const HOUSE_GAP_MIN_MS = 6 * 60_000;
+export const HOUSE_GAP_MAX_MS = 12 * 60_000;
+/** With at least this many tracks, off-air gaps get rarer. */
 export const HOUSE_BIG_CATALOGUE = 12;
-/** Chance of a pirate block after a song when the catalogue is big. */
-export const HOUSE_PIRATE_P_BIG = 0.25;
+/** Chance of an off-air gap after a song when the catalogue is big. */
+export const HOUSE_GAP_P_BIG = 0.25;
 /** Length of a WORLDWIDE ALERT break (sting + one spoken line). */
 export const HOUSE_ALERT_S = 12;
 
@@ -191,9 +191,9 @@ export function houseDay(cat: HouseCatalog, day: number): HouseItem[] {
       t += len;
       afterBreak = true;
     }
-    if (all.length < HOUSE_BIG_CATALOGUE || r() < HOUSE_PIRATE_P_BIG) {
-      // a hole: the pirate station plays until the next house song
-      t += HOUSE_PIRATE_MIN_MS + Math.round(r() * (HOUSE_PIRATE_MAX_MS - HOUSE_PIRATE_MIN_MS));
+    if (all.length < HOUSE_BIG_CATALOGUE || r() < HOUSE_GAP_P_BIG) {
+      // a hole: off air until the next house song
+      t += HOUSE_GAP_MIN_MS + Math.round(r() * (HOUSE_GAP_MAX_MS - HOUSE_GAP_MIN_MS));
       afterBreak = false;
     }
   }

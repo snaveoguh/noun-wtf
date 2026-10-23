@@ -318,7 +318,7 @@ describe('timeline', () => {
     expect(s.current?.startAt).toBe(end + FM_GAP_MS);
   });
 
-  it('falls back to the pirate station when nothing is on', () => {
+  it('goes off air (fallback) when nothing is on', () => {
     const s = emptyFmState();
     expect(onAir(s, T0)).toMatchObject({ source: 'fallback', track: null, key: '' });
     expect(nextChange(s, T0)).toBeNull();

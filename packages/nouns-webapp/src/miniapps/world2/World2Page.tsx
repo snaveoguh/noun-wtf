@@ -63,7 +63,7 @@ const CONTROLS: { k: string; v: string }[] = [
   { k: 'C', v: 'camera' },
   { k: 'P', v: 'time of day' },
   { k: 'B', v: 'map' },
-  { k: 'M / .', v: 'radio station (pirate, NOUN FM, off), next track' },
+  { k: 'M / .', v: 'radio (NOUN FM from the van, off), next track' },
   { k: 'E (in the van)', v: 'NOUN FM decks: queue a track, book a DJ set' },
   {
     k: 'E (cab door)',

@@ -82,6 +82,8 @@ export class YouTubeDeck {
   /** Last error code from the player (101/150 = embedding disabled by the owner). */
   error: number | null = null;
   onState?: (state: number) => void;
+  /** The player refused the video (see `error` for the code). */
+  onError?: (code: number) => void;
   private volume = 0.6;
 
   /** The visible screen element is ready (React mounted it). */
@@ -161,12 +163,14 @@ export class YouTubeDeck {
             onStateChange: e => this.onState?.(e.data),
             onError: e => {
               this.error = e.data;
+              this.onError?.(e.data);
             },
           },
         });
       })
       .catch(() => {
         this.error = -1;
+        this.onError?.(-1);
       });
     return true;
   }

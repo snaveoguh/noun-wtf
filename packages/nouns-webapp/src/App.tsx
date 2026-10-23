@@ -60,6 +60,7 @@ const VotePageRouter = lazy(() => import('@/pages/Vote/VotePageRouter'));
 import { setActiveAccount } from '@/state/slices/account';
 import TorchOverlay from '@/components/TorchOverlay';
 import { FeedSkeleton, GenericSkeleton, GovernanceSkeleton } from '@/components/Skeleton';
+import NounFmWidget from '@/components/NounFm/NounFmWidget';
 
 import classes from './App.module.css';
 
@@ -442,6 +443,8 @@ function App() {
       </BrowserRouter>
       <MiniWindowHost />
       <ReindexingBanner />
+      {/* Site-wide NOUN FM: outside the router so it keeps playing across pages. */}
+      <NounFmWidget />
     </div>
   );
 }
