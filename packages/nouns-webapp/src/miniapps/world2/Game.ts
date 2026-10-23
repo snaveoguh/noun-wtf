@@ -558,6 +558,7 @@ export class Game {
       // which go straight into the radio bus
       this.radioDuck = ctx.createGain();
       this.radioDuck.connect(radioBus);
+      this.radio.attach(ctx, this.radioDuck);
       this.fm.attach(ctx, this.radioDuck, this.audio.noise);
       this.spots.attach(ctx, radioBus);
       this.radio.onNowPlaying = label => {
@@ -629,8 +630,8 @@ export class Game {
         this.hud = {
           ...this.hud,
           toast: {
-            tag: '📻 NOW PLAYING ON NOUN FM',
-            text: label.replace(/^NOUN FM · /, ''),
+            tag: '📻 NOW PLAYING ON COMMUNITY RADIO',
+            text: label.replace(/^COMMUNITY RADIO · /, ''),
             at: performance.now(),
           },
         };
@@ -662,7 +663,7 @@ export class Game {
   }
   billboards = new PipBillboards();
 
-  /** off → NOUN FM → live streams → off */
+  /** off → NOUN FM → NOUN BEATS → live streams → off */
   cycleRadio() {
     this.unlockAudio();
     this.radio.cycle();
@@ -1973,10 +1974,10 @@ function escapeHtml(s: string) {
 const RADIO_MODE_STORE = 'noun-world-radio-v3';
 
 /** The radio mode the rider last picked (null: never picked, off by default). */
-function savedRadioMode(): 'off' | 'fm' | null {
+function savedRadioMode(): 'off' | 'fm' | 'beats' | null {
   try {
     const m = localStorage.getItem(RADIO_MODE_STORE);
-    return m === 'off' || m === 'fm' ? m : null;
+    return m === 'off' || m === 'fm' || m === 'beats' ? m : null;
   } catch {
     return null;
   }

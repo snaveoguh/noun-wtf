@@ -75,7 +75,7 @@ export const ORACLE_RIDDLES: Riddle[] = [
   {
     text: 'The ice cream van has a voice, and anyone can lend it theirs.',
     plain:
-      'NOUN FM broadcasts from the van: press M to tune in, or step inside and press E to queue a track.',
+      'COMMUNITY RADIO broadcasts from the van: press M to tune in, or step inside and press E to queue a track.',
   },
   {
     text: 'Walls remember paint.',
@@ -98,7 +98,7 @@ export const GREETING: Record<NpcId, string> = {
     'Oh, you’re here. Sit, if you like. Have a cookie. You’ll feel right as rain. I know why you came: you want to know if the hill is real. Let’s find out what you can do first.',
   keymaker:
     'Every door has a key, and every key has a door. I make them. The one you want is the deepest, and it is not given. It is earned.',
-  dj: 'Selector on the decks. The van is a station: NOUN FM, live, for everyone in the world at once.',
+  dj: 'Selector on the decks. The van is a station: COMMUNITY RADIO, live, for everyone in the world at once.',
   writer: 'You ride the city. I sign it. Want to leave something behind?',
   courier: 'Lost. Late. Holding a box that isn’t mine to open. You look fast.',
   captain: 'Welcome to Jersey. Nobody built it and nobody leaves. Skate with us.',

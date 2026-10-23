@@ -31,7 +31,7 @@ export function FmSpotsUi({ spots }: { spots: FmSpots }) {
           data-w2hud="toasts"
           className="w2-nowplaying pointer-events-none absolute left-1/2 top-16 -translate-x-1/2"
         >
-          <span>{v.stage === 'town' ? '🌵 DRY GULCH' : '📻 NOUN FM'}</span>
+          <span>{v.stage === 'town' ? '🌵 DRY GULCH' : '📻 COMMUNITY RADIO'}</span>
           <b>{v.title}</b>
         </div>
       )}
@@ -41,7 +41,7 @@ export function FmSpotsUi({ spots }: { spots: FmSpots }) {
           data-fm-spot="subtitle"
         >
           <div className="mb-0.5 text-[10px] font-bold tracking-[0.2em] text-[#ffd400]">
-            🎙 NOUN FM · DJ UPDATE
+            🎙 COMMUNITY RADIO · DJ UPDATE
           </div>
           {v.subtitle}
         </div>

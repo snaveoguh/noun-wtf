@@ -246,7 +246,7 @@ export class FmSpots {
     const audio = d.audioUrl !== null ? await loadBuffer(ctx, d.audioUrl) : null;
     await this.stage(
       token,
-      { stage: 'dj', title: 'NOUN FM · DJ update', subtitle: d.script },
+      { stage: 'dj', title: 'COMMUNITY RADIO · DJ update', subtitle: d.script },
       done => {
         if (audio !== null) {
           const h = playBuffer(ctx, out, audio, { onEnded: done });

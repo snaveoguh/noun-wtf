@@ -308,10 +308,10 @@ export class NounFm {
     const t = air.track;
     const h = this.houseNow;
     if (h !== null && (t === null || air.key === h.key))
-      return `NOUN FM · house mix: ${this.houseLabel(h)}`;
-    if (t === null) return 'NOUN FM · off air';
+      return `COMMUNITY RADIO · house mix: ${this.houseLabel(h)}`;
+    if (t === null) return 'COMMUNITY RADIO · off air';
     const who = air.set !== null ? `${air.set.dj}: ` : '';
-    return `NOUN FM · ${who}${t.title.slice(0, 40)} — ${t.artist.slice(0, 24)}`;
+    return `COMMUNITY RADIO · ${who}${t.title.slice(0, 40)} — ${t.artist.slice(0, 24)}`;
   }
 
   /** Fresh label for what's on air right now (the radio chip / toast). */
@@ -606,7 +606,7 @@ export class NounFm {
     if (ctx === null || bus === null) return;
     const into = Math.max(0, (now - it.at) / 1000);
     const alert = it.brk.type === 'alert' && this.alertLine !== '';
-    const tag = alert ? '⚠ WORLDWIDE ALERT' : '📻 NOUN FM';
+    const tag = alert ? '⚠ WORLDWIDE ALERT' : '📻 COMMUNITY RADIO';
     const text = alert ? this.alertLine : this.houseLabel(it);
     this.onBreak?.(tag, text);
     if (!alert) {
@@ -966,7 +966,7 @@ function seekable(el: HTMLMediaElement, t: number): boolean {
 function okText(op: string): string {
   switch (op) {
     case 'fm:add':
-      return 'queued on NOUN FM';
+      return 'queued on COMMUNITY RADIO';
     case 'fm:remove':
       return 'removed';
     case 'fm:move':

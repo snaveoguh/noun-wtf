@@ -58,7 +58,7 @@ export const NPCS: Record<NpcId, NpcDef> = {
     name: 'Selector',
     nouns: [1062],
     seeds: [[0, 4, 35, 20, 16]], // boombox head
-    where: 'the NOUN FM ice cream van',
+    where: 'the ice cream van (COMMUNITY RADIO)',
   },
   writer: {
     id: 'writer',
@@ -217,8 +217,8 @@ export const MISSIONS: MissionDef[] = [
     npc: 'dj',
     tier: 1,
     title: 'Hear the signal',
-    flavour: 'Everybody hears the van. Few tune in. Press M till it says NOUN FM.',
-    goal: 'Tune your radio to NOUN FM.',
+    flavour: 'Everybody hears the van. Few tune in. Press M till it says COMMUNITY RADIO.',
+    goal: 'Tune your radio to COMMUNITY RADIO.',
     obj: { k: 'fm' },
     after: ['wake-up'],
     reward: 'Listener',
@@ -229,7 +229,7 @@ export const MISSIONS: MissionDef[] = [
     tier: 2,
     title: 'Stay tuned',
     flavour: 'A set is a ride. Keep the station on and keep rolling for three minutes.',
-    goal: 'Ride for 3 minutes in all with NOUN FM on.',
+    goal: 'Ride for 3 minutes in all with COMMUNITY RADIO on.',
     obj: { k: 'fmRide', s: 180 },
     after: ['hear-the-signal'],
     reward: 'Selector',
