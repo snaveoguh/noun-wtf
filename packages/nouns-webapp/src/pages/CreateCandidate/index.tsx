@@ -5,13 +5,14 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Col } from 'react-bootstrap';
+import { Alert, Col } from 'react-bootstrap';
 import { Link, useSearchParams } from 'react-router';
 import { withStepProgress } from 'react-stepz';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 
+import BsButton from '@/components/BsButton';
 import CreateCandidateButton from '@/components/CreateCandidateButton';
 import ProposalActionModal from '@/components/ProposalActionsModal';
 import ProposalEditor from '@/components/ProposalEditor';
@@ -360,13 +361,13 @@ const CreateCandidatePage = () => {
           </strong>
         </Alert>
         <div className="d-grid">
-          <Button
+          <BsButton
             className={classes.proposalActionButton}
             variant="dark"
             onClick={() => setShowTransactionFormModal(true)}
           >
             <Trans>Add Action</Trans>
-          </Button>
+          </BsButton>
         </div>
         <ProposalTransactions
           proposalTransactions={proposalTransactions}
