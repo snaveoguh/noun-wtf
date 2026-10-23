@@ -1,11 +1,12 @@
-import type { Party, PartyKitServer, Connection } from 'partykit/server';
+import type { Connection, Party } from './room';
 
 import { FmRelay } from './fmRelay';
 import { HoopsRelay } from './hoopsRelay';
 import { WarfareRelay } from './warfareRelay';
 
 /**
- * noun.wtf — PartyKit real-time multiplayer server.
+ * noun.wtf — real-time multiplayer server (PartyServer on Cloudflare; see
+ * worker.ts. Written for PartyKit, whose hosted platform shut down 2026-10-23).
  *
  * Handles two game modes via message type prefix:
  *
@@ -132,7 +133,7 @@ async function ensureFm(room: Party): Promise<FmRelay> {
 
 // ── Server ────────────────────────────────────────────────────────────
 
-export default {
+export const handlers = {
   async onStart(room: Party) {
     if (room.id === WARFARE_ROOM) return;
     const stored = await room.storage.get<LeaderboardEntry[]>('leaderboard');
@@ -560,4 +561,4 @@ export default {
     room.broadcast(JSON.stringify({ type: 'leave', id: connection.id, count }));
     room.broadcast(JSON.stringify({ type: 'world:leave', id: connection.id, count }));
   },
-} satisfies PartyKitServer & { onStart?: (room: Party) => Promise<void> };
+};
