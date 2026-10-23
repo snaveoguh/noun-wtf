@@ -7,7 +7,9 @@ import type { TimeOfDayPreset } from './nature/TimeOfDay';
 
 import * as THREE from 'three';
 
-import { PirateRadio } from './audio/PirateRadio';
+import { claimAudio } from '@/lib/nounFmBus';
+
+import { GameRadio } from './audio/GameRadio';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
 import { seedVoice } from './audio/voice/cast';
@@ -552,11 +554,10 @@ export class Game {
     if (ctx !== null && !this.radioAttached) {
       this.radioAttached = true;
       const radioBus = this.mixer.attach(ctx).bus('radio') ?? ctx.destination;
-      // the station + pirate radio duck under the rider's own spots (intro,
-      // town themes), which go straight into the radio bus
+      // the station ducks under the rider's own spots (intro, town themes),
+      // which go straight into the radio bus
       this.radioDuck = ctx.createGain();
       this.radioDuck.connect(radioBus);
-      this.radio.attach(ctx, this.radioDuck, this.audio.noise);
       this.fm.attach(ctx, this.radioDuck, this.audio.noise);
       this.spots.attach(ctx, radioBus);
       this.radio.onNowPlaying = label => {
@@ -566,8 +567,9 @@ export class Game {
         };
         this.emit();
       };
-      // The plaza needs a soundtrack: NOUN FM on drop-in (or the rider's own pick)
-      this.radio.setMode(savedRadioMode() ?? 'fm');
+      // Off by default: the site-wide NOUN FM player is the soundtrack; the
+      // rider can still tune the van's station in (M / the FM panel)
+      this.radio.setMode(savedRadioMode() ?? 'off');
     }
   }
 
@@ -604,7 +606,7 @@ export class Game {
     }
   }
 
-  radio = new PirateRadio();
+  radio = new GameRadio();
   private radioAttached = false;
   /** NOUN FM, the shared station in the ice cream van (radio/). */
   readonly fm: NounFm;
@@ -612,14 +614,11 @@ export class Game {
   van: VanStation | null = null;
   private fmFwd = new THREE.Vector3();
 
-  /** NOUN FM joins the radio cycle; its fallback is the pirate worklet. */
+  /** NOUN FM joins the radio cycle (nothing on air: silence, never a generated station). */
   private wireFm() {
     const fm = this.fm;
     this.radio.fm = fm;
     fm.volume = this.radio.volume;
-    fm.onFallback = on => this.radio.setFmFallback(on);
-    fm.onFallbackNext = () => this.radio.nextFallback();
-    fm.fallbackSong = () => this.radio.songLabel;
     fm.onBreak = (tag, text) => {
       this.hud = { ...this.hud, toast: { tag, text, at: performance.now() } };
       this.emit();
@@ -644,6 +643,11 @@ export class Game {
     const cam = this.gfx.camera;
     cam.getWorldDirection(this.fmFwd);
     this.fm.update(dt, cam.position, this.fmFwd);
+    // our radio on, or the van audible nearby: the site-wide NOUN FM holds
+    claimAudio(
+      'noun-world-radio',
+      !this.paused && (this.radio.mode !== 'off' || (this.fm.view.near && this.fm.live)),
+    );
     this.van?.animate(dt, this.fm.level, this.fm.live);
     const decks =
       this.van !== null &&
@@ -658,7 +662,7 @@ export class Game {
   }
   billboards = new PipBillboards();
 
-  /** off → pirate radio → live streams → off */
+  /** off → NOUN FM → live streams → off */
   cycleRadio() {
     this.unlockAudio();
     this.radio.cycle();
@@ -682,6 +686,7 @@ export class Game {
     this.paused = p;
     this.input.setEnabled(!p);
     this.fm.setHidden(p);
+    if (p) claimAudio('noun-world-radio', false);
   }
 
   private frame = (now: number) => {
@@ -1925,6 +1930,7 @@ export class Game {
   }
 
   dispose() {
+    claimAudio('noun-world-radio', false);
     this.cutscene.abort();
     this.voice.stopAll();
     this.sfx.dispose();
@@ -1962,14 +1968,15 @@ function escapeHtml(s: string) {
   );
 }
 
-// v2: NOUN FM became the default, so older picks (mostly pirate) are dropped once
-const RADIO_MODE_STORE = 'noun-world-radio-v2';
+// v3: the site-wide NOUN FM player became the default soundtrack and the
+// pirate station went, so older picks are dropped once (everyone starts off)
+const RADIO_MODE_STORE = 'noun-world-radio-v3';
 
-/** The radio mode the rider last picked (null: never picked, NOUN FM by default). */
-function savedRadioMode(): 'off' | 'pirate' | 'fm' | null {
+/** The radio mode the rider last picked (null: never picked, off by default). */
+function savedRadioMode(): 'off' | 'fm' | null {
   try {
     const m = localStorage.getItem(RADIO_MODE_STORE);
-    return m === 'off' || m === 'pirate' || m === 'fm' ? m : null;
+    return m === 'off' || m === 'fm' ? m : null;
   } catch {
     return null;
   }

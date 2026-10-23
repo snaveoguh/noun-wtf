@@ -15,7 +15,8 @@
 //   - nothing queued and no set on: the house programme (house.ts): the
 //     library tracks (the owner's songs stay out), cut-offs, jingles and WORLDWIDE
 //     ALERT news breaks, on a shared deterministic schedule.
-//   - nothing at all to play: the procedural pirate station (PirateRadio).
+//   - nothing at all to play: silence (the site-wide NOUN FM player,
+//     components/NounFm, is what plays across the rest of the site).
 // Tuned in (radio cycle → NOUN FM) you hear it anywhere; otherwise it only
 // plays out of the van's speakers when you're within FM_NEAR of it.
 
@@ -156,12 +157,6 @@ export class NounFm {
   level = 0;
   /** A track (not the fallback) is on air. */
   live = false;
-  /** Play / stop the procedural pirate station as NOUN FM's fallback. */
-  onFallback?: (on: boolean) => void;
-  /** Skip the fallback's song. */
-  onFallbackNext?: () => void;
-  /** The fallback's current song name (for the label). */
-  fallbackSong?: () => string;
   /** A new track came on air (tuned: through the radio toast; near: a banner). */
   onTrackChange?: (label: string, tuned: boolean) => void;
   /** A house break started (a WORLDWIDE ALERT / a jingle), for the toast. */
@@ -314,10 +309,7 @@ export class NounFm {
     const h = this.houseNow;
     if (h !== null && (t === null || air.key === h.key))
       return `NOUN FM · house mix: ${this.houseLabel(h)}`;
-    if (t === null) {
-      const song = this.fallbackSong?.() ?? '';
-      return `NOUN FM · pirate relay${song !== '' ? `: ${song}` : ''}`;
-    }
+    if (t === null) return 'NOUN FM · off air';
     const who = air.set !== null ? `${air.set.dj}: ` : '';
     return `NOUN FM · ${who}${t.title.slice(0, 40)} — ${t.artist.slice(0, 24)}`;
   }
@@ -484,11 +476,11 @@ export class NounFm {
     this.publish(this.view.air, this.view.phase);
   }
 
-  /** "Next track" while tuned: skip your own track, or the fallback's song. */
+  /** "Next track" while tuned: skip your own track (nothing to skip off air). */
   next() {
     const air = this.view.air;
-    if (air.source === 'fallback') this.onFallbackNext?.();
-    else if (air.source === 'queue' && air.track?.owner === this.myTag) this.skip();
+    if (air.source === 'fallback') return;
+    if (air.source === 'queue' && air.track?.owner === this.myTag) this.skip();
     else {
       this.error = { msg: 'only whoever queued a track can skip it', at: performance.now() };
       this.publish(air, this.view.phase, true);
@@ -815,12 +807,8 @@ export class NounFm {
       if (air.track !== null && audible) this.onTrackChange?.(this.labelFor(air), this.tuned);
     }
 
-    // the pirate generator only when the house has nothing at all
-    const fb = this.tuned && air.track === null && house === null && !this.hold;
-    if (fb !== this.fbOn) {
-      this.fbOn = fb;
-      this.onFallback?.(fb);
-    }
+    // tuned in with nothing on air: just the van lights idling
+    this.fbOn = this.tuned && air.track === null && house === null && !this.hold;
 
     let phase: FmView['phase'] = brk !== null ? 'break' : this.tuned ? 'fallback' : 'off';
     const tr = air.track;

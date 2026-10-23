@@ -46,6 +46,8 @@ import { checkLink } from '../lib/walletAuth';
 //      (id, decision: 'approve' | 'reject', note) } with header
 //      X-World-Admin: WORLD_ADMIN_TOKEN (Netlify env; unset = admin off).
 //      Approving writes the record to the rider's row.
+// POST { action: 'admin-missions' } (same header) → who finished which
+//      mission: per-mission counts and every rider with any finished.
 //
 // Wallet links (one identity per ETH address, so prize winners can be paid):
 // POST { action: 'link', rider, name, address, ts, sig }
@@ -473,6 +475,27 @@ async function admin(
     case 'admin-appeal': {
       const d = await appealTrace(store, id);
       return d === null ? json(404, { error: 'No such appeal' }) : json(200, { id, d });
+    }
+    case 'admin-missions': {
+      const riders = ((await store.get('riders', { type: 'json' })) as Rider[] | null) ?? [];
+      const done = riders.filter(r => Object.keys(r.missions ?? {}).length > 0);
+      const byMission: Record<string, number> = {};
+      for (const r of done)
+        for (const m of Object.keys(r.missions!)) byMission[m] = (byMission[m] ?? 0) + 1;
+      return json(200, {
+        riders: riders.length,
+        withMissions: done.length,
+        byMission,
+        list: done
+          .map(r => ({
+            name: r.name,
+            ...(r.addr ? { addr: r.addr } : {}),
+            missions: r.missions,
+            ...(r.title ? { title: r.title } : {}),
+            last: r.last,
+          }))
+          .sort((a, b) => b.last - a.last),
+      });
     }
     case 'admin-decide': {
       const approve = input.decision === 'approve';

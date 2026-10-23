@@ -2,8 +2,8 @@
 //
 //   SkateAudio master ─ comp ─┐                (skate SFX, graffiti hiss,
 //   Sfx (samples, ambience) ──┼─ sfx  ──┐        hoops one-shots + crowd)
-//   PirateRadio out ──────────┐         │
-//   NOUN FM direct/spatial ───┼─ radio ─┤
+//   NOUN FM direct/spatial ───┐         │
+//   GameRadio streams ────────┼─ radio ─┤
 //   cutscene music cues ──────┘         ├─ master ─ destination
 //                                voice ─┤   (mute-all zeroes this one)
 //   VoiceBox (NPC babble) ─────── npc ──┘

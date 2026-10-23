@@ -34,7 +34,7 @@ export const CATALOG: Section[] = [
       {
         path: '/world',
         name: 'NOUN WORLD',
-        blurb: 'skate the plaza. voice, graffiti, pirate radio.',
+        blurb: 'skate the plaza. voice, graffiti, NOUN FM.',
         hot: true,
       },
       {

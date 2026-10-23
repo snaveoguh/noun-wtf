@@ -6,7 +6,7 @@
 //     programme carries on at its current position (a random tune),
 //   - "▶ intro" / "▶ latest DJ update" replays from the FM panel,
 //   - Dry Gulch's theme (townTheme.ts).
-// While a spot plays, NOUN FM holds (goes quiet here) and the pirate radio
+// While a spot plays, NOUN FM holds (goes quiet here) and any other radio
 // is ducked; spot audio goes into the mixer's radio bus, so the radio slider
 // and mute govern it. Everything is skippable.
 
