@@ -19,7 +19,9 @@
       "@nouns/graffiti": ["../nouns-graffiti/src/index.ts"],
       "@nouns/graffiti/r3f": ["../nouns-graffiti/src/adapters/r3f/index.ts"],
       "@nouns/graffiti/ui": ["../nouns-graffiti/src/ui/index.ts"],
-      "@nouns/graffiti/core": ["../nouns-graffiti/src/core/index.ts"]
+      "@nouns/graffiti/core": ["../nouns-graffiti/src/core/index.ts"],
+      "onnxruntime-web/wasm": ["./node_modules/onnxruntime-web/types.d.ts"],
+      "phonemizer": ["./node_modules/phonemizer/types/phonemizer.d.ts"]
     },
 
     "plugins": [

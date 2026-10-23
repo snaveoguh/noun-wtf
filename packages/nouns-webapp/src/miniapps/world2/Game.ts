@@ -13,7 +13,10 @@ import { GameRadio } from './audio/GameRadio';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
 import { seedVoice } from './audio/voice/cast';
+import { RiderVoice } from './audio/voice/RiderVoice';
+import { TtsEngine } from './audio/voice/TtsEngine';
 import { VoiceBox } from './audio/voice/VoiceBox';
+import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -225,6 +228,30 @@ export class Game {
     () => this.bus('npc'),
     () => this.audio.noise,
   );
+  /**
+   * Real character voices (Piper neural TTS in a worker): loads lazily the
+   * first time a line is spoken with voices on; VoiceBox babbles meanwhile.
+   */
+  readonly tts = new TtsEngine();
+  /** Settings: real voices auto / on / off (settings/bind.ts sets it). */
+  voiceMode: VoiceModeLike = 'auto';
+  private readonly deviceNet = readDeviceNet();
+  /** Real voices allowed on this device with the current setting. */
+  realVoicesOn(): boolean {
+    return realVoicesOn(this.voiceMode, this.deviceNet);
+  }
+  /** The rider's own callouts (bails, speed, records), in their seed's voice. */
+  readonly rider: RiderVoice = new RiderVoice({
+    voice: this.voice,
+    tts: this.tts,
+    seed: () => {
+      const s = this.seed;
+      return [s.background, s.body, s.accessory, s.head, s.glasses];
+    },
+    audioCtx: () => this.audio.ctx,
+    realOn: () => this.realVoicesOn(),
+    busy: () => this.cutscene.id !== null,
+  });
   /** In-engine cutscenes (cutscene/): while one plays it owns the camera and the clock. */
   readonly cutscene: CutscenePlayer = new CutscenePlayer(gameHost(this));
 
@@ -287,6 +314,11 @@ export class Game {
   constructor(opts: GameOptions) {
     this.opts = opts;
     this.stats.onRecord = e => this.records.onRecord(e);
+    this.stats.onRaise = (_k, _v, prev) => {
+      // Beating a best you already had (not filling in a first one)
+      if (prev !== undefined && prev > 0) this.rider.record();
+    };
+    this.voice.realVoice = () => (this.realVoicesOn() ? this.tts : null);
     this.labelLayer = opts.labelLayer;
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
@@ -796,6 +828,12 @@ export class Game {
       this.updateMyCharacter(dt);
     }
     this.updateAudio(dt);
+    {
+      const p = this.player;
+      const riding =
+        p.mode === 'board' && p.state !== 'bail' && !this.van2.driving && !this.dragon.riding;
+      this.rider.tick(dt, p.speed, riding);
+    }
     this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
@@ -1320,6 +1358,7 @@ export class Game {
           break;
         case 'bail':
           this.audio.bail(e.impact);
+          this.rider.bail();
           this.cam.addShake(0.7);
           this.particles.dustAt(p.pos, 1);
           break;
@@ -1934,6 +1973,7 @@ export class Game {
     claimAudio('noun-world-radio', false);
     this.cutscene.abort();
     this.voice.stopAll();
+    this.tts.dispose();
     this.sfx.dispose();
     this.missions.dispose();
     this.hoops.dispose();
