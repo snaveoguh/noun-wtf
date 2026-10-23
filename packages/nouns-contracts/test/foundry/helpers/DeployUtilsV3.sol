@@ -14,6 +14,7 @@ import { NounsAuctionHouseProxy } from '../../../contracts/proxies/NounsAuctionH
 import { NounsAuctionHouseProxyAdmin } from '../../../contracts/proxies/NounsAuctionHouseProxyAdmin.sol';
 import { NounsToken } from '../../../contracts/NounsToken.sol';
 import { NounsSeeder } from '../../../contracts/NounsSeeder.sol';
+import { NounsDescriptorV2 } from '../../../contracts/NounsDescriptorV2.sol';
 import { ProxyRegistryMock } from './ProxyRegistryMock.sol';
 import { ForkDAODeployer } from '../../../contracts/governance/fork/ForkDAODeployer.sol';
 import { NounsTokenFork } from '../../../contracts/governance/fork/newdao/token/NounsTokenFork.sol';
@@ -83,6 +84,10 @@ abstract contract DeployUtilsV3 is DeployUtils {
     struct Temp {
         NounsDAOExecutorV2 timelock;
         NounsToken nounsToken;
+        address weth;
+        NounsDescriptorV2 descriptor;
+        NounsSeeder seeder;
+        ProxyRegistryMock proxyRegistry;
     }
 
     function _deployDAOV3WithParams(uint256 auctionDuration) internal returns (INounsDAOLogic) {
@@ -91,10 +96,24 @@ abstract contract DeployUtilsV3 is DeployUtils {
         t.timelock.initialize(address(1), TIMELOCK_DELAY);
 
         auctionHouseProxyAdmin = new NounsAuctionHouseProxyAdmin();
-        address predictedTokenAddress = computeCreateAddress(address(this), vm.getNonce(address(this)) + 9);
+
+        // Everything the token depends on is deployed first, and nothing but the three `new` expressions
+        // happens between the nonce read below and the token. With forge's dynamic test linking (the default
+        // since 1.8) every external CALL this contract makes advances its nonce, not only CREATEs, so a
+        // prediction taken across the descriptor's setter calls -- the old `nonce + 9` -- landed well short and
+        // failed every setUp with 'Token address mismatch'. Keeping the window call-free makes the prediction
+        // hold whether linking is on or off.
+        t.weth = address(new WETH());
+        t.descriptor = _deployAndPopulateV2();
+        t.seeder = new NounsSeeder();
+        t.proxyRegistry = new ProxyRegistryMock();
+
+        // The auction house takes the token address as an immutable and the token takes the auction house as
+        // its minter, so one side has to be predicted: +0 auction house impl, +1 its proxy, +2 the token.
+        address predictedTokenAddress = computeCreateAddress(address(this), vm.getNonce(address(this)) + 2);
         NounsAuctionHouseV3 auctionHouseImpl = new NounsAuctionHouseV3(
             INounsToken(predictedTokenAddress),
-            address(new WETH()),
+            t.weth,
             auctionDuration
         );
         NounsAuctionHouseProxy auctionProxy = new NounsAuctionHouseProxy(
@@ -102,18 +121,17 @@ abstract contract DeployUtilsV3 is DeployUtils {
             address(auctionHouseProxyAdmin),
             ''
         );
-        auctionHouseProxyAdmin.transferOwnership(address(t.timelock));
-
         t.nounsToken = new NounsToken(
             makeAddr('noundersDAO'),
             address(auctionProxy),
-            _deployAndPopulateV2(),
-            new NounsSeeder(),
-            new ProxyRegistryMock()
+            t.descriptor,
+            t.seeder,
+            t.proxyRegistry
         );
-        t.nounsToken.transferOwnership(address(t.timelock));
-
         require(predictedTokenAddress == address(t.nounsToken), 'Token address mismatch');
+
+        auctionHouseProxyAdmin.transferOwnership(address(t.timelock));
+        t.nounsToken.transferOwnership(address(t.timelock));
 
         address daoLogicImplementation = address(new NounsDAOLogicV4());
 

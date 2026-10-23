@@ -518,7 +518,9 @@ contract ProposalRewardsEligibilityTest is BaseProposalRewardsTest {
         lastNounId = settleAuction();
 
         // verify assumptions
-        assertEq(nounsToken.totalSupply(), 12);
+        // 13, not the 12 upstream expects: the auction settled just above drew no bid, and this repo's auction
+        // house routes an unsold noun to the treasury instead of burning it, so supply does not drop by one.
+        assertEq(nounsToken.totalSupply(), 13);
         assertEq(nounsToken.getCurrentVotes(bidder1), 8);
 
         votingClientIds = [0];
