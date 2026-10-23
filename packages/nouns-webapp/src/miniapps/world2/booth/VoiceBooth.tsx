@@ -139,7 +139,7 @@ function useBoothRecorder() {
         cancelAnimationFrame(raf.current);
         const ctx = audioCtx();
         const buf = await ctx.decodeAudioData(await take.blob.arrayBuffer());
-        const shape = analyseClip(buf.getChannelData(0), buf.sampleRate);
+        const shape = analyseClip(buf.getChannelData(0), buf.sampleRate, maxS);
         if (shape === null)
           throw new Error("Didn't hear anything. Try again a bit closer to the mic.");
         if (kind === 'clips' && take.blob.size > CLIP_MAX_BYTES)

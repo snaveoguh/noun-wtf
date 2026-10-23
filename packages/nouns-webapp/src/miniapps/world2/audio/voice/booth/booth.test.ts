@@ -96,6 +96,7 @@ describe('clip validation and limits', () => {
       { ...goodClip, mime: 'audio/wav' },
       { ...goodClip, mime: 'text/html' },
       { ...goodClip, dur: 9 },
+      { ...goodClip, dur: 6, t0: 0.5, t1: 5 }, // 4.5 s of speech
       { ...goodClip, t1: 0.05 },
       { ...goodClip, t1: 3 },
       { ...goodClip, gain: 0 },
@@ -127,6 +128,16 @@ describe('clip validation and limits', () => {
     expect(a.t1).toBeLessThan(1.35);
     expect(a.gain).toBeCloseTo(0.89 / 0.2, 1);
     expect(analyseClip(new Float32Array(8000), rate)).toBeNull();
+  });
+
+  it('a late stop (busy device) still plays at most the limit', () => {
+    const rate = 8000;
+    const s = new Float32Array(rate * 6);
+    for (let i = 0; i < s.length; i++) s[i] = 0.3 * Math.sin(i / 3);
+    const a = analyseClip(s, rate, 4)!;
+    expect(a.dur).toBe(6);
+    expect(a.t1 - a.t0).toBeLessThanOrEqual(4);
+    expect(validateClip({ ...goodClip, ...a }).ok).toBe(true);
   });
 });
 

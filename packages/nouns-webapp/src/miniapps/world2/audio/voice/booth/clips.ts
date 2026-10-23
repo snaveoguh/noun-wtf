@@ -164,9 +164,13 @@ export function validateShape(raw: unknown, maxS = CLIP_MAX_S): Check<ClipShape>
   const t0 = num(o.t0);
   const t1 = num(o.t1);
   const gain = num(o.gain);
-  // A little slack: MediaRecorder stops a frame or two after the timer
-  if (!(dur > 0 && dur <= maxS + 0.6)) return { ok: false, error: `clips are ${maxS} s at most` };
+  // What plays (t0..t1) is the clip: at most maxS. The raw take may run a
+  // little over (a busy phone's stop timer fires late); the 64 KB byte cap
+  // bounds it anyway, and anything past 2× is refused.
+  if (!(dur > 0 && dur <= maxS * 2 + 0.6))
+    return { ok: false, error: `clips are ${maxS} s at most` };
   if (!(t0 >= 0 && t1 > t0 && t1 <= dur + 0.05)) return { ok: false, error: 'bad trim' };
+  if (t1 - t0 > maxS + 0.05) return { ok: false, error: `clips are ${maxS} s at most` };
   if (!(gain > 0 && gain <= GAIN_MAX)) return { ok: false, error: 'bad gain' };
   const r = (n: number) => Math.round(n * 1000) / 1000;
   return { ok: true, value: { t0: r(t0), t1: r(t1), gain: r(gain), dur: r(dur) } };
@@ -206,7 +210,11 @@ const SILENT_PEAK = 0.02;
  * window (so a noisy room still trims), padded 60 ms each side.
  * null when the clip is silence.
  */
-export function analyseClip(samples: Float32Array, rate: number): ClipShape | null {
+export function analyseClip(
+  samples: Float32Array,
+  rate: number,
+  maxS = Infinity,
+): ClipShape | null {
   const n = samples.length;
   const dur = n / rate;
   if (n === 0 || rate <= 0) return null;
@@ -234,7 +242,8 @@ export function analyseClip(samples: Float32Array, rate: number): ClipShape | nu
   if (a < 0) a = 0;
   const pad = 0.06;
   const t0 = Math.max(0, (a * win) / rate - pad);
-  const t1 = Math.min(dur, ((b + 1) * win) / rate + pad);
+  // Never more than maxS of speech (a late stop on a busy device)
+  const t1 = Math.min(dur, ((b + 1) * win) / rate + pad, t0 + maxS);
   // Peak inside the trimmed region
   let p = 0;
   for (let i = Math.floor(t0 * rate); i < Math.min(n, Math.ceil(t1 * rate)); i++) {
