@@ -2,7 +2,15 @@
 
 export type TtsIn =
   | { t: 'init'; modelUrl: string; configUrl: string }
-  | { t: 'synth'; id: number; text: string; speaker: number; scales: [number, number, number] };
+  | {
+      t: 'synth';
+      id: number;
+      text: string;
+      speaker: number;
+      scales: [number, number, number];
+      /** Silence between sentences (s, in the synthesized clip). */
+      gap: number;
+    };
 
 export type TtsOut =
   | { t: 'progress'; loaded: number; total: number }

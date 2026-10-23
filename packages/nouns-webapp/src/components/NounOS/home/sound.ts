@@ -3,6 +3,7 @@
 //   ident()      the "tu-DUM": a boom-bap kick + muted stab, then a warm sub
 //                drop under a dusty minor-9 chord through a short room.
 //   motif(game)  a short hover stinger per featured game.
+//   playFile()   the one file: the hero's voice-over (voiceOver.ts).
 //
 // Browsers only let audio start after the visitor interacts with the page,
 // so on a cold first load the intro is silent; that's fine. Nothing here
@@ -275,6 +276,76 @@ export function motif(game: GameId): void {
     });
     stab(c, o.dry, t + 0.32, [hz(50), hz(57), hz(62)], 0.5, 0.07, [2200, 400]);
   }
+}
+
+const files = new Map<string, Promise<AudioBuffer | null>>();
+
+/** A decoded audio file (fetched once per page view). */
+function loadFile(c: Ctx, url: string): Promise<AudioBuffer | null> {
+  let p = files.get(url);
+  if (p === undefined) {
+    p = fetch(url)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then(b => c.decodeAudioData(b))
+      .catch(() => {
+        files.delete(url); // try again next time
+        return null;
+      });
+    files.set(url, p);
+  }
+  return p;
+}
+
+export interface Playback {
+  /** Fade out and stop (safe to call any time, any number of times). */
+  stop(): void;
+  /** Resolves when it finishes, is stopped, or couldn't play. */
+  done: Promise<void>;
+}
+
+/**
+ * Play a voice-over file through the master bus (dry: the file carries its own
+ * room). Only while audio is already running, so it can never be the thing
+ * that makes a page start talking before the visitor turned sound on.
+ */
+export function playFile(url: string, level = 1): Playback | null {
+  const c = audio();
+  if (!c || !master || c.state !== 'running') return null;
+  const g = c.createGain();
+  g.gain.value = level;
+  g.connect(master);
+  let src: AudioBufferSourceNode | null = null;
+  let stopped = false;
+  let finish: () => void = () => undefined;
+  const done = new Promise<void>(r => (finish = r));
+  const end = () => {
+    finish();
+    setTimeout(() => g.disconnect(), 400);
+  };
+  void loadFile(c, url).then(buf => {
+    if (stopped || buf === null || c.state !== 'running') return end();
+    src = c.createBufferSource();
+    src.buffer = buf;
+    src.connect(g);
+    src.onended = end;
+    src.start(c.currentTime + 0.05);
+  });
+  return {
+    done,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      if (src === null) return end();
+      const now = c.currentTime;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setTargetAtTime(0, now, 0.08);
+      try {
+        src.stop(now + 0.35);
+      } catch {
+        end();
+      }
+    },
+  };
 }
 
 /** A tiny tick for focusing cards with the keyboard (sound on only). */

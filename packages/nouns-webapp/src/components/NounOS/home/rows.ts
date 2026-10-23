@@ -122,6 +122,8 @@ export interface Slide {
   cta?: string;
   /** Brand slide: the second button browses the shelves instead of MORE INFO */
   browse?: boolean;
+  /** A voice-over read over it, once per page view, sound on only (voiceOver.ts) */
+  vo?: string;
   /** How long it stays up, ms */
   ms: number;
 }
@@ -140,6 +142,7 @@ export const HERO_SLIDES: Slide[] = [
     game: 'world',
     cta: 'PLAY NOUN WORLD',
     browse: true,
+    vo: '/home/vo-intro.mp3',
     ms: 16900,
   },
   {

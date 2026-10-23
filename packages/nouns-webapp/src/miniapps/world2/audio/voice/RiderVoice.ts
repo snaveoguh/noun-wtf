@@ -1,7 +1,8 @@
 // ── The rider talks: callouts on bails, speed and new records ────────────
 //
-// The rider's voice comes from their own Noun seed like everyone else's,
-// revved up a little. Lines are picked and rate-limited by CalloutBrain
+// The rider's real voice is one hand-picked deep male speaker (ttsVoice's
+// RIDER_VOICE), revved up a little; the babble fallback still comes from their
+// Noun seed. Lines are picked and rate-limited by CalloutBrain
 // (callouts.ts); once real voices are ready the whole bank for the current
 // mode is synthesized in the background, so a bail is heard the instant it
 // happens. Callouts only play when real voices are on (babbling while the
@@ -12,7 +13,7 @@ import type { VoiceBox } from './VoiceBox';
 
 import { bank, CalloutBrain, type CalloutEvent } from './callouts';
 import { seedVoice } from './cast';
-import { hyped, lineKey, ttsVoiceOf, type TtsVoice } from './ttsVoice';
+import { hyped, lineKey, RIDER_VOICE, type TtsVoice } from './ttsVoice';
 import { type SeedLike } from './voiceParams';
 
 export interface RiderVoiceHost {
@@ -41,9 +42,9 @@ export class RiderVoice {
 
   constructor(private host: RiderVoiceHost) {}
 
-  /** The rider's real voice (from their seed). */
+  /** The rider's real voice: the one hand-picked deep male speaker, a touch hyped. */
   ttsVoice(): TtsVoice {
-    return hyped(ttsVoiceOf(seedVoice(this.host.seed())));
+    return hyped(RIDER_VOICE, 1.04);
   }
 
   /** Every frame: the clock, the speed callout and background pre-warming. */

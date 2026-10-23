@@ -13,8 +13,19 @@ import {
   SPEED_UP_KMH,
 } from './callouts';
 import { npcVoice, seedVoice } from './cast';
-import { cleanText, clauses, toIds, toPhonemes } from './piperText';
-import { hyped, lineKey, modelScales, pitchFactor, SPEAKERS, ttsVoiceOf } from './ttsVoice';
+import { cleanText, clauses, sentences, toIds, toPhonemes } from './piperText';
+import {
+  hyped,
+  lineKey,
+  modelScales,
+  NPC_GAP,
+  pitchFactor,
+  RIDER_SPEAKER,
+  RIDER_VOICE,
+  sentenceGap,
+  SPEAKERS,
+  ttsVoiceOf,
+} from './ttsVoice';
 import { autoVoicesOk, realVoicesOn } from './voicePrefs';
 
 describe('real voices from seeds', () => {
@@ -111,6 +122,59 @@ describe('text for Piper', () => {
     const map = { _: [0], '^': [1], $: [2], a: [14], b: [15], '!': [4] };
     expect(toIds('ab!', map)).toEqual([1, 0, 14, 0, 15, 0, 4, 0, 2]);
     expect(toIds('a☃b', map)).toEqual([1, 0, 14, 0, 15, 0, 2]);
+  });
+
+  it('splits sentences so each beat gets a real pause ("who\'s the goat? ... me.")', () => {
+    expect(sentences("Who's the goat?... Me.", 0.6)).toEqual([
+      { text: "Who's the goat?...", pause: 0.84 },
+      { text: 'Me.', pause: 0 },
+    ]);
+    expect(sentences("Who's the goat? Me.", 0.6).map(s => s.text)).toEqual([
+      "Who's the goat?",
+      'Me.',
+    ]);
+    expect(sentences('Fuck yes! Fuck yes!', 0.5)).toEqual([
+      { text: 'Fuck yes!', pause: 0.5 },
+      { text: 'Fuck yes!', pause: 0 },
+    ]);
+    // Clause commas stay inside one sentence; decimals and lone marks don't split
+    expect(sentences('Ahh, shit!', 0.5)).toEqual([{ text: 'Ahh, shit!', pause: 0 }]);
+    expect(sentences('Hit 3.5 m air. Nice', 0.3).map(s => s.text)).toEqual([
+      'Hit 3.5 m air.',
+      'Nice',
+    ]);
+    expect(sentences(' ... ', 0.3)).toEqual([]);
+  });
+
+  it('every two-beat callout really is two sentences', () => {
+    for (const ev of ['bail', 'speed', 'record'] as const)
+      for (const clean of [false, true])
+        for (const t of bank(ev, clean)) {
+          const n = sentences(t, 0.6).length;
+          // a "?"/"!"/"." mid-line always means a pause, never a run-on
+          expect(n).toBe(t.trim().split(/(?<=[!.?])\s+/).length);
+        }
+    expect(sentences(bank('record', false).find(t => t.includes('goat'))!, 0.6)).toHaveLength(2);
+  });
+});
+
+describe("the player's voice", () => {
+  it("one fixed male speaker, no resampled pitch, Piper's expressive defaults", () => {
+    expect(RIDER_VOICE.speaker).toBe(RIDER_SPEAKER);
+    expect(RIDER_VOICE.pitch).toBe(0);
+    expect(RIDER_VOICE.noise).toBeCloseTo(0.667, 3);
+    expect(RIDER_VOICE.noiseW).toBeCloseTo(0.8, 3);
+    expect(RIDER_VOICE.unison).toBe(0);
+    expect(RIDER_VOICE.echo).toBe(0);
+    // a real beat between sentences, longer than an NPC's
+    expect(RIDER_VOICE.gap).toBeGreaterThanOrEqual(0.5);
+    expect(RIDER_VOICE.gap).toBeGreaterThan(NPC_GAP);
+  });
+
+  it('the gap survives pitch playback, and is part of the cache key', () => {
+    const t = ttsVoiceOf(npcVoice('oracle'));
+    expect(sentenceGap(t) / pitchFactor(t.pitch)).toBeCloseTo(t.gap, 6);
+    expect(lineKey('x', { ...t, gap: 0.2 })).not.toBe(lineKey('x', { ...t, gap: 0.6 }));
   });
 });
 
