@@ -1,92 +1,55 @@
-// ── Home: the agent. A full-screen typable feed that greets you ──────────
+// ── Home: the noun.wtf shelf ─────────────────────────────────────────────
 //
-// The background of noun.wtf is a conversation with NounIRL (same /api/chat
-// agent as the terminal). Local verbs (play, index, readme, pip3, feed, bid)
-// drive the OS; anything else goes to the agent. The Noun World cover hangs
-// behind it as a poster — click it (or type `play`) to load the game. The
-// other games (Noun Hoops, …) are stacked behind it like a deck: click a
-// back card (or its chip) to bring it forward, click the front one to play.
+// A Netflix-style homescreen so people can see everything noun.wtf does and
+// where to click: a sticky header (wordmark, section jumps, the search / ask
+// NounIRL bar), a rotating featured-game hero, then shelves of 2:3 box-art
+// cards: Play now, one per catalog section, Other Nouns clients, Community.
+// The first visit of a session opens on the noggles ident (home/Intro).
+//
+// Props and game launching are unchanged from the old agent console, and
+// the console itself lives on in the ask bar (home/AskBar + useNounIRL).
 
 import type { AppKind } from './osStore';
 
-import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { UIEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useAccount } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 
-import { DRAFT_DAO_LABEL, normalizeDraftDao } from '@/components/GameShell/draftDao';
-import {
-  openProposalDraft,
-  type ProposalDraftPrefill,
-} from '@/components/GameShell/openProposalDraft';
-import GovernanceActionConfirm, {
-  type GovernanceAction,
-} from '@/components/TerminalFeed/GovernanceActionConfirm';
-import {
-  detectCancelIntent,
-  detectDraftPayload,
-  detectProposalDraftIntent,
-} from '@/components/TerminalFeed/TerminalPrompt';
+import { CATALOG } from './catalog';
+import AskBar from './home/AskBar';
+import { parseEntries, SUBMISSIONS_URL } from './home/community';
+import { GameSheet, SubmitDialog } from './home/Dialogs';
+import Hero from './home/Hero';
+import { HOME_CSS } from './home/homeStyles';
+import Intro, { shouldPlayIntro } from './home/Intro';
+import { buildRows, GAMES, HERO_SLIDES, type Game, type GameId, type Item } from './home/rows';
+import { Shelf } from './home/Shelf';
+import { ident, unlockAudio } from './home/sound';
+import { cx } from './osStore';
 
-const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
-const API_BASE =
-  typeof apiBaseEnv === 'string' && apiBaseEnv.length > 0
-    ? apiBaseEnv
-    : 'https://spirited-flexibility-production-3c30.up.railway.app';
+export type { GameId } from './home/rows';
 
-interface Line {
-  who: 'agent' | 'you' | 'sys';
-  text: string;
-  /** characters revealed so far (agent lines type out) */
-  shown: number;
-}
+const SOUND_KEY = 'nounwtf-home-sound';
 
-export type GameId = 'world' | 'hoops' | 'warfare';
-
-const GAMES: { id: GameId; name: string; cover: string; cta: string; loading: string }[] = [
-  {
-    id: 'world',
-    name: 'Noun World',
-    cover: '/world2/cover-1200.webp',
-    cta: 'PRESS TO PLAY ▸',
-    loading: 'loading noun world. grab a board',
-  },
-  {
-    id: 'hoops',
-    name: 'Noun Hoops',
-    cover: '/world2/hoops-cover.webp',
-    cta: 'PLAY 3V3 ▸',
-    loading: 'lacing up. off to the noun jersey court',
-  },
-  {
-    id: 'warfare',
-    name: 'Noun Warfare',
-    cover: '/warfare/cover.webp',
-    cta: 'LOCK & LOAD ▸',
-    loading: 'loading noun warfare. paint up',
-  },
+const JUMPS: [string, string][] = [
+  ['play', 'Games'],
+  ['art', 'Art'],
+  ['free', 'Freedom'],
+  ['gov', 'The DAO'],
+  ['mkt', 'Market'],
+  ['net', 'Network'],
+  ['clients', 'Clients'],
+  ['community', 'Community'],
 ];
 
-const GREETING = [
-  '⌐◨-◨ you made it',
-  '',
-  'the dao got captured',
-  "we didn't",
-  '',
-  'this is noun.wtf. the underground side of nouns',
-  'say something, or type one of these',
-  '',
-  'play     skate noun world',
-  'hoops    3v3 on the jersey court',
-  'warfare  paintball. red noggles vs blue',
-  'index    everything else',
-  'readme   what happened',
-  'pip3     the art',
-].join('\n');
-
-const RETURNING = ['⌐◨-◨ back again', '', 'play, index, readme, pip3', 'or just talk'].join('\n');
-
-const SEEN_KEY = 'nounos-home-seen';
+function readSound(): boolean {
+  try {
+    return localStorage.getItem(SOUND_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export default function AgentHome({
   active,
@@ -108,275 +71,195 @@ export default function AgentHome({
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
 }) {
-  const { address } = useAccount();
-  const [lines, setLines] = useState<Line[]>([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [action, setAction] = useState<GovernanceAction | null>(null);
-  const [front, setFront] = useState<GameId>('world');
-  const history = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const logRef = useRef<HTMLDivElement>(null);
+  const [intro, setIntro] = useState(shouldPlayIntro);
+  const [sound, setSound] = useState(readSound);
+  const [scrolled, setScrolled] = useState(false);
+  const [sheet, setSheet] = useState<Game | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
 
-  const say = useCallback((text: string, who: Line['who'] = 'agent') => {
-    setLines(ls => [...ls, { who, text, shown: who === 'agent' ? 0 : text.length }]);
-  }, []);
+  const community = useQuery({
+    queryKey: ['community-submissions'],
+    queryFn: async () => {
+      const res = await fetch(SUBMISSIONS_URL);
+      if (!res.ok) return [];
+      return parseEntries(await res.json().catch(() => null));
+    },
+    staleTime: 5 * 60_000,
+    retry: 0,
+  });
 
-  // Greeting, typed out on arrival
+  const rows = useMemo(() => buildRows(CATALOG, community.data ?? []), [community.data]);
+
+  const resumable = useCallback(
+    (id: GameId) => (id === 'world' && worldLoaded) || (id === 'warfare' && warfareLoaded),
+    [worldLoaded, warfareLoaded],
+  );
+
+  const ctaFor = useCallback((id: GameId) => GAMES.find(g => g.id === id)?.cta ?? 'PLAY', []);
+
+  const play = useCallback(
+    (id: GameId) => {
+      if (id === 'hoops') onEnterHoops();
+      else if (id === 'warfare') onEnterWarfare();
+      else onEnterWorld();
+    },
+    [onEnterHoops, onEnterWarfare, onEnterWorld],
+  );
+
+  const activate = useCallback(
+    (it: Item) => {
+      const a = it.action;
+      switch (a.t) {
+        case 'game':
+          play(a.id);
+          return;
+        case 'submit':
+          setSubmitting(true);
+          return;
+        case 'external':
+          window.open(a.url, '_blank', 'noopener,noreferrer');
+          return;
+        case 'entry':
+          if (a.entry.app !== undefined) onOpen(a.entry.app);
+          else if (a.entry.path === '/world/classic') window.location.assign(a.entry.path);
+          else onNavigate(a.entry.path);
+      }
+    },
+    [play, onOpen, onNavigate],
+  );
+
+  // Sound is opt-in. Once on, the first click anywhere unlocks the audio
+  // context (browsers need a gesture), so hover stingers can play.
   useEffect(() => {
-    let seen = false;
+    if (!sound) return;
+    const unlock = () => void unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
+  }, [sound]);
+
+  const toggleSound = useCallback(async () => {
+    const next = !sound;
+    setSound(next);
     try {
-      seen = localStorage.getItem(SEEN_KEY) === '1';
-      localStorage.setItem(SEEN_KEY, '1');
+      localStorage.setItem(SOUND_KEY, next ? '1' : '0');
     } catch {
-      // private mode
+      // ignore
     }
-    const t = window.setTimeout(() => say(seen ? RETURNING : GREETING), 450);
-    return () => window.clearTimeout(t);
-  }, [say]);
+    if (next && (await unlockAudio())) ident(true);
+  }, [sound]);
 
-  // Typewriter
-  useEffect(() => {
-    const pending = lines.findIndex(l => l.shown < l.text.length);
-    if (pending < 0) return;
-    const t = window.setTimeout(() => {
-      setLines(ls =>
-        ls.map((l, i) =>
-          i === pending ? { ...l, shown: Math.min(l.text.length, l.shown + 2) } : l,
-        ),
-      );
-    }, 18);
-    return () => window.clearTimeout(t);
-  }, [lines]);
-
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [lines]);
-
-  useEffect(() => {
-    if (active) inputRef.current?.focus({ preventScroll: true });
-  }, [active]);
-
-  const run = async (raw: string) => {
-    const text = raw.trim();
-    if (text === '') return;
-    say(text, 'you');
-    const cmd = text.toLowerCase().replace(/^\//, '');
-    const local: Record<string, () => void> = {
-      play: onEnterWorld,
-      skate: onEnterWorld,
-      world: onEnterWorld,
-      'noun world': onEnterWorld,
-      hoops: onEnterHoops,
-      bball: onEnterHoops,
-      basketball: onEnterHoops,
-      'noun hoops': onEnterHoops,
-      warfare: onEnterWarfare,
-      paintball: onEnterWarfare,
-      'noun warfare': onEnterWarfare,
-      index: () => onOpen('directory'),
-      menu: () => onOpen('directory'),
-      help: () => onOpen('directory'),
-      ls: () => onOpen('directory'),
-      readme: () => onOpen('manifesto'),
-      manifesto: () => onOpen('manifesto'),
-      pip3: () => onOpen('pip3'),
-      art: () => onOpen('pip3'),
-      feed: () => onOpen('terminal'),
-      terminal: () => onOpen('terminal'),
-      vote: () => onNavigate('/vote'),
-      props: () => onNavigate('/vote'),
-      bid: () => onNavigate('/v2'),
-      auction: () => onNavigate('/v2'),
-      clear: () => setLines([]),
-    };
-    if (Object.hasOwn(local, cmd)) {
-      const replies: Record<string, string> = {
-        play: 'loading noun world. grab a board',
-        skate: 'loading noun world. grab a board',
-        world: 'loading noun world. grab a board',
-        'noun world': 'loading noun world. grab a board',
-        hoops: GAMES[1]!.loading,
-        bball: GAMES[1]!.loading,
-        basketball: GAMES[1]!.loading,
-        'noun hoops': GAMES[1]!.loading,
-        warfare: GAMES[2]!.loading,
-        paintball: GAMES[2]!.loading,
-        'noun warfare': GAMES[2]!.loading,
-        readme: 'read it. then go make something',
-        manifesto: 'read it. then go make something',
-      };
-      if (replies[cmd]) say(replies[cmd]);
-      local[cmd]!();
-      return;
-    }
-    // Same command layer as TERMINAL.EXE: /cancel, /draft, /propose [lil],
-    // pasted proposal JSON/markdown open the draft window or confirm card.
-    const cancel = detectCancelIntent(text);
-    if (cancel) {
-      const dao = cancel.lil ? 'lil-nouns' : 'nouns';
-      setAction({
-        type: 'CANCEL_PROPOSAL',
-        proposalId: cancel.proposalId,
-        dao,
-      } as GovernanceAction);
-      say(
-        `ready to cancel ${dao === 'lil-nouns' ? 'lil nouns' : 'nouns'} prop #${cancel.proposalId}. confirm below, only the proposer can cancel`,
-      );
-      return;
-    }
-    const draft = detectDraftPayload(text) ?? detectProposalDraftIntent(text);
-    if (draft) {
-      openProposalDraft(draft);
-      const label = DRAFT_DAO_LABEL[normalizeDraftDao(draft.dao)];
-      const tx = draft.transactions?.length ?? 0;
-      say(
-        tx > 0
-          ? `opened a ${label} draft with ${tx} transaction${tx === 1 ? '' : 's'}. review and submit`
-          : `opened a ${label} draft. write it up, add actions, submit`,
-      );
-      return;
-    }
-    setBusy(true);
-    history.current.push({ role: 'user', content: text });
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          wallet: address ?? null,
-          history: history.current.slice(-10),
-          agent_mode: 'nounirl',
-          view_context: { page: 'home' },
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        response?: string;
-        error?: string;
-        action?: GovernanceAction;
-        proposalDraft?: ProposalDraftPrefill;
-      };
-      if (data.proposalDraft) openProposalDraft(data.proposalDraft);
-      if (data.action?.type !== undefined) setAction(data.action);
-      const reply =
-        data.response ??
-        (res.status === 401
-          ? 'connect a wallet for that one, bottom of the screen'
-          : (data.error ?? 'static on the line, try again'));
-      history.current.push({ role: 'assistant', content: reply });
-      say(reply);
-    } catch {
-      say('signal lost. give it a sec', 'sys');
-    } finally {
-      setBusy(false);
-    }
+  const jump = (id: string) => {
+    const el = scroller.current?.querySelector<HTMLElement>(`#row-${id}`);
+    if (!el) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   };
+
+  const handlers = useMemo(
+    () => ({ onEnterWorld, onEnterHoops, onEnterWarfare, onOpen, onNavigate }),
+    [onEnterWorld, onEnterHoops, onEnterWarfare, onOpen, onNavigate],
+  );
+
+  const onIntroDone = useCallback(() => setIntro(false), []);
+  const closeSheet = useCallback(() => setSheet(null), []);
+  const closeSubmit = useCallback(() => setSubmitting(false), []);
 
   return (
     <div
-      className="nos-home"
-      onPointerDown={() => inputRef.current?.focus({ preventScroll: true })}
+      ref={scroller}
+      className={cx('nh', scrolled && 'is-scrolled', intro && 'is-intro')}
+      onScroll={(e: UIEvent<HTMLDivElement>) => setScrolled(e.currentTarget.scrollTop > 24)}
     >
-      <div className="nos-poster" aria-hidden>
-        <img src="/world2/cover-blur.webp" alt="" draggable={false} />
-      </div>
-      {GAMES.map((g, i) => {
-        // Depth in the stack: 0 = front, then the rest in order behind it
-        const fi = GAMES.findIndex(x => x.id === front);
-        const d = (i - fi + GAMES.length) % GAMES.length;
-        const resume = (g.id === 'world' && worldLoaded) || (g.id === 'warfare' && warfareLoaded);
-        return (
-          <button
-            key={g.id}
-            type="button"
-            className={d > 0 ? 'nos-poster-card is-back' : 'nos-poster-card'}
-            style={{ '--d': d, zIndex: 10 - d } as CSSProperties}
-            data-nos-reflect={d === 0 ? 'poster' : undefined}
-            tabIndex={d === 0 ? 0 : -1}
-            onPointerDown={e => e.stopPropagation()}
-            onClick={() => {
-              if (d > 0) {
-                setFront(g.id);
-                return;
-              }
-              if (g.id === 'hoops') {
-                say(g.loading);
-                onEnterHoops();
-              } else if (g.id === 'warfare') {
-                say(resume ? 'back in the arena' : g.loading);
-                onEnterWarfare();
-              } else {
-                say(resume ? 'back to the plaza' : g.loading);
-                onEnterWorld();
-              }
-            }}
-            aria-label={d === 0 ? `Play ${g.name}` : `Show ${g.name}`}
-          >
-            <img src={g.cover} alt={g.name} draggable={false} />
-            {d === 0 && <span className="nos-poster-cta">{resume ? 'RESUME ▸' : g.cta}</span>}
+      <style>{HOME_CSS}</style>
+      {intro && <Intro onDone={onIntroDone} />}
+
+      <header className="nh-head">
+        <a
+          className="nh-brand"
+          href="/"
+          onClick={e => {
+            e.preventDefault();
+            scroller.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          aria-label="noun.wtf home"
+        >
+          <span className="nh-brand-nog" aria-hidden>
+            ⌐◨-◨
+          </span>
+          <span className="nh-wordmark">NOUN.WTF</span>
+        </a>
+        <nav className="nh-nav" aria-label="Sections">
+          {JUMPS.map(([id, label]) => (
+            <button key={id} type="button" onClick={() => jump(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <AskBar
+          rows={rows}
+          active={active && !intro}
+          handlers={handlers}
+          onActivate={activate}
+          onOpen={onOpen}
+        />
+      </header>
+
+      <Hero
+        slides={HERO_SLIDES}
+        active={active && !intro && sheet === null}
+        sound={sound}
+        resumable={resumable}
+        ctaFor={ctaFor}
+        onToggleSound={() => void toggleSound()}
+        onPlay={play}
+        onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
+        onBrowse={() => jump('play')}
+      />
+
+      <div className="nh-manifesto">
+        <p>
+          <b>the dao got captured. we didn&rsquo;t.</b> noun.wtf is the underground side of nouns:
+          games, art, a free dao and every tool for watching the old one.
+        </p>
+        <div className="nh-manifesto-links">
+          <button type="button" onClick={() => onOpen('manifesto')}>
+            README
           </button>
-        );
-      })}
-      <div className="nos-game-tabs" onPointerDown={e => e.stopPropagation()}>
-        {GAMES.map(g => (
-          <button
-            key={g.id}
-            type="button"
-            className={g.id === front ? 'is-on' : undefined}
-            onClick={() => setFront(g.id)}
-          >
-            {g.name}
+          <button type="button" onClick={() => onOpen('directory')}>
+            INDEX
           </button>
-        ))}
+          <button type="button" onClick={() => onOpen('terminal')}>
+            TERMINAL
+          </button>
+        </div>
       </div>
 
-      <div className="nos-console">
-        <div ref={logRef} className="nos-log">
-          {lines.map((l, i) => (
-            <pre key={i} className={`nos-line who-${l.who}`}>
-              {l.who === 'you' ? '> ' : ''}
-              {l.text.slice(0, l.shown)}
-              {l.shown < l.text.length && <span className="nos-caret">▌</span>}
-            </pre>
-          ))}
-          {busy && <pre className="nos-line who-sys">…</pre>}
-          {action && (
-            <div className="nos-action">
-              <GovernanceActionConfirm
-                action={action}
-                onSuccess={hash =>
-                  say(`tx submitted: ${hash.slice(0, 10)}… etherscan.io/tx/${hash}`)
-                }
-                onCancel={() => {
-                  setAction(null);
-                  say('cancelled');
-                }}
-              />
-            </div>
-          )}
-        </div>
-        <form
-          className="nos-prompt"
-          onSubmit={e => {
-            e.preventDefault();
-            const v = input;
-            setInput('');
-            void run(v);
-          }}
-        >
-          <span>›</span>
-          <input
-            ref={inputRef}
-            className="nos-bare"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="say something"
-            spellCheck={false}
-            autoComplete="off"
-          />
-        </form>
-      </div>
+      <nav className="nh-jumps" aria-label="Jump to section">
+        {JUMPS.map(([id, label]) => (
+          <button key={id} type="button" onClick={() => jump(id)}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="nh-rows">
+        {rows.map(r => (
+          <Shelf key={r.id} row={r} onActivate={activate} sound={sound} />
+        ))}
+      </main>
+
+      <footer className="nh-foot">
+        <span>⌐◨-◨</span> noun.wtf · cc0 · one noun a day, forever ·{' '}
+        <button type="button" onClick={() => setSubmitting(true)}>
+          submit something
+        </button>
+      </footer>
+
+      {sheet && (
+        <GameSheet game={sheet} resume={resumable(sheet.id)} onPlay={play} onClose={closeSheet} />
+      )}
+      {submitting && <SubmitDialog onClose={closeSubmit} />}
     </div>
   );
 }
