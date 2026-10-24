@@ -200,6 +200,14 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
   - **Train my voice.** 100 original sentences, local only. The booth exports an LJSpeech zip (22050 Hz mono 16-bit WAVs + `metadata.csv` + a free Piper/Colab README) via a store-only zip writer (`booth/zip.ts`).
   - **My voice model.** Load `.onnx` + `.onnx.json` (validated in `booth/piperConfig.ts`, kept in IndexedDB, never uploaded). A second `TtsEngine` runs it (`init-bytes`). Two switches, both off by default: `modelVoice` (callouts without a recording, and typed chat, in the player's voice) and `modelShare`. With `modelShare` on, chat lines become ephemeral clips: 8 s max, 1 per 5 s, 60/h, served for 10 min.
 
+### Books (Meme Value)
+
+`/books/meme-value` (alias `/memevalue`) is "MEME VALUE" by LIL 67 (the site owner's own book) as a flipbook, with an ART / CULTURE card (`public/home/covers/meme-value.webp`).
+- **Pages:** `public/books/meme-value/p001.webp…p252.webp` (1400 px, ~25 MB) plus `sm/` (700 px, for phones) and `pages.json` (page count + each page's text, for search, alt text and the TEXT panel). The PDF's covers and spreads are cropped to the trim and split, so the book is 252 square pages.
+- **Re-render:** get the PDF from memevalue.pinit.eth.limo (88 MB, never hosted here) and run `python3 scripts/books/render-meme-value.py <pdf>` from `packages/nouns-webapp` (needs poppler + Pillow).
+- **Reader:** `src/pages/Books/`. `bookMath.ts` is the pure part (views/spreads, the fold geometry, search) and is tested. `Flipbook.tsx` draws the page curl with nested transformed boxes only, no dependencies; reduced motion falls back to a fade. `?p=N` deep-links a page.
+- **License:** the book's Viral Public License stays in the book as page 2. The About panel credits it as printed ("LIL 67", "written and illustrated by 67 unless specified otherwise") and links the original and its PDF.
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
