@@ -205,6 +205,8 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
   const flows: Flow[] = [];
   let convertedEth = 0;
   let ethToUsdc = 0;
+  const ethToUsdcByYear = new Map<number, number>();
+  const yearOf = (t: number) => new Date(t * 1000).getUTCFullYear();
 
   const proposalsById = new Map(input.proposals.map(p => [String(p.id), p]));
   const executedAt = new Map<string, { t: number; tx: string }>();
@@ -416,7 +418,10 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
         case 'conversion': {
           const eth = Number(formatUnits(act.wei, 18));
           convertedEth += eth;
-          if (act.target === TOKEN_BUYER) ethToUsdc += eth;
+          if (act.target === TOKEN_BUYER) {
+            ethToUsdc += eth;
+            ethToUsdcByYear.set(yearOf(t), (ethToUsdcByYear.get(yearOf(t)) ?? 0) + eth);
+          }
           break;
         }
         case 'call': {
@@ -665,10 +670,19 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
   const yearMap = new Map<number, YearSlice & { _props: Set<number> }>();
   for (const f of flows) {
     if (!f.t) continue;
-    const year = new Date(f.t * 1000).getUTCFullYear();
+    const year = yearOf(f.t);
     let y = yearMap.get(year);
     if (!y) {
-      y = { year, inEth: 0, outEth: 0, outUsd: 0, auctions: 0, props: 0, _props: new Set() };
+      y = {
+        year,
+        inEth: 0,
+        outEth: 0,
+        outUsd: 0,
+        ethToUsdc: 0,
+        auctions: 0,
+        props: 0,
+        _props: new Set(),
+      };
       yearMap.set(year, y);
     }
     if (f.kind === 'auction') {
@@ -687,6 +701,7 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
       inEth: r6(y.inEth),
       outEth: r6(y.outEth),
       outUsd: r6(y.outUsd),
+      ethToUsdc: r6(ethToUsdcByYear.get(y.year) ?? 0),
       props: _props.size,
     }));
 

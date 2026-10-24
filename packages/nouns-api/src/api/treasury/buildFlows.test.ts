@@ -59,6 +59,10 @@ describe('stats', () => {
     close(sum('outEth'), r.stats.outEth);
     close(sum('outUsd'), r.stats.outUsd);
     expect(r.years.map(y => y.year)).toEqual([2021, 2022, 2023]);
+    close(
+      r.years.reduce((s, y) => s + y.ethToUsdc, 0),
+      r.stats.ethToUsdc,
+    );
   });
 });
 

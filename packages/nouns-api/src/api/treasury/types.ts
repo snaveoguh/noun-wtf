@@ -141,6 +141,8 @@ export interface YearSlice {
   inEth: number;
   outEth: number;
   outUsd: number;
+  /** ETH sent to the Token Buyer that year (net = inEth − outEth − ethToUsdc). */
+  ethToUsdc: number;
   auctions: number;
   props: number;
 }
