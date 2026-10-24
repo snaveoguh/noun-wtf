@@ -73,6 +73,7 @@ const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPa
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 const VoiceBoothPage = lazy(() => import('@/miniapps/world2/booth/VoiceBoothPage'));
+const DoodlePage = lazy(() => import('@/miniapps/doodle/DoodlePage'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -391,6 +392,17 @@ function ThemedAppContent() {
     if (theme === 'abacus') return;
     setTheme('abacus');
   }, [logicalPath, themePrefix, theme, setTheme]);
+
+  // Doodle Garden — full-screen kids' game, no chrome
+  if (location.pathname === '/doodle' || location.pathname === '/doodle/') {
+    return (
+      <Suspense
+        fallback={<div style={{ background: '#58c4ff', width: '100vw', height: '100vh' }} />}
+      >
+        <DoodlePage />
+      </Suspense>
+    );
+  }
 
   // Classic world — full-screen canvas, no chrome
   if (location.pathname === '/world/classic') {
