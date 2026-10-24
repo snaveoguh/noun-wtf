@@ -278,14 +278,19 @@ const COVERED_PATHS = new Set([
   '/underground',
 ]);
 
+/** Posters whose file isn't named after the path. */
+const COVER_FILES: Partial<Record<string, string>> = { '/world/voice': 'voice-booth' };
+
 /** The poster for a catalog path, if it has one. */
 export function coverForPath(path: string): string | undefined {
+  const file = COVER_FILES[path];
+  if (file !== undefined) return `/home/covers/${file}.webp`;
   if (!COVERED_PATHS.has(path)) return undefined;
   return `/home/covers/${path.replace(/^\//, '').replace(/\//g, '-')}.webp`;
 }
 
 /** Extra things to play, from the catalog, after the three games. */
-const PLAY_PATHS = ['/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
+const PLAY_PATHS = ['/world/voice', '/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
 
 export type Action =
   | { t: 'game'; id: GameId }
