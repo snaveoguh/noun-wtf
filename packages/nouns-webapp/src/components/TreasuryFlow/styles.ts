@@ -38,6 +38,41 @@ export const NONSENSE_CSS = `
 .nz-h-year{color:var(--nz-acid);margin-left:8px}
 .nz-muted{color:var(--nz-dim);font-size:13px;margin:0}
 .nz-empty-inline{color:var(--nz-dim);font-size:14px;padding:12px 0;margin:0}
+.nz-sub{margin:-6px 0 14px}
+.nz-section-h{max-width:1100px;margin:26px auto 12px;font-size:28px;color:var(--nz-acid)}
+.nz-tile.is-usdc .nz-tile-k{color:#e89a3c}
+/* treasury now */
+.nz-now-hero{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 28px;margin-bottom:6px}
+.nz-now-hero>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.nz-now-v{font-size:clamp(40px,8vw,68px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--nz-acid);overflow-wrap:anywhere}
+.nz-now-v.is-usd{font-size:clamp(26px,4.6vw,40px);color:var(--nz-ink)}
+.nz-now-k{color:var(--nz-dim);font-size:14px;display:flex;align-items:center;gap:6px}
+.nz-holders{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.nz-holder{background:rgba(255,255,255,.03);border-radius:14px;padding:10px 12px}
+.nz-holder-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600}
+.nz-holder-sum{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--nz-ink)}
+.nz-hold-table td:first-child{min-width:0}
+.nz-hold-table tbody tr{cursor:default}
+.nz-rate{display:block;color:var(--nz-dim);font-size:11px;font-weight:400}
+.nz-share-cell{width:34%}
+.nz-share{display:inline-block;vertical-align:middle;width:calc(100% - 52px);height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.nz-share b{display:block;height:100%;background:var(--nz-acid);border-radius:4px;min-width:2px}
+.nz-share-pct{display:inline-block;width:48px;text-align:right;font-variant-numeric:tabular-nums;color:var(--nz-dim);font-size:12px}
+.nz-row-meta .nz-share{width:100%;margin-top:6px;height:6px}
+/* waterfall */
+.nz-wf-list{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:12px}
+.nz-wf-row{display:flex;flex-direction:column;gap:4px}
+.nz-wf-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.nz-wf-label{display:flex;align-items:center;gap:8px;font-weight:600}
+.nz-wf-label i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.nz-wf-val{font-variant-numeric:tabular-nums;font-weight:700;margin-left:auto}
+.nz-wf-val em{font-style:normal;font-weight:500;color:var(--nz-dim)}
+.nz-wf-row.is-total .nz-wf-val{font-size:20px}
+.nz-wf-row.is-total:last-child .nz-wf-val{color:var(--nz-acid)}
+.nz-wf-track{position:relative;height:12px;background:rgba(255,255,255,.04);border-radius:4px}
+.nz-wf-track b{position:absolute;top:0;bottom:0;border-radius:4px}
+.nz-wf-row small{color:var(--nz-dim);font-size:12px}
+.nz-wf-row.is-total:last-child{border-top:1px solid var(--nz-div);padding-top:12px}
 /* sankey */
 .nz-sankey svg{display:block;overflow:visible}
 .nz-sk-label{font-size:13px;fill:var(--nz-ink);dominant-baseline:middle}
@@ -154,5 +189,13 @@ export const NONSENSE_CSS = `
   .nz-table .hide-sm{display:none}
   .nz-row-meta.show-sm{display:block}
   .nz-card,.nz-legend-card{padding:14px}
+  .nz-holder{padding:8px}
+  .nz-hold-table{table-layout:fixed;font-size:13px}
+  .nz-hold-table th,.nz-hold-table td{padding:7px 4px}
+  .nz-hold-table th:nth-child(1){width:32%}
+  .nz-hold-table th:nth-child(3){width:24%}
+  .nz-hold-table .num{white-space:normal;overflow-wrap:anywhere}
+  .nz-row-meta .nz-share{display:block}
+  .nz-tip:hover::after,.nz-tip:focus::after{position:fixed;left:16px;right:16px;top:auto;bottom:84px;transform:none;width:auto;z-index:60}
 }
 `;

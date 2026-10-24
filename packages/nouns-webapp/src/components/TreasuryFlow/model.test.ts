@@ -1,14 +1,17 @@
-import type { Flow, FlowNode, TreasuryFlowsResponse } from './types';
+import type { Flow, FlowNode, Reconciliation, TreasuryFlowsResponse } from './types';
 
 import { describe, expect, it } from 'vitest';
 
 import {
   bidderRows,
   fmtEth,
+  fmtToken,
   fmtUsd,
   matchesQuery,
   recipientRows,
+  shareOf,
   viewTotals,
+  waterfallSteps,
   type ViewFilter,
 } from './model';
 
@@ -189,5 +192,65 @@ describe('format', () => {
     expect(fmtUsd(29_635_557)).toBe('$29.6M');
     expect(fmtUsd(41_500)).toBe('$42k');
     expect(fmtUsd(450)).toBe('$450');
+  });
+});
+
+describe('waterfallSteps', () => {
+  // The live reconciliation (2026-10-24), as the API returns it.
+  const rec: Reconciliation = {
+    inEth: 55486.317678,
+    paidOutEth: 20025.681335,
+    soldForUsdcEth: 13352.216288,
+    forkEth: 20227.969411,
+    stakedOutEth: 443.207,
+    stakedOut: [
+      { symbol: 'wstETH', amount: 20.699985, rate: 1.247096, eth: 25.81 },
+      { symbol: 'rETH', amount: 355.419901, rate: 1.174373, eth: 417.39 },
+    ],
+    flowNetEth: 1437.243644,
+    residualEth: 2680.05,
+    nowEth: 4117.293644,
+    nowUsd: 573602.15,
+    complete: true,
+  };
+  const steps = waterfallSteps(rec);
+
+  it('runs in → outs → derived residual → now, each bar starting where the last ended', () => {
+    expect(steps.map(s => s.key)).toEqual([
+      'in',
+      'paid',
+      'usdc',
+      'fork',
+      'staked',
+      'residual',
+      'now',
+    ]);
+    for (let i = 1; i < steps.length - 1; i++)
+      expect(steps[i]!.from).toBeCloseTo(steps[i - 1]!.to, 6);
+    expect(steps[5]!.from).toBeCloseTo(rec.flowNetEth, 3);
+    expect(steps[5]!.to).toBeCloseTo(rec.nowEth, 3);
+    expect(steps[6]).toMatchObject({ from: 0, to: rec.nowEth, total: true });
+    expect(steps.find(s => s.derived === true)?.key).toBe('residual');
+  });
+
+  it('labels the USDC step as dollar grants and the residual as derived', () => {
+    expect(steps[2]!.label).toBe('sold for USDC to pay grants in dollars');
+    expect(steps[5]!.label).toBe('staking yield & other (derived)');
+    expect(steps[4]!.explain).toContain('20.7 wstETH + 355.4 rETH');
+    expect(steps.every(s => s.tip.length > 20)).toBe(true);
+  });
+
+  it('skips the staked step when nothing staked was paid out', () => {
+    const s = waterfallSteps({ ...rec, stakedOutEth: 0, stakedOut: [] });
+    expect(s.map(x => x.key)).not.toContain('staked');
+  });
+
+  it('share and token formatting', () => {
+    expect(shareOf(2804.45, 4117.29)).toBeCloseTo(0.6811, 3);
+    expect(shareOf(null, 100)).toBe(0);
+    expect(shareOf(5, 0)).toBe(0);
+    expect(fmtToken(2248.7845, 'wstETH')).toBe('2,249 wstETH');
+    expect(fmtToken(0.0206, 'WETH')).toBe('0.0206 WETH');
+    expect(fmtToken(484743.29, 'USDC')).toBe('$484,743');
   });
 });

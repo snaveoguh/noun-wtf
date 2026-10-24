@@ -83,12 +83,14 @@ export default function YearBars({ data, year, onYear }: Props) {
           <>
             <b>{shown.year}</b> in {fmtEth(shown.inEth)} from {shown.auctions} auctions; out{' '}
             {fmtEth(shown.outEth)} + {fmtUsd(shown.outUsd)} across {shown.props} proposals
-            {shown.ethToUsdc > 0 && <>; {fmtEth(shown.ethToUsdc)} swapped to USDC</>}
+            {shown.ethToUsdc > 0 && (
+              <>; {fmtEth(shown.ethToUsdc)} sold for USDC to pay grants in dollars</>
+            )}
           </>
         ) : (
           <>
-            left bar: auction ETH in. right bar: ETH out by kind, plus ETH swapped to USDC. tap a
-            year to filter the page.
+            left bar: auction ETH in. right bar: ETH out by kind, plus ETH sold for USDC to pay
+            grants in dollars. tap a year to filter the page.
           </>
         )}
       </div>
