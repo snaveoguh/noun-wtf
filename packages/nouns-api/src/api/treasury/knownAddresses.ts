@@ -143,6 +143,13 @@ export const KNOWN_ADDRESSES: Readonly<Record<string, KnownAddress>> = {
     source: 'sdk',
     note: 'webapp src/lib/knownAbis.ts NOUNS_CLIENT_REWARDS_ADDRESS',
   },
+  '0x44d97d22b3d37d837ce4b22773aad9d1566055d9': {
+    name: 'Fork Escrow',
+    kind: 'dao-contract',
+    description: 'Holds Nouns escrowed toward a fork',
+    source: 'onchain',
+    note: 'governor forkEscrow()',
+  },
   '0xf790a5f59678dd733fb3de93493a91f472ca1365': {
     name: 'Nouns DAO Data',
     kind: 'dao-contract',

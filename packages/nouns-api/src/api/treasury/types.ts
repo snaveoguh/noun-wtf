@@ -17,7 +17,8 @@ export type FlowKind = 'auction' | 'direct' | 'stream' | 'payer' | 'call' | 'for
  * Who an address is. Derived by explicit rules (see buildFlows.ts `classify`):
  *  treasury  — nouns.eth + the legacy timelock (known-address table), merged into one node
  *  nounders  — nounders.eth (known-address table)
- *  subdao    — a fork treasury (from the governor's ExecuteFork event) or a known sub-DAO
+ *  subdao    — a fork treasury (governor ExecuteFork event), a known sub-DAO, or a
+ *              recipient whose primary ENS name is a *.nouns.eth subname (DAO-issued)
  *  contract  — a DAO contract (known table) or any recipient with non-Safe contract code
  *  multisig  — a recipient whose code is a Safe proxy (team / grant multisigs)
  *  person    — a recipient with no code (an EOA)

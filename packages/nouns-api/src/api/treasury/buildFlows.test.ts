@@ -119,6 +119,7 @@ describe('entity types (rules, not guesses)', () => {
     expect(type('0x0e09ceb98492715ec5b080d2b95b5004ddf43947')).toBe('contract');
     expect(type('0x79095391743e0f017a16c388de6a6a3f175a5cd5')).toBe('multisig');
     expect(type(B)).toBe('person');
+    expect(type('0x0260ba2dae8b85b5a1bd492829738bdcc7956f35')).toBe('subdao'); // grants.nouns.eth, a Safe
     expect(type('0x2222222222222222222222222222222222222222')).toBe('bidder');
   });
   it('flags recipients whose code lookup failed', () => {

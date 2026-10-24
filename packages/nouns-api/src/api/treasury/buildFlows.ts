@@ -551,6 +551,9 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
     else if (known?.kind === 'nounders') type = 'nounders';
     else if (known?.kind === 'subdao' || forkTreasury.has(n.id)) type = 'subdao';
     else if (known?.kind === 'dao-contract') type = 'contract';
+    // A primary name under nouns.eth (forward-verified by ReverseRecords) was
+    // issued by the DAO, which owns nouns.eth: a DAO program's wallet.
+    else if (received && ens?.endsWith('.nouns.eth')) type = 'subdao';
     else if (received) {
       const code = input.code[n.id];
       if (!code) n.codeUnknown = true;

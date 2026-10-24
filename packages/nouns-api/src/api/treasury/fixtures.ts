@@ -276,7 +276,7 @@ export const BUILD_INPUT: BuildInput = {
     [C]: 'contract',
     // 0x3dfd… deliberately missing → person, codeUnknown
   },
-  ens: { [W1]: 'whale.eth' },
+  ens: { [W1]: 'whale.eth', '0x0260ba2dae8b85b5a1bd492829738bdcc7956f35': 'grants.nouns.eth' },
   indexing: { complete: true, block: 1, timestamp: 1 },
 };
 
