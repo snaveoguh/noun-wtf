@@ -329,11 +329,12 @@ export class DoodleGame {
 
   private skyRainbows() {
     const u = this.unit;
+    // Below the score / buttons row.
     const r = Math.min(this.W * 0.22, 150 * u);
     const band = r * 0.09;
     return [
-      { x: r * 0.95, y: r * 1.05, r, band },
-      { x: this.W - r * 0.95, y: r * 1.05, r, band },
+      { x: r * 0.95, y: r + 80, r, band },
+      { x: this.W - r * 0.95, y: r + 80, r, band },
     ];
   }
 

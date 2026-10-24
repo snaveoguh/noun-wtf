@@ -13,19 +13,25 @@ import { DoodleGame } from './game';
 import { isMuted, setMuted, startMusic, stopMusic, unlockAudio } from './sound';
 
 const FONT = '"Comic Neue","Comic Sans MS",system-ui,sans-serif';
+// The site theme forces its font on `*`; this outranks it inside the game.
+// Also tucks away the idle NOUN FM pill so it doesn't sit on the game.
+const GAME_CSS = `[data-theme] .dg, [data-theme] .dg * { font-family: ${FONT} !important; }
+[data-nounfm="off"] { display: none !important; }`;
+
 const bigBtn =
-  'rounded-full border-4 border-[#2b1d3a] shadow-[0_6px_0_#2b1d3a] active:translate-y-1 active:shadow-[0_2px_0_#2b1d3a] font-black select-none';
+  'border-4 border-[#2b1d3a] shadow-[0_6px_0_#2b1d3a] text-[#2b1d3a] active:translate-y-1 active:shadow-[0_2px_0_#2b1d3a] font-black select-none';
 
 function Sky({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 overflow-auto"
+      className="dg fixed inset-0 overflow-auto"
       style={{
         background: 'linear-gradient(#58c4ff 0%, #d6f3ff 70%, #5cc04a 70%, #3f9e36 100%)',
         fontFamily: FONT,
         touchAction: 'manipulation',
       }}
     >
+      <style>{GAME_CSS}</style>
       {children}
     </div>
   );
@@ -61,21 +67,22 @@ function Play({ who, onHome }: { who: DoodleCharacter; onHome: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 select-none" style={{ fontFamily: FONT, background: '#58c4ff' }}>
+    <div className="dg fixed inset-0 select-none" style={{ background: '#58c4ff' }}>
+      <style>{GAME_CSS}</style>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full"
         style={{ touchAction: 'none' }}
       />
-      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full border-4 border-[#2b1d3a] bg-white px-4 py-1 text-4xl font-black text-[#2b1d3a] shadow-[0_5px_0_#2b1d3a]">
+      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full border-4 border-[#2b1d3a] bg-[#fff] px-4 py-1 text-4xl font-black text-[#2b1d3a] shadow-[0_5px_0_#2b1d3a]">
         <span>🌼</span>
         <span>{count}</span>
       </div>
-      <div className="absolute bottom-3 right-3 flex gap-3">
+      <div className="absolute right-3 top-3 flex gap-3">
         <button
           type="button"
           aria-label={muted ? 'Sound on' : 'Sound off'}
-          className={`${bigBtn} h-16 w-16 bg-white text-3xl`}
+          className={`${bigBtn} h-16 w-16 rounded-full bg-[#fff] text-3xl`}
           onClick={toggleMute}
         >
           {muted ? '🔇' : '🔊'}
@@ -83,7 +90,7 @@ function Play({ who, onHome }: { who: DoodleCharacter; onHome: () => void }) {
         <button
           type="button"
           aria-label="Back to the drawings"
-          className={`${bigBtn} h-16 w-16 bg-[#ffd60a] text-3xl`}
+          className={`${bigBtn} h-16 w-16 rounded-full bg-[#ffd60a] text-3xl`}
           onClick={onHome}
         >
           🏠
@@ -190,12 +197,12 @@ function AddDrawing({ onDone }: { onDone: (c: DoodleCharacter | null) => void })
         <h1 className="text-center text-4xl font-black">📷 Add a drawing</h1>
         {!img && (
           <>
-            <p className="rounded-2xl bg-white/80 p-3 text-center text-lg font-bold">
+            <p className="rounded-2xl bg-[rgba(255,255,255,0.8)] p-3 text-center text-lg font-bold">
               Take a photo of the drawing on plain paper, in good light. Fill the screen with it.
             </p>
             <button
               type="button"
-              className={`${bigBtn} bg-[#ffd60a] px-8 py-4 text-3xl`}
+              className={`${bigBtn} rounded-full bg-[#ffd60a] px-8 py-4 text-3xl`}
               onClick={() => fileRef.current?.click()}
             >
               📸 Take photo
@@ -212,7 +219,7 @@ function AddDrawing({ onDone }: { onDone: (c: DoodleCharacter | null) => void })
 
         {img && !result && crop && (
           <>
-            <p className="rounded-2xl bg-white/80 px-3 py-2 text-center text-lg font-bold">
+            <p className="rounded-2xl bg-[rgba(255,255,255,0.8)] px-3 py-2 text-center text-lg font-bold">
               Drag a box around just the character
             </p>
             <div
@@ -246,14 +253,14 @@ function AddDrawing({ onDone }: { onDone: (c: DoodleCharacter | null) => void })
             <div className="flex gap-3">
               <button
                 type="button"
-                className={`${bigBtn} bg-white px-5 py-3 text-xl`}
+                className={`${bigBtn} rounded-full bg-[#fff] px-5 py-3 text-xl`}
                 onClick={() => fileRef.current?.click()}
               >
                 🔁 New photo
               </button>
               <button
                 type="button"
-                className={`${bigBtn} bg-[#06d6a0] px-6 py-3 text-2xl`}
+                className={`${bigBtn} rounded-full bg-[#06d6a0] px-6 py-3 text-2xl`}
                 onClick={cut}
                 disabled={busy}
               >
@@ -278,14 +285,14 @@ function AddDrawing({ onDone }: { onDone: (c: DoodleCharacter | null) => void })
             <div className="flex gap-3">
               <button
                 type="button"
-                className={`${bigBtn} bg-white px-5 py-3 text-xl`}
+                className={`${bigBtn} rounded-full bg-[#fff] px-5 py-3 text-xl`}
                 onClick={() => setResult(null)}
               >
                 ↩️ Try again
               </button>
               <button
                 type="button"
-                className={`${bigBtn} bg-[#06d6a0] px-6 py-3 text-2xl`}
+                className={`${bigBtn} rounded-full bg-[#06d6a0] px-6 py-3 text-2xl`}
                 onClick={keep}
               >
                 ✅ Play!
@@ -301,7 +308,7 @@ function AddDrawing({ onDone }: { onDone: (c: DoodleCharacter | null) => void })
         )}
         <button
           type="button"
-          className={`${bigBtn} mt-2 bg-white px-5 py-2 text-xl`}
+          className={`${bigBtn} mt-2 rounded-full bg-[#fff] px-5 py-2 text-xl`}
           onClick={() => onDone(null)}
         >
           ← Back
@@ -363,7 +370,7 @@ const DoodlePage: React.FC = () => {
         >
           🌼 Doodle Garden 🌼
         </h1>
-        <p className="rounded-full bg-white/80 px-5 py-2 text-center text-2xl font-bold">
+        <p className="rounded-full bg-[rgba(255,255,255,0.8)] px-5 py-2 text-center text-2xl font-bold">
           Who wants to play?
         </p>
         <div className="flex flex-wrap justify-center gap-5">
@@ -372,7 +379,7 @@ const DoodlePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => play(c)}
-                className={`${bigBtn} flex h-60 w-44 flex-col items-center justify-end gap-1 rounded-3xl bg-white p-3`}
+                className={`${bigBtn} flex h-60 w-44 flex-col items-center justify-end gap-1 rounded-3xl bg-[#fff] p-3`}
               >
                 <img
                   src={c.src}
@@ -388,7 +395,7 @@ const DoodlePage: React.FC = () => {
                   type="button"
                   aria-label={`Remove ${c.name}`}
                   onClick={() => remove(c)}
-                  className="absolute -right-2 -top-2 h-9 w-9 rounded-full border-2 border-[#2b1d3a] bg-white text-lg"
+                  className="absolute -right-2 -top-2 h-9 w-9 rounded-full border-2 border-[#2b1d3a] bg-[#fff] text-lg"
                 >
                   ✕
                 </button>
@@ -398,13 +405,13 @@ const DoodlePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setScreen('add')}
-            className={`${bigBtn} flex h-60 w-44 flex-col items-center justify-center gap-2 rounded-3xl border-dashed bg-white/70 text-2xl`}
+            className={`${bigBtn} flex h-60 w-44 flex-col items-center justify-center gap-2 rounded-3xl border-dashed bg-[rgba(255,255,255,0.7)] text-2xl`}
           >
             <span className="text-6xl">📷</span>
             Add a drawing
           </button>
         </div>
-        <div className="max-w-md rounded-2xl bg-white/80 p-4 text-center text-lg font-bold">
+        <div className="max-w-md rounded-2xl bg-[rgba(255,255,255,0.8)] p-4 text-center text-lg font-bold">
           👆 Touch where to go · touch up high to jump
           <br />
           Catch the treats 🍓⭐ · pop the balloons 🎈
