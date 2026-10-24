@@ -7,13 +7,18 @@
 // clock: whatever the browser does, a frame either shows the whole state for
 // that moment or isn't drawn at all.
 
-/** Pixel-for-pixel the real noggles (nouns-assets glasses-square-red, 16x5). */
+/**
+ * Pixel-for-pixel the real noggles: nouns-assets/images/v0/4-glasses/
+ * glasses-square-red.png, cropped to its bbox (16x6; the lenses are closed
+ * at the bottom). Checked against the PNG in introScene.test.ts.
+ */
 export const NOGGLES = [
   '...RRRRRR.RRRRRR',
   '...RWWBBR.RWWBBR',
   'RRRRWWBBRRRWWBBR',
   'R..RWWBBR.RWWBBR',
   'R..RWWBBR.RWWBBR',
+  '...RRRRRR.RRRRRR',
 ];
 export const NOG_RED = '#f3322c';
 
@@ -130,13 +135,13 @@ export function drawIntro(c: CanvasRenderingContext2D, w: number, h: number, t: 
 
   const px = Math.min(w * 0.046, 36);
   const nw = 16 * px;
-  const nh = 5 * px;
+  const nh = NOGGLES.length * px;
   const ox = (w - nw) / 2;
   const oy = (h - nh) / 2;
   const st = stageAt(t);
   // the dive lands in the right pupil (columns 13-14, rows 1-4)
   const fx = ox + nw * 0.875;
-  const fy = oy + nh * 0.6;
+  const fy = oy + nh * 0.5;
   c.save();
   c.translate(fx, fy);
   c.rotate((st.rot * Math.PI) / 180);

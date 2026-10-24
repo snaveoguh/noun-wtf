@@ -1,11 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import { PIXELS, pixelAt, stageAt, streakAt, STREAK_COUNT, T } from './introScene';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { PNG } from 'pngjs';
+
+import { NOGGLES, PIXELS, pixelAt, stageAt, streakAt, STREAK_COUNT, T } from './introScene';
 
 describe('intro timeline', () => {
-  it('uses the real 16x5 noggles: 34 frame, 16 white, 16 pupil pixels', () => {
-    const n = (k: string) => PIXELS.filter(p => p.k === k).length;
-    expect([n('R'), n('W'), n('B')]).toEqual([34, 16, 16]);
+  it('matches glasses-square-red.png pixel for pixel', () => {
+    const png = PNG.sync.read(
+      readFileSync(
+        resolve(__dirname, '../../../../../nouns-assets/images/v0/4-glasses/glasses-square-red.png'),
+      ),
+    );
+    const rows: string[] = [];
+    for (let y = 0; y < png.height; y++) {
+      let row = '';
+      for (let x = 0; x < png.width; x++) {
+        const i = (y * png.width + x) * 4;
+        const [r, g, b, a] = [png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]];
+        row += a === 0 ? '.' : r === 255 && g === 255 && b === 255 ? 'W' : r === 0 && g === 0 && b === 0 ? 'B' : 'R';
+      }
+      rows.push(row);
+    }
+    // crop to the drawn pixels
+    const ys = rows.map((r, y) => (/[^.]/.test(r) ? y : -1)).filter(y => y >= 0);
+    const xs = rows.flatMap(r => [...r].map((c, x) => (c === '.' ? -1 : x))).filter(x => x >= 0);
+    const crop = rows
+      .slice(Math.min(...ys), Math.max(...ys) + 1)
+      .map(r => r.slice(Math.min(...xs), Math.max(...xs) + 1));
+    expect(crop).toEqual(NOGGLES);
   });
 
   it('starts empty', () => {
