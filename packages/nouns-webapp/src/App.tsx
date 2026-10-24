@@ -73,6 +73,7 @@ const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPa
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 const VoiceBoothPage = lazy(() => import('@/miniapps/world2/booth/VoiceBoothPage'));
+const MemeValuePage = lazy(() => import('@/pages/Books/MemeValuePage'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -269,6 +270,15 @@ function SiteRoutes() {
           </Suspense>
         }
       />
+      <Route
+        path="books/meme-value"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <MemeValuePage />
+          </Suspense>
+        }
+      />
+      <Route path="memevalue" element={<Navigate to="/books/meme-value" replace />} />
       <Route
         path="exchange"
         element={
