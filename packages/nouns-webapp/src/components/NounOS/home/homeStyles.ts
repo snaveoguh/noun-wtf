@@ -150,6 +150,8 @@ export const HOME_CSS = `
 .nh-sound:hover{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1.5px #fff}
 .nh-sound.is-on{box-shadow:inset 0 0 0 1.5px var(--acid);color:var(--acid)}
 .nh-sound svg{width:22px;height:22px}
+.nh-tap-hint{align-self:center;margin-right:10px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--acid);white-space:nowrap;animation:nh-hint 1.6s ease-in-out infinite}
+@keyframes nh-hint{0%,100%{opacity:.55}50%{opacity:1}}
 .nh-hero-side::after{content:'CC0 · FREE TO PLAY';font-family:${MONO};font-size:11px;font-weight:700;letter-spacing:.12em;color:#fff;
   padding:9px 30px 9px 14px;background:rgba(40,40,46,.6);border-left:3px solid rgba(255,255,255,.7);white-space:nowrap}
 .nh-pips{position:absolute;right:var(--gut);bottom:clamp(30px,6vh,60px);display:flex;gap:7px;z-index:2}
@@ -370,39 +372,9 @@ body .nh-form-done p{margin:0 auto 22px;max-width:380px}
 body .nh-intro{position:fixed;inset:0;z-index:10000;background:radial-gradient(ellipse 46% 40% at 50% 50%,#2a2a31 0%,#141418 55%,#000 100%);display:grid;place-items:center;overflow:hidden;cursor:pointer;
   --nog:#f3322c;--px:min(4.6vw,36px);transition:opacity .26s ease}
 body .nh-intro.is-leaving{opacity:0}
-/* the dive lands in the right pupil (columns 13-14, rows 2-5 of 16x5) */
-body .nh-intro-stage{position:relative;transform-origin:87.5% 60%;animation:nh-dive 4.2s cubic-bezier(.75,0,.9,.2) forwards}
-body .nh-nog{display:grid;grid-template-columns:repeat(16,var(--px));grid-template-rows:repeat(5,var(--px));
-  animation:nh-hit .5s cubic-bezier(.2,1.8,.4,1) 1.32s both}
-body .nh-nog i{display:block;width:calc(100% + 1px);height:calc(100% + 1px)}
-/* Only transform + opacity animate in the intro: those run on the compositor,
-   so the build can't freeze half way while the homepage loads behind it (a
-   filter animation here kept the frame pixels on the busy main thread). */
-body .nh-nog .is-R{position:relative;background:var(--nog);box-shadow:0 0 calc(var(--px) * .6) rgba(243,50,44,.45);will-change:transform,opacity;
-  animation:nh-px-in .36s cubic-bezier(.2,1.7,.45,1) calc(.23s + var(--x) * 55ms + var(--y) * 18ms) both}
-body .nh-nog .is-R::after{content:'';position:absolute;inset:0;background:#fff;opacity:0;will-change:opacity;
-  animation:nh-glint .45s ease-in-out calc(1.9s + var(--x) * 34ms) both}
-body .nh-nog .is-W{background:#fff}
-body .nh-nog .is-B{background:#000}
-body .nh-nog .is-W,body .nh-nog .is-B{will-change:transform,opacity;animation:nh-eye-in .22s cubic-bezier(.3,1.5,.5,1) calc(1.32s + var(--y) * 14ms) both}
-body .nh-intro-streaks{position:absolute;inset:-10% 0;display:flex;justify-content:center;gap:.6vw;pointer-events:none}
-body .nh-intro-streaks i{flex:0 0 2.4vw;height:100%;opacity:0;
-  background:linear-gradient(180deg,transparent,hsl(calc(346 + var(--i) * 1.2) 95% calc(48% + var(--i) * .8%)) 28%,hsl(calc(2 + var(--i) * .6) 98% 60%) 72%,transparent);
-  box-shadow:0 0 1.2vw hsl(358 95% 55% / .6);
-  animation:nh-streak 1.15s cubic-bezier(.6,0,.9,.4) calc(2.65s + var(--i) * 20ms) both}
-body .nh-intro-streaks i:nth-child(3n){filter:brightness(1.5)}
-body .nh-intro-streaks i:nth-child(4n){flex-basis:.6vw}
+body .nh-intro-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 body .nh-intro-skip{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-family:${MONO} !important;font-size:11px;letter-spacing:.14em !important;
   color:rgba(255,255,255,.3);animation:nh-fade .4s ease .5s both}
-@keyframes nh-px-in{0%{opacity:0;transform:translateY(-140%) scale(0)}60%{opacity:1;transform:translateY(8%) scale(1.25)}100%{opacity:1;transform:none}}
-@keyframes nh-eye-in{0%{opacity:0;transform:scale(2.6)}100%{opacity:1;transform:none}}
-@keyframes nh-glint{0%,100%{opacity:0}50%{opacity:.5}}
-@keyframes nh-hit{0%{transform:scale(1)}30%{transform:scale(1.09) rotate(-1.2deg)}100%{transform:none}}
-@keyframes nh-streak{0%{opacity:0;transform:scaleY(0)}35%{opacity:1;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.4) scaleX(5)}}
-@keyframes nh-dive{0%,68%{transform:scale(1)}100%{transform:scale(34)}}
-body .nh-intro.is-still .nh-intro-stage,body .nh-intro.is-still .nh-intro-stage *,body .nh-intro.is-still .nh-intro-streaks{animation:none !important}
-body .nh-intro.is-still .nh-intro-streaks{display:none}
-body .nh-intro.is-still .nh-intro-stage{animation:nh-fade .3s ease both !important}
 
 @media (prefers-reduced-motion:reduce){
   .nh *,.nh *::before,.nh *::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
