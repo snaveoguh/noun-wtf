@@ -88,6 +88,16 @@ p {
   font-family: 'Londrina Solid';
 }
 
+.treasuryLink {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.treasuryLink:hover {
+  color: var(--brand-cool-dark-text, inherit);
+}
+
 .treasuryInfoText {
   padding-top: 1rem;
   padding-bottom: 1rem;

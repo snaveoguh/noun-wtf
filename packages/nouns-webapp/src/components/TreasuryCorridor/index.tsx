@@ -3,11 +3,14 @@
  * Immersive first-person corridor with live treasury data panels.
  */
 import { FC, useState, useCallback, Suspense } from 'react';
+
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { Link } from 'react-router';
+
 import Corridor from './Corridor';
-import NounCharacter from './NounCharacter';
 import DataPanels from './DataPanels';
+import NounCharacter from './NounCharacter';
 import { useStatsData } from './useStatsData';
 
 // ─── HUD Overlay ────────────────────────────────────────────────────────────
@@ -26,69 +29,101 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
       }}
     >
       {/* Controls hint — top center */}
-      <div style={{
-        position: 'absolute',
-        top: 16,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: 8,
-        alignItems: 'center',
-      }}>
-        <span style={{
-          fontSize: '0.75rem',
-          color: 'var(--theme-text-muted)',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '4px 10px',
-          borderRadius: 6,
-          border: '1px solid var(--theme-divider)',
-        }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '0.75rem',
+            color: 'var(--theme-text-muted)',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '4px 10px',
+            borderRadius: 6,
+            border: '1px solid var(--theme-divider)',
+          }}
+        >
           WASD / Arrows to move, Click + drag to look, Space for auto-walk
         </span>
       </div>
 
+      {/* The same treasury figures, flat and explained — top left */}
+      <Link
+        to="/nonsense"
+        style={{
+          position: 'absolute',
+          top: 52,
+          left: 16,
+          pointerEvents: 'auto',
+          fontSize: '0.75rem',
+          color: '#d4ff3a',
+          background: 'rgba(0,0,0,0.6)',
+          padding: '4px 10px',
+          borderRadius: 6,
+          border: '1px solid var(--theme-divider)',
+          textDecoration: 'none',
+        }}
+      >
+        treasury in plain numbers: what it holds, where it went →
+      </Link>
+
       {/* Progress bar — bottom */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 3,
-        background: '#0a0a1a',
-      }}>
-        <div style={{
-          width: `${progress}%`,
-          height: '100%',
-          background: 'linear-gradient(90deg, #fbbf24, #ec4899, #60a5fa)',
-          transition: 'width 0.1s linear',
-        }} />
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: '#0a0a1a',
+        }}
+      >
+        <div
+          style={{
+            width: `${progress}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #fbbf24, #ec4899, #60a5fa)',
+            transition: 'width 0.1s linear',
+          }}
+        />
       </div>
 
       {/* Depth indicator — bottom right */}
-      <div style={{
-        position: 'absolute',
-        bottom: 12,
-        right: 16,
-        fontSize: '0.75rem',
-        color: 'var(--theme-text-muted)',
-        fontFamily: 'monospace',
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 12,
+          right: 16,
+          fontSize: '0.75rem',
+          color: 'var(--theme-text-muted)',
+          fontFamily: 'monospace',
+        }}
+      >
         {progress.toFixed(0)}% explored
       </div>
 
       {/* Auto-walk indicator */}
       {autoWalk && (
-        <div style={{
-          position: 'absolute',
-          bottom: 12,
-          left: 16,
-          fontSize: '0.75rem',
-          color: '#fbbf24',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '3px 8px',
-          borderRadius: 4,
-          border: '1px solid #3b3011',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: 16,
+            fontSize: '0.75rem',
+            color: '#fbbf24',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '3px 8px',
+            borderRadius: 4,
+            border: '1px solid #3b3011',
+          }}
+        >
           AUTO-WALK ▶
         </div>
       )}
@@ -99,28 +134,30 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
 // ─── Loading Screen ─────────────────────────────────────────────────────────
 
 const LoadingScreen: FC = () => (
-  <div style={{
-    position: 'absolute',
-    inset: 0,
-    background: '#050510',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-    fontFamily: "'PT Root UI', sans-serif",
-  }}>
-    <div style={{
-      fontSize: '2rem',
-      color: '#fbbf24',
-      marginBottom: 16,
-      animation: 'pulse 2s ease-in-out infinite',
-    }}>
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      background: '#050510',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 20,
+      fontFamily: "'PT Root UI', sans-serif",
+    }}
+  >
+    <div
+      style={{
+        fontSize: '2rem',
+        color: '#fbbf24',
+        marginBottom: 16,
+        animation: 'pulse 2s ease-in-out infinite',
+      }}
+    >
       🐚
     </div>
-    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-      Loading Treasury Corridor...
-    </div>
+    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Loading Treasury Corridor...</div>
     <style>{`
       @keyframes pulse {
         0%, 100% { opacity: 0.5; transform: scale(1); }
@@ -178,11 +215,7 @@ const TreasuryCorridor: FC = () => {
 
           {/* Post-processing */}
           <EffectComposer>
-            <Bloom
-              luminanceThreshold={0.2}
-              luminanceSmoothing={0.9}
-              intensity={0.8}
-            />
+            <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={0.8} />
           </EffectComposer>
         </Suspense>
       </Canvas>
