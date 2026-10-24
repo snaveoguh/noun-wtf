@@ -4,6 +4,8 @@
 // PLAY / MORE INFO sit over a gradient. Hovering lifts it a little and, with
 // sound on, plays that game's stinger. Clips pause when the hero is off
 // screen or the tab is hidden; reduced motion and save-data get posters.
+// A slide with a `bed` (Noun Hoops) gets a court + groove under it with sound
+// on (bed.ts), faded out on any change and never over the voice-over.
 
 import type { Clip, GameId, Slide } from './rows';
 
@@ -12,7 +14,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { cx } from '../osStore';
 
-import { motif, playFile, unlockAudio, type Playback } from './sound';
+import { shouldPlayBed } from './bed';
+import { courtBed, motif, playFile, unlockAudio, type Playback } from './sound';
 import { DUCKED, shouldStartVo, shouldStopVo, VO_CREDIT } from './voiceOver';
 
 export const GAME_ACCENT: Record<GameId, string> = {
@@ -198,6 +201,30 @@ export default function Hero({
   }, [sound, voSrc, live]);
   useEffect(() => () => vo.current?.stop(), []);
 
+  // The slide's sound bed (bed.ts): plays while it should, any change in
+  // that fades it out (the cleanup); a gesture starts it if audio is locked.
+  const bedTrack = s.bed?.track;
+  useEffect(() => {
+    if (bedTrack === undefined || !shouldPlayBed({ sound, slideHasBed: true, live, voOn })) return;
+    let cancelled = false;
+    let bed: Playback | null = null;
+    const go = () => {
+      void unlockAudio().then(ok => {
+        if (!ok || cancelled || bed !== null) return;
+        bed = courtBed(bedTrack);
+      });
+    };
+    go();
+    window.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go);
+      bed?.stop();
+    };
+  }, [sound, bedTrack, live, voOn]);
+
   useEffect(() => {
     if (paused || voOn) return;
     // Just finished the voice-over: a beat, then move on
@@ -212,8 +239,13 @@ export default function Hero({
   const onEnter = () => {
     setHeld(true);
     const now = performance.now();
-    // Clips with their own soundtrack speak for themselves
-    if (sound && !(s.clip?.audio === true && motion) && now - lastMotif.current > 1500) {
+    // Clips with their own soundtrack (or a bed) speak for themselves
+    if (
+      sound &&
+      !(s.clip?.audio === true && motion) &&
+      s.bed === undefined &&
+      now - lastMotif.current > 1500
+    ) {
       lastMotif.current = now;
       motif(s.game);
     }
