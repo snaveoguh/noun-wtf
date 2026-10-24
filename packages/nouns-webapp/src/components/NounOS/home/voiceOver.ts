@@ -14,7 +14,7 @@
 //   No reserve. No gatekeepers.
 //   Free games. Free art. A free DAO. And eyes on the old one.
 //   Just Nouns.
-//   Welcome to Nouns.
+//   Welcome to Noun.
 
 // The file is public/home/vo-intro.mp3, set as the sizzle slide's `vo` (rows.ts).
 
@@ -23,7 +23,7 @@ export const VO_SPEAKER = 499; // LibriTTS-R speaker "2427" in the model's speak
 /** Length of public/home/vo-intro.mp3, s. While it plays the slide's clip is
  * restarted and slowed to last exactly as long, so voice and picture end
  * together instead of the clip looping back to scenes already seen. */
-export const VO_SECONDS = 17.06;
+export const VO_SECONDS = 16.8;
 
 /** Playback rate that stretches a clip of `clipSeconds` over the voice-over (never faster, at most 25% slower). */
 export function syncRate(clipSeconds: number): number {
