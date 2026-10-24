@@ -69,6 +69,18 @@ export interface WorldSettings {
   callouts: boolean;
   /** No swearing in the rider's callouts. */
   cleanVoices: boolean;
+  /** Voice Booth: the rider says lines in the player's own recordings. */
+  myVoice: boolean;
+  /** Hear other players' recorded voices (off: their callouts fall back to TTS). */
+  hearVoices: boolean;
+  /** Voice Booth in clean mode: also list the swear versions to record. */
+  boothSwears: boolean;
+  /** Share my booth recordings so other players hear them (ticked consent). */
+  shareRecordings: boolean;
+  /** Use my own trained voice model for my character (callouts without a recording, my typed chat). */
+  modelVoice: boolean;
+  /** Let other players hear my model voice (short generated clips of my chat lines, never the model). */
+  modelShare: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -95,6 +107,12 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
     voices: 'auto',
     callouts: true,
     cleanVoices: false,
+    myVoice: true,
+    hearVoices: true,
+    boothSwears: false,
+    shareRecordings: false,
+    modelVoice: false,
+    modelShare: false,
   };
 }
 
@@ -160,6 +178,12 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
     voices: oneOf(o.voices, VOICE_MODES, base.voices),
     callouts: bool(o.callouts, base.callouts),
     cleanVoices: bool(o.cleanVoices, base.cleanVoices),
+    myVoice: bool(o.myVoice, base.myVoice),
+    hearVoices: bool(o.hearVoices, base.hearVoices),
+    boothSwears: bool(o.boothSwears, base.boothSwears),
+    shareRecordings: bool(o.shareRecordings, base.shareRecordings),
+    modelVoice: bool(o.modelVoice, base.modelVoice),
+    modelShare: bool(o.modelShare, base.modelShare),
   };
 }
 

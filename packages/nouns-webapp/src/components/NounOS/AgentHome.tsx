@@ -43,11 +43,12 @@ const JUMPS: [string, string][] = [
   ['community', 'Community'],
 ];
 
+/** Sound is on by default; only an explicit mute ('0') is remembered as off. */
 function readSound(): boolean {
   try {
-    return localStorage.getItem(SOUND_KEY) === '1';
+    return localStorage.getItem(SOUND_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -129,13 +130,14 @@ export default function AgentHome({
     [play, onOpen, onNavigate],
   );
 
-  // Sound is opt-in. Once on, the first click anywhere unlocks the audio
-  // context (browsers need a gesture), so hover stingers can play.
+  // Sound is on by default (the visitor can mute). Browsers won't play audio
+  // before a gesture, so the first click, tap or key anywhere unlocks it.
   useEffect(() => {
     if (!sound) return;
     const unlock = () => void unlockAudio();
-    window.addEventListener('pointerdown', unlock, { once: true });
-    return () => window.removeEventListener('pointerdown', unlock);
+    const evs = ['pointerdown', 'keydown', 'touchstart'] as const;
+    evs.forEach(ev => window.addEventListener(ev, unlock, { once: true, passive: true }));
+    return () => evs.forEach(ev => window.removeEventListener(ev, unlock));
   }, [sound]);
 
   const toggleSound = useCallback(async () => {
@@ -204,17 +206,22 @@ export default function AgentHome({
         />
       </header>
 
-      <Hero
-        slides={HERO_SLIDES}
-        active={active && !intro && sheet === null}
-        sound={sound}
-        resumable={resumable}
-        ctaFor={ctaFor}
-        onToggleSound={() => void toggleSound()}
-        onPlay={play}
-        onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
-        onBrowse={() => jump('play')}
-      />
+      {/* The hero (video) and the shelves (dozens of posters) mount once the
+          intro is done: mounting them under it kept the main thread so busy
+          the noggles froze half built on real machines. */}
+      {!intro && (
+        <Hero
+          slides={HERO_SLIDES}
+          active={active && !intro && sheet === null}
+          sound={sound}
+          resumable={resumable}
+          ctaFor={ctaFor}
+          onToggleSound={() => void toggleSound()}
+          onPlay={play}
+          onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
+          onBrowse={() => jump('play')}
+        />
+      )}
 
       <div className="nh-manifesto">
         <p>
@@ -243,9 +250,7 @@ export default function AgentHome({
       </nav>
 
       <main className="nh-rows">
-        {rows.map(r => (
-          <Shelf key={r.id} row={r} onActivate={activate} sound={sound} />
-        ))}
+        {!intro && rows.map(r => <Shelf key={r.id} row={r} onActivate={activate} sound={sound} />)}
       </main>
 
       <footer className="nh-foot">

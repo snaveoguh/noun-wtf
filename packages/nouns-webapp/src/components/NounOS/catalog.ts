@@ -44,6 +44,11 @@ export const CATALOG: Section[] = [
         hot: true,
       },
       {
+        path: '/world/voice',
+        name: 'VOICE BOOTH',
+        blurb: "record your rider's voice lines, or train your own voice model.",
+      },
+      {
         path: '/icecreamvan',
         name: 'ICE CREAM VAN',
         blurb: 'icecreamvan.eth. walk round the van.',

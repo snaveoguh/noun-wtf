@@ -28,6 +28,11 @@ export const CLIPS = {
     poster: '/home/world-vhs-poster.jpg',
     audio: true,
   },
+  hoops: {
+    webm: '/home/hero-hoops.webm',
+    mp4: '/home/hero-hoops.mp4',
+    poster: '/home/hero-hoops-poster.jpg',
+  },
 } satisfies Record<string, Clip>;
 
 export interface Game {
@@ -124,8 +129,19 @@ export interface Slide {
   browse?: boolean;
   /** A voice-over read over it, once per page view, sound on only (voiceOver.ts) */
   vo?: string;
+  /**
+   * A sound bed under it while it shows, sound on only (bed.ts): a looping
+   * music file plus synthesised ambience, faded in and out with the slide.
+   */
+  bed?: Bed;
   /** How long it stays up, ms */
   ms: number;
+}
+
+/** A slide's sound bed: a seamless music loop + the ambience to put under it. */
+export interface Bed {
+  track: string;
+  ambience: 'court';
 }
 
 export const HERO_SLIDES: Slide[] = [
@@ -164,10 +180,11 @@ export const HERO_SLIDES: Slide[] = [
     tagline: GAMES[1]!.tagline,
     teaser: GAMES[1]!.teaser,
     accent: '#ff9a1f',
-    still: GAMES[1]!.cover,
-    focus: GAMES[1]!.focus,
+    clip: CLIPS.hoops,
+    focus: '50% 50%',
     game: 'hoops',
-    ms: 9000,
+    bed: { track: '/home/hoops-track.mp3', ambience: 'court' },
+    ms: 12000,
   },
   {
     key: 'warfare',
@@ -261,14 +278,19 @@ const COVERED_PATHS = new Set([
   '/underground',
 ]);
 
+/** Posters whose file isn't named after the path. */
+const COVER_FILES: Partial<Record<string, string>> = { '/world/voice': 'voice-booth' };
+
 /** The poster for a catalog path, if it has one. */
 export function coverForPath(path: string): string | undefined {
+  const file = COVER_FILES[path];
+  if (file !== undefined) return `/home/covers/${file}.webp`;
   if (!COVERED_PATHS.has(path)) return undefined;
   return `/home/covers/${path.replace(/^\//, '').replace(/\//g, '-')}.webp`;
 }
 
 /** Extra things to play, from the catalog, after the three games. */
-const PLAY_PATHS = ['/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
+const PLAY_PATHS = ['/world/voice', '/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
 
 export type Action =
   | { t: 'game'; id: GameId }

@@ -8,6 +8,15 @@
 //   flipRotation  → rider yaw
 //   state         → compact JSON blob (anim, rider quat, board pose, …)
 // Voice is a WebRTC mesh signalled over the same socket (see Voice.ts).
+//
+// Voice Booth (audio/voice/booth/): the blob also carries, only when set,
+//   vo  the rider's public voice tag (their shared recordings)
+//   co  [seq, event, line, clean] their last callout: event and line index
+//       only, never audio; listeners play that rider's clip or their TTS
+//   cv  [tag, id, seq] their last chat line spoken in their own voice (an
+//       ephemeral clip on the world-voice function)
+// The relay passes the blob through untouched and older clients ignore
+// unknown keys, so nothing changes for them.
 
 import type { HoopsMsg } from '../hoops/contract';
 
@@ -15,6 +24,8 @@ import PartySocket from 'partysocket';
 import * as THREE from 'three';
 
 import { PARTYKIT_HOST } from '../../world/engine/types';
+import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
+import { type CalloutEvent } from '../audio/voice/callouts';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 
@@ -53,8 +64,42 @@ export function parseVehicle(v: unknown): Vehicle | undefined {
   return v === 'van' || v === 'dragon' ? v : undefined;
 }
 
+/** Callout events by their wire code (co[1]). */
+export const CALLOUT_CODES: readonly CalloutEvent[] = ['bail', 'speed', 'record'];
+
+export interface RemoteCallout {
+  ev: CalloutEvent;
+  index: number;
+  clean: boolean;
+}
+
+/** A blob's `co` → the callout (null for anything malformed). */
+export function parseCallout(v: unknown): (RemoteCallout & { seq: number }) | null {
+  if (!Array.isArray(v) || v.length < 4) return null;
+  const [seq, code, index, clean] = v as unknown[];
+  const ev = CALLOUT_CODES[Number(code)];
+  if (typeof seq !== 'number' || !Number.isInteger(seq) || ev === undefined) return null;
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index > 99) return null;
+  return { seq, ev, index, clean: clean === 1 || clean === true };
+}
+
+/** A blob's `cv` → the voiced chat clip (null for anything malformed). */
+export function parseChatVoice(v: unknown): { tag: string; id: string; seq: number } | null {
+  if (!Array.isArray(v) || v.length < 3) return null;
+  const [tag, id, seq] = v as unknown[];
+  if (typeof tag !== 'string' || !TAG_RE.test(tag)) return null;
+  if (typeof id !== 'string' || !CHAT_ID_RE.test(id)) return null;
+  if (typeof seq !== 'number' || !Number.isInteger(seq)) return null;
+  return { tag, id, seq };
+}
+
 export interface RemotePlayer {
   id: string;
+  /** Their public voice tag (Voice Booth), '' when they don't share one. */
+  voiceTag: string;
+  /** Last callout / voiced chat seq seen (so a joiner doesn't replay old ones). */
+  coSeq: number;
+  cvSeq: number;
   seedKey: string;
   name: string;
   // Interpolation buffer
@@ -111,6 +156,16 @@ export class Net {
   onHoops?: (m: HoopsMsg) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
+  /** Voice Booth: a remote rider's callout fired. */
+  onCallout?: (id: string, c: RemoteCallout) => void;
+  /** Voice Booth: a remote rider spoke a chat line in their own voice. */
+  onChatVoice?: (id: string, tag: string, clipId: string) => void;
+  /** My public voice tag while I share recordings ('' = none). */
+  voiceTag = '';
+  /** My last callout, relayed in the blob. */
+  callout: [number, number, number, number] | null = null;
+  /** My last voiced chat line, relayed in the blob. */
+  chatVoice: [string, string, number] | null = null;
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -233,11 +288,16 @@ export class Net {
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
+    const co = parseCallout(blob.co);
+    const cv = parseChatVoice(blob.cv);
     let rp = this.players.get(id);
     const now = performance.now();
     if (!rp) {
       rp = {
         id,
+        voiceTag: '',
+        coSeq: co?.seq ?? -1,
+        cvSeq: cv?.seq ?? -1,
         seedKey: pose.seedKey,
         name: pose.name,
         samples: [],
@@ -263,6 +323,15 @@ export class Net {
     rp.samples.push({ t: now, pose });
     if (rp.samples.length > 8) rp.samples.shift();
     rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
+    rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
+    if (co !== null && co.seq !== rp.coSeq) {
+      rp.coSeq = co.seq;
+      this.onCallout?.(id, co);
+    }
+    if (cv !== null && cv.seq !== rp.cvSeq) {
+      rp.cvSeq = cv.seq;
+      this.onChatVoice?.(id, cv.tag, cv.id);
+    }
   }
 
   /** Interpolate remote players ~120ms in the past. */
@@ -333,6 +402,10 @@ export class Net {
       // Only while riding, so older clients' blobs are unchanged otherwise
       // (an older client reads 'dragon' as nothing: the rider, no dragon)
       ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
+      // Voice Booth (see the header): only when set
+      ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
+      ...(this.callout !== null ? { co: this.callout } : {}),
+      ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

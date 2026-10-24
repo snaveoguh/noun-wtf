@@ -3,7 +3,9 @@
 //   ident()      the "tu-DUM": a boom-bap kick + muted stab, then a warm sub
 //                drop under a dusty minor-9 chord through a short room.
 //   motif(game)  a short hover stinger per featured game.
-//   playFile()   the one file: the hero's voice-over (voiceOver.ts).
+//   playFile()   a file: the hero's voice-over (voiceOver.ts).
+//   courtBed()   the Noun Hoops slide's bed (bed.ts): a looping groove file
+//                and a synthesised court (dribbles, squeaks, swish, crowd).
 //
 // Browsers only let audio start after the visitor interacts with the page,
 // so on a cold first load the intro is silent; that's fine. Nothing here
@@ -11,6 +13,8 @@
 // silence.
 
 import type { GameId } from './rows';
+
+import { BED_AMBIENCE_LEVEL, BED_FADE_IN, BED_FADE_OUT, BED_TRACK_LEVEL } from './bed';
 
 type Ctx = AudioContext;
 
@@ -344,6 +348,205 @@ export function playFile(url: string, level = 1): Playback | null {
       } catch {
         end();
       }
+    },
+  };
+}
+
+const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+
+/**
+ * The Noun Hoops slide's bed (bed.ts): `track` on loop plus a synthesised
+ * court under it: dribble runs, sneaker squeaks, a swish now and then with
+ * the crowd lifting and a scatter of claps, all over a low crowd murmur in
+ * the room. Fades in; `stop()` fades it out. Only while audio is already
+ * running, like playFile.
+ */
+export function courtBed(track: string): Playback | null {
+  const c = audio();
+  if (!c || !master || c.state !== 'running') return null;
+  const t0 = c.currentTime;
+  // One fade on the dry bus and one on the room send, ramped together
+  const fade = c.createGain();
+  const send = c.createGain();
+  for (const [g, to] of [
+    [fade, 1],
+    [send, 0.45],
+  ] as const) {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.setTargetAtTime(to, t0, BED_FADE_IN / 3);
+  }
+  fade.connect(master);
+  if (room) send.connect(room);
+
+  const music = c.createGain();
+  music.gain.value = BED_TRACK_LEVEL;
+  music.connect(fade);
+  const court = c.createGain();
+  court.gain.value = BED_AMBIENCE_LEVEL;
+  court.connect(fade);
+  court.connect(send);
+
+  const noise = noiseBuffer(c, 2);
+  const sources: AudioScheduledSourceNode[] = [];
+
+  // Crowd murmur: looped noise through two voice-ish bands, breathing slowly
+  const murmur = c.createBufferSource();
+  murmur.buffer = noise;
+  murmur.loop = true;
+  const crowd = c.createGain();
+  crowd.gain.value = 0.1;
+  for (const [f, q, v] of [
+    [420, 0.9, 1],
+    [1150, 1.4, 0.45],
+  ] as const) {
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = f;
+    bp.Q.value = q;
+    const g = c.createGain();
+    g.gain.value = v;
+    murmur.connect(bp).connect(g).connect(crowd);
+  }
+  crowd.connect(court);
+  murmur.start(t0);
+  sources.push(murmur);
+
+  const panned = (pan: number): AudioNode => {
+    if (typeof c.createStereoPanner !== 'function') return court;
+    const p = c.createStereoPanner();
+    p.pan.value = pan;
+    p.connect(court);
+    return p;
+  };
+  // A short burst of the shared noise buffer, filtered
+  const burst = (
+    out: AudioNode,
+    t: number,
+    dur: number,
+    vol: number,
+    type: BiquadFilterType,
+    f0: number,
+    f1 = f0,
+    q = 1,
+  ) => {
+    const s = c.createBufferSource();
+    s.buffer = noise;
+    const f = c.createBiquadFilter();
+    f.type = type;
+    f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(out);
+    s.start(t, rnd(0, 1.5));
+    s.stop(t + dur + 0.05);
+  };
+  const dribble = (out: AudioNode, t: number, vol: number) => {
+    kick(c, out, t, rnd(180, 220), 85, 0.14, vol);
+    burst(out, t, 0.035, vol * 0.3, 'bandpass', 1300, 1300, 1.2);
+  };
+  const squeak = (out: AudioNode, t: number) => {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    const f = rnd(1700, 2600);
+    const d = rnd(0.06, 0.13);
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.linearRampToValueAtTime(f * rnd(1.15, 1.5), t + d);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(rnd(0.04, 0.08), t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + d + 0.03);
+  };
+  const swish = (t: number) => {
+    const out = panned(rnd(-0.3, 0.3));
+    burst(out, t - 0.05, 0.05, 0.08, 'bandpass', 900, 900, 3); // rim kiss
+    burst(out, t, 0.38, 0.16, 'bandpass', 2600, 6500, 1.1); // the net
+    // the crowd lifts, then a scatter of claps
+    crowd.gain.setTargetAtTime(0.24, t + 0.15, 0.12);
+    crowd.gain.setTargetAtTime(0.1, t + 1.2, 0.5);
+    for (let i = 0; i < 14; i++)
+      burst(panned(rnd(-0.8, 0.8)), t + rnd(0.25, 1.4), 0.03, rnd(0.04, 0.09), 'highpass', 1500);
+  };
+
+  // Lookahead scheduler: plans events a little ahead of the audio clock
+  let nextDribble = t0 + 0.4;
+  let runLeft = 0;
+  let runOut: AudioNode = court;
+  let runVol = 0.4;
+  let nextSqueak = t0 + rnd(0.8, 2);
+  let nextSwish = t0 + rnd(4, 6);
+  const plan = () => {
+    const until = c.currentTime + 0.3;
+    while (nextDribble < until) {
+      if (runLeft <= 0) {
+        runLeft = Math.floor(rnd(4, 10));
+        runOut = panned(rnd(-0.6, 0.6));
+        runVol = rnd(0.3, 0.5);
+      }
+      dribble(runOut, nextDribble, runVol * rnd(0.85, 1));
+      runLeft--;
+      nextDribble += runLeft > 0 ? rnd(0.36, 0.46) : rnd(0.8, 1.8);
+    }
+    while (nextSqueak < until) {
+      const out = panned(rnd(-0.7, 0.7));
+      squeak(out, nextSqueak);
+      if (Math.random() < 0.4) squeak(out, nextSqueak + rnd(0.08, 0.16));
+      nextSqueak += rnd(0.9, 3);
+    }
+    while (nextSwish < until) {
+      swish(nextSwish);
+      nextSwish += rnd(6, 10);
+    }
+  };
+  plan();
+  const timer = window.setInterval(plan, 100);
+
+  // The groove, once it's decoded
+  let stopped = false;
+  void loadFile(c, track).then(buf => {
+    if (stopped || buf === null) return;
+    const s = c.createBufferSource();
+    s.buffer = buf;
+    s.loop = true;
+    s.connect(music);
+    s.start(c.currentTime + 0.05);
+    sources.push(s);
+  });
+
+  let finish: () => void = () => undefined;
+  const done = new Promise<void>(r => (finish = r));
+  return {
+    done,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      window.clearInterval(timer);
+      const now = c.currentTime;
+      for (const g of [fade, send]) {
+        g.gain.cancelScheduledValues(now);
+        g.gain.setTargetAtTime(0, now, BED_FADE_OUT / 3);
+      }
+      const end = now + BED_FADE_OUT * 2;
+      for (const s of sources)
+        try {
+          s.stop(end);
+        } catch {
+          // already stopped
+        }
+      setTimeout(
+        () => {
+          fade.disconnect();
+          send.disconnect();
+          finish();
+        },
+        BED_FADE_OUT * 2000 + 100,
+      );
     },
   };
 }

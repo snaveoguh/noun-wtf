@@ -72,6 +72,7 @@ const TerraformsPage = lazy(() => import('@/miniapps/terraforms/TerraformsPage')
 const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPage'));
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
+const VoiceBoothPage = lazy(() => import('@/miniapps/world2/booth/VoiceBoothPage'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -257,6 +258,14 @@ function SiteRoutes() {
         element={
           <Suspense fallback={<GenericSkeleton />}>
             <IceCreamVanPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="world/voice"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <VoiceBoothPage />
           </Suspense>
         }
       />

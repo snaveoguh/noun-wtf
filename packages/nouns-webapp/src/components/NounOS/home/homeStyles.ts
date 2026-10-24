@@ -34,7 +34,12 @@ export const HOME_CSS = `
 .nh.is-scrolled .nh-head{background:rgba(7,7,10,.88);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
   box-shadow:0 1px 0 rgba(255,255,255,.06),0 12px 30px rgba(0,0,0,.4)}
 .nh-brand{display:flex;align-items:baseline;gap:9px;color:var(--tx);text-decoration:none;flex-shrink:0}
-.nh-wordmark{font-size:27px;line-height:1;letter-spacing:.02em;color:var(--tx);text-shadow:2px 2px 0 var(--pink),4px 4px 0 rgba(32,214,255,.8)}
+/* Quiet lockup: dark grey letters; a light band sweeps across on hover */
+.nh-wordmark{font-size:14px;line-height:1;letter-spacing:.06em;text-shadow:none;color:#34343b;
+  background:linear-gradient(100deg,#34343b 0 40%,#d9d9e0 50%,#34343b 60% 100%) 100% 0/250% 100% no-repeat;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nh-brand:hover .nh-wordmark,.nh-brand:focus-visible .nh-wordmark{animation:nh-shimmer .9s ease-out both}
+@keyframes nh-shimmer{from{background-position:100% 0}to{background-position:0 0}}
 .nh-nav{display:flex;gap:2px;flex:1;min-width:0}
 .nh-nav button{border:0;background:none;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;color:rgba(244,242,234,.78);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s}
 .nh-nav button:hover{color:#fff;background:rgba(255,255,255,.08)}
@@ -48,7 +53,9 @@ export const HOME_CSS = `
   background:rgba(12,12,16,.62);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:box-shadow .2s,background .2s}
 .nh-ask-form:focus-within{background:rgba(12,12,16,.92);box-shadow:inset 0 0 0 1.5px var(--acid),0 0 0 4px rgba(212,255,58,.12)}
 .nh-ask-icon{width:17px;height:17px;color:var(--dim);flex-shrink:0}
-.nh-ask-form input{flex:1;min-width:0;height:100%;background:none;border:0;outline:none;color:#fff;font-size:14.5px}
+/* !important: the site theme's global input style adds its own box + background here */
+.nh .nh-ask-form input{flex:1;min-width:0;height:100%;background:none !important;border:0 !important;box-shadow:none !important;border-radius:0 !important;
+  outline:none;color:#fff;font-size:14.5px;padding:0 0 0 4px !important;margin:0 !important}
 .nh-ask-form input::placeholder{color:rgba(244,242,234,.45)}
 .nh-ask-form:focus-within .nh-ask-icon{color:var(--acid)}
 .nh kbd{font-size:11px;color:var(--dim);border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:1px 6px;line-height:1.4}
@@ -84,7 +91,7 @@ export const HOME_CSS = `
 @media (max-width:760px){
   .nh{--hh:60px;--cw:clamp(118px,33vw,150px)}
   .nh-head{padding:0 12px 0 72px;gap:10px}
-  .nh-wordmark{font-size:22px}
+  .nh-wordmark{font-size:12px}
   .nh-ask{width:auto;position:static}
   .nh-ask-toggle{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;border:0;background:rgba(12,12,16,.6);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);cursor:pointer}
@@ -368,12 +375,16 @@ body .nh-intro-stage{position:relative;transform-origin:87.5% 60%;animation:nh-d
 body .nh-nog{display:grid;grid-template-columns:repeat(16,var(--px));grid-template-rows:repeat(5,var(--px));
   animation:nh-hit .5s cubic-bezier(.2,1.8,.4,1) 1.32s both}
 body .nh-nog i{display:block;width:calc(100% + 1px);height:calc(100% + 1px)}
-body .nh-nog .is-R{background:var(--nog);box-shadow:0 0 calc(var(--px) * .6) rgba(243,50,44,.45);
-  animation:nh-px-in .36s cubic-bezier(.2,1.7,.45,1) calc(.23s + var(--x) * 55ms + var(--y) * 18ms) both,
-    nh-glint .45s ease-in-out calc(1.9s + var(--x) * 34ms) both}
+/* Only transform + opacity animate in the intro: those run on the compositor,
+   so the build can't freeze half way while the homepage loads behind it (a
+   filter animation here kept the frame pixels on the busy main thread). */
+body .nh-nog .is-R{position:relative;background:var(--nog);box-shadow:0 0 calc(var(--px) * .6) rgba(243,50,44,.45);will-change:transform,opacity;
+  animation:nh-px-in .36s cubic-bezier(.2,1.7,.45,1) calc(.23s + var(--x) * 55ms + var(--y) * 18ms) both}
+body .nh-nog .is-R::after{content:'';position:absolute;inset:0;background:#fff;opacity:0;will-change:opacity;
+  animation:nh-glint .45s ease-in-out calc(1.9s + var(--x) * 34ms) both}
 body .nh-nog .is-W{background:#fff}
 body .nh-nog .is-B{background:#000}
-body .nh-nog .is-W,body .nh-nog .is-B{animation:nh-eye-in .22s cubic-bezier(.3,1.5,.5,1) calc(1.32s + var(--y) * 14ms) both}
+body .nh-nog .is-W,body .nh-nog .is-B{will-change:transform,opacity;animation:nh-eye-in .22s cubic-bezier(.3,1.5,.5,1) calc(1.32s + var(--y) * 14ms) both}
 body .nh-intro-streaks{position:absolute;inset:-10% 0;display:flex;justify-content:center;gap:.6vw;pointer-events:none}
 body .nh-intro-streaks i{flex:0 0 2.4vw;height:100%;opacity:0;
   background:linear-gradient(180deg,transparent,hsl(calc(346 + var(--i) * 1.2) 95% calc(48% + var(--i) * .8%)) 28%,hsl(calc(2 + var(--i) * .6) 98% 60%) 72%,transparent);
@@ -385,7 +396,7 @@ body .nh-intro-skip{position:absolute;bottom:28px;left:0;right:0;text-align:cent
   color:rgba(255,255,255,.3);animation:nh-fade .4s ease .5s both}
 @keyframes nh-px-in{0%{opacity:0;transform:translateY(-140%) scale(0)}60%{opacity:1;transform:translateY(8%) scale(1.25)}100%{opacity:1;transform:none}}
 @keyframes nh-eye-in{0%{opacity:0;transform:scale(2.6)}100%{opacity:1;transform:none}}
-@keyframes nh-glint{0%,100%{filter:none}50%{filter:brightness(1.9) saturate(.7)}}
+@keyframes nh-glint{0%,100%{opacity:0}50%{opacity:.5}}
 @keyframes nh-hit{0%{transform:scale(1)}30%{transform:scale(1.09) rotate(-1.2deg)}100%{transform:none}}
 @keyframes nh-streak{0%{opacity:0;transform:scaleY(0)}35%{opacity:1;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.4) scaleX(5)}}
 @keyframes nh-dive{0%,68%{transform:scale(1)}100%{transform:scale(34)}}

@@ -2,9 +2,12 @@
 // sizzle reel, once per page view, only with sound on.
 //
 // Rendered offline (not in the browser) with Piper TTS, LibriTTS-R medium
-// model, speaker VO_SPEAKER (a deep male read; LibriTTS-R is CC BY 4.0), a
-// touch slower than natural (length_scale 1.1), then darkened with ffmpeg:
-// a low-shelf lift, a small room and a slight pitch drop. The script:
+// model, speaker VO_SPEAKER (a deep male read; LibriTTS-R is CC BY 4.0) at
+// length_scale 1.18, then slowed like tape (asetrate x0.92: slower and ~1.4
+// semitones deeper with no pitch-shift artifacts), low-shelf lift and a
+// small room, over a procedurally generated 86 BPM boom-bap bed (Rhodes
+// Fm9/Dbmaj7, swung hats, vinyl) that ducks under the voice. ~27 s. "DAO"
+// is fed to the model as "Dow" so it's said that way. The script:
 //
 //   In the year the DAO was captured... the whales took the treasury.
 //   The rest of us went underground.

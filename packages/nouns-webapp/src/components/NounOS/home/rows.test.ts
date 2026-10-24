@@ -35,7 +35,12 @@ describe('buildRows', () => {
     );
     expect(play.items.slice(0, 3).every(i => i.cover !== undefined)).toBe(true);
     const paths = play.items.flatMap(i => (i.action.t === 'entry' ? [i.action.entry.path] : []));
-    expect(paths).toEqual(expect.arrayContaining(['/icecreamvan', '/playground', '/crystal-ball']));
+    expect(paths).toEqual(
+      expect.arrayContaining(['/world/voice', '/icecreamvan', '/playground', '/crystal-ball']),
+    );
+    const booth = play.items.find(i => i.key === 'play:/world/voice')!;
+    expect(booth.cover).toBe('/home/covers/voice-booth.webp');
+    expect(booth.action).toMatchObject({ t: 'entry', entry: { path: '/world/voice' } });
   });
 
   it('gives Noun World a hover preview clip', () => {
@@ -117,6 +122,7 @@ describe('covers', () => {
   it('names posters after the path and leaves unknown pages to the generated box art', () => {
     expect(coverForPath('/world/classic')).toBe('/home/covers/world-classic.webp');
     expect(coverForPath('/explore/wallet')).toBe('/home/covers/explore-wallet.webp');
+    expect(coverForPath('/world/voice')).toBe('/home/covers/voice-booth.webp');
     expect(coverForPath('/not-a-page')).toBeUndefined();
     const community = rows.find(r => r.id === 'community')!;
     expect(community.items.every(i => i.cover === undefined)).toBe(true);
@@ -131,6 +137,10 @@ describe('searchItems', () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(keys[0]!.startsWith('NOUN')).toBe(true);
     expect(keys.filter(k => k === 'NOUN WORLD')).toHaveLength(1);
+  });
+  it('finds the Voice Booth by name and by what it does', () => {
+    expect(searchItems(rows, 'voice booth')[0]?.title).toBe('VOICE BOOTH');
+    expect(searchItems(rows, 'voice model').map(h => h.title)).toContain('VOICE BOOTH');
   });
   it('matches blurbs', () => {
     expect(searchItems(rows, 'order book').map(h => h.title)).toContain('GRAND EXCHANGE');
