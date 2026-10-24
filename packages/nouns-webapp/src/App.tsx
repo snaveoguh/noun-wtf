@@ -24,6 +24,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks';
 import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 const AuctionPage = lazy(() => import('@/pages/Auction'));
 const CandidatePage = lazy(() => import('@/pages/Candidate'));
+const Cc0LibraryPage = lazy(() => import('@/pages/Cc0Library'));
 const IceCreamVanPage = lazy(() => import('@/pages/IceCreamVan'));
 const ExchangePage = lazy(() => import('@/pages/Exchange'));
 const CreateCandidatePage = lazy(() => import('@/pages/CreateCandidate'));
@@ -137,6 +138,14 @@ function SiteRoutes() {
       <Route path="underground" element={<UndergroundPage />} />
       <Route path="delegate" element={<DelegatePage />} />
       <Route path="traits" element={<TraitsPage />} />
+      <Route
+        path="cc0"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <Cc0LibraryPage />
+          </Suspense>
+        }
+      />
       <Route path="explore" element={<Navigate to="/probe" replace />} />
       <Route path="nouns" element={<Navigate to="/probe" replace />} />
       <Route
