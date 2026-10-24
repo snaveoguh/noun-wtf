@@ -123,6 +123,8 @@ describe('covers', () => {
     expect(coverForPath('/world/classic')).toBe('/home/covers/world-classic.webp');
     expect(coverForPath('/explore/wallet')).toBe('/home/covers/explore-wallet.webp');
     expect(coverForPath('/world/voice')).toBe('/home/covers/voice-booth.webp');
+    expect(coverForPath('/books/meme-value')).toBe('/home/covers/meme-value.webp');
+    expect(coverForPath('/cc0')).toBe('/home/covers/cc0-library.webp');
     expect(coverForPath('/not-a-page')).toBeUndefined();
     const community = rows.find(r => r.id === 'community')!;
     expect(community.items.every(i => i.cover === undefined)).toBe(true);
@@ -141,6 +143,26 @@ describe('searchItems', () => {
   it('finds the Voice Booth by name and by what it does', () => {
     expect(searchItems(rows, 'voice booth')[0]?.title).toBe('VOICE BOOTH');
     expect(searchItems(rows, 'voice model').map(h => h.title)).toContain('VOICE BOOTH');
+  });
+  it('finds the MEME VALUE book on the ART / CULTURE shelf', () => {
+    expect(searchItems(rows, 'meme value')[0]?.title).toBe('MEME VALUE');
+    expect(searchItems(rows, 'book').map(h => h.title)).toContain('MEME VALUE');
+    const art = rows.find(r => r.id === 'art')!;
+    const card = art.items.find(i => i.key === 'art:/books/meme-value')!;
+    expect(card.cover).toBe('/home/covers/meme-value.webp');
+    expect(card.action).toMatchObject({ t: 'entry', entry: { path: '/books/meme-value' } });
+  });
+
+  it('finds the CC0 Library on the ART / CULTURE shelf', () => {
+    const art = rows.find(r => r.id === 'art')!;
+    const cc0 = art.items.find(i => i.key === 'art:/cc0')!;
+    expect(cc0).toMatchObject({ title: 'CC0 LIBRARY', cover: '/home/covers/cc0-library.webp' });
+    for (const q of ['cc0', 'cc0 library', 'voxels', 'sounds'])
+      expect(
+        searchItems(rows, q).map(h => h.title),
+        q,
+      ).toContain('CC0 LIBRARY');
+    expect(searchItems(rows, 'cc0')[0]?.title).toBe('CC0 LIBRARY');
   });
   it('matches blurbs', () => {
     expect(searchItems(rows, 'order book').map(h => h.title)).toContain('GRAND EXCHANGE');

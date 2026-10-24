@@ -24,6 +24,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks';
 import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 const AuctionPage = lazy(() => import('@/pages/Auction'));
 const CandidatePage = lazy(() => import('@/pages/Candidate'));
+const Cc0LibraryPage = lazy(() => import('@/pages/Cc0Library'));
 const IceCreamVanPage = lazy(() => import('@/pages/IceCreamVan'));
 const ExchangePage = lazy(() => import('@/pages/Exchange'));
 const CreateCandidatePage = lazy(() => import('@/pages/CreateCandidate'));
@@ -73,6 +74,7 @@ const CrystalBallPage = lazy(() => import('@/miniapps/crystal-ball/CrystalBallPa
 const Pip3Page = lazy(() => import('@/pages/Pip3Page'));
 const WorldPage = lazy(() => import('@/miniapps/world/WorldPage'));
 const VoiceBoothPage = lazy(() => import('@/miniapps/world2/booth/VoiceBoothPage'));
+const MemeValuePage = lazy(() => import('@/pages/Books/MemeValuePage'));
 
 /**
  * The full set of <Route> definitions extracted into a component so the same
@@ -136,6 +138,14 @@ function SiteRoutes() {
       <Route path="underground" element={<UndergroundPage />} />
       <Route path="delegate" element={<DelegatePage />} />
       <Route path="traits" element={<TraitsPage />} />
+      <Route
+        path="cc0"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <Cc0LibraryPage />
+          </Suspense>
+        }
+      />
       <Route path="explore" element={<Navigate to="/probe" replace />} />
       <Route path="nouns" element={<Navigate to="/probe" replace />} />
       <Route
@@ -269,6 +279,15 @@ function SiteRoutes() {
           </Suspense>
         }
       />
+      <Route
+        path="books/meme-value"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <MemeValuePage />
+          </Suspense>
+        }
+      />
+      <Route path="memevalue" element={<Navigate to="/books/meme-value" replace />} />
       <Route
         path="exchange"
         element={

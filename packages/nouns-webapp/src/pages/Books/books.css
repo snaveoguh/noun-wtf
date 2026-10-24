@@ -1,0 +1,678 @@
+/* Book reader (/books/meme-value). House look around the book: dark, Pip3,
+   acid + pink accents; the book itself lies on a lit table. */
+
+.bk {
+  --bg: #07070a;
+  --tx: #f4f2ea;
+  --dim: #9b998f;
+  --acid: #d4ff3a;
+  --pink: #ff2f8e;
+  --cyan: #20d6ff;
+  --ink: #0b0b0f;
+  --paper: #fbfaf6;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: max(560px, calc(100dvh - 150px));
+  background: var(--bg);
+  color: var(--tx);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  overflow: hidden;
+}
+.bk:fullscreen {
+  height: 100dvh;
+}
+.bk *,
+.bk *::before,
+.bk *::after {
+  box-sizing: border-box;
+}
+
+/* ── header ─────────────────────────────────────────── */
+.bk-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 14px 18px 10px;
+  flex-wrap: wrap;
+}
+.bk-title {
+  margin: 0;
+  font-family: 'Pip3', 'Londrina Solid', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(30px, 4.4vw, 52px);
+  line-height: 0.86;
+  letter-spacing: 0.01em;
+  color: #fff;
+  -webkit-text-stroke: 0.06em var(--ink);
+  paint-order: stroke fill;
+  text-shadow:
+    0.05em 0.05em 0 var(--pink),
+    0.1em 0.1em 0 var(--cyan);
+  white-space: nowrap;
+}
+.bk-title b {
+  color: var(--acid);
+  font-weight: 400;
+}
+.bk-by {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding-bottom: 3px;
+}
+.bk-by strong {
+  color: var(--acid);
+  font-weight: 800;
+}
+.bk-by a {
+  color: var(--tx);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 47, 142, 0.7);
+}
+.bk-by a:hover {
+  color: var(--pink);
+}
+
+/* ── the table + stage ─────────────────────────────── */
+.bk-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 60% 55% at 50% 46%,
+      rgba(255, 236, 200, 0.17),
+      rgba(255, 236, 200, 0.05) 55%,
+      transparent 75%
+    ),
+    radial-gradient(ellipse 120% 90% at 50% 120%, #1d1a22 0%, #0d0c11 55%, #07070a 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bk-stage.is-zoomed {
+  overflow: auto;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+}
+.bk-stage::after {
+  /* grain on the table */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+.bk-center {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
+}
+.bk-zoom {
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ── the book ──────────────────────────────────────── */
+.fb {
+  position: relative;
+  cursor: pointer;
+}
+.fb-book {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.fb-book:not(.is-turning) {
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.fb-spine {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.fb-spine > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.fb-page {
+  overflow: hidden;
+  background: var(--paper);
+  transform-origin: 0 0;
+  backface-visibility: hidden;
+}
+.fb-left,
+.fb-right {
+  box-shadow:
+    0 22px 46px -18px rgba(0, 0, 0, 0.85),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+}
+.fb-left {
+  border-radius: 3px 0 0 3px;
+}
+.fb-right {
+  border-radius: 0 3px 3px 0;
+}
+.fb-page.is-cover {
+  border-radius: 0 6px 6px 0;
+}
+.fb-left.is-cover {
+  border-radius: 6px 0 0 6px;
+}
+.fb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.fb-ghost {
+  /* single layout: the back of a leaf is paper, with the front showing through */
+  transform: scaleX(-1);
+  opacity: 0.07;
+}
+.fb-back {
+  background: #f3f1ea;
+}
+.fb-clip {
+  overflow: hidden;
+  pointer-events: none;
+  will-change: transform;
+}
+.fb-clip > .fb-page {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.fb-clip > .fb-back {
+  box-shadow: 0 0 26px rgba(0, 0, 0, 0.35);
+}
+
+/* gutters: the paper darkens into the spine */
+.fb-gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9%;
+  pointer-events: none;
+}
+.fb-gutter-l {
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.05) 55%, rgba(0, 0, 0, 0.2));
+}
+.fb-gutter-r {
+  left: 0;
+  background: linear-gradient(270deg, transparent, rgba(0, 0, 0, 0.05) 55%, rgba(0, 0, 0, 0.22));
+}
+.is-cover > .fb-gutter-r {
+  width: 4%;
+  background: linear-gradient(270deg, transparent, rgba(0, 0, 0, 0.06) 60%, rgba(0, 0, 0, 0.28));
+}
+.is-cover > .fb-gutter-l {
+  width: 4%;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06) 60%, rgba(0, 0, 0, 0.28));
+}
+
+/* shading strips, 100 px wide before scaling; the fold sits on their right edge */
+.fb-shade {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100px;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+.fb-shade-front {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06) 60%, rgba(0, 0, 0, 0.26));
+}
+.fb-shade-back {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.1) 0%,
+    rgba(255, 255, 255, 0.28) 45%,
+    rgba(255, 255, 255, 0.08) 75%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
+}
+.fb-shade-under {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12) 35%, transparent);
+}
+
+/* stacked page edges (book thickness) */
+.fb-edge {
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #e9e5da 0 1px, #cfcabd 1px 2px), #ddd8cb;
+  box-shadow: 0 22px 40px -20px rgba(0, 0, 0, 0.8);
+}
+.fb-edge-l {
+  transform-origin: 100% 50%;
+}
+
+/* dog-ears: a folded corner on each outer edge, lifts on hover */
+.fb-ear {
+  position: absolute;
+  bottom: 0;
+  width: 7%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  transition: width 0.18s ease-out;
+}
+/* the corner beyond the fold shows the table; the other half is the folded flap */
+.fb-ear-r {
+  right: 0;
+  background: linear-gradient(
+    315deg,
+    #24222a 0 49.5%,
+    #c9c3b4 49.5% 51%,
+    #f7f5ef 56%,
+    #e6e1d5 100%
+  );
+}
+.fb-ear-l {
+  left: 0;
+  background: linear-gradient(45deg, #24222a 0 49.5%, #c9c3b4 49.5% 51%, #f7f5ef 56%, #e6e1d5 100%);
+}
+.fb:hover .fb-ear {
+  width: 9%;
+}
+
+/* reduced motion: pages swap with a short fade */
+@media (prefers-reduced-motion: reduce) {
+  .fb-book:not(.is-turning) {
+    transition: none;
+  }
+  .fb-left,
+  .fb-right {
+    animation: bk-fade 0.22s ease-out;
+  }
+  .fb:hover .fb-ear {
+    width: 7%;
+  }
+}
+@keyframes bk-fade {
+  from {
+    opacity: 0.2;
+  }
+}
+
+/* ── controls ──────────────────────────────────────── */
+.bk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 12px 12px;
+  background: linear-gradient(180deg, rgba(7, 7, 10, 0.6), var(--bg));
+  border-top: 1px solid #1c1c22;
+}
+.bk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #18181e;
+  color: var(--tx);
+  font:
+    800 12px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  white-space: nowrap;
+}
+.bk-btn:hover {
+  background: #23232b;
+  color: #fff;
+}
+.bk-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.bk-btn.is-on {
+  background: var(--acid);
+  color: #000;
+  box-shadow: none;
+}
+.bk-btn.is-pink {
+  background: var(--pink);
+  color: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.bk .bk-btn:focus-visible,
+.bk input:focus-visible,
+.bk .bk-thumb:focus-visible,
+.bk .bk-hit:focus-visible {
+  outline: 3px solid var(--acid);
+  outline-offset: 2px;
+}
+.bk-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.bk-count {
+  min-width: 96px;
+  text-align: center;
+  font:
+    800 13px/1 ui-monospace,
+    'SF Mono',
+    Menlo,
+    monospace;
+  letter-spacing: 0.06em;
+  color: var(--acid);
+}
+.bk-sep {
+  width: 1px;
+  height: 22px;
+  background: #26262e;
+  margin: 0 4px;
+}
+.bk-zoomlabel {
+  font:
+    700 11px/1 ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--dim);
+  min-width: 38px;
+  text-align: center;
+}
+
+/* ── panels (thumbs, search, about, text) ─────────── */
+.bk-panel {
+  position: absolute;
+  z-index: 5;
+  inset: 0 0 auto auto;
+  top: 0;
+  bottom: 0;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: rgba(14, 14, 19, 0.97);
+  border-left: 1px solid #22222a;
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.5);
+  animation: bk-slide 0.18s ease-out;
+}
+.bk-panel.is-wide {
+  width: min(760px, 100%);
+}
+@keyframes bk-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-panel {
+    animation: none;
+  }
+}
+.bk-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 10px 18px;
+  border-bottom: 1px solid #1f1f26;
+}
+.bk-panel-head h2 {
+  margin: 0;
+  flex: 1;
+  font-family: 'Pip3', 'Londrina Solid', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 24px !important;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--pink);
+}
+.bk-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 18px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a30 transparent;
+}
+.bk-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.bk-thumb {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #1a1a20;
+  cursor: pointer;
+  aspect-ratio: 1;
+  overflow: hidden;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+}
+.bk-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.bk-thumb span {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font:
+    700 10px/1 ui-monospace,
+    Menlo,
+    monospace;
+}
+.bk-thumb.is-here {
+  box-shadow:
+    0 0 0 3px var(--acid),
+    0 6px 14px rgba(0, 0, 0, 0.4);
+}
+.bk-search {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #1c1c23;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+}
+.bk-search:focus {
+  box-shadow: inset 0 0 0 1.5px var(--acid);
+}
+.bk-meta {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.bk-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bk-hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin: 0 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: #17171d;
+  color: var(--tx);
+  font-size: 13.5px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.bk-hit:hover {
+  background: #202028;
+}
+.bk-hit b {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--acid);
+  font:
+    800 11px/1 ui-monospace,
+    Menlo,
+    monospace;
+  letter-spacing: 0.06em;
+}
+.bk-hit mark {
+  background: var(--pink);
+  color: #fff;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.bk-about p {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #dcd9cf;
+}
+.bk-about .bk-credit {
+  margin: 4px 0 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #15151b;
+  box-shadow: inset 0 0 0 1px #24242c;
+}
+.bk-about .bk-credit p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.bk-about .bk-credit p:first-child {
+  font-family: 'Pip3', 'Londrina Solid', system-ui, sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.bk-about .bk-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.bk-text h3 {
+  margin: 0 0 8px;
+  font:
+    800 11px/1 ui-monospace,
+    Menlo,
+    monospace;
+  letter-spacing: 0.14em;
+  color: var(--acid);
+}
+.bk-text pre {
+  margin: 0 0 22px;
+  white-space: pre-wrap;
+  font:
+    14px/1.55 Georgia,
+    'Times New Roman',
+    serif;
+  color: #e6e3da;
+}
+.bk-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.bk-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.bk-phone {
+  display: none !important;
+}
+@media (max-width: 640px) {
+  .bk-phone {
+    display: inline-flex !important;
+  }
+  .bk-desk {
+    display: none !important;
+  }
+  .bk {
+    height: max(520px, calc(100dvh - 120px));
+  }
+  .bk-head {
+    padding: 10px 14px 8px;
+    gap: 8px 12px;
+  }
+  .bk-by {
+    font-size: 10.5px;
+  }
+  .bk-bar {
+    gap: 4px;
+    /* clear the floating NOUN FM chip */
+    padding: 8px 8px 58px;
+  }
+  .bk-btn {
+    min-width: 34px;
+    height: 36px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  .bk-btn .bk-lbl {
+    display: none;
+  }
+  .bk-count {
+    min-width: 62px;
+    font-size: 12px;
+  }
+  .bk-sep {
+    display: none;
+  }
+  .bk-hint {
+    display: none;
+  }
+}

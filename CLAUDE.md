@@ -200,6 +200,39 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
   - **Train my voice.** 100 original sentences, local only. The booth exports an LJSpeech zip (22050 Hz mono 16-bit WAVs + `metadata.csv` + a free Piper/Colab README) via a store-only zip writer (`booth/zip.ts`).
   - **My voice model.** Load `.onnx` + `.onnx.json` (validated in `booth/piperConfig.ts`, kept in IndexedDB, never uploaded). A second `TtsEngine` runs it (`init-bytes`). Two switches, both off by default: `modelVoice` (callouts without a recording, and typed chat, in the player's voice) and `modelShare`. With `modelShare` on, chat lines become ephemeral clips: 8 s max, 1 per 5 s, 60/h, served for 10 min.
 
+### Books (Meme Value)
+
+`/books/meme-value` (alias `/memevalue`) is "MEME VALUE" by LIL 67 (the site owner's own book) as a flipbook, with an ART / CULTURE card (`public/home/covers/meme-value.webp`).
+- **Pages:** `public/books/meme-value/p001.webp…p252.webp` (1400 px, ~25 MB) plus `sm/` (700 px, for phones) and `pages.json` (page count + each page's text, for search, alt text and the TEXT panel). The PDF's covers and spreads are cropped to the trim and split, so the book is 252 square pages.
+- **Re-render:** get the PDF from memevalue.pinit.eth.limo (88 MB, never hosted here) and run `python3 scripts/books/render-meme-value.py <pdf>` from `packages/nouns-webapp` (needs poppler + Pillow).
+- **Reader:** `src/pages/Books/`. `bookMath.ts` is the pure part (views/spreads, the fold geometry, search) and is tested. `Flipbook.tsx` draws the page curl with nested transformed boxes only, no dependencies; reduced motion falls back to a fade. `?p=N` deep-links a page.
+- **License:** the book's Viral Public License stays in the book as page 2. The About panel credits it as printed ("LIL 67", "written and illustrated by 67 unless specified otherwise") and links the original and its PDF.
+
+### CC0 library
+
+- **Route:** `/cc0` ("CC0 LIBRARY", `src/pages/Cc0Library/`), opened in the NounOS navigator; catalog entry on the ART / CULTURE shelf, poster `public/home/covers/cc0-library.webp`.
+- **Sources** (`assets.ts` merges them; `useCc0Assets.ts` loads each on its own and tolerates failures):
+  - the curated archive: `public/cc0-archive/index.json` + `creators/*.json`, loaded by `src/cc0-archive` only when the page opens (~2.8 MB);
+  - cc0-lib.wtf's API (best-effort; its domain lapsed in Oct 2026, so it shows "offline");
+  - approved community uploads.
+- **Uploads** (`netlify/functions/cc0-uploads.ts`, rules shared with the form in `uploadRules.ts`):
+  - png / jpg / gif / webp / svg, mp3 / wav / ogg, glb / gltf; ≤ 10 MB, sent in 3 MB parts (`begin` → `part` → `finish`).
+  - Checks: magic bytes; SVGs with scripts, handlers, outside refs or DOCTYPEs are refused; a .gltf must embed its buffers. JPEG EXIF and PNG text chunks are stripped (WebP metadata is not).
+  - The CC0 consent box must be `true`. Rate limits are per IP hash. Stored in the Netlify Blobs store `cc0-uploads`.
+- **Serving:** `netlify/functions/cc0-file.ts` (streaming; `?id=`, `&dl=1` to download) serves only approved, visible files: a year of browser cache, 10 min at the CDN, Range supported.
+- **Moderation:**
+  - Uploads stay pending until an admin approves them. POST `admin-pending` lists pending and reported uploads. POST `admin-decide {id, approve: true|false}` publishes or deletes; `{id, hidden: true|false}` hides or unhides.
+  - Both need `X-World-Admin: $WORLD_ADMIN_TOKEN`; the same header lets an admin preview a pending file from `cc0-file`.
+  - Anyone can POST `report {id, reason}` on an approved upload (the detail panel's report button).
+
+### Nonsense (treasury flows)
+
+`/nonsense` (`src/components/TreasuryFlow/`) shows where Nouns DAO money comes from and goes, from `GET /api/treasury/flows` (version 2). The route (`nouns-api/src/api/routes/treasury.ts`) only reads tables; the logic is the pure builder `src/api/treasury/buildFlows.ts` and decoder `decode.ts` (tests: `cd packages/nouns-api && npx tsx --test src/api/treasury/*.test.ts`, real proposal calldata in `fixtures.ts`).
+- **Data.** In = winning auction bids (`nounsAuctionHouseV2` table). Out = executed proposals' actions decoded from the `transaction` table (ETH, ERC-20 `transfer`, USDC Payer `sendOrRegisterDebt`, Stream Factory `createStream`, Nouns transfers, ETH sent with a call) plus fork payouts from the `treasury_send` table (nouns.eth `ETHSent`/`ERC20Sent`; only the fork paths can call them). Streams count once (createStream minus what a cancel returned; the funding transfer is skipped). Timelock V1 ↔ nouns.eth moves, wraps/stakes/Token Buyer swaps (`convertedEth`), Payer top-ups and zero-value calls are not "out". USDC is never added to ETH; net = in − ETH out − ETH sent to the Token Buyer.
+- **Types (by rule, never from proposal text):** `treasury` (both timelocks), `nounders`, `subdao` (fork treasuries from `ExecuteFork`, known sub-DAOs, or a forward-verified `*.nouns.eth` primary name), `contract` (DAO contracts, or recipient code that isn't a Safe), `multisig` (Safe proxy code), `person` (no code; EIP-7702 counts as no code), `bidder` (auction winners who never got paid). `eth_getCode` is cached a day; ENS via `ReverseRecords.getNames`.
+- **Known addresses** live in one sourced table: `nouns-api/src/api/treasury/knownAddresses.ts`. nouns.eth is Timelock V2 `0xb1a3…ef71`; `0x0bc3…de10` is the legacy Timelock V1. Nounder rewards are counted with NounsToken's rule (id ≤ 1820, id % 10 == 0): `noun.mintedTo` always holds a treasury because the ERC721 mint goes 0x0 → owner → recipient.
+- The 3D view (`Explore3D.tsx`) is an optional explore mode; `Scene.tsx` is the wallet explorer's renderer, not this page's.
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.

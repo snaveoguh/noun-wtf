@@ -279,7 +279,11 @@ const COVERED_PATHS = new Set([
 ]);
 
 /** Posters whose file isn't named after the path. */
-const COVER_FILES: Partial<Record<string, string>> = { '/world/voice': 'voice-booth' };
+const COVER_FILES: Partial<Record<string, string>> = {
+  '/world/voice': 'voice-booth',
+  '/books/meme-value': 'meme-value',
+  '/cc0': 'cc0-library',
+};
 
 /** The poster for a catalog path, if it has one. */
 export function coverForPath(path: string): string | undefined {
