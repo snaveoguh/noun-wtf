@@ -6,7 +6,7 @@
 // length_scale 1.0, then slowed like tape (asetrate x0.94: slower and ~1.4
 // semitones deeper with no pitch-shift artifacts), low-shelf lift and a
 // small room, over a procedurally generated 86 BPM boom-bap bed (Rhodes
-// Fm9/Dbmaj7, swung hats, vinyl) that ducks under the voice. ~20 s. "DAO"
+// Fm9/Dbmaj7, swung hats, vinyl) that ducks under the voice. ~17 s. "DAO"
 // is fed to the model as "Dow" so it's said that way. The script:
 //
 //   In the year the DAO was captured... the whales took the treasury.
@@ -14,7 +14,7 @@
 //   No reserve. No gatekeepers.
 //   Free games. Free art. A free DAO. And eyes on the old one.
 //   Just Nouns.
-//   Welcome to noun dot W T F.   (fed as "noun. dot. double you, tee, eff.")
+//   Welcome to Nouns.
 
 // The file is public/home/vo-intro.mp3, set as the sizzle slide's `vo` (rows.ts).
 
@@ -23,7 +23,7 @@ export const VO_SPEAKER = 499; // LibriTTS-R speaker "2427" in the model's speak
 /** Length of public/home/vo-intro.mp3, s. While it plays the slide's clip is
  * restarted and slowed to last exactly as long, so voice and picture end
  * together instead of the clip looping back to scenes already seen. */
-export const VO_SECONDS = 19.96;
+export const VO_SECONDS = 17.06;
 
 /** Playback rate that stretches a clip of `clipSeconds` over the voice-over (never faster, at most 25% slower). */
 export function syncRate(clipSeconds: number): number {
