@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCallout, parseChatVoice } from '../../../net/Net';
+import { sentences } from '../piperText';
+import { lineKey, MODEL_VOICE, RIDER_VOICE } from '../ttsVoice';
 
 import { calloutId, datasetRows, metadataCsv, readme } from './dataset';
 import { type StoredClip } from './voiceDb';
@@ -53,6 +55,15 @@ describe('voice dataset', () => {
       expect(l).toMatch(
         /github\.com\/(rhasspy|OHF-Voice)\/|huggingface\.co\/datasets\/rhasspy\/|colab\.research\.google\.com/,
       );
+  });
+});
+
+describe('own model voice', () => {
+  it('uses the rider’s sentence pauses (and they are part of the cache key)', () => {
+    expect(MODEL_VOICE.gap).toBe(RIDER_VOICE.gap);
+    expect(MODEL_VOICE.pitch).toBe(0);
+    expect(sentences("Who's the goat?... Me.", MODEL_VOICE.gap).length).toBe(2);
+    expect(lineKey('x', MODEL_VOICE)).not.toBe(lineKey('x', { ...MODEL_VOICE, gap: 0.25 }));
   });
 });
 

@@ -18,7 +18,7 @@ import { myTag, voiceNet } from './audio/voice/booth/voiceSync';
 import { seedVoice } from './audio/voice/cast';
 import { RiderVoice } from './audio/voice/RiderVoice';
 import { TtsEngine } from './audio/voice/TtsEngine';
-import { hyped, ttsVoiceOf } from './audio/voice/ttsVoice';
+import { hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
 import { DeckSync } from './character/deckStore';
@@ -1662,7 +1662,7 @@ export class Game {
     this.voice.speak({
       text: res.text,
       voice: sv,
-      tts: hyped(ttsVoiceOf(sv)),
+      tts: { ...hyped(ttsVoiceOf(sv)), gap: RIDER_VOICE.gap },
       gain: hear.gain,
       pan: hear.pan,
     });
