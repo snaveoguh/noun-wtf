@@ -15,8 +15,8 @@ import { useEffect, useRef, useState } from 'react';
 import { cx } from '../osStore';
 
 import { shouldPlayBed } from './bed';
-import { courtBed, motif, playFile, unlockAudio, type Playback } from './sound';
-import { DUCKED, shouldStartVo, shouldStopVo, VO_CREDIT } from './voiceOver';
+import { audioRunning, courtBed, motif, playFile, unlockAudio, type Playback } from './sound';
+import { DUCKED, shouldStartVo, shouldStopVo, syncRate, VO_CREDIT } from './voiceOver';
 
 export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
@@ -55,6 +55,7 @@ export function ClipVideo({
   className,
   onPlaying,
   duck = false,
+  synced = false,
 }: {
   clip: Clip;
   onPlaying?: () => void;
@@ -62,6 +63,8 @@ export function ClipVideo({
   withSound: boolean;
   /** Something is talking over it: its own soundtrack drops right down. */
   duck?: boolean;
+  /** The voice-over just started: restart and stretch to end with it. */
+  synced?: boolean;
   focus?: string;
   className?: string;
 }) {
@@ -70,6 +73,28 @@ export function ClipVideo({
     const v = ref.current;
     if (v) v.volume = duck ? DUCKED : 1;
   }, [duck]);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    // While synced it plays once and holds its last frame (no loop back to
+    // scenes already seen) until the carousel moves on
+    v.loop = !synced;
+    if (!synced) {
+      v.playbackRate = 1;
+      return;
+    }
+    // The voice-over can start before the clip knows its length
+    const sync = () => {
+      v.currentTime = 0;
+      v.playbackRate = syncRate(v.duration);
+    };
+    if (Number.isFinite(v.duration)) {
+      sync();
+      return;
+    }
+    v.addEventListener('loadedmetadata', sync, { once: true });
+    return () => v.removeEventListener('loadedmetadata', sync);
+  }, [synced]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -158,6 +183,19 @@ export default function Hero({
   // if they mute, the slide changes or the hero goes off screen / the tab
   // hides. While it talks the carousel holds and the clip's own track ducks.
   const [voOn, setVoOn] = useState(false);
+  // Sound is on by default, but browsers keep audio locked until a gesture:
+  // say so next to the speaker until the first click / key unlocks it.
+  const [unlocked, setUnlocked] = useState(audioRunning);
+  useEffect(() => {
+    if (unlocked) return;
+    const on = () => void unlockAudio().then(ok => ok && setUnlocked(true));
+    window.addEventListener('pointerdown', on);
+    window.addEventListener('keydown', on);
+    return () => {
+      window.removeEventListener('pointerdown', on);
+      window.removeEventListener('keydown', on);
+    };
+  }, [unlocked]);
   const [voTail, setVoTail] = useState(-1); // the slide whose voice-over just ended
   const voPlayed = useRef(false);
   const vo = useRef<Playback | null>(null);
@@ -228,7 +266,7 @@ export default function Hero({
   useEffect(() => {
     if (paused || voOn) return;
     // Just finished the voice-over: a beat, then move on
-    const ms = voTail === idx ? 2500 : s.ms;
+    const ms = voTail === idx ? 300 : s.ms;
     const t = window.setTimeout(() => {
       setVoTail(-1);
       setIdx(i => (i + 1) % slides.length);
@@ -279,6 +317,7 @@ export default function Hero({
                   playing={live}
                   withSound={sound}
                   duck={voOn}
+                  synced={voOn}
                   focus={x.focus}
                 />
               ) : (
@@ -320,6 +359,11 @@ export default function Hero({
           </div>
         </div>
         <div className="nh-hero-side">
+          {sound && !unlocked && (
+            <span className="nh-tap-hint" aria-hidden>
+              click anywhere for sound
+            </span>
+          )}
           <button
             type="button"
             className={cx('nh-sound', sound && 'is-on')}
